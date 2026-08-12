@@ -29,6 +29,7 @@ Contents: [Where the rest of this chapter lives](#where-the-rest-of-this-chapter
 [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) ·
 [Shoreline integration](#shoreline-integration) ·
 [Transparency & pass ordering](#transparency--pass-ordering) ·
+[What to pre-cook](#what-to-pre-cook-and-what-to-recompute) ·
 [Engine-native water](#engine-native-water-the-ue-water-plugin-read-as-architecture) ·
 [Stylized water](#stylized-water-same-contracts-different-bands) · [Pitfalls](#pitfalls) ·
 [Sources & provenance → `12b`](12b-water-provenance.md)
@@ -2043,54 +2044,114 @@ Water is the classic hard transparency case, and the frame must be structured fo
 
 ## What to pre-cook, and what to recompute
 
-Water is where teams reach for lookup tables first and profile them last. The decision rule is
-one line: **tabulate what is expensive, low-dimensional, and independent of this frame's
-radiance.** If it depends on what is lit right now it is a per-frame pass, not a table; if it is
-cheap in closed form, evaluating beats fetching, because a texture fetch carries a latency a
-polynomial does not.
+The question that decides this is not *how expensive is it* — it is **how often does its input
+change, and how is it consumed**. Cost decides whether the saving is worth having; **cadence**
+decides whether a table is even correct, and **consumption** decides whether it helps. A rule
+built on cost alone mis-files half of this chapter.
 
-That splits this chapter's machinery four ways, and the boundaries are not where intuition puts
-them.
+Cadence is a ladder, not a switch, and every rung is populated in a shipping water renderer:
 
-| | What | Why it lands here |
+| Rung | Rebuilt | This chapter's inhabitants |
 |---|---|---|
-| **Simulate per frame** | The wave field (FFT cascade or Gerstner set, as displacement + slope targets); the caustic map | Both change with the water every frame. The caustic map is not a candidate *for* a table — [it already is the tier-2 precompute](#the-tier-ladder) |
-| **Static geometric table** | The gathers' form factors; the meniscus line's integral; single-scattering in a turbid slab | Expensive, two or three dimensions, and a function of geometry and angles rather than of what is lit |
-| **Constant, resolved at load** | The internal-reflection integrals `1 − 1/n²` and the vertical-receiver form; the diffuse Fresnel pair; band-integrated absorption | Scalars once `n` and the band edges are fixed. A table would be a one-texel texture |
-| **Reformulate, do not tabulate** | Fresnel; the sun's disc lobe; the roughness correction | Cheaper, or numerically safer, written out |
+| **Never** | offline, shipped as data | `k(ω,h)` from the dispersion relation ([shallow water](#the-physics-worth-stealing)) — Newton iterations that must never run per frame |
+| **On load** | once `n`, the band edges and the body are fixed | `1 − 1/n²` and the vertical-receiver form; the diffuse Fresnel pair; band-integrated `a`. These are **uniforms**, not textures |
+| **On a slow event** | when the body, the sun or the weather moves | the Water Info Texture; prefiltered reflections; anything with an **invalidation contract** |
+| **Per frame, reduced** | every frame, at low resolution or ¼ rate with reprojection | the sky/atmosphere LUT; caustics in most shipping engines |
+| **Per frame, full** | every frame | the wave field; the caustic map as [tier 2](#the-tier-ladder) |
+| **Per pixel** | never stored | Fresnel; the sun lobe; the roughness correction |
 
-Three of those need the reasoning, because each is a place where the obvious move is wrong.
+Two consumption tests sit beside the cadence one, and they are why things get baked that are not
+expensive:
 
-**A gather does not go in a table whole.** The integral it computes depends on the bed's radiance,
-which changes every frame, so tabulating the result bakes one lighting condition. What is static is
-the **geometric** half — the fraction of the hemisphere the receiver sees, as a function of its
-height above the bed, its orientation, and its distance to the edge. Two or three smooth
-dimensions. Multiply by the bed's mean radiance at runtime and carry the caustic modulation
-separately. Geometry in the table, light in the shader, and the split is what makes it transfer
-between scenes.
+- **Fusion.** The Water Info Texture is not tabulated because its parts are costly — they are not.
+  It is tabulated because it replaces many scattered lookups with one coherent sample. A rule that
+  prices only per-sample cost cannot see this.
+- **Divergence.** A term confined to a thin screen-space curve — the waterline, a shoreline — is
+  **divergence-bound, not ALU-bound**: it clips a few lanes of many warps and masks the rest. A
+  table does not fix that; running the term on a coherent band does, which is why the chapter puts
+  the meniscus on [a decal or a junction shader](#the-meniscus-line-where-reachability-cannot-fail)
+  and why the natural table there is a **1-D profile across the decal's width**, not a 3-D lookup.
 
-**The meniscus line is the strongest candidate in the whole model**, and for reasons worth naming
-because they generalise: it is expensive (an integral over the fillet's whole tilt range), genuinely
-low-dimensional (view elevation against the wall, sun azimuth against the wall's normal, local wave
-slope), and confined to a curve rather than an area, so the table is read along a thin locus and
-stays in cache. Cost concentrated on few pixels is the profile a table is *for*.
+### The three that surprise people
 
-**The sun's disc must be rewritten, not tabulated.** Pinning peak, width and flux to the disc
-simultaneously gives an exponent `n = 2/θ_s² − 1`, which is order 10⁵ — and `pow(cosθ, 1e5)` in
-fp32 is a catastrophe of cancellation near the peak, exactly where the term matters. The Gaussian
-in angle it converges to is the same lobe, evaluated safely, and it convolves with a slope
-distribution in closed form ([Pick the kernel](#pick-the-kernel-on-purpose-and-give-the-variance-a-receiver)).
-The same logic retires the other two: exact Fresnel is a handful of flops, and the roughness
-correction is *already* a fit — a closed-form table needing no memory.
+**A gather is not a table, and the obvious factorisation destroys it.** Nondimensionalised, the
+poolward gather over flat water is **scale-invariant** — a constant, not a surface — and the riser
+gather's closure has a closed form of a handful of flops (`12a` §8). What is worth storing is not a
+scalar form factor but the **radial kernel, self-similar in `ρ/q`**, one dimension after
+nondimensionalisation, applied as a *filtered lookup of the bed*. The tempting factorisation —
+form factor × mean bed radiance — is exact only for uniform `L`, and the gather's entire value is
+that it is near-field-dominated: half its irradiance arrives from inside 30 cm, and it carries
+11–18% of the bed's cell-scale contrast (`D`). Factor out a mean and you have thrown away exactly
+the part you built it for.
 
-**The trap, and it is the one that wastes a month.** A table fitted to one body of water is not a
-table, it is a bake. Parameterise dimensionlessly wherever the physics allows — the meniscus in
-units of the capillary length `a = √(σ/ρg)`, the gathers in units of depth, scattering in optical
-depth `c·L` rather than metres — or the table will not survive the move from a pool to the sea, and
-the failure will look like an art problem rather than a parameterisation one. **Generate them from
-a reference implementation rather than by hand**, and the error is then measurable in the same
-quantities the reference already reports, which is what tells you whether the parameterisation
-transferred.
+**The caustic map is not a table, and tier 0 is the cautionary tale.** Tier 2 is a per-frame
+render-to-texture — one light-view pass over the wave grid — not a precompute. The *tabulated*
+alternative is tier 0, a scrolling authored texture, and the ladder already prices what that bake
+costs: **the caustics keep churning when the water goes calm**, because what was baked out was the
+coupling to the surface. That is the sharpest illustration in the chapter of the real risk — a bake
+does not lose accuracy, it loses a *correlation*, and correlations are what the eye reads.
+
+**The sun's disc must be rewritten — but not for the reason you would guess.** Pinning peak, width
+and flux to the disc simultaneously gives `n = 2/θ_s² − 1 ≈ 9.3×10⁴` (`P`, `12a` §6). In **fp32
+this is fine**: `pow(dot, n)` carries ~0.14% relative error across the lobe (`D`), and swapping it
+for a Gaussian in `acos(dot)` buys **nothing** — measured at 0.138% against 0.137%. The problem is
+elsewhere and it is twofold.
+
+- **The angle, not the function.** `x ↦ xⁿ` at `x ≈ 1` has condition number `n`, so 1e-6 of
+  sloppiness in `cosθ` — an unnormalised half-vector, a packed normal, an interpolated varying —
+  becomes a median 6% error with a 50% tail (`D`). Take the angle from the **chord**,
+  `‖H − L‖ = 2sin(θ/2)`, which keeps full relative precision: 0.0009% against 0.137%, a factor of
+  500 (`D`). *Compute the angle from the difference of unit vectors, never from their dot product.*
+- **fp16 is a genuine catastrophe.** The lobe's e-folding half-width is `1 − cosθ = 1/n = 1.07×10⁻⁵`,
+  which is **0.022 of a single fp16 step below 1.0** (ulp = 2⁻¹¹). So `half(cos θ_s)` rounds to
+  exactly 1, one step down evaluates to ~10⁻²⁰, and the sun becomes **binary**: full brightness or
+  nothing, with no disc between. Half-precision varyings and packed normals are routine, which is
+  what makes this the version of the claim that bites.
+
+### Format, precision, and the bug everyone ships once
+
+- **A one-texel table is a uniform.** "Resolved on load" means a material constant; making it a
+  texture costs a fetch to learn nothing.
+- **unorm8 is 0.4% per step.** On a term multiplied by a solar radiance of order 10⁵ that terraces
+  visibly. R16F is the floor for anything feeding a specular path.
+- **The half-texel remap.** A bilinear table must be sampled over `[0.5/N, 1 − 0.5/N]`, or its
+  endpoints are wrong by half a texel. This is the most-shipped LUT bug there is, and it silently
+  violates this chapter's own requirement that a filtered path
+  [degenerate exactly to the unfiltered one](#pick-the-kernel-on-purpose-and-give-the-variance-a-receiver)
+  at the limit.
+- **Index tables on quantities that are already prefiltered.** A table indexed by instantaneous
+  slope aliases *in its own axis*, and its mip chain knows nothing about the pixel's footprint.
+  Index on the **variance tensor**, not the slope — the same discipline the chapter applies to
+  shading, applied to the table's argument.
+
+### Underwater, a load-time constant is two constants
+
+Every entry in the *on load* rung is medium-dependent, and the submerged view is not an exception
+to be handled later — it changes the numbers. The solar disc **refracts**: its half-angle goes
+0.265° → **0.199°**, so `Ω_sun` shrinks by exactly `n² = 1.782`, the peak radiance rises by the
+same factor, and the lobe exponent rises to **1.67×10⁵** (`D`). A renderer that resolves these once
+at load and reuses them below the surface is wrong by that factor everywhere.
+
+### Generating them, and the trap
+
+A table fitted to one body of water is not a table, it is a **bake**. Nondimensionalise wherever
+the physics allows — the meniscus in capillary lengths `a = √(σ/ρg)`, the gathers in units of
+depth — or it will not survive the move from a pool to the sea, and the failure will read as an art
+problem rather than a parameterisation one.
+
+**Scattering needs more than optical depth.** `τ` alone does not transfer: a treated pool and milk
+at the same `τ` look opposite, because what separates them is the single-scattering albedo
+`ω₀ = b/(a + b)`, 0.00 against 0.98. The transferable index is `(τ, ω₀, g)` plus the boundary
+albedo — which is the same
+[count of free parameters](#water-body-optical-identity-where-sigma-actually-comes-from) the
+chapter uses to separate Case 1 from Case 2 water. And take `τ` from the **right** coefficient: `c`
+for a sharp sightline, `K_d` for the diffuse column, never one constant for both.
+
+**Generate from a reference implementation, and close the loop.** A generated table is not finished
+when it looks right; it is finished when it **reproduces the closed form at its sample points** and
+its *interpolation* error is bounded against a tolerance justified from the estimator's own error —
+the same standard this chapter applies to every other measurement. That check is what tells you
+whether the parameterisation transferred, or whether you have shipped a bake.
 
 ## Engine-native water: the UE Water plugin, read as architecture
 
