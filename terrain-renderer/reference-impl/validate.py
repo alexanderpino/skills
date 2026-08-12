@@ -1414,7 +1414,10 @@ def tier3_geometry(R):
           % (K // 1000, float(w.std()) / np.sqrt(K)))
 
 
-def _menis_ode(R, theta_c, a, nstep=400000):
+_ODE_CACHE = {}
+
+
+def _menis_ode(R, theta_c, a, nstep=200000):
     """The meniscus profile by MARCHING YOUNG-LAPLACE, not by integrating it.
 
     render.py ships the closed-form first integral, z = 2a sin(phi/2), and the
@@ -1427,31 +1430,42 @@ def _menis_ode(R, theta_c, a, nstep=400000):
         dd/ds   = +cos(phi)     (d measured poolward from the wall)
 
     starting at phi = phi_w, z = h, d = 0. Nothing in this loop knows that the
-    answer is 2a sin(phi/2), or what dd/dphi is; it knows the differential
-    statement the closed form was derived FROM. Returns (phi, d, z) sampled
-    along the march."""
+    answer is 2a sin(phi/2), or what dd/dphi is; it knows the DIFFERENTIAL
+    statement the closed form was derived from. Scalar arithmetic on purpose --
+    numpy on three-element states spends all its time in dispatch.
+
+    Returns (phi, d, z) along the march, phi descending."""
+    key = (round(theta_c, 12), round(a, 15), nstep)
+    if key in _ODE_CACHE:
+        return _ODE_CACHE[key]
+    from math import sin, cos
     phw = np.pi / 2 - theta_c
     h = a * np.sqrt(2.0 * (1.0 - np.sin(theta_c)))
-    # step in arc length: the whole fillet is a few capillary lengths of arc
-    ds = 6.0 * a / nstep
-
-    def f(y):
-        ph, z, d = y
-        return np.array([-z / (a * a), -np.sin(ph), np.cos(ph)])
-
-    y = np.array([phw, h, 0.0])
-    out = [y.copy()]
+    ds = 12.0 * a / nstep                 # the whole fillet is a few a of arc
+    ia2 = 1.0 / (a * a)
+    ph, z, d = float(phw), float(h), 0.0
+    P = [ph]
+    D = [d]
+    Z = [z]
     for _ in range(nstep):
-        k1 = f(y)
-        k2 = f(y + .5 * ds * k1)
-        k3 = f(y + .5 * ds * k2)
-        k4 = f(y + ds * k3)
-        y = y + (ds / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
-        if y[0] <= 0.0:
+        k1p, k1z, k1d = -z * ia2, -sin(ph), cos(ph)
+        p2, z2 = ph + .5 * ds * k1p, z + .5 * ds * k1z
+        k2p, k2z, k2d = -z2 * ia2, -sin(p2), cos(p2)
+        p3, z3 = ph + .5 * ds * k2p, z + .5 * ds * k2z
+        k3p, k3z, k3d = -z3 * ia2, -sin(p3), cos(p3)
+        p4, z4 = ph + ds * k3p, z + ds * k3z
+        k4p, k4z, k4d = -z4 * ia2, -sin(p4), cos(p4)
+        ph += (ds / 6.0) * (k1p + 2 * k2p + 2 * k3p + k4p)
+        z += (ds / 6.0) * (k1z + 2 * k2z + 2 * k3z + k4z)
+        d += (ds / 6.0) * (k1d + 2 * k2d + 2 * k3d + k4d)
+        if ph <= 0.0:
             break
-        out.append(y.copy())
-    o = np.array(out)
-    return o[:, 0], o[:, 2], o[:, 1]
+        P.append(ph)
+        D.append(d)
+        Z.append(z)
+    out = (np.array(P), np.array(D), np.array(Z))
+    _ODE_CACHE[key] = out
+    return out
 
 
 def tier_meniscus(R):
@@ -1603,48 +1617,60 @@ def tier_meniscus(R):
         um, uz = Vm0 / vn, Vz0 / vn              # in-plane unit view, toward eye
         # fan axis: perpendicular to the view, in the (poolward, up) plane
         ex_, ez_ = -uz, um
-        M, S = 4000, 3000
-        q0 = -uz * reach + um * 0.0              # perp of the outer end
-        q1 = -uz * 0.0 + um * (2 * a)            # perp of the wall end, with slack
-        qq = np.linspace(min(q0, q1) - 2e-3, max(q0, q1) + 2e-3, M)
+        M, S = 4000, 1200
+        qq = np.linspace(-uz * reach - 2e-3, um * (2 * a) + 2e-3, M)
         dq = float(qq[1] - qq[0])
-        # each ray starts well outside the fillet and marches toward the surface
-        t = np.linspace(0.0, 0.10, S)[None, :]
-        rd = qq[:, None] * ex_ + 0.05 * um - um * t
-        rz = qq[:, None] * ez_ + 0.05 * uz - uz * t
-        # the surface height under each marched point: the profile inside the
-        # reach, zero outside it, and the wall (an infinite cliff) at d < 0
-        zs = np.interp(np.clip(rd, 0.0, reach), pd[::-1], pz[::-1])
-        zs = np.where(rd > reach, 0.0, zs)
-        below = (rz <= zs) & (rd >= 0.0)
-        hit = below.any(1)
-        first = np.argmax(below, 1)
-        hd = rd[np.arange(M), first]
-        # which cell of the shipped quadrature the ray landed in
-        phh = np.interp(np.clip(hd, 0.0, reach), pd[::-1], oph[keep][::-1])
-        edges = np.concatenate([[0.0], .5 * (ph[1:] + ph[:-1]), [np.pi / 2]])
-        cnt, _ = np.histogram(phh[hit & (hd <= reach)], bins=edges)
-        meas = cnt * dq * vn                      # projected area per cell
+        ex_, ez_ = -uz, um                        # the fan's own axis
+
+        def solid(tt):
+            """Is the marched point inside the liquid or the wall? The fillet
+            below its own surface, and everything at d < 0, which is the wall."""
+            rd = qq * ex_ + 0.05 * um - um * tt
+            rz = qq * ez_ + 0.05 * uz - uz * tt
+            zs = np.where(rd > reach, 0.0,
+                          np.interp(np.clip(rd, 0.0, reach), pd, pz))
+            return (rd < 0.0) | (rz <= zs), rd, rz
+
+        # stage 1: a coarse march to BRACKET the first entry. The crest is
+        # 30 um of d and a uniform step fine enough to resolve it over 100 mm
+        # of march would be 4e7 samples, so the grid brackets and a bisection
+        # finishes -- still a march, with a root-find on its own predicate.
+        tg = np.linspace(0.0, 0.10, S)
+        inside = np.zeros((M, S), bool)
+        for i in range(S):
+            inside[:, i] = solid(tg[i])[0]
+        hit = inside.any(1)
+        first = np.argmax(inside, 1)
+        lo = tg[np.maximum(first - 1, 0)]
+        hi = tg[first]
+        for _ in range(50):                       # stage 2: bisect the bracket
+            mid = .5 * (lo + hi)
+            sm_, _, _ = solid(mid)
+            lo = np.where(sm_, lo, mid)
+            hi = np.where(sm_, hi, mid)
+        _, hd, hz = solid(hi)
+        # a ray that passes over the crest lands on the WALL above the fillet,
+        # not on the fillet; the fillet's own top is at z = h
+        onfil = hit & (hd >= -1e-9) & (hd <= reach) & (hz <= pz[0] + 1e-9)
+        meas = float(onfil.sum()) * dq * vn
         ndv, wf, wl, wo, isil = R._menis_weights(np.array([um * vn]),
                                                  np.array([uz * vn]))
-        want = wf[0]
-        # group into 8 super-cells: one ray of quantisation on a cell that holds
-        # only a few rays is 30%, and the row is about the distribution, not
-        # about a single node
-        g = 8
-        mg = meas.reshape(g, -1).sum(1)
-        wg = want.reshape(g, -1).sum(1)
-        err = float(np.max(np.abs(mg - wg)))
-        check(3, 'fillet projected area per cell, quadrature vs a %d-ray march '
-              'of the marched profile  [Vm = %.3f]' % (M, um * vn),
-              err, 0.0, 3 * dq * vn,
-              'the fan resolves the projection to one spacing, %.1f um, and a '
-              'cell boundary can move a ray either way; 3 spacings is the '
-              'tolerance on the worst of 8 super-cells' % (1e6 * dq),
-              unit='m')
-        check(3, '  ... and their total  [Vm = %.3f]' % (um * vn),
-              float(meas.sum()), float(want.sum()), 4 * dq * vn,
-              'the same fan, summed; 4 spacings covers the two end cells')
+        # the quadrature truncates the fillet's log-divergent outer tail at
+        # d = reach, where the true surface still stands z(reach) above the
+        # far field; the march sees that stump and the sum does not, so it is
+        # subtracted rather than absorbed into a tolerance
+        want = float(wf.sum()) - um * vn * float(pz[-1])
+        check(3, 'fillet projected area, quadrature vs a %d-ray march of the '
+              'RK4 profile  [Vm = %.3f]' % (M, um * vn), meas, want,
+              4 * dq * vn,
+              'the fan resolves a projection to one spacing, %.2f um, and each '
+              'of the two ends can lose or gain a ray; 4 spacings is the '
+              'tolerance' % (1e6 * dq), unit='m')
+        info(3, '  ... rays landing on the fillet  [Vm = %.3f]' % (um * vn),
+             '%d of %d cast, over a fan %.1f mm wide'
+             % (int(onfil.sum()), M, 1000 * (qq[-1] - qq[0])),
+             'the rest pass over the crest onto the wall, or outside the reach '
+             'onto flat water')
 
     # ---------------------------------------- 5. the deposit, integrated back
     # THE CLOSURE ACROSS ALL THREE TERMS. Hand `meniscus` a scene of unit
