@@ -539,3 +539,76 @@ distinguishable —
 Render the geometry first and report the split. Do not adjust anything until the
 two candidates have been separated — this is precisely the arbitration section C
 needed in wave 4 and got, and the same discipline applies.
+
+### J2 · A ninth photograph, and it is the first calibrated one since intake
+
+> Supplied with a **place, date and time**: Aljezur, 2026-08-12, **15:28 WEST**.
+> That single line changes its status. The seventh and eighth frames are visual
+> readings; this one has a sun that can be computed, so it can carry numbers.
+>
+> Shot from higher again, with a parasol occupying the left of the frame. It
+> contains, in one exposure: sunlit water, **the shade sail's shadow on the
+> water**, the submerged wall, the coping, and a return fitting.
+
+**The sun, computed for that place and time** (NOAA position, Bennett refraction,
+Kasten–Young air mass):
+
+| | elevation | azimuth | air mass |
+|---|---|---|---|
+| intake photographs, 18:41 WEST | 21.0° | 273.75° (W) | 2.77 |
+| **this frame, 15:28 WEST** | **57.22°** | **233.96°** (SW) | **1.189** |
+
+1.80 h past solar noon, hour angle +26.9°. Shadows run toward bearing 54.0° at
+0.64 × height — checkable against the parasol's own shadow in the frame.
+
+**What this does to the comparison, quantified rather than waved at.** The two
+suns are not interchangeable, and the differences run in known directions:
+
+- The sun enters the water at **32.8°** incidence here against 69.0° at intake, so
+  **97.78%** of the beam gets in against 87.74% — a factor 1.11 in the water's
+  favour that the deck does not get.
+- Its slant path to a 1.40 m bed is **1.53 m** against 1.96 m, worth a further
+  1.12× in red.
+- Horizontal irradiance rises with both `sin h` and the thinner air, but a deck
+  and a water surface are both horizontal, so **that part cancels in any
+  water-to-deck ratio** and may not be invoked to explain one.
+
+Together: roughly **1.25×**, and the water-to-stone gap measured against the
+render is far larger than that. The confounds do not close it.
+
+**The air mass runs the wrong way for the render, which strengthens the finding.**
+At AM 1.19 this sun is near white; the render's illuminant is `SUN_COL =
+(1.000, 0.892, 0.674)`, golden at AM 2.77, i.e. **1.48× richer in red relative to
+blue**. A redder illuminant should give redder water. The render's water is
+*less* red than this photograph's. The confound therefore makes the discrepancy
+harder to explain, not easier.
+
+**A confound that must be stated before any chromaticity is argued from these
+frames:** they are phone photographs with automatic white balance, and a scene
+dominated by cyan water will be pushed toward neutral. **Absolute channel ratios
+read off them are not evidence.** What survives white balance and exposure alike
+is a *within-frame* ratio, and this frame offers three:
+
+1. **lit water / shaded water** — the shade sail's own shadow, in the same
+   exposure. This is section A's "roughly half the lit value, not a dark hole",
+   now with both terms in one frame instead of a recollection.
+2. **water / submerged wall** — both seen through water, so the interface and the
+   `n²` cancel and what is left is the two albedos and two path lengths.
+3. **water / dry freeboard band** — same pigment, one with a water path and one
+   without. The band was established last round as a free calibration target: no
+   water path, no interface, no `n²`.
+
+Use these three. Do not argue from an absolute sRGB triple read off a phone.
+
+**The decisive experiment this photograph makes possible.** The scene is built for
+the intake sun. Render it **at this frame's sun instead** — 57.22° elevation,
+233.96° azimuth, air mass 1.189 — changing nothing but the sun, and compare. It
+separates the two candidates named in J cleanly:
+
+- if the pale water appears, the transport was right and the gap was illumination
+  and geometry all along;
+- if it stays dark, the gap is transport, and no camera move will fix it.
+
+Either way the answer arrives without a single constant being touched, which is
+the only way this project is allowed to arrive at it. **Report both renders side
+by side with the three within-frame ratios above measured on each.**
