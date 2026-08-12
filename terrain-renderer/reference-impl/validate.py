@@ -164,6 +164,14 @@ REQUIRED = [
     'XW0', 'XW1', 'YW0', 'YW1', 'pool_sdf_grad',
     'MENIS_FOLD_TOL', '_menis_fold_guard',
     'stone_vis', 'sun_vis', 'coping_vis', 'SBUL', 'COPW', 'ZD', 'ZLIP',
+    # the camera under the water: the interface crossed in the gaining
+    # direction, the tracer that is allowed to look up, and the frame the
+    # window's rim is measured off
+    'into_water', 'submerged_radiance', 'scene_hit_under', '_cyl_entry_any',
+    'uw_interface', 'uw_shade', 'uw_render', 'uw_dirs', 'uw_pixel_dirs',
+    'uw_project', 'UW_EYE', 'UW_TC', 'UW_TSUN', 'UW_SPREAD', 'UW_FOV',
+    'UW_TF', 'UW_PIXANG', 'INSCAT', 'INSCAT_K', 'W', 'H', 'SS',
+    'normal_from_grad',
 ]
 
 
@@ -2547,6 +2555,19 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
   TESTED ONLY AGAINST ITSELF, and would need a second implementation
     * The whole camera pass: projection, subsample grid, adaptive edge refine,
       the spectral Latin square. Nothing here renders a pixel.
+    * The underwater camera's RADIANCE, as against its geometry. The window's
+      half angle is measured off the frame's own ray DIRECTIONS, the interface
+      against closed forms, and the tracer against a march -- but no row here
+      reads a wall map, so nothing external says the mirrored twin shows the
+      right wall at the right place. What checks that is render.py's own
+      waterline measurement, which walks a column across the north wall's
+      waterline and reports the image, the wall and the step between them; it
+      is a consistency argument, not an external one.
+    * Two `?` in that pass, both named in render.py and neither testable here:
+      the world above the water is `sky()` alone, so the outermost ~0.2 deg of
+      the window shows sky where a photograph shows the coping and the deck;
+      and the unresolved slope variance is not fed to a refracted lobe, though
+      the footprint that generates it is measured every run.
     * The shade sail's shadow map, the freeboard band, the waterline, the deck
       and liner gathers. (The coping's height-field march is no longer in this
       list: `stone_vis` is now checked against a 2 mm shadow march of the same
@@ -2605,6 +2626,275 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
 """
 
 
+# ======================== TIER 1 / 3: THE CAMERA UNDER THE WATER
+# The pass that flips the assert. Every row here is about something that could
+# not be reached from any call site before it existed: `eta > 1`, `refract()`'s
+# null return, and the interface crossed in the GAINING direction.
+#
+# THE TRAP THIS FILE HAS ALREADY BEEN CAUGHT IN ONCE is two "independent
+# methods" transcribed from one comment (TIR_VERT, and both rows were wrong
+# together). So each pair below is named with what it does NOT share:
+#   * the window's half angle is measured off the FRAME's own ray directions
+#     through render.py's `is_tir`, and compared with asin(1/n) -- a formula
+#     that appears nowhere in the pass;
+#   * the onset of the mirror regime is bisected on `refract()`'s null return
+#     and compared with a scan of the exact reflectance reaching 1 -- one solves
+#     for cos t and tests its sign, the other forms amplitude ratios;
+#   * the n^2 gain is composed through render.py's `into_water` and
+#     `uw_interface` on the water side, and closed against a hemispherical
+#     integral of THIS file's own `fresnel_exact` on the air side. The two share
+#     the three indices and nothing else.
+def tier_underwater(R):
+    n = R.IOR
+
+    # ---- the sibling tracer did not become a second opinion ------------------
+    # `scene_hit_under` handles rays of either sign; on the downgoing half it
+    # must reproduce `scene_hit` EXACTLY, or the mirrored twin and the hero's
+    # own bed would be two different pools.
+    rng = np.random.default_rng(20260812)
+    N = 120000
+    d = rng.normal(size=(N, 3))
+    d /= np.linalg.norm(d, axis=1, keepdims=True)
+    d[:, 2] = -np.abs(d[:, 2])
+    px = rng.uniform(R.XW0 + 1e-3, R.XW1 - 1e-3, N)
+    py = rng.uniform(R.YW0 + 1e-3, R.YW1 - 1e-3, N)
+    for lbl, pz in (('from the surface', 0.0),
+                    ('from mid-depth', rng.uniform(-1.3, -0.05, N))):
+        a = R.scene_hit(px, py, d[:, 0], d[:, 1], d[:, 2], pz)
+        b = R.scene_hit_under(px, py, pz, d[:, 0], d[:, 1], d[:, 2])
+        same = all(np.array_equal(np.asarray(a[k]), np.asarray(b[k]))
+                   for k in range(5))
+        check(1, 'scene_hit_under == scene_hit, downgoing %s' % lbl,
+              float(same), 1.0, 0.0,
+              'the sibling must reproduce the five-plane solve bit for bit on '
+              'the half it shares -- id, u, v, distance and cylinder, over '
+              '120000 random rays. No tolerance: equality or a bug')
+
+    # ---- and its UPGOING half against a brute-force march --------------------
+    # The half no existing code covers, so it gets the treatment `scene_hit`
+    # itself gets: a 0.5 mm march of the water body's own definition (inside the
+    # walls, under the surface, over `bed_z`) against the analytic solve.
+    M = 20000
+    dm = rng.normal(size=(M, 3))
+    dm /= np.linalg.norm(dm, axis=1, keepdims=True)
+    qx = rng.uniform(R.XW0 + .02, R.XW1 - .02, M)
+    qy = rng.uniform(R.YW0 + .02, R.YW1 - .02, M)
+    qz = rng.uniform(-1.35, -0.02, M)
+    ok = qz > R.bed_z(qx, qy) + .02
+    qx, qy, qz, dm = qx[ok], qy[ok], qz[ok], dm[ok]
+    sid, _u, _v, sm, _c = R.scene_hit_under(qx, qy, qz, dm[:, 0], dm[:, 1], dm[:, 2])
+    step = 5e-4
+    tm = np.full(qx.size, np.inf)
+    alive = np.ones(qx.size, bool)
+    for i in range(1, int(9.0 / step)):
+        t = i * step
+        x, y, z = qx + dm[:, 0] * t, qy + dm[:, 1] * t, qz + dm[:, 2] * t
+        out = alive & ~((x > R.XW0) & (x < R.XW1) & (y > R.YW0) & (y < R.YW1)
+                        & (z < 0.0) & (z > R.bed_z(x, y)))
+        tm[out] = t
+        alive &= ~out
+        if not alive.any():
+            break
+    err = np.abs(tm - sm)
+    check(3, 'scene_hit_under vs a 0.5 mm march of the water body',
+          float(np.percentile(err, 99.9)), 0.5 * step, 0.5 * step,
+          'a forward march overshoots by half a step on average and one step at '
+          'worst, so the p99.9 is compared against half a step with half a step '
+          'of slack. The p100 is not used: a ray tangent to a riser at exactly '
+          'the cap height is a measure-zero disagreement between two exact '
+          'solids, and 1 ray in 36000 finds one', 'm')
+    info(3, '  ... the same march, median and worst',
+         'median %.4f mm | max %.1f mm | %d rays, %.0f%% of them upgoing'
+         % (1000 * np.median(err), 1000 * err.max(), qx.size,
+            100 * (dm[:, 2] > 0).mean()),
+         'the median is the march\'s own half-step; the max is the tangency')
+    info(1, '  ... what an upgoing ray can now hit',
+         'surface %.1f%% | riser %.1f%% | bed %.1f%% | walls %.1f%%'
+         % (100 * (sid == 6).mean(), 100 * (sid == 5).mean(),
+            100 * (sid == 0).mean(), 100 * ((sid >= 1) & (sid <= 4)).mean()),
+         'id 6 is the new one -- the still surface seen from below, which is '
+         'where a ray leaves the tracer and meets the interface')
+
+    # ---- THE WINDOW'S HALF ANGLE, OFF THE FRAME'S OWN GEOMETRY --------------
+    # No formula enters this. Take the camera's own ray directions, flat water,
+    # and ask render.py's `uw_interface` -- i.e. `refract` and `is_tir` -- which
+    # of them found a mirror. The rim is then bracketed between the steepest ray
+    # that still transmitted and the shallowest that did not, and asin(1/n) has
+    # to lie inside that bracket. The bracket's width is the frame's own angular
+    # sampling and nothing else, which is what makes this a measurement of the
+    # renderer rather than of the tolerance.
+    W_, H_, SS_ = R.W, R.H, R.SS
+    jj = np.arange(0, W_ * H_, 7)                  # a coprime stride: all rows
+    dv = R.uw_pixel_dirs(jj)
+    pol = np.degrees(np.arccos(np.clip(dv[:, 2], -1, 1)))
+    keep = (dv[:, 2] > 0) & (np.abs(pol - np.degrees(np.arcsin(1 / n[1]))) < 3.0)
+    dv, pol = dv[keep], pol[keep]
+    z0 = np.zeros(dv.shape[0])
+    nz0 = R.normal_from_grad(z0, z0)
+    pixang = np.degrees(R.UW_PIXANG)
+    mids = []
+    for c, nm in enumerate('RGB'):
+        tir = R.uw_interface(dv, nz0[0], nz0[1], nz0[2],
+                             np.full(dv.shape[0], n[c]), c)[3]
+        lo, hi = pol[~tir].max(), pol[tir].min()
+        mids.append(.5 * (lo + hi))
+        tc = np.degrees(np.arcsin(1.0 / n[c]))
+        check(1, 'Snell window off the frame == asin(1/n)  [%s]' % nm,
+              .5 * (lo + hi), tc, max(.5 * (hi - lo), 1e-9),
+              'the rim bracketed by the frame\'s own rays -- the steepest that '
+              'transmitted (%.5f deg) and the shallowest that did not (%.5f) -- '
+              'against the closed form. The tolerance IS the bracket, i.e. the '
+              'frame\'s angular sampling; it is not a free parameter and it '
+              'shrinks if the frame is rendered finer' % (lo, hi), 'deg')
+    check(1, 'the rim\'s dispersive spread, red - blue, off the frame',
+          mids[0] - mids[2],
+          np.degrees(np.arcsin(1 / n[0]) - np.arcsin(1 / n[2])), 2 * pixang,
+          'the difference of two bracket midpoints, each good to half the '
+          'frame\'s pixel angle (%.5f deg)' % pixang, 'deg')
+    info(1, '  ... the three rims and the README\'s figures',
+         '%s deg against 48.6551 / 48.5190 / 48.2683'
+         % np.round(np.degrees(np.arcsin(1 / n)), 4),
+         'the same three constants that put the fringing on the bed caustics, '
+         'used on a hard edge instead of a soft one')
+
+    # ---- THE MIRROR REGIME IS TOTAL ----------------------------------------
+    tirall = R.uw_interface(dv, nz0[0], nz0[1], nz0[2],
+                            np.full(dv.shape[0], n[1]), 1)
+    check(1, 'past the rim the reflectance is exactly 1, with no partial regime',
+          float(tirall[4][tirall[3]].min()), 1.0, 0.0,
+          'section G: "there is no partial regime out there". Every ray '
+          '`is_tir` flags must carry R = 1 identically; no tolerance')
+    info(1, '  ... and how close it gets from the transmitting side',
+         'max R below the rim %.6f, at %.4f deg'
+         % (tirall[4][~tirall[3]].max(),
+            pol[~tirall[3]][np.argmax(tirall[4][~tirall[3]])]),
+         'the rim is continuous in radiance, not a step: R rises to 1 like '
+         'sqrt(theta_c - theta), so the transmitted column fades rather than '
+         'being cut. What is discontinuous there is the DERIVATIVE')
+
+    # ---- THE ONSET, FROM TWO FUNCTIONS THAT SHARE NO LINE -------------------
+    # The green band already carries this row in tier1_snell; here it is run for
+    # all three, through the shading path's own entry point rather than through
+    # `refract` directly, so the pass cannot lose the branch by wrapping it.
+    fr = np.linspace(0.0, np.pi / 2, 4000001)
+    for c, nm in enumerate('RGB'):
+        lo_, hi_ = 0.0, np.pi / 2
+        for _ in range(200):
+            mid = .5 * (lo_ + hi_)
+            dd = np.array([[np.sin(mid), 0.0, np.cos(mid)]])
+            t_ = R.uw_interface(dd, np.zeros(1), np.zeros(1), np.ones(1),
+                                np.full(1, n[c]), c)
+            lo_, hi_ = (mid, hi_) if not t_[3][0] else (lo_, mid)
+        rr_ = fresnel_exact(np.cos(fr), 1.0 / n[c])[0]
+        onset = float(fr[int(np.argmax(rr_ >= 1.0 - 1e-15))])
+        check(1, 'uw_interface TIR onset == where exact Fresnel reaches 1  [%s]'
+              % nm, np.degrees(.5 * (lo_ + hi_)), np.degrees(onset), 1e-4,
+              'a bisection on the pass\'s own null return against a 4M-point '
+              'scan of the exact water->air reflectance. Different code, and '
+              'neither of them contains asin(1/n). 1e-4 deg is the scan\'s grid',
+              'deg')
+
+    # ---- REVERSIBILITY, WHICH IS WHY THERE IS ONLY ONE FRESNEL IN THE FILE --
+    # `uw_interface` gets the INTERNAL reflectance out of the file's EXTERNAL
+    # `fresnel` by evaluating it at the conjugate air-side angle. If that
+    # identity failed, the whole window would carry the wrong weight.
+    th = np.linspace(1e-4, np.arcsin(1 / n[1]) - 1e-5, 20001)
+    dvr = np.stack([np.sin(th), np.zeros_like(th), np.cos(th)], 1)
+    zz = np.zeros(th.size)
+    Rw = R.uw_interface(dvr, zz, zz, np.ones(th.size),
+                        np.full(th.size, n[1]), 1)[4]
+    ci = np.cos(th)
+    sa = n[1] * np.sin(th)
+    ca = np.sqrt(np.maximum(1 - sa ** 2, 0.))
+    rs = ((n[1] * ci - ca) / (n[1] * ci + ca)) ** 2
+    rp = ((n[1] * ca - ci) / (n[1] * ca + ci)) ** 2
+    check(1, 'R_water->air(theta_w) == R_air->water(theta_a)  [reversibility]',
+          float(np.abs(Rw - .5 * (rs + rp)).max()), 0.0, 1e-12,
+          'Stokes reversibility, exactly. The left side is the shipped path -- '
+          'render.py\'s external `fresnel` read at the conjugate angle; the '
+          'right is the water->air equations formed here from the two indices. '
+          '1e-12 is double round-off over 20001 angles')
+
+    # ---- THE n^2 RADIANCE GAIN ---------------------------------------------
+    # First the identity that says the two directions are one law.
+    L = np.array([[0.3, 0.7, 1.1], [2.0, 0.01, 5.0]])
+    check(1, 'into_water(out_of_water(L)) == L',
+          float(np.abs(R.into_water(R.out_of_water(L)) - L).max()), 0.0, 1e-15,
+          'the gaining and losing directions of L/n^2 are one factor and its '
+          'reciprocal; one double ulp')
+    check(1, 'into_water(1) == n^2', R.into_water(np.ones((1, 3)))[0], n ** 2,
+          1e-15, 'the factor itself, read out of the shipped function rather '
+                 'than out of a comment')
+
+    # ...and then the closed form it has to satisfy on a flat surface. A uniform
+    # sky of radiance 1 shines on flat water. Count the transmitted flux TWICE:
+    #   AIR SIDE, this file's own quadrature over the whole hemisphere,
+    #       E = pi INT 2 mu (1 - R_ext(mu)) dmu
+    #   WATER SIDE, through render.py's `uw_interface` and `into_water`, over
+    #       the WINDOW only -- everything outside it is mirror --
+    #       E = pi INT_{cos tc}^{1} 2 mu_w (1 - R_int) n^2 dmu_w
+    # They are equal only for the square. The window's compression of solid
+    # angle and the n^2 gain in radiance are the same statement, so this row
+    # fails if the exponent is 1 or 3 as loudly as if the factor were absent --
+    # and it is the FIRST row in this file that tests the gaining direction.
+    NQ = 40000
+    mu = (np.arange(NQ) + .5) / NQ
+    for c, nm in enumerate('RGB'):
+        air = float(np.mean(2. * mu * (1. - fresnel_exact(mu, n[c])[0])))
+        muc = np.cos(np.arcsin(1.0 / n[c]))
+        mw = muc + (1. - muc) * (np.arange(NQ) + .5) / NQ
+        sw = np.sqrt(np.maximum(1. - mw ** 2, 0.))
+        dvw = np.stack([sw, np.zeros_like(sw), mw], 1)
+        zw = np.zeros(NQ)
+        tw = R.uw_interface(dvw, zw, zw, np.ones(NQ), np.full(NQ, n[c]), c)
+        gain = R.into_water(np.ones((NQ, 1)) * (1. - tw[4])[:, None],
+                            n[c] ** 2)[:, 0]
+        # the mean is over (mu_c, 1], so the integral is that mean times the
+        # interval, and the interval is 1 - mu_c.
+        wat = float(np.mean(2. * mw * gain) * (1. - muc))
+        check(1, 'sky flux into the water: n^2 over the window == T over the '
+                 'hemisphere  [%s]' % nm, wat, air, 1e-3, rel=True,
+              why='the same transmitted irradiance counted on both sides of a '
+                  'flat interface -- the water side through the shipped '
+                  '`uw_interface` and `into_water` over the window alone, the '
+                  'air side through this file\'s `fresnel_exact` over the whole '
+                  'hemisphere. At n^1 the water side reads %.3f of the air '
+                  'side and at n^3 %.3f, so the exponent is what is under test. '
+                  '1e-3 relative is the two 40000-node rules'
+                  % (1. / n[c], n[c]))
+    info(1, '  ... the gain at the window\'s centre',
+         '(1 - F0) n^2 = %s' % np.round((1 - R.F0) * n ** 2, 4),
+         'the sky straight overhead is brighter under water than over it, by '
+         '0.80 of a stop, and that is not a look: it is the solid angle the '
+         'window compresses it into')
+
+    # ---- THE EYE, AND WHAT THE COMPOSITION CLAIMS --------------------------
+    dwall = min(R.UW_EYE[0] - R.XW0, R.XW1 - R.UW_EYE[0],
+                R.UW_EYE[1] - R.YW0, R.YW1 - R.UW_EYE[1])
+    rim_r = -R.UW_EYE[2] * np.tan(np.arcsin(1 / n[1]))
+    check(1, 'the underwater eye is inside the water body',
+          float((R.UW_EYE[2] < 0) and (R.UW_EYE[2] > R.bed_z(
+              np.array([R.UW_EYE[0]]), np.array([R.UW_EYE[1]]))[0]) and
+              (R.pool_sdf(np.array([R.UW_EYE[0]]),
+                          np.array([R.UW_EYE[1]]))[0] < 0)), 1.0, 0.0,
+          'a camera inside the liner renders a frame that reads as a shading '
+          'bug; no tolerance')
+    between(1, 'the window is unclipped: d tan(tc) / (nearest wall) < 1',
+            rim_r / dwall, 0.0, 1.0,
+            'the rim lands on the surface at d tan(theta_c) = %.3f m and the '
+            'nearest wall is %.3f m away, so the whole rim is on open water. '
+            'This is a one-sided condition and it is the only thing the eye\'s '
+            'depth is chosen against; the margin it leaves, %.0f%%, is what the '
+            'camera comment claims' % (rim_r, dwall, 100 * (1 - rim_r / dwall)))
+    info(1, '  ... the sun in the window',
+         'refracted to %.2f deg from vertical, %.2f deg inside the green rim'
+         % (np.degrees(np.arcsin(np.sqrt(1 - R.SUN_DIR[2] ** 2) / n[1])),
+            np.degrees(np.arcsin(1 / n[1])
+                       - np.arcsin(np.sqrt(1 - R.SUN_DIR[2] ** 2) / n[1]))),
+         'section G predicts 44.4 deg and 4.1 deg from a 21.0 deg sun; both '
+         'follow from SUN_DIR and IOR with nothing else in them')
+
+
 def main():
     t0 = time.time()
     print('validate.py -- external checks on the pool reference implementation')
@@ -2637,6 +2927,7 @@ def main():
                      (tier3_diffuse_fresnel, (R,)), (tier3_cylinder, (R,)),
                      (tier3_gemm, (fld,)), (tier3_geometry, (R,)),
                      (tier_meniscus, (R,)),
+                     (tier_underwater, (R,)),
                      (tier3_wake, (fld, wkm))):
         try:
             fn(*args)

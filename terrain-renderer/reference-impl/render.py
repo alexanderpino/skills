@@ -117,6 +117,27 @@ def out_of_water(L_w):
     return np.asarray(L_w) / N2[None]
 
 
+def into_water(L_a, n2=None):
+    """The SAME law, run the other way: an air-side radiance as seen from inside
+    the water. `out_of_water` divides by n^2 because the pencil's solid angle
+    opens out on the way up; a pencil coming DOWN is compressed by exactly the
+    same factor, so what an in-water eye sees is
+
+          L_water(theta_w) = T(theta_a) * L_air(theta_a) * n^2
+
+    with the caller applying Fresnel's T, as above. `into_water(out_of_water(L))`
+    is the identity, and `validate.py` asserts it -- which is the whole content
+    of "L/n^2 is what is conserved" (Nicodemus 1963; see
+    `references/12-water-rendering.md`), stated as code rather than as a factor.
+    This is the FIRST call site in the project that crosses the interface in the
+    gaining direction: everything before it was a view into the medium.
+
+    `n2` overrides the band-nominal N2 for a wavelength sampled inside a band, so
+    that the gain and the refraction that produced the direction are taken at one
+    and the same index."""
+    return np.asarray(L_a) * (N2[None] if n2 is None else n2)
+
+
 # --- WET LINER, DERIVED RATHER THAN DIALLED ----------------------------------
 # A film of water on a NON-POROUS substrate darkens it by a mechanism with no
 # free parameter: light crosses the air/water interface twice, and between the
@@ -1521,6 +1542,16 @@ BED_DRY = shade(bed[:3], LIN, BED_AO, glow=GLOW, dep=np.zeros_like(BDEP),
 # a near-field integral of the floor 5 cm away, and at the waterline 1.4 m up it
 # is a far-field integral of the whole basin, attenuated over metres of water.
 # Both are printed, per height, further down.
+# ? THIS RESOLUTION IS SIZED FOR THE HERO FRAME AND THE UNDERWATER PASS BROKE IT.
+# ? 512 arc samples on the outer nosing is 18.4 mm, which at the hero's 3.4 m is
+# ? well under an output pixel and invisible. The camera at the foot of this file
+# ? stands 1.2 m from the same faces, where one bin is 26 OUTPUT PIXELS wide, and
+# ? the estimator's bin-to-bin variation reads as hard vertical stripes over the
+# ? whole step unit -- with the bilinear interpolation's creases visible in them.
+# ? It is the estimator's own noise, made visible by a 3x closer look at the same
+# ? buffer, and it wants about 4x the arc resolution. NOT changed here: this
+# ? number is on the hero frame's path and the underwater pass shipped under a
+# ? bit-identity contract. Recorded in the README as the next round's work.
 RIS_NT, RIS_NZ = 512, 24        # arc samples per cylinder (18 mm), height samples
 RIS_ND, RIS_NP = 20, 12         # distance strata x azimuth strata = 240 directions
 RIS_D0, RIS_D1 = 0.006, 120.0   # sampled range of bed distance, m. The upper
@@ -3643,6 +3674,39 @@ def _riser_shade(hxr, hyr, hzr, ci, c, mode):
 MENIS_TIR_REACH = 0.0        # solid angle of the fillet's underside, per camera
 
 
+def submerged_radiance(sid, u, v, sm, cyl, hz, mode):
+    """The IN-WATER radiance arriving along a ray that has already been traced:
+    the bed, wall and riser maps a hit reads, times Beer-Lambert over the leg it
+    travelled. It stops at the water's edge -- nothing here crosses the
+    interface -- so the caller decides what happens next: `_menis_under` divides
+    by n^2 and hands an air-side radiance up through the surface, and the
+    underwater camera at the foot of this file uses it as it stands, because
+    there is no interface between that eye and this geometry at all.
+
+    ONE function for both, because the underwater pass's whole claim is that it
+    is the same water: if the mirrored twin at the waterline and the bed under
+    the hero's own camera were read by two pieces of code, the twin would be a
+    second renderer's opinion rather than this one's geometry.
+
+    `hz` is the world height of the hit, which only the risers need."""
+    col = np.zeros((sid.size, 3))
+    bi, wim = bed_img[mode], wall_img[mode]
+    for c in range(3):
+        m = sid == 0
+        if m.any():
+            col[m, c] = sample(bi[..., c:c + 1], u[m], v[m], X0, X1, Y0, Y1)[:, 0]
+        for wi, sv in enumerate((1, 2, 3, 4)):
+            m = sid == sv
+            if m.any():
+                a, b = (Y0, Y1) if sv <= 2 else (X0, X1)
+                col[m, c] = sample(wim[wi][..., c:c + 1], u[m], v[m],
+                                   a, b, -DEPTH, WTOP)[:, 0]
+        m = sid == 5
+        if m.any():
+            col[m, c] = _riser_shade(u[m], v[m], hz[m], cyl[m], c, mode)
+    return col * np.exp(-ABS[None] * sm[:, None])
+
+
 def _menis_under(sid, u, v, sm, cyl, tzc, mode):
     """What comes back OUT of a fillet's TRANSMITTED ray: the same bed, wall and
     riser maps `water_shade` reads for the flat surface, with the same
@@ -3669,22 +3733,7 @@ def _menis_under(sid, u, v, sm, cyl, tzc, mode):
     than off a surface of its own. It is `?` in the SOURCE, never in the amount:
     the projected area that carries it is exact and is what `validate.py`
     checks."""
-    col = np.zeros((sid.size, 3))
-    bi, wim = bed_img[mode], wall_img[mode]
-    for c in range(3):
-        m = sid == 0
-        if m.any():
-            col[m, c] = sample(bi[..., c:c + 1], u[m], v[m], X0, X1, Y0, Y1)[:, 0]
-        for wi, sv in enumerate((1, 2, 3, 4)):
-            m = sid == sv
-            if m.any():
-                a, b = (Y0, Y1) if sv <= 2 else (X0, X1)
-                col[m, c] = sample(wim[wi][..., c:c + 1], u[m], v[m],
-                                   a, b, -DEPTH, WTOP)[:, 0]
-        m = sid == 5
-        if m.any():
-            col[m, c] = _riser_shade(u[m], v[m], tzc[m] * sm[m], cyl[m], c, mode)
-    return out_of_water(col * np.exp(-ABS[None] * sm[:, None]))
+    return out_of_water(submerged_radiance(sid, u, v, sm, cyl, tzc * sm, mode))
 
 
 def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
@@ -3949,6 +3998,19 @@ def surf_stats(x, y, fp):
     return gx, gy, vxx, vyy, vxy
 
 
+# The residual in-scatter of a treated pool, and the extinction it accumulates
+# against. `b_b ~ 0` is the chapter's reading of a filtered domestic pool -- the
+# colour is the bottom, not the water -- but "~ 0" is not 0, and what is left of
+# it is a PATH integral: a uniform source S with extinction k gives
+# S (1 - exp(-k s)) along a path of length s. Over the 1.4 m round trip a camera
+# ABOVE the water sees, that is worth a fraction of an sRGB level; over the 6 m
+# horizontal legs an eye INSIDE the water sees, it is the contrast loss with
+# distance that section G asks for. Hoisted out of `water_shade` so the two
+# cameras integrate the same medium rather than two constants that look alike.
+INSCAT = np.array([.002, .011, .019])
+INSCAT_K = .30
+
+
 def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     """Everything one camera ray does once it is over water: the surface normal
     from field.py, Fresnel, the sky reflection with the coping's overhang cut
@@ -4034,7 +4096,7 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
             smG_, sidG, uG, vG, cylG = sm, sid, u, v, cyl
     # the residual in-scatter of a treated pool: tiny, but it is a PATH integral,
     # so it grows with the water actually crossed and is one more depth cue.
-    water += np.array([.002, .011, .019])[None] * (1 - np.exp(-.30 * smG_))[:, None]
+    water += INSCAT[None] * (1 - np.exp(-INSCAT_K * smG_))[:, None]
     water *= lip_ao[:, None]
     # ...and here it crosses the surface. `water` up to this line is an IN-WATER
     # radiance -- every term in it, the maps, the Beer-Lambert leg and the
@@ -5534,3 +5596,718 @@ print("zoom on the step unit: %dx%d px at (%d, %d)" % (ZW, ZH, ZX, ZY))
 Image.fromarray(hero[ZY:ZY + ZH, ZX:ZX + ZW]).resize(
     (ZW * S, ZH * S), Image.LANCZOS).save("pool_final_zoom.png")
 print("wrote pool_final_dispersion.png, pool_final_zoom.png")
+
+
+# ===================================================== THE CAMERA UNDER THE WATER
+# Everything above this line is a view INTO the medium. This is the view from
+# inside it, and it is the last unrendered section of the bar (`gauntlet/bar/
+# photo-spec.md` section G). It is here rather than in a second file for the one
+# reason the section itself gives: it is judged on the SAME scene, the same code
+# and the same water, and a renderer tuned to look good from below would fail the
+# section by construction. Every map it reads -- the bed's caustics, the four
+# wall maps, the risers -- is the one the hero frame reads, through
+# `submerged_radiance`, which is why it can be trusted as an instrument: an
+# above-water shortcut that survives by being invisible from a 33 deg downward
+# view has nowhere to hide when the same buffer is looked at from underneath.
+#
+#     POOL_UNDERWATER=1 python3 render.py     # also writes pool_under.png
+#
+# THE GUARD IS AN ENVIRONMENT VARIABLE, and the whole section sits after the hero
+# frame is encoded and written, so the default run cannot be reached by it:
+# `pool_final.png` is bit-identical with the switch off, and that was checked by
+# hashing the file either side of this section being added. Two things above the
+# line did move, both of them factorings and neither of them arithmetic:
+# `submerged_radiance` was lifted out of `_menis_under` so that both cameras read
+# the maps through one function, and the in-scatter pair was named.
+#
+# WHAT THE PHYSICS FORCES, in the order the code below meets it:
+#
+#  1  SNELL'S WINDOW. Looking up from inside, the whole above-water world arrives
+#     inside a cone of half-angle asin(1/n) about the vertical -- 48.52 deg
+#     green, 97.04 deg across. OUTSIDE it there is no transmitted direction at
+#     all and the surface is a mirror of reflectance exactly 1. This pass reaches
+#     that regime through `refract()`'s null return and `is_tir()`, and nowhere
+#     writes an angle comparison of its own: the assert at the head of
+#     `water_shade`'s refraction -- `the camera is above the water` -- is the one
+#     this pass flips, and the branch it guards has been unreachable since it was
+#     built. Deriving the rim from the same function that produces the direction
+#     is what makes the rim's position and the reflectance's rise to 1 two
+#     independent statements that must agree; `validate.py` bisects one against
+#     the other.
+#
+#  2  RADIANCE IS NOT CONSERVED ACROSS THE INTERFACE -- L/n^2 IS (Nicodemus
+#     1963). This is the FIRST call site in the project that crosses the surface
+#     in the GAINING direction, so it is the test of that law rather than another
+#     consumer of it: sky radiance entering the water arrives as
+#     L_air (1 - R) n^2, computed by `into_water` from `N2 = IOR**2` and never
+#     written by hand. The diffuse form of the same factor, (1 - R_EXT)/n^2 =
+#     1 - R_INT = 0.52, is what the wet liner and WBOUNCE already use, one
+#     direction down.
+#
+#  3  ABSORPTION IS NOW AERIAL PERSPECTIVE. The water column lies between the eye
+#     and the geometry instead of behind it, so the file's own band-integrated
+#     `ABS` acts along the VIEW path: at 5 m the transmission is (0.27, 0.77,
+#     0.95) and the frame goes cyan with distance. No new triple, and the
+#     measurement of it off the rendered frame is printed below.
+#
+#  4  THE MIRRORED TWIN COMES FREE OR NOT AT ALL. Section G's strongest
+#     photographic criterion is that anything touching the surface meets its own
+#     mirror image at the waterline. Nothing below special-cases it: outside the
+#     window R is 1, the reflected ray is traced by the EXISTING downgoing
+#     `scene_hit` from the surface point, and the wall's image folds down because
+#     the wall is where it is. Built any other way it would be a decoration of
+#     the waterline rather than a consequence of the surface.
+#
+# WHAT IT DOES NOT HAVE, stated here rather than discovered by a reader:
+#  ?  THERE IS NO WORLD ABOVE THE WATER EXCEPT `sky`. A refracted ray leaving at
+#     theta_a close to 90 deg points at the coping, the deck and the shade sail,
+#     and gets sky instead. That band is the outermost degree or so of the
+#     window, where (1 - R) has already fallen below 0.3, and its extent is
+#     measured and printed below rather than assumed small.
+#  ?  THE UNRESOLVED SLOPE VARIANCE FEEDS NOTHING. On the hero it becomes the
+#     reflection ellipse and the Bruneton masking term; the refracted lobe has no
+#     equivalent here. The surface is 0.6-1.6 m from this eye, so the footprint
+#     is millimetres against a 28 mm dominant wave and there is little left to
+#     remove -- but "little" is a measurement and it is printed, not asserted.
+import os as _os
+import time as _time
+
+UW_ON = _os.environ.get('POOL_UNDERWATER', '') not in ('', '0', 'no', 'off')
+
+# --- the window, and the numbers that are only geometry -----------------------
+UW_TC = np.arcsin(1.0 / IOR)                       # critical angle, per band
+UW_SPREAD = float(np.degrees(UW_TC[0] - UW_TC[2]))
+UW_TSUN = np.arcsin(np.sqrt(max(1.0 - SUN_DIR[2] ** 2, 0.0)) / IOR)
+print("\nSnell window: half-angle %s deg (%.2f deg across, green); dispersive "
+      "rim spread %.3f deg, red outside blue"
+      % (np.round(np.degrees(UW_TC), 3), 2 * np.degrees(UW_TC[1]), UW_SPREAD))
+print("  the refracted sun sits %s deg from vertical, %s deg inside the rim"
+      % (np.round(np.degrees(UW_TSUN), 2),
+         np.round(np.degrees(UW_TC - UW_TSUN), 2)))
+
+# --- WHERE THE EYE IS, AND WHY ------------------------------------------------
+# Held to the standard of the CAM_AZ block above: every number here is either
+# forced by the physics of the view or marked as the one free choice it is.
+#
+# THE LENS FIRST, because it decides what an eye position can be asked to do. The
+# window is 2 asin(1/n) = 97.04 deg across, so no lens narrower than that can
+# show the rim on two sides at once. Section H's supplied reference for the
+# submerged half is a 16 mm behind a dome; 16 mm on the 3:2 frame this file
+# already renders (2400 x 3600, portrait) gives 2 atan(18/16) = 96.73 deg on the
+# long axis and 73.74 deg on the short -- which is, by 0.31 deg, NOT enough to
+# contain the whole window even pointed straight up. That near-miss is worth
+# recording rather than fixing: the reference lens for this kind of frame is a
+# third of a degree short of the thing the frame is about.
+#
+# It is a different lens from the hero's 46 deg and it has to be. Same body, same
+# 3:2 frame, different focal length, which is what a photographer changes on
+# going under; what it is NOT is a different renderer, a different exposure or a
+# different water. EXPOSURE stays at 0.275, so a radiance in this frame and a
+# radiance in the hero are the same number of stops -- which is what makes the
+# two frames comparable at all, and the one thing section H says may never be
+# fudged between halves.
+#
+# THE PORT, since a camera in water has one. A concentric dome is afocal for rays
+# through its centre of curvature, so it leaves the in-water field at the lens's
+# native value and introduces no magnification; that is why section H's over-
+# under references are shot with one, and it is why the field above can be quoted
+# as the field in water. A FLAT port would narrow 96.73 deg to 2 asin(sin(48.37)/
+# n) = 67.9 deg and magnify by n -- a real, visible, different choice, and
+# section H is where it is tested. Modelling it here would put a second refracting
+# interface between this eye and the window and confuse the two.
+#
+# WHY NOT POINT IT AT THE ZENITH. Containing the whole window AND anything below
+# the horizontal needs a half-field of at least 90 deg, which no rectilinear
+# projection has. The choice is therefore forced, and it is not close: the
+# window's centre is the least compressed and least dispersive part of it and
+# carries no test, while the rim, the sun crowded against it, the twin at the
+# waterline, the step unit and the aerial perspective are all in the outer half
+# of it or below it. So the aim tilts down until the frame holds the rim and the
+# geometry, and the window's centre is out of shot at v = +2.4.
+#
+# THE PLAN POSITION. Two features have to be in frame and they are 73 deg of
+# azimuth apart, which is most of the 73.74 deg short axis:
+#   * the SUN, which is not a composition choice. It arrives at the sun's own
+#     plan bearing -- 176.25 deg in this file's convention; see the CAM_AZ block
+#     for the two conventions and the defect that lived between them -- at 44.4
+#     deg from vertical, 4.1 deg inside the rim.
+#   * the STEP UNIT, which is the instrument for the reading section H names:
+#     apparent-depth compression is what an eye ABOVE the water does to this
+#     flight, and an eye inside the water shares its medium with it and does
+#     nothing to it at all. The same three treads, uncompressed, in the same
+#     round of renders, is the cheapest available evidence that the compression
+#     above is the interface rather than a fudge in the step geometry.
+# From (6.60, 1.40) the unit's centre bears 103.0 deg and the sun 176.25 deg;
+# aiming between them at 145 deg puts the sun at u = -0.60 (in frame, high and
+# left -- a tilted rectilinear frame reaches further in azimuth the higher it
+# looks) and more than half of every nosing arc on the right. The north wall then
+# runs across the lower frame from 2.6 m to 6.9 m away, which is the twin AND the
+# aerial perspective on one wall.
+#
+# THE DEPTH IS THE ONE FREE NUMBER, and it is bounded on one side only. The rim
+# lands on the surface at radius d tan(theta_c) = 1.134 d from the eye's
+# vertical, so for the window to be unclipped by the basin the eye must sit
+# further than that from every wall: here min(1.40, 1.40, 2.60, 6.60) = 1.40 m,
+# hence d < 1.234 m. Nothing bounds it from below except the surface.
+# ? Taken at 0.70 m -- half the basin's deepest depth, so the eye is equidistant
+# ? from the surface and the bed and the rim clears the nearest wall by 43%.
+# ? That is a choice and it is marked as one; what follows from it is printed
+# ? (rim radius, the twin's extent, the path lengths) rather than assumed.
+UW_EYE = np.array([6.60, 1.40, -0.70])
+UW_AZ = np.deg2rad(145.0)
+UW_EL = np.deg2rad(22.0)
+UW_F = 16.0                        # mm, section H's reference lens for the wet half
+UW_FOV = 2.0 * np.arctan(18.0 / UW_F)           # on the 36 mm axis, portrait
+UW_TGT = UW_EYE + 3.0 * np.array([np.cos(UW_AZ) * np.cos(UW_EL),
+                                  np.sin(UW_AZ) * np.cos(UW_EL), np.sin(UW_EL)])
+
+
+def _uw_eye_check():
+    """The eye has to be IN the water and inside nothing else. Asserted rather
+    than assumed: a camera inside the liner produces a frame that reads as a bug
+    in the shading, and it is cheaper to fail here."""
+    d = -UW_EYE[2]
+    p = (np.array([UW_EYE[0]]), np.array([UW_EYE[1]]))
+    assert d > 0.0, 'the underwater eye is above the water'
+    assert UW_EYE[2] > bed_z(*p)[0], 'the underwater eye is inside the bed'
+    assert pool_sdf(*p)[0] < 0.0, 'the underwater eye is outside the basin'
+    return d, float(UW_EYE[2] - bed_z(*p)[0]), d * np.tan(UW_TC[1]), \
+        min(UW_EYE[0] - XW0, XW1 - UW_EYE[0], UW_EYE[1] - YW0, YW1 - UW_EYE[1])
+
+
+UW_D, UW_CLEAR, UW_RIM_R, UW_DWALL = _uw_eye_check()
+print("underwater eye %s: %.2f m down, %.2f m over the bed; the rim lands at "
+      "%.3f m and the nearest wall is %.3f m -- %s"
+      % (UW_EYE, UW_D, UW_CLEAR, UW_RIM_R, UW_DWALL,
+         'unclipped' if UW_RIM_R < UW_DWALL else 'CLIPPED BY THE BASIN'))
+print("  lens %.0f mm on the 3:2 frame: %.2f deg long axis, %.2f deg short; the "
+      "window is %.2f deg across, so this lens is %.2f deg short of holding it"
+      % (UW_F, np.degrees(UW_FOV), 2 * np.degrees(np.arctan(12.0 / UW_F)),
+         2 * np.degrees(UW_TC[1]), 2 * np.degrees(UW_TC[1]) - np.degrees(UW_FOV)))
+
+
+# --- A RAY THAT IS ALLOWED TO GO UP -------------------------------------------
+# `scene_hit` is downgoing-only, and not by accident: its floor branch takes the
+# root of the z = -DEPTH plane only for tz < 0, its cylinder entry clamps the cap
+# plane with `np.minimum(tz, -1e-9)`, and it has no ceiling at all because all
+# five of its callers start at the surface and go down. An underwater eye needs
+# the other half of the sphere.
+#
+# THIS IS A SIBLING RATHER THAN AN EXTENSION, and the reason is the hero frame.
+# Extending `scene_hit` would mean a new surface id in a function five call sites
+# read positionally, a cylinder entry that no longer skips the upgoing branch,
+# and a ceiling plane in the argmin that every existing caller would then have to
+# be shown not to reach -- five arguments to make, each checkable only by the
+# frame coming out identical. A sibling makes one argument, in one place, and
+# leaves the downgoing solve untouched to the bit. What it does NOT do is
+# duplicate the physics: `validate.py` fires both at the same downgoing rays and
+# asserts they agree exactly, so the sibling cannot drift into a second opinion
+# about where the walls are.
+def _cyl_entry_any(px, py, pz, tx, ty, tz):
+    """`_cyl_entry` for a ray of EITHER sign of tz. A step is the solid
+    {r <= R, z <= ztop}, so the z half-space is an interval in t whose sense
+    flips with the ray: a descending ray ENTERS it at the cap and stays inside,
+    an ascending one is inside until the cap and then leaves. Writing both as
+    (t_lo, t_hi) and intersecting with the radial interval is the whole
+    generalisation, and the downgoing case reduces to t_hi = +inf, which is the
+    `np.maximum(t1, tc)` the original writes directly."""
+    n = px.shape
+    bt = np.full(n, BIG); bf = np.zeros(n, bool); bi = np.full(n, -1, np.int8)
+    a = tx * tx + ty * ty
+    vert = a <= 1e-14
+    inva = 1.0 / np.where(vert, 1.0, a)
+    up, dn = tz > 1e-9, tz < -1e-9
+    lvl = ~(up | dn)                          # level: no cap crossing at all
+    tzs = np.where(lvl, 1.0, tz)
+    for i, (cx, cy, R, ztop) in enumerate(CYL):
+        ox, oy = px - cx, py - cy
+        b = 2.0 * (ox * tx + oy * ty)
+        c = ox * ox + oy * oy - R * R
+        disc = b * b - 4.0 * a * c
+        hit = (disc > 0.0) & ~vert
+        sq = np.sqrt(np.where(hit, disc, 0.0))
+        t1 = np.where(hit, (-b - sq) * 0.5 * inva, BIG)
+        t2 = np.where(hit, (-b + sq) * 0.5 * inva, -BIG)
+        t1 = np.where(vert, np.where(c < 0.0, -BIG, BIG), t1)
+        t2 = np.where(vert, np.where(c < 0.0, BIG, -BIG), t2)
+        tc = (ztop - pz) / tzs
+        out = lvl & (pz > ztop)               # level and above the cap: no hit
+        zlo = np.where(dn, tc, np.where(out, BIG, -BIG))
+        zhi = np.where(up, tc, np.where(out, -BIG, BIG))
+        tin = np.maximum(t1, zlo)
+        ok = (tin < np.minimum(t2, zhi)) & (tin > 1e-6) & (tin < bt)
+        bt = np.where(ok, tin, bt)
+        bf = np.where(ok, t1 >= zlo, bf)      # entered through the round face
+        bi = np.where(ok, i, bi)
+    return bt, bf, bi
+
+
+def scene_hit_under(px, py, pz, tx, ty, tz):
+    """First hit of a ray of ANY direction, starting anywhere inside the water.
+    Surface ids are `scene_hit`'s, plus one:
+         6 = the still water surface z = 0, seen FROM BELOW; (u,v) = (x,y)
+    which is the only id that is not geometry -- it is where a ray leaves this
+    function and meets `uw_interface`."""
+    tx, ty, tz = np.asarray(tx), np.asarray(ty), np.asarray(tz)
+    px, py, pz = (np.broadcast_to(np.asarray(q, float), tx.shape)
+                  for q in (px, py, pz))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        s = np.stack([
+            np.where(tz < -1e-9, (-DEPTH - pz) / tz, BIG),
+            np.where(tx < -1e-9, (XW0 - px) / tx, BIG),
+            np.where(tx > 1e-9, (XW1 - px) / tx, BIG),
+            np.where(ty < -1e-9, (YW0 - py) / ty, BIG),
+            np.where(ty > 1e-9, (YW1 - py) / ty, BIG),
+            np.where(tz > 1e-9, (0.0 - pz) / tz, BIG)])
+    s = np.where(np.isfinite(s), s, BIG)
+    s = np.where(s > 1e-9, s, BIG)             # a backward root is a miss
+    k = np.argmin(s, 0)
+    sm = np.take_along_axis(s, k[None].astype(np.intp), 0)[0]
+    sid = np.where(k == 5, 6, k).astype(np.int8)
+    cyl = np.full(tx.shape, -1, np.int8)
+    bx2, by2 = px + tx * sm, py + ty * sm
+    near = ((np.minimum(px, bx2) <= STEP_BB[1]) & (np.maximum(px, bx2) >= STEP_BB[0]) &
+            (np.minimum(py, by2) <= STEP_BB[3]) & (np.maximum(py, by2) >= STEP_BB[2]))
+    idx = np.flatnonzero(near)
+    if idx.size:
+        ct, cf, ci = _cyl_entry_any(px[idx], py[idx], pz[idx],
+                                    tx[idx], ty[idx], tz[idx])
+        take = ct < sm[idx]
+        j = idx[take]
+        sm[j] = ct[take]
+        sid[j] = np.where(cf[take], 5, 0).astype(np.int8)
+        cyl[j] = ci[take]
+    hx, hy, hz = px + tx * sm, py + ty * sm, pz + tz * sm
+    flat = (sid == 0) | (sid == 5) | (sid == 6)
+    u = np.where(flat, hx, np.where(sid <= 2, hy, hx))
+    v = np.where(flat, hy, hz)
+    return sid, u, v, sm, cyl
+
+
+# --- THE INTERFACE, FROM UNDERNEATH -------------------------------------------
+# One function, so that there is exactly one place in this file where the window
+# is decided, and so that `validate.py` can ask it where the rim is without
+# building a single map.
+#
+# THE REFLECTANCE IS THE FILE'S OWN `fresnel`, READ THROUGH REVERSIBILITY. The
+# Fresnel amplitude ratios for a ray going water -> air at theta_w and one going
+# air -> water at the conjugate theta_a are the same pair with the roles of the
+# two media exchanged, and the reflectANCE comes out identical:
+#     R_wa(theta_w) = R_aw(theta_a),    sin theta_a = n sin theta_w.
+# That is Stokes reversibility, and it is the same identity the wet-liner term
+# above already uses to get R_INT out of R_EXT. So the internal reflectance here
+# is `fresnel(cos theta_a)` with cos theta_a read off the direction `refract` has
+# just returned: no second Fresnel implementation enters this file, and
+# `validate.py` checks the identity against a water -> air Fresnel formed
+# directly from the two indices.
+#
+# AND IT MAKES THE RIM SELF-CONSISTENT WITHOUT BEING TOLD TO. As theta_w climbs
+# to the critical angle theta_a -> 90 deg, cos theta_a -> 0, and fresnel(0) is
+# exactly 1 by its own algebra. So the transmitted column fades to zero exactly
+# where `refract` stops returning a direction, out of two computations that share
+# no line: the rim is where a square root changes sign, the reflectance reaching
+# 1 is where a ratio of cosines does. The `np.where` on `is_tir` past that point
+# is belt and braces rather than the mechanism -- but it is NOT the check, and it
+# must not be mistaken for one: past the rim `refract` returns the null vector,
+# which makes cos theta_a exactly 0 and therefore makes `fresnel` return 1 by
+# construction. The check is on the SUB-critical side, where the two are free to
+# disagree and do not; it is measured below and bisected in `validate.py`.
+def uw_interface(dvec, nx, ny, nz, eta, c):
+    """(tx, ty, tz, tir, R) for a ray arriving at the surface FROM BELOW.
+
+    `n` is field.py's UPWARD surface normal; the normal handed to `refract` must
+    oppose the incident ray, and an upgoing ray is opposed by the DOWNWARD one,
+    so it is flipped here and in no other place. `eta = n_water / n_air > 1`,
+    which is the side of the interface that `water_shade`'s assert exists to say
+    the hero's five call sites are NOT on."""
+    tx, ty, tz = refract(dvec[:, 0], dvec[:, 1], dvec[:, 2], -nx, -ny, -nz, eta)
+    tir = is_tir(tx, ty, tz)
+    ca = np.abs(tx * nx + ty * ny + tz * nz)       # cos of the AIR-side angle
+    return tx, ty, tz, tir, np.where(tir, 1.0, fresnel(ca)[:, c])
+
+
+def uw_shade(dvec, mode='disp', qlam=None, fp=None):
+    """One camera ray from an eye inside the water. Three exits and no fourth:
+      * it meets geometry without ever reaching the surface -- bed, wall, riser
+        -- and reads it through `submerged_radiance`, with Beer-Lambert over the
+        whole traced leg. There is no interface anywhere on this path, which is
+        section H's claim that a submerged camera magnifies nothing;
+      * it meets the surface INSIDE the window and splits into a transmitted
+        share (1 - R) of the sky, gained by n^2, and a reflected share R of the
+        pool folded back down;
+      * it meets the surface OUTSIDE the window, where R is 1 and the second of
+        those is the whole of it. The mirrored twin is that case, and it is the
+        same two lines as the one before it rather than a special one.
+    Returns (radiance, sid, sm, tir_green, bed_u, bed_v, path, on_bed). The last
+    four exist for ONE measurement and are worth the four arrays: a texel of the
+    floor that is seen BOTH directly and in the mirror is the same pigment under
+    the same light at two different path lengths, which is the only clean
+    instrument for Beer-Lambert on a view leg that a single frame contains."""
+    sid, u, v, sm, cyl = scene_hit_under(UW_EYE[0], UW_EYE[1], UW_EYE[2],
+                                         dvec[:, 0], dvec[:, 1], dvec[:, 2])
+    hz = UW_EYE[2] + dvec[:, 2] * sm
+    out = np.zeros((dvec.shape[0], 3))
+    tirg = np.zeros(dvec.shape[0], bool)
+    bu = np.zeros(dvec.shape[0]); bv = np.zeros(dvec.shape[0])
+    tot = sm.copy(); onb = sid == 0
+    bu[onb], bv[onb] = u[onb], v[onb]
+    g = sid != 6
+    if g.any():
+        out[g] = submerged_radiance(sid[g], u[g], v[g], sm[g], cyl[g], hz[g], mode)
+        # the in-scatter is added AFTER the leg's attenuation and not through it,
+        # exactly as `water_shade` does: S(1 - exp(-k s)) is already what the
+        # accumulated source looks like from the eye.
+        out[g] += INSCAT[None] * (1.0 - np.exp(-INSCAT_K * sm[g]))[:, None]
+    w = np.flatnonzero(sid == 6)
+    if w.size:
+        hx_, hy_ = u[w], v[w]
+        d = dvec[w]
+        st = surf_stats(hx_, hy_, None if fp is None else fp[w])
+        nx_, ny_, nz_ = normal_from_grad(st[0], st[1])
+        # THE MIRROR LEG, and it is achromatic: a reflection carries no index, so
+        # one trace serves all three channels, and the tracer is the EXISTING
+        # downgoing `scene_hit` started at the surface point. The twin is this.
+        dn = d[:, 0] * nx_ + d[:, 1] * ny_ + d[:, 2] * nz_
+        rx = d[:, 0] - 2.0 * dn * nx_
+        ry = d[:, 1] - 2.0 * dn * ny_
+        rz = d[:, 2] - 2.0 * dn * nz_
+        rsid, ru, rv, rsm, rcyl = scene_hit(hx_, hy_, rx, ry, rz, 0.0)
+        mir = submerged_radiance(rsid, ru, rv, rsm, rcyl, rz * rsm, mode)
+        e1 = np.exp(-INSCAT_K * sm[w])
+        e2 = 1.0 - np.exp(-INSCAT_K * rsm)
+        col = np.zeros((w.size, 3))
+        for c in range(3):
+            if mode == 'disp':
+                nb = n_water(BAND[c, 0] + qlam[w] * (BAND[c, 1] - BAND[c, 0]))
+            else:
+                nb = np.full(w.size, IOR[1])
+            tx, ty, tz, tir, R = uw_interface(d, nx_, ny_, nz_, nb, c)
+            if c == 1:
+                tirg[w] = tir
+            col[:, c] = (np.exp(-ABS[c] * sm[w])
+                         * ((1.0 - R) * into_water(sky(tx, ty, tz)[:, c], nb ** 2)
+                            + R * mir[:, c])
+                         + INSCAT[c] * ((1.0 - e1) + R * e1 * e2))
+        out[w] = col
+        # a mirrored floor hit, on a ray whose R is 1: the whole of what comes
+        # back is that texel, one longer path away.
+        mb = (rsid == 0) & tirg[w]
+        jb = w[mb]
+        bu[jb], bv[jb] = ru[mb], rv[mb]
+        tot[jb] = sm[jb] + rsm[mb]
+        onb[jb] = True
+    return out, sid, sm, tirg, bu, bv, tot, onb
+
+
+# --- the frame ----------------------------------------------------------------
+_uwf = UW_TGT - UW_EYE; _uwf /= np.linalg.norm(_uwf)
+_uwr = np.cross(_uwf, [0, 0, 1.]); _uwr /= np.linalg.norm(_uwr)
+_uwu = np.cross(_uwr, _uwf)
+UW_TF = np.tan(UW_FOV / 2)
+UW_PIXANG = 2. * UW_TF / H
+
+
+def uw_dirs(px, py):
+    """Camera directions for image coordinates in [-1, 1]: the same pinhole
+    construction the hero uses, so the two frames differ by focal length and
+    nothing else."""
+    d = (_uwf[None] + _uwr[None] * (px * UW_TF * W / H)[:, None]
+         + _uwu[None] * (py * UW_TF)[:, None])
+    return d / np.linalg.norm(d, axis=1, keepdims=True)
+
+
+def uw_pixel_dirs(j):
+    """Directions for flat subsample indices into the W x H grid."""
+    return uw_dirs((j % W + .5) / W * 2 - 1, 1 - (j // W + .5) / H * 2)
+
+
+def uw_project(P):
+    d = np.atleast_2d(np.asarray(P, float)) - UW_EYE[None]
+    f = np.maximum(d @ _uwf, 1e-6)
+    return np.stack([(((d @ _uwr) / f / (UW_TF * W / H) + 1) * .5 * W - .5) / SS,
+                     ((1 - (d @ _uwu) / f / UW_TF) * .5 * H - .5) / SS], -1)
+
+
+def uw_render(mode='disp', chunk=600000):
+    """The frame, in chunks: the mirror leg doubles the traces and the surface
+    statistics are the expensive part, so 8.6 M subsamples are not held at once.
+    The spectral stratification is the hero's own `SUBK` Latin square, on the
+    same grid -- one wavelength per subsample, so the SS x SS box filter does the
+    band integral at the same time as the spatial one."""
+    img = np.zeros((W * H, 3))
+    sid = np.zeros(W * H, np.int8)
+    smm = np.zeros(W * H)
+    tir = np.zeros(W * H, bool)
+    bed = np.zeros((W * H, 2), np.float32)
+    tot = np.zeros(W * H, np.float32)
+    onb = np.zeros(W * H, bool)
+    qs = ((SUBK.astype(np.float64) + .5) / NSPEC)
+    for i0 in range(0, W * H, chunk):
+        i1 = min(i0 + chunk, W * H)
+        j = np.arange(i0, i1)
+        d = uw_pixel_dirs(j)
+        # the footprint of an OUTPUT pixel on the surface, by the hero's rule:
+        # the traced distance times the pixel's angle, opened out by the
+        # obliquity of the plane it lands on.
+        s0 = np.where(d[:, 2] > 1e-9, -UW_EYE[2] / np.maximum(d[:, 2], 1e-9), 0.0)
+        fp = s0 * UW_PIXANG / np.maximum(np.abs(d[:, 2]), .10) * SS
+        c, s_, m_, t_, bu_, bv_, tt_, ob_ = uw_shade(d, mode, qs[j], fp)
+        img[i0:i1] = c
+        sid[i0:i1], smm[i0:i1], tir[i0:i1] = s_, m_, t_
+        bed[i0:i1, 0], bed[i0:i1, 1] = bu_, bv_
+        tot[i0:i1], onb[i0:i1] = tt_, ob_
+    return img.reshape(H, W, 3), sid, smm, tir, bed, tot, onb
+
+
+def _uw_rim(flag, pol, lo=44., hi=53., nb=180):
+    """The polar angle at which a mirror flag crosses one half, and the 10-90
+    width of that crossing. Read off the frame's own rays: every subsample knows
+    its direction and `is_tir` has already said what it found. The estimator's
+    resolution is the bin width, (hi - lo)/nb = 0.05 deg."""
+    ed = np.linspace(lo, hi, nb + 1)
+    k = np.clip(np.digitize(pol, ed) - 1, 0, nb - 1)
+    num = np.bincount(k, weights=flag.astype(float), minlength=nb)
+    den = np.bincount(k, minlength=nb).astype(float)
+    ok = den > 200
+    f, x = num[ok] / np.maximum(den[ok], 1.), .5 * (ed[:-1] + ed[1:])[ok]
+
+    def _cross(lv):
+        m = np.flatnonzero(f >= lv)
+        if m.size == 0 or m[0] == 0:
+            return float('nan')
+        a = m[0]
+        return x[a - 1] + (lv - f[a - 1]) * (x[a] - x[a - 1]) / (f[a] - f[a - 1])
+    return _cross(.5), _cross(.9) - _cross(.1)
+
+
+if UW_ON:
+    print("\n--- the camera under the water --------------------------------")
+    _t0 = _time.time()
+    UW_HDR, UW_SID, UW_SM, UW_TIR, UW_BED, UW_TOT, UW_ONB = uw_render('disp')
+    _isw = UW_SID == 6
+    print("underwater pass: %.0f s.  %.1f%% of subsamples reach the surface; of "
+          "those %.1f%% are past the critical angle and see the mirror. %.1f%% "
+          "meet geometry with no interface on the path at all."
+          % (_time.time() - _t0, 100. * _isw.mean(), 100. * UW_TIR[_isw].mean(),
+             100. * (~_isw).mean()))
+    UW_ENC = encode(UW_HDR)
+    Image.fromarray(UW_ENC).save("pool_under.png")
+    print("wrote pool_under.png")
+
+    # ---- THE RIM, MEASURED OFF THE FRAME'S OWN GEOMETRY ---------------------
+    # Not off a formula. Every subsample that reached the surface knows its own
+    # direction; `is_tir` has already said whether it found a mirror there; and
+    # the polar angle at which that flag crosses one half IS the window's half
+    # angle as this frame draws it. The only thing it can then be compared with
+    # is asin(1/n), which appears nowhere in the pass.
+    _jall = np.flatnonzero(_isw)
+    _dall = uw_pixel_dirs(_jall)
+    _polall = np.degrees(np.arccos(np.clip(_dall[:, 2], -1, 1)))
+    # only the band that straddles the rim carries the measurement, and cutting
+    # to it before the surface statistics are evaluated is what makes it cheap.
+    _band = np.abs(_polall - np.degrees(UW_TC[1])) < 4.5
+    _jw, _dw, _pol = _jall[_band], _dall[_band], _polall[_band]
+    _az = np.degrees(np.arctan2(_dw[:, 1], _dw[:, 0]))
+    _ql = (SUBK[_jw].astype(np.float64) + .5) / NSPEC
+    _hxw = UW_EYE[0] + _dw[:, 0] * UW_SM[_jw]
+    _hyw = UW_EYE[1] + _dw[:, 1] * UW_SM[_jw]
+    _sw = surf_stats(_hxw, _hyw, None)
+    _nw = normal_from_grad(_sw[0], _sw[1])
+    _z0 = np.zeros(_jw.size)
+    _n0 = normal_from_grad(_z0, _z0)
+    _azr = (_az - np.degrees(UW_AZ) + 180.) % 360. - 180.
+    print("the rim, off %d surface subsamples within 4.5 deg of it, spanning "
+          "%.0f deg of azimuth about the aim:" % (_jw.size, np.ptp(_azr)))
+    _rim0, _rim1 = [], []
+    for c, nm in enumerate('RGB'):
+        _nb = n_water(BAND[c, 0] + _ql * (BAND[c, 1] - BAND[c, 0]))
+        _cf = np.degrees(np.arcsin(1.0 / _nb.mean()))
+        r0 = _uw_rim(uw_interface(_dw, _n0[0], _n0[1], _n0[2], _nb, c)[3], _pol)[0]
+        r1, wd = _uw_rim(uw_interface(_dw, _nw[0], _nw[1], _nw[2], _nb, c)[3], _pol)
+        _rim0.append(r0); _rim1.append(r1)
+        print("  %s  flat water %.4f deg (closed form %.4f, %+.4f);  as rendered "
+              "%.4f deg, 10-90 wobble %.3f deg" % (nm, r0, _cf, r0 - _cf, r1, wd))
+    print("  dispersive spread red - blue: %.4f deg flat, %.4f deg as rendered, "
+          "%.4f deg closed form" % (_rim0[0] - _rim0[2], _rim1[0] - _rim1[2],
+                                    UW_SPREAD))
+    # and the sub-critical side of the same rim: how close does the reflectance
+    # get to 1 BEFORE the branch takes over? Two computations, one number.
+    _tt = uw_interface(_dw, _n0[0], _n0[1], _n0[2],
+                       n_water(BAND[1, 0] + _ql * (BAND[1, 1] - BAND[1, 0])), 1)
+    _sub = ~_tt[3]
+    print("  on the transmitting side of the rim the reflectance reaches %.6f, "
+          "and R > 0.99 over the last %.3f deg -- `refract`'s null return and "
+          "`fresnel` meeting at 1 from two directions"
+          % (_tt[4][_sub].max(),
+             np.degrees(UW_TC[1]) - _pol[_sub & (_tt[4] > .99)].min()
+             if (_sub & (_tt[4] > .99)).any() else float('nan')))
+    # the band the sky stands in for the deck: (1 - R) is still worth something
+    # there, and the world above the water is `sky` and nothing else.
+    for _lv in (.30, .10, .03):
+        _m = _sub & ((1.0 - _tt[4]) < _lv)
+        if _m.any():
+            print("     (1 - R) < %.2f over the last %.3f deg of the window -- "
+                  "? that band looks at the coping and the deck and is given sky"
+                  % (_lv, np.degrees(UW_TC[1]) - _pol[_m].min()))
+
+    # ---- THE SUN IN THE WINDOW ----------------------------------------------
+    _lum = UW_HDR.reshape(-1, 3) @ np.array([.2126, .7152, .0722])
+    _bl = np.flatnonzero((_lum > L_WHITE) & _isw & ~UW_TIR)
+    if _bl.size:
+        _bp = np.degrees(np.arccos(np.clip(uw_pixel_dirs(_bl)[:, 2], -1, 1)))
+        print("the sun: %d subsamples inside the window blow an output pixel on "
+              "their own; polar %.2f-%.2f deg, median %.2f, i.e. %.2f deg inside "
+              "the green rim against %.2f deg closed form"
+              % (_bl.size, _bp.min(), _bp.max(), np.median(_bp),
+                 np.degrees(UW_TC[1]) - np.median(_bp),
+                 np.degrees(UW_TC[1] - UW_TSUN[1])))
+    else:
+        print("the sun: nothing in the window blows an output pixel")
+    # ...and section G's weaker claim that the RIM is the brightest thing in
+    # frame, which is a prediction and is tested here rather than arranged.
+    _pall = np.degrees(np.arccos(np.clip(_dall[:, 2], -1, 1)))
+    _lall = _lum[_jall]
+    print("radiance across the window, by polar angle (green rim at %.2f deg):"
+          % np.degrees(UW_TC[1]))
+    for _a, _b in ((22, 30), (30, 38), (38, 44), (44, 47), (47, 48.5),
+                   (48.5, 50), (50, 56), (56, 70)):
+        _m = (_pall >= _a) & (_pall < _b)
+        if _m.sum() > 2000:
+            print("   %4.1f-%4.1f deg %8d px   median %.3f   p99 %.3f   %s"
+                  % (_a, _b, _m.sum(), np.median(_lall[_m]),
+                     np.percentile(_lall[_m], 99),
+                     'window' if _b <= 48.5 else 'mirror'))
+    print("   for comparison the median over everything that is NOT the surface "
+          "-- bed, walls, risers -- is %.3f" % np.median(_lum[~_isw]))
+
+    # ---- THE TWIN AT THE WATERLINE ------------------------------------------
+    # Section G's strongest photographic criterion, measured rather than looked
+    # at. Walk a column of the frame across the north wall's waterline: the wall
+    # and its image are the same liner one reflection apart, so the two have to
+    # be close AND the join has to be a join rather than a step. A special case
+    # would show up as the second failing while the first passed.
+    print("the twin at the north wall's waterline, on the encoded frame. The "
+          "three stations are the stretches of that wall the step unit (x 4.5 "
+          "to 7.5) and the bench lobe (x 2.15 to 3.85) do not stand in front "
+          "of:")
+    for _xw in (1.0, 1.8, 4.2):
+        _p = uw_project([[_xw, Y1, 0.0]])[0]
+        _cxp, _cyp = int(round(_p[0])), int(round(_p[1]))
+        if not (6 < _cxp < W // SS - 7 and 14 < _cyp < H // SS - 15):
+            continue
+        _co = UW_ENC[:, _cxp - 3:_cxp + 4].astype(float).mean(1)
+        _ab = _co[_cyp - 12:_cyp - 3].mean(0)      # above the line: the image
+        _be = _co[_cyp + 4:_cyp + 13].mean(0)      # below it: the wall itself
+        _st2 = np.abs(_co[_cyp] - _co[_cyp - 1]).max()
+        # the difference in sRGB levels, not a ratio: red is 0-3 levels at this
+        # path length and a ratio of two numbers that small says nothing.
+        print("   x %.1f m (%.2f m away, px %d,%d): image %s  wall %s  image - "
+              "wall %s levels;  largest one-pixel step at the line %.1f levels"
+              % (_xw, np.hypot(_xw - UW_EYE[0], Y1 - UW_EYE[1]), _cxp, _cyp,
+                 np.round(_ab, 1), np.round(_be, 1), np.round(_ab - _be, 1), _st2))
+
+    # ---- AERIAL PERSPECTIVE, OFF THE FRAME ----------------------------------
+    # Section G's claim is that `ABS` now acts along the VIEW path, and the frame
+    # can be made to say so with no constant of the shading entering. The naive
+    # instrument -- bin every floor hit by distance and watch the colour drift --
+    # DOES NOT WORK, and it is worth saying why: the bed's own radiance varies in
+    # COLOUR across the basin (the bed-return map, the sky view factor, the sail's
+    # shadow swapping a golden illuminant for a blue one, the caustics), and from
+    # one frame that variation is not separable from the path. Measured that way
+    # the fit lands 14% and 119% off, and the residual is the pool, not the water.
+    #
+    # THE CLEAN INSTRUMENT IS IN THE SAME FRAME. Outside the window the surface is
+    # a mirror of reflectance 1, so a texel of the floor is seen TWICE -- once
+    # directly, once folded down off the underside -- and those two readings are
+    # the same pigment under the same light at two different path lengths. Every
+    # confound above cancels in the pair, because it is the same texel. What is
+    # left is exp(-a s) and nothing else, and the difference of two channels'
+    # logarithms over the difference of the two paths is a difference of two
+    # absorption coefficients. Binned on an 8 cm grid over the floor, which is
+    # coarse against the caustic net's 15-30 cm cells and fine against everything
+    # else that varies.
+    _fl = np.flatnonzero(UW_ONB)
+    _bx, _by = UW_BED[_fl, 0].astype(float), UW_BED[_fl, 1].astype(float)
+    _keep = bed_z(_bx, _by) <= -DEPTH + 1e-9         # the floor, not a tread
+    _fl, _bx, _by = _fl[_keep], _bx[_keep], _by[_keep]
+    _dir = UW_SID[_fl] == 0
+    _cell = (np.floor((_bx - X0) / .08).astype(np.int64) * 4096
+             + np.floor((_by - Y0) / .08).astype(np.int64))
+    _L = UW_HDR.reshape(-1, 3)[_fl]
+    _P = UW_TOT[_fl].astype(float)
+    _lr = np.log(np.maximum(_L[:, 0], 1e-9) / np.maximum(_L[:, 1], 1e-9))
+    _lb = np.log(np.maximum(_L[:, 2], 1e-9) / np.maximum(_L[:, 1], 1e-9))
+    _uc, _inv = np.unique(_cell, return_inverse=True)
+    _nc = _uc.size
+
+    def _cellmed(mask, q):
+        """median of q per cell, and the count, over the masked subset."""
+        o = np.full(_nc, np.nan); c = np.bincount(_inv[mask], minlength=_nc)
+        idx = _inv[mask]; qq = q[mask]
+        srt = np.argsort(idx, kind='stable')
+        idx, qq = idx[srt], qq[srt]
+        st = np.concatenate([[0], np.cumsum(c)])
+        for k in np.flatnonzero(c >= 60):
+            o[k] = np.median(qq[st[k]:st[k + 1]])
+        return o, c
+
+    _pd, _cd = _cellmed(_dir, _P)
+    _pm, _cm = _cellmed(~_dir, _P)
+    _rd = _cellmed(_dir, _lr)[0]; _rm = _cellmed(~_dir, _lr)[0]
+    _bd = _cellmed(_dir, _lb)[0]; _bm = _cellmed(~_dir, _lb)[0]
+    _ok = np.isfinite(_pd) & np.isfinite(_pm) & (np.abs(_pm - _pd) > .40)
+    print("aerial perspective, on the %d floor texels this frame sees BOTH "
+          "directly and in the mirror (>= 60 subsamples each way, path pairs "
+          "at least 0.40 m apart):" % _ok.sum())
+    if _ok.sum() > 20:
+        _ds = _pm[_ok] - _pd[_ok]
+        for nm, dl, dc in (('R/G', _rm[_ok] - _rd[_ok], ABS[0] - ABS[1]),
+                           ('B/G', _bm[_ok] - _bd[_ok], ABS[2] - ABS[1])):
+            _e = dl / _ds
+            print("   d ln(%s)/ds = %+.5f /m (median over texels; quartiles "
+                  "%+.5f / %+.5f) against -(a_%s - a_G) = %+.5f /m  (%+.1f%%)"
+                  % (nm, np.median(_e), np.percentile(_e, 25),
+                     np.percentile(_e, 75), nm[0], -dc,
+                     100 * (np.median(_e) / -dc - 1)))
+        print("   path pairs: direct %.2f-%.2f m, mirrored %.2f-%.2f m, median "
+              "difference %.2f m -- and the ONLY residual left in the pair is "
+              "the in-scatter, which is a source and does not attenuate"
+              % (_pd[_ok].min(), _pd[_ok].max(), _pm[_ok].min(), _pm[_ok].max(),
+                 np.median(_ds)))
+    # ...and the naive version, kept because the size of its error is the
+    # measurement of how much of a frame's colour-with-distance is the pool
+    # rather than the water.
+    _lit = _dir & (bed_sun(_bx, _by, np.full(_bx.size, -DEPTH)) > .999) \
+        & (pool_sdf(_bx, _by) < -1.0)
+    _sc, _rg = [], []
+    for a, b in ((1.5, 2.0), (2.0, 2.5), (2.5, 3.0), (3.0, 4.0), (4.0, 5.0)):
+        m = _lit & (_P >= a) & (_P < b)
+        if m.sum() > 4000:
+            _sc.append(np.median(_P[m])); _rg.append(np.median(_lr[m]))
+    if len(_sc) > 2:
+        print("   for contrast, the naive fit over sunlit open floor binned by "
+              "distance alone: d ln(R/G)/ds = %+.5f /m, %+.1f%% off -- that gap "
+              "is the bed's own colour varying across the basin"
+              % (np.polyfit(_sc, _rg, 1)[0],
+                 100 * (np.polyfit(_sc, _rg, 1)[0] / -(ABS[0] - ABS[1]) - 1)))
+    print("   the frame's own path range gives a red transmission of %.3f at "
+          "its median geometry distance %.2f m and %.3f at its longest, %.2f m"
+          % (np.exp(-ABS[0] * np.median(UW_SM[~_isw])), np.median(UW_SM[~_isw]),
+             np.exp(-ABS[0] * UW_SM[~_isw].max()), UW_SM[~_isw].max()))
+
+    # ---- WHAT THE SURFACE FILTER LEFT BEHIND --------------------------------
+    _fpw = UW_SM[_jall] * UW_PIXANG / np.maximum(np.abs(_dall[:, 2]), .10) * SS
+    _k = np.arange(0, _jall.size, max(1, _jall.size // 200000))
+    _svv = surf_stats(UW_EYE[0] + _dall[_k, 0] * UW_SM[_jall[_k]],
+                      UW_EYE[1] + _dall[_k, 1] * UW_SM[_jall[_k]], _fpw[_k])
+    _srem = float(np.sqrt(np.mean(_svv[2] + _svv[3])))
+    _sres = float(np.sqrt(np.mean(_svv[0] ** 2 + _svv[1] ** 2)))
+    print("the surface, from this eye: footprint %.2f-%.2f mm (median %.2f) "
+          "against a 28 mm dominant wind wave; resolved slope rms %.4f, "
+          "unresolved %.5f -- %.3f deg of normal tilt, ? not fed to a refracted "
+          "lobe" % (1000 * _fpw.min(), 1000 * _fpw.max(), 1000 * np.median(_fpw),
+                    _sres, _srem, np.degrees(np.arctan(_srem))))
+    print("path lengths in the frame: eye to surface %.2f-%.2f m, geometry "
+          "%.2f-%.2f m; the deepest red transmission in shot is %.3f"
+          % (UW_SM[_isw].min(), UW_SM[_isw].max(), UW_SM[~_isw].min(),
+             UW_SM[~_isw].max(), np.exp(-ABS[0] * UW_SM[~_isw].max())))

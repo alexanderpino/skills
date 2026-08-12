@@ -7,6 +7,10 @@ or falsified here.
 
     python3 render.py          # writes pool_final.png, pool_final_dispersion.png,
                                #        pool_final_zoom.png
+    POOL_UNDERWATER=1 python3 render.py       # the same frames, plus
+                               #        pool_under.png -- the camera under the
+                               #        water. The hero frame is bit-identical
+                               #        either way; see the section below.
 
 | File | Owns |
 |---|---|
@@ -28,9 +32,9 @@ not written here, in three tiers, in about 35 seconds — no render, no PNG.
 
 | Tier | Strength of evidence | Covers |
 |---|---|---|
-| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½` and `WALL_SKY` as the other half of that same hemisphere, the meniscus's force balance and projected-area identity and its two collapse limits, the sign that refutes the fillet's internal-reflection term, **Walsh's relation and a closed energy audit of the whole pool**, the four wall planes against `pool_sdf`, the analytic ceiling on the fillet's transmitted column, the near-wall fold guard fired both ways, and a shadow march of the coping |
+| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½` and `WALL_SKY` as the other half of that same hemisphere, the meniscus's force balance and projected-area identity and its two collapse limits, the sign that refutes the fillet's internal-reflection term, **Walsh's relation and a closed energy audit of the whole pool**, the four wall planes against `pool_sdf`, the analytic ceiling on the fillet's transmitted column, the near-wall fold guard fired both ways, a shadow march of the coping, and — new this round — **the Snell window's half-angle measured off the underwater frame's own ray directions**, the mirror regime's reflectance being exactly 1, Stokes reversibility, and **the `n²` radiance gain closed against the air-side transmitted flux** |
 | 2 · published measurement | a disagreement may be a bug or a different water | pure-water absorption vs Pope & Fry 1997 and Smith & Baker 1981, slope statistics vs Cox & Munk 1954, the round-jet constants S and B, capillary-gravity dispersion and c_min |
-| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, **the bed ↔ wall transfer closed by reciprocity — the shipped gather's lattice against that same rectangle view factor**, the shipped 240-direction lattice against its own closed form over the wall's height range, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian, an RK4 march of Young–Laplace vs the meniscus profile, a 4000-ray fan vs its projected area, a 1 mm march of the bed height field vs `scene_hit`'s five-plane solve, a 128 000-hit march of the fillet's transmitted fan vs the wall map's extent, and the pool's apparent albedo integrated ray by ray vs `wet_albedo`'s trapped series |
+| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, **the bed ↔ wall transfer closed by reciprocity — the shipped gather's lattice against that same rectangle view factor**, the shipped 240-direction lattice against its own closed form over the wall's height range, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian, an RK4 march of Young–Laplace vs the meniscus profile, a 4000-ray fan vs its projected area, a 1 mm march of the bed height field vs `scene_hit`'s five-plane solve, a 128 000-hit march of the fillet's transmitted fan vs the wall map's extent, the pool's apparent albedo integrated ray by ray vs `wet_albedo`'s trapped series, and a 0.5 mm march of the water body vs `scene_hit_under`'s any-direction solve |
 
 The highest-value single test is the **sinusoid caustic**: for `h = a sin(kx)`
 under a vertical sun the whole pass is a 1-D map with an exact Jacobian, so the
@@ -66,9 +70,10 @@ closed with no tolerance widened; four tolerances were *tightened* to double
 round-off because the quantity they cover became an identity rather than an
 approximation.
 
-**It is now 196 rows and 0 FAIL, up from 169.** The 27 new ones are the guards on
-the six defects closed below plus the four on the wall gather, and each was
-checked the only way a guard can be: by putting the defect back. Reverting the
+**It is now 215 rows and 0 FAIL, up from 196.** The 19 newest are the underwater
+camera's, and they are listed with the section below. The 27 before them are the
+guards on the six defects closed below plus the four on the wall gather, and each
+was checked the only way a guard can be: by putting the defect back. Reverting the
 `1/n²` fails 6 rows, writing `1/n` instead of `1/n²` fails the same 6, putting
 the wall planes back on the plan rectangle fails 4, shortening the wall map fails
 2, neutering the fold guard fails 2, handing stone `sun_vis` again fails 1, and
@@ -374,60 +379,263 @@ than the stone-to-water balance the constant was presumably dialled against —
 same pigment, same frame, one path apart — and it did not exist before this
 round. The constant still has no derivation and this round did not move it.
 
-## Not modelled yet — the camera under the water
+## Closed — the camera is now under the water
 
-Requested for a later pass, and the largest single inversion left in the model:
-everything above is a view *into* the medium, this is a view *from inside* it.
-Numbers below are computed from the constants already in `render.py`, so the
-feature is mostly a matter of building the view, not of finding new physics.
+    POOL_UNDERWATER=1 python3 render.py     # also writes pool_under.png
 
-- **Snell's window.** The whole above-water world compresses into a cone of half
-  angle `asin(1/n)` overhead — 48.5 deg green, so 97 deg across. Outside that cone
-  the surface is a **perfect mirror**: reflectance is exactly 1 beyond the critical
-  angle, so the camera sees the bed, the walls and the step unit folded back down.
-  There is no partial regime out there, which makes the rim the hardest edge in
-  the scene and the easiest thing to get visibly wrong.
-- **`refract()` now has the branch this pass is built on.** Past the critical
-  angle it returns the null vector `(0,0,0)`, and `is_tir(t)` is the predicate.
-  It used to clamp the radicand at zero and hand back a horizontal vector of
-  length `n·sin i > 1` — a direction that is not a direction, returned silently,
-  which is precisely the failure this pass would have inherited on its first
-  frame. Unreachable from every current call site (all five refract *into* the
-  water, `eta = 1/n < 1`, where no critical angle exists); the two whose `eta` is
-  computed rather than a literal assert which side of the interface they are on,
-  and this pass is the one that will flip that assert. The
-  suite bisects on `refract()`'s own output for the onset of the null return and
-  checks it against the angle at which the exact Fresnel reflectance reaches 1 —
-  two functions with no shared line of code, agreeing to 1e-4 deg.
-- **The rim is dispersive, and by a measurable amount.** With the file's own
-  `IOR = 1.3320 / 1.3348 / 1.3400`, the critical angle runs 48.655 / 48.519 /
-  48.268 deg — a **0.39 deg** spread, red rim outside blue. Same three constants
-  that already produce the fringing on the bed caustics, used on a hard edge
-  instead of a soft one.
-- **The sun sits just inside the rim, at this sun elevation.** 21.0 deg elevation
-  is 69.0 deg from vertical in air, refracting to **44.4 deg** from vertical below
-  the surface — only **4.1 deg** inside the window's edge. So the sun is not
-  overhead in the window, it is crowded against its edge, which is where the
-  window is most compressed and most dispersive.
-- **Absorption becomes aerial perspective.** This is the first view in the model
-  where the water column sits between the camera and the far geometry, so `a`
-  acts along the *view* path. `render.py` uses Pope & Fry (1997) averaged over
-  its own channel bands, `a = (0.2617, 0.05299, 0.01022) /m`; the chapter quotes
-  the same table point-sampled at its own 610/550/450 nm,
-  `a = (0.2644, 0.0565, 0.00922) /m`. **Same water, same table, two samplings of
-  it** — not two candidate waters, and `validate.py` checks both against the
-  published table so neither can drift. Transmission at 5 m is `(0.27, 0.77,
-  0.95)` — the far wall loses nearly three quarters of its red and the scene
-  goes cyan with distance. The chapter's "the colour is the bottom, not the water"
-  is a statement about a view from above; from inside, the water genuinely does
-  colour the image.
-- **`b_b ~ 0` gets its real test here.** Backscatter that is negligible over a
-  1.4 m round trip from above is what produces the visible beam structure and the
-  contrast loss along an 8 m horizontal path. Same reason the wall lights below
-  need the `a`/`b`/`g` split rather than one collapsed `sigma`.
-- **Real time:** the window is a single `dot(N, V)` against the critical angle plus
-  a Fresnel term, and the mirror side is the existing reflection path. Nothing
-  here needs a path tracer.
+**Built this round.** It was the largest single inversion left in the model —
+everything else is a view *into* the medium, this is a view *from inside* it —
+and it is the last unrendered section of the bar (`gauntlet/bar/photo-spec.md`
+section G). The numbers below were computed from the constants already in
+`render.py` before it was built; what follows each of them now is what the frame
+actually produced.
+
+The pass is guarded by an environment variable and sits after the hero frame is
+encoded and written, so `pool_final.png` is **bit-identical** with the switch
+off — hashed either side of the change (`edfa13ae…`, unchanged). Two things
+above the line moved, both factorings and neither arithmetic: the map lookup was
+lifted out of `_menis_under` into `submerged_radiance`, so both cameras read the
+bed, wall and riser maps through one function, and the in-scatter pair was named
+(`INSCAT`, `INSCAT_K`). That sharing is the whole basis of the section's claim
+that it is the **same water**: the mirrored twin at the waterline is the hero's
+own wall buffer, read by the hero's own `scene_hit`, from the other side.
+
+- **Snell's window.** The above-water world compresses into a cone of half angle
+  `asin(1/n)` overhead — 48.5 deg green, 97 deg across. Outside that cone the
+  surface is a **perfect mirror**: reflectance exactly 1 beyond the critical
+  angle, so the camera sees the bed, the walls and the step unit folded back
+  down. There is no partial regime out there.
+  **Measured off the frame, flat water: 48.6560 / 48.5108 / 48.2729 deg**
+  against `asin(1/n)` = 48.6554 / 48.5074 / 48.2618. The residual is not error:
+  it is the **band integral**. A channel is a band, so nine wavelength strata
+  refract at nine indices and the rendered rim is the mean of `asin(1/n(λ))`,
+  which by convexity sits above `asin(1/n(λ̄))` — by 0.0006 deg in red, 0.0034 in
+  green and 0.0110 in blue, in exactly the ratio of the three bands' `dn`
+  (0.00239 / 0.00382 / 0.00670). The rim is a **band-averaged** critical angle,
+  and the widest band is the one that shows it.
+- **The rim is reached through `refract()`'s null return and `is_tir()`**, never
+  through an angle comparison, and the assert at `water_shade`'s refraction —
+  `the camera is above the water` — is the one this pass flips. `uw_interface`
+  gets its reflectance from the file's own external `fresnel` evaluated at the
+  **conjugate air-side angle**, which is Stokes reversibility and the same
+  identity the wet liner already uses for `R_INT`. So the transmitted column
+  fades to zero exactly where the square root changes sign, out of two
+  computations that share no line. **Measured: R reaches 0.9983 on the last
+  transmitting ray and exceeds 0.99 over the final 0.098 deg.** `validate.py`
+  bisects the two against each other for all three bands and they agree to
+  1e-4 deg, which is the scan's own grid.
+- **The rim is dispersive.** With `IOR = 1.3320 / 1.3348 / 1.3400`, the critical
+  angle runs 48.655 / 48.519 / 48.268 deg — a **0.39 deg** spread, red rim
+  outside blue. **Measured off the frame: 0.3832 deg on flat water** (the 0.0041
+  deficit is the band-integral bias above, which is largest in blue), **0.3873
+  deg closed form.**
+- **The sun sits just inside the rim.** 21.0 deg elevation is 69.0 deg from
+  vertical in air, refracting to **44.4 deg** below the surface — only **4.1 deg**
+  inside the window's edge. **Measured: the 2225 subsamples that blow an output
+  pixel on their own have a median polar angle of 44.41 deg, i.e. 4.11 deg
+  inside the green rim, against 4.15 deg closed form.** They are spread over
+  42.6–45.8 deg, which is the wave field smearing the disc, not the disc.
+- **Absorption becomes aerial perspective**, and measuring it off the frame
+  needed a better instrument than the obvious one. `render.py` uses Pope & Fry
+  (1997) averaged over its own channel bands, `a = (0.2617, 0.05299, 0.01022)/m`;
+  red transmission runs 0.594 at this frame's median geometry distance (1.99 m)
+  and 0.156 at its longest (7.10 m), so the frame goes cyan with distance as the
+  chapter's numbers require.
+  **The obvious instrument does not work, and the size of its failure is itself
+  the finding.** Binning every floor hit by distance and watching the colour
+  drift measures the *pool*, not the water: the bed's own radiance varies in
+  colour across the basin — the bed-return map, the sky view factor, the sail's
+  shadow swapping a golden illuminant for a blue one, the caustics — and one
+  frame cannot separate that from the path. Restricted to sunlit open floor a
+  metre off every wall it still lands **+13.2%** off `-(a_R - a_G)`.
+  **The clean instrument is in the same frame, and it is the mirror.** Outside
+  the window the surface reflects 1, so a floor texel is seen **twice** — once
+  directly and once folded down off the underside — at two path lengths, same
+  pigment, same light. Every confound cancels inside the pair. Binned on an 8 cm
+  grid, **804 texels are seen both ways with their two paths at least 0.40 m
+  apart, and they give `d ln(R/G)/ds = −0.19643 /m` against `−(a_R − a_G) =
+  −0.20871` (−5.9%, inter-quartile −0.200 to −0.191) and `d ln(B/G)/ds =
+  +0.04160` against `+0.04277` (−2.7%).** That the mirror is what makes
+  Beer–Lambert measurable on a view leg is a consequence of the window, not a
+  trick: it is the only way one frame contains the same surface at two ranges.
+- **`b_b ~ 0` got its test here**, and it is what is left in that −5.9%. The
+  residual in-scatter, hoisted out of `water_shade` and integrated as the broken
+  path it is (eye → surface, then the reflected share through a second leg), is
+  a source rather than a pigment: it does not attenuate, so it lifts the longer
+  reading of each pair and *reduces* the apparent attenuation. `?` The sign and
+  the order are right — a rough accounting gives about +0.02 /m against the
+  measured +0.012 /m deficit — but the residual was not decomposed exactly.
+- **The mirrored twin came free**, which was the point. Nothing in the pass
+  mentions the waterline. Outside the window `R` is 1, the reflected ray is
+  traced by the **existing downgoing `scene_hit`** from the surface point, and
+  the wall's image folds down because the wall is where it is. **Measured on
+  three stations of the north wall — the stretches the step unit and the bench
+  lobe do not stand in front of — the image and the wall agree to 3% in green
+  and blue, and the largest one-pixel step across the line is 5–10 sRGB levels,
+  which is the wave wobble at the line and not a seam.** The tile grout lines
+  run through the join and come back mirrored.
+- **Real time:** the window is `refract` plus a Fresnel term and the mirror side
+  is the existing reflection path. The pass costs **30 s** on top of the hero's
+  own render at the same 2400 × 3600 × 3² — no path tracer, and cheaper than the
+  hero's camera pass because the mirror leg is achromatic and needs one trace
+  for three channels.
+
+### The camera, and the one number in it that is a choice
+
+Held to the standard of the `CAM_AZ` block. The eye is at **(6.60, 1.40, −0.70)**
+looking at azimuth 145 deg, elevation +22 deg, through a **16 mm** lens on the
+same 3:2 portrait frame the hero uses.
+
+- **The lens is section H's**, the reference for the submerged half of an
+  over-under. 16 mm on 36 × 24 mm gives 96.73 deg on the long axis — and the
+  window is 2 asin(1/n) = **97.04 deg** across, so *the reference lens for this
+  kind of frame is 0.31 deg too narrow to hold the thing the frame is about*.
+  That near-miss is recorded rather than fixed.
+- **It is not pointed at the zenith, and that is forced.** Holding the whole
+  window *and* anything below the horizontal needs a half-field of at least
+  90 deg, which no rectilinear projection has. The window's centre is the least
+  compressed and least dispersive part of it and carries no test; the rim, the
+  sun crowded against it, the twin, the step unit and the aerial perspective are
+  all in the outer half or below it. So the aim tilts down and the centre goes
+  out of shot at v = +2.4.
+- **The port is a dome**, stated because a camera in water has one. A concentric
+  dome is afocal for rays through its centre of curvature, so the in-water field
+  is the lens's native one and no magnification enters. A flat port would narrow
+  96.73 deg to 67.9 deg and magnify by `n` — a real and visible different
+  choice, and section H is where it is tested.
+- **`EXPOSURE` does not move.** A radiance in this frame and a radiance in the
+  hero are the same number of stops, which is what makes the two comparable and
+  is the one thing section H says may never be fudged between halves.
+- **The depth is the only free number**, and it is bounded on one side: the rim
+  lands at `d tan(theta_c) = 1.134 d` from the eye's vertical, so an unclipped
+  window needs `d < 1.234 m` here. `? 0.70 m` is taken — half the basin's
+  deepest depth, the eye equidistant from surface and bed, the rim clearing the
+  nearest wall by 43%. It is marked `?` and its consequences are printed rather
+  than assumed.
+
+### What the view found, which is why it was built
+
+Section G calls the submerged view the strongest verification instrument in the
+project, on the grounds that every above-water shortcut that survives by being
+invisible from a 33 deg downward view becomes visible from underneath. It did.
+
+- **`riser_bounce`'s map is visibly banded at 1.2 m.** `RIS_NT = 512` arc
+  samples per cylinder is 18.4 mm on the outer nosing; from this eye that is
+  **26 output pixels wide**, and the map's bin-to-bin Monte-Carlo variation
+  reads as hard vertical stripes over the whole step unit, with the bilinear
+  interpolation's ridges visible as creases. From the hero's 3.4 m the same unit
+  is 130 px tall and the same bins are under a pixel each, which is why six
+  waves of work never saw it. **The bench lobe shows the same estimator as
+  speckle** rather than stripes, because its face is more nearly normal to this
+  view. Both are the *estimator's own noise*, made visible by a 3× closer look
+  at the same buffer.
+  **Not fixed, deliberately.** Raising `RIS_NT` or the gather's 240 directions
+  changes the hero frame, and the hero frame is the bit-identity contract this
+  round was built under. It is recorded here as the next round's work, with the
+  number that sizes it: the map needs about 4× the arc resolution before its
+  bins fall under an output pixel at 1.2 m.
+- **The rim is not a hard edge, and it is not a step.** Section G calls it "the
+  hardest edge in the scene". It is continuous in radiance: `R → 1` like
+  `sqrt(theta_c - theta)`, so the transmitted column *fades* rather than being
+  cut, and what is discontinuous there is the derivative. On top of that, the
+  wave field smears it: **the 10–90 width of the rim's own crossing is 6.1–6.3
+  deg**, because this eye sits 0.9 m from the jet's boil where the resolved
+  slope rms is 0.076 (4.4 deg of normal tilt). The rim in this frame is a
+  wrinkled band six degrees wide whose *mean* is `asin(1/n)` to 0.005 deg. That
+  is a reading of the wave field from a third direction, and it is the one the
+  split shot (section H) will want.
+- **The window's brightest part is not its rim.** Section G's weaker,
+  recollection-tier criterion says "the window's rim is the brightest thing in
+  frame". Measured by polar angle, the window's median radiance runs 1.320
+  (22–30 deg) → 1.485 (30–38) → **1.577 (38–44)** → 1.464 (44–47) → 1.312
+  (47–48.5). The peak is **4–10 deg inside the rim**, because `(1 - R)` falls
+  faster near the edge than the compressed horizon sky brightens, and the last
+  degree of the window is *darker* than its middle. The brightest individual
+  pixels in the frame are the sun (p99 2.58 at 44–47 deg) and the caustics seen
+  in the mirror (p99 4.56 at 50–56 deg), not the rim. **This is a disagreement
+  with the bar**, and it is filed as one: the criterion is marked *recollection
+  of photographs in general*, and what the physics gives instead is a bright
+  window (median 1.3–1.6) against dark geometry (median 0.396) with its peak
+  inside the rim rather than on it.
+- **The world above the water is `sky()` and nothing else.** A refracted ray
+  leaving at `theta_a` near 90 deg points at the coping, the deck and the shade
+  sail and gets sky. **Measured: that band is the outermost 0.205 deg of the
+  window at `(1 - R) < 0.30`, and 0.107 deg at `(1 - R) < 0.10`** — so it is
+  thin and weighted down, but it is a `?` and it is the reason the very rim
+  reads as a soft blue line rather than as a ring of compressed poolside.
+- **The unresolved slope variance feeds nothing here.** On the hero it becomes
+  the reflection ellipse and the Bruneton masking term; the refracted lobe has
+  no equivalent. **Measured: the surface is 0.74–7.08 m from this eye, the
+  output pixel's footprint on it is 1.5–133 mm (median 2.9) against a 28 mm
+  dominant wind wave, and the unresolved slope rms left over is 0.0108 — 0.6 deg
+  of normal tilt.** Small, but `?` rather than zero, and near the rim the
+  refraction amplifies it by `n cos(theta_w)/cos(theta_a)`, which diverges.
+- **The mirror is a measuring instrument, not only a picture.** A frame taken
+  from inside the medium contains the same floor texel at two ranges, and that
+  is what makes Beer–Lambert on a *view* leg measurable at all. It was found by
+  the naive measurement failing, and it is the sharpest new number this round
+  produced (−5.9% and −2.7% against the two closed forms, on 804 texel pairs).
+  Nothing above the water can do this: from above, every bed point is seen once.
+- **`scene_hit` is downgoing-only, and now has a sibling.** `scene_hit_under`
+  handles either sign of `tz`, adds the still surface as id 6, and generalises
+  the cylinder entry to the ascending case. A sibling rather than an extension
+  because extending would have put a new id into a function five call sites read
+  positionally; `validate.py` fires both at the same 120 000 downgoing rays and
+  asserts they agree **bit for bit**, and marches the upgoing half against a
+  0.5 mm walk of the water body.
+
+### The rows it added — 19, and what each pair does not share
+
+`validate.py` is now **215 pass, 0 FAIL, 43 info**. The new rows are built to
+the rule the `TIR_VERT` failure produced: *a test and the code it checks must not
+share a premise*, and neither may two tests of the same number.
+
+- **The window's half angle, off the frame's own geometry** (tier 1, three
+  rows). The camera's own ray directions, flat water, through `uw_interface` —
+  i.e. through `refract` and `is_tir`. The rim is bracketed between the steepest
+  ray that still transmitted and the shallowest that did not, and `asin(1/n)`
+  must lie inside. **The tolerance *is* the bracket** — the frame's angular
+  sampling, 1.1e-4 deg — so it is not a free parameter and it shrinks if the
+  frame is rendered finer. Plus the dispersive spread as a fourth row.
+- **The onset of the mirror regime** (tier 1, three rows). A bisection on the
+  pass's own null return against a 4 M-point scan of the exact water→air
+  reflectance reaching 1. One solves for `cos t` and tests its sign; the other
+  forms amplitude ratios. Neither contains `asin(1/n)`. They agree to 1e-4 deg,
+  the scan's grid, in all three bands.
+- **The mirror is total** (tier 1): every ray `is_tir` flags carries `R = 1`
+  identically, no tolerance. Section G's "there is no partial regime out there",
+  as an assertion.
+- **Stokes reversibility** (tier 1): the shipped path — render.py's *external*
+  `fresnel` read at the conjugate angle — against the water→air equations formed
+  in `validate.py` from the two indices. 4e-14 over 20 001 angles. This is what
+  buys the file having only one Fresnel implementation.
+- **The `n²` radiance gain** (tier 1, three rows plus two identities). A uniform
+  sky on flat water, and the transmitted irradiance counted twice: on the water
+  side through the shipped `uw_interface` and `into_water` over the **window
+  alone**, and on the air side through `validate.py`'s own `fresnel_exact` over
+  the **whole hemisphere**. They are equal only for the square — at `n¹` the
+  water side reads 0.75 of the air side and at `n³` 1.33 — so this is the first
+  row in the suite that tests the *gaining* direction of `L/n²`, and it fails as
+  loudly for a wrong exponent as for a missing factor. Plus
+  `into_water(out_of_water(L)) == L` and `into_water(1) == n²` at one ulp.
+- **The sibling tracer** (tier 1 × 2, tier 3 × 1): exact agreement with
+  `scene_hit` on the downgoing half from two starting heights, and the p99.9 of
+  a 0.5 mm march of the water body on the upgoing half against half a march
+  step. The p100 is not used, and the row says why: a ray tangent to a riser at
+  exactly the cap height is a measure-zero disagreement between two exact
+  solids, and one ray in 36 000 finds one.
+- **The eye** (tier 1 × 2): inside the water body, and `d tan(theta_c)` under
+  the distance to the nearest wall, which is the one condition the depth is
+  chosen against.
+
+One caution about what these rows do *not* cover, in the spirit of the file's
+own epilogue: **none of them renders a pixel.** They measure the rim off the
+frame's ray *directions* and the interface off closed forms; what is checked
+inside `render.py` itself, every underwater run, is the rim, the sun's position,
+the twin's continuity and the absorption fit, each printed with the closed form
+beside it. The mirror leg's *radiance* — that the twin reads the right wall map
+at the right place — is still only checked by the frame's own twin measurement,
+which is a consistency argument and not an external one.
 
 ## Closed — the walls now stand in the bed's light
 
