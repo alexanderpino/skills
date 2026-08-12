@@ -1707,7 +1707,7 @@ WB_N = [np.array([1., 0.]), np.array([-1., 0.]),
         np.array([0., 1.]), np.array([0., -1.])]      # inward normals, x0 x1 y0 y1
 WB_P = [XW0, XW1, YW0, YW1]
 WB_Z = np.linspace(-DEPTH, WTOP, WB_NZ)
-WBNC, _wvf, _wbs = [], [], []
+WBNC, _wvf, _wbs, _wok, _wa = [], [], [], [], []
 for wi in range(4):
     _uu = np.linspace(Y0, Y1, WB_NU) if wi < 2 else np.linspace(X0, X1, WB_NU)
     _UU, _ZZ = np.meshgrid(_uu, WB_Z)
@@ -1722,13 +1722,24 @@ for wi in range(4):
     _E, _vf = bounce_gather(_px, _py, _pz, _nx, _ny, _hh)
     WBNC.append(_E.reshape(WB_NZ, WB_NU, 3))
     _wvf.append(_vf.reshape(WB_NZ, WB_NU, 3))
-    _wbs.append(_E[_ZZ.ravel() <= 0.].mean(0))
-_wvfa = np.concatenate([v[:-1].reshape(-1, 3) for v in _wvf])     # submerged only
-print("wall bounce: %d wall texels x %d directions; view-factor closure %.3f of "
-      "the 0.500 a vertical face has by geometry (%.3f of it is the truncation "
-      "to %.0f mm - %.0f m, %.1f%% is rays dropped on a riser). Of the closure, "
-      "%.3f is the BED and %.3f is another wall."
-      % (4 * WB_NU * WB_NZ, RIS_ND * RIS_NP, _wvfa[:, :2].sum(1).mean(),
+    # WETTED WALL is the only wall any of the numbers below are about: submerged,
+    # and not buried behind the step unit or under the floor at the junction.
+    # A buried texel had its origin lifted onto its own foot, so it reports the
+    # view factor of a face standing ON the bed -- close to the full 0.500 -- and
+    # averaging that into a wall statistic would inflate every one of them with
+    # 3.6 m2 of liner no ray can reach.
+    _wok.append((_ZZ.ravel() <= 0.) & (_ZZ.ravel() >= _zf - 1e-9))
+    _wa.append(((Y1 - Y0) if wi < 2 else (X1 - X0)) / WB_NU
+               * (DEPTH + WTOP) / WB_NZ * np.ones(_E.shape[0]))
+    _wbs.append(_E[_wok[wi]].mean(0))
+_wvfa = np.concatenate([v.reshape(-1, 3)[m] for v, m in zip(_wvf, _wok)])
+_wara = np.concatenate([a[m] for a, m in zip(_wa, _wok)])
+print("wall bounce: %d wall texels x %d directions, of which %d are wetted wall; "
+      "view-factor closure %.3f of the 0.500 a vertical face has by geometry "
+      "(%.3f of it is the truncation to %.0f mm - %.0f m, %.1f%% is rays dropped "
+      "on a riser). Of the closure, %.3f is the BED and %.3f is another wall."
+      % (4 * WB_NU * WB_NZ, RIS_ND * RIS_NP, _wvfa.shape[0],
+         _wvfa[:, :2].sum(1).mean(),
          float(np.mean(_ris_closure(np.linspace(RIS_HMIN, DEPTH, 64),
                                     RIS_D0, RIS_D1))),
          1000 * RIS_D0, RIS_D1, 100 * _wvfa[:, 2].mean(),
@@ -1753,16 +1764,21 @@ for _h in (0.02, 0.10, 0.35, 0.70, 1.40):
 # quadrature; `_sky_vf` measures F(bed -> sky) in closed form and its complement
 # is what the bed sends at the walls. Reciprocity says the two fluxes are one
 # flux: A_bed * F(bed -> wall) == A_wall * F(wall -> bed), and neither side
-# knows how the other is computed. The gap is the step unit, which is wall to
-# one of them (a riser standing over a bed point) and not wall to the other.
+# knows how the other is computed. What is left over is the step unit, which the
+# rectangle formula counts as wall (it is the non-sky part of a bed point's
+# hemisphere) and the gather counts as riser and drops. validate.py carries the
+# version of this identity with nothing left over -- the same shipped estimator
+# run against an EMPTY box, where the two definitions of "wall" coincide, and it
+# closes there to 3.1% against the lattice's own 3.0% quadrature error.
 _ABED = (X1 - X0) * (Y1 - Y0)
-_AWALL = 2 * ((X1 - X0) + (Y1 - Y0)) * DEPTH
-_recip = (_ABED * _WSH.mean(), _AWALL * _wvfa[:, 0].mean())
+_AWALL = float(_wara.sum())
+_recip = (_ABED * _WSH.mean(), float((_wara * _wvfa[:, 0]).sum()))
 print("  reciprocity, bed <-> wall: A_bed * F(bed->wall) = %.2f m2 (exact "
       "rectangle view factor, %.1f%% of the bed's hemisphere over %.0f m2) "
       "against A_wall * F(wall->bed) = %.2f m2 (the gather's own lattice over "
-      "%.1f m2) -- %+.1f%%, and the difference is the step unit, which the "
-      "rectangle formula counts as wall and the gather counts as riser (%.1f%%)"
+      "%.1f m2 of wetted wall) -- %+.1f%%, and what is left over is the step "
+      "unit, which the rectangle formula counts as wall and the gather counts "
+      "as riser and drops (%.1f%% of its rays)"
       % (_recip[0], 100 * _WSH.mean(), _ABED, _recip[1], _AWALL,
          100 * (_recip[1] / _recip[0] - 1), 100 * _wvfa[:, 2].mean()))
 
@@ -1823,29 +1839,41 @@ for _wi, _nm in ((0, 'west  (x0)'), (1, 'east  (x1)'), (2, 'south (y0)'),
           "%s)   cau %.3f"
           % (_nm, np.round(_L, 3), np.round(_B, 3),
              np.round(SKY_AMB * WALL_SKY * .78, 3), wall[_wi][3][_k0:].mean()))
-# THE CEILING ON THE WHOLE TERM, stated as an inequality so that nobody has to
+# THE CEILING ON THE BOUNCE, stated as an inequality so that nobody has to
 # discover it as a disappointment. A Lambertian floor's radiance does not depend
 # on where it is viewed from, so there is no sense in which a wall "catches" the
 # floor's light and "turns it toward the eye" -- it can only re-emit what it
 # absorbs, over a half hemisphere:
-#      E_wall <= 0.5 * L_floor        (the downgoing half, uniform L)
-#      L_wall  = alb_wall * E_wall
-#  =>  L_wall / L_floor <= 0.5 * alb_wall,
-# which for this pool's own liner is about 0.30 in green. A wall lit ONLY by the
-# floor beside it CANNOT out-radiate that floor, in this or any renderer, and no
-# gather can be tuned into doing so. The three ways the ordering does invert in
-# a photograph are all outside this term: the wall is lit DIRECTLY by the
-# refracted sun (the east and south walls above, `cau` > 0); or the floor being
-# compared is in shadow; or the wall is a paler material than the floor -- a
-# mosaic waterline course, which bar section B2b rules out for this liner pool.
-# Transport is the only thing left and it is small: 3.4 m more water on the
-# floor's round trip is exp(-ABS*3.4) = 0.84 in green, 0.41 in red.
+#      E_bounce <= 0.5 * L_floor        (the downgoing half, uniform L)
+#  =>  the bounce's OWN contribution to the wall's radiance is at most
+#      0.5 * alb_wall * L_floor,
+# which for this pool's own liner is 0.12 / 0.32 / 0.38 of the floor's radiance.
+# So one bounce off the floor cannot, even at its theoretical maximum, carry a
+# wall past the floor that lights it, and no gather can be tuned into doing so.
+# (This bounds the BOUNCE, not the wall: the wall's total also holds sky and the
+# TIR return, and those reach it through far less water than they reach the
+# floor through, which is where most of its ratio below comes from.)
+# The ways the ordering DOES invert in a photograph are all outside this term:
+# the wall is lit directly by the refracted sun -- the east wall above, `cau`
+# 0.92, which reads brighter than the floor by the ratio printed below; or the
+# floor being compared is in shadow; or the wall is a paler material than the
+# floor, a mosaic waterline course, which bar section B2b rules out here.
 _LF = bed_img['disp'][BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0)
-_LN = wall_img['disp'][3][_k0:].reshape(-1, 3).mean(0)
-print("  the ceiling, measured: 0.5*alb_wall = %s. North wall's top 250 mm "
-      "reads %s against a deep floor of %s -- %s of it, inside the bound on "
-      "every channel." % (np.round(.5 * .82 * LINER_TINT, 3), np.round(_LN, 3),
-                          np.round(_LF, 3), np.round(_LN / _LF, 3)))
+_ALW = .82 * LINER_TINT
+print("  the ceiling on the bounce: 0.5*alb_wall*L_floor = %s is the MOST one "
+      "bounce off the floor can put on a wall. The north wall's gather delivers "
+      "%s of that -- so the term is at %s of its own theoretical maximum and "
+      "there is no headroom left in it."
+      % (np.round(.5 * _ALW * _LF, 3),
+         np.round(_ALW * WBNC_FULL[3][_k0:].reshape(-1, 3).mean(0), 3),
+         np.round(_ALW * WBNC_FULL[3][_k0:].reshape(-1, 3).mean(0)
+                  / (.5 * _ALW * _LF), 2)))
+print("  and the four walls against the floor that lights them, top 250 mm "
+      "over the deep floor's %s: %s"
+      % (np.round(_LF, 3), "   ".join(
+          "%s %s" % (nm, np.round(wall_img['disp'][wi][_k0:].reshape(-1, 3).mean(0)
+                                  / _LF, 2))
+          for wi, nm in ((0, 'west'), (1, 'east'), (2, 'south'), (3, 'north')))))
 
 # WHAT THE MISSING WALL TERM IS WORTH, now that both halves of it exist as
 # numbers in one place. `_WSH` above is exactly the cosine-weighted FRACTION of a
@@ -4799,7 +4827,11 @@ del _hdr
 # comparison is the harder one and it is the one no grade can produce, so both
 # are measured, in the same frame, off the same encode.
 #   6  the dry blue band, above the waterline          (`liner_band`, in air)
-#   7  the submerged wall, the top 250 mm of it        (`wall_img`, under water)
+#   7  the submerged wall, the first 100 mm under the line   (`wall_img`)
+#   9  the same wall, 100-250 mm down -- because the coping's overhang shades
+#      the sky over the first of those and not the second, and after this round
+#      it does not shade the bed bounce at all, so the two strips move by
+#      different amounts and averaging them would hide which
 #   8  the deep floor 0.2-0.8 m out from that same wall
 # All three are taken on the NORTH wall west of the step unit, because that is
 # the stretch this frame sees all three of at once.

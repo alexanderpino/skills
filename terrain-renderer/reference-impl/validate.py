@@ -2554,6 +2554,16 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
       SAIL half of it, which is stubbed to 1 for that row.)
     * `_riser_shade` and the riser bounce MAP -- the closure of its estimator is
       tested, the map it produces is not.
+    * The WALL bounce map, and here the gap has a shape worth naming. What is
+      tested is the estimator's GEOMETRY: the shipped 240-direction lattice
+      against `_ris_closure` over the wall's own height range, and the bed <->
+      wall transfer against the exact rectangle view factor by reciprocity, both
+      with a unit radiance and an empty box substituted for the scene. What is
+      NOT tested is that render.py APPLIES that transfer to the walls -- no row
+      here reads a wall map, because building one costs a caustic pass. A wall
+      left dark would still pass every row in this file; what would catch it is
+      render.py's own `wall bounce:` print, which measures the term's size every
+      run, and the ordering verdict in the colour regression.
     * The bed-return (TIR) map: TIR_FRAC and TIR_VERT are tested, the 2.4 M-ray
       splat that spends them is not.
 
