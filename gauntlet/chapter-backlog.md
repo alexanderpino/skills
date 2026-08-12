@@ -448,3 +448,89 @@ the specular path only — and it is now a prerequisite rather than a nicety.
   normalised in the per-axis slope convention and three in the total, because
   both expressions divide by two and mean different things. It shipped for months
   and put two units on the two sides of one budget.
+
+---
+
+## The water/deck ratio, derived — and what it eliminates
+
+**Owner ruling, and it settles the method for the rest of this work:** *"Het enige
+wat wij kunnen doen is de natuurkunde volgen."* After three independent camera
+failure modes (J2, J2c, J2d), the photographs cannot be a ground truth. The
+ground truth has to be the physics, and the question changes shape with it: not
+*what does the photograph read*, but **what does the physics predict for water
+against sunlit sandstone, and does the render produce it.**
+
+That ratio is fully derivable. Both surfaces are horizontal, so the incident
+irradiance cancels; everything else is in the file already.
+
+**The chain, in flux rather than radiance** — which is what removes the `n²`
+bookkeeping trap, because the factor lives inside the diffuse internal
+reflectance instead of being carried separately:
+
+```
+rho_eff = T_slant · rho_bed · (1 - R_int_diff) / (1 - rho_bed · T_roundtrip · R_int_diff)
+ratio   = (1 - R_ext(sun)) · rho_eff / rho_stone        [luminance-weighted]
+```
+
+with `R_int_diff = 1 - (1 - R_ext_diff)/n² = 0.4762` from Walsh, `R_ext_diff =
+0.0667` quadratured, `a = (0.2617, 0.05299, 0.01022)` and `rho_bed = 0.74 ·
+LINER_TINT = (0.222, 0.585, 0.681)` — all of them the file's own constants, none
+introduced for this.
+
+**Evaluated at the render's own sun (21.0°) and its own view angles:**
+
+| sandstone albedo | near wall, 44° | mid, 64° | far wall, 73° |
+|---|---|---|---|
+| 0.25 | 0.998 | 0.984 | 0.979 |
+| 0.30 | 0.832 | 0.820 | 0.816 |
+| 0.35 | 0.713 | 0.703 | 0.699 |
+| 0.40 | 0.624 | 0.615 | 0.612 |
+
+**Measured off `w12-wide.png`: 0.401.** Below the whole plausible range for
+sandstone paving. The deficit is a factor of **1.5 to 2.5**.
+
+### What this eliminates, which is the valuable part
+
+Section J named two candidates for the dark far water and called them separable.
+**This calculation separates them without rendering anything, and it kills the
+first one.**
+
+- **Geometry is dead.** The predicted ratio moves from 0.998 to 0.979 between the
+  near wall and the far wall — **half a percent across the whole basin**. The
+  emergent radiance from a Lambertian bed under a surface is itself close to
+  Lambertian, so the view angle barely enters. "The eye is too low, the sky takes
+  too large a share" cannot produce a factor of two.
+- **And the sign of the residual geometry runs the other way.** The specular sky
+  reflection sitting on top of this rises from 2.7% at the near wall to 17% at the
+  far wall, which *adds* to the far water. Geometry, properly accounted, predicts
+  the far end should be the **brighter** one.
+- **So the finding is transport**, and it is a defect in the render rather than a
+  property of the viewpoint. No camera move will close it.
+
+### Simplifications, stated so the wave can attack them
+
+Not caveats offered to soften the result — places where the estimate could be
+wrong, each of which the wave should close or refute:
+
+- Only the direct beam illuminates both surfaces here; the sky's contribution is
+  omitted. It reaches both a deck and a water surface, so it largely cancels in
+  the ratio, but "largely" is not "exactly".
+- The emergent distribution from the bed is taken as Lambertian. True in the
+  limit; the departure near the critical angle is unquantified here.
+- The walls are ignored. A 8 × 4 × 1.40 m basin has real wall area, same liner,
+  and the extra bounces cost absorption — this pushes the prediction **down**,
+  and is the one simplification that could move it toward the render.
+- Sandstone albedo is bracketed rather than known. The photographs' ~1.0 implies
+  about 0.28, which is ordinary for pale sandstone paving, but that is inference
+  and not measurement.
+
+### The brief
+
+Find where the render loses the factor. Named suspects, in order of how cheaply
+they can be checked: whether the **trapped series** is applied to the bed at all
+or only to `wet_albedo` on the wall; whether `1/n²` is applied **twice** anywhere
+on the bed's route to the eye, now that the exit transport has been derived once;
+and whether the bed's irradiance is missing the sky. `validate.py` already
+carries a closed energy audit that returns exactly 1 for a white bed with no
+absorption — **it passes today, so whatever is wrong survives it**, and finding
+out why is itself a finding about the suite.
