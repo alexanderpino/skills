@@ -660,3 +660,50 @@ have different answers.**
   luminance ratio — water against sunlit sandstone in the same exposure, which the
   render puts near 0.40 where all three frames read at or above 1. Nothing in this
   testimony touches that, and it remains the thing to explain.
+
+#### J2c · The tone curve breaks the within-frame ratio too — and the observer caught it
+
+> Owner testimony, A–F weight, given after J2b: *"De schaduw is op de foto iets
+> donkerder dan in werkelijkheid nog."* The shade sail's shadow on the water is
+> slightly deeper in the photograph than it was in life.
+
+**This corrects a claim made in J2 by the lead agent, and the correction matters
+more than the original claim did.** J2 asserted that a ratio taken between two
+surfaces in one exposure survives white balance and exposure alike, and offered
+three such ratios as the preferred instrument. That is true of a *linear*
+pipeline. A phone applies a display-referred **tone curve** on top of the sRGB
+transfer function — an S-shape that deepens the toe to buy apparent contrast —
+and a ratio between two levels does **not** survive it. Inverting the sRGB EOTF
+recovers display-referred linear, not scene-referred linear, and the residual is
+exactly this curve.
+
+**The distortion is not uniform, and that gives the sorting rule.** Locally the
+curve is smooth, so a pair of surfaces at *similar* levels is transported by
+nearly the same slope and its ratio comes through close to intact. A pair far
+apart in level — a sunlit surface against a shadowed one — sits on two very
+different slopes, and that is where the curve does its damage. So:
+
+| instrument | levels | standing after this testimony |
+|---|---|---|
+| water / sunlit sandstone | close — the observer's frames read them near equal | **robust**; this is the one carrying the open finding, and it survives |
+| water / dry freeboard band | close — both directly lit, one pigment | **robust** |
+| lit water / shaded water | far apart by construction | **weakest**; the photograph *exaggerates* the gap, by an unquantified amount |
+
+The headline measurement is therefore the one least hurt, which is luck rather
+than design and should be said out loud.
+
+**What it does to section A.** Section A's *"the shaded region is clearly luminous
+— roughly half the lit value"* was read off a photograph. If the frames deepen
+shadows, that figure is a **lower bound**: the true shaded-to-lit ratio is above
+one half, not at it. The section's qualitative claim — luminous, not a dark hole,
+unreachable by a binary occluder — is strengthened, and its number loses its
+upper end.
+
+**What it does not license.** No constant may be moved on the strength of this.
+`SAIL_TAU = 0.30` carries the comment *"shade fabric transmits ~15–20%,
+DIFFUSELY"*, which is a statement about the fabric and not about the shadow's
+depth in frame; the shadow's depth is that transmission plus the sky the shaded
+water still sees plus the bed's own inter-reflection. Raising `SAIL_TAU` to
+lighten a shadow would be fitting a fabric constant to a tone curve — two errors
+at once. Measure the render's shaded-to-lit ratio, report it against "above one
+half", and if it falls short, find which of the three contributions is missing.
