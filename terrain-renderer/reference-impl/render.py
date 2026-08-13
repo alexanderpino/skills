@@ -22,6 +22,12 @@ Chain (terrain-renderer/references/12-water-rendering.md):
    -> and the RADIANCE COMPRESSION that goes with those equations: what leaves
       the water is T(theta_v) L_water / n^2, never T L_water. See
       `out_of_water` below.
+   -> above the water, TWO ILLUMINANTS AND NOT A CONSTANT: the horizontal deck's
+      and the vertical freeboard band's, each the cosine integral of this file's
+      own `sky()` with the sun's disc taken out of it (the disc IS the beam, and
+      the beam is already an explicit term). `SKY_DECK` used to be
+      `SKY_AMB * 0.30 + SUN_COL * 0.075`, applied to both; see "THE ILLUMINANTS
+      ABOVE THE WATER".
 
 Nothing in the caustic pattern is authored: no texture, no Voronoi, no noise.
 The chromatic fringing on the bed is emergent -- three IORs, three fold sets.
@@ -302,6 +308,26 @@ def rho_water(rho_bed, cos_sun=None, dep=DEPTH, bounces=None, absorb=None):
             * trap_gain(rho_bed, dep, bounces, absorb))
 
 
+def wbounce_of(L_bed, dep=DEPTH, absorb=None):
+    """The AIR-SIDE upwelling radiance a pool of in-water bed radiance `L_bed`
+    presents to a facet standing over it -- `WBOUNCE`, in one line.
+
+    A Lambertian bed of radiance L radiates pi*L upward. `slab_esc` is the share
+    of that flux which crosses `dep` of water AND gets through the surface, with
+    the attenuation and the escape inside ONE integral because they are
+    correlated (see above). What comes out is pi*L*slab_esc of flux; written
+    back as the radiance of an equivalent Lambertian emitter that is
+    L * slab_esc, which is the number a diffuse receiver above the water wants.
+
+    `?` The escaped distribution is NOT Lambertian -- the surface passes the
+    steep rays preferentially, so the real lobe is narrower than a cosine and a
+    facet directly over the water sees slightly more than this while one at a
+    grazing angle sees slightly less. `liner_band` and `_stone` both gather over
+    a half-space, where that difference integrates out to first order; nothing
+    in this file reads the upwelling in a single direction."""
+    return np.asarray(L_bed, float) * slab_esc(dep, absorb)
+
+
 
 # --- Fresnel, exactly, because this is a reference ---------------------------
 # The unpolarised reflectance of a smooth dielectric interface, from the Fresnel
@@ -406,14 +432,12 @@ SUN_COL = np.array([1.000, 0.892, 0.674]) * 8.6   # golden: AM 2.77, not a noon 
 SKY_TOP = np.array([0.26, 0.46, 0.98])
 SKY_HOR = np.array([0.86, 0.90, 0.98])
 SKY_AMB = np.array([0.26, 0.42, 0.66]) * 2.15   # clear sky is still a big blue source
-# ...but SKY_AMB is the sky the WATER sees: through the Snell window it is
-# zenith-weighted, and the zenith is the blue part. A horizontal stone surface
-# sees a cosine-weighted hemisphere instead, and at a 21 degree sun most of that
-# hemisphere's energy is in the aureole and the horizon band around the sun,
-# reddened by the same air mass 2.77 that makes SUN_COL golden. Feeding the
-# water's blue ambient to the stone is what made the deck come out neutral grey
-# in the previous frame: a warm albedo times a blue illuminant is grey.
-SKY_DECK = SKY_AMB * 0.30 + SUN_COL * 0.075
+# ...but SKY_AMB is the sky the WATER sees, and it is the LAST hand-set
+# illuminant in this file. `SKY_DECK` used to sit on the next line as
+# `SKY_AMB * 0.30 + SUN_COL * 0.075`; it is now DERIVED, from the same
+# environment `sky()` builds, several hundred lines below where `sky()` exists
+# -- see "THE ILLUMINANTS ABOVE THE WATER". SKY_AMB itself is measured against
+# that derivation there and the disagreement is reported rather than absorbed.
 SAIL_TAU = 0.30          # shade fabric transmits ~15-20%, DIFFUSELY:
                          # it lifts the shadow without making caustics
 
@@ -675,9 +699,28 @@ ZCEN = ZD - BULR  # centre of the bullnose arc, in (s, z)
 ZLIP = ZCEN       # lowest point of the bullnose == top of the BEAD
 COPW =  0.34      # width of the coping course
 WET  =  0.210     # how far back from the lip the stone is still splash-damp
+
+
+def edge_z(s):
+    """The coping's own section, as a height over the still water at poolward
+    offset `s`: the bullnose arc from ZLIP at s = SLIP up to the deck at ZD.
+    HOISTED to here from beside `paving`, unchanged, because the freeboard
+    band's illuminant is derived by MARCHING this profile and that happens
+    several hundred lines earlier in the file."""
+    d = np.clip(SBUL - s, 0., BULR)
+    return np.where(s >= SBUL, ZD,
+                    ZCEN + np.sqrt(np.maximum(BULR * BULR - d * d, 0.)))
+
 # A real pool liner is BLUE, not white plaster. Absolute albedo ~ (0.24, 0.54, 0.70):
 # reflective enough to stay bright, saturated enough to carry the colour itself.
 LINER_TINT = np.array([0.30, 0.79, 0.92])
+# ? Warm sandstone, pink-tan -- a visual reading of bar section B2's close frame
+# ? of the coping, not a measurement. Hoisted out of `_stone` because the
+# ? illuminant derivation below needs it to price what the open `0.30` on the
+# ? direct beam does to the deck's COLOUR, and a second copy of the triple would
+# ? be a second place for it to drift.
+COP_ALB = np.array([.715, .572, .438])          # the coping course
+PAV_ALB = np.array([.676, .536, .414])          # the terrace behind it
 
 rng = np.random.default_rng(20260810)
 
@@ -1479,14 +1522,41 @@ def cell_size(x0, x1, y0, y1, arr=None):
 # it is worth writing down that the file therefore already HAD the 1/n^2 on this
 # path while the camera path went without: the two routes out of the same
 # surface disagreed by a factor of n^2 and nothing compared them.
-WBOUNCE = T_OUT_DIFFUSE * LINER_TINT * 0.74 * (
-    SUN_COL * cos_i * TSUN * np.exp(-ABS * (slant + DEPTH)) + SKY_AMB * 0.8)
-print("water upwelling onto the coping: %s  (sky on stone: %s)"
-      % (np.round(WBOUNCE, 3), np.round(SKY_DECK, 3)))
-print("  the exit transport on it is 1 - R_int = %s, which is (1 - R_ext)/n^2 "
-      "-- the diffuse form of the same 1/n^2 `out_of_water` applies per ray. It "
-      "shipped as a bare 0.5 (%.1f%% low)."
-      % (np.round(T_OUT_DIFFUSE, 4), 100 * (1 - 0.5 / T_OUT_DIFFUSE[1])))
+#
+# AND THE WHOLE OF IT HAS NOW MOVED, past the solve, because the quantity it
+# approximates is one the file now computes exactly. What stood here was
+#
+#     WBOUNCE_old = T_OUT_DIFFUSE * 0.74 * LINER_TINT
+#                   * (SUN_COL * cos_i * TSUN * exp(-a(slant + DEPTH))
+#                      + SKY_AMB * 0.8)
+#
+# and it carries three defects that the previous round measured at (0.53, 0.77,
+# 0.93) of the truth -- 89% high in red, 30% high in green:
+#   * the ESCAPE IS FACTORISED OUT OF THE ATTENUATION. `exp(-a*DEPTH)` is the
+#     VERTICAL up leg and `T_OUT_DIFFUSE` the mean escape, multiplied. A steep
+#     ray escapes AND crosses less water; the two are correlated and this file
+#     has already been caught making exactly this mistake once (see `slab_esc`
+#     above, and the 19.4/5.1/1.1% it costs per band). One integral, both
+#     factors inside it, is `slab_esc()`.
+#   * the ambient half, `SKY_AMB * 0.8`, carries an undeclared 0.8 and is not
+#     attenuated on the up leg at all.
+#   * it is a ONE-BOUNCE bed with no trap and no walls -- the quantity the
+#     six-pass solve below converges to, and which is now available directly.
+# The replacement is a Lambertian bed of the CONVERGED radiance the solve
+# returns, times the share of its upward flux that escapes:
+#     WBOUNCE = slab_esc() * <converged deep floor>
+# which is a radiance-in-air, the same units the old form produced. It cannot
+# be evaluated here because `bed_img` does not exist yet, so what stands here is
+# the same expression on the CLOSED-FORM bed -- the deep floor's radiance as
+# `shade` itself writes it, at full caustic and no occlusion -- and the line
+# after the solve rebinds it to the converged one. Nothing reads WBOUNCE before
+# that point; the seed exists so the two routes can be printed against each
+# other, and so that `validate.py`, which cannot run a six-pass solve, still
+# sees a WBOUNCE.
+BED_L_CLOSED = 0.74 * LINER_TINT * (
+    SUN_COL * cos_i * TSUN * np.exp(-ABS * slant)
+    + SKY_AMB * np.exp(-ABS * DEPTH * 1.55))
+WBOUNCE = wbounce_of(BED_L_CLOSED)
 
 
 # --------------------------------------------------------------------------- materials
@@ -2682,6 +2752,38 @@ print("  %d passes in %.1f s (bed %d x %d x %d directions, wall 4 x %d x %d x "
       "%d, plus %d downgoing wall gathers)"
       % (NSOLVE, _solve_sec, UB_NX, UB_NY, UP_N, WU_NU, WU_NZ, UP_N, NSOLVE))
 
+# --- WBOUNCE, AGAINST THE CONVERGED FLOOR RATHER THAN A ONE-BOUNCE GUESS -----
+# The derivation is where it always was, six hundred lines above, beside the
+# `1 - R_int` it used to lead with. Only the evaluation has moved here, because
+# the quantity it wants -- the pool's own bed radiance, with the trap closed and
+# the walls in it -- did not exist until the line above.
+_WB_DEEP = bed_img['disp'][BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0)
+_WB_ALL = bed_img['disp'].reshape(-1, 3).mean(0)
+_WBOUNCE_OLD = T_OUT_DIFFUSE * LINER_TINT * 0.74 * (
+    SUN_COL * cos_i * TSUN * np.exp(-ABS * (slant + DEPTH)) + SKY_AMB * 0.8)
+WBOUNCE = wbounce_of(_WB_DEEP)
+print("water upwelling onto the coping and the band: %s = slab_esc %s x the "
+      "CONVERGED deep floor %s. The closed-form guess it replaces reads %s, "
+      "i.e. %s of this -- 89%% high in red and 30%% in green -- and it was high "
+      "for three reasons at once: the escape factorised out of the attenuation, "
+      "an undeclared 0.8 on an unattenuated ambient, and one bounce where the "
+      "solve has six."
+      % (np.round(WBOUNCE, 4), np.round(slab_esc(), 4), np.round(_WB_DEEP, 4),
+         np.round(_WBOUNCE_OLD, 4), np.round(_WBOUNCE_OLD / WBOUNCE, 3)))
+print("  the closed-form SEED that stands in the file until this line -- the "
+      "same slab_esc on `shade`'s own deep-floor expression -- reads %s, %s of "
+      "the converged answer. The gap is the trap and the walls, i.e. exactly "
+      "what six passes add, and it is the second route this number now has."
+      % (np.round(wbounce_of(BED_L_CLOSED), 4),
+         np.round(wbounce_of(BED_L_CLOSED) / WBOUNCE, 3)))
+print("  `?` the DEEP floor and not the whole bed: the coping and the band on "
+      "this wall stand over 1.40 m of water, and the step unit is at the far "
+      "end. Over the whole bed it would read %s, %s of this, and the local "
+      "variation the gather does see is carried by `pat` and `fal` rather than "
+      "by the level."
+      % (np.round(wbounce_of(_WB_ALL), 4),
+         np.round(wbounce_of(_WB_ALL) / WBOUNCE, 3)))
+
 # ...and does it carry the NET, or only the level? Same measurement the risers
 # get, along the north wall, at four heights.
 print("  cell-scale contrast carried (rms of a 0.60 m high-pass along the north "
@@ -3349,11 +3451,14 @@ def _lobe_shape(n, cov):
     return g, 1.0 / np.maximum(w, 1e-12)
 
 
-def sky(dx, dy, dz, cov=None):
+SKY_DIFFUSE_LOBES = SKY_LOBE[1:]    # everything but the disc -- see below
+
+
+def sky(dx, dy, dz, cov=None, lobes=None):
     t = np.clip(dz, 0, 1)[:, None] ** .55
     col = SKY_HOR[None] * (1 - t) + SKY_TOP[None] * t
     cs = np.clip(dx * SUN_DIR[0] + dy * SUN_DIR[1] + dz * SUN_DIR[2], 0, 1)
-    for amp, n, c in SKY_LOBE:
+    for amp, n, c in (SKY_LOBE if lobes is None else lobes):
         g, ne = _lobe_shape(n, cov)
         if cov is None:
             col = col + c[None] * amp * (cs ** ne)[:, None]
@@ -3421,6 +3526,422 @@ print("  aureole cross-check: %.1f%% of the Rayleigh lobe's flux falls inside "
       % (100 * _csr_in, _lf * _csr_in / (_lf * _csr_in + E_SUN[1]),
          0.05 / max(_lf * _csr_in / (_lf * _csr_in + E_SUN[1]), 1e-12),
          np.degrees(1. / np.sqrt(N_AURE))))
+
+
+# ================== THE ILLUMINANTS ABOVE THE WATER, FROM ONE ATMOSPHERE ======
+# `SKY_DECK = SKY_AMB * 0.30 + SUN_COL * 0.075` was the longest-standing
+# underived constant in this file -- 1.74 stops written by hand, filed as open
+# in the README for the whole project, and applied to two receivers that are at
+# RIGHT ANGLES to each other: the horizontal coping and paving, and the
+# VERTICAL, poolward-facing freeboard band. It is closed here, and so is the
+# second illuminant, and neither is a fit.
+#
+# THE POINT IS THAT THERE IS NOTHING LEFT TO CHOOSE. An illuminant for a
+# diffuse receiver is one number:
+#
+#     E(N)/pi = (1/pi) INT_hemisphere L(w) (w.N)_+ dw
+#
+# and this file already OWNS L(w): `sky()` is a complete environment -- a
+# horizon/zenith gradient and two cos^n lobes whose amplitudes were derived,
+# the previous round, from the same Rayleigh atmosphere that reddens SUN_COL
+# (AIRMASS = 2.77, TAU_R from the file's own `_tau_rayleigh`). So both
+# illuminants are the same integral of the same environment against two
+# different normals, and the only judgement in them is which lobes belong.
+#
+# WHICH LOBES BELONG: everything except the disc. `SKY_LOBE[0]` is the sun's
+# own disc, and the audit above proves it carries the beam EXACTLY -- its flux
+# is pi*SUN_COL to a part in a thousand. Every diffuse receiver in this file
+# already gets that beam as an explicit `SUN_COL * (N.L) * vis` term, so
+# integrating the disc into an illuminant as well would light the frame with
+# two suns. The aureole is not the beam: it is light Rayleigh-scattered OUT of
+# the beam, it arrives from directions the beam does not, and it is skylight.
+# `SKY_DIFFUSE_LOBES` is that partition and `sky()` takes it as an argument, so
+# a later round that moves a lobe moves both illuminants with it.
+def env_diffuse(dx, dy, dz):
+    """The environment MINUS the sun's disc, in absolute radiance: the sky
+    gradient and the Rayleigh aureole. Same code path as `sky()` -- a row in
+    `validate.py` asserts `env_diffuse + disc == sky` over 4096 directions, so
+    the two cannot drift."""
+    return sky(dx, dy, dz, lobes=SKY_DIFFUSE_LOBES)
+
+
+# The quadrature. Uniform in cos(theta) and in phi, which is the measure the
+# integrand is written against -- no cosine has to be reintroduced by hand and
+# the solid angle is one constant. 256 x 512 costs 3 MB and converges the deck
+# to 6 significant figures; `validate.py` runs it again at 1024 x 2048 and
+# compares, and also against a closed form the quadrature cannot see.
+ENV_NMU, ENV_NPH = 256, 512
+_emu = (np.arange(ENV_NMU) + .5) / ENV_NMU              # cos from the zenith
+_eph = (np.arange(ENV_NPH) + .5) / ENV_NPH * (2. * np.pi)
+_est = np.sqrt(np.maximum(1. - _emu ** 2, 0.))
+ENV_DX = np.repeat(_est, ENV_NPH) * np.tile(np.cos(_eph), ENV_NMU)
+ENV_DY = np.repeat(_est, ENV_NPH) * np.tile(np.sin(_eph), ENV_NMU)
+ENV_DZ = np.repeat(_emu, ENV_NPH)
+ENV_DW = (1. / ENV_NMU) * (2. * np.pi / ENV_NPH)        # d(mu) d(phi), sr
+ENV_L = env_diffuse(ENV_DX, ENV_DY, ENV_DZ)
+
+
+def env_irradiance(nx, ny, nz, weight=None, nmu=None, nph=None, L=None):
+    """E(N)/pi over the SKY hemisphere, per channel -- an illuminant in exactly
+    the units every diffuse term in this file is written in, so that a facet of
+    albedo `a` and unobstructed sky comes out at `a * env_irradiance(N)`.
+
+    `weight` multiplies the integrand per direction and is how an occluder or an
+    interface goes inside the integral rather than beside it. `nmu`/`nph`
+    rebuild the lattice at another resolution, which is how the suite measures
+    this quadrature's own error instead of assuming it. `L` replaces the
+    environment -- a UNIFORM L must give exactly L on a horizontal face and
+    exactly L/2 on a vertical one, which is the row that fires at a dropped
+    1/pi or a wrong solid angle."""
+    if nmu is None and nph is None:
+        dx, dy, dz, dw = ENV_DX, ENV_DY, ENV_DZ, ENV_DW
+        L = ENV_L if L is None else np.broadcast_to(np.asarray(L, float),
+                                                    ENV_L.shape)
+    else:
+        nmu, nph = nmu or ENV_NMU, nph or ENV_NPH
+        m = (np.arange(nmu) + .5) / nmu
+        p = (np.arange(nph) + .5) / nph * (2. * np.pi)
+        s = np.sqrt(np.maximum(1. - m ** 2, 0.))
+        dx = np.repeat(s, nph) * np.tile(np.cos(p), nmu)
+        dy = np.repeat(s, nph) * np.tile(np.sin(p), nmu)
+        dz = np.repeat(m, nph)
+        dw = (1. / nmu) * (2. * np.pi / nph)
+        L = (env_diffuse(dx, dy, dz) if L is None
+             else np.broadcast_to(np.asarray(L, float), (dx.size, 3)))
+    w = np.clip(dx * nx + dy * ny + dz * nz, 0., None) * dw
+    if weight is not None:
+        w = w * np.asarray(weight, float)
+    return (L * w[:, None]).sum(0) / np.pi
+
+
+# --- ILLUMINANT ONE: the horizontal deck ------------------------------------
+SKY_DECK = env_irradiance(0., 0., 1.)
+_ENV_GRAD = sky(ENV_DX, ENV_DY, ENV_DZ, lobes=())        # gradient alone
+_deck_grad = (_ENV_GRAD * (np.clip(ENV_DZ, 0., None) * ENV_DW)[:, None]
+              ).sum(0) / np.pi
+_deck_aur = SKY_DECK - _deck_grad
+_SKY_DECK_OLD = SKY_AMB * 0.30 + SUN_COL * 0.075
+print("THE ILLUMINANTS ABOVE THE WATER, both derived from sky():")
+print("  SKY_DECK, horizontal: %s  = gradient %s + Rayleigh aureole %s"
+      % (np.round(SKY_DECK, 4), np.round(_deck_grad, 4), np.round(_deck_aur, 4)))
+print("    it shipped as SKY_AMB x 0.30 + SUN_COL x 0.075 = %s, i.e. %s of the "
+      "derived value per channel. The level was 16%% high in GREEN and the "
+      "COLOUR was wrong both ways -- red %+.0f%%, blue %+.0f%% -- because the "
+      "two hand terms are each wrong by more than the sum is: SKY_AMB x 0.30 is "
+      "%.2fx the gradient's own cosine integral and SUN_COL x 0.075 is %.1fx "
+      "the aureole's. They very nearly cancel in green, which is why the "
+      "constant survived a project."
+      % (np.round(_SKY_DECK_OLD, 4), np.round(_SKY_DECK_OLD / SKY_DECK, 3),
+         100 * (_SKY_DECK_OLD[0] / SKY_DECK[0] - 1),
+         100 * (_SKY_DECK_OLD[2] / SKY_DECK[2] - 1),
+         (SKY_AMB * 0.30)[1] / _deck_grad[1],
+         (SUN_COL * 0.075)[1] / _deck_aur[1]))
+# THE AUREOLE'S SHARE HAS A CEILING AND IT IS A CLOSED FORM, which is the part
+# of this that needs no quadrature at all. The Rayleigh phase function is
+# P(Theta) = (3/4)(1 + cos^2 Theta), and over the sphere INT P dw / 4pi = 1 with
+# the cos^2 half contributing exactly (3/4)(1/3) = 1/4. So in ANY single-
+# scattering Rayleigh sky the anisotropic lobe can carry at most a quarter of
+# the scattered light, whatever the optical depth and whatever the sun's
+# elevation -- and cosine-weighted onto a deck it is a little under that. The
+# shipped constant put it at 68% in green. That is not a tuning error, it is
+# outside what the atmosphere the file already recovered from SUN_COL can
+# produce, and it is provable without a photograph.
+_P_ANISO = 0.25
+print("    the aureole is %.1f%% of the derived deck illuminant in green. The "
+      "Rayleigh phase function caps that at INT (3/4)cos^2 dw / 4pi = %.2f of "
+      "the singly-scattered light for ANY optical depth and ANY sun -- and the "
+      "shipped constant put it at %.0f%%, which no Rayleigh atmosphere can "
+      "reach. That is the whole falsification, and it needs no photograph."
+      % (100 * _deck_aur[1] / SKY_DECK[1], _P_ANISO,
+         100 * (SUN_COL * 0.075)[1] / _SKY_DECK_OLD[1]))
+# `?` WHAT IS STILL NOT DERIVED, stated exactly. The two LOBES come from the
+# file's Rayleigh atmosphere; the GRADIENT (SKY_HOR, SKY_TOP and the 0.55
+# exponent between them) does not -- it is a hand-set profile and it always
+# was. What the atmosphere CAN say about it is a lower bound, and the bound is
+# computed rather than asserted: single-scattered Rayleigh radiance for a
+# ground observer at view cosine mu_v with the sun at mu_s is
+#     L = (F0 P(Theta)/4pi) mu_s (e^{-tau/mu_v} - e^{-tau/mu_s}) / (mu_v - mu_s)
+# with F0 = E_SUN e^{+tau m} the top-of-atmosphere beam this file's own SUN_COL
+# implies. That form is a LOWER bound on a real sky by construction: it has no
+# multiple scattering and no ground return, and at tau_R(blue) = 0.20 those are
+# not small. What is missing from the gradient is therefore named -- the
+# second and higher orders of the sky's own radiative transfer, and the
+# albedo of the ground under it -- rather than left as "a choice".
+def _ss_rayleigh(mu_v, cos_theta):
+    """Single-scattered Rayleigh sky radiance, per channel."""
+    mu_s = float(SUN_DIR[2])
+    f0 = E_SUN * np.exp(TAU_R * AIRMASS)
+    p = 0.75 * (1. + np.asarray(cos_theta, float) ** 2)
+    mv = np.maximum(np.asarray(mu_v, float), 1e-4)
+    d = mv - mu_s
+    d = np.where(np.abs(d) < 1e-5, 1e-5, d)
+    return (f0[None] * (p / (4. * np.pi))[:, None]
+            * mu_s * (np.exp(-TAU_R[None] / mv[:, None])
+                      - np.exp(-TAU_R[None] / mu_s)) / d[:, None])
+
+
+_ss_cos = -(ENV_DX * SUN_DIR[0] + ENV_DY * SUN_DIR[1] + ENV_DZ * SUN_DIR[2])
+_SS_L = _ss_rayleigh(ENV_DZ, _ss_cos)
+_ss_deck = (_SS_L * (ENV_DZ * ENV_DW)[:, None]).sum(0) / np.pi
+print("    `?` the LOBES are derived, the GRADIENT is not. Single-scattered "
+      "Rayleigh from this file's own TAU_R and AIRMASS gives a deck "
+      "illuminant of %s against the gradient's %s -- %s of it -- and that is a "
+      "LOWER BOUND, not a disagreement: it has no multiple scattering and no "
+      "ground return, and at tau(blue) = %.2f neither is small. What is "
+      "missing is named (orders two and up, and the ground's albedo), which is "
+      "the honest form of an open constant."
+      % (np.round(_ss_deck, 4), np.round(_deck_grad, 4),
+         np.round(_ss_deck / _deck_grad, 3), TAU_R[2]))
+_vert_az = np.array([env_irradiance(np.cos(a), np.sin(a), 0.)
+                     for a in np.linspace(0., 2. * np.pi, 24, endpoint=False)])
+print("    `?` `_stone` still spreads this over its facets as (0.55 + 0.45 Nz), "
+      "linear in the normal's z. From the same integral a VERTICAL stone facet "
+      "collects %.3f of the deck's, azimuth-averaged (%.3f facing the sun, "
+      "%.3f averted), against that form's 0.550 -- so the endpoint is 4%% low "
+      "and the azimuth spread it cannot represent at all is +-%.0f%%. Linear "
+      "is exact for a UNIFORM sky and for no other, which is the same finding "
+      "`axial_share` made under the water; the deck's version is smaller "
+      "because stone facets here are near-horizontal, and it is left as a `?`."
+      % (_vert_az[:, 1].mean() / SKY_DECK[1],
+         _vert_az[:, 1].max() / SKY_DECK[1], _vert_az[:, 1].min() / SKY_DECK[1],
+         100 * (_vert_az[:, 1].max() - _vert_az[:, 1].min())
+         / (2. * _vert_az[:, 1].mean())))
+
+
+# --- ILLUMINANT TWO: the vertical, poolward-facing freeboard band ------------
+# THE CATEGORY ERROR THIS CLOSES. `liner_band` lit a VERTICAL strip with
+# `SKY_DECK x 0.50` -- a horizontal-deck illuminant, halved. Halving is right
+# for a UNIFORM sky and for nothing else: a vertical face's cosine weight is
+# sin^2(theta) d(theta), which is heaviest at the HORIZON, where this sky is
+# brightest in red and green; and the aureole sits 21 deg above the horizon at
+# one azimuth, so a face turned away from it collects almost none of it while a
+# face turned toward it collects more than half. One number cannot be both.
+#
+# So the band gets its own integral, at its own azimuth. Three sources, and
+# they are the three things a strip 0-100 mm over the water can actually see:
+#
+#   1. THE SKY, over its upper half. Unoccluded -- and that is now read off the
+#      geometry rather than assumed; see the trace below.
+#   2. THE WATER, over its lower half, which returns two different things:
+#        * the pool's own upwelling, WBOUNCE, escaping through the surface;
+#        * the SKY REFLECTED in that surface. This was missing entirely, and it
+#          is not small: the lower half's weight is heaviest at the horizon,
+#          where the water's external Fresnel is heading for 1. The
+#          mean R_ext over a vertical face's lower half is BAND_RBAR = 0.24,
+#          not the 0.02 of normal incidence.
+#   3. THE SUN, where the geometry admits it -- unchanged, `SUN_COL (N.L)+ vis`,
+#      and on the wall the owner's observation is about, N.L = -0.061 and it
+#      admits nothing.
+#
+# The azimuth dependence is one parameter, because the sun's elevation is
+# fixed: everything but the gradient depends only on the angle between the
+# face's normal and the sun's azimuth. So both halves are tabulated once over
+# that angle and read with `np.interp`, which makes the band correct on all
+# FOUR walls -- and "on every side" is the load-bearing word in the observation
+# this whole line of work is about.
+BAND_NAZ = 121
+
+
+def _band_tables():
+    """(sky, mirror) per azimuth: the upper half's own sky and the lower half's
+    reflected sky, both as E/pi for a vertical face whose normal makes the
+    tabulated angle with the sun's azimuth."""
+    sx, sy = SUN_DIR[0], SUN_DIR[1]
+    sn = np.hypot(sx, sy)
+    sx, sy = sx / sn, sy / sn
+    # the lower half mirrored into the upper: a ray leaving the face downward
+    # at (dx, dy, -dz) meets the water at incidence cos = dz and comes back
+    # from (dx, dy, +dz) with R_ext(dz) of that direction's sky on it. Same
+    # lattice, same L, one Fresnel factor -- and the horizontal (w.N) is
+    # unchanged by the flip, which is why one table serves both halves.
+    ang = np.linspace(0., np.pi, BAND_NAZ)
+    out_s = np.zeros((BAND_NAZ, 3))
+    out_m = np.zeros((BAND_NAZ, 3))
+    fr = fresnel(ENV_DZ)                        # (N, 3) external reflectance
+    for k in range(BAND_NAZ):
+        ca, sa = np.cos(ang[k]), np.sin(ang[k])
+        nx, ny = sx * ca - sy * sa, sx * sa + sy * ca
+        w = np.clip(ENV_DX * nx + ENV_DY * ny, 0., None) * ENV_DW
+        out_s[k] = (ENV_L * w[:, None]).sum(0) / np.pi
+        out_m[k] = (ENV_L * fr * w[:, None]).sum(0) / np.pi
+    return ang, out_s, out_m
+
+
+BAND_ANG, BAND_SKY_TAB, BAND_MIR_TAB = _band_tables()
+# the radiance- and cosine-weighted mean external reflectance a vertical face's
+# lower half sees. It is the number that says why the reflected term is not
+# negligible: at normal incidence R_ext is 0.02, and this is an order above it,
+# because the weight is heaviest at the horizon and so is the water's Fresnel.
+BAND_RBAR = float((ENV_L[:, 1] * fresnel(ENV_DZ)[:, 1]
+                   * np.clip(-ENV_DY, 0., None) * ENV_DW).sum()
+                  / max((ENV_L[:, 1] * np.clip(-ENV_DY, 0., None)
+                         * ENV_DW).sum(), 1e-30))
+
+
+def band_illum(nx, ny):
+    """(sky, mirror) for a vertical face of poolward normal (nx, ny): its own
+    upper half's sky, and the sky the water in front of it reflects into its
+    lower half. Both are E/pi, both already carry the half-space's own 0.5, and
+    neither is `SKY_DECK x 0.50`."""
+    sx, sy = SUN_DIR[0], SUN_DIR[1]
+    sn = np.hypot(sx, sy)
+    c = np.clip((np.asarray(nx, float) * sx + np.asarray(ny, float) * sy)
+                / (sn * np.maximum(np.hypot(nx, ny), 1e-12)), -1., 1.)
+    a = np.arccos(c)
+    return (np.stack([np.interp(a, BAND_ANG, BAND_SKY_TAB[:, k])
+                      for k in range(3)], -1),
+            np.stack([np.interp(a, BAND_ANG, BAND_MIR_TAB[:, k])
+                      for k in range(3)], -1))
+
+
+# --- AND THE OVERHANG, TRACED RATHER THAN ASSERTED ---------------------------
+# `liner_band` wrote its sky share as a flat 0.50 with the note that "a vertical
+# facet's cosine-weighted hemisphere splits EXACTLY in half at the horizon".
+# True, and it is only the whole answer if nothing stands over the strip. The
+# section this file actually builds says nothing does: the bullnose's poolward
+# extreme is at `SBUL - BULR = SLIP`, the band's OWN plane, and the stone
+# recedes from the pool going up, so every direction the coping could occupy has
+# (w.N) <= 0 and carries zero weight. That is now MARCHED against the real
+# height field instead of being read off the algebra -- a ray per lattice
+# direction, stepped out from the strip and tested against `edge_z(s)` --
+# and the closed form for a strip under an infinite ledge of width w at height D,
+# (alpha + sin alpha cos alpha)/pi with alpha = atan(D/w), is the second route
+# to the same number.
+def band_sky_vis(z, s=None, nmu=64, nph=128, n=150, reach=0.60, prof=None,
+                 base=None):
+    """The share of a poolward-facing vertical strip's SKY half that survives
+    the coping, by marching this file's own height field: one ray per direction,
+    stepped out in the (s, z) section and tested against `edge_z(s)`. Returns
+    the fraction of the upper half's cosine weight that is unoccluded; 1.0 means
+    the strip keeps everything the horizon split gives it. Its own lattice,
+    coarser than `ENV_*` because a march costs `n` times as much and the answer
+    is a share rather than a colour.
+
+    `prof` and `base` replace the occluder: `prof` is any other section z(s) and
+    `base` the s beyond which that section exists. That is how the suite fires
+    this marcher at a geometry whose answer is known. Note WHICH geometry: a
+    real overhang is NOT a height field -- a section z(s) can only put stone the
+    strip is standing on over it, which is exactly why the shipped answer is 1
+    and the ledge form below is a counterfactual rather than a correction. What
+    a height field CAN put in front of the strip is a WALL, and the suite fires
+    this at one, at the limit and against a direct angular quadrature of the
+    same blocking rule in between."""
+    s0 = SLIP if s is None else s
+    prof = edge_z if prof is None else prof
+    base = s0 if base is None else base
+    m = (np.arange(nmu) + .5) / nmu
+    p = (np.arange(nph) + .5) / nph * (2. * np.pi)
+    st = np.sqrt(np.maximum(1. - m ** 2, 0.))
+    ds = np.repeat(st, nph) * np.tile(np.cos(p), nmu)   # the +s (outward) axis
+    dz = np.repeat(m, nph)
+    dw = (1. / nmu) * (2. * np.pi / nph)
+    ws = np.clip(-ds, 0., None) * dw                    # (w.N) with N = -s_hat
+    k = (np.arange(n) + 1.) * (reach / n)
+    ss = s0 + ds[:, None] * k[None]
+    zz = z + dz[:, None] * k[None]
+    blocked = ((ss > base) & (zz <= prof(np.maximum(ss, base)))).any(1)
+    return float(1. - (ws * blocked).sum() / max(ws.sum(), 1e-30))
+
+
+def _ledge(alpha):
+    """(alpha + sin alpha cos alpha)/pi -- the sky a vertical strip keeps under
+    an infinite horizontal ledge, alpha = atan(D/w). 0.5 at w = 0."""
+    return (alpha + np.sin(alpha) * np.cos(alpha)) / np.pi
+
+
+_bvz = np.linspace(0.004, 0.098, 12)
+BAND_SKY_VIS = float(np.mean([band_sky_vis(z) for z in _bvz]))
+_bvis = BAND_SKY_VIS
+print("  SKY_BAND, vertical and poolward -- one integral per azimuth, and NOT "
+      "SKY_DECK x 0.50:")
+print("    averted (N.L = %+.3f, the wall the observation is about): %s   "
+      "against the SKY_DECK x 0.50 it had, %s"
+      % (float(-SUN_DIR[1]), np.round(band_illum(0., -1.)[0], 4),
+         np.round(_SKY_DECK_OLD * .50, 4)))
+print("    facing the sun (N.L = %+.3f, the east wall): %s -- %.2fx the "
+      "averted one, and a single halved deck illuminant cannot be both"
+      % (float(-SUN_DIR[0]), np.round(band_illum(-1., 0.)[0], 4),
+         band_illum(-1., 0.)[0][1] / band_illum(0., -1.)[0][1]))
+print("    the sky the WATER in front reflects into the lower half: %s "
+      "(averted). Cosine-weighted mean R_ext over that half is %.3f, not the "
+      "0.02 of normal incidence -- the lower half's weight is heaviest at the "
+      "horizon and so is the water's Fresnel. This term was absent."
+      % (np.round(band_illum(0., -1.)[1], 4), BAND_RBAR))
+print("    the coping's occlusion of that sky, MARCHED over %d directions at "
+      "%d heights: %.4f of the half kept, against the ledge form's %.4f at "
+      "w = 0 and %.4f at a 30 mm overhang. The section this file builds has the "
+      "bullnose's poolward extreme at s = SLIP = %.3f, the band's own plane, so "
+      "the answer is exactly one and the 0.50 the shader used was right for a "
+      "reason it did not state."
+      % (64 * 128, len(_bvz), _bvis, _ledge(np.pi / 2) / .5,
+         float(np.mean(_ledge(np.arctan((ZLIP - _bvz) / .030))) / .5), SLIP))
+# `?` WHAT THE UPPER HALF STILL DOES NOT HAVE, and it is the same `?` section G
+# already carries: the world above the water is `sky()` and nothing else. The
+# far coping's top stands ZD - z above this strip at 4 m, i.e. up to 2.2 deg
+# above its horizon, and a vertical face's weight is heaviest exactly there --
+# 4.9% of the upper half lies inside that wedge and it is sunlit stone, not
+# sky. That is a bound on one term, printed, not a correction applied.
+_far_el = float(np.arctan2(ZD - _bvz.mean(), Y1 - Y0))
+# the share of a vertical face's UPPER-half weight lying within `_far_el` of the
+# horizon: the same (alpha + sin alpha cos alpha)/pi, read from the other end.
+_far_w = _ledge(_far_el) / .5
+print("    `?` and the far side of the basin is not in it: the far coping "
+      "subtends %.1f deg above this strip's horizon and %.1f%% of the upper "
+      "half's cosine weight lies inside that wedge, where the integrand is "
+      "sky() and the scene has sunlit stone. Bounded here, not corrected -- it "
+      "is section G's standing `?` with a number on it."
+      % (np.degrees(_far_el), 100 * _far_w))
+# --- WHAT THE DERIVATION EXPOSES, AND IT IS NOT A NEW DEFECT -----------------
+# The comment that used to sit above SKY_DECK justified its warmth like this:
+# "a warm albedo times a blue illuminant is grey", and it was RIGHT about the
+# mechanism. What it got wrong is which constant makes the deck grey. With the
+# illuminant derived, the deck's sky is the blue sky it actually is -- and the
+# warm beam standing beside it is still multiplied by `0.30`, the one factor
+# above the water with no derivation anywhere in this file. Under-weight the
+# beam by 3.33 and the blue term wins; the previous SKY_DECK hid that by being
+# warm in the wrong place. The counterfactual is computed here and NOT applied,
+# because moving `0.30` is an exposure question for the whole above-water half
+# and this round's business is the illuminants.
+_dnl = float(SUN_DIR[2])                       # a horizontal facet's own N.L
+_E030 = SUN_COL * _dnl * 0.30 + SKY_DECK
+_E100 = SUN_COL * _dnl + SKY_DECK
+_sat = lambda c: float((c.max() - c.min()) / max(c.max(), 1e-12))
+print("  the `0.30` on the direct beam, which this derivation makes VISIBLE. A "
+      "horizontal coping facet in full sun gets E/pi = %s at 0.30 and %s at "
+      "1.00; through COP_ALB that is %s against %s -- linear saturation %.3f "
+      "against %.3f, and the sky is %.0f%% of the first and %.0f%% of the "
+      "second. The old SKY_DECK was warm enough to mask it. `?` NOT MOVED: it "
+      "is the exposure of the whole above-water half and it is the last "
+      "underived constant up here."
+      % (np.round(_E030, 3), np.round(_E100, 3), np.round(COP_ALB * _E030, 3),
+         np.round(COP_ALB * _E100, 3), _sat(COP_ALB * _E030),
+         _sat(COP_ALB * _E100), 100 * SKY_DECK[1] / _E030[1],
+         100 * SKY_DECK[1] / _E100[1]))
+
+
+# --- AND THE THIRD ILLUMINANT, MEASURED AND NOT MOVED ------------------------
+# SKY_AMB is the level of the sky every SUBMERGED receiver gets. The same
+# integral prices it, because the Snell window is a change of variables and
+# nothing else: n^2 cos(t_w) sin(t_w) dt_w = cos(t_a) sin(t_a) dt_a maps the
+# window integral of the n^2-gained sky exactly onto the air-side hemisphere, so
+# a bed point's sky irradiance is the DECK's, less what the surface reflects
+# away. That number is computed here and compared with SKY_AMB, and it is NOT
+# applied: this round's control is that nothing below the waterline moves, and
+# moving SKY_AMB moves the wall and the band together, which would make the one
+# ratio this work exists to report unattributable.
+_RBAR = (ENV_L * fresnel(ENV_DZ)
+         * (np.clip(ENV_DZ, 0., None) * ENV_DW)[:, None]).sum(0) / np.pi / SKY_DECK
+SKY_SUB_DERIVED = SKY_DECK * (1. - _RBAR)
+print("  `?` THE THIRD ILLUMINANT, PRICED AND NOT MOVED. The same environment "
+      "puts a submerged horizontal face's sky at SKY_DECK x (1 - Rbar) = %s "
+      "(Rbar = %s, the radiance-weighted external reflectance the surface turns "
+      "away) where SKY_AMB ships at %s -- %s of the derived value, i.e. the "
+      "bed's sky term is %.0f%% high in green. It is left alone on purpose: it "
+      "is the numerator's illuminant as well as the denominator's, and this "
+      "round's control is that nothing under the water moves."
+      % (np.round(SKY_SUB_DERIVED, 4), np.round(_RBAR, 4), np.round(SKY_AMB, 4),
+         np.round(SKY_AMB / SKY_SUB_DERIVED, 3),
+         100 * (SKY_AMB[1] / SKY_SUB_DERIVED[1] - 1)))
 
 
 # --------------------------------------- the removed variance becomes a lobe
@@ -3556,11 +4077,6 @@ def vnoise_d(x, y):
 # face, bullnose rolled over the overhang, water 75 mm below the coping top.
 pool_s = pool_sdf              # the shape enters through ONE function; see the top
 pool_grad = pool_sdf_grad
-
-
-def edge_z(s):
-    d = np.clip(SBUL - s, 0., BULR)
-    return np.where(s >= SBUL, ZD, ZCEN + np.sqrt(np.maximum(BULR * BULR - d * d, 0.)))
 
 
 def _hash(a, b, k=0.):
@@ -3952,14 +4468,16 @@ def _stone(x, y, s, vdir, fp):
     ks = np.where(cop, np.floor((along + .19 * side) / .55), np.floor((x + .46 * (row % 2.)) / .92))
     kt = np.where(cop, side, row)
     t1, t2 = _hash(ks, kt, 3.1), _hash(ks, kt, 11.7)
-    # ? Warm sandstone, pink-tan -- a visual reading of bar section B2's close
-    # ? frame of the coping, not a measurement. The previous values were a
-    # ? neutral grey-beige and rendered at saturation 0.20; the green is pulled
-    # ? down 5% against the red, which is what separates a sandstone from a
-    # ? limestone. The illuminant was already corrected (SKY_DECK), so this is
-    # ? the albedo half of the same finding and nothing else moved.
-    alb = np.where(cop[:, None], np.array([.715, .572, .438])[None],
-                   np.array([.676, .536, .414])[None])
+    # COP_ALB / PAV_ALB, hoisted next to LINER_TINT with their `?` on them. The
+    # previous values were a neutral grey-beige at saturation 0.20; the green is
+    # pulled 5% down against the red, which is what separates a sandstone from a
+    # limestone. THAT ALBEDO NOW RENDERS NEUTRAL AGAIN, and it is not the
+    # albedo's fault: with SKY_DECK derived, the deck's illuminant is the blue
+    # sky it actually is, and the warm beam beside it is still multiplied by the
+    # underived `0.30`. The comment that used to sit on SKY_DECK -- "a warm
+    # albedo times a blue illuminant is grey" -- was right about the mechanism
+    # and wrong about which constant was causing it. See the illuminant section.
+    alb = np.where(cop[:, None], COP_ALB[None], PAV_ALB[None])
     alb = alb * (1. + .46 * (t1 - .5))[:, None]
     alb = alb * (1. + np.stack([.20 * (t2 - .5), .03 * (t2 - .5), -.21 * (t2 - .5)], 1))
     alb = alb * (1. + .13 * (n1 - .5) + .11 * w2 * (n2 - .5) + .09 * w3 * (n3 - .5)
@@ -4087,18 +4605,49 @@ def liner_band(x, y, z, vdir):
     # ? same status as the sandstone's: neutral grey concrete, slightly cool.
     alb = np.where(bead[:, None], np.array([.40, .41, .42])[None], alb)
 
-    # --- light. A vertical facet's cosine-weighted hemisphere splits EXACTLY in
-    # half at the horizon -- sky above, water below -- so each half gets 0.50 and
-    # neither number is a choice. The lip cannot shade this face (the bullnose
-    # rolls away from the pool above it), so the sun term takes the sail's
-    # shadow alone and not coping_vis.
+    # --- light. A vertical facet's cosine-weighted hemisphere splits exactly in
+    # half at the horizon -- sky above, water below -- and THAT IS A PARTITION,
+    # not an illuminant. What used to stand here was `SKY_DECK * 0.50`: a
+    # HORIZONTAL-deck illuminant, halved, on a vertical sun-averted strip.
+    # Halving is right for a uniform sky and for nothing else, because a
+    # vertical face's weight is sin^2(theta) d(theta) -- heaviest at the horizon,
+    # which is the brightest part of this sky in red and green and the part the
+    # aureole sits 21 deg above at ONE azimuth. `band_illum` does the integral
+    # instead, at this face's own azimuth, and returns both halves:
+    #   * `esky`  the upper half's own sky, occluded by `BAND_SKY_VIS`, which is
+    #             MARCHED off `edge_z` rather than asserted -- and comes out at
+    #             exactly 1, because the bullnose's poolward extreme is at
+    #             s = SLIP, the band's own plane, so the coping overhangs the
+    #             LINER by nothing even though it overhangs the WATER by 20 mm;
+    #   * `emir`  the sky the water in front REFLECTS back into the lower half.
+    #             This term was absent, and it is not small: the mean R_ext over
+    #             that half is BAND_RBAR = 0.24, not the 0.02 of normal
+    #             incidence, because the weight is heaviest exactly where the
+    #             water's own Fresnel is heading for 1.
+    # The pool's own upwelling keeps the 0.50 -- it is the lower half's own
+    # share of a diffuse source and it IS a partition -- and `fal` gates both
+    # water terms on there actually being water in that direction.
+    # `?` TWO THINGS THE MIRROR TERM ASSUMES, both stated rather than dialled.
+    # (i) the surface it reflects in is the STILL plane z = 0. The grazing end
+    # of that half looks metres out at a slope rms of 0.058, which smears the
+    # source by a few degrees inside an integral that is already a half-space
+    # average -- the same approximation, and the same `?`, that `up_gather`
+    # carries under the water. (ii) beyond the basin the reflected ray finds
+    # `sky()` where the scene has a far coping: that wedge is 1.4 deg above the
+    # strip's horizon and 3.2% of the half's weight, printed with the
+    # illuminants and bounded there.
+    # The lip cannot shade this face, so the sun term takes the sail's shadow
+    # alone and not coping_vis; on this frame's north wall N.L = -0.061 and the
+    # sun term is zero, which is why the observation is about a sky term.
     L = SUN_DIR
     ndl = np.clip(Nx * L[0] + Ny * L[1], 0, 1)
     vis = np.asarray(sail_vis(x, y), float)
     lift = SAIL_TAU * (1. - vis) * sail_glow(x, y)
     pat, fal = band_water(along, sd, z)
+    esky, emir = band_illum(Nx, Ny)
     E = (SUN_COL[None] * (ndl * vis + SUN_DIR[2] * lift)[:, None] * .30
-         + SKY_DECK[None] * .50
+         + esky * BAND_SKY_VIS
+         + emir * fal[:, None]
          + WBOUNCE[None] * pat * (.50 * fal)[:, None])
     col = alb * E
 
@@ -4107,6 +4656,14 @@ def liner_band(x, y, z, vdir):
     # normal to an eye above it points down into the basin. So the source is
     # WBOUNCE. `?` R_EXT is water's; a dry PVC sheet is nearer 0.043 at normal
     # incidence, and identical to this at the grazing angle the band is seen at.
+    # `?` AND THE SOURCE IS NOW INCOMPLETE, which the round that derived the
+    # band's hemisphere records rather than fixes: what the band's mirror
+    # direction finds is the water, and the water at a grazing angle is mostly
+    # REFLECTED SKY, not upwelling -- `emir` above is exactly that quantity
+    # averaged over the half-space. Using WBOUNCE alone here understates the
+    # sheen by roughly the ratio the two carry in the gather. It is left because
+    # the sheen is a per-direction term and `emir` is a hemisphere average, so
+    # closing it properly means a per-ray lookup, not a swapped constant.
     Vx, Vy = -vdir[:, 0], -vdir[:, 1]
     ndv = np.clip(Nx * Vx + Ny * Vy, 1e-3, 1)
     # ? the 0.25 on the bead: cast concrete is rough where a vinyl sheet is not,
@@ -6366,11 +6923,13 @@ print("     rho_water measured %.4f  against closed form %.4f  -> %+.1f%%"
 _L_stone = _hy[_s4].mean()
 _rho_stone_eff = _L_stone / (_Y3 * (_EBEAM + _ESKY)).sum()
 print("  sunlit stone: mean %.4f  median %.4f -> effective albedo %.4f "
-      "(the table's own %s is 0.593 in luminance, and it gets 0.30 of the beam: "
-      "the two errors are opposite and they very nearly cancel, which is why "
-      "the open `0.30` finding does not show up in this ratio)"
-      % (_L_stone, np.median(_hy[_s4]), _rho_stone_eff,
-         np.round(np.array([.715, .572, .438]), 3)))
+      "(COP_ALB %s is 0.593 in luminance, and it gets 0.30 of the beam: the two "
+      "errors are opposite and they nearly cancel in LEVEL, which is why the "
+      "open `0.30` does not show up in this ratio. It shows up in COLOUR "
+      "instead, and now that SKY_DECK is derived it shows up in the frame: this "
+      "stone renders at saturation %.3f where its own albedo is %.3f.)"
+      % (_L_stone, np.median(_hy[_s4]), _rho_stone_eff, np.round(COP_ALB, 3),
+         _sat(COP_ALB * _E030), _sat(COP_ALB)))
 # THE SPECULAR COLUMN CANNOT BE MEANED WITHOUT SAYING SO. A sun glint is a rare
 # event of enormous radiance -- L_SUN is 3.6e5 in these units against a water
 # pixel's 0.5 -- so the arithmetic mean of the reflected column over water is a
@@ -6502,87 +7061,72 @@ if _b6.sum() >= 100:
         -pool_sdf_grad(np.array([X0 + 3.]), np.array([Y1 - .001]))[1][0] * SUN_DIR[1]
         - pool_sdf_grad(np.array([X0 + 3.]), np.array([Y1 - .001]))[0][0] * SUN_DIR[0],
         0, 1))
+    _bnx, _bny = band_illum(0., -1.)
     print("     THE DRY BAND, decomposed. Its own irradiance over the rays that "
-          "land on it is %s. Three terms make it and on THIS wall the sun is "
+          "land on it is %s. Four terms make it and on THIS wall the sun is "
           "not one of them: the north wall's poolward normal has N.L = %.3f, "
-          "clipped to zero, so the `0.30` on the direct beam -- the open "
-          "constant with no derivation -- multiplies nothing here and cannot "
-          "be what is holding the ratio down. What is left is SKY_DECK x 0.50 "
-          "= %s and WBOUNCE x 0.50 x (pattern) = %s at full pattern."
-          % (np.round(_bE.mean(0), 4),
-             float(-SUN_DIR[1]), np.round(SKY_DECK * .50, 4),
-             np.round(WBOUNCE * .50, 4)))
-    # the closed form for a vertical strip under an infinite horizontal ledge:
-    # a ray at elevation alpha clears an overhang of width w at height D above
-    # the point when tan alpha < D/w, and integrating the face's own cosine
-    # over that wedge gives (alpha + sin alpha cos alpha)/pi, which is 0.5 at
-    # alpha = pi/2 -- i.e. exactly the file's 0.50 when w = 0.
-    _ledge = lambda a: (a + np.sin(a) * np.cos(a)) / np.pi
+          "clipped to zero, so the `0.30` on the direct beam -- the last "
+          "constant above the water with no derivation -- multiplies nothing "
+          "here and cannot be what is holding the ratio down. What is left is "
+          "its OWN sky %s, the sky the water reflects into its lower half %s, "
+          "and WBOUNCE x 0.50 = %s at full pattern."
+          % (np.round(_bE.mean(0), 4), float(-SUN_DIR[1]),
+             np.round(_bnx, 4), np.round(_bny, 4), np.round(WBOUNCE * .50, 4)))
+    print("       * ITS SKY HALF IS NO LONGER A DECK ILLUMINANT HALVED, and "
+          "that was a category error rather than a mis-tuning: SKY_DECK x 0.50 "
+          "= %s went onto a VERTICAL, sun-averted strip. The integral at this "
+          "face's own azimuth gives %s -- %s of it per channel. The level "
+          "hardly moves in green and the COLOUR moves a great deal, which is "
+          "the finding: the old constant was two errors that cancelled in "
+          "green (its SKY_AMB x 0.30 was 0.42x the gradient's own cosine "
+          "integral, its SUN_COL x 0.075 was 6.2x the aureole's), so the "
+          "previous round's counterfactual -- drop the aureole, ratio 0.518 -> "
+          "0.78 -- was arithmetic on top of a wrong decomposition and does not "
+          "survive the derivation."
+          % (np.round(_SKY_DECK_OLD * .50, 4), np.round(_bnx, 4),
+             np.round(_bnx / (_SKY_DECK_OLD * .50), 3)))
     _bz = np.linspace(0.002, FREEB, 200)
     _ovh = float(np.mean(_ledge(np.arctan((ZLIP - _bz) / .030))) / .5)
-    print("       * its SKY half is geometrically unoccluded, and that is a "
-          "reading of the geometry rather than an assumption: the coping's "
-          "bullnose has its poolward extreme at s = SLIP = %.3f, which is the "
-          "band's OWN plane, and recedes from the pool going up (SBUL = %.3f "
-          "at ZD). A vertical strip under a ZERO overhang keeps its whole "
-          "upper half, so 0.50 is exact for the section this file builds. `?` "
-          "IT IS ALSO A CHOICE: a real coping overhangs the liner, and the "
-          "closed form for a strip under an infinite ledge of width w at "
-          "height D -- (alpha + sin alpha cos alpha)/pi with alpha = "
-          "atan(D/w) -- says a 30 mm overhang would leave this band %.0f%% of "
-          "its sky. That is the second candidate for the gap below and it is a "
-          "SECTION question, not a lighting one."
-          % (SLIP, SBUL, 100 * _ovh))
-    print("       * what is NOT derived in that half is SKY_DECK itself on an "
-          "averted vertical face. It is a HORIZONTAL-deck illuminant, "
-          "SKY_AMB x 0.30 + SUN_COL x 0.075, and %.0f%% of it in green is that "
-          "second term -- the aureole and horizon band around a due-west sun, "
-          "which a SOUTH-facing strip sees at cos(azimuth) = %.3f, i.e. behind "
-          "its own plane. `?` Marked, not moved: it is the same calibration "
-          "question as the `0.30` beside it, SKY_DECK also lights the coping "
-          "and the paving, and the reference is a photograph this round does "
-          "not have."
-          % (100 * (SUN_COL * .075)[1] / SKY_DECK[1],
-             float(-SUN_DIR[1] / np.hypot(SUN_DIR[0], SUN_DIR[1]))))
-    # `slab_esc` and NOT T_DIFF_UP x T_OUT_DIFFUSE: the attenuation of the up
-    # leg and its chance of escaping are correlated -- a steep ray escapes AND
-    # crosses less water -- and this file has already been caught factorising
-    # that pair once. One integral, both factors inside it.
-    _upw = slab_esc() * bed_img['disp'][
-        BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0)
-    print("       * its WATER half, WBOUNCE, is a closed form and the solve now "
-          "gives a second route to it: T_OUT_DIFFUSE x T_DIFF_UP x the "
-          "CONVERGED deep floor is %s against WBOUNCE's %s, %s per channel. "
-          "%s -- and it is the half of the band that a brighter pool feeds "
-          "back into, so if it is low the band is low with it."
-          % (np.round(_upw, 4), np.round(WBOUNCE, 4),
-             np.round(_upw / np.maximum(WBOUNCE, 1e-9), 3),
-             "the closed form is the LOW one, so the band is under-lit by its "
-             "own upwelling and the ratio below flatters the wall"
-             if _upw[1] > WBOUNCE[1] else
-             "the closed form is the HIGH one, so the band is over-lit by its "
-             "own upwelling and the ratio below understates the wall"))
-    # THE COUNTERFACTUAL, COMPUTED AND NOT APPLIED. The aureole term is the
-    # one part of the band's light that is demonstrably in the wrong place on
-    # THIS wall, and it is large. Its size is printed so that the remaining gap
-    # is attributed rather than left as a mystery -- and it is not moved,
-    # because SKY_DECK also lights the coping and the paving and its
-    # calibration reference is a photograph this round does not have. That is
-    # the same ruling the `0.30` beside it is under.
-    _bE_noaur = _bE.mean(0) - (SUN_COL * .075) * .50
-    _kY = np.array([.2126, .7152, .0722])
-    _cf = float((_kY * _bE_noaur).sum() / max((_kY * _bE.mean(0)).sum(), 1e-9))
+    print("       * the coping's occlusion of it is MARCHED and not asserted: "
+          "%.4f of the upper half survives, off this file's own `edge_z`, "
+          "because the bullnose's poolward extreme is at s = SLIP = %.3f -- the "
+          "band's OWN plane -- and it recedes from the pool going up (SBUL = "
+          "%.3f at ZD). The stone overhangs the WATER by 20 mm and the LINER by "
+          "nothing. The ledge form (alpha + sin alpha cos alpha)/pi is the "
+          "second route: 1.000 at w = 0, and %.0f%% at a 30 mm overhang, which "
+          "is what a different section would cost."
+          % (BAND_SKY_VIS, SLIP, SBUL, 100 * _ovh))
+    _upw = wbounce_of(bed_img['disp'][BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0))
+    print("       * its WATER half is now the converged floor and not a "
+          "one-bounce closed form: WBOUNCE = slab_esc x the deep floor = %s, "
+          "against the %s the guess gave -- %s per channel, 89%% high in red. "
+          "The band was over-lit by its own upwelling, so the ratio below used "
+          "to UNDERSTATE the wall by this much and now does not."
+          % (np.round(_upw, 4), np.round(_WBOUNCE_OLD, 4),
+             np.round(_WBOUNCE_OLD / np.maximum(_upw, 1e-9), 3)))
+    print("       * and the sky the WATER reflects into the lower half was "
+          "absent altogether: %s, %.0f%% of what that half now gets. The mean "
+          "external reflectance over it is %.3f, not the 0.02 of normal "
+          "incidence, because a vertical face's weight is heaviest at the "
+          "horizon and so is the water's Fresnel. It is the one term this "
+          "round ADDS to the band, and it works against the ordering."
+          % (np.round(_bny, 4),
+             100 * _bny[1] / max(_bny[1] + (WBOUNCE * .50)[1], 1e-9), BAND_RBAR))
     print("     SO: submerged wall %.3f of the dry band on the averted wall, "
-          "against wave 14's 0.470 and the observation's > 1. THE ORDERING DOES "
-          "NOT EMERGE, and the attribution is: the wall's whole hemisphere is "
-          "now traced and closed to %.1f%% of one hemisphere, so what is left "
-          "is not a missing receiver term. The band's own sky is where the "
-          "next unexplained factor sits -- drop the aureole it cannot see and "
-          "its irradiance falls to %.0f%% of what it has, taking the ratio to "
-          "%.3f, still short of 1. `?` NOT APPLIED."
+          "against wave 15's 0.518, wave 14's 0.470 and the observation's > 1. "
+          "THE ORDERING STILL DOES NOT EMERGE. The wall's hemisphere is traced "
+          "and closed to %.1f%% of one hemisphere and did NOT move this round "
+          "-- nothing below the waterline did, which is this round's control -- "
+          "and the band's illuminant is now derived rather than chosen. So the "
+          "remaining factor of %.2f is not a missing band term and not a "
+          "missing wall term: it is either the %.2fx SKY_AMB is measured at "
+          "above the same environment (which would move the WALL, and is "
+          "reported and not applied here), or the observation and the physics "
+          "disagree."
           % (_hy[WREG == 7].mean() / _Lband,
              100 * (0.5 + float(np.mean(_wvfa[:, :2].sum(1)))),
-             100 * _cf, _hy[WREG == 7].mean() / (_Lband * _cf)))
+             _Lband / max(_hy[WREG == 7].mean(), 1e-9),
+             SKY_AMB[1] / SKY_SUB_DERIVED[1]))
 
 
 # --- THE FREEBOARD BAND, MEASURED --------------------------------------------

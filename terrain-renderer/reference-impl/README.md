@@ -40,9 +40,9 @@ not written here, in three tiers, in about 100 seconds — no render, no PNG.
 
 | Tier | Strength of evidence | Covers |
 |---|---|---|
-| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½` and `WALL_SKY` as the other half of that same hemisphere, the meniscus's force balance and projected-area identity and its two collapse limits, the sign that refutes the fillet's internal-reflection term, **Walsh's relation, `2E_3(0) = 1`, the diffuse path being longer than the vertical one, and a lossless white-bedded pool composed through the shipped `rho_water` coming to exactly 1**, the four wall planes against `pool_sdf`, the analytic ceiling on the fillet's transmitted column, the near-wall fold guard fired both ways, a shadow march of the coping, and — new this round — **the Snell window's half-angle measured off the underwater frame's own ray directions**, the mirror regime's reflectance being exactly 1, Stokes reversibility, **the `n²` radiance gain closed against the air-side transmitted flux**, and — new this round — **the Snell window's share of a HORIZONTAL face against `1/n²` and of a VERTICAL one against `½ − tir_vert(t_c)(1 − 1/n²)`, the same ratio driven to exactly `WALL_SKY = ½` in the `n → 1` limit, `r_int_at` against the water→air equations written from the two indices, `r_int_at ≡ 1` past the critical angle with no tolerance at all, and the upgoing gather closing on 1 over a horizontal face's hemisphere and on exactly ½ over a vertical face's upper half — the same ½ the downgoing gather leaves** |
-| 2 · published measurement | a disagreement may be a bug or a different water | pure-water absorption vs Pope & Fry 1997 and Smith & Baker 1981, slope statistics vs Cox & Munk 1954, the round-jet constants S and B, capillary-gravity dispersion and c_min |
-| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, **the bed ↔ wall transfer closed by reciprocity — the shipped gather's lattice against that same rectangle view factor**, the shipped 960-direction lattice against its own closed form over the wall's height range, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian, an RK4 march of Young–Laplace vs the meniscus profile, a 4000-ray fan vs its projected area, a 1 mm march of the bed height field vs `scene_hit`'s five-plane solve, a 128 000-hit march of the fillet's transmitted fan vs the wall map's extent, the pool's apparent albedo integrated ray by ray vs `wet_albedo`'s trapped series, **`rho_water` at the file's own absorption against a 400 000-photon random walk, and `2E_3` by Gauss-Legendre against the exponential-integral recurrence**, a 0.5 mm march of the water body vs `scene_hit_under`'s any-direction solve, and — new this round — **`axial_share`'s 2-D quadrature reproducing `tir_vert(t_c)`'s closed form, the upgoing lattice's mirror coefficient against `R_INT` reached by Walsh's reciprocity rather than by any integral, and the solve run for exactly `NSOLVE` passes from black against `trap_gain`'s closed geometric series** |
+| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½` and `WALL_SKY` as the other half of that same hemisphere, the meniscus's force balance and projected-area identity and its two collapse limits, the sign that refutes the fillet's internal-reflection term, **Walsh's relation, `2E_3(0) = 1`, the diffuse path being longer than the vertical one, and a lossless white-bedded pool composed through the shipped `rho_water` coming to exactly 1**, the four wall planes against `pool_sdf`, the analytic ceiling on the fillet's transmitted column, the near-wall fold guard fired both ways, a shadow march of the coping, and — new this round — **the Snell window's half-angle measured off the underwater frame's own ray directions**, the mirror regime's reflectance being exactly 1, Stokes reversibility, **the `n²` radiance gain closed against the air-side transmitted flux**, and — new this round — **the Snell window's share of a HORIZONTAL face against `1/n²` and of a VERTICAL one against `½ − tir_vert(t_c)(1 − 1/n²)`, the same ratio driven to exactly `WALL_SKY = ½` in the `n → 1` limit, `r_int_at` against the water→air equations written from the two indices, `r_int_at ≡ 1` past the critical angle with no tolerance at all, and the upgoing gather closing on 1 over a horizontal face's hemisphere and on exactly ½ over a vertical face's upper half — the same ½ the downgoing gather leaves**, and — new in the illuminant round — **a uniform sky integrating to exactly `L` on a horizontal face and exactly `L/2` on a vertical one, the sky gradient being uniform in BLUE and therefore forcing a vertical face's share of it to the same number to double round-off, the Rayleigh phase function's `cos²Θ` half carrying exactly ¼ of the scattered light — the ceiling that falsifies the old `SKY_DECK` with no photograph in it — `sky() = env_diffuse + the disc` over 4096 directions, `slab_esc(0) = T_OUT_DIFFUSE`, and the ledge form at both of its limits** |
+| 2 · published measurement | a disagreement may be a bug or a different water | pure-water absorption vs Pope & Fry 1997 and Smith & Baker 1981, slope statistics vs Cox & Munk 1954, the round-jet constants S and B, capillary-gravity dispersion and c_min, and — new in the illuminant round — **the derived deck illuminant's diffuse fraction of global horizontal against the 0.10–0.35 a clear sky gives at air mass 2.8** |
+| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, **the bed ↔ wall transfer closed by reciprocity — the shipped gather's lattice against that same rectangle view factor**, the shipped 960-direction lattice against its own closed form over the wall's height range, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian, an RK4 march of Young–Laplace vs the meniscus profile, a 4000-ray fan vs its projected area, a 1 mm march of the bed height field vs `scene_hit`'s five-plane solve, a 128 000-hit march of the fillet's transmitted fan vs the wall map's extent, the pool's apparent albedo integrated ray by ray vs `wet_albedo`'s trapped series, **`rho_water` at the file's own absorption against a 400 000-photon random walk, and `2E_3` by Gauss-Legendre against the exponential-integral recurrence**, a 0.5 mm march of the water body vs `scene_hit_under`'s any-direction solve, and — new this round — **`axial_share`'s 2-D quadrature reproducing `tir_vert(t_c)`'s closed form, the upgoing lattice's mirror coefficient against `R_INT` reached by Walsh's reciprocity rather than by any integral, and the solve run for exactly `NSOLVE` passes from black against `trap_gain`'s closed geometric series**, and — new in the illuminant round — **the deck illuminant against a 400 000-sample cosine Monte-Carlo and against its own lattice at 16× the directions, the aureole term against its lobe integrated in `validate.py` from `L_AURE` and `N_AURE` alone, `slab_esc` against a 300 000-photon walk of the same slab, and the band's occlusion march against a direct angular quadrature of the same blocking rule** |
 
 The highest-value single test is the **sinusoid caustic**: for `h = a sin(kx)`
 under a vertical sun the whole pass is a 1-D map with an exact Jacobian, so the
@@ -78,7 +78,11 @@ closed with no tolerance widened; four tolerances were *tightened* to double
 round-off because the quantity they cover became an identity rather than an
 approximation.
 
-**It is now 240 rows and 0 FAIL, up from 225.** The 15 newest are the underside
+**It is now 268 rows and 0 FAIL, up from 240.** The 28 newest are the two
+illuminants above the water — the deck's and the freeboard band's, both derived
+from the file's own `sky()`, plus the closures around `WBOUNCE` and the coping's
+occlusion march — and their bug-reintroduction table is with their section below.
+The 15 before them are the underside
 of the surface — the window's two shares, the mirror's own reflectance, the
 upgoing gather's closures and the solve's fixed point — and every one of them was
 fired at the bug it was written for by putting the bug back:
@@ -146,6 +150,401 @@ checks must not share a premise.** Derive the value from physics, write the
 derivation down, and then guard it with something that could not have been written
 from it — a limit, a conservation identity, an analytic special case, or the same
 quantity reached by unrelated code.
+
+## Measured — two illuminants derived from one atmosphere, and the ordering still does **not** emerge
+
+The previous round located the remaining factor of 1.9 on the **band** rather
+than the wall, named three candidates, and moved none of them. They are moved
+here — not by calibration, which the standing ruling forbids, but by deriving
+them, and the first thing the derivation does is **falsify the previous round's
+own counterfactual**.
+
+| north wall (averted, `cau` = 0.000), scene-linear luminance / dry band | wave 14 | wave 15 | wave 16 |
+|---|---|---|---|
+| wall, 0–100 mm below the line | 0.470 | 0.518 | **0.513** |
+| wall, 100–250 mm | 0.581 | 0.616 | **0.621** |
+| the dry band itself, absolute | 0.5724 | 0.5721 | **0.5524** |
+| what the observation requires | > 1 | > 1 | > 1 |
+
+**The ordering did not emerge, and this round says so plainly rather than
+reaching for it.** What it does deliver is that the gap is now attributed to one
+place: with the band's illuminant derived and the wall's hemisphere untouched,
+the remaining factor of **1.95** is not a missing band term and not a missing
+wall term.
+
+**The control is the mirror image of the last round's.** Wave 15 moved
+everything under the water and nothing over it. This round moves everything over
+the water and nothing under it: the solve's convergence table is *identical* to
+wave 15's, line for line, seed to pass 6. The submerged pixels do move by a
+little — 83.4 → 80.5 in encoded luminance on the first 100 mm of wall — and that
+is entirely the **reflected** column, because what the water reflects at the
+wall is the band and the coping and both of those changed. The transmitted
+column is unchanged to the digit (0.190 and 0.239, before and after).
+
+### `SKY_DECK`, and it was two errors that cancelled in green
+
+`SKY_DECK = SKY_AMB × 0.30 + SUN_COL × 0.075` was the longest-standing underived
+constant in the file — 1.74 stops written by hand, filed as open for the whole
+project, and applied to a horizontal deck and a vertical band alike. There is
+nothing left to choose in it. An illuminant for a diffuse receiver is one
+number,
+
+```
+E(N)/pi = (1/pi) INT_hemisphere L(w) (w.N)+ dw
+```
+
+and the file already owns `L(w)`: `sky()` is a complete environment whose two
+lobes were derived, the round before, from the same Rayleigh atmosphere that
+reddens `SUN_COL`. The only judgement is **which lobes belong**, and that is
+settled by the audit already in the file: the disc lobe carries the beam
+*exactly* (its flux is `π·SUN_COL` to a part in a thousand), and every diffuse
+receiver already gets that beam as an explicit `SUN_COL·(N·L)·vis` term, so
+integrating the disc as well would light the frame with two suns. The aureole is
+not the beam — it is light scattered *out* of the beam, arriving from directions
+the beam does not — and it is skylight.
+
+|  | red | green | blue |
+|---|---|---|---|
+| the gradient's own cosine integral | 0.4478 | 0.6381 | 1.1270 |
+| the Rayleigh aureole | 0.0616 | 0.0928 | 0.1405 |
+| **derived `SKY_DECK`** | **0.5094** | **0.7310** | **1.2675** |
+| what shipped | 0.8127 | 0.8462 | 0.8604 |
+| shipped / derived | **1.60** | **1.16** | **0.68** |
+
+**The level was 16% high in green and the colour was wrong in both directions,
+because the two hand terms were each wrong by more than their sum was.**
+`SKY_AMB × 0.30` is **0.42×** the gradient's own cosine integral; `SUN_COL ×
+0.075` is **6.2×** the aureole's. They very nearly cancel in green — which is
+how a constant this wrong survived every green-channel comparison this project
+ever made.
+
+**And the aureole's share has a ceiling that needs no quadrature at all.** The
+Rayleigh phase function is `P(Θ) = (3/4)(1 + cos²Θ)`. Over the sphere `∫P dω/4π
+= 1`, and its `cos²Θ` half contributes exactly `(3/4)(1/3) = 1/4` — for **any**
+optical depth and **any** sun elevation. So a singly-scattered Rayleigh sky
+cannot put more than a quarter of its diffuse light in the forward lobe — and
+higher orders only add to the isotropic side, so the ceiling on the *total*
+diffuse sky is if anything lower. The derived aureole is **12.7%** of the deck illuminant in green. The constant it
+replaced put it at **68%**. That is a falsification from the atmosphere the file
+already recovered from `SUN_COL`, and it needs no photograph.
+
+**`?` What is still not derived, and exactly what is missing.** The two lobes
+come from the Rayleigh atmosphere; the **gradient** — `SKY_HOR`, `SKY_TOP` and
+the 0.55 exponent between them — does not, and never did. What the atmosphere
+can say about it is a **lower bound**, and the bound is computed rather than
+asserted: single-scattered Rayleigh radiance for a ground observer,
+
+```
+L = (F0 P(Theta)/4pi) mu_s (e^{-tau/mu_v} - e^{-tau/mu_s}) / (mu_v - mu_s)
+```
+
+with `F0 = E_SUN·e^{+τ·m}` the top-of-atmosphere beam this file's own `SUN_COL`
+implies, gives a deck illuminant of `(0.246, 0.367, 0.557)` against the
+gradient's `(0.448, 0.638, 1.127)` — **0.55 / 0.58 / 0.49** of it. That is a
+bound and not a disagreement: it has no multiple scattering and no ground
+return, and at `τ_R(blue) = 0.202` neither is small. **What is missing is
+named** — orders two and up of the sky's own radiative transfer, and the albedo
+of the ground under it — which is the honest form of an open constant rather
+than a `0.30`.
+
+### The band's own hemisphere, and the term that was absent from it
+
+`liner_band` lit a **vertical, sun-averted** strip with `SKY_DECK × 0.50`. The
+halving is right for a uniform sky and for nothing else: a vertical face's
+cosine weight is `sin²θ dθ`, heaviest at the **horizon**, which is the brightest
+part of this sky in red and green and the part the aureole sits 21° above at
+*one* azimuth. One number cannot be both. So the band gets its own integral, at
+its own azimuth, with three sources:
+
+| the band's irradiance / π, north wall (averted) | red | green | blue |
+|---|---|---|---|
+| its own sky, upper half | 0.3139 | 0.4016 | 0.6124 |
+| the sky the **water reflects** into the lower half | 0.0838 | 0.0975 | 0.1291 |
+| the pool's upwelling, `WBOUNCE × 0.50` | 0.0484 | 0.3242 | 0.4749 |
+| direct sun (`N·L = −0.061`, clipped) | 0 | 0 | 0 |
+| **total** (over the rays that land on it) | **0.4761** | **0.9220** | **1.3568** |
+| what it was | 0.5205 | 0.9449 | 1.0660 |
+
+**And here is the finding the previous round could not have made.** Its
+counterfactual — *drop the aureole the band cannot see and the ratio goes 0.518
+→ 0.78* — was arithmetic on top of a wrong decomposition. Against the derived
+integral the band's sky half goes to **0.77 / 0.95 / 1.42** of `SKY_DECK ×
+0.50`: it *barely moves in green* and moves a great deal in colour. The
+category error was real; its size was not what subtracting one hand constant
+from another suggested.
+
+**The azimuth dependence is now real and it is 1.24×.** The east wall's band,
+facing the sun, collects `(0.377, 0.497, 0.756)` against the north wall's
+`(0.314, 0.402, 0.612)`. "On **every** side" is the load-bearing word in the
+observation this line of work is about, and a single halved deck illuminant
+cannot be both numbers. A `validate.py` row asserts the ratio is above 1.10 —
+a constant wearing an integral's name reads exactly 1.00 and fails it.
+
+**The one term this round ADDS to the band, and it works against the ordering.**
+A poolward-facing strip 0–100 mm over the water sees, in its lower half, the
+water — and the water returns two different things. The pool's own upwelling was
+there; the **sky reflected in that surface** was not. It is not small: the lower
+half's weight is heaviest at the horizon and so is the water's external Fresnel,
+so the radiance-weighted mean `R_ext` over that half is **0.243**, not the 0.02
+of normal incidence. It is 23% of what the band's lower half now gets, and it
+makes the band brighter. It is in because it is there, not because of which way
+it pushes.
+
+### The coping's overhang, marched instead of asserted
+
+The shader's `0.50` for the sky half was right, and it was right for a reason it
+did not state. The bullnose's poolward extreme is at `SBUL − BULR = SLIP`, the
+band's **own plane**, and the stone recedes from the pool going up, so every
+direction the coping occupies has `(ω·N) ≤ 0` and carries zero weight. The stone
+overhangs the **water** by 20 mm and the **liner** by nothing.
+
+That is now **traced**: `band_sky_vis` marches one ray per direction over 8192
+directions at 12 heights against this file's own `edge_z`, and returns
+**1.0000**. The closed form for a strip under an infinite ledge of width `w` at
+height `D` — `(α + sin α cos α)/π`, `α = atan(D/w)` — is the second route, and
+it is exactly 0.50 (i.e. the whole upper half) at `w = 0`. The 30 mm
+counterfactual costs the strip 6% of its sky on average and 0.6% at its foot;
+that is what a *different section* would cost and it is a section question, not
+a lighting one.
+
+**A real overhang is not a height field, and saying so is the point.** `edge_z`
+is a section `z(s)`; the only thing it can put over the band is stone the band
+stands on. So the shipped answer is an identity, not a coincidence — and the
+marcher is fired at the thing a height field *can* put in front of the band, a
+wall, at the limit (a 3 m wall 10 mm out takes everything) and in between
+(against a direct angular quadrature that shares no step and no height field).
+
+### `WBOUNCE`, against the converged floor
+
+It shipped as a closed-form guess with three defects at once, and the previous
+round measured it at `(0.53, 0.77, 0.93)` of the truth:
+
+- the **escape was factorised out of the attenuation** — `exp(−a·DEPTH)` for a
+  vertical up leg times a mean escape, when a steep ray escapes *and* crosses
+  less water. This file has already been caught making exactly this mistake
+  once; it costs 19.4 / 5.1 / 1.1% per band;
+- an undeclared `0.8` on an ambient that was not attenuated at all;
+- **one bounce**, where the solve has six.
+
+It is now `wbounce_of(L) = L × slab_esc()` — one integral, both factors inside —
+evaluated on the **converged deep floor**. The definition stays where it always
+was, six hundred lines up beside the `1 − R_int` it used to lead with; only the
+evaluation moved past the solve, and a closed-form seed stands in its place
+until then so the two routes can be printed against each other.
+
+| | red | green | blue |
+|---|---|---|---|
+| `slab_esc()` | 0.3403 | 0.4795 | 0.5106 |
+| × the converged deep floor `(0.285, 1.352, 1.860)` | **0.0969** | **0.6484** | **0.9498** |
+| the closed-form seed (same escape, `shade`'s own deep floor) | 0.1465 | 0.8360 | 1.1043 |
+| what shipped | 0.1836 | 0.8404 | 1.0249 |
+| shipped / converged | **1.90** | **1.30** | 1.08 |
+
+The gap between the seed and the converged value is the trap and the walls,
+i.e. exactly what six passes add — the second route this number now has. And
+note the **sign**: the band was over-lit by its own upwelling, so the wall/band
+ratio used to *understate* the wall and now does not.
+
+### What this did to the water/stone ratio, and it is the honest answer
+
+| water / sunlit stone, hero frame, transmitted column, scene-linear | wave 15 | wave 16 |
+|---|---|---|
+| the render | 0.836 | **0.908** |
+| the closed form beside it | 0.772 | **0.839** |
+| apart | +8.3% | **+8.2%** |
+
+**Both sides moved by the same factor and the disagreement did not move at
+all**, which is exactly what should happen: the closed form's water is unchanged
+(nothing under the water moved) and its *denominator* is the render's own
+sunlit stone, which fell 8% when the deck's illuminant was derived. So this
+round adds no information about the 8.2% — and that is itself information,
+because it means the overshoot is **not** in the deck term. It is in the bed's.
+
+**Bar section J2b's headline measurement is water against sunlit sandstone, and
+it moves the right way — in the units the bar actually read it in.** The bar
+records the render "near 0.40 where all three frames read at or above 1". That
+0.40 was a *display-referred* reading of a PNG, which this project has already
+refuted as an instrument (see the section below: 0.395 against a true 0.735).
+Both numbers moved this round and both moved up: scene-linear **0.836 → 0.908**,
+and the display-linear median-over-median off the sRGB frame — the number a
+reader with the PNG would get — **0.779 → 0.849**. From a denominator that was
+derived rather than dialled, with the water untouched.
+
+**The wide frame moves the same way, and by the same mechanism.** `POOL_WIDE=1`,
+same code, same constants, only the camera: water / sunlit stone goes **0.796 →
+0.863** against a closed form that moves **0.677 → 0.735** on that geometry —
++17.6% apart before, **+17.4%** after. Two cameras, one denominator, and the
+disagreement is the same one in both. **77.4% of the wide frame's pixels moved,
+mean |Δ| 17.9, worst 34, luminance 169.35 → 165.46** — more of that frame is deck
+than of the hero's, which is the whole of why.
+
+### And the third illuminant, priced and **not** moved
+
+The same integral prices `SKY_AMB`, because the Snell window is a change of
+variables and nothing else: `n² cos t_w sin t_w dt_w = cos t_a sin t_a dt_a`
+maps the window integral of the `n²`-gained sky exactly onto the air-side
+hemisphere, so a submerged horizontal face's sky irradiance is the **deck's**,
+less what the surface reflects away.
+
+| | red | green | blue |
+|---|---|---|---|
+| `SKY_DECK × (1 − R̄)`, `R̄ = (0.086, 0.077, 0.068)` | 0.4655 | 0.6745 | 1.1812 |
+| shipped `SKY_AMB` | 0.559 | 0.903 | 1.419 |
+| shipped / derived | 1.20 | **1.34** | 1.20 |
+
+**It is left alone on purpose, and the reason is attribution, not timidity.**
+`SKY_AMB` is the wall's illuminant *and* the bed's, so it is the numerator and
+the denominator of the wall/band ratio at once; moving it in the same round as
+the band would make the one number this work exists to report unreadable. It is
+also the arithmetic that closes the water/stone overshoot: the sky is **20.3%**
+of what lights this floor in luminance (beam `(1.469, 1.974, 1.624)` against sky
+`(0.219, 0.505, 0.861)`, both printed every run), a 34% over-supply of it is
+worth **5.2%** on the bed directly, and the trap and the wall return amplify
+that by a further 1.2–1.3× — against the **8.2%** measured. Same order, same
+sign, and not arranged. **That is the next round, and it is now a number rather
+than a suspicion.**
+
+### What the derivation exposes, which is not a new defect
+
+The comment that used to sit over `SKY_DECK` justified its warmth as *"a warm
+albedo times a blue illuminant is grey"*. It was **right about the mechanism and
+wrong about which constant causes it.** With the illuminant derived, the deck's
+sky is the blue sky it actually is — and the warm beam standing beside it is
+still multiplied by `0.30`, the last factor above the water with no derivation
+anywhere in this file. Under-weight the beam by 3.33 and the blue term wins:
+
+| a horizontal coping facet in full sun | `E/π` | × `COP_ALB` | linear saturation | sky's share |
+|---|---|---|---|---|
+| at the shipped `0.30` | (1.435, 1.557, 1.891) | (1.026, 0.890, 0.828) | 0.193 | 47% |
+| at `1.00` | (3.595, 3.483, 3.347) | (2.570, 1.992, 1.466) | **0.430** | 21% |
+
+In the frame the coping's sRGB median goes **(180, 164, 139) sat 0.23 → (166,
+158, 157) sat 0.05**. That is a legible regression in the picture and it is
+reported as one. It is **not moved**, for the reason it has never been moved:
+`0.30` is the exposure of the entire above-water half, its blast radius is
+coping, paving, band and the `WBOUNCE`/`SKY_DECK` balance between them, and
+raising it to 1 more than doubles the deck. What has changed is that it is no
+longer hiding behind a warm illuminant — the symptom is now on the picture and
+in a printed counterfactual, which is a sharper handle than "two receivers get
+the same beam at a ratio of 3.33".
+
+
+Also worth recording, because a `?` that is written down is worth more than one
+that is not: the band's **grazing sheen** still takes `WBOUNCE` as its source,
+and after this round that is demonstrably the wrong half of what the water
+returns — at the angle the band is seen at, the water in front of it is mostly
+reflected sky. `emir` is exactly that quantity, but averaged over a half-space,
+and the sheen is a *per-direction* term, so closing it means a per-ray lookup
+rather than a swapped constant. Marked in `liner_band`, not moved.
+
+### The observation this whole line of work is chasing, against the bar's own reading
+
+Worth stating, because it changes what "the ordering" means. Bar section J,
+written from the seventh and eighth photographs of the same pool:
+
+> **The submerged wall reads darker than the freeboard above it, in both
+> frames** — the opposite ordering to the low-angle sunlit photographs that
+> drove the wall work. **Both orderings are real and the render must produce
+> both** … This is a prediction to test, not a target to dial.
+
+The hero frame's wall is the **north** one, averted, `cau = 0.000` — a shaded
+wall seen against a directly-lit band. It reads 0.513, i.e. **the J ordering**.
+The other ordering is a *sunlit* wall, and the file prints `cau = 0.920` on the
+east wall and its radiance at 2.63 / 1.63 / 1.39 × the deep floor. So the render
+produces both, from geometry, with no constant between them — which is what J
+asks for. What it does **not** produce is the low-angle ordering *on an averted
+wall*, and after two rounds of building the receiver and one of deriving the
+source, the honest reading is that either `SKY_AMB` above is the whole of the
+remainder, or that observation and this physics disagree.
+
+### What moved in the picture
+
+Above the waterline, everything; below it, only what the water reflects. **43.0%
+of the hero's pixels moved, mean |Δ| 16.6 levels over those, worst 35**, mean
+encoded luminance **140.96 → 138.74**.
+
+**And the underwater frame is bit-identical to wave 15's — every pixel, all
+960 000 of them.** `w16-underwater.png` and `w15-underwater.png` differ by zero,
+which is worth stating precisely: that frame sees the submerged wall *directly*,
+with no reflected column over it, so it is the cleanest available check that the
+wall's own radiance did not move. What it does **not** check is the band or the
+coping, because it cannot see either — the window's outer rim is filled by
+`sky()` and nothing else, which is section G's standing `?`. The two controls
+together — this frame and the solve's convergence table, identical line for line
+— are what let the hero frame's 0.518 → 0.513 be attributed entirely to the
+band.
+
+| sRGB median, encoded luminance | wave 15 | wave 16 | why |
+|---|---|---|---|
+| **riser face** | **(16, 122, 162) · 102.4** | **(16, 122, 162) · 102.4** | **the control** |
+| **tread top** | **(73, 169, 193) · 150.3** | **(73, 169, 193) · 150.3** | **the control** |
+| **floor, sunlit** | **(53, 161, 184) · 139.7** | **(53, 161, 184) · 139.7** | **the control** |
+| **floor, in shadow** | **(42, 109, 156) · 98.1** | **(42, 109, 156) · 98.1** | **the control** |
+| **water in front of the wall** | **(66, 157, 182) · 139.5** | **(66, 157, 182) · 139.5** | **the control** |
+| coping stone | (180, 164, 139) · 165.6 · sat 0.23 | **(166, 158, 157) · 159.6 · sat 0.05** | the deck illuminant, derived — and the `0.30` beside it |
+| freeboard, dry blue band | (45, 153, 173) · 131.5 · sat 0.74 | **(39, 148, 188) · 127.7 · sat 0.79** | its own hemisphere, `WBOUNCE` closed |
+| wall, 0–100 mm | (20, 97, 136) · 83.4 | **(15, 94, 139) · 80.5** | the reflected column only |
+| wall, 100–250 mm | (30, 109, 152) · 95.3 | **(27, 107, 153) · 93.3** | the same |
+
+**Five rows are the control and they did not move at all** — same triple, same
+luminance to the decimal. Nothing this round touches can reach into the water,
+and the frame says so rather than the commit message. The band went **more
+saturated and slightly darker** (0.74 → 0.79), which is the derived illuminant
+doing what a derived illuminant does: the old constant's fake warmth was
+desaturating a blue liner.
+
+### Suite
+
+**268 rows, 0 FAIL, up from 240.** The 28 new ones are the two illuminants and
+the closures around them, and every one was fired at the bug it was written for
+by putting the bug back:
+
+| bug reintroduced | rows that FAIL |
+|---|---|
+| `SKY_DECK` back to `SKY_AMB*0.30 + SUN_COL*0.075` | 3 — the identity, the aureole cross-check, and the Monte-Carlo |
+| the `1/π` dropped from `env_irradiance` | 9 |
+| the sun's **disc** let into the diffuse lobes | 8 — including the ¼ ceiling and the blue/red bounds |
+| the **aureole** dropped from them | 3 |
+| `band_illum` returned `SKY_DECK × 0.50` flat | 3 — including the azimuth-dependence row |
+| `band_sky_vis` neutered to "nothing is ever blocked" | 3 |
+| `wbounce_of` re-factorised as `T_DIFF_UP × T_OUT_DIFFUSE` | 1 |
+| `slab_esc` re-factorised the same way | 1 — the 300k-photon walk |
+| the band's mirror term flattened to `R_ext = 0.02` | 2 |
+
+Two routes to every number that has two: the deck illuminant against a
+400k-sample cosine Monte-Carlo *and* against its own lattice at 16× the
+directions; the aureole term against a lobe integrated in `validate.py` from
+`L_AURE` and `N_AURE` with none of `render.py`'s weights; `slab_esc` against a
+300k-photon walk *and* against `T_OUT_DIFFUSE` in the zero-depth limit; the
+band's occlusion march against a direct angular quadrature *and* against the
+ledge closed form at both limits.
+
+**And the sharpest row in the section needs no tolerance from the quadrature at
+all.** `SKY_HOR` and `SKY_TOP` are **equal in blue** (0.98 both), so the
+gradient is exactly uniform in that channel — and therefore a vertical face's
+share of it must be the *same* number the uniform-sky row produces, whatever
+that number's own error is. In red and green the horizon is brighter and a
+vertical face weights the horizon, so the share must be strictly **larger**. One
+row proves the integrator weights by `sin²θ` and not by a constant, and it does
+it to double round-off.
+
+**Runtime, priced.** `validate.py` goes **83.0 s → 92.2 s** (+11%, both measured
+on an otherwise idle box): the `load_render`
+slice gains ~5 s building the 131 072-direction environment lattice, the
+121-azimuth band tables and the twelve occlusion marches, and the new tier costs
+~4 s, most of it the two Monte-Carlos. `render.py` is unchanged in its
+passes — the solve reads **272.7 s → 281.8 s**, which is scheduling noise on the
+same 6 × (200 × 100 × 576) gather — and the illuminant block itself is
+milliseconds against twelve minutes.
+
+Archived: `gauntlet/evidence/w16-hero-above.png`, `w16-wall-waterline.png` — the
+**same crop of the north waterline in both renders, wave 15 above and wave 16
+below**, which is the picture this round is about: coping, grey bead, dry blue
+band, meniscus line, submerged liner, water, with the *bottom* three now the
+unchanged ones and the top three moved — plus `w16-underwater.png`,
+`w16-underwater-risers.png` and `w16-wide.png`. All are re-rendered from the
+shipped file; the wide one is reproducible with `POOL_WIDE=1` and is comparable
+with `w12-wide.png`, `w14-wide.png` and `w15-wide.png`.
 
 ## Refuted — the water is **not** dark by a factor of two, and the two errors that made it look that way
 
@@ -628,6 +1027,15 @@ The wall's receiver side is now traced and closed to 94.7% of one hemisphere, so
 what is left is **not** a missing receiver term. All three remaining suspects are
 on the **band**, all three are now measured, and none of them is moved:
 
+> **All three were moved by the round after this one, by derivation rather than
+> by calibration, and the first of them turned out to be misdiagnosed — see the
+> illuminant section at the top of this file.** `SKY_DECK`'s aureole term was
+> indeed in the wrong place, but the counterfactual below (0.518 → 0.78) does
+> not survive: it subtracted one hand constant while keeping another that is
+> itself **0.42×** the gradient's own cosine integral. Against the derived
+> integral the band's sky half moves by 5% in green, not 34%, and the ratio ends
+> at **0.513**.
+
 1. **`SKY_DECK` on an averted vertical face.** The band's sky half is
    `SKY_DECK × 0.50`, and `SKY_DECK = SKY_AMB × 0.30 + SUN_COL × 0.075` is a
    *horizontal-deck* illuminant of which **68% in green** is that second term —
@@ -943,6 +1351,23 @@ The file also printed `wrote pool.png` while writing `pool_final.png`, and
 pool_final_zoom.png`. Same class, one line.
 
 ## Open — the `0.30` on every above-water direct-sun term
+
+> **Still open after the illuminant round, and now it is the ONLY thing above
+> the water without a derivation — and it is visible.** `SKY_DECK` is derived;
+> `WBOUNCE` is closed against the converged floor; the band has its own
+> hemisphere. The `0.30` is what is left, and with a properly blue deck
+> illuminant beside it the coping renders at saturation **0.05** against 0.23.
+> The old `SKY_DECK`'s fake warmth was masking it. `render.py` prints the
+> counterfactual — a horizontal coping facet in full sun goes from linear
+> saturation 0.193 at `0.30` to **0.430** at `1.00`, with the sky's share of it
+> falling from 47% to 21% — and does not apply it. The section below is the
+> original finding, kept as written. Two things in it are now superseded: the
+> `SKY_DECK` beside this constant is no longer "a derivation in the comment
+> above it", and the *"removing it alone takes the ratio from 0.518 to 0.80"* at
+> the end of it does not survive the derivation — the aureole was in the wrong
+> place, but it was 12.7% of the deck illuminant and not 68%. What has not
+> changed is the finding itself: two receivers in one frame get the same beam at
+> a ratio of 3.33, with a derivation on one side and nothing on the other.
 
 **Found while closing the six above; not fixed, and the reason matters.**
 
@@ -1390,6 +1815,14 @@ ceiling arithmetic allows it.
 > requires. The `0.30` — or rather the `SKY_DECK` that sits beside it on the same
 > band — is now the *measured* remaining suspect, worth a further 0.518 → 0.80 if
 > it were moved, which it was not.
+>
+> **And the round after THAT moved it, by deriving it, and the 0.80 was wrong.**
+> `SKY_DECK` is now the cosine integral of the file's own `sky()` minus the sun's
+> disc; the band has its own hemisphere at its own azimuth; `WBOUNCE` is closed
+> against the converged floor. The ratio ends at **0.513**, because the old
+> constant was two errors that cancelled in green rather than one that did not.
+> The remaining suspect is `SKY_AMB`, which the same integral prices at **1.34×**
+> its derived value — and that one moves the *wall*, not the band.
 
 **Everything else that moved, and why.** Three things read the wall maps, so
 three things moved, and each is the wall map arriving somewhere rather than a
@@ -1470,7 +1903,7 @@ symptoms this backlog entry predicted were right in sign and mixed in size:
 |---|---|
 | the flat `SKY_AMB` over the wall share is wrong, by `_WSH·(L_wall − SKY_AMB·e^{−ad·1.55})` = `(−0.048, +0.059, +0.025)` | the traced answer over the whole bed is `(0.050, 0.437, 0.727)`, which also carries the mirror. The prediction used a mean wall against a mean share; the gather uses the wall each texel can see |
 | *"caustic interiors on the deep floor come out too dark and the sail's shadow too bright — one missing mechanism, two symptoms"* | the bed's ambient rises 39% in green, and the sail's shadow on the east wall now arrives at **92%** of its own depth against 91% |
-| *"the submerged wall reads 0.47 of the dry band where the owner's observation puts it over 1"* | **0.518.** The receiver is now complete and the ordering still does not emerge |
+| *"the submerged wall reads 0.47 of the dry band where the owner's observation puts it over 1"* | **0.518**, and **0.513** after the round that derived the band's own illuminant. The receiver is complete, the source is derived, and the ordering still does not emerge |
 
 **The cost, measured.** Six passes in **274 s** — the bed on a 200 × 100 lattice
 × 576 directions, the four walls on 144 × 24 × 576, plus six downgoing wall

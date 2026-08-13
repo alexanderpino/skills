@@ -157,6 +157,13 @@ REQUIRED = [
     '_e3', 'T_DIFF_UP', 'trap_gain', 'rho_water', 'slab_esc', 'slab_trap',
     'R_INT_MU',
     'N_AURE', 'L_AURE', 'AIRMASS', 'TAU_R', '_tau_rayleigh', 'THETA_SUN',
+    # the two illuminants above the water, and the third one they price
+    'env_diffuse', 'env_irradiance', 'SKY_DIFFUSE_LOBES', 'ENV_DX', 'ENV_DY',
+    'ENV_DZ', 'ENV_DW', 'ENV_L', 'ENV_NMU', 'ENV_NPH', 'SKY_DECK', 'SKY_AMB',
+    'SKY_HOR', 'SKY_TOP', 'band_illum', 'BAND_ANG', 'BAND_NAZ', 'BAND_SKY_TAB',
+    'BAND_MIR_TAB', 'BAND_RBAR', 'band_sky_vis', 'BAND_SKY_VIS', '_ledge',
+    'wbounce_of', 'WBOUNCE', 'BED_L_CLOSED', 'SKY_SUB_DERIVED', '_ss_rayleigh',
+    'COP_ALB', 'PAV_ALB', 'ABS', 'DEPTH', 'FREEB', 'r_int_at',
     'CAP_A', 'MENIS_H', 'SIGMA_W',
     # the fillet: the tables, the two helpers the columns are built on, the
     # shipped integrator, and the constant that records the refuted term
@@ -2982,9 +2989,29 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
     * ETA_C, C_SRC, SIG_EST, RIS_HMIN, the contact angle, the wake carrier
       ratio, the bead width -- the file's own `?` markers. Each is a place the
       reference cannot answer; none has moved.
-    * The materials: LINER_TINT, the stone, the paving, the tile grout, the
-      sail's transmittance. These are chosen to match a photograph and there is
-      no measurement behind any of them.
+    * The materials: LINER_TINT, COP_ALB, PAV_ALB, the tile grout, the sail's
+      transmittance. These are chosen to match a photograph and there is no
+      measurement behind any of them.
+    * The sky's own GRADIENT -- SKY_HOR, SKY_TOP and the 0.55 exponent between
+      them. The two illuminants built on it are now derived and guarded, and so
+      are the two lobes it carries, but the gradient's level and shape are a
+      hand-set profile. render.py prints single-scattered Rayleigh from its own
+      TAU_R and AIRMASS beside it as a LOWER bound (it comes to 0.55/0.58/0.49
+      of it) and names what is missing -- orders two and up, and the ground's
+      albedo -- which is as far as this file can take it without a sky model.
+    * The `0.30` on every above-water direct-sun term. Still no derivation
+      anywhere, and now visible: with SKY_DECK derived the deck's illuminant is
+      properly blue, the beam beside it is still 1.74 stops under, and the
+      coping renders at saturation 0.05 against 0.23. render.py prints the
+      counterfactual colour; nothing here asserts on it, because there is
+      nothing external to assert against.
+    * That render.py builds WBOUNCE from the CONVERGED floor rather than the
+      closed-form seed that stands in its place until the solve runs. The
+      escape is guarded two ways (a photon walk and a zero-depth limit) and the
+      identity `wbounce_of == L x slab_esc` is a row, but this file cannot run
+      a six-pass solve, so the input to that call is untested here. What
+      catches it is render.py's own print, which puts the seed and the
+      converged value side by side every run.
     * The tone map, the exposure and L_WHITE. There is no external referent for
       a look.
     * The Gabor reconstruction of the WAKE band as shipped. The tests above
@@ -3362,6 +3389,326 @@ def tier_underwater(R):
          'follow from SUN_DIR and IOR with nothing else in them')
 
 
+# =========================================== TIER: THE TWO ILLUMINANTS ABOVE
+def tier_illuminants(R):
+    """`SKY_DECK` was `SKY_AMB * 0.30 + SUN_COL * 0.075` for the whole life of
+    this project -- two hand constants, 1.74 stops, applied to a HORIZONTAL deck
+    and to a VERTICAL band alike. It is now the cosine integral of the file's own
+    `sky()` with the sun's disc taken out, and the band has a second integral of
+    its own. Both are quadratures, so what this section does is pin them from
+    outside: exact limits a quadrature cannot fake, a Monte-Carlo that shares no
+    lattice with them, a closed form for the aureole's SHARE that needs no
+    integral at all, and the one clear-sky number the level can be compared with.
+    """
+    np1 = np.ones(3)
+    Y = np.array([.2126, .7152, .0722])
+
+    # -- IDENTITY. The shipped constant IS the integral, and this row is what a
+    # hand-set replacement would fail on. Double round-off only.
+    check(1, 'SKY_DECK == env_irradiance(0,0,1)', R.SKY_DECK,
+          R.env_irradiance(0., 0., 1.), 1e-15,
+          'the same call the constant is assigned from; a literal put back in '
+          'its place cannot satisfy it')
+
+    # -- NORMALISATION, the two exact limits of ANY hemisphere integrator. A
+    # uniform sky of radiance L gives E/pi = L on a horizontal face and exactly
+    # L/2 on a vertical one -- the second is the "0.50" the band's shader used
+    # to spend on a partition, and it is the ONLY thing that 0.50 was ever
+    # right about. A dropped 1/pi, a wrong solid angle or a missing cosine
+    # fails one or both.
+    uh = R.env_irradiance(0., 0., 1., L=np1)
+    uv = R.env_irradiance(0., -1., 0., L=np1)
+    check(1, 'uniform sky: horizontal face gets exactly L', uh, np1, 1e-12,
+          'midpoint in mu is exact for the integrand 2mu; only round-off left')
+    check(1, 'uniform sky: vertical face gets exactly L/2', uv, .5 * np1, 1e-4,
+          'the vertical integrand is sqrt(1-mu^2)|cos phi|, not polynomial; '
+          'measured resolution scaling 256x512 -> 1024x2048 moves it 1.5e-5, '
+          'so 1e-4 is six times the residual of the shipped lattice')
+
+    # -- THE BLUE IDENTITY, and it is the sharpest row here because it needs no
+    # tolerance from the quadrature at all. SKY_HOR and SKY_TOP are EQUAL in
+    # blue (0.98 both), so the gradient is exactly uniform in that channel --
+    # and therefore the vertical face's share of it must be the SAME number the
+    # uniform-sky row above produces, whatever that number's own error is. In
+    # red and green the horizon is brighter than the zenith and a vertical face
+    # weights the horizon, so the share must be strictly LARGER. One row proves
+    # the integrator is weighting by sin^2 and not by a constant.
+    grad = R.sky(R.ENV_DX, R.ENV_DY, R.ENV_DZ, lobes=())
+    gh = R.env_irradiance(0., 0., 1., L=grad)
+    gv = R.env_irradiance(0., -1., 0., L=grad)
+    check(1, 'gradient is uniform in BLUE => vertical/deck == the uniform ratio',
+          gv[2] / gh[2], uv[2] / uh[2], 1e-12,
+          'SKY_HOR[2] == SKY_TOP[2], so the two integrals share an integrand '
+          'and the quadrature error cancels exactly; double round-off only')
+    between(1, 'red   vertical/deck exceeds the uniform ratio (horizon-lit)',
+            gv[0] / gh[0], uv[2] / uh[2] + 1e-9, 1.0,
+            'a vertical face weights sin^2(theta), heaviest at the horizon, '
+            'and SKY_HOR[0] > SKY_TOP[0]; a flat partition gives exactly the '
+            'uniform ratio and would fail the lower bound')
+    between(1, 'green vertical/deck exceeds the uniform ratio (horizon-lit)',
+            gv[1] / gh[1], uv[2] / uh[2] + 1e-9, 1.0,
+            'same, with SKY_HOR[1] > SKY_TOP[1]')
+
+    # -- THE PARTITION OF sky() ITSELF. env_diffuse must be sky() minus the
+    # disc, exactly, or the beam is either counted twice or lost.
+    rng = np.random.default_rng(4242)
+    d = rng.normal(size=(4096, 3))
+    d /= np.linalg.norm(d, axis=1, keepdims=True)
+    d[:, 2] = np.abs(d[:, 2])
+    full = R.sky(d[:, 0], d[:, 1], d[:, 2])
+    diff = R.env_diffuse(d[:, 0], d[:, 1], d[:, 2])
+    disc = R.sky(d[:, 0], d[:, 1], d[:, 2], lobes=R.SKY_LOBE[:1]) - R.sky(
+        d[:, 0], d[:, 1], d[:, 2], lobes=())
+    check(1, 'sky == env_diffuse + the disc lobe, over 4096 directions',
+          np.abs(full - diff - disc).max(), 0.0, 1e-12,
+          'the same summation reassociated; float64 cancellation only')
+
+    # -- THE AUREOLE'S CEILING, WITH NO QUADRATURE IN THE ANSWER. The Rayleigh
+    # phase function is (3/4)(1 + cos^2 Theta). Over the sphere it normalises to
+    # 1 and its cos^2 half carries exactly (3/4)(1/3) = 1/4, for ANY optical
+    # depth and ANY sun elevation. So a singly-scattered Rayleigh sky cannot put
+    # more than a quarter of its diffuse light in the forward lobe -- and the
+    # constant this round replaced put 68% of the deck's illuminant there. That
+    # is a falsification from the atmosphere, not from a photograph.
+    nmq, npq = 2000, 720
+    mq = (np.arange(nmq) + .5) / nmq * 2 - 1
+    dwq = (2. / nmq) * (2. * np.pi / npq)
+    iso = float((0.75 * (1 + mq ** 2) * dwq * npq).sum() / (4 * np.pi))
+    ani = float((0.75 * mq ** 2 * dwq * npq).sum() / (4 * np.pi))
+    check(1, 'Rayleigh phase normalises to 1 over the sphere', iso, 1.0, 1e-5,
+          'midpoint on 2000 bins in cos(Theta) of a quadratic; the residual is '
+          'the bin width squared')
+    check(1, 'its cos^2 half carries exactly 1/4 of the scattered light',
+          ani, 0.25, 1e-5, 'same quadrature, same integrand degree')
+    _grad_deck = gh
+    _aur = R.SKY_DECK - _grad_deck
+    # ...and the aureole term ITSELF, against its own lobe integrated here from
+    # L_AURE and N_AURE with none of render.py's lattice, weights or ordering.
+    # This is the row that fires if the lobe is dropped from SKY_DIFFUSE_LOBES
+    # as well as if the disc is let in -- the ceiling row above only catches the
+    # second.
+    nmu2, nph2 = 3000, 1440
+    m2 = (np.arange(nmu2) + .5) / nmu2
+    p2 = (np.arange(nph2) + .5) / nph2 * 2 * np.pi
+    s2 = np.sqrt(np.maximum(1. - m2 ** 2, 0.))
+    ax = np.outer(s2, np.cos(p2)); ay = np.outer(s2, np.sin(p2))
+    az = np.repeat(m2[:, None], nph2, 1)
+    cs2 = np.clip(ax * R.SUN_DIR[0] + ay * R.SUN_DIR[1] + az * R.SUN_DIR[2], 0, 1)
+    dw2 = (1. / nmu2) * (2 * np.pi / nph2)
+    aur_ref = np.array([(R.L_AURE[c] * cs2 ** R.N_AURE * az * dw2).sum() / np.pi
+                        * 1.15 / 1.15 for c in range(3)])
+    check(1, 'the aureole term of SKY_DECK, against its own lobe integrated here',
+          _aur, aur_ref, 2e-3,
+          'two midpoint quadratures at different resolutions over a cos^2 lobe '
+          'clipped at the horizon; the integrand has a kink there and the two '
+          'lattices straddle it differently, which is the whole tolerance',
+          rel=True)
+    between(1, 'the aureole is under the 1/4 ceiling on a deck', 
+            float(_aur[1] / R.SKY_DECK[1]), 0.0, 0.25,
+            'the ceiling is the closed form two rows up; the cosine weight can '
+            'only lower it, and higher scattering orders add to the ISOTROPIC '
+            'side, so the bound on the total diffuse sky is if anything tighter '
+            'than 1/4. The shipped SKY_AMB*0.30 + SUN_COL*0.075 put this at '
+            '0.68, which no Rayleigh atmosphere reaches')
+
+    # -- TIER 3. A cosine-sampled Monte-Carlo of the same integrand, sharing no
+    # lattice, no solid angle and no ordering with the quadrature above.
+    NMC = 400000
+    u1, u2 = rng.random(NMC), rng.random(NMC)
+    ct = np.sqrt(u1)
+    st = np.sqrt(np.maximum(1. - u1, 0.))
+    ph = 2. * np.pi * u2
+    mc = R.env_diffuse(st * np.cos(ph), st * np.sin(ph), ct).mean(0)
+    check(3, 'SKY_DECK vs a %dk-sample cosine Monte-Carlo' % (NMC // 1000),
+          mc, R.SKY_DECK, 3e-3, 'the estimator is a mean of %d samples whose '
+          'own coefficient of variation is ~0.4, so one standard error is '
+          '6e-4 relative; 3e-3 is five of them' % NMC, rel=True)
+    info(3, '  ... and the lattice against itself at 16x the directions',
+         '%s at 256x512 against %s at 1024x2048'
+         % (np.round(R.SKY_DECK, 6),
+            np.round(R.env_irradiance(0., 0., 1., nmu=1024, nph=2048), 6)),
+         'the shipped lattice\'s own quadrature error, measured rather than '
+         'assumed: 4e-6 relative in the worst channel')
+
+    # -- TIER 2. The one thing about this illuminant that can be compared with
+    # a measured sky: the DIFFUSE FRACTION. Both halves are in the file's own
+    # units and the units cancel, so this is dimensionless and checkable.
+    # For a clear sky the diffuse share of global horizontal irradiance runs
+    # roughly 0.10-0.20 at high sun and rises toward 0.25-0.35 at air mass 3;
+    # this frame is air mass 2.77.
+    ebeam = R.SUN_COL * float(R.SUN_DIR[2])
+    kd = float((Y * R.SKY_DECK).sum() / (Y * (R.SKY_DECK + ebeam)).sum())
+    between(2, 'diffuse fraction of global horizontal, clear sky at AM 2.77',
+            kd, 0.10, 0.35,
+            'clear-sky diffuse fractions measured at air mass ~3 sit in this '
+            'band (Erbs/Reindl-type correlations put k_d at 0.15-0.25 for a '
+            'clearness index of 0.7); a wider band would not discriminate and '
+            'a narrower one would be reading one site\'s aerosol')
+    # ...and its COLOUR, which is the half the shipped constant got wrong by
+    # more than the level. Diffuse skylight is Rayleigh-scattered, so its
+    # blue/red must lie between 1 (grey, impossible for Rayleigh) and the
+    # optically-thin single-scatter limit tau_b/tau_r, which this file's own
+    # _tau_rayleigh puts at 3.39. Multiple scattering saturates the blue and
+    # pulls it down inside that.
+    between(1, 'diffuse deck illuminant blue/red, inside the Rayleigh bounds',
+            float(R.SKY_DECK[2] / R.SKY_DECK[0]), 1.0,
+            float(R.TAU_R[2] / R.TAU_R[0]),
+            'the upper bound is the optically-thin single-scatter ratio of the '
+            'file\'s own TAU_R (3.39); the lower is a grey sky, which Rayleigh '
+            'cannot produce. The constant this replaced read 1.06.')
+
+    # -- THE BAND'S TABLE against the integral it is built from, at both ends.
+    for nm, nx, ny in (('averted (north wall)', 0., -1.),
+                       ('facing the sun (east wall)', -1., 0.)):
+        s_tab, m_tab = R.band_illum(nx, ny)
+        check(1, 'band_illum sky, %s, == env_irradiance there' % nm,
+              s_tab, R.env_irradiance(nx, ny, 0.), 2e-4,
+              'the table is sampled at %d azimuths and read with np.interp; '
+              'these two normals land ON samples, so only round-off and the '
+              'shared lattice separate them' % R.BAND_NAZ)
+        check(1, 'band_illum mirror, %s, == the same with R_ext inside' % nm,
+              m_tab,
+              R.env_irradiance(nx, ny, 0., weight=R.fresnel(R.ENV_DZ)[:, 1]),
+              2e-2,
+              'the reference here uses ONE channel of the Fresnel weight '
+              'against the table\'s three, so the row checks the geometry and '
+              'the ordering rather than the dispersion; R_ext varies 2% across '
+              'the three channels and that is the whole tolerance', rel=True)
+    # ...and that it is NOT azimuth-flat, which is what a halved deck
+    # illuminant would be. This is the row that says the category error is
+    # actually fixed and not merely renamed.
+    _sun_face = R.band_illum(-1., 0.)[0][1]
+    _averted = R.band_illum(0., -1.)[0][1]
+    between(1, 'the band illuminant is azimuth-DEPENDENT (sunward/averted)',
+            float(_sun_face / _averted), 1.10, 2.0,
+            'SKY_DECK x 0.50 is one number for all four walls; the aureole '
+            'sits 21 deg over the horizon at one azimuth and a vertical face '
+            'either sees it or does not. Anything at 1.00 is a constant '
+            'wearing an integral\'s name.')
+
+    # -- THE OVERHANG, MARCHED, at the two limits where the march has an exact
+    # answer. Shipped geometry: the bullnose's poolward extreme is at s = SLIP,
+    # the band's own plane, so nothing the coping occupies has (w.N) > 0 and the
+    # strip keeps its whole upper half. Fully covered: a plate over the entire
+    # poolward half takes all of it.
+    check(1, 'the coping occludes the band by nothing, marched off edge_z',
+          R.band_sky_vis(0.05), 1.0, 1e-12,
+          'the occluder is entirely at (w.N) <= 0, so no direction with weight '
+          'can reach it; the march must return the identity 1')
+    # A REAL OVERHANG IS NOT A HEIGHT FIELD, which is why the row above is an
+    # identity and not a coincidence: `edge_z` is a section z(s), so the only
+    # thing it can put over the band is stone the band is standing on. What a
+    # height field CAN put in front of it is a wall, and that is what this
+    # marcher would have to catch if the scene ever grew one -- so it is fired
+    # at exactly that, at the limit and in between.
+    def wall_prof(a, H, s0=0.):
+        return lambda ss: np.where(ss <= s0 - a, H, -1.0)
+
+    check(1, '  ... and a 3 m wall 10 mm in front of it takes all of it',
+          R.band_sky_vis(0.0, s=0.0, base=-1e9, prof=wall_prof(0.010, 3.0),
+                         n=800, reach=8.0),
+          0.0, 2e-3,
+          'a ray clears a 3 m wall at 10 mm only above 89.8 deg of elevation, '
+          'and that wedge carries 3e-6 of a vertical face\'s weight; the 2e-3 '
+          'is the marcher\'s own step at the wall\'s foot, not a fudge')
+    # ...and in between, against a direct angular quadrature of the same
+    # blocking rule that shares no step, no height field and no lattice with it.
+    def wall_exact(a, H, nth=1200, nph=1200):
+        th = (np.arange(nth) + .5) / nth * (np.pi / 2)
+        ph = (np.arange(nph) + .5) / nph * np.pi - np.pi / 2
+        T, P = np.meshgrid(th, ph, indexing='ij')
+        clear = np.tan(T) * np.cos(P) < a / H         # reaches H before a
+        wgt = np.sin(T) ** 2 * np.cos(P)
+        return float((wgt * clear).sum() / wgt.sum())
+    for a, H in ((0.30, 0.10), (0.60, 0.30)):
+        got = R.band_sky_vis(0.0, s=0.0, base=-1e9, prof=wall_prof(a, H),
+                             n=900, reach=6.0)
+        check(3, 'a %d mm wall %d mm high in front of the band: march vs '
+              'angular integral' % (1000 * a, 1000 * H),
+              got, wall_exact(a, H), 8e-3,
+              'the march steps 6.7 mm against a wall at %d mm and the angular '
+              'integral bins theta at 0.075 deg; 8e-3 is the larger of the two '
+              'discretisations, and the two estimators share nothing but the '
+              'geometry' % (1000 * a))
+    info(1, '  ... and the elevation-only ledge form, for the counterfactual',
+         'a 30 mm overhang leaves a texel at the FOOT of the band %.3f of its '
+         'sky and one at its TOP %.3f; over the 100 mm strip the mean is %.3f'
+         % (R._ledge(np.arctan(0.120 / 0.030)) / .5,
+            R._ledge(np.arctan(0.020 / 0.030)) / .5,
+            float(np.mean(R._ledge(np.arctan(
+                (R.ZLIP - np.linspace(0.002, R.FREEB, 200)) / .030)) / .5))),
+         'the classic (alpha + sin a cos a)/pi blocks on ELEVATION alone -- an '
+         'edge at w in every azimuth -- and it is the only way to price an '
+         'overhang at all, because an overhang is not a height field and this '
+         'file\'s geometry is one. That is why the shipped answer is exactly 1 '
+         'and this is a counterfactual rather than a correction')
+    check(1, 'the ledge form is exactly 1/2 at zero overhang', R._ledge(np.pi / 2),
+          0.5, 1e-15, 'algebraic: (pi/2 + 0)/pi. Double round-off')
+    check(1, 'the ledge form is exactly 0 at zero clearance', R._ledge(0.), 0.0,
+          1e-15, 'algebraic: (0 + 0)/pi')
+
+    # -- WBOUNCE. Two things: the zero-depth limit, where the correlated
+    # integral must collapse onto the diffuse transmittance the file computes a
+    # completely different way; and the factorised form it replaced.
+    check(1, 'slab_esc(0) == T_OUT_DIFFUSE = (1 - R_ext)/n^2',
+          R.slab_esc(dep=0.0), R.T_OUT_DIFFUSE, 1e-4,
+          'a 2000-point Gauss-Legendre in the water-side cosine against a '
+          '512-point midpoint in the AIR-side one, joined by Walsh\'s '
+          'relation; the two disagree by 3e-5 and the tolerance is three of it')
+    check(1, 'wbounce_of is that escape on the bed\'s own radiance',
+          R.wbounce_of(np.array([1., 2., 3.])),
+          np.array([1., 2., 3.]) * R.slab_esc(), 1e-15,
+          'definitional; the row exists so that a re-factorised version -- '
+          'T_DIFF_UP x T_OUT_DIFFUSE, which is what shipped -- fails here')
+    # ...and a photon walk of the same escape, which shares no quadrature with
+    # it and fails the FACTORISED form by the size of the correlation.
+    NW = 300000
+    u = rng.random(NW)
+    mu = np.sqrt(u)                       # cosine-distributed off a Lambertian bed
+    esc = np.zeros(3)
+    for c in range(3):
+        t = np.exp(-R.ABS[c] * R.DEPTH / mu)
+        rr = R.r_int_at(mu)[:, c]
+        esc[c] = float((t * (1. - rr)).mean())
+    check(3, 'slab_esc vs a %dk-photon cosine walk of the same slab' % (NW // 1000),
+          esc, R.slab_esc(), 6e-3,
+          'a mean of %d samples of exp(-a d/mu)(1 - R_int(mu)) whose own '
+          'coefficient of variation is ~0.9; one standard error is 1.6e-3 '
+          'relative and 6e-3 is under four of them' % NW, rel=True)
+    _fact = R.T_DIFF_UP * R.T_OUT_DIFFUSE
+    info(1, '  ... and what factorising it costs',
+         'slab_esc %s against T_DIFF_UP x T_OUT_DIFFUSE %s, %s'
+         % (np.round(R.slab_esc(), 4), np.round(_fact, 4),
+            np.round(_fact / R.slab_esc(), 4)),
+         'the escape and the attenuation are positively correlated -- a steep '
+         'ray escapes AND crosses less water -- so the product of the means '
+         'understates the mean of the product. This is the same 19.4/5.1/1.1% '
+         'the pool albedo section priced, on the term that lights the deck')
+
+    # -- THE THIRD ILLUMINANT, PRICED AND NOT MOVED. Recorded as an INFO row
+    # because it is the next round's work and because a check() here would be
+    # asserting something this file deliberately has not done.
+    info(1, 'SKY_AMB against the same environment (NOT applied)',
+         'derived SKY_DECK x (1 - Rbar) = %s, shipped SKY_AMB = %s, ratio %s'
+         % (np.round(R.SKY_SUB_DERIVED, 4), np.round(R.SKY_AMB, 4),
+            np.round(R.SKY_AMB / R.SKY_SUB_DERIVED, 3)),
+         'the Snell window is a change of variables: n^2 cos t_w sin t_w dt_w '
+         '= cos t_a sin t_a dt_a maps the window integral of the n^2-gained sky '
+         'exactly onto the air-side hemisphere, so a submerged horizontal face '
+         'gets the DECK\'s illuminant less what the surface reflects away. '
+         'SKY_AMB is 32% over that in green. It is the bed\'s sky term, it is '
+         'the numerator and the denominator of the wall/band ratio at once, and '
+         'this round leaves it alone on purpose')
+    info(1, 'the constant this round replaced, per channel',
+         'SKY_AMB*0.30 + SUN_COL*0.075 = %s against the derived %s, ratio %s'
+         % (np.round(R.SKY_AMB * 0.30 + R.SUN_COL * 0.075, 4),
+            np.round(R.SKY_DECK, 4),
+            np.round((R.SKY_AMB * 0.30 + R.SUN_COL * 0.075) / R.SKY_DECK, 3)),
+         'the level was 16% high in green and the colour wrong both ways; the '
+         'two hand terms were each wrong by more than their sum was, which is '
+         'how it survived every green-channel comparison this project made')
+
+
 def main():
     t0 = time.time()
     print('validate.py -- external checks on the pool reference implementation')
@@ -3395,6 +3742,7 @@ def main():
                      (tier3_gemm, (fld,)), (tier3_geometry, (R,)),
                      (tier_meniscus, (R,)),
                      (tier_underwater, (R,)), (tier_underside, (R,)),
+                     (tier_illuminants, (R,)),
                      (tier3_wake, (fld, wkm))):
         try:
             fn(*args)
