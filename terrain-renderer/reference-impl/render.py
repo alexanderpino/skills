@@ -37,6 +37,46 @@ import time as _time
 import numpy as np
 from PIL import Image
 
+# --------------------------------------------------------- WHAT IS NOT IN HERE
+# The physics that is not this pool's left this file in the wave that made a
+# SECOND scene possible. A beach -- waves, shoaling, breaking, coastal optics --
+# is coming, and the default outcome of a second scene is a fork whose two
+# copies of the optics drift apart until neither reference can be trusted. This
+# project has already been bitten by the miniature version: `validate.py` once
+# had two "independent methods" that were both transcriptions of the same
+# comment, so they agreed on a wrong number.
+#
+# So `field.py` and `wake.py` (the surface, and the jet's wake) are now joined by
+#
+#     optics.py      water and the air/water interface: IOR, the absorption
+#                    triple, exact Fresnel, refraction and its TIR branch, the
+#                    n^2 radiance transport both ways, the diffuse interface
+#                    constants, the trapped-slab closed forms, the critical
+#                    angle and the Snell window's geometry.
+#     atmosphere.py  the sun's ephemeris, the Rayleigh atmosphere read back out
+#                    of SUN_COL, the disc and the aureole, sky(), the cosine
+#                    integral of it, and the two illuminants above the water.
+#
+# and what is left here is THIS SCENE: the basin's plan and bed, the coping and
+# its section, the liner and the tiles, the step unit, the cameras and their
+# justifications, the jet, the sail and the float -- plus every `print` in the
+# file, which is why its stdout did not move when the physics did.
+#
+# The names are imported explicitly rather than with a star, so that any line
+# below can be traced to the file that owns it by reading this block.
+from optics import (
+    ABS, BAND, CAUCHY_A, CAUCHY_B, F0, IOR, LAM, N2, R_EXT, R_INT,
+    TC_SNELL, TIR_FRAC, TIR_VERT, T_OUT_DIFFUSE, _e3, fresnel, into_water,
+    is_tir, n_water, out_of_water, r_int_at, refract, rho_water, slab_esc,
+    slab_trap, tir_vert, trap_gain, wbounce_of, wet_albedo)
+from atmosphere import (
+    AIRMASS, ENV_DW, ENV_DX, ENV_DY, ENV_DZ, ENV_L, E_SUN, L_SUN, N_AURE,
+    N_DISC, OMEGA_SUN, SITE_LAT, SITE_LON, SITE_NAME, SHOOT, SKY_AMB,
+    SKY_DECK, SKY_HOR, SKY_LOBE, SKY_SUB_DERIVED, SKY_TOP, SKY_VERT, SUN_AM,
+    SUN_AZ, SUN_COL, SUN_DECL, SUN_DIR, SUN_DIR_DERIVED, SUN_EL, SUN_EL_GEOM,
+    SUN_EOT, SUN_HA, TAU_R, WIN_BED, WIN_VERT, _RBAR, _ss_rayleigh,
+    env_irradiance, sky, sky_diffuse, window_shares)
+
 # --------------------------------------------------------------------------- config
 DEPTH = 1.40   # the DEEPEST point only. Depth is a field -- bed_depth(x, y) --
                # and every optical path length is taken from it. What is left of
@@ -52,371 +92,13 @@ CAU_NX, CAU_NY = 2666, 1333          # 3 mm bed texels
 WNU, WNV = 1800, 340                 # wall caustic maps
 SHADOW_N = (2200, 1100)
 
-IOR = np.array([1.3320, 1.3348, 1.3400])     # 620 / 545 / 460 nm
-LAM = np.array([0.620, 0.545, 0.460])        # the wavelengths those three ARE, um
-# Pure-water absorption, m^-1. PURE water -- Pope & Fry (1997), Appl. Opt.
-# 36(33) 8710-8723, the integrating-cavity measurement that is the modern
-# standard and the one this project's own bibliography names.
-#
-# THESE ARE BAND MEANS, NOT POINT SAMPLES, and that is a decision, not an
-# accident. `a(lambda)` at the three nominal wavelengths is (0.2755, 0.0511,
-# 0.00979); averaged over the Voronoi bands defined thirty lines below --
-# 582.5-657.5, 502.5-582.5, 417.5-502.5 nm, which is what a channel of this
-# renderer actually integrates -- the same table gives
-#
-#     a_band = (0.26170, 0.052988, 0.010224) m^-1
-#
-# The file's own doctrine two paragraphs down is that *a channel is a BAND, not
-# a wavelength*; the bands tile 417.5-657.5 with no gap and no overlap, and every
-# other spectral quantity here (n, the caustic eta, the dispersion sweep) is
-# already sampled through them. Taking `a` at a delta function while everything
-# beside it is taken over a band is the inconsistency, and `a` is the quantity
-# where it costs most: it is strongly curved across the red band (0.0896 at
-# 580 nm to 0.3400 at 650), so the point value and the band mean differ by 5.0%
-# there. The band reading is the one this file's own model asks for. (A band mean
-# of `a` is still an approximation -- Beer-Lambert over a band is the log of a
-# mean of exponentials, not the mean of the exponents -- but it is first-order
-# right where the point sample is not even that.)
-#
-# WHAT WAS WRONG BEFORE: (0.2750, 0.0546, 0.0145). Red was Pope & Fry at 620 nm
-# to 0.2%; green was 6.9% high; and blue was 0.0145, which is Smith & Baker
-# (1981) at 450 nm EXACTLY -- 48% above Pope & Fry, the wrong paper at the wrong
-# wavelength, in a project whose own provenance file bans Smith & Baker for blue
-# by name (that era's blue is contaminated by scattering in natural water).
-# Two independent passes reached the same identification. `validate.py` tier 2
-# checks this triple against both tables, point-sampled and band-integrated.
-ABS = np.array([0.2617, 0.05299, 0.01022])
-F0 = ((IOR - 1.0) / (IOR + 1.0)) ** 2
-
-# --- WHAT LEAVES THE WATER, AND THE FACTOR THAT IS NOT FRESNEL ---------------
-# Radiance is NOT conserved across a refracting interface. What is conserved
-# along a ray is the basic radiance L/n^2, because a pencil's etendue n^2 dA
-# dOmega is: Snell compresses the solid angle by exactly the factor n^2 that the
-# projected area does not. So an in-water radiance L_w arriving at the surface
-# leaves as
-#
-#       L_air(theta_v) = T(theta_v) * L_w / n^2,     n^2 = 1.774/1.782/1.796
-#
-# and Fresnel's T alone is only PART of the transport. This is not a fudge and
-# it is not small: 1/n^2 is 0.827-0.844 stops, and it applies to the transmitted
-# column of every water pixel while the reflected column beside it is air-side
-# and already right -- so leaving it out is a RELATIVE error between the two
-# halves of one pixel, which is the one thing no exposure can absorb.
-#
-# TWO CHECKS THAT IT IS THE RIGHT WAY UP. Both are in `validate.py`:
-#   * hemispherically, (1/pi) INT T(mu) (1/n^2) cos dw over the air-side
-#     hemisphere is (1 - R_EXT)/n^2 = 1 - R_INT -- the diffuse transmittance OUT
-#     of water, which the file already computes by reciprocity for the wet-liner
-#     term and which the Egan & Hilgeman fit agrees with to 0.09%.
-#   * energetically, a pool with a PERFECT WHITE bed and no absorption must have
-#     an apparent albedo of exactly 1. Composed through this function it does;
-#     composed without the divisor it comes to 1.73, which is not a taste.
-# It was shipped without the divisor for several rounds and is item 5 of 12a's
-# `What did not reproduce`; what it had been absorbing is written up there.
-N2 = IOR ** 2
-
-
-def out_of_water(L_w):
-    """An in-water radiance, as seen from the air side of the surface. Fresnel's
-    T is applied by the caller (it depends on the view angle); this is the part
-    that does not, and it is the part that was missing. ONE function so that
-    there is exactly one place in the file where a radiance crosses out of the
-    medium, and so that `validate.py` has something to integrate."""
-    return np.asarray(L_w) / N2[None]
-
-
-def into_water(L_a, n2=None):
-    """The SAME law, run the other way: an air-side radiance as seen from inside
-    the water. `out_of_water` divides by n^2 because the pencil's solid angle
-    opens out on the way up; a pencil coming DOWN is compressed by exactly the
-    same factor, so what an in-water eye sees is
-
-          L_water(theta_w) = T(theta_a) * L_air(theta_a) * n^2
-
-    with the caller applying Fresnel's T, as above. `into_water(out_of_water(L))`
-    is the identity, and `validate.py` asserts it -- which is the whole content
-    of "L/n^2 is what is conserved" (Nicodemus 1963; see
-    `references/12-water-rendering.md`), stated as code rather than as a factor.
-    This is the FIRST call site in the project that crosses the interface in the
-    gaining direction: everything before it was a view into the medium.
-
-    `n2` overrides the band-nominal N2 for a wavelength sampled inside a band, so
-    that the gain and the refraction that produced the direction are taken at one
-    and the same index."""
-    return np.asarray(L_a) * (N2[None] if n2 is None else n2)
-
-
-# --- WET LINER, DERIVED RATHER THAN DIALLED ----------------------------------
-# A film of water on a NON-POROUS substrate darkens it by a mechanism with no
-# free parameter: light crosses the air/water interface twice, and between the
-# crossings it is trapped by total internal reflection. With R_EXT the diffuse
-# external reflectance of that interface -- integrated here from THIS FILE'S
-# own per-channel Fresnel over a cosine-weighted hemisphere, so no constant
-# enters -- and R_INT = 1 - (1 - R_EXT)/n^2 by reciprocity, a substrate of dry
-# albedo `a` reads
-#       a_wet = R_EXT + (1 - R_EXT)(1 - R_INT) a / (1 - a R_INT)
-# The wet band at the foot of the blue is therefore a measured fraction of the
-# dry one, and it is printed rather than chosen.
-#
-# HOISTED TO HERE from beside the freeboard band, because `1 - R_INT` is the
-# DIFFUSE form of `out_of_water` above -- (1 - R_EXT)/n^2, the share of an
-# isotropic in-water radiance that gets out at all -- and WBOUNCE, six hundred
-# lines below, needs exactly that number. It used to carry a hand-written 0.5
-# in its place. Same interface, same transport, two call sites; now one source.
-_wmu = ((np.arange(512) + .5) / 512.)[:, None]
-_wct = np.sqrt(np.maximum(1. - (1. - _wmu ** 2) / IOR[None] ** 2, 0.))
-_wrs = ((_wmu - IOR[None] * _wct) / (_wmu + IOR[None] * _wct)) ** 2
-_wrp = ((IOR[None] * _wmu - _wct) / (IOR[None] * _wmu + _wct)) ** 2
-R_EXT = (2. * _wmu * .5 * (_wrs + _wrp)).mean(0)
-R_INT = 1. - (1. - R_EXT) / IOR ** 2
-T_OUT_DIFFUSE = 1. - R_INT       # = (1 - R_EXT)/n^2 = 0.526/0.524/0.519
-
-
-def wet_albedo(a):
-    return R_EXT[None] + (1. - R_EXT[None]) * (1. - R_INT[None]) * a / (
-        1. - a * R_INT[None])
-
-
-# --- THE POOL'S OWN ALBEDO, IN CLOSED FORM ------------------------------------
-# `wet_albedo` above is the same physics over a film thin enough to have no
-# absorption in it. A POOL is that chain with a 1.40 m column in every leg, and
-# it is the quantity that settles the water-to-deck comparison without a
-# photograph, an exposure or a camera: a deck and a water surface are both
-# HORIZONTAL, so the irradiance that lights them is the same number and cancels
-# in their ratio, leaving two albedos. Written in FLUX rather than radiance,
-# which is what keeps the n^2 inside R_int instead of carried loose:
-#
-#   rho_w = (1 - R_ext(sun)) * T_slant * rho_bed * T_up * (1 - R_int)
-#                            / (1 - rho_bed * T_up * T_dn * R_int)
-#
-# Every factor has a name: the beam gets in, crosses to the bed at the REFRACTED
-# slant, is reflected, crosses back up, and gets out -- with the geometric series
-# counting the light the underside sends back down and the bed sends back up.
-#
-# THE UP LEG IS IN THE NUMERATOR AND IT IS EASY TO DROP. The writing this round
-# was handed had `T_slant * rho_bed * (1 - R_int) / (1 - rho_bed * T_round *
-# R_int)`: a round trip in the denominator and no one-way transmission in the
-# numerator at all. That over-states the answer by 1/T_up -- 13.0% in luminance
-# at this depth and 85% in red -- and it is the whole of why the prediction that
-# opened the round read 0.61-1.00 where the corrected form reads 0.55-0.88. The
-# numerator must carry exactly ONE up leg and the denominator exactly one round
-# trip; `validate.py` pins that with a limit no arithmetic slip can reach.
-#
-# T_up and T_dn are the same number and it is NOT exp(-a d). A Lambertian bed
-# radiates over a cosine distribution, so the flux transmittance of the column
-# is <exp(-a d / mu)> over the measure 2 mu dmu, which is the third exponential
-# integral,   T_diff = 2 E_3(a d),   evaluated below by Gauss-Legendre on mu and
-# by nothing else. At this depth it is 0.542 / 0.871 / 0.972 against the vertical
-# exp(-a d) of 0.694 / 0.929 / 0.986: the diffuse path is longer than the
-# vertical one and the difference is a fifth of the red.
-def _e3(x):
-    """2 E_3(x) -- the cosine-weighted flux transmittance of a slab of optical
-    depth x, by Gauss-Legendre on mu in (0, 1]. The leading 2 is the
-    normalisation of the measure 2 mu dmu; dropping it halves every answer, and
-    that is exactly what the first writing of this block did."""
-    _m, _w = np.polynomial.legendre.leggauss(400)
-    _m, _w = .5 * (_m + 1), .5 * _w
-    return 2. * np.array([(_w * _m * np.exp(-xx / _m)).sum()
-                          for xx in np.atleast_1d(x)])
-
-
+# The one place this file still spends `optics._e3`: the cosine-weighted flux
+# transmittance of THIS pool's deepest column. The derivation is beside `_e3`
+# in `optics.py`; the 1.40 m in it is the only thing about it that is the
+# pool's, which is exactly why the integral is there and the product is here.
 T_DIFF_UP = _e3(ABS * DEPTH)
 
 
-# ...AND THE TWO INTEGRALS DO NOT FACTORISE, which is the correction this round
-# makes to its own first writing. `T_diff * (1 - R_int)` treats the attenuation
-# of an up leg and its chance of escaping as independent. They are not: a steep
-# ray escapes AND crosses less water, a grazing one is totally reflected AND
-# crosses more, so the two are positively correlated and the product of the
-# means understates the mean of the product -- by 19.4% in red, 5.1% in green,
-# 1.1% in blue. The round trip is correlated the other way and the factorised
-# form OVERstates it by 30% in red. So the escape and the trap are written here
-# as ONE integral each, over the water-side cosine, with the exact internal
-# Fresnel inside them:
-#
-#   T_esc = INT_0^1 2 mu exp(-a d / mu) (1 - R_int(mu)) dmu
-#   G_rt  = INT_0^1 2 mu exp(-2 a d / mu)    R_int(mu)  dmu
-#
-# and then, because the bed redraws the direction from a cosine law at every
-# bounce, the series really is geometric in rho * G_rt and nothing is lost:
-#
-#   rho_w = (1 - R_ext(sun)) T_slant rho_bed T_esc / (1 - rho_bed G_rt)
-#
-# `validate.py` holds this against a photon Monte-Carlo that shares no line with
-# it and agrees to 0.1%, which is the only way a correlated integral can be
-# checked -- a second quadrature would have shared the premise.
-_SQM, _SQW = np.polynomial.legendre.leggauss(2000)
-_SQM, _SQW = .5 * (_SQM + 1), .5 * _SQW          # water-side cosine on (0, 1]
-_SQ_SINA = IOR[None] * np.sqrt(np.maximum(1. - _SQM[:, None] ** 2, 0.))
-_SQ_TIR = _SQ_SINA >= 1.0
-_SQ_COSA = np.sqrt(np.maximum(1. - _SQ_SINA ** 2, 0.))
-_SQ_RS = ((IOR[None] * _SQM[:, None] - _SQ_COSA)
-          / (IOR[None] * _SQM[:, None] + _SQ_COSA)) ** 2
-_SQ_RP = ((IOR[None] * _SQ_COSA - _SQM[:, None])
-          / (IOR[None] * _SQ_COSA + _SQM[:, None])) ** 2
-# the internal reflectance of the surface for a ray arriving from BELOW at
-# cosine mu: exactly 1 past the critical angle, the Fresnel mean inside it.
-R_INT_MU = np.where(_SQ_TIR, 1.0, .5 * (_SQ_RS + _SQ_RP))
-
-
-def slab_esc(dep=DEPTH, absorb=None):
-    """The share of a Lambertian bed's upward flux that escapes on its FIRST
-    pass: attenuation and escape integrated together, not multiplied."""
-    a = ABS if absorb is None else np.asarray(absorb, float)
-    return (_SQW[:, None] * 2. * _SQM[:, None]
-            * np.exp(-a[None] * dep / _SQM[:, None])
-            * (1. - R_INT_MU)).sum(0)
-
-
-def slab_trap(dep=DEPTH, absorb=None, cone_only=False):
-    """The share of that flux that is returned by the surface and arrives back
-    at the bed -- one round trip, at the same cosine, since a specular interface
-    does not change it. `cone_only` replaces the exact internal Fresnel with a
-    perfect mirror past the critical angle and nothing inside it, which is the
-    model the shipped bedret pass carries."""
-    a = ABS if absorb is None else np.asarray(absorb, float)
-    r = np.where(_SQ_TIR, 1.0, 0.0) if cone_only else R_INT_MU
-    return (_SQW[:, None] * 2. * _SQM[:, None]
-            * np.exp(-2. * a[None] * dep / _SQM[:, None]) * r).sum(0)
-
-
-def trap_gain(rho, dep=DEPTH, bounces=None, absorb=None, cone_only=False):
-    """The light trap under the surface, as a factor on the bed's own light.
-    `bounces=None` closes the geometric series; an integer truncates it at that
-    many returns, which is what turns the render's own truncation into a number
-    rather than an omission -- `bounces=1, cone_only=True` is exactly the model
-    the shipped bedret pass carries, before any of its geometry."""
-    g = np.asarray(rho) * slab_trap(dep, absorb, cone_only)
-    if bounces is None:
-        return 1.0 / (1.0 - g)
-    return sum(g ** k for k in range(bounces + 1))
-
-
-def rho_water(rho_bed, cos_sun=None, dep=DEPTH, bounces=None, absorb=None):
-    """Apparent albedo of the water column: the share of the beam falling on the
-    surface that comes back out of it, EXCLUDING the surface's own reflection.
-    Add `fresnel(cos_sun)` to it and a LOSSLESS WHITE-BEDDED pool comes to
-    exactly 1 -- energy conservation, with no constant of this file in the
-    right-hand side. That limit pins the SHAPE of the series but it cannot see
-    a path length, because at zero absorption every path is 1; what pins the
-    legs is the Monte-Carlo row beside it, at the file's own absorption."""
-    ci = cos_i if cos_sun is None else cos_sun
-    a = ABS if absorb is None else np.asarray(absorb, float)
-    st = np.sqrt(np.maximum(1. - np.asarray(ci, float) ** 2, 0.)) / IOR
-    tsl = np.exp(-a * dep / np.sqrt(1. - st ** 2))
-    return ((1. - fresnel(ci)) * tsl * np.asarray(rho_bed) * slab_esc(dep, absorb)
-            * trap_gain(rho_bed, dep, bounces, absorb))
-
-
-def wbounce_of(L_bed, dep=DEPTH, absorb=None):
-    """The AIR-SIDE upwelling radiance a pool of in-water bed radiance `L_bed`
-    presents to a facet standing over it -- `WBOUNCE`, in one line.
-
-    A Lambertian bed of radiance L radiates pi*L upward. `slab_esc` is the share
-    of that flux which crosses `dep` of water AND gets through the surface, with
-    the attenuation and the escape inside ONE integral because they are
-    correlated (see above). What comes out is pi*L*slab_esc of flux; written
-    back as the radiance of an equivalent Lambertian emitter that is
-    L * slab_esc, which is the number a diffuse receiver above the water wants.
-
-    `?` The escaped distribution is NOT Lambertian -- the surface passes the
-    steep rays preferentially, so the real lobe is narrower than a cosine and a
-    facet directly over the water sees slightly more than this while one at a
-    grazing angle sees slightly less. `liner_band` and `_stone` both gather over
-    a half-space, where that difference integrates out to first order; nothing
-    in this file reads the upwelling in a single direction."""
-    return np.asarray(L_bed, float) * slab_esc(dep, absorb)
-
-
-
-# --- Fresnel, exactly, because this is a reference ---------------------------
-# The unpolarised reflectance of a smooth dielectric interface, from the Fresnel
-# equations themselves. With sin t = sin i / n (Snell),
-#
-#     R_s = ((cos i - n cos t)/(cos i + n cos t))^2      # E perpendicular
-#     R_p = ((n cos i -   cos t)/(n cos i +   cos t))^2  # E in the plane
-#     R   = (R_s + R_p)/2                                # unpolarised sunlight
-#
-# THIS FILE USED TO SHIP SCHLICK (1994), `F0 + (1-F0)(1-cos i)^5`, everywhere.
-# Schlick's whole justification is that it is one multiply-add cheaper than the
-# square roots above; its error is quoted as ~1% of R for common dielectrics and
-# for water it is nothing of the sort. Measured against the exact equations:
-#
-#     worst absolute, 0-90 deg   exact 0.5163 against Schlick 0.5751 at 83.8 deg
-#     over the frame's own incidence range (38-79 deg, render.py's own
-#       measurement of what this camera spans), Schlick / exact - 1 runs
-#           -22.8%  at 51.3 deg   (exact 0.0360 against Schlick 0.0278)
-#           +14.3%  at 79.0 deg   (exact 0.3152 against Schlick 0.3604)
-#       crossing zero at 67.1 deg
-#
-# AND THAT SIGN FLIP IS THE POINT. It is not a grazing-only overshoot that a
-# scale could absorb: inside one frame the fit is a fifth low on the mid water
-# and a seventh high on the far water, so the far band read too much like a
-# mirror while the mid band read too little, with no single multiplier able to
-# fix both. The far water's specular term is the brightest thing in the picture
-# and the mid water is most of its area, so the error sits on exactly the pixels
-# a reflection model is judged by, in both directions at once. An
-# approximation whose only argument is speed does not belong in a file whose only
-# argument is being right. The exact form costs one sqrt and one divide per
-# channel, measured at +1.1% of a full render (5m23s -> 5m27s at this resolution),
-# and that is the entire price of the 14%.
-#
-# Provenance: Born & Wolf, *Principles of Optics*, §1.5.2 (the Fresnel
-# coefficients); Schlick, *Computer Graphics Forum* 13(3) 233-246 (1994) for what
-# was replaced. Guarded in `validate.py` by three things that do not go through
-# the same expression: R(0) = F0, the Brewster identity R(atan n) = ((n^2-1)/
-# (n^2+1))^2 / 2 exactly (a closed-form NUMBER -- Schlick misses it by 22%), and
-# R_s >= R >= R_p over the whole range.
-def fresnel(cos_i):
-    """Exact unpolarised Fresnel reflectance, per channel. Returns (..., 3)."""
-    ci = np.clip(np.asarray(cos_i, float), 0.0, 1.0)[..., None]
-    ct = np.sqrt(np.maximum(1.0 - (1.0 - ci * ci) / IOR ** 2, 0.0))
-    rs = ((ci - IOR * ct) / (ci + IOR * ct)) ** 2
-    rp = ((IOR * ci - ct) / (IOR * ci + ct)) ** 2
-    return 0.5 * (rs + rp)
-
-
-# --- a camera channel is a BAND, not a wavelength ----------------------------
-# The three IORs above are three delta functions standing in for three broad
-# sensor bands, and a 3-point quadrature is only as good as the integrand is
-# smooth over the sample spacing. On a caustic FOLD the integrand is smooth over
-# the dispersion scale and three samples are plenty -- that is why the fringing
-# on the folds reads correctly. On an OPAQUE SILHOUETTE the integrand is a step
-# AT the dispersion scale, and three deltas resolve a step as a comb: three
-# separately-placed edges, so the pixel between them carries one primary with
-# the other two missing. That is not dispersion, it is aliasing of dispersion,
-# and it is what put saturated blue and yellow speckle on every step nosing.
-# MEASURED before the fix: the red and blue images of the bed are separated by
-# 9.8 mm on the floor and 8.7 mm at the step unit, which is 2.1 and 2.4 OUTPUT
-# pixels -- and 0.33% of all water rays disagreed about WHICH surface they hit.
-#
-# n(lambda) is not a new constant: a two-parameter Cauchy fit through the three
-# (lambda, n) pairs already in the file reproduces all three to 5e-5, so the
-# three IORs were themselves drawn from one dispersion curve and the curve can
-# be recovered from them.
-_uu2 = 1.0 / LAM ** 2
-CAUCHY_B = (((_uu2 - _uu2.mean()) * (IOR - IOR.mean())).sum()
-            / ((_uu2 - _uu2.mean()) ** 2).sum())
-CAUCHY_A = IOR.mean() - CAUCHY_B * _uu2.mean()
-
-
-def n_water(lam_um):
-    """Refractive index at a wavelength, from the file's own three IORs."""
-    return CAUCHY_A + CAUCHY_B / np.asarray(lam_um) ** 2
-
-
-# The bands are the VORONOI CELLS of the three nominal wavelengths: edges at the
-# midpoints 582.5 and 502.5 nm, the outer edges mirrored so each band is centred
-# on its nominal. They then tile 417.5-657.5 nm with no gap and no overlap,
-# which is the minimum a three-channel sensor must do to reproduce a continuous
-# spectrum without holes. No new number enters -- only the three wavelengths
-# that were already here. A real Bayer CFA overlaps its neighbours instead of
-# tiling them (`?`), which would smear the edge slightly MORE than this, so the
-# tiling choice is the conservative one.
-_mid = 0.5 * (LAM[:-1] + LAM[1:])
-BAND = np.array([[_mid[0], 2 * LAM[0] - _mid[0]],
-                 [_mid[1], _mid[0]],
-                 [2 * LAM[2] - _mid[1], _mid[1]]])       # [lo, hi] um, per channel
 print("dispersion: n(lam) = %.5f + %.6f/lam[um]^2, max residual on the three "
       "stated IORs %.1e" % (CAUCHY_A, CAUCHY_B, np.abs(n_water(LAM) - IOR).max()))
 print("  channel bands (nm): " + "  ".join(
@@ -424,14 +106,6 @@ print("  channel bands (nm): " + "  ".join(
                                n_water(b[0]) - n_water(b[1]))
     for nm, b in zip("RGB", BAND)))
 
-# NOAA solar position, Aljezur 37.319N 8.803W, 2026-08-10 18:41 WEST:
-#   elevation 21.02 deg, azimuth 273.75 deg (due west), air mass 2.77
-SUN_DIR = np.array([-0.93141, 0.06104, 0.35878])   # +x east, +y north, +z up
-SUN_DIR /= np.linalg.norm(SUN_DIR)
-SUN_COL = np.array([1.000, 0.892, 0.674]) * 8.6   # golden: AM 2.77, not a noon sun
-SKY_TOP = np.array([0.26, 0.46, 0.98])
-SKY_HOR = np.array([0.86, 0.90, 0.98])
-SKY_AMB = np.array([0.26, 0.42, 0.66]) * 2.15   # clear sky is still a big blue source
 # ...but SKY_AMB is the sky the WATER sees, and it is the LAST hand-set
 # illuminant in this file. `SKY_DECK` used to sit on the next line as
 # `SKY_AMB * 0.30 + SUN_COL * 0.075`; it is now DERIVED, from the same
@@ -1115,57 +789,6 @@ def float_normal(hx, hy, hz):
             (hz - FLOAT_CEN[2]) / FLOAT_R)
 
 
-def refract(ix, iy, iz, nx, ny, nz, eta):
-    """Snell's law as a direction map, WITH its total-internal-reflection branch.
-
-    `eta` = n_incident / n_transmitted; `n` must oppose the incident ray. Writing
-    the transmitted direction as `t = eta*i + f*n`, orthogonality of the tangential
-    part to `n` and |t| = 1 give `f = eta*cos i - cos t` with
-
-        k = cos^2 t = 1 - eta^2 (1 - cos^2 i)
-
-    and k < 0 exactly when sin i > 1/eta -- the critical angle asin(1/eta), which
-    exists only for eta > 1 (looking OUT of the denser medium). Past it there is
-    no transmitted direction at all: every photon reflects, and the Fresnel R that
-    goes with this same interface is 1 there, identically.
-
-    THE BUG THIS FIXES. The old line clamped k at 0 and returned
-    `eta*i + eta*cos(i)*n` regardless -- a vector of length `eta*sin i > 1` lying
-    flat in the interface plane. Not a unit vector, not the TIR reflection, not a
-    flag: a direction that does not exist, handed back silently. Nothing
-    downstream could tell it from a real one, because nothing downstream measured
-    its length. Unreachable from today's call sites (all five pass eta = 1/n < 1,
-    air -> water, where k >= 1 - eta^2 >= 0), and squarely on the path of the
-    underwater-camera pass the README describes, which is written entirely around
-    this branch.
-
-    THE CONTRACT. Past the critical angle this returns the NULL vector (0, 0, 0);
-    `is_tir(t)` is the predicate. Zero was chosen over a NaN or a fourth return
-    value because it keeps the signature, it propagates to zero radiance rather
-    than to a poisoned frame, and it is checkable with one dot product -- which is
-    what `validate.py` does. The five call sites below cannot reach the branch, so
-    each declares which side of the interface it is on instead: an assert on eta
-    where the eta is computed there, a comment where it is a literal 1/IOR. The
-    onset of the null return is cross-checked in the suite against the angle at
-    which the exact Fresnel R reaches 1, i.e. against different code.
-    """
-    cosi = -(ix * nx + iy * ny + iz * nz)
-    k = 1.0 - eta * eta * (1.0 - cosi * cosi)
-    f = eta * cosi - np.sqrt(np.maximum(k, 0.0))
-    tx, ty, tz = eta * ix + f * nx, eta * iy + f * ny, eta * iz + f * nz
-    # One reduction decides whether the branch was reached at all, so the eta < 1
-    # call sites pay a min() over the batch and nothing else.
-    if np.min(k) >= 0.0:
-        return tx, ty, tz
-    ok = k >= 0.0
-    return tx * ok, ty * ok, tz * ok
-
-
-def is_tir(tx, ty, tz):
-    """True where `refract` returned its null vector. A transmitted direction is
-    a unit vector, so |t|^2 is either 1 or 0 and the 0.5 threshold cannot be
-    reached by round-off from either side."""
-    return (tx * tx + ty * ty + tz * tz) < 0.5
 
 
 BIG = np.float32(1e9)
@@ -1855,7 +1478,7 @@ def cell_size(x0, x1, y0, y1, arr=None):
 BED_L_CLOSED = 0.74 * LINER_TINT * (
     SUN_COL * cos_i * TSUN * np.exp(-ABS * slant)
     + SKY_AMB * np.exp(-ABS * DEPTH * 1.55))
-WBOUNCE = wbounce_of(BED_L_CLOSED)
+WBOUNCE = wbounce_of(BED_L_CLOSED, DEPTH)
 
 
 # --------------------------------------------------------------------------- materials
@@ -1970,126 +1593,12 @@ def bed_ao(x, y, z=None):
 
 BED_AO = bed_ao(BU, BV)
 
-# --- WHAT IS ACTUALLY OVER A SUBMERGED FACE ----------------------------------
-# Every submerged receiver in this file used to be handed `SKY_AMB` over some
-# fraction of its hemisphere. On the BED that is exactly right and it is worth
-# saying why, because the same sentence says why it is wrong on a WALL. The sky
-# a submerged point sees is not a hemisphere: it is the Snell window, the whole
-# air-side hemisphere compressed into a cone of half angle asin(1/n) = 48.5 deg
-# about the VERTICAL, and gained by n^2 on the way in (`into_water`). For a
-# HORIZONTAL receiver those two factors cancel exactly --
-#
-#     (1/pi) INT_{t<tc} n^2 L_air cos t dw  =  n^2 L_air sin^2(tc)  =  L_air
-#
-# -- since sin^2(tc) = 1/n^2. So "a full hemisphere of SKY_AMB" and "the window
-# at n^2 SKY_AMB" are the same number on the bed, which is why the bed's term
-# has always worked and why nothing here moves it.
-#
-# On a VERTICAL face the cancellation fails, and it fails by the largest factor
-# available: a vertical face weights directions by sin t, so it collects almost
-# nothing from a cone about the vertical, while the bed weights them by cos t
-# and collects all of it. The two closed forms the file already owns give the
-# ratio with nothing new introduced:
-#
-#     E_vert(hemisphere)/E_bed(hemisphere) = tir_vert(0)         = 0.500
-#     E_vert(cone t>tc)/E_bed(cone t>tc)   = tir_vert(tc)        = 0.885
-#     E_bed(cone t>tc)/E_bed(hemisphere)   = 1 - 1/n^2           = 0.439
-#  => the WINDOW's share of a vertical face, against the bed's:
-#     (0.5 - tir_vert(tc)*(1 - 1/n^2)) * n^2                     = 0.199
-#
-# and `WALL_SKY = 0.5` -- correct as a PARTITION of a hemisphere -- is not that
-# number. It over-gives the sky to a submerged vertical face by x2.5 before the
-# `WAO` occlusion and by x1.96 after it. What belongs in the rest of that upper
-# half is the MIRROR: past tc the underside is a perfect reflector, so a wall
-# looks at the pool's own upwelling field folded down, and that is the term the
-# file has been carrying at one truncated bounce.
-#
-# THE THREE FUNCTIONS BELOW ARE THE WHOLE OF IT and none of them is new physics:
-# `tir_vert` was already here, `r_int_at` is the file's own external `fresnel`
-# read through Stokes reversibility exactly as `uw_interface` reads it, and the
-# sky profile is `sky()`'s own first two lines. What is new is that they are now
-# evaluated per direction inside one integral instead of being replaced by a
-# constant.
-TC_SNELL = np.arcsin(1.0 / IOR)     # 48.655 / 48.507 / 48.262 deg -- dispersive
-# NAMED TC_SNELL and not THETA_C: `THETA_C` in this file is the meniscus's
-# CONTACT angle, four hundred lines down, and the two have nothing to do with
-# each other. One collision of that kind is a silently wrong picture.
-TIR_FRAC = 1.0 - 1.0 / IOR[1] ** 2  # green's cone share; the shooting pass below
 
-
-def tir_vert(tc):
-    """Vertical-face / horizontal-bed irradiance from a uniform radiance filling
-    the cone t > tc. Exact; tir_vert(0) == 1/2 identically. MOVED UP from beside
-    the riser TIR term, where its derivation still stands -- the window share
-    below needs it four hundred lines earlier, and a second copy would be a
-    second premise."""
-    return ((np.pi / 2 - tc + np.sin(tc) * np.cos(tc))
-            / (np.pi * np.cos(tc) ** 2))
-
-
-TIR_VERT = float(tir_vert(np.arcsin(1.0 / IOR[1])))
-
-
-def r_int_at(mu):
-    """The underside's reflectance at a water-side polar angle of cosine `mu`,
-    per channel, reached through the file's ONE Fresnel implementation. Snell
-    takes the water-side angle to the air-side one; past the critical angle the
-    air-side cosine's square goes negative and the reflectance is exactly 1,
-    which is found here by the sign of that square and never by comparing an
-    angle with `TC_SNELL`. Same identity, same code path, as `uw_interface`."""
-    mu = np.asarray(mu, float)
-    s2 = np.clip(1.0 - mu * mu, 0.0, 1.0)
-    out = np.ones(mu.shape + (3,))
-    for c in range(3):
-        ca2 = 1.0 - IOR[c] ** 2 * s2
-        m = ca2 > 0.0
-        oc = np.ones(mu.shape)
-        if m.any():
-            oc[m] = fresnel(np.sqrt(ca2[m]))[:, c]
-        out[..., c] = oc
-    return out
-
-
-def sky_diffuse(mu_air):
-    """`sky()`'s diffuse term and nothing else, as a function of the air-side
-    direction's cosine from the vertical. The three SUN LOBES are deliberately
-    left out: for a submerged receiver the sun arrives as the refracted beam and
-    is already counted as `SUN_COL * cos_i * TSUN * cau`, so putting the disc in
-    here would be that beam a second time. What it does keep is the horizon /
-    zenith gradient, which is the part that matters: the OUTER window -- the
-    directions a vertical face weights most -- looks at the air-side horizon,
-    and SKY_HOR is brighter than SKY_TOP in red and green and equal in blue."""
-    t = np.clip(np.asarray(mu_air, float), 0, 1)[..., None] ** .55
-    return (SKY_HOR[None] * (1 - t) + SKY_TOP[None] * t) * 1.15
-
-
-def window_shares(profile=True, ior=None):
-    """(W_bed, W_vert), per channel: the (1/pi) INT L cos dw that a HORIZONTAL
-    and a VERTICAL submerged face collect from the Snell window, with L the
-    transmitted, n^2-gained sky. `profile=False` sets L to 1 and must reproduce
-    the two closed forms 1/n^2 and 0.5 - tir_vert(tc)*(1 - 1/n^2) -- which is
-    the row `validate.py` fires at this quadrature, since neither closed form
-    can be written from the integrand."""
-    ior = IOR if ior is None else np.asarray(ior, float)
-    Wb, Wv = np.zeros(3), np.zeros(3)
-    for c in range(3):
-        tc = np.arcsin(1.0 / ior[c])
-        t = (np.arange(40000) + .5) / 40000 * tc
-        st, ct = np.sin(t), np.cos(t)
-        if profile:
-            ca = np.sqrt(np.maximum(1. - (ior[c] * st) ** 2, 0.))
-            L = (1. - r_int_at(ct)[:, c]) * into_water(sky_diffuse(ca))[:, c]
-        else:
-            L = np.ones_like(t)
-        Wb[c] = 2. * np.sum(L * ct * st) * (tc / 40000)
-        Wv[c] = (2. / np.pi) * np.sum(L * st * st) * (tc / 40000)
-    return Wb, Wv
-
-
-WIN_BED, WIN_VERT = window_shares(True)
-SKY_VERT = WIN_VERT / WIN_BED       # a vertical submerged face's sky, as a
-                                    # multiple of the BED's -- the number that
-                                    # replaces WALL_SKY under the water
+# --- WHAT IS ACTUALLY OVER A SUBMERGED FACE, MEASURED ------------------------
+# `WIN_BED`, `WIN_VERT` and `SKY_VERT` are `atmosphere.py`'s, with the
+# derivation of all three beside them there. What is here is the measurement
+# they are reported by: the flat-sky limit against its two closed forms, and
+# the profiled integral against the constant `WALL_SKY = 0.5` it replaces.
 _w0b, _w0v = window_shares(False)
 _wcf = (0.5 - tir_vert(TC_SNELL) * (1. - 1. / IOR ** 2)) * IOR ** 2
 print("the Snell window, as a source for a submerged face:")
@@ -3060,28 +2569,29 @@ _WB_DEEP = bed_img['disp'][BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0)
 _WB_ALL = bed_img['disp'].reshape(-1, 3).mean(0)
 _WBOUNCE_OLD = T_OUT_DIFFUSE * LINER_TINT * 0.74 * (
     SUN_COL * cos_i * TSUN * np.exp(-ABS * (slant + DEPTH)) + SKY_AMB * 0.8)
-WBOUNCE = wbounce_of(_WB_DEEP)
+WBOUNCE = wbounce_of(_WB_DEEP, DEPTH)
 print("water upwelling onto the coping and the band: %s = slab_esc %s x the "
       "CONVERGED deep floor %s. The closed-form guess it replaces reads %s, "
       "i.e. %s of this -- 89%% high in red and 30%% in green -- and it was high "
       "for three reasons at once: the escape factorised out of the attenuation, "
       "an undeclared 0.8 on an unattenuated ambient, and one bounce where the "
       "solve has six."
-      % (np.round(WBOUNCE, 4), np.round(slab_esc(), 4), np.round(_WB_DEEP, 4),
+      % (np.round(WBOUNCE, 4), np.round(slab_esc(DEPTH), 4),
+         np.round(_WB_DEEP, 4),
          np.round(_WBOUNCE_OLD, 4), np.round(_WBOUNCE_OLD / WBOUNCE, 3)))
 print("  the closed-form SEED that stands in the file until this line -- the "
       "same slab_esc on `shade`'s own deep-floor expression -- reads %s, %s of "
       "the converged answer. The gap is the trap and the walls, i.e. exactly "
       "what six passes add, and it is the second route this number now has."
-      % (np.round(wbounce_of(BED_L_CLOSED), 4),
-         np.round(wbounce_of(BED_L_CLOSED) / WBOUNCE, 3)))
+      % (np.round(wbounce_of(BED_L_CLOSED, DEPTH), 4),
+         np.round(wbounce_of(BED_L_CLOSED, DEPTH) / WBOUNCE, 3)))
 print("  `?` the DEEP floor and not the whole bed: the coping and the band on "
       "this wall stand over 1.40 m of water, and the step unit is at the far "
       "end. Over the whole bed it would read %s, %s of this, and the local "
       "variation the gather does see is carried by `pat` and `fal` rather than "
       "by the level."
-      % (np.round(wbounce_of(_WB_ALL), 4),
-         np.round(wbounce_of(_WB_ALL) / WBOUNCE, 3)))
+      % (np.round(wbounce_of(_WB_ALL, DEPTH), 4),
+         np.round(wbounce_of(_WB_ALL, DEPTH) / WBOUNCE, 3)))
 
 # ...and does it carry the NET, or only the level? Same measurement the risers
 # get, along the north wall, at four heights.
@@ -3593,43 +3103,33 @@ for nm, zz, x0, x1, y0, y1 in _PATCH:
              100 * bed_sun(_pu, _pv, zz).mean()))
 
 
-# --------------------------------------------------------------------------- sky
-# The sun and its aureole live in the environment as three cos^n lobes. They are
-# named here rather than written inline because they are the ONLY angular
-# structure in this sky narrower than the reflection ellipse the footprint
-# filter creates below -- the sky gradient itself turns over 90 degrees and a
-# few degrees of blur does nothing to it, which is what makes convolving the
-# lobes alone the whole of the job and not an approximation of convenience.
-# A cos^n lobe is exp(-n th^2 / 2) near its peak, so its per-axis angular
-# variance is 1/n, and its flux over the hemisphere is 2 pi / (n + 1).
-#
-# ALL SIX NUMBERS BELOW WERE GUESSES AND ARE NOW DERIVED. The audit that used to
-# sit under this block priced the guess: the disc lobe's peak was 1563x under the
-# sun's own radiance and 7.8x too wide, and the three lobes together carried a
-# 35th of the direct beam. That is the whole of bar section C's complaint -- a
-# broad dim smear where the physics has a small blinding point -- so this round
-# replaces the amplitudes and the widths with the atmosphere.
-#
-# --- THE ATMOSPHERE, READ BACK OUT OF A CONSTANT THIS FILE ALREADY HAD --------
-# SUN_COL's COLOUR is not a choice. exp(-m tau_Rayleigh) at the bar's own air
-# mass 2.77, evaluated at this file's own three band centres and normalised to
-# red, is (1.0000, 0.8921, 0.6740); SUN_COL's triple is (1.000, 0.892, 0.674).
-# One part in 10^4 on two channels. So the beam that lights this scene has been
-# through a RAYLEIGH atmosphere at the stated air mass and nothing else, which
-# fixes three things at once: the air mass is not free, the reddening is not a
-# grade, and the aerosol optical depth SUN_COL was written with is ZERO. Every
-# lobe below is built on that atmosphere, and the one place a number is added to
-# it rather than read out of it is marked.
-def _tau_rayleigh(lam_um):
-    """Whole-atmosphere Rayleigh optical depth at sea level: the standard
-    0.008569 lam^-4 form with its two dispersion corrections (Hansen & Travis
-    1974). Not fitted here -- it is what makes the check above a check."""
-    return 0.008569 * lam_um ** -4 * (1. + 0.0113 * lam_um ** -2
-                                      + 0.00013 * lam_um ** -4)
+# --------------------------------------------------------------- the sky, priced
+# `atmosphere.py` derives all of this; every line from here to the end of the
+# illuminant block is the file reading its own atmosphere back and reporting it,
+# which is where the finding lives. The ephemeris first, because it is new: the
+# place, the date and the clock time now go in and the elevation, the azimuth
+# and the air mass come out, where all three used to be a comment.
+_sgap = np.degrees(np.arccos(np.clip(float(SUN_DIR @ SUN_DIR_DERIVED), -1., 1.)))
+print("the sun, from the place and the clock rather than from a comment:")
+print("  %s, %.3fN %.3fW, %04d-%02d-%02d %02d:%02d UTC%+d -- declination "
+      "%.3f deg, equation of time %+.2f min, hour angle %+.3f deg (POSITIVE: "
+      "an afternoon sun, which is the branch an acos cannot see)"
+      % (SITE_NAME, SITE_LAT, -SITE_LON, SHOOT[0], SHOOT[1], SHOOT[2],
+         SHOOT[3], SHOOT[4], SHOOT[6], SUN_DECL, SUN_EOT, SUN_HA))
+print("  elevation %.4f deg geometric, %.4f apparent (Bennett refraction "
+      "%+.2f arcmin), azimuth %.4f deg compass = %.4f deg in this file's own "
+      "math convention, Kasten-Young air mass %.4f against the AIRMASS = %.2f "
+      "the atmosphere below is built on"
+      % (SUN_EL_GEOM, SUN_EL, 60. * (SUN_EL - SUN_EL_GEOM), SUN_AZ,
+         (90. - SUN_AZ) % 360., SUN_AM, AIRMASS))
+print("  `?` SUN_DIR ships as %s and the ephemeris gives %s -- %.4f deg apart, "
+      "a %.0fth of the sun's own radius and two orders under anything this "
+      "frame resolves. MEASURED AND NOT MOVED: adopting it would move every "
+      "caustic and every glint, and the wave that split this file out was "
+      "required to move no pixel at all."
+      % (np.round(SUN_DIR, 5), np.round(SUN_DIR_DERIVED, 5), _sgap,
+         np.deg2rad(0.53) / 2. / np.deg2rad(_sgap)))
 
-
-AIRMASS = 2.77                                     # the bar's, for elevation 21
-TAU_R = _tau_rayleigh(np.array([620., 545., 460.]) / 1000.)
 _TRAY = np.exp(-AIRMASS * TAU_R)
 print("atmosphere, read back out of SUN_COL rather than assumed:")
 print("  Rayleigh tau %s at 620/545/460 nm -> exp(-m tau)/red = %s at m = %.2f, "
@@ -3638,133 +3138,6 @@ print("  Rayleigh tau %s at 620/545/460 nm -> exp(-m tau)/red = %s at m = %.2f, 
       "written with carries tau_aerosol = 0."
       % (np.round(TAU_R, 4), np.round(_TRAY / _TRAY[0], 4), AIRMASS,
          np.round(SUN_COL / SUN_COL[0], 4)))
-
-# --- LOBE 1, THE DISC: nothing free at all -----------------------------------
-# `shade` uses SUN_COL as E_n/pi, so E_n = pi*SUN_COL is the normal irradiance
-# and the disc's radiance is E_n / Omega_sun with Omega_sun the disc's own solid
-# angle. A cos^n lobe carries 2 pi / (n + 1); setting that equal to Omega_sun
-# gives n = 2/theta_s^2 - 1 and then a peak of L_sun makes the lobe's FLUX equal
-# the direct beam exactly. Peak, width and flux all land on the sun at once --
-# there is no amplitude left to choose, which is the point.
-THETA_SUN = np.deg2rad(0.53) / 2.0                 # solar angular radius
-OMEGA_SUN = np.pi * THETA_SUN ** 2                 # 6.72e-5 sr
-E_SUN = np.pi * SUN_COL                            # normal irradiance, 24.1 green
-L_SUN = E_SUN / OMEGA_SUN                          # 3.59e5 green
-N_DISC = 2.0 / THETA_SUN ** 2 - 1.0                # 93493
-
-# --- LOBE 2, THE AUREOLE THIS ATMOSPHERE ACTUALLY HAS ------------------------
-# The aureole is single-scattered sunlight and its radiance follows from the
-# same plane-parallel integral the beam does. Scattering at optical depth tau'
-# feeds the view direction at F_0 exp(-tau'/mu_0) omega P(Theta) / (4 pi) and the
-# result is attenuated out again; in the sun's OWN direction mu = mu_0, the
-# integral collapses to F_0 m tau exp(-m tau) P / (4 pi), and F_0 exp(-m tau) is
-# the beam that arrives, which is E_n. So
-#     L(Theta) = (E_n / 4 pi) P(Theta) m tau_sca
-# with no free scale: the aureole is the beam times a phase function times the
-# slant scattering optical depth, and the atmosphere above has already fixed
-# tau_sca -- it is tau_Rayleigh, whose single-scattering albedo is exactly 1.
-#
-# Rayleigh's phase function is 3/4 (1 + cos^2 Theta), which splits into an
-# ISOTROPIC 3/4 -- a uniform sky, which is what SKY_HOR/SKY_TOP and their
-# elevation gradient already carry -- plus 3/4 cos^2 Theta, which is the whole
-# of the forward structure a Rayleigh atmosphere has. cos^2 IS a cos^n lobe,
-# with n = 2, so the aureole needs no fitting at all:
-#     amp = (E_n / 4 pi) m tau_R * 3/4,   n = 2.
-# It is broad and it is faint -- 0.4 against a sky of about 1.0 -- and that is
-# the point: a clean atmosphere has no compact aureole, because a compact
-# aureole is a DIFFRACTION peak and diffraction needs particles.
-N_AURE = 2.0
-L_AURE = (E_SUN / (4. * np.pi)) * AIRMASS * TAU_R * 0.75
-
-# --- LOBE 3, THE AEROSOL AUREOLE: DERIVED TO ZERO, AND MEASURED THERE --------
-# What is NOT here, and why, because its absence is a result rather than an
-# omission. A real coastal afternoon carries tau_a ~ 0.1 of aerosol, and an
-# aerosol aureole is a genuine feature: for particles large against the
-# wavelength the extinction efficiency tends to 2 and exactly HALF of it is
-# diffraction -- the Airy pattern of the particle's own shadow -- which is a
-# forward peak a few degrees wide, the aureole a photographer sees. The other
-# half is refraction and reflection, broad, Henyey-Greenstein at the asymmetry
-# quoted for tropospheric aerosol. Two mechanisms, two widths, one optical
-# depth: the previous cos^260 and cos^14 were sitting almost exactly on those
-# two widths, which is why only their amplitudes were wrong.
-#
-# THE REASON IT IS ZERO IS ENERGY, NOT TASTE. SUN_COL's colour is Rayleigh
-# extinction alone, so the beam that lights this frame was never dimmed by
-# aerosol. Adding aerosol scattering to the environment without removing it from
-# the beam creates the light twice, and it creates it exactly where a reflection
-# is most sensitive to it. Dimming the beam instead means changing SUN_COL,
-# which relights every diffuse surface in the frame and is a round of its own.
-# So the environment is built from the atmosphere the beam actually came
-# through, and the aerosol pair waits for the round that can afford both halves.
-#
-# WHAT IT WOULD COST, measured rather than guessed: this file was rendered with
-# that pair in, at tau_a(550) = 0.10, Angstrom 1.0, single-scattering albedo
-# 0.95, half of the coarse mode's scattering in a 2.0 um diffraction peak. It
-# put a peak radiance of 72 into a 3.4 deg lobe and 15 into a 13.5 deg one, and
-# on the picture it moved the mirror band's REFLECTED median from 0.16 to 4.04
-# -- past this file's own white point of 11.2 once the disc's glints are added
-# on top -- and took the far water's mean luminance to 245 of 255 with 98% of it
-# over 200. A frame shot along the sun's azimuth cannot hold both a hazy sky and
-# a legible bed, which is a statement about the reference photograph's weather
-# as much as about this renderer.
-
-# sky() multiplies the WHOLE environment by 1.15, and the background wants it --
-# it is what makes what sky() returns agree with SKY_AMB. The amplitudes below
-# are absolute RADIANCES and must not be scaled a second time, so each carries
-# 1/1.15 and the product is the derived peak exactly.
-_UNSCALE = 1.0 / 1.15
-SKY_LOBE = ((_UNSCALE, N_DISC, L_SUN),             # the disc
-            (_UNSCALE, N_AURE, L_AURE))            # the Rayleigh aureole
-
-
-def _lobe_shape(n, cov):
-    """One cos^n lobe of the environment, convolved with the reflection ellipse
-    that the UNRESOLVED slope variance puts on the mirror direction.
-
-    Two Gaussians convolve to a Gaussian whose covariance is the sum and whose
-    INTEGRAL is unchanged, so the peak falls by sqrt(det Q_0 / det Q). Writing
-    the widened lobe back as cos^(n_eff) rather than as exp(-n_eff th^2 / 2)
-    costs nothing and buys the one property that matters here: at cov = None it
-    is EXACTLY the expression this file had before, so the unfiltered path is
-    bit-for-bit the old one and the sky behind the pool never moves.
-
-    n_eff is directional -- 1 / (u_hat^T Q u_hat), the variance of the summed
-    Gaussian along the direction of the offset to the sun -- which is how the
-    anisotropy survives. WIND is a 45 deg spread about the wind azimuth and the
-    wake is directional, so what the filter removes is a Cox-Munk ellipse and a
-    lobe widened by its trace would be visibly wrong across the wind. On the
-    axis (offset zero) every direction gives cos^n = 1 and only the peak factor
-    is doing anything, so the fallback there is the mean variance."""
-    if cov is None:
-        return 1.0, n
-    u1, u2, c11, c12, c22 = cov
-    q11 = 1.0 / n + c11
-    q22 = 1.0 / n + c22
-    det = np.maximum(q11 * q22 - c12 * c12, 1e-30)
-    g = (1.0 / n) / np.sqrt(det)
-    r2 = u1 * u1 + u2 * u2
-    w = np.where(r2 > 1e-16,
-                 (u1 * u1 * q11 + 2.0 * u1 * u2 * c12 + u2 * u2 * q22)
-                 / np.maximum(r2, 1e-16),
-                 0.5 * (q11 + q22))
-    return g, 1.0 / np.maximum(w, 1e-12)
-
-
-SKY_DIFFUSE_LOBES = SKY_LOBE[1:]    # everything but the disc -- see below
-
-
-def sky(dx, dy, dz, cov=None, lobes=None):
-    t = np.clip(dz, 0, 1)[:, None] ** .55
-    col = SKY_HOR[None] * (1 - t) + SKY_TOP[None] * t
-    cs = np.clip(dx * SUN_DIR[0] + dy * SUN_DIR[1] + dz * SUN_DIR[2], 0, 1)
-    for amp, n, c in (SKY_LOBE if lobes is None else lobes):
-        g, ne = _lobe_shape(n, cov)
-        if cov is None:
-            col = col + c[None] * amp * (cs ** ne)[:, None]
-        else:
-            col = col + c[None] * amp * (g * cs ** ne)[:, None]
-    return col * 1.15
-
 
 print("sky lobes: per-axis sigma %s deg -- these are the angular scales the "
       "reflection ellipse has to be compared against"
@@ -3827,94 +3200,10 @@ print("  aureole cross-check: %.1f%% of the Rayleigh lobe's flux falls inside "
          np.degrees(1. / np.sqrt(N_AURE))))
 
 
-# ================== THE ILLUMINANTS ABOVE THE WATER, FROM ONE ATMOSPHERE ======
-# `SKY_DECK = SKY_AMB * 0.30 + SUN_COL * 0.075` was the longest-standing
-# underived constant in this file -- 1.74 stops written by hand, filed as open
-# in the README for the whole project, and applied to two receivers that are at
-# RIGHT ANGLES to each other: the horizontal coping and paving, and the
-# VERTICAL, poolward-facing freeboard band. It is closed here, and so is the
-# second illuminant, and neither is a fit.
-#
-# THE POINT IS THAT THERE IS NOTHING LEFT TO CHOOSE. An illuminant for a
-# diffuse receiver is one number:
-#
-#     E(N)/pi = (1/pi) INT_hemisphere L(w) (w.N)_+ dw
-#
-# and this file already OWNS L(w): `sky()` is a complete environment -- a
-# horizon/zenith gradient and two cos^n lobes whose amplitudes were derived,
-# the previous round, from the same Rayleigh atmosphere that reddens SUN_COL
-# (AIRMASS = 2.77, TAU_R from the file's own `_tau_rayleigh`). So both
-# illuminants are the same integral of the same environment against two
-# different normals, and the only judgement in them is which lobes belong.
-#
-# WHICH LOBES BELONG: everything except the disc. `SKY_LOBE[0]` is the sun's
-# own disc, and the audit above proves it carries the beam EXACTLY -- its flux
-# is pi*SUN_COL to a part in a thousand. Every diffuse receiver in this file
-# already gets that beam as an explicit `SUN_COL * (N.L) * vis` term, so
-# integrating the disc into an illuminant as well would light the frame with
-# two suns. The aureole is not the beam: it is light Rayleigh-scattered OUT of
-# the beam, it arrives from directions the beam does not, and it is skylight.
-# `SKY_DIFFUSE_LOBES` is that partition and `sky()` takes it as an argument, so
-# a later round that moves a lobe moves both illuminants with it.
-def env_diffuse(dx, dy, dz):
-    """The environment MINUS the sun's disc, in absolute radiance: the sky
-    gradient and the Rayleigh aureole. Same code path as `sky()` -- a row in
-    `validate.py` asserts `env_diffuse + disc == sky` over 4096 directions, so
-    the two cannot drift."""
-    return sky(dx, dy, dz, lobes=SKY_DIFFUSE_LOBES)
-
-
-# The quadrature. Uniform in cos(theta) and in phi, which is the measure the
-# integrand is written against -- no cosine has to be reintroduced by hand and
-# the solid angle is one constant. 256 x 512 costs 3 MB and converges the deck
-# to 6 significant figures; `validate.py` runs it again at 1024 x 2048 and
-# compares, and also against a closed form the quadrature cannot see.
-ENV_NMU, ENV_NPH = 256, 512
-_emu = (np.arange(ENV_NMU) + .5) / ENV_NMU              # cos from the zenith
-_eph = (np.arange(ENV_NPH) + .5) / ENV_NPH * (2. * np.pi)
-_est = np.sqrt(np.maximum(1. - _emu ** 2, 0.))
-ENV_DX = np.repeat(_est, ENV_NPH) * np.tile(np.cos(_eph), ENV_NMU)
-ENV_DY = np.repeat(_est, ENV_NPH) * np.tile(np.sin(_eph), ENV_NMU)
-ENV_DZ = np.repeat(_emu, ENV_NPH)
-ENV_DW = (1. / ENV_NMU) * (2. * np.pi / ENV_NPH)        # d(mu) d(phi), sr
-ENV_L = env_diffuse(ENV_DX, ENV_DY, ENV_DZ)
-
-
-def env_irradiance(nx, ny, nz, weight=None, nmu=None, nph=None, L=None):
-    """E(N)/pi over the SKY hemisphere, per channel -- an illuminant in exactly
-    the units every diffuse term in this file is written in, so that a facet of
-    albedo `a` and unobstructed sky comes out at `a * env_irradiance(N)`.
-
-    `weight` multiplies the integrand per direction and is how an occluder or an
-    interface goes inside the integral rather than beside it. `nmu`/`nph`
-    rebuild the lattice at another resolution, which is how the suite measures
-    this quadrature's own error instead of assuming it. `L` replaces the
-    environment -- a UNIFORM L must give exactly L on a horizontal face and
-    exactly L/2 on a vertical one, which is the row that fires at a dropped
-    1/pi or a wrong solid angle."""
-    if nmu is None and nph is None:
-        dx, dy, dz, dw = ENV_DX, ENV_DY, ENV_DZ, ENV_DW
-        L = ENV_L if L is None else np.broadcast_to(np.asarray(L, float),
-                                                    ENV_L.shape)
-    else:
-        nmu, nph = nmu or ENV_NMU, nph or ENV_NPH
-        m = (np.arange(nmu) + .5) / nmu
-        p = (np.arange(nph) + .5) / nph * (2. * np.pi)
-        s = np.sqrt(np.maximum(1. - m ** 2, 0.))
-        dx = np.repeat(s, nph) * np.tile(np.cos(p), nmu)
-        dy = np.repeat(s, nph) * np.tile(np.sin(p), nmu)
-        dz = np.repeat(m, nph)
-        dw = (1. / nmu) * (2. * np.pi / nph)
-        L = (env_diffuse(dx, dy, dz) if L is None
-             else np.broadcast_to(np.asarray(L, float), (dx.size, 3)))
-    w = np.clip(dx * nx + dy * ny + dz * nz, 0., None) * dw
-    if weight is not None:
-        w = w * np.asarray(weight, float)
-    return (L * w[:, None]).sum(0) / np.pi
-
-
-# --- ILLUMINANT ONE: the horizontal deck ------------------------------------
-SKY_DECK = env_irradiance(0., 0., 1.)
+# --- ILLUMINANT ONE, AND WHAT IT FALSIFIES -----------------------------------
+# `SKY_DECK` is derived in `atmosphere.py`. Its two halves are separated here
+# only to price the constant it replaced, which is what makes this a finding
+# rather than a refactor.
 _ENV_GRAD = sky(ENV_DX, ENV_DY, ENV_DZ, lobes=())        # gradient alone
 _deck_grad = (_ENV_GRAD * (np.clip(ENV_DZ, 0., None) * ENV_DW)[:, None]
               ).sum(0) / np.pi
@@ -3953,30 +3242,6 @@ print("    the aureole is %.1f%% of the derived deck illuminant in green. The "
       "reach. That is the whole falsification, and it needs no photograph."
       % (100 * _deck_aur[1] / SKY_DECK[1], _P_ANISO,
          100 * (SUN_COL * 0.075)[1] / _SKY_DECK_OLD[1]))
-# `?` WHAT IS STILL NOT DERIVED, stated exactly. The two LOBES come from the
-# file's Rayleigh atmosphere; the GRADIENT (SKY_HOR, SKY_TOP and the 0.55
-# exponent between them) does not -- it is a hand-set profile and it always
-# was. What the atmosphere CAN say about it is a lower bound, and the bound is
-# computed rather than asserted: single-scattered Rayleigh radiance for a
-# ground observer at view cosine mu_v with the sun at mu_s is
-#     L = (F0 P(Theta)/4pi) mu_s (e^{-tau/mu_v} - e^{-tau/mu_s}) / (mu_v - mu_s)
-# with F0 = E_SUN e^{+tau m} the top-of-atmosphere beam this file's own SUN_COL
-# implies. That form is a LOWER bound on a real sky by construction: it has no
-# multiple scattering and no ground return, and at tau_R(blue) = 0.20 those are
-# not small. What is missing from the gradient is therefore named -- the
-# second and higher orders of the sky's own radiative transfer, and the
-# albedo of the ground under it -- rather than left as "a choice".
-def _ss_rayleigh(mu_v, cos_theta):
-    """Single-scattered Rayleigh sky radiance, per channel."""
-    mu_s = float(SUN_DIR[2])
-    f0 = E_SUN * np.exp(TAU_R * AIRMASS)
-    p = 0.75 * (1. + np.asarray(cos_theta, float) ** 2)
-    mv = np.maximum(np.asarray(mu_v, float), 1e-4)
-    d = mv - mu_s
-    d = np.where(np.abs(d) < 1e-5, 1e-5, d)
-    return (f0[None] * (p / (4. * np.pi))[:, None]
-            * mu_s * (np.exp(-TAU_R[None] / mv[:, None])
-                      - np.exp(-TAU_R[None] / mu_s)) / d[:, None])
 
 
 _ss_cos = -(ENV_DX * SUN_DIR[0] + ENV_DY * SUN_DIR[1] + ENV_DZ * SUN_DIR[2])
@@ -4218,19 +3483,6 @@ print("  the `0.30` on the direct beam, which this derivation makes VISIBLE. A "
          100 * SKY_DECK[1] / _E100[1]))
 
 
-# --- AND THE THIRD ILLUMINANT, MEASURED AND NOT MOVED ------------------------
-# SKY_AMB is the level of the sky every SUBMERGED receiver gets. The same
-# integral prices it, because the Snell window is a change of variables and
-# nothing else: n^2 cos(t_w) sin(t_w) dt_w = cos(t_a) sin(t_a) dt_a maps the
-# window integral of the n^2-gained sky exactly onto the air-side hemisphere, so
-# a bed point's sky irradiance is the DECK's, less what the surface reflects
-# away. That number is computed here and compared with SKY_AMB, and it is NOT
-# applied: this round's control is that nothing below the waterline moves, and
-# moving SKY_AMB moves the wall and the band together, which would make the one
-# ratio this work exists to report unattributable.
-_RBAR = (ENV_L * fresnel(ENV_DZ)
-         * (np.clip(ENV_DZ, 0., None) * ENV_DW)[:, None]).sum(0) / np.pi / SKY_DECK
-SKY_SUB_DERIVED = SKY_DECK * (1. - _RBAR)
 print("  `?` THE THIRD ILLUMINANT, PRICED AND NOT MOVED. The same environment "
       "puts a submerged horizontal face's sky at SKY_DECK x (1 - Rbar) = %s "
       "(Rbar = %s, the radiance-weighted external reflectance the surface turns "
@@ -8072,8 +7324,8 @@ for _nm, _k in (("wall,   0-100 mm", 7), ("wall, 100-250 mm", 9),
 _RHO_BED = LIN[BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0)
 _TSLANT = np.exp(-ABS * slant)
 _RSUN = fresnel(cos_i)                    # (3,) -- 12% of the beam never enters
-_SERIES = trap_gain(_RHO_BED)
-RHO_WATER = rho_water(_RHO_BED)
+_SERIES = trap_gain(_RHO_BED, DEPTH)
+RHO_WATER = rho_water(_RHO_BED, cos_i, DEPTH)
 _Y3 = np.array([.2126, .7152, .0722])
 # the beam and the sky, as irradiance/pi -- the units `shade` and `_stone` both
 # write their light in, so no conversion enters this comparison.
@@ -8081,7 +7333,8 @@ _EBEAM = SUN_COL * SUN_DIR[2]
 _ESKY = SKY_AMB.copy()
 print("the pool's apparent albedo, closed form from this file's constants:")
 print("  T_slant %s   T_esc %s   G_roundtrip %s   trapped series %s"
-      % (np.round(_TSLANT, 4), np.round(slab_esc(), 4), np.round(slab_trap(), 4),
+      % (np.round(_TSLANT, 4), np.round(slab_esc(DEPTH), 4),
+         np.round(slab_trap(DEPTH), 4),
          np.round(_SERIES, 4)))
 print("  ...and the two forms this round corrected on the way here, for the "
       "record: factorising T_esc as T_diff*(1-R_int) gives %s (lum %.4f) and "
@@ -8379,7 +7632,8 @@ if _b6.sum() >= 100:
           "second route: 1.000 at w = 0, and %.0f%% at a 30 mm overhang, which "
           "is what a different section would cost."
           % (BAND_SKY_VIS, SLIP, SBUL, 100 * _ovh))
-    _upw = wbounce_of(bed_img['disp'][BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0))
+    _upw = wbounce_of(bed_img['disp'][BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0),
+                      DEPTH)
     print("       * its WATER half is now the converged floor and not a "
           "one-bounce closed form: WBOUNCE = slab_esc x the deep floor = %s, "
           "against the %s the guess gave -- %s per channel, 89%% high in red. "

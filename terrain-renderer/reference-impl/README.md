@@ -27,14 +27,19 @@ or falsified here.
                                #        switch rather than a scratch copy so
                                #        that number can be re-run.
 
-| File | Owns |
-|---|---|
-| `field.py` | The water surface: wind, reverberant tail, wall reflections, jet boil, jet wake. Answers "what is the slope at (x,y)". Knows nothing about light. |
-| `wake.py`  | Eikonal ray tracing of the jet's stationary wake through its own drift field. |
-| `render.py`| Light: the caustic pass, liner and tile materials, Fresnel — the **exact equations at every water interface**, not Schlick, because an approximation justified only by speed does not belong in a reference and the far water's specular term is the brightest thing in the frame — sky, camera, tone map. |
+| File | Owns | Scene-independent? |
+|---|---|---|
+| `optics.py` | Water and the air/water interface: `IOR`, the absorption triple, **the exact Fresnel equations**, `refract` and its TIR branch, the `n²` radiance transport in both directions, the diffuse interface constants, the trapped-slab closed forms, the critical angle and the Snell window's geometry. | **yes** — no depth, no basin, no sun |
+| `atmosphere.py` | The sun's ephemeris (place + clock → elevation, azimuth, air mass), the Rayleigh atmosphere read back out of `SUN_COL`, the solar disc and its aureole, `sky()`, the cosine integral of it, and the two derived illuminants above the water. | **yes**, once the shoot's own block at the top is replaced |
+| `field.py` | The water surface: wind, reverberant tail, wall reflections, jet boil, jet wake. Answers "what is the slope at (x,y)". Knows nothing about light. | mostly — the basin's walls are in it |
+| `wake.py`  | Eikonal ray tracing of the jet's stationary wake through its own drift field. | yes |
+| `render.py`| **This scene**: the basin's plan and bed, the coping and its section, the liner and the tiles, the step unit, the cameras and their justifications, the jet, the sail and the float — plus every diagnostic `print` in the project, which is why its stdout did not move when the physics did. | no, by construction |
 
-Sun position is the measured one for the reference photograph (Aljezur, 37.319N
-8.803W, 2026-08-10 18:41 WEST): elevation 21.0 deg, azimuth 273.75 deg.
+Sun position is no longer asserted: `atmosphere.solar_position` takes the
+reference photograph's place and clock (Aljezur, 37.319 N 8.803 W, 2026-08-10
+18:41 WEST) and returns **elevation 20.978° geometric / 21.020° apparent,
+azimuth 273.746°, Kasten–Young air mass 2.770** — the three numbers that used to
+be a comment. See *the physics left `render.py`* below.
 
 ## Validating it — `validate.py`
 
@@ -71,12 +76,18 @@ outside what the measurement itself can explain, and the next question is *which
 of the two sides is wrong*, never *can the tolerance move*. Rows marked INFO carry
 no assertion and never affect the exit code.
 
-**It loads `render.py` by slicing.** `render.py` has no `__main__` guard, so
-importing it would run the full render. `load_render()` parses the source and
-executes only the nodes that define things. The guard against that silently losing
-something is the `REQUIRED` list: the loader raises if any name the suite tests is
-missing, so a restructured `render.py` produces a loud error rather than a quietly
-absent test.
+**It imports the physics and slices only the scene.** `optics.py` and
+`atmosphere.py` are ordinary modules with no render in them, so every row that
+tests physics reads the shipped implementation directly — `import optics as OPT`,
+`import atmosphere as ATM` — and 228 of the suite's references go through those
+two names rather than through a reconstruction. Only the rows that test the
+*scene* still need the slice: `render.py` has no `__main__` guard, so importing it
+would run the full render, and `load_render()` parses the source and executes only
+the nodes that define things. The guard against that silently losing something is
+still `REQUIRED`, now split three ways — `REQUIRED_OPTICS` and `REQUIRED_ATMO` are
+checked against the two modules, and what is left in `REQUIRED` is the scene. A
+name that migrates back into `render.py`, where a second scene could not reach it,
+fails the load loudly instead of quietly passing.
 
 **It is green, and that took work rather than tolerance.** The suite exited 1 on
 eight rows for several rounds — three absorption, two Schlick-vs-exact-Fresnel, one
@@ -157,6 +168,268 @@ checks must not share a premise.** Derive the value from physics, write the
 derivation down, and then guard it with something that could not have been written
 from it — a limit, a conservation identity, an analytic special case, or the same
 quantity reached by unrelated code.
+
+## Split — the physics left `render.py` before the beach arrived, and no pixel moved
+
+The owner's ruling, recorded in `gauntlet/chapter-backlog.md`: *"Als we een 2e
+scene bouwen, met strand, moet het zwembad niet verdwijnen."* A second reference
+scene is coming — a beach, for waves, shoaling, breaking and coastal optics — and
+the default outcome of a second scene is a **fork that drifts**, which leaves
+neither reference trustworthy. This project has already been bitten by the
+miniature version of exactly that: `validate.py` once carried two "independent
+methods" that were both transcriptions of the same comment, so they agreed on a
+wrong number.
+
+**So the extraction happened before the beach, not after** — build first and split
+later is how the fork happens, because by then the two scenes have grown their own
+copies — and it happened with the picture nailed down.
+
+### The contract, and it is the whole test
+
+Every rendered output is **bit-for-bit identical**, on every switch the file
+carries:
+
+| run | frame | sha256, before **and** after |
+|---|---|---|
+| `python3 render.py` | `pool_final.png` | `220d2779daa947850f969cd8586be7df3661c1aba900b38e0de2fbc9e5c430fa` |
+| | `pool_final_dispersion.png` | `1e0b412082a1bef58a3d18b073985f37be48546c68374d5b3717ad65293f7ae1` |
+| | `pool_final_zoom.png` | `9bea3ee1f52043958cddffdf094ddbad927e6e35006ae8de46c421a7e18c341d` |
+| | `pool_final_float.png` | `929d6e524a579fa9beb0a96ad505cd196ed5e6dcda9f1e45e3bf3870f8079979` |
+| `POOL_UNDERWATER=1` | `pool_under.png` | `22be1d6aeadcb8b059514c8276eb3856c9460b9aa01823fc9d6305c45132e27c` |
+| | `pool_under_float.png` | `d36f0b3270ced8ab9762eec71088ee8c72675b5bd397fac4cfba68a2a9ab827f` |
+| `POOL_WIDE=1` | `pool_wide.png` | `817c7bf43fc35b9ee204acc9ce9b21da2efcc2be675788d35599d2a6e139d5d1` |
+| | `pool_wide_dispersion.png` | `7285cf1c953d0f8d98804a506d3511f286a2405a0240fff0d94816963af07d83` |
+| | `pool_wide_zoom.png` | `50d59cc8d1c14bff5acf235c6fb02a810738fc6606d2a8881d5c27d09c2e8ea3` |
+| | `pool_wide_float.png` | `1065596690706be25b666836482ad995605eda32552993b69cb46dd79d97e084` |
+| `POOL_NOFLOAT=1` | `pool_final.png` | `fabb3d1b37127b5aec8203d7af8b55e2eaf92798165905b506599490cbea60a7` |
+| | `pool_final_dispersion.png` | `f2123b1fd0a0cc77c58b701bb5f0bae6eec68441dca18ab87ae9786f45308b83` |
+| | `pool_final_zoom.png` | `7eec90f26c6e1437cb2f72265aaf49937778d6a1d35b1df2711f787e72e5c4b4` |
+
+`POOL_UNDERWATER=1` reproduces the hero set byte for byte as well, before and
+after — the claim that switch has always made about itself, re-checked here
+because a refactor is exactly when it would stop being true.
+
+**`validate.py` is unchanged at 285 pass / 0 FAIL / 54 info**, and not merely in
+the count. Diffed whole, the two `-v` transcripts of 795 lines differ in **eight**:
+the two elapsed-time lines, the line numbers in the loader's five expected load
+errors, and the count of top-level nodes the slicer skips, which rises by exactly
+four — the four `print`s the ephemeris adds. Every expected, measured and
+tolerance column in all 339 rows is character-identical.
+
+**A cheaper check ran first, and is worth repeating before any future split.**
+Both versions were sliced the way `validate.py` slices them and every module-level
+value compared: **448 values, all exactly equal** — the only differences being
+five wall-clock timers and the `repr()` of five RNG objects, which is their
+addresses. (The RNGs matter more than they look: none of the moved code draws a
+random number, so every stream is consumed in the same order by the same caller,
+which is what a reordering refactor is most likely to break silently.) That check
+takes two minutes and would have caught a mistake a render takes twenty to
+report.
+
+### What moved, and the test each candidate had to pass
+
+The test was one question, asked of every line: **would a beach need exactly this,
+unchanged?**
+
+- **`optics.py` — water and the interface.** `IOR`, `LAM`, the Pope & Fry band-mean
+  absorption triple, `F0`; `N2`, `out_of_water` and `into_water`; `R_EXT`,
+  `R_INT`, `T_OUT_DIFFUSE` and `wet_albedo`; `_e3` and the correlated-integral
+  slab forms `slab_esc`, `slab_trap`, `trap_gain`, `rho_water`, `wbounce_of` with
+  `R_INT_MU` under them; `fresnel`; the Cauchy fit, `n_water` and `BAND`;
+  `refract` and `is_tir`; `TC_SNELL`, `TIR_FRAC`, `tir_vert`, `TIR_VERT` and
+  `r_int_at`.
+- **`atmosphere.py` — the sky and the sun.** `solar_position` (new — see below),
+  the shoot's own `SUN_DIR`/`SUN_COL`/`SKY_TOP`/`SKY_HOR`/`SKY_AMB`,
+  `_tau_rayleigh`, `AIRMASS`, `TAU_R`; the disc (`THETA_SUN`, `OMEGA_SUN`,
+  `E_SUN`, `L_SUN`, `N_DISC`) and the Rayleigh aureole (`N_AURE`, `L_AURE`);
+  `SKY_LOBE`, `_lobe_shape`, `sky`, `env_diffuse`, the `ENV_*` lattice,
+  `env_irradiance` and `SKY_DECK`; `_ss_rayleigh`; `SKY_SUB_DERIVED`; and, at the
+  foot, the two things that need **both** halves of the physics — `sky_diffuse`
+  and `window_shares`, with `WIN_BED`, `WIN_VERT` and `SKY_VERT`.
+
+The dependency runs **one way**: `atmosphere.py` imports `optics.py` and must
+never be imported by it.
+
+**The comments travelled with the code, verbatim.** The extraction was done by
+line ranges, not by retyping: each moved definition took the whole comment block
+above it, so every derivation, every refuted hypothesis and every `?` is where it
+was, beside the constant it argues for. `render.py` is 36% comment and that is the
+argument of the file; a derivation separated from its constant is how the four
+hand-written constants this project has since closed survived as long as they did.
+
+**Nothing in either module prints.** Every diagnostic stayed in `render.py`,
+reading the values back across the import. That is deliberate twice over: a module
+that prints on import would pollute `validate.py`, and leaving all ~90 prints
+exactly where they were is what made the extraction checkable. `render.py`'s
+own stdout was then diffed run against run, on all four switch settings: **the
+whole of the difference is the four new ephemeris lines and three lines that
+quote a wall-clock time.** Every measured number the file prints about itself —
+367 lines of them on the default run — is character-identical.
+
+### What deliberately stayed behind, and why
+
+This list is as much the deliverable as the modules are. Nothing was extracted for
+its own sake.
+
+- **`T_DIFF_UP`, `WBOUNCE`, `BED_L_CLOSED`, `RHO_WATER`.** Products of a module
+  function with **this pool's 1.40 m**. The integral is shared; the number is the
+  scene's.
+- **`cos_i`, `sin_t`, `cos_t`, `slant`, `TSUN`.** The sun beam's own refraction
+  into *this* basin, and `slant = DEPTH/cos_t` is a pool length. `refract` is the
+  shared part and it moved.
+- **The freeboard band's two tables** (`_band_tables`, `band_illum`, `BAND_RBAR`)
+  **and the coping's occlusion march** (`band_sky_vis`, `_ledge`). They integrate
+  `atmosphere.py`'s environment, but what they integrate it *over* is a 100 mm
+  liner strip under a 34 mm bullnose. A beach has neither.
+- **`up_gather`, `bounce_gather`, `wall_shade`, the six-pass solve.** Generic in
+  form, but every one is written against the basin's four wall planes and its bed
+  grid. Splitting them needs a geometry abstraction, and inventing one on the
+  strength of a single scene is how the wrong abstraction gets frozen.
+- **`axial_share` and its two tables `AX_WIN`, `AX_MIR`.** The integrator is
+  scene-free — *(1/π)∫L(t)(n·ω)⁺dω for a face at polar angle β* is exactly what a
+  sloping sandbar and a tilted rock want — but the only two non-uniform profiles
+  it is ever called with, `_win_L` and `_mir_L`, are reduced to **green**, and the
+  comment says why: *"since the nosing's interpolation is one scalar."* That is
+  the step unit's justification, sitting inside what would otherwise be physics.
+  Moving the integrator without its callers would be extraction for its own sake;
+  moving the callers would carry a step nosing into `atmosphere.py`. **This is the
+  extraction the round that gives `_win_L` its three channels back should make.**
+- **`_fresnel_rough` and `_refl_ellipse`.** Honest borderline. `_fresnel_rough` is
+  Bruneton's rough-surface Fresnel and takes the slope variance as an argument, so
+  it is scene-free by inspection; `_refl_ellipse` is the mirror direction plus its
+  covariance under that variance, and is too. They stayed because they sit inside
+  the footprint-filter block whose whole derivation is about *this* file's filter
+  and `field.slope_var_points`, and splitting the code from the argument is the
+  one thing this extraction was told not to do. **Second on the list**, behind the
+  meniscus.
+- **The meniscus** (`menis_tables`, `_menis_weights`, `meniscus`, `MENIS_*`) and
+  **the float's fillet**. This is the closest call in the list. `menis_tables` is
+  Young–Laplace at a plane wall at a stated contact angle and a beach's rock would
+  want exactly it — but every consumer is the coping, the liner band or the ball,
+  and the shipped integrator carries the pool's camera in its signature.
+  **First on the list of what to extract next**, once a beach exists to prove the
+  interface against; doing it now would have been a guess with no second caller.
+- **`CAP_A`, `SIGMA_W`.** Already `field.py`'s, and already shared.
+
+### The one signature change, and why it is not indirection
+
+`slab_esc`, `slab_trap`, `trap_gain`, `rho_water` and `wbounce_of` used to carry
+`dep=DEPTH`, and `rho_water` used to fall back on `cos_i` — a global defined
+**1 400 lines below it**, so `rho_water(rho)` was only callable from the bottom
+half of the file. Both defaults are now explicit arguments. A default drawn from
+one scene's deepest point is exactly the hidden coupling this split exists to
+prevent: **a beach's depth is a field.** The pool passes its own `DEPTH` at each
+of its eleven call sites, which is two lines longer and one premise shorter.
+
+### And the sun now comes from a clock
+
+The three numbers the whole radiometric chain stands on — elevation, azimuth, air
+mass — used to enter as a *comment* above a hand-written unit vector. A comment
+cannot be re-run at another place, on another date, at another hour, and the
+beach's reference photographs are timed exactly as this one's are. So
+`atmosphere.solar_position` is the low-order NOAA/Meeus solution (Meeus ch. 25 and
+28), with Bennett refraction and Kasten–Young air mass, and it reproduces all
+three:
+
+| | comment said | ephemeris gives |
+|---|---|---|
+| elevation | 21.02° | 20.978° geometric, **21.020°** apparent |
+| azimuth (compass) | 273.75° | **273.746°** |
+| air mass | 2.77 | **2.7702** |
+
+**Two things in it are silent when they are wrong, and both are written out rather
+than transcribed.** The textbook azimuth solves for `cos Az` and takes an `acos`,
+which returns [0, π] and *cannot* distinguish morning from afternoon — the branch
+is decided by the sign of the hour angle and by nothing in the expression. Get it
+wrong and this scene's 273.75° becomes 86.25°, a sunrise, **while the elevation
+stays exactly right**: every cosine, every Beer–Lambert path and every Fresnel term
+still reads correctly and only the shadows point the wrong way, in a scene whose
+camera was placed on the anti-solar side. It is written with `atan2`, whose
+numerator carries the quadrant. And Bennett's refraction at 21° is +2.57′, the
+difference between the geometric 20.978° and the apparent 21.020° — the file's own
+21.02 is the **apparent** one, and air mass is a function of apparent altitude, so
+taking the geometric one there would have moved `AIRMASS`, which is the constant
+`SUN_COL`'s colour is read back out of.
+
+**`SUN_DIR` is measured and not moved.** `SUN_DIR_DERIVED` sits 0.006° from the
+shipped triple — a fortieth of the sun's own radius, two orders under anything the
+frame resolves — and `render.py` prints the gap. Adopting it would move every
+caustic and every glint, and this wave's contract was that no pixel moves. A round
+allowed to move pixels should adopt it, and then the hand-written triple leaves
+the file for good. Same treatment `SKY_AMB` already gets against
+`SKY_SUB_DERIVED`.
+
+### Where the suite still shares a source — recorded, not fixed
+
+The 228 rewritten references changed *where* a number is read from, not how many
+independent routes reach it. Two things follow and both are worth saying plainly:
+
+- **Rows that compare two shipped quantities now draw both from the same module.**
+  `slab_esc(0) == T_OUT_DIFFUSE` and `wbounce_of == L × slab_esc` are identities of
+  `optics.py` against itself; they were identities of `render.py` against itself
+  before, so nothing got worse — but a defect in a shared premise (`IOR`, `ABS`,
+  the Gauss–Legendre nodes) is invisible to them in both worlds. What is *not*
+  blind to it is the tier-3 column: the 400 000-photon walk, the recurrence for
+  `2E₃`, the 300 000-photon slab, the Monte-Carlo against the reflected-slope
+  ellipse. **Those are the rows that make the identities worth having**, and none
+  of them shares a line with the module.
+- **The `window_shares` blindness is unchanged and still recorded** (see the
+  section below): `SKY_VERT` and `WIN_VERT/WIN_BED` come from the same call, so a
+  wrong sky *profile* inside the window moves both and no row moves. Moving the
+  function into `atmosphere.py` did not make that better or worse; it made it
+  easier to see, because the profile and the window are now nine lines apart.
+
+### Found while moving it, and **not** changed
+
+A refactor is the best code review a file gets. These are suspicions, filed rather
+than acted on, because a refactor whose diff also contains a fix cannot be verified
+by the bit-identity contract — which is the only thing that made this wave safe.
+
+- **The sky is written out three times, and one of the copies is provably
+  redundant.** `_env_menis` — the environment a meniscus fillet mirrors — rebuilds
+  the horizon/zenith gradient, loops the non-disc lobes and applies the `1.15` by
+  hand. Substituting `atmosphere.env_diffuse(rx, ry, |rz|)` for those six lines
+  reproduces it **exactly**, `max|Δ| = 0.0` over 2 000 random directions, which is
+  checked and stated here rather than applied. As it stands, a round that changes
+  the gradient's `0.55` exponent or adds a lobe moves `sky()` and `env_diffuse`
+  and leaves the fillet behind, silently — **the same copy-drift this whole wave
+  exists to prevent, already present inside one file.** Not fixed here for the one
+  reason nothing else was: it would be a change inside a diff whose only guarantee
+  is that nothing changed.
+- **`1.15` is an unnamed literal appearing eight times, once as its reciprocal.**
+  `sky()` multiplies the whole environment by it, `sky_diffuse` repeats it,
+  `_env_menis` repeats it again, `_UNSCALE = 1/1.15` cancels it inside
+  `SKY_LOBE`, and the lobe-flux audit applies it four more times. It is the
+  mechanism behind the item above, and it wants a name.
+- **`sky_diffuse` and `env_diffuse` are one word apart and are not the same
+  function.** `sky_diffuse` is the gradient alone (for a submerged receiver, whose
+  sun arrives as the refracted beam); `env_diffuse` is the gradient *plus the
+  Rayleigh aureole* (for an above-water receiver). In `render.py` they sat 1 500
+  lines apart; in `atmosphere.py` they are both visible at once, and this is
+  exactly the collision the file already warns about at `TC_SNELL` — *"`THETA_C` in
+  this file is the meniscus's contact angle … one collision of that kind is a
+  silently wrong picture."* Renaming touches the suite and was left for a round
+  that may move numbers.
+- **`_ss_rayleigh` clamps a removable singularity instead of taking its limit.**
+  At `μ_v = μ_s` the plane-parallel form is 0/0; the code clamps the denominator to
+  `1e-5`, which is finite but not the limit `(τ/μ²)e^{−τ/μ}`. It is a print-only
+  lower bound, so nothing shipped depends on it — but a beach that looks *along*
+  the sun's azimuth reaches that direction, and this one does not.
+- **Five of the moved comments' internal cross-references now point across the
+  import.** `refract`'s contract says *"the five call sites below cannot reach the
+  branch"* and those call sites are in `render.py`; `T_OUT_DIFFUSE`'s note points
+  at `WBOUNCE` *"six hundred lines below"*, `tir_vert`'s at *"the window share
+  below"*, `TIR_FRAC`'s at *"the shooting pass below"*, and `sky()`'s at *"the
+  footprint filter creates below"*. Every one is still true of the project and
+  false of the file. **Deliberately left verbatim**, so that the extraction is a
+  pure move and `diff` proves it; repointing them is a comment-only pass and
+  belongs in a commit that contains nothing else.
+- **`_e3` rebuilds a 400-node Gauss–Legendre rule on every call.** Cost only; it is
+  called a handful of times.
+- **`fresnel` clips `cos_i` to [0, 1] silently.** A back-facing normal returns the
+  normal-incidence value instead of raising. Every current call site is
+  front-facing; a beach's steep rock faces are the first place that stops being
+  obviously true.
 
 ## Closed — Snell's window has the world in it, and what was missing was 1.1% of it
 

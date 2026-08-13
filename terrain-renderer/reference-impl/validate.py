@@ -46,6 +46,17 @@ import numpy as np
 HERE = __file__.rsplit('/', 1)[0] if '/' in __file__ else '.'
 sys.path.insert(0, HERE)
 
+# THE PHYSICS IS IMPORTED, NOT SLICED. `optics.py` and `atmosphere.py` are
+# ordinary modules with no render in them, so every row that tests physics reads
+# the shipped implementation directly instead of reaching it through a
+# reconstruction of `render.py`. Only the rows that test THE SCENE -- the basin,
+# the bed, the liner, the step unit, the cameras, the float -- still go through
+# the slice below, and those are the only ones that need it. `sys.path` is
+# primed one line above so that this works from any working directory, which is
+# the same line the slice has always needed to find `field.py`.
+import atmosphere as ATM                                        # noqa: E402
+import optics as OPT                                            # noqa: E402
+
 VERBOSE = '-v' in sys.argv or '--verbose' in sys.argv
 
 
@@ -133,37 +144,59 @@ _SKIP_ASSIGN = {
 }
 _HEAVY_TEXT = ('np.zeros((', 'np.meshgrid', 'rng.random((', 'np.linspace(X0 - 3')
 
-REQUIRED = [
+# THE MODULES' OWN GUARD. `optics.py` and `atmosphere.py` are imported, not
+# sliced, so a name that vanishes from one of them raises an ImportError long
+# before this list is read -- but the list is still what says WHICH names this
+# suite is entitled to, and moving a name back into `render.py` (where a second
+# scene could not reach it) has to be a loud change and not a quiet one.
+REQUIRED_OPTICS = [
     'IOR', 'LAM', 'ABS', 'F0', 'n_water', 'BAND', 'CAUCHY_A', 'CAUCHY_B',
-    'SUN_DIR', 'SUN_COL', 'DEPTH', 'X0', 'X1', 'Y0', 'Y1', 'CYL',
-    'refract', 'is_tir', 'fresnel', 'tir_vert',
+    'refract', 'is_tir', 'fresnel', 'tir_vert', 'TIR_FRAC', 'TIR_VERT',
+    'TC_SNELL', 'r_int_at', 'R_EXT', 'R_INT', 'wet_albedo', 'R_INT_MU',
+    '_e3', 'trap_gain', 'rho_water', 'slab_esc', 'slab_trap', 'wbounce_of',
+    'N2', 'out_of_water', 'into_water', 'T_OUT_DIFFUSE',
+]
+REQUIRED_ATMO = [
+    'solar_position', '_julian_day', 'SITE_NAME', 'SITE_LAT',
+    'SITE_LON', 'SHOOT',
+    'SUN_EL', 'SUN_EL_GEOM', 'SUN_AZ', 'SUN_AM', 'SUN_DIR_DERIVED',
+    'SUN_DIR', 'SUN_COL', 'SKY_AMB', 'SKY_HOR', 'SKY_TOP',
+    'sky_diffuse', 'window_shares', 'WIN_BED', 'WIN_VERT', 'SKY_VERT',
+    '_lobe_shape', 'sky', 'SKY_LOBE', 'E_SUN', 'L_SUN', 'OMEGA_SUN', 'N_DISC',
+    'N_AURE', 'L_AURE', 'AIRMASS', 'TAU_R', '_tau_rayleigh', 'THETA_SUN',
+    'env_diffuse', 'env_irradiance', 'SKY_DIFFUSE_LOBES', 'ENV_DX', 'ENV_DY',
+    'ENV_DZ', 'ENV_DW', 'ENV_L', 'ENV_NMU', 'ENV_NPH', 'SKY_DECK',
+    'SKY_SUB_DERIVED', '_ss_rayleigh',
+]
+
+# ...and what is left for the slice is THE SCENE. Every name below is a
+# statement about this basin, this bed, this liner, this step unit, these
+# cameras or this ball -- which is the test the split was made against, read
+# back out of the suite.
+REQUIRED = [
+    'DEPTH', 'X0', 'X1', 'Y0', 'Y1', 'CYL',
     'scene_hit', 'box_hit', '_cyl_entry', 'splat', 'blur', 'sample',
     'bed_depth', 'bed_z', 'pool_sdf', 'edge_z',
     'cos_i', 'cos_t', 'sin_t', 'slant', 'TSUN', 'sig_at', 'SIG_EST',
-    'TIR_FRAC', 'TIR_VERT', '_sky_vf', '_ris_closure', 'RIS_D0', 'RIS_D1',
+    '_sky_vf', '_ris_closure', 'RIS_D0', 'RIS_D1',
     'RIS_ND', 'RIS_NP', 'RIS_HMIN', '_DD', '_PH', '_lnR',
     # the gather, now shared by the risers and the pool walls, and the partition
     # of the wall's hemisphere that keeps the sky from being counted twice
     'bounce_gather', 'bed_wall_src', 'wall_shade', 'WALL_SKY', 'WB_NU', 'WB_NZ',
-    # the underside of the surface: the window's two shares, the mirror's own
-    # reflectance, the upgoing gather and the solve that iterates it
-    'TC_SNELL', 'r_int_at', 'sky_diffuse', 'window_shares', 'WIN_BED',
-    'WIN_VERT', 'SKY_VERT', 'up_gather', 'up_ambient', 'UP_N', 'UP_NT', 'UP_NP',
+    # the underside of the surface: the upgoing gather and the solve that
+    # iterates it (the window's two shares are `atmosphere.py`'s now)
+    'up_gather', 'up_ambient', 'UP_N', 'UP_NT', 'UP_NP',
     'axial_share', 'AX_WIN', 'AX_MIR', 'NSOLVE', 'WU_NU', 'WU_NZ',
     'UB_NX', 'UB_NY', '_wall_grid',
     'WALL_BAND_Z', 'WALL_FRONT',
-    'R_EXT', 'R_INT', 'wet_albedo', '_fresnel_rough', '_refl_ellipse',
-    '_lobe_shape', 'sky', 'SKY_LOBE', 'E_SUN', 'L_SUN', 'OMEGA_SUN', 'N_DISC',
-    '_e3', 'T_DIFF_UP', 'trap_gain', 'rho_water', 'slab_esc', 'slab_trap',
-    'R_INT_MU',
-    'N_AURE', 'L_AURE', 'AIRMASS', 'TAU_R', '_tau_rayleigh', 'THETA_SUN',
-    # the two illuminants above the water, and the third one they price
-    'env_diffuse', 'env_irradiance', 'SKY_DIFFUSE_LOBES', 'ENV_DX', 'ENV_DY',
-    'ENV_DZ', 'ENV_DW', 'ENV_L', 'ENV_NMU', 'ENV_NPH', 'SKY_DECK', 'SKY_AMB',
-    'SKY_HOR', 'SKY_TOP', 'band_illum', 'BAND_ANG', 'BAND_NAZ', 'BAND_SKY_TAB',
+    '_fresnel_rough', '_refl_ellipse',
+    'T_DIFF_UP',
+    # the freeboard band and the coping ledge over it: the tables are the
+    # scene's, the environment they integrate is not
+    'band_illum', 'BAND_ANG', 'BAND_NAZ', 'BAND_SKY_TAB',
     'BAND_MIR_TAB', 'BAND_RBAR', 'band_sky_vis', 'BAND_SKY_VIS', '_ledge',
-    'wbounce_of', 'WBOUNCE', 'BED_L_CLOSED', 'SKY_SUB_DERIVED', '_ss_rayleigh',
-    'COP_ALB', 'PAV_ALB', 'ABS', 'DEPTH', 'FREEB', 'r_int_at',
+    'WBOUNCE', 'BED_L_CLOSED',
+    'COP_ALB', 'PAV_ALB', 'DEPTH', 'FREEB',
     'CAP_A', 'MENIS_H', 'SIGMA_W',
     # the fillet: the tables, the two helpers the columns are built on, the
     # shipped integrator, and the constant that records the refuted term
@@ -172,17 +205,17 @@ REQUIRED = [
     '_menis_weights', '_menis_under', '_env_menis', 'meniscus',
     'MENIS_TIR_REACH', 'EDGE_REFL', 'surf_stats', 'pool_grad',
     'EYE', 'PIXANG', 'SS', 'SLIP', 'sail_vis',
-    # the six defects closed in the round that follows: the interface
-    # transport, the wall planes, the map's top, the fold guard and the
-    # stone's own sun term
-    'N2', 'out_of_water', 'T_OUT_DIFFUSE', 'WTOP',
+    # the six defects closed in the round that follows: the wall planes, the
+    # map's top, the fold guard and the stone's own sun term (the interface
+    # transport itself is `optics.py`'s)
+    'WTOP',
     'XW0', 'XW1', 'YW0', 'YW1', 'pool_sdf_grad',
     'MENIS_FOLD_TOL', '_menis_fold_guard',
     'stone_vis', 'sun_vis', 'coping_vis', 'SBUL', 'COPW', 'ZD', 'ZLIP',
     # the camera under the water: the interface crossed in the gaining
     # direction, the tracer that is allowed to look up, and the frame the
     # window's rim is measured off
-    'into_water', 'submerged_radiance', 'scene_hit_under', '_cyl_entry_any',
+    'submerged_radiance', 'scene_hit_under', '_cyl_entry_any',
     'uw_interface', 'uw_shade', 'uw_render', 'uw_dirs', 'uw_pixel_dirs',
     'uw_project', 'UW_EYE', 'UW_TC', 'UW_TSUN', 'UW_SPREAD', 'UW_FOV',
     'UW_TF', 'UW_PIXANG', 'INSCAT', 'INSCAT_K', 'W', 'H', 'SS',
@@ -239,6 +272,14 @@ def load_render():
             'validate.py: the render.py slice did not produce %s.\n'
             'render.py has been restructured; fix load_render or REQUIRED.\n'
             'First few load errors: %s' % (missing, errors[:8]))
+    for name, mdl, req in (('optics', OPT, REQUIRED_OPTICS),
+                           ('atmosphere', ATM, REQUIRED_ATMO)):
+        gone = [n for n in req if not hasattr(mdl, n)]
+        if gone:
+            raise SystemExit(
+                'validate.py: %s.py no longer defines %s. The physics moved '
+                'back into a scene file, or was renamed; either way a second '
+                'scene can no longer reach it.' % (name, gone))
     return mod, skipped, errors
 
 
@@ -258,7 +299,7 @@ def fresnel_exact(cos_i, n):
 
 # ============================================================ TIER 1: FRESNEL
 def tier1_fresnel(R):
-    IOR, F0 = R.IOR, R.F0
+    IOR, F0 = OPT.IOR, OPT.F0
     # -- the normal-incidence identity. Pure algebra: R(0) = ((n-1)/(n+1))^2 is
     # the exact Fresnel limit, so the only tolerance is float round-off.
     check(1, 'F0 == ((n-1)/(n+1))^2', F0, ((IOR - 1) / (IOR + 1)) ** 2, 1e-15,
@@ -332,10 +373,10 @@ def tier1_fresnel(R):
         nn = IOR[c]
         cb = np.cos(np.arctan(nn))
         check(1, 'render fresnel at Brewster == ((n^2-1)/(n^2+1))^2/2  [%s]' % nm,
-              float(R.fresnel(cb)[c]), 0.5 * ((nn ** 2 - 1) / (nn ** 2 + 1)) ** 2,
+              float(OPT.fresnel(cb)[c]), 0.5 * ((nn ** 2 - 1) / (nn ** 2 + 1)) ** 2,
               1e-15, 'closed-form value of the unpolarised reflectance at the '
                      'zero of R_p; no integral, no table, one double ulp')
-    check(1, 'render fresnel(1) == F0 (normal incidence)', R.fresnel(1.0), F0,
+    check(1, 'render fresnel(1) == F0 (normal incidence)', OPT.fresnel(1.0), F0,
           1e-15, 'algebraic identity; the two are computed by different code')
     # -- TSUN, the sun's transmission into the water at 69 deg incidence.
     ex = 1.0 - fresnel_exact(R.cos_i, IOR[1])[0]
@@ -351,24 +392,24 @@ def tier1_fresnel(R):
     rs = ((mu - IOR[None] * ct) / (mu + IOR[None] * ct)) ** 2
     rp = ((IOR[None] * mu - ct) / (IOR[None] * mu + ct)) ** 2
     check(1, 'R_EXT 512-pt rule vs converged quadrature',
-          R.R_EXT, (2. * mu * .5 * (rs + rp)).mean(0), 2e-5,
+          OPT.R_EXT, (2. * mu * .5 * (rs + rp)).mean(0), 2e-5,
           'midpoint rule on a smooth integrand converges as N^-2; 2e-5 is well '
           'above the 512-vs-200000 difference and below any physical effect')
     # -- reciprocity: R_int = 1 - (1 - R_ext)/n^2 is a two-line consequence of
     # the n^2 law for radiance. Independent check in tier 3 against Walsh.
-    check(1, 'R_INT == 1 - (1 - R_EXT)/n^2', R.R_INT,
-          1. - (1. - R.R_EXT) / IOR ** 2, 1e-15, 'algebraic identity')
+    check(1, 'R_INT == 1 - (1 - R_EXT)/n^2', OPT.R_INT,
+          1. - (1. - OPT.R_EXT) / IOR ** 2, 1e-15, 'algebraic identity')
     # -- the wet-albedo series is a geometric sum; check its two fixed points.
     check(1, 'wet_albedo(1) == 1 (no light lost on a perfect reflector)',
-          R.wet_albedo(np.ones((1, 3)))[0], np.ones(3), 1e-12,
+          OPT.wet_albedo(np.ones((1, 3)))[0], np.ones(3), 1e-12,
           'a = 1 must give a_wet = 1 identically; anything else leaks energy')
     check(1, 'wet_albedo(0) == R_EXT (bare interface over a black substrate)',
-          R.wet_albedo(np.zeros((1, 3)))[0], R.R_EXT, 1e-15, 'algebraic limit')
+          OPT.wet_albedo(np.zeros((1, 3)))[0], OPT.R_EXT, 1e-15, 'algebraic limit')
 
 
 # ====================================================== TIER 1: SNELL AND TIR
 def tier1_snell(R):
-    IOR = R.IOR
+    IOR = OPT.IOR
     th = np.linspace(0.0, np.deg2rad(89.9), 4001)
     for c, nm in enumerate('RGB'):
         n = IOR[c]
@@ -379,7 +420,7 @@ def tier1_snell(R):
         nx = np.zeros_like(ix)
         ny = np.zeros_like(ix)
         nz = np.ones_like(ix)
-        tx, ty, tz = R.refract(ix, iy, iz, nx, ny, nz, 1.0 / n)
+        tx, ty, tz = OPT.refract(ix, iy, iz, nx, ny, nz, 1.0 / n)
         # -- the refracted ray must be a unit vector. `refract` normalises by
         # construction only when it does not hit the k < 0 branch.
         check(1, 'refract() returns a unit vector, air->water  [%s]' % nm,
@@ -393,7 +434,7 @@ def tier1_snell(R):
         # -- round trip. Refracting the transmitted ray again with eta = n and
         # the same normal must recover the incident direction exactly. Same code
         # path the README's underwater camera will use, run in its safe regime.
-        bx, by, bz = R.refract(tx, ty, tz, nx, ny, nz, n)
+        bx, by, bz = OPT.refract(tx, ty, tz, nx, ny, nz, n)
         check(1, 'refraction round trip air->water->air  [%s]' % nm,
               float(max(np.abs(bx - ix).max(), np.abs(bz - iz).max())), 0.0,
               1e-9, 'two square roots and a subtraction; the round trip is '
@@ -418,13 +459,13 @@ def tier1_snell(R):
             thi = np.linspace(np.arcsin(1.0 / n) + 1e-3, np.deg2rad(89.9), 500)
             ix2, iz2 = np.sin(thi), np.cos(thi)
             z = np.zeros_like(ix2)
-            tx2, ty2, tz2 = R.refract(ix2, z, iz2, z, z, -np.ones_like(z), n)
+            tx2, ty2, tz2 = OPT.refract(ix2, z, iz2, z, z, -np.ones_like(z), n)
             L = np.sqrt(tx2 ** 2 + ty2 ** 2 + tz2 ** 2)
             check(1, 'no transmission past the critical angle, water->air',
                   float(np.abs(L).max()), 0.0, 1e-9,
                   'past TIR the transmitted direction must be null or flagged; a '
                   'returned vector of any length is a direction that does not exist')
-            check(1, 'is_tir() flags exactly those rays', float(R.is_tir(
+            check(1, 'is_tir() flags exactly those rays', float(OPT.is_tir(
                 tx2, ty2, tz2).mean()), 1.0, 0.0,
                   'boolean over all 500 past-critical rays; no tolerance')
             # -- and BELOW the critical angle it must still transmit a real unit
@@ -433,7 +474,7 @@ def tier1_snell(R):
             thb = np.linspace(1e-3, np.arcsin(1.0 / n) - 1e-3, 500)
             ix3, iz3 = np.sin(thb), np.cos(thb)
             z3 = np.zeros_like(ix3)
-            tx3, ty3, tz3 = R.refract(ix3, z3, iz3, z3, z3, -np.ones_like(z3), n)
+            tx3, ty3, tz3 = OPT.refract(ix3, z3, iz3, z3, z3, -np.ones_like(z3), n)
             check(1, 'refract() still transmits a unit vector below TIR, water->air',
                   float(np.abs(np.sqrt(tx3 ** 2 + ty3 ** 2 + tz3 ** 2) - 1).max()),
                   0.0, 1e-12, 'algebraic identity over 500 sub-critical angles; '
@@ -449,8 +490,8 @@ def tier1_snell(R):
             lo_, hi_ = 0.0, np.pi / 2
             for _ in range(200):
                 mid = 0.5 * (lo_ + hi_)
-                t_ = R.refract(np.sin(mid), 0.0, np.cos(mid), 0.0, 0.0, -1.0, n)
-                lo_, hi_ = (mid, hi_) if not R.is_tir(*t_) else (lo_, mid)
+                t_ = OPT.refract(np.sin(mid), 0.0, np.cos(mid), 0.0, 0.0, -1.0, n)
+                lo_, hi_ = (mid, hi_) if not OPT.is_tir(*t_) else (lo_, mid)
             fr_ = np.linspace(0.0, np.pi / 2, 4000001)
             # water -> air: the same equations with the index ratio inverted.
             rr_ = fresnel_exact(np.cos(fr_), 1.0 / n)[0]
@@ -467,21 +508,21 @@ def tier1_snell(R):
     ti = np.arcsin(R.cos_i)          # the file's own incidence, 69 deg from normal
     ti = np.arccos(R.cos_i)
     h = 1e-6
-    num = (np.arcsin(np.sin(ti + h) / R.IOR[1])
-           - np.arcsin(np.sin(ti - h) / R.IOR[1])) / (2 * h)
+    num = (np.arcsin(np.sin(ti + h) / OPT.IOR[1])
+           - np.arcsin(np.sin(ti - h) / OPT.IOR[1])) / (2 * h)
     check(1, 'penumbra compression dtheta_t/dtheta_i == cos i /(n cos t)',
-          R.cos_i / (R.IOR[1] * R.cos_t), num, 1e-8,
+          R.cos_i / (OPT.IOR[1] * R.cos_t), num, 1e-8,
           'central difference at h = 1e-6 has O(h^2) = 1e-12 truncation and '
           '~1e-10 of cancellation; 1e-8 covers both')
     # -- and the resulting figure the chapter quotes.
-    pen = np.deg2rad(0.53) * (R.cos_i / (R.IOR[1] * R.cos_t)) * R.slant
+    pen = np.deg2rad(0.53) * (R.cos_i / (OPT.IOR[1] * R.cos_t)) * R.slant
     check(1, 'sun-disc penumbra on the 1.40 m bed', 1000 * pen, 6.8, 0.05,
           'the chapter and README both quote 6.8 mm to 1 dp; 0.05 mm is that '
           'quotation precision', 'mm')
     # -- the slant path is a geometric statement about the traced ray, so it is
     # checked against scene_hit rather than against its own formula.
-    tx = np.array([R.sin_t * -R.SUN_DIR[0] / np.hypot(*R.SUN_DIR[:2])])
-    ty = np.array([R.sin_t * -R.SUN_DIR[1] / np.hypot(*R.SUN_DIR[:2])])
+    tx = np.array([R.sin_t * -ATM.SUN_DIR[0] / np.hypot(*ATM.SUN_DIR[:2])])
+    ty = np.array([R.sin_t * -ATM.SUN_DIR[1] / np.hypot(*ATM.SUN_DIR[:2])])
     tz = np.array([-R.cos_t])
     _, _, _, sm, _ = R.scene_hit(np.array([1.0]), np.array([1.5]), tx, ty, tz)
     check(1, 'refracted slant to the bed, traced vs DEPTH/cos(t)',
@@ -492,7 +533,7 @@ def tier1_snell(R):
 
 # ================================================== TIER 1: BEER-LAMBERT
 def tier1_beer(R):
-    ABS = R.ABS
+    ABS = OPT.ABS
     # -- the law itself, over the renderer's own light-leg slant. render.py
     # applies exp(-ABS*sm) with sm from scene_hit, so this is the composed
     # quantity and not a restatement of the expression.
@@ -562,8 +603,8 @@ def _caustic_run(R, fld, a, k, nray=2_000_000, nbin=3000, x0=0.30, nper=4):
     y = np.full(nray, 1.5)                      # clear of the step unit and bench
     gx = a * k * np.cos(k * (x - x0))
     nx, ny, nz = fld.normal_from_grad(gx, np.zeros_like(gx))
-    tx, ty, tz = R.refract(np.float64(0.), np.float64(0.), np.float64(-1.),
-                           nx, ny, nz, 1.0 / R.IOR[1])
+    tx, ty, tz = OPT.refract(np.float64(0.), np.float64(0.), np.float64(-1.),
+                           nx, ny, nz, 1.0 / OPT.IOR[1])
     sid, u, v, sm, _ = R.scene_hit(x, y, tx, ty, tz)
     lo, hi = x0 - 0.3, x1 + 0.3
     h, edges = np.histogram(u, bins=nbin, range=(lo, hi))
@@ -573,7 +614,7 @@ def _caustic_run(R, fld, a, k, nray=2_000_000, nbin=3000, x0=0.30, nper=4):
 
 
 def _caustic_analytic(R, xs, a, k, x0):
-    n, d = R.IOR[1], R.DEPTH
+    n, d = OPT.IOR[1], R.DEPTH
     hp = a * k * np.cos(k * (xs - x0))
     hpp = -a * k * k * np.sin(k * (xs - x0))
     thn = np.arctan(hp)
@@ -586,7 +627,7 @@ def _caustic_analytic(R, xs, a, k, x0):
 
 
 def tier1_caustic(R, fld):
-    d, n = R.DEPTH, R.IOR[1]
+    d, n = R.DEPTH, OPT.IOR[1]
     lam = 0.20
     k = 2 * np.pi / lam
     # -- the 0.25 in F = 0.25 d s k is 1 - 1/n, not a round number.
@@ -699,8 +740,8 @@ def tier1_flat(R, fld):
     nx, ny, nz = fld.normal_from_grad(gx, gx)
     check(1, 'flat surface: normal_from_grad(0,0) == +z', [nx[0], ny[0], nz[0]],
           [0., 0., 1.], 1e-15, 'algebraic identity')
-    tx, ty, tz = R.refract(-R.SUN_DIR[0], -R.SUN_DIR[1], -R.SUN_DIR[2],
-                           nx, ny, nz, 1.0 / R.IOR[1])
+    tx, ty, tz = OPT.refract(-ATM.SUN_DIR[0], -ATM.SUN_DIR[1], -ATM.SUN_DIR[2],
+                           nx, ny, nz, 1.0 / OPT.IOR[1])
     sid, u, v, sm, _ = R.scene_hit(x, y, tx, ty, tz)
     ok = sid == 0
     du, dv = u[ok] - x[ok], v[ok] - y[ok]
@@ -717,7 +758,7 @@ def tier1_flat(R, fld):
           float(off.mean()), 1.37, 0.005,
           'the README quotes 1.37 m to 2 dp; 5 mm is that precision', 'm')
     check(1, 'flat surface: offset lies along the sun azimuth',
-          float(np.abs(du.mean() * -R.SUN_DIR[1] - dv.mean() * -R.SUN_DIR[0])
+          float(np.abs(du.mean() * -ATM.SUN_DIR[1] - dv.mean() * -ATM.SUN_DIR[0])
                 / max(off.mean(), 1e-12)), 0.0, 1e-9,
           'the refracted ray stays in the plane of incidence; cross product is '
           'identically zero')
@@ -764,55 +805,55 @@ def tier1_energy(R):
     # -- the disc lobe. n = 2/theta^2 - 1 is chosen so that a cos^n lobe's
     # hemisphere integral 2pi/(n+1) equals the sun's own solid angle, which is
     # what makes peak, width and flux land on the sun together.
-    check(1, 'cos^N_DISC solid angle == Omega_sun', 2 * np.pi / (R.N_DISC + 1),
-          R.OMEGA_SUN, 1e-18, 'the identity N = 2/theta^2 - 1 is defined by this')
-    check(1, 'Omega_sun == pi theta_s^2', R.OMEGA_SUN,
-          np.pi * R.THETA_SUN ** 2, 1e-20, 'algebraic identity')
+    check(1, 'cos^N_DISC solid angle == Omega_sun', 2 * np.pi / (ATM.N_DISC + 1),
+          ATM.OMEGA_SUN, 1e-18, 'the identity N = 2/theta^2 - 1 is defined by this')
+    check(1, 'Omega_sun == pi theta_s^2', ATM.OMEGA_SUN,
+          np.pi * ATM.THETA_SUN ** 2, 1e-20, 'algebraic identity')
     check(1, 'L_sun * Omega_sun == E_sun (normal irradiance)',
-          R.L_SUN * R.OMEGA_SUN, R.E_SUN, 1e-12,
+          ATM.L_SUN * ATM.OMEGA_SUN, ATM.E_SUN, 1e-12,
           'the definition of radiance for a small source; float round-off')
-    check(1, 'E_sun == pi * SUN_COL', R.E_SUN, np.pi * R.SUN_COL, 1e-15,
+    check(1, 'E_sun == pi * SUN_COL', ATM.E_SUN, np.pi * ATM.SUN_COL, 1e-15,
           'shade() uses SUN_COL as E/pi; this is that convention, restated')
     # -- the flux the sky() function actually delivers, including the 1/1.15 the
     # lobes carry and the 1.15 sky() multiplies back. If that bookkeeping were
     # wrong the reflected sun would be off by 15% and nothing else would notice.
-    disc = R.SKY_LOBE[0]
+    disc = ATM.SKY_LOBE[0]
     flux_disc = disc[0] * disc[2] * 1.15 * 2 * np.pi / (disc[1] + 1)
     check(1, 'disc lobe flux, as shipped, == the direct beam', flux_disc,
-          R.E_SUN, 1e-9,
+          ATM.E_SUN, 1e-9,
           'exact by construction; 1e-9 catches a lost or doubled 1.15 and '
           'nothing else', rel=True)
     # -- the peak, measured by calling sky() along the sun direction rather than
     # by recomputing the amplitude.
-    got = R.sky(np.array([R.SUN_DIR[0]]), np.array([R.SUN_DIR[1]]),
-                np.array([R.SUN_DIR[2]]))[0]
-    hor = R.SKY_HOR * (1 - np.clip(R.SUN_DIR[2], 0, 1) ** .55) \
-        + R.SKY_TOP * np.clip(R.SUN_DIR[2], 0, 1) ** .55
-    peak = got - hor * 1.15 - R.L_AURE * 1.15 * disc[0] / disc[0]
+    got = ATM.sky(np.array([ATM.SUN_DIR[0]]), np.array([ATM.SUN_DIR[1]]),
+                np.array([ATM.SUN_DIR[2]]))[0]
+    hor = ATM.SKY_HOR * (1 - np.clip(ATM.SUN_DIR[2], 0, 1) ** .55) \
+        + ATM.SKY_TOP * np.clip(ATM.SUN_DIR[2], 0, 1) ** .55
+    peak = got - hor * 1.15 - ATM.L_AURE * 1.15 * disc[0] / disc[0]
     check(1, 'sky() peak radiance on axis == L_sun (+ aureole)',
-          float((got[1] - hor[1] * 1.15) / R.L_SUN[1]),
-          1.0 + float(R.L_AURE[1] / R.L_SUN[1]), 1e-6,
+          float((got[1] - hor[1] * 1.15) / ATM.L_SUN[1]),
+          1.0 + float(ATM.L_AURE[1] / ATM.L_SUN[1]), 1e-6,
           'evaluated through sky() itself, so it also checks _lobe_shape\'s '
           'cov = None path is the identity', rel=True)
     # -- the aureole's flux is not free either: for a Rayleigh atmosphere it is
     # E m tau / 8, so the total is (1 + m tau / 8) of the beam.
-    tot = sum(amp * c * 1.15 * 2 * np.pi / (nn + 1) for amp, nn, c in R.SKY_LOBE)
+    tot = sum(amp * c * 1.15 * 2 * np.pi / (nn + 1) for amp, nn, c in ATM.SKY_LOBE)
     check(1, 'total lobe flux / direct beam == 1 + m tau_R / 8',
-          tot / R.E_SUN, 1.0 + R.AIRMASS * R.TAU_R / 8.0, 1e-12,
+          tot / ATM.E_SUN, 1.0 + ATM.AIRMASS * ATM.TAU_R / 8.0, 1e-12,
           'closed form for a cos^2 Rayleigh lobe of amplitude E m tau (3/4)/(4pi); '
           'float round-off')
-    check(1, 'total lobe flux / direct beam (green) == 1.035', float(tot[1] / R.E_SUN[1]),
+    check(1, 'total lobe flux / direct beam (green) == 1.035', float(tot[1] / ATM.E_SUN[1]),
           1.035, 5e-4, 'render.py prints 1.035 to 3 dp')
     # -- the sun colour read back as Rayleigh extinction. This is the file's own
     # claim; the test is that _tau_rayleigh is the standard form, checked against
     # the 0.008569 lam^-4 law it says it is.
     lam = np.array([0.620, 0.545, 0.460])
-    check(1, 'Rayleigh tau is the Hansen & Travis 1974 form', R._tau_rayleigh(lam),
+    check(1, 'Rayleigh tau is the Hansen & Travis 1974 form', ATM._tau_rayleigh(lam),
           0.008569 * lam ** -4 * (1 + 0.0113 * lam ** -2 + 0.00013 * lam ** -4),
           1e-15, 'algebraic identity with the published coefficients')
-    tr = np.exp(-R.AIRMASS * R.TAU_R)
+    tr = np.exp(-ATM.AIRMASS * ATM.TAU_R)
     check(1, 'exp(-m tau)/red reproduces SUN_COL\'s colour', tr / tr[0],
-          R.SUN_COL / R.SUN_COL[0], 1e-3,
+          ATM.SUN_COL / ATM.SUN_COL[0], 1e-3,
           'render.py claims one part in 1e4 on two channels; 1e-3 is ten times '
           'looser and still fails if the air mass moves by 0.02')
     # -- the riser gather's closure. (1/pi) INT L cos dw over the downgoing
@@ -876,7 +917,7 @@ def _tab(t, w):
 
 
 def tier2_absorption(R):
-    nm = 1000.0 * R.LAM                                  # 620 / 545 / 460
+    nm = 1000.0 * OPT.LAM                                  # 620 / 545 / 460
     pf = _tab(POPE_FRY_1997, nm)
     sb = _tab(SMITH_BAKER_1981, nm)
     # -- POINT VALUES at the file's own three nominal wavelengths.
@@ -890,17 +931,17 @@ def tier2_absorption(R):
     #       cavity work agree to a few percent in the green and red.
     # 15% covers both with room to spare, and is still four times smaller than
     # the blue disagreement it reports.
-    check(2, 'ABS vs Pope & Fry 1997 at 620/545/460 nm', R.ABS / pf,
+    check(2, 'ABS vs Pope & Fry 1997 at 620/545/460 nm', OPT.ABS / pf,
           [1., 1., 1.], 0.15,
           'covers the delta-vs-band ambiguity (<=5%) and the published spread; '
           'chosen before the measurement, not after')
     info(2, '  ... Pope & Fry point values at 620/545/460 nm', np.round(pf, 5),
          'the file states these three wavelengths itself')
     info(2, '  ... ABS / Pope & Fry point values, per channel',
-         np.round(R.ABS / pf, 4),
+         np.round(OPT.ABS / pf, 4),
          'ABS is the BAND MEAN of this same table, so the residual here is the '
          'curvature of a(lambda) across each band and nothing else')
-    info(2, '  ... ABS / Smith & Baker 1981 at the same three', np.round(R.ABS / sb, 4),
+    info(2, '  ... ABS / Smith & Baker 1981 at the same three', np.round(OPT.ABS / sb, 4),
          'the file used to ship 0.0145 in blue, Smith & Baker\'s 450 nm value '
          'exactly; it no longer does')
     # -- BAND INTEGRALS over the file's own Voronoi cells. This is the reading
@@ -911,17 +952,17 @@ def tier2_absorption(R):
     # and has not been touched -- but the residual it now covers is a transcribed
     # constant against a trapezoid of the published table, ~2e-4 relative.
     band = []
-    for lo, hi in np.sort(R.BAND, axis=1) * 1000.0:
+    for lo, hi in np.sort(OPT.BAND, axis=1) * 1000.0:
         xs = np.linspace(lo, hi, 801)
         band.append(float(np.trapezoid(_tab(POPE_FRY_1997, xs), xs) / (hi - lo)))
     band = np.array(band)
     check(2, 'ABS vs Pope & Fry band-integrated over the file\'s own BAND cells',
-          R.ABS / band, [1., 1., 1.], 0.15, 'same justification as above')
+          OPT.ABS / band, [1., 1., 1.], 0.15, 'same justification as above')
     info(2, '  ... Pope & Fry averaged over BAND (582-658, 502-582, 418-502 nm)',
          np.round(band, 5), 'the reading the file\'s own band model asks for, '
                             'and the one it now ships')
     info(2, '  ... ABS - band mean, per channel, relative',
-         np.round(R.ABS / band - 1.0, 6),
+         np.round(OPT.ABS / band - 1.0, 6),
          'this is transcription error only; the two are the same integral')
     # -- the chapter's triple, at ITS stated wavelengths. NOT an alternative
     # water: the same Pope & Fry table point-sampled at 610/550/450 instead of
@@ -942,19 +983,19 @@ def tier2_absorption(R):
     # above Pope & Fry, in a project whose provenance file bans Smith & Baker for
     # blue by name (that era's blue carries scattering from natural water). This
     # row exists so that value cannot come back unnoticed.
-    _dsb = float(np.min(np.abs(R.ABS[2] / np.array(
+    _dsb = float(np.min(np.abs(OPT.ABS[2] / np.array(
         [SMITH_BAKER_1981[w] for w in (440, 450, 460)]) - 1.0)))
     check(2, 'ABS blue is Pope & Fry, not Smith & Baker 1981',
-          float(_dsb > 0.10 and abs(R.ABS[2] / band[2] - 1.0) < 0.05), 1.0, 0.0,
+          float(_dsb > 0.10 and abs(OPT.ABS[2] / band[2] - 1.0) < 0.05), 1.0, 0.0,
           'boolean, no tolerance: blue must sit within 5% of the Pope & Fry band '
           'mean AND more than 10%% from every Smith & Baker value in 440-460 nm')
     info(2, '  ... ABS blue against the two candidate tables',
          'Pope & Fry band mean %+.2f%%, nearest Smith & Baker 440-460 %+.1f%%'
-         % (100 * (R.ABS[2] / band[2] - 1), 100 * _dsb),
+         % (100 * (OPT.ABS[2] / band[2] - 1), 100 * _dsb),
          'the identification that settled the dispute, kept as a regression')
     # -- and what the correction was worth, so the severity is a number.
     old = np.array([0.2750, 0.0546, 0.0145])
-    over = np.exp(-old * 2 * R.slant) / np.exp(-R.ABS * 2 * R.slant)
+    over = np.exp(-old * 2 * R.slant) / np.exp(-OPT.ABS * 2 * R.slant)
     info(2, '  ... what the old triple cost on the 3.92 m down-and-back path',
          'transmittance ratio %s (blue was %.1f%% dark, red %.1f%%)'
          % (np.round(over, 4), 100 * (1 - over[2]), 100 * (1 - over[0])),
@@ -1213,7 +1254,7 @@ def tier3_refl_ellipse(R, fld):
 # reaches that. Both crossings use THIS file's own `fresnel_exact`, so the only
 # thing borrowed from render.py is the quantity under test.
 def tier_interface(R):
-    n = R.IOR
+    n = OPT.IOR
     NQ = 20000
     mu = (np.arange(NQ) + .5) / NQ                # cosine in air / in water
 
@@ -1246,7 +1287,7 @@ def tier_interface(R):
          'the identity picks out the square and nothing else, so a wrong power '
          'is as visible here as a missing factor')
     check(3, 'R_EXT / R_INT as shipped, vs this file\'s own quadratures',
-          np.concatenate([R.R_EXT, R.R_INT]), np.concatenate([r_ext, r_int]),
+          np.concatenate([OPT.R_EXT, OPT.R_INT]), np.concatenate([r_ext, r_int]),
           5e-4,
           'render.py integrates R_EXT on 512 nodes and gets R_INT by '
           'reciprocity; this integrates both directly on 20000 and gets R_INT '
@@ -1254,12 +1295,12 @@ def tier_interface(R):
 
     # -- THE HEMISPHERICAL FORM OF THE FACTOR UNDER TEST.
     check(1, 'INT T(mu) out_of_water(1) 2 mu dmu == 1 - R_int',
-          Tbar * R.out_of_water(np.ones((1, 3)))[0], 1. - r_int, 3e-4,
+          Tbar * OPT.out_of_water(np.ones((1, 3)))[0], 1. - r_int, 3e-4,
           'the exit transport, hemispherically averaged, evaluated THROUGH the '
           'shipped function. Without the 1/n^2 it reads 0.93 against 0.52 -- a '
           'clean factor n^2; with a 1/n instead it reads 0.70')
     check(1, 'T_OUT_DIFFUSE, the factor WBOUNCE now carries, == 1 - R_int',
-          R.T_OUT_DIFFUSE, 1. - r_int, 5e-4,
+          OPT.T_OUT_DIFFUSE, 1. - r_int, 5e-4,
           'the same transport in its diffuse form. The bare 0.5 it replaced '
           'misses this by 4.5%, which is why it is derived now')
 
@@ -1267,9 +1308,9 @@ def tier_interface(R):
     def apparent_albedo(rho, divisor=True):
         E_w = (1. - r_ext) / (1. - rho * r_int)       # in-water bed irradiance
         L_w = rho * E_w / np.pi                       # in-water bed radiance
-        L_a = R.out_of_water(L_w[None])[0]            # <- THE THING UNDER TEST
+        L_a = OPT.out_of_water(L_w[None])[0]            # <- THE THING UNDER TEST
         if not divisor:
-            L_a = L_a * R.IOR ** 2
+            L_a = L_a * OPT.IOR ** 2
         return r_ext + Tbar * np.pi * L_a
 
     check(1, 'a LOSSLESS pool (white bed, no absorption) has albedo exactly 1',
@@ -1286,7 +1327,7 @@ def tier_interface(R):
     # trapped bounces), itself already guarded against Egan & Hilgeman.
     for rho in (0.222, 0.585, 0.681, 0.95):
         check(3, 'apparent albedo of the pool == wet_albedo(%.3f)' % rho,
-              apparent_albedo(rho), R.wet_albedo(np.array([[rho] * 3]))[0],
+              apparent_albedo(rho), OPT.wet_albedo(np.array([[rho] * 3]))[0],
               1e-3,
               'this side integrates the transport ray by ray; wet_albedo sums '
               'the trapped series in closed form. They share no line of code. '
@@ -1315,7 +1356,7 @@ def tier_interface(R):
     # 1. The other half of the fix is in render.py, which now prints the three
     # scene terms the closed form has no room for, each signed and measured.
     check(1, '2 E_3(0) == 1 exactly (a transparent slab transmits all of it)',
-          R._e3(0.0), np.ones(1), 1e-14,
+          OPT._e3(0.0), np.ones(1), 1e-14,
           'the cosine measure 2 mu dmu integrates to 1; this is the row that '
           'catches a dropped leading 2, which halves every path in the chain')
     # -- 2 E_3 by a route with nothing in common with a Gauss-Legendre rule on
@@ -1329,7 +1370,7 @@ def tier_interface(R):
             t = t * (-x) / k
             s = s - t / k
         return s
-    xs = R.ABS * R.DEPTH
+    xs = OPT.ABS * R.DEPTH
     rec = np.array([np.exp(-x) * (1. - x) + x * x * _E1(x) for x in xs])
     check(3, 'T_DIFF_UP == e^-x (1-x) + x^2 E_1(x)  [quadrature vs recurrence]',
           R.T_DIFF_UP, rec, 1e-10,
@@ -1346,7 +1387,7 @@ def tier_interface(R):
     # -- THE AUDIT, RE-COMPOSED THROUGH THE SHIPPED CHAIN.
     _cs = float(R.cos_i)
     check(1, 'LOSSLESS WHITE POOL through rho_water: R(sun) + rho_w == 1',
-          R.fresnel(_cs) + R.rho_water(1.0, absorb=0.0), np.ones(3), 1e-12,
+          OPT.fresnel(_cs) + OPT.rho_water(1.0, _cs, R.DEPTH, absorb=0.0), np.ones(3), 1e-12,
           'energy conservation, and the right-hand side is the number 1. Unlike '
           'the audit above this goes through render.py\'s own transport: drop '
           'the up leg from its numerator and the row reads 1/T_up too high; put '
@@ -1363,7 +1404,7 @@ def tier_interface(R):
         exp_ = rs + (1. - rs) * (1. - r_int) * rho / (1. - rho * r_int)
         check(3, 'lossless pool albedo == wet_albedo\'s algebra at R(sun), '
                  'rho=%.3f' % rho,
-              R.fresnel(_cs) + R.rho_water(rho, absorb=0.0), exp_, 1e-3,
+              OPT.fresnel(_cs) + OPT.rho_water(rho, _cs, R.DEPTH, absorb=0.0), exp_, 1e-3,
               'render.py composes a beam, a bed, an up leg and a series; this '
               'side is the closed geometric sum written out with r_int taken '
               'from this file\'s own 20000-node quadrature through the TIR '
@@ -1387,7 +1428,7 @@ def tier_interface(R):
     NMC = 400_000
     ci_s = float(R.cos_i)
     st = np.sqrt(1. - ci_s ** 2) / n
-    tsl = np.exp(-R.ABS * R.DEPTH / np.sqrt(1. - st ** 2))
+    tsl = np.exp(-OPT.ABS * R.DEPTH / np.sqrt(1. - st ** 2))
     rsun = np.array([float(fresnel_exact(np.array([ci_s]), nc)[0][0]) for nc in n])
     rb = np.array([0.222, 0.585, 0.681])
 
@@ -1404,15 +1445,15 @@ def tier_interface(R):
         esc = 0.0
         for _ in range(80):
             mu = np.sqrt(rng.random(NMC))            # cosine law off the bed
-            wt = wt * np.exp(-R.ABS[c] * R.DEPTH / mu)
+            wt = wt * np.exp(-OPT.ABS[c] * R.DEPTH / mu)
             rr = _rint_mu(mu, n[c])
             esc += float((wt * (1. - rr)).sum())
-            wt = wt * rr * np.exp(-R.ABS[c] * R.DEPTH / mu) * rb[c]
+            wt = wt * rr * np.exp(-OPT.ABS[c] * R.DEPTH / mu) * rb[c]
             if wt.sum() < 1e-12 * NMC:
                 break
         mc[c] = esc / NMC
     check(3, 'rho_water at the file\'s own ABS vs a %dk-photon walk' % (NMC // 1000),
-          R.rho_water(rb), mc, 4e-3,
+          OPT.rho_water(rb, _cs, R.DEPTH), mc, 4e-3,
           'the walk\'s own standard error on 400k photons is under 1e-3 '
           'relative; 4e-3 covers it and the direction-sampling bias with room '
           'to spare. Factorising T_esc fails this row by 5-19%%, and dropping '
@@ -1420,16 +1461,16 @@ def tier_interface(R):
           'above can see', rel=True)
     info(3, '  ... the two wrong writings of the same chain, on this row',
          'factorised %s | no up leg %s | walk %s'
-         % (np.round(R._e3(R.ABS * R.DEPTH) * (1. - r_int) * (1. - rsun) * tsl
-                     * rb / (1. - rb * R._e3(R.ABS * R.DEPTH) ** 2 * r_int), 5),
+         % (np.round(OPT._e3(OPT.ABS * R.DEPTH) * (1. - r_int) * (1. - rsun) * tsl
+                     * rb / (1. - rb * OPT._e3(OPT.ABS * R.DEPTH) ** 2 * r_int), 5),
             np.round((1. - r_int) * (1. - rsun) * tsl * rb
-                     / (1. - rb * R._e3(R.ABS * R.DEPTH) ** 2 * r_int), 5),
+                     / (1. - rb * OPT._e3(OPT.ABS * R.DEPTH) ** 2 * r_int), 5),
             np.round(mc, 5)),
          'both pass the lossless limit and both fail the walk; that is why the '
          'walk is here')
 
-    full = R.trap_gain(rb)
-    one_cone = R.trap_gain(rb, bounces=1, cone_only=True)
+    full = OPT.trap_gain(rb, R.DEPTH)
+    one_cone = OPT.trap_gain(rb, R.DEPTH, bounces=1, cone_only=True)
     info(1, 'the trapped series, closed vs the shipped pass\'s own model',
          'closed %s | one bounce over the TIR cone %s | ratio %s'
          % (np.round(full, 4), np.round(one_cone, 4),
@@ -1545,8 +1586,8 @@ def tier_map_extent(R):
                 ny = np.broadcast_to(mvec[1] * MS[None], (a.size, MD.size)).ravel()
                 nz = np.broadcast_to(MC[None], (a.size, MD.size)).ravel()
                 ndv = -(P[:, 0] * nx + P[:, 1] * ny + P[:, 2] * nz)
-                tx, ty, tz = R.refract(P[:, 0], P[:, 1], P[:, 2], nx, ny, nz,
-                                       1.0 / R.IOR[1])
+                tx, ty, tz = OPT.refract(P[:, 0], P[:, 1], P[:, 2], nx, ny, nz,
+                                       1.0 / OPT.IOR[1])
                 sid, uu, vv, sm, _ = R.scene_hit(nd_x, nd_y, tx, ty, tz, pz)
                 sel = (sid >= 1) & (sid <= 4) & (ndv > 0.)
                 if not sel.any():
@@ -1602,11 +1643,11 @@ def tier_fold(R):
           'node could carry; the tolerance is a thousandth of that, so it is '
           '"no ray at all" rather than a budget')
     # -- end to end, through `meniscus` itself, on the two walls that differ.
-    stash = (R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN, R.sail_vis)
+    stash = (R._env_menis, R._menis_under, R.EDGE_REFL, ATM.L_SUN, R.sail_vis)
     R._env_menis = lambda rx, ry, rz: np.ones((np.asarray(rx).size, 3))
     R._menis_under = lambda sid, u, v, sm, cyl, tz, mode: np.ones((sid.size, 3))
     R.EDGE_REFL = np.ones(3)
-    R.L_SUN = np.zeros(3)
+    ATM.L_SUN = np.zeros(3)
     R.sail_vis = lambda x, y: np.ones(np.asarray(x).shape)
     try:
         def run(P):
@@ -1630,7 +1671,7 @@ def tier_fold(R):
     except AssertionError:
         oke = 1
     finally:
-        (R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN,
+        (R._env_menis, R._menis_under, R.EDGE_REFL, ATM.L_SUN,
          R.sail_vis) = stash
     check(1, 'meniscus() runs on the NORTH waterline (the frame\'s own)', okn,
           1, 0, 'Vm = +0.94 there; the reference frame must render')
@@ -1675,9 +1716,9 @@ def tier_stone_sun(R):
     occ = np.zeros(PXa.size, bool)
     for c0 in range(0, PXa.size, 128):
         sl = slice(c0, c0 + 128)
-        rx = PXa[sl][:, None] + R.SUN_DIR[0] * tt
-        ry = PYa[sl][:, None] + R.SUN_DIR[1] * tt
-        rz = z0[sl][:, None] + R.SUN_DIR[2] * tt
+        rx = PXa[sl][:, None] + ATM.SUN_DIR[0] * tt
+        ry = PYa[sl][:, None] + ATM.SUN_DIR[1] * tt
+        rz = z0[sl][:, None] + ATM.SUN_DIR[2] * tt
         occ[sl] = ((rz + 2e-4) < gz(rx, ry)).any(1)
     check(1, 'the sun reaches EVERY coping-top point (2 mm march of the height '
           'field, %d points on 4 sides)' % PXa.size, int(occ.sum()), 0, 0,
@@ -1709,11 +1750,11 @@ def tier_stone_sun(R):
     bx = R.X0 - sb
     by = np.full_like(sb, 2.0)
     bz = gz(bx, by)
-    rx = bx[:, None] + R.SUN_DIR[0] * tt
-    ry = by[:, None] + R.SUN_DIR[1] * tt
-    rz = bz[:, None] + R.SUN_DIR[2] * tt
+    rx = bx[:, None] + ATM.SUN_DIR[0] * tt
+    ry = by[:, None] + ATM.SUN_DIR[1] * tt
+    rz = bz[:, None] + ATM.SUN_DIR[2] * tt
     bocc = ((rz + 2e-4) < gz(rx, ry)).any(1)
-    nl = -R.SUN_DIR[0]       # the west bullnose faces +x; the sun is at -x
+    nl = -ATM.SUN_DIR[0]       # the west bullnose faces +x; the sun is at -x
     info(1, '  ... the west bullnose shades its own foot',
          '%.0f%% of the roll-over, up to s = %+.1f mm; N.L there is %+.3f'
          % (100 * bocc.mean(), 1000 * sb[bocc].max() if bocc.any() else 0., nl),
@@ -1730,14 +1771,14 @@ def tier3_diffuse_fresnel(R):
     # fitted by Egan & Hilgeman (1979) and in wide use in tissue optics as
     #     r_i = -1.440/n^2 + 0.710/n + 0.668 + 0.0636 n
     # It shares no arithmetic with the file's route to the number.
-    walsh = -1.440 / R.IOR ** 2 + 0.710 / R.IOR + 0.668 + 0.0636 * R.IOR
-    check(3, 'R_INT vs the Egan & Hilgeman 1979 empirical fit', R.R_INT, walsh,
+    walsh = -1.440 / OPT.IOR ** 2 + 0.710 / OPT.IOR + 0.668 + 0.0636 * OPT.IOR
+    check(3, 'R_INT vs the Egan & Hilgeman 1979 empirical fit', OPT.R_INT, walsh,
           0.01,
           'the fit is quoted to 3-4 significant figures over n = 1.0-2.0; 1% is '
           'its own stated accuracy, and the two share no arithmetic at all',
           rel=True)
     info(3, '  ... R_INT, quadrature vs empirical fit',
-         '%s against %s' % (np.round(R.R_INT, 5), np.round(walsh, 5)),
+         '%s against %s' % (np.round(OPT.R_INT, 5), np.round(walsh, 5)),
          'two unrelated routes to the same interface')
 
 
@@ -1889,16 +1930,16 @@ def tier3_geometry(R):
     K = 2000000
     u = rng.random(K)
     th = np.arcsin(np.sqrt(u))                 # cosine-weighted polar angle
-    tc = np.arcsin(1.0 / R.IOR[1])
+    tc = np.arcsin(1.0 / OPT.IOR[1])
     frac = float((th > tc).mean())
-    check(3, 'TIR_FRAC vs %dk cosine-weighted MC' % (K // 1000), R.TIR_FRAC, frac,
+    check(3, 'TIR_FRAC vs %dk cosine-weighted MC' % (K // 1000), OPT.TIR_FRAC, frac,
           4 * np.sqrt(frac * (1 - frac) / K),
           'binomial 1 sigma = %.5f; 4 sigma' % np.sqrt(frac * (1 - frac) / K))
-    check(1, 'TIR_FRAC == 1 - 1/n^2 exactly', R.TIR_FRAC,
-          1 - 1 / R.IOR[1] ** 2, 1e-15, 'algebraic identity')
+    check(1, 'TIR_FRAC == 1 - 1/n^2 exactly', OPT.TIR_FRAC,
+          1 - 1 / OPT.IOR[1] ** 2, 1e-15, 'algebraic identity')
     info(3, '  ... TIR_FRAC vs the file\'s own diffuse R_INT',
          '%.4f (TIR only) against %.4f (TIR + sub-critical Fresnel)'
-         % (R.TIR_FRAC, R.R_INT[1]),
+         % (OPT.TIR_FRAC, OPT.R_INT[1]),
          'the same interface, priced twice, 8.5%% apart; the bed return uses the '
          'smaller one')
     # -- TIR_VERT: the irradiance a vertical face collects from the returning
@@ -1938,14 +1979,14 @@ def tier3_geometry(R):
     # E = INT L (w.n)+ dw estimated as 2 pi <(w.n)+ . 1[t>tc]>; the 2 pi and the
     # sample count cancel in the ratio, so this is a ratio of two plain means.
     mcv = float((st2[m] * np.maximum(np.cos(p2[m]), 0)).sum() / ct2[m].sum())
-    check(3, 'TIR_VERT vs quadrature of the arriving RADIANCE', R.TIR_VERT,
+    check(3, 'TIR_VERT vs quadrature of the arriving RADIANCE', OPT.TIR_VERT,
           float(quad), 1e-6,
           'both are the same pair of one-dimensional integrals; the trapezoid\'s '
           'own error on 2e6 points is under 1e-11')
     _se = float(np.std(np.where(m, st2 * np.maximum(np.cos(p2), 0), 0.0))
                 / np.sqrt(K) / (ct2[m].sum() / K))
     check(3, 'TIR_VERT vs %dk uniform-solid-angle MC of the same field'
-          % (K // 1000), R.TIR_VERT, mcv, 4 * _se,
+          % (K // 1000), OPT.TIR_VERT, mcv, 4 * _se,
           'MC 1 sigma on the numerator is %.5f; 4 sigma' % _se)
     # -- THE GUARD THAT CANNOT SHARE THE PREMISE, and the one that would have
     # caught the original defect on its own. As tc -> 0 the cone opens to the
@@ -1955,14 +1996,14 @@ def tier3_geometry(R):
     # (1/(4 pi))/(1/3) = 0.2387 and the 0.635 form to 0.3183; only the radiance
     # form lands on 1/2.
     check(1, 'tir_vert(theta_c -> 0) == 1/2 exactly (the full hemisphere)',
-          float(R.tir_vert(0.0)), 0.5, 1e-15,
+          float(OPT.tir_vert(0.0)), 0.5, 1e-15,
           'algebraic limit of the closed form; one double ulp')
     # -- and the same 1/2 arrived at from the other end of the file: the riser
     # gather's estimator closes on 1/2 over its full range, by a completely
     # different integral (a distance-importance-sampled view factor) over the
     # same hemisphere. Two independent pieces of code, one number.
     check(1, 'tir_vert(0) == the riser gather\'s full-range closure (both 1/2)',
-          float(R.tir_vert(0.0)), float(R._ris_closure(0.12, 1e-9, 1e9)), 1e-6,
+          float(OPT.tir_vert(0.0)), float(R._ris_closure(0.12, 1e-9, 1e9)), 1e-6,
           'the same half-hemisphere identity reached by two unrelated '
           'estimators; 1e-6 is the closure\'s own truncation at 1e-9/1e9 m')
     # -- AND THE SAME 1/2 A THIRD TIME, where it is a PARTITION and not a
@@ -1980,12 +2021,12 @@ def tier3_geometry(R):
           'to come OUT of the sky term, and both halves are 1/2 exactly. 1e-6 '
           'is the closure\'s own truncation at 1e-9/1e9 m')
     check(1, 'WALL_SKY == tir_vert(0), the same half from the interface side',
-          float(R.WALL_SKY), float(R.tir_vert(0.0)), 1e-15,
+          float(R.WALL_SKY), float(OPT.tir_vert(0.0)), 1e-15,
           'a vertical face collects half of what a horizontal one does under a '
           'uniform hemisphere; algebraic limit, one double ulp')
     info(3, '  ... TIR_VERT, three readings of one sentence',
          'shipped-before 0.56271, the comment\'s own words 0.63476, physics '
-         '%.5f (code now %.5f)' % (quad, R.TIR_VERT),
+         '%.5f (code now %.5f)' % (quad, OPT.TIR_VERT),
          'the suite asserted the middle one until this round')
     # -- the riser gather's estimator. _ris_closure is the analytic value of the
     # truncated view factor; the estimator that is actually run is a lattice of
@@ -2150,8 +2191,8 @@ def tier3_geometry(R):
 #     row is the one that fails if the iteration is truncated, and truncation at
 #     one bounce is exactly the defect this round was sent to close.
 def tier_underside(R):
-    n = R.IOR
-    tc = R.TC_SNELL
+    n = OPT.IOR
+    tc = OPT.TC_SNELL
 
     # ---- the window's two shares, against two closed forms -------------------
     # `window_shares(profile=False)` is the shipped quadrature with a FLAT sky
@@ -2160,7 +2201,7 @@ def tier_underside(R):
     # n^2 SKY_AMB" the same number on the bed, and therefore the reason the
     # bed's calibration never had to move -- and a vertical one must collect
     # 0.5 - tir_vert(tc)(1 - 1/n^2), the partition of its own upper half.
-    Wb, Wv = R.window_shares(profile=False)
+    Wb, Wv = ATM.window_shares(profile=False)
     QERR = 1e-8       # midpoint rule, 40 000 strata, over a smooth integrand on
                       # [0, tc]: the O(h^2 f'') term is ~1e-10. 1e-8 is two
                       # decades of headroom on the RULE, not on the answer.
@@ -2170,19 +2211,19 @@ def tier_underside(R):
               'error on a smooth integrand is ~1e-10; %s is two decades of '
               'headroom on the rule' % _fmt(QERR))
     check(1, 'window share, vertical face == 1/2 - tir_vert(tc)(1 - 1/n^2)',
-          Wv, 0.5 - R.tir_vert(tc) * (1.0 - 1.0 / n ** 2), QERR,
+          Wv, 0.5 - OPT.tir_vert(tc) * (1.0 - 1.0 / n ** 2), QERR,
           why='same quadrature, same headroom; the right-hand side is built '
               'from tir_vert and 1 - 1/n^2, neither of which is in the '
               'integrand')
     check(1, 'SKY_VERT is what render.py actually uses, and it is that ratio',
-          R.SKY_VERT / (R.WIN_VERT / R.WIN_BED), np.ones(3), 1e-12,
+          ATM.SKY_VERT / (ATM.WIN_VERT / ATM.WIN_BED), np.ones(3), 1e-12,
           why='an identity between two module-level names; it exists so that '
               'renaming one and not the other is a FAIL and not a silent '
               'divergence')
     info(1, '  ... the sky PROFILE inside the window is NOT guarded here',
          'SKY_VERT = %s with the sky\'s horizon/zenith gradient and the '
          'angular Fresnel in the integrand, %s with a flat sky'
-         % (np.round(R.SKY_VERT, 4), np.round(Wv / Wb, 4)),
+         % (np.round(ATM.SKY_VERT, 4), np.round(Wv / Wb, 4)),
          'a blind spot, recorded rather than papered over: every row above '
          'tests window_shares with profile=False, and the identity row '
          'compares SKY_VERT with WIN_VERT/WIN_BED, which come from the SAME '
@@ -2198,7 +2239,7 @@ def tier_underside(R):
     # a cone integral it would pass this row and fail the two above; if it had
     # been written as a cone integral with the wrong receiver cosine it would
     # pass those and fail this one.
-    Wb1, Wv1 = R.window_shares(profile=False, ior=[1.0 + 1e-9] * 3)
+    Wb1, Wv1 = ATM.window_shares(profile=False, ior=[1.0 + 1e-9] * 3)
     check(1, 'window share ratio -> WALL_SKY = 1/2 exactly as n -> 1',
           Wv1 / Wb1, np.full(3, 0.5), 1e-4,
           why='tc = asin(1/(1+1e-9)) is 4.5e-5 rad short of pi/2, so the cone '
@@ -2226,7 +2267,7 @@ def tier_underside(R):
     a0 = float(R.axial_share(np.array([0.0]), cone, nt=NT)[0])
     a9 = float(R.axial_share(np.array([np.pi / 2]), cone, nt=NT)[0])
     check(3, 'axial_share on the TIR cone == tir_vert(tc), 2-D vs closed form',
-          a9 / a0, float(R.tir_vert(tc[1])), 3e-4, rel=True,
+          a9 / a0, float(OPT.tir_vert(tc[1])), 3e-4, rel=True,
           why='the integrand is an INDICATOR with a step at tc, so the midpoint '
               'rule\'s error is one half-cell of that step divided by the '
               'cone\'s own width: (pi/2)/%d / (pi/2 - tc) = %.1e relative. '
@@ -2240,7 +2281,7 @@ def tier_underside(R):
     # different algebra: one takes an air-side cosine and inverts Snell, the
     # other forms the amplitude ratios with n_1 = n and n_2 = 1.
     mu = np.cos(np.linspace(0.0, np.pi / 2, 20001))
-    got = R.r_int_at(mu)
+    got = OPT.r_int_at(mu)
     exp = np.ones_like(got)
     for c in range(3):
         sw = np.sqrt(np.maximum(1.0 - mu ** 2, 0.0))
@@ -2344,7 +2385,7 @@ def tier_underside(R):
     Es, Em, Ed, vf, _ = R.up_gather(one(4.), one(2.), one(-DP), 0., 0., 1.,
                                     src=src0, hit=flat_up, dhit=flat_down)
     check(3, 'up_gather\'s mirror coefficient == R_INT (Walsh, not a quadrature)',
-          Em[0], R.R_INT, 0.006,
+          Em[0], OPT.R_INT, 0.006,
           why='the lattice\'s own resolution of the Fresnel step at the '
               'critical angle, the same O(1/N) as the closure row above and '
               'measured there at 0.4%% on a horizontal face; 0.006 absolute on '
@@ -2358,7 +2399,7 @@ def tier_underside(R):
             float(R.up_gather(one(4.), one(2.), one(-.7), 1., 0., 0.,
                               src=src0, hit=flat_up, dhit=flat_down)[1][0, 1]
                   / Em[0, 1]),
-            float(R.tir_vert(tc[1]) * (1 - 1 / n[1] ** 2) / R.R_INT[1])),
+            float(OPT.tir_vert(tc[1]) * (1 - 1 / n[1] ** 2) / OPT.R_INT[1])),
          'a vertical face sees the mirror better than the bed does, because '
          'the return arrives shallow')
 
@@ -2390,7 +2431,7 @@ def tier_underside(R):
             L = rho * (1.0 + float(Em2[0, 1]))
         check(3, 'the solve, %d passes from black, == trap_gain(%.2f)'
               % (int(R.NSOLVE), rho), L / rho,
-              float(R.trap_gain(rho, absorb=np.zeros(3))[1]), 0.015, rel=True,
+              float(OPT.trap_gain(rho, R.DEPTH, absorb=np.zeros(3))[1]), 0.015, rel=True,
               why='the series is 1/(1 - rho G) and the lattice\'s G is 1.3%% '
                   'off R_INT (row above), which the series amplifies by '
                   'd(gain)/gain = rho G/(1 - rho G) = %.2f -- so %.1f%% is the '
@@ -2681,11 +2722,11 @@ def tier_meniscus(R):
     # environment-weighted columns. `sail_vis` is stubbed with it because the
     # slice does not build the shade-sail map and the disc term is the only
     # caller; with L_SUN zero it multiplies nothing.
-    stash = (R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN, R.sail_vis)
+    stash = (R._env_menis, R._menis_under, R.EDGE_REFL, ATM.L_SUN, R.sail_vis)
     R._env_menis = lambda rx, ry, rz: np.ones((np.asarray(rx).size, 3))
     R._menis_under = lambda sid, u, v, sm, cyl, tz, mode: np.ones((sid.size, 3))
     R.EDGE_REFL = np.ones(3)
-    R.L_SUN = np.zeros(3)
+    ATM.L_SUN = np.zeros(3)
     R.sail_vis = lambda x, y: np.ones(np.asarray(x).shape)
     try:
         for P, tag in ((np.array([1.40, R.Y1 + R.SLIP, 0.]), 'north wall, 8.4 m'),
@@ -2777,7 +2818,7 @@ def tier_meniscus(R):
              % dep(np.pi / 2 - 1e-9, a),
              'the fillet is gone and the term is the flat surface minus itself')
     finally:
-        (R._env_menis, R._menis_under, R.EDGE_REFL, R.L_SUN,
+        (R._env_menis, R._menis_under, R.EDGE_REFL, ATM.L_SUN,
          R.sail_vis) = stash
 
     # ------------------------------------------------- 7. the reachability algebra
@@ -2859,7 +2900,7 @@ def tier_meniscus(R):
     # it. Two rows -- the algebraic sign, and a scan of the shipped `refract`
     # over every wall, every point along it and every tilt.
     ci = np.linspace(0.0, 1.0, 200001)
-    eta = 1.0 / R.IOR[1]
+    eta = 1.0 / OPT.IOR[1]
     f = eta * ci - np.sqrt(1.0 - eta ** 2 * (1.0 - ci ** 2))
     check(1, 'refracting INTO water: f = eta cos_i - cos_t < 0 at every '
           'incidence', float(f.max()), eta - 1.0, 1e-12,
@@ -2891,7 +2932,7 @@ def tier_meniscus(R):
         iz = np.broadcast_to(V[:, 2:3], nz.shape)
         nxb = np.broadcast_to(nx, nz.shape)
         nyb = np.broadcast_to(ny, nz.shape)
-        tx, ty, tz = R.refract(ix.ravel(), iy.ravel(), iz.ravel(),
+        tx, ty, tz = OPT.refract(ix.ravel(), iy.ravel(), iz.ravel(),
                                nxb.ravel(), nyb.ravel(), nz.ravel(), eta)
         front = -(ix.ravel() * nxb.ravel() + iy.ravel() * nyb.ravel()
                   + iz.ravel() * nz.ravel()) > 1e-9
@@ -3389,7 +3430,7 @@ def tier_float(R):
           'has a tolerance' % tot)
 
     # ---- Snell's Jacobian, which the whole window audit is weighted by -------
-    nn2 = float(R.IOR[1])
+    nn2 = float(OPT.IOR[1])
     nq = 200000
     mu = (np.arange(nq) + .5) / nq
     cw = np.sqrt(np.maximum(1. - (1. - mu ** 2) / nn2 ** 2, 0.))
@@ -3416,7 +3457,7 @@ def tier_float(R):
     vis = np.asarray(R.float_vis(gx2, gy2), float)
     ss = (np.arange(4000) + 1) * 5e-4
     Q = (np.stack([gx2, gy2, np.zeros(600)], 1)[:, None, :]
-         + R.SUN_DIR[None, None] * ss[None, :, None])
+         + ATM.SUN_DIR[None, None] * ss[None, :, None])
     hit = (((Q - R.FLOAT_CEN[None, None]) ** 2).sum(-1) < R.FLOAT_R2).any(1)
     # compare only away from the penumbra, which is 2-5 mm wide and is a ramp in
     # render.py and a step in the march.
@@ -3436,9 +3477,9 @@ def tier_float(R):
     # stubbing it changes nothing here and `tier_stone_sun` already tests it.
     _sv = R.sail_vis
     R.sail_vis = lambda x, y: np.ones(np.asarray(x, float).shape)
-    tsun = np.arcsin(np.sqrt(1. - R.SUN_DIR[2] ** 2) / nn2)
+    tsun = np.arcsin(np.sqrt(1. - ATM.SUN_DIR[2] ** 2) / nn2)
     off = float(R.DEPTH) * np.tan(tsun)
-    shat = -R.SUN_DIR[:2] / np.linalg.norm(R.SUN_DIR[:2])
+    shat = -ATM.SUN_DIR[:2] / np.linalg.norm(ATM.SUN_DIR[:2])
     hitp = R.FLOAT_XY + shat * off
     check(1, 'the ball\'s shadow on the floor is dark where refraction puts it',
           float(R.bed_sun(np.array([hitp[0]]), np.array([hitp[1]]),
@@ -3506,7 +3547,7 @@ def _arch_h(R):
 
 
 def tier_underwater(R):
-    n = R.IOR
+    n = OPT.IOR
 
     # ---- the sibling tracer did not become a second opinion ------------------
     # `scene_hit_under` handles rays of either sign; on the downgoing half it
@@ -3680,10 +3721,10 @@ def tier_underwater(R):
     # First the identity that says the two directions are one law.
     L = np.array([[0.3, 0.7, 1.1], [2.0, 0.01, 5.0]])
     check(1, 'into_water(out_of_water(L)) == L',
-          float(np.abs(R.into_water(R.out_of_water(L)) - L).max()), 0.0, 1e-15,
+          float(np.abs(OPT.into_water(OPT.out_of_water(L)) - L).max()), 0.0, 1e-15,
           'the gaining and losing directions of L/n^2 are one factor and its '
           'reciprocal; one double ulp')
-    check(1, 'into_water(1) == n^2', R.into_water(np.ones((1, 3)))[0], n ** 2,
+    check(1, 'into_water(1) == n^2', OPT.into_water(np.ones((1, 3)))[0], n ** 2,
           1e-15, 'the factor itself, read out of the shipped function rather '
                  'than out of a comment')
 
@@ -3708,7 +3749,7 @@ def tier_underwater(R):
         dvw = np.stack([sw, np.zeros_like(sw), mw], 1)
         zw = np.zeros(NQ)
         tw = R.uw_interface(dvw, zw, zw, np.ones(NQ), np.full(NQ, n[c]), c)
-        gain = R.into_water(np.ones((NQ, 1)) * (1. - tw[4])[:, None],
+        gain = OPT.into_water(np.ones((NQ, 1)) * (1. - tw[4])[:, None],
                             n[c] ** 2)[:, 0]
         # the mean is over (mu_c, 1], so the integral is that mean times the
         # interval, and the interval is 1 - mu_c.
@@ -3724,7 +3765,7 @@ def tier_underwater(R):
                   '1e-3 relative is the two 40000-node rules'
                   % (1. / n[c], n[c]))
     info(1, '  ... the gain at the window\'s centre',
-         '(1 - F0) n^2 = %s' % np.round((1 - R.F0) * n ** 2, 4),
+         '(1 - F0) n^2 = %s' % np.round((1 - OPT.F0) * n ** 2, 4),
          'the sky straight overhead is brighter under water than over it, by '
          '0.80 of a stop, and that is not a look: it is the solid angle the '
          'window compresses it into')
@@ -3749,9 +3790,9 @@ def tier_underwater(R):
             'camera comment claims' % (rim_r, dwall, 100 * (1 - rim_r / dwall)))
     info(1, '  ... the sun in the window',
          'refracted to %.2f deg from vertical, %.2f deg inside the green rim'
-         % (np.degrees(np.arcsin(np.sqrt(1 - R.SUN_DIR[2] ** 2) / n[1])),
+         % (np.degrees(np.arcsin(np.sqrt(1 - ATM.SUN_DIR[2] ** 2) / n[1])),
             np.degrees(np.arcsin(1 / n[1])
-                       - np.arcsin(np.sqrt(1 - R.SUN_DIR[2] ** 2) / n[1]))),
+                       - np.arcsin(np.sqrt(1 - ATM.SUN_DIR[2] ** 2) / n[1]))),
          'section G predicts 44.4 deg and 4.1 deg from a 21.0 deg sun; both '
          'follow from SUN_DIR and IOR with nothing else in them')
 
@@ -3772,8 +3813,8 @@ def tier_illuminants(R):
 
     # -- IDENTITY. The shipped constant IS the integral, and this row is what a
     # hand-set replacement would fail on. Double round-off only.
-    check(1, 'SKY_DECK == env_irradiance(0,0,1)', R.SKY_DECK,
-          R.env_irradiance(0., 0., 1.), 1e-15,
+    check(1, 'SKY_DECK == env_irradiance(0,0,1)', ATM.SKY_DECK,
+          ATM.env_irradiance(0., 0., 1.), 1e-15,
           'the same call the constant is assigned from; a literal put back in '
           'its place cannot satisfy it')
 
@@ -3783,8 +3824,8 @@ def tier_illuminants(R):
     # to spend on a partition, and it is the ONLY thing that 0.50 was ever
     # right about. A dropped 1/pi, a wrong solid angle or a missing cosine
     # fails one or both.
-    uh = R.env_irradiance(0., 0., 1., L=np1)
-    uv = R.env_irradiance(0., -1., 0., L=np1)
+    uh = ATM.env_irradiance(0., 0., 1., L=np1)
+    uv = ATM.env_irradiance(0., -1., 0., L=np1)
     check(1, 'uniform sky: horizontal face gets exactly L', uh, np1, 1e-12,
           'midpoint in mu is exact for the integrand 2mu; only round-off left')
     check(1, 'uniform sky: vertical face gets exactly L/2', uv, .5 * np1, 1e-4,
@@ -3800,9 +3841,9 @@ def tier_illuminants(R):
     # red and green the horizon is brighter than the zenith and a vertical face
     # weights the horizon, so the share must be strictly LARGER. One row proves
     # the integrator is weighting by sin^2 and not by a constant.
-    grad = R.sky(R.ENV_DX, R.ENV_DY, R.ENV_DZ, lobes=())
-    gh = R.env_irradiance(0., 0., 1., L=grad)
-    gv = R.env_irradiance(0., -1., 0., L=grad)
+    grad = ATM.sky(ATM.ENV_DX, ATM.ENV_DY, ATM.ENV_DZ, lobes=())
+    gh = ATM.env_irradiance(0., 0., 1., L=grad)
+    gv = ATM.env_irradiance(0., -1., 0., L=grad)
     check(1, 'gradient is uniform in BLUE => vertical/deck == the uniform ratio',
           gv[2] / gh[2], uv[2] / uh[2], 1e-12,
           'SKY_HOR[2] == SKY_TOP[2], so the two integrals share an integrand '
@@ -3822,9 +3863,9 @@ def tier_illuminants(R):
     d = rng.normal(size=(4096, 3))
     d /= np.linalg.norm(d, axis=1, keepdims=True)
     d[:, 2] = np.abs(d[:, 2])
-    full = R.sky(d[:, 0], d[:, 1], d[:, 2])
-    diff = R.env_diffuse(d[:, 0], d[:, 1], d[:, 2])
-    disc = R.sky(d[:, 0], d[:, 1], d[:, 2], lobes=R.SKY_LOBE[:1]) - R.sky(
+    full = ATM.sky(d[:, 0], d[:, 1], d[:, 2])
+    diff = ATM.env_diffuse(d[:, 0], d[:, 1], d[:, 2])
+    disc = ATM.sky(d[:, 0], d[:, 1], d[:, 2], lobes=ATM.SKY_LOBE[:1]) - ATM.sky(
         d[:, 0], d[:, 1], d[:, 2], lobes=())
     check(1, 'sky == env_diffuse + the disc lobe, over 4096 directions',
           np.abs(full - diff - disc).max(), 0.0, 1e-12,
@@ -3848,7 +3889,7 @@ def tier_illuminants(R):
     check(1, 'its cos^2 half carries exactly 1/4 of the scattered light',
           ani, 0.25, 1e-5, 'same quadrature, same integrand degree')
     _grad_deck = gh
-    _aur = R.SKY_DECK - _grad_deck
+    _aur = ATM.SKY_DECK - _grad_deck
     # ...and the aureole term ITSELF, against its own lobe integrated here from
     # L_AURE and N_AURE with none of render.py's lattice, weights or ordering.
     # This is the row that fires if the lobe is dropped from SKY_DIFFUSE_LOBES
@@ -3860,9 +3901,9 @@ def tier_illuminants(R):
     s2 = np.sqrt(np.maximum(1. - m2 ** 2, 0.))
     ax = np.outer(s2, np.cos(p2)); ay = np.outer(s2, np.sin(p2))
     az = np.repeat(m2[:, None], nph2, 1)
-    cs2 = np.clip(ax * R.SUN_DIR[0] + ay * R.SUN_DIR[1] + az * R.SUN_DIR[2], 0, 1)
+    cs2 = np.clip(ax * ATM.SUN_DIR[0] + ay * ATM.SUN_DIR[1] + az * ATM.SUN_DIR[2], 0, 1)
     dw2 = (1. / nmu2) * (2 * np.pi / nph2)
-    aur_ref = np.array([(R.L_AURE[c] * cs2 ** R.N_AURE * az * dw2).sum() / np.pi
+    aur_ref = np.array([(ATM.L_AURE[c] * cs2 ** ATM.N_AURE * az * dw2).sum() / np.pi
                         * 1.15 / 1.15 for c in range(3)])
     check(1, 'the aureole term of SKY_DECK, against its own lobe integrated here',
           _aur, aur_ref, 2e-3,
@@ -3871,7 +3912,7 @@ def tier_illuminants(R):
           'lattices straddle it differently, which is the whole tolerance',
           rel=True)
     between(1, 'the aureole is under the 1/4 ceiling on a deck', 
-            float(_aur[1] / R.SKY_DECK[1]), 0.0, 0.25,
+            float(_aur[1] / ATM.SKY_DECK[1]), 0.0, 0.25,
             'the ceiling is the closed form two rows up; the cosine weight can '
             'only lower it, and higher scattering orders add to the ISOTROPIC '
             'side, so the bound on the total diffuse sky is if anything tighter '
@@ -3885,15 +3926,15 @@ def tier_illuminants(R):
     ct = np.sqrt(u1)
     st = np.sqrt(np.maximum(1. - u1, 0.))
     ph = 2. * np.pi * u2
-    mc = R.env_diffuse(st * np.cos(ph), st * np.sin(ph), ct).mean(0)
+    mc = ATM.env_diffuse(st * np.cos(ph), st * np.sin(ph), ct).mean(0)
     check(3, 'SKY_DECK vs a %dk-sample cosine Monte-Carlo' % (NMC // 1000),
-          mc, R.SKY_DECK, 3e-3, 'the estimator is a mean of %d samples whose '
+          mc, ATM.SKY_DECK, 3e-3, 'the estimator is a mean of %d samples whose '
           'own coefficient of variation is ~0.4, so one standard error is '
           '6e-4 relative; 3e-3 is five of them' % NMC, rel=True)
     info(3, '  ... and the lattice against itself at 16x the directions',
          '%s at 256x512 against %s at 1024x2048'
-         % (np.round(R.SKY_DECK, 6),
-            np.round(R.env_irradiance(0., 0., 1., nmu=1024, nph=2048), 6)),
+         % (np.round(ATM.SKY_DECK, 6),
+            np.round(ATM.env_irradiance(0., 0., 1., nmu=1024, nph=2048), 6)),
          'the shipped lattice\'s own quadrature error, measured rather than '
          'assumed: 4e-6 relative in the worst channel')
 
@@ -3903,8 +3944,8 @@ def tier_illuminants(R):
     # For a clear sky the diffuse share of global horizontal irradiance runs
     # roughly 0.10-0.20 at high sun and rises toward 0.25-0.35 at air mass 3;
     # this frame is air mass 2.77.
-    ebeam = R.SUN_COL * float(R.SUN_DIR[2])
-    kd = float((Y * R.SKY_DECK).sum() / (Y * (R.SKY_DECK + ebeam)).sum())
+    ebeam = ATM.SUN_COL * float(ATM.SUN_DIR[2])
+    kd = float((Y * ATM.SKY_DECK).sum() / (Y * (ATM.SKY_DECK + ebeam)).sum())
     between(2, 'diffuse fraction of global horizontal, clear sky at AM 2.77',
             kd, 0.10, 0.35,
             'clear-sky diffuse fractions measured at air mass ~3 sit in this '
@@ -3918,8 +3959,8 @@ def tier_illuminants(R):
     # _tau_rayleigh puts at 3.39. Multiple scattering saturates the blue and
     # pulls it down inside that.
     between(1, 'diffuse deck illuminant blue/red, inside the Rayleigh bounds',
-            float(R.SKY_DECK[2] / R.SKY_DECK[0]), 1.0,
-            float(R.TAU_R[2] / R.TAU_R[0]),
+            float(ATM.SKY_DECK[2] / ATM.SKY_DECK[0]), 1.0,
+            float(ATM.TAU_R[2] / ATM.TAU_R[0]),
             'the upper bound is the optically-thin single-scatter ratio of the '
             'file\'s own TAU_R (3.39); the lower is a grey sky, which Rayleigh '
             'cannot produce. The constant this replaced read 1.06.')
@@ -3929,13 +3970,13 @@ def tier_illuminants(R):
                        ('facing the sun (east wall)', -1., 0.)):
         s_tab, m_tab = R.band_illum(nx, ny)
         check(1, 'band_illum sky, %s, == env_irradiance there' % nm,
-              s_tab, R.env_irradiance(nx, ny, 0.), 2e-4,
+              s_tab, ATM.env_irradiance(nx, ny, 0.), 2e-4,
               'the table is sampled at %d azimuths and read with np.interp; '
               'these two normals land ON samples, so only round-off and the '
               'shared lattice separate them' % R.BAND_NAZ)
         check(1, 'band_illum mirror, %s, == the same with R_ext inside' % nm,
               m_tab,
-              R.env_irradiance(nx, ny, 0., weight=R.fresnel(R.ENV_DZ)[:, 1]),
+              ATM.env_irradiance(nx, ny, 0., weight=OPT.fresnel(ATM.ENV_DZ)[:, 1]),
               2e-2,
               'the reference here uses ONE channel of the Fresnel weight '
               'against the table\'s three, so the row checks the geometry and '
@@ -4018,13 +4059,13 @@ def tier_illuminants(R):
     # integral must collapse onto the diffuse transmittance the file computes a
     # completely different way; and the factorised form it replaced.
     check(1, 'slab_esc(0) == T_OUT_DIFFUSE = (1 - R_ext)/n^2',
-          R.slab_esc(dep=0.0), R.T_OUT_DIFFUSE, 1e-4,
+          OPT.slab_esc(0.0), OPT.T_OUT_DIFFUSE, 1e-4,
           'a 2000-point Gauss-Legendre in the water-side cosine against a '
           '512-point midpoint in the AIR-side one, joined by Walsh\'s '
           'relation; the two disagree by 3e-5 and the tolerance is three of it')
     check(1, 'wbounce_of is that escape on the bed\'s own radiance',
-          R.wbounce_of(np.array([1., 2., 3.])),
-          np.array([1., 2., 3.]) * R.slab_esc(), 1e-15,
+          OPT.wbounce_of(np.array([1., 2., 3.]), R.DEPTH),
+          np.array([1., 2., 3.]) * OPT.slab_esc(R.DEPTH), 1e-15,
           'definitional; the row exists so that a re-factorised version -- '
           'T_DIFF_UP x T_OUT_DIFFUSE, which is what shipped -- fails here')
     # ...and a photon walk of the same escape, which shares no quadrature with
@@ -4034,19 +4075,19 @@ def tier_illuminants(R):
     mu = np.sqrt(u)                       # cosine-distributed off a Lambertian bed
     esc = np.zeros(3)
     for c in range(3):
-        t = np.exp(-R.ABS[c] * R.DEPTH / mu)
-        rr = R.r_int_at(mu)[:, c]
+        t = np.exp(-OPT.ABS[c] * R.DEPTH / mu)
+        rr = OPT.r_int_at(mu)[:, c]
         esc[c] = float((t * (1. - rr)).mean())
     check(3, 'slab_esc vs a %dk-photon cosine walk of the same slab' % (NW // 1000),
-          esc, R.slab_esc(), 6e-3,
+          esc, OPT.slab_esc(R.DEPTH), 6e-3,
           'a mean of %d samples of exp(-a d/mu)(1 - R_int(mu)) whose own '
           'coefficient of variation is ~0.9; one standard error is 1.6e-3 '
           'relative and 6e-3 is under four of them' % NW, rel=True)
-    _fact = R.T_DIFF_UP * R.T_OUT_DIFFUSE
+    _fact = R.T_DIFF_UP * OPT.T_OUT_DIFFUSE
     info(1, '  ... and what factorising it costs',
          'slab_esc %s against T_DIFF_UP x T_OUT_DIFFUSE %s, %s'
-         % (np.round(R.slab_esc(), 4), np.round(_fact, 4),
-            np.round(_fact / R.slab_esc(), 4)),
+         % (np.round(OPT.slab_esc(R.DEPTH), 4), np.round(_fact, 4),
+            np.round(_fact / OPT.slab_esc(R.DEPTH), 4)),
          'the escape and the attenuation are positively correlated -- a steep '
          'ray escapes AND crosses less water -- so the product of the means '
          'understates the mean of the product. This is the same 19.4/5.1/1.1% '
@@ -4057,8 +4098,8 @@ def tier_illuminants(R):
     # asserting something this file deliberately has not done.
     info(1, 'SKY_AMB against the same environment (NOT applied)',
          'derived SKY_DECK x (1 - Rbar) = %s, shipped SKY_AMB = %s, ratio %s'
-         % (np.round(R.SKY_SUB_DERIVED, 4), np.round(R.SKY_AMB, 4),
-            np.round(R.SKY_AMB / R.SKY_SUB_DERIVED, 3)),
+         % (np.round(ATM.SKY_SUB_DERIVED, 4), np.round(ATM.SKY_AMB, 4),
+            np.round(ATM.SKY_AMB / ATM.SKY_SUB_DERIVED, 3)),
          'the Snell window is a change of variables: n^2 cos t_w sin t_w dt_w '
          '= cos t_a sin t_a dt_a maps the window integral of the n^2-gained sky '
          'exactly onto the air-side hemisphere, so a submerged horizontal face '
@@ -4068,9 +4109,9 @@ def tier_illuminants(R):
          'this round leaves it alone on purpose')
     info(1, 'the constant this round replaced, per channel',
          'SKY_AMB*0.30 + SUN_COL*0.075 = %s against the derived %s, ratio %s'
-         % (np.round(R.SKY_AMB * 0.30 + R.SUN_COL * 0.075, 4),
-            np.round(R.SKY_DECK, 4),
-            np.round((R.SKY_AMB * 0.30 + R.SUN_COL * 0.075) / R.SKY_DECK, 3)),
+         % (np.round(ATM.SKY_AMB * 0.30 + ATM.SUN_COL * 0.075, 4),
+            np.round(ATM.SKY_DECK, 4),
+            np.round((ATM.SKY_AMB * 0.30 + ATM.SUN_COL * 0.075) / ATM.SKY_DECK, 3)),
          'the level was 16% high in green and the colour wrong both ways; the '
          'two hand terms were each wrong by more than their sum was, which is '
          'how it survived every green-channel comparison this project made')
