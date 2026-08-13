@@ -804,3 +804,32 @@ finding — the reference pool's submerged wall reading lighter than its dry
 band — must **not** be closed by reaching for this. The cheaper explanation (the
 band is simply over-lit) has not been eliminated, and a fouling profile tuned
 until the ordering appears is a fit wearing a mechanism's name.
+
+### And the default is not zero — an owner ruling on where the neutral setting sits
+
+> *"Maar het is wel realistisch en zal bij buitenbaden die er al wat langer liggen
+> veelal aanwezig zijn."*
+
+This is a statement about the **default**, not about the feature, and it is the
+more consequential of the two. If most outdoor pools in service carry a waterline
+weathering band, then:
+
+- **A pristine liner is the special case**, not the base case. The chapter
+  currently describes an unweathered liner as the neutral state and weathering as
+  something added, which has the ordering backwards for anything but a pool in its
+  first season.
+- **A renderer whose default is zero age reads as CG by default**, and the
+  correction is the kind that gets deferred and then forgotten. The overriding bar
+  in `gauntlet/bar/photo-spec.md` is that *a single synthetic tell anywhere in
+  frame fails it, and the tell is usually not the water* — a perfectly clean
+  waterline is exactly such a tell, and unlike most tells it is present in every
+  outdoor pool ever framed.
+- So the `neglect` control should **ship at a non-zero default**, and the chapter
+  should say so rather than leaving it to be discovered. `0` is *newly
+  commissioned* and is a deliberate choice, not the absence of one.
+
+The same argument transfers beyond pools and should be written that way: any
+surface with a persistent liquid line — tanks, locks, harbour walls, canal
+revetments, a boat's hull — accumulates at that line, and the default state of a
+real one is *not* the state of a new one. Rendering the new one is the exception
+that needs justifying.
