@@ -611,16 +611,20 @@ def run_suite():
           'a row placed at 40 m would have been passing on the gravity term '
           'rather than on the undertow.')
     between(2, 'undertow inside the surf zone, m/s',
-            float(fl_b['u_u'][tr_b['brk']].mean()), 0.05, 1.0,
-            'Measured surf-zone undertows run about 0.1-0.4 m/s, and a '
-            'depth-averaged return flow outside 0.05-1.0 m/s is not a beach. '
-            'THIS IS THE ROW THAT CATCHES THE STANDING TRAP: substituting the '
-            'dissipation rate D_w for the energy density E_w leaves the '
-            'dimensions of the shipped function untouched -- the caller passed '
-            'the wrong thing -- and only the MAGNITUDE gives it away, at '
-            '0.007 m/s. The dimension rows above guard the formula; this one '
-            'guards the argument, and the --bugs table is what proved they are '
-            'different guards.', unit='m/s')
+            float(fl_b['u_u'][tr_b['brk']].mean()), 0.08, 0.60,
+            'Measured depth-averaged surf-zone undertows run about 0.1-0.4 '
+            'm/s. The bounds are that published band with a 50% margin either '
+            'side -- 0.08 and 0.60 -- and they are set from the band, not from '
+            'anything this file produces: the measured value sits at 0.24, in '
+            'the middle, and would pass a much tighter row. THIS IS THE ROW '
+            'THAT CATCHES THE STANDING TRAP, and it took the --bugs table to '
+            'find out that the dimension rows do not. Substituting the '
+            'dissipation rate D_w for the energy density E_w is a CALLER '
+            'passing the wrong thing, so the shipped function\'s dimensions '
+            'are untouched and the algebra rows stay green; only the magnitude '
+            'gives it away, at 0.058 m/s -- below the published band before '
+            'any margin is applied. The dimension rows guard the formula; this '
+            'one guards the argument.', unit='m/s')
 
     # ============================================================ 7 · the bar
     t0 = time.time()

@@ -175,7 +175,7 @@ similarity parameter*.
 | `D50 = 0.30 mm`, and `w_s`, `Ω` under it | no grain-size survey of Aljezur; only the beach-state label depends on it |
 | `DEAN_A = 0.13` | no profile survey; it is the initial condition the bar is measured *against* |
 | `K_DALLY` | bounded: the crest depth is independent of it (proved, not asserted) |
-| `K_ROLLER = 0.5` | bounded from above by the measured undertow it implies (0.38 → 0.57 m/s) |
+| `K_ROLLER = 0.5` | bounded from above by the undertow it implies: the mean over the surf zone is 0.24 m/s against a published 0.1–0.4 m/s, and the suite asserts that band |
 | `ROLLER_LAG = 0.5 L` | swept over a factor of four; the crest depth moves < 0.15 m |
 | `SK_MAX`, `UR_HALF` (the skewness parameterisation) | only the two limits are load-bearing and both are tested |
 | the Kriebel–Kraus–Larson `A(w_s)` fit | **not used** — printed as an INFO and nothing depends on it |
@@ -204,7 +204,7 @@ zone (the Exner step is tapered out shallower than 0.35 m), a 2DH solve that
 
 Recorded because a wave that overturns something is a good outcome here.
 
-0. **The bar is not the convergence of two fluxes — one is enough.** Chapter 12
+1. **The bar is not the convergence of two fluxes — one is enough.** Chapter 12
    says the breakpoint bar is where "the two fluxes converge": skewness onshore
    seaward of the break, undertow offshore landward of it. Switch the undertow
    off entirely in this model and **a bar still forms, at the same depth** —
@@ -217,7 +217,7 @@ Recorded because a wave that overturns something is a good outcome here.
    by `no-undertow` failing **no rows at all**, and it is recorded rather than
    patched over.
 
-1. **Chapter 12's runnable core cannot produce the feature its own section is
+2. **Chapter 12's runnable core cannot produce the feature its own section is
    about.** It writes the transform as `H_w = min(shoal(H_0, d), γ·d)`, and
    `shoal()` is the unbroken flux-conserving height, which keeps growing
    shoreward. Over a bar–trough profile that expression stays pinned to `γ·d`
@@ -228,7 +228,7 @@ Recorded because a wave that overturns something is a good outcome here.
    `--bug cap-not-dissipation` puts the chapter's line back and shows what it
    costs.
 
-2. **Chapter 27's "wavelength-scale filtered depth" is wrong for a morphodynamic
+3. **Chapter 27's "wavelength-scale filtered depth" is wrong for a morphodynamic
    loop.** Taken literally the filter here would be 13–130 m and the bar is 11 m
    wide: filtering at that scale does not blur the bar, it **hides the bar from
    the wave that is supposed to break on it**, so the feedback that limits the
@@ -247,7 +247,7 @@ than from the module it checks. `--bugs` puts eight defects back, one at a time,
 and prints which rows caught each; a guard that does not fire on its own bug is a
 comment with a `check()` around it.
 
-**45 pass / 0 FAIL / 1 open / 22 info, in about 70 s.** The one OPEN row is
+**46 pass / 0 FAIL / 1 open / 23 info, in about 77 s.** The one OPEN row is
 section B's second breaking line, above.
 
 Four defects were found *by* the suite while it was being written, and they are
@@ -274,7 +274,7 @@ worth listing because each is a way a green suite can lie:
 
 `--bugs` reloads the module, patches in one defect, and re-runs everything:
 
-| bug reintroduced | rows that FAIL, first run | after the two rows it exposed |
+| bug reintroduced | rows that FAIL, first run | after the row it exposed |
 |---|---|---|
 | `dw-for-ew` — the undertow built from the dissipation rate | **0** | 1 |
 | `quarter-at-break` — the deep-water ¼ paired with breaking values | 1 | 1 |
@@ -292,8 +292,10 @@ than the six that worked.**
   trap chapter 12 names is a *caller* passing `D_w` where `E_w` belongs, and
   that leaves the function's own dimensions untouched: the algebra row is a
   guard on the formula, not on the argument. What catches it is the
-  **magnitude** — the undertow drops from 0.37 m/s to 0.007 m/s — so a row now
-  checks the surf-zone undertow against the 0.05–1.0 m/s a beach can have.
+  **magnitude** — the mean surf-zone undertow falls from 0.244 m/s to
+  0.058 m/s — so a row now checks it against the published 0.1–0.4 m/s band
+  with a 50% margin either side. The bug's value is below that band before any
+  margin, and the clean value sits in the middle of it.
 - **`no-undertow` — the bug is not a bug.** See the finding above: the bar
   survives it. A row was added that detects the undertow being switched off (the
   same magnitude row), and an INFO row now reports the bar with and without it,
