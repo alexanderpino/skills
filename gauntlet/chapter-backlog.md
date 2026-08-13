@@ -914,3 +914,61 @@ work in surf.
 Keep the frame. Three mechanisms, backlighting and a coastal-water colour in one
 exposure is a denser reference than most of the single-purpose photographs the
 pool bar was built from.
+
+---
+
+## Preparing the real-time loop — the bar changes kind, and that has to be set up first
+
+Owner: *"Volgende week gaan we een loop draaien voor realtime benadering."*
+
+**The bar cannot be a photograph this time, and that is the whole design問題.** For
+the pool the bar was *"a viewer should have to wonder whether it is a
+photograph"*. For an approximation that standard is useless, because the errors
+that matter are invisible. This session found four separate faults of 5–25% —
+a missing up leg, two correlated integrals split apart, a caustic read on the
+wrong coordinate, an over-supplied sky on a vertical face — and **every one of
+them looked fine**. A perceptual image metric would have passed all four.
+
+So the bar for the real-time loop is **the reference itself**, and the question
+changes from *does this look right* to **how many percent is this approximation
+off, per channel, on a named quantity**. That is what the reference is for, and it
+only works because the renderer is deterministic quadrature rather than Monte
+Carlo — a 3% difference is a number, not noise.
+
+### Three things to have in place before it starts
+
+1. **A frozen ground-truth set, committed.** Scene-linear buffers plus the derived
+   scalars — `rho_water`, `trap_gain`, `window_shares`, `slab_esc`, both
+   illuminants, the wall/band and water/stone ratios. Without it every score costs
+   a 12-minute render, which puts the slowness in exactly the wrong place. A dump
+   hook was started in an earlier wave; finish it and freeze the output.
+2. **An error metric fixed in advance.** Per channel, relative, on named
+   quantities. **Not** a perceptual image metric — see above; it would have scored
+   today's bugs as passes. Decide the metric before the first approximation
+   exists, so it cannot be chosen to flatter one.
+3. **A budget.** Platform, frame time, memory for LUTs. Without it "approximation"
+   is unbounded and there is nothing to optimise against — an approximation is only
+   meaningful relative to what it is allowed to cost.
+
+### What is already in place
+
+The LUT factorisation law with the covariance identity and the rule that *a
+pre-computation may split a product only across variables the integral does not
+run over*; the screen-space fullscreen-triangle pass; *What to pre-cook*, rewritten
+on cadence; the vertical-face caustic bug with its screen-space variant named; the
+weathering mask driven by height relative to the water plane rather than baked at
+a fixed level; and the near-Lambertian emergent-radiance result with its cone, so
+a reader knows when the cheap simplification holds and when it does not.
+
+### What must land first
+
+- **Wave 19** — the window's world and the float.
+- **The band-against-water measurement in scene-linear**, which decides whether the
+  J/K residual is material or an over-lit band. Starting a real-time loop against a
+  ground truth with an unresolved 2× in it would propagate the error into every
+  approximation scored against it.
+- **Section H, the split shot.** Not optional for this purpose: it reads one wave
+  field three independent ways in a single frame — in profile at the port, as the
+  window's rim from below, and in projection as the caustics on the bed. An
+  approximation that passes each reading separately can still fail their
+  agreement, and that failure is invisible in any single view.
