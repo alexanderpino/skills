@@ -676,6 +676,50 @@ longshore current than a flat one, and the slope field is already in hand (it is
 that picks breaker class below). Dropping `tanβ` gives every coast the same drift, which is the
 tell that someone copied the proportionality without the derivation.
 
+**The `∝` has a closed form, and the derivation is worth more than the number.** The chapter left
+this as a proportionality; an implementation built against it needed the constant, derived one,
+got it wrong by 25%, and the missing term turns out to be the same *kind* of omission the
+paragraph above warns about. On a **saturated plane slope** (`H_w = γ·d`, `n = c_g/c → 1`), with
+the standard linearised bed stress `τ_b = ρ·C_f·(2/π)·u_orb·V` and `u_orb = (γ/2)·√(g·d)`:
+
+```
+S_yx      = (ρ·g·γ²·d²/8) · sinθ·cosθ                         # radiation stress, n = 1
+−∂S_yx/∂x = (ρ·g·γ²/8) · [ 2·d·(∂d/∂x)·sinθ·cosθ              # ── the DEPTH term
+                           + d²·∂(sinθ·cosθ)/∂x ]             # ── the REFRACTION term
+# depth term alone, balanced against τ_b:
+V_long = (π/4)   · (γ/C_f) · tanβ · √(g·d) · sinθ·cosθ        # = 0.7854 — INCOMPLETE
+# in shallow water Snell gives c = √(g·d), so sinθ ∝ √d and, for small θ,
+#   ∂ln(sinθ·cosθ)/∂x = ½·∂ln d/∂x  →  the refraction term is EXACTLY a quarter of the
+#   depth term, with the SAME sign, so the bracket carries 5/2 where it looked like 2:
+V_long = (5π/16) · (γ/C_f) · tanβ · √(g·d) · sinθ·cosθ        # = 0.9817 — complete
+```
+
+**Checked, not asserted** (rewritten independently of the implementation: plane beach `tanβ = 0.02`,
+`T = 9 s`, `θ₀ = 20°`, `S_yx` differentiated numerically with the true `θ(x)` from Snell and the
+balance re-solved). The numerical solve divided by the two closed forms, as the shallow-water
+limit is approached:
+
+| `d` | `kd` | `V_num ÷ (π/4) form` | `V_num ÷ (5π/16) form` |
+|---|---|---|---|
+| 4.0 m | 0.46 | 1.228 | 0.982 |
+| 2.0 m | 0.32 | 1.239 | 0.991 |
+| 1.0 m | 0.23 | 1.244 | 0.996 |
+| 0.25 m | 0.11 | **1.249** | **0.999** |
+
+The refraction factor `∂(d²·sinθcosθ)/∂x ÷ [sinθcosθ·∂(d²)/∂x]` measured on its own runs
+1.228 → 1.2486 over the same range, i.e. → **5/4**; and `∂ln sinθ/∂ln d` measures **0.467** against
+the ½ the derivation assumes, the residual being `kd` not yet zero. The 25% is the whole of the
+gap, and it is not in the friction closure.
+
+**Provenance.** The coefficient is **derived here**, from radiation stress (P) and Snell (P) plus
+a linearised bed stress (F); `5π/16` is also the value carried in the Longuet-Higgins 1970 row of
+`00`, so treat the derivation as the reason and the citation as the corroboration — **do not
+report the constant as read off a paper this chapter has not opened.** Tier of the *structure*
+is unchanged at **P**; `C_f`, the `2/π` cycle-mean and the mixing profile `f` remain tuned/F.
+And the practical warning is the sibling of the one above: **dropping the alongshore refraction
+term is a 25% error with no symptom** — the profile shape is unchanged, only the magnitude, so
+nothing looks wrong.
+
 This is the current that physically executes the CERC transport above — `Q_long` is the sand
 flux it carries.
 
@@ -686,10 +730,45 @@ dissipation is strongest. (Check the dimensions of that group: it must come out 
 it from the *dissipation rate* `D_w` instead of the *energy density* `E_w` yields an
 acceleration, and is a standing trap in reimplementations.) Seaward of the breakpoint, wave-orbital
 **skewness** (sharp shoreward crest-strokes) nudges sand shoreward; landward of it, the undertow
-drags stirred sand seaward. The two fluxes converge at the break point, and the Exner balance
+drags stirred sand seaward. ~~The two fluxes converge at the break point~~ — **corrected below:
+the *onshore* flux converges at the break point, and it does so whether or not the undertow is
+there** — and the Exner balance
 turns convergence into a ridge — the **breaker bar**, crest near depth `d_bar ≈ H_b/γ` with
 `γ ≈ 0.78`, the same breaking index the renderer's break mask uses. Storms (large `H_b`) push the
 bar seaward; calm swell walks it back — the profile breathes on a storm/calm cycle.
+
+> **Correction — what the undertow actually does, and what it does not.** The struck sentence
+> reads as *two* fluxes meeting, and implies both are load-bearing. They are not, and the
+> difference decides what an implementer builds first.
+>
+> **The measurement.** A reference implementation of this loop
+> (`terrain-renderer/reference-impl/beach.py`, `sediment_flux(undertow_on=…)` inside `evolve()`;
+> 500 m of profile, `H_0 = 1.5 m`, `T = 9 s`, 6000 morphological steps from a monotone Dean ramp)
+> was run with the offshore term **deleted entirely** — no undertow, no roller, nothing carrying
+> sand seaward:
+>
+> | | crest depth | ratio to `H_b/γ` | crest amplitude above the ramp | bar-to-trough relief |
+> |---|---|---|---|---|
+> | undertow **on** | 2.084 m | 0.893 | 1.421 m | 0.900 m |
+> | undertow **off** | **2.070 m** | **0.887** | 1.146 m (**−19%**) | **0.011 m** |
+>
+> **A bar still forms, in the same depth.** The onshore flux converges against **zero**: breaking
+> destroys the very skewness that drives it, so `q_on` collapses over a few metres at the break
+> point regardless of what is happening on the other side. `∂q/∂x < 0` needs one flux that stops,
+> not two that meet.
+>
+> **What the undertow is for.** It sets the **relief**, and it is the sole author of the
+> **trough** — 0.900 m of bar-to-trough relief with it, 0.011 m without, i.e. the couplet
+> disappears and only the ridge survives. It also holds the crest in place: without it the crest
+> drifts 17 m shoreward (x = 360 → 377 m) and the scour hollow moves to the *seaward* side.
+>
+> **So the honest statement is:** the **skewness flux and its collapse at breaking put the bar
+> where it is**; the **undertow sets how much bar there is, and carves the trough**. Build the
+> transform and the skewness term first — they produce the landform. Add the undertow second —
+> it produces the *profile*.
+>
+> Tier unchanged at **P** (Svendsen 1984, Bailard 1981 both still do exactly what they are cited
+> for). What moved is not the physics but the *attribution of necessity* inside it.
 
 ```
 # 1D cross-shore profile step — the runnable core (energetics-style)
@@ -698,6 +777,9 @@ bar seaward; calm swell walks it back — the profile breathes on a storm/calm c
 profileStep(h[], H_0, T, dt):
     d      = waterSurface − h
     H_w    = min(shoal(H_0, d), γ·d)                  # transform: shoaling + breaker cap
+    #        ^^^ MEMORYLESS FIRST APPROXIMATION. Correct for where breaking STARTS;
+    #            cannot decay a broken wave and cannot reform one. Replace with the
+    #            energy-flux march below before using this on a barred bed.
     E_w    = ρ·g·H_w² / 8                             # wave energy density
     D_w    = −∂(E_w·c_g)/∂x                           # dissipation rate, where the cap bites
     u_u    = k_u · E_w / (ρ·c·max(d, d_min))          # undertow return flow — E_w, not D_w
@@ -708,6 +790,128 @@ profileStep(h[], H_0, T, dt):
     h     -= dt/(1 − poros) · ∂q/∂x                   # Exner: flux convergence builds the bar
 # equilibrium: bar crest settles near depth d ≈ H_b/γ; far field relaxes to the Dean ramp
 ```
+
+**Correction — the runnable core's transform cannot produce the reform this section is about.**
+`min(shoal(H_0,d), γ·d)` is a **pure function of the local depth**. `shoal()` is the unbroken,
+flux-conserving height; the `min` re-evaluates it at every station with no record of the energy
+the last breaker removed. So the cap is a **mask, not a transform**, and everything that depends
+on a broken wave *staying* broken is outside its reach — which includes the break–reform–break
+couplet over a bar, the thing this section exists to explain.
+
+**The measurement** (`terrain-renderer/reference-impl/beach.py`, `transform()`; the `min` form
+evaluated on the same barred bed that file's loop produced). Take two stations in **the same
+depth**, one seaward of the bar with an unbroken wave, one 44 m landward with a wave that has just
+broken across the crest:
+
+| | seaward, x = 358 m, d = 2.55 m | landward, x = 402 m, d = 2.60 m | difference |
+|---|---|---|---|
+| `min(shoal, γ·d)` | 1.786 m | 1.778 m | **7 mm** |
+| energy-flux march (below) | 1.788 m | 1.204 m | **584 mm** |
+
+The `min` form does not know the bar happened. Following its energy flux across the crest makes
+the same point in one number: `F/F₀` is back to **1.000** in the trough at x = 375 m — the entire
+flux the breaker took out is handed back the instant the water deepens — against **0.642** for a
+march that carries the loss.
+
+**Be precise about the failure, because the `min` form does come off the cap.** Over a trough deep
+enough that `shoal(H_0,d) < γ·d` it stops being capped — 55 cells on this bed — and a careless
+reading of that would call it a reform. It is not one. What emerges is the wave that **never
+broke**, restored to full height (1.727 m in the trough, *above* the 1.625 m it carried before it
+ever reached the bar), rather than a bore that decayed and is now re-shoaling. And because the
+on/off test is `H = γ·d` in *both* directions, the set "broken, but not yet re-broken" is **empty
+by construction**; in the marched model on this same bed it holds **139 cells**. That set *is* the
+reform, and it is the one the `min` form cannot represent at any bathymetry.
+
+**What the runnable core needs instead: dissipation carried as state.** March the energy flux
+shoreward and let breaking subtract from it, with **hysteresis** — two indices, not one:
+
+```
+# transform with memory — replaces the min() line above. Dally, Dean & Dalrymple (1985).
+#   γ_b ≈ 0.78  breaking STARTS when H_w ≥ γ_b·d      (the same index as everywhere else)
+#   γ_s ≈ 0.40  breaking STOPS  when H_w ≤ γ_s·d      (the STABLE wave the bore decays to)
+#   F = E_w·c_g·cosθ   — energy flux per unit length of COAST, the conserved quantity
+waveTransform(h[], H_0, T, θ_0):
+    d, k, c, c_g, θ = dispersion(h) and Snell(θ_0)     # as before
+    F[0]   = (ρ·g·H_0²/8) · c_g0 · cosθ_0              # offshore boundary: F is the input
+    broken = false
+    for i in stations, shoreward:
+        H_w[i] = sqrt(8·F[i] / (ρ·g·c_g[i]·cosθ[i]))   # height is READ OUT of the flux
+        if H_w[i] ≥ γ_b·d[i]:   broken = true          # ── onset
+        elif H_w[i] ≤ γ_s·d[i]: broken = false         # ── cessation: the reform, and the
+        if broken:                                     #    reason two indices are needed
+            F_s    = (ρ·g·(γ_s·d[i])²/8)·c_g[i]·cosθ[i]        # the stable flux it decays to
+            F[i+1] = F_s + (F[i] − F_s)·exp(−K·Δx/d[i])        # exact for locally constant d
+        else:
+            F[i+1] = F[i]                                      # no dissipation: pure shoaling
+    D_w = −∂F/∂x                                       # dissipation rate falls out, as a RATE
+# H_b and d_b are still OUTPUTS: they are where H_w first reaches γ_b·d.
+# K ≈ 0.15 in this energy-flux form is a decay RATE and is NOT the onset — the break point,
+# and with it the predicted crest depth, is independent of it.
+```
+
+Three properties the `min` form does not have and a bar section needs: the wave **loses** energy
+where it breaks; it **stays** lost when the water deepens again; and `γ_b ≠ γ_s` opens a band of
+depths in which the wave is broken but has not restarted — which is the trough, and the reform.
+
+**Tier.** The `min` cap: **F** — a first approximation with a known failure mode, not a model.
+The energy-flux march with hysteresis: **P** for the model (Dally, Dean & Dalrymple 1985 — the
+canonical reference for exactly this). The onset criterion and `γ_s ≈ 0.4` are **relayed**: they
+are quoted from the REF/DIF 1 v3.0 manual §2.3.5 by the implementation named above, and neither
+that manual nor the 1985 paper was opened by this chapter — so they are as good as that relay and
+no better, and a reader who needs `γ_s` to two figures should open one of them. `K` is **`?`** on its numeric
+value — it is quoted as 0.15 in the energy-flux form and 0.017 in amplitude form and the
+conversion was not settled here; use it bounded, and note that nothing this section predicts
+depends on it.
+
+**What this correction does *not* touch.** The rest of the block stands: `E_w`, `u_u` built from
+`E_w` and not `D_w`, the skewness factor on the onshore term, and Exner are unchanged, and the
+`min` cap remains the right two-line answer for *where the surf zone begins* on a monotone ramp
+— which is what a graph node that only needs a break mask is asking.
+
+**`d_bar ≈ H_b/γ` — attacked and standing, with one caveat about your grid.** This is the
+section's central quantitative prediction and it has now been run at rather than assumed. The
+implementation above swept five sea states from `H_0 = 1.0` to `3.0 m` and reported the crest
+consistently *shallower* than predicted, closing as the waves grew — which looks exactly like a
+missing term that matters at small `H_b`:
+
+| `H_0` | `H_b` | `H_b/γ` | measured crest depth | ratio |
+|---|---|---|---|---|
+| 1.0 m | 1.306 m | 1.675 m | 1.367 m | 0.82 |
+| 1.5 m | 1.820 m | 2.333 m | 2.084 m | 0.89 |
+| 2.0 m | 2.307 m | 2.958 m | 2.729 m | 0.92 |
+| 2.5 m | 2.776 m | 3.560 m | 3.394 m | 0.95 |
+| 3.0 m | 3.234 m | 4.146 m | 4.010 m | 0.97 |
+
+**It is mostly the grid, not the physics, and this is the correction to the *finding* rather than
+to the chapter.** Refining the cross-shore spacing at fixed sea state moves the ratio the same way
+raising the sea state does, and by a comparable amount:
+
+| `Δx` | `H_0 = 1.0 m` | `H_0 = 1.5 m` | `H_0 = 3.0 m` |
+|---|---|---|---|
+| 1.00 m | 0.816 | 0.893 | 0.967 |
+| 0.50 m | 0.930 | 0.941 | 0.981 |
+| 0.25 m | 0.950 | 0.971 | *(unstable — see below)* |
+
+Halving the **morphological time step** at either spacing changes the ratio by `1×10⁻⁴`, so the
+time integration is converged and the space step is not. The mechanism is plain once seen: the bar
+is **9 m wide at `H_0 = 1.0 m` and 19 m at `3.0 m`**, so at a fixed 1 m spacing the *small* sea
+state's bar is the badly resolved one, and a coarse grid builds a taller, sharper crest (amplitude
+1.28 m at `Δx = 1 m` against 1.13 m at `Δx = 0.25 m`). The apparent dependence on `H_b` is a
+dependence on **cells per bar width** wearing the same trend.
+
+**So `d_bar ≈ H_b/γ` survives.** A residual shortfall of a few per cent may well survive
+refinement — the crest sits marginally shoreward of the break crossing, in marginally less water,
+which is geometry and is inside the `≈` — but the strong, physical-looking trend with wave height
+is largely an artefact. **The chapter is unchanged on this point, deliberately.**
+
+**Two things to take from it.** First, the **verification** below acquires a precondition:
+*before* reporting a crest-depth shortfall, halve the grid spacing and check the number moves by
+less than the shortfall. Second, the **stability limit that bites when you do**: the slope term of
+the energetics flux is a diffusion, with `D_eff = k·ε·u_orb³/(1−poros)` — measured at
+`6.7×10⁻⁴ m²/s` at the top of the sweep — so the Exner step needs `Δt < Δx²/(2·D_eff)`, which is
+**746 s at `Δx = 1 m` but only 47 s at `Δx = 0.25 m`**. Refining space without refining time is
+what produced the missing cell in the table above: the bed grew a spike of several thousand
+metres. Halve `Δx`, quarter `Δt`.
 
 **Which surf zone to author — beach states (Wright & Short 1984).** One number picks the
 template: the dimensionless fall velocity `Ω = H_b/(w_s·T)`, where `w_s` is the sand **settling
@@ -757,7 +961,30 @@ bed, shoreward at the surface), and a single 2D field carries the *surface* circ
 raised; coast segments with `1 < Ω < 6` grow rips and segments outside the band don't; rip
 spacing clusters around λ_rip with scatter (quasi-rhythmic, neither exactly periodic nor
 uniformly random); `flowVelocity` is nonzero in the surf band, and its jets point seaward
-through the gaps they carved (`09`).
+through the gaps they carved (`09`). Four additions from the implementation review above, each of
+which caught something: **halve `Δx` before believing any crest-depth shortfall** (and quarter
+`Δt` with it); check the bar survives whatever **depth filter** the transform reads (`27`) by
+measuring the crest depth in the *filtered* field, not the raw one; assert the wave's **energy
+flux is monotone non-increasing** shoreward, which the `min` cap violates and a marched transform
+cannot; and check the domain's **sand volume** to round-off, since a loop that quietly gains sand
+will build any bar you ask for.
+
+**Tested against an implementation.** Four claims in this section were re-derived and measured by
+a reference implementation written against it (`terrain-renderer/reference-impl/beach.py`,
+`validate_beach.py`; the corrections are inline above, each with its file, function and number).
+**Two were corrected** — the bar's mechanism (the undertow sets relief, not position) and the
+runnable core's transform (memoryless; cannot reform). **One was extended** — the longshore
+coefficient now carries its derivation. **One was attacked and stood**: `d_bar ≈ H_b/γ`, whose
+apparent shortfall is a grid artefact. That last is a result, and it is recorded because a claim
+that has been attacked and survived is in a different state from one nobody has tested.
+
+> **A gap in the tier vocabulary, stated rather than papered over.** The scheme in `SKILL.md` —
+> **P** verified paper, **F** folklore, **L** landform, **N** tool node, **?** claimed but
+> unverified — has **no mark for "implemented, measured, and it held"**, which is a different and
+> in some ways stronger warrant than a citation: it is reproducible by anyone who runs the file,
+> whereas a citation is only as good as the reader's library access. Until the scheme has one,
+> this section carries the fact in prose. Nothing here upgrades a tier on the strength of a
+> measurement, and nothing should.
 
 **Tier.** The loop's physics is **P**: radiation stress (Longuet-Higgins & Stewart 1962, and the
 1964 nearshore exposition), longshore current (Longuet-Higgins 1970), undertow (Svendsen 1984),
