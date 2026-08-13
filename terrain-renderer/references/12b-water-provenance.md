@@ -717,6 +717,78 @@ least-confident-claims ledger in `00-index.md`.
   film enhancement, not the prefactor. Treat the factor 3–9 as indicative. The restriction to short
   waves is physics, not caution: the inextensible limit needs film elasticity large against the
   wave, which fails for swell.
+- **`?`** — **Waterline weathering: the zones, the mechanisms and their signs**, in [A liner in
+  service is an albedo field](12-water-rendering.md#a-liner-in-service-is-an-albedo-field-and-the-waterline-is-its-coordinate).
+  The organising claim — that a liner in service is an albedo *field* keyed to `h = z − z_water`
+  rather than one swatch — is this skill's framing over the project owner's ruling that not every
+  pool is newly laid. The chemistry under it is **standard in kind and unsourced in quantity**, and
+  the quantities are exactly where the section stops on purpose:
+  - **Carbonate scale at the waterline** by evaporative concentration past the saturation index is
+    standard pool-operation practice (`D` in kind, the same practice cited in the pool-chemistry
+    entry above). The **deposition rate, the band width (quoted as "order 1–5 cm"), and the albedo
+    and spectrum of pool scale were not measured and not chased to a source** (`?`). The organic
+    half of the deposit — body oils, sunscreen, airborne dust — is observation, with no composition
+    or reflectance behind it (`?`).
+  - **UV photodegradation of PVC liner pigment and plasticiser** above the line, and **oxidative
+    attack by free chlorine** below it, are standard polymer-degradation mechanisms from model
+    knowledge; **neither was chased to a primary source, and there is no rate, no dose–response and
+    no measured albedo of an aged liner against a new one** (`?`). That UV-B is stripped in the top
+    decimetres of water faster than UV-A is standard water optics in kind; the depth grading of the
+    submerged wall that this chapter infers from it is **argued, not computed here** (`?`).
+  - **Biofilm and algae in dead-circulation corners**, darkening and green-shifted, is
+    pool-operation practice plus direct observation (`F`); the establishment and kill times are
+    stated as orders of magnitude and are `?`. That corners are the dead zones *because* the return
+    jets sweep the open water is this chapter's own [driven-basin](12-water-rendering.md#the-wave-field-is-a-driven-basin-not-a-spectrum)
+    reasoning, not a measured circulation map (`?`).
+  - **Abrasion** on treads and the shallow end is `F`; the claim that its roughness change is a more
+    reliable cue than its albedo change is this chapter's and is untested (`?`).
+  - The **modification-versus-deposit composition split** (a multiply against a coverage lerp toward
+    the deposit's own albedo) and the **six inference rules R1–R6** are this chapter's construction
+    over those mechanisms (`F`). R4's content — orientation-independence rules a shading explanation
+    out — is the reference observer's own reasoning as recorded in the project bar, not a citation.
+  - **Nothing in this section carries a measured number**, which is the entry's most important line.
+    A reader who wants a figure has to go and get one; the durable content is the zone set, the
+    mechanism in each, and the **sign**, and the signs are checkable against any photograph of a pool
+    that has been in service.
+- **D/?** — **The weathering amplification**, in [Where a weathering profile is allowed to come
+  from](12-water-rendering.md#where-a-weathering-profile-is-allowed-to-come-from-and-what-the-water-does-to-it).
+  `A = ρ/(1 − ρ·R_int)`, `G = 1/(1 − ρ·R_int)` and the identity `dlnA/dlnρ = G` are algebra,
+  recomputed here (`D`); the four-row table at `R_int = 0.47617` (the green diffuse internal
+  reflectance already quadratured in the Fresnel entry above) reproduces to every digit printed, as
+  does the paired **+27.5% albedo → +36.3% apparent** step from ρ = 0.40 to 0.51.
+  **The depth-aware table is the load-bearing correction and it is per-channel.** For a bed at depth
+  the denominator is `1 − ρ·G_rt(τ)`, not `1 − ρ·R_int` — `G_rt → R_int` only as `τ → 0`, exactly as
+  [Attenuation and escape do not
+  factorise](12-water-rendering.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them)
+  establishes — so on this chapter's pool (`G_rt = 0.0965 / 0.3277 / 0.4445` at
+  `τ = 0.3664 / 0.0742 / 0.0143`, both already `D` in the LUT entry above) the gain runs **1.04–1.07
+  in red against 1.22–1.45 in blue** where the diffuse constant promises 1.24–1.50. The diffuse-
+  constant table is therefore an **upper bound**, and quoting it for a body with depth overstates the
+  amplification by up to 40% in red. Round-trip transmittances `exp(−a·2.80) = 0.4806 / 0.8621 /
+  0.9718` at the 1.40 m floor are arithmetic on the reference implementation's band means (`D`).
+  The three consequences — contrast amplified by exactly `G`, level attenuated by exactly the round
+  trip, and hence a colour-neutral material change arriving cyan-shifted at a red:blue swing ratio of
+  **0.494** — are this chapter's composition of those two results (`F`) and were **not** checked
+  against `reference-impl/` (`?`).
+  One bookkeeping note for anyone comparing the two tables in `12`: the `Apparent` column of the
+  liner table in [The two materials a pool actually
+  has](12-water-rendering.md#the-two-materials-a-pool-actually-has-and-neither-is-water) is **not**
+  `ρ·G` — across all six of its rows it is consistent with `ρ·G` carrying a constant first-surface
+  factor of ≈ 0.934 = `1 − R_ext`. The two tables agree exactly on gain and on every ratio; only the
+  absolute column differs, and only by that constant.
+- **F** — **The stated/derived doctrine and the runtime form of the profile**, in the same section.
+  That light transport is derived and material parameters are stated is [OpenPBR's own
+  division](12-water-rendering.md#saying-it-in-openpbr-and-where-the-mapping-stops) restated, and
+  the freeze-then-render test (*would you have written the same profile if you had never seen the
+  render?*) is this skill's doctrine, not a cited method. The runtime rules — two `z_water` (datum
+  for the deposit, instantaneous surface for the wet film), `h` sourced from the same field every
+  other consumer reads, exclusion from RVT/VT page generation carried over from `13`'s
+  [state-layer doctrine](13-snow-weather-surface-state.md#static-says-possible-runtime-says-current),
+  the 1-D-LUT-in-`h` form with a non-linear parameterisation, and the prohibition on touching
+  `transmission_*` — are this chapter's composition over contracts it already owns. The texel
+  arithmetic is exact (±2 m at 256 texels is 15.6 mm/texel) but the tide-line width it is compared
+  against is `?`. **No implementation of this profile exists in `reference-impl/`** (`?`): the
+  section is a specification, and nothing in it has been rendered or falsified.
 - **F** — That treated pool water sits outside every Jerlov class (`b_b ≈ 0`, `c ≈ a`, Secchi
   exceeding body depth), that pool colour is therefore a bottom-albedo property rather than a
   scattering one, and the man-made gating table: this skill's composition from the optics above

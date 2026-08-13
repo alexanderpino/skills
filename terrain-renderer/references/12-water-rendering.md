@@ -99,6 +99,9 @@ the reference implementation or read off a photograph, not supposed.
 | Water uniformly coloured whatever the depth | The depth field ignored — absorption run off a **constant instead of the bathymetry**, so the shallow→deep ramp, the strongest realism cue water has, never happens | [Shading and optics](#shading-and-optics) |
 | Deep clear water rendered bright cyan | Reflectance goes as `b_b/a`, and in clear water `b_b` is molecular and tiny: deep clear water is **near-black**. Bright cyan is *shallow* water over a bright bottom | [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) |
 | A pool that looks the same over every liner, and at every depth | Its colour was art-directed into the **scatter term**. Treated water has `b_b ≈ 0` and no body colour of its own; what is seen is bottom albedo attenuated over the down-and-back path | [Pool optics](#pool-optics-the-colour-is-the-bottom-not-the-water) |
+| A pool reads brand-new — one flat liner colour from the coping to the floor — and no amount of caustic or ripple detail rescues it | The liner authored as a **single `base_color`** where a body in service is an albedo **field**, organised around the waterline. The uniformity is the tell, and it is always in the same place | [A liner in service is an albedo field](#a-liner-in-service-is-an-albedo-field-and-the-waterline-is-its-coordinate) |
+| Weathering visible everywhere else, but the waterline itself is a clean geometric edge with no tide line | The mask is **multiplicative only**. Scale is a *deposit*: it covers the liner and brings its own albedo, so it composes as a coverage lerp — and no multiple of a dark liner is white. The highest-contrast feature on an aged pool is the one a multiply-only pipeline is structurally unable to draw | [A liner in service is an albedo field](#a-liner-in-service-is-an-albedo-field-and-the-waterline-is-its-coordinate) |
+| A weathering or dirt mask lands at the wrong strength — and by a different amount over a pale bottom than a dark one | The trapped series. Apparent bed brightness is `ρ/(1 − ρ·G_rt)`, whose **elasticity in `ρ` is the gain itself**, so a mask authored in albedo space arrives amplified by a factor that depends on the albedo it acts on, per channel. Contrast up, level down, and a neutral change does not stay neutral. Tuning it against the picture is inverting that by eye | [Where a weathering profile is allowed to come from](#where-a-weathering-profile-is-allowed-to-come-from-and-what-the-water-does-to-it) |
 | No bright line where the water meets a wall, a jetty or a stone | The meniscus modelled as an **ambient or roughness lift** rather than a specular strip. A few millimetres of fillet holds every facet orientation, which is why that line survives sun-and-camera geometry nothing else in the frame can reach | [The meniscus line](#the-meniscus-line-where-reachability-cannot-fail) |
 | Objects above the water smear into it — a dock post, a torso, the coping | The refracted sample was **not depth-rejected**, so it landed on geometry nearer than the water surface | [Shading and optics](#shading-and-optics) |
 | Fine ripples and long waves drift in lockstep | One scrolled texture advects every scale at **one velocity** by construction. Real water is dispersive — across a pool-sized band the long components outrun the short by roughly 4:1 | [Sun glitter](#sun-glitter-the-sparkle-path) |
@@ -1100,7 +1103,10 @@ Two consequences for how a scene is authored:
   internal reflection the dry surface does not have. That makes the dry band a **free calibration
   target**: it is the pigment with no water path, no interface and no `n²` between it and the eye,
   so it pins `rho` on its own — and the ratio between it and the submerged bed then pins the
-  absorption path. Two measurements from one photograph, and neither needs a reference chart.
+  absorption path. Two measurements from one photograph, and neither needs a reference chart. That
+  last step assumes one pigment above and below, which is true of a liner on the day it was fitted
+  and of no other day: [A liner in service is an albedo
+  field](#a-liner-in-service-is-an-albedo-field-and-the-waterline-is-its-coordinate).
 
 ### Saying it in OpenPBR, and where the mapping stops
 
@@ -1217,6 +1223,296 @@ names for Epic's things**, quoted verbatim so the section can be checked against
 and deliberately not translated. The same holds for `liquidBody[i]` and its fields, which are
 terrain-architect's export names, not this chapter's.
 
+### A liner in service is an albedo field, and the waterline is its coordinate
+
+The contract above gives the liner one `base_color`. That is right for the day it was fitted and
+wrong for every day after it, and the project owner's ruling on this is a statement about the
+*class* rather than about one pool: *"We moeten rekening houden met dat niet ieder zwembad net
+aangelegd is en kalk aantasting of andere bleking heeft ondergaan"* — not every pool is newly laid,
+and the ones that are not have taken scale attack or some other bleaching. A perfectly uniform liner
+reads as CG immediately, and the tell is always in the same place.
+
+Nothing here needs new vocabulary, which is the point of putting it directly after
+[the vocabulary rule](#the-vocabulary-and-which-half-of-it-you-can-look-up). A weathering field is
+`base_color` as a function of position — that is what a texture is — and the mechanisms under it are
+ordinary chemistry. The only thing that is not obvious is the **organising coordinate**, and it is
+not the one an author reaches for.
+
+```
+h(x) = x.z - z_water          # signed height above the free surface, metres
+```
+
+Everything below keys off `h`. World height is wrong, because a pool with a step, a bench or a
+sloping floor has one waterline and many bed elevations. A painted texture is wrong, because
+`z_water` moves — a pool being drained or filled, a tank whose level is gameplay state — and the
+profile has to move with it.
+
+**It decomposes, and the two kinds of weathering do not compose the same way.**
+
+```
+rho(x) = lerp( lerp( rho_0 * w(h) * m(x),  rho_scale, c(h) ),  rho_bio, m_dep(x) )
+
+  rho_0       pristine liner albedo -- the base_color of the two-material contract, per channel
+  w(h)        MODIFICATION of the pigment in place: UV bleach, oxidative attack. MULTIPLIES.
+  m(x)        the same, geometry-selective: abrasion on treads and nosings. NOT a function of h.
+  c(h)        COVERAGE by a layer deposited on top: carbonate scale and the oils bound into it. LERPS.
+  m_dep(x)    the same, geometry-selective: biofilm in dead corners and shade. NOT a function of h.
+  rho_scale   the deposit's OWN albedo and spectrum -- pale, near-neutral, nothing to do with rho_0
+  rho_bio     the other deposit's own -- dark and green-shifted, and it is why one lerp is not enough
+
+  Nesting order is DEPOSITION order: biofilm settles onto scale, not the other way round.
+```
+
+That distinction is load-bearing and it is the one most often collapsed into a single multiply. A
+modification can only scale the pigment already there; a deposit *replaces* it over a coverage
+fraction and brings its own albedo, its own hue and its own roughness. **A multiplicative weathering
+mask can never draw a dark liner's tide line**, because white is not a multiple of dark blue — so the
+highest-contrast feature on an aged pool is precisely the one a multiply-only pipeline is
+structurally unable to produce.
+
+| Zone | Band | Mechanism | Kind | ρ | Hue | Clock |
+|---|---|---|---|---|---|---|
+| **Dry band / freeboard** | above the splash reach, up to the bead track | **UV photodegradation** of pigment and plasticiser. No water column over it, so it takes the highest solar UV dose of any part of the liner, and it dries between wettings | modification | **↑ lightens**, and chalking raises roughness with it | desaturates toward the pale substrate; on a blue liner red rises fastest because it started lowest | slow, monotone, years (`?`) |
+| | | *and* airborne soil, pollen and dust settle on the same band | deposit | ↓ | site-dependent | — |
+| **Tide line** | a *narrow* band on the **long-term mean** level, order 1–5 cm (`?`) | **Carbonate scale**: evaporation concentrates the surface microlayer exactly at the line, and CaCO₃ leaves solution past the saturation index onto the strip that is wetted and dried over and over. Plus **body oils, sunscreen and dust** bound into it | **deposit** | **↑↑ strongly, over a narrow band** — the highest-contrast feature on an aged liner, and the reason it reads as a *line* rather than a gradient | near-neutral white where scale dominates, grey-brown where the organic film does. Two deposits, two colours, one band | months; removed in an afternoon with acid |
+| **Splash zone** | just above and below, order ±10 cm | repeated wetting and drying: partial scale, and the **optical** wet-film darkening in the same place | both — *and one of them is not weathering at all* | ↑ material, ↓ optical | — | the optical half is instantaneous and closed form ([`12a`](12a-water-derivations.md#the-companion-why-a-wet-band-is-darker-with-no-free-parameter)); the material half is permanent |
+| **Submerged wall and bed** | `h < 0`, graded with depth | **Oxidative attack by free chlorine** on the pigment, running continuously for as long as the pool is sanitised, plus the UV that survives the column — UV-B is stripped in the top decimetres and UV-A goes further, so the photolytic dose falls with depth | modification | **↑ lightens, graded, strongest just under the line** | toward the substrate, as the dry band | dose-like in concentration × time (`?`) |
+| **Corners, coves, behind ladders, shaded runs, the lee of steps** | **not** a function of `h` | **Biofilm and algae**, where circulation is dead and the sanitiser residual is lowest. Corners are dead precisely *because* the return jets sweep the open water ([driven basin](#the-wave-field-is-a-driven-basin-not-a-spectrum)) | deposit | **↓↓ darkens** — the counterexample | green to blue-black: pulls red hardest, blue next, green least | days to establish, hours to kill |
+| **Treads, step nosings, the shallow end, the entry** | geometry-selective, `h`-adjacent | **Abrasion** — feet, brushes, the vacuum head | modification | ↑ on a pigmented liner: the top layer goes first | little hue change | use-driven; roughness is usually the more reliable cue than albedo (`?`) |
+
+**Say which way each one goes, because a reader who assumes weathering bleaches will get the corners
+backwards** — and the corners are what sells the picture. An old pool is *pale in the middle and dark
+in its corners at the same time*, and a mask that only lightens produces a pool that has been left
+in the sun rather than one that has been swum in.
+
+**The mechanisms do not move together, so age is not a scalar.** A pool that was acid-washed last
+spring has no tide line at all and a fully bleached submerged wall. A brand-new pool with a failed
+chlorinator has algae in the corners, no tide line, and pristine albedo everywhere else. A new pool
+filled with hard water and run at pH 8.2 grows a tide line within a season and nothing else. **One
+"age" slider produces combinations no pool has**, and a wrong combination is more visible than no
+weathering, because each zone runs on its own clock and a viewer has seen all of them.
+
+**Inference rules, from the picture back to the mechanism.** Each is also a constraint on what a
+profile is *allowed* to claim:
+
+```
+R1  narrow, high-contrast, centred on the mean level, lighter than its surroundings
+        -> DEPOSIT.  A pigment change cannot be that narrow; no dose gradient has that edge.
+R2  graded monotonically in |h| below the line, no edge anywhere in it
+        -> DOSE-LIMITED MODIFICATION (oxidant or UV). Not a deposit.
+R3  geometry-selective, darkening, green-shifted, indifferent to h
+        -> BIOFILM.  Key it to circulation and shade, never to height.
+R4  present on every wall regardless of aspect
+        -> MATERIAL, not shading.  Orientation-independence is what rules a lighting explanation
+           out, and it is the entire content of the reference observer's "rondom donkerder".
+R5  the SIGN of the change differs above and below the line
+        -> TWO mechanisms, therefore two profiles.  One mask with a sign flip inside it is a
+           curve fit; two mechanisms on two clocks is a model.
+R6  a deposit reads the same colour above the line and on the bed
+        -> TRANSPORT MISSING, not material.  Same carbonate, different path length: next section.
+```
+
+**And the numbers are deliberately not here.** Deposition rates, bleaching rates, the albedo and
+spectrum of pool scale, the albedo of a two-year-old liner against a new one — none of these were
+measured in this run or chased to a source, and every one of them is marked `?` in
+[`12b`](12b-water-provenance.md). That is the more useful state to leave them in: a reader handed a
+figure stops measuring, and a reader handed a marked gap goes and swabs the wall. What is durable
+here is the **set of zones, the mechanism in each, and the sign** — and the signs are checkable
+against a photograph of any pool that has been in service.
+
+### Where a weathering profile is allowed to come from, and what the water does to it
+
+**Light transport is derived; material parameters are stated.** Given geometry, an illuminant and
+materials, every radiance in the frame follows and nothing in it is free — that is what the tier
+ladders in this chapter are ladders *of*. Material parameters are the other kind: inputs, from
+outside the render, that no amount of transport work will produce. [OpenPBR draws exactly this
+line](#saying-it-in-openpbr-and-where-the-mapping-stops) — the BSDF is physics the renderer
+evaluates, `base_color` is a number the author supplies, and the specification has nothing whatever
+to say about where that number came from.
+
+A weathering profile is on the stated side. It is therefore legitimate input on exactly the terms any
+material parameter is: **it came from a measurement of the surface, or from a stated typical value
+with its source named and its uncertainty carried.** It becomes illegitimate the moment it is
+adjusted until the picture is right — not because the mechanism is fake, but because at that point it
+has stopped being a statement about the pool and become a residual wearing a physical name, and a
+residual absorbs whatever error is nearest to hand, including the errors that belong to the
+transport.
+
+**The test is one question:** *would you have written the same profile if you had never seen the
+render?* Three things follow, and they are what make the question usable rather than rhetorical:
+
+- A profile from a measurement passes by construction, because the measurement predates the render.
+- A profile from a typical value passes **only while the value stays typical**. Nudging it off the
+  published figure to close a gap fails, and its having started as a citation does not launder it —
+  a cited number moved by 30% is an uncited number with a footnote.
+- Enforceability is procedural: **write the profile down, freeze it, then render**, and report the
+  resulting ordering as an *output*. A material split only measures something for as long as it is
+  reported rather than fitted; the moment it is fitted the render stops being an instrument.
+
+**Weathering is dangerous specifically because it is real.** A tint has no argument behind it and is
+easy to refuse. Every mechanism in the table above is genuine chemistry, so a weathering term arrives
+with an excuse ready for any value it is given — and, uniquely, for values in *either direction*,
+since the zone table supplies both lightening and darkening. A parameter that can be argued for both
+ways is the one to watch, and it is the one whose justification has to be written before its value is
+chosen.
+
+**What the water then does to it is not a constant.** The bed's apparent brightness under the
+[trapped series](#the-two-materials-a-pool-actually-has-and-neither-is-water) is
+
+```
+A(rho) = rho / (1 - rho * R_int)          # radiance factor AT the bed, per unit irradiance there
+G(rho) = 1   / (1 - rho * R_int)          # the trap gain
+
+dlnA/dlnrho = 1 + rho*R_int/(1 - rho*R_int) = 1/(1 - rho*R_int) = G(rho)      # exact
+```
+
+**The elasticity of apparent brightness with respect to albedo is the trap gain itself.** A 1% change
+in liner albedo is a `G`% change in what the picture shows — and `G` is not a constant, it is a
+function of the very quantity being changed. At the diffuse constant `R_int = 0.47617` (green;
+this is the `τ → 0` limit, which matters below):
+
+| ρ_bed | trap gain `G` | apparent `A = ρ·G` | elasticity `dlnA/dlnρ` |
+|---|---|---|---|
+| 0.40 | 1.23528 | 0.49411 | 1.235 |
+| 0.51 | 1.32074 | 0.67358 | 1.321 |
+| 0.60 | 1.39998 | 0.83999 | 1.400 |
+| 0.70 | 1.49997 | 1.04998 | 1.500 |
+
+(`D`, recomputed here; all four rows reproduce to the digits printed.) Between the first two rows,
+**+27.5% in albedo comes out as +36.3% in apparent brightness** — a finite-step amplification of
+1.321, which sits between `G(0.40)` and `G(0.51)` as it must. `A` passing 1 at high albedo is not an
+error to clamp: it is a radiance factor at the bed relative to the irradiance delivered *there*, and
+the trapped series legitimately returns more than one bounce's worth to the bed. What escapes is `A`
+with the escape leg on it, which is where `1 − R_int` and the [`1/n²`](#radiance-is-not-conserved-across-the-interface) live.
+
+**But `R_int` is the wrong constant for a bed at depth — it is an upper bound, and a chromatic one.**
+The reflectance that closes the series for a *submerged* bed is not the diffuse surface constant but
+the round-trip return `G_rt(τ)` of [Attenuation and escape do not
+factorise](#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them): the
+light must cross the column **twice** before it is back on the bed, so the denominator is
+`1 − ρ·G_rt(τ)`, and `G_rt → R_int` only as `τ → 0`. On this chapter's own pool
+(`τ = a·d = 0.3664 / 0.0742 / 0.0143` at 1.40 m, `G_rt = 0.0965 / 0.3277 / 0.4445`):
+
+| ρ_bed | gain, red | gain, green | gain, blue |
+|---|---|---|---|
+| 0.40 | 1.0401 | 1.1509 | 1.2162 |
+| 0.51 | 1.0518 | 1.2007 | 1.2932 |
+| 0.60 | 1.0615 | 1.2447 | 1.3637 |
+| 0.70 | 1.0724 | 1.2977 | 1.4517 |
+
+(`D`, recomputed here from this chapter's own `G_rt`.) **Red barely traps at all** — 1.07 at ρ = 0.70
+against the 1.50 the diffuse constant promises — because a red photon sent back down mostly does not
+return. So the amplification is real and monotone in albedo, but on a 1.40 m pool it runs **1.04–1.45
+across the channels**, not the 1.24–1.50 of the `τ → 0` table. Use the diffuse constants as a bound
+and `G_rt` for a body that has depth.
+
+**The consequence runs two ways at once, on two different quantities.** Take a mask authored on a dry
+sample — a swatch, a material-editor preview, a photograph of the liner out of the water — and put
+the same material under 1.40 m of pool:
+
+- **Contrast is amplified, by exactly the gain** — `G` above, taken with `G_rt` for a bed at depth.
+  The ratio between two weathered patches is `A(ρ₂)/A(ρ₁)`, and every constant on the exit path
+  cancels out of it. A 10% albedo step on the swatch is a **10.4–14.5%** radiance step on this
+  pool's bed, the low end in red and the high end in blue over a pale liner.
+- **Level is attenuated, by exactly the round trip, per channel.** At 1.40 m the round trip is 2.80 m
+  and `exp(−a·2.80)` on the reference implementation's band means is **0.4806 / 0.8621 / 0.9718**
+  (`D`). The same mask therefore lands *fainter in absolute radiance and higher in contrast* than it
+  was authored — a combination nobody tunes their way out of by eye.
+- **A neutral change does not stay neutral.** Because that transmittance is 0.48 in red against 0.97
+  in blue, a **colour-neutral** weathering step on the bed reaches the eye with roughly **half the red
+  swing it has in blue** (ratio 0.494). So the tide line and the scale on the floor can be the same
+  carbonate and must *not* be the same colour in the frame: above the line the deposit reads as
+  itself, on the bed it reads cyan-shifted. That is R6, and it is a review test — if scale above and
+  below the waterline comes out the same colour, what is missing is transport, not material.
+
+**Which is why a weathering mask cannot be tuned against the final image.** Anyone doing it is
+inverting `A = ρ/(1 − ρ·G_rt)` by eye, through a gain that depends on the value being solved for,
+separately per channel, composited under a Fresnel sky share that varies across the frame with view
+angle. Whatever comes out of that is not a material statement, which puts it straight back on the
+test above. **Author the profile in albedo space against the material; read the picture to check it,
+never to set it.**
+
+**Driving it at runtime, and the whole of it is one line: there are two `z_water`.**
+
+```hlsl
+// Waterline weathering: one 1-D LUT in h, one two-channel stamp in the body's frame.
+// Every constant below is a STATED input. None of them is a place to close a residual,
+// and RHO_SCALE / RHO_BIOFILM are marked `?` in 12b because nobody measured them here.
+float  hDatum = worldPos.z - WaterDatumZ(bodyId);          // liquidBody[i].waterSurface -- the MEAN level
+float  hInst  = worldPos.z - WaterSurfaceZ(worldPos.xy);   // the displaced surface, this frame
+
+float4 prof   = WaterlineLUT.SampleLevel(smpClamp, ProfileU(hDatum), 0);   // .rgb = w(h), .a = c(h)
+float2 stamp  = WeatherStamp.SampleLevel(smpBody, BodyUV(worldPos), 0).rg; // .r = m(x)     wear
+                                                                          // .g = m_dep(x) biofilm cover
+
+float3 base   = rho0 * prof.rgb * stamp.r;                 // pigment modification -- MULTIPLIES
+       base   = lerp(base, RHO_SCALE,   prof.a);           // scale + oils  -- COVERS, own albedo, PALE
+       base   = lerp(base, RHO_BIOFILM, stamp.g);          // algae         -- COVERS, own albedo, DARK
+float  rough  = lerp(rough0, ROUGH_DEPOSIT, max(prof.a, stamp.g));   // both deposits are rougher
+
+// The wet film is OPTICAL and instantaneous, in the same place and on the other clock.
+base          = lerp(base, WetAlbedo(base), WetFraction(hInst));   // a_wet, closed form, 12a
+```
+
+- **The tide line uses the datum; the wet band uses the instantaneous surface.** A deposit laid down
+  over months sits at the *mean* level and must not wobble with 3 mm of ripple; the water film does
+  wobble, because it is water. One `z` each. A pipeline carrying only one of them has either a tide
+  line that breathes or a wet band that is frozen, and both are immediately visible.
+- **`h` comes from the field everything else reads** — `liquidBody[i].waterSurface` from
+  [the handoff](#the-handoff-seen-from-the-render-side), or the [Water Info
+  Texture](#the-water-info-texture-fuse-the-handoff-into-one-sampleable-field) where the architecture
+  is that shape. Never a second copy of the level: a drained pool with its tide line still at the old
+  height is the tell, and a texture baked at a fixed level guarantees it.
+- **Never into RVT/VT pages.** The profile is a function of a time-varying global, so it composes
+  *over* the resolved base material — `13`'s [state-layer
+  doctrine](13-snow-weather-surface-state.md#static-says-possible-runtime-says-current), and the same
+  rule that keeps snow amount out of page generation keeps water level out. Draining a pool must not
+  dirty the cache.
+- **It is one-dimensional, so it is a 1-D texture — and the parameterisation is the whole cost.**
+  Only the geometry-selective term needs a 2-D map, and being stationary in the basin that is a bake
+  in the body's frame exactly like the [jet
+  wake](#the-wave-field-is-a-driven-basin-not-a-spectrum). But a *linear* 1-D LUT over ±2 m at 256
+  texels is 15.6 mm per texel against a tide line 10–50 mm wide (`?`) — the highest-contrast feature
+  in the frame landing on one to three texels. Spend texels where the derivative is: an `asinh`-like
+  or piecewise `ProfileU(h)` with most of its range inside ±10 cm.
+- **It writes `base_color` and `specular_roughness`, and nothing else.** In particular it must not
+  touch `transmission_color` or `transmission_depth`: those are the medium, and the medium does not
+  weather. Reaching for them to make an old pool look tired is modelling a carbonate deposit as a
+  change in the water — the `waterColor` category error arriving through a new door.
+
+**What this does to the open finding this project is currently stuck on.** Its bar records it in
+sections J and K: the reference pool's submerged wall reads *lighter* than its dry band, on every
+side, and two waves of derived transport failed to produce that ordering. The render stalls at a
+wall:band ratio of 0.513 where the observation requires greater than 1, which prices the albedo ratio
+submerged:dry at **≥ 1.95** and, since albedo cannot exceed 1, constrains *both* sides at once.
+
+Weathering makes that ordering **reachable as a material fact rather than an optical one**, and it
+gets there through the rules above rather than by assumption: a sign difference across the line is
+R5 (chlorine attack below, a dry band whose pigment is intact or soiled above), and the
+orientation-independence the observer reports — *"de rand is rondom donkerder"* — is R4, which is what
+removes the shading explanation.
+
+**It is a hypothesis under test in that project, not a settled result, and this section is not a
+licence for it.** Three reasons it is not yet earned, and the first is the one that matters:
+
+1. **The cheaper explanation has not been eliminated.** A dry band that is simply over-*lit*
+   reproduces both orderings with no material difference at all. The instrument that separates them —
+   band against water, in scene-linear, a within-frame pair close enough in level to survive every
+   camera failure that bar catalogues — has not been read.
+2. **The profile has no measurement behind it.** K's albedo table is the set of values the ordering
+   *requires*: that is the inverse of a stated input, derived from the target. Under the test above it
+   is a fit wearing a mechanism's name, and the mechanism being real is exactly what makes it hard to
+   see as one.
+3. **The required albedo ratio and the required apparent ratio are not the same number.** By the
+   amplification above they differ by a per-channel gain that depends on the albedos being solved for,
+   so a profile fitted against the picture is not the profile a reflectance measurement of the actual
+   liner would return — and the two will disagree even in the case where the ordering comes out right.
+
+What closes it is a measurement of the real liner above and below the line, which turns the profile
+from a fit into a statement and makes the ordering an **output**. Short of that the row stays open —
+and an open row that says so is worth more than one closed by choosing a number. Reaching for
+weathering to explain a discrepancy is precisely the move the test in this section exists to catch.
+
 ### The rest of the man-made checklist
 
 - **Straight lines are the fidelity test.** Tiled walls and rectangular coping hand the viewer a
@@ -1227,6 +1523,9 @@ terrain-architect's export names, not this chapter's.
 - **The waterline is geometry, not a fade.** On a vertical wall the shore-distance field carries no
   information. Author the band: wet tile below the line, a damp gradient above from splash, the static
   scale line at the tile course, a specular [meniscus](#the-meniscus-line-where-reachability-cannot-fail).
+  All of it keys off `h = z − z_water` and none of it is paintable at a fixed level —
+  [A liner in service is an albedo
+  field](#a-liner-in-service-is-an-albedo-field-and-the-waterline-is-its-coordinate).
 - **Inflows are the flow field.** Return jets and skimmer draw are the only steady flow, and they
   are small and local — author them as sim-patch injections rather than exporting a flow raster for
   a 10 m body.
