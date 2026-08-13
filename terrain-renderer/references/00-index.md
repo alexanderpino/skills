@@ -312,7 +312,16 @@ verification effort first.
   near-total reflectors" is an argued approximation, not a figure. The pool-optics worked example
   is arithmetic done in-chapter over Pope & Fry absorption sampled at the chapter's own RGB points
   (610/550/450 nm — **not** the 418 nm absolute minimum, which is below a typical blue channel);
-  the liner albedos are representative values, not product data.
+  the liner albedos are representative values, not product data. Two items added 2026-08 and both
+  **open** rather than uncertain: the submerged vertical face's sky share is *located* — the window
+  is 0.199 of a horizontal face at the same depth against the 0.390 the reference implementation
+  hands it — but **not fixed**, because closing it needs the mirror's missing bounces at the same
+  time and moving the sky constant alone runs the wrong way; and the caustic read on a vertical face
+  is corrected to the refracted beam's continuation yet is still a **proxy**, since the bed's map is
+  focused at each texel's own depth and the honest fix is to rasterise those faces into their own
+  caustic map. The artefact figures attached to the second (41% arc rms, stripe rms 1.372 → 0.816,
+  z/arc 0 → 0.941) are the implementation's own printed diagnostics on one frame and were not
+  independently re-derived.
 - `12`, `03` (engine-native water, added 2026-08): every claim in the UE Water sections is D/N-tier
   engine documentation fetched 2026-08 — architecture, quadtree/tile defaults, body types and spline
   metadata, Landmass brush modes and the edit-layers requirement, Single Layer Water's inputs and its

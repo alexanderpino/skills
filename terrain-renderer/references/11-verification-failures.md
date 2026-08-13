@@ -410,6 +410,36 @@ golden-image test cannot catch, because nothing about the image is wrong.
   `(0.2290, 0.6917, 0.0793)` (`D`). A *luminance* ratio read off a P3 file misread as sRGB is still
   usable; a *chromaticity* read off it is not.
 
+  **And the instrument does not have to be a camera: your own renderer's output is display-referred
+  too.** The entry above is written about photographs because that is where it was learned, but the
+  second failure — a display-referred tone curve rescaling level non-uniformly — is a property of
+  the *file*, not of the optics that made it. A render's PNG has been through a view transform and a
+  display-side curve exactly as a phone's JPEG has, and **inverting the sRGB EOTF on it recovers
+  display-linear, not scene-linear.** This project committed that against its own frames within
+  ninety minutes of writing the warning above: a water-to-stone ratio was read off the render's PNG
+  with `colour_table`, after ACES and a display S-curve, and reported the render short by a factor
+  of two. It was not short at all. The rule is one line — **measure in the render target, before the
+  tone map, or you are measuring your grade** — and it costs nothing, because unlike a photograph
+  the scene-linear buffer is *right there*.
+
+  Two further distortions compounded it in that episode, and each is independently common enough to
+  be worth naming, because the three multiply and none of them looks like an error on its own:
+
+  | Distortion | Factor, on that frame | Why it is easy to take |
+  |---|---|---|
+  | A **median** over a right-skewed field | **×0.953** | A caustic net is bright folds over dim cells: median/mean is **0.786** on the transmitted column (`D`). A median is the standard defence against outliers, and here the outliers *are* the signal — the same median over smooth stone reads the stone, so it biases only one side of the ratio |
+  | A **display-referred** read of the render's own PNG | **×0.996** here, **×0.966** on the hero frame | The two surfaces sat close in level on the wide frame and far apart on the hero — which is this section's own "prefer pairs close in level" precondition, observed running both ways |
+  | A **region** that was not the quantity being predicted | **×0.590** | The closed form is about *sunlit bed under water*; the region was **all** water in the frame, including an occluder's shadow and the strip the refracted beam never reaches. That strip is physics, not a deficit |
+
+  `0.706 × 0.953 × 0.996 × 0.590 = 0.395` against a true **0.706** on that frame — a factor of
+  **1.79**, every link measured rather than argued (`D`, arithmetic recomputed here). **Note the
+  ranking, because it is the opposite of what the episode felt like:** the tone curve was the
+  *smallest* of the three on that frame and the region was the largest. The transferable lesson is
+  therefore not "the curve got me" but the ordering rule — **check what was measured over before
+  checking what space it was in** — and then check both, because a factor of two is rarely one
+  mistake. A discrepancy that resolves into three independent factors of 0.6–1.0 was never going to
+  be found by arguing about the physics.
+
 **The remedy, stated as a method rather than as a warning: ratios internal to one frame, and pairs
 close in level.** Two surfaces in one exposure share the white balance, the exposure and the colour
 space, so those three factors divide out of their ratio — which is the same structural fact as the
@@ -491,6 +521,90 @@ by construction — fixed dt, scripted transform); and platform-specific goldens
 reference platform (raster and filtering differ legitimately across vendors — golden per
 platform tier, cross-platform diffs only as an informational report).
 
+### The eighth way is about the test, not the measurement
+
+This one earns its own heading rather than an eighth bullet above, and the reason is the useful
+part of it. The seven are all failures of an **instrument**: each produces a number that is
+reproducible and wrong, and the remedy is to fix the reading. This one produces a number that is
+**right**, about the wrong thing. Nothing in it lies; the suite is honest, the assertion holds, the
+physics it asserts is real. What fails is *coverage*, and coverage is not a property of a
+measurement at all — it is a property of the test's relationship to the code. Filing it with the
+seven would blur the list's own thesis, which is that a measurement can lie while looking like one.
+This is the opposite failure: a test that tells the truth while touching nothing.
+
+**A test's power is the surface area it shares with the thing under test.** That is the whole rule,
+and it is worth stating before the story, because it inverts an instinct. Robustness and power pull
+against each other: a test written to be independent of the implementation's details is written to
+be blind to them, and the limit of that process is a test that shares one symbol with the code and
+checks a law of nature.
+
+**What it looked like here.** A water renderer carried a *closed energy audit of the whole pool*:
+put a perfect white Lambertian bed under a flat surface, no absorption, uniform sky, compose it the
+way the renderer composes, and the apparent albedo must come out **exactly 1** — energy
+conservation, right-hand side the number 1, no constant of the renderer in it. That is a genuinely
+good guard, it was written for a real bug (a missing `1/n²` on light leaving the medium, which it
+catches: without the divisor the audit reads 1.73), and it passed for the project's whole run while
+the transport it was named after carried a **truncated** interreflection series over the wrong cone,
+no path lengths at all, and no basin — three things it was structurally incapable of noticing.
+
+Read what it *borrowed* and the reason is mechanical — **one name**:
+
+- it wrote its **own** irradiance and its **own** in-water radiance, so it never asked the renderer
+  for the field it was auditing;
+- it closed the interreflection series `1/(1 − ρ·R_int)` **itself**, so a renderer truncating that
+  series at one bounce over the wrong cone could not register;
+- it had **no absorption and no depth** — every path length in it is exactly 1 — so any error in a
+  path length was invisible either way;
+- it had **no scene**: no walls to intercept the beam, no occluder.
+
+One function was on the stand. Everything else in the assertion was the test's own arithmetic, and
+the right-hand side was a law that would hold for almost any implementation that composed
+*something* through that one function. **It is a good unit test of one divisor wearing the title of
+an audit** — and the title is what did the damage, because a suite containing a row called "closed
+energy audit of the whole pool" is a suite nobody asks a second question of.
+
+**The remedy is a pair chosen so each sees where the other is blind**, and it generalises past
+water. The audit was replaced by two rows through the *shipped* chain:
+
+- **a limit** — lossless white bed, zero absorption: `R(θ_sun) + ρ_water(1, a = 0) == 1`. Right-hand
+  side the number 1, no constant of the renderer, and it pins the **shape** of the series. It is
+  also blind to every path length in the chain, because at `a = 0` every path is 1.
+- **a 400 000-photon analog walk** at the medium's own absorption. A photon enters at the refracted
+  angle, crosses to the bed, is redrawn from a cosine law, attenuates over its **own** `1/μ`, meets
+  the exact internal Fresnel and either escapes or returns. **Nothing in it is an average of
+  anything**, which is the only way a *correlated* integral can be checked — a second quadrature
+  would have shared the premise, which is the fourth way above. It agrees with the closed form to
+  **0.15% at worst and under 0.1% in two of three channels** (`D`, both recomputed here).
+
+**And then fire each one at the bug it was written for, by putting the bug back.** This is the part
+that is transferable whatever the domain, and it is cheap: a reintroduced bug is a four-line patch
+and the answer is a row number. Four were reintroduced here:
+
+| Bug put back | Rows that FAIL | Does the limit alone catch it? |
+|---|---|---|
+| Drop the leading `2` in the `2·E₃` slab transmittance | 7 | **yes** — it reads 0.42 against 1 |
+| Drop the up leg from the transport's numerator | 2 | **no** — only the walk, and only at nonzero absorption |
+| A one-way transmittance where the round trip belongs | 1 | **no** — only the walk |
+| Re-separate the joint escape integral into its two means | 2 | **no** — the two agree exactly at `a = 0` |
+
+**The lossless limit alone passes three of the four** (`D`, verified here by evaluating each variant
+against the limit). That is the same blindness the old audit had, caught before it shipped this
+time, and it is why the discipline is *two* guards with named blind spots rather than one guard with
+a good name. The physics case is [`12`'s water
+transport](12-water-rendering.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them);
+the mechanism is general.
+
+Three questions to ask of any test that has never failed, in the order they are cheapest to answer:
+
+1. **How many symbols does it import from the code under test?** One is a warning, not a
+   certificate. Count them literally.
+2. **What does its right-hand side depend on?** A physics identity is a strength when the code has
+   to reach it through the shipped path and a weakness when the test can compute both sides itself.
+   `assert conservation(my_own_composition()) == 1` is a test of the assertion.
+3. **Which of its inputs are at a degenerate value?** Zero absorption, unit albedo, normal
+   incidence, one texel, a flat surface — every degeneracy silently deletes the terms that only
+   exist away from it, and those terms are usually the ones a reviewer would have asked about.
+
 ## Review checklist
 
 Ordered by frequency of real defects in shipped terrain renderers. State findings as
@@ -547,3 +661,6 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
 | That automatic white balance biases a saturated frame toward neutral, and that a display-referred tone curve deepens the toe — with the sign of each, and the resulting one-sided bounds | **F** (universal camera-pipeline behaviour; no single citation) + **D** (direction and rough magnitude independently confirmed by an observer present at the reference shoot, for *one* subject — a bounded corroboration, not a calibration) |
 | The within-frame-ratio method, the "prefer pairs close in level" precondition, and the three cancelling pairs | **F/D** — the tone-curve precondition is the local-slope argument (arithmetic); which pairs cancel what is derivation (`12a`); that this is the right instrument is this skill's composition, and it was corrected mid-project after the tone curve was pointed out |
 | `L = K·N²/(ISO·t)`, `K ≈ 12.5`, as the EXIF route to a scene luminance | **P** (the ISO 2720 / standard reflected-light-meter relation; `K` in 10.6–13.4 by manufacturer, 12.5 for Canon/Nikon — quoted from model knowledge, **not** re-verified against the standard, so treat it as ±10%) |
+| That a *render's* own PNG is display-referred too, and that inverting the sRGB EOTF on it recovers display-linear rather than scene-linear | **F/D** — universal of any view-transformed output (no citation needed, and the same mechanism as the seventh way's second axis); **D** for the episode, committed on this project's own frames and reproduced from the render's scene-linear buffer |
+| The three-factor chain `0.706 × 0.953 × 0.996 × 0.590 = 0.395` against a true 0.706, i.e. 1.79× | **D** — arithmetic recomputed here on the reference implementation's whole-basin frame; the median/mean skew ratio 0.786 and the region factor 0.590 are properties of *that* frame, that occluder and that sun. ⚠️ The chain had been quoted against a "true 0.735", which is the **hero** frame's ratio, not that frame's; the factor is 1.79, not 1.86. What transfers is the **ordering rule** — check the region before the colour space — and the observation that the tone curve was the smallest of the three here (×0.996) while being the one the episode was named after |
+| The eighth way: a test's power is the surface area it shares with the code under test | **F** (house doctrine, and the general form of the fourth way's "two methods that read one premise are one method") + **D** for the case — the audit's one borrowed name, the lossless-limit/photon-walk pair agreeing to 0.15%, and the four-bug table are all `reference-impl/validate.py`, re-evaluated here; that **the lossless limit alone passes three of the four** was verified by evaluating each variant against the limit, not quoted |

@@ -268,6 +268,49 @@ least-confident-claims ledger in `00-index.md`.
   renderer (`P`, arithmetic). The **verification** half of this entry, and why a Fresnel suite cannot
   see any of it, is `11`'s
   [sixth way a measurement lies](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
+  ⚠️ **What that audit could not see, added in this pass:** it borrows exactly one name from the
+  renderer, so it certifies the divisor and nothing else. The replacement pair and the
+  reintroduced-bug table are `11`'s
+  [eighth way](11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement).
+- **P/D** — [Attenuation and escape do not
+  factorise](12-water-rendering.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them),
+  and the same derivation in
+  [`12a` §10](12a-water-derivations.md#the-diffuse-exit-and-why-its-two-factors-may-not-be-separated).
+  The identity `⟨fg⟩ = ⟨f⟩⟨g⟩ + Cov(f, g)`, and its relative form `r·CV_f·CV_g`, are elementary
+  probability (`P`) and carry no water in them — the transferable claim is that a pre-computation
+  may split a product only across variables the integral does not run over. Everything numeric is
+  `D`, recomputed here by 2000-node Gauss–Legendre on the exact unpolarised internal Fresnel over
+  the cosine-weighted measure `2μ dμ`: `T_esc = 0.3403 / 0.4795 / 0.5106` and
+  `G_rt = 0.0965 / 0.3277 / 0.4445` at this pool's `τ = a·d = 0.3664 / 0.0742 / 0.0143`; the
+  separated forms `2E₃(τ)·(1 − R_int) = 0.2850 / 0.4563 / 0.5050` and
+  `(2E₃(τ))²·R_int = 0.1389 / 0.3614 / 0.4546`; hence **16.2 / 4.8 / 1.1 % low** on the escape leg
+  and **43.9 / 10.3 / 2.3 % high** on the round trip. ⚠️ Those percentages are quoted in both
+  directions on purpose, because the same two facts have circulated as "understates by 19.4%" and
+  "overstates by 30%" — which are the *reciprocal* readings (joint over separated) of the same two
+  numbers. Both readings are correct; mixing one of each in a chain is how a factor gets
+  double-counted, so a percentage of this kind is quoted with its denominator or not at all. The
+  correlation coefficients (**+0.76**, **−0.85** at the red `τ`, both tending toward ±0.90 as `τ`
+  grows) and the error-versus-`τ` ladder are quadratures here (`D`). The **cancellation** — 19.4% in
+  the term against 2.8% in the composed albedo — is a property of *this* chain's algebra (the round
+  trip sits in a denominator) and is `D`; that term-level errors of this class hide behind
+  chain-level agreement is the general claim. That the separated form is **exact at `τ = 0`**, and
+  therefore invisible to every lossless or white-bed check, is algebra (`P`), and it is the reason
+  the guard is a photon walk at nonzero absorption rather than a second quadrature.
+- **P/D** — The near-Lambertian emergence in the same section: that a Lambertian bed under a flat
+  surface emits nearly Lambertian into air, so a water-to-deck ratio needs no view axis. The
+  mechanism is `P` — the only angular dependence on the way out is the Fresnel transmittance, the
+  `1/n²` being angle-independent, and Fresnel is flat far from grazing. The **cone** is the part
+  that must travel with the claim, and it is `D`, recomputed here on this chapter's IOR triple: the
+  shape factor `S(θ) = (1 − R(θ))/(1 − R_ext)` spreads **0.11% inside 30°, 0.43% inside 40°, 0.78%
+  inside 45°, 4.2% by 60° and 13.1% by 70°** in luminance. ⚠️ **A correction made in this pass:** a
+  figure of "0.5% across a whole basin" was in circulation; 0.4–0.5% is the spread inside a **40°
+  cone**, and across the reference implementation's own whole-basin frame — whose water spans
+  44°–73° from vertical — the shape factor alone varies by **17.6%**, and the full emergent field,
+  once the up leg's own `exp(−a·d/μ_w)` is included, by **21.2%** in luminance and **29.3%** in red.
+  "Near-Lambertian" is a nadir statement — an aerial reference, or a closed form written for one;
+  at a poolside eye it is worth a fifth of the answer. The medium also tilts it per channel
+  (emergent red 0.855 of nadir at 60° against 0.955 in blue), which is a signed inference rule when
+  two cameras at different heights disagree.
 - **P/D** — [The illuminant is part of the
   comparison](12-water-rendering.md#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not).
   The **solar position** half lives in [`10`](10-lighting-shadows.md#computing-the-illuminant-from-a-place-and-a-time)
@@ -481,6 +524,53 @@ least-confident-claims ledger in `00-index.md`.
   basin and that liner. The transferable claim is the inequality and the diagnostic that follows it:
   the *ordering* of two surfaces at one depth through one water is invariant to exposure, tone curve
   and white point, being a ratio of radiances within a single frame.
+- **P/D** — [What a submerged vertical face sees of the
+  sky](12-water-rendering.md#what-a-submerged-vertical-face-sees-of-the-sky), derived in
+  [`12a` §7](12a-water-derivations.md#the-window-and-the-mirror-two-halves-of-one-hemisphere). The
+  physics is standard optics with no free parameter: past `θ_c = asin(1/n)` the underside of a flat
+  water surface is a **perfect mirror** and inside it the sky arrives compressed into that cone
+  about the vertical, so a vertical receiver's upper half-hemisphere is a partition of those two and
+  not "the sky". The three integrals — `tir_vert(0) = ½`, `TIR_VERT = 0.8853`,
+  `TIR_FRAC = 1 − 1/n² = 0.4387` — are closed forms recomputed here at `n = 1.3348` and are each
+  guarded in `reference-impl/validate.py`, `TIR_VERT` by a quadrature and a 4M-sample Monte-Carlo of
+  the arriving *radiance* plus two premise-free rows. What is new here and is arithmetic on them
+  (`D`): the split of that half-hemisphere into **77.7% mirror and 22.3% window**, and the window's
+  share against a horizontal face at the same depth, `(0.5 − TIR_VERT·TIR_FRAC)·n² = **0.199**`
+  (0.1995 / 0.1988 / 0.1976 per channel — a 1% spread, so one figure is honest). The renderer's
+  `WALL_SKY × WAO = 0.50 × 0.78 = 0.390`, hence an over-give of **×1.96**, is a property of *that*
+  implementation (`D`), and the submerged-wall readings it produces — **0.470** of the dry band over
+  the first 100 mm and **0.581** over the next 150 mm, against an observation that puts it above 1 —
+  are that frame, that liner and that sun. The **coupling** is the transferable half and it is
+  structural, not measured: the window and the mirror partition one hemisphere, so over-giving one
+  necessarily under-gives the other and any instrument that reads only their sum is blind by
+  construction. The three separators offered (hue, moving caustic structure, and zeroing the sky to
+  test for a fall to 0.777) follow from the same partition. This is **not** the floor-lit-wall
+  ceiling `L_wall ≤ ρ·L_floor/2` in the entry above — that bounds the *lower* half of the same
+  hemisphere against the floor — and the two are additive; conflating them has already cost this
+  project a round, which is why both sections state the distinction rather than assume it.
+  The fault itself is **open** (`?`): closing it needs the window's share *and* the mirror's missing
+  bounces, and moving the sky constant alone runs the wrong way.
+- **D** — [A caustic on a vertical
+  face](12-water-rendering.md#a-caustic-on-a-vertical-face-is-not-the-beds-pattern-at-that-faces-own-position).
+  The correction is conservation of flux along one refracted direction, which is `P` and has no free
+  parameter: the point at height `z` on a vertical face is lit by the beam that would have landed at
+  `face_xy + (z − z_foot)·tan θ_t·ŝ`, with `θ_t` the **refracted** sun angle. The geometry figures
+  are recomputed here on the reference implementation's sun (incidence 68.97°, refracted 44.37°,
+  `tan θ_t = 0.978`, hence **235 mm of run over the 240 mm riser, 249 mm over the 255 mm one and
+  685 mm over the 700 mm drop at the outer nosing**) (`D`). ⚠️ **A correction made in this pass:**
+  "249 mm on the tallest riser" pairs the run of the *middle* riser with a face that is not the
+  tallest — the outer nosing's face, which is where the artefact was measured, drops the full 700 mm
+  to the floor. The artefact figures — **41% rms along the arc against zero up the face**, a stripe
+  rms of **1.372 → 0.816** encoded levels, and the term's height-to-arc ratio **0 → 0.941** — are
+  the implementation's own printed diagnostics on one frame (`D`) and were **not** re-derivable here
+  without a full render; they price that step unit at that sun. So is the negative result beside
+  them, that quadrupling the caustic map's arc bins *and* the gather's directions moved the stripe
+  rms only 1.372 → 1.363. What transfers is the **signature** — a term whose variation collapses to
+  exactly zero along one axis is missing an argument, not noise — and the observation that a
+  screen-space or world-axis projected caustic pass has the identical degeneracy on vertical faces.
+  The fix shipped there is still a **proxy** (`?`): the bed map is focused at each texel's own
+  depth, so reading it at the face's height ignores the focusing over that run; the honest answer is
+  to rasterise the vertical faces into their own caustic map, which is not done.
 - **P/D** — The bubble constant. `1 − 1/n²` is the cosine-weighted flux beyond the critical angle
   and equals **43.7%** at `n = 1.333` (44.3% at 1.34) — arithmetic here, and the same quantity as
   `cos²θ_c`. The 0.999 red transmission over 5 mm is Beer-Lambert on the corrected `a(610)`. The

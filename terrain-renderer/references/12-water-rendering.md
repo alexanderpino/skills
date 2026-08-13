@@ -61,7 +61,11 @@ explain, and the next question is which of the two sides is wrong, never whether
 move. A suite that passes because its tolerances were widened proves nothing — and one that passes
 because its rows were transcribed from the sentence beside the constant proves less than nothing,
 which is what happened to two of those eight (see `11`, *[Seven ways a measurement lies while looking
-like one](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one)*). **A test and the code it checks must not share a premise.** The file also ends with a
+like one](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one)*). **A test and the code it checks must not share a premise** — and its converse, learned in the same file
+one round later: **a test that shares almost nothing with the code tests almost nothing**, which is
+[`11`'s eighth way](11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement)
+and cost this suite a row called *closed energy audit of the whole pool* that was neither. The file
+also ends with a
 list of what is not tested *at all*, which is as much the deliverable as the tests are.
 
 ## Diagnostic index: symptom to mechanism
@@ -105,6 +109,10 @@ the reference implementation or read off a photograph, not supposed.
 | Shadows in the render point plausibly but disagree with the reference by tens of degrees, while the sun's *height* is clearly right | The azimuth's `acos` branch, taken from the wrong one of two conventions. Elevation comes from `cos ζ`, which has no branch, so it stays correct and every other check still passes — a 72° error that reads as a shading problem | [`10`, the quadrant trap](10-lighting-shadows.md#the-quadrant-trap-and-why-the-elevation-stays-right) |
 | A water-to-deck ratio disagrees with the reference, and the low sun is offered as the explanation | Both are **horizontal receivers**, so `sin h` and the air-mass attenuation are identical on them and cancel exactly in the ratio. What does *not* cancel is only the Fresnel entry share and the slant path — 1.25× between a 21° and a 57° sun, and nothing beyond that is available | [The illuminant is part of the comparison](#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not) |
 | Absolute sRGB triples read off a reference photograph will not reconcile with the render, and the disagreement changes between frames of the same pool | The camera, not the renderer: automatic white balance rescales chromaticity toward neutral hardest where the subject is most saturated, a display tone curve rescales level non-uniformly, and a Display P3 file read as sRGB shifts a water pixel's R/B by 28–52% while leaving the stone beside it near-untouched | [`11`, seven ways](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one) |
+| Every vertical surface under the water is streaked with fine vertical bars that do not change up the face — walls, risers, pilings, a hull | The caustic map sampled at the receiver's own world `(x, y)`, with **no height term**. A bed pattern with structure at its texel scale and none in `z` is a comb. Not a resolution problem: quadrupling the map and the gather moved it by 0.7% | [A caustic on a vertical face](#a-caustic-on-a-vertical-face-is-not-the-beds-pattern-at-that-faces-own-position) |
+| A submerged wall reads sky-coloured and structureless while its level looks about right | The upper half of a vertical face's hemisphere filled with sky. It is **22% Snell window and 78% mirror**; a flat `0.5` over-gives the sky by ×1.96 and under-gives the pool's own upwelling field by the same partition, so level survives while hue and caustic structure do not | [What a submerged vertical face sees of the sky](#what-a-submerged-vertical-face-sees-of-the-sky) |
+| Water is subtly dark after a lookup table replaced a computed transport, and no index or format bug explains it | An integral **split into two tables and multiplied**. Attenuation and escape share the water-side cosine and are correlated `+0.76`, so the product of the means understates by 19.4% in red; the trapped leg is correlated the other way, so the composed result moves only 2.8% and hides it | [Attenuation and escape do not factorise](#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them) |
+| The suite is green, has been green for months, and the picture is visibly wrong in the quantity the suite is named after | A test that **borrows one name and writes the rest itself**: its own inputs, its own transport, a physics identity for a right-hand side. It exercises one function and certifies a law that would hold for almost any implementation | [`11`, the eighth way](11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement) |
 
 Two habits make the table worth more than the sum of its rows. **Read pairs, not symptoms** — the
 dark-interiors/bright-shadows row is diagnostic only as a pair, because either half alone reads as
@@ -1369,6 +1377,96 @@ apparent albedo of **exactly 1**; composed with the divisor it is 1, without it 
 Fresnel tests could not see any of this — and why that generalises past water — is
 [`11`](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
 
+**And then read what that audit *borrows*, because it is one name.** It catches the divisor and it
+catches nothing else: it writes its own irradiance and its own in-water radiance, closes the
+interreflection series itself, has no absorption (every path length exactly 1) and no basin. So it
+passed throughout while the transport it was named after was wrong in three separate factors. The
+replacement is a **pair** — a lossless limit that pins the series' shape, and a photon walk at the
+medium's own absorption that pins its path lengths — chosen so each sees where the other is blind,
+and both fired at deliberately reintroduced bugs. That discipline, and why the title of a test is
+the most dangerous thing about it, is [`11`'s eighth
+way](11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement).
+
+### What a submerged vertical face sees of the sky
+
+The same interface, read by a receiver that is not the bed. A submerged wall, a step riser, a
+piling, a ladder stringer, a swimmer's flank — every vertical face under the water — has an upper
+half-hemisphere, and a renderer will fill it with the sky. **It is not the sky.** It is the
+underside of the surface, and the underside is two different things either side of the critical
+angle: inside the Snell cone the transmitted sky, compressed into `asin(1/n)` about the **vertical**
+— the worst possible placement for a receiver whose normal is horizontal — and outside it, over
+`1 − 1/n²` of the directions, a perfect mirror showing the pool's own upwelling field.
+
+**Split the half-hemisphere and both numbers fall out.** Take a uniform in-water radiance `L`, let
+`θ_c = asin(1/n)`, and normalise everything to what a *horizontal* face at the same depth collects
+from the whole hemisphere. The three ratios, and the partition identity that ties them, are
+[`12a` §7's](12a-water-derivations.md#the-window-and-the-mirror-two-halves-of-one-hemisphere):
+
+```
+E_vert / E_horiz  over the FULL hemisphere       = tir_vert(0)          = 0.500
+E_vert / E_horiz  over the mirror cone t > tc    = TIR_VERT             = 0.885
+E_horiz(cone)     / E_horiz(hemisphere)          = 1 - 1/n^2 = TIR_FRAC = 0.439
+
+    tir_vert(tc) = ( pi/2 - tc + sin tc cos tc ) / ( pi cos^2 tc )
+
+=> mirror's share of the vertical face      = TIR_VERT * TIR_FRAC       = 0.388
+   window's share of the vertical face      = 0.5 - 0.388               = 0.112
+   ...and against the BED's own sky, which arrives through the same window and is 1/n^2 of
+   that bed's hemisphere:                     0.112 * n^2               = 0.199
+```
+
+Three things to take from those lines (`D`, recomputed here at `n = 1.3348`; per channel the
+window share runs 0.1995 / 0.1988 / 0.1976 on this chapter's IOR triple, so one figure is honest):
+
+- **`0.5` is a correct partition and a wrong description.** A vertical face does collect exactly
+  half of what a horizontal one does under a uniform hemisphere — that is the ½ every riser gather
+  closes on — but of that half, **77.7% is mirror and only 22.3% is window**. Filling the whole
+  upper half with sky is not a small approximation of the split; it is the other end of it.
+- **A submerged vertical face's sky share is `0.199` of a horizontal face's at the same depth**, not
+  `0.5`. The reference implementation handed it `WALL_SKY × WAO = 0.50 × 0.78 = 0.390`, **over-giving
+  the sky by ×1.96** — a factor of two on a term, arrived at by using the partition as the value.
+- **Over-giving the sky necessarily under-gives the mirror**, because they are two halves of one
+  hemisphere and the partition is fixed. The upwelling field that should fill the other 77.7% is the
+  pool's own trapped return, which a one-bounce truncation already under-delivers. So the wall
+  arrives at roughly the right *level* by two errors of opposite sign, and **a wall lit right for
+  the wrong reason is the failure mode.**
+
+**How to separate them, because any measurement of the total is blind by construction.** Three
+instruments, in increasing order of what they cost to set up:
+
+- **Colour.** The window carries the *sky's* spectrum and the mirror carries the *bed's*, filtered
+  by two more legs of water. They are far apart: a blue-dominant hemisphere against a liner-coloured
+  upwelling field that has crossed the column twice. A vertical face whose hue tracks the sky rather
+  than the liner is over-window-ed, whatever its level.
+- **Structure.** The mirror carries the caustic net — folded, doubled and softened, but present and
+  *moving with the surface*. The window carries none. A submerged face with the right brightness and
+  no moving structure on it has had the mirror replaced by a constant.
+- **Turn one off.** Zero the sky and the face must fall to 77.7% of its upper-half irradiance, not
+  to zero and not to half. That single ratio separates the two terms with no photograph and no
+  reference, and it is the row to add to a suite before either constant is touched.
+
+**This is a different claim from the floor-lit-wall ceiling and the two must not be merged.** The
+ceiling in [the masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped)
+— `L_wall ≤ ρ_wall·L_floor/2` — compares a wall against **the floor**, and it is about the *lower*
+half of the wall's hemisphere: a form factor of exactly ½ to an adjoining diffuse plane, which is
+why adding gather strength cannot rescue a dark wall. This section is about the **upper** half and
+compares a wall against **the sky through the surface**. One bounds what the bed can give a wall;
+the other says what the surface can. Conflating them produces the confident wrong move of raising a
+gather multiplier to fix a sky term, and the two halves sum to the whole hemisphere, so an error in
+either shows up as the same symptom.
+
+**Where it stands in the reference implementation: measured and open.** The submerged wall reads
+**0.470** of the dry liner band over its first 100 mm and **0.581** over the next 150 mm where an
+observation of the real pool puts it above 1 (`D`). Beer–Lambert over those centimetres of water is
+worth 0.971–0.995, so the path is not the cause; binned by traced leg the ratio *rises*, because a
+deeper texel sees more of the bed, which means the bins are reading depth and not absorption. The
+receiver is short, and the entry fee alone — an in-water radiance seen from the air takes the
+`1/n²` while the dry band 10 cm above it takes nothing — means the wall must be **1.78× brighter
+than the band below the surface merely to draw level with it above the surface**. Closing it needs
+both halves at once: the window's `0.199` in place of `0.5`, *and* the mirror's missing bounces. Move
+the sky constant alone and the wall goes darker still, which is the wrong direction — the honest
+state of this one is a located fault, not a fixed one (`?`).
+
 ### The illuminant is part of the comparison: what cancels and what does not
 
 A render is compared to a photograph by holding everything but the renderer fixed, and the largest
@@ -2134,6 +2232,14 @@ A surface lit *only* by a neighbouring diffuse surface is therefore **necessaril
 38 %** of the floor's radiance. This is not a pool fact: it bounds a cave wall beside a lit floor, a
 canyon wall, the shaft of a light well, any receiver whose only source is a diffuse neighbour.
 
+**That ceiling is about the wall's *lower* half-hemisphere, and there is a separate claim about its
+upper one — keep them apart.** This bounds what the **floor** can give a wall. What the **surface**
+can give it is [a different partition entirely](#what-a-submerged-vertical-face-sees-of-the-sky):
+the upper half is 22% Snell window and 78% mirror, so a submerged face's *sky* share is 0.199 of a
+horizontal face's at the same depth and not the ½ that appears in both arguments. The two halves are
+additive and their ½s are the same half-hemisphere split seen from two sides; merging them produces
+the confident wrong move of raising a gather multiplier to fix a sky term.
+
 **The renderer rule that follows is a stop sign.** If a submerged wall renders too dark, *adding
 bounce cannot fix it* and a multiplier on the gather is the wrong move — on the reference pool the
 gather already sits at **0.77 / 0.83 / 0.87** of its own theoretical maximum, so there is no
@@ -2182,6 +2288,76 @@ at 486 nm to 1.331 at 656 nm — so the three channels' fold sets do not coincid
 small, but it lands on the highest-contrast feature in the image, which is why real caustic edges
 carry faint colour fringing. Refract per channel, or offset the sampled map per channel scaled
 with depth, rather than shipping a grey caustic.
+
+### A caustic on a vertical face is not the bed's pattern at that face's own position
+
+The masking contract says caustics fall on *everything* below the surface, and every renderer that
+takes that seriously immediately hits the question of how a **vertical** surface reads a map that
+was rasterised for a horizontal one. The cheap answer — sample the caustic map at the receiver's own
+world `(x, y)` — is wrong in a way that is diagnostic, and it is wrong on every vertical surface in
+the scene at once: pool walls, step risers, pilings, ladders, a swimmer's body, a hull, a submerged
+rock face.
+
+**The signature, so a reader recognises it before diagnosing it: vertical streaking with no
+variation along the height.** A bed caustic map has structure at its own texel scale — millimetres
+in a pool, centimetres in open water — and a read with no `z` term smears whatever that map is doing
+at one point up the entire face. A field with fine structure along the arc and *exactly none* in
+`z` is a comb, and a comb convolved with a bilinear read is a set of vertical bars. On the
+reference implementation's step unit the term carried **41% rms along the arc and zero up the
+face — zero by construction, not by measurement** (`D`), while the bed-bounce term beside it carried
+1.1% along the arc. That asymmetry is the tell: **a term whose variation collapses to zero along one
+axis is not noisy, it is missing an argument.**
+
+It is also why the obvious fix fails. Resolution does nothing to it, because it is not an
+estimator problem: quadrupling the caustic map's arc bins **and** quadrupling the gather's directions
+— 4× and 4×, both acting on that map and nothing else — moved the visible stripe rms on the frame's
+near riser from **1.372 to 1.363** encoded levels (`D`, measured on the implementation). *A term that
+can be quartered in noise without moving the artefact is not the artefact.*
+
+**Where the read belongs, derived.** The refracted sun under the water is **one direction**, and
+flux is conserved along it. The horizontal flux density crossing a plane at height `z` is the same
+density that would cross the bed plane further along that beam — so the point on a vertical face at
+height `z` is lit by the beam that, had the face not been there, would have landed at the beam's
+own continuation to the **face's own foot**:
+
+```
+sample_xy(z) = face_xy  +  (z - z_foot) * T_sun.xy / (-T_sun.z)
+             = face_xy  +  (z - z_foot) * tan(theta_t) * sun_azimuth_hat
+
+    theta_t = the REFRACTED sun angle, from Snell at the surface -- not the incident one
+    z_foot  = the height of the bed at the foot of THAT face, not a global datum
+```
+
+and the per-face-area conversion beside it is unchanged: `N·L / cos θ_t` turns flux per horizontal
+area into flux per face area, and it was never the problem. Note what the correction is *not*: it is
+not a blur, not a fade with height, and not a second noise term. It is the removal of a missing
+variable, and it costs one bed-height lookup and two adds per sample.
+
+On the reference implementation's sun (incidence 68.97°, refracted 44.37°, `tan θ_t = 0.978`) the
+run is very nearly the height itself — **235 mm over the 240 mm riser, 249 mm over the 255 mm one,
+and 685 mm over the 700 mm drop to the floor at the outer nosing** (`D`, recomputed here). Fixing
+it took that frame's stripe rms from **1.372 to 0.816** encoded levels and the term's
+height-to-arc structure ratio from **0 to 0.941** (`D`, measured on the implementation).
+
+**The same trap in different clothes.** Two other ways to sample a caustic have exactly this bug
+with a different-looking symptom:
+
+- **A screen-space or projected caustic pass** projects the map down the world `z` axis onto
+  whatever it finds. On a vertical face that projection is degenerate — the whole face maps to one
+  line of the texture — so it produces the identical comb, and it will be blamed on projection
+  aliasing rather than on the sample position. Project along the **refracted light direction**, which
+  is what a shadow-map-style light-space projection does for free if it is built from the light and
+  not from the axis.
+- **A caustic decal projected onto the terrain heightfield only.** Named in the masking contract
+  as a coverage bug; it is the same bug with the vertical surfaces omitted instead of mis-sampled.
+
+**And the honest limit of the fix used here (`?`).** Reading the bed's map at the beam's
+continuation is still a **proxy**, because that map is focused at each texel's *own* depth and the
+face's point is at a different one; the fold pattern's focusing over that quarter-metre of run is
+ignored. On this pool the folds move by less than their own width over that distance, so it is
+below the artefact it replaces — but the correct answer is to **rasterise the vertical faces into
+their own caustic map** in the pass itself, which is the same forward-splat with the receiver
+geometry changed and no new physics. Filed as not-done rather than claimed.
 
 ### A channel is a band, not a wavelength
 
@@ -2524,6 +2700,140 @@ elsewhere and it is twofold.
   exactly 1, one step down evaluates to ~10⁻²⁰, and the sun becomes **binary**: full brightness or
   nothing, with no disc between. Half-precision varyings and packed normals are routine, which is
   what makes this the version of the claim that bites.
+
+### Attenuation and escape do not factorise, and a LUT is where you will separate them
+
+The three above are about *what* to bake. This one is about **how a baked quantity is allowed to be
+written down**. The half-texel remap below is the most-*shipped* LUT bug; this is the one that
+survives being looked for, because the table is built correctly, sampled correctly and interpolated
+correctly, and holds the wrong number. It has nothing to do with water in particular — it is a
+statement about products of correlated integrands, and water only supplies an unusually sharp
+instance of it.
+
+**The rule, first, because it is two lines of probability and it governs every table in this
+section.** For any two quantities integrated over the same variable under a normalised measure,
+
+```
+<f g>  =  <f> <g>  +  Cov(f, g)                     # exact, always
+<f g> / (<f> <g>)  -  1  =  r * CV_f * CV_g         # r = correlation, CV = coefficient of variation
+```
+
+So the product of the means equals the mean of the product **only** when the two are uncorrelated
+over that measure. Storing `<f>` in one table and `<g>` in another and multiplying them at runtime
+is the product of the means, and the error is not a rounding — it is `r·CV_f·CV_g`, which is
+first-order in each factor's spread and carries the sign of the correlation.
+
+**The water case, which is the exit transport of a submerged bed.** Light leaving a Lambertian bed
+at depth `d` has to do two things before it reaches the air: cross the column, and get through the
+underside of the surface. Both are functions of the **same** water-side cosine `μ`, and they are
+strongly correlated — a steep ray is inside the Snell cone *and* takes the short path, a grazing
+one is totally internally reflected *and* takes the long one. The correct objects are one integral
+each, over that cosine, with both factors inside:
+
+```
+measure on the water-side cosine:   dP = 2 mu dmu,    INT_0^1 2 mu dmu = 1
+
+T_esc(tau) = INT_0^1 2 mu exp(  -tau / mu) (1 - R_int(mu)) dmu     # escapes on this pass
+G_rt (tau) = INT_0^1 2 mu exp(-2 tau / mu)      R_int(mu)  dmu     # returned, and back at the bed
+
+    tau = a*d, the vertical optical depth;  R_int(mu) = 1 past the critical angle,
+    the exact unpolarised Fresnel inside it -- NOT a diffuse constant
+
+rho_water = (1 - R_ext(theta_sun)) * T_slant * rho_bed * T_esc / (1 - rho_bed * G_rt)
+```
+
+The separated pair a table-builder reaches for instead is an **absorption** term and a
+**Fresnel/escape** term: `<T> = 2E₃(τ)`, the diffuse slab transmittance, times the diffuse exit
+constant `1 − R_int`. Both are respectable quantities; their product is not the transport. On this
+chapter's pool (`τ = a·d = 0.3664 / 0.0742 / 0.0143` at 1.40 m, `D`, recomputed here):
+
+| Leg | Joint integral | Separated `<f>·<g>` | Separated form reads | Correlation `r` |
+|---|---|---|---|---|
+| Escape, `T_esc` | **0.3403 / 0.4795 / 0.5106** | 0.2850 / 0.4563 / 0.5050 | **16.2 / 4.8 / 1.1 % low** (the truth is 19.4 / 5.1 / 1.1 % above it) | **+0.76** in red |
+| Round trip, `G_rt` | **0.0965 / 0.3277 / 0.4445** | 0.1389 / 0.3614 / 0.4546 | **43.9 / 10.3 / 2.3 % high** (the truth is 30.5 / 9.3 / 2.2 % below it) | **−0.85** in red |
+
+**The two errors have opposite signs, and that is the dangerous part.** The escape leg is
+positively correlated and the separated form is dark; the round trip is negatively correlated and
+the separated form is bright; the round trip sits in a *denominator*, so the two partly cancel in
+the composed albedo. Written out on this pool the composed number moves by **−2.8% in luminance**
+while the escape term inside it is wrong by **19.4% in red** (`D`). A chain-level comparison at that
+tolerance passes. **Check the term, not the chain** — an end-to-end agreement of a few percent is
+not evidence about a factor that is wrong by twenty, and a bake is exactly where term-level errors
+get composed out of sight.
+
+**How the error scales, so it can be priced before it is measured.** It is a function of optical
+depth alone, and it is already worth having at depths nobody thinks of as absorbing (`D`,
+quadrature here on the exact internal Fresnel):
+
+```
+tau = a*d      0.05    0.10    0.20    0.37    0.50    1.00    2.00
+escape leg    +3.6%   +6.6%  +12.0%  +19.4%  +24.6%  +39.6%  +58.4%    (joint over separated)
+round trip    -7.3%  -13.2%  -22.9%  -35.5%  -43.6%  -64.2%  -83.2%
+```
+
+At `τ → 0` both collapse to the diffuse constants — `T_esc → 1 − R_int`, `G_rt → R_int` — and this
+is the trap's second half: **a lossless check cannot see it.** Open water's absorption to zero and
+the separated form becomes exact, so an energy-conservation row, a white-bed audit, or any test run
+at `a = 0` passes every version of this. What catches it is a check at the medium's own absorption
+with nothing averaged in it — a photon walk that attenuates each path over its own `1/μ` (`12a`
+§10). That is a general property of this class of bug and it is why it belongs beside
+[`11`'s eighth way](11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement).
+
+**Where the temptation arises in a real-time pipeline**, in rough order of how often it is taken:
+
+- **The water shader's own composition.** `refracted * exp(-c * rayDistance) * (1 - F)` is the
+  separated form written inline: an extinction and an exit Fresnel, multiplied. It is right for a
+  *single* ray, whose `μ` is known, and wrong the moment either factor is standing in for an average
+  over directions — which is exactly what a diffuse bed term, an irradiance cache or a prefiltered
+  probe is.
+- **A depth-indexed absorption table times a constant exit factor.** The most direct instance:
+  `T[depth] * kExit`. Store `T_esc[τ]` and `G_rt[τ]` instead — one table, one fetch, two channels,
+  identical cost. The trap is free to avoid and there is no performance argument on the other side
+  of it.
+- **Splitting a table by "what changes and what does not".** `n` is fixed at load and `d` is a
+  field, so the Fresnel half looks like a uniform and the Beer half like a texture. That reasoning
+  is about *cadence* and it silently reorders an integral. Cadence decides where a term is
+  evaluated; it may not decide whether a product is inside or outside an integral sign.
+- **Any `mean(visibility) * mean(radiance)`** — a shadow term times an irradiance cache, an AO
+  scalar times a probe, a caustic mean times a sun term. Same identity, same sign rule: if the
+  occluder is correlated with the source direction, the separated product is wrong in whichever
+  direction the correlation runs.
+
+**The general statement to carry out of this section:** *a pre-computation may split a product only
+across variables the integral does not run over.* Two factors that share an integration variable
+are one table. And when a split is forced, price it: compute `r·CV_f·CV_g` once, offline, at the
+extremes of the table's own domain, and either bound it or store the joint form.
+
+**And the factorisation that does hold, with the cone it holds inside.** The useful converse, and
+the one worth knowing because it saves a dimension: **a Lambertian bed under a flat surface emits a
+near-Lambertian field into the air**, so a water-to-deck ratio is nearly view-independent and a
+table over the bed does not need a view axis. The reason is that the only angular dependence on the
+way out is the Fresnel transmittance, which is flat until it is not. Normalising by the
+cosine-weighted mean gives the shape factor a directional read has to carry:
+
+```
+S(theta_a) = (1 - R(theta_a)) / (1 - R_ext_diff)        # 1.049 at nadir on this IOR triple
+```
+
+| View from vertical | 0° | 30° | 45° | 60° | 70° | 80° |
+|---|---|---|---|---|---|---|
+| `S(θ)`, green | 1.0494 | 1.0483 | 1.0413 | 1.0071 | 0.9280 | 0.6980 |
+| … × the up leg's own `exp(−a·d/μ_w)`, red, against nadir | 1.000 | 0.971 | 0.929 | 0.855 | 0.761 | — |
+
+So the emergent field is Lambertian to **0.4% in luminance inside a 40° cone** and 0.8% inside 45°,
+and then it stops: **4.2% by 60°, 13.1% by 70°** on the Fresnel factor alone (`D`, all recomputed
+here). Two corrections to the simplification, both signed, both easy to state:
+
+- **The medium tilts it further, and per channel.** The last leg is `d/μ_w`, not `d`, so absorption
+  adds its own obliquity: at 60° the emergent red is 0.855 of nadir against 0.955 in blue, which
+  means **an oblique view of a pool reads more cyan than a nadir one for reasons that are not the
+  water's colour**. Useful as a signed inference rule when a render and a photograph disagree at
+  different camera heights.
+- **A standing camera is not inside the cone.** Over the reference implementation's own whole-basin
+  frame the water spans **44°–73°** from vertical, and across that span the shape factor alone
+  varies by **17.6%** in luminance and the full emergent field by **21.2%**, rising to **29.3%** in
+  red (`D`). "Near-Lambertian" is a nadir statement — an aerial or drone reference, or a closed form
+  written for one — and quoting it at a poolside eye is worth a fifth of the answer.
 
 ### Format, precision, and the bug everyone ships once
 

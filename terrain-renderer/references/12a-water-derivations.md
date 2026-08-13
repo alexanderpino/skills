@@ -1220,6 +1220,64 @@ method, and they agreed with each other on 0.635 while the code sat on 0.563. Sa
 would have moved the code onto the middle column — replacing one wrong number with another, with a
 green run to certify it.
 
+### The window and the mirror: two halves of one hemisphere
+
+`TIR_VERT` answers what a vertical face collects from the **mirror** relative to the bed. The
+question a renderer actually asks is the other one: what a vertical face collects from the **sky**,
+which arrives only through the Snell window. Both come out of the same partition, and writing it in
+one normalisation is what keeps them from being double-counted.
+
+Normalise everything to `E_horiz(hemisphere)` — what a horizontal face at the same depth collects
+from the whole in-water hemisphere under a uniform radiance `L`, which is `πL`. Then, with
+`θ_c = asin(1/n)`:
+
+```
+E_vert (hemisphere) / E_horiz(hemisphere) = tir_vert(0)               = 0.5000
+E_vert (t > tc)     / E_horiz(t > tc)     = TIR_VERT  = tir_vert(tc)  = 0.8853
+E_horiz(t > tc)     / E_horiz(hemisphere) = 1 - 1/n^2 = TIR_FRAC      = 0.4387
+
+    tir_vert(tc) = ( pi/2 - tc + sin tc cos tc ) / ( pi cos^2 tc )
+
+mirror share of the vertical face   = TIR_VERT * TIR_FRAC             = 0.3884
+window share of the vertical face   = 0.5 - TIR_VERT * TIR_FRAC       = 0.1116
+                                                       -------------------------
+                                          the two sum to tir_vert(0) = 0.5000
+```
+
+The last line is the check that makes the split trustworthy: the two shares are *defined* as a
+partition of the vertical face's upper half, so they must sum to `tir_vert(0)` exactly, and they do
+— which means an error in either one shows as an error in the other and never in the total.
+
+**The `n²`, and why it is there.** The window share above is in units of the bed's *whole*
+hemisphere, and what a renderer wants is the vertical face against the bed **for the same sky**. The
+bed's own sky arrives through the same window and is `1/n²` of its hemisphere (the complement of
+`TIR_FRAC`), so
+
+```
+window share of a vertical face, against a HORIZONTAL face at the same depth
+    = (0.5 - TIR_VERT * TIR_FRAC) * n^2 = 0.1116 * 1.7817 = 0.1988
+```
+
+Per channel on this file's IOR triple: `θ_c = 48.655 / 48.519 / 48.268°`,
+`TIR_VERT = 0.8881 / 0.8853 / 0.8801`, `TIR_FRAC = 0.4364 / 0.4387 / 0.4431`, and the window share
+**0.1995 / 0.1988 / 0.1976** — a 1% spread, so one figure is honest at this precision (`D`,
+quadrature and closed form here).
+
+**What that costs when it is written as `0.5`.** `WALL_SKY = 0.5` is an exactly correct *partition*
+of a vertical face's hemisphere and an exactly wrong *description* of what fills the upper half:
+**77.7% of it is mirror and 22.3% is window**. The implementation handed a submerged vertical face
+`WALL_SKY × WAO = 0.50 × 0.78 = 0.390` where the window's share is `0.199` — over-giving the sky by
+**×1.96** — and the mirror that should carry the remaining 77.7% comes from the same one-bounce
+truncation that delivers ×1.0217 of the closed series' ×1.2354. Over-count one half, under-count the
+other, and the total can look right at any single level while the **hue** and the **caustic
+structure** on that face are both wrong. The limit check that separates them costs nothing: zero the
+sky and the face must fall to `0.777` of its upper-half irradiance — not to zero, and not to half.
+
+**Do not merge this with the floor-lit-wall ceiling.** `L_wall ≤ ρ·L_floor/2` is about the *lower*
+half of the same hemisphere — a form factor of exactly ½ to the adjoining diffuse plane — and its ½
+is the same ½ as `tir_vert(0)` only because both are the half-hemisphere split. One bounds what the
+**bed** can give a wall; this bounds what the **surface** can. They are additive, not alternative.
+
 ---
 
 ## 8. The gathers
@@ -1458,6 +1516,86 @@ at a 21° sun), the camera leg is whatever the view ray actually ran (median 1.9
 floor of the reference frame). Beer–Lambert composes, so the round trip is one exponential over the
 sum — which is the property that makes the next step work.
 
+### The diffuse exit, and why its two factors may not be separated
+
+The round trip above is one *ray*, whose `μ` is known. The pool's own apparent albedo is the same
+transport over a **distribution** of rays — a Lambertian bed emits over a cosine law — and that is
+where a product of two respectable averages stops being the transport.
+
+**The measure, first.** A Lambertian bed's flux leaves over the cosine-weighted density `2μ dμ` on
+the water-side cosine, normalised: `∫₀¹ 2μ dμ = 1`. Two things then happen to a pencil at cosine
+`μ`, and **both are functions of `μ`**: it crosses `d/μ` of water, and it meets an internal
+reflectance `R_int(μ)` that is 1 past the critical angle and the exact unpolarised Fresnel inside
+it. So
+
+```
+T_esc(tau) = INT_0^1 2 mu exp(  -tau / mu) (1 - R_int(mu)) dmu     # escapes on this pass
+G_rt (tau) = INT_0^1 2 mu exp(-2 tau / mu)      R_int(mu)  dmu     # returned, and back at the bed
+
+    tau = a*d  (vertical optical depth).  Both -> the diffuse constants as tau -> 0:
+    T_esc(0) = 1 - R_int = 0.5263 / 0.5238 / 0.5193,  G_rt(0) = R_int = 0.4737 / 0.4762 / 0.4807
+
+rho_water = (1 - R_ext(theta_sun)) * T_slant * rho_bed * T_esc / (1 - rho_bed * G_rt)
+```
+
+and because the bed redraws the direction from a cosine law at **every** bounce, the trap really is
+geometric in `ρ_bed·G_rt` and the closed series loses nothing.
+
+**The separated writing, and its error.** The tempting form takes the diffuse slab transmittance
+`⟨T⟩ = 2E₃(τ)` and the diffuse exit constant `1 − R_int` and multiplies them. That is the product of
+two means where the mean of a product is wanted, and the identity is exact:
+
+```
+<f g> = <f><g> + Cov(f, g),        <f g>/(<f><g>) - 1 = r * CV_f * CV_g
+```
+
+The correlation is not incidental and its **sign differs between the two legs**: a steep ray escapes
+*and* crosses less water (positive), while a grazing ray is totally reflected *and* crosses more, so
+the reflectance is large exactly where the round-trip transmittance is small (negative).
+
+| At this pool's `τ = a·d = 0.3664 / 0.0742 / 0.0143` | Joint | Separated `⟨f⟩⟨g⟩` | Separated reads |
+|---|---|---|---|
+| `T_esc` | **0.3403 / 0.4795 / 0.5106** | `2E₃(τ)·(1−R_int)` = 0.2850 / 0.4563 / 0.5050 | 16.2 / 4.8 / 1.1 % **low** |
+| `G_rt` | **0.0965 / 0.3277 / 0.4445** | `(2E₃(τ))²·R_int` = 0.1389 / 0.3614 / 0.4546 | 43.9 / 10.3 / 2.3 % **high** |
+
+(`D`, 2000-node Gauss–Legendre here on the exact internal Fresnel; the correlation coefficient under
+`2μ dμ` is **+0.76** on the escape leg and **−0.85** on the round trip at the red channel's `τ`, and
+both tend toward ±0.90 as `τ` grows.) The error is monotone in optical depth and is already 3.6% at
+`τ = 0.05`:
+
+```
+tau            0.05    0.10    0.20    0.37    0.50    1.00    2.00
+escape leg    +3.6%   +6.6%  +12.0%  +19.4%  +24.6%  +39.6%  +58.4%   (joint over separated)
+round trip    -7.3%  -13.2%  -22.9%  -35.5%  -43.6%  -64.2%  -83.2%
+```
+
+**Why it survived, and what it took to catch.** The two errors carry opposite signs and the round
+trip sits in a denominator, so they partly cancel: on this pool the composed `rho_water` moves
+**−2.8% in luminance** while the escape term inside it is **19.4%** wrong in red (`D`). And at
+`τ = 0` the separated form is *exact*, because both integrands lose their `μ` dependence — so every
+lossless check, every white-bed energy audit and every zero-absorption limit passes it untouched.
+What sees it is a check at the file's own absorption with nothing averaged in it: the 400 000-photon
+analog walk in `validate.py`, which attenuates each photon over its **own** `1/μ` and agrees with
+the joint form to **0.15% at worst, under 0.1% in green and blue**. A second quadrature would have
+shared the premise — the fourth way in [`11`](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
+
+**The two forms this section replaced, priced on the same constants** (`D`, luminance weighted by
+this file's own `SUN_COL`, `ρ_bed = 0.222 / 0.585 / 0.681`):
+
+| Writing | `rho_water` | luminance | against the joint form |
+|---|---|---|---|
+| No up leg in the numerator at all | 0.0634 / 0.3074 / 0.4400 | 0.2569 | **+12.9%** |
+| Up leg present, both integrals separated | 0.0343 / 0.2678 / 0.4279 | 0.2213 | −2.8% |
+| **Joint integrals** | **0.0406 / 0.2745 / 0.4283** | **0.2275** | — |
+
+The missing up leg is worth `1/⟨T⟩` — **1.846× in red**, 1.148 in green, 1.028 in blue — and it is
+the easiest of the three to drop, because the round trip in the denominator *looks* like it has
+already accounted for the column. The numerator must carry exactly **one** up leg and the
+denominator exactly **one** round trip.
+
+The renderer-facing consequence — that this is the shape of every water lookup table anyone is about
+to bake — is [`12`](12-water-rendering.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them).
+
 ### The calibration
 
 A liner pool's freeboard band above the waterline is **the same sheet** as the bed below it, with no
@@ -1627,6 +1765,11 @@ method (a disagreement localises to one of the two methods).
 | Penumbra compression `cos i/(n cos t)`; 6.8 mm | differentiated Snell; traced slant | 1 | pass |
 | Flat-surface degenerate case (offset, uniformity) | closed form | 1 | pass |
 | Beer–Lambert composition, slant, monotonicity | identities | 1 | pass |
+| `2E₃` itself | `2E₃(0) = 1` exactly; the `E_{n+1}` recurrence down to `E_1` by its own series — no quadrature node shared | 1, 3 | pass |
+| **`T_esc`, `G_rt` and the closed series** | the lossless limit `R(θ_sun) + ρ_water(1, a=0) = 1` (shape only), **and** a 400k-photon analog walk at the file's own `ABS` (the legs) — 0.15% worst channel | 1, 3 | pass |
+| The trap as the shipped pass carries it | priced, not asserted: `trap_gain(bounces=1, cone_only=True)` against the closed series | 1 | **info** — the deficit is real and open |
+| Riser caustic read at the beam's continuation | — | — | **no test**; the stripe rms and the z/arc ratio are render-side diagnostics, not suite rows |
+| Vertical face's window vs mirror split | the halves are arithmetic on `TIR_VERT` and `TIR_FRAC`, and both of those are guarded above; the partition identity `window + mirror = tir_vert(0) = ½` holds exactly, and `WALL_SKY == tir_vert(0)` is its own row | 1 | pass — but **no row asserts the split is what the renderer applies** |
 | `R_ext`, `R_int`, `a_wet` boundary conditions | quadrature; reciprocity; Egan & Hilgeman fit | 1, 3 | pass |
 | `a(λ)` itself | Pope & Fry 1997 point-sampled *and* band-integrated; a Smith & Baker exclusion row | 2 | pass |
 | Dry-band absorption regression | — | — | **no test** |
