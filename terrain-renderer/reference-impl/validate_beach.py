@@ -116,6 +116,38 @@ def info(tier, name, got, note, exp=None):
     ROWS.append(Row(tier, name, exp, got, '-', 'INFO', note, ''))
 
 
+def error_row(label, exc):
+    """A section that raised. Recorded as a ROW and the run continues.
+
+    WAVE 2 FOUND THIS DEFECT IN ITS OWN HARNESS AND FIXED THE ROWS RATHER THAN
+    THE HARNESS, so the harness could still be lied to. Three of its deliberate
+    bugs destroyed the bar; the new reform rows had no guard for a degenerate
+    profile and raised; the `--bugs` driver counted the exception as one catch
+    and STOPPED -- so `cap-not-dissipation`, which fails eight rows, was
+    reported as failing one. A row that explodes is worth less than a row that
+    fails, because it takes every row after it with it.
+
+    The fix that survives the next such bug is structural: the suite is a list
+    of SECTIONS, each called through `guard()`, and an exception inside one
+    section costs that section and nothing else. It prints as ERROR, it counts
+    against the exit code exactly as a FAIL does, and the sections after it
+    still run and still report their own failures.
+    """
+    ROWS.append(Row(0, 'section "%s" RAISED' % label, '-',
+                    '%s: %s' % (type(exc).__name__, str(exc)[:60]), '-',
+                    'ERROR', 'The section did not finish. Its remaining rows '
+                    'were never evaluated, so this run is INCOMPLETE and not '
+                    'merely failing.', ''))
+
+
+def guard(fn, label, ctx):
+    try:
+        fn(ctx)
+    except Exception as exc:                              # noqa: BLE001
+        error_row(label, exc)
+    return ctx
+
+
 def openq(tier, name, got, exp, why, unit=''):
     """A criterion this scene does NOT meet yet, carried as a row.
 
@@ -345,6 +377,81 @@ def _bug_crest_depth_mixed_fields(mod):
                                                                  field='bed')
 
 
+
+def _bug_no_transverse_refraction(mod):
+    """The 2-D march with its source term deleted: k_y is carried unchanged, so
+    the crest keeps the direction it entered with and the surf lines stay
+    straight while the shore curves. Bar section J's named failure."""
+    orig = mod.transform_2d
+
+    def transform_2d(x, y, h2, T, H0, theta0, **kw):
+        kw = dict(kw)
+        kw['refraction'] = False
+        return orig(x, y, h2, T, H0, theta0, **kw)
+    mod.transform_2d = transform_2d
+
+
+def _bug_uniform_hardness(mod):
+    """Chapter 12's own counter-case: uniform rock, and the headlands and the
+    bay go with it."""
+    orig = mod.hardness_field
+    mod.hardness_field = lambda x, y, **kw: orig(x, y, **dict(kw,
+                                                              uniform=True))
+    mod._BAY_CACHE.clear()
+
+
+def _bug_wide_notch(mod):
+    """`notchHeight` too large -- the chapter says this is what costs you the
+    wave-cut platform, and it is stated as a diagnostic rather than tested.
+
+    Patched on the FUNCTION and not on the constant: `coastal_step`'s default
+    argument was bound when the module was defined, so rebinding
+    `mod.NOTCH_HEIGHT` changes nothing a caller sees. A bug that patches
+    nothing is the failure mode wave 1 recorded under `quarter-at-break` --
+    a defect with nothing to break tests the row, not the code."""
+    orig = mod.coastal_step
+    wide = 6.0 * mod.NOTCH_HEIGHT
+
+    def step(*a, **kw):
+        return orig(*a, **dict(kw, notch=kw.get('notch', wide)))
+    mod.coastal_step = step
+    mod.NOTCH_HEIGHT = wide
+    mod._BAY_CACHE.clear()
+
+
+def _bug_no_waterline_attack(mod):
+    """coastalStep exactly as chapter 12 writes it: the notch band is a pure
+    function of the cell's own elevation, with no term for the cliff face the
+    water actually reaches. Measured consequence: the coast retreats a few
+    metres and stops."""
+    orig = mod.coastal_step
+    mod.coastal_step = lambda *a, **kw: orig(*a, **dict(kw, waterline=False))
+    mod._BAY_CACHE.clear()
+
+
+def _bug_alignment_mixed_fields(mod):
+    """Measure the crest against a contour read off the RAW bed while the crest
+    direction came out of the FILTERED one. Wave 2's error class, in the place
+    2-D offers it a second time."""
+    orig = mod.contour_alignment
+    mod.contour_alignment = lambda tr2, field='wave', **kw: orig(
+        tr2, field='bed', **kw)
+
+
+def _bug_flux_not_along_ray(mod):
+    """Carry the plan-view sediment flux along the grid's x axis instead of
+    along the wave direction. On a straight coast that is the same vector; in a
+    bay it is not, and neither the slope term nor the divergence is right."""
+    orig = mod.sediment_flux_2d
+
+    def flux(tr2, **kw):
+        tr3 = dict(tr2)
+        tr3['theta'] = np.zeros_like(tr2['theta'])
+        fl = orig(tr3, **kw)
+        return fl
+    mod.sediment_flux_2d = flux
+
+
 BUGS = {
     'dw-for-ew': _bug_dw_for_ew,
     'quarter-at-break': _bug_quarter_at_break,
@@ -358,15 +465,25 @@ BUGS = {
     'sat-no-slope': _bug_sat_no_slope,
     'reform-exponent': _bug_reform_exponent,
     'crest-depth-mixed-fields': _bug_crest_depth_mixed_fields,
+    'no-transverse-refraction': _bug_no_transverse_refraction,
+    'uniform-hardness': _bug_uniform_hardness,
+    'wide-notch': _bug_wide_notch,
+    'no-waterline-attack': _bug_no_waterline_attack,
+    'alignment-mixed-fields': _bug_alignment_mixed_fields,
+    'flux-not-along-ray': _bug_flux_not_along_ray,
 }
 
 
 # ------------------------------------------------------------------ the suite
-def run_suite():
-    del ROWS[:]
-    B = BCH
-    T = B.T_SWELL
-    omega = 2.0 * math.pi / T
+#
+# THE SUITE IS A LIST OF SECTIONS, and that is a change wave 3 made to the
+# harness rather than to any row. See `error_row` above: an exception anywhere
+# used to end the run, and the `--bugs` driver counted the crash as one catch,
+# so a defect that fails eight rows was reported as failing one. Each section
+# below is called through `guard()`; one that raises costs itself and nothing
+# after it, and prints as ERROR.
+def _sec_waves(ctx):
+    B, T, omega = ctx['B'], ctx['T'], ctx['omega']
 
     # ================================================== 1 · linear wave theory
     # The depth set runs from the solver's own floor (D_MIN -- below it the
@@ -718,6 +835,12 @@ def run_suite():
             'any margin is applied. The dimension rows guard the formula; this '
             'one guards the argument.', unit='m/s')
 
+
+
+def _sec_bar(ctx):
+    B, T, omega = ctx['B'], ctx['T'], ctx['omega']
+    x = ctx['x']
+    h_dean = B.dean_bed(x)
     # ============================================================ 7 · the bar
     t0 = time.time()
     sc = B.run_scene()
@@ -1137,6 +1260,16 @@ def run_suite():
           'what the missing citation can cost.', unit='m')
     info(3, 'crest depth at lag 0.25L / 0.5L / 1.0L', lag, 'm of water')
 
+    ctx.update(sc=sc, x_s=x_s, h_s=h_s, hd_s=hd_s, tr_s=tr_s, cr=cr,
+               th_s=th_s, b_s=b_s, d_pred=d_pred)
+
+
+def _sec_states(ctx):
+    B, T, omega = ctx['B'], ctx['T'], ctx['omega']
+    x = ctx['x']
+    h_dean = B.dean_bed(x)
+    sc, x_s, h_s, hd_s = ctx['sc'], ctx['x_s'], ctx['h_s'], ctx['hd_s']
+    tr_s, cr, th_s, b_s = ctx['tr_s'], ctx['cr'], ctx['th_s'], ctx['b_s']
     # ======================================== 8 · sediment and the beach state
     w_s = B.settling_velocity()
     d_fine = 20e-6
@@ -1227,7 +1360,541 @@ def run_suite():
             'gate is inactive and the loop never runs where it may not.'
             % (B.deep_wavelength(T) / 2.0, -h_dean[0]), unit='m')
 
-    return sc
+
+
+
+# ============================================ 11 · the coast in plan, wave 3
+# Bar section J settles that this coast is an embayment between headlands, and
+# it makes one of the four required closed forms checkable by eye: the breaking
+# lines bend to stay parallel to the shore all the way round the curve. That
+# check is worth nothing if the curve was drawn, so these rows are about where
+# the curve came from -- chapter 12's notch -> collapse -> deposit, run on the
+# plan grid with a spatially varying hardness and nothing else.
+def _sec_coast(ctx):
+    B = ctx['B']
+    t0 = time.time()
+    cs = B.run_coast()
+    ctx['cs'] = cs
+    x, y, dx, dy = cs['x'], cs['y'], cs['dx'], cs['dy']
+    info(2, 'coastal loop run time, s', time.time() - t0,
+         '%d iterations on a %d x %d plan grid' % (B.N_COAST, y.size, x.size))
+
+    # ---- the initial condition has no bay in it, to machine precision
+    spread = float(np.abs(cs['h0'] - cs['h0'][0][None, :]).max())
+    check(1, 'the coast starts alongshore-uniform', spread, 0.0, 0.0,
+          'Everything the loop is credited with -- the cliff, the bench, the '
+          'embayment -- has to come out of a bed whose every alongshore row is '
+          'the same number. Zero, not a tolerance: `initial_coast` broadcasts '
+          'one profile, so any spread at all would mean something wrote to it.',
+          unit='m')
+
+    # ---- the domain's rock book closes
+    dv = float((cs['h'] - cs['h0']).sum()) * dx * dy
+    check(1, 'coastal loop: eroded = deposited + exported', dv + cs['exported'],
+          0.0, 1e-6 * max(cs['vol'], 1.0),
+          'The notch removes a measured volume each step; the sheltered '
+          'nearshore takes what it has room for and the rest is returned as '
+          '`export` instead of vanishing. A loop that quietly loses rock will '
+          'retreat any coast you ask it to -- the first version of this one '
+          'lost 116154 m^3 out of a closed domain because the pseudocode\'s '
+          'deposition weight is identically zero over open water.', unit='m^3')
+    info(2, 'rock eroded, deposited, exported (m^3)',
+         (cs['vol'], cs['vol'] - cs['exported'], cs['exported']),
+         'a cliff makes far more debris than a beach can hold: retreating '
+         '100 m of a plain rising at 1:12.5 removes ~750 m^2 per metre of '
+         'coast and the nearshore band holds ~120. The export is real and it '
+         'is reported rather than hidden.')
+
+    # ---- chapter 12: hardness is what makes headlands
+    xs, xs0 = cs['x_s'], cs['x_s0']
+    hard_at = np.array([cs['hard'][j, int(round(xs[j] / dx))]
+                        for j in range(y.size)])
+    r = float(np.corrcoef(xs, hard_at)[0, 1])
+    check(2, 'retreat is set by the rock: corr(shoreline, hardness)', r, -1.0,
+          0.35,
+          'Chapter 12: a landform "emerges naturally where a hard bed survives '
+          'while the softer rock around it retreats -- so it requires '
+          'spatially varying hardness". x_s increases shoreward, so a coast '
+          'whose plan-form is cut by the geology has this correlation strongly '
+          'NEGATIVE. The tolerance is loose on purpose: the claim is the sign '
+          'and the strength, not a number the chapter gives.', unit='r')
+    amp = float(xs.max() - xs.min())
+    info(2, 'embayment: shoreline range and retreat (m)',
+         (amp, float(xs.mean() - xs0.mean())),
+         'headland-to-bay amplitude, then the mean retreat that produced it')
+
+    # ---- chapter 12: uniform rock gives a straight cliff and nothing else
+    cs_u = B.run_coast(uniform_hardness=True, n_steps=max(B.N_COAST // 4, 1))
+    cs_v = B.run_coast(n_steps=max(B.N_COAST // 4, 1))
+    amp_u = float(cs_u['x_s'].max() - cs_u['x_s'].min())
+    amp_v = float(cs_v['x_s'].max() - cs_v['x_s'].min())
+    check(2, 'uniform rock: no embayment (amplitude ratio to varying rock)',
+          amp_u / max(amp_v, 1e-9), 0.0, 0.34,
+          'Chapter 12 states it as the reason coastal graphs look boring: '
+          '"With uniform rock you get a straight cliff and nothing else". The '
+          'same loop, the same steps, the same exposure sweep, hardness set to '
+          '1 everywhere. Some residue is expected and is the exposure feedback '
+          'acting on its own; a third of the varying-rock amplitude is the '
+          'ceiling this row allows it.', unit='ratio')
+    info(2, 'shoreline amplitude, uniform vs varying hardness (m)',
+         (amp_u, amp_v), 'at a quarter of the standard run, both from the '
+         'same straight initial coast')
+
+    # ---- chapter 12's own wave-cut-platform diagnostic, run BOTH ways
+    def _bench(h2, xx):
+        """Width of the flat bench seaward of the shoreline, per row."""
+        xsl = B.shoreline_x(xx, h2)
+        ddx = float(xx[1] - xx[0])
+        out = []
+        for j in range(h2.shape[0]):
+            i1 = int(round(xsl[j] / ddx))
+            i0 = max(i1 - int(200.0 / ddx), 0)
+            seg = h2[j, i0:i1]
+            if seg.size < 6:
+                out.append(0.0)
+                continue
+            lvl = float(np.median(seg[-int(0.4 * seg.size):]))
+            k = seg.size - 1
+            n = 0
+            while k >= 0 and abs(seg[k] - lvl) <= 0.25:
+                n += 1
+                k -= 1
+            out.append(n * ddx)
+        return np.array(out)
+
+    w_narrow = _bench(cs['h'], x)
+    cs_wide = B.run_coast(notch=6.0 * B.NOTCH_HEIGHT,
+                          n_steps=max(B.N_COAST // 4, 1))
+    w_wide = _bench(cs_wide['h'], x)
+    check(2, "chapter 12's bench diagnostic: narrow notch gives a bench",
+          1.0 if w_narrow.mean() > 40.0 else 0.0, 1.0, 0.0,
+          'Chapter 12: "The flat bench at sea level is the signature. It '
+          'emerges if `band` is narrow and `K_coast` is high ... If you\'re '
+          'not getting one, `notchHeight` is too large." 40 m is a bench and '
+          'not a slope: the Dean ramp this coast relaxes to crosses 0.5 m of '
+          'relief in 20 m near the shoreline, so a 40 m run inside +-0.25 m '
+          'cannot be a ramp.', unit='m')
+    check(2, "and the same diagnostic the other way: notch x 6, no bench",
+          1.0 if w_wide.mean() < 0.5 * w_narrow.mean() else 0.0, 1.0, 0.0,
+          'The chapter gives the diagnostic as a one-way instruction. A row '
+          'that only checks the good case cannot tell a bench that emerged '
+          'from a bench that was always going to be there, so this one runs '
+          'the loop at six times the notch height and requires the bench to '
+          'go away. `--bug wide-notch` is the same experiment fired at the '
+          'first row.', unit='m')
+    info(2, 'bench width, mean / min / max (m)',
+         (float(w_narrow.mean()), float(w_narrow.min()), float(w_narrow.max())),
+         'the pocketing bar section H1 reads off the platform is this spread; '
+         'it is an output of the hardness field and vanishes with it')
+    info(2, 'bench width at 6x the notch height (m)', float(w_wide.mean()),
+         'against %.0f m at the standard notch' % w_narrow.mean())
+
+    # ---- K_COAST * N_STEPS is the clock, not the answer
+    cs_h = B.run_coast(n_steps=B.N_COAST // 2, k_coast=2.0 * B.K_COAST)
+    d_shore = float(np.abs(cs_h['x_s'] - cs['x_s']).max())
+    check(3, 'K_coast and the step count are one clock',
+          d_shore, 0.0, 3.0 * cs['dx'],
+          'Halve the steps and double the rate and the plan-form must be the '
+          'same coast. This is the coastal loop\'s version of the row that '
+          'halves K_Q in the morphodynamic loop: a rate that changes the '
+          'ANSWER rather than the clock is a fitted constant wearing a rate\'s '
+          'name. Three cells is the tolerance because the shoreline is read by '
+          'interpolation between them.', unit='m')
+
+    # ---- the coarse fetch sweep against the full grid
+    e_full = B.fetch_exposure(x, y, cs['h'], coarse=(1, 1))
+    e_used = B.fetch_exposure(x, y, cs['h'])
+    m = np.maximum(-cs['h'], 0.0) > 0.5
+    check(3, 'the coarsened fetch sweep against the full-grid one',
+          float(np.abs(e_full - e_used)[m].max()), 0.0, 0.15,
+          'The sweep is run every other cross-shore cell and interpolated, '
+          'because exposure is an integral over 900 m of fetch and does not '
+          'have structure at the cell. Compared here against the sweep with no '
+          'coarsening at all, over the wet cells that drive the notch. The '
+          'tolerance is set from the coarsening and not from the answer: the '
+          'coarse water mask puts the shoreline within half a coarse cell '
+          '(8 m) of where the fine one puts it, and exposure crosses its whole '
+          'range over about 60 m there, so a shift of that size is worth ~0.13 '
+          'in the one row of cells at the waterline.',
+          unit='exposure')
+
+
+# ================================= 12 · the wave transform in 2-D, wave 3
+# Wave 1 verified sin(theta)/c invariant to 2.2e-16 on a straight coast and said
+# in the same breath that the test passes by construction. These are the rows
+# that do not.
+def _sec_transform2d(ctx):
+    B = ctx['B']
+    T = ctx['T']
+
+    # ---- (a) the degenerate case: it must BE the 1-D transform
+    xu = B.make_grid(500.0, 2.0)
+    yu = np.arange(-96.0, 96.0 + 16.0, 16.0)
+    hu = B.dean_bed(xu)
+    h2u = np.repeat(hu[None, :], yu.size, axis=0)
+    j = yu.size // 2
+    t1 = B.transform(xu, hu, T, B.H0_SWELL, 0.0)
+    t2 = B.transform_2d(xu, yu, h2u, T, B.H0_SWELL, 0.0)
+    check(1, '2-D march = 1-D transform, normal incidence, uniform bed',
+          float(np.abs(t2['H'][j] - t1['H']).max()), 0.0, 1e-12,
+          'At theta = 0 the transverse divergence is identically zero and the '
+          'Dally sink is integrated over the same length by both, so the two '
+          'codes are doing the same arithmetic in different loops and the only '
+          'difference allowed is float64 ordering. This is the row that says '
+          'the plan-view scene is running the SAME wave model waves 1 and 2 '
+          'measured, not a second one that resembles it.', unit='m')
+    ky = t2['k'][j] * np.sin(t2['theta'][j])
+    check(1, 'Snell falls out of the march: k_y invariant on a uniform bed',
+          float(ky.max() - ky.min()), 0.0, 1e-14,
+          'The march integrates dk_y/dx = d(k_x)/dy, the irrotationality of '
+          'the wavenumber vector. On an alongshore-uniform bed the right-hand '
+          'side is zero, so k_y = k sin(theta) = omega sin(theta)/c is '
+          'constant -- which IS Snell. Nothing in `transform_2d` computes '
+          'sin(theta) from c; the invariant is an OUTPUT here and an identity '
+          'in the 1-D code.', unit='1/m')
+
+    # ---- (b) THE REAL TEST: contours oblique to the grid
+    # A plane beach rotated by phi in plan. Snell still holds, about the
+    # ROTATED normal, and the march has never heard of phi.
+    errs = {}
+    for phi_deg in (10.0, 20.0, 30.0):
+        phi = math.radians(phi_deg)
+        dxo, dyo = 2.0, 4.0
+        xo = np.arange(0.0, 700.0 + dxo, dxo)
+        yo = np.arange(-1200.0, 1200.0 + dyo, dyo)
+        X, Y = np.meshgrid(xo, yo)
+        u = X * math.cos(phi) + Y * math.sin(phi)
+        u_flat = 1200.0 * math.sin(phi) + 10.0
+        d_o = np.clip(8.0 - 0.016 * (u - u_flat), 0.06, 8.0)
+        tro = B.transform_2d(xo, yo, -d_o, T, 1.0, math.radians(15.0),
+                             breaking=False)
+        inv = math.sin(tro['theta'][0, 0] - phi) / tro['c'][0, 0]
+        th_pred = phi + np.arcsin(np.clip(tro['c'] * inv, -1.0, 1.0))
+        ramp = (d_o < 7.9) & (d_o > 0.4)
+        # WHERE THIS ROW LOOKS IS PART OF THE ROW, and the first version got it
+        # wrong in the direction that flatters. On a rotated bed the ramp
+        # crosses each alongshore row over a different span of x, so a window
+        # pinned to the GRID CENTRE samples less and less of it as phi grows --
+        # at 30 deg the centre row holds no ramp at all, and the 5202 cells the
+        # window did contain were the deep end, where the wave has barely
+        # turned. The row read 0.030 deg and made the test look EASIER with more
+        # rotation, which is backwards. Centred on the row that samples the ramp
+        # most fully it reads 0.277.
+        #
+        # And 60 rows are cut off each alongshore edge, which is a real
+        # exclusion and not a convenience: the march's transverse differences go
+        # one-sided there and the error reaches 2.71 deg in the outermost rows.
+        # That is a boundary artefact of an open boundary; it is reported rather
+        # than hidden, and it is why the plan-view domain is a window wider than
+        # the coast it is asked about.
+        cover = ramp.sum(axis=1)
+        j_best = int(np.argmax(cover))          # NOT `j`: that name is the
+        win = np.zeros_like(ramp)               # uniform-bed row index above,
+        win[max(j_best - 100, 60):              # and clobbering it cost this
+            min(j_best + 100, yo.size - 60), :] = True   # section an IndexError
+        m = ramp & win
+        errs[phi_deg] = math.degrees(float(np.abs(tro['theta'] - th_pred)[m].max()))
+    check(1, 'Snell about a ROTATED normal, contours oblique to the grid',
+          [errs[10.0], errs[20.0], errs[30.0]], [0.0, 0.0, 0.0], 0.50,
+          'The first refraction test in this project that does not pass by '
+          'construction. The bed is a plane beach whose contours run at 10, 20 '
+          'and 30 degrees to the grid; the exact answer is Snell taken about '
+          'the rotated normal, and the march is given the rotation nowhere -- '
+          'it integrates the wavenumber\'s irrotationality on the grid axes. '
+          '0.5 deg is 1.6x the worst measured error, and the error is the '
+          'first-order upwind difference in y rather than the physics: it does '
+          'not fall when the ray step is refined and it does fall with dy.',
+          unit='deg')
+    info(1, 'the same, per rotation (deg)',
+         (errs[10.0], errs[20.0], errs[30.0]),
+         'against 0.000 deg at zero rotation, where the test is an identity '
+         'again -- the straight-coast case wave 1 measured at 2.2e-16')
+
+    # ---- (c) obliquity: the 1-D form decays over dx, the divergence over ds
+    gap = []
+    for deg in (0.0, 20.0, 40.0):
+        th0 = math.radians(deg)
+        a = B.transform(xu, hu, T, B.H0_SWELL, th0)
+        b = B.transform_2d(xu, yu, h2u, T, B.H0_SWELL, th0)
+        gap.append(float(np.abs(b['H'][j] - a['H']).max()))
+    check(1, 'the obliquity gap vanishes at normal incidence', gap[0], 0.0,
+          1e-12,
+          'chapter 12 (and this file\'s 1-D transform after it) marches '
+          'F = E c_g cos(theta) with dF/dx = -(K/d)(F - F_s), applying the '
+          'Dally rate per unit CROSS-SHORE distance. A divergence applies it '
+          'per unit RAY distance, ds = dx/cos(theta). The two are the same '
+          'statement only at theta = 0, and this row is that identity; the '
+          'INFO below is the size of the disagreement where it is not.',
+          unit='m')
+    info(1, 'obliquity gap in H at theta_0 = 0 / 20 / 40 deg (m)', gap,
+         'small BECAUSE refraction is doing its job -- the wave has turned to '
+         '6.6 deg by the time it breaks, and cos of that is 0.994. On a coast '
+         'steep enough to break before it turns the same term is worth per '
+         'cent, and a 1-D transform written from the chapter would not carry '
+         'it. Measured, reported, and NOT patched into the 1-D file, which is '
+         'what waves 1 and 2 measured with.')
+
+    # ---- (d) the energy flux is monotone shoreward (chapter 12's own item)
+    bay = B.run_bay(dx=4.0, n_steps=300, dt=6000.0)
+    ctx['bay'] = bay
+    tr = bay['tr']
+    F = tr['Phi'] * np.cos(tr['theta'])
+    tot = F.sum(axis=0) * bay['dy']
+    rise = float(np.diff(tot).max()) / float(tot[0])
+    check(1, 'the wave energy flux never increases shoreward', rise, 0.0, 1e-4,
+          'Chapter 12 lists this as a verification item and notes that the '
+          '`min(shoal, gamma d)` cap violates it while a marched transform '
+          'cannot. IT IS A DIFFERENT STATEMENT IN 2-D and the first version of '
+          'this row got it wrong: per CELL the flux may legitimately RISE, '
+          'because refraction focuses one ray tube at the expense of its '
+          'neighbour -- measured at 0.7 per cent of the peak over the bar, '
+          'which is the focusing bar section B asks for ("Curved contours '
+          'focus"), not an energy leak. What may not rise is the flux summed '
+          'across the coast, and it does not: 7e-5 of the offshore value, '
+          'which is the open alongshore boundary and float64.', unit='fraction')
+    info(1, 'per-cell flux rise, as a fraction of the peak',
+         float((np.diff(F, axis=1) * (tr['d_raw'][:, 1:] > 0.4)).max()
+               / F.max()),
+         'refraction focusing, and the reason the 1-D form of this row cannot '
+         'be carried into a plan view unchanged')
+
+    # ---- (e) an independent integrator over the bay's own curved contours
+    x, y = bay['x'], bay['y']
+    th_start = float(tr['theta'][0, 0])
+    d_filt = -tr['d']                          # the field the march READ
+    def _ray_gap(bed):
+        out = []
+        for y0 in np.linspace(-500.0, 500.0, 11):
+            r = B.trace_ray(x, y, bed, T, 2.0 * bay['dx'], y0, th_start,
+                            ds=2.0, n_max=3000)
+            r = r[r[:, 0] < x[-1] - bay['dx']]
+            ii = np.clip((r[:, 0] - x[0]) / bay['dx'], 0, x.size - 1.001)
+            jj = np.clip((r[:, 1] - y[0]) / bay['dy'], 0, y.size - 1.001)
+            i0 = ii.astype(int)
+            j0 = jj.astype(int)
+            tx, ty = ii - i0, jj - j0
+            def _bi(A):
+                return (A[j0, i0] * (1 - tx) * (1 - ty)
+                        + A[j0, i0 + 1] * tx * (1 - ty)
+                        + A[j0 + 1, i0] * (1 - tx) * ty
+                        + A[j0 + 1, i0 + 1] * tx * ty)
+            m = _bi(tr['d']) > 0.6
+            if m.sum() > 10:
+                out.append(float(np.abs(r[:, 2] - _bi(tr['theta']))[m].max()))
+        return np.array(out)
+    g_same = _ray_gap(d_filt)
+    g_mixed = _ray_gap(bay['h'])
+    check(3, 'RK2 ray tracer against the 2-D march, over the bay',
+          float(g_same.max()), 0.0, 0.06,
+          'Two integrators with no arithmetic in common: `trace_ray` steps '
+          'dtheta/ds = (sin.dc/dx - cos.dc/dy)/c along a path, the march '
+          'integrates dk_y/dx = dk_x/dy across a grid, and neither contains '
+          'Snell. On the STRAIGHT coast they agree to 1.6e-3 rad; over the '
+          'bay\'s curved contours the gap is 0.038 rad and it is the '
+          'alongshore grid, not either integrator -- refining ds by four does '
+          'not move it. 0.06 rad is 1.6x the measured worst case.', unit='rad')
+    info(3, 'ray-vs-march gap: same field, then mixed fields (rad)',
+         (float(g_same.max()), float(g_mixed.max())),
+         'THE SAME ERROR CLASS AGAIN, and in 2-D it is worth a factor of six. '
+         'The march reads the filtered depth; `trace_ray` was handed the raw '
+         'bed, and the disagreement went from 0.038 to 0.226 rad -- 13 degrees '
+         'of apparent refraction error that is entirely the two fields. The '
+         'straight-coast version of this row could not have shown it, because '
+         'a filter along x alone leaves a plane bed plane.')
+
+    # ---- (f) the crest turns onto the contour, and by how much
+    a_w, m_w = B.contour_alignment(tr, field='wave')
+    a_b, m_b = B.contour_alignment(tr, field='bed')
+    brk = tr['brk']
+    al = float(np.abs(a_w[m_w & brk]).mean())
+    tr_no = B.transform_2d(x, y, bay['h'], T, B.H0_SWELL, B.THETA0_SWELL,
+                           refraction=False)
+    a_n, _ = B.contour_alignment(tr_no, field='wave')
+    al_no = float(np.abs(a_n[m_w & brk]).mean())
+    check(2, 'refraction halves the crest-to-contour angle at breaking',
+          al / al_no, 0.0, 0.75,
+          'Bar section J: "The breaking lines bend to stay parallel to the '
+          'shore around the whole curve ... A render whose surf lines stay '
+          'straight while the shore curves has failed a criterion a layman '
+          'could catch." This is that criterion as a number: the angle between '
+          'the crest and the local depth contour, with the transverse '
+          'refraction term on and off, both angles measured against the SAME '
+          'depth field. Not zero and it should not be -- Snell only takes '
+          'sin(theta) to zero in the limit.', unit='ratio')
+    info(2, 'crest-to-contour angle at breaking: refracting, frozen (deg)',
+         (al, al_no), 'and the shore-normal itself swings through %.0f deg '
+         'across this bay, so a crest that ignored the contours would carry '
+         'the whole of that swing as error'
+         % float(np.ptp(np.degrees(np.arctan(np.gradient(bay['x_s'], bay['dy']))))))
+    info(2, 'the same angle measured against the RAW bed (deg)',
+         float(np.abs(a_b[m_b & brk]).mean()),
+         'the mixed-field form of the same statistic. `contour_alignment` '
+         'takes `field` with no default for the reason chapter 12 now carries '
+         'as a general finding, and `--bug alignment-mixed-fields` puts the '
+         'wrong pairing back.')
+
+    # ---- (g) the regression, against the closed form
+    reg = B.crest_azimuth_regression(tr, d_lo=1.0, d_hi=2.4)
+    cf = float(B.refraction_slope_closed_form(tr, 1.7, 8.0))
+    reg_no = B.crest_azimuth_regression(tr_no, d_lo=1.0, d_hi=2.4)
+    between(1, 'crest azimuth regressed on contour azimuth: the slope',
+            reg['slope'], 0.15, cf,
+            'Slope 0 is a crest that ignores the shore; slope 1 is a crest '
+            'locked to the contour. The closed form bounds it from above: '
+            'differentiating Snell about a contour at azimuth beta gives '
+            'd(theta)/d(beta) = 1 - c(d)/c(d_ref) = %.3f here, with d_ref the '
+            '8 m shelf where this bathymetry stops being alongshore-uniform. '
+            'The measured slope must sit BELOW that, because the bay\'s '
+            'contours turn gradually rather than all at the shelf edge, and '
+            'above zero, because the crests do turn.' % cf, unit='slope')
+    info(1, 'regression slope, R^2, and the closed-form bound',
+         (reg['slope'], reg['r2'], cf),
+         'and the same regression with the transverse refraction term removed '
+         'gives a slope of %.4f -- a crest that stays where it entered'
+         % reg_no['slope'])
+    check(1, 'with refraction frozen the slope collapses to zero',
+          reg_no['slope'], 0.0, 0.02,
+          'The control for the row above. `refraction=False` keeps every other '
+          'term -- shoaling, the Dally decay, the transverse divergence -- and '
+          'freezes the wave direction at the offshore boundary value, which is '
+          'exactly the render bar section J says a layman could catch.',
+          unit='slope')
+
+
+# ================================================= 13 · the bar in plan, wave 3
+def _sec_bay(ctx):
+    B = ctx['B']
+    bay = ctx.get('bay') or B.run_bay(dx=4.0, n_steps=300, dt=6000.0)
+    x, y, h, hi, tr = (bay['x'], bay['y'], bay['h'], bay['h_init'], bay['tr'])
+
+    # ---- the initial bed has no bar in it anywhere
+    worst = 0.0
+    for j in range(y.size):
+        d0 = -hi[j][hi[j] < -0.3]
+        if d0.size > 4:
+            worst = max(worst, float(np.diff(d0).max()))
+    check(1, 'the plan bed starts monotone in the cross-shore, every row',
+          worst, 0.0, 0.02,
+          'The 1-D loop was measured against a monotone Dean ramp and the plan '
+          'loop must be too: if the composed bed carried a ridge anywhere, a '
+          '"bar" in the answer could be the join between the coastal loop and '
+          'the equilibrium ramp rather than a landform. It carried one on the '
+          'first attempt -- a 1.8 m step where the bench met the ramp, which '
+          'the transform duly broke the whole wave field on, 200 m seaward of '
+          'any surf.', unit='m per cell')
+
+    # ---- a bar in every row, and chapter 12's crest depth in ONE field
+    ba = B.bar_alongshore(x, y, h, hi)
+    n_bar = int((ba['amp'] > 0.5).sum())
+    check(1, 'a bar grows in every alongshore row', n_bar, y.size, 0.0,
+          'Nothing in the plan bed says "bar here" and nothing in the loop '
+          'stamps an alongshore rhythm -- wave 1\'s figure did, and this wave '
+          'removes it. Half a metre of relief cannot be a rounding artefact.',
+          unit='rows')
+    ratio = B.bay_crest_ratio(bay, field='wave')
+    ratio_mixed = B.bay_crest_ratio(bay, field='bed')
+    ok = ~np.isnan(ratio)
+    check(2, 'd_bar ~ H_b/gamma in the bay, one field, every row',
+          float(np.nanmean(ratio)), 1.0, 0.12,
+          'Chapter 12\'s central quantitative prediction, now asked of 89 '
+          'independent cross-shore profiles that the coastal loop shaped '
+          'differently from one another. Both terms come from the depth the '
+          'wave saw. 12 per cent is twice the 6 per cent the 1-D row allows, '
+          'because this grid is 4 m where that one is 1 m and the relation '
+          'is met to 5 per cent on coarse grids by chapter 12\'s own '
+          'measurement.', unit='ratio')
+    info(2, 'crest-depth ratio across the bay: mean, sd, min, max',
+         (float(np.nanmean(ratio)), float(np.nanstd(ratio)),
+          float(np.nanmin(ratio)), float(np.nanmax(ratio))),
+         'and the MIXED-field form of the same statistic has a mean of %.3f. '
+         'In 1-D that error was worth 0.08 of the ratio; here it is worth '
+         '0.37, because the filter is 6 m on this grid and the bar is 25 m '
+         'wide. The trap gets WORSE in 2-D, not better.'
+         % float(np.nanmean(ratio_mixed)))
+
+    # ---- does the bar vary alongshore? a measurement, not an imposition
+    info(2, 'bar crest depth alongshore: mean, sd, min, max (m)',
+         (float(np.nanmean(ba['d'])), float(np.nanstd(ba['d'])),
+          float(np.nanmin(ba['d'])), float(np.nanmax(ba['d']))),
+         'the brief asked whether the nearshore profile varies with the local '
+         'exposure and by how much, rather than asking for it to vary. It '
+         'does: the crest sits in %.2f m of water at one station and %.2f m '
+         'at another, on ONE offshore sea state, because the coastal loop gave '
+         'each station a different shoreface.'
+         % (float(np.nanmin(ba['d'])), float(np.nanmax(ba['d']))))
+    off = ba['x'] - bay['x_s']
+    info(2, 'bar offset from the local shoreline: mean, sd (m)',
+         (float(np.nanmean(off)), float(np.nanstd(off))),
+         'the bar follows the shoreline round the bay rather than sitting at '
+         'one cross-shore distance: its spread about a constant offset is '
+         '%.0f m against a shoreline that itself swings %.0f m'
+         % (float(np.nanstd(off)), float(np.ptp(bay['x_s']))))
+
+    # ---- the surf line follows the shore, and that is the by-eye criterion
+    sl = B.surf_line_x(tr)
+    good = ~np.isnan(sl)
+    rr = float(np.corrcoef(sl[good], bay['x_s'][good])[0, 1])
+    check(2, 'the outer surf line follows the shoreline round the bay', rr,
+          1.0, 0.25,
+          'The plainest form of bar section J\'s criterion: the most seaward '
+          'breaking onset in each alongshore row, correlated against the '
+          'shoreline position of that row. A surf line that ignored the bay '
+          'would be a straight line across a curved shore and this number '
+          'would be near zero.', unit='r')
+    info(2, 'surf line: range, and its spread about a constant offset (m)',
+         (float(np.nanmax(sl) - np.nanmin(sl)),
+          float(np.nanstd(sl - bay['x_s']))),
+         'against a shoreline range of %.0f m' % float(np.ptp(bay['x_s'])))
+
+    # ---- Exner still conserves sand in two dimensions
+    dv = float((h - hi).sum()) * bay['dx'] * bay['dy']
+    check(1, 'the 2-D Exner step conserves sand', dv - bay['edge'], 0.0,
+          1e-6 * max(abs(dv), 1.0),
+          'The 1-D row that guards this found a 1.83 m^2 leak in an earlier '
+          'version of the shallow gate. In 2-D there is a second way to leak '
+          '-- the alongshore flux at the domain edges. The answer there is NOT a '
+          'wall: the domain is a window on a longer coast and sand really does '
+          'cross those boundaries. So the row closes the book instead of '
+          'pretending it balances -- the boundary term of the scheme actually '
+          'used is accumulated step by step inside `evolve_2d` and subtracted, '
+          'and what is left is round-off. The raw change is printed beside it.',
+          unit='m^3')
+    info(1, 'sand: net change, and the flux through the open alongshore edges',
+         (dv, bay['edge']),
+         'the two agree, which is the statement; the second number is real '
+         'transport and not a leak')
+
+    # ---- and the grid, because wave 2 was caught by exactly this
+    b4 = B.run_bay(dx=4.0, n_steps=75, dt=6000.0)
+    b2 = B.run_bay(dx=2.0, n_steps=300, dt=1500.0)
+    r4 = float(np.nanmean(B.bay_crest_ratio(b4, field='wave')))
+    r2 = float(np.nanmean(B.bay_crest_ratio(b2, field='wave')))
+    check(3, 'the crest-depth ratio at dx = 4 m against dx = 2 m', r2, r4,
+          0.10,
+          'Both runs held at 125 hours of the same swell, with dt set from the '
+          'same diffusion bound dt < dx^2/(2 D_eff) rather than kept fixed -- '
+          'the mistake chapter 12 now records as the reason its own refinement '
+          'table has a hole. The same-field ratio is the quantity compared, '
+          'because the raw-bed form measures the filter and the filter is '
+          '1.5 dx.', unit='ratio')
+    info(3, 'crest-depth ratio at dx = 4 m, then 2 m', (r4, r2),
+         'the 1-D loop reads 0.953-0.994 over dx = 2.0 to 0.25 m')
+
+
+def run_suite():
+    del ROWS[:]
+    B = BCH
+    ctx = dict(B=B, T=B.T_SWELL, omega=2.0 * math.pi / B.T_SWELL,
+               x=B.make_grid())
+    for fn, label in ((_sec_waves, 'linear theory, shoaling, refraction, '
+                                   'radiation stress, sediment'),
+                      (_sec_bar, 'the bar and the second breaking line'),
+                      (_sec_states, 'beach state, Iribarren, the sun'),
+                      (_sec_coast, 'the coast in plan'),
+                      (_sec_transform2d, 'the wave transform in 2-D'),
+                      (_sec_bay, 'the bar in plan')):
+        guard(fn, label, ctx)
+    return ctx.get('sc')
 
 
 # --------------------------------------------------------------------- output
@@ -1236,6 +1903,7 @@ def report(title=''):
     n_fail = sum(r.status == 'FAIL' for r in ROWS)
     n_info = sum(r.status == 'INFO' for r in ROWS)
     n_open = sum(r.status == 'OPEN' for r in ROWS)
+    n_err = sum(r.status == 'ERROR' for r in ROWS)
     print('=' * 100)
     if title:
         print(title)
@@ -1249,14 +1917,17 @@ def report(title=''):
             for ln in _wrap(r.why, 92):
                 print('       %s' % ln)
     print('-' * 100)
-    print('%d pass / %d FAIL / %d open / %d info'
-          % (n_pass, n_fail, n_open, n_info))
+    print('%d pass / %d FAIL / %d ERROR / %d open / %d info'
+          % (n_pass, n_fail, n_err, n_open, n_info))
+    for r in ROWS:
+        if r.status == 'ERROR':
+            print('ERROR: %s -- %s' % (r.name, r.got))
     for r in ROWS:
         if r.status == 'OPEN':
             print('OPEN: %s' % r.name)
             for ln in _wrap(r.why, 92):
                 print('      %s' % ln)
-    return n_fail
+    return n_fail + n_err
 
 
 def _wrap(s, w):
@@ -1273,7 +1944,8 @@ def _wrap(s, w):
 
 
 def _fail_names():
-    return [r.name for r in ROWS if r.status == 'FAIL']
+    return [r.name for r in ROWS
+            if r.status in ('FAIL', 'ERROR')]
 
 
 if __name__ == '__main__':

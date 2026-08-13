@@ -1,4 +1,4 @@
-"""The beach scene's visual evidence, into `gauntlet/sea/evidence/` as `s1-*`.
+"""The beach scene's visual evidence, into `gauntlet/sea/evidence/`.
 
     python3 beach_evidence.py [outdir]
 
@@ -24,7 +24,8 @@ import beach as B                                               # noqa: E402
 import beach_plot as P                                          # noqa: E402
 import optics as OPT                                            # noqa: E402
 
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
+OUT = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-')\
+    else os.path.join(
     HERE, '..', '..', 'gauntlet', 'sea', 'evidence')
 
 SAND = (208, 190, 158)
@@ -671,11 +672,320 @@ def fig_forcing(path):
     return P.save(img, path)
 
 
+
+# =========================================================== wave 3, figure 14
+def _bay_pixels(bay, tr, crests=True, surf=True):
+    """The plan field as an RGB array, (nx, ny, 3): rows are cross-shore with
+    the sea at the top, columns are alongshore. Nothing here is physics -- every
+    field it paints was computed by `beach.py` in SI and none of it is read back
+    off the image."""
+    d = np.maximum(-bay['h'], 0.0)
+    dry = d <= 0.0
+    # water: two-way Beer-Lambert over a sand bed, through the POOL's own
+    # absorption triple. Same ramp the wave-1 plan figure used.
+    alb = np.array([0.62, 0.58, 0.48])
+    rgb = alb[None, None, :] * np.exp(-2.0 * OPT.ABS[None, None, :]
+                                      * d[:, :, None])
+    rgb = rgb + np.array([0.02, 0.06, 0.11])[None, None, :] * (~dry)[:, :, None]
+    # land: bed elevation, shaded so the cliff reads
+    hl = np.clip(bay['h'] / 30.0, 0.0, 1.0)
+    land = (np.array([0.80, 0.74, 0.62])[None, None, :] * (1.0 - 0.55 * hl[:, :, None])
+            + np.array([0.10, 0.09, 0.07])[None, None, :])
+    rgb = np.where(dry[:, :, None], land, rgb)
+
+    if crests:
+        # the wave crests THEMSELVES: contours of the phase the march
+        # accumulated, so what is drawn is the wave field and not a texture.
+        ph = np.cos(tr['S'])
+        w = np.clip((ph - 0.90) / 0.10, 0.0, 1.0) * (~dry) * (~tr['brk'])
+        rgb = rgb + 0.28 * w[:, :, None] * np.array([1.0, 1.0, 1.0])[None, None, :]
+    if surf:
+        # the breaking mask, whitened by how hard the wave is breaking there
+        f = np.clip(tr['D_w'] / max(np.percentile(tr['D_w'][tr['brk']], 80), 1e-9),
+                    0.0, 1.0) if tr['brk'].any() else np.zeros_like(d)
+        a = np.clip(0.30 + 0.70 * f, 0.0, 1.0) * tr['brk'] * (~dry)
+        rgb = rgb * (1.0 - a[:, :, None]) + a[:, :, None] * np.array(
+            [0.97, 0.98, 1.0])[None, None, :]
+    # depth contours, on the field itself
+    for lev in (2.0, 4.0, 6.0):
+        m = (np.abs(d - lev) < 0.06) & (~dry)
+        rgb[m] = np.array([0.62, 0.72, 0.80])
+    out = (np.clip(rgb, 0, 1) ** (1 / 2.2) * 255).astype(np.uint8)
+    return np.transpose(out, (1, 0, 2))          # (nx, ny, 3): x down, y across
+
+
+def fig_bay_plan(bay, path):
+    """THE figure this wave owes: the whole bay in plan, computed depth, the
+    wave field and the breaking mask, framed to lie beside bar section J."""
+    x, y, tr = bay['x'], bay['y'], bay['tr']
+    B_ = B
+    tr_no = B_.transform_2d(x, y, bay['h'], B_.T_SWELL, B_.H0_SWELL,
+                            B_.THETA0_SWELL, refraction=False)
+    pix = _bay_pixels(bay, tr)
+    pix_no = _bay_pixels(bay, tr_no)
+    # framed on the WATER, not on the grid: the domain runs 1000 m inland to
+    # give the cliff room to retreat into, and 300 m of dry plateau in the
+    # frame is 300 m in which nothing this figure is about can happen.
+    x0 = 150.0
+    x1 = float(np.nanmax(bay['x_s'])) + 90.0
+    i0 = int(np.searchsorted(x, x0))
+    i1 = int(np.searchsorted(x, x1))
+
+    img = P.canvas(1560, 1010)
+    ax = P.Axes(img, (70, 66, 1050, 690), (y[0], y[-1]), (x0, x1),
+                title='The bay in plan: computed depth, the wave field, and where it is breaking',
+                xlabel='alongshore, m', ylabel='cross-shore, m (sea at the top, beach at the bottom)',
+                y_up=False)
+    ax.image(pix[i0:i1])
+    ax.frame(_ticks(y[0], y[-1], 6), _ticks(x0, x1, 6))
+    ax.line(y, bay['x_s'], (255, 96, 64), 2)
+    P.legend(ax, [((255, 96, 64), 'shoreline, computed by the coastal loop'),
+                  ((160, 190, 210), 'depth contours 2 / 4 / 6 m'),
+                  ((250, 250, 255), 'breaking mask, H/d past the index'),
+                  ((235, 235, 235), 'wave crests = contours of the marched phase')],
+             y[0] + 30, x1 - 55)
+
+    ax2 = P.Axes(img, (1110, 66, 1500, 690), (y[0], y[-1]), (x0, x1),
+                 title='the same bed, refraction frozen',
+                 xlabel='alongshore, m', y_up=False)
+    ax2.image(pix_no[i0:i1])
+    ax2.frame(_ticks(y[0], y[-1], 3), _ticks(x0, x1, 6))
+    ax2.line(y, bay['x_s'], (255, 96, 64), 2)
+
+    reg = B_.crest_azimuth_regression(tr, d_lo=1.0, d_hi=2.4)
+    reg0 = B_.crest_azimuth_regression(tr_no, d_lo=1.0, d_hi=2.4)
+    a, m = B_.contour_alignment(tr)
+    a0, _ = B_.contour_alignment(tr_no)
+    mb = m & tr['brk']
+    sl = B_.surf_line_x(tr)
+    good = ~np.isnan(sl)
+    P.caption(img, [
+        'COMPUTED, not drawn: the headlands and the embayment are the output of chapter 12\'s coastal loop (notch -> collapse -> deposit) run on this plan grid with a',
+        'spatially varying rock hardness and nothing else; the submarine profile is the Dean ramp keyed to the shoreline the loop produced; the bar is the Exner',
+        'equilibrium of the 2-D morphodynamic loop; the wave field is a 2-D energy-flux march with Snell nowhere in it. DECLARED INPUTS: the rock hardness (a',
+        'band-limited random field, seed %d, marked `?`), the offshore sea state (H_0 = %.1f m, T = %.0f s, %.0f deg), and the Dean coefficient A = %.2f.'
+        % (B_.HARD_SEED, B_.H0_SWELL, B_.T_SWELL, math.degrees(B_.THETA0_SWELL), B_.DEAN_A),
+        'NOTHING IS STAMPED. Wave 1\'s plan figure inserted one cross-shore profile at every alongshore station and stamped chapter 12\'s ripSystem rhythm through it;',
+        'this one does neither, and there are consequently NO RIP CHANNELS -- the 2DH circulation that would carve them is still out of scope and still missing.',
+        '',
+        'MEASURED, so the comparison with the photograph is not an impression: the crest azimuth regressed on the depth-contour azimuth has slope %.3f (R^2 %.2f)'
+        % (reg['slope'], reg['r2']),
+        'against %.3f with refraction frozen -- right panel, where the crests keep the direction they entered with while the shore curves away underneath them.'
+        % reg0['slope'],
+        'The crest-to-contour angle at breaking is %.1f deg against %.1f deg frozen, and the outer surf line correlates with the shoreline at r = %.3f.'
+        % (float(np.abs(a[mb]).mean()), float(np.abs(a0[mb]).mean()),
+           float(np.corrcoef(sl[good], bay['x_s'][good])[0, 1])),
+    ], x=40, y=760)
+    return P.save(img, path)
+
+
+# =========================================================== wave 3, figure 15
+def fig_coastal_loop(path):
+    cs = B.run_coast()
+    cs_u = B.run_coast(uniform_hardness=True, n_steps=max(B.N_COAST // 4, 1))
+    cs_v = B.run_coast(n_steps=max(B.N_COAST // 4, 1))
+    x, y = cs['x'], cs['y']
+    img = P.canvas(1400, 900)
+    lo = float(min(cs['x_s0'].min(), cs['x_s'].min(),
+                   cs_u['x_s'].min())) - 30.0
+    hi = float(max(cs['x_s'].max(), cs_u['x_s'].max())) + 30.0
+
+    ax = P.Axes(img, (80, 66, 660, 430), (y[0], y[-1]), (lo, hi),
+                title='The embayment is an output: shoreline through the run',
+                xlabel='alongshore, m', ylabel='cross-shore, m', y_up=False)
+    ax.frame(_ticks(y[0], y[-1], 5), _ticks(lo, hi, 6))
+    cols = [(200, 205, 212), (150, 170, 190), (100, 140, 175), (60, 110, 160),
+            (30, 80, 140), (196, 84, 58), (196, 84, 58)]
+    for i, (step, hh) in enumerate(cs['hist']):
+        ax.line(y, B.shoreline_x(x, hh), cols[min(i, len(cols) - 1)],
+                3 if i == len(cs['hist']) - 1 else 1)
+    ax.line(y, cs['x_s0'], (28, 30, 34), 2, dash=(7, 5))
+
+    ax2 = P.Axes(img, (740, 66, 1340, 430), (y[0], y[-1]), (0.4, 1.7),
+                 title='the geology (input) and the retreat it produced (output)',
+                 xlabel='alongshore, m', ylabel='rock hardness, mean 1')
+    ax2.frame(_ticks(y[0], y[-1], 5), [0.5, 0.75, 1.0, 1.25, 1.5])
+    hard_at = np.array([cs['hard'][j, int(round(cs['x_s'][j] / cs['dx']))]
+                        for j in range(y.size)])
+    ax2.line(y, hard_at, (124, 72, 168), 2)
+    ret = cs['x_s'] - cs['x_s0']
+    ax2.line(y, 0.4 + 1.3 * (ret - ret.min()) / max(np.ptp(ret), 1e-9),
+             (196, 84, 58), 2)
+    P.legend(ax2, [((124, 72, 168), 'hardness at the shoreline'),
+                   ((196, 84, 58), 'retreat, rescaled to the same axis')],
+             y[0] + 30, 1.62)
+    r = float(np.corrcoef(cs['x_s'], hard_at)[0, 1])
+
+    ax3 = P.Axes(img, (80, 510, 660, 700), (y[0], y[-1]), (lo, hi),
+                 title='uniform rock: chapter 12\'s own counter-case',
+                 xlabel='alongshore, m', ylabel='shoreline x, m', y_up=False)
+    ax3.frame(_ticks(y[0], y[-1], 5), _ticks(lo, hi, 4))
+    ax3.line(y, cs_u['x_s'], (110, 112, 118), 2)
+    ax3.line(y, cs_v['x_s'], (196, 84, 58), 2)
+    P.legend(ax3, [((110, 112, 118), 'hardness = 1 everywhere'),
+                   ((196, 84, 58), 'the same run with the geology')],
+             y[0] + 30, lo + 18)
+
+    j = int(np.argmax(cs['x_s']))
+    ax4 = P.Axes(img, (740, 510, 1340, 700), (250.0, float(x[-1])), (-6.0, 30.0),
+                 title='one profile: the cliff and the bench the loop cut',
+                 xlabel='cross-shore, m (shoreward ->)', ylabel='elevation, m')
+    ax4.frame(_ticks(250.0, float(x[-1]), 5), [-5, 0, 5, 10, 15, 20, 25, 30])
+    ax4.line(x, cs['h0'][j], (110, 112, 118), 2, dash=(7, 5))
+    ax4.line(x, cs['h'][j], (28, 30, 34), 2)
+    ax4.hline(0.0, (70, 130, 180), 1, dash=(4, 4))
+
+    P.caption(img, [
+        'Chapter 12\'s coastalStep, on the plan grid: a notch at sea level weighted by the fetch sweep and divided by hardness, chapter 05\'s thermal step collapsing',
+        'the undercut face, and the eroded rock deposited in the sheltered nearshore. The initial coast is STRAIGHT to machine precision (dashed) and rises at 1:12.5',
+        'with no cliff in it. corr(shoreline, hardness) = %.2f: the plan-form is cut by the geology, which is the chapter\'s own statement -- "with uniform rock you' % r,
+        'get a straight cliff and nothing else". Bottom left is that sentence run as an experiment: the same loop with hardness set to 1 leaves %.0f m of amplitude'
+        % float(np.ptp(cs_u['x_s'])),
+        'against %.0f m with it. Bottom right is the wave-cut platform, planed at %.1f m, which is the landform bar section H1 reads the pocketing off.'
+        % (float(np.ptp(cs_v['x_s'])), float(np.median(cs['h'][j][(cs['h'][j] < 0.2) & (cs['h'][j] > -3)]))),
+        'TWO DEPARTURES FROM THE PSEUDOCODE, both measured and both written up: the notch also attacks the first land cell above the waterline (without it the coast',
+        'retreats 16 m and stops dead), and the deposit is row-local and capacity-limited (the literal weight is zero over open water and loses the rock entirely).'])
+    return P.save(img, path)
+
+
+# =========================================================== wave 3, figure 16
+def fig_oblique_snell(path):
+    img = P.canvas(1240, 660)
+    ax = P.Axes(img, (90, 66, 700, 470), (0.0, 8.0), (-2.0, 34.0),
+                title='Snell about a rotated normal, on a grid that has never heard of the rotation',
+                xlabel='water depth, m (shoaling ->)', ylabel='ray azimuth from the grid x axis, deg')
+    ax.frame([0, 2, 4, 6, 8], [0, 5, 10, 15, 20, 25, 30])
+    cols = {0.0: (110, 112, 118), 10.0: (32, 128, 96), 20.0: (24, 84, 168),
+            30.0: (124, 72, 168)}
+    rows = []
+    for phi_deg in (0.0, 10.0, 20.0, 30.0):
+        phi = math.radians(phi_deg)
+        dxo, dyo = 2.0, 4.0
+        xo = np.arange(0.0, 700.0 + dxo, dxo)
+        yo = np.arange(-1200.0, 1200.0 + dyo, dyo)
+        X, Y = np.meshgrid(xo, yo)
+        u = X * math.cos(phi) + Y * math.sin(phi)
+        d_o = np.clip(8.0 - 0.016 * (u - (1200.0 * math.sin(phi) + 10.0)),
+                      0.06, 8.0)
+        tro = B.transform_2d(xo, yo, -d_o, B.T_SWELL, 1.0, math.radians(15.0),
+                             breaking=False)
+        inv = math.sin(tro['theta'][0, 0] - phi) / tro['c'][0, 0]
+        th_pred = phi + np.arcsin(np.clip(tro['c'] * inv, -1.0, 1.0))
+        # THE ROW MATTERS: over a rotated bed the ramp crosses each alongshore
+        # row over a different span of x, and the centre row can miss most of
+        # it -- the first version of this figure drew the 30 deg case as four
+        # points. Take the row that samples the ramp most fully.
+        cover = ((d_o < 7.9) & (d_o > 0.4)).sum(axis=1)
+        j = int(np.argmax(cover))
+        m = (d_o[j] < 7.9) & (d_o[j] > 0.4)
+        ax.line(d_o[j][m], np.degrees(tro['theta'][j][m]), cols[phi_deg], 3)
+        ax.line(d_o[j][m], np.degrees(th_pred[j][m]), (250, 250, 250), 1)
+        ramp = (d_o < 7.9) & (d_o > 0.4)
+        win = np.zeros_like(ramp)
+        win[max(j - 100, 60):min(j + 100, yo.size - 60), :] = True
+        e = math.degrees(float(np.abs(tro['theta'] - th_pred)[ramp & win].max()))
+        rows.append((phi_deg, e))
+    P.legend(ax, [(cols[p], 'contours at %.0f deg to the grid' % p)
+                  for p in (0.0, 10.0, 20.0, 30.0)]
+             + [((250, 250, 250), 'Snell about the rotated normal (thin)')],
+             4.6, 33.0)
+
+    ax2 = P.Axes(img, (790, 66, 1180, 470), (-5.0, 35.0), (0.0, 0.40),
+                 title='the error',
+                 xlabel='contour rotation, deg', ylabel='max |theta_march - Snell|, deg')
+    ax2.frame([0, 10, 20, 30], [0.0, 0.1, 0.2, 0.3, 0.4])
+    ax2.line([r[0] for r in rows], [r[1] for r in rows], (196, 84, 58), 3)
+    for p, e in rows:
+        ax2.marker(p, e, (196, 84, 58))
+    P.caption(img, [
+        'Wave 1 verified sin(theta)/c invariant to 2.2e-16 on a straight coast and said in the same breath that the test passes by construction -- `snell_sin`',
+        'computes sin(theta) FROM c, so the ratio is an identity. This is the same law asked of a march that does not contain it: `transform_2d` integrates the',
+        'irrotationality of the wavenumber vector, dk_y/dx = dk_x/dy, on the grid axes, and the bed is a plane beach whose contours run at 10, 20 and 30 degrees',
+        'to those axes. The exact answer is Snell about the rotated normal and the march is never told the rotation. Worst error %.3f deg over the three rotations;'
+        % max(r[1] for r in rows),
+        'at zero rotation it is 0.000 and the test degenerates into wave 1\'s identity again. The error is the first-order upwind difference in y rather than the',
+        'physics -- it does not fall when the ray step is refined and it does fall with dy. The window excludes 60 rows at each alongshore edge, where the march\'s',
+        'transverse differences go one-sided and the error reaches 2.7 deg: a real boundary artefact of an open boundary, reported rather than masked away.'])
+    return P.save(img, path)
+
+
+# =========================================================== wave 3, figure 17
+def fig_bar_alongshore(bay, path):
+    x, y, tr = bay['x'], bay['y'], bay['tr']
+    ba = B.bar_alongshore(x, y, bay['h'], bay['h_init'])
+    ratio = B.bay_crest_ratio(bay, field='wave')
+    ratio_b = B.bay_crest_ratio(bay, field='bed')
+    Hb = np.array([(lambda b: b['H_b'] if b else np.nan)(
+        B.breaker_state(B.row_slice(tr, j))) for j in range(y.size)])
+    img = P.canvas(1320, 760)
+
+    lo = float(np.nanmin(ba['x'])) - 40.0
+    hi = float(np.nanmax(bay['x_s'])) + 40.0
+    ax = P.Axes(img, (85, 66, 1270, 300), (y[0], y[-1]), (lo, hi),
+                title='The bar, the surf line and the shore, station by station',
+                xlabel='', ylabel='cross-shore, m', y_up=False)
+    ax.frame(_ticks(y[0], y[-1], 6), _ticks(lo, hi, 5))
+    ax.line(y, bay['x_s'], (196, 84, 58), 3)
+    ax.line(y, ba['x'], (24, 84, 168), 3)
+    ax.line(y, B.surf_line_x(tr), (110, 112, 118), 2)
+    P.legend(ax, [((196, 84, 58), 'shoreline'), ((24, 84, 168), 'bar crest'),
+                  ((110, 112, 118), 'outer breaking onset')], y[0] + 30, lo + 12)
+
+    ax2 = P.Axes(img, (85, 360, 660, 560), (y[0], y[-1]), (0.0, 3.2),
+                 title='crest depth against H_b/gamma, per station',
+                 xlabel='alongshore, m', ylabel='m')
+    ax2.frame(_ticks(y[0], y[-1], 4), [0, 1, 2, 3])
+    ax2.line(y, ba['d'], (24, 84, 168), 3)
+    ax2.line(y, Hb / B.GAMMA_B, (196, 84, 58), 2, dash=(7, 5))
+    P.legend(ax2, [((24, 84, 168), 'crest depth, the wave\'s own field'),
+                   ((196, 84, 58), "chapter 12's H_b/gamma")], y[0] + 30, 3.0)
+
+    ax3 = P.Axes(img, (740, 360, 1270, 560), (y[0], y[-1]), (0.2, 1.2),
+                 title='the ratio, in one field and in two',
+                 xlabel='alongshore, m', ylabel='d_bar / (H_b/gamma)')
+    ax3.frame(_ticks(y[0], y[-1], 4), [0.25, 0.5, 0.75, 1.0])
+    ax3.hline(1.0, (110, 112, 118), 1, dash=(4, 4))
+    ax3.line(y, ratio, (32, 128, 96), 3)
+    ax3.line(y, ratio_b, (196, 84, 58), 2)
+    P.legend(ax3, [((32, 128, 96), 'both terms in the depth the wave saw'),
+                   ((196, 84, 58), 'crest off the raw bed (the trap)')],
+             y[0] + 30, 0.45)
+
+    P.caption(img, [
+        'Eighty-nine cross-shore profiles, one offshore sea state, and no two stations the same -- the coastal loop gave each of them a different shoreface and the',
+        'morphodynamic loop grew a bar on every one. Crest depth runs %.2f to %.2f m (sd %.2f); the bar sits %.0f +- %.0f m seaward of its own local shoreline, so'
+        % (float(np.nanmin(ba['d'])), float(np.nanmax(ba['d'])), float(np.nanstd(ba['d'])),
+           float(np.nanmean(bay['x_s'] - ba['x'])), float(np.nanstd(bay['x_s'] - ba['x']))),
+        'it follows the bay rather than sitting at one distance from the grid. Chapter 12\'s d_bar ~ H_b/gamma holds at %.3f +- %.3f across the whole embayment when'
+        % (float(np.nanmean(ratio)), float(np.nanstd(ratio))),
+        'both terms are read from one depth field, and collapses to %.3f when the crest is read off the raw bed -- the error wave 2 withdrew a finding for, and it is'
+        % float(np.nanmean(ratio_b)),
+        'worth %.2f of the ratio here against 0.08 in 1-D, because the filter is 1.5 cells wide and so is the bar, in cells.'
+        % (float(np.nanmean(ratio)) - float(np.nanmean(ratio_b)))])
+    return P.save(img, path)
+
+
 def main():
+    # `python3 beach_evidence.py [outdir] [prefix]` -- the prefix filter exists
+    # because the full set costs a morphodynamic run per wave and regenerating
+    # thirteen figures to inspect one is how a build loop stops being run at
+    # all. `s3` regenerates this wave's four.
+    only = None
+    args_ = [a for a in sys.argv[1:] if not a.startswith('-')]
+    if len(args_) > 1:
+        only = args_[1]
     os.makedirs(OUT, exist_ok=True)
-    print('evidence -> %s' % os.path.abspath(OUT))
-    sc = B.run_scene()
-    sc_storm = B.run_scene(H0=B.H0_STORM)
+    print('evidence -> %s%s' % (os.path.abspath(OUT),
+                                (' (only %s*)' % only) if only else ''))
+    want = lambda nm: only is None or nm.startswith(only)      # noqa: E731
+    need_1d = any(want(n) for n in ('s1-profile-bar.png', 's1-wave-transform.png',
+                                    's1-flux-convergence.png', 's1-plan-depth.png',
+                                    's1-refraction-rays.png', 's2-reform-map.png',
+                                    's2-hd-transect.png'))
+    sc = B.run_scene() if need_1d else None
+    sc_storm = B.run_scene(H0=B.H0_STORM) if want('s1-profile-bar.png') else None
+    bay = B.run_bay() if any(want(n) for n in ('s3-bay-plan.png',
+                                               's3-bar-alongshore.png')) else None
     for fn, args in ((fig_profile, (sc, sc_storm, 's1-profile-bar.png')),
                      (fig_transform, (sc, 's1-wave-transform.png')),
                      (fig_flux, (sc, 's1-flux-convergence.png')),
@@ -688,7 +998,13 @@ def main():
                      (fig_hd_transect, (sc, 's2-hd-transect.png')),
                      (fig_ratio_resolved, ('s2-ratio-resolved.png',)),
                      (fig_saturated_gamma, ('s2-saturated-gamma.png',)),
-                     (fig_forcing, ('s2-forcing-history.png',))):
+                     (fig_forcing, ('s2-forcing-history.png',)),
+                     (fig_coastal_loop, ('s3-coastal-loop.png',)),
+                     (fig_oblique_snell, ('s3-refraction-oblique.png',)),
+                     (fig_bay_plan, (bay, 's3-bay-plan.png')),
+                     (fig_bar_alongshore, (bay, 's3-bar-alongshore.png'))):
+        if not want(args[-1]):
+            continue
         a = list(args)
         a[-1] = os.path.join(OUT, a[-1])
         print('   %s' % os.path.basename(fn(*a)))
