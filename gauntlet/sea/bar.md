@@ -319,3 +319,54 @@ structural reason rather than for effort.**
 eddies with foam as the tracer. A coverage mask advected by a potential flow will
 not produce it; it needs the vorticity the breaking itself generates. *Photograph;
 recorded as a criterion for the foam wave, not this one.*
+
+## I · The reform, photographed — and the barrel, from stand-ins
+
+### I1 · The second breaking line exists at this coast. Owner's frame.
+
+A twelfth owner photograph, from the cliff: **two clearly separated lines of
+whitewater with a calm band between them**, birds over the trough. No time given;
+illuminant `?`.
+
+**This is section B's central criterion, photographed at the reference coast**, and
+it lands while the implementation cannot produce it — wave 1 reported `H/d`
+bottoming at 0.456 against the 0.40 needed, across four tide levels and three sea
+states, and filed it `OPEN` rather than widening a tolerance. **That was the right
+call and this frame confirms it was a real gap.**
+
+The consequence binds every later wave: **no wave may resolve section B by
+concluding that this coast does not reform.** It does; here it is. The failure is
+the model's, and the finding must name what the model lacks.
+
+### I2 · Three barrel frames, and they are stand-ins — say so
+
+Three further images arrived with the above: a large wave with the lip throwing
+and spray blown back off the crest, and two tube frames shot from the front and
+the side. **They are plainly not the reference coast** — much larger surf, and
+professional surf photography rather than the owner's cliff-top phone frames.
+
+They carry the standing the pool bar gave its own stand-ins (the lagoon over-under
+and the dome-versus-flat-port comparison): **evidence for a mechanism, never for
+this coast, and never for radiometry.** A critic may not credit the render against
+Aljezur on their strength. Marked, as those were.
+
+What they do supply:
+
+- **The definitive multivalued surface.** A barrel is the free surface wrapped over
+  itself with air enclosed — not a steep graph, an *enclosed volume*. Bar section F
+  defers this for a structural reason and these frames are what that reason looks
+  like. *Photograph, stand-in.*
+- **The interior is lit through its own wall.** Inside the tube the light does not
+  arrive from the sky — it arrives through one to two metres of wave face, and it
+  is Beer–Lambert filtered on the way in. That is why a barrel's interior reads
+  **green** rather than blue or shadowed. It is the section-A path argument again,
+  in its strongest form: **a room whose only window is the water.** A renderer that
+  lights a tube interior with ambient sky has missed the whole mechanism.
+  *Derived from the frames; the path length `?`.*
+- **Two surface states on one wave, simultaneously.** The face is smooth and
+  glassy while the lip is exploding, centimetres apart. Any model with a single
+  roughness or a single foam threshold across the wave cannot hold both.
+  *Photograph, stand-in.*
+- **Spray blown back off the crest** — offshore wind against the wave's own motion,
+  so the plume goes *backwards* relative to the break. A spray model advected only
+  by the wave will send it the wrong way. *Photograph, stand-in.*
