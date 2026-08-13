@@ -986,6 +986,110 @@ def box_hit(px, py, tx, ty, tz):
     return sid, u, v, sm
 
 
+# MOVED UP, wave 15, and nothing in it changed. It was written for the
+# underwater camera and lived beside it; the internal light field's
+# UP-GOING gather needs the same solve four hundred lines earlier, and a
+# second copy would be a second opinion about where the walls are. The
+# `validate.py` row that fires both tracers at the same downgoing rays and
+# asserts bit-for-bit agreement is what holds the move honest.
+# --- A RAY THAT IS ALLOWED TO GO UP -------------------------------------------
+# `scene_hit` is downgoing-only, and not by accident: its floor branch takes the
+# root of the z = -DEPTH plane only for tz < 0, its cylinder entry clamps the cap
+# plane with `np.minimum(tz, -1e-9)`, and it has no ceiling at all because all
+# five of its callers start at the surface and go down. An underwater eye needs
+# the other half of the sphere.
+#
+# THIS IS A SIBLING RATHER THAN AN EXTENSION, and the reason is the hero frame.
+# Extending `scene_hit` would mean a new surface id in a function five call sites
+# read positionally, a cylinder entry that no longer skips the upgoing branch,
+# and a ceiling plane in the argmin that every existing caller would then have to
+# be shown not to reach -- five arguments to make, each checkable only by the
+# frame coming out identical. A sibling makes one argument, in one place, and
+# leaves the downgoing solve untouched to the bit. What it does NOT do is
+# duplicate the physics: `validate.py` fires both at the same downgoing rays and
+# asserts they agree exactly, so the sibling cannot drift into a second opinion
+# about where the walls are.
+def _cyl_entry_any(px, py, pz, tx, ty, tz):
+    """`_cyl_entry` for a ray of EITHER sign of tz. A step is the solid
+    {r <= R, z <= ztop}, so the z half-space is an interval in t whose sense
+    flips with the ray: a descending ray ENTERS it at the cap and stays inside,
+    an ascending one is inside until the cap and then leaves. Writing both as
+    (t_lo, t_hi) and intersecting with the radial interval is the whole
+    generalisation, and the downgoing case reduces to t_hi = +inf, which is the
+    `np.maximum(t1, tc)` the original writes directly."""
+    n = px.shape
+    bt = np.full(n, BIG); bf = np.zeros(n, bool); bi = np.full(n, -1, np.int8)
+    a = tx * tx + ty * ty
+    vert = a <= 1e-14
+    inva = 1.0 / np.where(vert, 1.0, a)
+    up, dn = tz > 1e-9, tz < -1e-9
+    lvl = ~(up | dn)                          # level: no cap crossing at all
+    tzs = np.where(lvl, 1.0, tz)
+    for i, (cx, cy, R, ztop) in enumerate(CYL):
+        ox, oy = px - cx, py - cy
+        b = 2.0 * (ox * tx + oy * ty)
+        c = ox * ox + oy * oy - R * R
+        disc = b * b - 4.0 * a * c
+        hit = (disc > 0.0) & ~vert
+        sq = np.sqrt(np.where(hit, disc, 0.0))
+        t1 = np.where(hit, (-b - sq) * 0.5 * inva, BIG)
+        t2 = np.where(hit, (-b + sq) * 0.5 * inva, -BIG)
+        t1 = np.where(vert, np.where(c < 0.0, -BIG, BIG), t1)
+        t2 = np.where(vert, np.where(c < 0.0, BIG, -BIG), t2)
+        tc = (ztop - pz) / tzs
+        out = lvl & (pz > ztop)               # level and above the cap: no hit
+        zlo = np.where(dn, tc, np.where(out, BIG, -BIG))
+        zhi = np.where(up, tc, np.where(out, -BIG, BIG))
+        tin = np.maximum(t1, zlo)
+        ok = (tin < np.minimum(t2, zhi)) & (tin > 1e-6) & (tin < bt)
+        bt = np.where(ok, tin, bt)
+        bf = np.where(ok, t1 >= zlo, bf)      # entered through the round face
+        bi = np.where(ok, i, bi)
+    return bt, bf, bi
+
+
+def scene_hit_under(px, py, pz, tx, ty, tz):
+    """First hit of a ray of ANY direction, starting anywhere inside the water.
+    Surface ids are `scene_hit`'s, plus one:
+         6 = the still water surface z = 0, seen FROM BELOW; (u,v) = (x,y)
+    which is the only id that is not geometry -- it is where a ray leaves this
+    function and meets `uw_interface`."""
+    tx, ty, tz = np.asarray(tx), np.asarray(ty), np.asarray(tz)
+    px, py, pz = (np.broadcast_to(np.asarray(q, float), tx.shape)
+                  for q in (px, py, pz))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        s = np.stack([
+            np.where(tz < -1e-9, (-DEPTH - pz) / tz, BIG),
+            np.where(tx < -1e-9, (XW0 - px) / tx, BIG),
+            np.where(tx > 1e-9, (XW1 - px) / tx, BIG),
+            np.where(ty < -1e-9, (YW0 - py) / ty, BIG),
+            np.where(ty > 1e-9, (YW1 - py) / ty, BIG),
+            np.where(tz > 1e-9, (0.0 - pz) / tz, BIG)])
+    s = np.where(np.isfinite(s), s, BIG)
+    s = np.where(s > 1e-9, s, BIG)             # a backward root is a miss
+    k = np.argmin(s, 0)
+    sm = np.take_along_axis(s, k[None].astype(np.intp), 0)[0]
+    sid = np.where(k == 5, 6, k).astype(np.int8)
+    cyl = np.full(tx.shape, -1, np.int8)
+    bx2, by2 = px + tx * sm, py + ty * sm
+    near = ((np.minimum(px, bx2) <= STEP_BB[1]) & (np.maximum(px, bx2) >= STEP_BB[0]) &
+            (np.minimum(py, by2) <= STEP_BB[3]) & (np.maximum(py, by2) >= STEP_BB[2]))
+    idx = np.flatnonzero(near)
+    if idx.size:
+        ct, cf, ci = _cyl_entry_any(px[idx], py[idx], pz[idx],
+                                    tx[idx], ty[idx], tz[idx])
+        take = ct < sm[idx]
+        j = idx[take]
+        sm[j] = ct[take]
+        sid[j] = np.where(cf[take], 5, 0).astype(np.int8)
+        cyl[j] = ci[take]
+    hx, hy, hz = px + tx * sm, py + ty * sm, pz + tz * sm
+    flat = (sid == 0) | (sid == 5) | (sid == 6)
+    u = np.where(flat, hx, np.where(sid <= 2, hy, hx))
+    v = np.where(flat, hy, hz)
+    return sid, u, v, sm, cyl
+
+
 def splat(acc, u, v, w, u0, u1, v0, v1):
     nv, nu = acc.shape
     fu = (u - u0) / (u1 - u0) * nu - 0.5
@@ -1466,15 +1570,25 @@ GLOW = sail_glow(BU, BV)
 
 
 def bed_ao(x, y, z=None):
-    """Sky visibility at a bed point, cosine-weighted. Two occluders:
-      * the pool walls -- 1 - 0.30 exp(-d/0.30) is a two-wall corner losing 60%.
-      * every step riser standing PROUD of this point. For a straight wall of
+    """Sky visibility at a bed point, cosine-weighted, from the STEP UNIT alone.
+
+    WHAT LEFT, wave 15: `1 - 0.30 exp(pool_sdf/0.30)`, a two-wall corner losing
+    60%. That factor was a stand-in for the pool walls taking part of a bed
+    point's hemisphere, and the return leg now TRACES that share -- the rays
+    that used to be deleted here arrive carrying the wall's own radiance
+    instead. Leaving both in would occlude the sky twice and then add the wall
+    on top. Its replacement is not a constant: `_sky_vf` gives the exact
+    rectangle view factor at every texel (35.3% mean, 77% worst) against this
+    term's flat 30% ceiling, and the up-gather closes on that number.
+
+    What is KEPT is the riser contact shadow, and it is kept because it is
+    sharper than the lattice: for a straight wall of
         height h at distance a the cosine-weighted occluded fraction is exactly
         (1 - a/sqrt(a^2+h^2))/2, so the dark line that hugs the underside of each
         nosing is a closed form, not a painted gradient. The arcs are convex
         outward, so this slightly over-occludes; that is the conservative way
         round for a contact shadow."""
-    ao = 1.0 - 0.30 * np.exp(pool_sdf(x, y) / 0.30)
+    ao = np.ones_like(np.asarray(x, float))
     zz = bed_z(x, y) if z is None else z
     for (cx, cy, R, ztop) in CYL:
         a = np.sqrt((x - cx) ** 2 + (y - cy) ** 2) - R
@@ -1487,7 +1601,157 @@ def bed_ao(x, y, z=None):
 
 BED_AO = bed_ao(BU, BV)
 
+# --- WHAT IS ACTUALLY OVER A SUBMERGED FACE ----------------------------------
+# Every submerged receiver in this file used to be handed `SKY_AMB` over some
+# fraction of its hemisphere. On the BED that is exactly right and it is worth
+# saying why, because the same sentence says why it is wrong on a WALL. The sky
+# a submerged point sees is not a hemisphere: it is the Snell window, the whole
+# air-side hemisphere compressed into a cone of half angle asin(1/n) = 48.5 deg
+# about the VERTICAL, and gained by n^2 on the way in (`into_water`). For a
+# HORIZONTAL receiver those two factors cancel exactly --
+#
+#     (1/pi) INT_{t<tc} n^2 L_air cos t dw  =  n^2 L_air sin^2(tc)  =  L_air
+#
+# -- since sin^2(tc) = 1/n^2. So "a full hemisphere of SKY_AMB" and "the window
+# at n^2 SKY_AMB" are the same number on the bed, which is why the bed's term
+# has always worked and why nothing here moves it.
+#
+# On a VERTICAL face the cancellation fails, and it fails by the largest factor
+# available: a vertical face weights directions by sin t, so it collects almost
+# nothing from a cone about the vertical, while the bed weights them by cos t
+# and collects all of it. The two closed forms the file already owns give the
+# ratio with nothing new introduced:
+#
+#     E_vert(hemisphere)/E_bed(hemisphere) = tir_vert(0)         = 0.500
+#     E_vert(cone t>tc)/E_bed(cone t>tc)   = tir_vert(tc)        = 0.885
+#     E_bed(cone t>tc)/E_bed(hemisphere)   = 1 - 1/n^2           = 0.439
+#  => the WINDOW's share of a vertical face, against the bed's:
+#     (0.5 - tir_vert(tc)*(1 - 1/n^2)) * n^2                     = 0.199
+#
+# and `WALL_SKY = 0.5` -- correct as a PARTITION of a hemisphere -- is not that
+# number. It over-gives the sky to a submerged vertical face by x2.5 before the
+# `WAO` occlusion and by x1.96 after it. What belongs in the rest of that upper
+# half is the MIRROR: past tc the underside is a perfect reflector, so a wall
+# looks at the pool's own upwelling field folded down, and that is the term the
+# file has been carrying at one truncated bounce.
+#
+# THE THREE FUNCTIONS BELOW ARE THE WHOLE OF IT and none of them is new physics:
+# `tir_vert` was already here, `r_int_at` is the file's own external `fresnel`
+# read through Stokes reversibility exactly as `uw_interface` reads it, and the
+# sky profile is `sky()`'s own first two lines. What is new is that they are now
+# evaluated per direction inside one integral instead of being replaced by a
+# constant.
+TC_SNELL = np.arcsin(1.0 / IOR)     # 48.655 / 48.507 / 48.262 deg -- dispersive
+# NAMED TC_SNELL and not THETA_C: `THETA_C` in this file is the meniscus's
+# CONTACT angle, four hundred lines down, and the two have nothing to do with
+# each other. One collision of that kind is a silently wrong picture.
+TIR_FRAC = 1.0 - 1.0 / IOR[1] ** 2  # green's cone share; the shooting pass below
+
+
+def tir_vert(tc):
+    """Vertical-face / horizontal-bed irradiance from a uniform radiance filling
+    the cone t > tc. Exact; tir_vert(0) == 1/2 identically. MOVED UP from beside
+    the riser TIR term, where its derivation still stands -- the window share
+    below needs it four hundred lines earlier, and a second copy would be a
+    second premise."""
+    return ((np.pi / 2 - tc + np.sin(tc) * np.cos(tc))
+            / (np.pi * np.cos(tc) ** 2))
+
+
+TIR_VERT = float(tir_vert(np.arcsin(1.0 / IOR[1])))
+
+
+def r_int_at(mu):
+    """The underside's reflectance at a water-side polar angle of cosine `mu`,
+    per channel, reached through the file's ONE Fresnel implementation. Snell
+    takes the water-side angle to the air-side one; past the critical angle the
+    air-side cosine's square goes negative and the reflectance is exactly 1,
+    which is found here by the sign of that square and never by comparing an
+    angle with `TC_SNELL`. Same identity, same code path, as `uw_interface`."""
+    mu = np.asarray(mu, float)
+    s2 = np.clip(1.0 - mu * mu, 0.0, 1.0)
+    out = np.ones(mu.shape + (3,))
+    for c in range(3):
+        ca2 = 1.0 - IOR[c] ** 2 * s2
+        m = ca2 > 0.0
+        oc = np.ones(mu.shape)
+        if m.any():
+            oc[m] = fresnel(np.sqrt(ca2[m]))[:, c]
+        out[..., c] = oc
+    return out
+
+
+def sky_diffuse(mu_air):
+    """`sky()`'s diffuse term and nothing else, as a function of the air-side
+    direction's cosine from the vertical. The three SUN LOBES are deliberately
+    left out: for a submerged receiver the sun arrives as the refracted beam and
+    is already counted as `SUN_COL * cos_i * TSUN * cau`, so putting the disc in
+    here would be that beam a second time. What it does keep is the horizon /
+    zenith gradient, which is the part that matters: the OUTER window -- the
+    directions a vertical face weights most -- looks at the air-side horizon,
+    and SKY_HOR is brighter than SKY_TOP in red and green and equal in blue."""
+    t = np.clip(np.asarray(mu_air, float), 0, 1)[..., None] ** .55
+    return (SKY_HOR[None] * (1 - t) + SKY_TOP[None] * t) * 1.15
+
+
+def window_shares(profile=True, ior=None):
+    """(W_bed, W_vert), per channel: the (1/pi) INT L cos dw that a HORIZONTAL
+    and a VERTICAL submerged face collect from the Snell window, with L the
+    transmitted, n^2-gained sky. `profile=False` sets L to 1 and must reproduce
+    the two closed forms 1/n^2 and 0.5 - tir_vert(tc)*(1 - 1/n^2) -- which is
+    the row `validate.py` fires at this quadrature, since neither closed form
+    can be written from the integrand."""
+    ior = IOR if ior is None else np.asarray(ior, float)
+    Wb, Wv = np.zeros(3), np.zeros(3)
+    for c in range(3):
+        tc = np.arcsin(1.0 / ior[c])
+        t = (np.arange(40000) + .5) / 40000 * tc
+        st, ct = np.sin(t), np.cos(t)
+        if profile:
+            ca = np.sqrt(np.maximum(1. - (ior[c] * st) ** 2, 0.))
+            L = (1. - r_int_at(ct)[:, c]) * into_water(sky_diffuse(ca))[:, c]
+        else:
+            L = np.ones_like(t)
+        Wb[c] = 2. * np.sum(L * ct * st) * (tc / 40000)
+        Wv[c] = (2. / np.pi) * np.sum(L * st * st) * (tc / 40000)
+    return Wb, Wv
+
+
+WIN_BED, WIN_VERT = window_shares(True)
+SKY_VERT = WIN_VERT / WIN_BED       # a vertical submerged face's sky, as a
+                                    # multiple of the BED's -- the number that
+                                    # replaces WALL_SKY under the water
+_w0b, _w0v = window_shares(False)
+_wcf = (0.5 - tir_vert(TC_SNELL) * (1. - 1. / IOR ** 2)) * IOR ** 2
+print("the Snell window, as a source for a submerged face:")
+print("  half angle %s deg; a FLAT sky gives the window %s of a bed point's "
+      "hemisphere (closed form 1/n^2 = %s) and %s of a vertical face's (closed "
+      "form (1/2 - tir_vert(tc)(1-1/n^2))n^2 x 1/n^2 = %s), so a vertical face "
+      "may have %s of the sky the bed has -- not WALL_SKY = 0.5"
+      % (np.round(np.degrees(TC_SNELL), 3), np.round(_w0b, 4),
+         np.round(1. / IOR ** 2, 4), np.round(_w0v, 4),
+         np.round(_wcf / IOR ** 2, 4), np.round(_w0v / _w0b, 4)))
+print("  with the sky's OWN horizon/zenith profile in the integrand instead of "
+      "a constant it is %s -- the outer window is the air-side horizon, which "
+      "SKY_HOR makes brighter than the zenith in red and green, and a vertical "
+      "face weights exactly that outer part. SKY_AMB is unchanged and so is the "
+      "BED's sky term: %s is the bed's own window integral, and the wall's is "
+      "taken as a ratio to it." % (np.round(SKY_VERT, 4), np.round(WIN_BED, 4)))
+
+
 # --- one bounce back off the UNDERSIDE of the surface -------------------------
+# WHAT THIS IS NOW, wave 15: a SEED and a CROSS-CHECK, not the shipped term. The
+# mirror is integrated per direction by `up_gather` further down, over the whole
+# upper hemisphere, with the exact internal Fresnel and iterated to convergence.
+# This pass stays because it is the only thing in the file that reaches the same
+# transport by SHOOTING rather than by gathering -- 2.4 M photons launched off
+# the bed and splatted where they land, against a lattice quadrature at each
+# receiver -- and because it is what prices its own truncation: measured on the
+# outer nosing's own face it carries 1.8% of a face whose mean is 0.7326, where
+# the traced integral carries 25.0% of a face whose mean is 1.0195 -- 0.0132
+# against 0.2549, a factor of NINETEEN -- and the 58% it prints below is why.
+# Its output seeds the first wall map and nothing else reads it.
+#
 # The bed is a bright Lambertian reflector and the interface above it is a
 # mirror over most of its output: everything leaving beyond the critical angle
 # 48.6 deg is totally internally reflected straight back down. For a cosine
@@ -1501,7 +1765,7 @@ BED_AO = bed_ao(BU, BV)
 # metres -- which is why it is estimated on a coarse grid and why it reads as a
 # lift rather than as a glow. Only ONE bounce is taken; the further ones and the
 # share that lands on the walls and comes back are not modelled.
-TIR_FRAC = 1.0 - 1.0 / IOR[1] ** 2
+# TIR_FRAC and the critical angle are defined with the window shares above.
 _S2C = 1.0 / IOR[1] ** 2
 NRET, RNX, RNY = 2_400_000, 200, 100
 _rr = np.random.default_rng(4242)
@@ -1580,9 +1844,10 @@ def _sky_vf(x, y, h):
 _WSH = 1.0 - _sky_vf(BU, BV, np.maximum(BDEP, 1e-3))
 print("  the walls take %.1f%% of the bed's cosine-weighted hemisphere on "
       "average (%.0f%% at the worst texel, exact rectangle view factor) -- and "
-      "SKY_AMB is applied over the WHOLE of it, so the flat ambient is "
-      "over-counted by that share and the directional wall term that should "
-      "replace it is missing" % (100 * _WSH.mean(), 100 * _WSH.max()))
+      "SKY_AMB was applied over the WHOLE of it. That share is the size of the "
+      "RETURN LEG, and the solve below carries it: the sky comes off it and "
+      "the wall's own radiance goes on"
+      % (100 * _WSH.mean(), 100 * _WSH.max()))
 BEDRET = np.stack([sample(bedret[..., c:c + 1], BU.ravel(), BV.ravel(),
                           X0, X1, Y0, Y1)[:, 0].reshape(BU.shape)
                    for c in range(3)], -1)
@@ -1594,8 +1859,7 @@ bed_img = {'disp': shade(bed[:3], LIN, BED_AO, glow=GLOW, dep=BDEP, extra=BEDRET
 # the dry band and the bed are one pigment differing by one path, so bed_img /
 # BED_DRY is that path, measured on the maps the picture is actually made from
 # rather than argued from constants. Costs one more `shade`; nothing samples it.
-BED_DRY = shade(bed[:3], LIN, BED_AO, glow=GLOW, dep=np.zeros_like(BDEP),
-                extra=BEDRET)
+# BED_DRY is built from the CONVERGED bed, after the solve below.
 # --- ONE BOUNCE OFF THE BED, ONTO A VERTICAL FACE ----------------------------
 # This section is the ESTIMATOR. It was written in wave 3 for the step risers,
 # and it is now what lights the pool WALLS as well: the two receivers differ
@@ -1824,6 +2088,172 @@ def bounce_gather(px, py, pz, nx, ny, hh, src=None, hit=None):
     return acc / (RIS_ND * RIS_NP), vf / (RIS_ND * RIS_NP)
 
 
+
+
+# --- THE OTHER HALF OF THE HEMISPHERE: THE RETURN LEG, AND THE MIRROR --------
+# `bounce_gather` above integrates the DOWNGOING half of a vertical face's
+# hemisphere. This integrates the UPGOING half, for a face of any orientation,
+# and it is the pass the README has carried as `not modelled yet -- the return
+# leg, wall -> bed` for four rounds. One estimator answers three separate open
+# items, because all three are the same integral read at different receivers:
+#
+#   * THE BED's ambient was `SKY_AMB` over its WHOLE hemisphere, including the
+#     35.3% of it that is wall. That is the return leg. A ray that meets a wall
+#     before it meets the surface now brings the wall's own radiance back.
+#   * THE WALL's sky was `WALL_SKY * WAO * SKY_AMB` over its whole upper half.
+#     Only the window is sky, and it is worth SKY_VERT of the bed's, derived
+#     above. The rest of that upper half is the mirror.
+#   * THE LIGHT TRAP was a single shooting pass over the cone t > tc from the
+#     bed alone, with the 58% of it that meets a wall on the way up DELETED and
+#     with the partial Fresnel inside the window dropped. Here the trap is a
+#     GATHER: every direction is traced, the reflectance is the exact internal
+#     Fresnel at that direction, the walls are emitters as well as receivers,
+#     and the whole thing is iterated to convergence rather than truncated at
+#     one bounce. What the shooting pass measures is one term of what this
+#     integrates, and `validate.py` fires the two at each other -- shoot against
+#     gather, sharing no line -- which is the only cross-check available for a
+#     transport nothing else in the file computes.
+#
+# WHAT IT DOES NOT DO. The surface it reflects in is the STILL plane z = 0, not
+# the wave field. That is the same approximation the shooting pass made and it
+# is defensible for the same reason: the mirror leg is metres long, the slope
+# rms is 0.053-0.12, and what the waves do to a source that far away is smear
+# it by a few degrees -- the integral is already a hemisphere average. It is a
+# `?` and it is the reason the mirror carries a lift and not a caustic net.
+#
+# THE LATTICE is cosine-weighted and stratified, so `(1/pi) INT L cos dw` is the
+# plain MEAN of the sampled radiance and the closure is exact by construction:
+# sum(w) is 1 for a horizontal face over the whole hemisphere and exactly 1/2
+# for a vertical one over the upgoing half, which is the same 1/2 `tir_vert(0)`
+# and `_ris_closure(h, 0, inf)` and `bounce_gather`'s downgoing closure return.
+# There is no truncation to price here, unlike the (d, phi) lattice: the
+# integrand is bounded and the whole hemisphere is sampled.
+UP_NT, UP_NP = 24, 24               # ? cosine strata x azimuth strata = 576
+                                    # ? directions. It cannot move the term's
+                                    # ? SIZE (the closure is exact at any
+                                    # ? count); it decides how finely the
+                                    # ? mirror's own structure is resolved, and
+                                    # ? the mirrored bed sits 1.5-4 m away where
+                                    # ? the caustic cell subtends 3-8 deg, so
+                                    # ? this is about seven samples per cell.
+_upr = np.random.default_rng(271828)
+_up1 = ((np.arange(UP_NT)[:, None] + _upr.random((UP_NT, UP_NP))) / UP_NT).ravel()
+_up2 = ((np.arange(UP_NP)[None, :] + _upr.random((UP_NT, UP_NP))) / UP_NP).ravel()
+UP_SIN = np.sqrt(_up1)                       # sin t of the CONE angle about n
+UP_COS = np.sqrt(np.maximum(1. - _up1, 0.))
+UP_N = UP_NT * UP_NP
+
+
+def up_gather(px, py, pz, nx, ny, nz, src=None, hit=None, dhit=None,
+              ris_sky=False):
+    """The upgoing half of a submerged receiver's hemisphere, traced.
+
+    Returns (E_sky, E_mir, E_dir, vf, clo):
+      E_sky  (N, 3)  the Snell window's sky, as a MULTIPLE of SKY_AMB. Its level
+                     is the analytic `window_shares` integral and the lattice
+                     supplies only the unoccluded FRACTION, so a bed point in an
+                     empty basin gets exactly 1.000 and the bed's calibration
+                     cannot drift with a sample count.
+      E_mir  (N, 3)  the underside as a mirror: R_int(t) times whatever the
+                     reflected ray finds, over the whole upper half -- past the
+                     critical angle R is 1 and inside the window it is the
+                     partial reflection the shooting pass dropped.
+      E_dir  (N, 3)  what a ray meets BEFORE the surface. On a bed point this is
+                     the wall, and it is the return leg.
+      vf     (N, 3)  the weight split [surface, solid, riser], summing to 1/2 on
+                     a vertical face and 1 on a horizontal one.
+      clo    (3,)    the lattice's own sky quadrature against `window_shares`,
+                     an unoccluded closure printed as a regression.
+
+    `src` and `hit` are arguments for the same reason `bounce_gather`'s are: so
+    `validate.py` can substitute a unit radiance and an empty box and recover the
+    geometry alone."""
+    hit = scene_hit_under if hit is None else hit
+    dhit = scene_hit if dhit is None else dhit
+    src = bed_wall_src if src is None else src
+    px, py, pz = (np.asarray(q, float) for q in (px, py, pz))
+    n = px.shape
+    up = nz > 0.5
+    # the face frame. A horizontal receiver spans the whole azimuth; a vertical
+    # one is restricted to the half whose directions go UP, which is exactly the
+    # half `bounce_gather` does not take.
+    if up:
+        e1 = (1., 0., 0.); e2 = (0., 1., 0.); nn = (0., 0., 1.)
+        span, w = 2 * np.pi, 1.0 / UP_N
+    else:
+        e1 = (-ny, nx, 0.); e2 = (0., 0., 1.); nn = (nx, ny, 0.)
+        span, w = np.pi, 0.5 / UP_N
+    E_sky = np.zeros((px.size, 3)); E_mir = np.zeros((px.size, 3))
+    E_dir = np.zeros((px.size, 3)); vf = np.zeros((px.size, 3))
+    clo = np.zeros(3)
+    ox, oy, oz = px + nn[0] * 1e-4, py + nn[1] * 1e-4, pz + nn[2] * 1e-4
+    for i in range(UP_N):
+        ph = span * _up2[i]
+        s, c = UP_SIN[i], UP_COS[i]
+        cp, sp = np.cos(ph), np.sin(ph)
+        tx = s * cp * e1[0] + s * sp * e2[0] + c * nn[0]
+        ty = s * cp * e1[1] + s * sp * e2[1] + c * nn[1]
+        tz = s * cp * e1[2] + s * sp * e2[2] + c * nn[2]
+        if tz <= 1e-9:
+            continue                       # cannot happen: kept as an assertion
+        R = r_int_at(np.array([tz]))[0]    # (3,) the underside's reflectance
+        st = np.sqrt(max(1. - tz * tz, 0.))
+        fs = np.zeros(3)                   # the window's transmitted sky, per
+        for ch in range(3):                # channel -- three critical angles
+            if IOR[ch] * st < 1.0:
+                cac = np.sqrt(max(1. - (IOR[ch] * st) ** 2, 0.))
+                fs[ch] = (1. - R[ch]) * into_water(
+                    sky_diffuse(np.array([cac])))[0, ch]
+        clo = clo + fs * w
+        # tx and ty may be per-texel (a cylinder's outward normal is a function
+        # of the arc); tz never is, because e2 is z-hat on every vertical face
+        # and n-hat on the bed, so the polar angle -- the only thing the Fresnel
+        # and the window depend on -- is one number per direction.
+        TX, TY = np.zeros(n) + tx, np.zeros(n) + ty
+        TZ = np.zeros(n) + tz
+        sid, u, v, sm, cyl = hit(ox, oy, oz, TX, TY, TZ)
+        srf = sid == 6
+        E_dir += src(sid, u, v, sm) * w
+        ok = srf | (ris_sky & (sid == 5))
+        # THE ATTENUATION IS INSIDE THE INTEGRAL, with the Fresnel and the two
+        # cosines, and that is not a detail. `shade` used to write the sky as
+        # `SKY_AMB * ao * exp(-a * dep * 1.55)` -- a product of a mean weight
+        # and a mean path, with 1.55 the DIFFUSE elongation of a whole
+        # hemisphere. The sky does not arrive over a hemisphere; it arrives
+        # through a 48.5 deg cone, where the cosine-weighted mean of 1/cos t is
+        # (1 - cos tc)/(sin^2 tc / 2) = 1.205 and not 1.55. Factorising a
+        # correlated pair is the error this project has now made twice; here
+        # both factors are per direction and the ratio below does the rest.
+        E_sky += (np.where(ok, 1., 0.)[:, None] * fs[None]
+                  * np.exp(-ABS[None] * sm[:, None]) * w)
+        vf[:, 0] += np.where(srf, w, 0.)
+        vf[:, 1] += np.where((sid >= 0) & (sid <= 4), w, 0.)
+        vf[:, 2] += np.where(sid == 5, w, 0.)
+        j = np.flatnonzero(srf)
+        if j.size:
+            hx, hy = ox[j] + TX[j] * sm[j], oy[j] + TY[j] * sm[j]
+            sd2, u2, v2, sm2, _ = dhit(hx, hy, TX[j], TY[j], -TZ[j], 0.0)
+            E_mir[j] += src(sd2, u2, v2, sm[j] + sm2) * (R[None] * w)
+    # THE SKY'S LEVEL IS ANALYTIC AND ONLY ITS VISIBILITY IS SAMPLED. Dividing
+    # the lattice's occluded sum by the lattice's OWN unoccluded sum leaves a
+    # pure visibility in [0, 1]; multiplying by the closed-form window integral
+    # for this face, over the BED's, puts it back in units of SKY_AMB. So an
+    # unoccluded bed point comes out at exactly 1.000 whatever UP_NT and UP_NP
+    # are -- the sample count cannot move a level, only a shadow's edge -- and
+    # an unoccluded vertical face comes out at exactly SKY_VERT.
+    Wf = WIN_BED if up else WIN_VERT
+    E_sky = E_sky * (Wf / np.maximum(clo, 1e-12))[None] / WIN_BED[None]
+    return E_sky, E_mir, E_dir, vf, clo / Wf
+
+
+def up_ambient(E_sky, E_rest, vis=1.0):
+    """The upper hemisphere composed into one irradiance in the units `shade`
+    calls `amb`. `E_sky` is already in multiples of SKY_AMB -- which is where
+    the whole of what `WALL_SKY` used to be now lives -- and `vis` is the only
+    thing left outside the gather: the bed's riser contact shadow, whose closed
+    form resolves at 3 mm where this lattice resolves at 40."""
+    return SKY_AMB[None] * E_sky * np.asarray(vis)[..., None] + E_rest
+
 # --- does it actually CARRY the net?  Measure, do not assert. ----------------
 # The number that matters is not a map's total variance -- a self-shadow
 # gradient running round an arc gives that for free -- but the variance at
@@ -1865,34 +2295,58 @@ WALL_SKY = 0.5
 wall_img = {'disp': [None] * 4, 'mono': [None] * 4}
 
 
-def wall_shade(wi, bnc=None):
-    """One wall's (disp, mono) radiance maps. `bnc` is the bed-bounce term, in
-    the same units as the TIR return beside it; None is the first pass."""
+# WHAT LEFT WITH IT, wave 15, and it is the `?` that sat directly in the way.
+#     WAO = .78 * WALL_SKY * (1 - .32 exp(V/.055))
+# The 0.78 was marked "the wall's own sky visibility and has no derivation
+# here". It has none anywhere, and the geometry it stands for is not there: the
+# coping's bullnose has its POOLWARD EXTREME at s = SLIP, which is the wall
+# plane itself (`ZLIP = ZCEN`, the arc's lowest point, at s = SBUL - BULR =
+# SLIP), and it recedes from the pool going up. So the stone overhangs the
+# WATER by 20 mm and overhangs the WALL FACE by nothing at all. Worse, the
+# window it was shading is a cone about the VERTICAL: a submerged texel `d`
+# below the line sends its window rays out through the surface between 0 and
+# 1.13 d poolward of the wall plane, and the only ones a 0-mm overhang could
+# ever catch are within atan(0.020/(d + 0.12)) of straight up -- 9.5 deg at the
+# waterline, falling with depth -- which is the part of the window a vertical
+# face weights by sin^2 t and therefore the part worth least. Both factors are
+# gone. The wall's sky occlusion is now TRACED, by the same lattice that traces
+# everything else, and what is left unmodelled is stated rather than dialled:
+# the outer window looks at the air-side horizon, which in this scene holds a
+# terrace and a house that `sky()` does not have. That is section G's standing
+# `?` -- "the world above the water is sky() and nothing else" -- and it is one
+# `?` in one place instead of a 0.78 with no owner.
+def wall_shade(wi, bnc=None, ups=None):
+    """One wall's (disp, mono) radiance maps.
+
+    `ups` is the UPGOING half of the hemisphere -- window sky, mirror and the
+    walls it can see before the surface -- from `up_gather`; `bnc` is the
+    DOWNGOING half from `bounce_gather`. Together they are the whole
+    hemisphere, and `ao` is passed 0 because there is no term left for it to
+    scale: every ambient direction is now traced or integrated. `ups=None` is
+    the SEED pass, which is the field as wave 14 shipped it -- the gather has to
+    read a wall radiance for the rays that cross the basin before any wall
+    radiance exists, and iterating from the previous round's answer makes the
+    first increment the exact size of the defect."""
     uu = WALL_UU[wi]
     UU, VV = np.meshgrid(uu, np.linspace(-DEPTH, WTOP, WNV))
     T = tiles(UU, VV)
-    WR = np.stack([sample(wallret[wi][..., c:c + 1], UU.ravel(), VV.ravel(),
-                          uu[0], uu[-1], -DEPTH, WTOP)[:, 0].reshape(UU.shape)
-                   for c in range(3)], -1)
-    # the coping overhangs the wall by 20 mm, so the last few centimetres of wall
-    # sit in its shade: the darkest thing in the pool is the line under the lip.
-    # It multiplies the SKY term and nothing else, which is now a statement with
-    # content: an overhang at the top of the wall occludes the upgoing half and
-    # cannot occlude the floor, so the bounce below is not darkened by it.
-    # ? the 0.78 is the wall's own sky visibility and has no derivation here; it
-    # ? is untouched this round. What is derived is the WALL_SKY beside it.
-    WAO = .78 * WALL_SKY * (1.0 - .32 * np.exp(VV / .055))
-    # ...and the map runs WTOP ABOVE the still line now, over the fillet's own
-    # climb. Those texels carry no caustic (no sun ray can land above the still
+    # ...the map runs WTOP ABOVE the still line, over the fillet's own climb.
+    # Those texels carry no caustic (no sun ray can land above the still
     # surface, so `wall` is identically zero there -- which is the right answer,
     # not a gap) and no water column over them either, hence the clamp on `dep`:
-    # a negative depth would run Beer-Lambert backwards and AMPLIFY. What is
-    # left is the ambient under the coping's shade, which is what the top of a
-    # fillet actually shows.
+    # a negative depth would run Beer-Lambert backwards and AMPLIFY.
     DEP = np.maximum(-VV, 0.)
-    ex = WR if bnc is None else WR + bnc
-    return (shade(wall[wi][:3], T, WAO, dep=DEP, extra=ex),
-            shade([wall[wi][3]] * 3, T, WAO, dep=DEP, extra=ex))
+    if ups is None:
+        WR = np.stack([sample(wallret[wi][..., c:c + 1], UU.ravel(), VV.ravel(),
+                              uu[0], uu[-1], -DEPTH, WTOP)[:, 0].reshape(UU.shape)
+                       for c in range(3)], -1)
+        WAO = .78 * WALL_SKY * (1.0 - .32 * np.exp(VV / .055))
+        WR = WR if bnc is None else WR + bnc
+        return (shade(wall[wi][:3], T, WAO, dep=DEP, extra=WR),
+                shade([wall[wi][3]] * 3, T, WAO, dep=DEP, extra=WR))
+    ex = ups if bnc is None else ups + bnc
+    return (shade(wall[wi][:3], T, 0.0, dep=DEP, extra=ex),
+            shade([wall[wi][3]] * 3, T, 0.0, dep=DEP, extra=ex))
 
 
 for wi in range(4):
@@ -1931,31 +2385,43 @@ WB_N = [np.array([1., 0.]), np.array([-1., 0.]),
         np.array([0., 1.]), np.array([0., -1.])]      # inward normals, x0 x1 y0 y1
 WB_P = [XW0, XW1, YW0, YW1]
 WB_Z = np.linspace(-DEPTH, WTOP, WB_NZ)
-WBNC, _wvf, _wbs, _wok, _wa = [], [], [], [], []
-for wi in range(4):
-    _uu = np.linspace(Y0, Y1, WB_NU) if wi < 2 else np.linspace(X0, X1, WB_NU)
-    _UU, _ZZ = np.meshgrid(_uu, WB_Z)
-    _nx, _ny = WB_N[wi]
-    _px = np.full(_UU.size, WB_P[wi]) if wi < 2 else _UU.ravel()
-    _py = _UU.ravel() if wi < 2 else np.full(_UU.size, WB_P[wi])
-    # the foot: whatever the bed does just inside this wall face. Read, not
-    # tabulated, so the map needs no edit when a level moves.
-    _zf = bed_z(_px + _nx * 2e-3, _py + _ny * 2e-3)
-    _pz = np.maximum(_ZZ.ravel(), _zf + 1e-3)
-    _hh = np.maximum(_pz - _zf, RIS_HMIN)
-    _E, _vf = bounce_gather(_px, _py, _pz, _nx, _ny, _hh)
-    WBNC.append(_E.reshape(WB_NZ, WB_NU, 3))
-    _wvf.append(_vf.reshape(WB_NZ, WB_NU, 3))
-    # WETTED WALL is the only wall any of the numbers below are about: submerged,
-    # and not buried behind the step unit or under the floor at the junction.
-    # A buried texel had its origin lifted onto its own foot, so it reports the
-    # view factor of a face standing ON the bed -- close to the full 0.500 -- and
-    # averaging that into a wall statistic would inflate every one of them with
-    # 3.6 m2 of liner no ray can reach.
-    _wok.append((_ZZ.ravel() <= 0.) & (_ZZ.ravel() >= _zf - 1e-9))
-    _wa.append(((Y1 - Y0) if wi < 2 else (X1 - X0)) / WB_NU
-               * (DEPTH + WTOP) / WB_NZ * np.ones(_E.shape[0]))
-    _wbs.append(_E[_wok[wi]].mean(0))
+def _wall_grid(wi, nu, nz):
+    """One wall's receiver lattice: positions, inward normal, the foot the bed
+    makes just inside the face, and the mask of texels that are WETTED WALL --
+    submerged, and not buried behind the step unit or under the floor at the
+    junction. A buried texel has its ray origin lifted onto its own foot so the
+    map stays finite, and it then reports the view factor of a face standing ON
+    the bed -- close to the full 0.500 -- so averaging it into a wall statistic
+    would inflate every one of them with 3.6 m2 of liner no ray can reach."""
+    uu = np.linspace(Y0, Y1, nu) if wi < 2 else np.linspace(X0, X1, nu)
+    UU, ZZ = np.meshgrid(uu, np.linspace(-DEPTH, WTOP, nz))
+    nx, ny = WB_N[wi]
+    px = np.full(UU.size, WB_P[wi]) if wi < 2 else UU.ravel()
+    py = UU.ravel() if wi < 2 else np.full(UU.size, WB_P[wi])
+    zf = bed_z(px + nx * 2e-3, py + ny * 2e-3)
+    pz = np.maximum(ZZ.ravel(), zf + 1e-3)
+    ok = (ZZ.ravel() <= 0.) & (ZZ.ravel() >= zf - 1e-9)
+    ar = (((Y1 - Y0) if wi < 2 else (X1 - X0)) / nu
+          * (DEPTH + WTOP) / nz * np.ones(px.size))
+    return uu, px, py, pz, zf, nx, ny, ok, ar
+
+
+def wall_down_pass():
+    """The downgoing half of every wall texel: the bed in front of the face."""
+    WBNC, _wvf, _wbs, _wok, _wa = [], [], [], [], []
+    for wi in range(4):
+        _uu, _px, _py, _pz, _zf, _nx, _ny, _ok, _ar = _wall_grid(wi, WB_NU, WB_NZ)
+        _hh = np.maximum(_pz - _zf, RIS_HMIN)
+        _E, _vf = bounce_gather(_px, _py, _pz, _nx, _ny, _hh)
+        WBNC.append(_E.reshape(WB_NZ, WB_NU, 3))
+        _wvf.append(_vf.reshape(WB_NZ, WB_NU, 3))
+        _wok.append(_ok)
+        _wa.append(_ar)
+        _wbs.append(_E[_ok].mean(0))
+    return WBNC, _wvf, _wbs, _wok, _wa
+
+
+WBNC, _wvf, _wbs, _wok, _wa = wall_down_pass()
 _wvfa = np.concatenate([v.reshape(-1, 3)[m] for v, m in zip(_wvf, _wok)])
 _wara = np.concatenate([a[m] for a, m in zip(_wa, _wok)])
 print("wall bounce: %d wall texels x %d directions, of which %d are wetted wall; "
@@ -1968,9 +2434,10 @@ print("wall bounce: %d wall texels x %d directions, of which %d are wetted wall;
                                     RIS_D0, RIS_D1))),
          1000 * RIS_D0, RIS_D1, 100 * _wvfa[:, 2].mean(),
          _wvfa[:, 0].mean(), _wvfa[:, 1].mean()))
-print("  it adds %s of irradiance on the submerged wall against %s of sky "
-      "ambient on the same face -- and unlike the sky term it carries the "
-      "caustic net" % (np.round(np.mean(_wbs, 0), 3), np.round(SKY_AMB * WALL_SKY, 3)))
+print("  it adds %s of irradiance on the submerged wall against the %s of "
+      "window sky the same face may have (SKY_AMB x SKY_VERT) -- and unlike the "
+      "sky term it carries the caustic net"
+      % (np.round(np.mean(_wbs, 0), 3), np.round(SKY_AMB * SKY_VERT, 3)))
 # WHERE THE TERM LIVES, since that is what decides whether the wall reads as a
 # band at the waterline or as a lift at its foot: the closed form for the share
 # of a vertical face's own half-hemisphere that the bed within `a` metres fills.
@@ -2011,24 +2478,210 @@ print("  reciprocity, bed <-> wall: A_bed * F(bed->wall) = %.2f m2 (exact "
          2 * ((X1 - X0) + (Y1 - Y0)) * DEPTH,
          100 * (_recip[1] / _recip[0] - 1), 100 * _wvfa[:, 2].mean()))
 
-WBNC_FULL = []
-for wi in range(4):
-    _uu = WALL_UU[wi]
-    _UU, _VV = np.meshgrid(_uu, np.linspace(-DEPTH, WTOP, WNV))
-    WBNC_FULL.append(np.stack(
-        [sample(WBNC[wi][..., c:c + 1], _UU.ravel(), _VV.ravel(),
-                _uu[0], _uu[-1], -DEPTH, WTOP)[:, 0].reshape(_UU.shape)
-         for c in range(3)], -1))
-_wall_v0 = [w.reshape(-1, 3).mean(0) for w in wall_img['disp']]
+
+# --- THE INTERNAL FIELD, SOLVED RATHER THAN TRUNCATED ------------------------
+# Everything above computes ONE transfer of a field that is coupled: the bed
+# lights the wall, the wall lights the bed, the underside sends both of them
+# back to each other, and the answer is the fixed point rather than any one
+# pass. Wave 14 stopped after the first transfer in each direction and priced
+# what that cost -- x1.0217 of a closed series' x1.2354 on the bed's trap, and a
+# submerged wall at 0.47 of the dry band where the owner reads it over 1. This
+# is the iteration, and it is written so the ORDER of the terms is visible:
+#
+#   bed   ambient = window sky (occluded, attenuated)  + mirror + WALL      <- return leg, new
+#   wall  ambient = window sky x SKY_VERT              + mirror + wall      <- upper half, new
+#                 + the bed in front                                        <- bounce_gather
+#
+# THE SEED IS THE WAVE-14 FIELD, deliberately. A fixed point does not depend on
+# where the iteration starts, so starting from the previous round's shipped
+# answer makes the FIRST increment the exact size of the defect, per channel and
+# per receiver, and the run prints it. Starting from black would hide that.
+#
+# WHY IT CONVERGES, and fast: each pass multiplies the field by an albedo (0.24
+# / 0.65 / 0.75 on this liner) times a view factor (0.35 of the bed's hemisphere
+# is wall, 0.44 of a bed direction is returned by the underside), so the
+# operator's gain is ~0.15-0.25 in the brightest channel. The successive
+# increments are printed with their own ratio, and the geometric tail past the
+# last one is printed as a bound rather than assumed to be zero.
+UB_NX, UB_NY = 200, 100     # ? the bed's up-gather lattice: 40 x 40 mm, the same
+                            # ? grid the shooting pass splats onto. Like the wall
+                            # ? gather's, it cannot change the term's SIZE -- the
+                            # ? sky's level is analytic and the mirror is smeared
+                            # ? over metres -- only how finely the return leg's
+                            # ? own shadows are resolved.
+WU_NU, WU_NZ = 144, 24      # ? and the wall's: 56 mm along, 58 mm in height.
+                            # ? Coarser than the downgoing gather's 288 x 40 on
+                            # ? purpose: the downgoing half is a NEAR-field
+                            # ? integral of the bed a few centimetres away and
+                            # ? carries the caustic net, the upgoing half is a
+                            # ? far-field integral of a mirror 1.5-4 m off.
+_UBX, _UBY = np.meshgrid(np.linspace(X0, X1, UB_NX), np.linspace(Y0, Y1, UB_NY))
+_UBZ = bed_z(_UBX.ravel(), _UBY.ravel())
+
+
+def bed_up_pass():
+    """The bed's whole hemisphere: the window's sky where it is open, the
+    underside's mirror, and -- new -- the WALL over the 35.3% of that hemisphere
+    the walls take. `ris_sky=True` hands the riser's occlusion of the sky back to
+    `bed_ao`, whose closed form resolves the contact shadow at the bed map's own
+    3 mm rather than at this lattice's 40 mm; the riser's radiance is dropped
+    either way, exactly as it was before, so nothing is counted twice."""
+    Es, Em, Ed, vf, clo = up_gather(_UBX.ravel(), _UBY.ravel(), _UBZ,
+                                    0., 0., 1., ris_sky=True)
+    r = lambda q: q.reshape(UB_NY, UB_NX, 3)
+    return r(Es), r(Em + Ed), r(vf), clo
+
+
+def _to_bed(M):
+    return np.stack([sample(M[..., c:c + 1], BU.ravel(), BV.ravel(),
+                            X0, X1, Y0, Y1)[:, 0].reshape(BU.shape)
+                     for c in range(3)], -1)
+
+
+def wall_up_pass():
+    """The same integral on the four walls. A texel above the still line -- the
+    fillet's own climb, WTOP of it -- gathers as if it sat AT the line: there is
+    no water over it to look up through, and it is read only by the meniscus."""
+    out = []
+    for wi in range(4):
+        _uu, _px, _py, _pz, _zf, _nx, _ny, _ok, _ar = _wall_grid(wi, WU_NU, WU_NZ)
+        Es, Em, Ed, vf, clo = up_gather(_px, _py, np.minimum(_pz, -1e-4),
+                                        _nx, _ny, 0.)
+        out.append((Es.reshape(WU_NZ, WU_NU, 3), (Em + Ed).reshape(WU_NZ, WU_NU, 3),
+                    vf.reshape(WU_NZ, WU_NU, 3), clo, _ok))
+    return out
+
+
+def _to_wall(wi, M, nz, nu):
+    uu = WALL_UU[wi]
+    UU, VV = np.meshgrid(uu, np.linspace(-DEPTH, WTOP, WNV))
+    return np.stack([sample(M[..., c:c + 1], UU.ravel(), VV.ravel(),
+                            uu[0], uu[-1], -DEPTH, WTOP)[:, 0].reshape(UU.shape)
+                     for c in range(3)], -1)
+
+
+def _wbnc_full(WB):
+    return [_to_wall(wi, WB[wi], WB_NZ, WB_NU) for wi in range(4)]
+
+
+NSOLVE = 6                  # ? iterations. Not chosen by looking at a picture:
+                            # ? the increments and their ratio are printed and
+                            # ? the geometric tail past the last one is printed
+                            # ? as a bound. It is enough when that bound is under
+                            # ? the lattice's own quadrature error.
+_solve_t0 = _time.time()
+# the seed is the WAVE-14 SHIPPED field, not the first pass: its walls carry
+# their bed bounce, so the increments below are measured against what the
+# previous round actually put in the picture.
+WBNC_FULL = _wbnc_full(WBNC)
 for wi in range(4):
     wall_img['disp'][wi], wall_img['mono'][wi] = wall_shade(wi, WBNC_FULL[wi])
-print("  the wall's mean radiance moves %s -> %s (first pass -> shipped), and "
-      "the first pass is what the gather itself read off the far wall, so what "
-      "is truncated is one bounce over the %.0f%% of the hemisphere that is "
-      "wall" % (np.round(np.mean(_wall_v0, 0), 3),
-                np.round(np.mean([w.reshape(-1, 3).mean(0)
-                                  for w in wall_img['disp']], 0), 3),
-                100 * _wvfa[:, 1].mean()))
+_bed_hist, _wall_hist = [bed_img['disp'].reshape(-1, 3).mean(0)], \
+                        [np.mean([w.reshape(-1, 3).mean(0)
+                                  for w in wall_img['disp']], 0)]
+print("the internal field, solved. Seed = the wave-14 maps; each row is one "
+      "full transfer in both directions (mean radiance over the bed / over the "
+      "four walls, and the increment on the previous row):")
+print("    seed        bed %s   wall %s" % (np.round(_bed_hist[0], 4),
+                                            np.round(_wall_hist[0], 4)))
+for _it in range(NSOLVE):
+    if _it > 0:
+        WBNC, _wvf, _wbs, _wok, _wa = wall_down_pass()
+    WBNC_FULL = _wbnc_full(WBNC)
+    # --- the bed, whose hemisphere is entirely upgoing -----------------------
+    _bs, _bm, _bvf, _bclo = bed_up_pass()
+    BSKY, BOTH = _to_bed(_bs), _to_bed(_bm)
+    BAMB = up_ambient(BSKY, BOTH, BED_AO)
+    bed_img = {'disp': shade(bed[:3], LIN, 0.0, glow=GLOW, dep=BDEP, extra=BAMB),
+               'mono': shade([bed[3]] * 3, LIN, 0.0, glow=GLOW, dep=BDEP, extra=BAMB)}
+    # --- the walls, whose hemisphere is two halves ---------------------------
+    _wu = wall_up_pass()
+    WUPS = []
+    for wi in range(4):
+        _es = _to_wall(wi, _wu[wi][0], WU_NZ, WU_NU)
+        _em = _to_wall(wi, _wu[wi][1], WU_NZ, WU_NU)
+        WUPS.append(up_ambient(_es, _em))
+        wall_img['disp'][wi], wall_img['mono'][wi] = \
+            wall_shade(wi, WBNC_FULL[wi], WUPS[wi])
+    _bed_hist.append(bed_img['disp'].reshape(-1, 3).mean(0))
+    _wall_hist.append(np.mean([w.reshape(-1, 3).mean(0)
+                               for w in wall_img['disp']], 0))
+    print("    pass %d      bed %s   wall %s   d(bed) %s   d(wall) %s"
+          % (_it + 1, np.round(_bed_hist[-1], 4), np.round(_wall_hist[-1], 4),
+             np.round(_bed_hist[-1] - _bed_hist[-2], 4),
+             np.round(_wall_hist[-1] - _wall_hist[-2], 4)))
+_bd = np.array([_bed_hist[i + 1] - _bed_hist[i] for i in range(NSOLVE)])
+_wd = np.array([_wall_hist[i + 1] - _wall_hist[i] for i in range(NSOLVE)])
+# the ratio is only meaningful where the increment is above the lattice's own
+# noise; a channel that has already converged to the digit reports a ratio of
+# nothing over nothing, so it is floored rather than allowed to read 0.99.
+_rb = np.where(np.abs(_bd[-2]) > 1e-4,
+               np.abs(_bd[-1] / np.where(np.abs(_bd[-2]) > 1e-12, _bd[-2], np.inf)), 0.)
+_rw = np.where(np.abs(_wd[-2]) > 1e-4,
+               np.abs(_wd[-1] / np.where(np.abs(_wd[-2]) > 1e-12, _wd[-2], np.inf)), 0.)
+print("  the operator's measured gain (last increment over the one before) is "
+      "%s on the bed and %s on the wall, so the GEOMETRIC TAIL past the last "
+      "pass is bounded by |d| r/(1-r) = %s and %s -- %.3f%% and %.3f%% of the "
+      "converged level in green. That is the residual, and it is under this "
+      "lattice's own quadrature error."
+      % (np.round(_rb, 4), np.round(_rw, 4),
+         np.round(np.abs(_bd[-1]) * _rb / np.maximum(1 - _rb, 1e-9), 5),
+         np.round(np.abs(_wd[-1]) * _rw / np.maximum(1 - _rw, 1e-9), 5),
+         100 * abs(_bd[-1, 1]) * _rb[1] / max(1 - _rb[1], 1e-9) / _bed_hist[-1][1],
+         100 * abs(_wd[-1, 1]) * _rw[1] / max(1 - _rw[1], 1e-9) / _wall_hist[-1][1]))
+print("  from the wave-14 seed to the fixed point: bed %s -> %s (x%s), wall %s "
+      "-> %s (x%s). The wall moves more than the bed, which is the whole shape "
+      "of the finding: the bed's ambient was nearly right because a horizontal "
+      "face's window integral and a full hemisphere of SKY_AMB are the same "
+      "number, and a vertical face's are not."
+      % (np.round(_bed_hist[0], 4), np.round(_bed_hist[-1], 4),
+         np.round(_bed_hist[-1] / _bed_hist[0], 3), np.round(_wall_hist[0], 4),
+         np.round(_wall_hist[-1], 4), np.round(_wall_hist[-1] / _wall_hist[0], 3)))
+print("  the upgoing lattice's own sky closure against `window_shares`: bed "
+      "%s, wall %s (1.000 is exact, and the wall's deficit is the rim's own "
+      "discontinuity in the integrand -- it is DIVIDED OUT of the level, which "
+      "is why the sample count cannot move a wall's brightness). The traced "
+      "share of a bed point's hemisphere that is not sky is %.3f wall + %.3f "
+      "riser = %.3f, against the exact rectangle view factor's %.3f, which "
+      "counts the step unit as part of the non-sky half. Two constructions of "
+      "one transfer that share no line."
+      % (np.round(_bclo, 5), np.round(np.mean([q[3] for q in _wu], 0), 5),
+         float(np.mean(_bvf[..., 1])), float(np.mean(_bvf[..., 2])),
+         float(np.mean(_bvf[..., 1] + _bvf[..., 2])), float(_WSH.mean())))
+print("  the bed's own ambient, decomposed on the deep floor: window sky %s "
+      "(was SKY_AMB x ao x exp(-a d 1.55) = %s) + mirror and wall %s (was the "
+      "one-bounce splat's %s). THE SKY FALLS, and by more than the horizon "
+      "argument suggests: a bed point at 1.40 m sends its window rays out to "
+      "1.40 tan(48.5) = 1.58 m of horizontal run, so in an 8 x 4 m basin 87%% "
+      "of the floor has part of its OWN WINDOW behind a wall -- and the part "
+      "behind it is the outer window, which a horizontal face weights by "
+      "cos t sin t and therefore weights most. The wall's own radiance "
+      "replaces it, and the trap carried past one bounce is on top: the "
+      "ambient goes %s -> %s, +%.0f%% in green. That is the return leg."
+      % (np.round(SKY_AMB * (BSKY[BDEP >= DEPTH - 1e-6].reshape(-1, 3)
+                             * BED_AO[BDEP >= DEPTH - 1e-6, None]).mean(0), 4),
+         np.round(SKY_AMB * BED_AO[BDEP >= DEPTH - 1e-6].mean()
+                  * np.exp(-ABS * DEPTH * 1.55), 4),
+         np.round(BOTH[BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0), 4),
+         np.round(BEDRET[BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0), 4),
+         np.round(SKY_AMB * BED_AO[BDEP >= DEPTH - 1e-6].mean()
+                  * np.exp(-ABS * DEPTH * 1.55)
+                  + BEDRET[BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0), 4),
+         np.round(SKY_AMB * (BSKY[BDEP >= DEPTH - 1e-6].reshape(-1, 3)
+                             * BED_AO[BDEP >= DEPTH - 1e-6, None]).mean(0)
+                  + BOTH[BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0), 4),
+         100 * ((SKY_AMB * (BSKY[BDEP >= DEPTH - 1e-6].reshape(-1, 3)
+                            * BED_AO[BDEP >= DEPTH - 1e-6, None]).mean(0)
+                 + BOTH[BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0))[1]
+                / (SKY_AMB * BED_AO[BDEP >= DEPTH - 1e-6].mean()
+                   * np.exp(-ABS * DEPTH * 1.55)
+                   + BEDRET[BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0))[1] - 1)))
+_solve_sec = _time.time() - _solve_t0
+BED_DRY = shade(bed[:3], LIN, 0.0, glow=GLOW, dep=np.zeros_like(BDEP), extra=BAMB)
+print("  %d passes in %.1f s (bed %d x %d x %d directions, wall 4 x %d x %d x "
+      "%d, plus %d downgoing wall gathers)"
+      % (NSOLVE, _solve_sec, UB_NX, UB_NY, UP_N, WU_NU, WU_NZ, UP_N, NSOLVE))
+
 # ...and does it carry the NET, or only the level? Same measurement the risers
 # get, along the north wall, at four heights.
 print("  cell-scale contrast carried (rms of a 0.60 m high-pass along the north "
@@ -2067,7 +2720,7 @@ for _wi, _nm in ((0, 'west  (x0)'), (1, 'east  (x1)'), (2, 'south (y0)'),
     print("    %s  radiance %s   bed-bounce irradiance %s (sky on the same face "
           "%s)   cau %.3f"
           % (_nm, np.round(_L, 3), np.round(_B, 3),
-             np.round(SKY_AMB * WALL_SKY * .78, 3), wall[_wi][3][_k0:].mean()))
+             np.round(SKY_AMB * SKY_VERT, 3), wall[_wi][3][_k0:].mean()))
 # DOES THE BED'S OWN SHADOW ARRIVE, or only its mean? The gather reads
 # `bed_img` at each traced hit, not an average, so structure of every scale is
 # in it -- but a hemisphere integral is a low-pass whose width is the height
@@ -2142,33 +2795,46 @@ print("  and the four walls against the floor that lights them, top 250 mm "
                                   / _LF, 2))
           for wi, nm in ((0, 'west'), (1, 'east'), (2, 'south'), (3, 'north')))))
 
-# WHAT THE MISSING WALL TERM IS WORTH, now that both halves of it exist as
-# numbers in one place. `_WSH` above is exactly the cosine-weighted FRACTION of a
-# bed point's hemisphere that is wall, in the same normalisation the riser gather
-# closes on -- (1/pi) INT cos dw over the hemisphere is 1 -- so a wall of mean
-# outgoing radiance L contributes L * _WSH in the units `shade` calls `amb`, and
-# what is being applied over that same share today is SKY_AMB. The difference,
-# per channel, IS the error, and it is signed. THE RECEIVING HALF IS NOW BUILT
-# -- the wall gets its bed bounce, above -- and this is the RETURN LEG, which is
-# not: it still needs an UP-GOING intersector that scene_hit is not, so the
-# number below is what remains open, measured on a wall that is now lit right.
+# WHAT THE WALL AS A LIGHT CARRIER TURNED OUT TO BE WORTH -- the return leg's
+# own price tag, now that the leg exists. `_WSH` is exactly the cosine-weighted
+# FRACTION of a bed point's hemisphere that is wall, in closed form; a wall of
+# mean outgoing radiance L contributes L * _WSH in the units `shade` calls
+# `amb`, and what USED to be applied over that same share was SKY_AMB. The
+# difference, per channel, was the error. It is now the correction, measured
+# rather than predicted: `BOTH` holds what the bed's own gather actually brought
+# back from the walls, and the closed-form estimate is beside it.
 _LW = np.mean([w.reshape(-1, 3).mean(0) for w in wall_img['disp']], 0)
 _ERR = _WSH.mean() * (_LW - SKY_AMB * np.exp(-ABS * DEPTH * 1.55))
-print("the wall as a light carrier, priced: mean wall radiance %s against %s of "
-      "sky ambient reaching the bed. Over the %.1f%% of the hemisphere the walls "
-      "take, swapping one for the other would move the bed's ambient by %s per "
-      "channel -- signed, so the sign of each channel is the direction the flat "
-      "constant is wrong in."
+_BDIRM = float(np.mean(_to_bed(_bm)[..., 1]))
+print("the return leg, priced against its own prediction: mean wall radiance %s "
+      "against %s of the sky ambient it displaces. Over the %.1f%% of the "
+      "hemisphere the walls take, the closed-form swap is %s per channel; the "
+      "solve's own traced answer over the whole bed is %s, which also carries "
+      "the mirror. Predicted and delivered, and they are not the same number "
+      "because the prediction used a MEAN wall against a mean share and the "
+      "gather uses the wall each texel can actually see."
       % (np.round(_LW, 3), np.round(SKY_AMB * np.exp(-ABS * DEPTH * 1.55), 3),
-         100 * _WSH.mean(), np.round(_ERR, 3)))
+         100 * _WSH.mean(), np.round(_ERR, 3),
+         np.round(_to_bed(_bm).reshape(-1, 3).mean(0), 3)))
 _wtop = np.mean([w[int(WNV * .95):].reshape(-1, 3).mean(0) for w in wall_img['disp']], 0)
 _wbot = np.mean([w[:int(WNV * .05)].reshape(-1, 3).mean(0) for w in wall_img['disp']], 0)
-print("  ...and it is not a constant to be corrected: the wall runs %s at the "
-      "waterline to %s at its foot, a factor %.1f in green over 1.40 m, so what "
-      "replaces SKY_AMB there has to be DIRECTIONAL. That is the return leg, and "
-      "it needs an UP-GOING intersector that scene_hit is not."
+print("  ...and it was never a constant to be corrected: the wall runs %s at "
+      "the waterline to %s at its foot, a factor %.1f in green over 1.40 m, "
+      "which is why what replaces SKY_AMB on the bed had to be a DIRECTIONAL "
+      "gather and not a number. It is one, and `scene_hit_under` -- built for "
+      "the underwater camera -- is the tracer it needed."
       % (np.round(_wtop, 3), np.round(_wbot, 3),
          _wtop[1] / max(_wbot[1], 1e-9)))
+print("  the wall's own hemisphere, as it now stands, averaged over the wetted "
+      "wall: window sky %s (x SKY_AMB, and SKY_VERT of what the BED's window "
+      "gives) + mirror and far wall %s + the bed in front %s. What wave 14 "
+      "handed the same face was WALL_SKY x WAO x SKY_AMB = %s of flat sky over "
+      "the whole upper half, plus a one-bounce TIR splat."
+      % (np.round(SKY_AMB * np.mean([q[0].reshape(-1, 3)[m].mean(0)
+                                     for q, m in zip(_wu, [q[4] for q in _wu])], 0), 3),
+         np.round(np.mean([q[1].reshape(-1, 3)[m].mean(0)
+                           for q, m in zip(_wu, [q[4] for q in _wu])], 0), 3),
+         np.round(np.mean(_wbs, 0), 3), np.round(SKY_AMB * 0.5 * 0.78, 3)))
 
 # --- THE SAME GATHER, ON THE RISERS ------------------------------------------
 RIS_MAP, RIS_FOOT, _mbs = [], [], []
@@ -2221,7 +2887,7 @@ print("  %d arc bins is %.1f mm on the outer nosing; the pass took %.1f s and "
          sum(m.nbytes for m in RIS_MAP) / 1e6))
 print("  it adds %s of irradiance against %s of sky ambient on the same face "
       "-- and unlike the sky term it carries the caustic net"
-      % (np.round(np.mean(_mbs, 0), 3), np.round(SKY_AMB * WALL_SKY, 3)))
+      % (np.round(np.mean(_mbs, 0), 3), np.round(SKY_AMB * SKY_VERT, 3)))
 print("  cell-scale contrast carried (rms of a 0.60 m high-pass along the arc, "
       "over the mean):")
 for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
@@ -2240,6 +2906,147 @@ for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
                                 _hb.std() / max(_bb[_ok].mean(), 1e-9),
                                 100 * (_hr.std() / max(_hb.std(), 1e-12))
                                 * (_bb[_ok].mean() / max(_rr3[_ok].mean(), 1e-9))))
+
+
+# --- AND THE SAME UPPER HEMISPHERE, ON THE RISERS ----------------------------
+# A step riser is a submerged vertical face standing beside the same bed as the
+# wall, so it takes the same integral or the file holds two opinions about one
+# piece of physics. It is a CONSUMER and not an emitter -- `bed_wall_src`
+# returns nothing for a riser hit and always has -- so this runs once, after the
+# field has converged, rather than inside the solve.
+#
+# THE ARC GRID IS COARSER THAN THE BOUNCE MAP'S, and for the reason the bounce
+# map's is fine: the downgoing half looks at the tread 30-300 mm away and
+# carries a 20 cm caustic net that needs 4.6 mm bins; the upgoing half looks at
+# a mirror 1.5-4 m off through a hemisphere average. 37 mm bins, expanded
+# periodically -- the arc WRAPS, which `sample` does not, so the expansion is
+# written out rather than borrowed.
+RU_NT, RU_NZ = 256, 12
+RIS_UPS, RIS_UPM = [], []
+_ris_u0 = _time.time()
+for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
+    _th = (np.arange(RU_NT) + .5) / RU_NT * 2 * np.pi
+    _ct, _st = np.cos(_th), np.sin(_th)
+    _zf = np.minimum(bed_z(_cx + (_R + 2e-3) * _ct, _cy + (_R + 2e-3) * _st),
+                     _zt - 1e-3)
+    _tt = (np.arange(RU_NZ) + .5) / RU_NZ
+    _Z = (_zf[None, :] + _tt[:, None] * (_zt - _zf)[None, :])
+    _PX = np.broadcast_to(_cx + _R * _ct, _Z.shape).ravel()
+    _PY = np.broadcast_to(_cy + _R * _st, _Z.shape).ravel()
+    _NX = np.broadcast_to(_ct, _Z.shape).ravel().copy()
+    _NY = np.broadcast_to(_st, _Z.shape).ravel().copy()
+    _PZ = np.minimum(_Z.ravel(), -1e-4)
+    _es = np.zeros((_PZ.size, 3)); _em = np.zeros((_PZ.size, 3))
+    _ix = np.flatnonzero(pool_sdf(_PX, _PY) < 0.0)
+    if _ix.size:
+        # the arc outside the basin is behind a wall: every distance there is
+        # negative and it would poison its neighbours through the bilinear read.
+        _a, _b, _c2, _v, _cl = up_gather(_PX[_ix], _PY[_ix], _PZ[_ix],
+                                         _NX[_ix], _NY[_ix], 0.)
+        _es[_ix] = _a
+        _em[_ix] = _b + _c2
+    RIS_UPS.append(_es.reshape(RU_NZ, RU_NT, 3))
+    RIS_UPM.append(_em.reshape(RU_NZ, RU_NT, 3))
+
+
+def _ris_expand(A):
+    """(RU_NZ, RU_NT, 3) -> (RIS_NZ, RIS_NT, 3), bilinear, PERIODIC in the arc
+    and clamped in height -- the same read `riser_bounce` does, at build time so
+    that one map layout serves both terms."""
+    fa = (np.arange(RIS_NT) + .5) / RIS_NT * RU_NT - .5
+    ja = np.floor(fa).astype(np.int64)
+    fj = (fa - ja)[None, :, None]
+    B = A[:, ja % RU_NT] * (1 - fj) + A[:, (ja + 1) % RU_NT] * fj
+    fz = (np.arange(RIS_NZ) + .5) / RIS_NZ * RU_NZ - .5
+    kz = np.clip(np.floor(fz), 0, RU_NZ - 2).astype(np.int64)
+    fk = np.clip(fz - kz, 0, 1)[:, None, None]
+    return B[kz] * (1 - fk) + B[kz + 1] * fk
+
+
+RIS_UPS = [_ris_expand(a) for a in RIS_UPS]
+RIS_UPM = [_ris_expand(a) for a in RIS_UPM]
+print("riser upper half: 4 x %d x %d faces x %d directions in %.1f s. It adds "
+      "%s of window sky (x SKY_AMB) and %s of mirror, against the %s of flat "
+      "SKY_AMB x 0.5 the face used to be handed"
+      % (RU_NT, RU_NZ, UP_N, _time.time() - _ris_u0,
+         np.round(SKY_AMB * np.mean([a.reshape(-1, 3).mean(0) for a in RIS_UPS], 0), 3),
+         np.round(np.mean([a.reshape(-1, 3).mean(0) for a in RIS_UPM], 0), 3),
+         np.round(SKY_AMB * 0.5, 3)))
+
+
+# --- A TILTED FACE UNDER AN AXIALLY SYMMETRIC FIELD, EXACTLY -----------------
+# The riser's top NOSE_R rolls over toward the tread, so its normal is not
+# vertical there -- `Nz` runs 0 to sin(pi/4). Both the window's sky and the
+# mirror's return are axially symmetric about the vertical, so what a face at
+# polar angle beta collects is a one-dimensional functional of beta, and the
+# file has been interpolating it LINEARLY (`TIR_VERT + (1 - TIR_VERT) * Nz`).
+# It is not linear. Here it is done exactly, once, on a grid in beta, by the
+# 2-D quadrature the linear form was standing in for:
+#
+#     S(beta) = (1/pi) INT_{upper half} L(t) max(n . w, 0) dw,
+#     n = (sin beta, 0, cos beta),  w = (sin t cos p, sin t sin p, cos t)
+#
+# and `axial_share(0)` and `axial_share(pi/2)` reproduce `window_shares`' two
+# ends by a completely different integral -- 2-D against 1-D, no shared line --
+# which is the row `validate.py` fires at both.
+def axial_share(beta, L=None, nt=400, npz=800):
+    """(1/pi) INT L(t) max(n.w, 0) dw over the UPGOING half, for a face whose
+    normal is at polar angle `beta` from the vertical. `L=None` is a uniform
+    field, for which S(0) = 1 and S(pi/2) = 1/2 exactly."""
+    beta = np.atleast_1d(np.asarray(beta, float))
+    t = (np.arange(nt) + .5) / nt * (np.pi / 2)
+    ph = (np.arange(npz) + .5) / npz * (2 * np.pi)
+    Lt = np.ones_like(t) if L is None else np.asarray(L(t), float)
+    st, ct = np.sin(t), np.cos(t)
+    ndw = (np.sin(beta)[:, None, None] * st[None, :, None] * np.cos(ph)[None, None]
+           + np.cos(beta)[:, None, None] * ct[None, :, None])
+    w = np.maximum(ndw, 0.) * (Lt * st)[None, :, None]
+    return w.sum((1, 2)) * (np.pi / 2 / nt) * (2 * np.pi / npz) / np.pi
+
+
+def _win_L(t):
+    """The window's transmitted, n^2-gained sky as a function of the water-side
+    polar angle -- green, since the nosing's interpolation is one scalar."""
+    mu = np.cos(t)
+    R = r_int_at(mu)[:, 1]
+    st = np.sin(t)
+    ok = IOR[1] * st < 1.0
+    ca = np.sqrt(np.maximum(1. - (IOR[1] * st) ** 2, 0.))
+    return np.where(ok, (1. - R) * into_water(sky_diffuse(ca))[:, 1], 0.)
+
+
+def _mir_L(t):
+    """...and the mirror's own angular shape: the underside's reflectance,
+    which is ~0.02 inside the window and exactly 1 past the critical angle."""
+    return r_int_at(np.cos(t))[:, 1]
+
+
+_ax_b = np.linspace(0., np.pi / 2, 65)          # 0 = horizontal, pi/2 = vertical
+_ax_v = float(axial_share(np.array([np.pi / 2]), _win_L)[0])
+AX_WIN = axial_share(_ax_b, _win_L) / max(_ax_v, 1e-12)
+AX_MIR = axial_share(_ax_b, _mir_L) / max(
+    float(axial_share(np.array([np.pi / 2]), _mir_L)[0]), 1e-12)
+AX_UNI = axial_share(_ax_b) / 0.5
+print("  the nosing's roll-over, exactly rather than linearly. As a multiple of "
+      "what a VERTICAL face collects, a face tilted beta off the vertical gets:")
+print("      beta         " + "".join("%8.0f" % np.degrees(_ax_b[k])
+                                      for k in (64, 48, 32, 16, 0)))
+print("      window sky   " + "".join("%8.3f" % AX_WIN[k]
+                                      for k in (64, 48, 32, 16, 0)))
+print("      mirror       " + "".join("%8.3f" % AX_MIR[k]
+                                      for k in (64, 48, 32, 16, 0)))
+print("      the LINEAR form the file wrote (1 + cos beta for the sky, "
+      "(TIR_VERT + (1-TIR_VERT) cos beta)/TIR_VERT for the return):")
+print("                   " + "".join(
+    "%8.3f" % (1. + np.cos(_ax_b[k])) for k in (64, 48, 32, 16, 0))
+    + "   /" + "".join(
+    "%7.3f" % ((TIR_VERT + (1 - TIR_VERT) * np.cos(_ax_b[k])) / TIR_VERT)
+    for k in (64, 48, 32, 16, 0)))
+print("      -- the sky's true horizontal/vertical ratio is 1/SKY_VERT = %.2f, "
+      "not 2, because the window is a cone about the vertical and a horizontal "
+      "face owns all of it. `axial_share(0)/axial_share(pi/2)` on a UNIFORM "
+      "field is %.4f, which must be exactly 2 and is the row that guards the "
+      "quadrature." % (1. / SKY_VERT[1], AX_UNI[0]))
 
 # The TIR return arrives at SHALLOW angles -- everything the bed emits beyond the
 # critical angle 48.6 deg comes back down between 48.6 and 90 deg from vertical --
@@ -2281,22 +3088,20 @@ for _i, (_cx, _cy, _R, _zt) in enumerate(CYL):
 # the riser gather's estimator closes on, by a completely different integral over
 # the same geometry, and the same 1/2 WALL_SKY takes off the wall's sky term;
 # validate.py now asserts all three against each other.
-def tir_vert(tc):
-    """Vertical-face / horizontal-bed irradiance from a uniform radiance filling
-    the cone t > tc. Exact; tir_vert(0) == 1/2 identically."""
-    return ((np.pi / 2 - tc + np.sin(tc) * np.cos(tc))
-            / (np.pi * np.cos(tc) ** 2))
-
-
-TIR_VERT = float(tir_vert(np.arcsin(1.0 / IOR[1])))
+# `tir_vert` and TIR_VERT are DEFINED with the window shares, far above -- the
+# submerged wall's sky needed them there. The derivation stays here, where the
+# quantity is used and where the three wrong numbers were found.
 print("  TIR return on a vertical face: %.3f of its value on the bed "
       "(hemisphere limit %.3f)" % (TIR_VERT, tir_vert(0.0)))
 
 
-def riser_bounce(x, y, z, ci):
-    """Bilinear read of the bounce map. Theta wraps; height is normalised to the
-    riser's own foot, so a 240 mm riser and the 700 mm drop to the floor carry
-    the same map without either being resampled."""
+def riser_bounce(x, y, z, ci, maps=None):
+    """Bilinear read of a per-cylinder map. Theta wraps; height is normalised to
+    the riser's own foot, so a 240 mm riser and the 700 mm drop to the floor
+    carry the same map without either being resampled. `maps` is an argument so
+    that the bounce, the window sky and the mirror -- three fields on one
+    lattice -- cannot be read three different ways."""
+    maps = RIS_MAP if maps is None else maps
     out = np.zeros((x.size, 3))
     for i, (cx, cy, R, ztop) in enumerate(CYL):
         m = ci == i
@@ -2310,7 +3115,7 @@ def riser_bounce(x, y, z, ci):
         fb = np.clip((z[m] - zf) / np.maximum(ztop - zf, 1e-6), 0, 1) * RIS_NZ - .5
         kb = np.clip(fb, 0, RIS_NZ - 1.001).astype(np.int64)
         fk = np.clip(fb - kb, 0, 1)[:, None]
-        A = RIS_MAP[i]
+        A = maps[i]
         out[m] = ((A[kb, j0] * (1 - fj) + A[kb, j1] * fj) * (1 - fk) +
                   (A[kb + 1, j0] * (1 - fj) + A[kb + 1, j1] * fj) * fk)
     return out
@@ -3796,8 +4601,12 @@ def _riser_shade(hxr, hyr, hzr, ci, c, mode, parts=False):
       * the BOUNCE off the sunlit bed in front, gathered above -- the largest,
         the one that carries the caustic net, and the one whose absence rendered
         this whole region neutral grey;
-      * the TIR return, arriving shallow and so favouring a vertical face;
-      * sky through the Snell window, over the upgoing half hemisphere only;
+      * the MIRROR: the underside of the surface past the critical angle, and
+        the far wall it shows, traced by `up_gather` on the same lattice the
+        pool walls use -- a riser is a submerged vertical face and may not have
+        a different answer to what is over it;
+      * sky through the Snell window, which for a vertical face is SKY_VERT of
+        what the bed gets and not half of it;
       * direct sun, which is nonzero only on the crescent that turns west and is
         never visible from an anti-solar camera. It is kept because it is real,
         not because it is seen."""
@@ -3851,20 +4660,27 @@ def _riser_shade(hxr, hyr, hzr, ci, c, mode, parts=False):
     cau = sample((bed[c] if mode == 'disp' else bed[3])[..., None],
                  hxr + ox * .030 + TSUN_DIR[0] * _slb,
                  hyr + oy * .030 + TSUN_DIR[1] * _slb, X0, X1, Y0, Y1)[:, 0]
-    aow = bed_ao(hxr, hyr, hzr)
-    ao = aow * .5 * (1. + Nz)          # a vertical face sees half the sky
+    # THE UPPER HALF, wave 15. It used to be `SKY_AMB * aow * .5 * (1 + Nz)`
+    # plus the bed's own TIR map scaled by `TIR_VERT + (1 - TIR_VERT) * Nz` --
+    # a flat sky over the whole upgoing half, and a one-bounce return borrowed
+    # from a horizontal receiver's map. Both are now the traced integral the
+    # walls take, on the same lattice, through the same `up_gather`: a riser is
+    # a submerged vertical face standing beside the same bed, and the file may
+    # not hold two opinions about what is over one. `aow` goes with them: the
+    # occlusion it estimated is traced now, cylinder by cylinder.
     bnc = riser_bounce(hxr, hyr, hzr, ci)[:, c]
-    tir = sample(bedret[..., c:c + 1], hxr, hyr, X0, X1, Y0, Y1)[:, 0] * \
-        aow * (TIR_VERT + (1. - TIR_VERT) * Nz)
+    _bet = np.arccos(np.clip(Nz, 0., 1.))
+    _ups = riser_bounce(hxr, hyr, hzr, ci, RIS_UPS)[:, c] * np.interp(_bet, _ax_b, AX_WIN)
+    _upm = riser_bounce(hxr, hyr, hzr, ci, RIS_UPM)[:, c] * np.interp(_bet, _ax_b, AX_MIR)
     _k = LINER_TINT[c] * lev
     _sun = _k * SUN_COL[c] * cos_i * TSUN * cau * (ndl / cos_t) * np.exp(
         -ABS[c] * d / cos_t)
-    _sky = _k * SKY_AMB[c] * ao * np.exp(-ABS[c] * d * 1.55)
+    _sky = _k * SKY_AMB[c] * _ups
     if parts:
         # `parts` exists so the arc-scale diagnostic below cannot drift from the
         # shader: the four terms are RETURNED, never re-derived.
-        return _sun, _sky, _k * tir, _k * bnc
-    return _sun + _sky + _k * (tir + bnc)
+        return _sun, _sky, _k * _upm, _k * bnc
+    return _sun + _sky + _k * (_upm + bnc)
 
 
 # --- WHICH TERM STRIPES THE STEP UNIT, MEASURED ------------------------------
@@ -3912,7 +4728,7 @@ print("what stripes the step unit, measured on the outer nosing's own face "
       "artefact):"
       % (_arc_R, _ARC_NZ, _ARC_N, 1000 * 2 * np.pi * _arc_R / _ARC_N, 30.))
 for _nm, _t in (("direct sun   ", _arc_p[0]), ("sky ambient  ", _arc_p[1]),
-                ("TIR return   ", _arc_p[2]), ("bed bounce   ", _arc_p[3])):
+                ("mirror       ", _arc_p[2]), ("bed bounce   ", _arc_p[3])):
     _ar = np.mean([_hipass(_t[_j], _arc_k)[_arc_ok].std()
                    for _j in range(_ARC_NZ)])
     _zr = _t[:, _arc_ok].std(0).mean()
@@ -5454,8 +6270,9 @@ print("  rho_bed %s -> rho_water %s, luminance %.4f"
 _SUNLIT = (BDEP >= DEPTH - 1e-6) & (bed_sun(BU, BV, -DEPTH) > 0.98)
 _CAUBAR = np.array([bed[c][_SUNLIT].mean() for c in range(3)])
 _EBED_SUN = _EBEAM * TSUN * _CAUBAR * _TSLANT           # the beam, as it lands
-_EBED_SKY = SKY_AMB * BED_AO[_SUNLIT].mean() * np.exp(-ABS * DEPTH * 1.55)
-_EBED_RET = BEDRET[_SUNLIT].reshape(-1, 3).mean(0)
+_EBED_SKY = (SKY_AMB * (BSKY[_SUNLIT].reshape(-1, 3) * BED_AO[_SUNLIT, None]).mean(0))
+_EBED_RET = BOTH[_SUNLIT].reshape(-1, 3).mean(0)
+_EBED_OLD = BEDRET[_SUNLIT].reshape(-1, 3).mean(0)
 print("  ...and the three things that form leaves out, measured on this scene's "
       "own sunlit deep floor (%.1f m2 of it):" % (_SUNLIT.mean() * 32.0))
 print("     1. the beam does not all reach the bed. `cau` there means %s of the "
@@ -5483,16 +6300,21 @@ print("     ...and the beam ALONE, which is the only thing the closed form has, 
                 / (_Y3 * _EBEAM * TSUN * _TSLANT * _SERIES).sum() - 1),
          100 * (_Y3 * _EBED_SKY).sum()
          / (_Y3 * _EBEAM * TSUN * _TSLANT * _SERIES).sum()))
-print("     3. the trap is carried at ONE bounce over the TIR cone only. It "
-      "adds %s, i.e. x%s on the bed, against the closed series' x%s. Three "
-      "reasons and all three are geometry the form has no room for: the cone is "
-      "1 - 1/n^2 = %.4f and not R_int = %.4f (the partial Fresnel inside the "
-      "cone is dropped), 58%% of the cone meets a WALL before it reaches the "
-      "surface, and the returning half is splatted onto walls as well as bed. "
-      "Signed DOWN."
+print("     3. the trap, WHICH IS NO LONGER TRUNCATED. The mirror and the wall "
+      "return together add %s, i.e. x%s on the bed, against the closed series' "
+      "x%s -- and the shooting pass that used to carry this alone, at one "
+      "bounce over the TIR cone with the 58%% that meets a wall deleted, adds "
+      "%s (x%s). The gap between the solve and the closed series is not a "
+      "deficit: the series is an INFINITE basin with no walls to absorb, and "
+      "this one loses %s of every bounce to a liner of albedo %s over %.1f%% of "
+      "a bed point's hemisphere. Signed UP against the old pass, DOWN against "
+      "an infinite pool, and both are now computed rather than argued."
       % (np.round(_EBED_RET, 4),
          np.round(1. + _EBED_RET / (_EBED_SUN + _EBED_SKY), 4),
-         np.round(_SERIES, 4), TIR_FRAC, R_INT[1]))
+         np.round(_SERIES, 4), np.round(_EBED_OLD, 4),
+         np.round(1. + _EBED_OLD / (_EBED_SUN + _EBED_SKY), 4),
+         np.round(1. - .82 * LINER_TINT, 3), np.round(.82 * LINER_TINT, 3),
+         100 * _WSH.mean()))
 
 # --- and the same quantity MEASURED off the frame ----------------------------
 # Two things have to be right for a measurement to be comparable with a flux:
@@ -5646,41 +6468,121 @@ if _b6.sum() >= 100:
               "span here is under 0.4 m of water; a receiver short by a factor "
               "of two at 10 mm of it is short in the RECEIVER.")
 
-    # --- AND WHERE IT IS SHORT, DERIVED RATHER THAN GUESSED ------------------
-    # A submerged vertical face's UPGOING half hemisphere is not the sky. It is
-    # the underside of the surface, and that underside is two different things
-    # either side of the critical angle: inside the Snell cone it is the
-    # transmitted sky, compressed into 48.6 deg about the VERTICAL -- the worst
-    # placement there is for a vertical receiver -- and outside it, over
-    # 1 - 1/n^2 of the directions, it is a PERFECT MIRROR showing the pool's own
-    # upwelling field.
+    # --- THE TWO HALVES OF THE RATIO, ATTRIBUTED SEPARATELY -----------------
+    # The ratio has a numerator and a denominator and it is easy to close it
+    # from the wrong end, so both are decomposed here into the terms that make
+    # them, in the units they are made in, and the closed form that used to
+    # stand for the wall's upper half is printed beside what replaced it.
     #
-    # `WALL_SKY = 0.5` is exactly right as a PARTITION of a hemisphere and it is
-    # not a description of what fills the upper half: it hands a submerged face
-    # the same sky an above-water face gets. How wrong that is, is closed form,
-    # and the file already owns both halves of it in `tir_vert`:
-    #     E_vert(hemisphere) / E_bed(hemisphere) = tir_vert(0) = 0.5
-    #     E_vert(cone t > tc) / E_bed(cone t > tc) = TIR_VERT
-    #     E_bed(cone) / E_bed(hemisphere) = 1 - 1/n^2 = TIR_FRAC
-    # so the WINDOW's share of a vertical face is 0.5 - TIR_VERT * TIR_FRAC, and
-    # the bed's share of the same window is 1/n^2. Their ratio is what a
-    # submerged vertical face may have of the sky, and it is not 0.5.
+    # THE WALL. Its upper half is the underside of the surface, which is two
+    # different things either side of the critical angle: inside the Snell cone
+    # the transmitted sky, compressed into 48.5 deg about the VERTICAL -- the
+    # worst placement there is for a vertical receiver -- and outside it, over
+    # 1 - 1/n^2 of the directions, a PERFECT MIRROR showing the pool's own
+    # upwelling field. `WALL_SKY = 0.5` was exactly right as a PARTITION of a
+    # hemisphere and was never a description of what fills the upper half.
     _VWIN = (0.5 - TIR_VERT * TIR_FRAC) * IOR[1] ** 2
-    print("     WHERE IT IS SHORT. A submerged vertical face reaches the sky "
-          "only through the Snell window, a %.1f deg cone about the VERTICAL. "
-          "Its share of the sky is %.3f of the bed's by that closed form; the "
-          "render hands it WALL_SKY x WAO = %.2f x %.2f = %.3f, over-giving the "
-          "sky by x%.2f. What should fill the REST of that upper half is the "
-          "mirror -- the %.1f%% the underside returns -- and the render supplies "
-          "it from the one-bounce TIR pass priced above, which is carrying "
-          "x%.4f of the closed series' x%.4f. Over-count the sky, under-count "
-          "the mirror, and they do not cancel: the wall lands at %.2f of the "
-          "band where the observation puts it over 1. THIS IS A SEPARATE FAULT "
-          "FROM THE WATER/STONE RATIO ABOVE, WHICH IS LEVEL."
-          % (np.degrees(np.arcsin(1.0 / IOR[1])), _VWIN, WALL_SKY, 0.78,
-             WALL_SKY * 0.78, WALL_SKY * 0.78 / _VWIN, 100 * R_INT[1],
-             (1. + _EBED_RET / (_EBED_SUN + _EBED_SKY))[1], _SERIES[1],
-             _hy[WREG == 7].mean() / _Lband))
+    print("     THE WALL's upper half, before and after. The window's share of "
+          "a vertical face is %.3f of the bed's by the closed form "
+          "(0.5 - TIR_VERT x TIR_FRAC) n^2, and %.3f with the sky's own "
+          "horizon profile in the integrand; wave 14 handed it "
+          "WALL_SKY x WAO = %.2f x %.2f = %.3f, over-giving the sky by x%.2f "
+          "and leaving the mirror to a one-bounce splat over the TIR cone with "
+          "the %.0f%% that meets a wall on the way up deleted. Both halves are "
+          "now one traced integral."
+          % (_VWIN, SKY_VERT[1], WALL_SKY, 0.78, WALL_SKY * 0.78,
+             WALL_SKY * 0.78 / _VWIN, 58.))
+    # THE DENOMINATOR, measured with the same care. The dry band is a 100 mm
+    # vertical strip of the SAME liner, in air, and its three sources are
+    # separable because `liner_band` returns the irradiance that made it.
+    # BAND_E is already the dry-blue selection (`_bsel`), one row per
+    # subsample ray that lands on it, so it is read whole.
+    _bE = BAND_E
+    _bsun = SUN_COL * 0.30 * float(np.clip(
+        -pool_sdf_grad(np.array([X0 + 3.]), np.array([Y1 - .001]))[1][0] * SUN_DIR[1]
+        - pool_sdf_grad(np.array([X0 + 3.]), np.array([Y1 - .001]))[0][0] * SUN_DIR[0],
+        0, 1))
+    print("     THE DRY BAND, decomposed. Its own irradiance over the rays that "
+          "land on it is %s. Three terms make it and on THIS wall the sun is "
+          "not one of them: the north wall's poolward normal has N.L = %.3f, "
+          "clipped to zero, so the `0.30` on the direct beam -- the open "
+          "constant with no derivation -- multiplies nothing here and cannot "
+          "be what is holding the ratio down. What is left is SKY_DECK x 0.50 "
+          "= %s and WBOUNCE x 0.50 x (pattern) = %s at full pattern."
+          % (np.round(_bE.mean(0), 4),
+             float(-SUN_DIR[1]), np.round(SKY_DECK * .50, 4),
+             np.round(WBOUNCE * .50, 4)))
+    # the closed form for a vertical strip under an infinite horizontal ledge:
+    # a ray at elevation alpha clears an overhang of width w at height D above
+    # the point when tan alpha < D/w, and integrating the face's own cosine
+    # over that wedge gives (alpha + sin alpha cos alpha)/pi, which is 0.5 at
+    # alpha = pi/2 -- i.e. exactly the file's 0.50 when w = 0.
+    _ledge = lambda a: (a + np.sin(a) * np.cos(a)) / np.pi
+    _bz = np.linspace(0.002, FREEB, 200)
+    _ovh = float(np.mean(_ledge(np.arctan((ZLIP - _bz) / .030))) / .5)
+    print("       * its SKY half is geometrically unoccluded, and that is a "
+          "reading of the geometry rather than an assumption: the coping's "
+          "bullnose has its poolward extreme at s = SLIP = %.3f, which is the "
+          "band's OWN plane, and recedes from the pool going up (SBUL = %.3f "
+          "at ZD). A vertical strip under a ZERO overhang keeps its whole "
+          "upper half, so 0.50 is exact for the section this file builds. `?` "
+          "IT IS ALSO A CHOICE: a real coping overhangs the liner, and the "
+          "closed form for a strip under an infinite ledge of width w at "
+          "height D -- (alpha + sin alpha cos alpha)/pi with alpha = "
+          "atan(D/w) -- says a 30 mm overhang would leave this band %.0f%% of "
+          "its sky. That is the second candidate for the gap below and it is a "
+          "SECTION question, not a lighting one."
+          % (SLIP, SBUL, 100 * _ovh))
+    print("       * what is NOT derived in that half is SKY_DECK itself on an "
+          "averted vertical face. It is a HORIZONTAL-deck illuminant, "
+          "SKY_AMB x 0.30 + SUN_COL x 0.075, and %.0f%% of it in green is that "
+          "second term -- the aureole and horizon band around a due-west sun, "
+          "which a SOUTH-facing strip sees at cos(azimuth) = %.3f, i.e. behind "
+          "its own plane. `?` Marked, not moved: it is the same calibration "
+          "question as the `0.30` beside it, SKY_DECK also lights the coping "
+          "and the paving, and the reference is a photograph this round does "
+          "not have."
+          % (100 * (SUN_COL * .075)[1] / SKY_DECK[1],
+             float(-SUN_DIR[1] / np.hypot(SUN_DIR[0], SUN_DIR[1]))))
+    # `slab_esc` and NOT T_DIFF_UP x T_OUT_DIFFUSE: the attenuation of the up
+    # leg and its chance of escaping are correlated -- a steep ray escapes AND
+    # crosses less water -- and this file has already been caught factorising
+    # that pair once. One integral, both factors inside it.
+    _upw = slab_esc() * bed_img['disp'][
+        BDEP >= DEPTH - 1e-6].reshape(-1, 3).mean(0)
+    print("       * its WATER half, WBOUNCE, is a closed form and the solve now "
+          "gives a second route to it: T_OUT_DIFFUSE x T_DIFF_UP x the "
+          "CONVERGED deep floor is %s against WBOUNCE's %s, %s per channel. "
+          "%s -- and it is the half of the band that a brighter pool feeds "
+          "back into, so if it is low the band is low with it."
+          % (np.round(_upw, 4), np.round(WBOUNCE, 4),
+             np.round(_upw / np.maximum(WBOUNCE, 1e-9), 3),
+             "the closed form is the LOW one, so the band is under-lit by its "
+             "own upwelling and the ratio below flatters the wall"
+             if _upw[1] > WBOUNCE[1] else
+             "the closed form is the HIGH one, so the band is over-lit by its "
+             "own upwelling and the ratio below understates the wall"))
+    # THE COUNTERFACTUAL, COMPUTED AND NOT APPLIED. The aureole term is the
+    # one part of the band's light that is demonstrably in the wrong place on
+    # THIS wall, and it is large. Its size is printed so that the remaining gap
+    # is attributed rather than left as a mystery -- and it is not moved,
+    # because SKY_DECK also lights the coping and the paving and its
+    # calibration reference is a photograph this round does not have. That is
+    # the same ruling the `0.30` beside it is under.
+    _bE_noaur = _bE.mean(0) - (SUN_COL * .075) * .50
+    _kY = np.array([.2126, .7152, .0722])
+    _cf = float((_kY * _bE_noaur).sum() / max((_kY * _bE.mean(0)).sum(), 1e-9))
+    print("     SO: submerged wall %.3f of the dry band on the averted wall, "
+          "against wave 14's 0.470 and the observation's > 1. THE ORDERING DOES "
+          "NOT EMERGE, and the attribution is: the wall's whole hemisphere is "
+          "now traced and closed to %.1f%% of one hemisphere, so what is left "
+          "is not a missing receiver term. The band's own sky is where the "
+          "next unexplained factor sits -- drop the aureole it cannot see and "
+          "its irradiance falls to %.0f%% of what it has, taking the ratio to "
+          "%.3f, still short of 1. `?` NOT APPLIED."
+          % (_hy[WREG == 7].mean() / _Lband,
+             100 * (0.5 + float(np.mean(_wvfa[:, :2].sum(1)))),
+             100 * _cf, _hy[WREG == 7].mean() / (_Lband * _cf)))
 
 
 # --- THE FREEBOARD BAND, MEASURED --------------------------------------------
@@ -6348,104 +7250,6 @@ print("  lens %.0f mm on the 3:2 frame: %.2f deg long axis, %.2f deg short; the 
       "window is %.2f deg across, so this lens is %.2f deg short of holding it"
       % (UW_F, np.degrees(UW_FOV), 2 * np.degrees(np.arctan(12.0 / UW_F)),
          2 * np.degrees(UW_TC[1]), 2 * np.degrees(UW_TC[1]) - np.degrees(UW_FOV)))
-
-
-# --- A RAY THAT IS ALLOWED TO GO UP -------------------------------------------
-# `scene_hit` is downgoing-only, and not by accident: its floor branch takes the
-# root of the z = -DEPTH plane only for tz < 0, its cylinder entry clamps the cap
-# plane with `np.minimum(tz, -1e-9)`, and it has no ceiling at all because all
-# five of its callers start at the surface and go down. An underwater eye needs
-# the other half of the sphere.
-#
-# THIS IS A SIBLING RATHER THAN AN EXTENSION, and the reason is the hero frame.
-# Extending `scene_hit` would mean a new surface id in a function five call sites
-# read positionally, a cylinder entry that no longer skips the upgoing branch,
-# and a ceiling plane in the argmin that every existing caller would then have to
-# be shown not to reach -- five arguments to make, each checkable only by the
-# frame coming out identical. A sibling makes one argument, in one place, and
-# leaves the downgoing solve untouched to the bit. What it does NOT do is
-# duplicate the physics: `validate.py` fires both at the same downgoing rays and
-# asserts they agree exactly, so the sibling cannot drift into a second opinion
-# about where the walls are.
-def _cyl_entry_any(px, py, pz, tx, ty, tz):
-    """`_cyl_entry` for a ray of EITHER sign of tz. A step is the solid
-    {r <= R, z <= ztop}, so the z half-space is an interval in t whose sense
-    flips with the ray: a descending ray ENTERS it at the cap and stays inside,
-    an ascending one is inside until the cap and then leaves. Writing both as
-    (t_lo, t_hi) and intersecting with the radial interval is the whole
-    generalisation, and the downgoing case reduces to t_hi = +inf, which is the
-    `np.maximum(t1, tc)` the original writes directly."""
-    n = px.shape
-    bt = np.full(n, BIG); bf = np.zeros(n, bool); bi = np.full(n, -1, np.int8)
-    a = tx * tx + ty * ty
-    vert = a <= 1e-14
-    inva = 1.0 / np.where(vert, 1.0, a)
-    up, dn = tz > 1e-9, tz < -1e-9
-    lvl = ~(up | dn)                          # level: no cap crossing at all
-    tzs = np.where(lvl, 1.0, tz)
-    for i, (cx, cy, R, ztop) in enumerate(CYL):
-        ox, oy = px - cx, py - cy
-        b = 2.0 * (ox * tx + oy * ty)
-        c = ox * ox + oy * oy - R * R
-        disc = b * b - 4.0 * a * c
-        hit = (disc > 0.0) & ~vert
-        sq = np.sqrt(np.where(hit, disc, 0.0))
-        t1 = np.where(hit, (-b - sq) * 0.5 * inva, BIG)
-        t2 = np.where(hit, (-b + sq) * 0.5 * inva, -BIG)
-        t1 = np.where(vert, np.where(c < 0.0, -BIG, BIG), t1)
-        t2 = np.where(vert, np.where(c < 0.0, BIG, -BIG), t2)
-        tc = (ztop - pz) / tzs
-        out = lvl & (pz > ztop)               # level and above the cap: no hit
-        zlo = np.where(dn, tc, np.where(out, BIG, -BIG))
-        zhi = np.where(up, tc, np.where(out, -BIG, BIG))
-        tin = np.maximum(t1, zlo)
-        ok = (tin < np.minimum(t2, zhi)) & (tin > 1e-6) & (tin < bt)
-        bt = np.where(ok, tin, bt)
-        bf = np.where(ok, t1 >= zlo, bf)      # entered through the round face
-        bi = np.where(ok, i, bi)
-    return bt, bf, bi
-
-
-def scene_hit_under(px, py, pz, tx, ty, tz):
-    """First hit of a ray of ANY direction, starting anywhere inside the water.
-    Surface ids are `scene_hit`'s, plus one:
-         6 = the still water surface z = 0, seen FROM BELOW; (u,v) = (x,y)
-    which is the only id that is not geometry -- it is where a ray leaves this
-    function and meets `uw_interface`."""
-    tx, ty, tz = np.asarray(tx), np.asarray(ty), np.asarray(tz)
-    px, py, pz = (np.broadcast_to(np.asarray(q, float), tx.shape)
-                  for q in (px, py, pz))
-    with np.errstate(divide='ignore', invalid='ignore'):
-        s = np.stack([
-            np.where(tz < -1e-9, (-DEPTH - pz) / tz, BIG),
-            np.where(tx < -1e-9, (XW0 - px) / tx, BIG),
-            np.where(tx > 1e-9, (XW1 - px) / tx, BIG),
-            np.where(ty < -1e-9, (YW0 - py) / ty, BIG),
-            np.where(ty > 1e-9, (YW1 - py) / ty, BIG),
-            np.where(tz > 1e-9, (0.0 - pz) / tz, BIG)])
-    s = np.where(np.isfinite(s), s, BIG)
-    s = np.where(s > 1e-9, s, BIG)             # a backward root is a miss
-    k = np.argmin(s, 0)
-    sm = np.take_along_axis(s, k[None].astype(np.intp), 0)[0]
-    sid = np.where(k == 5, 6, k).astype(np.int8)
-    cyl = np.full(tx.shape, -1, np.int8)
-    bx2, by2 = px + tx * sm, py + ty * sm
-    near = ((np.minimum(px, bx2) <= STEP_BB[1]) & (np.maximum(px, bx2) >= STEP_BB[0]) &
-            (np.minimum(py, by2) <= STEP_BB[3]) & (np.maximum(py, by2) >= STEP_BB[2]))
-    idx = np.flatnonzero(near)
-    if idx.size:
-        ct, cf, ci = _cyl_entry_any(px[idx], py[idx], pz[idx],
-                                    tx[idx], ty[idx], tz[idx])
-        take = ct < sm[idx]
-        j = idx[take]
-        sm[j] = ct[take]
-        sid[j] = np.where(cf[take], 5, 0).astype(np.int8)
-        cyl[j] = ci[take]
-    hx, hy, hz = px + tx * sm, py + ty * sm, pz + tz * sm
-    flat = (sid == 0) | (sid == 5) | (sid == 6)
-    u = np.where(flat, hx, np.where(sid <= 2, hy, hx))
-    v = np.where(flat, hy, hz)
-    return sid, u, v, sm, cyl
 
 
 # --- THE INTERFACE, FROM UNDERNEATH -------------------------------------------

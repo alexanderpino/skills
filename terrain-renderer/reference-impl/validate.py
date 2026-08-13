@@ -145,6 +145,12 @@ REQUIRED = [
     # the gather, now shared by the risers and the pool walls, and the partition
     # of the wall's hemisphere that keeps the sky from being counted twice
     'bounce_gather', 'bed_wall_src', 'wall_shade', 'WALL_SKY', 'WB_NU', 'WB_NZ',
+    # the underside of the surface: the window's two shares, the mirror's own
+    # reflectance, the upgoing gather and the solve that iterates it
+    'TC_SNELL', 'r_int_at', 'sky_diffuse', 'window_shares', 'WIN_BED',
+    'WIN_VERT', 'SKY_VERT', 'up_gather', 'up_ambient', 'UP_N', 'UP_NT', 'UP_NP',
+    'axial_share', 'AX_WIN', 'AX_MIR', 'NSOLVE', 'WU_NU', 'WU_NZ',
+    'UB_NX', 'UB_NY', '_wall_grid',
     'WALL_BAND_Z', 'WALL_FRONT',
     'R_EXT', 'R_INT', 'wet_albedo', '_fresnel_rough', '_refl_ellipse',
     '_lobe_shape', 'sky', 'SKY_LOBE', 'E_SUN', 'L_SUN', 'OMEGA_SUN', 'N_DISC',
@@ -2101,6 +2107,287 @@ def tier3_geometry(R):
          'the rest of the wall\'s downgoing half is the other three walls')
 
 
+
+
+# ======================== TIER 1 / 3: THE UNDERSIDE OF THE SURFACE
+# What is over a submerged face, and the solve that closes it. Every row here is
+# about a term that did not exist before this round: the Snell window's share of
+# a VERTICAL face, the underside as a mirror, and the fixed point of the two
+# together. The file's own rule applies -- a test and the code it checks must not
+# share a premise -- so each pair below is named with what it does NOT share.
+#
+#   * the window's shares are a 1-D quadrature over the water-side polar angle
+#     in render.py; the closed forms they are checked against are 1/n^2 and
+#     0.5 - tir_vert(tc)(1 - 1/n^2), neither of which appears in the integrand,
+#     plus the n -> 1 limit, where the interface vanishes and a vertical face
+#     must collect EXACTLY half of a horizontal one. Nothing can be transcribed
+#     into that limit: it is the number 1/2.
+#   * `axial_share` reaches the same two numbers by a 2-D quadrature over
+#     (t, phi) with the receiver's own cosine inside it, which is a different
+#     integral of a different integrand over a different domain.
+#   * the mirror's diffuse coefficient is the shipped lattice summing
+#     `r_int_at` per direction; it is checked against R_INT, which render.py
+#     gets from R_EXT by Walsh's reciprocity relation and NOT by integrating
+#     anything, and against this file's own water -> air Fresnel formed
+#     directly from the two indices.
+#   * the SOLVE is checked against the closed geometric series `trap_gain`. That
+#     row is the one that fails if the iteration is truncated, and truncation at
+#     one bounce is exactly the defect this round was sent to close.
+def tier_underside(R):
+    n = R.IOR
+    tc = R.TC_SNELL
+
+    # ---- the window's two shares, against two closed forms -------------------
+    # `window_shares(profile=False)` is the shipped quadrature with a FLAT sky
+    # in it. A horizontal submerged face must then collect sin^2(tc) = 1/n^2 --
+    # the identity that makes "a full hemisphere of SKY_AMB" and "the window at
+    # n^2 SKY_AMB" the same number on the bed, and therefore the reason the
+    # bed's calibration never had to move -- and a vertical one must collect
+    # 0.5 - tir_vert(tc)(1 - 1/n^2), the partition of its own upper half.
+    Wb, Wv = R.window_shares(profile=False)
+    QERR = 1e-8       # midpoint rule, 40 000 strata, over a smooth integrand on
+                      # [0, tc]: the O(h^2 f'') term is ~1e-10. 1e-8 is two
+                      # decades of headroom on the RULE, not on the answer.
+    check(1, 'window share, horizontal face == 1/n^2 (flat sky)',
+          Wb, 1.0 / n ** 2, QERR,
+          why='the shipped 40 000-stratum midpoint quadrature\'s own O(h^2) '
+              'error on a smooth integrand is ~1e-10; %s is two decades of '
+              'headroom on the rule' % _fmt(QERR))
+    check(1, 'window share, vertical face == 1/2 - tir_vert(tc)(1 - 1/n^2)',
+          Wv, 0.5 - R.tir_vert(tc) * (1.0 - 1.0 / n ** 2), QERR,
+          why='same quadrature, same headroom; the right-hand side is built '
+              'from tir_vert and 1 - 1/n^2, neither of which is in the '
+              'integrand')
+    check(1, 'SKY_VERT is what render.py actually uses, and it is that ratio',
+          R.SKY_VERT / (R.WIN_VERT / R.WIN_BED), np.ones(3), 1e-12,
+          why='an identity between two module-level names; it exists so that '
+              'renaming one and not the other is a FAIL and not a silent '
+              'divergence')
+    info(1, '  ... the sky PROFILE inside the window is NOT guarded here',
+         'SKY_VERT = %s with the sky\'s horizon/zenith gradient and the '
+         'angular Fresnel in the integrand, %s with a flat sky'
+         % (np.round(R.SKY_VERT, 4), np.round(Wv / Wb, 4)),
+         'a blind spot, recorded rather than papered over: every row above '
+         'tests window_shares with profile=False, and the identity row '
+         'compares SKY_VERT with WIN_VERT/WIN_BED, which come from the SAME '
+         'call -- so a wrong profile moves both and no row moves. The two '
+         'differ by 2%, which bounds what this blindness can cost')
+
+    # ---- and the limit nothing can be transcribed into ------------------------
+    # At n -> 1 the interface disappears: the window opens to the whole
+    # hemisphere, the compression and the n^2 gain both go to 1, and a vertical
+    # face must collect exactly HALF of what a horizontal one does. That is
+    # `WALL_SKY = 0.5` -- correct as a partition, and correct here and nowhere
+    # else. If the window share had been written as a partition rather than as
+    # a cone integral it would pass this row and fail the two above; if it had
+    # been written as a cone integral with the wrong receiver cosine it would
+    # pass those and fail this one.
+    Wb1, Wv1 = R.window_shares(profile=False, ior=[1.0 + 1e-9] * 3)
+    check(1, 'window share ratio -> WALL_SKY = 1/2 exactly as n -> 1',
+          Wv1 / Wb1, np.full(3, 0.5), 1e-4,
+          why='tc = asin(1/(1+1e-9)) is 4.5e-5 rad short of pi/2, so the cone '
+              'the quadrature covers misses the last 4.5e-5 rad of the '
+              'hemisphere; the resulting deficit is O(tc-pi/2) = 5e-5. The '
+              'tolerance is that deficit doubled, and it is a property of the '
+              'PROBE, not of the answer')
+
+    # ---- the same two numbers by a 2-D quadrature ----------------------------
+    # `axial_share` integrates over (t, phi) with the receiver's own cosine
+    # inside, for a field axially symmetric about the vertical. On a UNIFORM
+    # field it must give 1 at beta = 0 and 1/2 at beta = pi/2 -- the same 1/2
+    # again, from a third direction. On the TIR CONE it must reproduce
+    # tir_vert(tc), which is a closed form with an arctangent in it and no
+    # integral at all.
+    NT = 20000
+    u0 = float(R.axial_share(np.array([0.0]), nt=NT)[0])
+    u9 = float(R.axial_share(np.array([np.pi / 2]), nt=NT)[0])
+    check(1, 'axial_share(0) == 1 and axial_share(pi/2) == 1/2 (uniform field)',
+          np.array([u0, u9]), np.array([1.0, 0.5]), 2e-5,
+          why='midpoint in t (%d strata) x midpoint in phi (800): the phi '
+              'integral of max(cos, 0) is the coarser of the two and its own '
+              'O(h^2) error at 800 strata is 1e-5' % NT)
+    cone = lambda t: (t > tc[1]).astype(float)
+    a0 = float(R.axial_share(np.array([0.0]), cone, nt=NT)[0])
+    a9 = float(R.axial_share(np.array([np.pi / 2]), cone, nt=NT)[0])
+    check(3, 'axial_share on the TIR cone == tir_vert(tc), 2-D vs closed form',
+          a9 / a0, float(R.tir_vert(tc[1])), 3e-4, rel=True,
+          why='the integrand is an INDICATOR with a step at tc, so the midpoint '
+              'rule\'s error is one half-cell of that step divided by the '
+              'cone\'s own width: (pi/2)/%d / (pi/2 - tc) = %.1e relative. '
+              'Nothing here is fitted to the disagreement'
+              % (NT, (np.pi / 2 / NT) / (np.pi / 2 - tc[1])))
+
+    # ---- the underside's reflectance, formed twice ---------------------------
+    # `r_int_at` reads render.py's EXTERNAL `fresnel` at the conjugate air-side
+    # angle -- Stokes reversibility. Here the water -> air equations are written
+    # out directly from the two indices, which is the same physics through a
+    # different algebra: one takes an air-side cosine and inverts Snell, the
+    # other forms the amplitude ratios with n_1 = n and n_2 = 1.
+    mu = np.cos(np.linspace(0.0, np.pi / 2, 20001))
+    got = R.r_int_at(mu)
+    exp = np.ones_like(got)
+    for c in range(3):
+        sw = np.sqrt(np.maximum(1.0 - mu ** 2, 0.0))
+        sa = n[c] * sw
+        ok = sa < 1.0
+        ca = np.sqrt(np.maximum(1.0 - sa ** 2, 0.0))
+        rs = ((n[c] * mu - ca) / (n[c] * mu + ca)) ** 2
+        rp = ((mu - n[c] * ca) / (mu + n[c] * ca)) ** 2
+        exp[:, c] = np.where(ok, 0.5 * (rs + rp), 1.0)
+    # The comparison is restricted to ca > 1e-2, and the reason is arithmetic
+    # rather than physical: ca = sqrt(1 - n^2 sin^2 t) is the square root of a
+    # CANCELLING difference, so within a hair of the rim it carries eps/ca^2 of
+    # relative error -- 1e-12 at ca = 1e-3 -- and the two algebraically
+    # identical forms then disagree by that and not by anything either of them
+    # believes. Measured: 2.7e-14 over ca > 1e-2 and 6.0e-13 at ca = 1.1e-3.
+    # The sliver it excludes is 0.06 deg wide and is covered by the row below,
+    # which is exact and has no tolerance at all.
+    far = (np.sqrt(np.maximum(1.0 - (n[None] * np.sqrt(
+        np.maximum(1.0 - mu ** 2, 0.0))[:, None]) ** 2, 0.0)) > 1e-2)
+    check(1, 'r_int_at vs water->air Fresnel written from the two indices',
+          float(np.max(np.abs(got - exp)[far])), 0.0, 1e-13,
+          why='both sides are float64 arithmetic on the same two indices with '
+              'no iteration and differ only in the order of the operations. '
+              'Over ca > 1e-2 the measured worst is 2.7e-14, about 120 ulp of '
+              'a quantity of order 1; 1e-13 is that with a factor of four')
+    info(1, '  ... and inside that sliver, which is conditioning and not physics',
+         '%.1e' % float(np.max(np.abs(got - exp))),
+         'worst |r_int_at - the two-index form| over the whole scan, at '
+         'ca = 1.1e-3, where sqrt(1 - n^2 sin^2 t) has already lost half its '
+         'digits to cancellation. Both forms still reach exactly 1 at the rim')
+    past = mu[:, None] < np.cos(tc)[None]        # steeper than tc, per channel
+    check(1, 'r_int_at == 1 identically past the critical angle',
+          float(np.min(np.where(past, got, 1.0))), 1.0, 0.0,
+          why='exact: the air-side cosine\'s square is negative there and the '
+              'function returns the literal 1, so no tolerance is admissible')
+
+    # ---- the lattice closes on the two halves it partitions ------------------
+    # `up_gather`'s weights are cosine-stratified, so sum(w) is exact by
+    # construction: 1 over a horizontal face's whole hemisphere and 1/2 over a
+    # vertical face's upgoing half. That 1/2 is the SAME 1/2 that
+    # `_ris_closure(h, 0, inf)`, `tir_vert(0)` and `WALL_SKY` return, and the
+    # two gathers together must cover one hemisphere and no more.
+    X0_, X1_, Y0_, Y1_, DP = R.X0, R.X1, R.Y0, R.Y1, R.DEPTH
+    BIGV = 1e9
+
+    def flat_up(px, py, pz, tx, ty, tz):
+        """An EMPTY, WALL-LESS pool: a flat bed at -DEPTH and the still surface
+        at 0, nothing else. Written here, from the two planes, so it shares no
+        line with `scene_hit_under`."""
+        px, py = np.broadcast_arrays(np.asarray(px, float), np.asarray(py, float))
+        pz = np.broadcast_to(np.asarray(pz, float), px.shape)
+        sm = np.where(tz > 1e-12, (0.0 - pz) / np.where(tz > 1e-12, tz, 1.0), BIGV)
+        return (np.full(px.shape, 6, np.int8), px + tx * sm, py + ty * sm, sm,
+                np.full(px.shape, -1, np.int8))
+
+    def flat_down(px, py, tx, ty, tz, pz=0.0):
+        px, py = np.broadcast_arrays(np.asarray(px, float), np.asarray(py, float))
+        pz = np.broadcast_to(np.asarray(pz, float), px.shape)
+        sm = np.where(tz < -1e-12, (-DP - pz) / np.where(tz < -1e-12, tz, -1.0), BIGV)
+        return (np.zeros(px.shape, np.int8), px + tx * sm, py + ty * sm, sm,
+                np.full(px.shape, -1, np.int8))
+
+    unit_bed = lambda sd, u, v, sm: np.repeat((sd == 0)[:, None].astype(float), 3, 1)
+    one = lambda q: np.array([q], float)
+    _, _, _, vfb, clob = R.up_gather(one(4.), one(2.), one(-DP), 0., 0., 1.,
+                                     src=unit_bed, hit=flat_up, dhit=flat_down)
+    _, _, _, vfw, clow = R.up_gather(one(4.), one(2.), one(-.7), 1., 0., 0.,
+                                     src=unit_bed, hit=flat_up, dhit=flat_down)
+    check(1, 'up_gather closure: 1 over a horizontal face\'s hemisphere',
+          float(vfb.sum()), 1.0, 1e-12,
+          why='the weights are 1/N per cosine-stratified sample and every one '
+              'of them reaches the surface in an empty pool, so the sum is '
+              'exact to float64 accumulation')
+    check(1, 'up_gather closure: 1/2 over a vertical face\'s upgoing half',
+          float(vfw.sum()), 0.5, 1e-12, why='the same, over half the azimuth')
+    check(1, 'up_gather(vertical) + bounce_gather == one hemisphere',
+          float(vfw.sum()) + float(R._ris_closure(0.35, 1e-9, 1e9)), 1.0, 1e-6,
+          why='the downgoing gather\'s full-range closure is a closed form '
+              '(_ris_closure) and the upgoing one is a stratified sum; the '
+              '1e-6 is the closed form\'s own arctangent round-off. The two '
+              'may not overlap and may not leave a gap')
+    check(1, 'up_gather\'s window quadrature closes on window_shares',
+          np.concatenate([clob, clow]), np.ones(6), 0.03,
+          why='the integrand STEPS to zero at the rim, so a %d-sample lattice '
+              'resolves it to O(1/N) in the strata that straddle it -- '
+              'measured at 0.4%% on the bed and 2.6%% on a vertical face, '
+              'where the sin^2 weight puts most of the mass at the rim. It is '
+              'DIVIDED OUT of the level (up_gather normalises by it), so this '
+              'row is a regression on the lattice and not on any radiance'
+              % R.UP_N)
+
+    # ---- TIER 3: the mirror's diffuse coefficient, three ways ---------------
+    # Summed over the shipped lattice with `r_int_at` per direction, a unit
+    # radiance on the bed of a wall-less pool with no absorption returns exactly
+    # the DIFFUSE internal reflectance. render.py has that number already, and
+    # it did not integrate anything to get it: R_INT = 1 - (1 - R_EXT)/n^2, by
+    # Walsh's reciprocity relation. A lattice quadrature of the angular Fresnel
+    # and a reciprocity identity on the hemispherical one are as independent as
+    # two routes to a number get.
+    src0 = lambda sd, u, v, sm: np.repeat((sd == 0)[:, None].astype(float), 3, 1)
+    Es, Em, Ed, vf, _ = R.up_gather(one(4.), one(2.), one(-DP), 0., 0., 1.,
+                                    src=src0, hit=flat_up, dhit=flat_down)
+    check(3, 'up_gather\'s mirror coefficient == R_INT (Walsh, not a quadrature)',
+          Em[0], R.R_INT, 0.006,
+          why='the lattice\'s own resolution of the Fresnel step at the '
+              'critical angle, the same O(1/N) as the closure row above and '
+              'measured there at 0.4%% on a horizontal face; 0.006 absolute on '
+              'a coefficient of 0.476 is 1.3%%, twice that')
+    info(3, '  ... the mirror on a VERTICAL face, for comparison',
+         '%s against the horizontal face\'s %s -- the ratio is %.3f, and '
+         'tir_vert(tc) x (1 - 1/n^2) / R_INT = %.3f'
+         % (np.round(R.up_gather(one(4.), one(2.), one(-.7), 1., 0., 0.,
+                                 src=src0, hit=flat_up, dhit=flat_down)[1][0], 4),
+            np.round(Em[0], 4),
+            float(R.up_gather(one(4.), one(2.), one(-.7), 1., 0., 0.,
+                              src=src0, hit=flat_up, dhit=flat_down)[1][0, 1]
+                  / Em[0, 1]),
+            float(R.tir_vert(tc[1]) * (1 - 1 / n[1] ** 2) / R.R_INT[1])),
+         'a vertical face sees the mirror better than the bed does, because '
+         'the return arrives shallow')
+
+    # ---- TIER 3: THE SOLVE REACHES THE FIXED POINT -------------------------
+    # The row this round exists for. Take the shipped estimator, a wall-less
+    # pool with no absorption and a Lambertian bed of albedo rho, and iterate
+    # the same way render.py's solve does: the bed lights the underside, the
+    # underside returns R_int of it, the bed re-emits rho of that. The fixed
+    # point is the closed geometric series, and render.py owns that series
+    # already as `trap_gain` -- built from `slab_trap`'s Gauss-Legendre
+    # quadrature over mu, which shares no line with this lattice.
+    #
+    # THIS IS THE ROW THAT FAILS IF THE ITERATION IS TRUNCATED. At one bounce
+    # the gain is 1 + rho R_INT instead of 1/(1 - rho R_INT); for rho = 0.79
+    # that is 1.376 against 1.599, 14% low, and the tolerance is 1%.
+    # AND IT IS RUN FOR EXACTLY `NSOLVE` PASSES FROM BLACK, which is what
+    # render.py's solve does when its seed is removed -- so the row guards the
+    # ITERATION COUNT and not only the operator. At NSOLVE = 6 the truncated
+    # series is 0.08% short of the closed one; at 3 it is 2.1% short and at 1
+    # it is 14% short, so a 1% tolerance passes only from four passes up.
+    for rho in (0.30, 0.79):
+        L = 0.0
+        for _ in range(int(R.NSOLVE)):
+            _, Em2, _, _, _ = R.up_gather(
+                one(4.), one(2.), one(-DP), 0., 0., 1.,
+                src=lambda sd, u, v, sm, _L=L: np.repeat(
+                    (sd == 0)[:, None].astype(float) * _L, 3, 1),
+                hit=flat_up, dhit=flat_down)
+            L = rho * (1.0 + float(Em2[0, 1]))
+        check(3, 'the solve, %d passes from black, == trap_gain(%.2f)'
+              % (int(R.NSOLVE), rho), L / rho,
+              float(R.trap_gain(rho, absorb=np.zeros(3))[1]), 0.015, rel=True,
+              why='the series is 1/(1 - rho G) and the lattice\'s G is 1.3%% '
+                  'off R_INT (row above), which the series amplifies by '
+                  'd(gain)/gain = rho G/(1 - rho G) = %.2f -- so %.1f%% is the '
+                  'propagated quadrature error and nothing else. Truncating '
+                  'the iteration at one bounce reads %.4f against %.4f, which '
+                  'is %.0f x this tolerance'
+                  % (rho * 0.476 / (1 - rho * 0.476),
+                     100 * 0.013 * rho * 0.476 / (1 - rho * 0.476),
+                     1 + rho * 0.476, 1 / (1 - rho * 0.476),
+                     abs(1 + rho * 0.476 - 1 / (1 - rho * 0.476))
+                     / (0.015 / (1 - rho * 0.476))))
+
+
 _ODE_CACHE = {}
 
 
@@ -2739,23 +3026,34 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
       is the right one. What says it is render.py's own arc-scale print, which
       measures each of the four terms' structure along AND up the face and would
       show a height-independent term as a z/arc of zero.
-    * The WALL bounce map, and here the gap has a shape worth naming. What is
-      tested is the estimator's GEOMETRY: the shipped 960-direction lattice
-      against `_ris_closure` over the wall's own height range, and the bed <->
-      wall transfer against the exact rectangle view factor by reciprocity, both
+    * The WALL bounce map and the UPGOING gather beside it, and here the gap has
+      a shape worth naming. What is tested is the estimators' GEOMETRY: the
+      shipped 960-direction downgoing lattice against `_ris_closure` over the
+      wall's own height range, the bed <-> wall transfer against the exact
+      rectangle view factor by reciprocity, the upgoing lattice's closure on 1
+      and on exactly 1/2, and the two halves summing to one hemisphere -- all
       with a unit radiance and an empty box substituted for the scene. What is
-      NOT tested is that render.py APPLIES that transfer to the walls -- no row
+      NOT tested is that render.py APPLIES those transfers to the walls -- no row
       here reads a wall map, because building one costs a caustic pass. A wall
       left dark would still pass every row in this file; what would catch it is
-      render.py's own `wall bounce:` print, which measures the term's size every
-      run, and the ordering verdict in the colour regression.
-    * The bed-return (TIR) map: TIR_FRAC and TIR_VERT are tested, the 2.4 M-ray
-      splat that spends them is not. Its TRUNCATION is now priced -- one bounce
-      over the TIR cone against the closed series, in a row above -- but that row
-      compares two closed forms; no row here reads the splat's own output, and
-      the 58% of the cone it drops on the walls is measured only by render.py's
-      own print. This is the largest single gap in the file's transport and it is
-      the one the README's water/stone section ends on.
+      render.py's own `wall bounce:` and `the internal field, solved` prints,
+      which measure the terms' size every run, and the ordering verdict in the
+      colour regression.
+    * The bed-return (TIR) splat is no longer what lights anything -- the mirror
+      is `up_gather`'s traced integral, and its coefficient, its closures and the
+      FIXED POINT of iterating it are three rows above. What is still untested is
+      the splat itself, which survives as a seed and as the one route to this
+      transport that SHOOTS rather than gathers; no row here reads its output.
+      What is also untested is that render.py runs the solve on the REAL maps:
+      the fixed-point row uses a wall-less stub, so a solve wired to the wrong
+      buffer would pass it. What catches that is render.py's own convergence
+      table, printed every run with the geometric tail as a bound.
+    * The sky PROFILE inside the Snell window -- (1 - R_int(t)) times the
+      horizon/zenith gradient, normalised on the bed. Every row tests
+      `window_shares(profile=False)`, and the identity row compares SKY_VERT
+      with WIN_VERT/WIN_BED, which come from the SAME call, so a wrong profile
+      moves both and no row moves. An INFO row prints the profiled and the flat
+      value side by side, which bounds the blindness at 2%.
 
   TESTED IN PART
     * The meniscus. Its GEOMETRY is now well covered -- a force balance on the
@@ -3096,7 +3394,7 @@ def main():
                      (tier3_diffuse_fresnel, (R,)), (tier3_cylinder, (R,)),
                      (tier3_gemm, (fld,)), (tier3_geometry, (R,)),
                      (tier_meniscus, (R,)),
-                     (tier_underwater, (R,)),
+                     (tier_underwater, (R,)), (tier_underside, (R,)),
                      (tier3_wake, (fld, wkm))):
         try:
             fn(*args)
