@@ -749,6 +749,107 @@ the transmitted column traces into are stubbed out for the closure row, so what 
 geometry and the split, not the radiance. The contact angle remains `?` and unmeasured, and every
 row above is run across its whole plausible range rather than at one value.
 
+### A floating body, and the split its own meniscus hides
+
+**Derived from:** the same fillet, stood on a hull instead of a wall, plus one tangency.
+
+Everything above solves the meniscus against a **vertical plane**, where the free surface leaves the
+solid at `φ_w = 90° − θ_contact`. A floating body generalises it with one substitution and no new
+physics: with perfect wetting (`θ_contact = 0`, this file's own choice) the surface leaves the solid
+**tangentially**, so `φ_w` is the solid's own tangent angle at the contact line — on a sphere,
+exactly the contact polar angle `β` measured from the lower pole. Nothing else in the fillet algebra
+knows what it is standing on; the frame becomes radial (`m` outward from the body's axis, `t`
+tangential) and the profile, the climb, the reach, the force balance and the projected-area identity
+are all the wall's.
+
+**The draught is then an output, not a parameter** — provided the body's mass and size are inputs
+someone else fixed. Balance weight against the pressure integral over the wetted cap and the contact
+line's own pull:
+
+```
+m = rho [ V_cap(beta) - z_w pi r_w^2 ]  -  (sigma/g) 2 pi r_w sin(phi_w)
+
+    V_cap(beta) = pi h^2 (3R - h)/3,   h = R(1 - cos beta),   r_w = R sin(beta)
+    z_w = 2 a sin(beta/2)                        the fillet's climb at the hull, a = capillary length
+```
+
+Two terms in that are the ones a naive Archimedes drops, and they pull the same way:
+
+- the **`− z_w π r_w²`** is the divergence theorem taken against the **far-field** water plane rather
+  than against the contact plane. The contact line stands `z_w` above the far field, so a cylinder of
+  raised water sits inside the cap's projected area and is not displacement. Dropping it is the usual
+  way this comes out wrong;
+- the **line tension** acts along the free surface at the contact line, which here is *raised*, so
+  its vertical component is **downward**. A floating body with a rising meniscus floats **deeper**
+  than Archimedes alone puts it.
+
+Worked on the reference implementation's float — a FINA size 5 water polo ball, `R = 0.11061 m`,
+`m = 0.425 kg`, `σ = 0.0728`, and this file's own `ρ = 1000`, `a = 2.724 mm`:
+
+| | |
+|---|---|
+| solved `β` | **50.07°** |
+| draught `h` | **39.61 mm of a 221.2 mm ball — 17.90% of the diameter** |
+| waterline circle | **169.6 mm** across |
+| fillet climb `z_w` at the hull | **2.305 mm** (against 3.853 mm on a vertical wall, where `φ_w = 90°`) |
+| the balance, in kg | displacement 0.4801, contact plane −0.0521, line tension −0.0030 → **0.4250** against `m` = 0.4250 |
+| the two capillary terms | **13.0% of the weight** — Archimedes alone floats it at **37.11 mm**, 2.50 mm high |
+
+(`D`, re-solved here by bisection on `β`; every row reproduces the implementation's own printed
+figures to the digits it prints. `12`'s `ρ = 998` convention moves `β` by 0.03° and the draught by
+0.04 mm, which is the only difference between the two files here.) The force balance
+`ρg ∫z dx = σ sin φ_w` closes at **0.05582 N/m** on the float's own table, which is the wall's row
+run at a contact angle the wall never reaches.
+
+**Now the optical consequence, which is the part nobody predicts.** An above-water camera looking at
+a floating body ought to see it cut in two at the waterline: the dry hull directly, and the wet cap
+through the surface, displaced by refraction. Whether that split is visible at all is a **tangency**
+condition, and the meniscus is in it.
+
+A camera ray crosses the surface **outside** the contact circle — inside it there is no free surface,
+only hull — and descends at `θ_w` from the vertical. Idealise the surface as flat at the far-field
+plane and put the body's centre at `z_O = z_w + R cos β` above it. The limiting ray is the one that
+enters at the contact circle's own radius, `x = −r_w`, and its perpendicular distance from the centre
+is
+
+```
+p = | z_O sin(t_w) + r_w cos(t_w) |
+  = z_w sin(t_w) + R cos(beta) sin(t_w) + R sin(beta) cos(t_w)
+  = z_w sin(t_w) + R sin(beta + t_w)
+```
+
+so the ray reaches the hull iff `p < R`. And the touching point sits at height `z_O − R sin θ_w`,
+which is below the contact line iff `cos β < sin θ_w`. The two together:
+
+```
+beta + t_w > 90 deg                          the touch is on the WET cap, not the dry hull
+R ( 1 - sin(beta + t_w) ) > z_w sin(t_w)     the ray clears the raised contact line at all
+```
+
+Three consequences, in increasing order of how much they cost to learn the other way.
+
+1. **With `z_w = 0` the condition is just `β + θ_w > 90°`.** Since `θ_w ≤ θ_c`, a floating sphere
+   must sit at `β > 90° − θ_c =` **41.481°** — a draught deeper than `(1 − cos β)/2 =` **12.55% of
+   its diameter** — before *any* above-water camera can see its wet half. That is a statement about
+   floats in general and it disqualifies most of them: an inflatable rides at under 3%.
+2. **The meniscus term is not a correction, it is the decision.** On the reference float at its own
+   eye, `β + θ_w = 92.01°`, so the first test passes with 2° to spare and the second fails: the
+   left-hand side is `0.11061 × (1 − sin 92.01°) =` **0.068 mm** against `z_w sin θ_w =` **1.541 mm**
+   — short by a factor of **22.6**. A 2.305 mm climb is the whole of why that frame shows no split
+   (`D`, recomputed here).
+   **So "no split visible" is not evidence that the refraction is missing.** It is a prediction with
+   a threshold, and the threshold involves surface tension.
+3. **The threshold can be closed against the object's own catalogue.** At the window's most
+   favourable exit angle, `θ_w = θ_c`, the pair of conditions needs `β >` **51.78°**, which through
+   the flotation solve above is `m >` **0.480 kg** — outside FINA's 0.450 kg ceiling. So *no* camera
+   splits *this* ball, and the closed form says so before a frame is rendered.
+
+**The check that could not have been written from any of this**: fire the condition at the rays it
+predicts. The reference implementation runs 396 pairs of `(β, θ_w)` at 4800 rays each through its
+shipped ray–sphere intersector and compares the predicted flag with the traced answer. That row
+caught the *first* version of this derivation, which compared the ray's slope against the hull's
+tangent instead of finding the tangency, and disagreed on 196 of the 396 pairs (`D`).
+
 ---
 
 ## 4. Footprint filtering
@@ -1293,6 +1394,160 @@ half of the same hemisphere — a form factor of exactly ½ to the adjoining dif
 is the same ½ as `tir_vert(0)` only because both are the half-hemisphere split. One bounds what the
 **bed** can give a wall; this bounds what the **surface** can. They are additive, not alternative.
 
+### One interface, two diffuse reflectances
+
+This file and `12` both use the word "reflectance" for two different numbers, and the sections above
+use one of them while [`12`'s composition](12-water-rendering.md#shading-and-optics) uses the other.
+One flat water surface carries **two** diffuse Fresnel constants — the two directions through one
+boundary — and nothing in a shader's spelling tells them apart:
+
+```
+R_ext = INT_0^1 2 mu R(mu; air -> water) dmu     arriving from the AIR and never entering    A LOSS
+R_int = INT_0^1 2 mu R(mu; water -> air) dmu     arriving from the WATER and turned back     A TRAP
+```
+
+Same cosine-weighted measure `2μ dμ`, same unpolarised Fresnel formula, indices swapped. The
+internal integrand is discontinuous at `μ_c = cos θ_c` — it is identically 1 below it — so the
+quadrature is split there or it is wrong at the third digit:
+
+| `n` | `θ_c` | `R_ext` | `R_int` | `R_int / R_ext` | `1 − 1/n²` (TIR) | `R_int − (1 − 1/n²)` (partial) |
+|---|---|---|---|---|---|---|
+| 1.3320 | 48.656° | 6.6248% | 47.3712% | 7.151 | 43.6373% | 3.7339% |
+| **1.3348** | **48.519°** | **6.6690%** | **47.6166%** | **7.140** | **43.8735%** | **3.7431%** |
+| 1.3400 | 48.268° | 6.7511% | 48.0681% | 7.120 | 44.3083% | 3.7598% |
+
+(`D`, 2000-node Gauss–Legendre here, split at `μ_c`.) Three things follow, and each is load-bearing
+somewhere in `12`.
+
+**The two are tied, so neither is free.** Walsh's relation `n²(1 − R_int) = 1 − R_ext` holds on
+these quadratures to **6×10⁻¹¹** — float64 noise, not agreement to a tolerance — which is what makes
+it a guard rather than a restatement: the two integrals are computed from different index pairs and
+the identity is a statement about the `L/n²` law plus Fresnel reciprocity, so it pins the
+**exponent** and not merely the presence of a factor (at `n¹` the two sides part by 25%, at `n³` by
+33%).
+
+**`R_int` decomposes exactly, and the larger piece is not Fresnel at all.** Past `θ_c` the
+reflectance is exactly 1, and the cosine-weighted flux beyond `θ_c` is `cos²θ_c = 1 − 1/n²`. So
+
+```
+R_int = (1 - 1/n^2)                                geometry: R = 1 exactly for every mu < mu_c
+      + INT_{mu_c}^1 2 mu R(mu; water -> air) dmu  partial Fresnel INSIDE the cone
+      = 0.438735 + 0.037431 = 0.476166            at n = 1.3348
+```
+
+**92.1% of the internal return is the mirror outside Snell's window** and 7.9% is partial Fresnel
+inside the cone. That is why `1 − 1/n²` and `R_int` are so often confused with each other as well as
+with `R_ext`: they differ by 3.74 points, which is small enough to hide and large enough to matter —
+using `1 − 1/n²` where `R_int` belongs costs 1.9% of a red trap and 12.2% of a blue one
+([the truncation table in `12`](12-water-rendering.md#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point)).
+
+**And `1 − 1/n²` is the constant that whitens foam.** An air bubble seen from the water side is the
+same water→air interface as the surface seen from below, so it has the same critical angle and
+mirrors the same `43.874%` of everything that strikes it. One number runs the mirror outside Snell's
+window and the opacity of whitewater; a renderer that derives one and paints the other has
+special-cased one face of a single constant. The bubble side is
+[`12`'s aerated water](12-water-rendering.md#aerated-water-foam-spray-and-whitewater).
+
+**The directional pair, for the same reason.** `R_ext` and `R_int` are hemispherical means and are
+correct only for hemispherical quantities; per direction, use `R(θ)` on the right index pair and read
+the internal one at its conjugate air-side angle (Stokes reversibility). On this chapter's own sun
+positions the external value is nowhere near either diffuse constant:
+
+| | normal | 32.78° (a 57.22° sun) | 68.98° (a 21.02° sun) | diffuse |
+|---|---|---|---|---|
+| `R_ext(θ)` at `n = 1.3348` | 2.056% | **2.217%** | **12.241%** | **6.669%** |
+
+(`D`, exact unpolarised Fresnel here.) A "surface reflection" quoted as one number is therefore
+under-specified twice over — which side of the boundary, and averaged over what.
+
+### The window from below: Snell's Jacobian, and where the horizon goes
+
+**Derived from:** Snell's law differentiated. Nothing else enters.
+
+The partition above says how much of a submerged receiver's hemisphere is window. This says **where
+inside the window each part of the air world lands**, which is the question a submerged *camera*
+asks and a submerged diffuse face never does.
+
+Snell's law maps the air hemisphere onto the window one-to-one. Differentiate it and take the ratio
+of the two solid-angle elements:
+
+```
+sin(t_a) = n sin(t_w)              =>   cos(t_a) dt_a = n cos(t_w) dt_w
+
+dOmega_w / dOmega_a = ( sin(t_w) dt_w ) / ( sin(t_a) dt_a )
+                    = ( sin(t_a)/n ) / sin(t_a) * cos(t_a) / ( n cos(t_w) )
+                    = cos(t_a) / ( n^2 cos(t_w) )                              # azimuth is untouched
+```
+
+That is the weight any audit of the window has to be taken with, and it has a closure that needs no
+renderer in it: integrated over the whole air hemisphere it must return the window's own solid angle,
+
+```
+INT_{air hemisphere} cos(t_a)/(n^2 cos(t_w)) dOmega_a  =  2 pi ( 1 - cos t_c )
+                                                       =  2.12139 sr   at n = 1.3348
+```
+
+(`D`, Gauss–Legendre here: `2.1213850054` against `2π(1 − cos θ_c) = 2.1213850054`.) A stratified
+estimator that closes on this is measuring shares *of* something; one that does not is reporting
+percentages of an unknown denominator.
+
+**Where the horizon goes.** The Jacobian's numerator vanishes at grazing, so the map crushes the
+whole low-elevation air world into a thin annulus just inside the rim:
+
+| air, `θ_a` from vertical | elevation | lands at `θ_w` | share of the **air hemisphere** beyond it | share of the **window** beyond it | concentration |
+|---|---|---|---|---|---|
+| 0° | 90° | 0.000° | 100.00% | 100.00% | 1.00× |
+| 30° | 60° | 21.999° | 86.60% | 78.44% | 1.10× |
+| 45° | 45° | 31.988° | 70.71% | 55.03% | 1.29× |
+| 60° | 30° | 40.452° | 50.00% | 29.20% | 1.71× |
+| 70° | 20° | 44.748° | 34.20% | 14.17% | 2.41× |
+| 75° | 15° | 46.357° | 25.88% | 8.23% | 3.14× |
+| 80° | 10° | 47.544° | 17.36% | 3.75% | 4.63× |
+| 85° | 5° | 48.273° | 8.72% | 0.95% | 9.17× |
+| 89° | 1° | 48.509° | 1.75% | 0.04% | 45.7× |
+| 90° | 0° | 48.519° | 0 | 0 | → ∞ |
+
+(`D`, closed form here at `n = 1.3348`.) **Half of the air hemisphere lives in the outer 29% of the
+window, and the last ten degrees of elevation live in 3.75% of it.** The concentration diverges at
+the horizon, which is the whole content of the law: an environment lookup taken from under the water
+is a lookup into a map whose sampling density goes to zero exactly where the world is densest.
+
+**So the naive parameterisation is wrong in a specific direction.** Index the window radially by
+`θ_w`, or by the disc radius, or by an equal-area map of the *water-side* hemisphere, and the
+samples are spread by `dΩ_w` — which is the wrong measure by the Jacobian above. Priced on a
+`θ_w`-uniform radial map:
+
+- the **innermost 10°** of `θ_w` takes **20.6%** of the radial samples and carries **2.72%** of the
+  air hemisphere — over-served **7.6×**, and it is the zenith, where a sky is smooth;
+- the **outermost 1°** of `θ_w` takes **2.06%** of them and carries **17.58%** of the air hemisphere
+  — starved **8.5×**, and it is where every horizon-line object in the scene is stacked.
+
+**The correct radial variable is the air-side cosine**, because equal solid angle in air is equal
+steps in `cos θ_a`:
+
+```
+v = cos(t_a) = sqrt( 1 - n^2 sin^2(t_w) )        v = 1 at the window's centre, v = 0 at its rim
+```
+
+Uniform in `v` is uniform in air solid angle by construction — `1 − v` **is** the share of the air
+hemisphere outside that ring, which is the middle column of the table above read off directly. The
+operational form is simpler than the algebra: **refract first, look up second.** Store and sample
+the environment as a function of the *air* direction and let Snell's law choose the sample, rather
+than storing a window-space disc and hoping its texel grid lands where the world is. When a
+window-space table is unavoidable — a cached disc for a fixed camera depth — make its radial
+coordinate `v`, not `θ_w/θ_c` and not `r/r_max`.
+
+**Two routes to the same audit answer different questions, and they will not agree line by line.**
+Weighting a rendered frame's transmitting subsamples by their own solid angle measures *what this
+picture spends its window on*: the camera's exit points and directions are a biased sample of the
+interface, chosen by where the photographer stood. Weighting directions off the hemisphere with the
+Jacobian above measures *what the window contains*, which is a property of the scene and the
+interface and of no camera. On the reference implementation the two agree on the non-sky **total** to
+0.13 percentage points and disagree on individual entries by up to **4.6×**
+([`12`](12-water-rendering.md#what-the-window-actually-contains-and-why-the-rim-is-where-the-world-is)) —
+which is not a discrepancy to reconcile. Quote route 1 for a cost or a visibility question and route
+2 for a physics one, and never mix an entry from one with a total from the other.
+
 ---
 
 ## 8. The gathers
@@ -1761,6 +2016,9 @@ method (a disagreement localises to one of the two methods).
 | Both terms → 0 as `a → 0` and as `θ_c → 90°` | forced limits, linear in each | 1 | pass |
 | Reachability algebra `R(φ)·L`, `β = A − B` | literal reflection over 60 random `(V, L)`; constructed `(L+V)·t = 0` | 1 | pass (9×10⁻¹⁶) |
 | Internal reflection off the fillet's underside | **refuted**: `f = η cos_i − cos_t < 0`, so `t_z < 0` identically; 323 400-sample scan, 0 hits | 1 | pass |
+| Floating-body flotation (`β`, draught, waterline) | the cap re-integrated as a 20 000-node quadrature of `π r(z)² dz` — never forming the closed-form cap volume — and the line tension re-derived from **Keller's theorem** (the pull equals the weight of liquid the meniscus displaces) | 1, 3 | pass (2×10⁻⁴ rel.) |
+| The fillet at a hull's contact angle (`φ_w = β`, not 90°) | the force balance and the projected-area identity re-run on the float's own table through the **shipped** `_menis_weights` | 1 | pass (0.00%) |
+| The split condition `R(1 − sin(β+θ_w)) > z_w sin θ_w` | 396 `(β, θ_w)` pairs × 4800 rays through the shipped ray–sphere solve — no shared algebra | 3 | pass (and it **failed** the first version of the derivation, on 196 of 396) |
 | The radiance the two columns read (`_env_menis`, the traced maps) | — | — | **no test** (stubbed for the closure row) |
 | `W(k)`, `σ_w = 0.3748·fp`, `half_footprint = λ/2` | closed-form identities | 1 | pass |
 | Separable evaluation vs direct sum | grid vs point path | 3 | pass |
@@ -1785,6 +2043,10 @@ method (a disagreement localises to one of the two methods).
 | The trap as the shipped pass carries it | priced, not asserted: `trap_gain(bounces=1, cone_only=True)` against the closed series | 1 | **info** — the deficit is real and open |
 | Riser caustic read at the beam's continuation | — | — | **no test**; the stripe rms and the z/arc ratio are render-side diagnostics, not suite rows |
 | Vertical face's window vs mirror split | the halves are arithmetic on `TIR_VERT` and `TIR_FRAC`, and both of those are guarded above; the partition identity `window + mirror = tir_vert(0) = ½` holds exactly, and `WALL_SKY == tir_vert(0)` is its own row | 1 | pass — but **no row asserts the split is what the renderer applies** |
+| Snell's Jacobian `cos θ_a/(n² cos θ_w)` | the identity `∫ dΩ_a = 2π(1 − cos θ_c)`, which is what makes the window audit's percentages shares *of* something | 1 | pass (2.1213850054 vs 2.1213850054) |
+| `air_world` returns sky / edge / sail / float in that order | four rays aimed by geometry at the four things above this water; the kinds are what the audit is binned on, so a wrong code is a wrong report | 1 | pass |
+| The window audit's **shares** | — | — | **no test**: two estimators are run and reported side by side, and they measure two different questions (see the Jacobian section above). Neither is a guard on the other |
+| The sail's underside radiance | — | — | **no test**, and this is the coverage case: it lands on **0** subsamples of the hero frame, so the picture cannot see it either. Derived, not guarded |
 | `R_ext`, `R_int`, `a_wet` boundary conditions | quadrature; reciprocity; Egan & Hilgeman fit | 1, 3 | pass |
 | `a(λ)` itself | Pope & Fry 1997 point-sampled *and* band-integrated; a Smith & Baker exclusion row | 2 | pass |
 | Dry-band absorption regression | — | — | **no test** |
@@ -1809,7 +2071,9 @@ it; where the guard is the more interesting half, that is said.
 prose overstates or mislabels a number the code gets right, and both sit inside blocks this round was
 told not to touch. They are one-line corrections for whoever owns those blocks, not for this round.
 
-A seventh disagreement, found while closing the four, is recorded after item 6 and is **open**.
+A seventh disagreement, found while closing the four, is recorded after item 6 and is **open**. An
+eighth, found in this pass, is recorded after it and is **closed by recomputation**: it is an
+arithmetic slip in a write-up rather than a defect in the code.
 
 1. **`TIR_VERT` — the vertical-face internal-reflection ratio.** *Now fixed; shipped value 0.885.*
    It shipped 0.563; the derivation stated beside it evaluates to 0.635; the correct value for a
@@ -1961,6 +2225,24 @@ A seventh disagreement, found while closing the four, is recorded after item 6 a
    gained their direct sun, so whatever balance this constant was dialled against no longer holds.
    What is not in doubt is that two receivers in one frame are being given the same beam at a ratio
    of 3.33, with a derivation on one side and nothing on the other.
+
+8. **An inflatable ring's draught.** *A write-up figure; the code never used it.* The argument that
+   an air-filled ring is the wrong instrument for a waterline is right and the number attached to it
+   is not. With tube radius `r = 90 mm` and skin `t = 0.25 mm`, the shell fraction of a **torus** is
+   `2t/r`, so `ρ_eff = ρ_PVC·2t/r + ρ_air = 8.42 kg/m³` and the submerged volume fraction is
+   **0.842%** — both of which reproduce. The draught that follows does not: for a circular section a
+   submerged **area** fraction of 0.842% needs a half-angle of `α = 0.3438 rad`, i.e.
+   `d = r(1 − cos α) =` **5.27 mm**, not the 9 mm quoted. (For a floating torus the two fractions are
+   the same number: the bottom segment is symmetric about the tube's own axis, so Pappus gives
+   `V_sub/V = A_sub/A` exactly.) 9 mm would need `ρ_eff = 18.7 kg/m³`. The likely origin is visible
+   in the companion figure, which **does** reproduce: a beach ball of `R = 180 mm` and the same skin
+   has shell fraction `3t/R`, hence `ρ_eff = 6.62 kg/m³`, 0.663% and a draught of **17.2 mm** against
+   the quoted 17 mm — so the sphere's `3t/R` appears to have been carried onto the tube, where the
+   right factor is `2t/r`. The conclusion is unaffected and in fact strengthened: at 5.3 mm of
+   draught the ring's own meniscus climbs **0.93 mm**, **17.7%** of it, so a waterline reading on an
+   inflatable is a surface-tension measurement wearing a buoyancy label. *(`D`, all four numbers
+   recomputed here; the method rule this belongs to is
+   [`11`](11-verification-failures.md#pick-instruments-whose-parameters-someone-else-has-fixed).)*
 
 ## Three more, closed in the same round, that this file did not carry
 

@@ -361,6 +361,29 @@ least-confident-claims ledger in `00-index.md`.
   (`D/?`), and the behaviour of a dome port *in air* was not worked through (`?`). The mirrored-twin
   cue and the "one straight edge settles which port" check are this chapter's composition, and both
   are cheap to falsify.
+- **P/D** — [What the window actually contains, and why the rim is where the world
+  is](12-water-rendering.md#what-the-window-actually-contains-and-why-the-rim-is-where-the-world-is),
+  derived in [`12a`
+  §7](12a-water-derivations.md#the-window-from-below-snells-jacobian-and-where-the-horizon-goes).
+  **Snell's Jacobian** `dΩ_w/dΩ_a = cos θ_a/(n² cos θ_w)` is differentiated Snell and carries no free
+  parameter (`P`); its closure `∫dΩ_a = 2π(1 − cos θ_c)` is an identity and is the only guarded
+  quantity in the whole audit — quadratured here to **2.1213850054 vs 2.1213850054 sr** and asserted
+  in `reference-impl/validate.py` (`D`). The elevation → polar-angle table, the 3.75% / 0.95% / 0.04%
+  annulus shares, the 7.6× over-service of the zenith and the 8.5× starvation of the outer degree,
+  and the change of variable `v = cos θ_a = √(1 − n² sin²θ_w)` are closed-form arithmetic recomputed
+  here at `n = 1.3348` (`D`). The **contents** table is a property of *that* pool, that sail and that
+  camera and transfers as a mechanism only (`D`): route 1 weights a rendered frame's transmitting
+  subsamples by `cos³`, route 2 samples the air hemisphere stratified in `cos θ_a` under the
+  Jacobian. The **sail's 72–77° from the vertical** is that scene's geometry; the **1.44°** it
+  compresses into is recomputed here and is the number the chapter's earlier "about 1.5°" rounds to.
+  ⚠️ **Neither route guards the other** — they answer different questions and a binning error common
+  to both would not show (`?`). The claim that a raised edge admits **no deck** into the window is
+  geometry (`P`) and is additionally asserted against a 0.2 mm march of the edge profile in that
+  implementation (`D`). ⚠️ **A correction carried by this entry:** an earlier round priced the
+  missing world as "a thin rim" — the outermost 0.205° of window at low transmittance — and
+  separately expected the sail to occupy a large solid angle. Both are refuted above: the rim
+  measurement is the right measurement for the rim and the wrong one for the share, and the sail is
+  **0.066%** of the window against the pool's own edge section at **0.989%**.
 - **P** — Linear (Airy) wave theory — dispersion `ω² = gk·tanh(kh)`, shallow-water celerity
   `sqrt(g·h)`, Green's-law shoaling `a ∝ h^(-1/4)`, refraction: coastal-engineering canon;
   textbook treatment in Dean & Dalrymple, *Water Wave Mechanics for Engineers and Scientists*
@@ -574,7 +597,31 @@ least-confident-claims ledger in `00-index.md`.
 - **P/D** — The bubble constant. `1 − 1/n²` is the cosine-weighted flux beyond the critical angle
   and equals **43.7%** at `n = 1.333` (44.3% at 1.34) — arithmetic here, and the same quantity as
   `cos²θ_c`. The 0.999 red transmission over 5 mm is Beer-Lambert on the corrected `a(610)`. The
-  surf/plume split is this chapter's composition; the physics in each column is standard.
+  surf/plume split is this chapter's composition; the physics in each column is standard. **What is
+  new in this pass** is the exact relation between that constant and the diffuse internal
+  reflectance it is routinely confused with: `R_int = (1 − 1/n²) + partial Fresnel inside the cone =
+  0.438735 + 0.037431 = 0.476166` at `n = 1.3348`, so `1 − 1/n²` is **92.1%** of `R_int` and not all
+  of it (`D`, quadratured here). Use `1 − 1/n²` for a bubble wall — a per-direction mirror — and
+  `R_int` for a hemispherical average; the two are 3.74 points apart, which is worth 1.9% of a red
+  trap and 12.2% of a blue one.
+- **P/D** — [Surface reflection names two opposite things: a loss and a
+  trap](12-water-rendering.md#surface-reflection-names-two-opposite-things-a-loss-and-a-trap),
+  derived in [`12a` §7](12a-water-derivations.md#one-interface-two-diffuse-reflectances). That one
+  interface carries two diffuse Fresnel constants, that they are the same integral over `2μ dμ` with
+  the index pair swapped, and that they are tied by Walsh's relation, are standard optics (`P`; the
+  **name** Walsh is still `?` — see the `1/n²` entry above, where the 1926 paper is cited but was not
+  read here). Every figure is a quadrature recomputed here (`D`, 2000-node Gauss–Legendre, the
+  internal integrand split at `μ_c` because it is discontinuous there): `R_ext = 6.6248 / 6.6690 /
+  6.7511 %` and `R_int = 47.3712 / 47.6166 / 48.0681 %` across the IOR triple 1.3320/1.3348/1.3400,
+  hence a ratio of **7.151 / 7.140 / 7.120** and Walsh closing to **6×10⁻¹¹**; the directional
+  external values 2.056% at normal, **2.217%** at 32.78° and **12.241%** at 68.98°; the decomposition
+  43.874% + 3.743%. The **cost of the confusion** — trap gain −9.2 / −24.9 / −29.2 % per channel if
+  `R_ext` is used internally, ×0.561 if `R_int` is used externally, ×0.421 for both — is arithmetic
+  on this chapter's liner `ρ = 0.222 / 0.585 / 0.681` (`D`) and is a property of that albedo, not a
+  general constant; what transfers is that the two errors are of *different kinds*, one chromatic and
+  one flat. ⚠️ **This entry exists because the chapter used both senses under one word** in several
+  places for its whole run; those uses are now disambiguated in place, and a reader who took the
+  wrong one was out by 7.14× in the direction that darkens a pool interior.
 - **P/F** — Glitter as a level set of the slope field, and the four review tests that follow
   (trackable crests, dispersive multi-scale motion, phase-lock with the caustics, interference
   rather than cells). The geometry — a glint occurs where the normal is the sun/eye half-vector —
@@ -593,10 +640,55 @@ least-confident-claims ledger in `00-index.md`.
   spread is finite-component sampling plus a varying shelter mask, not water, and the conclusion is
   quoted across the whole of it (7.6σ–8.3σ, 14.7σ–16.1σ). **Occlusion versus cast shadow was never
   separated** (`?`). AO/bevel framing is composition.
+- **P/D** — [A floating body, and the split its own meniscus
+  hides](12a-water-derivations.md#a-floating-body-and-the-split-its-own-meniscus-hides). The
+  generalisation of the wall fillet to a hull is one substitution — with perfect wetting the surface
+  leaves the solid tangentially, so `φ_w` is the solid's own tangent angle, which on a sphere is the
+  contact polar angle `β` — and the rest of the fillet algebra is unchanged (`P`, with the perfect
+  wetting itself a **choice**, `?`, as it is for the wall). The **flotation balance**
+  `m = ρ[V_cap − z_w π r_w²] − (σ/g)2π r_w sin φ_w` is the divergence theorem plus the contact line's
+  own pull (`P`); the two capillary terms carrying **13.0%** of the weight, and Archimedes alone
+  floating the ball **2.50 mm** high, are that ball (`D`, re-solved here by bisection on `β` at the
+  implementation's ρ = 1000, where every row of the balance reproduces its printed figures exactly;
+  `12`'s ρ = 998 convention moves the draught by 0.04 mm). The **tangency condition** `β + θ_w > 90°` **and**
+  `R(1 − sin(β + θ_w)) > z_w sin θ_w` is derived here from the perpendicular distance of the limiting
+  ray to the body's centre (`P/synthesis`); its `z_w = 0` corollary — no above-water camera sees a
+  floating sphere's wet half until the draught exceeds **12.55%** of the diameter — is general, and
+  the frame-specific numbers (`β + θ_w = 92.01°`, 0.068 mm against 1.541 mm, short by **22.6×**) are
+  that ball at that eye (`D`, recomputed here). The threshold `β > 51.78°`, i.e. `m > 0.480 kg` against FINA's 0.450 kg
+  ceiling, is the flotation solve evaluated at `θ_w = θ_c` (`D`). The **guard** is the one thing here
+  that shares nothing with the derivation: 396 `(β, θ_w)` pairs × 4800 rays through the shipped
+  ray–sphere intersector, and it **failed** the first version of the derivation on 196 of 396 pairs.
+  The **instrument** argument — a FINA size 5 ball because circumference (0.68–0.71 m) and mass
+  (0.400–0.450 kg) are both published, so the draught is an output with a published tolerance —
+  **38.40–40.79 mm** across the mass band and **40.15–39.10 mm** across the circumference band — is
+  `P/D` and is stated as method in
+  [`11`](11-verification-failures.md#pick-instruments-whose-parameters-someone-else-has-fixed).
+  ⚠️ **A correction made in this pass:** an inflatable ring of tube radius 90 mm and skin 0.25 mm has
+  `ρ_eff = ρ_PVC·2t/r + ρ_air = 8.42 kg/m³` and floats at 0.842% of its volume, which is
+  **5.27 mm of a 180 mm tube** — not the 9 mm in circulation, which needs 18.7 kg/m³ and looks like a
+  *sphere's* `3t/R` applied to a tube. The companion beach-ball figure (17 mm of a 360 mm sphere)
+  reproduces at 17.2 mm, which is what identifies the slip (`D`, both recomputed here). Its meniscus
+  climbs **0.93 mm**, 17.7% of that draught, which is the real reason an inflatable cannot read a
+  waterline. The full derivation and the correction are
+  [`12a`'s eighth non-reproducing item](12a-water-derivations.md#what-did-not-reproduce).
 - **F** — The four-gate masking contract (depth fade, extinction along the light path, sun
   visibility at the surface entry point, irradiance-not-albedo) and the tier ladder as a whole:
   production practice assembled over the physics above. The shadow-at-entry-point rule is the one
-  most often skipped and is stated here as doctrine, not as a cited result.
+  most often skipped and is stated here as doctrine, not as a cited result. ⚠️ **An attribution
+  corrected in this pass:** the chapter attributed a shadow that reads as a *reduction* rather than a
+  hole to the occluder being non-binary — fabric or foliage transmitting 15–30% diffusely. That
+  mechanism is real and stays, and it is **not the dominant one**. A facet tilted by `ε` swings the
+  transmitted ray by `|1 − cos θ_i/(n cos θ_t)|·ε`, which is differentiated Snell (`P`) and is the
+  same derivative the [focusing
+  number](12a-water-derivations.md#the-focusing-number-derived) is built from — **0.2508** at normal
+  incidence, where it is exactly `1 − 1/n`, and **0.6241** at this chapter's 21° sun (`D`,
+  recomputed here). So the shadow of an **opaque** body fills in too, and on the reference
+  implementation's float it fills by **84%**: an 87 mm rms wander (slope rms 0.0712 over a 1.96 m
+  slant) against a 221 mm shadow, geometric umbra 0.0800 m² against 0.0131 m² surviving in the
+  caustic map, bed radiance **72.8%** inside and net contrast **61.5%** (`D`, that ball, that sun,
+  that basin — the umbra's core is measured at exactly zero, so the occluder really is opaque). What
+  transfers is the coefficient and its sun dependence, not the 84%.
 - **P** — Pool-water optics: pure-water absorption from the Pope & Fry table read above, sampled at
   this chapter's RGB points — `a = (0.2644, 0.0565, 0.00922) m⁻¹` at 610/550/450 nm; the 417.5 nm
   absolute minimum is deliberately *not* used as a blue channel. (`reference-impl` uses the same

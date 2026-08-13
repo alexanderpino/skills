@@ -521,6 +521,56 @@ by construction — fixed dt, scripted transform); and platform-specific goldens
 reference platform (raster and filtering differ legitimately across vendors — golden per
 platform tier, cross-platform diffs only as an informational report).
 
+### An irradiance used as a radiance
+
+This one belongs with the seven above rather than with the eighth, because it is an instrument
+failure: the number is reproducible and wrong. It gets a heading because it is, in this project's
+experience and in most light-transport code, **the most common unit error there is**, and because it
+is nearly always a factor of about **π**.
+
+**The two quantities.** Irradiance `E` is W/m² — flux arriving on a surface, integrated over a
+hemisphere. Radiance `L` is W/m²/sr — flux per unit projected area *per unit solid angle*, and it is
+what a shader must hand to a compositor, a lerp or a tone map. For a Lambertian receiver they are
+related by
+
+```
+L = rho * E / pi
+```
+
+and that `1/π` is the whole of the confusion. Both are three floats. Neither carries a unit. A
+renderer that adds them, lerps between them, or hands one to a function expecting the other produces
+a picture with **one surface** out by π and everything else right — which reads as an art-direction
+problem, not as a bug, and gets absorbed by whatever constants were fitted around it.
+
+**How it looked here.** A shade sail's underside shipped as `albedo × (SKY_AMB × 1.6 + SUN_COL ×
+0.22)`: an *irradiance* triple used where a radiance was wanted, with two invented multipliers on it.
+Derived properly — what the fabric transmits plus what its underside reflects off the ground it
+shades — the panel is `[0.627, 0.656, 0.796]` against the shipped `[2.062, 2.255, 2.695]`:
+**×3.29 / 3.44 / 3.38**, i.e. π to within the two hand multipliers. A shade sail that read *brighter
+than the sky it shades*, for the project's whole run (`D`).
+
+**The checks, in order of cost.**
+
+1. **A radiance and an irradiance cannot be compared, so any expression that does is the bug.** Grep
+   for the operations that mix them — an add, a `lerp`, a `max`, a comparison — and check the two
+   operands' kinds. This is a type error being carried by a language that has no such type.
+2. **Any bare constant near 3.14 or 0.318 in a shading term, with no derivation beside it, is this
+   error wearing a knob.** So is any pair of invented multipliers whose product lands near either.
+   The rule is not that π may not appear — it appears legitimately in every diffuse BRDF — it is that
+   it may not appear *undocumented*, because a documented π is a division and an undocumented one is
+   a fit.
+3. **Name the kind in the symbol and the error becomes unwritable.** `E_deck` and `L_deck` cost
+   nothing and make the mixing sites visible at a glance; a shared `SKY_DECK` that is used as an
+   irradiance in one call and a radiance in another is what allowed this one.
+
+**Why a picture does not catch it.** π is **1.65 stops** — enormous on a chart, and entirely
+plausible on a fabric panel nobody has a reference for. It survives every *ratio* check taken on one surface,
+because it is a constant multiplier on that surface alone; it survives every energy audit that
+composes its own irradiance; and if the surface is small or off-frame it survives everything, which
+is the [ninth way](#the-ninth-way-the-code-no-pixel-reached) below. The guard that does see it is
+the one that crosses the boundary between the two quantities: integrate the shaded radiance over a
+hemisphere and check that it returns the irradiance you started from.
+
 ### The eighth way is about the test, not the measurement
 
 This one earns its own heading rather than an eighth bullet above, and the reason is the useful
@@ -604,6 +654,96 @@ Three questions to ask of any test that has never failed, in the order they are 
 3. **Which of its inputs are at a degenerate value?** Zero absorption, unit albedo, normal
    incidence, one texel, a flat surface — every degeneracy silently deletes the terms that only
    exist away from it, and those terms are usually the ones a reviewer would have asked about.
+
+A fourth question belongs beside them and is answered against the *frame* rather than against the
+suite: **how many subsamples reached the code at all?** That is the
+[ninth way](#the-ninth-way-the-code-no-pixel-reached) below, and it is the failure the eighth cannot
+see, because a test that touches nothing and a frame that reaches nothing are independent holes in
+the same wall.
+
+### The ninth way: the code no pixel reached
+
+The eighth way is a test that touches nothing. This is its sibling and it fails one layer further
+out: the **test is fine, and the coverage is zero.** Nothing is wrong with the assertion, the
+tolerance, the physics or the estimator — the code under discussion is simply never executed by the
+thing everyone is looking at.
+
+**A frame is a sampling of the code, not a proof of it — and the sample is biased toward what the
+author framed.** That is the whole rule. A golden-image suite's coverage is the union of its
+viewpoints, and that union was chosen for how it looks. Every shortcut that lives outside it is
+protected by the same taste that produced the shot.
+
+**Measured here.** The shade sail of the entry above lands on **0 of 8 640 000 subsamples** of the
+hero frame — its panel is behind and above the camera, and the water it shades is shaded by it
+without ever showing it. Three rounds of review, a 268-row suite and a per-channel colour regression
+all passed over a term that was 3.4× wrong, because no pixel had ever asked for it. What found it was
+a **new viewpoint** — the same scene from under the water, where the whole panel is inside Snell's
+window (`D`).
+
+**The instruments, cheapest first.**
+
+1. **Count the subsamples each branch receives, and print the count.** A branch with a zero count is
+   a finding, not a curiosity: it says the frame cannot speak about that code either way. This costs
+   one counter per branch and it turns "is it covered" from a judgement into a row.
+2. **Add a viewpoint chosen for reach rather than for beauty.** In this project the rule fell out of
+   the geometry: *every above-water shortcut that survives by being invisible from a downward view
+   becomes visible from underneath.* The submerged camera is a coverage instrument that happens to
+   also be a shot. The general form is to pick the camera that inverts the frame's own occlusion —
+   behind the hero object, under the vehicle, inside the room the level never enters.
+3. **Ask what the frame structurally cannot see.** Not what it happens to miss — what it is *unable*
+   to reach: geometry behind the camera, surfaces whose normals face away everywhere in the shot,
+   branches gated on a state the scene never enters. That list is short, it is writable in an
+   afternoon, and each entry is either covered by another frame or marked.
+
+**And do not let a green suite stand in for it**, because the two failures compound in one direction:
+the eighth way says a test can be true about nothing, the ninth says a frame can be right about
+nothing, and a project that has both believes it has two independent confirmations. It has none. The
+question to ask of any suite plus any golden set is *which lines does the union of these actually
+execute* — and the answer is a number, not an impression.
+
+### Pick instruments whose parameters someone else has fixed
+
+A scene object that exists to test physics is an **instrument**, and every free number in it is a
+free number in the reading. The discipline is one line: **choose an object whose parameters someone
+else has already standardised, so its state is an output rather than a setting.**
+
+Worked, because the arithmetic is the argument. This project needed a floating body to read a wave
+field and a waterline. The obvious choice — the inflatable ring in the reference photograph — is the
+worst instrument available, and Archimedes says why. An air-filled PVC tube of radius `r` and skin
+`t` has effective density `ρ_PVC·2t/r + ρ_air`; at `r = 90 mm`, `t = 0.25 mm` that is **8.42 kg/m³**,
+so it floats with **0.842%** of its volume under — **5.27 mm of a 180 mm tube** — and its meniscus
+climbs **0.93 mm**, i.e. **17.7% of the draught**. The waterline it draws is mostly capillary, and
+nothing about its depth is a reading of anything. ⚠️ A figure of "9 mm" for that draught has been in
+circulation for this geometry and does **not** reproduce: 9 mm needs an effective density of
+18.7 kg/m³, and the 9 mm appears to come from applying a *sphere's* shell fraction `3t/R` to a tube,
+where the tube's is `2t/r`. The companion figure for a beach ball — 17 mm of a 360 mm sphere — does
+reproduce (17.2 mm at `3t/R`), which is what identifies the slip (`D`, both recomputed here).
+
+What was taken instead is a **FINA size 5 water polo ball**, because both numbers that decide the
+flotation are published: circumference **0.68–0.71 m** and mass **0.400–0.450 kg** (FINA Water Polo
+Rules, equipment). Mid-range gives `R = 0.11061 m`, `m = 0.425 kg`, a mean density of **75 kg/m³**,
+and a draught that is then *solved* rather than set — **39.61 mm of a 221.2 mm ball**, with the
+contact line's own tension carrying **13.0%** of the weight (the balance, and the tangency condition
+it then makes falsifiable, are
+[`12a` §3](12a-water-derivations.md#a-floating-body-and-the-split-its-own-meniscus-hides)).
+
+**The standard supplies the tolerance as well as the value, and that is half the point.** Across the
+published **mass** band the draught runs **38.40 → 40.79 mm** (±3.0%) and across the published
+**circumference** band **40.15 → 39.10 mm** (±1.3%, and note the sign: a bigger ball floats
+*shallower* at fixed mass). So a disagreement inside that envelope is the instrument and a
+disagreement outside it is a finding. A chosen number gives a
+value with no tolerance at all, which is why "I set the draught to 40 mm" cannot falsify anything.
+
+Three tests for whether an object is an instrument or a prop:
+
+1. **Is its state an output?** Can the quantity you intend to read be *computed* from the published
+   parameters plus the physics, before the frame is rendered? If it has to be dialled until it looks
+   right, it is a prop.
+2. **Does the standard come with a range?** A single catalogue number with no tolerance is only half
+   a standard, and the missing half is the error bar on every conclusion drawn from it.
+3. **Is the effect you want to read the dominant term in its state?** The inflatable fails this one
+   even before its parameters are questioned: with the meniscus at 18% of the draught, a waterline
+   reading on it is a surface-tension measurement wearing a buoyancy label.
 
 ## When the target is an approximation, the bar changes kind
 
@@ -721,12 +861,21 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
     budget — and was the metric chosen before the candidate rather than after?
 14. Is any quantity the ground truth is scored on still open in the *reference*? An unresolved
     discrepancy there propagates into every approximation measured against it.
+15. Does every triple that crosses between **irradiance and radiance** say which it is in its own
+    name, and is every bare constant near 3.14 or 0.318 in a shading term accompanied by a
+    derivation? ([An irradiance used as a radiance](#an-irradiance-used-as-a-radiance))
+16. Which code does the golden set actually **reach**? A branch with zero subsamples across every
+    frame in the suite is a finding, and a viewpoint chosen for reach — not for beauty — is the
+    cheapest way to close it. ([The ninth way](#the-ninth-way-the-code-no-pixel-reached))
 
 ## Sources & provenance
 
 | Claim | Tier |
 |---|---|
 | Symptom → mechanism → minimal fix review discipline; control-test doctrine ("a metric with no control is not evidence") | **F** (house doctrine, mirrored from terrain-architect `09`) |
+| `L = ρE/π` for a Lambertian receiver, and therefore that an irradiance/radiance confusion is a factor of ~π | **P** (definitional radiometry). The ×3.29 / 3.44 / 3.38 measured on a shade sail, and the derived `[0.627, 0.656, 0.796]` behind it, are **D** — one panel in `12`'s reference implementation |
+| The ninth way: a frame is a sampling of the code, and its coverage is the union of its framings | **F** (this skill's composition, stated as doctrine). The **0 of 8 640 000 subsamples** that let a 3.4× error stand for three rounds is **D**, measured on that implementation's hero frame |
+| Instruments with published parameters: draught as an output, and the tolerance the standard itself supplies | **P/D** — FINA Water Polo Rules give the size 5 circumference (0.68–0.71 m) and mass (0.400–0.450 kg) bands (`P`, equipment schedule); every derived figure — 75 kg/m³, 39.61 mm, 38.40–40.79 mm across the mass band, and the inflatable's 8.42 kg/m³ / 5.27 mm — is arithmetic recomputed here (`D`), the last of which **corrects** a 9 mm figure in circulation |
 | T-junction sparkle: watertight raster guaranteed only across shared-vertex edges | **D** (D3D/Vulkan raster rules) + **F** (terrain reading) |
 | Slope-scaled shadow bias sized to texel world footprint; cascade texel snapping vs shimmer | **P/F** (standard shadow-map literature + practice) |
 | Specular/normal aliasing fixed by roughness-encoding normal mips (Toksvig/vMF family) | **P** (Toksvig 2005; Olano & Baker 2010, LEAN/vMF family) |

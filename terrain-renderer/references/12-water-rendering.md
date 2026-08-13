@@ -90,7 +90,8 @@ the reference implementation or read off a photograph, not supposed.
 | The seen bottom reads bright against the sky reflected in the same pixel, and no exposure fixes both at once | **Radiance is not conserved across a refracting interface** — `L/n²` is. The reflected column is air-side and right; the transmitted one is an in-water radiance shipped without its `1/n²`, so it is 1.78× hot. A *relative* error inside one pixel, which is why a grade cannot absorb it | [Radiance is not conserved](#radiance-is-not-conserved-across-the-interface) |
 | A submerged wall is too dark, and adding more bounce does not help | The refracted sun does not reach it. A surface lit only by a neighbouring diffuse one is capped at **half its own albedo** times that neighbour's radiance — the form factor to an adjoining infinite plane is exactly ½ — so a floor-lit wall is *necessarily* darker than the floor and no gather can be tuned past it | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
 | A submerged step's riser, or a shaded wall face, renders flat and near-neutral grey | The third symptom of that same missing leg: the receiver gets **no direct sun and one flat ambient**, so a grazing sky reflection wins by default and the bounce that should carry both colour and the caustic net is absent | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
-| A shadowed region on the bed is a dark hole | The sun-visibility gate treated as **binary** when the occluder is fabric or foliage. Shade cloth transmits ~15–30% *diffusely*: the caustic term is still gated hard to zero, and an ambient term belongs underneath it | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
+| A shadowed region on the bed is a dark hole | Two mechanisms, and the second is the bigger one. The sun-visibility gate treated as **binary** when the occluder is fabric or foliage (shade cloth transmits ~15–30% *diffusely*) — and, for **any** occluder including a fully opaque one, the refracted beam's own wander under the slope field, worth 87 mm against a 221 mm shadow at a 21° sun | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
+| An **opaque** object's shadow on the bed reads as a reduction rather than a hole, and translucency is reached for to explain it | The **surface**, not the occluder. A facet tilted by `ε` swings the transmitted ray by `\|1 − cos θ_i/(n cos θ_t)\|·ε` — 0.6241 at a 21° sun against 0.2508 at noon — so the field that writes the caustic net smears the shadow's edges into its own interior. The umbra's core really is zero; the fill is transport | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
 | The caustic pattern plays across a shadow on the bed | The same gate missing altogether, or sampled at the **receiver** instead of at the surface entry point — metres apart at low sun. Nothing else announces "this is a scrolling texture" so loudly | [The masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped) |
 | Caustics keep moving after the water has gone calm | An authored or cell-noise caustic, **uncorrelated with the surface above it**. A flat surface has a constant Jacobian and produces no caustic structure at all | [The tier ladder](#the-tier-ladder) |
 | The caustic net fades while the water still looks perfectly clear | Rising `b`, and this is scattering's **first** symptom: contrast along the sun path halves at `b ≈ 0.35 m⁻¹`, where Secchi depth is still ~3 m. A body colour is the *fourth* symptom, not the first | [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) |
@@ -113,6 +114,11 @@ the reference implementation or read off a photograph, not supposed.
 | A water-to-deck ratio disagrees with the reference, and the low sun is offered as the explanation | Both are **horizontal receivers**, so `sin h` and the air-mass attenuation are identical on them and cancel exactly in the ratio. What does *not* cancel is only the Fresnel entry share and the slant path — 1.25× between a 21° and a 57° sun, and nothing beyond that is available | [The illuminant is part of the comparison](#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not) |
 | Absolute sRGB triples read off a reference photograph will not reconcile with the render, and the disagreement changes between frames of the same pool | The camera, not the renderer: automatic white balance rescales chromaticity toward neutral hardest where the subject is most saturated, a display tone curve rescales level non-uniformly, and a Display P3 file read as sRGB shifts a water pixel's R/B by 28–52% while leaving the stone beside it near-untouched | [`11`, seven ways](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one) |
 | Every vertical surface under the water is streaked with fine vertical bars that do not change up the face — walls, risers, pilings, a hull | The caustic map sampled at the receiver's own world `(x, y)`, with **no height term**. A bed pattern with structure at its texel scale and none in `z` is a comb. Not a resolution problem: quadrupling the map and the gather moved it by 0.7% | [A caustic on a vertical face](#a-caustic-on-a-vertical-face-is-not-the-beds-pattern-at-that-faces-own-position) |
+| A pool interior is too dark by a factor of two to seven, or washed out, and every constant that fixes it breaks the surface | **"Surface reflection" taken in the wrong sense.** One interface carries two diffuse constants: `R_ext = 6.669%`, a loss on the way in, and `R_int = 47.617%`, a trap on the way out. They differ by **7.14×**; swapping both is **2.37×** of darkness, and swapping only the internal one desaturates while passing every luminance check | [Surface reflection names two opposite things](#surface-reflection-names-two-opposite-things-a-loss-and-a-trap) |
+| Everything near the rim of Snell's window is mush in an underwater shot while the zenith is fine — the shoreline, a jetty, a person standing at the edge | The environment indexed from **below**. Snell's Jacobian `cos θ_a/(n² cos θ_w)` vanishes at grazing, so the entire air world under 10° of elevation lands inside **3.75%** of the window's solid angle. A `θ_w`-uniform lookup starves that annulus 8.5× and over-serves the zenith 7.6×. Index by the air-side cosine instead | [What the window actually contains](#what-the-window-actually-contains-and-why-the-rim-is-where-the-world-is) |
+| An overhead occluder — a shade sail, a canopy, a hull — expected to fill Snell's window and barely appearing in it | The same Jacobian, run forwards. A panel 8–12 m away and 2.4 m up sits at **72–77° from the vertical**, which Snell compresses into **1.44°** of polar angle. What dominates a window instead is whatever stands at the observer's own edge, seen at grazing all the way round | [What the window actually contains](#what-the-window-actually-contains-and-why-the-rim-is-where-the-world-is) |
+| A floating body shows no refracted split at its waterline, and the refraction is checked and correct | Its own **meniscus** hides it. The split needs `R(1 − sin(β + θ_w)) > z_w·sin θ_w`; on a 221 mm ball a 2.31 mm climb beats the left-hand side by 22.6×. "No split" is a prediction with a threshold — and with `z_w = 0` the threshold is still a draught over **12.55%** of the diameter, which no inflatable reaches | [`12a` §3](12a-water-derivations.md#a-floating-body-and-the-split-its-own-meniscus-hides) |
+| One surface in the frame is off by a factor near 3.14 and everything around it is right | An **irradiance used as a radiance**. `E` and `L` differ by π and a shading term, and nothing in a shader's types says which a triple holds. A bare constant near 3.14 or 0.318 in a shading term with no derivation beside it is this bug | [`11`, an irradiance used as a radiance](11-verification-failures.md#an-irradiance-used-as-a-radiance) |
 | A submerged wall reads sky-coloured and structureless while its level looks about right | The upper half of a vertical face's hemisphere filled with sky. It is **22% Snell window and 78% mirror**; a flat `0.5` over-gives the sky by ×1.96 and under-gives the pool's own upwelling field by the same partition, so level survives while hue and caustic structure do not | [What a submerged vertical face sees of the sky](#what-a-submerged-vertical-face-sees-of-the-sky) |
 | Water is subtly dark after a lookup table replaced a computed transport, and no index or format bug explains it | An integral **split into two tables and multiplied**. Attenuation and escape share the water-side cosine and are correlated `+0.76`, so the product of the means understates by 19.4% in red; the trapped leg is correlated the other way, so the composed result moves only 2.8% and hides it | [Attenuation and escape do not factorise](#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them) |
 | The suite is green, has been green for months, and the picture is visibly wrong in the quantity the suite is named after | A test that **borrows one name and writes the rest itself**: its own inputs, its own transport, a physics identity for a right-hand side. It exercises one function and certifies a law that would hold for almost any implementation | [`11`, the eighth way](11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement) |
@@ -781,6 +787,10 @@ from the water side presents the same water→air interface as the surface seen 
 the same critical angle, and the cosine-weighted flux beyond it is `1 − 1/n²` = **43.72%** at
 `n = 1.333` and **43.874%** at this chapter's own green IOR of 1.3348 (`D`, recomputed; it runs
 43.64 / 43.87 / 44.31 % across the IOR triple, so it is barely chromatic and one figure is honest).
+That is the *geometric* part of the internal reflectance and not the whole of it: the full diffuse
+`R_int` is **47.617%**, of which `1 − 1/n²` is 92.1% and partial Fresnel inside the cone is the
+remaining **3.743%**. Use `1 − 1/n²` for a bubble wall, which is a per-direction mirror, and `R_int`
+for a hemispherical average — [both, and the loss neither of them is](#surface-reflection-names-two-opposite-things-a-loss-and-a-trap).
 Every bubble wall mirrors that share of everything striking it: one bubble reads silvered, a cloud
 of them reads white and opaque. A renderer that gets Snell's window right and takes foam whiteness
 from a painted albedo has special-cased one of the two faces of a single number. And **foam is
@@ -1197,8 +1207,10 @@ So the contract is two lines, and the second is the interesting one:
     liner  : base_color, base_weight, specular_roughness    # the boundary -- albedo, and wet vs dry
 
 **Liner albedo is not proportional to what you see, and that surprises people.** Light that returns
-from the liner meets the underside of the surface, where a diffuse internal reflectance of
-`R_int ≈ 0.476` sends about half of it back down for another bounce. That trapped series — the
+from the liner meets the underside of the surface, where the diffuse **internal** reflectance
+`R_int = 0.47617` sends about half of it back down for another bounce — the *trap* sense of
+"surface reflection", 7.14× the 6.669% loss the same surface applies on the way in, and the two are
+told apart in [their own section](#surface-reflection-names-two-opposite-things-a-loss-and-a-trap). That trapped series — the
 ordinary geometric interreflection sum, under a name that is this chapter's own — is
 `1/(1 − ρ·R_int)`, so its *gain* rises with the albedo — and a dark liner therefore loses twice,
 once on each return and again on the bounces it never gets:
@@ -1213,8 +1225,9 @@ once on each return and again on the bounces it never gets:
 | Anthracite / black | 0.05 | 1.02× | 0.05 | **0.04** |
 
 A black liner returns **4%** of what a white one does where its albedo is 6% of it (`D`). That is
-why an anthracite pool reads almost as a mirror — with nothing coming back from below, the surface
-reflection is all that is left, and the body goes near-black. It is also why the same water, the
+why an anthracite pool reads almost as a mirror — with nothing coming back from below, the
+**external** reflection `R_ext` is all that is left (6.669% diffuse, 2.06% at normal incidence and
+rising steeply toward grazing), and the body goes near-black. It is also why the same water, the
 same sun and the same depth can look like the Caribbean or like a slate tank: **you are choosing
 the pool's colour when you choose its lining, not when you tint its water.**
 
@@ -1225,7 +1238,7 @@ Two consequences for how a scene is authored:
   white bottom — three things a photograph refutes immediately.
 - **Wet is not dry.** The liner above the waterline and the same liner below it are one pigment,
   but the wet one reads `(0.85, 0.79, 0.82)` of the dry (`D`), because the water film adds an
-  internal reflection the dry surface does not have. That makes the dry band a **free calibration
+  internal reflection — `R_int` again, the trap sense — that the dry surface does not have. That makes the dry band a **free calibration
   target**: it is the pigment with no water path, no interface and no `n²` between it and the eye,
   so it pins `rho` on its own — and the ratio between it and the submerged bed then pins the
   absorption path. Two measurements from one photograph, and neither needs a reference chart. That
@@ -1511,8 +1524,8 @@ the trapped series legitimately returns more than one bounce's worth to the bed.
 with the escape leg on it, which is where `1 − R_int` and the [`1/n²`](#radiance-is-not-conserved-across-the-interface) live.
 
 **But `R_int` is the wrong constant for a bed at depth — it is an upper bound, and a chromatic one.**
-The reflectance that closes the series for a *submerged* bed is not the diffuse surface constant but
-the round-trip return `G_rt(τ)` of [Attenuation and escape do not
+The reflectance that closes the series for a *submerged* bed is not the diffuse **internal** constant
+but the round-trip return `G_rt(τ)` of [Attenuation and escape do not
 factorise](#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them): the
 light must cross the column **twice** before it is back on the bed, so the denominator is
 `1 − ρ·G_rt(τ)`, and `G_rt → R_int` only as `τ → 0`. On this chapter's own pool
@@ -1831,7 +1844,9 @@ color = lerp(refracted_underwater, reflected_environment, Fresnel(NdotV))
 ```
 
 - **Fresnel** is the blend, and its `F0` comes from the body's index of refraction — a
-  **per-body** value, not a constant. Fresh water is IOR 1.33 → `F0 = ((1.33−1)/(1.33+1))² ≈ 0.02`,
+  **per-body** value, not a constant. It is the **external** reflectance, the one a camera in air
+  meets; the same interface returns 7.14× as much to light arriving from *inside*, and conflating
+  the two is [its own failure](#surface-reflection-names-two-opposite-things-a-loss-and-a-trap). Fresh water is IOR 1.33 → `F0 = ((1.33−1)/(1.33+1))² ≈ 0.02`,
   **half** the generic dielectric default of 0.04 (which is IOR 1.5, glass/plastic); ship the
   default and calm water reads too reflective and faintly plastic even before the
   distance-filtering problems compound it. But natural liquids span IOR ~1.31–1.47 (ice → seawater
@@ -1915,9 +1930,77 @@ descriptor — ocean, clear lake, and turbid river must not share one global con
   space — expensive, hero-camera only). The untreated version — one frame of neither-state
   garbage at the crossing — is a certified review catch.
 
+### Surface reflection names two opposite things: a loss and a trap
+
+Everything above says "Fresnel", "surface reflection" or "reflectance" and means one of **two**
+numbers. They are the same interface read from its two sides, they differ by **7.14×**, and they push
+a pool's interior in opposite directions. This chapter used both senses under one word for its whole
+run; a reader who takes the wrong one is out by that factor, in the direction that makes the water
+too dark. Fix the vocabulary before quoting any transport figure below.
+
+| | seen from **above** — `R_ext` | seen from **below** — `R_int` |
+|---|---|---|
+| what it is | light arriving from the air that **never enters** the water | light arriving from the water that is **turned back into** it |
+| it behaves as | a **loss**: subtract it once, on the way in | a **trap**: it multiplies, `1/(1 − ρ·R_int)` |
+| diffuse constant at `n = 1.3348` | **6.669%** | **47.617%** |
+| at normal incidence | 2.056% | — (the whole cone is sub-critical; use `R(θ)`) |
+| at 32.78° incidence — a 57.22° sun | **2.217%** | — |
+| at 68.98° incidence — a 21.02° sun | **12.241%** | — |
+| past `θ_c` = 48.519° | no critical angle exists from the thin side | **exactly 1** — total internal reflection |
+| where it belongs | the entry fee on the sun and on the sky; the reflected column of a water pixel; the sky a poolward band sees *in* the water (`sin²θ`-weighted mean **0.2112**) | the denominator of the trapped series; the diffuse escape `1 − R_int`; the mirror outside Snell's window, which fills 78% of a submerged vertical face's upper half |
+
+(`D`, exact unpolarised Fresnel and 2000-node quadratures recomputed here on this chapter's IOR
+triple; the derivation, the per-channel spread and the discontinuity that has to be split out of the
+internal integral are [`12a` §7](12a-water-derivations.md#one-interface-two-diffuse-reflectances).)
+
+**The two are tied, so getting one right does not license guessing the other.** Walsh's relation
+
+```
+n^2 (1 - R_int) = 1 - R_ext          0.933310 vs 0.933310 at n = 1.3348
+```
+
+holds on independent quadratures of the two index pairs to **6×10⁻¹¹**. It is the same identity that
+[pins the `1/n²`](#radiance-is-not-conserved-across-the-interface) on light leaving the medium, and
+it is a guard rather than a definition precisely because neither side is computed from the other.
+
+**The internal one decomposes exactly, and its larger piece is not Fresnel at all.**
+
+```
+R_int  =  (1 - 1/n^2)   +   partial Fresnel inside the cone
+       =    43.874%     +        3.743%       =  47.617%
+```
+
+**92.1% of the internal return is total internal reflection** — pure geometry, `cos²θ_c`, no Fresnel
+evaluation in it — and 7.9% is the partial reflection of sub-critical rays. That is why `1 − 1/n²`
+gets used *as* `R_int`: the two are 3.74 points apart, small enough to hide and large enough to cost
+1.9% of a red trap and 12.2% of a blue one
+([the truncation table](#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point)).
+
+**And `1 − 1/n²` is the same constant that whitens foam.** An air bubble seen from the water side
+presents the same water→air interface as the surface seen from below, so it has the same critical
+angle and mirrors the same 43.874% of everything striking it. One number runs the mirror outside
+Snell's window and the opacity of whitewater — see
+[Aerated water](#aerated-water-foam-spray-and-whitewater), where it arrives from the other end. A
+renderer that derives one face of it and paints the other has split a single constant in two.
+
+**What the confusion costs, priced.** On this chapter's liner (`ρ_bed = 0.222 / 0.585 / 0.681`):
+
+| the wrong sense | what it does |
+|---|---|
+| `R_ext` (6.669%) used as the internal return | the trapped gain falls `1.386 → 1.041` in green: **−9.2 / −24.9 / −29.2 %** per channel. Chromatic, so it **desaturates** rather than darkens, and survives a luminance check |
+| `R_int` (47.617%) used as the external loss | the surface rejects 47.6% of the sun instead of 6.7% — the water takes **0.561×** the light, flatly and achromatically |
+| both, which is what one symbol produces | **0.421×** in green — the interior is **2.37× too dark**, and no exposure fixes it because the reflected column of the same pixel is untouched |
+
+(`D`, arithmetic here on the constants above.) The rule that prevents it is the same one this chapter
+applies to `c` versus `K_d` and to per-axis versus total slope: **name the convention once, upstream
+of every consumer.** Two symbols, `R_ext` and `R_int`, never one `R_surface`; and where a number is
+quoted, say which side of the boundary the light was on and whether it is a hemispherical mean or a
+`R(θ)`.
+
 ### Radiance is not conserved across the interface
 
-The composition at the top of this section reads as a blend of two radiances, and it is not one.
+The composition at the top of [Shading and optics](#shading-and-optics) reads as a blend of two
+radiances, and it is not one.
 The reflected term is measured in **air**; the refracted term — bottom albedo times the irradiance
 that got through the surface — is measured in **water**, and radiance does not survive a change of
 index. What is invariant along a pencil is **`L/n²`**, because the étendue `n² dA dΩ` is. So the
@@ -1936,8 +2019,10 @@ one half of a pixel. This project shipped the omission for its whole run.
 
 **The diffuse form, and the trap that follows it.** For a Lambertian source under the surface the
 same transport integrates to `(1 − R_ext)/n² = 1 − R_int` — **0.526 / 0.524 / 0.519** on those
-IORs, Walsh's relation, and the same `R_int ≈ 0.476` that drives the [trapped
-series](#the-two-materials-a-pool-actually-has-and-neither-is-water). A renderer will happily carry
+IORs, Walsh's relation, and the same `R_int = 0.47617` that drives the [trapped
+series](#the-two-materials-a-pool-actually-has-and-neither-is-water). Note which reflectance is on
+which side of it: the numerator's is the **external** 6.669% and the result's is the **internal**
+47.617%, and [they are not the same number](#surface-reflection-names-two-opposite-things-a-loss-and-a-trap). A renderer will happily carry
 that on **one** route out of the interface and not on another: `reference-impl` had a hand-written
 `0.5` on the diffuse route (upwelling radiance onto the surrounding stone) while the camera's own
 route through the `lerp` had nothing at all. Two exits from one interface disagreeing by `n²`, with
@@ -2406,6 +2491,95 @@ coping, a mooring line — must **step in scale** through a flat port and run **
 dome. A frame whose halves match while claiming a flat port has not chosen a port at all. And the
 magnification is the *interface*, not the water: a camera fully submerged with no port sees none,
 because nothing refracts between it and the subject.
+
+### What the window actually contains, and why the rim is where the world is
+
+The section above says the above-water world compresses into a 97°-wide cone. This one says **where
+inside that cone it lands**, because that is not uniform, and the non-uniformity decides how an
+underwater frame is sampled and what an overhead occluder is worth. The map is Snell's law
+differentiated, and it is derived in
+[`12a` §7](12a-water-derivations.md#the-window-from-below-snells-jacobian-and-where-the-horizon-goes):
+
+```
+dOmega_w / dOmega_a  =  cos(theta_a) / ( n^2 cos(theta_w) )        theta_a = angle in AIR
+                                                                   theta_w = angle in WATER
+INT over the air hemisphere  =  2 pi (1 - cos theta_c)  =  2.12139 sr        at n = 1.3348
+```
+
+**The law: refraction crushes the whole low-elevation air world into a narrow annulus just inside
+the rim.** The numerator vanishes at grazing, so the concentration diverges there:
+
+| air, `θ_a` from vertical | elevation | lands at `θ_w` | share of the **air hemisphere** beyond it | share of the **window** beyond it |
+|---|---|---|---|---|
+| 60° | 30° | 40.45° | 50.00% | 29.20% |
+| 70° | 20° | 44.75° | 34.20% | 14.17% |
+| 80° | 10° | 47.54° | 17.36% | **3.75%** |
+| 85° | 5° | 48.27° | 8.72% | **0.95%** |
+| 89° | 1° | 48.51° | 1.75% | **0.04%** |
+
+(`D`, closed form recomputed here.) Half the sky sits in the outer 29% of the window; everything
+under 10° of elevation — which is where a shoreline, a jetty, a hull, a person at the pool edge and
+the horizon itself all live — is inside **3.75%** of it.
+
+**So an environment lookup indexed naively from below is wrong in a specific direction.** Spread
+samples uniformly in `θ_w`, or uniformly across the window disc, or over an equal-area map of the
+*water-side* hemisphere, and the resolution follows `dΩ_w`, which is the wrong measure by exactly
+that Jacobian. Priced on a `θ_w`-uniform radial map: the innermost 10° of `θ_w` takes **20.6%** of
+the radial samples for **2.72%** of the air hemisphere (over-served 7.6×, and it is the zenith, where
+a sky is smooth and slowly varying), while the outermost 1° takes **2.06%** for **17.58%**
+(starved 8.5×, and it is where the entire horizon is stacked). The correct radial variable is the
+**air-side cosine**, `v = cos θ_a = √(1 − n² sin²θ_w)`, which runs 1 at the centre to 0 at the rim
+and is uniform in air solid angle by construction. The operational form is shorter than the algebra:
+**refract first, look up second** — index the environment by the air direction and let Snell's law
+choose the sample. A cached window-space disc is only defensible if its radial coordinate is `v`.
+
+**What is actually up there, measured two ways.** On this chapter's reference pool — a basin under a
+shade sail, with a coping, a deck and a float — the window's solid angle divides as (`D`):
+
+| what a refracted ray finds above the water | route 1 · off the frame | route 2 · off the hemisphere |
+|---|---|---|
+| the pool's own edge — band, bead, bullnose, in section | 0.4520% | **0.9888%** |
+| the shade sail | 0.3025% | **0.0660%** |
+| a float on the surface | 0.2406% | **0.0697%** |
+| still sky | 99.0049% | **98.8755%** |
+
+Route 1 weights every transmitting subsample of a rendered underwater frame by the solid angle a
+rectilinear pixel subtends (`cos³` of the angle off the optical axis). Route 2 never touches a
+camera: it samples the **air** hemisphere stratified in `cos θ_a` from points on the surface and
+weights each direction by the Jacobian above — the estimator closing on **2.12138 sr** against the
+window's own **2.12139 sr**, which is what makes those percentages shares *of* something.
+
+**Two things fall out, and the second is the one nobody predicts.** The sail was expected to be a
+large dark shape overhead and is not: it stands 8–12 m away and 2.4 m up, and subtends **72–77° from
+the vertical in air** (measured across the panel; a bare `atan(2.4 / 8…12)` from a point *on* the
+surface gives 73.3–78.7°, and the degree between them is the observer's own depth). Snell compresses
+that whole band into **1.44°** of polar angle just inside the rim. It is a
+real dark shape, it is legible in the frame, and it is a **fifteenth of a percent** of the window.
+What dominates instead is **the basin's own edge section, seen at grazing all the way round** — the
+freeboard band, the bead and the bullnose, in section, at 15× the sail. The general form of that is
+the law above: at 72° in air a receiver is already inside the outer 12% of the window, and *every*
+horizontal direction the observer has is stacked there.
+
+**And the deck is not reachable from below at all**, which is the shape of the answer rather than a
+detail. An upgoing ray in air that has cleared the coping never comes back down, and one that has not
+cleared it met the vertical face first — so a poolside window contains the coping **in section** and
+no paving, whatever the paving is made of. That is a geometric statement about any raised edge, and
+on the reference implementation it is asserted against a 0.2 mm march of the edge profile rather than
+argued (`D`).
+
+**The two routes disagree by up to 4.6× on individual entries and agree on the total to 0.13
+percentage points, and that is not a discrepancy.** A frame samples what its camera happens to see —
+here the sail and the float are both in shot and most of the far coping is not — so route 1 answers
+*what is this picture spending its window on*, a cost and visibility question. Route 2 samples the
+hemisphere, so it answers *what does the window contain*, a property of the scene and the interface
+with no camera in it. **Quote route 1 for a budget, route 2 for the physics, and never take an entry
+from one against a total from the other.** That generalises past water: any percentage measured by
+binning a render is conditioned on the framing, and the fix is not a better frame but a second
+estimator that has no frame at all.
+
+`?` What is still open on the reference implementation's own audit: **neither route guards the
+other** — they are two reports, not a check — and the only guarded quantity in the pair is the
+Jacobian's closure. A binning error common to both would not show.
 
 ### Water-body optical identity: where the IOPs come from
 
@@ -3031,6 +3205,23 @@ sunLighting += caustic;                                       // 4. irradiance, 
    most of it, and a `1/(1 + (d/R)²)` falloff about the centroid is enough. Ship the binary
    version and the shadowed water goes far too dark, losing the cue that actually reads: under a
    shade sail the caustics vanish while the water stays luminous.
+   **And a shadow on the bed fills in even when the occluder is perfectly opaque, by a mechanism
+   that is not the occluder's at all.** The same slope field that writes the caustic net swings the
+   refracted beam: a facet tilted by `ε` moves the transmitted direction by
+   `|1 − cos θ_i/(n cos θ_t)|·ε` — **0.2508** at normal incidence, which is the `1 − 1/n` of [the
+   focusing number](#the-focusing-number-which-regime-the-bed-is-in), and **0.6241** at this
+   chapter's 21° sun, so a low sun wanders a shadow 2.5× harder than a high one. Over the slant to
+   the bed that is a *displacement*: a one-axis slope rms of 0.0712 over 1.96 m moves the beam's
+   landing point **87 mm** rms, against a floating ball's shadow only **221 mm** wide across the
+   beam. Measured on that shadow: the geometric umbra is 0.0800 m², the umbra the caustic map
+   actually holds is 0.0131 m² — **84% of it is filled in** — with bed radiance **72.8%** of the
+   open floor inside it and the net's own contrast still **61.5%**, i.e. legible (`D`). The umbra's
+   core is genuinely zero: a rubber ball transmits nothing. So *a shadow under water is a reduction
+   rather than a hole* is true of **opaque** occluders too, and attributing it to translucency
+   installs a second, wrong mechanism on top of a real one. **The net inside the shadow and the
+   softness of its edge are one mechanism, and it is the mechanism that writes the caustics.**
+   Diagnostic consequence: if a shadow's fill does not respond to sun elevation and to slope
+   variance, it is being painted rather than transported.
 4. **Caustics are irradiance.** They multiply the sun's contribution to the receiver's BRDF; they
    are not added to albedo or to the final colour. Backwards, and they survive into shadow, into
    ambient-only lighting and into fog, and they stop responding to exposure.
@@ -4035,7 +4226,7 @@ above except the TotK physics talk is community reconstruction or press/footage 
   shadows lift, then distance hazes — a body colour is the *fourth* symptom of rising `b`, and the
   first three are a contrast multiplier and a haze term away.
 - **Chrome-dome horizon**: plain Schlick Fresnel on a low-variance distant ocean drives grazing
-  reflectance to ~100%. Use the roughness-aware Fresnel fit and keep Smith masking in the sun lobe.
+  **external** reflectance to ~100%. Use the roughness-aware Fresnel fit and keep Smith masking in the sun lobe.
 - **Whitecaps shimmer or vanish at distance**: a binary per-pixel Jacobian threshold cannot be
   filtered. Switch to prefilterable statistical coverage over the footprint's Jacobian mean and
   variance; ground the amount against `W = 3.84e-6·U^3.41`.
@@ -4054,8 +4245,8 @@ above except the TotK physics talk is community reconstruction or press/footage 
   opposition to the flow field (wave–current interaction, above); where flow data shows no
   rip/outflow, the missing feature is generation-side — route to terrain-architect.
 - **Water too reflective / faintly plastic even when calm**: Fresnel `F0` left at the generic
-  dielectric 0.04 (IOR 1.5). Water is IOR 1.33 → `F0 ≈ 0.02`; the default doubles surface
-  reflectance.
+  dielectric 0.04 (IOR 1.5). Water is IOR 1.33 → `F0 ≈ 0.02`; the default doubles the **external**
+  reflectance — the 6.669%-diffuse one, not the 47.617% the same surface shows from below.
 - **Every liquid equally reflective**: `F0` hardcoded to water's value. Brine, oil and meltwater
   differ (IOR ~1.31–1.47, `F0` ~0.018–0.036); take `ior` from the `liquidBody` descriptor into
   `specular_ior`.
