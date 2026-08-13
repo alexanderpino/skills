@@ -1050,3 +1050,73 @@ rather than a spatial one.
 asking for — a frame of the swash retreating down a beach face, where the sheet
 flow is visibly loaded, would pin the one mechanism none of these nine frames
 catches.
+
+---
+
+## A second scene: a beach with rocks — and why it is a better instrument, not just a better picture
+
+Owner: *"Voor de golven moeten we misschien een andere scene maken. 1 met een
+realistisch strand en wat rotsen."*
+
+**Agreed, and the argument is not aesthetic.** The pool is a bounded basin with a
+constant depth; a beach is a *depth field going to zero*, and that is what makes
+shoaling, refraction and breaking happen at all. None of them are reachable in the
+pool at any effort.
+
+### What changes structurally
+
+| | pool | beach |
+|---|---|---|
+| depth | constant 1.40 m | a field → 0 at the shoreline |
+| domain | closed, four walls | open offshore; the beach and rocks are the reflectors |
+| waterline | fixed at a bead track | **sweeps the beach face every few seconds** |
+| forcing | a jet, from inside | a swell arriving from outside |
+
+The moving waterline is the one that matters most: it is a **moving boundary**,
+and it is where the sand and the turbidity of the surf zone come from.
+
+**Rocks earn their place for a reason beyond breaking-on-hard-objects.** They give
+a **fixed fiducial in frame** — something whose scale and position do not change —
+without which wave motion is not measurable. The pool had walls for this; open
+water has nothing.
+
+### The real argument: a beach carries more closed forms than the pool did
+
+This project runs on quantities that can be checked against something other than
+the render. A beach supplies four the pool could not:
+
+- **Shoaling** — wave height grows as `h^(−1/4)` (Green's law) in the shoaling zone
+- **Refraction** — crests turn parallel to the depth contours; Snell for water
+  waves, with a real `c(h)`
+- **The breaker index** — waves break near `H/h ≈ 0.78`
+- **Run-up** — scales with the Iribarren number
+
+Each is a prediction readable off the scene and checkable against literature, in a
+suite that already has three tiers for exactly this.
+
+### Two conditions for it to remain a reference rather than a picture
+
+1. **The geometry stays analytic.** The pool's is: an SDF in plan, the bed as a
+   field, cylinders for the risers. A beach must match — a **Dean equilibrium
+   profile** `h = A·x^(2/3)` gives a real beach shape from one parameter, and rocks
+   as simple analytic solids. A sculpted mesh is unverifiable and ends the
+   project's central claim.
+2. **The wave field arrives from outside**, with a stated offshore spectrum and
+   direction, so that **shoaling and refraction are outputs and not inputs**. A
+   field authored to look like it has shoaled proves nothing.
+
+### A staging that defers the hard part
+
+In the shoaling zone the free surface is **still a graph** over the plane. Only the
+plunging lip is not. So the existing representation reaches a long way, and the
+multivalued surface can be held back as the *last* problem rather than the first —
+build the beach up to the point of breaking, verify it against the four closed
+forms above, and take the overturning lip separately.
+
+### The pool stays
+
+It is the calibrated reference: nine photographs, a computed sun, 268 guarded
+tests, and every constant above the water derived but one. The beach is a **second
+reference**, not a replacement. Its intake is the owner's surf and coast
+photographs, from a known place — so the sun is computable there too, and the bar
+can be written the same way this one was.
