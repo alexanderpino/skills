@@ -1206,3 +1206,39 @@ instrument lying, but the **source not being what the timestamp implies**. The
 project's own rule already covers it — *you cannot compare a render to a
 photograph until you know that photograph's illuminant* — and an eclipse is that
 rule's extreme case.
+
+### Owner ruling: the pool does not disappear when the beach arrives
+
+> *"Als we een 2e scene bouwen, met strand, moet het zwembad niet verdwijnen."*
+
+Recorded as a ruling because the default outcome of a second scene is a **fork
+that drifts**, and drift here is fatal: two references that disagree leave neither
+trustworthy.
+
+**What it concretely requires**
+
+1. **The pool's hero frame stays bit-for-bit reproducible.** That contract has
+   caught several defects in this session alone, and it is the check on every
+   refactor the beach makes necessary.
+2. **The suite stays green on the pool** — currently 268 pass / 0 FAIL, much of it
+   pool-specific: the basin, the liner, the step unit.
+3. **Shared physics is shared, not copied.** `fresnel`, `refract`, `out_of_water`,
+   the trapped-series closed forms, the atmosphere, the solar position: **one**
+   implementation, used by both scenes. Copies drift, and this session already
+   found the same failure in miniature — two "independent methods" in `validate.py`
+   both transcribed from the same comment, so they agreed on a wrong number.
+
+**The shape, therefore: extract the physics, keep the scene definitions
+separate.** Not one file with flags, not a fork. `field.py` and `wake.py` are
+already out; what remains inside `render.py` is the optics and the atmosphere.
+
+**And the extraction happens *before* the beach, not after.** Building first and
+splitting later is exactly how the fork happens — by then the two scenes have
+already grown their own copies.
+
+**The upside, which is not merely defensive.** A second scene is the strongest
+available test that the physics module is genuinely scene-independent. If the
+beach needs a special case inside the Fresnel code, something was wrong all
+along — and one scene could never have revealed it. The same argument this project
+already makes about the underwater camera: a view that cannot be tuned
+independently is the one that finds what tuning hid.
