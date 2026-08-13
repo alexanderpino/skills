@@ -868,13 +868,18 @@ depends on it.
 `min` cap remains the right two-line answer for *where the surf zone begins* on a monotone ramp
 — which is what a graph node that only needs a break mask is asking.
 
-**`d_bar ≈ H_b/γ` — attacked and standing, with one caveat about your grid.** This is the
-section's central quantitative prediction and it has now been run at rather than assumed. The
-implementation above swept five sea states from `H_0 = 1.0` to `3.0 m` and reported the crest
-consistently *shallower* than predicted, closing as the waves grew — which looks exactly like a
-missing term that matters at small `H_b`:
+**`d_bar ≈ H_b/γ` — attacked twice and standing, and the second attack corrected the first.** This
+is the section's central quantitative prediction and it has now been run at rather than assumed.
+Two rounds against it are recorded below **in the order they happened**, because the second
+overturns the first's *explanation* while keeping its numbers, and a reader who sees only the
+conclusion will not know which parts of the reasoning are safe to reuse.
 
-| `H_0` | `H_b` | `H_b/γ` | measured crest depth | ratio |
+**Round 1 — the shortfall, and a trend across sea states.** The implementation above swept five
+sea states from `H_0 = 1.0` to `3.0 m` and reported the crest consistently *shallower* than
+predicted, closing as the waves grew — which looks exactly like a missing term that matters at
+small `H_b`:
+
+| `H_0` | `H_b` | `H_b/γ` | crest depth **read from the raw bed** | ratio |
 |---|---|---|---|---|
 | 1.0 m | 1.306 m | 1.675 m | 1.367 m | 0.82 |
 | 1.5 m | 1.820 m | 2.333 m | 2.084 m | 0.89 |
@@ -882,36 +887,133 @@ missing term that matters at small `H_b`:
 | 2.5 m | 2.776 m | 3.560 m | 3.394 m | 0.95 |
 | 3.0 m | 3.234 m | 4.146 m | 4.010 m | 0.97 |
 
-**It is mostly the grid, not the physics, and this is the correction to the *finding* rather than
-to the chapter.** Refining the cross-shore spacing at fixed sea state moves the ratio the same way
-raising the sea state does, and by a comparable amount:
+~~**It is mostly the grid, not the physics, and this is the correction to the *finding* rather
+than to the chapter.**~~ ~~The apparent dependence on `H_b` is a dependence on **cells per bar
+width** wearing the same trend.~~ — **struck by round 2: it is neither the physics nor the cells.
+The two numbers in that ratio were read from two different depth fields, and the whole trend is
+the difference between them.** The table below is *also* struck as an explanation and kept as a
+measurement — every cell in it reproduces, and none of it means what it was taken to mean:
 
 | `Δx` | `H_0 = 1.0 m` | `H_0 = 1.5 m` | `H_0 = 3.0 m` |
 |---|---|---|---|
 | 1.00 m | 0.816 | 0.893 | 0.967 |
 | 0.50 m | 0.930 | 0.941 | 0.981 |
-| 0.25 m | 0.950 | 0.971 | *(unstable — see below)* |
+| 0.25 m | 0.950 | 0.971 | *(the missing cell — `Δt` was left outside the bound; see hygiene, below)* |
 
-Halving the **morphological time step** at either spacing changes the ratio by `1×10⁻⁴`, so the
-time integration is converged and the space step is not. The mechanism is plain once seen: the bar
-is **9 m wide at `H_0 = 1.0 m` and 19 m at `3.0 m`**, so at a fixed 1 m spacing the *small* sea
-state's bar is the badly resolved one, and a coarse grid builds a taller, sharper crest (amplitude
-1.28 m at `Δx = 1 m` against 1.13 m at `Δx = 0.25 m`). The apparent dependence on `H_b` is a
-dependence on **cells per bar width** wearing the same trend.
+~~Halving the **morphological time step** at either spacing changes the ratio by `1×10⁻⁴`, so the
+time integration is converged and the space step is not.~~ — **struck, and it is the pivot of the
+whole error.** That check was run at `Δx = 1 m`, where `Δt = 300 s` sits at **0.40 of the
+diffusion bound** and time genuinely is converged, and its conclusion was then carried to the
+refined rows, where the *same* `Δt` sits at **1.6×** the bound at `Δx = 0.5 m` and **6.4×** at
+`0.25 m`. So round 1's fine end is partly under-resolved **time**, not a clean refinement in
+space — which is why its finest row blew up and is missing from the table rather than reported.
+**A convergence check is only valid at the spacing it was run at.**
 
-**So `d_bar ≈ H_b/γ` survives.** A residual shortfall of a few per cent may well survive
-refinement — the crest sits marginally shoreward of the break crossing, in marginally less water,
-which is geometry and is inside the `≈` — but the strong, physical-looking trend with wave height
-is largely an artefact. **The chapter is unchanged on this point, deliberately.**
+> **Correction, round 2 — the ratio straddled two depth fields, and that is the entire trend.**
+> Re-measured on the same implementation with the comparison made *within* one field
+> (`terrain-renderer/reference-impl/beach.py`, `crest_depth_ratio(tr, cr, b, field=…)`; the numbers
+> below were reproduced independently here, not relayed).
+>
+> **The two fields.** `H_b` and `d_b` are outputs of `transform()`, which does not read the bed —
+> it reads `smooth_depth(d, Δx, 1.5·Δx)`, a filtered copy, so that one-cell bed noise cannot
+> dither the break point in a loop that is writing the bed it is reading. The crest depth was read
+> off the **raw** bed. A low-pass filter always *deepens* the water over a bed maximum — to leading
+> order by `½σ²·|∂²d/∂x²|` with `σ = 1.5·Δx` — so the two terms of the ratio disagree by
+> construction, and they disagree most where the crest is sharpest.
+>
+> **The arithmetic, which is exact and settles it.** Write `δ = d_filtered − d_raw > 0` at the
+> crest. Then the two forms of the ratio differ by a term that contains no physics at all:
+>
+> > `d_bar/(H_b/γ)|raw  =  d_bar/(H_b/γ)|filtered  −  δ·γ/H_b`
+>
+> On the base scene (`H_0 = 1.5 m`, `Δx = 1 m`, 6000 × 300 s) the bar is **11 m wide at half
+> amplitude**, `δ = 0.1875 m`, and `H_b/γ = 2.3333 m`, so the offset is `0.0804` — against a
+> measured gap of `0.9734 − 0.8930 = 0.0804`. Four figures, both sides. **The shortfall was
+> `δ`.**
+>
+> **And it explains the trend in *both* tables, which is why it looked physical.** `δ` is a
+> property of the filter and the crest's curvature, not of the wave. Along the sea-state axis a
+> bigger bar is a *broader* bar (9 m at `H_0 = 1.0 m`, 19 m at `3.0 m`, measured), so a fixed
+> filter takes proportionally less off it and `δ·γ/H_b` shrinks twice over. Along the grid axis
+> the filter is `1.5·Δx`, so refining `Δx` **shrinks the filter itself**. One monotone,
+> physically plausible curve, seen down two axes.
+>
+> **The controlled experiment that separates cause from correlation**, and the reason round 1's
+> mechanism is *disproved* rather than merely displaced. Round 1 refined `Δx` and moved two things
+> at once — cells per bar width **and** filter width, which `1.5·Δx` locks together. Pin the
+> filter at **1.5 m absolute** and refine `Δx` alone:
+>
+> | filter width | cells per bar width, `Δx` = 1.0 → 0.5 → 0.25 m | raw-bed ratio, same three |
+> |---|---|---|
+> | `1.5·Δx` (shipped — filter shrinks with the grid) | 10 → 18 → 38 | 0.864 → 0.896 → **0.964** |
+> | **1.5 m, pinned** (only the resolution moves) | 10 → 19 → 34 | 0.864 → 0.870 → **0.858** |
+>
+> (`H_0 = 1.0 m`, `Δt` at 0.6 of the bound below, run length held in **seconds**.) **Cells per bar
+> width more than tripled and the ratio did not move.** The climb in round 1's `Δx` table follows
+> the filter, not the resolution.
+>
+> **The relation, measured in one field.** Refining space and time together at
+> `Δx` = 2.0 / 1.0 / 0.5 / 0.25 m the raw-bed form runs **0.834 / 0.906 / 0.942 / 0.974** — still
+> climbing, because the filter is still shrinking — while the same-field form sits at
+> **0.959 / 0.953 / 0.982 / 0.994** and is already at its answer on the coarsest grid. Read in one
+> field the relation is met to **0.953–0.998 over every grid and sea state tried** with `Δt`
+> inside the bound, and to **0.994–0.998** on the finest grid tried (`Δx = 0.25 m`, the only one
+> carrying more than 38 cells across the bar) — i.e. **within 0.6% once the bar is properly
+> resolved, and within 5% on anything coarser**. The residual is the geometry inside the `≈`: the
+> crest sits marginally shoreward of the break crossing, in marginally less water.
+>
+> **It is not asymptotic in `H_b`, which was round 1's headline.** At `Δx = 0.25 m` the same-field
+> ratio is **0.995 at `H_0 = 1.0 m` and 0.998 at `3.0 m`** — a spread of 0.3%, against the 15%
+> spread the mixed-field form shows across the same sea states at `Δx = 1 m`. The trend is gone,
+> not reduced.
+>
+> **Was round 1 wrong or merely incomplete?** Its measurements were right — every number in both
+> tables above reproduces to the digits printed. Its *mechanism* was wrong, and wrong in the way
+> that is hardest to catch: it had a real correlation, one confounded axis, and a physically
+> plausible story that fit. **Tier unchanged at P**, and the relation is stronger than before:
+> it has now been attacked twice, from two different directions, and stood both times.
 
-**Two things to take from it.** First, the **verification** below acquires a precondition:
-*before* reporting a crest-depth shortfall, halve the grid spacing and check the number moves by
-less than the shortfall. Second, the **stability limit that bites when you do**: the slope term of
-the energetics flux is a diffusion, with `D_eff = k·ε·u_orb³/(1−poros)` — measured at
-`6.7×10⁻⁴ m²/s` at the top of the sweep — so the Exner step needs `Δt < Δx²/(2·D_eff)`, which is
-**746 s at `Δx = 1 m` but only 47 s at `Δx = 0.25 m`**. Refining space without refining time is
-what produced the missing cell in the table above: the bed grew a spike of several thousand
-metres. Halve `Δx`, quarter `Δt`.
+**Numerical hygiene, kept from round 1 and re-framed.** The stability limit round 1 documented is
+real, generally useful, and **is the reason its own table has a hole** — so it survives the
+correction with its standing raised rather than lowered. The slope term of the energetics flux is
+a **diffusion**, with `D_eff = k·ε·u_orb³/(1−poros)` — measured at `6.7×10⁻⁴ m²/s` at the top of
+the sweep — so the explicit Exner step needs
+
+> `Δt < Δx²/(2·D_eff)` — **746 s at `Δx = 1 m`, but only 47 s at `Δx = 0.25 m`.**
+
+**Refining space without refining time blows the bed up.** Reproduced here as the missing cell
+itself: `H_0 = 3.0 m`, `Δx = 0.25 m`, `Δt` left at 300 s — **6.4× the bound** — and after 6000
+steps the bed carries a spike **4415 m** high. The same run with `Δt = 28 s` (0.6 of the bound) is
+healthy, closes its sand volume to `2.5×10⁻¹² m²`, and fills in the missing cell at **0.989**.
+Note which cell went missing: `D_eff` is largest at the top of the sweep, so the `H_0 = 3.0 m`
+column blows up while `H_0 = 1.0 m` at the same `Δx` and `Δt` survives — which is exactly the
+shape of the hole. **Halve `Δx`, quarter `Δt`**, and hold the run length in *seconds*, not in
+steps. Done that way the grid is **converged**: the minimum `H/d` behind the bar runs
+**0.4574 / 0.4607 / 0.4629 / 0.4625** over the four spacings — settled by 0.5 m, and moving *away*
+from the `γ_s = 0.40` threshold rather than toward it.
+
+**The finding that replaces round 1's, because it is not about beaches.** Round 1's error was not
+a coastal error and the guard against it is not a coastal guard:
+
+> **A ratio must name the field each of its terms came from.** Comparing two quantities computed
+> from **different versions of the same field** — raw against filtered, pre- against post-relaxation,
+> nodal against cell-centred, one resolution against another — is a silent error class. It does not
+> announce itself as a discrepancy, because both numbers are correct in their own field; it
+> announces itself as a **clean, monotone, physically plausible trend**, which is the most
+> dangerous possible failure, because a trend that shape *invites a physical explanation* and will
+> usually be given one.
+
+This chapter is full of places to make that mistake, because it filters on purpose: the transform
+reads a smoothed depth (`27`), the break mask reads another, and the bed is a state variable being
+written by the loop that reads it. The same trap sits wherever `06`'s masks are cut from a
+smoothed height and then compared against the raw one.
+
+**The guard is a signature, not a discipline.** Make the field an **explicit argument** rather than
+a default, so that a comparison across fields has to be *written down* to happen — the
+implementation now ships `crest_depth_ratio(tr, cr, b, field=…)` with no default field for the
+depth it reads, and carries a deliberate-defect row, `crest-depth-mixed-fields`, that puts the
+raw-against-filtered comparison back and checks that a test fires. A convention that lives in a
+signature outlives the person who knew about it; one that lives in a comment does not.
 
 **Which surf zone to author — beach states (Wright & Short 1984).** One number picks the
 template: the dimensionless fall velocity `Ω = H_b/(w_s·T)`, where `w_s` is the sand **settling
@@ -962,8 +1064,11 @@ raised; coast segments with `1 < Ω < 6` grow rips and segments outside the band
 spacing clusters around λ_rip with scatter (quasi-rhythmic, neither exactly periodic nor
 uniformly random); `flowVelocity` is nonzero in the surf band, and its jets point seaward
 through the gaps they carved (`09`). Four additions from the implementation review above, each of
-which caught something: **halve `Δx` before believing any crest-depth shortfall** (and quarter
-`Δt` with it); check the bar survives whatever **depth filter** the transform reads (`27`) by
+which caught something: **name the depth field on both sides of the ratio before believing any
+crest-depth shortfall** — the crest depth and `H_b` must come from *one* field, and on this bar
+the raw-against-filtered comparison was worth 0.08 of the ratio, which was the whole of the
+apparent shortfall — *then* halve `Δx` (and quarter `Δt` with it) to check what is left; check the
+bar survives whatever **depth filter** the transform reads (`27`) by
 measuring the crest depth in the *filtered* field, not the raw one; assert the wave's **energy
 flux is monotone non-increasing** shoreward, which the `min` cap violates and a marched transform
 cannot; and check the domain's **sand volume** to round-off, since a loop that quietly gains sand
@@ -974,9 +1079,14 @@ a reference implementation written against it (`terrain-renderer/reference-impl/
 `validate_beach.py`; the corrections are inline above, each with its file, function and number).
 **Two were corrected** — the bar's mechanism (the undertow sets relief, not position) and the
 runnable core's transform (memoryless; cannot reform). **One was extended** — the longshore
-coefficient now carries its derivation. **One was attacked and stood**: `d_bar ≈ H_b/γ`, whose
-apparent shortfall is a grid artefact. That last is a result, and it is recorded because a claim
-that has been attacked and survived is in a different state from one nobody has tested.
+coefficient now carries its derivation. **One was attacked twice and stood both times**:
+`d_bar ≈ H_b/γ`, whose apparent shortfall was first attributed to the grid and turns out to be a
+**mixed-field** artefact — the crest depth read from the raw bed and `H_b` from the filtered one.
+Read within one field it is met to within 0.6% on a grid that resolves the bar (within 5% on
+anything coarser), and its apparent dependence on `H_b` is gone rather than reduced. That last is a result, and it is
+recorded because a claim that has been attacked and survived is in a different state from one
+nobody has tested — and a claim that survived a *second* attack which overturned the first
+attack's reasoning is in a different state again.
 
 > **A gap in the tier vocabulary, stated rather than papered over.** The scheme in `SKILL.md` —
 > **P** verified paper, **F** folklore, **L** landform, **N** tool node, **?** claimed but
@@ -985,6 +1095,14 @@ that has been attacked and survived is in a different state from one nobody has 
 > whereas a citation is only as good as the reader's library access. Until the scheme has one,
 > this section carries the fact in prose. Nothing here upgrades a tier on the strength of a
 > measurement, and nothing should.
+>
+> **Still true, and now it costs more.** A second round re-read `SKILL.md` before writing the
+> correction above and the vocabulary is unchanged. The gap has widened in the meantime: this
+> section now holds a claim that has been **implemented, measured, attacked twice — once with an
+> explanation that was itself wrong — and held**, and the scheme's only way to say that is the
+> same **P** it wore before anyone ran it. **For a maintainer:** the missing mark is not a
+> convenience. Without it a reader cannot tell an untested `P` from a twice-attacked one, and the
+> difference is precisely what round 2 above exists to record.
 
 **Tier.** The loop's physics is **P**: radiation stress (Longuet-Higgins & Stewart 1962, and the
 1964 nearshore exposition), longshore current (Longuet-Higgins 1970), undertow (Svendsen 1984),
