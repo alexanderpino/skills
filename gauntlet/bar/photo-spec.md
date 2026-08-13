@@ -779,3 +779,65 @@ the observer is at the pool:
 Everything measured against these photographs so far is **relative**. Any of the
 three above makes an absolute check possible, which is the difference between
 knowing the render's proportions are right and knowing its exposure is.
+
+## K · The liner may be two materials, not one — owner hypothesis, and the render prices it
+
+> Raised by the project owner after two waves failed to produce the ordering of the
+> submerged-wall observation: *"Ik kan wel kijken of het onderwater misschien iets
+> uitgebeten is. Iets wat mogelijk wel meegemodelleerd moet kunnen worden."*
+>
+> He also closed the shading question that was put to him: *"Nee, de rand is
+> rondom donkerder."* The dry band is not darker because it is shaded. It is
+> darker on every side, which is the same orientation-independence the original
+> observation had, now confirmed on the other term of the ratio.
+
+**This is the first hypothesis that can explain the impasse, because it is not
+about light transport at all.** `render.py` uses one `LINER_TINT` above and below
+the waterline. Chlorine attacks the submerged liner continuously and UV attacks
+the dry band; there is no reason the two should end up with the same albedo, and
+**no transport term can ever produce a difference the material has.** Two waves
+built the wall's whole hemisphere and both illuminants and neither moved the
+ratio past 0.52 — consistent with the residual not being optical.
+
+**The render, whose transport is now derived and guarded on both sides, becomes
+the instrument that measures the liner.** With wall/band at 0.513 and the
+observation requiring > 1, the albedo ratio submerged:dry must be at least
+**1.95**, and because albedo cannot exceed 1 that constrains *both* sides:
+
+| dry-band luminance albedo | implied submerged | |
+|---|---|---|
+| 0.514 — **as the file models both** | 1.002 | **impossible** |
+| 0.450 | 0.877 | borderline |
+| 0.400 | 0.780 | physical |
+| 0.385 | 0.750 | physical |
+
+**So the hypothesis carries a falsifiable prediction, and it is not the one that
+was being looked for.** If the submerged liner bleaches to a pale blue-white near
+0.75, the **dry band must sit at 0.385** — about **0.75×** the albedo the file
+currently gives it. The search was for extra light on the wall; the answer, if
+this is it, is *less* pigment on the band. **The dry band should render
+noticeably darker and deeper blue than it does today**, and that is checkable by
+eye against the coping stone in any of the nine photographs.
+
+**An internal tension this exposes, and it must be settled before either reading
+is used.** Section B2b records, from the sixth photograph: *"the dry band is
+markedly **paler** than the water."* The owner now reports the band darker on
+every side. Those can both be true only if *paler* meant **less saturated** —
+chalky, greyed, bloomed — rather than **lighter**. A limed band is exactly that:
+duller in colour and darker in tone. If *paler* meant lighter, then B2b and this
+section contradict each other and one of them is a transcription error by the
+lead agent, which has happened before in this file and was corrected in place.
+
+**Question put to the owner, unanswered at time of writing:** is the dry strip
+*duller and greyer* than the water, or *lighter*? Do not resolve it by choosing
+whichever reading suits the render.
+
+**What may not be done with this section.** It is a hypothesis with a price
+attached, not a licence. Splitting `LINER_TINT` into two constants and choosing
+values that produce the ordering would be the exact failure the owner's standing
+ruling forbids — *"Het moet komen door natuurkundige effecten"* — and it would
+also destroy the render's value as an instrument, since the measurement only
+means something while the split is *reported* rather than fitted. If the split is
+implemented, the submerged albedo must come from a stated material property or a
+measurement of the actual liner, and the resulting ordering must then be an
+**output**, not an input.
