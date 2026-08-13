@@ -187,6 +187,15 @@ REQUIRED = [
     'uw_project', 'UW_EYE', 'UW_TC', 'UW_TSUN', 'UW_SPREAD', 'UW_FOV',
     'UW_TF', 'UW_PIXANG', 'INSCAT', 'INSCAT_K', 'W', 'H', 'SS',
     'normal_from_grad',
+    # the float, and the world above the water the window finally has in it
+    'FLOAT_ON', 'FLOAT_R', 'FLOAT_R2', 'FLOAT_M', 'FLOAT_XY', 'FLOAT_BETA',
+    'FLOAT_PHW', 'FLOAT_H', 'FLOAT_RW', 'FLOAT_ZW', 'FLOAT_CEN', 'FLOAT_CON',
+    'FLOAT_N', 'FLOAT_FP', '_float_forces', '_float_solve', '_float_hit',
+    'float_normal', 'float_vis', '_float_place', '_float_eta',
+    'FLOAT_MWD', 'FLOAT_MD', 'FLOAT_MZ', 'FLOAT_MSIN', 'FLOAT_MCOS',
+    'FLOAT_MREACH', 'FLOAT_MTAB', 'FLOAT_MLIFT', 'float_meniscus',
+    'air_world', '_edge_hit', '_sail_hit', 'SAIL_UNDER', 'SAIL_ALB', 'SAIL',
+    'float_air', 'float_wet', 'float_sky_E', 'FLOAT_ALB', 'bed_sun',
 ]
 
 
@@ -3138,6 +3147,364 @@ WHAT IS STILL UNVALIDATED, so that this file is also a map of the gaps.
 #     `uw_interface` on the water side, and closed against a hemispherical
 #     integral of THIS file's own `fresnel_exact` on the air side. The two share
 #     the three indices and nothing else.
+# ================================= THE FLOAT, AND THE WORLD ABOVE THE WATER
+# Two features arrived together and they are each other's evidence: a body that
+# touches the surface, and a window that finally has something in it. The rows
+# below are built to the same rule the rest of this file is -- a test and the
+# code it checks may not share a premise -- and each pair is named with what it
+# does NOT share:
+#   * the FLOTATION is solved in render.py from a closed-form spherical cap and
+#     a line-tension term; here the same displacement is re-integrated as a
+#     QUADRATURE of pi r(z)^2 dz over the wetted cap, and the tension term is
+#     re-derived from Keller's theorem -- the vertical pull on a floating body
+#     equals the WEIGHT OF THE LIQUID the meniscus displaces -- which is a
+#     different statement about the same fillet and shares no line with it.
+#   * the FILLET is the file's own `menis_tables` at a contact angle it has
+#     never been called at, so the wall's rows re-run at phi_w = 50 deg: the
+#     force balance rho g INT z dx = sigma sin(phi_w) and the projected-area
+#     identity SUM(w_fil + w_occ - w_flt) = Vm z(phi*). Neither is written into
+#     the quadrature.
+#   * `_float_hit` is a quadratic; it is checked against a 0.05 mm MARCH of the
+#     implicit sphere, which shares only the centre and the radius.
+#   * the POOL EDGE seen from below is solved in `_edge_hit` as one plane root
+#     and one circle root; it is checked against a march of `edge_z`, which is
+#     the profile function the coping is DRAWN from and knows nothing of the
+#     solve.
+#   * the WINDOW'S SOLID ANGLE, which the report rests on, is measured in
+#     render.py by weighting air directions with Snell's Jacobian. That the
+#     Jacobian integrates to 2 pi (1 - cos theta_c) is an identity, and it is
+#     asserted here against a quadrature -- the row that fires at a wrong
+#     Jacobian, and the one that makes the shares in the report shares OF
+#     something.
+def tier_float(R):
+    # ---- the flotation, re-integrated ---------------------------------------
+    b = float(R.FLOAT_BETA)
+    Rr, h = float(R.FLOAT_R), float(R.FLOAT_H)
+    # route B for the cap: a quadrature of the disc area over depth, which never
+    # forms pi h^2 (3R - h)/3.
+    nz = 20000
+    zq = (np.arange(nz) + .5) / nz * h            # depth below the contact plane
+    zc = Rr - h + zq                              # distance from the centre
+    Vq = float((np.pi * (Rr ** 2 - zc ** 2) * (h / nz)).sum())
+    check(1, 'float: cap volume, quadrature vs closed form', Vq,
+          np.pi * h * h * (3 * Rr - h) / 3., 1e-9,
+          'a 20 000-node midpoint rule on pi r(z)^2 dz over 40 mm of cap; the '
+          'rule\'s own error on a smooth integrand at this node count is far '
+          'under the tolerance', unit='m3')
+    # route B for the tension: Keller's theorem. The vertical surface-tension
+    # force on a floating body equals the weight of the liquid displaced by the
+    # meniscus -- so the shipped sigma * 2 pi r_w sin(phi_w) must equal
+    # rho g * 2 pi r_w * INT z dd over the fillet, and INT z dd is the same
+    # column `MENIS_LIFT` integrates for the wall.
+    keller = (1000.0 * 9.81 * 2 * np.pi * float(R.FLOAT_RW)
+              * float((R.FLOAT_MZ * R.FLOAT_MWD).sum()))
+    shipped = -_ff_tension(R)
+    check(1, "float: line tension, Keller's theorem vs sigma L sin(phi_w)",
+          keller, shipped * 9.81, 2e-4,
+          'both are the same fillet; the residual is the 64-node quadrature\'s '
+          'own error, which the wall\'s own force-balance row measures at the '
+          'same order', unit='N', rel=True)
+    # ...and the balance the ball actually floats on, at the shipped beta.
+    tot = sum(R._float_forces(b))
+    check(1, 'float: the shipped contact angle balances the weight', tot,
+          float(R.FLOAT_M), 1e-9,
+          'the bisection is run to 200 halvings of (0, pi), i.e. to the double\'s '
+          'own precision, so the residual is float noise', unit='kg')
+    # the two capillary terms are not decoration: without them the ball floats
+    # measurably higher, and the row says by how much.
+    b_arch = np.arccos(np.clip(1. - _arch_h(R) / Rr, -1, 1))
+    info(1, 'float: draught with the capillary terms vs Archimedes alone',
+         '%.1f mm vs %.1f mm' % (1000 * h, 1000 * _arch_h(R)),
+         'the contact-plane and line-tension terms are %.1f%% of the weight, '
+         'and dropping them lifts the ball %.1f mm -- %.1f%% of its own draught'
+         % (100 * abs(sum(R._float_forces(b)[1:])) / float(R.FLOAT_M),
+            1000 * (h - _arch_h(R)),
+            100 * (h - _arch_h(R)) / h))
+    del b_arch
+
+    # ---- the fillet, at a contact angle the wall never reaches ---------------
+    lift = float((R.FLOAT_MZ * R.FLOAT_MWD).sum() * 1000.0 * 9.81)
+    check(1, 'float fillet: rho g INT z dx = sigma sin(phi_w)', lift,
+          float(R.SIGMA_W) * np.sin(float(R.FLOAT_PHW)), 3e-3,
+          'the same identity the wall\'s fillet is held to, at phi_w = 50.07 '
+          'deg instead of 90; the residual is the 64-node quadrature\'s',
+          unit='N/m', rel=True)
+    # the projected-area identity, on the FLOAT's table through the SHIPPED
+    # `_menis_weights`. It is the one statement about the quadrature that the
+    # quadrature nowhere encodes.
+    Vm = np.array([0.94, 0.61, 0.20, 0.05])
+    Vz = np.array([0.34, 0.79, 0.98, 0.999])
+    ndv, wf, wl, wo, isil = R._menis_weights(Vm, Vz, R.FLOAT_MTAB)
+    got = (wf + wo - wl).sum(1)
+    # every node faces the eye where Vm > 0, so the silhouette tilt IS phi_w and
+    # the identity's right-hand side is Vm times the full climb.
+    exp = Vm * 2. * float(R.CAP_A) * np.sin(.5 * float(R.FLOAT_PHW))
+    check(1, 'float fillet: SUM(w_fil + w_occ - w_flt) = Vm z(phi*)', got, exp,
+          6e-6, 'a 64-node midpoint rule against an identity that is exact for '
+          'any monotone profile; 6 um of projected area per metre of waterline '
+          'is one node\'s worth at this climb', unit='m')
+
+    # ---- the ball as a solid: a quadratic against a march --------------------
+    rng = np.random.default_rng(4242)
+    P = R.FLOAT_CEN[None] + rng.normal(0, .35, (2000, 3))
+    d = rng.normal(0, 1, (2000, 3))
+    d /= np.linalg.norm(d, axis=1, keepdims=True)
+    tq = R._float_hit(P[:, 0], P[:, 1], P[:, 2], d[:, 0], d[:, 1], d[:, 2])
+    step, nstep = 5e-5, 24000
+    ts = (np.arange(nstep) + 1) * step
+    tm = np.full(2000, np.inf)
+    for k in range(0, 2000, 200):
+        sl = slice(k, k + 200)
+        pts = P[sl, None, :] + d[sl, None, :] * ts[None, :, None]
+        ins = ((pts - R.FLOAT_CEN[None, None]) ** 2).sum(-1) < R.FLOAT_R2
+        first = np.argmax(ins, 1).astype(float)
+        tm[sl] = np.where(ins.any(1), ts[np.argmax(ins, 1)], np.inf)
+        del pts, ins, first
+    both = np.isfinite(tm) & (tq < 1e8)
+    # only rays that start OUTSIDE: `_float_hit` returns BIG for a ray that
+    # starts inside, and the march would return its first inside sample.
+    out = ((P - R.FLOAT_CEN[None]) ** 2).sum(1) > R.FLOAT_R2
+    m = both & out
+    check(3, 'float: ray-sphere entry vs a 0.05 mm march',
+          float(np.abs(tq[m] - tm[m]).max()), 0.0, step,
+          'the march resolves the entry to one step, so one step IS the '
+          'tolerance and it shrinks if the step does; %d of %d rays hit'
+          % (int(m.sum()), 2000), unit='m')
+    agree = int((((tq < 1e8) == np.isfinite(tm)) | ~out).sum())
+    check(1, 'float: the two agree about WHICH rays hit', agree, 2000, 0,
+          'a disagreement here is a missed or invented intersection, which no '
+          'tolerance covers')
+
+    # ---- switching the ball out leaves `scene_hit` bit-identical -------------
+    # The comment beside the new branch says it "touches no existing line".
+    # This is that claim as a row: fire rays that cannot reach the ball with the
+    # ball on and off, and require the geometry buffer to be identical to the
+    # bit.
+    far = np.array([1.2, 2.9, 5.0, 3.3, 7.0])
+    px = np.repeat(far, 400) + rng.normal(0, .05, 2000)
+    py = rng.uniform(0.3, 3.7, 2000)
+    dz = -rng.uniform(.2, 1., 2000)
+    dx = rng.normal(0, .3, 2000); dy = rng.normal(0, .3, 2000)
+    nn = np.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
+    dx, dy, dz = dx / nn, dy / nn, dz / nn
+    keep = R._float_hit(px, py, np.zeros(2000), dx, dy, dz) >= 1e8
+    a = R.scene_hit(px[keep], py[keep], dx[keep], dy[keep], dz[keep])
+    was = R.FLOAT_ON
+    R.FLOAT_ON = False
+    try:
+        b2 = R.scene_hit(px[keep], py[keep], dx[keep], dy[keep], dz[keep])
+    finally:
+        R.FLOAT_ON = was
+    same = int(all(bool(np.array_equal(x, y)) for x, y in zip(a, b2)))
+    check(1, 'scene_hit is bit-identical off the ball', same, 1, 0,
+          '%d rays that miss the ball\'s sphere, traced with the branch on and '
+          'off; sid, u, v, distance and cylinder must all match exactly, which '
+          'is what "one more candidate compared against the argmin\'s result" '
+          'means' % int(keep.sum()))
+
+    # ---- the pool edge, seen from below: a solve against a march -------------
+    # `_edge_hit` takes one plane root and one circle root. `edge_z` is the
+    # profile the coping is DRAWN from; marching a ray against it shares the
+    # section and nothing of the solve.
+    ex = np.full(1500, 5.80); ey = rng.uniform(0.8, 3.2, 1500)
+    th = rng.uniform(np.deg2rad(60.), np.deg2rad(89.9), 1500)
+    ph = rng.uniform(0, 2 * np.pi, 1500)
+    tx = np.sin(th) * np.cos(ph); ty = np.sin(th) * np.sin(ph); tz = np.cos(th)
+    te, qe = R._edge_hit(ex, ey, np.zeros(1500), tx, ty, tz)
+    st2, ns2 = 2e-4, 42000
+    tt = (np.arange(ns2) + 1) * st2
+    tmar = np.full(1500, np.inf)
+    for k in range(0, 1500, 60):
+        sl = slice(k, k + 60)
+        X = ex[sl, None] + tx[sl, None] * tt[None]
+        Y = ey[sl, None] + ty[sl, None] * tt[None]
+        Z = tz[sl, None] * tt[None]
+        s = R.pool_sdf(X, Y)
+        ins = (s >= R.SLIP) & (Z <= R.edge_z(np.maximum(s, R.SLIP)))
+        tmar[sl] = np.where(ins.any(1), tt[np.argmax(ins, 1)], np.inf)
+        del X, Y, Z, s, ins
+    mm = np.isfinite(tmar) & (te < 1e8)
+    check(3, 'the pool edge from below: solve vs a 0.2 mm march',
+          float(np.abs(te[mm] - tmar[mm]).max()), 0.0, 3. * st2,
+          'the march resolves entry to one step and the surfaces it enters are '
+          'grazing here, so three steps is the honest bound; %d of %d upgoing '
+          'rays meet the edge' % (int(mm.sum()), 1500), unit='m')
+    check(1, 'the edge solve and the march agree about WHICH rays clear it',
+          int(((te < 1e8) == np.isfinite(tmar)).sum()), 1500, 0,
+          'a ray that clears the coping never comes back down, so a '
+          'disagreement here is a missed hit or an invented one')
+    # and the deck is NOT reachable from below, which the comment claims.
+    zh = tz[mm] * te[mm]
+    check(1, 'nothing above the coping top is reachable from the water',
+          float(zh.max() <= R.ZD + 1e-9), 1.0, 0.0,
+          'an upgoing ray that has cleared ZD never returns; the row is here '
+          'because "the window contains the coping\'s section and no paving" '
+          'is a claim about the geometry, not about the shading', unit='m')
+
+    # ---- the split condition, against the rays themselves --------------------
+    # render.py claims that the wet half of a floating sphere is reachable
+    # through the surface iff  R(1 - sin(beta + theta_w)) > z_w sin(theta_w),
+    # from the tangency of a straight ray to a convex cap. That is a formula;
+    # this fires the actual rays. For a grid of contact angles and refracted
+    # view angles it builds the ball those numbers describe, launches a fan of
+    # rays from just outside the contact circle at exactly theta_w, and asks
+    # `_float_hit` -- the shipped quadratic -- whether any of them enters. The
+    # predicate and the ray set share only R and the capillary length.
+    Rb = float(R.FLOAT_R)
+    cen0 = R.FLOAT_CEN.copy()
+    bad = 0
+    tot = 0
+    try:
+        for bt in np.deg2rad(np.arange(30., 86., 2.5)):
+            zw = 2. * float(R.CAP_A) * np.sin(.5 * bt)
+            rw = Rb * np.sin(bt)
+            h = Rb * (1. - np.cos(bt))
+            R.FLOAT_CEN = np.array([0., 0., zw + Rb - h])
+            for tw in np.deg2rad(np.arange(5., 48.6, 2.5)):
+                pred = (bt + tw > np.pi / 2
+                        and Rb * (1. - np.sin(bt + tw)) - zw * np.sin(tw) > 0.)
+                # rays from just outside the contact circle, inward and down at
+                # exactly theta_w from the vertical, all round the ring
+                ph = np.linspace(0, 2 * np.pi, 24, endpoint=False)
+                off = np.linspace(0., .35 * Rb, 200)
+                PH, OF = np.meshgrid(ph, off)
+                r0 = rw + OF.ravel()
+                px2 = r0 * np.cos(PH.ravel()); py2 = r0 * np.sin(PH.ravel())
+                dxy = -np.sin(tw)
+                dd = np.stack([dxy * np.cos(PH.ravel()),
+                               dxy * np.sin(PH.ravel()),
+                               np.full(px2.size, -np.cos(tw))], -1)
+                got = bool((R._float_hit(px2, py2, np.zeros(px2.size),
+                                         dd[:, 0], dd[:, 1], dd[:, 2])
+                            < 1e8).any())
+                tot += 1
+                bad += int(got != pred)
+    finally:
+        R.FLOAT_CEN = cen0
+    check(3, 'the split condition vs the rays it predicts', bad, 0, 0,
+          '%d (beta, theta_w) pairs over 30-85 deg of contact angle and 5-48.5 '
+          'deg of refracted view angle, each fired at 4800 rays from outside '
+          'the contact circle through the SHIPPED `_float_hit`. A single '
+          'disagreement is a wrong condition or a wrong tracer, and neither '
+          'has a tolerance' % tot)
+
+    # ---- Snell's Jacobian, which the whole window audit is weighted by -------
+    nn2 = float(R.IOR[1])
+    nq = 200000
+    mu = (np.arange(nq) + .5) / nq
+    cw = np.sqrt(np.maximum(1. - (1. - mu ** 2) / nn2 ** 2, 0.))
+    jac = mu / (nn2 ** 2 * cw)
+    check(1, "Snell's Jacobian integrates to the window", 2 * np.pi * jac.mean(),
+          2 * np.pi * (1. - np.sqrt(1. - 1. / nn2 ** 2)), 1e-6,
+          'INT cos(a)/(n^2 cos(w)) dOmega_a over the hemisphere is exactly '
+          '2 pi (1 - cos theta_c) by the substitution u = cos(theta_w); a '
+          '200 000-node midpoint rule on a smooth integrand', unit='sr',
+          rel=True)
+
+    # ---- `float_vis` against an independent occlusion test ------------------
+    # render.py takes the perpendicular distance from the ball's centre to the
+    # sun ray; this walks the ray in 0.1 mm steps and asks whether any sample is
+    # inside the sphere. Same sphere, no shared algebra.
+    gx2 = R.FLOAT_XY[0] + np.linspace(-0.10, 0.90, 600)
+    gy2 = np.full(600, R.FLOAT_XY[1])
+    # only points that are on WATER. The hull dips 40 mm under the surface, so
+    # a plan point inside the contact circle is inside the SOLID and there is
+    # no sun visibility to ask about there; the march would report it inside on
+    # its first sample and be right.
+    onw = ((np.stack([gx2, gy2, np.zeros(600)], 1)
+            - R.FLOAT_CEN[None]) ** 2).sum(1) > R.FLOAT_R2
+    vis = np.asarray(R.float_vis(gx2, gy2), float)
+    ss = (np.arange(4000) + 1) * 5e-4
+    Q = (np.stack([gx2, gy2, np.zeros(600)], 1)[:, None, :]
+         + R.SUN_DIR[None, None] * ss[None, :, None])
+    hit = (((Q - R.FLOAT_CEN[None, None]) ** 2).sum(-1) < R.FLOAT_R2).any(1)
+    # compare only away from the penumbra, which is 2-5 mm wide and is a ramp in
+    # render.py and a step in the march.
+    hard = ((vis < 1e-6) | (vis > 1. - 1e-6)) & onw
+    check(3, 'float_vis vs a 0.5 mm march of the sun ray',
+          int((hard & ((vis < .5) != hit)).sum()), 0, 0,
+          'outside the 0.53 deg penumbra the two are a step and a step; inside '
+          'it one is a ramp and the other is not, so the %d penumbral samples '
+          'of %d are excluded by construction rather than by tolerance'
+          % (int((~hard).sum()), 600))
+    del Q
+
+    # ---- the shadow lands where the refraction puts it, not under the ball ---
+    # `sail_vis` reads the SHADOW map, which is one of the loader's skipped
+    # allocations, so it is stubbed to full sun for these two rows -- the sail
+    # is 8 m west of the ball and its shadow reaches x = 4.5 at this y, so
+    # stubbing it changes nothing here and `tier_stone_sun` already tests it.
+    _sv = R.sail_vis
+    R.sail_vis = lambda x, y: np.ones(np.asarray(x, float).shape)
+    tsun = np.arcsin(np.sqrt(1. - R.SUN_DIR[2] ** 2) / nn2)
+    off = float(R.DEPTH) * np.tan(tsun)
+    shat = -R.SUN_DIR[:2] / np.linalg.norm(R.SUN_DIR[:2])
+    hitp = R.FLOAT_XY + shat * off
+    check(1, 'the ball\'s shadow on the floor is dark where refraction puts it',
+          float(R.bed_sun(np.array([hitp[0]]), np.array([hitp[1]]),
+                          np.array([-R.DEPTH]))[0]), 0.0, 1e-9,
+          'the point 1.37 m downsun of the ball at 1.40 m must be fully '
+          'shadowed; this is `bed_sun` walking one refracted slant back up the '
+          'beam to `float_vis`, and it is the row that fires if the shadow is '
+          'painted under the ball instead')
+    check(1, 'and NOT dark directly under the ball',
+          float(R.bed_sun(np.array([R.FLOAT_XY[0]]), np.array([R.FLOAT_XY[1]]),
+                          np.array([-R.DEPTH]))[0]), 1.0, 1e-9,
+          'the floor under a floating ball at 1.40 m is in full sun, because '
+          'the beam that would have reached it came in at 44.4 deg from 1.37 m '
+          'upsun of the hull. A renderer that projects the shadow downward '
+          'fails exactly here')
+    R.sail_vis = _sv
+
+    # ---- what the world above the water is, by kind --------------------------
+    # One ray at each of the four things `air_world` can meet, aimed by
+    # geometry rather than by search, so a re-ordering of the kind codes or a
+    # missed solid shows up as a wrong code rather than as a colour.
+    ax = np.array([5.80, 5.80, 5.80, R.FLOAT_XY[0] - .55])
+    ay = np.array([1.40, 1.40, 1.40, R.FLOAT_XY[1]])
+    tgt = np.stack([np.array([5.80, 1.40, 40.]),                # zenith: sky
+                    np.array([R.X1 + R.SLIP, 1.40, .05]),       # the band
+                    R.SAIL.mean(0),                             # the sail
+                    R.FLOAT_CEN])                               # the ball
+    dd = tgt - np.stack([ax, ay, np.zeros(4)], 1)
+    dd /= np.linalg.norm(dd, axis=1, keepdims=True)
+    # the two SHADERS the edge branch calls read buffers the loader skips
+    # (`liner_band` reaches the reconstructed waterline, `_stone` the noise
+    # tables). They are stubbed to a constant: this row is about WHICH solid
+    # each ray meets, and the shading of it is measured off the frame instead.
+    _lb, _st, _fa = R.liner_band, R._stone, R.float_air
+    R.liner_band = lambda x, y, z, v: (np.zeros((np.asarray(x).size, 3)), None)
+    R._stone = lambda x, y, s, v, f: np.zeros((np.asarray(x).size, 3))
+    R.float_air = lambda x, y, z, v, fp=None: np.zeros((np.asarray(x).size, 3))
+    try:
+        kk = R.air_world(ax, ay, 0.0, dd[:, 0], dd[:, 1], dd[:, 2],
+                         kind=True)[1]
+    finally:
+        R.liner_band, R._stone, R.float_air = _lb, _st, _fa
+    check(1, 'air_world meets sky / edge / sail / float in that order',
+          kk, np.array([0, 1, 2, 3]), 0,
+          'four rays aimed at the four things there are above this water; the '
+          'kinds are what the window\'s solid-angle audit is binned on, so a '
+          'wrong code is a wrong report')
+
+
+def _ff_tension(R):
+    """render.py's own line-tension term, in kg, at the shipped contact angle."""
+    return R._float_forces(float(R.FLOAT_BETA))[2]
+
+
+def _arch_h(R):
+    """Draught from Archimedes ALONE -- no contact-plane term, no line tension.
+    Solved here rather than in render.py because it is the counterfactual, and a
+    counterfactual that lives in the shipped file is a second implementation."""
+    lo, hi = 1e-6, 2. * float(R.FLOAT_R)
+    for _ in range(200):
+        m = .5 * (lo + hi)
+        V = np.pi * m * m * (3. * float(R.FLOAT_R) - m) / 3.
+        lo, hi = (m, hi) if 1000.0 * V < float(R.FLOAT_M) else (lo, m)
+    return .5 * (lo + hi)
+
+
 def tier_underwater(R):
     n = R.IOR
 
@@ -3737,7 +4104,7 @@ def main():
                      (tier3_refl_ellipse, (R, fld)),
                      (tier_interface, (R,)), (tier_wall_plane, (R,)),
                      (tier_map_extent, (R,)), (tier_fold, (R,)),
-                     (tier_stone_sun, (R,)),
+                     (tier_stone_sun, (R,)), (tier_float, (R,)),
                      (tier3_diffuse_fresnel, (R,)), (tier3_cylinder, (R,)),
                      (tier3_gemm, (fld,)), (tier3_geometry, (R,)),
                      (tier_meniscus, (R,)),

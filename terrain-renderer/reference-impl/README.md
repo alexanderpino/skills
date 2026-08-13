@@ -6,11 +6,18 @@ doctrine statement in that chapter that carries a number was either derived here
 or falsified here.
 
     python3 render.py          # writes pool_final.png, pool_final_dispersion.png,
-                               #        pool_final_zoom.png
+                               #        pool_final_zoom.png, pool_final_float.png
     POOL_UNDERWATER=1 python3 render.py       # the same frames, plus
-                               #        pool_under.png -- the camera under the
-                               #        water. The hero frame is bit-identical
-                               #        either way; see the section below.
+                               #        pool_under.png and pool_under_float.png
+                               #        -- the camera under the water. The hero
+                               #        frame is bit-identical either way; see
+                               #        the section below.
+    POOL_NOFLOAT=1 python3 render.py          # the scene without the floating
+                               #        ball, which is the A/B every number in
+                               #        the float section is measured against
+                               #        and the control the suite's
+                               #        "scene_hit is bit-identical off the
+                               #        ball" row is written from.
     POOL_WIDE=1 python3 render.py             # the whole basin from a high
                                #        oblique: pool_wide.png and its two
                                #        companions. Same physics, same
@@ -36,13 +43,13 @@ Sun position is the measured one for the reference photograph (Aljezur, 37.319N
 
 `render.py` prints ~90 diagnostics per run and almost all of them check the
 implementation against itself. `validate.py` checks it against things that were
-not written here, in three tiers, in about 100 seconds — no render, no PNG.
+not written here, in three tiers, in about 120 seconds — no render, no PNG.
 
 | Tier | Strength of evidence | Covers |
 |---|---|---|
-| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½` and `WALL_SKY` as the other half of that same hemisphere, the meniscus's force balance and projected-area identity and its two collapse limits, the sign that refutes the fillet's internal-reflection term, **Walsh's relation, `2E_3(0) = 1`, the diffuse path being longer than the vertical one, and a lossless white-bedded pool composed through the shipped `rho_water` coming to exactly 1**, the four wall planes against `pool_sdf`, the analytic ceiling on the fillet's transmitted column, the near-wall fold guard fired both ways, a shadow march of the coping, and — new this round — **the Snell window's half-angle measured off the underwater frame's own ray directions**, the mirror regime's reflectance being exactly 1, Stokes reversibility, **the `n²` radiance gain closed against the air-side transmitted flux**, and — new this round — **the Snell window's share of a HORIZONTAL face against `1/n²` and of a VERTICAL one against `½ − tir_vert(t_c)(1 − 1/n²)`, the same ratio driven to exactly `WALL_SKY = ½` in the `n → 1` limit, `r_int_at` against the water→air equations written from the two indices, `r_int_at ≡ 1` past the critical angle with no tolerance at all, and the upgoing gather closing on 1 over a horizontal face's hemisphere and on exactly ½ over a vertical face's upper half — the same ½ the downgoing gather leaves**, and — new in the illuminant round — **a uniform sky integrating to exactly `L` on a horizontal face and exactly `L/2` on a vertical one, the sky gradient being uniform in BLUE and therefore forcing a vertical face's share of it to the same number to double round-off, the Rayleigh phase function's `cos²Θ` half carrying exactly ¼ of the scattered light — the ceiling that falsifies the old `SKY_DECK` with no photograph in it — `sky() = env_diffuse + the disc` over 4096 directions, `slab_esc(0) = T_OUT_DIFFUSE`, and the ledge form at both of its limits** |
+| 1 · closed form | a disagreement is a bug in one of the two | exact Fresnel (F0, grazing, Brewster, s/p) — including the renderer's own `fresnel` against the closed-form Brewster value — Snell and the critical angles, TIR and the null return past it, Beer–Lambert, the sun-disc penumbra compression, **a single sinusoid's caustic against its analytic Jacobian**, a flat surface, the sun lobes' flux, the riser gather's closure and `tir_vert(0) = ½` and `WALL_SKY` as the other half of that same hemisphere, the meniscus's force balance and projected-area identity and its two collapse limits, the sign that refutes the fillet's internal-reflection term, **Walsh's relation, `2E_3(0) = 1`, the diffuse path being longer than the vertical one, and a lossless white-bedded pool composed through the shipped `rho_water` coming to exactly 1**, the four wall planes against `pool_sdf`, the analytic ceiling on the fillet's transmitted column, the near-wall fold guard fired both ways, a shadow march of the coping, and — new in the float round — **the ball's flotation re-integrated as a quadrature and its line tension re-derived from Keller's theorem, the fillet's force balance and projected-area identity re-run at a contact angle the wall never reaches, `scene_hit` proved bit-identical with the ball switched out, the assertion that nothing above the coping top is reachable from under the water, Snell's Jacobian integrating to the window's own solid angle, and the ball's shadow being dark 1.37 m downsun and NOT dark under the hull**, and — new this round — **the Snell window's half-angle measured off the underwater frame's own ray directions**, the mirror regime's reflectance being exactly 1, Stokes reversibility, **the `n²` radiance gain closed against the air-side transmitted flux**, and — new this round — **the Snell window's share of a HORIZONTAL face against `1/n²` and of a VERTICAL one against `½ − tir_vert(t_c)(1 − 1/n²)`, the same ratio driven to exactly `WALL_SKY = ½` in the `n → 1` limit, `r_int_at` against the water→air equations written from the two indices, `r_int_at ≡ 1` past the critical angle with no tolerance at all, and the upgoing gather closing on 1 over a horizontal face's hemisphere and on exactly ½ over a vertical face's upper half — the same ½ the downgoing gather leaves**, and — new in the illuminant round — **a uniform sky integrating to exactly `L` on a horizontal face and exactly `L/2` on a vertical one, the sky gradient being uniform in BLUE and therefore forcing a vertical face's share of it to the same number to double round-off, the Rayleigh phase function's `cos²Θ` half carrying exactly ¼ of the scattered light — the ceiling that falsifies the old `SKY_DECK` with no photograph in it — `sky() = env_diffuse + the disc` over 4096 directions, `slab_esc(0) = T_OUT_DIFFUSE`, and the ledge form at both of its limits** |
 | 2 · published measurement | a disagreement may be a bug or a different water | pure-water absorption vs Pope & Fry 1997 and Smith & Baker 1981, slope statistics vs Cox & Munk 1954, the round-jet constants S and B, capillary-gravity dispersion and c_min, and — new in the illuminant round — **the derived deck illuminant's diffuse fraction of global horizontal against the 0.10–0.35 a clear sky gives at air mass 2.8** |
-| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, **the bed ↔ wall transfer closed by reciprocity — the shipped gather's lattice against that same rectangle view factor**, the shipped 960-direction lattice against its own closed form over the wall's height range, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian, an RK4 march of Young–Laplace vs the meniscus profile, a 4000-ray fan vs its projected area, a 1 mm march of the bed height field vs `scene_hit`'s five-plane solve, a 128 000-hit march of the fillet's transmitted fan vs the wall map's extent, the pool's apparent albedo integrated ray by ray vs `wet_albedo`'s trapped series, **`rho_water` at the file's own absorption against a 400 000-photon random walk, and `2E_3` by Gauss-Legendre against the exponential-integral recurrence**, a 0.5 mm march of the water body vs `scene_hit_under`'s any-direction solve, and — new this round — **`axial_share`'s 2-D quadrature reproducing `tir_vert(t_c)`'s closed form, the upgoing lattice's mirror coefficient against `R_INT` reached by Walsh's reciprocity rather than by any integral, and the solve run for exactly `NSOLVE` passes from black against `trap_gain`'s closed geometric series**, and — new in the illuminant round — **the deck illuminant against a 400 000-sample cosine Monte-Carlo and against its own lattice at 16× the directions, the aureole term against its lobe integrated in `validate.py` from `L_AURE` and `N_AURE` alone, `slab_esc` against a 300 000-photon walk of the same slab, and the band's occlusion march against a direct angular quadrature of the same blocking rule** |
+| 3 · independent method | a disagreement localises to one of the two methods | Monte-Carlo vs the reflected-slope ellipse, a 0.2 mm march vs the analytic cylinder, the separable GEMM vs the direct plane-wave sum, MC vs the exact rectangle view factor, **the bed ↔ wall transfer closed by reciprocity — the shipped gather's lattice against that same rectangle view factor**, the shipped 960-direction lattice against its own closed form over the wall's height range, MC vs TIR_FRAC and TIR_VERT, the empirical diffuse-Fresnel fit vs the file's quadrature, the eikonal solve against its own conserved Hamiltonian, an RK4 march of Young–Laplace vs the meniscus profile, a 4000-ray fan vs its projected area, a 1 mm march of the bed height field vs `scene_hit`'s five-plane solve, a 128 000-hit march of the fillet's transmitted fan vs the wall map's extent, the pool's apparent albedo integrated ray by ray vs `wet_albedo`'s trapped series, **`rho_water` at the file's own absorption against a 400 000-photon random walk, and `2E_3` by Gauss-Legendre against the exponential-integral recurrence**, a 0.5 mm march of the water body vs `scene_hit_under`'s any-direction solve, and — new this round — **`axial_share`'s 2-D quadrature reproducing `tir_vert(t_c)`'s closed form, the upgoing lattice's mirror coefficient against `R_INT` reached by Walsh's reciprocity rather than by any integral, and the solve run for exactly `NSOLVE` passes from black against `trap_gain`'s closed geometric series**, and — new in the float round — **a 0.05 mm march of the implicit sphere against the shipped ray-sphere quadratic, a 0.2 mm march of `edge_z` against the pool edge's plane-and-arc solve seen from below, a 0.5 mm march of the sun ray against `float_vis`, and the closed-form condition for a floating sphere's wet half being visible through the surface fired at 396 x 4800 rays** — and — new in the illuminant round — **the deck illuminant against a 400 000-sample cosine Monte-Carlo and against its own lattice at 16× the directions, the aureole term against its lobe integrated in `validate.py` from `L_AURE` and `N_AURE` alone, `slab_esc` against a 300 000-photon walk of the same slab, and the band's occlusion march against a direct angular quadrature of the same blocking rule** |
 
 The highest-value single test is the **sinusoid caustic**: for `h = a sin(kx)`
 under a vertical sun the whole pass is a 1-D map with an exact Jacobian, so the
@@ -150,6 +157,485 @@ checks must not share a premise.** Derive the value from physics, write the
 derivation down, and then guard it with something that could not have been written
 from it — a limit, a conservation identity, an analytic special case, or the same
 quantity reached by unrelated code.
+
+## Closed — Snell's window has the world in it, and what was missing was 1.1% of it
+
+Wave 13 built the camera under the water and filed a `?` against itself in the
+same breath: *"the world above the water is `sky()` and nothing else. A refracted
+ray leaving at `theta_a` near 90 deg points at the coping, the deck and the shade
+sail and gets sky."* It priced that as an **angular band at the rim** — the
+outermost 0.205 deg of the window at `(1 − R) < 0.30` — and left it. Wave 17
+separately filed the sail's occlusion of the window as not done.
+
+`air_world` is that function, and it is built out of **the scene's own geometry
+shaded by the scene's own shaders**. No environment map enters, and the reason is
+not taste: nearly all HDRIs are relative rather than calibrated in cd/m², they
+are camera-captured and carry the white-balance and colour-space failures bar
+J2/J2d documents, and this renderer's sky is *derived from the atmosphere
+recovered from `SUN_COL` itself* — substituting a library image would break the
+coupling between the direct and the indirect light the illuminant section rests
+on.
+
+**The rim measurement was the right measurement for the rim and the wrong one for
+the question.** 0.205 deg of window prices only the rays that leave near grazing;
+the question is what share of the window's **solid angle** was being handed the
+sky. Two routes, sharing no source:
+
+| what a refracted ray finds above the water | route 1 · off the frame | route 2 · off the hemisphere |
+|---|---|---|
+| the pool's own edge — band, bead, bullnose | 0.4520% | **0.9888%** |
+| the shade sail | 0.3025% | **0.0660%** |
+| the float | 0.2406% | **0.0697%** |
+| still `sky()`, and marked | 99.0049% | **98.8755%** |
+
+Route 1 weights every transmitting subsample of the underwater frame (2 647 436
+of the 5 096 683 that reach the surface) by its own solid angle — `cos³` of the
+angle off the optical axis, which is what a rectilinear pixel subtends — and bins
+it by what `air_world` returned. Route 2 never touches the camera: from 96 exit
+points on the surface it samples the **air** hemisphere stratified in
+`cos(theta_a)` and weights each direction by **Snell's own Jacobian**,
+`cos(theta_a) / (n² cos(theta_w))`, which is the in-water solid angle a pencil of
+air directions occupies. That Jacobian integrates to `2π(1 − cos theta_c)`
+exactly, and the estimator closes on **2.12138 sr against 2.12139 sr** — the row
+that would fire at a wrong Jacobian, and what makes the percentages above shares
+*of* something. The two routes differ line by line because the frame holds a
+biased half of the window — the sail and the ball are both in it and the far
+coping is mostly not — and agree on the total to a tenth of a percent.
+
+**So the answer is about one percent, and the sail was not the large dark shape
+it was expected to be.** The hypothesis going in was that the sail hangs overhead
+and should occlude a big solid angle at moderate angles. It does not, and the
+geometry says why: `SAIL` spans x −5.4…−2.1 with the basin at x 0…8, so from
+anywhere in this pool the panel sits **8–12 m away and 2.4 m up** — 72–77 deg
+from the vertical in air, which Snell compresses into about **1.5 deg of polar
+angle** just inside the rim. It is a real dark shape, it is legible in the frame
+(`w17-window.png`, left of centre), and it is 0.066% of the window. What actually
+dominates is the **coping's own section**, seen at grazing all the way round the
+basin.
+
+**And the deck is not reachable at all**, which is the shape of the answer rather
+than a detail. An upgoing ray that has cleared the coping never comes back down,
+and one that has not cleared it met the vertical face first — so the window
+contains the blue freeboard band, the grey bead and the bullnose **in section**,
+and no paving. `validate.py` asserts that no hit above `ZD` exists, against a
+0.2 mm march of `edge_z`.
+
+`?` **What is still `sky()` and is left that way:** everything beyond the terrace.
+This scene has no fence, no house, no trees and no cloud deck. The section G
+reference photograph's window is full of trees because *that* pool has trees;
+none is invented here.
+
+### The sail's underside was 3.4× too bright, and the window is what found it
+
+The hero gave the sail `[.74, .72, .76] * (SKY_AMB * 1.6 + SUN_COL * .22)` — an
+irradiance triple used as a radiance, with two invented multipliers on it. It
+survived because the panel lands on **0 of the hero's 8 640 000 subsamples**. The
+window shows the whole of it, and section G's own argument — every above-water
+shortcut invisible from a 33 deg downward view becomes visible from underneath —
+collects another one.
+
+Derived, the fabric's underside is two terms and there is no third:
+
+    L_under = SAIL_TAU (SUN_COL cos_i · 0.30 + SKY_DECK)   what it transmits
+            + rho_sail · L_deck_shaded / 2                  what it reflects
+
+`SAIL_TAU` is already in the file as the fabric's diffuse transmittance, the
+panel is very nearly horizontal so the irradiance on its top is the deck's own,
+and the ground under it is the terrace standing in the sail's own shade — a
+downward facet over an infinite plane takes exactly half of it. That gives
+**[0.627, 0.656, 0.796]** against the shipped **[2.062, 2.255, 2.695]**: the
+constant was **×3.29 / 3.44 / 3.38**, a shade sail that read *brighter than the
+sky it shades*. The albedo triple is the old constant's own and is kept; every
+other number in it is now a quantity this file derives elsewhere. It moves
+**0.0000%** of the hero frame and about a fifth of a percent of the window.
+
+## Built — a floating object, and bar section I criterion by criterion
+
+Section I says what the float is for: *"it is not decoration, it is a
+water-physics instrument. Every criterion below is a reading of the wave field or
+of the medium."* A float earns its place because it **touches the surface**,
+which nothing else in this scene does — the coping stands 152 mm over it, the
+step unit hangs 205 mm under it.
+
+### What it is, and why it has no free number in it
+
+The obvious choice is the section's own reference photograph, an inflatable ring;
+the obvious choice is also the worst instrument available, and the reason is
+Archimedes. An air-filled PVC ring of tube radius 90 mm and skin 0.25 mm has an
+effective density of **8.4 kg/m³**, so it floats with 0.84% of its volume under —
+**9 mm of a 180 mm tube**. The same arithmetic kills the beach ball (17 mm of a
+360 mm sphere). *An inflatable is the wrong instrument*, and it is worth saying so
+rather than shipping one and calling the reading faint.
+
+What is taken instead is a **water polo ball, FINA size 5**, because both numbers
+that decide the flotation are **published**: circumference 0.68–0.71 m and mass
+400–450 g (FINA Water Polo Rules, equipment). Mid-range on both gives
+`R = 0.1106 m` and `m = 0.425 kg`, a mean density of **75 kg/m³** — eighteen
+percent of the ball under water instead of four, on an object genuinely found in
+a pool.
+
+**The draught is solved, not set, and the meniscus is in the solve.** With `beta`
+the polar angle of the contact circle from the ball's lower pole,
+
+    m = rho [ V_cap(beta) − z_w π r_w² ] − (sigma/g) 2π r_w sin(phi_w)
+
+The first bracket is the pressure integral over the wetted cap taken by the
+divergence theorem against the **far-field** water plane rather than against the
+contact plane — that is the `− z_w π r_w²` term, and dropping it is the usual way
+this comes out wrong. The second is the contact line's own pull: the meniscus is
+*raised* here, so surface tension acts **downward** and the ball floats deeper
+than Archimedes alone would put it.
+
+| | |
+|---|---|
+| contact angle `beta` | **50.07 deg** |
+| draught | **39.6 mm of a 221.2 mm ball — 17.9%** |
+| waterline circle | **169.6 mm across** |
+| fillet climb at the hull | **2.31 mm** |
+| the balance, in kg | displacement 0.4801, contact plane −0.0521, line tension −0.0030 → **0.4250** against m = 0.4250 |
+| the two capillary terms | **13.0% of the weight** — Archimedes alone floats it at **37.1 mm**, 2.5 mm high |
+
+`validate.py` re-integrates the cap as a **20 000-node quadrature of `π r(z)² dz`**
+— never forming the closed-form cap volume — and re-derives the tension term from
+**Keller's theorem**, that the vertical pull on a floating body equals the weight
+of the liquid its meniscus displaces, against the shipped `sigma L sin(phi_w)`.
+They agree to 2e-4 relative, which is the 64-node fillet quadrature's own error.
+
+### It rides the waves — and this is a **disagreement with the bar**
+
+The attitude is the surface normal under the ball and the height is the elevation
+there. Both are read from the field the caustics are written from, and both are
+**filtered at the ball's own beam**: a floating body follows wave components long
+against its own size and averages out the short ones, which is exactly what
+`grad_points(x, y, fp)` does. Handing it the ball's diameter is the response
+function, not a blur.
+
+render.py has no height field, so the elevation is recovered the way `_waterline`
+recovers it along a wall: the mean over a ring of directions of the line integral
+of the slope out to `L = 0.5 m` is `<eta on the circle> − eta(P)`, i.e. a
+high-passed elevation, and 0.5 m is `_waterline`'s own high-pass scale taken
+unchanged.
+
+**Measured: 0.617 deg of tilt and −0.28 mm of heave.** Section I says *"a float
+that sits level on a moving surface is wrong"*. On **this** field a 221 mm body
+very nearly is level, and the reason is not a shortcut: slope variance lives at
+the short end, the resolved slope rms at a pixel is 0.1006 and at the ball's own
+beam **0.0108** — a factor of **9.4** — and this basin's longest carrier is
+0.53 m against a 0.221 m hull. The mechanism is the right one, one field, and the
+reading is sub-pixel. What would make it visible is a **longer wave**, not a
+different float.
+
+### The waterline wraps it — the fillet, off a straight wall for the first time
+
+Section B3's fillet is a wall term: `phi_w = 90 − THETA_C`. The float's contact
+line stands on a **hull**, and with `THETA_C = 0` (perfect wetting, the file's own
+choice) the free surface leaves the solid *tangentially* — so `phi_w` is the
+hull's own tangent angle there, which on a sphere is exactly `beta`. That one
+substitution is the whole generalisation, and `_menis_weights` now takes the
+table it works on so that every wall caller reads the same arrays it always did.
+
+Shared with the wall, to the line: the profile `z = 2a sin(phi/2)` and therefore
+the capillary length, the climb and the reach; the force balance on that
+quadrature; the projected areas and their identity; both columns — reflected
+through `_env_menis`, transmitted through a traced `scene_hit` and `_menis_under`;
+the footprint deposit; and the sun's disc as a closed-form Gaussian in
+`phi − phi*`. Different, and each is a statement about the **solid** rather than
+about the fillet:
+
+1. `phi_w = 50.07 deg` instead of 90.
+2. the frame is **radial** — `m` outward from the ball's axis, `t` tangential,
+   `d = r − r_w`. Nothing else in the algebra knows which it is.
+3. the occluder of the mirror direction is the **hull**, traced with `_float_hit`
+   rather than compared against `ZD`, so a facet whose mirror direction runs into
+   the ball reflects **the ball**, at its own shaded radiance, not a constant.
+
+| | float | wall |
+|---|---|---|
+| `phi_w` | 50.07 deg | 90 deg |
+| climb | 2.31 mm | 3.85 mm |
+| tabulated reach | 16.21 mm | 15.23 mm |
+| `rho g INT z dx` vs `sigma sin(phi_w)` | 0.05582 / 0.05582 N/m, **0.00%** | 0.02% |
+
+**And one thing a closed contact line does that no wall can.** `_menis_weights`
+is only a bound where `Vm < 0` — the near-wall fold — and `meniscus` *raises*
+there. A ring has `Vm < 0` over exactly the half of it beyond the ball, by
+construction, so the guard would fire on every frame. It is not disabled: the
+ring is evaluated only where `Vm > 0`, and `Vm = 0` is exactly the plan
+silhouette of a convex hull, so **the discarded half is precisely the half the
+ball stands in front of**. Measured: **2125 camera rays selected, 286 dropped —
+11.9%**. The rim it draws is **2.63 output pixels wide** (16.21 mm of reach
+against 6.17 mm per pixel on the water at this range), which is why it is a crop
+and not a headline.
+
+`?` **The curvature of the contact line is neglected, and priced.** The 2-D
+profile solves a straight line; a ring of radius `r_w` carries a second principal
+curvature `1/r_w`, so the true profile differs at `O(a/r_w) = 2.72/84.8 =`
+**3.2%**, in the climb and therefore in the deposited flux at the same order. It
+is one-signed: a convex contact line lowers the climb.
+
+### It is cut in two by refraction — **and the fillet's own climb is what hides it**
+
+This is the criterion the round did not expect to have to derive, and the
+derivation is the round's sharpest single result.
+
+A camera ray crosses the surface **outside** the contact circle — inside it the
+hull is in the way — and leaves at `theta_w` from the vertical, so it descends
+with slope `cot(theta_w)` per unit of horizontal run. The cap it is trying to
+reach hangs from a contact line standing `z_w` **above** the far-field plane, and
+the cap is convex: its steepest tangent is at the contact line and it flattens to
+horizontal at the keel. A straight line under a convex arc touches it once or not
+at all, and the touching radius is `r* = R cos(theta_w)`. So the whole question is
+the sign of one expression:
+
+    beta + theta_w > 90 deg      AND      R (1 − sin(beta + theta_w)) > z_w sin(theta_w)
+
+the first because `r*` is inside the contact circle only there, the second the
+tangency itself. Three things fall out of it.
+
+1. **With `z_w = 0` it is just `beta + theta_w > 90 deg`**, and since
+   `theta_w <= theta_c` a floating sphere must sit at `beta > 41.5 deg` — deeper
+   than 12.5% of its diameter — before *any* above-water camera can see its wet
+   half. That is a bar-level statement about floats in general, and it is why the
+   section's own inflatable could never have shown this.
+2. **From this eye the ball is `beta + theta_w = 92.01 deg`, so it clears the
+   first test and fails the second**: `R(1 − sin(beta + theta_w))` is 6.85e-5 m
+   against `z_w sin(theta_w)` = 1.54e-3 m, short by a factor of **22.6**. `0` subsamples of the hero frame
+   see the submerged cap, and that is the geometry rather than a shortcut. **The
+   2.31 mm of meniscus climb is what decides it** — a term nobody expected to be
+   load-bearing, and without it this frame would just show the split.
+3. **No camera can show it for this ball.** At the window's most favourable exit
+   angle, `theta_w = theta_c = 48.52 deg`, the condition needs `beta > 51.78 deg`
+   against the ball's own 50.07 — which is **m > 0.480 kg**, above FINA's 0.450 kg
+   ceiling. The wide camera is the test: it stands 3.6 m up and looks down at
+   `theta_w = 39.30 deg`, `beta + theta_w = 89.37 deg`, which fails the *first*
+   test, and it renders `0` cap subsamples too. Same ball, same code, two cameras,
+   and a closed form that says in advance that neither splits.
+
+So the criterion is **not met, and it is not met for a reason** — which is a
+better outcome than meeting it by choosing the flattering end of a tolerance. The
+mid-range FINA mass is kept rather than the 0.400 kg end, because the point of
+taking a published object was not to have a dial.
+
+What the frame *does* carry is the other half of the same geometry: the ball's
+silhouette is **83 output pixels wide and 75 tall**, a circle with its lower chord
+cut away where the hull crosses the water — the waterline, seen at 25 deg of
+depression, sitting in the bottom 15% of the disc exactly where it belongs.
+
+### Its shadow on the bed is a reduction, and the wave field is why
+
+Nothing paints it. The caustic pass launches from the surface, `float_vis` takes
+the sun off the launch point **in air** — which is the whole reason the shadow is
+displaced at all — and the survivor refracts at 44.4 deg and runs east. A shadow
+painted on the bed under the ball would have needed a number; this one cannot have
+one, and `validate.py` fires at exactly that: the floor 1.37 m downsun of the ball
+at 1.40 m must be fully shadowed **and** the floor directly under it must be in
+full sun.
+
+| | |
+|---|---|
+| the geometric umbra on the floor | **0.0800 m²** against `π R² / sin 21 deg` = 0.1071 m² |
+| the umbra the caustic map actually holds | **0.0131 m²** — 84% of the shadow is **filled in** |
+| the caustic factor along the beam, 50 mm discs at 100 mm steps | reaches **0.00** at the predicted landing |
+| the caustic factor inside the geometric umbra | 0.5646 against 1.0395 outside — **54.3%** |
+| bed radiance inside vs outside, green | 1.4828 / 2.0362 — **72.8% survives** |
+| the net's contrast inside vs outside (0.30 m high-pass) | 0.8734 / 1.4201 — **61.5%**, so the net **is** legible inside |
+| displacement, bearing | **0.56 deg** off the sun's own anti-bearing |
+| displacement, magnitude | 1.524 m against 1.370 m, `?` biased long and one-signed |
+
+**What fills the shadow in is priced rather than noticed.** A surface facet tilted
+by `eps` swings the transmitted ray by `|cos(i)/(n cos(t)) − 1| eps = 0.624 eps`,
+so a one-axis slope rms of 0.0712 over the 1.96 m slant wanders the refracted sun
+by **87 mm** — against a shadow only **221 mm wide** across the beam. So section
+I's *"a reduction, not a hole, with the caustic net legible inside it"* comes out
+**true**, by a mechanism the bar does not name: not translucency — a water polo
+ball is opaque rubber and transmits nothing, and the caustic factor at the umbra's
+core really is zero — but the same slope field that writes the net smearing the
+shadow's own edges into it. The net inside the shadow and the softness of its edge
+are **one mechanism**, and it is the mechanism that writes the caustics.
+
+The magnitude is marked. The step unit's own shadow lands 0.685 m east of its
+outer nosing and lies on the **upsun** side of the ball's; it is excluded from the
+sample by tracing back up the beam through `scene_hit_under`, so the surviving
+umbra is the ball's downsun half and the centroid is biased long. The bearing
+carries no such bias, and the same threshold on open sunlit floor 0.90 m away
+flags 0.0037 m² of the net's own dark cells, which is the control.
+
+### Its underside is lit by the pool
+
+Above the waterline that is one line: a facet tilted `g` from the vertical sees
+the water over `(1 − N_z)/2` of its cosine-weighted hemisphere — the exact form
+factor from a differential facet to an infinite plane below it — and what comes up
+out of that plane is **`WBOUNCE`**, the same upwelling radiance the coping already
+stands in. The coping is a receiver 152 mm over the water and the ball's keel is a
+receiver 0 mm over it: one illuminant, a larger view factor.
+
+Below the waterline the receiver is submerged and the upwelling is not an air-side
+constant but **the bed itself**, 0.66 m under the keel and carrying the caustic
+net, so it is **traced**: 4096 rays on the same cosine-weighted downward
+hemisphere `bounce_gather` uses, through the same `scene_hit` and
+`submerged_radiance` every other receiver in this file reads. **76.2% of that
+hemisphere lands on the bed and 23.8% on a riser or a wall** — the ball floats
+over the step unit's outer tread — and it collects **[0.289, 1.505, 2.015]** of
+in-water radiance. One gather serves the whole cap and the licence is measured
+rather than assumed: repeated at the two ends of the 170 mm waterline circle
+against a 0.66 m standoff, the two readings differ by under a percent in green.
+
+**The refracted sun never touches the cap, and that is geometry rather than a
+simplification.** The sun arrives under the surface travelling *downward* at
+44.4 deg and every outward normal on the submerged cap points downward too — the
+steepest is at the contact line, 50.07 deg below the horizontal — so
+`n · (−TSUN_DIR) <= 0` over the whole cap. There is no direct term to write; the
+keel is lit by the pool alone.
+
+`?` The ball's own diffuse albedo is the one number about it that is not out of a
+rule book. Section I puts the float's material out of scope beyond "a plain
+diffuse colour"; this is one.
+
+### One wave and not two: the float in the window and the float in the mirror
+
+Section G calls the mirrored twin *"the single most recognisable underwater cue
+after the window itself"*, and a floating body is the case that section is
+actually written about. It is also the object that appears **inside the window at
+the same time**. Both are counted off **one buffer**:
+
+| the ball, from the underwater eye | subsamples |
+|---|---|
+| met **directly** — no interface on the path at all | **15 517** |
+| met **in the mirror** — a surface hit past the critical angle whose reflected leg lands on the hull | **2 707** |
+| met **through the window** — the transmitted share of a sub-critical ray, refracted out and met by `air_world` | **4 356** |
+
+**These came out of one surface, not two, and that is checkable rather than
+asserted.** The transmitted share and the reflected share are the two halves of a
+single `uw_interface` return, evaluated on a single `surf_stats` call and a single
+normal per subsample; the direct hit never touches the surface at all. Nothing in
+the pass mentions the ball's waterline: outside the window `R` is 1, the reflected
+ray is traced by the **hero's own downgoing `scene_hit`** from the surface point,
+and the twin folds down because the hull is where it is.
+
+Measured off the frame's own ray directions: the direct hits run **61.37–64.53 deg
+of polar angle** and the mirrored ones **60.69–62.11**, and they meet at
+**61.74 deg** — the rim of the contact circle, seen from below. They agree in
+radiance to **[1.046, 0.980, 0.985]** per channel, which is what says it is one
+surface and not two shaders. The twin is **1.43 deg deep against the hull's 3.15**:
+a 39.6 mm draught seen at 1.57 m, and a thin twin is what a shallow-draught float
+has.
+
+## The rows this round added — 17, and what each pair does not share
+
+`validate.py` was **268 pass / 0 FAIL / 53 info in 92 s** and is now
+**285 / 0 / 54 in 118 s**. The 26 s is two brute-force marches and a ray fan, and
+it is priced below. Every pair is named with what it does *not* share:
+
+- **the flotation** (tier 1 × 3, plus an INFO). render.py solves it from a
+  closed-form spherical cap and a line-tension term; the suite re-integrates the
+  displacement as a 20 000-node quadrature of `π r(z)² dz` and re-derives the
+  tension from **Keller's theorem** — the pull equals the weight of liquid the
+  meniscus displaces, a different statement about the same fillet. The INFO row is
+  the counterfactual: Archimedes alone floats the ball 2.5 mm high.
+- **the fillet at a contact angle the wall never reaches** (tier 1 × 2). The force
+  balance `rho g INT z dx = sigma sin(phi_w)` and the projected-area identity
+  `SUM(w_fil + w_occ − w_flt) = Vm z(phi*)`, both on the float's table through the
+  **shipped** `_menis_weights`. Neither is written into the quadrature.
+- **the ball as a solid** (tier 3 × 1, tier 1 × 1). A quadratic against a 0.05 mm
+  march of the implicit sphere — the tolerance *is* the step — and the agreement
+  about *which* rays hit, at no tolerance.
+- **the split condition against the rays it predicts** (tier 3). 396 pairs of
+  contact angle and refracted view angle, each fired at 4800 rays through the
+  shipped `_float_hit`. This is the row that caught the first version of the
+  derivation, which compared the ray's slope with the hull's *tangent* instead of
+  finding the tangency, and disagreed on 196 of them.
+- **switching the ball out leaves `scene_hit` bit-identical** (tier 1). The
+  comment beside the new branch says it "touches no existing line"; this is that
+  claim as a row, on rays that cannot reach the ball, with sid, u, v, distance and
+  cylinder all required to match exactly.
+- **the pool edge from below** (tier 3 × 1, tier 1 × 2). `_edge_hit` takes one
+  plane root and one circle root; the suite marches the ray against `edge_z`,
+  which is the profile the coping is *drawn* from and knows nothing of the solve.
+  Plus the agreement about which rays clear the coping, and the assertion that
+  **nothing above `ZD` is reachable from the water**.
+- **Snell's Jacobian** (tier 1). That
+  `INT cos(a)/(n² cos(w)) dOmega_a = 2π(1 − cos theta_c)` is an identity; it is
+  the weight the whole window audit is taken with, so it is what makes those
+  percentages shares of something.
+- **`float_vis` against a march** (tier 3). render.py takes the perpendicular
+  distance from the ball's centre to the sun ray; the suite walks the ray in
+  0.5 mm steps and asks whether any sample is inside the sphere. Same sphere, no
+  shared algebra. Penumbral samples are excluded **by construction** — one side is
+  a ramp and the other a step — rather than by tolerance.
+- **the shadow lands where the refraction puts it** (tier 1 × 2). The floor 1.37 m
+  downsun must be fully shadowed *and* the floor directly under the ball must be
+  in full sun. A renderer that projects the shadow downward fails on the second.
+- **`air_world` meets sky / edge / sail / float in that order** (tier 1). Four
+  rays aimed by geometry at the four things there are above this water. The kinds
+  are what the window's solid-angle audit is binned on, so a wrong code is a wrong
+  report.
+
+**Every one of them was fired at a deliberately reintroduced bug**, which is the
+rule the last three waves each found one of their own rows blind by:
+
+| bug injected into `render.py` | what fired |
+|---|---|
+| `_float_hit` drops the discriminant test (`np.where(t > 1e-6, …)`) | 6 rows, including *the two agree about WHICH rays hit* and *air_world meets sky/edge/sail/float* |
+| the sail branch removed from `air_world` | *air_world meets sky / edge / sail / float in that order* |
+| the bullnose arc branch removed from `_edge_hit` | *the edge solve and the march agree about which rays clear it* |
+| `float_vis` dropped from `sun_vis` | *the ball's shadow on the floor is dark where refraction puts it* |
+| the float's fillet built on the **wall's** `THETA_C` | 3 rows: Keller, the force balance, and the projected-area identity |
+| `bed_sun` projects the shadow straight down instead of up the beam | both shadow rows, in opposite directions |
+| the float branch clobbers `cyl` for every ray (`np.full_like`) | *scene_hit is bit-identical off the ball*, plus both sibling-tracer rows |
+| the split condition tested against the hull's tangent rather than the tangency | *the split condition vs the rays it predicts*, on 196 of 396 pairs — and this one was not an injection, it was the first version of the derivation |
+
+## What moved in the picture, and what it cost
+
+**The hero frame is no longer bit-identical, and it could not be.** The ball is in
+it, its shadow is in the caustic pass, and `scene_hit` — which the bed's and the
+walls' inter-reflection gathers run through — now has one more solid in it.
+
+| | hero | underwater |
+|---|---|---|
+| output pixels moved by > 2 sRGB levels | 13 447 of 960 000 — **1.40%** | 7 695 — **0.80%** |
+| mean absolute change over the whole frame | 0.96 levels | 0.58 levels |
+| the same, **away from the ball and its reflection** | 0.18 levels, max 29 | 0.18 levels, max 137 |
+
+That residual quarter of a percent is the internal light field settling around one
+more occluder, and it is the honest cost of not special-casing the ball out of the
+gathers.
+
+**Runtime.** The default render was 12 m 12 s and is **15 m 34 s** — +27%. The
+underwater pass alone went 51 s → **53 s**, and the rest is `scene_hit` carrying a
+sphere test through six inter-reflection passes plus the fillet ring and
+`air_world`. The suite went 92 s → **118 s**. Both are real and both are priced;
+if the sphere test in `scene_hit` ever needs to come back, the plan-space prune
+the cylinders already use is the place.
+
+`gauntlet/evidence/w17-*.png`: the float from above and from below, the window's
+rim band as an A/B against wave 16, refreshed hero, wide and underwater frames,
+and the two archived comparisons this round invalidates — the risers and the
+coping's waterline — re-rendered as wave 16 above / wave 17 below so that what did
+*not* move is as readable as what did.
+
+## Still open, or marked, after this round
+
+- `?` **the ball's plan position** (5.95, 2.60) — the one choice in the float
+  block. Four constraints leave a small region: in the sun (the sail's shadow
+  reaches x = 4.5 at this y), its shadow clear of the step unit's outer nosing and
+  of the east wall, in **both** frames at once, and outside the disc Snell's window
+  lands on from the underwater eye (radius 0.792 m — a ball inside it would carry
+  no mirrored twin at all). This is a choice inside that region.
+- `?` **the ball's albedo**, out of scope by section I's own ruling.
+- `?` **the ring's curvature**, 3.2% on the climb, one-signed.
+- `?` **the shadow's measured displacement**, biased long by the step unit's own
+  shadow being excluded from the sample. The bearing is unbiased.
+- `?` **the wave field does not part around the hull.** The ball rides the surface;
+  it does not displace it, radiate a ring or leave a wake. Section I asks for none
+  of those and the file does not pretend to them.
+- `?` **the world beyond the terrace is still `sky()`.**
+- `?` **the underwater pass still has no adaptive edge refinement**, so the ball's
+  silhouette and its twin are estimated at 3×3 where the hero's would be at 8×8.
+  It shows as a slightly ragged edge on a 15 000-subsample object.
+- and the standing `?` on **`0.30`**, the last underived number above the water,
+  which the ball's own direct-sun term now also carries — deliberately, because
+  using anything else would make the ball and the coping two different exposures of
+  one sun.
 
 ## Measured — two illuminants derived from one atmosphere, and the ordering still does **not** emerge
 

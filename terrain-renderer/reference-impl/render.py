@@ -880,6 +880,241 @@ MENIS_W = 2.0 * CAP_A                               # fillet reach, ~2 a
 # vacuous nor satisfiable by shrinking the map.
 WTOP = float(MENIS_H)
 
+
+# ------------------------------------------------------------------ THE FLOAT
+# Bar section I, and the section says what it is for: "it is not decoration, it
+# is a water-physics instrument. Every criterion below is a reading of the wave
+# field or of the medium." A float earns its place because it TOUCHES THE
+# SURFACE, which nothing else in this scene does -- the coping stands 152 mm
+# over it, the step unit hangs 205 mm under it -- so it is the only body in the
+# frame that reads the wave field IN PROFILE.
+#
+# WHAT IT IS, AND WHY IT HAS NO FREE NUMBER IN IT. The obvious choice is the
+# section's own reference photograph, an inflatable ring; the obvious choice is
+# also the one with the worst instrument in it, and the reason is Archimedes. An
+# air-filled PVC ring of tube radius 90 mm and skin 0.25 mm has an effective
+# density of 8.4 kg/m^3, so it floats with 0.84% of its volume under: 9 mm of a
+# 180 mm tube. Its waterline is then a millimetre-scale feature and the
+# "cut in two by refraction" the section asks for is a millimetre of
+# displacement. The same arithmetic kills the beach ball (17 mm of a 360 mm
+# sphere). AN INFLATABLE IS THE WRONG INSTRUMENT, and it is worth saying why
+# rather than shipping one and calling the reading faint.
+#
+# What is taken instead is a WATER POLO BALL, FINA size 5, and it is taken
+# because both numbers that decide the flotation are PUBLISHED rather than
+# chosen: circumference 0.68-0.71 m and mass 400-450 g (FINA Water Polo Rules,
+# equipment). Mid-range on both gives R = 0.1106 m and m = 0.425 kg, a mean
+# density of 75 kg/m^3 -- eighteen percent of the ball under water instead of
+# four, on an object that is genuinely found in a pool. Nothing about the
+# flotation is a dial: the two numbers come from a rule book and the third,
+# below, comes from a force balance.
+#
+# THE DRAUGHT IS SOLVED, NOT SET, AND THE MENISCUS IS IN THE SOLVE. A floating
+# body at capillary scale is not held up by displacement alone. Writing beta for
+# the polar angle of the contact circle measured from the ball's lower pole, the
+# vertical force balance over the wetted cap plus the contact line is
+#
+#     m = rho [ V_cap(beta) - z_w * pi r_w^2 ]  -  (sigma/g) 2 pi r_w sin(phi_w)
+#
+#     V_cap = pi h^2 (3R - h)/3,  h = R(1 - cos beta)      the cap below the line
+#     r_w   = R sin beta                                   contact circle radius
+#     z_w   = 2a sin(beta/2)                               the climb, from B3
+#     phi_w = beta                                         see the next paragraph
+#
+# The first bracket is the pressure integral over the wetted cap, taken by the
+# divergence theorem against the FAR-FIELD water plane rather than against the
+# contact plane -- that is what the -z_w pi r_w^2 term is, and dropping it is the
+# usual way this comes out wrong. The second is the contact line's own pull: the
+# meniscus is RAISED here, so the surface tension acts DOWNWARD on the ball and
+# the ball floats deeper than Archimedes alone would put it. Both extra terms
+# push the same way and together they are worth 12% of the ball's weight, which
+# is not a correction anybody may drop at this size.
+#
+# phi_w = beta IS THE FILE'S OWN CONTACT ANGLE, TRANSPLANTED. THETA_C = 0 above
+# -- perfect wetting -- means the free surface leaves the solid TANGENTIALLY, so
+# the surface tilt at the contact line equals the hull's own tilt there; on a
+# sphere the tangent plane at polar angle beta rises at exactly beta from the
+# horizontal. The wall's phi_w = 90 - THETA_C is the same statement on a
+# VERTICAL solid. So the float's meniscus is not a second model: it is section
+# B3's fillet with the wall's 90 deg replaced by the hull's own local angle,
+# which is the whole content of "does the meniscus term generalise off a
+# straight wall".
+#
+# WHERE IT SITS. Four constraints, and between them they leave a small region:
+#   * IN THE SUN. Inside the sail's shadow there is no caustic net to be legible
+#     inside the float's own shadow, so the sail's shadow quad (which reaches
+#     x = 4.5 at this y) rules out the west half of the basin.
+#   * ITS SHADOW ON THE FLOOR. The refracted sun runs 44.4 deg from vertical, so
+#     the shadow lands 1.37 m east of the ball at 1.40 m; it has to clear the
+#     step unit's outer nosing (r = 1.5 m about (6.0, 4.0)) and the east wall.
+#   * IN BOTH FRAMES. The hero looks WNW from the east deck and the underwater
+#     eye looks WNW from inside the water 2.8 m further in, so the two fields
+#     overlap in a wedge and the ball has to be in it.
+#   * OUTSIDE SNELL'S WINDOW as the underwater eye sees it. The window lands on
+#     the surface as a disc of radius d tan(theta_c) = 0.792 m about the eye's
+#     vertical; a ball INSIDE that disc would be seen against the transmitted
+#     sky and would carry no mirrored twin, which is the one thing section G
+#     says the frame is for. At 1.35 m from the eye's vertical it sits in the
+#     mirror regime, and its own hull is then met twice -- once directly and
+#     once folded down off the underside of the surface.
+# (5.95, 2.60) satisfies all four; it is a choice inside that region and it is
+# the only choice in this block, marked below.
+FLOAT_ON = _os.environ.get('POOL_NOFLOAT', '') in ('', '0', 'no', 'off')
+FLOAT_C_M = 0.695           # m, FINA size 5 circumference, mid of 0.68-0.71
+FLOAT_R = FLOAT_C_M / (2. * np.pi)                  # 0.11061 m
+FLOAT_M = 0.425             # kg, FINA size 5, mid of 0.400-0.450
+FLOAT_XY = np.array([5.95, 2.60])   # ? the one choice in this block; see above
+RHO_W = 1000.0              # the same 1000 CAP_A is built on, named rather than
+                            # written twice
+FLOAT_R2 = FLOAT_R * FLOAT_R
+
+
+def _float_forces(beta):
+    """(displacement, contact-plane term, line-tension term) in kg, at contact
+    polar angle `beta`. Three terms so the balance can be reported as a split
+    rather than as one root, and so `validate.py` can fire at each separately."""
+    h = FLOAT_R * (1. - np.cos(beta))
+    Vc = np.pi * h * h * (3. * FLOAT_R - h) / 3.
+    rw = FLOAT_R * np.sin(beta)
+    zw = 2. * CAP_A * np.sin(.5 * beta)
+    return (RHO_W * Vc, -RHO_W * zw * np.pi * rw * rw,
+            -(SIGMA_W / 9.81) * 2. * np.pi * rw * np.sin(beta))
+
+
+def _float_solve(lo=1e-5, hi=np.pi - 1e-5, n=200):
+    """The contact angle that floats the ball, by bisection on the balance. A
+    bisection rather than a fixed point because the balance is monotone in beta
+    over (0, pi/2] and a fixed point would hide a sign error in one of the three
+    terms; the bracket is asserted."""
+    f = lambda b: sum(_float_forces(b)) - FLOAT_M
+    assert f(lo) < 0. < f(hi), 'the ball does not float at any contact angle'
+    for _ in range(n):
+        m = .5 * (lo + hi)
+        lo, hi = (m, hi) if f(m) < 0. else (lo, m)
+    return .5 * (lo + hi)
+
+
+FLOAT_BETA = _float_solve()
+FLOAT_PHW = FLOAT_BETA                      # the fillet's tilt at the hull
+FLOAT_H = FLOAT_R * (1. - np.cos(FLOAT_BETA))          # cap depth below the line
+FLOAT_RW = FLOAT_R * np.sin(FLOAT_BETA)                # contact circle radius
+FLOAT_ZW = 2. * CAP_A * np.sin(.5 * FLOAT_BETA)        # climb at the hull
+_ffd, _ffp, _fft = _float_forces(FLOAT_BETA)
+print("\nthe float -- a FINA size 5 ball, R %.4f m (C = %.3f m) and %.3f kg, "
+      "mean density %.1f kg/m3" % (FLOAT_R, FLOAT_C_M, FLOAT_M,
+                                   FLOAT_M / (4. / 3. * np.pi * FLOAT_R ** 3)))
+print("  it floats at a contact angle of %.2f deg from its lower pole: draught "
+      "%.1f mm of a %.1f mm ball (%.1f%%), waterline circle %.1f mm across, and "
+      "the fillet climbs %.2f mm up the hull at phi_w = %.2f deg"
+      % (np.degrees(FLOAT_BETA), 1000 * FLOAT_H, 2000 * FLOAT_R,
+         100 * FLOAT_H / (2 * FLOAT_R), 2000 * FLOAT_RW, 1000 * FLOAT_ZW,
+         np.degrees(FLOAT_PHW)))
+print("  the balance, in kg: displacement %.4f, contact plane %+.4f, line "
+      "tension %+.4f -> %.4f against m = %.4f. The two capillary terms are "
+      "%.1f%% of the weight, so the draught is NOT Archimedes alone"
+      % (_ffd, _ffp, _fft, _ffd + _ffp + _fft, FLOAT_M,
+         100 * abs(_ffp + _fft) / FLOAT_M))
+
+# --- AND WHERE THE WAVE FIELD PUTS IT ----------------------------------------
+# Two readings of the same field, and neither is a new number.
+#
+# ATTITUDE. The ball's up is the surface normal under it -- but filtered at the
+# BALL'S OWN BEAM, not at a pixel. A floating body follows wave components long
+# against its own size and averages out the short ones, and that is exactly what
+# `grad_points(x, y, fp)` does: fp is a low-pass on the slope field at a stated
+# length. Handing it the ball's diameter is the response function, not a blur.
+# This scene's field has its longest carrier at 0.53 m against a 0.221 m ball,
+# so the ball is inside the carriers and outside the 28 mm wind band, which is
+# the regime a float is an instrument in at all -- and the tilt it comes out
+# with is printed rather than assumed visible.
+#
+# HEIGHT. render.py has no height field: field.py answers slopes. `_waterline`
+# already solves that along a wall by integrating the along-wall slope; the same
+# integral at a POINT is the mean of eta(P + L u) - eta(P) over a ring of
+# directions u, which is eta(P) minus the mean elevation on a circle of radius
+# L about it. That is the elevation relative to the surroundings at scale L --
+# a high-passed elevation, which is what `_waterline` also reports and for the
+# same reason (integrating a zero-mean field over an unbounded path is a random
+# walk). L = 0.5 m is `_waterline`'s own high-pass scale, taken here unchanged.
+#
+# BOTH READINGS ARE TAKEN AFTER `_norm_jets()`, several hundred lines down, and
+# that is not a tidiness choice: field.py's jet amplitudes are unnormalised
+# until that call, so a slope read before it is 400x too large and the ball
+# would ride at 31 deg of tilt on a surface whose real rms is 0.076. The
+# placement is a function called at the caustic pass's head; only the FLOTATION
+# -- which knows nothing about the field -- is solved here.
+FLOAT_FP = 2.0 * FLOAT_R            # the response low-pass: the ball's own beam
+FLOAT_N = np.array([0., 0., 1.])
+FLOAT_ETA = 0.0
+FLOAT_TILT = 0.0
+FLOAT_CEN = np.array([FLOAT_XY[0], FLOAT_XY[1], FLOAT_ZW + FLOAT_R - FLOAT_H])
+FLOAT_CON = FLOAT_CEN - FLOAT_N * (FLOAT_R - FLOAT_H)
+FLOAT_TOP = float(FLOAT_CEN[2] + FLOAT_R)
+
+
+def _float_eta(L=0.5, nd=96, ns=40):
+    """Surface elevation at the ball, relative to the mean on a circle of radius
+    L about it: -mean over directions of the line integral of the slope."""
+    th = (np.arange(nd) + .5) / nd * 2. * np.pi
+    ux, uy = np.cos(th), np.sin(th)
+    s = (np.arange(ns) + .5) / ns * L
+    px = (FLOAT_XY[0] + ux[:, None] * s[None]).ravel()
+    py = (FLOAT_XY[1] + uy[:, None] * s[None]).ravel()
+    gx, gy = grad_points(px, py, FLOAT_FP)
+    d = (gx.reshape(nd, ns) * ux[:, None] + gy.reshape(nd, ns) * uy[:, None])
+    return -float((d.sum(1) * (L / ns)).mean())
+
+
+def _float_place():
+    """Put the ball on the field. Called once, after `_norm_jets()`."""
+    global FLOAT_N, FLOAT_ETA, FLOAT_TILT, FLOAT_CEN, FLOAT_CON, FLOAT_TOP
+    g = grad_points(np.array([FLOAT_XY[0]]), np.array([FLOAT_XY[1]]), FLOAT_FP)
+    n = normal_from_grad(g[0], g[1])
+    FLOAT_N = np.array([float(n[0][0]), float(n[1][0]), float(n[2][0])])
+    FLOAT_TILT = float(np.degrees(np.arccos(np.clip(FLOAT_N[2], -1, 1))))
+    FLOAT_ETA = _float_eta()
+    # the ball's centre: up the local normal from the local water plane by the
+    # climb (which is where the contact line stands) plus R - h (which is where
+    # the centre stands over the contact plane).
+    FLOAT_CEN = (np.array([FLOAT_XY[0], FLOAT_XY[1], FLOAT_ETA])
+                 + FLOAT_N * (FLOAT_ZW + FLOAT_R - FLOAT_H))
+    FLOAT_CON = FLOAT_CEN - FLOAT_N * (FLOAT_R - FLOAT_H)
+    FLOAT_TOP = float(FLOAT_CEN[2] + FLOAT_R)
+    print("the float rides the field it is in: the local slope at the ball's "
+          "own %.0f mm beam is %.4f, so it sits %.3f deg off level and its "
+          "waterline tilts by that; local elevation %+.2f mm. The crown stands "
+          "%.1f mm over the still plane and the keel %.1f mm under it."
+          % (1000 * FLOAT_FP, np.hypot(g[0][0], g[1][0]), FLOAT_TILT,
+             1000 * FLOAT_ETA, 1000 * FLOAT_TOP,
+             1000 * (FLOAT_CEN[2] - FLOAT_R)))
+
+
+def _float_hit(px, py, pz, tx, ty, tz):
+    """First ENTRY of a ray into the ball, or BIG. Directions are unit -- every
+    caller's `t` is a path length that Beer-Lambert is evaluated on, so they
+    have to be. A ray that STARTS inside the ball gets BIG rather than the exit
+    root: the only rays that do are caustic rays launched from the patch of
+    surface the ball is sitting on, they carry the ball's own shadow and so
+    almost no weight, and giving them the inside face would give them a normal
+    pointing the wrong way."""
+    ox = np.asarray(px) - FLOAT_CEN[0]
+    oy = np.asarray(py) - FLOAT_CEN[1]
+    oz = np.asarray(pz) - FLOAT_CEN[2]
+    b = ox * tx + oy * ty + oz * tz
+    c = ox * ox + oy * oy + oz * oz - FLOAT_R2
+    disc = b * b - c
+    ok = disc > 0.
+    t = -b - np.sqrt(np.where(ok, disc, 0.))
+    return np.where(ok & (t > 1e-6), t, BIG)
+
+
+def float_normal(hx, hy, hz):
+    """Outward unit normal at a point on the hull. A sphere, so it is the radius
+    and there is nothing to interpolate."""
+    return ((hx - FLOAT_CEN[0]) / FLOAT_R, (hy - FLOAT_CEN[1]) / FLOAT_R,
+            (hz - FLOAT_CEN[2]) / FLOAT_R)
+
+
 def refract(ix, iy, iz, nx, ny, nz, eta):
     """Snell's law as a direction map, WITH its total-internal-reflection branch.
 
@@ -1016,9 +1251,26 @@ def scene_hit(px, py, tx, ty, tz, pz=0.0):
         sid[j] = np.where(cf[take], 5, 0).astype(np.int8)
         cyl[j] = ci[take]
 
+    # THE FLOAT, as id 7. It is added HERE rather than as a sibling tracer for
+    # the reason the sibling argument itself gives: what was refused before was
+    # a new id that changed the meaning of an EXISTING branch (the cylinder
+    # entry's sign, the floor's root). This adds a solid that is disjoint from
+    # every one of them and touches no existing line -- the argmin above is
+    # already complete and this is one more candidate compared against its
+    # result. `validate.py` fires the tracer with the ball switched out and
+    # asserts the frame's geometry buffer is unchanged everywhere the ball is
+    # not, which is what makes "touches no existing line" checkable.
+    if FLOAT_ON:
+        ft = _float_hit(px, py, pz, tx, ty, tz)
+        tk = ft < sm
+        sm = np.where(tk, ft, sm)
+        sid = np.where(tk, np.int8(7), sid).astype(np.int8)
+        cyl = np.where(tk, np.int8(-1), cyl).astype(np.int8)
+
     hx, hy, hz = px + tx * sm, py + ty * sm, pz + tz * sm
-    u = np.where((sid == 0) | (sid == 5), hx, np.where(sid <= 2, hy, hx))
-    v = np.where((sid == 0) | (sid == 5), hy, hz)
+    flat = (sid == 0) | (sid == 5) | (sid == 7)
+    u = np.where(flat, hx, np.where(sid <= 2, hy, hx))
+    v = np.where(flat, hy, hz)
     return sid, u, v, sm, cyl
 
 
@@ -1126,8 +1378,19 @@ def scene_hit_under(px, py, pz, tx, ty, tz):
         sm[j] = ct[take]
         sid[j] = np.where(cf[take], 5, 0).astype(np.int8)
         cyl[j] = ci[take]
+    # the float, as id 7, and it must be compared against the SURFACE root too:
+    # an upgoing ray under the ball meets the hull before it meets z = 0, and a
+    # ray that met z = 0 first inside the waterline circle would be refracting
+    # at a surface the ball is standing on. The argmin above already holds the
+    # surface as id 6, so one comparison settles both.
+    if FLOAT_ON:
+        ft = _float_hit(px, py, pz, tx, ty, tz)
+        tk = ft < sm
+        sm = np.where(tk, ft, sm)
+        sid = np.where(tk, np.int8(7), sid).astype(np.int8)
+        cyl = np.where(tk, np.int8(-1), cyl).astype(np.int8)
     hx, hy, hz = px + tx * sm, py + ty * sm, pz + tz * sm
-    flat = (sid == 0) | (sid == 5) | (sid == 6)
+    flat = (sid == 0) | (sid == 5) | (sid == 6) | (sid == 7)
     u = np.where(flat, hx, np.where(sid <= 2, hy, hx))
     v = np.where(flat, hy, hz)
     return sid, u, v, sm, cyl
@@ -1282,13 +1545,47 @@ def sail_vis(x, y):
             (SHADOW[iv + 1, iu] * (1 - du) + SHADOW[iv + 1, iu + 1] * du) * dv)
 
 
+def float_vis(x, y, z=0.0):
+    """The ball's own shadow ON THE WATER SURFACE, with the sun's disc in it.
+
+    THE SHADOW IS CAST IN AIR AND NOWHERE ELSE, which is the whole reason the
+    float's shadow on the BED is displaced. The ball floats on the surface, so
+    the beam it interrupts is interrupted above the water; the surviving beam
+    then refracts to 44.4 deg and runs 1.37 m east before it reaches the floor.
+    Nothing here knows that -- this returns the visibility at the SURFACE, and
+    the displacement is the refraction the caustic pass already does. A shadow
+    painted on the bed under the ball would have needed a number; this one
+    cannot have one.
+
+    The penumbra is the sun's own 0.53 deg over the standoff to the hull, which
+    at 0.2-0.6 m is 2-5 mm: a hard edge on the water, and the soft edge the bed
+    gets comes from `sig_at` over the 1.4 m of water below it. Same construction
+    as `coping_vis` -- a ramp of the disc's width about the geometric edge."""
+    if not FLOAT_ON:
+        return np.ones_like(np.asarray(x, float))
+    ox = np.asarray(x, float) - FLOAT_CEN[0]
+    oy = np.asarray(y, float) - FLOAT_CEN[1]
+    oz = np.asarray(z, float) - FLOAT_CEN[2]
+    b = ox * SUN_DIR[0] + oy * SUN_DIR[1] + oz * SUN_DIR[2]
+    perp = np.sqrt(np.maximum(ox * ox + oy * oy + oz * oz - b * b, 0.))
+    behind = b < 0.                     # the ball is toward the sun from here
+    s = np.maximum(-b, 1e-6)            # standoff along the beam
+    # the 0.53 deg is the disc's FULL angle, which is the width `_LPEN` above
+    # already uses for the coping's own penumbra -- one convention, two edges.
+    return np.where(behind,
+                    np.clip((perp - FLOAT_R) / (np.deg2rad(0.53) * s) + .5,
+                            0., 1.), 1.)
+
+
 def sun_vis(x, y):
     """Sun visibility ON THE WATER SURFACE, and only there: the sail's shadow
-    times the coping lip's. Every caller is a point on or under the water --
-    the caustic launch grid, `bed_sun`'s surface entry point. Stone takes
-    `sail_vis` alone (see `_stone`), because `coping_vis` measures the run from
-    a point INSIDE the pool to the lip and is meaningless outside it."""
-    return sail_vis(x, y) * coping_vis(x, y)
+    times the coping lip's times the float's. Every caller is a point on or
+    under the water -- the caustic launch grid, `bed_sun`'s surface entry point.
+    Stone takes `sail_vis` alone (see `_stone`), because `coping_vis` measures
+    the run from a point INSIDE the pool to the lip and is meaningless outside
+    it, and because the ball cannot reach the coping: its shadow on the water
+    runs east and every coping east of it is 1.7 m away across dry stone."""
+    return sail_vis(x, y) * coping_vis(x, y) * float_vis(x, y)
 
 
 def stone_vis(x, y):
@@ -1306,6 +1603,8 @@ def stone_vis(x, y):
 
 # --------------------------------------------------------------------------- caustic pass
 _norm_jets()
+if FLOAT_ON:
+    _float_place()
 print("caustic pass: %.1f M rays x 4 sets" % (RAY_NX * RAY_NY / 1e6))
 bed = [np.zeros((CAU_NY, CAU_NX)) for _ in range(4)]        # 0,1,2 = RGB ; 3 = mono
 wall = [[np.zeros((WNV, WNU)) for _ in range(4)] for _ in range(4)]
@@ -4685,6 +4984,314 @@ def paving(x, y, z, s, vdir, fp):
     return out
 
 
+# ------------------------------------------- THE FLOAT'S TWO SIDES, AND THE SKY
+# THE ILLUMINANT ON A TILTED FACET, TABULATED RATHER THAN RAMPED. `_stone` gives
+# a stone facet `SKY_DECK * (.55 + .45 Nz)`, which is a linear stand-in for the
+# cosine integral; on a sphere every normal in the hemisphere occurs, including
+# the ones pointing at the sun's aureole and the ones pointing away from it, so
+# the stand-in's error is a shading term rather than a level. `env_irradiance`
+# is the exact integral and it is already built; the only reason it is not
+# called per pixel is cost, so it is called on a LATTICE of normals instead.
+# The environment has exactly two axes -- the zenith gradient and the sun's own
+# aureole -- so the lattice is (n_z, azimuth from the sun) and nothing else, and
+# a bilinear read of it is exact to the lattice's own curvature. 33 x 24 = 792
+# hemisphere integrals, done as one BLAS product per chunk.
+FLOAT_ENZ, FLOAT_ENA = 33, 24
+_fez = np.linspace(-1., 1., FLOAT_ENZ)
+_fea = (np.arange(FLOAT_ENA) + .5) / FLOAT_ENA * 2. * np.pi
+_sun_az = np.arctan2(SUN_DIR[1], SUN_DIR[0])
+_FE = np.zeros((FLOAT_ENZ, FLOAT_ENA, 3))
+_fnz = np.repeat(_fez, FLOAT_ENA)
+_fst = np.sqrt(np.maximum(1. - _fnz ** 2, 0.))
+_fnx = _fst * np.cos(np.tile(_fea, FLOAT_ENZ) + _sun_az)
+_fny = _fst * np.sin(np.tile(_fea, FLOAT_ENZ) + _sun_az)
+for _c0 in range(0, _fnz.size, 64):
+    _n = slice(_c0, _c0 + 64)
+    _w = np.clip(np.outer(_fnx[_n], ENV_DX) + np.outer(_fny[_n], ENV_DY)
+                 + np.outer(_fnz[_n], ENV_DZ), 0., None) * ENV_DW
+    _FE.reshape(-1, 3)[_n] = (_w @ ENV_L) / np.pi
+del _fnx, _fny, _fnz, _fst
+print("the float's sky illuminant, tabulated: env_irradiance over %d x %d "
+      "normals; zenith %s against SKY_DECK %s, horizon-toward-sun %s, "
+      "horizon-away %s, nadir %s"
+      % (FLOAT_ENZ, FLOAT_ENA, np.round(_FE[-1, 0], 4), np.round(SKY_DECK, 4),
+         np.round(_FE[FLOAT_ENZ // 2, 0], 4),
+         np.round(_FE[FLOAT_ENZ // 2, FLOAT_ENA // 2], 4),
+         np.round(_FE[0, 0], 4)))
+
+
+def float_sky_E(nx, ny, nz):
+    """E(N)/pi over the sky hemisphere for a hull normal, off the lattice."""
+    fz = np.clip((nz + 1.) * .5 * (FLOAT_ENZ - 1), 0., FLOAT_ENZ - 1.001)
+    az = (np.arctan2(ny, nx) - _sun_az) % (2. * np.pi)
+    fa = az / (2. * np.pi) * FLOAT_ENA - .5
+    iz = fz.astype(np.int64); dz = fz - iz
+    ia = np.floor(fa).astype(np.int64); da = fa - ia
+    i0, i1 = ia % FLOAT_ENA, (ia + 1) % FLOAT_ENA
+    return (((_FE[iz, i0] * (1 - da)[:, None] + _FE[iz, i1] * da[:, None])
+             * (1 - dz)[:, None])
+            + ((_FE[iz + 1, i0] * (1 - da)[:, None]
+                + _FE[iz + 1, i1] * da[:, None]) * dz[:, None]))
+
+
+# ? THE BALL'S ALBEDO. Section I puts the float's own material out of scope
+# ? beyond "a plain diffuse colour", so this is one, and it is the only number
+# ? about the ball that is not out of a rule book. FINA size 5 balls are yellow;
+# ? this is a yellow of the same reflectance class as the coping's sandstone so
+# ? that the two are lit by the same illuminants at the same level and any
+# ? difference between them in the frame is geometry rather than albedo.
+FLOAT_ALB = np.array([.78, .62, .13])
+FLOAT_ALB_WET = wet_albedo(FLOAT_ALB[None])[0]
+# the standoff to the bed under the ball. FLOAT_LUP -- what the keel actually
+# gathers off it -- is traced further down the file, where `submerged_radiance`
+# exists to be traced through.
+FLOAT_BEDZ = float(bed_z(np.array([FLOAT_XY[0]]), np.array([FLOAT_XY[1]]))[0])
+FLOAT_STAND = float(FLOAT_CEN[2] - FLOAT_R - FLOAT_BEDZ)
+FLOAT_LUP = np.zeros(3)
+
+
+def float_air(hx, hy, hz, vdir, fp=None):
+    """The hull ABOVE the water, as a plain diffuse body. Three terms and no
+    fourth, and the third is the one section I is about:
+      * the sun, through `sail_vis` and the ball's own terminator. It carries
+        the same underived 0.30 every other above-water direct term in this
+        file carries (see `Open -- the 0.30`); using anything else here would
+        make the ball and the coping two different exposures of one sun.
+      * the sky, `float_sky_E` -- the exact cosine integral of the same `sky()`
+        the water reflects, per normal.
+      * THE POOL. A facet tilted g from the vertical sees the water over
+        (1 - N_z)/2 of its cosine-weighted hemisphere -- the exact form factor
+        from a differential facet to an infinite plane below it -- and what
+        comes up out of that plane is `WBOUNCE`, the same upwelling radiance the
+        coping already stands in. This is bar section I's "its underside is lit
+        by the pool, not by the sky", and it needs no new quantity: the coping
+        is a receiver 152 mm over the water and the ball's keel is a receiver
+        0 mm over it, so it is the same illuminant at a larger view factor."""
+    nx, ny, nz = float_normal(hx, hy, hz)
+    ndl = np.clip(nx * SUN_DIR[0] + ny * SUN_DIR[1] + nz * SUN_DIR[2], 0., 1.)
+    vis = np.asarray(sail_vis(hx, hy), float)
+    lift = SAIL_TAU * (1. - vis) * sail_glow(hx, hy)
+    return FLOAT_ALB[None] * (
+        SUN_COL[None] * (ndl * vis + SUN_DIR[2] * lift)[:, None] * .30
+        + float_sky_E(nx, ny, nz)
+        + WBOUNCE[None] * (.5 * (1. - nz))[:, None])
+
+
+def float_wet(hx, hy, hz):
+    """The hull BELOW the water, in IN-WATER radiance, per channel as a column.
+
+    THE REFRACTED SUN NEVER TOUCHES IT, and that is geometry rather than a
+    simplification: the sun arrives under the surface travelling DOWNWARD at
+    44.4 deg, and every outward normal on the submerged cap points downward too
+    -- the steepest is at the contact line, where it is 50.1 deg BELOW the
+    horizontal. So `n . (-TSUN_DIR) <= 0` over the whole cap, there is no direct
+    term to write, and the keel is lit by the pool alone. `validate.py` asserts
+    that over the cap rather than leaving it as a sentence.
+
+    What is left is the two halves of its hemisphere:
+      * DOWN, the bed -- and the bed under this ball is sunlit and carries the
+        caustic net, so the keel carries a net too, blurred by its own gather.
+        The gather is a cosine-weighted average of the bed over a patch the
+        standoff's own width; `FLOAT_LUP` is that average, measured off the
+        bed's own map rather than off WBOUNCE, and the variation of it across
+        the cap is measured and printed below rather than assumed flat.
+      * UP, the underside of the surface, which every other submerged receiver
+        in this file takes as `SKY_AMB` and which is taken as that here, over
+        the same 1.55 slant the diffuse path in `shade()` uses."""
+    nx, ny, nz = float_normal(hx, hy, hz)
+    fd = .5 * (1. - nz)                 # share of the hemisphere below horizontal
+    return FLOAT_ALB_WET[None] * (FLOAT_LUP[None] * fd[:, None]
+                                  + SKY_AMB[None] * (1. - fd)[:, None])
+
+
+# --------------------------------------------------- THE WORLD ABOVE THE WATER
+# Wave 13 built the camera under the water and left this open, in its own words:
+# "THE WORLD ABOVE THE WATER IS `sky()` AND NOTHING ELSE. A refracted ray
+# leaving at theta_a near 90 deg points at the coping, the deck and the shade
+# sail and gets sky." It measured the band that band occupies at the rim and
+# left the rest. This is that function, and it is built out of the scene's OWN
+# geometry -- no environment map enters, and the reason is not taste: this
+# renderer's sky is derived from the atmosphere recovered from `SUN_COL`, so a
+# library image would break the coupling between the direct and the indirect
+# light that the whole illuminant section rests on, and no HDRI is calibrated in
+# cd/m^2 anyway.
+#
+# WHAT IS UP THERE, and it is a short list because the scene is a short list:
+#   * THE POOL'S OWN EDGE. A ray leaving the surface and heading at a wall
+#     crosses that wall's vertical face at height z = r cot(theta_a): below
+#     ZLIP it meets the blue freeboard band, between ZLIP and ZD it meets the
+#     bullnose, above ZD it clears the coping and is gone. So the edge is
+#     reachable only at grazing exit angles -- and, crucially, from ANY exit
+#     point, because a ray at 89.9 deg crosses the whole basin rising 10 mm.
+#     THE DECK ITSELF IS NOT REACHABLE AT ALL and that is worth saying: it is a
+#     horizontal plane ABOVE the water, an upgoing ray that has cleared the
+#     coping never returns, and one that has not cleared it met the face first.
+#     The window contains the coping's poolward SECTION and no paving.
+#   * THE SHADE SAIL, which is the one thing overhead. It is the same quad the
+#     shadow pass projects and the hero's own `hit_sail` tests, and it is met
+#     with the same radiance the hero gives it, hoisted to `SAIL_UNDER` so there
+#     is one constant rather than two.
+#   * THE FLOAT, which is the reason this wave builds both at once: a ball
+#     sitting ON the surface is the one object that appears in the window AND
+#     in the mirror around it, out of one surface.
+#   * EVERYTHING ELSE IS STILL `sky()`, and that is left marked: what lies
+#     beyond the terrace -- a landscape, a fence, cloud, the trees the section G
+#     reference photograph is full of -- is not in this scene and is not
+#     invented here.
+# --- THE SAIL'S UNDERSIDE, DERIVED -- AND THE WINDOW IS WHAT EXPOSED IT ------
+# The hero gave the sail `[.74, .72, .76] * (SKY_AMB * 1.6 + SUN_COL * .22)`,
+# with no derivation attached and two invented multipliers in it. It survived
+# because the sail is above the hero frame's top edge and lands on essentially
+# no pixels; the window shows the WHOLE panel, and section G's own argument --
+# that every above-water shortcut invisible from a 33 deg downward view becomes
+# visible from underneath -- collects another one here.
+#
+# What a shade fabric's underside carries is two terms and there is no third:
+#   * WHAT IT TRANSMITS. SAIL_TAU is already in this file as the fabric's
+#     diffuse transmittance, and the panel is very nearly horizontal, so the
+#     irradiance on its top is the deck's own: `SUN_COL * cos_i * 0.30` (the
+#     file's one open above-water constant, taken here rather than a second
+#     one) plus `SKY_DECK`.
+#   * WHAT IT REFLECTS OF THE GROUND UNDER IT, which is the terrace standing in
+#     its own shade. A downward facet over an infinite plane takes exactly half
+#     of it, so the term is rho_sail * L_deck_shaded / 2, and L_deck_shaded is
+#     `_stone`'s own expression with vis = 0 and the sail's own glow lift.
+# The fabric's albedo triple is the one the old constant already carried; every
+# other number in it is now a quantity this file derives elsewhere.
+SAIL_ALB = np.array([.74, .72, .76])          # the old constant's own triple
+_sail_top = SUN_COL * SUN_DIR[2] * .30 + SKY_DECK
+_deck_shade = PAV_ALB * (SUN_COL * SUN_DIR[2] * SAIL_TAU * .30 + SKY_DECK)
+SAIL_UNDER = SAIL_TAU * _sail_top + SAIL_ALB * .5 * _deck_shade
+_SAIL_OLD = SAIL_ALB * (SKY_AMB * 1.6 + SUN_COL * .22)
+print("the sail's underside: derived %s = transmitted %s + reflected off the "
+      "shaded terrace %s. It shipped as %s, i.e. %s of the derived value -- a "
+      "shade sail that read BRIGHTER than the sky it shades. What it costs the "
+      "hero frame is printed with the camera below."
+      % (np.round(SAIL_UNDER, 4), np.round(SAIL_TAU * _sail_top, 4),
+         np.round(SAIL_ALB * .5 * _deck_shade, 4), np.round(_SAIL_OLD, 4),
+         np.round(_SAIL_OLD / SAIL_UNDER, 2)))
+_AW_WALLS = ((0, XW0, -1.), (0, XW1, 1.), (1, YW0, -1.), (1, YW1, 1.))
+
+
+def _sail_hit(px, py, pz, tx, ty, tz):
+    """Moller-Trumbore against the sail's two triangles, with a PER-RAY origin.
+    `tri` above takes one origin and many directions, which is what a pinhole
+    camera needs; every ray here leaves the surface somewhere different."""
+    best = np.full(tx.shape, BIG)
+    o = np.stack([px, py, pz], -1)
+    d = np.stack([tx, ty, tz], -1)
+    for a, b, c in ((0, 1, 2), (0, 2, 3)):
+        A, B, C = SAIL[a], SAIL[b], SAIL[c]
+        e1, e2 = B - A, C - A
+        p = np.cross(d, e2[None])
+        det = p @ e1
+        inv = 1. / np.where(np.abs(det) < 1e-12, 1e-12, det)
+        s = o - A[None]
+        u = (s * p).sum(1) * inv
+        q = np.cross(s, e1[None])
+        v = (d * q).sum(1) * inv
+        t = (q @ e2) * inv
+        ok = (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 1e-4) & (t < best)
+        best = np.where(ok, t, best)
+    return best
+
+
+def _edge_hit(px, py, pz, tx, ty, tz):
+    """Where an UPGOING ray meets the pool's own edge, in section.
+
+    Returns (t, q) -- the distance, and the poolward offset of the hit measured
+    from the wall face at s = SLIP, so that `q < 0` flags no hit. The section is
+    the file's own `edge_z`: a vertical face from the water up to ZLIP and a
+    bullnose arc of radius BULR centred at (SBUL, ZCEN) from there to ZD. Both
+    are solved exactly, in the wall's own (outward, up) plane, and the ONE wall
+    tested is the first plane the ray crosses -- once a ray is outside the plan
+    boundary it is over the deck and the far wall does not exist there."""
+    n = tx.shape[0]
+    pz = np.broadcast_to(np.asarray(pz, float), tx.shape)
+    tp = np.full(n, BIG)
+    wq = np.zeros(n)                       # d(offset)/dt on the chosen wall
+    wsel = np.full(n, -1, np.int8)
+    for wi, (ax, pl, sg) in enumerate(_AW_WALLS):
+        dr = (tx if ax == 0 else ty) * sg
+        p0 = (px if ax == 0 else py)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            t = (pl - p0) * sg / np.where(np.abs(dr) < 1e-12, 1e-12, dr)
+        ok = (dr > 1e-12) & (t > 1e-6) & (t < tp)
+        tp = np.where(ok, t, tp)
+        wq = np.where(ok, dr, wq)
+        wsel = np.where(ok, wi, wsel)
+    zf = pz + tz * tp                       # height at the face
+    hit = (wsel >= 0) & (zf <= ZD + 1e-9)
+    t_out = np.where(hit & (zf <= ZCEN), tp, BIG)
+    q_out = np.zeros(n)
+    # the bullnose: (q - BULR)^2 + (z - ZCEN)^2 = BULR^2, q measured out from the
+    # face plane, so q = 0 at z = ZCEN and q = BULR at z = ZD. The ray is
+    # q(t) = wq (t - tp), z(t) = pz + tz t.
+    arc = np.flatnonzero(hit & (zf > ZCEN))
+    if arc.size:
+        a_ = wq[arc] ** 2 + tz[arc] ** 2
+        q0 = -wq[arc] * tp[arc]                # offset at t = 0, negative
+        z0 = pz[arc] - ZCEN
+        b_ = 2. * ((q0 - BULR) * wq[arc] + z0 * tz[arc])
+        c_ = (q0 - BULR) ** 2 + z0 * z0 - BULR * BULR
+        ds = b_ * b_ - 4. * a_ * c_
+        good = ds > 0.
+        sq = np.sqrt(np.where(good, ds, 0.))
+        ta = (-b_ - sq) / (2. * a_)
+        za = pz[arc] + tz[arc] * ta
+        qa = q0 + wq[arc] * ta
+        good &= (ta > 1e-6) & (za >= ZCEN - 1e-9) & (za <= ZD + 1e-9) & (qa >= -1e-9)
+        t_out[arc] = np.where(good, ta, BIG)
+        q_out[arc] = np.where(good, np.clip(qa, 0., BULR), 0.)
+    return t_out, q_out
+
+
+def air_world(px, py, pz, tx, ty, tz, fp=None, kind=False):
+    """The radiance an UPGOING ray leaving the water carries back down it.
+
+    This is the function the underwater camera's window reads and the one wave
+    13 left as `sky()`. It is the scene's own geometry, shaded by the scene's
+    own shaders -- `liner_band`, `_stone`, the sail's own constant, the ball's
+    own diffuse -- so that a ray that leaves the water and comes back through a
+    wall map has met exactly what a hero-camera ray meeting that wall meets."""
+    px, py, tx, ty, tz = (np.asarray(q, float) for q in (px, py, tx, ty, tz))
+    n = tx.shape[0]
+    pzv = np.broadcast_to(np.asarray(pz, float), tx.shape).astype(float)
+    out = sky(tx, ty, tz)
+    kd = np.zeros(n, np.int8)               # 0 sky, 1 edge, 2 sail, 3 float
+    te, qe = _edge_hit(px, py, pzv, tx, ty, tz)
+    ts = _sail_hit(px, py, pzv, tx, ty, tz)
+    tf = (_float_hit(px, py, pzv, tx, ty, tz) if FLOAT_ON
+          else np.full(n, BIG))
+    tm = np.minimum(np.minimum(te, ts), tf)
+    d = np.stack([tx, ty, tz], -1)
+    m = np.flatnonzero((te <= tm) & (te < BIG))
+    if m.size:
+        hx, hy = px[m] + tx[m] * te[m], py[m] + ty[m] * te[m]
+        hz = pzv[m] + tz[m] * te[m]
+        fpm = (np.full(m.size, .002) if fp is None
+               else np.maximum(np.asarray(fp, float)[m], 1e-5))
+        col = np.zeros((m.size, 3))
+        lo = hz < ZLIP - 1e-5
+        if lo.any():
+            col[lo] = liner_band(hx[lo], hy[lo], hz[lo], d[m][lo])[0]
+        hi = ~lo
+        if hi.any():
+            col[hi] = _stone(hx[hi], hy[hi], SLIP + qe[m][hi], d[m][hi], fpm[hi])
+        out[m] = col
+        kd[m] = 1
+    m = np.flatnonzero((ts < te) & (ts <= tf) & (ts < BIG))
+    if m.size:
+        out[m] = SAIL_UNDER[None]
+        kd[m] = 2
+    m = np.flatnonzero((tf < te) & (tf < ts) & (tf < BIG))
+    if m.size:
+        out[m] = float_air(px[m] + tx[m] * tf[m], py[m] + ty[m] * tf[m],
+                           pzv[m] + tz[m] * tf[m], d[m])
+        kd[m] = 3
+    return (out, kd) if kind else out
+
+
 # --------------------------------------------------------------------------- camera
 fwd = TGT - EYE; fwd /= np.linalg.norm(fwd)
 rgt = np.cross(fwd, [0, 0, 1.]); rgt /= np.linalg.norm(rgt)
@@ -4811,9 +5418,26 @@ t_hit, S_HIT, _isw, _nmar, _ndn = trace_edge(D)
 print("edge march: %d of %d rays (%.2f%%) straddle the coping"
       % (_nmar, _ndn, 100. * _nmar / max(_ndn, 1)))
 hx, hy = Ex + D[:, 0] * t_hit, Ey + D[:, 1] * t_hit
-inp = _isw & ~hit_sail
-pav = (D[:, 2] < -1e-9) & ~hit_sail & ~inp
-bgm = ~hit_sail & ~inp & ~pav             # nothing: the frame is water and stone
+# THE BALL, ON THE PRIMARY RAYS. It is the one solid between this eye and the
+# water, so it is tested against `t_hit` -- the coping/water march's own
+# distance -- and wins where it is nearer. `trace_edge` is left alone: it solves
+# a height field over the plan, the ball is not one, and putting a sphere into
+# that march would have made a bisection out of a quadratic.
+t_flt = (_float_hit(Ex, Ey, Ez, D[:, 0], D[:, 1], D[:, 2]) if FLOAT_ON
+         else np.full(D.shape[0], BIG))
+hit_float = (t_flt < t_hit) & ~hit_sail
+inp = _isw & ~hit_sail & ~hit_float
+pav = (D[:, 2] < -1e-9) & ~hit_sail & ~inp & ~hit_float
+bgm = ~hit_sail & ~inp & ~pav & ~hit_float   # nothing: the frame is water/stone
+print("the sail lands on %d of the hero's %d subsamples, so re-deriving its "
+      "underside moves %.4f%% of this frame" % (hit_sail.sum(), hit_sail.size,
+                                                100. * hit_sail.mean()))
+print("the float in the hero frame: %d of %d subsamples (%.3f%%), %.1f output "
+      "px across at %.2f m" % (hit_float.sum(), hit_float.size,
+                               100. * hit_float.mean(),
+                               2 * FLOAT_R / np.linalg.norm(FLOAT_CEN - EYE)
+                               / (FOV / (H / SS)),
+                               float(np.linalg.norm(FLOAT_CEN - EYE))))
 
 PIXANG = 2. * np.tan(FOV / 2.) / H
 FOOT = t_hit * PIXANG / np.maximum(np.abs(D[:, 2]), .10)
@@ -5041,9 +5665,17 @@ def _env_menis(rx, ry, rz):
     return np.where((rz >= 0)[:, None], col, fw * col + (1 - fw) * WBOUNCE[None])
 
 
-def _menis_weights(Vm, Vz):
+def _menis_weights(Vm, Vz, tab=None):
     """The fillet's PROJECTED AREA toward the eye, node by node, and that of the
     flat strip it replaces -- per unit length of waterline, in metres.
+
+    `tab` is (sin phi, cos phi, dd) for a fillet whose tilt at the solid is not
+    the wall's 90 - THETA_C: the float's contact line stands on a HULL, whose
+    tangent there rises at the contact polar angle rather than vertically, and
+    with perfect wetting that angle IS phi_w. Defaulting to the module's own
+    tables leaves every wall caller reading exactly the same arrays it did --
+    including `validate.py`, which installs its own over the module's and
+    re-runs the shipped `meniscus` through this function.
 
     Fresnel-free and environment-free: this is the geometry both columns share,
     and it is factored out so that it can be measured a completely different way.
@@ -5106,11 +5738,12 @@ def _menis_weights(Vm, Vz):
     trip it, and that an east-wall one does."""
     Vm = np.asarray(Vm)
     Vz = np.asarray(Vz)
-    ndv = MENIS_SIN[None] * Vm[:, None] + MENIS_COS[None] * Vz[:, None]
+    _sn, _cs, _wd = (MENIS_SIN, MENIS_COS, MENIS_WD) if tab is None else tab
+    ndv = _sn[None] * Vm[:, None] + _cs[None] * Vz[:, None]
     vis = ndv > 0.
     w_flt = np.broadcast_to(np.maximum(Vz, 0.)[:, None],
-                            ndv.shape) * MENIS_WD[None]
-    w_fil = np.where(vis, ndv, 0.) / MENIS_COS[None] * MENIS_WD[None]
+                            ndv.shape) * _wd[None]
+    w_fil = np.where(vis, ndv, 0.) / _cs[None] * _wd[None]
     w_occ = np.where(vis, 0., 1.) * w_flt
     # the silhouette node: the steepest facet still facing the eye. ndv is
     # monotone in phi for fixed (Vm, Vz), so the visible set is a prefix and
@@ -5345,7 +5978,7 @@ def submerged_radiance(sid, u, v, sm, cyl, hz, mode):
     the hero's own camera were read by two pieces of code, the twin would be a
     second renderer's opinion rather than this one's geometry.
 
-    `hz` is the world height of the hit, which only the risers need."""
+    `hz` is the world height of the hit, which the risers and the float need."""
     col = np.zeros((sid.size, 3))
     bi, wim = bed_img[mode], wall_img[mode]
     for c in range(3):
@@ -5361,7 +5994,64 @@ def submerged_radiance(sid, u, v, sm, cyl, hz, mode):
         m = sid == 5
         if m.any():
             col[m, c] = _riser_shade(u[m], v[m], hz[m], cyl[m], c, mode)
+    m = sid == 7
+    if m.any():
+        col[m] = float_wet(u[m], v[m], hz[m])
     return col * np.exp(-ABS[None] * sm[:, None])
+
+
+# --- WHAT THE KEEL GATHERS OFF THE POOL, TRACED ------------------------------
+# Bar section I: "its underside is lit by the pool, not by the sky -- the
+# upwelling radiance the coping already uses, now on a receiver that hangs over
+# the water." Above the waterline that is `WBOUNCE` at a view factor, which
+# `float_air` writes in one line. BELOW it the receiver is submerged and the
+# upwelling is not an air-side constant but the bed itself, 0.66 m under the
+# keel and carrying the caustic net -- so it is TRACED rather than quoted, on
+# the same cosine-weighted hemisphere `bounce_gather` uses and through the same
+# `scene_hit` and `submerged_radiance` every other receiver in this file reads.
+# 4096 rays from one point: the whole gather costs less than one output pixel of
+# the frame, and it buys the keel a level with the bed's own colour and the
+# bed's own absorption in it instead of a stand-in.
+#
+# ONE gather for the whole cap, and the licence for that is measured rather than
+# assumed: it is repeated at the two ends of the waterline circle -- 170 mm
+# apart, against a 0.66 m standoff -- and the spread is printed. A cap that
+# needed a per-pixel gather would show it there.
+def _float_gather(P, nt=64, nph=64):
+    """Cosine-weighted downward hemisphere gather of `submerged_radiance` from
+    a point. Uniform in mu^2 so the cosine weight is the measure and no weight
+    has to be reintroduced -- the same construction `bounce_gather` uses."""
+    mu = np.sqrt((np.arange(nt) + .5) / nt)          # cos from the DOWNWARD axis
+    ph = (np.arange(nph) + .5) / nph * 2. * np.pi
+    st = np.sqrt(np.maximum(1. - mu ** 2, 0.))
+    dx = np.repeat(st, nph) * np.tile(np.cos(ph), nt)
+    dy = np.repeat(st, nph) * np.tile(np.sin(ph), nt)
+    dz = -np.repeat(mu, nph)
+    px = np.full(dx.size, P[0]); py = np.full(dx.size, P[1])
+    sid, u, v, sm, cyl = scene_hit(px, py, dx, dy, dz, P[2])
+    return submerged_radiance(sid, u, v, sm, cyl, P[2] + dz * sm,
+                              'disp').mean(0), sid
+
+
+_fkeel = FLOAT_CEN - FLOAT_N * FLOAT_R                     # the keel point
+FLOAT_LUP, _fk_sid = _float_gather(_fkeel)
+_fe1 = FLOAT_CON + FLOAT_RW * np.array([1., 0., 0.]) - np.array([0, 0, 1e-4])
+_fe2 = FLOAT_CON - FLOAT_RW * np.array([1., 0., 0.]) - np.array([0, 0, 1e-4])
+_fl1 = _float_gather(_fe1)[0]
+_fl2 = _float_gather(_fe2)[0]
+if FLOAT_ON:
+    print("the float's keel, gathered: it stands %.3f m over the bed (which is the "
+          "%s here) and collects %s in-water radiance over its downward "
+          "hemisphere; %.1f%% of that hemisphere lands on the bed, %.1f%% on a "
+          "riser or wall" % (FLOAT_STAND,
+                             'floor' if FLOAT_BEDZ <= -DEPTH + 1e-9 else 'step unit',
+                             np.round(FLOAT_LUP, 4), 100. * (_fk_sid == 0).mean(),
+                             100. * ((_fk_sid >= 1) & (_fk_sid <= 5)).mean()))
+    print("  one gather serves the whole cap, and the licence is measured: at the "
+          "two ends of the %.0f mm waterline circle it reads %s and %s, a spread "
+          "of %.1f%% in green against a %.2f m standoff"
+          % (2000 * FLOAT_RW, np.round(_fl1, 4), np.round(_fl2, 4),
+             100 * abs(_fl1[1] - _fl2[1]) / max(FLOAT_LUP[1], 1e-9), FLOAT_STAND))
 
 
 def _menis_under(sid, u, v, sm, cyl, tzc, mode):
@@ -5632,6 +6322,246 @@ def meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
     return out
 
 
+# ------------------------------------------- THE SAME FILLET, ON A CURVED HULL
+# Bar section I: "the waterline wraps it. Its own meniscus runs right around the
+# hull, at the same capillary scale as section B3 and with the same specular
+# consequence -- a bright rim where the fillet sweeps through the mirror
+# direction. It is the cheapest possible check that the meniscus term
+# generalises off a straight wall."
+#
+# WHAT GENERALISES AND WHAT DOES NOT, stated before the code so a reader can
+# check the claim rather than take it. Shared with the wall, to the line:
+#   * the PROFILE, z = 2a sin(phi/2), and therefore the capillary length, the
+#     climb and the reach. `menis_tables` is called again, not rewritten.
+#   * the FORCE BALANCE on that quadrature, rho g INT z dx = sigma sin(phi_w),
+#     asserted below at the ball's own phi_w as it is at the wall's.
+#   * the PROJECTED AREAS, through the same `_menis_weights` -- the same
+#     visibility gate, the same silhouette node, the same identity
+#     SUM(w_fil + w_occ - w_flt) = Vm z(phi*).
+#   * BOTH COLUMNS: the reflected one through `_env_menis` and the same
+#     roughened Fresnel, the transmitted one traced through the same
+#     `scene_hit` and `_menis_under`.
+#   * the FOOTPRINT DEPOSIT, the same folded Gaussian at the same sigma.
+#   * the SUN'S DISC, the same closed-form Gaussian in (phi - phi*).
+# What is different is exactly three things, and each is a statement about the
+# solid rather than about the fillet:
+#   1  phi_w = the hull's own tangent angle at the contact line (50.07 deg here)
+#      instead of the wall's 90 - THETA_C = 90 deg. That is the ONE line the
+#      generalisation turns on, and it is why `_menis_weights` now takes a
+#      table: perfect wetting means the free surface leaves the solid
+#      tangentially, so phi_w is a property of the solid's shape.
+#   2  the frame is RADIAL. `m` is outward from the ball's axis instead of
+#      poolward from a wall, `t` is tangential instead of along-wall, and `d` is
+#      r - r_w. Nothing else in the algebra knows which it is.
+#   3  the OCCLUDER of the mirror direction is the hull instead of the coping's
+#      undercut, and it is traced (`_float_hit`) rather than compared against
+#      ZD -- so where a fillet facet's mirror direction runs into the ball it
+#      reflects the BALL, at its own shaded radiance, instead of a constant.
+#
+# AND ONE THING THE CLOSED CONTACT LINE DOES THAT NO WALL CAN. `_menis_weights`
+# is only a bound where Vm < 0 -- the near-wall fold -- and `meniscus` RAISES
+# there. A ring has Vm < 0 over exactly the half of it beyond the ball, by
+# construction, so the guard would fire on every frame. It is not disabled: the
+# ring is evaluated only where Vm > 0, and Vm = 0 is exactly the plan silhouette
+# of a convex hull, so the discarded half is precisely the half the ball itself
+# stands in front of. The fraction discarded is measured and printed rather than
+# argued, and `validate.py` fires a ray into the discarded half and asserts the
+# ball is met first.
+#
+# THE CURVATURE OF THE CONTACT LINE IS NEGLECTED, and priced. The 2-D profile
+# solves a straight line; a ring of radius r_w carries a second principal
+# curvature 1/r_w, so the true profile differs from this one by O(a/r_w) =
+# 2.72/84.8 = 3.2%. That is in the CLIMB and therefore in the deposited flux at
+# the same order; it is `?`, it is one-sided (a convex contact line lowers the
+# climb), and 3.2% of a term that is itself a rim a pixel or two wide is not
+# what decides this picture.
+(_fmp, FLOAT_MWD, FLOAT_MD, FLOAT_MZ, FLOAT_MSIN, FLOAT_MCOS,
+ FLOAT_MREACH) = menis_tables(np.pi / 2 - FLOAT_PHW, CAP_A, MENIS_N)
+FLOAT_MTAB = (FLOAT_MSIN, FLOAT_MCOS, FLOAT_MWD)
+FLOAT_MLIFT = float((FLOAT_MZ * FLOAT_MWD).sum() * 1000.0 * 9.81)
+if FLOAT_ON:
+    print("the float's fillet, on the same quadrature: phi_w %.2f deg (the "
+          "hull's tangent, not 90), climb %.2f mm against the wall's %.2f, "
+          "reach %.2f mm against %.2f. Its force balance rho g INT z dx = "
+          "%.5f N/m against sigma sin(phi_w) = %.5f N/m, %.2f%% apart -- the "
+          "same identity as the wall's, at a different contact angle, which is "
+          "the whole of what 'generalises' means here."
+          % (np.degrees(FLOAT_PHW), 1000 * FLOAT_ZW, 1000 * MENIS_H,
+             1000 * FLOAT_MREACH, 1000 * MENIS_REACH, FLOAT_MLIFT,
+             SIGMA_W * np.sin(FLOAT_PHW),
+             100 * abs(FLOAT_MLIFT / (SIGMA_W * np.sin(FLOAT_PHW)) - 1)))
+    print("  and the ring's own curvature is not in the profile: a / r_w = "
+          "%.4f, so the 2-D climb is high by that order (%.1f%%), one-signed "
+          "and `?`" % (CAP_A / FLOAT_RW, 100 * CAP_A / FLOAT_RW))
+
+_FRING = [0, 0]          # [rays selected, rays dropped to the Vm < 0 half]
+
+
+def float_meniscus(hw_x, hw_y, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
+                   mode='disp'):
+    """The ball's own fillet, as an excess radiance on the rays that see it."""
+    out = np.zeros((hw_x.size, 3))
+    if fp is None or not FLOAT_ON:
+        return out
+    ex_ = hw_x - FLOAT_XY[0]
+    ey_ = hw_y - FLOAT_XY[1]
+    r_ = np.maximum(np.hypot(ex_, ey_), 1e-9)
+    d = r_ - FLOAT_RW                       # distance OUT from the waterline
+    mx, my = ex_ / r_, ey_ / r_             # outward from the hull, |m| = 1
+    tx, ty = -my, mx                        # along the contact line
+    dh = np.maximum(np.hypot(dvec[:, 0], dvec[:, 1]), 1e-9)
+    pxh, pyh = dvec[:, 0] / dh, dvec[:, 1] / dh
+    pm = pxh * mx + pyh * my
+    qm = -pyh * mx + pxh * my
+    w_m = np.abs(fp) * np.sqrt(pm * pm + (qm * dvec[:, 2]) ** 2)
+    sig = np.maximum(w_m / SS, 2e-4) / np.sqrt(12.)
+    Vm_all = -(dvec[:, 0] * mx + dvec[:, 1] * my)
+    band = (d > 0.) & (d < FLOAT_MREACH + 3.5 * sig)
+    _FRING[1] += int((band & (Vm_all <= 0.)).sum())
+    sel = np.flatnonzero(band & (Vm_all > 0.))
+    _FRING[0] += int(sel.size)
+    if not sel.size:
+        return out
+    for c0 in range(0, sel.size, 20000):
+        k = sel[c0:c0 + 20000]
+        Vm = Vm_all[k]
+        Vt = -(dvec[k, 0] * tx[k] + dvec[k, 1] * ty[k])
+        Vz = -dvec[k, 2]
+        Lt = SUN_DIR[0] * tx[k] + SUN_DIR[1] * ty[k]
+        Lm = SUN_DIR[0] * mx[k] + SUN_DIR[1] * my[k]
+        ndv, W_FIL, W_FLT, W_OCC, ISIL = _menis_weights(Vm, Vz, FLOAT_MTAB)
+        _kk = np.arange(k.size)
+        Rm = 2. * ndv * FLOAT_MSIN[None] - Vm[:, None]
+        Rz = 2. * ndv * FLOAT_MCOS[None] - Vz[:, None]
+        Rt = np.broadcast_to(-Vt[:, None], Rm.shape)
+        Rx = Rm * mx[k][:, None] + Rt * tx[k][:, None]
+        Ry = Rm * my[k][:, None] + Rt * ty[k][:, None]
+        # the node's own place on the water, and the fillet's height there
+        wl_x = FLOAT_XY[0] + mx[k] * FLOAT_RW
+        wl_y = FLOAT_XY[1] + my[k] * FLOAT_RW
+        nd_x = (wl_x[:, None] + mx[k][:, None] * FLOAT_MD[None]).ravel()
+        nd_y = (wl_y[:, None] + my[k][:, None] * FLOAT_MD[None]).ravel()
+        nd_z = np.broadcast_to(FLOAT_MZ[None], ndv.shape).ravel()
+        # THE HULL AS THE OCCLUDER, TRACED. A facet whose mirror direction leans
+        # back toward the ball is looking at the ball, and what it reflects is
+        # the ball -- so this is not a cut-out, it is the object.
+        oh = _float_hit(nd_x, nd_y, nd_z, Rx.ravel(), Ry.ravel(), Rz.ravel())
+        occ = (oh < BIG)
+        Le = _env_menis(Rx.ravel(), Ry.ravel(), Rz.ravel())
+        if occ.any():
+            j = np.flatnonzero(occ)
+            Le[j] = float_air(nd_x[j] + Rx.ravel()[j] * oh[j],
+                              nd_y[j] + Ry.ravel()[j] * oh[j],
+                              nd_z[j] + Rz.ravel()[j] * oh[j],
+                              np.stack([Rx.ravel()[j], Ry.ravel()[j],
+                                        Rz.ravel()[j]], -1))
+        Le = Le.reshape(Rm.shape + (3,))
+        _sv = np.sqrt(np.maximum(pxh[k] ** 2 * vxx_[k]
+                                 + 2 * pxh[k] * pyh[k] * vxy_[k]
+                                 + pyh[k] ** 2 * vyy_[k], 0.))
+        _rgh = (np.exp(-2.69 * _sv) / (1. + 22.7 * _sv ** 1.5))[:, None]
+        nc = np.clip(ndv, 1e-4, 1.)
+        Ff = F0 + (fresnel(nc) - F0) * _rgh[..., None]
+        _Fs_ = Ff[_kk, ISIL][:, None]
+        fil = Ff * Le * W_FIL[..., None] + _Fs_ * Le[_kk, ISIL][:, None] * \
+            W_OCC[..., None]
+        # the flat surface it replaces, at the same distances and with the same
+        # occluder, so the subtraction is between two geometries and not two
+        # shaders -- exactly as on the wall.
+        o0 = _float_hit(nd_x, nd_y, np.zeros_like(nd_x),
+                        np.broadcast_to(dvec[k, 0][:, None], ndv.shape).ravel(),
+                        np.broadcast_to(dvec[k, 1][:, None], ndv.shape).ravel(),
+                        np.broadcast_to(-dvec[k, 2][:, None], ndv.shape).ravel())
+        L0 = _env_menis(dvec[k, 0], dvec[k, 1], Vz)[:, None]
+        L0 = np.broadcast_to(L0, ndv.shape + (3,)).copy()
+        j0 = np.flatnonzero(o0 < BIG)
+        if j0.size:
+            L0.reshape(-1, 3)[j0] = float_air(
+                nd_x[j0] + dvec[k, 0].repeat(ndv.shape[1])[j0] * o0[j0],
+                nd_y[j0] + dvec[k, 1].repeat(ndv.shape[1])[j0] * o0[j0],
+                -dvec[k, 2].repeat(ndv.shape[1])[j0] * o0[j0],
+                np.stack([dvec[k, 0].repeat(ndv.shape[1])[j0],
+                          dvec[k, 1].repeat(ndv.shape[1])[j0],
+                          -dvec[k, 2].repeat(ndv.shape[1])[j0]], -1))
+        F0v = F0 + (fresnel(Vz) - F0) * _rgh
+        flat = F0v[:, None] * L0 * W_FLT[..., None]
+        ex = fil - flat
+        # ---------------------------------------- the transmitted column, traced
+        _eta = 1.0 / IOR[1]
+        _ns = FLOAT_MSIN[None]
+        _ix = np.broadcast_to(dvec[k, 0][:, None], ndv.shape).ravel()
+        _iy = np.broadcast_to(dvec[k, 1][:, None], ndv.shape).ravel()
+        _iz = np.broadcast_to(dvec[k, 2][:, None], ndv.shape).ravel()
+        _nx = (mx[k][:, None] * _ns).ravel()
+        _ny = (my[k][:, None] * _ns).ravel()
+        _nz = np.broadcast_to(FLOAT_MCOS[None], ndv.shape).ravel()
+        ttx, tty, ttz = refract(_ix, _iy, _iz, _nx, _ny, _nz, _eta)
+        _g = scene_hit(nd_x, nd_y, ttx, tty, ttz, nd_z)
+        Lu = _menis_under(_g[0], _g[1], _g[2], _g[3], _g[4], ttz,
+                          mode).reshape(ndv.shape + (3,))
+        t0x, t0y, t0z = refract(dvec[k, 0], dvec[k, 1], dvec[k, 2],
+                                np.zeros_like(Vz), np.zeros_like(Vz),
+                                np.ones_like(Vz), _eta)
+        _f0 = np.broadcast_to(np.ones(ndv.shape[1]), ndv.shape)
+        _g0 = scene_hit(nd_x, nd_y,
+                        (t0x[:, None] * _f0).ravel(), (t0y[:, None] * _f0).ravel(),
+                        (t0z[:, None] * _f0).ravel(), 0.0)
+        Lu0 = _menis_under(_g0[0], _g0[1], _g0[2], _g0[3], _g0[4],
+                           (t0z[:, None] * _f0).ravel(),
+                           mode).reshape(ndv.shape + (3,))
+        filT = (1. - Ff) * Lu * W_FIL[..., None] + \
+            (1. - _Fs_) * Lu[_kk, ISIL][:, None] * W_OCC[..., None]
+        flatT = (1. - F0v)[:, None] * Lu0 * W_FLT[..., None]
+        ex = ex + (filT - flatT)
+        # --- the footprint kernel, folded at the contact line
+        sg = sig[k][:, None]
+        dl = (d[k][:, None] - FLOAT_MD[None]) / sg
+        dr = (d[k][:, None] + FLOAT_MD[None]) / sg
+        K = (np.exp(-.5 * dl * dl) + np.exp(-.5 * dr * dr)) / (
+            sg * np.sqrt(2. * np.pi))
+        vzc = np.maximum(Vz, .05)[:, None]
+        acc = (ex * K[..., None]).sum(1) / vzc
+        # --- the disc, analytically, on the same Gaussian in (phi - phi*)
+        thV = np.arctan2(Vm, Vz)
+        thL = np.arctan2(Lm, SUN_DIR[2])
+        phs = .5 * (thV + thL)
+        nvs = np.sin(phs) * Vm + np.cos(phs) * Vz
+        Rsm = 2. * nvs * np.sin(phs) - Vm
+        Rsz = 2. * nvs * np.cos(phs) - Vz
+        ds = np.interp(np.clip(phs, _fmp[0], _fmp[-1]), _fmp, FLOAT_MD)
+        dsx = FLOAT_XY[0] + mx[k] * (FLOAT_RW + ds)
+        dsy = FLOAT_XY[1] + my[k] * (FLOAT_RW + ds)
+        dsz = np.interp(np.clip(phs, _fmp[0], _fmp[-1]), _fmp, FLOAT_MZ)
+        # does the mirror direction at phi* run into the hull, and does the sun
+        # reach that facet at all? Both are the ball, and both are traced.
+        Rsx = Rsm * mx[k] - Vt * tx[k]
+        Rsy = Rsm * my[k] - Vt * ty[k]
+        clear = _float_hit(dsx, dsy, dsz, Rsx, Rsy, Rsz) >= BIG
+        svis = (np.asarray(float_vis(dsx, dsy, dsz), float)
+                * np.asarray(sail_vis(dsx, dsy), float) * clear)
+        b_ = pyh[k] ** 2 * vxx_[k] - 2 * pxh[k] * pyh[k] * vxy_[k] \
+            + pxh[k] ** 2 * vyy_[k]
+        qv = 1. / N_DISC + np.maximum(2. * (_sv ** 2 + nvs * nvs * b_), 0.)
+        gpk = (1. / N_DISC) / qv
+        nt = -(gxx_[k] * tx[k] + gyy_[k] * ty[k]) / np.sqrt(
+            1. + gxx_[k] ** 2 + gyy_[k] ** 2)
+        bet = (np.arcsin(np.clip(-Vt + 2. * nvs * nt, -1, 1))
+               - np.arcsin(np.clip(Lt, -1, 1)))
+        ea = np.sqrt(2. / qv)
+        cl = .5 * (_erf((FLOAT_PHW - phs) * ea) - _erf(-phs * ea))
+        Fs = F0 + (fresnel(np.clip(nvs, 1e-4, 1)) - F0) * _rgh
+        amp = (np.clip(nvs, 0, None) * CAP_A * np.cos(.5 * phs)
+               / np.maximum(np.sin(phs), 1e-6) * gpk * cl * svis
+               * np.exp(-bet * bet / (2. * qv)) * np.sqrt(np.pi / 2.)
+               * np.sqrt(qv))
+        dsl, dsr = (d[k] - ds) / sig[k], (d[k] + ds) / sig[k]
+        Kd = (np.exp(-.5 * dsl * dsl) + np.exp(-.5 * dsr * dsr)) / (
+            sig[k] * np.sqrt(2. * np.pi))
+        acc += Fs * L_SUN[None] * (amp * Kd)[:, None] / vzc
+        out[k] = acc
+    return out
+
+
 def surf_stats(x, y, fp):
     """The PAIR the footprint filter has to be consumed as, and the reason this
     is one function rather than two calls at the call site: the narrowed slope
@@ -5700,9 +6630,33 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
     over = rfz_ * np.maximum(in_w + SLIP, 0.) / np.maximum(toward, 1e-6)
     occ_ = np.where(toward > 0, np.clip(1. - over / ZD, 0, 1), 0.) ** .8
     refl_ = refl_ * (1 - occ_)[:, None] + EDGE_REFL[None] * occ_[:, None]
+    # THE BALL, IN THE WATER AROUND IT. The reflected ray is traced against the
+    # hull and nothing else -- the coping's occlusion above stays the analytic
+    # ramp it has been, because that ramp stands in for the spread of normals
+    # inside one pixel of flat water and a traced silhouette would replace a
+    # distribution with a step. A ball 0.2 m over the surface has no such
+    # excuse: its reflection is a hard object a hand's width away, and it is
+    # the reason a float reads as sitting IN water rather than on a picture of
+    # it. Same `_float_hit` the camera and the caustic pass use.
+    if FLOAT_ON:
+        _rfl = np.stack([rfx_, rfy_, rfz_], -1)
+        _rn = np.maximum(np.linalg.norm(_rfl, axis=1, keepdims=True), 1e-12)
+        _rfl = _rfl / _rn
+        _ft = _float_hit(hw_x, hw_y, np.zeros_like(hw_x),
+                         _rfl[:, 0], _rfl[:, 1], _rfl[:, 2])
+        _fm = np.flatnonzero(_ft < BIG)
+        if _fm.size:
+            refl_[_fm] = float_air(hw_x[_fm] + _rfl[_fm, 0] * _ft[_fm],
+                                   hw_y[_fm] + _rfl[_fm, 1] * _ft[_fm],
+                                   _rfl[_fm, 2] * _ft[_fm], _rfl[_fm])
     lip_ao = 1. - .34 * np.exp(-(in_w + SLIP) / .045)
     mnis_ = meniscus(hw_x, hw_y, s_h, dvec, fp, gxx_, gyy_, vxx_, vyy_, vxy_,
                      mode)
+    # ...and the ball's own waterline, on the same footing: an excess over the
+    # flat water it replaces, added to the SAME correction the wall's fillet
+    # goes into so that one clamp covers both.
+    mnis_ = mnis_ + float_meniscus(hw_x, hw_y, dvec, fp, gxx_, gyy_,
+                                   vxx_, vyy_, vxy_, mode)
 
     water = np.zeros((hw_x.size, 3))
     geo, smG_ = {}, None
@@ -5742,6 +6696,16 @@ def water_shade(hw_x, hw_y, dvec, s_h, mode, qlam, fp=None, stats=None):
         m = sid == 5
         if m.any():
             col[m] = _riser_shade(u[m], v[m], tz[m] * sm[m], cyl[m], c, mode)
+        # THE FLOAT'S SUBMERGED CAP, on the refracted ray -- which is the whole
+        # of bar section I's "it is cut in two by refraction". Nothing here
+        # displaces anything: the ray was bent by `refract` at the surface like
+        # every other transmitted ray in this function, and the cap is met
+        # wherever that bent ray finds it. The step at the waterline is the
+        # difference between where the hull is and where the bent ray thinks it
+        # is, and it moves with the surface because the normal does.
+        m = sid == 7
+        if m.any():
+            col[m] = float_wet(u[m], v[m], tz[m] * sm[m])[:, c]
         water[:, c] = col * np.exp(-ABS[c] * sm)
         # The three channels see the silhouette in three PLACES -- measured at
         # 2.07 output pixels apart -- so a pixel can be clean in green and cut
@@ -6464,6 +7428,7 @@ def _edge_pixels(keyW, smW):
     in ANY of the three channels, which are 2 px apart on a silhouette."""
     key = np.zeros(W * H, np.int32)
     key[pav] = 1
+    key[hit_float] = -1        # the ball's own silhouette, on water and on stone
     iw = np.flatnonzero(inp)
     key[iw] = 2 + keyW
     K = key.reshape(H // SS, SS, W // SS, SS).transpose(0, 2, 1, 3)
@@ -6500,6 +7465,18 @@ def _refine(idx, mode):
             hya = Ey + dv[:, 1] * th
             q = np.full(idx.size, (_APERM[a * n + b] + .5) / (n * n))
             c = np.zeros((idx.size, 3))
+            # the ball, on exactly the same test the primary grid uses -- this
+            # pass exists to make the refined pixels the SAME estimator at a
+            # higher rate, so a silhouette the primary grid resolves one way
+            # and this one another would be worse than no refinement at all.
+            tfl = (_float_hit(Ex, Ey, Ez, dv[:, 0], dv[:, 1], dv[:, 2])
+                   if FLOAT_ON else np.full(idx.size, BIG))
+            fl = tfl < th
+            isw = isw & ~fl
+            if fl.any():
+                c[fl] = float_air(Ex + dv[fl, 0] * tfl[fl],
+                                  Ey + dv[fl, 1] * tfl[fl],
+                                  Ez + dv[fl, 2] * tfl[fl], dv[fl])
             # the footprint is the OUTPUT pixel's, not this sample's: a refined
             # pixel covers exactly the area an unrefined one does, it is only
             # estimated from more rays. Filtering to the refinement rate would
@@ -6509,7 +7486,7 @@ def _refine(idx, mode):
             if isw.any():
                 c[isw] = water_shade(hxa[isw], hya[isw], dv[isw], sh[isw],
                                      mode, q[isw], fp=ftw[isw])[0]
-            ps = ~isw & (dv[:, 2] < -1e-9)
+            ps = ~isw & ~fl & (dv[:, 2] < -1e-9)
             if ps.any():
                 c[ps] = paving(hxa[ps], hya[ps], Ez + dv[ps, 2] * th[ps],
                                sh[ps], dv[ps], ftw[ps] / SS)
@@ -6522,11 +7499,15 @@ _PRINTED = []
 
 def render(mode):
     img = np.zeros((W * H, 3))
-    img[hit_sail] = (np.array([.74, .72, .76])[None] *
-                     (SKY_AMB[None] * 1.6 + SUN_COL[None] * .22))
+    img[hit_sail] = SAIL_UNDER[None]
     if bgm.any():
         img[bgm] = sky(D[bgm, 0], D[bgm, 1], np.abs(D[bgm, 2])) * .95
     img[pav] = PAV_COL
+    if hit_float.any():
+        _fi = np.flatnonzero(hit_float)
+        img[_fi] = float_air(Ex + D[_fi, 0] * t_flt[_fi],
+                             Ey + D[_fi, 1] * t_flt[_fi],
+                             Ez + D[_fi, 2] * t_flt[_fi], D[_fi])
     col, sidW, uW, vW, smW, cylW, occW, keyW, lspec, ltran = water_shade(
         hx[inp], hy[inp], D[inp], S_HIT[inp], mode, QSUB, stats=PRIM_STATS)
     img[inp] = col
@@ -6576,6 +7557,308 @@ _hdr = render('disp')
 # is a ratio between two radiances and it cannot be read off sRGB code values.
 HDRP = _hdr.reshape(H // SS, SS, W // SS, SS, 3).mean((1, 3))
 hero = encode(_hdr)
+
+
+# --- THE FLOAT, AGAINST BAR SECTION I, CRITERION BY CRITERION ----------------
+# Every line of section I is a reading of the wave field or of the medium, so
+# every one of them is a number here rather than a look at the picture.
+if FLOAT_ON:
+    print("\n--- the float, against bar section I ---------------------------")
+    _fcap = np.flatnonzero(WSID == 7)
+    _fw = np.flatnonzero(inp)
+    # THE CONDITION, IN CLOSED FORM, AND IT IS SHARPER THAN THE BAR ASSUMES.
+    # A camera ray crosses the surface OUTSIDE the contact circle -- inside it
+    # the hull is in the way -- and leaves at theta_w from the vertical, so it
+    # descends with slope cot(theta_w) per unit of horizontal run. The cap it is
+    # trying to reach hangs from a contact line that stands z_w ABOVE the
+    # far-field plane, and the cap's own surface is convex: its steepest tangent
+    # is at the contact line and it flattens to horizontal at the keel. A
+    # straight line under a convex arc touches it at one place or not at all,
+    # and the touching radius is r* = R cos(theta_w) -- so the whole question is
+    # the sign of one expression, and it comes out with the meniscus in it:
+    #
+    #       R (1 - sin(beta + theta_w))  >  z_w sin(theta_w)
+    #
+    # Two things fall straight out of that. (1) With z_w = 0 it is just
+    # beta + theta_w > 90 deg, and since theta_w <= theta_c the ball must float
+    # at beta > 90 - theta_c = 41.5 deg, i.e. deeper than 12.5% of its diameter,
+    # for ANY above-water camera to see its wet half. (2) The fillet's own climb
+    # is not a rounding term in this: it is what decides it here.
+    _thv = np.arccos(np.clip(np.abs(EYE[2] - FLOAT_CEN[2])
+                             / np.linalg.norm(FLOAT_CEN - EYE), 0, 1))
+    _thw = np.arcsin(np.clip(np.sin(_thv) / IOR[1], 0, 1))
+
+    def _split(bt, tw):
+        # the tangency r* = R cos(theta_w) is INSIDE the contact circle only
+        # where beta + theta_w > 90 deg; below that the ray leaves the contact
+        # line already falling faster than the hull and the maximum of the gap
+        # sits at the contact line itself, where it is -z_w. So the branch is
+        # part of the condition and not a detail of solving it.
+        if bt + tw <= np.pi / 2:
+            return -1.0
+        zw = 2. * CAP_A * np.sin(.5 * bt)
+        return FLOAT_R * (1. - np.sin(bt + tw)) - zw * np.sin(tw)
+    _lo, _hi = .5, np.pi / 2
+    for _ in range(160):                       # the beta that would just show it
+        _mm = .5 * (_lo + _hi)
+        _lo, _hi = (_mm, _hi) if _split(_mm, TC_SNELL[1]) < 0 else (_lo, _mm)
+    _bth = .5 * (_lo + _hi)
+    print("IT IS CUT IN TWO BY REFRACTION -- CONDITIONALLY, and this round had "
+          "to derive the condition. R(1 - sin(beta + theta_w)) > z_w "
+          "sin(theta_w), from the tangency of a straight ray to a convex cap at "
+          "r* = R cos(theta_w).")
+    _lhs = FLOAT_R * (1. - np.sin(FLOAT_BETA + _thw))
+    _rhs = 2. * CAP_A * np.sin(.5 * FLOAT_BETA) * np.sin(_thw)
+    print("   this eye: theta_v %.2f deg -> theta_w %.2f deg, beta + theta_w = "
+          "%.2f deg; R(1 - sin(beta + theta_w)) = %.3e m against z_w "
+          "sin(theta_w) = %.3e m, a gap of %+.3e, so the wet half is %s. %d "
+          "subsamples see the hull above the water and %d see the submerged cap "
+          "through the surface."
+          % (np.degrees(_thv), np.degrees(_thw),
+             np.degrees(FLOAT_BETA + _thw), _lhs, _rhs, _lhs - _rhs,
+             'REACHABLE' if _split(FLOAT_BETA, _thw) > 0 else 'HIDDEN',
+             int(hit_float.sum()), _fcap.size))
+    print("   THE FILLET'S OWN CLIMB IS WHAT DECIDES IT, which is not a "
+          "correction anybody expected to be load-bearing: at z_w = 0 the test "
+          "is beta + theta_w > 90 deg and this eye gives %.2f, i.e. it would "
+          "just show. With the %.2f mm climb in it the ball is short by a "
+          "factor %.1f, and even at the window's most favourable exit angle "
+          "(theta_w = theta_c = %.2f deg) it needs beta > %.2f deg against its "
+          "own %.2f -- which is m > %.3f kg, ABOVE FINA's 0.450 kg ceiling. So "
+          "this object cannot show the split to any camera, and that is a "
+          "property of a ball floating at 17.9%% rather than a property of this "
+          "frame."
+          % (np.degrees(FLOAT_BETA + _thw), 1000 * FLOAT_ZW,
+             _rhs / max(_lhs, 1e-12),
+             np.degrees(TC_SNELL[1]), np.degrees(_bth), np.degrees(FLOAT_BETA),
+             sum(_float_forces(_bth))))
+    if _fcap.size:
+        # the displacement, measured against the closed form. Where the cap
+        # actually is, against where the UNREFRACTED ray would have put it at
+        # the same depth: that difference is d (tan theta_v - tan theta_w), and
+        # nothing in the render computes it that way.
+        _cj = _fw[_fcap]
+        _cd = D[_cj]
+        _sx = hx[_cj]; _sy = hy[_cj]                  # where the ray crossed z=0
+        _cx = WU[_fcap]; _cy = WV[_fcap]              # where the cap was met
+        # the hit's depth, recovered from the SPHERE rather than from the traced
+        # distance, so the check and the trace do not share a line.
+        _dz = np.sqrt(np.maximum(FLOAT_R2 - (_cx - FLOAT_CEN[0]) ** 2
+                                 - (_cy - FLOAT_CEN[1]) ** 2, 0.))
+        _zc = FLOAT_CEN[2] - _dz
+        _tv = np.arccos(np.clip(-_cd[:, 2], 0, 1))
+        _tw = np.arcsin(np.clip(np.sin(_tv) / IOR[1], 0, 1))
+        _pred = np.abs(_zc) * (np.tan(_tv) - np.tan(_tw))
+        _meas = np.hypot(_cx - (_sx + _cd[:, 0] / np.maximum(-_cd[:, 2], 1e-9)
+                                * np.abs(_zc)),
+                         _cy - (_sy + _cd[:, 1] / np.maximum(-_cd[:, 2], 1e-9)
+                                * np.abs(_zc)))
+        print("   the offset, measured on every cap hit against the straight "
+              "line the same ray would have run: %.2f mm median (%.2f-%.2f), "
+              "against the closed form d (tan theta_v - tan theta_w) = %.2f mm "
+              "median. The cap sits %.1f mm under at most, and the view is "
+              "%.1f deg from vertical, so the split is that offset and not the "
+              "draught."
+              % (1000 * np.median(_meas), 1000 * np.percentile(_meas, 5),
+                 1000 * np.percentile(_meas, 95), 1000 * np.median(_pred),
+                 1000 * FLOAT_H, np.degrees(np.median(_tv))))
+        print("   and it MOVES WITH THE SURFACE: the same offset computed on "
+              "flat water would be a single number per pixel; the rendered "
+              "spread over the cap is %.2f mm rms about its own local mean, "
+              "which is the wave field bending each ray differently."
+              % (1000 * float(np.std(_meas - _pred))))
+    _spx = float(np.sqrt(np.mean(PRIM_STATS[0] ** 2 + PRIM_STATS[1] ** 2)))
+    _gb = grad_points(np.array([FLOAT_XY[0]]), np.array([FLOAT_XY[1]]), FLOAT_FP)
+    _sbl = float(np.hypot(_gb[0][0], _gb[1][0]))
+    print("IT RIDES THE WAVES. The attitude and the height are the field's, "
+          "filtered at the ball's own %.0f mm beam: tilt %.3f deg, heave %+.2f "
+          "mm. THIS IS A DISAGREEMENT WITH THE BAR and it is filed as one -- "
+          "section I says a float that sits level on a moving surface is wrong, "
+          "and on THIS field a 221 mm body IS very nearly level, because slope "
+          "variance lives at the short end: the resolved slope rms at a pixel "
+          "is %.4f and at the ball's beam %.4f, a factor %.1f, and this basin's "
+          "longest carrier is 0.53 m against a 0.22 m hull. The mechanism is "
+          "the right one and the reading is sub-pixel; what would make it "
+          "visible is a longer wave, not a different float."
+          % (1000 * FLOAT_FP, FLOAT_TILT, 1000 * FLOAT_ETA, _spx, _sbl,
+             _spx / max(_sbl, 1e-9)))
+    _fpx = (float(np.linalg.norm(FLOAT_CEN - EYE)) * PIXANG * SS
+            / max(abs(float(np.mean(D[np.flatnonzero(hit_float), 2]))), .10))
+    print("THE WATERLINE WRAPS IT. The ring selected %d camera rays and "
+          "dropped %d to the Vm < 0 half -- %.1f%% -- which is the half the "
+          "hull itself stands in front of; the fillet is %.2f mm of climb over "
+          "a %.2f mm reach, and at this range one output pixel is %.2f mm on "
+          "the water, so the rim is %.2f px wide."
+          % (_FRING[0], _FRING[1],
+             100. * _FRING[1] / max(_FRING[0] + _FRING[1], 1),
+             1000 * FLOAT_ZW, 1000 * FLOAT_MREACH, 1000 * _fpx,
+             FLOAT_MREACH / max(_fpx, 1e-9)))
+    # ---- ITS SHADOW ON THE BED ---------------------------------------------
+    # Read off the caustic map itself, which is the only place the shadow
+    # exists: nothing paints it. The predicted landing is the ball's plan
+    # position plus the refracted sun's own run over the local depth.
+    _shx = FLOAT_XY[0] - SUN_DIR[0] / np.hypot(SUN_DIR[0], SUN_DIR[1]) \
+        * DEPTH * np.tan(np.arcsin(np.sqrt(1 - SUN_DIR[2] ** 2) / IOR[1]))
+    _shy = FLOAT_XY[1] - SUN_DIR[1] / np.hypot(SUN_DIR[0], SUN_DIR[1]) \
+        * DEPTH * np.tan(np.arcsin(np.sqrt(1 - SUN_DIR[2] ** 2) / IOR[1]))
+    _bx1 = np.linspace(X0, X1, CAU_NX); _by1 = np.linspace(Y0, Y1, CAU_NY)
+    _i0 = np.searchsorted(_bx1, _shx - 1.0); _i1 = np.searchsorted(_bx1, _shx + 1.0)
+    _j0 = np.searchsorted(_by1, _shy - 1.0); _j1 = np.searchsorted(_by1, _shy + 1.0)
+    # THE SEARCH WINDOW, stated because a centroid is only a measurement if the
+    # window it is taken in is wider than the thing being measured. The umbra is
+    # 0.26 m across and the window is +-0.45 m about the PREDICTED landing, so
+    # the centroid is free to fall a third of the whole 1.37 m displacement away
+    # from the prediction and would say so. It is cut to that window because the
+    # 2 m box around it also contains the strip of floor the COPING shades off
+    # the east wall, where `cau` is zero for a quite different reason.
+    _SHW = 0.45
+    _cau2 = bed[1][_j0:_j1, _i0:_i1]
+    _rad2 = bed_img['disp'][_j0:_j1, _i0:_i1, 1]
+    _XX, _YY = np.meshgrid(_bx1[_i0:_i1], _by1[_j0:_j1])
+    _sunl = (bed_sun(_XX.ravel(), _YY.ravel(),
+                     np.full(_XX.size, -DEPTH)) > .999).reshape(_XX.shape)
+    # THE UMBRA, as a mask on the caustic map rather than a weighted centroid:
+    # `cau` outside the shadow is a caustic net that runs 0 to several, so a
+    # deficit-weighted centroid is dragged about by the net's own dark cells.
+    # Inside the umbra `cau` is identically zero, which is a clean threshold.
+    _umb = ((_cau2 < .02 * max(np.median(_cau2), 1e-9))
+            & (np.abs(_XX - _shx) < _SHW) & (np.abs(_YY - _shy) < _SHW))
+    if _umb.sum() > 20:
+        _cx2 = float((_XX * _umb).sum() / _umb.sum())
+        _cy2 = float((_YY * _umb).sum() / _umb.sum())
+    else:
+        _cx2, _cy2 = _shx, _shy
+    # THE CONTROL, because a threshold on a caustic net flags the net's own dark
+    # cells as well as the shadow. The SAME threshold in a window of the SAME
+    # size on open sunlit floor 0.90 m away says how much of the flagged area is
+    # the net rather than the ball, and it is subtracted from nothing -- it is
+    # printed, so the reader can price the centroid themselves.
+    _ct = (_cau2 < .02 * max(np.median(_cau2), 1e-9)) \
+        & (np.abs(_XX - _shx) < _SHW) & (np.abs(_YY - (_shy - .90)) < _SHW)
+    _rr2 = np.hypot(_XX - _cx2, _YY - _cy2)
+    # what the shadow IS, taken from the geometry rather than from a threshold:
+    # `bed_sun` walks one refracted slant back up the beam and asks `sun_vis`,
+    # which is where `float_vis` lives. The radiance and the net are measured
+    # inside THAT, and the caustic map is then the check that the shadow
+    # actually reached the pass rather than the definition of where it is.
+    _in = (bed_sun(_XX.ravel(), _YY.ravel(),
+                   np.full(_XX.size, -DEPTH)) < .01).reshape(_XX.shape) \
+        & (np.abs(_XX - _shx) < _SHW + .25) & (np.abs(_YY - _shy) < _SHW + .25)
+    # the comparison ring is the floor OUTSIDE the umbra and in full sun, so
+    # that the ratio is the ball's shadow and not the coping's or the sail's.
+    _out = (_rr2 > 0.40) & (_rr2 < 0.85) & _sunl
+    # THE STEP UNIT'S OWN SHADOW IS NEXT DOOR, and it has to be kept out of both
+    # sides of every ratio here. Its edge lands 0.685 m east of the outer nosing
+    # -- the same refraction, over 0.70 m of water instead of 1.40 -- which puts
+    # it inside the search window. It is excluded by TRACING: from each bed
+    # texel, back up the refracted beam through `scene_hit_under`; a texel whose
+    # back-ray reaches the surface (id 6) has an unobstructed beam and a texel
+    # whose back-ray meets the step does not.
+    _bk = scene_hit_under(_XX.ravel(), _YY.ravel(),
+                          np.full(_XX.size, -DEPTH + 1e-4),
+                          np.full(_XX.size, -TSUN_DIR[0]),
+                          np.full(_XX.size, -TSUN_DIR[1]),
+                          np.full(_XX.size, -TSUN_DIR[2]))[0]
+    _clr = (_bk == 6).reshape(_XX.shape)
+    _umb = _umb & _clr
+    _ct = _ct & _clr
+    _in = _in & _clr
+    _out = _out & _clr
+    if _umb.sum() > 20:
+        _cx2 = float((_XX * _umb).sum() / _umb.sum())
+        _cy2 = float((_YY * _umb).sum() / _umb.sum())
+        _rr2 = np.hypot(_XX - _cx2, _YY - _cy2)
+        _out = (_rr2 > 0.40) & (_rr2 < 0.85) & _sunl & _clr
+    # ...and the profile ALONG the beam through the predicted landing, on the
+    # caustic map smoothed to 50 mm, which is what says whether there is a dip
+    # there at all and how deep the wave field has left it.
+    _prof = []
+    for _s in np.arange(-0.60, 0.61, 0.10):
+        _px2 = _shx - TSUN_DIR[0] / np.hypot(TSUN_DIR[0], TSUN_DIR[1]) * _s
+        _py2 = _shy - TSUN_DIR[1] / np.hypot(TSUN_DIR[0], TSUN_DIR[1]) * _s
+        _mm = (np.hypot(_XX - _px2, _YY - _py2) < .05) & _clr
+        _prof.append(float(_cau2[_mm].mean()) if _mm.sum() > 5 else float('nan'))
+    _hpr = _rad2 - blur(_rad2, .30 / ((X1 - X0) / CAU_NX))
+    _tar = ((X1 - X0) / CAU_NX) * ((Y1 - Y0) / CAU_NY)
+    print("ITS SHADOW ON THE BED. The geometric shadow -- `bed_sun` walked one "
+          "refracted slant back up the beam to `float_vis` -- covers %.4f m2 "
+          "of floor, against pi R^2 / sin(21 deg) = %.4f m2 the ball takes out "
+          "of the beam. The umbra found by thresholding the caustic map is "
+          "%.4f m2." % (float(_in.sum()) * _tar, np.pi * FLOAT_R2 / SUN_DIR[2],
+                        float(_umb.sum()) * _tar))
+    print("   the caustic factor along the beam through that landing, in 50 mm "
+          "discs at 100 mm steps from -0.60 m to +0.60 m (the beam runs +x):\n"
+          "     %s" % "  ".join("%.2f" % v for v in _prof))
+    # THE WAVE FIELD FILLS THE SHADOW IN, and by how much is a closed form. A
+    # surface facet tilted by eps swings the transmitted ray by
+    # |cos(theta_i)/(n cos(theta_t)) - 1| eps = 0.624 eps, so over the 1.96 m
+    # slant a slope field of one-axis rms sigma_s wanders the beam by
+    # 1.96 * 0.624 * sigma_s. That is the SAME slope field that writes the
+    # caustics -- the net and the softness of this shadow are one mechanism.
+    _wan = slant * abs(cos_i / (IOR[1] * cos_t) - 1.) * (_spx / np.sqrt(2.))
+    print("Nothing paints it: the caustic pass launches "
+          "from the surface, `float_vis` takes the sun off the launch point in "
+          "AIR, and the survivor refracts. Inside the GEOMETRIC umbra the "
+          "caustic factor is %.4f against %.4f outside -- %.1f%% -- and the "
+          "hole is deep only at its core: the profile above reaches 0.00 at the "
+          "predicted landing while the rendered umbra covers %.4f m2 of the "
+          "%.4f m2 geometry gives it, i.e. %.0f%% of the shadow is FILLED IN."
+          % (float(_cau2[_in].mean()), float(_cau2[_out].mean()),
+             100. * _cau2[_in].mean() / max(_cau2[_out].mean(), 1e-9),
+             float(_umb.sum()) * _tar, float(_in.sum()) * _tar,
+             100. - 100. * _umb.sum() / max(_in.sum(), 1)))
+    print("   and what fills it is the wave field, priced rather than noticed: "
+          "|cos(i)/(n cos(t)) - 1| = %.3f swings the beam by that fraction of "
+          "every surface tilt, so a one-axis slope rms of %.4f over the %.2f m "
+          "slant wanders the refracted sun by %.0f mm -- against a shadow only "
+          "%.0f mm wide across the beam. The net inside the shadow and the "
+          "softness of its edge are ONE mechanism, and it is the mechanism that "
+          "writes the caustics."
+          % (abs(cos_i / (IOR[1] * cos_t) - 1.), _spx / np.sqrt(2.), slant,
+             1000 * _wan, 2000 * FLOAT_R))
+    print("   ON THE BED'S OWN RADIANCE, which is what the bar is about, it is "
+          "a REDUCTION: green %.4f inside against %.4f outside, i.e. %.1f%% "
+          "survives, and what survives is the sky through the window, the bed's "
+          "own return and the walls'. The NET inside it: the 0.30 m high-pass "
+          "of the radiance has an rms of %.4f inside against %.4f outside -- "
+          "%.1f%% of the contrast -- so the net is %s inside the shadow. %s"
+          % (float(_rad2[_in].mean()), float(_rad2[_out].mean()),
+             100. * _rad2[_in].mean() / max(_rad2[_out].mean(), 1e-9),
+             float(_hpr[_in].std()), float(_hpr[_out].std()),
+             100. * _hpr[_in].std() / max(_hpr[_out].std(), 1e-9),
+             'legible' if _hpr[_in].std() > .15 * _hpr[_out].std()
+             else 'NOT legible',
+             "AGREES with section I." if _hpr[_in].std() > .15 * _hpr[_out].std()
+             else "THIS IS A DISAGREEMENT WITH SECTION I, and the mechanism is "
+             "named: the bar reads that criterion off a photograph of a "
+             "TRANSLUCENT inflatable and off a canoe over white sand. An "
+             "opaque hull over a blue liner leaves an umbra whose only light "
+             "is the ambient and the return, and neither carries the net at "
+             "the net's own contrast."))
+    print("   and it is DISPLACED: the umbra's centroid is at (%.3f, %.3f), "
+          "%.3f m from the ball's own plan position (%.2f, %.2f) against the "
+          "%.3f m the refracted sun gives everything else at %.2f m -- %+.1f%%. "
+          "Its bearing is %.2f deg off the sun's own anti-bearing, and it "
+          "covers %.4f m2 against pi R^2 / sin(21 deg) = %.4f m2 the ball casts "
+          "along that beam -- the SAME threshold on open sunlit floor 0.90 m "
+          "away flags %.4f m2. `?` The magnitude is biased LONG and one-signed: "
+          "the step unit's own shadow is excluded from the sample and it lies "
+          "on the UPSUN side of the ball's, so the surviving umbra is its "
+          "downsun half. The BEARING carries no such bias and it is the number "
+          "to read."
+          % (_cx2, _cy2, np.hypot(_cx2 - FLOAT_XY[0], _cy2 - FLOAT_XY[1]),
+             FLOAT_XY[0], FLOAT_XY[1],
+             DEPTH * np.tan(np.arcsin(np.sqrt(1 - SUN_DIR[2] ** 2) / IOR[1])),
+             DEPTH,
+             100. * np.hypot(_cx2 - FLOAT_XY[0], _cy2 - FLOAT_XY[1])
+             / (DEPTH * np.tan(np.arcsin(np.sqrt(1 - SUN_DIR[2] ** 2) / IOR[1])))
+             - 100.,
+             abs((np.degrees(np.arctan2(_cy2 - FLOAT_XY[1], _cx2 - FLOAT_XY[0])
+                             - np.arctan2(-SUN_DIR[1], -SUN_DIR[0]))
+                  + 180.) % 360. - 180.),
+             float(_umb.sum()) * ((X1 - X0) / CAU_NX) * ((Y1 - Y0) / CAU_NY),
+             np.pi * FLOAT_R2 / SUN_DIR[2],
+             float(_ct.sum()) * ((X1 - X0) / CAU_NX) * ((Y1 - Y0) / CAU_NY)))
 del _hdr
 
 
@@ -7606,6 +8889,31 @@ Image.fromarray(hero[ZY:ZY + ZH, ZX:ZX + ZW]).resize(
 print("wrote %s, %s" % (_HERO_PNG.replace(".png", "_dispersion.png"),
                         _HERO_PNG.replace(".png", "_zoom.png")))
 
+# --- AND A ZOOM ON THE BALL, for the same reason the step unit has one --------
+# The waterline, the fillet and the ball's own shadow on the water are all
+# millimetre-scale features on a body 84 output pixels across; a crop is the
+# only honest way to show them, and its box is the ball's own projected
+# bounding sphere plus a margin so that it follows the ball if it moves.
+if FLOAT_ON:
+    _fa = np.linspace(0, 2 * np.pi, 200)
+    _fpp = project(np.stack([FLOAT_CEN[0] + FLOAT_R * 1.6 * np.cos(_fa),
+                             FLOAT_CEN[1] + FLOAT_R * 1.6 * np.sin(_fa),
+                             np.full(200, FLOAT_CEN[2] - FLOAT_R * 1.6)], -1))
+    _fpp = np.concatenate([_fpp, project(np.stack(
+        [FLOAT_CEN[0] + FLOAT_R * 1.6 * np.cos(_fa),
+         FLOAT_CEN[1] + FLOAT_R * 1.6 * np.sin(_fa),
+         np.full(200, FLOAT_CEN[2] + FLOAT_R * 1.6)], -1))])
+    FX = int(np.clip(_fpp[:, 0].min(), 0, W // SS - 40))
+    FY = int(np.clip(_fpp[:, 1].min(), 0, H // SS - 40))
+    FW = int(np.clip(_fpp[:, 0].max(), 0, W // SS) - FX)
+    FH = int(np.clip(_fpp[:, 1].max(), 0, H // SS) - FY)
+    _FS = max(1, int(320 // max(FW, 1)))
+    Image.fromarray(hero[FY:FY + FH, FX:FX + FW]).resize(
+        (FW * _FS, FH * _FS), Image.LANCZOS).save(
+            _HERO_PNG.replace(".png", "_float.png"))
+    print("zoom on the float: %dx%d px at (%d, %d), written at %dx as %s"
+          % (FW, FH, FX, FY, _FS, _HERO_PNG.replace(".png", "_float.png")))
+
 
 # ===================================================== THE CAMERA UNDER THE WATER
 # Everything above this line is a view INTO the medium. This is the view from
@@ -7850,11 +9158,14 @@ def uw_shade(dvec, mode='disp', qlam=None, fp=None):
       * it meets the surface OUTSIDE the window, where R is 1 and the second of
         those is the whole of it. The mirrored twin is that case, and it is the
         same two lines as the one before it rather than a special one.
-    Returns (radiance, sid, sm, tir_green, bed_u, bed_v, path, on_bed). The last
-    four exist for ONE measurement and are worth the four arrays: a texel of the
-    floor that is seen BOTH directly and in the mirror is the same pigment under
-    the same light at two different path lengths, which is the only clean
-    instrument for Beer-Lambert on a view leg that a single frame contains."""
+    Returns (radiance, sid, sm, tir_green, bed_u, bed_v, path, on_bed, kind).
+    `bed_*`/`path`/`on_bed` exist for ONE measurement and are worth the four
+    arrays: a texel of the floor that is seen BOTH directly and in the mirror is
+    the same pigment under the same light at two different path lengths, which
+    is the only clean instrument for Beer-Lambert on a view leg that a single
+    frame contains. `kind` is what the transmitted ray found ABOVE the water --
+    0 sky, 1 the pool's own edge, 2 the sail, 3 the ball -- read off green, and
+    it is what the window's own solid-angle audit is taken on."""
     sid, u, v, sm, cyl = scene_hit_under(UW_EYE[0], UW_EYE[1], UW_EYE[2],
                                          dvec[:, 0], dvec[:, 1], dvec[:, 2])
     hz = UW_EYE[2] + dvec[:, 2] * sm
@@ -7862,6 +9173,7 @@ def uw_shade(dvec, mode='disp', qlam=None, fp=None):
     tirg = np.zeros(dvec.shape[0], bool)
     bu = np.zeros(dvec.shape[0]); bv = np.zeros(dvec.shape[0])
     tot = sm.copy(); onb = sid == 0
+    knd = np.zeros(dvec.shape[0], np.int8)
     bu[onb], bv[onb] = u[onb], v[onb]
     g = sid != 6
     if g.any():
@@ -7896,8 +9208,28 @@ def uw_shade(dvec, mode='disp', qlam=None, fp=None):
             tx, ty, tz, tir, R = uw_interface(d, nx_, ny_, nz_, nb, c)
             if c == 1:
                 tirg[w] = tir
+            # THE WORLD ABOVE THE WATER. This line used to read `sky(tx, ty,
+            # tz)` and that was the `?` wave 13 filed against itself: a ray
+            # leaving the surface toward the coping, the shade sail or anything
+            # floating on the water was handed the sky instead. `air_world`
+            # meets the scene's own geometry with the scene's own shaders, so
+            # the window now carries the poolside section, the sail and the
+            # ball. Past the rim `refract` returns the null vector, `air_world`
+            # is evaluated on it and returns something -- and it is multiplied
+            # by (1 - R), which is exactly zero there, so the mirror side is
+            # untouched. That is the same construction the `sky()` call had.
+            aw, ak = air_world(hx_, hy_, 0.0, tx, ty, tz,
+                               fp=None if fp is None else fp[w], kind=True)
+            if c == 1:
+                # 0 sky, 1 the pool's edge, 2 the sail, 3 the ball IN the
+                # window; 4 is the ball IN THE MIRROR, which is the other half
+                # of section G's strongest criterion and is recorded here so
+                # that "one surface, two appearances" is countable rather than
+                # looked at. A ray is in exactly one of them: past the rim the
+                # transmitted share is zero and the mirror is the whole of it.
+                knd[w] = np.where(tir, np.where(rsid == 7, 4, 0), ak)
             col[:, c] = (np.exp(-ABS[c] * sm[w])
-                         * ((1.0 - R) * into_water(sky(tx, ty, tz)[:, c], nb ** 2)
+                         * ((1.0 - R) * into_water(aw[:, c], nb ** 2)
                             + R * mir[:, c])
                          + INSCAT[c] * ((1.0 - e1) + R * e1 * e2))
         out[w] = col
@@ -7908,7 +9240,7 @@ def uw_shade(dvec, mode='disp', qlam=None, fp=None):
         bu[jb], bv[jb] = ru[mb], rv[mb]
         tot[jb] = sm[jb] + rsm[mb]
         onb[jb] = True
-    return out, sid, sm, tirg, bu, bv, tot, onb
+    return out, sid, sm, tirg, bu, bv, tot, onb, knd
 
 
 # --- the frame ----------------------------------------------------------------
@@ -7953,6 +9285,7 @@ def uw_render(mode='disp', chunk=600000):
     bed = np.zeros((W * H, 2), np.float32)
     tot = np.zeros(W * H, np.float32)
     onb = np.zeros(W * H, bool)
+    knd = np.zeros(W * H, np.int8)
     qs = ((SUBK.astype(np.float64) + .5) / NSPEC)
     for i0 in range(0, W * H, chunk):
         i1 = min(i0 + chunk, W * H)
@@ -7963,12 +9296,13 @@ def uw_render(mode='disp', chunk=600000):
         # obliquity of the plane it lands on.
         s0 = np.where(d[:, 2] > 1e-9, -UW_EYE[2] / np.maximum(d[:, 2], 1e-9), 0.0)
         fp = s0 * UW_PIXANG / np.maximum(np.abs(d[:, 2]), .10) * SS
-        c, s_, m_, t_, bu_, bv_, tt_, ob_ = uw_shade(d, mode, qs[j], fp)
+        c, s_, m_, t_, bu_, bv_, tt_, ob_, kn_ = uw_shade(d, mode, qs[j], fp)
         img[i0:i1] = c
         sid[i0:i1], smm[i0:i1], tir[i0:i1] = s_, m_, t_
         bed[i0:i1, 0], bed[i0:i1, 1] = bu_, bv_
         tot[i0:i1], onb[i0:i1] = tt_, ob_
-    return img.reshape(H, W, 3), sid, smm, tir, bed, tot, onb
+        knd[i0:i1] = kn_
+    return img.reshape(H, W, 3), sid, smm, tir, bed, tot, onb, knd
 
 
 def _uw_rim(flag, pol, lo=44., hi=53., nb=180):
@@ -7995,7 +9329,8 @@ def _uw_rim(flag, pol, lo=44., hi=53., nb=180):
 if UW_ON:
     print("\n--- the camera under the water --------------------------------")
     _t0 = _time.time()
-    UW_HDR, UW_SID, UW_SM, UW_TIR, UW_BED, UW_TOT, UW_ONB = uw_render('disp')
+    (UW_HDR, UW_SID, UW_SM, UW_TIR, UW_BED, UW_TOT, UW_ONB,
+     UW_KND) = uw_render('disp')
     _isw = UW_SID == 6
     print("underwater pass: %.0f s.  %.1f%% of subsamples reach the surface; of "
           "those %.1f%% are past the critical angle and see the mirror. %.1f%% "
@@ -8004,6 +9339,24 @@ if UW_ON:
              100. * (~_isw).mean()))
     UW_ENC = encode(UW_HDR)
     Image.fromarray(UW_ENC).save("pool_under.png")
+    if FLOAT_ON:
+        # the same crop from below: the hull, its twin and the ball inside the
+        # window all sit in a few dozen pixels, and the twin is 1.4 deg deep.
+        _ua = np.linspace(0, 2 * np.pi, 200)
+        _up = np.concatenate([uw_project(np.stack(
+            [FLOAT_CEN[0] + FLOAT_R * 2.6 * np.cos(_ua),
+             FLOAT_CEN[1] + FLOAT_R * 2.6 * np.sin(_ua),
+             np.full(200, FLOAT_CEN[2] + _dzz)], -1))
+            for _dzz in (-FLOAT_R * 2.6, FLOAT_R * 2.6)])
+        _ux0 = int(np.clip(_up[:, 0].min(), 0, W // SS - 40))
+        _uy0 = int(np.clip(_up[:, 1].min(), 0, H // SS - 40))
+        _uw2 = int(np.clip(_up[:, 0].max(), 0, W // SS) - _ux0)
+        _uh2 = int(np.clip(_up[:, 1].max(), 0, H // SS) - _uy0)
+        _us = max(1, int(320 // max(_uw2, 1)))
+        Image.fromarray(UW_ENC[_uy0:_uy0 + _uh2, _ux0:_ux0 + _uw2]).resize(
+            (_uw2 * _us, _uh2 * _us), Image.LANCZOS).save("pool_under_float.png")
+        print("zoom on the float from below: %dx%d px at (%d, %d), %dx -> "
+              "pool_under_float.png" % (_uw2, _uh2, _ux0, _uy0, _us))
     print("wrote pool_under.png")
 
     # ---- THE RIM, MEASURED OFF THE FRAME'S OWN GEOMETRY ---------------------
@@ -8053,14 +9406,97 @@ if UW_ON:
           % (_tt[4][_sub].max(),
              np.degrees(UW_TC[1]) - _pol[_sub & (_tt[4] > .99)].min()
              if (_sub & (_tt[4] > .99)).any() else float('nan')))
-    # the band the sky stands in for the deck: (1 - R) is still worth something
-    # there, and the world above the water is `sky` and nothing else.
     for _lv in (.30, .10, .03):
         _m = _sub & ((1.0 - _tt[4]) < _lv)
         if _m.any():
-            print("     (1 - R) < %.2f over the last %.3f deg of the window -- "
-                  "? that band looks at the coping and the deck and is given sky"
+            print("     (1 - R) < %.2f over the last %.3f deg of the window"
                   % (_lv, np.degrees(UW_TC[1]) - _pol[_m].min()))
+
+    # ---- WHAT THE WINDOW WAS MISSING, IN SOLID ANGLE ------------------------
+    # Wave 13 left "the world above the water is `sky()` and nothing else" as a
+    # `?` and measured it as an ANGULAR BAND at the rim -- the outermost 0.205
+    # deg at (1 - R) < 0.30. That is the right measurement for the rim and the
+    # wrong one for the question, because it prices only the rays that leave
+    # near grazing. The question is what share of the WINDOW'S SOLID ANGLE was
+    # being handed the sky, and it is answered here two ways that share no
+    # source.
+    #
+    # ROUTE 1, OFF THE FRAME. Every transmitting subsample is a solid angle of
+    # the eye's own cone; for a rectilinear camera a pixel of the image plane
+    # subtends dOmega = (dA/f^2) cos^3(theta_axis), so the weight is cos^3 of
+    # the angle off the optical axis and nothing else. Summing that weight over
+    # the transmitting subsamples, split by what `air_world` found, is the
+    # frame's own audit of itself.
+    _wgt = (_dall @ _uwf) ** 3
+    _win = ~UW_TIR[_jall]
+    _wt = _wgt[_win].sum()
+    _kk = UW_KND[_jall][_win]
+    print("what the window was missing, ROUTE 1 -- off this frame, weighting "
+          "each transmitting subsample by its own solid angle (cos^3 of the "
+          "angle off the axis). Of the window this frame holds:")
+    for _i, _nm in ((1, "the pool's own edge (band, bead, bullnose)"),
+                    (2, "the shade sail"), (3, "the float")):
+        _s = _wgt[_win][_kk == _i].sum()
+        print("   %-44s %7.4f%% of the window's solid angle, %d subsamples"
+              % (_nm, 100. * _s / max(_wt, 1e-12), int((_kk == _i).sum())))
+    print("   %-44s %7.4f%%"
+          % ("still sky, and marked as such", 100. * _wgt[_win][_kk == 0].sum()
+             / max(_wt, 1e-12)))
+    print("   ...on %d transmitting subsamples of %d that reach the surface, so "
+          "these are shares of the window THIS FRAME HOLDS -- the lens is 0.31 "
+          "deg too narrow for the whole of it and the aim is tilted down."
+          % (int(_win.sum()), _jall.size))
+
+    # ROUTE 2, OFF THE HEMISPHERE, AND IT NEVER TOUCHES THE CAMERA. From a grid
+    # of exit points on the surface, sample the AIR hemisphere uniformly in
+    # solid angle and ask `air_world` what is there. The window's own solid
+    # angle is then the image of that hemisphere under refraction, and the
+    # Jacobian is exact and closed form:
+    #     dOmega_w / dOmega_a = cos(theta_a) / (n^2 cos(theta_w))
+    # so a set of air directions weighs, in the water, by that factor. Route 1
+    # weights by a camera's cos^3 and reads `is_tir`; this weights by Snell's
+    # own Jacobian and reads nothing of the camera at all. They are the same
+    # number computed from two different measures.
+    _rng2 = np.random.default_rng(90210)
+    _nex, _ndir = 96, 4000
+    _th = _rng2.random(_nex) * 2 * np.pi
+    _rr = np.sqrt(_rng2.random(_nex)) * UW_RIM_R
+    _ex = UW_EYE[0] + _rr * np.cos(_th)
+    _ey = UW_EYE[1] + _rr * np.sin(_th)
+    # STRATIFIED in mu, not uniform: the Jacobian's own integral is the row that
+    # says the estimator is right, and a plain draw leaves 0.7% of noise on it.
+    _mu = (np.arange(_ndir) + _rng2.random(_ndir)) / _ndir
+    _ph2 = _rng2.random(_ndir) * 2 * np.pi
+    _st2 = np.sqrt(np.maximum(1 - _mu ** 2, 0.))
+    _A = np.zeros(4); _AT = 0.0
+    for _e in range(_nex):
+        _dx = _st2 * np.cos(_ph2); _dy = _st2 * np.sin(_ph2); _dz = _mu
+        _kk2 = air_world(np.full(_ndir, _ex[_e]), np.full(_ndir, _ey[_e]), 0.0,
+                         _dx, _dy, _dz, kind=True)[1]
+        _cw = np.sqrt(np.maximum(1. - (1. - _mu ** 2) / IOR[1] ** 2, 0.))
+        _jac = _mu / (IOR[1] ** 2 * np.maximum(_cw, 1e-9))
+        _AT += _jac.sum()
+        for _i in range(4):
+            _A[_i] += _jac[_kk2 == _i].sum()
+    print("what the window was missing, ROUTE 2 -- %d exit points on the "
+          "surface x %d air directions, weighted by Snell's own Jacobian "
+          "cos(theta_a)/(n^2 cos(theta_w)) and with no camera in it:"
+          % (_nex, _ndir))
+    for _i, _nm in ((1, "the pool's own edge"), (2, "the shade sail"),
+                    (3, "the float")):
+        print("   %-44s %7.4f%% of the FULL window" % (_nm, 100. * _A[_i] / _AT))
+    print("   %-44s %7.4f%%   (the estimator's own closure: it integrates the "
+          "window to %.5f sr against 2 pi (1 - cos theta_c) = %.5f sr, %+.3f%%, "
+          "which is the row that fires at a wrong Jacobian)"
+          % ("still sky", 100. * _A[0] / _AT,
+             2 * np.pi * _AT / (_ndir * _nex),
+             2 * np.pi * (1 - np.cos(UW_TC[1])),
+             100. * (2 * np.pi * _AT / (_ndir * _nex))
+             / (2 * np.pi * (1 - np.cos(UW_TC[1]))) - 100.))
+    print("   ? WHAT IS STILL `sky()` AND IS LEFT THAT WAY: everything beyond "
+          "the terrace. This scene has no fence, no house, no trees and no "
+          "cloud deck, and none is invented here; the section G reference "
+          "photograph's window is full of trees because that pool has trees.")
 
     # ---- THE SUN IN THE WINDOW ----------------------------------------------
     _lum = UW_HDR.reshape(-1, 3) @ np.array([.2126, .7152, .0722])
@@ -8117,6 +9553,57 @@ if UW_ON:
               "wall %s levels;  largest one-pixel step at the line %.1f levels"
               % (_xw, np.hypot(_xw - UW_EYE[0], Y1 - UW_EYE[1]), _cxp, _cyp,
                  np.round(_ab, 1), np.round(_be, 1), np.round(_ab - _be, 1), _st2))
+
+    # ---- THE FLOAT FROM BELOW: THE SAME SURFACE, TWICE ----------------------
+    # Section G: "anything touching the surface from below carries a mirrored
+    # twin... it is the single most recognisable underwater cue after the window
+    # itself, and it comes free from the same surface." The wall already carried
+    # that; the ball is the case the section is actually written about, and it
+    # is also the case that puts the object INSIDE the window at the same time.
+    # Both are counted here off ONE buffer, so "one surface or two" is a number.
+    if FLOAT_ON:
+        _fd = np.flatnonzero(UW_SID == 7)               # the keel, seen directly
+        _ft2 = np.flatnonzero(UW_KND == 4)              # the keel, in the mirror
+        _fw2 = np.flatnonzero(UW_KND == 3)              # the ball, in the window
+        print("the float from below, on the SAME surface buffer:")
+        print("   %6d subsamples meet the hull DIRECTLY -- no interface on the "
+              "path at all, which is what an eye inside the medium does" % _fd.size)
+        print("   %6d meet it IN THE MIRROR -- surface hits past the critical "
+              "angle whose reflected leg, traced by the hero's own downgoing "
+              "`scene_hit` from the surface point, lands on the hull. Nothing "
+              "in the pass mentions the ball's waterline: R is 1 out there and "
+              "the twin folds down because the hull is where it is" % _ft2.size)
+        print("   %6d meet it THROUGH THE WINDOW -- the transmitted share of a "
+              "sub-critical ray, refracted out into the air and met by "
+              "`air_world` above the surface" % _fw2.size)
+        _one = (_fd.size > 0) + (_ft2.size > 0) + (_fw2.size > 0)
+        print("   -> %d of the 3 appearances are present, and all of them come "
+              "out of ONE `surf_stats` call per subsample and one normal: the "
+              "transmitted and the reflected share are the two halves of the "
+              "same `uw_interface` return, and the direct hit never touches the "
+              "surface at all." % _one)
+        if _fd.size and _ft2.size:
+            _pd2 = uw_pixel_dirs(_fd); _pt2 = uw_pixel_dirs(_ft2)
+            _pold = np.degrees(np.arccos(np.clip(_pd2[:, 2], -1, 1)))
+            _polt = np.degrees(np.arccos(np.clip(_pt2[:, 2], -1, 1)))
+            print("   the twin and the hull meet AT the waterline: the direct "
+                  "hits run %.2f-%.2f deg of polar angle and the mirrored ones "
+                  "%.2f-%.2f, and they meet at %.2f deg -- the rim of the "
+                  "contact circle, seen from below. The twin is %.2f deg deep "
+                  "against the hull's %.2f, which is the %.1f mm draught seen "
+                  "at %.2f m."
+                  % (_pold.min(), _pold.max(), _polt.min(), _polt.max(),
+                     .5 * (_pold.min() + _polt.max()), np.ptp(_polt),
+                     np.ptp(_pold), 1000 * FLOAT_H,
+                     float(np.linalg.norm(FLOAT_CEN - UW_EYE))))
+            _me = UW_HDR.reshape(-1, 3)
+            print("   and they agree in radiance, which is what says it is one "
+                  "surface: hull %s, twin %s, scene-linear, %s apart per "
+                  "channel"
+                  % (np.round(np.median(_me[_fd], 0), 4),
+                     np.round(np.median(_me[_ft2], 0), 4),
+                     np.round(np.median(_me[_ft2], 0) / np.maximum(
+                         np.median(_me[_fd], 0), 1e-9), 3)))
 
     # ---- AERIAL PERSPECTIVE, OFF THE FRAME ----------------------------------
     # Section G's claim is that `ABS` now acts along the VIEW path, and the frame
