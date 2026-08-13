@@ -273,3 +273,49 @@ and **surf lines running parallel to the shore** all the way round the curve.
 - **Headlands and bays are the coastal loop's own signature** — headlands retreat
   faster than bays until the coast straightens, which chapter `12` calls
   self-reinforcing. A scene built with one straight beach cannot show it.
+
+### H5 · One wave field, two breaker types — and the substrate decides
+
+An eleventh frame: a wave meeting the **seaward edge of the rock platform**,
+throwing a vertical plume of white water off the ledge, with churning foam beyond
+carrying visible rotational structure. No time given; illuminant `?` as above.
+
+**This is a *reflective* breaker, and the same set already contains an
+*intermediate* one.** The surf frames show a bar-and-trough system on sand:
+break, reform, break. This frame shows a near-vertical impact on rock: reflect,
+and throw the water upward. **One offshore wave field, two breaker classes, and
+the difference is entirely the substrate.**
+
+- **`terrain-architect` `12` carries the classifier** — Wright & Short (1984)'s
+  dimensionless fall velocity `Ω = H_b/(w_s·T)`, with `w_s` the sand settling
+  velocity from grain size. Below 1 is **reflective** — *"steep, coarse, no bar,
+  no rips; surging breakers at a beach step"*. 1–6 is the **bar–rip family**.
+  Above 6 is **dissipative**. Cite it; the settling law is stated as the
+  implementer's to supply.
+- **The rock is the limit beyond the classifier, not a point on it.** `Ω` is
+  defined for a sandy beach; a rock platform has no `w_s` and no mobile bed. What
+  transfers is the *breaker type* argument — a steep impermeable face surges and
+  reflects rather than spilling or plunging — and that must be said rather than
+  quietly extrapolated. *Derived; the extrapolation marked.*
+- **This sharpens section B again.** It is no longer only that breaking must emerge
+  from the depth field. **The *type* of breaking must differ by substrate within
+  one frame**, and the number that predicts which is already on the required-
+  reporting list.
+
+**A note on which number, because two are in play and they answer different
+questions.** Section B's fourth closed form names the **Iribarren** number, which
+classifies the *breaker* at a given slope; chapter `12` uses **`Ω`**, which
+classifies the *beach state* and hence the bar–rip morphology. Both are real and
+they are not substitutes. Report both, and say which is answering which — silently
+picking one is how a reader inherits a conflation. *Recorded rather than resolved.*
+
+**The plume is ballistic, and it is outside the representation.** Once the water
+leaves the ledge it is projectile motion — height from `v²/2g`, checkable against
+the wave's own momentum flux. But a vertical jet in air is not a graph over the
+plane, so it joins the plunging lip in bar section F: **deferred, and for the same
+structural reason rather than for effort.**
+
+**The foam beyond it carries rotational structure**, not just coverage — visible
+eddies with foam as the tracer. A coverage mask advected by a potential flow will
+not produce it; it needs the vorticity the breaking itself generates. *Photograph;
+recorded as a criterion for the foam wave, not this one.*
