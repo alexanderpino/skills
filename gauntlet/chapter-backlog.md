@@ -868,3 +868,49 @@ is a **scene/instance** property. Putting the pair in the wrong place is what
 forces a second algorithm later.
 
 `render.py` already separates `liner()` and `tiles()`, so the hook exists.
+
+---
+
+## A surf reference, recorded for the sea work — and the word "particles" is the trap
+
+Owner photograph, supplied at the close of the pool work: a beach break shot into
+the light, two breaking lines, surfers, persistent foam, spray off the crest, and
+a backlit wave face. His reading: *"Dat zijn ook particles."*
+
+**Three mechanisms in that frame look identical and are not**, and collapsing them
+into one particle system is the standard reason CG surf reads wrong. The chapter
+already separates them under *Aerated water*, on an owner correction made earlier
+in this same project — surf foam and a jacuzzi plume are unrelated — and this
+photograph shows all three at once, which no earlier reference did:
+
+| what | what it actually is | not |
+|---|---|---|
+| the white blanket left behind a break | a **coverage mask on the surface**, a bubble layer of high albedo, advected and decaying | not particles |
+| the opaque white *inside* the wave mouth | a **participating medium** with high scattering albedo, in the water — you stop seeing the bottom through it | not a surface layer |
+| spray thrown clear along the crest, visible against the light | **water in air**, a droplet size distribution | this one *is* particles, and it is the smallest share of the white in frame |
+
+All three whiten from **one constant already derived** for the pool: a bubble seen
+from inside has the same critical angle as the surface seen from below, so
+`1 − 1/n² = 43.874%` of everything meeting a bubble wall is totally reflected. One
+bubble is silvery, a cloud is white and opaque. The same number runs the mirror
+outside Snell's window.
+
+**What the frame puts within reach today, and what it exposes.** The wave face
+glows green from behind where the water is thinnest, just before it breaks — the
+same transmitted column the pool work derived, at short path and against the sun.
+But pure-water transmission over 2 m is `(0.59, 0.90, 0.98)`: a mild shift toward
+blue-green, **not** the saturated green photographed. That green is a *coastal
+water* signature — CDOM and chlorophyll taking the blue and leaving a window near
+550 nm — so it is not an extra effect but **different IOPs**, and it is precisely
+the gap the sea reference has to fill. The pool rests on `b_b ≈ 0`; this frame
+does not.
+
+**What is structurally out of reach.** A plunging breaker has an overturning jet
+and an air tube, so the free surface is **multivalued** — no longer a graph over
+the plane. That breaks the assumption `field.py` and the whole caustic pass rest
+on. It is not an extension; it is a different representation, and it is the real
+work in surf.
+
+Keep the frame. Three mechanisms, backlighting and a coastal-water colour in one
+exposure is a denser reference than most of the single-purpose photographs the
+pool bar was built from.
