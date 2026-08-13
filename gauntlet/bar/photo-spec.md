@@ -100,10 +100,26 @@ synthetic tell anywhere in frame fails it, and the tell is usually not the water
 >   narrow **grey concrete bead or edge beam** → sandstone coping. The grey strip
 >   is thin, maybe a fifth of the blue band, and it is what the liner's bead track
 >   sits behind. Two elements would read as a shortcut.
-> - **The dry band is markedly *paler* than the water**, not the same blue. Same
->   liner, but lit directly and seen through no water at all, against liner seen
->   through 1.40 m and a Beer-Lambert round trip. The contrast between the two
->   across the waterline is one of the strongest tonal edges in the frame.
+> - ~~**The dry band is markedly *paler* than the water**~~ — **WITHDRAWN. This was
+>   a misreading of the photograph by the lead agent, and it is the lead agent's
+>   error alone; it was never reported by the reference observer and he is not
+>   cited for it anywhere.** He states the opposite directly: *"de rand is rondom
+>   donkerder"* — the dry band is darker, on every side. The correction is left
+>   visible rather than deleted because the wrong line was quoted back at him as
+>   though it needed reconciling with his own observation, and because it
+>   propagated into section K.
+>
+>   **What survives is the reasoning, which pointed the other way all along.** The
+>   band is the same liner lit directly through no water at all; the water is that
+>   liner seen through 1.40 m and a Beer–Lambert round trip. The contrast across
+>   the waterline is one of the strongest tonal edges in the frame — that part
+>   holds. Only the *sign* was wrong, and getting the sign wrong on a strong edge
+>   is worse than being vague about a weak one.
+>
+>   **And it makes the open finding simpler, not harder.** The observer now has the
+>   dry band darker than the water *and* darker than the submerged wall. The render
+>   puts it near the water and above the wall. That is **one fault, on the band**,
+>   read two independent ways — not two faults needing two explanations.
 > - **The waterline against this wall is soft, and it undulates.** There is a
 >   visible wet band at the foot of the blue and the line itself wobbles with the
 >   surface. This does **not** contradict B2: B2 is the *coping's arris* seen from
@@ -819,18 +835,28 @@ this is it, is *less* pigment on the band. **The dry band should render
 noticeably darker and deeper blue than it does today**, and that is checkable by
 eye against the coping stone in any of the nine photographs.
 
-**An internal tension this exposes, and it must be settled before either reading
-is used.** Section B2b records, from the sixth photograph: *"the dry band is
-markedly **paler** than the water."* The owner now reports the band darker on
-every side. Those can both be true only if *paler* meant **less saturated** —
-chalky, greyed, bloomed — rather than **lighter**. A limed band is exactly that:
-duller in colour and darker in tone. If *paler* meant lighter, then B2b and this
-section contradict each other and one of them is a transcription error by the
-lead agent, which has happened before in this file and was corrected in place.
+**The tension this appeared to expose was not one — it was a misreading, and it
+has been withdrawn.** Section B2b carried *"the dry band is markedly paler than
+the water"*, attributed to the sixth photograph and written by the lead agent. It
+is wrong, it was never the observer's claim, and it has been struck in place. The
+observer's reading is consistent on both comparisons: the dry band is darker than
+the water **and** darker than the submerged wall.
 
-**Question put to the owner, unanswered at time of writing:** is the dry strip
-*duller and greyer* than the water, or *lighter*? Do not resolve it by choosing
-whichever reading suits the render.
+**That simplifies the open finding rather than complicating it.** The render puts
+the band near the water and above the wall. Two independent comparisons, one
+direction of error, **one fault and it is on the band** — which is where wave 16
+had already attributed the residual before this exchange, by a different route.
+The two readings agree, and they agreed before either knew about the other.
+
+**A consequence for section K's own hypothesis, stated so it is not quietly
+dropped.** If the band is over-lit rather than over-albedoed, the two-material
+split may not be needed at all — a band that is simply too bright reproduces both
+orderings without any material difference. K's price table stands as an upper
+bound on what a material split would have to be, but the cheaper explanation must
+be eliminated first: **measure the band against the water in the render, in
+scene-linear, and compare that ratio with the photographs.** It is a within-frame
+pair, close in level, so it survives every camera failure in J2–J2d — the
+strongest instrument available and it has not yet been read.
 
 **What may not be done with this section.** It is a hypothesis with a price
 attached, not a licence. Splitting `LINER_TINT` into two constants and choosing
