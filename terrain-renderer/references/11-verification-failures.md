@@ -605,6 +605,88 @@ Three questions to ask of any test that has never failed, in the order they are 
    incidence, one texel, a flat surface — every degeneracy silently deletes the terms that only
    exist away from it, and those terms are usually the ones a reviewer would have asked about.
 
+## When the target is an approximation, the bar changes kind
+
+Everything above is about verifying a renderer against the world. This section is about the other
+job — verifying a **cheap** renderer against an expensive one — and the reason it needs its own
+heading is that the bar for the two is not the same *kind* of thing, and using the first for the
+second is the most common way an optimisation programme goes quietly wrong.
+
+**For a photorealistic reference the bar is a photograph**, or a standard of the form *a viewer
+should have to wonder whether it is one*. It is a good bar: it is holistic, it is impossible to
+overfit to a single quantity, and it catches every error the eye is built to catch. **For an
+approximation it is useless**, and the reason is not that it is subjective — it is that the errors
+that matter to an approximation are, by selection, exactly the ones the eye does not catch. An
+approximation that produced a visible error would have been rejected on the first frame.
+
+**The evidence, and it is a bad enough result to be worth stating in full.** One project's water
+work found four separate transport faults in a single session — a missing up leg, two correlated
+integrals split apart and multiplied, a caustic read on the wrong coordinate, and an over-supplied
+sky on a vertical face — at sizes of **5% to 25%** on named radiometric quantities. **Every one of
+them looked fine.** Not "looked slightly off and was dismissed": looked fine, in frames that were
+being stared at daily by people looking for exactly this. A perceptual image metric would have
+scored all four as passes.
+
+**Why, in one table.** A view transform compresses. Through the sRGB EOTF a *linear* error becomes
+an encoded error roughly `(1 + e)^(1/2.4)`, so:
+
+| scene-linear error | encoded levels of 255, at L = 0.05 | at L = 0.18 (mid grey) | at L = 0.40 |
+|---|---|---|---|
+| +5% | 1.6 | 2.7 | 3.8 |
+| +10% | 3.1 | 5.3 | 7.4 |
+| +25% | 7.5 | **12.8** | 17.9 |
+
+(`D`, recomputed here through the exact sRGB transfer function.) A 5% radiometric error is **two to
+four levels** — below the threshold for a *flat patch* and far below it in textured, caustic-lit,
+noisy content where every local neighbourhood already varies by more than that. And a 25% error is
+about **13 levels at mid grey**, which is visible as a difference *between two images shown side by
+side* and is not visible as a property of one image. Both directions of that sentence matter: the
+metric that would catch 25% is a *difference* metric, and a difference metric needs the reference
+image, which is the thing this section is about acquiring.
+
+**So the bar becomes the reference itself, and the question changes shape.** Not *does this look
+right* but **how many percent off, per channel, on a named quantity**. That is what a reference
+implementation is *for*, and it is the only formulation under which a 5% fault is a failing test
+rather than a matter of opinion.
+
+**It works only because the reference is deterministic.** A quadrature reference re-run twice
+returns the same digits, so a 3% difference is a **number**; a Monte Carlo reference re-run twice
+returns two different numbers, so a 3% difference is a number *plus noise*, and separating them
+costs samples on every single score. That is not an argument against path-traced references in
+general — it is an argument that the reference for an approximation loop should be the deterministic
+one if a deterministic one is achievable, because the loop will read it thousands of times and the
+variance is paid on every read. If it must be stochastic, freeze the seed and report the estimator's
+own standard error next to every score, or the tolerance discussion above becomes unanswerable.
+
+**Three things must be in place before the first approximation is written, and the ordering is not
+negotiable.**
+
+1. **A frozen ground-truth set, committed to the repository.** Scene-linear buffers *and* the
+   derived scalars — the named quantities the approximation will be scored on, not just images.
+   Without it every score costs a full reference render, which puts the slowest thing in the
+   project in the innermost loop and guarantees the loop is run less often than it should be. Dump
+   it, freeze it, and version it: a ground truth that moves is not one.
+2. **An error metric fixed in advance.** Per channel, relative, on named quantities. Explicitly
+   **not** a perceptual image metric, for the reason the table above gives. The ordering is the
+   whole point: **decide the metric before the first approximation exists, so it cannot be chosen
+   to flatter one.** A metric selected after the candidate is a fit, by the same argument that makes
+   a tolerance widened to pass a row worthless — and it is harder to see, because choosing a metric
+   feels like methodology rather than like tuning.
+3. **A cost budget.** Platform, frame time, memory for LUTs. Without it "approximation" is unbounded
+   and there is nothing to optimise against: every candidate can be improved by spending more, so
+   the loop has no stopping rule and no way to compare two candidates that are both accurate
+   enough. **An approximation is only meaningful relative to what it is allowed to cost**, and the
+   budget is the half of the pair that gets deferred because it belongs to somebody else.
+
+**Two more preconditions that are specific rather than general, and both are about the ground truth
+rather than the metric.** Any quantity in the reference that is **itself unresolved** propagates
+into every approximation scored against it — so an open 2× discrepancy in the reference is not a
+row to close later, it is a reason not to start. And at least one **cross-consistency** reading
+should be in the frozen set: a scene that exposes one underlying field through more than one path,
+so that an approximation which passes each reading separately can still be caught failing their
+agreement. That failure is invisible in any single view by construction, which is precisely why it
+must be in the set before the loop starts rather than added when something looks wrong.
+
 ## Review checklist
 
 Ordered by frequency of real defects in shipped terrain renderers. State findings as
@@ -634,6 +716,11 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
     "planned"?
 12. Is there a worst-case-view replay with budget assertions wired into CI, and did it run on
     this change?
+13. If anything in this change is an **approximation of a reference**, do the three preconditions
+    exist — a frozen ground-truth set, an error metric fixed before the candidate, and a cost
+    budget — and was the metric chosen before the candidate rather than after?
+14. Is any quantity the ground truth is scored on still open in the *reference*? An unresolved
+    discrepancy there propagates into every approximation measured against it.
 
 ## Sources & provenance
 
@@ -663,4 +750,8 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
 | `L = K·N²/(ISO·t)`, `K ≈ 12.5`, as the EXIF route to a scene luminance | **P** (the ISO 2720 / standard reflected-light-meter relation; `K` in 10.6–13.4 by manufacturer, 12.5 for Canon/Nikon — quoted from model knowledge, **not** re-verified against the standard, so treat it as ±10%) |
 | That a *render's* own PNG is display-referred too, and that inverting the sRGB EOTF on it recovers display-linear rather than scene-linear | **F/D** — universal of any view-transformed output (no citation needed, and the same mechanism as the seventh way's second axis); **D** for the episode, committed on this project's own frames and reproduced from the render's scene-linear buffer |
 | The three-factor chain `0.706 × 0.953 × 0.996 × 0.590 = 0.395` against a true 0.706, i.e. 1.79× | **D** — arithmetic recomputed here on the reference implementation's whole-basin frame; the median/mean skew ratio 0.786 and the region factor 0.590 are properties of *that* frame, that occluder and that sun. ⚠️ The chain had been quoted against a "true 0.735", which is the **hero** frame's ratio, not that frame's; the factor is 1.79, not 1.86. What transfers is the **ordering rule** — check the region before the colour space — and the observation that the tone curve was the smallest of the three here (×0.996) while being the one the episode was named after |
+| That a photographic bar cannot verify an approximation, and that the bar becomes the reference plus a named-quantity per-channel metric | **F** (house doctrine, composed here) + **D** for the episode — four transport faults of 5–25% on one water renderer, every one of them invisible in the frame |
+| The linear-error → encoded-level table (5% ≈ 2.7 levels and 25% ≈ 12.8 levels at L = 0.18 of 255) | **D** — computed here through the exact sRGB transfer function, 2026-08. It is a property of the *view transform*, so it carries to any sRGB-encoded output and not to a different one; recompute for PQ or for a filmic curve, where the toe and shoulder change it by more than the percentages do |
+| That a deterministic quadrature reference makes a 3% difference a number while a Monte Carlo one makes it a number plus noise, hence the seed/standard-error requirement | **F** (elementary, but the *consequence for loop design* — variance paid on every read — is this skill's composition) |
+| The three preconditions (frozen ground truth, metric fixed in advance, cost budget) and the two ground-truth preconditions (no open discrepancy, one cross-consistency reading) | **F** (house doctrine; the metric-before-candidate rule is the same argument as "never widen a tolerance to pass a row", and the cross-consistency requirement generalises `12`'s split shot) |
 | The eighth way: a test's power is the surface area it shares with the code under test | **F** (house doctrine, and the general form of the fourth way's "two methods that read one premise are one method") + **D** for the case — the audit's one borrowed name, the lossless-limit/photon-walk pair agreeing to 0.15%, and the four-bug table are all `reference-impl/validate.py`, re-evaluated here; that **the lossless limit alone passes three of the four** was verified by evaluating each variant against the limit, not quoted |

@@ -793,3 +793,95 @@ least-confident-claims ledger in `00-index.md`.
   exceeding body depth), that pool colour is therefore a bottom-albedo property rather than a
   scattering one, and the man-made gating table: this skill's composition from the optics above
   plus standard pool-operation practice.
+- **P/synthesis, with three `D` measurements and one `?`** — **[An illuminant per receiver, and
+  what that costs at a waterline](12-water-rendering.md#an-illuminant-per-receiver-and-what-that-costs-at-a-waterline).**
+  The general result — that an illuminant is `(1/π)∫L(ω)(ω·N)⁺dω` and therefore a property of the
+  *receiver's orientation*, with weights `cos θ sin θ` for a horizontal face and `sin² θ` for a
+  vertical one, agreeing at exactly ½ under a uniform sky and nowhere else — is derived in
+  [`10`](10-lighting-shadows.md#an-illuminant-is-a-property-of-the-receivers-orientation-not-of-the-scene)
+  from the cosine law alone; the ½ was verified here by quadrature to 10⁻¹¹. **D** for the three
+  measured triples, all recomputed here on the reference implementation's own sky and basin: the
+  band's own hemisphere against half the derived deck illuminant (1.232 / 1.099 / 0.966), the
+  sun-facing-to-averted band ratio (1.201 / 1.238 / 1.234 per channel, **1.231** in luminance), and
+  the three-term irradiance table with the reflected sky at 19 / 12 / 11 % of the band's total and
+  63 / 23 / 21 % of its lower half. **D** for the `sin²θ`-weighted mean external reflectance
+  **0.2112** against 0.0667 cosine-weighted and 0.0206 at normal incidence, quadratured here from
+  the exact Fresnel equations at `n = 1.3348`. ⚠️ **`?` on the run's printed "total"** for that
+  table: it prints `(0.4761, 0.9220, 1.3568)` where its own three components sum to
+  `(0.4461, 0.8233, 1.2164)` — a discrepancy of 6.7 / 12.0 / 11.5 %, not a constant, so a different
+  normalisation rather than a rounding. This chapter quotes the components, marks the total open,
+  and does not know which is right. ⚠️ The reference implementation's **0.243** for the reflected
+  sky's mean `R_ext` is *not* the 0.2112 above: its weighting also carries the sky's own horizon
+  brightening. Two different quantities, one name. **D, integrated here** for the ledge table
+  (87.5 / 81.5 / 70.6 % of the full upper half, averaged over a 100 mm strip at 20 / 30 / 50 mm of
+  overhang; 99.7 / 99.0 / 96.0 % at the strip's foot) from the closed form `(α + sin α cos α)/π`,
+  `α = atan(D/w)`, which is exactly 0.50 at `w = 0`. ⚠️ A **94%** figure for a 30 mm overhang on this
+  geometry does not reproduce: the mean is dominated by the strip's top edge, where the form goes to
+  zero, so the answer is set by how far the strip's top sits below the ledge — a section question,
+  not a lighting one. Quote the profile or the foot, never the mean.
+- **D/P, with one derived bound** — **[The upgoing half, traced: the return leg, the mirror, and the
+  fixed point](12-water-rendering.md#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point).**
+  The gather's shape — trace the upgoing half, let the trace decide window from mirror, exact
+  per-direction internal Fresnel by Stokes reversibility, walls as emitters — is `reference-impl/`'s
+  `up_gather` read as doctrine (**D**), and the physics in it is standard (**P**). **D** for the
+  bed-ambient table (window sky falling 17% in green while the mirror-and-wall term rises ~8×, the
+  bed's ambient +39% in green, the occluder's shadow arriving at 92% of its own depth against 91%),
+  the 35.3% wall share of a bed point's hemisphere, the 87%-of-the-floor window-occlusion figure at
+  `1.40·tan 48.5° = 1.58 m` of run in an 8 × 4 m basin, the ×1.96 sky over-give, the +9.5 / +15.3 /
+  −6.2 % wall response and the +39% riser response, and the 4.9% / 1.4% riser hole. **D, recomputed
+  here** for the truncation table (`1/(1 − ρR_int)` against one and two bounces and against the
+  wrong cone, at `R_int = 0.47617` and `1 − 1/n² = 0.43874`, ρ = 0.222 / 0.400 / 0.585 / 0.681) —
+  the finding that the truncation error is **chromatic**, hence a desaturation rather than a
+  darkening, is this chapter's reading of that table and is new here. **Derived here** for the
+  geometric residual bound `tail ≤ dₖ·r/(1−r)`, and its evaluation at the run's measured gains
+  (0.335 / 0.442 on the bed, 0.378 / 0.475 on the wall → 0.50 / 0.79 and 0.61 / 0.90 × the last
+  increment, i.e. 0.012% and 0.033% of the converged level in green). `?` for the still-plane mirror
+  (the wave field is not on the mirror leg) — stated as an approximation, with its argument, not as
+  a result.
+- **`?` throughout, and deliberately** — **[Fouling in the corners, from an
+  algorithm](12-water-rendering.md#fouling-in-the-corners-from-an-algorithm-rather-than-from-a-texture).**
+  Nothing in this section is rendered, measured or falsified; it is a specification written before
+  implementation so the choices can be argued with rather than discovered in a diff. What is **P**
+  in it: potential flow as the classical first approximation, and the corner solution
+  `φ = A r^(π/α) cos(πθ/α)` with `|u| ~ r^(π/α − 1)` — **derived here**, giving exactly zero velocity
+  at a square corner (`r¹`), `r^0.5` at a 120° chamfer and a `r^(−1/3)` **singularity** at a
+  re-entrant one. That the model therefore *flatters the result precisely where the effect is
+  wanted* is the section's loudest mark. **Derived here** for the patchiness argument: linearising
+  `ḋ = S(1 + κd)(1 − d)` about a uniform state gives growth rate `S(κ(1 − 2d̄) − 1)`, positive above
+  a threshold coupling, so blotchiness is a linear instability and not a texture. **`?`** for
+  everything chemical and everything biological: which organism dominates in which conditions, every
+  rate, and the two-number susceptibility table (PVC / glazed ceramic / concrete) — those are
+  *orderings* a materials scientist would recognise, not measurements, and no numbers are stated
+  because none were measured. **A rate is not renderable at all** — it needs water hardness,
+  sanitiser regime, cumulative UV dose and polymer formulation, none of which is renderer input —
+  which is why the section states susceptibility instead. **F** for the parameter placement rule
+  (susceptibility on the material, the `neglect` path on the instance) and for the non-zero default,
+  which rests on an observation about pools in service rather than on a measurement.
+- **D/P, with the IOPs `?`** — **[The surf zone: what a pool reference lends the sea, and the one
+  thing it cannot](12-water-rendering.md#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot)**,
+  and the three-whites table in [Aerated
+  water](12-water-rendering.md#aerated-water-foam-spray-and-whitewater). The transfer table is
+  bookkeeping over results already provenanced in this file — Fresnel both sides, the critical
+  angle, `L/n²`, Beer–Lambert, the trapped series and dispersion are properties of an interface and
+  an IOR and carry unchanged; **`b_b ≈ 0` does not, and it is the only entry that does not.**
+  **D, recomputed here**: `1 − 1/n²` = 43.72% at `n = 1.333` and **43.874%** at 1.3348, running
+  43.64 / 43.87 / 44.31 % across the IOR triple; pure-water transmission over 2 m
+  `(0.593, 0.899, 0.980)` at the band means. **Derived here**: the wedge inversion
+  `c(λ) = −ln(T₂/T₁)/(L₂ − L₁)`, whose value is that the ratio cancels source spectrum, both surface
+  transmissions and camera gain — a within-frame pair in the sense `11` requires. **`?`** for the
+  coastal IOPs themselves: no spectrum was extracted from any of the nine frames, and the CDOM /
+  chlorophyll attribution of a green wave face is an identification, not a measurement. **`?`** for
+  the sediment transport in [Water-body optical
+  identity](12-water-rendering.md#water-body-optical-identity-where-the-iops-come-from) — the
+  entrainment law and the fall velocity in `db/dt + u·∇b = E − w_s b/d` are named to give the
+  *shape* of the coupling, and neither term is quantified here. The load-bearing claim is
+  categorial and needs no number: in the surf zone an IOP is a **state variable produced by the
+  dynamics**, not a material input. **F/D** for the two observational rulings the section rests on —
+  the two-colour backlit wave (a category refutation that needs no measurement, and the sharpest
+  available falsification of a `waterColor` tint), the reveals/hides discriminator watched under
+  motion, and the two-lifetime cloud. Each is a *reading* of an owner photograph, reproducible by
+  anyone with a camera and a coast, and none is a calibration. **`?`** for the multivalued free
+  surface: it is stated as a representation change with no route proposed, which is the honest state
+  of it. **The reference set has a named gap** — no frame catches the backwash lifting sand, i.e.
+  the erosive half of the swash cycle, and the inference that would fill it from the other eight is
+  exactly the inference not to make.

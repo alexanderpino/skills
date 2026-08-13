@@ -332,6 +332,51 @@ verification effort first.
   amortization property names, which came from search snippets rather than a fetched page (`?`).
   Community reports of version-specific Water breakage under World Partition are forum-tier and are
   flagged, not asserted. Everything here drifts by engine release; re-verify constants at time of use.
+- `10`, `12`, `12b` (illuminants and the submerged hemisphere, added 2026-08): the **general
+  results are derived and closed** — that an illuminant is a cosine integral of the scene's own sky
+  and is therefore a property of the *receiver's orientation* (weights `cos θ sin θ` and `sin² θ`,
+  equal at exactly ½ only under a uniform sky); that a disc lobe carrying the beam must be excluded
+  from that integral while the aureole must be included; and that the Rayleigh aureole's share of
+  any receiver is `⟨cos²Θ⟩_w/(1 + ⟨cos²Θ⟩_w)`, hence **≤ ½ pointwise and exactly ¼ over the
+  sphere**, for any optical depth and any solar elevation. Those need no verification effort: they
+  are moments of a phase function and an integral of the cosine law. What is **open**: the sky
+  *gradient* the two lobes sit on is not derived from anything — single-scattered Rayleigh gives
+  only a lower bound of 0.55 / 0.58 / 0.49 on it, missing orders ≥ 2 and the ground return (`?`);
+  the reference run's band-irradiance **total** does not equal the sum of its own components
+  (6.7 / 12.0 / 11.5 % apart, not a constant), so one of the two is wrong and this skill does not
+  know which (`?`); and the observation this whole line of work chases — a submerged wall reading
+  *lighter* than the dry band above it, on every side — **still does not emerge** now that both
+  halves of the wall's upper hemisphere have been derived and its source illuminant with them. The
+  render sits at 0.513 where the observation requires > 1. That supersedes the "located but not
+  fixed" note in the block above: the sky share **is** fixed (0.199 in place of 0.390) and the
+  mirror's bounces **are** carried to a fixed point with a measured residual bound, and the
+  remaining factor of ~1.95 belongs to neither. Either something is still missing from both sides,
+  or the observation and this physics disagree — and that is the state to leave it in.
+- `12` (fouling, added 2026-08): **the whole section is a specification and nothing in it has been
+  rendered.** The mechanism (three driver fields; stagnation from one Laplace solve; two unaligned
+  drivers, so an AO-driven grime mask is backwards for one of them; patchiness as a linear
+  instability of the roughness–deposit feedback) is argued and two pieces of it are derived here —
+  the corner exponent `|u| ~ r^(π/α − 1)` and the instability threshold. **Everything chemical and
+  biological is `?`**: which organism dominates where, every rate, and the per-material
+  susceptibility orderings. A weathering *rate* is not renderable input at all, which is the
+  section's own argument for stating susceptibility instead — verify the orderings against a
+  materials source before quoting them, and do not quote numbers, because none are given.
+- `12`, `12b` (the sea reference set, added 2026-08): the transfer table is bookkeeping over results
+  already provenanced, and **`b_b ≈ 0` is the single entry that does not carry from a pool to the
+  sea**. The observational rulings (a backlit wave reading green while the same water reads
+  grey-blue two metres away; reveals-and-stays-put against hides-and-pulses; two clouds separated by
+  lifetime) are readings of owner photographs, reproducible by anyone with a camera and a coast, and
+  none is a calibration. **`?`**: no spectrum was extracted from any frame, so the coastal IOPs
+  remain unmeasured and the CDOM/chlorophyll attribution is an identification; the sediment
+  entrainment law and fall velocity are named for shape only; the multivalued free surface under a
+  plunging lip is stated as a representation change with no route proposed. The reference set has a
+  **named gap** — no frame catches the backwash lifting sand — and filling it by inference from the
+  other eight is exactly the move the gap exists to prevent.
+- `11` (verifying an approximation, added 2026-08): the claim that a photographic bar cannot verify
+  an approximation rests on one episode (four transport faults of 5–25%, every one invisible in
+  frame) plus arithmetic through the sRGB transfer function that is exact but is a property of *that*
+  view transform — recompute it for a filmic curve or for PQ before quoting the levels. The three
+  preconditions are house doctrine (**F**), not a cited methodology.
 - `19`: PCISPH (Solenthaler & Pajarola 2009), IISPH (Ihmsen et al. 2014), DFSPH (Bender & Koschier
   2015) and the Kelvin-wake citation (Thomson 1887) were all **web-verified 2026-08** — the `?`
   flags are cleared. Probe-point buoyancy, the spray/foam/bubble split, domain-fade fractions and

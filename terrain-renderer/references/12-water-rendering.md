@@ -116,6 +116,18 @@ the reference implementation or read off a photograph, not supposed.
 | A submerged wall reads sky-coloured and structureless while its level looks about right | The upper half of a vertical face's hemisphere filled with sky. It is **22% Snell window and 78% mirror**; a flat `0.5` over-gives the sky by ×1.96 and under-gives the pool's own upwelling field by the same partition, so level survives while hue and caustic structure do not | [What a submerged vertical face sees of the sky](#what-a-submerged-vertical-face-sees-of-the-sky) |
 | Water is subtly dark after a lookup table replaced a computed transport, and no index or format bug explains it | An integral **split into two tables and multiplied**. Attenuation and escape share the water-side cosine and are correlated `+0.76`, so the product of the means understates by 19.4% in red; the trapped leg is correlated the other way, so the composed result moves only 2.8% and hides it | [Attenuation and escape do not factorise](#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them) |
 | The suite is green, has been green for months, and the picture is visibly wrong in the quantity the suite is named after | A test that **borrows one name and writes the rest itself**: its own inputs, its own transport, a physics identity for a right-hand side. It exercises one function and certifies a law that would hold for almost any implementation | [`11`, the eighth way](11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement) |
+| Every wall at a waterline is lit identically from the sky, on the sunny side and the shaded side alike | One "sky ambient" handed to receivers of different orientation. A horizontal face weights the sky by `cos θ sin θ`, a vertical one by `sin² θ`; they agree at exactly ½ for a uniform sky and nowhere else, and the aureole gives the vertical case an **azimuth** a constant cannot carry — 1.23× between a sun-facing and a sun-averted band of one pool | [An illuminant per receiver](#an-illuminant-per-receiver-and-what-that-costs-at-a-waterline) |
+| A dry band above the water reads flat and slightly cold, and no ambient value fixes both it and the deck | Its **lower half** was given the pool's upwelling and not the *sky reflected in the water*. The `sin²θ` weight peaks at the horizon, where a water surface reflects **0.2112** rather than the 0.0206 of normal incidence — a factor of 10.3, and 23% of what that half receives in green | [An illuminant per receiver](#an-illuminant-per-receiver-and-what-that-costs-at-a-waterline) |
+| The pool reads *desaturated* rather than dark — the liner's colour is weak but the level is plausible | The interreflection series **truncated at one bounce**. The error is chromatic because bed albedo is: 7.8% in green and 10.5% in blue against 1.1% in red on this liner, so it washes the colour out while surviving every luminance check. The second bounce buys back three quarters of it | [The upgoing half, traced](#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point) |
+| A submerged wall's level looks right, and correcting a term you know is wrong barely moves it | The **sky and the mirror are two halves of one hemisphere**, so over-giving one under-gives the other and any measurement of the total is blind by construction. Zero the sky: the face must fall to **77.7%**, not to zero and not to half | [The upgoing half, traced](#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point) |
+| An aged pool's dirt is all in the shade | A grime mask driven by **ambient occlusion**. Biofilm needs stagnation; photosynthetic algae need stagnation *and light*, so the worst place is the **sunlit stagnant** corner. One accessibility mask is right for one mechanism and exactly backwards for the other | [Fouling in the corners](#fouling-in-the-corners-from-an-algorithm-rather-than-from-a-texture) |
+| Weathering present but perfectly even — an aged surface that is uniformly grey rather than blotchy | Patchiness is **feedback, not noise**: deposit roughens, roughness holds more deposit, and above a threshold coupling the uniform state is linearly unstable. A few iterations give it; a noise octave fakes it and has to be re-authored per basin | [Fouling in the corners](#fouling-in-the-corners-from-an-algorithm-rather-than-from-a-texture) |
+| An outdoor pool with a geometrically clean waterline and no band at all | The `neglect` control shipped at a **zero default**. Most pools in service carry a band, so a pristine liner is the special case; a renderer defaulting to zero age reads as CG by default, and the same holds for every persistent liquid line — tanks, locks, harbour walls, hulls | [Fouling in the corners](#fouling-in-the-corners-from-an-algorithm-rather-than-from-a-texture) |
+| The sea is green everywhere, or blue everywhere, whatever the wave is doing | A tint on the water **body**. One backlit breaking wave refutes it in a single exposure: the face reads saturated green while the same water two metres away reads grey-blue, so the colour is the **path** and must vanish when the path does | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
+| Surf built as one particle system, and it reads as confetti over glass | **Three whites, three materials**: the blanket behind a break is a *coverage mask*, the opacity inside the wave mouth is a *participating medium*, the spray is *particles* — and the particles are the **smallest** share. All three whiten from the same `1 − 1/n²` and share nothing else | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
+| A white plume after a wave hits rock that either vanishes leaving nothing or lingers white far too long | **Two clouds with one decay curve.** Entrained air rises and bursts in seconds; suspended sediment settles over minutes and advects. They overlap in space and are separated by *lifetime*, not appearance | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
+| Water in the surf zone that is exactly as clear on every frame while the waves break through it | `b` treated as a **material constant** where it is a state variable produced by the dynamics: the waves suspend the bed, the backwash erodes, turbidity pulses at the wave period. The one optical property a still frame cannot verify | [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) |
+| A real-time approximation passes every image comparison and is 5–25% off on the quantities it approximates | The bar is still a **photograph** when the target is an approximation. 5% scene-linear is ~2.7 encoded levels of 255 at mid grey; the errors that matter are selected for invisibility. The bar has to become the reference plus a per-channel metric on named quantities | [`11`, the bar changes kind](11-verification-failures.md#when-the-target-is-an-approximation-the-bar-changes-kind) |
 
 Two habits make the table worth more than the sum of its rows. **Read pairs, not symptoms** — the
 dark-interiors/bright-shadows row is diagnostic only as a pair, because either half alone reads as
@@ -656,6 +668,100 @@ Wave–current interaction needs *no* new data — the flow field is already in 
 only optional addition is baking static flow into the τ solve as above.
 Max shore-wave amplitude joins max ambient amplitude in the culling-bounds inflation.
 
+### The surf zone: what a pool reference lends the sea, and the one thing it cannot
+
+A treated pool is the cleanest optics laboratory a water renderer has — flat datum, known bed,
+known depth, `b_b ≈ 0` — and the temptation after doing that work is to assume the sea is the same
+physics at larger numbers. **Most of it is.** The exception is a single one, it is the one that
+decides the colour, and knowing which is which is worth more than any individual sea constant.
+
+| what transfers from a pool **unchanged** | why |
+|---|---|
+| external Fresnel, and internal Fresnel with its critical angle | properties of one interface and one IOR; the ocean's `n` is 1.339 against fresh water's 1.333 — a 0.4% shift, worth 0.02% on the transmitted share |
+| the `1 − 1/n²` partition, and `L/n²` across the interface | [radiance is not conserved](#radiance-is-not-conserved-across-the-interface); geometry and IOR only |
+| Beer–Lambert along every leg | the law, not the coefficient |
+| the trapped series, wherever there is a bottom in reach | [the two materials a pool has](#the-two-materials-a-pool-actually-has-and-neither-is-water) |
+| dispersion, and [a channel is a band](#a-channel-is-a-band-not-a-wavelength) | `n(λ)` is Cauchy in both |
+| the meniscus, the glitter path, the caustic Jacobian | surface mathematics |
+| **the IOPs** | **nothing transfers. `b_b ≈ 0` is the pool's degenerate case and it is false everywhere in the sea** |
+
+**One exposure refutes the `waterColor` category error outright, and it needs no measurement.** In a
+frame of a breaking wave shot into the light, the wave *face* reads a saturated translucent green
+while the same water two metres away reads grey-blue. **The same liquid shows two colours at once**,
+so the green cannot be a tint on the water body: it is a **path-length effect**, present only where
+the column is thin *and* backlit and absent everywhere else in the same frame. That is the sharpest
+available statement of the rule this chapter already gives — **the colour is the path, so it must
+vanish when the path does** — and a renderer whose sea is green everywhere has tinted it. This is
+the falsification a `waterColor` parameter cannot survive, and it is a photograph anybody can take.
+
+**A breaking wave is a wedge, which makes it a variable-path cuvette, which makes it an
+instrument.** Thin at the lip, thick toward the trough, with the colour grading continuously across
+it. Two points on one backlit face at estimated thicknesses `L₁` and `L₂` invert directly:
+
+```
+T(lambda, L) = exp(-c(lambda) L)          # c = a + b, beam attenuation along the transmitted path
+=>  c(lambda) = -ln( T_2 / T_1 ) / (L_2 - L_1)
+```
+
+The ratio kills the source spectrum, the surface transmission at entry and exit, the camera's
+exposure and any constant gain — **everything that is not the path** — which is why a *within-frame*
+pair works where absolute triples do not, exactly as `11`'s
+[seven ways](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one)
+requires. The thicknesses come from the wave geometry, so the whole measurement is one frame plus a
+crest profile. **A breaking wave is a free spectrophotometer pointed at precisely the unknown**, and
+the unknown is the only quantity in the table above that the pool work cannot lend.
+
+**How far off the pool's own water is, in a number.** Pure water over a 2 m path transmits
+`(0.593, 0.899, 0.980)` (`D`, recomputed at the band means `a = (0.2617, 0.05299, 0.01022) m⁻¹`) —
+a mild shift toward blue-green, and **not** the saturated green a coastal wave face shows. That
+green is CDOM and chlorophyll taking the blue and leaving a window near 550 nm: not an extra effect,
+[different IOPs](#water-body-optical-identity-where-the-iops-come-from), and the same machinery run
+from the other end.
+
+**A confusable pair, with the discriminator, because both are in every coastal frame.**
+
+| | mechanism | how to tell |
+|---|---|---|
+| **shallow bottom** | you see the bed through the column; bright for exactly the reason a pool is | it **reveals** structure, and that structure **stays put** |
+| **suspended sediment** | a scattering veil *in* the column | it **hides** the bed, **moves with the water**, and **pulses** with the wave |
+
+The discriminator is temporal and it costs nothing: **watch it while the water moves.** A bed does
+not move; a veil does. The same test settles the corresponding question at a pool — whether a dark
+patch is weathering on the liner or something in the water — and it is more reliable than any
+single-frame reading because it uses the one axis a photograph does not have.
+
+**The cloud left after a wave breaks on rock is two clouds, and they are separated by decay rather
+than by appearance.**
+
+| | lifetime | behaviour |
+|---|---|---|
+| **entrained air** | **seconds** — bubbles rise and burst | the bright white plume that visibly shrinks; buoyant, so it goes *up* and out |
+| **suspended sediment** | **minutes** — settles, and advects with the current | the stain that stays; denser than water, so it goes *down* and along |
+
+They overlap in space and look alike in a still. **One decay curve fits neither**, and the tell is a
+plume that either vanishes too fast to leave a stain or lingers too white for too long. This is the
+same one-white-several-mechanisms error [Aerated water](#aerated-water-foam-spray-and-whitewater)
+records for foam and spray — now with a *temporal* separator instead of a spatial one, which is
+worth noticing on its own: **when two mechanisms are inseparable in space, look for an axis on which
+they are not**, and lifetime is the cheapest one to instrument.
+
+**And the structural obstacle, which is not an extension of anything above.** A plunging breaker
+throws its lip forward over an air tube, so for the duration of the overturn the free surface is
+**multivalued** — there is water above air above water on one vertical line. That is the moment
+`z = f(x, y)` stops existing, and with it goes the height field, the caustic pass's Jacobian, the
+surface-intersection route and every LOD scheme in [Surface geometry](#surface-geometry--lod). It is
+a **different representation** — a parametric sheet, a particle/level-set hybrid, or a genuinely
+volumetric surface — and it is the real work in surf. Everything else in this section is arithmetic
+on machinery that already exists; this one is not, and the honest planning move is to price it as a
+representation change rather than to schedule it as a feature (`?`).
+
+**The reference gap, named.** Nine frames of surf and coast supported the paragraphs above — an
+unbroken wave face, a coastline from a cliff, a rock break, two breaking lines with persistent foam,
+a backlit face, a mid-break lip. **None of them catches the backwash lifting sand**: the swash
+retreating down a beach face with the sheet flow visibly loaded is the one frame that would pin the
+erosive half of the cycle, and it is missing. Written down because a marked gap in a reference set
+is worth more than a confident inference from the frames that are there.
+
 ## Aerated water: foam, spray and whitewater
 
 When a wave breaks, a fall lands, or a rapid churns, air is entrained and the result is **not water
@@ -672,15 +778,34 @@ pigment, which is why foam is broadband white in the visible where water barely 
 
 **One constant runs the mirror under the surface and the whiteness of foam.** An air bubble seen
 from the water side presents the same water→air interface as the surface seen from below, so it has
-the same critical angle, and the cosine-weighted flux beyond it is `1 − 1/n²` = **43.7%** at
-`n = 1.333`. Every bubble wall mirrors that share of everything striking it: one bubble reads
-silvered, a cloud of them reads white and opaque. A renderer that gets Snell's window right and
-takes foam whiteness from a painted albedo has special-cased one of the two faces of a single
-number. And **foam is white rather than tinted because the paths are short**: transmission over
-5 mm of water is 0.999 in red, so light bouncing between bubble walls never accumulates enough path
-to pick up the water's colour or the bed's. **Foam is many short paths where blue water is one long
-one** — which is why foam over a blue liner and foam over sand are the same white, and why tinting
-foam toward the body colour is wrong in every water.
+the same critical angle, and the cosine-weighted flux beyond it is `1 − 1/n²` = **43.72%** at
+`n = 1.333` and **43.874%** at this chapter's own green IOR of 1.3348 (`D`, recomputed; it runs
+43.64 / 43.87 / 44.31 % across the IOR triple, so it is barely chromatic and one figure is honest).
+Every bubble wall mirrors that share of everything striking it: one bubble reads silvered, a cloud
+of them reads white and opaque. A renderer that gets Snell's window right and takes foam whiteness
+from a painted albedo has special-cased one of the two faces of a single number. And **foam is
+white rather than tinted because the paths are short**: transmission over 5 mm of water is 0.999 in
+red, so light bouncing between bubble walls never accumulates enough path to pick up the water's
+colour or the bed's. **Foam is many short paths where blue water is one long one** — which is why
+foam over a blue liner and foam over sand are the same white, and why tinting foam toward the body
+colour is wrong in every water.
+
+**A single frame of a beach break holds *three* whites, they are three different materials, and
+collapsing them into one particle system is the standard reason CG surf reads wrong.**
+
+| what | what it actually is | not | share of the white |
+|---|---|---|---|
+| the blanket left behind a break | a **coverage mask on the surface** — a bubble layer of high albedo, advected with the surface flow and decaying | not particles, and not a volume | the largest |
+| the opacity *inside* the wave mouth | a **participating medium** in the water, high scattering albedo — you stop seeing the bottom through it | not a surface layer | the one that carries the wave's form |
+| spray thrown clear along the crest | **water in air** — a droplet size distribution, ballistic, decoupled from the fluid | this one *is* particles | **the smallest** |
+
+They whiten from the same `1 − 1/n²` and share nothing else: different carrier (surface / volume /
+air), different advection (surface flow / fluid velocity / ballistics), different decay (seconds /
+the break itself / sub-second), different rendering (coverage lerp that kills Fresnel beneath it /
+`a`,`b`,`g` medium / sprites, becoming a medium at high wind). **The one that gets over-built is the
+smallest of the three**, because it is the one that looks like a particle system in a photograph —
+and the two that carry most of the white are a mask and a medium, neither of which a particle system
+can produce. `19` owns the simulation side; the rendering split is the row above.
 
 **"Aerated water" is two mechanisms that share only that constant**, and merging them is why
 jacuzzi water and surf usually get the same wrong effect:
@@ -1513,6 +1638,169 @@ from a fit into a statement and makes the ordering an **output**. Short of that 
 and an open row that says so is worth more than one closed by choosing a number. Reaching for
 weathering to explain a discrepancy is precisely the move the test in this section exists to catch.
 
+### Fouling in the corners, from an algorithm rather than from a texture
+
+The zone table above is organised by `h` because most of a liner's weathering is. **The corners are
+the row that is not**, and they are the row that sells the picture: an old pool is pale in the
+middle and dark in its corners *at the same time*. This section is the algorithm for that darkening,
+and it is worth having as an algorithm because the obvious substitutes — a painted mask, or a grime
+term driven by ambient occlusion — are wrong in a way that is specific and diagnosable rather than
+merely approximate.
+
+**Three driver fields, none of them authored.**
+
+| field | what it is | where it comes from |
+|---|---|---|
+| `h = z − z_water` | the zone coordinate | [the albedo field](#a-liner-in-service-is-an-albedo-field-and-the-waterline-is-its-coordinate) — already specified, already runtime |
+| `E` | irradiance at the surface point | the renderer computes it for shading anyway; reuse the value, do not re-derive a proxy |
+| `σ` | **stagnation** | the only new physics, and it is one Laplace solve |
+
+**`σ` needs no CFD, and the reason it does not is the load-bearing part.** Deposit does not collect
+in corners because corners are dark. It collects because **the water does not move there**. A pool
+has a return fitting at a known position and aim and a skimmer opposite it, so the first
+approximation is the classical one — incompressible, irrotational, plan view:
+
+```
+# Stagnation from one Laplace solve. Deterministic, mesh-free in the authoring sense,
+# and the same field every run -- which is what makes it an input rather than an effect.
+
+solve   grad^2 phi = 0                on the basin's plan polygon
+with    dphi/dn = 0                   on every wall            (no flux through a solid)
+        dphi/dn = +Q  at the return   (source, or a short segment for a wall jet)
+        dphi/dn = -Q  at the skimmer  (sink; the two must sum to zero or there is no solution)
+
+u       = grad phi                    # plan velocity
+sigma   = 1 - smoothstep(u_lo, u_hi, |u|)      # stagnation in [0,1], NOT 1/|u|
+```
+
+A few hundred iterations of Gauss–Seidel on a 2-D grid, or a direct sparse solve; it is cheaper
+than one frame of the render it feeds, and it is *classical* — the first thing a hydrodynamicist
+would write down, not an art trick reverse-engineered from a photograph.
+
+**Its limits belong beside it, and one of them is not a caveat but a warning.**
+
+- No viscosity, so no boundary layer and no separation: a real return jet separates off the wall it
+  runs along and the recirculation behind that separation is where a real pool's dead water is.
+- A pool return is a **wall jet**, not a point source. Model it as a short segment with an aim if
+  the geometry is known; a point source puts the momentum in the wrong place.
+- **Potential flow gives *exactly* zero velocity at a sharp corner, and that is precisely where the
+  effect is wanted.** In a corner of interior angle `α` the admissible solution is
+  `φ = A·r^(π/α)·cos(πθ/α)` — it satisfies `∇²φ = 0` and `∂φ/∂n = 0` on both walls by construction —
+  so
+
+  ```
+  |u|  ~  r^(pi/alpha - 1)
+       alpha =  90 deg  (a square corner)      ->  |u| ~ r^1      -> zero AT the corner
+       alpha = 120 deg  (a chamfered corner)   ->  |u| ~ r^0.5    -> still zero, less sharply
+       alpha = 270 deg  (a re-entrant corner,  ->  |u| ~ r^-1/3   -> SINGULAR: the model
+                         the outside of a step)                       predicts infinite speed
+  ```
+
+  (`D`, derived here.) So the approximation **flatters the result in exactly the place the feature
+  lives**, and it does so with an exponent that depends on the corner angle — a chamfered corner
+  gets less fouling than a square one for a reason the solve supplies rather than an author. Give
+  `σ` a floor and clamp `|u|` from below, and say that you did; an unclamped `1/|u|` is a
+  singularity waiting for a step nosing. This is the loudest `?` in the section: the *field* is
+  classical, its behaviour at the corner is a known artefact of dropping viscosity, and no part of
+  this predicts a rate.
+
+**The two fields are not aligned, and that is the whole diagnostic value of the section.** Biofilm
+needs **stagnation**. Photosynthetic algae need stagnation **and light**. So
+
+```
+cover_biofilm  =  f( sigma,        h )          # dark, indifferent to E
+cover_algae    =  f( sigma * E',   h )          # dark, green-shifted, needs BOTH
+                                                #   E' = irradiance normalised over the basin
+```
+
+and the worst place in a real pool is therefore not the darkest corner but the **sunlit stagnant**
+one. **The standard move — drive a grime mask from ambient occlusion — is the correct answer for
+one mechanism and exactly backwards for the other**, because AO is high where light is low, and one
+of the two organisms needs the light. A single accessibility mask cannot represent two unaligned
+drivers, whatever it is multiplied by; the tell is a pool whose dirt is all in the shade, and it
+generalises to every AO-driven dirt term in a renderer. (Which organism dominates in which
+conditions is `?` and is not a renderer's to assert.)
+
+**Patchiness comes from feedback, not from noise.** Deposit roughens the surface; a rougher surface
+holds more deposit. That coupling is **positive**, and it is why aged surfaces are blotchy rather
+than evenly grey:
+
+```
+d_{k+1} = d_k + dt * S(sigma, E, h) * (1 + kappa * d_k) * (1 - d_k)    # k = 3..5 is enough
+rough   = lerp(rough_0, ROUGH_DEPOSIT, d)
+```
+
+Linearise about a uniform state `d̄`: a perturbation grows at `∂ḋ/∂d = S·(κ(1 − 2d̄) − 1)`, which is
+**positive** for `κ > 1/(1 − 2d̄)` — so above a threshold roughness feedback the uniform state is
+unstable and any heterogeneity the geometry already supplies amplifies into blotches, while the
+`(1 − d)` saturation bounds them. **The pattern is the instability, not a texture.** A few
+iterations give it for free, and it keeps the useful property that nothing in the mask is authored
+— no noise, no cellular texture, nothing that has to be re-authored when the basin changes shape.
+Seed the heterogeneity from the fields already present (`σ`, `E`, `h`, and the surface's own
+roughness map), never from a noise octave: a noise texture here would be the first authored thing
+in the chain and it would be authored into the one place where a real mechanism is available.
+
+**Composition is the albedo field's, unchanged, and two of its rules bite hardest here.** Biofilm is
+a **deposit**, so it lerps toward `RHO_BIOFILM` and never multiplies — a multiplicative mask cannot
+darken toward a green-black that is not a multiple of the liner. And the same deposit above and
+below the line must **not** be the same colour in frame: the round trip at 1.40 m is
+`(0.4806, 0.8621, 0.9718)`, so a colour-neutral deposit on the bed arrives with roughly half the red
+swing it has in blue (`D`, recomputed). If it renders identical either side of the waterline, what
+is missing is [transport, not
+material](#where-a-weathering-profile-is-allowed-to-come-from-and-what-the-water-does-to-it).
+
+**Rates are not renderable. Susceptibility is, and it is two numbers per material.** A weathering
+*rate* is chemistry and service history — water hardness, sanitiser regime, cumulative UV dose, the
+polymer's formulation and plasticiser — and **none of it is renderable input**. A renderer that
+computed it would be inventing every term, which is the exact class of constant this chapter spends
+its length removing. **You state the state; you do not derive it.** What *is* renderable is how
+readily a material takes each of the two mechanisms the albedo field already separates:
+
+| | modification (pigment) — *multiplies* | deposition — *lerps to its own albedo* |
+|---|---|---|
+| **PVC liner** | high — chlorine and UV attack the pigment | high |
+| **glazed ceramic** | ≈ 0 — the glaze is glass | low on the glaze, **high in the grout** |
+| **fair-faced concrete / render** | low | high, and it wicks (`?`) |
+
+(`?` throughout — these are orderings a materials scientist would recognise, not measurements, and
+`12b` marks them as such. The *orderings* are what the section rests on; the numbers are not stated
+because nobody measured them here.)
+
+**The payoff is that the signature changes shape for free.** On a tiled pool the weathering moves
+from a **band** to a **grid**: the glaze stays clean while the grout limes and holds biofilm, being
+porous and rough. One algorithm, one control, two susceptibility pairs — and a qualitatively
+different picture, which is what a real tiled pool shows and what a second hand-authored mask is
+usually written to fake.
+
+**Where the parameters live, because the wrong placement is what forces a second algorithm later.**
+
+- **Susceptibility is a *material* property.** It sits beside `base_color` and
+  `specular_roughness`, travels with the material into every scene, and is two numbers.
+- **The `neglect` path is a *scene* (instance) property.** One control from *newly commissioned* to
+  *years badly maintained*, implemented as a **curve through** the individual dimensions rather than
+  as a dimension itself — because [age is not a
+  scalar](#a-liner-in-service-is-an-albedo-field-and-the-waterline-is-its-coordinate) and one slider
+  over the raw space produces combinations no pool has. A path through a space is one number that
+  keeps the space addressable; a slider *replacing* the space is one number that destroys it.
+- Put susceptibility on the instance and every material needs its own copy of the curve. Put the
+  path on the material and a scene cannot age two pools differently. Both mistakes end in a second
+  algorithm.
+
+**And the default is not zero.** Most outdoor pools in service carry a waterline band, so **a
+pristine liner is the special case** and a renderer whose neutral setting is zero age reads as CG by
+default — a perfectly clean waterline is a synthetic tell, and unlike most tells it is present in
+every outdoor pool ever framed. Ship `neglect` at a non-zero default and let `0` mean *newly
+commissioned*, which is then a deliberate choice rather than the absence of one.
+
+**Generalise it, because the pool is the least of it.** Any surface with a persistent liquid line
+accumulates at that line: tanks, locks, harbour walls, canal revetments, weirs, a boat's hull, a
+water butt, a reservoir drawdown zone. In every one of them the *default state of a real one is not
+the state of a new one*, and rendering the new one is the exception that needs justifying. The
+machinery is identical — `h` against the body's own datum, a stagnation field from whatever drives
+the flow, a susceptibility pair per material — and only the datum's stability changes: a lock's
+level cycles daily and writes a *wide* band, a reservoir's seasonally and writes a wider one, a
+pool's barely at all and writes the narrow high-contrast line this chapter measures.
+
 ### The rest of the man-made checklist
 
 - **Straight lines are the fidelity test.** Tiled walls and rectangular coping hand the viewer a
@@ -1754,17 +2042,168 @@ the other says what the surface can. Conflating them produces the confident wron
 gather multiplier to fix a sky term, and the two halves sum to the whole hemisphere, so an error in
 either shows up as the same symptom.
 
-**Where it stands in the reference implementation: measured and open.** The submerged wall reads
-**0.470** of the dry liner band over its first 100 mm and **0.581** over the next 150 mm where an
-observation of the real pool puts it above 1 (`D`). Beer–Lambert over those centimetres of water is
-worth 0.971–0.995, so the path is not the cause; binned by traced leg the ratio *rises*, because a
-deeper texel sees more of the bed, which means the bins are reading depth and not absorption. The
-receiver is short, and the entry fee alone — an in-water radiance seen from the air takes the
+**Where it stands in the reference implementation: measured, both halves now derived, and still
+open.** The submerged wall read **0.470** of the dry liner band over its first 100 mm and **0.581**
+over the next 150 mm; with the receiver's whole hemisphere traced those became **0.518** and
+**0.616**, and with the band's own illuminant derived as well, **0.513** and **0.621** — against an
+observation of the real pool that puts them above 1 (`D`, three successive rounds). Beer–Lambert
+over those centimetres of water is worth 0.971–0.995, so the path is not the cause; binned by traced
+leg the ratio *rises*, because a deeper texel sees more of the bed, which means the bins are reading
+depth and not absorption. The entry fee alone — an in-water radiance seen from the air takes the
 `1/n²` while the dry band 10 cm above it takes nothing — means the wall must be **1.78× brighter
-than the band below the surface merely to draw level with it above the surface**. Closing it needs
-both halves at once: the window's `0.199` in place of `0.5`, *and* the mirror's missing bounces. Move
-the sky constant alone and the wall goes darker still, which is the wrong direction — the honest
-state of this one is a located fault, not a fixed one (`?`).
+than the band below the surface merely to draw level with it above the surface**. Closing it needed
+both halves at once, and both have now been closed: the window's `0.199` in place of `0.5`, *and*
+the mirror's missing bounces, which is the section below. **The ordering still did not emerge**, and
+the remaining factor of ~1.95 is now attributed to neither the receiver nor the source but to what
+is missing from both — a located fault, not a fixed one (`?`).
+
+### The upgoing half, traced: the return leg, the mirror, and the fixed point
+
+The partition above says what the two halves of a submerged vertical face's upper hemisphere *are*.
+This section is how to evaluate them, and it exists because the shape of the integral is what
+renderers get wrong, not the constants in it. **Do not resolve the window and the mirror into two
+terms and multiply each by a constant.** Gather the half-hemisphere and let the trace decide which
+of the two any given direction is:
+
+```
+# The upgoing half of ANY submerged face's hemisphere -- bed, wall, riser, hull, ladder.
+# One function, so the renderer cannot hold two opinions about what is above a submerged surface.
+
+E_up/pi  =  (1/pi) INT_{w.n > 0, w_z > 0}  L(w) (w.n) dw
+
+L(w):
+    hit = trace_up(x, w)                       # an UP-GOING intersector -- see the note below
+    if hit is a solid before the surface:
+        return radiance_map[hit]               # THE RETURN LEG: wall -> bed, wall -> wall, riser
+    t   = angle(w, surface_normal)             # incidence on the underside, from inside
+    if t >= t_c:  return L(reflect(w))         # past the critical angle the mirror is PERFECT
+    R   = r_int_at(t)                          # exact internal Fresnel, per direction, no cone mean
+    return (1 - R) * sky_through_window(w) + R * L(reflect(w))
+```
+
+Three properties of that fragment are the whole content, and each is a thing production renderers
+routinely lack.
+
+- **`trace_up` is usually missing.** A water renderer's scene intersector is built for the *down*
+  legs — camera to surface, surface to bed, sun to bed — and is frequently direction-restricted or
+  depth-buffer-backed, neither of which can answer "what solid is above and to the side of this
+  wall texel". Without it, the wall→bed leg cannot exist and the bed's ambient gets a constant over
+  the third of its hemisphere that is wall. On this chapter's reference basin that share is
+  **35.3%** of the bed's hemisphere, and the wall it stands for runs `(0.335, 0.920, 1.186)` at the
+  waterline to `(0.125, 0.759, 1.131)` at its foot (`D`) — a factor of 2.7 in red across the
+  receiver, so no constant is right for it.
+- **`r_int_at(t)` must be the *external* Fresnel read at the conjugate air-side angle** — Stokes
+  reversibility — and not a cone-averaged `R_int`. The diffuse constant `R_int = 0.47617` is a
+  hemispherical mean and is correct only for the hemispherical quantity; used per direction it is
+  wrong everywhere, too high inside the window and too low outside it, and the two errors do not
+  cancel because the window and the mirror carry different sources.
+- **Walls are emitters as well as receivers.** In a shooting formulation the fraction of the trap
+  that meets a wall on its way up is a *loss*; in a gather those directions simply **are** wall hits
+  and bring the wall's own radiance back. Same geometry, opposite bookkeeping — and the shooting
+  version silently deletes it. On this basin that fraction was 58% (`D`).
+
+**A bed point's own window is occluded by the basin, which is not obvious and runs the other way.**
+The sky arrives through a 48.5° cone about the vertical, so a wall near the horizon cannot reach
+into it — the naive expectation is therefore that walls cost the bed nothing in sky. They do,
+through aspect ratio: a bed point at depth `d` sends its window rays out to `d·tan(48.5°)` of
+horizontal run — 1.58 m at 1.40 m — so in an 8 × 4 m basin **87% of the floor has part of its own
+window behind a wall**, and the part behind it is the *outer* window, which a horizontal face
+weights by `cos t sin t` and therefore weights most. Measured: the window's sky on the deep floor
+falls **17% in green** while the mirror-plus-wall term rises by a factor of ~8 (`D`):
+
+| the deep floor's ambient, same units | window sky | mirror **and wall** | together |
+|---|---|---|---|
+| one bounce, flat constant over the wall share | `(0.248, 0.629, 1.085)` | `(0.006, 0.054, 0.082)` | `(0.254, 0.683, 1.167)` |
+| traced, iterated to a fixed point | `(0.225, 0.521, 0.890)` | `(0.046, 0.426, 0.720)` | `(0.271, 0.947, 1.610)` |
+
+**+39% in green on the bed's ambient**, and the two-symptom prediction it closes is the one in the
+[masking contract](#the-masking-contract--four-gates-and-the-third-is-the-one-that-gets-skipped):
+caustic interiors too dark *and* an occluder's shadow too bright, in one frame. The occluder's
+shadow now arrives at **92%** of its own depth against 91% (`D`) — the shadow barely moved while the
+interiors filled, which is exactly what a *directional* return does and a raised ambient cannot.
+
+**Truncating the trap at one bounce is a real error with a computable size, and it is not small.**
+The closed geometric series and its truncations, at the diffuse constant and at the wrong cone:
+
+| bed albedo ρ | exact `1/(1 − ρ·R_int)` | one bounce | two bounces | one bounce over `1 − 1/n²` |
+|---|---|---|---|---|
+| 0.222 (this liner, red) | 1.1182 | 1.1057 (−1.1%) | 1.1169 (−0.1%) | 1.0974 (−1.9%) |
+| 0.400 (luminance) | 1.2353 | 1.1905 (−3.6%) | 1.2267 (−0.7%) | 1.1755 (−4.8%) |
+| 0.585 (this liner, green) | 1.3861 | 1.2786 (**−7.8%**) | 1.3562 (−2.2%) | 1.2567 (−9.3%) |
+| 0.681 (this liner, blue) | 1.4799 | 1.3243 (**−10.5%**) | 1.4294 (−3.4%) | 1.2988 (−12.2%) |
+
+(`D`, recomputed here at `R_int = 0.47617`, `1 − 1/n² = 0.43874`.) **The error is chromatic**,
+because ρ is, so a one-bounce truncation does not darken a pool — it *desaturates* it, by 7–10% in
+the channels the liner is bright in and 1% in the one it is dark in. That is why it survives a
+luminance check and why the symptom is read as a washed-out liner colour rather than as missing
+transport. And the second bounce buys back three quarters of it for one more pass, which is the
+cost argument: **truncation at one is never the cheap choice, it is the choice that leaves the
+largest single increment on the table.**
+
+**The fixed point is cheap, and its residual is a bound rather than an assumption.** The transfer is
+linear, so iterate it and measure its own gain:
+
+```
+L_0 = seed                                     # anything; the previous frame's maps are ideal
+L_{k+1} = E_direct + K L_k                     # K = the traced gather above, applied to every
+                                               #     submerged emitter (bed, walls, risers)
+d_k = |L_k - L_{k-1}|                          # the increment, per channel
+r   = d_k / d_{k-1}                            # the operator's MEASURED spectral gain
+tail <= d_k * r / (1 - r)                      # geometric bound on everything after pass k
+```
+
+Two things make this worth doing rather than picking a bounce count. **Seed from the previous
+solution and the first increment is exactly the size of the defect** — which is a free measurement
+of what the truncation was costing, taken on the way to fixing it. And `r` is *measured*, not
+assumed, so the residual is bounded rather than hoped for: on this basin `r = 0.335 / 0.442` on the
+bed and `0.378 / 0.475` on the wall (green / blue), giving a tail of **0.50× and 0.79×** the last
+increment on the bed and **0.61× and 0.90×** on the wall, i.e. **0.012% and 0.033% of the converged
+level in green** (`D`, the ratio `r/(1−r)` recomputed here). That is under the lattice's own
+quadrature error. **Guard the pass count with a row that fails at fewer passes** — run the same
+operator for exactly `N` passes from black against the closed series and check that `N−1` FAILs,
+or the constant is back.
+
+**Do not expect the fixed point to reach the infinite-basin series, and say why in the same
+breath.** That series has no walls to absorb; a real basin loses `(0.754, 0.352, 0.246)` of every
+bounce to a liner over a third of a bed point's hemisphere. A solve that *does* reach ×1.2354 in a
+walled basin has a leak in it. Print both and the gap between them is the basin.
+
+**How to separate the sky from the mirror, quantitatively — because the total is blind by
+construction.** The three qualitative instruments are
+[above](#what-a-submerged-vertical-face-sees-of-the-sky); this is the arithmetic that makes the
+blindness precise. In the reference implementation the sky was over-given by **×1.96** and the
+mirror under-given by roughly the same partition, and the two very nearly cancelled on the wall:
+correcting both moved the wall's own radiance **+9.5% in green, +15.3% in blue and −6.2% in red**
+(`D`) — **less than either error, in a different direction per channel.** On the step risers, whose
+sky share is smaller and whose mirror sees the bed at a metre rather than at four, the same two
+corrections gave **+39%** on the face. One scene, one pair of errors, and a factor of four between
+what they did to two surfaces.
+
+So: **the measurement that cannot separate them is the one everybody takes.** Three that can, in
+increasing cost —
+
+1. **Zero the sky and check the survivor.** The face must fall to **77.7%** of its upper-half
+   irradiance. Not to zero, not to half. One row, no reference, no photograph.
+2. **Read the two channels apart.** The correction's *sign flips between red and blue* on the wall
+   above, because the window carries the sky's spectrum and the mirror carries the liner's after two
+   more crossings of the column. A per-channel report distinguishes them where a luminance report
+   cannot; a change that moves all three channels the same way is not this pair.
+3. **Read a second receiver with a different partition.** A riser at a metre and a wall at four have
+   different mirror path lengths and different sky shares, so one pair of errors produces two
+   different total shifts. **Two receivers, one correction, two answers** — and if the two answers
+   are consistent with a single sky error and a single mirror error, the pair is identified. This is
+   the same argument as `11`'s [eighth
+   way](11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement), run
+   forwards: a test's power is the surface area it shares, and two receivers share more of the
+   partition than one does.
+
+**What stays approximate here, named rather than buried.** The mirror leg reflects in the **still**
+plane: the wave field is not on it. Over a leg of metres against a slope rms of 0.05–0.12 that
+smears a source by a few degrees inside an integral that is already a hemisphere average, which is
+why the mirror reads as a *lift* and not as a second caustic net — defensible, and an approximation
+(`?`). And a face whose own reflection is in the gather (a riser built from the wall map) needs a
+pass of its own or it contributes zero; on this basin that is 4.9% of the lower half and 1.4% of the
+upper (`D`), which is the size of the hole a "consumers are not emitters" shortcut leaves.
 
 ### The illuminant is part of the comparison: what cancels and what does not
 
@@ -1845,6 +2284,91 @@ ambient-to-direct mixture that a high-sun frame does not — which is precisely 
 pair below is a *separate* instrument from the water/deck one. And none of it survives a camera
 that is not linear: what a photograph can support is in
 [`11`](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
+
+### An illuminant per receiver, and what that costs at a waterline
+
+The section above is about holding the *sun* fixed between a render and a photograph. This one is
+about what happens after that is done, and it is the more expensive of the two because it is
+invisible in the frame that has no reference at all: **the ambient handed to the water and the
+ambient handed to the stone beside it are two different integrals of one sky**, and a renderer that
+ships one constant for both has quietly asserted that they are not.
+
+`10` derives the general result — [an illuminant is a property of the receiver's
+orientation](10-lighting-shadows.md#an-illuminant-is-a-property-of-the-receivers-orientation-not-of-the-scene),
+the two weights are `cos θ sin θ` and `sin² θ`, and the aureole gives a vertical face an azimuth
+that a halved deck constant cannot carry. A waterline is where a terrain frame collects the most
+receiver orientations in the smallest space, so it is where the cost shows first:
+
+| receiver, all within 150 mm of one another | what it sees | why one constant cannot serve it |
+|---|---|---|
+| **coping and deck**, horizontal, above the water | the whole sky, `cos θ sin θ` | the reference case — the only orientation a "deck illuminant" is right for |
+| **the dry liner band**, vertical, poolward-facing | its *upper* half by `sin² θ`, weighted onto the horizon; the aureole only if the sun is in front of its plane | +23 / +10 / −3 % against half the deck value on this sky, and **1.23× between a sun-facing and a sun-averted wall of the same pool** (`D`) |
+| **the same band's lower half** | the **water**: the pool's own upwelling *and* the sky reflected in that water at grazing incidence | the reflected-sky term is **23%** of what the band's lower half receives in green (`D`) and is the one most often absent entirely |
+| **the submerged wall**, vertical, below the water | 22% Snell window, 78% mirror — [a different partition again](#what-a-submerged-vertical-face-sees-of-the-sky) | not an illuminant question at all: the interface has replaced the sky |
+
+**The lower half is the term that gets left out, and grazing Fresnel is why it is not small.** A
+poolward-facing strip a few centimetres above the water looks *down* at the surface over the whole
+of its lower half, and the `sin²θ` weight puts most of that half near the horizon — which is
+exactly where a water surface stops being a 2% reflector. The `sin²θ`-weighted mean unpolarised
+external reflectance is **0.2112** against **0.0206** at normal incidence, a factor of **10.3**
+(`D`, quadratured here at `n = 1.3348`). So a band over water is lit substantially by *sky it can
+only see as a reflection*, and a renderer that gives it the pool's upwelling and stops has modelled
+the smaller half of what the water returns to it.
+
+**Both errors were live in this chapter's own reference implementation, and their signs are the
+useful part.** Its band took `SKY_DECK × 0.50` for its sky and the pool's diffuse upwelling for the
+water, with no reflected-sky term at all. Deriving the band's own hemisphere at its own azimuth
+gives (`D`, per channel, `E/π`):
+
+| the band's own irradiance, sun-averted wall | red | green | blue |
+|---|---|---|---|
+| its own sky, upper half | 0.3139 | 0.4016 | 0.6124 |
+| the sky the **water reflects** into the lower half | 0.0838 | 0.0975 | 0.1291 |
+| the pool's upwelling into the lower half | 0.0484 | 0.3242 | 0.4749 |
+| direct sun (`N·L = −0.061`, clipped) | 0 | 0 | 0 |
+| **sum of the terms above** | **0.4461** | **0.8233** | **1.2164** |
+
+The reflected sky is **19 / 12 / 11 %** of the band's total and **63 / 23 / 21 %** of its lower half
+(`D`, recomputed here). ⚠️ The run that produced these components prints a "total" of
+`(0.4761, 0.9220, 1.3568)`, which is **not** the sum of its own rows — the difference is 6.7 / 12.0 /
+11.5 % and is not a constant, so it is a different normalisation rather than a rounding. Both cannot
+be right and this chapter does not know which is; the components are reproducible and the total is
+marked `?` in [`12b`](12b-water-provenance.md). **Quote the terms, not the total.**
+
+**The counterfactual that this replaces is worth keeping as a method warning.** Before the integral
+existed, an earlier round reasoned: the band cannot see the aureole, the aureole is 68% of the deck
+illuminant, therefore drop it and the wall-to-band ratio goes 0.518 → 0.78. Every step is
+arithmetic and the conclusion is wrong, because it **subtracted one hand constant while keeping
+another** — and the one it kept was 0.42× the integral it stood for. Against the derived integral
+the band's sky half moves by about 5% in green, not 34%, and the ratio ends at **0.513** (`D`).
+The category error was real; its *size* was an artefact of the decomposition it was computed in.
+**A counterfactual evaluated inside a wrong decomposition inherits the decomposition's error, and it
+inherits it with confidence**, because subtraction of a known term feels like a measurement.
+
+**One thing an occluder over that band does not do, because the closed form is singular where it
+matters.** A strip of height `H` under a ledge overhanging it by `w` keeps a fraction
+`(α + sin α cos α)/π` of the upper half at depth `D` below the ledge, with `α = atan(D/w)` — exactly
+`0.50`, the whole upper half, at `w = 0`. The trap is that this goes to **zero** as `D → 0`, so a
+strip's *average* sky loss is dominated entirely by its top edge:
+
+| overhang `w` | mean over a 100 mm band, as a fraction of the full half | at the band's foot (`D` = 100 mm) |
+|---|---|---|
+| 20 mm | 87.5% | 99.68% |
+| 30 mm | 81.5% | 98.97% |
+| 50 mm | 70.6% | 95.95% |
+
+(`D`, integrated here.) ⚠️ A figure of "94% of its sky" for a 30 mm overhang has been quoted for
+this geometry and does not reproduce — the value depends almost entirely on how far the band's top
+sits below the ledge, which is a *section* question and not a lighting one. **An average sky-loss
+number for a strip under a ledge is mostly a statement about where you put the top of the strip**,
+so quote the profile or quote the foot; do not quote the mean.
+
+**What it costs to reuse one illuminant, stated as a rule.** Halving a horizontal illuminant for a
+vertical face is exact for a uniform sky and for nothing else; it is wrong by the sky's own
+horizon-to-zenith contrast in the channels where that contrast exists, and it is wrong by the
+aureole's whole azimuth structure on every face the sun is not in front of. Neither error is
+visible in a single frame, both are visible the moment the sun moves, and both are cheaper to fix
+than to detect: the integral is a few thousand directions against an environment already resident.
 
 ### The view from inside, and the split shot
 
@@ -2045,6 +2569,32 @@ high tier is the same single-scattering machinery a submerged lamp or a bubble p
 also where `ω₀` sits by the time the water is only *faintly* hazy: 0.73. **Scattering takes over the
 light budget long before it takes over the look**, which is why "treated water barely scatters"
 describes a very narrow regime and should be written as one.
+
+**In the surf zone an IOP stops being a material input and becomes a state variable.** Everything
+above treats `a`, `b` and `g` as a description of *the water*: constants of a body, authored or
+measured once, uniform over it. That is true of a pool, true of a lake, true of the open ocean —
+and **false in the swash zone**, where the waves suspend the bed, the **backwash** is the erosive
+half of the swash cycle, and turbidity therefore **pulses with each wave**. The IOPs become a field
+produced by the dynamics that also produce the surface:
+
+```
+db/dt  +  u . grad b   =   E(tau_bed, ...)  -  w_s * b / d          # suspend, advect, settle
+                            \___________/      \________/
+                             entrainment,       settling at
+                             set by bed shear   the fall velocity
+```
+
+**This is a change in what kind of quantity an IOP is, not an extra term**, and it has three
+consequences a renderer feels before it feels the equation. `b` is now **coupled to the wave field**
+rather than authored beside it, so a shader reading a constant is reading a quantity that no longer
+exists. It is **spatially structured** — a turbid band along the break line against clear water
+outside it, which is a strong composition cue and unreachable from any single value. And it is
+**periodic at the wave period**, so it is the one optical property a still frame cannot verify and a
+two-second clip settles immediately. The pool sits at the degenerate end of the same equation with
+`E = 0`, which is exactly why `b_b ≈ 0` holds there and nowhere in the surf; the
+[confusable pair](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot)
+under Shallow water is how to tell the resulting veil from a shallow bottom in a frame. (The
+entrainment law and the fall velocity are sediment transport, not rendering, and both are `?` here.)
 
 **Presets.** Jerlov's water types (oceanic I, IA, IB, II, III; coastal 1C–9C) are the standard
 classification, defined by the spectral shape of `K_d`, and Morel's chlorophyll ladder maps them

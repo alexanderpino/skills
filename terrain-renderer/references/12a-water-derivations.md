@@ -1050,6 +1050,21 @@ closed-form identity the environment can be tested against. It is broad and fain
 of ~1.0), and that is the result, not a shortfall: **a clean atmosphere has no compact aureole,
 because a compact aureole is a diffraction peak and diffraction needs particles.**
 
+**And the aureole's *share* is bounded with no quadrature at all.** For any receiver, with whatever
+weighting `w(ω)` its geometry imposes, the two halves of `P` integrate against the same weight, so
+
+```
+share = <(3/4) cos^2 Theta>_w / <(3/4)(1 + cos^2 Theta)>_w = <cos^2 Theta>_w / (1 + <cos^2 Theta>_w)
+```
+
+which is monotone in `⟨cos²Θ⟩_w ∈ [0, 1]`. Hence **≤ ½ for any receiver anywhere**, and **exactly
+¼ integrated over the sphere**, where `⟨cos²Θ⟩ = ⅓` — independent of `τ`, of solar elevation, of
+wavelength and of `F₀`, because `Θ` enters only through the phase function and its angular moments
+are fixed. The identity runs backwards as a diagnostic: any claimed aureole share inverts to a
+`⟨cos²Θ⟩_w` and a value above 1 does not exist. `10` spends this on a hand-written deck illuminant
+whose aureole term implied `⟨cos²Θ⟩_w = 2.125` —
+[the aureole has a ceiling](10-lighting-shadows.md#the-aureole-has-a-ceiling-and-no-quadrature-is-needed-to-find-it).
+
 ### The aerosol lobe, derived to zero
 
 The reference sun's *colour* is `exp(−m τ_Rayleigh)` at its own air mass to one part in 10⁴ (`D`).
