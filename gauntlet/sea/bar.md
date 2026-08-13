@@ -197,3 +197,79 @@ Recorded so a critic does not credit the render for something unphotographed:
 - **Any frame with a scale, a colour chart, or a neutral reference.**
 - **Any underwater or split view.** The pool set has both; this one has neither, so
   every criterion here is from above the water.
+
+---
+
+## H · Five more frames: the platform, the bay, and the swash — added at intake+1
+
+> Supplied by the owner before the first wave reported. **No time was given for
+> these**, so their illuminant is `?` and they carry the same standing as the surf
+> frames until one is supplied: evidence for **geometry, mechanism and ordering**,
+> not for radiometry. *Times requested.*
+
+Two of them close a gap this file recorded as open, and one of them corrects the
+scene plan.
+
+### H1 · It is a wave-cut platform, not scattered rock
+
+Two frames show a **flat bench at sea level**, deeply pocketed, with **sand
+infilling the hollows** and dark weed on the wet rock. That is a landform with a
+formation mechanism, not scenery.
+
+- **It must emerge from the coastal loop**, the same way the sandbar must emerge
+  from the morphodynamic one: `terrain-architect` `12`'s **notch → collapse →
+  deposit**, where the bench appears when the notch band is narrow and erosion is
+  high. That chapter gives the diagnostic outright: *"if you're not getting one,
+  `notchHeight` is too large."* **Cite it; do not re-derive it badly.**
+- **The pocketing requires spatially varying hardness.** Chapter `12` is explicit
+  that uniform rock yields a straight cliff and nothing else, and names it as the
+  usual reason a coastal graph looks boring. The pockets in these frames are the
+  evidence that this coast is not uniform.
+- **This corrects the plan recorded in the backlog**, which had rocks as
+  *"analytic solids"* placed in the scene. Same doctrine as the bar, one level up:
+  **the rock is an output, not an object.** *Lead agent's error, corrected before
+  the wave that would have inherited it.*
+- **A sea stack is representable in a height field and an arch is not.** Chapter
+  `12` flags this against `11`'s representation warning. Nothing in these frames
+  needs an arch; recorded so nobody adds one.
+
+### H2 · The swash is laden — the gap in section G is partly closed
+
+Section G recorded that the set contained **no frame of the backwash carrying
+sand**, and that section D therefore rested on owner testimony alone. Two frames
+now show it:
+
+- The retreating sheet is **visibly grey-brown, not clear** — suspended load in a
+  film a few millimetres deep. *Photograph.* Section D's turbidity now has an
+  image behind it, though the *concentration* remains `?` and is what
+  `terrain-architect` `28`'s Babin bridge is for.
+- **Foam is left behind as lace**, stranded by the retreating water rather than
+  advected with it — two different residence times on one surface, and a mask that
+  simply follows the water will not produce it. *Photograph.*
+- **The gap is only partly closed:** these show the swash *and* the backwash
+  together at a distance. A close frame of the backwash alone, where the load is
+  legible against the sand, would still be worth having.
+
+### H3 · The wet/dry sand boundary, and it transfers for free
+
+**One of the strongest tonal edges in these frames is the waterline on the sand**,
+and it is the same physics the pool already carries. Wet sand darkens because a
+thin film traps light between the surface and the substrate — the trapped series,
+which this project derived for the liner as `wet_albedo` and guarded against Egan
+& Hilgeman. **It applies to sand unchanged.** The wet band also goes *specular*
+where the dry sand is matte, so `base_color` and `specular_roughness` move
+together, exactly as the pool's weathering section specifies. *Derived; transfers
+without modification.*
+
+### H4 · The bay, and what it offers that a straight coast does not
+
+One frame shows the whole embayment from the cliff: headland, curved beach,
+and **surf lines running parallel to the shore** all the way round the curve.
+
+- **That is refraction, visible without instruments.** Crests turn onto the depth
+  contours, and a curved bay makes the turn large enough to see. A straight-contour
+  test passes by construction; this one does not. *Photograph, and it is the
+  cheapest available check on the refraction closed form.*
+- **Headlands and bays are the coastal loop's own signature** — headlands retreat
+  faster than bays until the coast straightens, which chapter `12` calls
+  self-reinforcing. A scene built with one straight beach cannot show it.
