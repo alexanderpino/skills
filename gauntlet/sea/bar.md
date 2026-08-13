@@ -417,3 +417,53 @@ waterline's fine structure or the swash. Those stay with the close frames of
 sections C, D and H2. A critic may not credit texture-scale work against this
 image, and a builder may not read a small feature off it. *Recorded so the frame's
 strength does not get borrowed by claims it cannot carry.*
+
+## K · Open water and the glitter path — a fourteenth frame
+
+Upright, from the cliff: a long crescent beach curving away to a headland and a
+village, dune vegetation in the foreground, and **the whole open sea with the
+sun's glitter path running from the horizon into the near field**. No time given;
+illuminant `?`. *Time requested.*
+
+### K1 · The glitter path is the strongest instrument in this set
+
+The pool's glitter was a window a few metres across. **This is the same physics at
+the scale where it actually bears weight**, and it carries a measurement nothing
+else here does.
+
+- **The path's angular width is a readout of the surface's mean square slope**, and
+  therefore of the wind (Cox & Munk). It is not decoration — it is the one quantity
+  in these photographs that reports on the *statistics* of the surface rather than
+  on a single wave. **The render must produce the path and report its width**, and
+  the width must come from the slope distribution rather than from a spread
+  parameter chosen to look right. *Derived; the wind at the time is `?`.*
+- **Its shape is diagnostic, not just its presence.** It narrows toward the horizon
+  and spreads toward the observer, because the same slope distribution subtends a
+  different range of specular directions at different incidences. A path of uniform
+  width is wrong in a way that is obvious once stated and almost never modelled.
+  *Derived.*
+- **One frame holds the surface from grazing to moderate incidence.** The horizon
+  is near 90°, the near field far from it, so the whole Fresnel ramp is in one
+  exposure. That makes the *relative* behaviour across the frame a within-frame
+  instrument — usable despite the camera failures — where any absolute value is
+  not. **Report the trend across the frame, not a value at a point.**
+
+### K2 · What else it establishes
+
+- **A long crescent with multiple shore-parallel surf lines**, confirming section J
+  rather than adding to it — but at a different beach and a different curvature,
+  which makes the refraction criterion harder to satisfy by coincidence.
+- **A sharp sea–sky horizon.** Trivial to render badly: the sea's radiance at
+  grazing must approach the sky's reflected value continuously, and any seam there
+  is a tell visible at a glance.
+- **Dune vegetation and a village in frame.** Out of scope, and recorded as out of
+  scope so nobody spends effort on them. Section E of the pool bar struck scenery
+  for the same reason and that ruling carries.
+
+### K3 · What it does not license
+
+Like section J this is a **distant** frame: it resolves neither foam texture nor
+the swash nor any waterline. And **the glitter path is exactly where a phone's
+tone curve does its worst**, since it spans the brightest and darkest parts of the
+frame. **Do not read a level off the path.** Read its *geometry* — width, shape,
+extent — which survives the transfer function that its brightness does not.
