@@ -713,3 +713,94 @@ wherever the chapter uses either — *external Fresnel reflectance* and *interna
 diffuse reflectance* / *total internal reflection* — and give the pair with its
 Walsh identity in one place so a reader can never be confused about which is
 meant.
+
+---
+
+## Fouling in the corners, from an algorithm — the design, before it is built
+
+**Owner request:** *"Het is mooi als er enige mate van aanslag in hoeken toegevoegd kan worden. Vanuit een algoritme alles van compleet nieuw opgeleverd tot jaren slecht onderhouden."*
+
+Written before implementation so the choices are on record and can be argued with
+rather than discovered in a diff. Nothing here is rendered yet.
+
+### Three driver fields, none of them a painted texture
+
+| field | what it is | where it comes from |
+|---|---|---|
+| `h = z − z_water` | the zone coordinate | already specified by `12`'s albedo-field section |
+| `E` | irradiance at the surface point | the renderer already computes it |
+| `σ` | **stagnation** | the piece that does not exist yet |
+
+**`σ` is the only new physics, and it does not need CFD.** Deposit does not
+collect in corners because corners are dark; it collects because **the water does
+not move there**. The basin has a return fitting at a known position and aim and a
+skimmer opposite it (recorded in bar B2b), so a **potential-flow solve in
+plan** — a source at the return, a sink at the skimmer, no flux through the
+walls — is one Laplace solve on a 2-D grid: cheap, deterministic, and the
+classical first approximation rather than an art trick. Stagnation is low `|∇φ|`,
+and the corners of a rectangle are naturally low.
+
+Its limits are statable and must be stated with it: no viscosity, no separation,
+and a real pool return is a **wall jet**, not a point source. Potential flow also
+gives *exactly* zero velocity at a sharp corner, so it over-predicts stagnation
+precisely where the effect is wanted — the one place the approximation flatters
+the result, which is where it needs the loudest mark.
+
+### The two fields are not aligned, and that is the whole point
+
+Biofilm needs **stagnation**. Photosynthetic algae need stagnation **and light**.
+So the worst place in a real pool is not the darkest corner but the **sunlit
+stagnant** one, and the accumulation field is a *product of two fields that do not
+line up*.
+
+**This is the diagnostic value of the section.** The standard move — drive a grime
+mask from ambient occlusion — puts deposit in dark corners, which is the correct
+answer for one mechanism and exactly backwards for the other. A single
+accessibility mask cannot represent two unaligned drivers, and the tell is a pool
+whose dirt is all in the shade. (Which organism dominates in which conditions is
+`?` here and should not be asserted from a renderer's chair.)
+
+### Composition, carried over from `12`'s albedo-field section
+
+- **Modification multiplies; deposition lerps toward its own albedo.** Scale is a
+  deposit, so it must be a lerp toward `RHO_SCALE`, never a factor — a
+  multiplicative mask structurally cannot draw a white tide line on a dark liner.
+- **The same carbonate above and below the line must not be the same colour in
+  frame.** The round trip is 0.48 in red against 0.97 in blue, so a colour-neutral
+  deposit on the bed arrives cyan-shifted. If it renders identical either side of
+  the waterline, what is missing is transport, not material.
+
+### Why it should be blotchy, and how to get that without authoring anything
+
+Deposit roughens the surface, and a rougher surface holds more deposit. The
+feedback is **positive**, and that — not noise — is why aged pools are patchy
+rather than evenly grey. A few iterations of that coupling produce the patchiness
+for free and keep the file's header claim intact: *nothing in the pattern is
+authored — no texture, no Voronoi, no noise.* A noise texture here would be the
+first authored thing in the file and it would be authored into the one place
+where a real mechanism is available.
+
+### The one slider, and the objection it has to answer
+
+`12`'s albedo-field section states that **age is not a scalar**: an acid-washed
+pool, one with a failed chlorinator and one in hard water reach mutually
+exclusive combinations. That does not refuse the request, but it fixes how it is
+built:
+
+> **One parameter is a *path* through the material state space, not the space
+> itself.**
+
+So: expose a single `neglect` control from *newly commissioned* to *years badly
+maintained*, implement it as a curve through the individual dimensions, and leave
+those dimensions addressable. Both properties survive — the convenience of one
+knob, and the ability to build a hard-water pool later without leaving the model.
+
+### What may not happen
+
+The same rule `12` states for weathering profiles applies here with force,
+because this feature is the most inviting hiding place in the project: **would
+the same curve have been written without having seen the render?** The open J/K
+finding — the reference pool's submerged wall reading lighter than its dry
+band — must **not** be closed by reaching for this. The cheaper explanation (the
+band is simply over-lit) has not been eliminated, and a fouling profile tuned
+until the ordering appears is a fit wearing a mechanism's name.
