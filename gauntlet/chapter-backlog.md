@@ -833,3 +833,38 @@ surface with a persistent liquid line — tanks, locks, harbour walls, canal
 revetments, a boat's hull — accumulates at that line, and the default state of a
 real one is *not* the state of a new one. Rendering the new one is the exception
 that needs justifying.
+
+### Rates are not renderable — susceptibility is, and it is two numbers per material
+
+> Owner: *"Betegeling zal minder snel verweren, maar dat is dus puur
+> materiaaleigenschap. Ik denk niet dat we de exacte verwering moeten gaan
+> uitrekenen toch?"*
+
+**Correct, and the reason is sharper than tractability.** A weathering *rate* is
+chemistry and service history: water hardness, sanitiser regime, cumulative UV
+dose, the polymer's formulation and plasticiser. None of it is renderable input,
+and a renderer that computed it would be inventing every term — the exact class of
+constant this project has spent the session removing. **You state the state; you
+do not derive it.**
+
+What *is* renderable is **susceptibility**: how readily a given material takes
+each of the two mechanisms `12`'s albedo-field section already separates.
+Two numbers per material, no simulation:
+
+| | modification (pigment) — *multiplies* | deposition — *lerps to its own albedo* |
+|---|---|---|
+| **PVC liner** | high — chlorine and UV attack the pigment | high |
+| **glazed ceramic** | ≈ 0 — the glaze is glass | low on the glaze, **high in the grout** |
+
+**The payoff is that the signature changes shape for free.** On a tiled pool the
+weathering moves from a **band** to a **grid**: the glaze stays clean while the
+grout limes and holds biofilm, being porous and rough. One algorithm, one
+`neglect` control, two susceptibility pairs — and a qualitatively different
+picture, which is what a real tiled pool shows.
+
+It also fixes where the parameter count belongs. Susceptibility is a **material**
+property and sits with `base_color` and `specular_roughness`; the `neglect` path
+is a **scene/instance** property. Putting the pair in the wrong place is what
+forces a second algorithm later.
+
+`render.py` already separates `liner()` and `tiles()`, so the hook exists.
