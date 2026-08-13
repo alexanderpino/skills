@@ -370,3 +370,50 @@ What they do supply:
 - **Spray blown back off the crest** — offshore wind against the wave's own motion,
   so the plume goes *backwards* relative to the break. A spray model advected only
   by the wave will send it the wrong way. *Photograph, stand-in.*
+
+## J · The scene, in one frame — the defining overview
+
+A thirteenth owner photograph, and the first that arrives upright: the whole
+embayment from the cliff. Headland to headland, cliff behind, a curved sand
+beach, and the surf running in **multiple lines that follow the curve all the way
+round**. No time given; illuminant `?`. *Time requested — this is the frame most
+worth having a sun for.*
+
+**This is the scene brief in one image, and it is the frame a whole-scene render
+must be judged against.** Everything else in this bar is a mechanism seen close;
+this is what they have to add up to.
+
+### What it establishes
+
+- **The coast is an embayment, not a straight beach.** Cliff, headland, curve,
+  headland. Section H4 recorded this from a weaker frame; this one settles it, and
+  it means the scene's plan geometry is a **bay**, with the depth contours curving
+  to match. A straight-shore scene cannot show what this frame shows.
+- **Refraction is legible without instruments.** The breaking lines bend to stay
+  parallel to the shore around the whole curve. That is crests turning onto the
+  depth contours — one of the four required closed forms — and it is checkable **by
+  eye against this frame**, which is the cheapest verification in the entire
+  project. A render whose surf lines stay straight while the shore curves has
+  failed a criterion a layman could catch. *Photograph.*
+- **Three to four separated breaking lines** across the wider parts, not one. So
+  the nearshore carries a **system** of bars rather than a single breakpoint bar,
+  which raises the bar for section B again: the implementation currently produces
+  one continuous surf zone, and this frame shows the coast producing several
+  discrete ones. *Photograph.*
+- **An offshore reef or rock outcrop** shows as a dark patch with white water over
+  it, well seaward of the main surf. Breaking over an isolated hard high — a third
+  break mechanism alongside the bar and the platform edge. *Photograph.*
+- **The full colour ladder in one exposure**, which makes it a within-frame
+  instrument and therefore usable despite the camera failures: deep blue offshore →
+  teal over the shallows → white surf → saturated brown wet sand → pale ochre dry
+  sand. **Five surfaces, one exposure**, with the wet/dry sand pair close in level
+  and therefore the most trustworthy comparison of the set. *Photograph; the
+  wet/dry pair is the measurable one.*
+
+### What it does not license
+
+It is a **distant** frame. Nothing in it resolves foam texture, spray, the
+waterline's fine structure or the swash. Those stay with the close frames of
+sections C, D and H2. A critic may not credit texture-scale work against this
+image, and a builder may not read a small feature off it. *Recorded so the frame's
+strength does not get borrowed by claims it cannot carry.*
