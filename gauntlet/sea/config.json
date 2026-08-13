@@ -27,7 +27,9 @@
     "The pool does not disappear. Shared physics is imported, never copied; the pool's frames stay bit-identical and its suite stays green.",
     "Measure in scene-linear, before the tone map. Never read a PNG for physics.",
     "Do not calibrate against the photographs. They carry three camera failures and one unresolved eclipse; the target is the closed form.",
-    "A wave may conclude that a previous wave was wrong, and that is a good outcome. Budget for it: on the pool loop the highest-value waves added nothing and found something already there was broken."
+    "A wave may conclude that a previous wave was wrong, and that is a good outcome. Budget for it: on the pool loop the highest-value waves added nothing and found something already there was broken.",
+    "Consult terrain-architect before inventing terrain. The bathymetry, the morphodynamic loop and the coastal IOPs are its material, and the two skills already share gamma ~ 0.78. Reconstructing any of it from memory is the failure this project exists to prevent.",
+    "Watch the radiation-stress factor of two: the longshore thrust is E_0/4 in DEEP-WATER quantities and E_b/2 in BREAKING-ZONE quantities, because c_g/c is 1/2 in deep water and 1 at breaking. Pairing the quarter with breaking-zone values is wrong by exactly two."
   ],
   "closed_forms_to_report": [
     "shoaling, Green's law, H proportional to h^-1/4",
@@ -37,9 +39,14 @@
   ],
   "open_at_intake": [
     "the eclipse's contact times at this longitude -- ? -- and until settled the surf frames are not radiometric evidence",
-    "coastal IOPs; the cuvette inversion on the wave face is the intended instrument",
     "the two decay timescales of the entrained-air and sediment clouds",
-    "no backwash frame exists; section D rests on owner testimony alone"
+    "no backwash frame exists; section D rests on owner testimony alone",
+    "the suspended load at Aljezur -- ? -- routed through 28-liquids' Babin bridge once the cuvette inversion gives b"
   ],
-  "extensions": []
+  "extensions": [],
+  "routes": {
+    "bathymetry": "terrain-architect references/12-glacial-coastal.md -- 'Surf-zone morphodynamics: bars, rips & the nearshore circulation' and 'Wave base & the submarine profile'. The breaker bar is an OUTPUT of the morphodynamic loop (waves -> radiation stress -> currents -> sediment flux -> Exner -> bed), not an authored ridge. Dean (1991) equilibrium ramp, depth proportional to distance^(2/3), is the far-field relaxation, not the whole profile.",
+    "coastal IOPs": "terrain-architect references/28-liquids.md -- 'The three constituents' and the Babin et al. 2003 concentration bridge, b_p(555)/SPM ~ 0.5 m2/g. CDOM darkens and does not scatter; sediment brightens; chlorophyll leaves the 550-570 nm window. Do not collapse them into one turbidity control.",
+    "shared constant": "gamma ~ 0.78 is already common to both skills -- 12-glacial-coastal names it as the same breaking index the renderer's break mask uses. Import it, do not restate it."
+  }
 }

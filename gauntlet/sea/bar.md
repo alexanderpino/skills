@@ -72,12 +72,32 @@ needs no measurement.
   thick toward the trough, with the colour grading across it. The render must
   reproduce the *grade*, not merely the hue. *Derived.*
 - **The hue is not pure water's.** Over 2 m, pure water transmits about
-  `(0.59, 0.90, 0.98)` — a mild shift, not a saturated green. This green is a
-  coastal-water signature: CDOM and chlorophyll take the blue and leave a window
-  near 550 nm. **The IOPs are the one thing this scene cannot inherit from the
-  pool work** — Fresnel both sides, the critical angle, `L/n²`, Beer–Lambert, the
-  trapped series and dispersion all transfer unchanged; `b_b ≈ 0` does not.
-  *Derived, with the coastal IOPs themselves `?`.*
+  `(0.59, 0.90, 0.98)` — a mild shift, not a saturated green.
+
+  > **Corrected before the loop opened, and the correction matters.** This first
+  > read *"CDOM and chlorophyll take the blue and leave a window near 550 nm"*,
+  > written by the lead agent. The sibling skill `terrain-architect` chapter `28`
+  > is sharper and the original conflated two opposite controls: **CDOM darkens,
+  > sediment brightens.** CDOM is `a(λ) = a₄₄₀·exp[−S(λ−440)]`, rising steeply
+  > into the blue and **scattering not at all** — it makes water *transparent and
+  > dark*, tea to near-black, and leaves no green window. The window at
+  > **550–570 nm** is **chlorophyll's**, which absorbs at 440 *and* 675.
+  >
+  > So this frame set holds **two different constituents**: the green wave face is
+  > a **phytoplankton** signature, and the pale milky surf zone of section D is
+  > **suspended mineral sediment**. A renderer with one turbidity slider cannot
+  > hold both, and reaching for turbidity to make a tannin-stained water would give
+  > mud instead.
+
+- **The IOPs no longer have to be invented.** They were the one thing this scene
+  could not inherit from the pool — Fresnel both sides, the critical angle,
+  `L/n²`, Beer–Lambert, the trapped series and dispersion all transfer unchanged,
+  but `b_b ≈ 0` does not. `terrain-architect` chapter `28` supplies the three
+  constituents and a **concentration→optics bridge** (Babin et al. 2003):
+  mineral-dominated suspended matter gives `b_p(555)/SPM ≈ 0.5 m²/g`, so **each
+  mg/L of load adds ≈ 0.5 m⁻¹ to `b` at 555 nm**. That closes the chain from the
+  wave field through the sediment flux to the optics. *Routed, `P`; the actual
+  load at Aljezur is `?` and is what the cuvette inversion is for.*
 
 ## B · The bar and trough: breaking must be a prediction
 
