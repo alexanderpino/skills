@@ -867,3 +867,66 @@ means something while the split is *reported* rather than fitted. If the split i
 implemented, the submerged albedo must come from a stated material property or a
 measurement of the actual liner, and the resulting ordering must then be an
 **output**, not an input.
+
+### K2 · Confirmed by a discriminating observation, and the observation is the method
+
+> Owner, at the pool, after the two-material hypothesis was priced: *"Bevestiging,
+> ja de lichtere kleur is verwering van het bad. Dat betekent ook dat deze gelijk
+> blijft bij golfbeweging. Hij is wel langs de waterspiegel en heeft een kort
+> verloop."*
+
+**The test he ran is the one that settles material against light, and it is worth
+recording as a method rather than only as a result.** Every optical candidate
+this project pursued — the mirror, the window's share, the caustic on a vertical
+face, the meniscus, the return leg — is carried by the surface, so **it moves when
+the surface moves.** A material property does not. Watching the feature while the
+water is disturbed separates the two in one observation, needs no instrument, and
+would have saved two waves had it been asked for first. It generalises to any
+wet surface and belongs in the chapter as a field test.
+
+**What it establishes.**
+
+- The lighter submerged colour is **weathering of the liner**, not transport. Two
+  waves built the wall's whole hemisphere and both illuminants and neither moved
+  the ratio past 0.52 — because there was nothing optical to move.
+- It is **keyed to `h = z − z_water`**, which makes it orientation-independent *by
+  construction*. That is the "on every side" that no light term could produce, and
+  the reason it looked so paradoxical.
+- Its **shape is a band along the waterline with a short falloff**, not a uniform
+  change over the whole submerged wall. Physically where it belongs: the first
+  centimetres below the line take the most UV — least water in front of them — and
+  the most aggressive chlorine attack, at the air–water boundary and through
+  wet–dry cycling.
+- It slots directly into `12`'s albedo-field section, which was written from a
+  different direction and already has `h` as its coordinate and a zone structure
+  waiting for exactly this.
+
+**Consistency check against what was already measured, unprompted by any of
+this.** The render's wall/band ratio was reported by band: **0.513** at 0–100 mm
+below the line and **0.621** at 100–250 mm. The discrepancy is *worse* nearest the
+surface, which is where the owner puts the weathering. Two independent readings,
+taken for different reasons, agree on where the effect lives.
+
+**What this licenses, and what it still does not.** Section K forbade splitting
+`LINER_TINT` until the submerged albedo came from "a stated material property or a
+measurement of the actual liner". This observation **is** that measurement,
+qualitatively, so implementation is now licensed. The discipline that remains:
+
+- The **shape** is observed — a band below the line, short falloff — and may be
+  implemented as observed.
+- The **falloff length and the magnitude** are not yet measured. They must be
+  carried as explicit parameters, and whatever values reproduce the observation
+  must be **reported as fitted to it and marked as such**, at the bar's own tier
+  for owner observations. They may not be presented as derived, and no other
+  constant may be moved to help them.
+- The cheaper explanation — that the band is simply **over-lit** — is *not*
+  eliminated by this and must still be tested separately. Band against water in
+  scene-linear is a within-frame pair close in level, so it survives every camera
+  failure in J2–J2d, and it remains unread. **If the band is also over-lit, then
+  fitting the weathering to the full residual will absorb an optical error into a
+  material constant** — the exact failure this file exists to prevent. Measure
+  first, fit second, and report the split between them.
+
+**Open question for the owner, not blocking:** how deep does the falloff run —
+centimetres, or tens of centimetres? It is the one number that would turn a fitted
+parameter into a measured one.
