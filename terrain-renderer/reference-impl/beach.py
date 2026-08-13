@@ -916,6 +916,69 @@ def evolve(x, h0, T, H0, theta0, n_steps=N_STEPS, dt=DT_MORPH, with_setup=False,
     return h, tr, hist
 
 
+def rayleigh_quantiles(h_rms, n):
+    """`n` equal-probability heights of a Rayleigh distribution with this H_rms.
+
+        P(H) = 1 - exp(-(H/H_rms)^2)   ->   H_i = H_rms*sqrt(-ln(1 - p_i))
+
+    Rayleigh is the standard deep-water height distribution for a narrow-band
+    sea (Longuet-Higgins 1952) and is what Battjes & Janssen clip to get their
+    breaking fraction. Equal-probability sampling is used rather than a grid in
+    H so the mean of H^2 comes out at H_rms^2 without a weight vector: for
+    n = 5 it lands at 2.098 against 2.250, a 7% energy deficit from the missing
+    tail, which is reported rather than corrected because correcting it by a
+    scale factor would put energy back at the wrong heights.
+    """
+    p = (np.arange(n) + 0.5) / n
+    return h_rms * np.sqrt(-np.log(1.0 - p))
+
+
+def evolve_forced(x, h0, T, theta0, n_steps=N_STEPS, dt=DT_MORPH,
+                  h0_of_t=None, z_of_t=None, n_quantiles=1, H0=H0_SWELL,
+                  **flux_kw):
+    """The same loop with the forcing allowed to VARY, which is what chapter 12
+    means by "the profile breathes on a storm/calm cycle".
+
+    Three knobs, and each one exists to test a candidate cause of section B's
+    missing reform rather than to make a prettier bar:
+
+      h0_of_t(t)    the offshore height as a function of model time -- the
+                    storm/calm cycle.
+      z_of_t(t)     the still-water level -- the tide, as a moving datum. It
+                    enters as `eta`, so the depth field, the break point, the
+                    Exner shallow gate and the transform all move together.
+      n_quantiles   how many Rayleigh heights the sediment flux is averaged
+                    over at each step. 1 is the monochromatic loop. Greater
+                    than 1 spreads the break point over the width of the height
+                    distribution, which is the physical reason real bars are
+                    broader than a monochromatic breakpoint model builds them.
+
+    WHAT THIS MEASURED, recorded here because it reverses the obvious guess:
+    every one of the three LOWERS the bar's relief. Steady monochromatic
+    forcing is the most favourable case this model has. The Rayleigh average
+    does widen the crest-to-trough separation -- 15 m to 25 m at n = 3 -- but
+    pays for it in relief, 0.90 m down to 0.53 m, and the minimum H/d behind
+    the bar barely moves (0.4296 to 0.4172 against the 0.40 needed). See
+    README-beach.md, "the second breaking line".
+    """
+    h = np.asarray(h0, float).copy()
+    dx = float(x[1] - x[0])
+    for step in range(n_steps):
+        t = step * dt
+        Hn = H0 if h0_of_t is None else float(h0_of_t(t))
+        eta = None if z_of_t is None else np.full_like(h, float(z_of_t(t)))
+        heights = (rayleigh_quantiles(Hn, n_quantiles) if n_quantiles > 1
+                   else np.array([Hn]))
+        q = np.zeros_like(h)
+        for Hi in heights:
+            tr_i = transform(x, h, T, Hi, theta0, eta=eta)
+            q += sediment_flux(tr_i, **flux_kw)['q']
+        q /= heights.size
+        tr = transform(x, h, T, Hn, theta0, eta=eta)
+        h = exner_step(h, q, dx, dt, tr['d'])
+    return h, transform(x, h, T, H0, theta0)
+
+
 # ------------------------------------------------------------- reading the bar
 def bar_crest(x, h, h_ref, x_min=None, x_max=None):
     """Find the bar as the largest POSITIVE anomaly of the bed above its
@@ -959,27 +1022,281 @@ def trough(x, h, h_ref, i_crest):
                 amp=float(h[j] - np.asarray(h_ref, float)[j]))
 
 
-def break_lines(tr, gamma_b=GAMMA_B):
-    """The x-intervals where H/d is at or above the breaker index.
-
-    This is the section-B test in one function: on a barred profile it must
-    return TWO intervals with a gap between them, and it must do so without
-    anything in the scene saying "break here".
-    """
-    over = tr['H'] >= gamma_b * tr['d']
-    out = []
-    i = 0
-    n = over.size
+def _spans(mask, x):
+    out, i, n = [], 0, mask.size
     while i < n:
-        if over[i]:
+        if mask[i]:
             j = i
-            while j + 1 < n and over[j + 1]:
+            while j + 1 < n and mask[j + 1]:
                 j += 1
-            out.append((float(tr['x'][i]), float(tr['x'][j])))
+            out.append((float(x[i]), float(x[j])))
             i = j + 1
         else:
             i += 1
     return out
+
+
+def break_lines(tr, gamma_b=GAMMA_B):
+    """The x-intervals where H/d is at or above the breaker index.
+
+    THIS IS THE ONSET TEST AND IT IS NOT THE SURF ZONE, and wave 2 had to
+    separate the two before section B could be argued about at all. H/d >= gamma
+    marks where a wave STARTS breaking. It says nothing about where one stops:
+    a wave that has broken sits well below gamma while it is still a bore, so
+    this function returns a single narrow interval at each break POINT and empty
+    space over the whole white-water band behind it. Reading its output as "the
+    breaking lines" makes a saturated surf zone look like no surf zone at all.
+
+    `surf_zone_spans` below is the band the photograph shows.
+    """
+    return _spans(tr['H'] >= gamma_b * tr['d'], tr['x'])
+
+
+def surf_zone_spans(tr):
+    """The x-intervals where the wave IS breaking -- the white water.
+
+    This reads `tr['brk']`, which is the transform's own hysteretic state: on at
+    H >= gamma_b*d, off again at H <= gamma_s*d. Section B's criterion --
+    "two breaking lines with calmer water between them" -- is a statement about
+    THIS list having two entries, not about `break_lines` having two.
+    """
+    return _spans(np.asarray(tr['brk'], bool), tr['x'])
+
+
+# ---------------------------------------------- the saturated surf zone, closed
+# The Dally, Dean & Dalrymple march has a closed-form fixed point on a plane
+# slope, and it is what decides whether a wave can ever un-break. Derived here
+# rather than cited, because no source read this wave states it.
+#
+# Write the flux in shallow water, where c_g -> sqrt(g d) and cos(theta) -> 1,
+# and put H = GAMMA*d for an as-yet-unknown ratio GAMMA(x):
+#
+#     F = (rho g H^2 / 8) * sqrt(g d) = (rho g^(3/2) / 8) * GAMMA^2 * d^(5/2)
+#
+# Substitute into the model, dF/dx = -(K/d) * (F - F_s), with the stable flux
+# F_s the same expression at GAMMA = gamma_s, and divide out the common factor
+# (rho g^(3/2)/8) d^(3/2):
+#
+#     2 GAMMA GAMMA' d  +  (5/2) m GAMMA^2  =  -K (GAMMA^2 - gamma_s^2)
+#
+# with m = dd/dx, NEGATIVE where the bed shoals shoreward. GAMMA' = 0 gives
+#
+#     GAMMA_eq = gamma_s / sqrt(1 + (5/2) m / K)
+#
+# and three things follow that are not in chapter 12 and were not obvious:
+#
+#   * A BROKEN WAVE ON A SHOALING BED DOES NOT DECAY TO gamma_s. It decays to a
+#     ratio strictly ABOVE it, because the bed keeps taking depth away as fast
+#     as the breaking takes height. On this scene's inner slope that ratio is
+#     0.477 and the wave sits on it from the bar to the shore. Reading
+#     gamma_s = 0.40 as "the H/d a surf zone relaxes to" is wrong by the slope.
+#   * IT IS SLOPE-DEPENDENT, RISING WITH tan(beta) -- which is exactly what
+#     Raubenheimer, Guza & Elgar (1996) measured on a natural beach and report
+#     as a range of 0.2 to 1.0 correlated with the local bed slope. That paper
+#     is a field measurement and this is a closed form off a 1985 decay model;
+#     they were not written from each other, and they agree in sign, in range
+#     and in the claim that gamma is not a constant.
+#   * THERE IS A SLOPE ABOVE WHICH NO SATURATED SURF ZONE EXISTS. The
+#     denominator vanishes at m = -2K/5, i.e. tan(beta) = 2K/5 = 0.060 here,
+#     one in 16.7. Steeper than that and the shoaling gain outruns the breaking
+#     loss, GAMMA grows without bound, and the wave surges up the face instead
+#     of spilling down it. That is the reflective end of Wright & Short's beach
+#     states arriving out of a wave model that has never heard of them.
+def saturated_ratio(dddx, k_dally=K_DALLY, gamma_s=GAMMA_STABLE):
+    """GAMMA_eq = gamma_s / sqrt(1 + (5/2)*(dd/dx)/K). See the block above.
+
+    `dddx` is dd/dx with x SHOREWARD, so it is negative on a shoaling bed and
+    positive down the back of a bar. Returns inf where no fixed point exists.
+    """
+    v = 1.0 + 2.5 * np.asarray(dddx, float) / k_dally
+    return np.where(v > 0.0, gamma_s / np.sqrt(np.maximum(v, 1e-12)), np.inf)
+
+
+def saturation_slope_limit(k_dally=K_DALLY):
+    """tan(beta) above which the Dally model has no saturated state: 2K/5."""
+    return 2.0 * k_dally / 5.0
+
+
+def reform_ratio(d_c, d_t, length, gamma_start=GAMMA_B, k_dally=K_DALLY,
+                 gamma_s=GAMMA_STABLE):
+    """H/d at the trough, from H/d = gamma_start at the crest, in closed form.
+
+    Same ODE as above, now integrated rather than fixed. With m = dd/dx constant
+    and positive (the bed DEEPENS shoreward, down the back of the bar), write
+    G = GAMMA^2 and change the independent variable from x to d = d_c + m*(x-x_c):
+
+        dG/dd + (a/d) G = b/d,    a = K/m + 5/2,    b = K gamma_s^2 / m
+
+    which is linear and integrates exactly:
+
+        G(d) = G_eq + (G_c - G_eq) * (d/d_c)^(-a),   G_eq = K gamma_s^2/(K+5m/2)
+
+    THE EXPONENT IS THE WHOLE ANSWER TO SECTION B. `a` carries K/m, so the decay
+    is paid for in TRAVEL DISTANCE and not in depth gained: doubling the relief
+    over the same 15 m helps far less than keeping the relief and doubling the
+    distance. That is why the reform is a trough-WIDTH condition dressed up as a
+    relief condition, and it is what `--bug reform-exponent` exists to prove.
+    """
+    m = (d_t - d_c) / max(length, 1e-9)
+    if m <= 0.0:
+        return float(gamma_start)
+    a = k_dally / m + 2.5
+    g_eq = k_dally * gamma_s ** 2 / (k_dally + 2.5 * m)
+    g = g_eq + (gamma_start ** 2 - g_eq) * (d_t / d_c) ** (-a)
+    return math.sqrt(max(g, 0.0))
+
+
+def reform_relief(d_c, length, gamma_start=GAMMA_B, k_dally=K_DALLY,
+                  gamma_s=GAMMA_STABLE, d_max=60.0):
+    """Invert `reform_ratio`: the crest-to-trough relief that un-breaks the wave.
+
+    Bisection on d_t, because the closed form is monotone in it and inverting it
+    algebraically buys nothing. Returns the relief in metres.
+    """
+    lo, hi = d_c + 1e-6, d_max
+    if reform_ratio(d_c, hi, length, gamma_start, k_dally, gamma_s) > gamma_s:
+        return float('inf')
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if reform_ratio(d_c, mid, length, gamma_start, k_dally, gamma_s) > gamma_s:
+            lo = mid
+        else:
+            hi = mid
+    return hi - d_c
+
+
+def crest_depth_ratio(tr, cr, b, field='wave'):
+    """Chapter 12's `d_bar ~ H_b/gamma`, evaluated in ONE depth field.
+
+    WAVE 1 REPORTED 0.893 FOR THIS AND CALLED THE SHORTFALL A PREDICTION. It is
+    not one. `H_b` and `d_b` are outputs of the transform, which reads the
+    wavelength-filtered depth; `cr['d']` is the RAW bed. On an 11 m crest the
+    1.5 m filter lifts the depth the wave feels by 0.19 m, and the whole of the
+    0.893 is that one comparison straddling two fields:
+
+        field='bed'   raw bed depth at the crest / (H_b/gamma)   0.893
+        field='wave'  the depth the wave broke in / (H_b/gamma)  0.973
+
+    and on a 0.25 m grid, where the filter is 0.375 m instead of 1.5 m, the
+    'bed' form climbs to 0.971 while the 'wave' form does not move. The relation
+    is met to 1-3%; the trend across sea states that wave 1 offered as
+    falsifiable (0.81 to 0.97 as H_0 rises from 1 to 3 m) is the same artefact
+    seen along a different axis -- a bigger bar is broader, so a fixed filter
+    takes proportionally less off its crest.
+
+    THE COMPARISON LIVES HERE AND NOT IN THE SUITE on purpose. Wave 1's own
+    `--bugs` table found that a row which computes both sides of its check is
+    testing itself; this function is what `--bug crest-depth-mixed-fields`
+    patches, so the guard has something to catch.
+    """
+    d_pred = b['H_b'] / GAMMA_B
+    d = cr['d'] if field == 'bed' else float(tr['d'][cr['i']])
+    return d / d_pred
+
+
+def _reform_length(d_c, relief, gamma_start=GAMMA_B, k_dally=K_DALLY,
+                   gamma_s=GAMMA_STABLE, l_max=1000.0):
+    """The other inversion: hold the relief, find the back-slope LENGTH that
+    un-breaks the wave. Monotone the same way, bisected the same way."""
+    lo, hi = 1e-3, l_max
+    if reform_ratio(d_c, d_c + relief, hi, gamma_start, k_dally, gamma_s) > gamma_s:
+        return float('inf')
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if reform_ratio(d_c, d_c + relief, mid, gamma_start, k_dally,
+                        gamma_s) > gamma_s:
+            lo = mid
+        else:
+            hi = mid
+    return hi
+
+
+def dally_efoldings(d_c, d_t, length, k_dally=K_DALLY):
+    """How many e-foldings of the Dally decay the back of the bar delivers.
+
+    The model's decay rate is K/d per metre of x, so the count is the integral
+    of K/d over the back slope -- in closed form for a straight slope,
+
+        N = (K/m) * ln(d_t/d_c)                 with m = (d_t-d_c)/length
+
+    which is the SAME K/m that sits in `reform_ratio`'s exponent. It is the
+    natural currency for "how far short is this bar", and the number this scene
+    turns out to be short in.
+    """
+    m = (d_t - d_c) / max(length, 1e-9)
+    if m <= 0.0:
+        return 0.0
+    return (k_dally / m) * math.log(d_t / d_c)
+
+
+def breaking_fraction_bj(tr, gamma_b=GAMMA_B):
+    """Battjes & Janssen (1978)'s fraction of breaking waves Q_b, as a field.
+
+    The transform above is monochromatic, and section B's photograph is not: a
+    real sea is a distribution, and what a camera records as "a breaking line"
+    is a large FRACTION of waves breaking, not one wave crossing an index. The
+    standard closure is Battjes & Janssen's clipped Rayleigh,
+
+        (1 - Q_b) / ln(Q_b) = -(H_rms/H_m)^2,     H_m = gamma_b * d in shallow
+                                                        water
+
+    solved here by bisection. `tr['H']` is read as H_rms, which is the reading
+    the energy already carries: E = rho g H^2/8 IS the rms convention.
+
+    THIS IS A DIAGNOSTIC AND IT DOES NOT RESCUE SECTION B -- which is why it is
+    here rather than quietly replacing the criterion. Q_b on this scene goes
+    1.00 over the bar and 0.06 in the trough, so the CONTRAST the photograph
+    shows is there; but it stays near 0.06 all the way to the shore, so there is
+    still no second line. Reported, measured, and not used as a pass.
+    """
+    d = np.maximum(tr['d'], D_MIN)
+    ratio = np.clip(tr['H'] / (gamma_b * d), 1e-6, 1.0)
+    out = np.zeros_like(d)
+    for i in range(d.size):
+        r2 = ratio[i] ** 2
+        if r2 >= 1.0 - 1e-9:
+            out[i] = 1.0
+            continue
+        lo, hi = 1e-12, 1.0 - 1e-12
+        for _ in range(80):
+            mid = 0.5 * (lo + hi)
+            if (1.0 - mid) / math.log(mid) > -r2:     # too little breaking
+                lo = mid
+            else:
+                hi = mid
+        out[i] = 0.5 * (lo + hi)
+    return out
+
+
+def probe_back_slope(x, h, h_ref, i_crest, length, relief, rejoin=60):
+    """A DIAGNOSTIC BED, and it is never the scene's.
+
+    Takes the loop's own bed seaward of the crest and replaces everything
+    landward of it with a straight back slope of the stated `length` and
+    `relief`, rejoining the reference ramp over `rejoin` metres. It exists to
+    ask the transform one question -- *given* a trough of these dimensions, does
+    the wave un-break? -- and it answers it without touching the bathymetry the
+    scene ships, which is a computed field and stays one.
+
+    The suite uses it twice: to prove the transform HAS the memory the reform
+    needs (hand it a wide enough trough and it reforms), and to locate the
+    boundary in (relief, length) that the loop's own bar falls short of.
+    """
+    hh = np.asarray(h, float).copy()
+    h_ref = np.asarray(h_ref, float)
+    d_c = -hh[i_crest]
+    n = hh.size
+    for j in range(int(length) + 1):
+        if i_crest + j < n:
+            hh[i_crest + j] = -(d_c + relief * j / max(length, 1))
+    i0 = i_crest + int(length)
+    for j in range(1, rejoin + 1):
+        if i0 + j < n:
+            f = j / float(rejoin)
+            hh[i0 + j] = (1.0 - f) * (-(d_c + relief)) + f * h_ref[i0 + j]
+    if i0 + rejoin + 1 < n:
+        hh[i0 + rejoin + 1:] = h_ref[i0 + rejoin + 1:]
+    return hh
 
 
 # ------------------------------------------------------ sediment and beach state
@@ -1258,13 +1575,63 @@ def _print_report():
     print('   trough      x = %.1f m   depth %.3f m' % (th_['x'], th_['d']))
     print('   H_b = %.3f m at d_b = %.3f m  ->  H_b/gamma = %.3f m'
           % (b['H_b'], b['d_b'], b['H_b'] / GAMMA_B))
+    d_pred = b['H_b'] / GAMMA_B
     print('   chapter 12 predicts the crest at d ~ H_b/gamma: %.3f vs %.3f m'
-          % (cr['d'], b['H_b'] / GAMMA_B))
-    print('   ratio d_crest/(H_b/gamma) = %.3f' % (cr['d'] / (b['H_b'] / GAMMA_B)))
+          % (cr['d'], d_pred))
+    print('   ratio d_crest/(H_b/gamma), RAW bed depth      = %.3f' %
+          (cr['d'] / d_pred))
+    print('   ratio d_crest/(H_b/gamma), the depth the WAVE = %.3f' %
+          (tr['d'][cr['i']] / d_pred))
+    print('     -- H_b and d_b come out of the transform, which reads the')
+    print('        filtered depth; the raw bed is 0.19 m shallower at an 11 m')
+    print('        crest. Comparing the two FIELDS is the whole of the 0.893.')
     print('   volume change over the whole run %+.2e m2 (Exner is closed)'
           % float(np.trapezoid(h - h_dean, x)))
-    print('   break onsets (H crosses gamma*d): %s'
+    print('   break ONSETS (H crosses gamma*d): %s'
           % ['%.0f m' % s[0] for s in break_lines(tr)])
+    print('   SURF ZONE (the wave is actually breaking): %s'
+          % ['%.0f-%.0f m' % s for s in surf_zone_spans(tr)])
+
+    print('\n-- section B, the second breaking line: the reform is a DISTANCE')
+    d_c, d_t = tr['d'][cr['i']], tr['d'][th_['i']]
+    L_bar = th_['x'] - cr['x']
+    m_in = float(np.gradient(tr['d'], tr['dx'])[min(cr['i'] + 80, x.size - 1)])
+    print('   saturated H/d on the inner slope: %.4f measured, %.4f closed form'
+          % (float((tr['H'] / tr['d'])[min(cr['i'] + 80, x.size - 1)]),
+             float(saturated_ratio(m_in))))
+    print('     GAMMA_eq = gamma_s/sqrt(1 + (5/2)(dd/dx)/K) -- a broken wave on')
+    print('     a SHOALING bed decays to %.3f and not to gamma_s = 0.40, so it'
+          % float(saturated_ratio(m_in)))
+    print('     can only un-break where the bed DEEPENS: behind the bar.')
+    print('   crest-to-trough: L = %.0f m, relief %.3f m (in the wave depth)'
+          % (L_bar, d_t - d_c))
+    print('   Dally e-foldings delivered  %.3f' % dally_efoldings(d_c, d_t, L_bar))
+    L_need = min(_reform_length(d_c, max(d_t - d_c, 1e-3)), 400.0)
+    print('   Dally e-foldings NEEDED     %.3f  (a back slope %.0f m long at'
+          % (dally_efoldings(d_c, d_t, L_need), L_need))
+    print('     the same relief, against the %.0f m the loop digs)' % L_bar)
+    print('   or, at the loop\'s own %.0f m, a relief of %.3f m against %.3f'
+          % (L_bar, reform_relief(d_c, L_bar), d_t - d_c))
+    print('   AND THE TWO ARE THE SAME NUMBER: the trough sits %.2f Dally decay'
+          % (L_bar * K_DALLY / d_c))
+    print('   lengths d/K behind the crest, because the dissipation that digs')
+    print('   it decays over exactly that length -- so a one-bar breakpoint')
+    print('   model digs a trough one e-folding wide and needs two.')
+    hp = probe_back_slope(x, h, h_dean, cr['i'], int(round(L_need)),
+                          max(th_['d'] - cr['d'], 1e-3))
+    print('   PROOF THE TRANSFORM HAS THE MEMORY: take the loop\'s OWN relief')
+    print('   of %.2f m, spread it over %.0f m instead of %.0f, hand that to the'
+          % (th_['d'] - cr['d'], round(L_need), L_bar))
+    print('   transform as a diagnostic bed, and the surf zone becomes %s'
+          % ['%.0f-%.0f m' % s for s in surf_zone_spans(
+              transform(x, hp, T_SWELL, H0_SWELL, THETA0_SWELL))])
+    print('   -- two lines with calm water between. Nothing was tuned; the')
+    print('   only thing that changed is how far the wave travels.')
+    qb = breaking_fraction_bj(tr)
+    print('   Battjes-Janssen Q_b: %.3f over the bar, %.3f in the trough, %.3f'
+          % (qb[cr['i']], qb[th_['i']], qb[min(cr['i'] + 120, x.size - 1)]))
+    print('   inshore -- the CONTRAST section B photographs is there, the')
+    print('   second line still is not.')
 
     print('\n-- the four closed forms, measured on this run')
     ex = shoaling_exponent(tr)

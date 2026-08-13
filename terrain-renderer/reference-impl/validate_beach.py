@@ -257,6 +257,94 @@ def _bug_no_slope_term(mod):
     mod.sediment_flux = lambda tr, **kw: orig(tr, **dict(kw, eps_slope=0.0))
 
 
+def _bug_no_hysteresis(mod):
+    """THE MEMORY BUG. Leave the flux march in place, but never switch breaking
+    off again: delete the `H <= gamma_s*d` branch by making gamma_s zero for the
+    ONSET test only. The wave then dissipates forever and can never reform --
+    which is what wave 1 suspected its own transform might silently be doing,
+    and what this bug exists to prove it is not."""
+    orig = mod.transform
+
+    def transform(x, h, T, H0, theta0, **kw):
+        kw = dict(kw)
+        kw['gamma_s'] = kw.get('gamma_s', mod.GAMMA_STABLE)
+        tr = orig(x, h, T, H0, theta0, **kw)
+        return tr
+
+    def marched(x, h, T, H0, theta0, **kw):
+        tr = transform(x, h, T, H0, theta0, **kw)
+        if not kw.get('breaking', True):
+            return tr             # a caller that asked for NO breaking still
+                                  # gets none; the bug is in the off-switch,
+                                  # not in the on-switch, and patching both
+                                  # would fail rows for the wrong reason
+        # re-march with the off-switch removed
+        d, cg, cos_t = tr['d'], tr['cg'], np.cos(tr['theta'])
+        gs = mod.GAMMA_STABLE
+        F = np.empty_like(d)
+        F[0] = tr['F0']
+        brk = np.zeros(d.size, bool)
+        on = False
+        dx = tr['dx']
+        for i in range(d.size - 1):
+            H_i = math.sqrt(max(8.0 * F[i] / (mod.RHO_SW * mod.G * cg[i]
+                                              * cos_t[i]), 0.0))
+            if H_i >= mod.GAMMA_B * d[i]:
+                on = True                       # and NEVER off again
+            brk[i] = on
+            if on:
+                F_s = (mod.RHO_SW * mod.G * (gs * d[i]) ** 2 / 8.0) * cg[i] * cos_t[i]
+                F[i + 1] = F_s + (F[i] - F_s) * math.exp(-mod.K_DALLY * dx / d[i])
+            else:
+                F[i + 1] = F[i]
+        brk[-1] = on
+        tr['F'] = F
+        tr['brk'] = brk
+        tr['H'] = np.sqrt(np.maximum(8.0 * F / (mod.RHO_SW * mod.G * cg * cos_t), 0.0))
+        tr['E'] = mod.RHO_SW * mod.G * tr['H'] ** 2 / 8.0
+        D = np.zeros_like(F)
+        D[1:-1] = -(F[2:] - F[:-2]) / (2.0 * dx)
+        D[0] = -(F[1] - F[0]) / dx
+        D[-1] = -(F[-1] - F[-2]) / dx
+        tr['D_w'] = D
+        return tr
+    mod.transform = marched
+
+
+def _bug_sat_no_slope(mod):
+    """The saturated ratio with the bed slope dropped: GAMMA_eq = gamma_s. This
+    is the reading of Dally that everyone starts with -- 'a broken wave decays
+    to 0.4' -- and it is wrong by the slope on every real beach."""
+    mod.saturated_ratio = lambda dddx, k_dally=mod.K_DALLY, \
+        gamma_s=mod.GAMMA_STABLE: np.full_like(np.asarray(dddx, float), gamma_s)
+
+
+def _bug_reform_exponent(mod):
+    """Drop the 5/2 from the reform exponent a = K/m + 5/2. The 5/2 is the
+    d^(5/2) in the shallow-water energy flux -- lose it and the closed form
+    stops agreeing with the march it was derived for."""
+    orig = mod.reform_ratio
+
+    def reform_ratio(d_c, d_t, length, gamma_start=mod.GAMMA_B,
+                     k_dally=mod.K_DALLY, gamma_s=mod.GAMMA_STABLE):
+        m = (d_t - d_c) / max(length, 1e-9)
+        if m <= 0.0:
+            return float(gamma_start)
+        a = k_dally / m                                     # the 5/2 gone
+        g_eq = k_dally * gamma_s ** 2 / (k_dally + 2.5 * m)
+        g = g_eq + (gamma_start ** 2 - g_eq) * (d_t / d_c) ** (-a)
+        return math.sqrt(max(g, 0.0))
+    mod.reform_ratio = reform_ratio
+
+
+def _bug_crest_depth_mixed_fields(mod):
+    """Wave 1's measurement put back: compare the RAW bed depth at the crest
+    against a breaker depth that came out of the FILTERED field."""
+    orig = mod.crest_depth_ratio
+    mod.crest_depth_ratio = lambda tr, cr, b, field='wave': orig(tr, cr, b,
+                                                                 field='bed')
+
+
 BUGS = {
     'dw-for-ew': _bug_dw_for_ew,
     'quarter-at-break': _bug_quarter_at_break,
@@ -266,6 +354,10 @@ BUGS = {
     'no-refraction': _bug_no_refraction,
     'wavelength-filter': _bug_wavelength_filter,
     'no-slope-term': _bug_no_slope_term,
+    'no-hysteresis': _bug_no_hysteresis,
+    'sat-no-slope': _bug_sat_no_slope,
+    'reform-exponent': _bug_reform_exponent,
+    'crest-depth-mixed-fields': _bug_crest_depth_mixed_fields,
 }
 
 
@@ -670,6 +762,31 @@ def run_suite():
             'a pass.', unit='ratio')
     info(2, 'crest depth vs H_b/gamma, m', (cr['d'], d_pred),
          'measured, then predicted')
+
+    # ---- WAVE 2: the 0.893 is a two-field comparison, not a shortfall.
+    # H_b and d_b are outputs of the transform, which reads the FILTERED depth;
+    # cr['d'] is the raw bed. On an 11 m crest the 1.5 m filter lifts the depth
+    # the wave feels by 0.19 m and the ratio by 0.08. Both forms are printed,
+    # and the one that compares like with like is the one that is asserted.
+    check(2, 'd_bar ~ H_b/gamma evaluated in ONE depth field',
+          B.crest_depth_ratio(tr_s, cr, b_s, field='wave'), 1.0, 0.06,
+          'Chapter 12 gives the relation without a tolerance. 6% is chosen '
+          'from the grid study below rather than from this number: refining '
+          'space and time together over dx = 2.0/1.0/0.5/0.25 m the same-field '
+          'ratio sits at 0.959 / 0.953 / 0.982 / 0.994, a spread of 4% over a '
+          'factor of eight in dx, so 6% is one and a half times the spread the '
+          'discretisation itself carries. The RAW-bed form of the same ratio '
+          'runs 0.834 / 0.906 / 0.942 / 0.974 over those grids -- monotone and '
+          'still climbing, which is the tell that it is measuring the filter '
+          'and not the physics.', unit='ratio')
+    info(2, 'the two forms of the ratio: raw bed, then the depth the wave broke in',
+         (B.crest_depth_ratio(tr_s, cr, b_s, field='bed'),
+          B.crest_depth_ratio(tr_s, cr, b_s, field='wave')),
+         'wave 1 reported the first and called the 0.893 a prediction the '
+         'model makes; wave 2 finds it is the two fields, and the trend it '
+         'reported across sea states (0.81 -> 0.97) is the same artefact seen '
+         'along H_0: a bigger bar is broader, so a fixed filter takes '
+         'proportionally less off its crest.')
     check(1, 'the trough is landward of the crest and deeper than it', 1.0 if
           (th_s is not None and th_s['x'] > cr['x'] and th_s['d'] > cr['d'])
           else 0.0, 1.0, 0.0,
@@ -689,19 +806,243 @@ def run_suite():
           'read off H/d after the fact.')
     info(1, 'break onsets, m from the offshore boundary',
          [round(s[0], 1) for s in lines], 'each is a crossing of H/d = gamma')
+    info(1, 'surf-zone spans -- where the wave IS breaking',
+         B.surf_zone_spans(tr_s),
+         'NOT the same list as the break onsets above, and wave 2 had to '
+         'separate them: H/d >= gamma marks where a wave STARTS breaking and '
+         'says nothing about where one stops. Section B\'s "two breaking '
+         'lines" is a claim about this list having two entries.')
+
+    # ============================ the second breaking line, wave 2 ============
+    # THE CLOSED FORM THAT DECIDES IT. Put H = GAMMA*d into the Dally march in
+    # shallow water and the fixed point falls out:
+    #     GAMMA_eq = gamma_s / sqrt(1 + (5/2)(dd/dx)/K)
+    # so a broken wave on a SHOALING bed decays to a ratio strictly ABOVE
+    # gamma_s and can only un-break where the bed DEEPENS. The rows below check
+    # that against the marched transform, which has no GAMMA_eq in it, and
+    # against a published field measurement that predates it by a decade.
+    def _plane(tan_b, d0=9.0, length=1400.0):
+        xp = np.arange(0.0, length, 1.0)
+        hp = np.minimum(-(d0 - tan_b * xp), -0.05)
+        return B.transform(xp, hp, T, 1.5, 0.0)
+
+    slopes = np.array([1 / 150., 1 / 100., 1 / 80., 1 / 60.])
+    meas, cfm = [], []
+    for tb in slopes:
+        tp = _plane(tb)
+        ok = tp['brk'] & (tp['d'] > 0.6)
+        idx = np.nonzero(ok)[0]
+        meas.append(float((tp['H'] / tp['d'])[idx[len(idx) // 2:]].mean()))
+        cfm.append(float(B.saturated_ratio(-tb)))
+    check(1, 'saturated H/d on a plane slope: closed form vs the march',
+          np.array(meas), np.array(cfm), 0.03,
+          'Two routes that share no arithmetic. The closed form is the fixed '
+          'point of the Dally ODE with the shallow-water flux substituted; the '
+          'measurement is the marched transform, which integrates the same ODE '
+          'numerically and has never been told the fixed point exists. 3% is '
+          'the residual of the shallow-water limit (c_g = sqrt(gd), n = 1) on '
+          'slopes this gentle -- it grows to 9% by 1:30 and the closed form '
+          'diverges past tan(beta) = 2K/5, both of which are the physics and '
+          'are reported as INFO below rather than tolerated here.', rel=True)
+    info(1, 'the same four, measured then closed-form',
+         (np.array(meas), np.array(cfm)), 'slopes 1:150, 1:100, 1:80, 1:60')
+    check(1, 'saturated H/d on the scene\'s own inner slope',
+          float((tr_s['H'] / tr_s['d'])[min(cr['i'] + 80, x_s.size - 1)]),
+          float(B.saturated_ratio(float(np.gradient(tr_s['d'], tr_s['dx'])[
+              min(cr['i'] + 80, x_s.size - 1)]))), 0.02,
+          'The same closed form on the bed the loop built rather than on a '
+          'plane. 2% because the scene\'s inner slope is not exactly straight '
+          'and the fixed point is approached, not sat on.', rel=True)
+    between(2, 'saturated gamma rises with bed slope and stays in 0.2-1.0',
+            float(B.saturated_ratio(-1 / 40.)) - float(B.saturated_ratio(-1 / 150.)),
+            0.02, 1.0,
+            'Raubenheimer, Guza & Elgar (1996), "Wave transformation across the '
+            'inner surf zone": on a natural beach the saturated H/h "ranged '
+            'from 0.2 to 1.0" and was "positively correlated with local beach '
+            'slope", and NOT with offshore steepness. That is a field '
+            'measurement from 1996 and this is a closed form off a 1985 decay '
+            'model; neither was written from the other. This row asserts the '
+            'sign and the direction -- the ratio must RISE with slope -- '
+            'because the magnitude depends on which beach.', unit='ratio')
+    info(2, 'saturated gamma at 1:150, 1:100, 1:60, 1:40, 1:25',
+         [float(B.saturated_ratio(-1 / n)) for n in (150, 100, 60, 40, 25)],
+         'all inside Raubenheimer et al.\'s 0.2-1.0, rising with slope, and '
+         'gamma_s = 0.40 is the flat-bed limit of the family rather than a '
+         'value any real surf zone sits at')
+    info(1, 'the slope above which no saturated surf zone exists: 2K/5',
+         B.saturation_slope_limit(),
+         'the closed form\'s denominator vanishes there. Steeper than 1:%.1f '
+         'and the shoaling gain outruns the breaking loss: the wave surges '
+         'instead of spilling. That is the reflective end of Wright & Short\'s '
+         'beach states falling out of a wave model that has never heard of '
+         'them, and it lands within a factor of 1.5 of their 1:10-1:15.'
+         % (1.0 / B.saturation_slope_limit()))
+
+    # the reform criterion, and it is a DISTANCE.
+    # DEFENSIVE, and it is not decoration: three of the deliberate bugs below
+    # destroy the bar outright, and a row that CRASHES on a degenerate profile
+    # takes every row after it down with it -- so the bugs that used to be
+    # caught by four rows each get reported as one exception. A guard must fail,
+    # not explode. `th_s` may be None and `_reform_length` may be infinite.
+    d_cf = float(tr_s['d'][cr['i']])
+    d_tf = float(tr_s['d'][th_s['i']]) if th_s else d_cf
+    L_bar = (th_s['x'] - cr['x']) if th_s else 0.0
+    check(3, 'reform closed form vs the march, on the loop\'s own back slope',
+          B.reform_ratio(d_cf, d_tf, max(L_bar, 1e-3)), r_min, 0.06,
+          'The integrated form G(d) = G_eq + (G_c-G_eq)(d/d_c)^-a, a = K/m + '
+          '5/2, against the minimum H/d the marched transform actually '
+          'reaches behind the bar. 6% because the closed form assumes a '
+          'straight back slope and the loop\'s is concave. Independent method: '
+          'one is an analytic integration in d, the other a cell-by-cell march '
+          'in x.', rel=True)
+    n_have = B.dally_efoldings(d_cf, d_tf, L_bar)
+    L_need = min(B._reform_length(d_cf, max(d_tf - d_cf, 1e-3)), 400.0)
+    L_need_i = int(round(L_need))
+    info(1, 'Dally e-foldings behind the bar: delivered, then needed',
+         (n_have, B.dally_efoldings(d_cf, d_tf, L_need)),
+         'the currency the shortfall is denominated in. The wave has to lose '
+         'a factor of (0.78/0.40)^2 in H/d while the depth grows, and the '
+         'decay is K/d per METRE, so what is short is travel distance.')
+    check(2, 'the trough sits one Dally decay length d/K behind the crest',
+          L_bar * B.K_DALLY / max(d_cf, 1e-6), 1.0, 0.30,
+          'NOT a coincidence and this row is the reason section B is hard. The '
+          'trough is scoured by the undertow, the undertow is driven by the '
+          'dissipation, and the dissipation decays over exactly d/K. So the '
+          'morphology inherits the wave model\'s own length scale. Measured '
+          'across five sea states from H_0 = 1.0 to 3.0 m the ratio runs 0.95 '
+          '/ 0.99 / 1.09 / 1.19 / 1.24, and +-30%% covers that whole span. A '
+          'one-bar breakpoint model therefore digs a trough ONE e-folding wide '
+          'and needs %.1f.' % B.dally_efoldings(d_cf, d_tf, max(L_need, 1e-3)),
+          unit='ratio')
+
+    # THE MEMORY IS THERE. Give the transform the loop's own relief spread over
+    # the length the closed form asks for and it un-breaks and re-breaks.
+    h_probe = B.probe_back_slope(x_s, h_s, hd_s, cr['i'], L_need_i,
+                                 max((th_s['d'] - cr['d']) if th_s else 0.0,
+                                     1e-3))
+    tr_probe = B.transform(x_s, h_probe, T, B.H0_SWELL, B.THETA0_SWELL)
+    spans_probe = B.surf_zone_spans(tr_probe)
+    check(3, 'the transform DOES reform, given the distance',
+          float(len(spans_probe)), 2.0, 0.0,
+          'The decisive row, and it separates two candidate causes that look '
+          'identical from outside. Take the bed the loop built, keep its OWN '
+          '%.2f m of relief, spread it over %d m instead of %.0f, and the '
+          'transform gives two surf zones with calm water between them: %s. '
+          'Nothing was tuned and no constant moved; the only change is how far '
+          'the wave travels. So the model is NOT missing the memory -- the '
+          'flux march and the gamma_b/gamma_s hysteresis carry it, and Dally, '
+          'Dean & Dalrymple (1985) say so in their own abstract, which reports '
+          'the model reproducing "the shoaling, breaking, and wave re-forming '
+          'process" on a profile with two bar-and-trough systems. What the '
+          'loop is missing is trough WIDTH. The probe bed is a diagnostic and '
+          'is never the scene\'s.'
+          % ((th_s['d'] - cr['d']) if th_s else 0.0, L_need_i, L_bar,
+             '; '.join('%.0f-%.0f m' % s for s in spans_probe)))
+
+    # ---- IS THE GAP ITSELF THE GRID? Refine space and time TOGETHER and see.
+    # The energetics slope term is a diffusion with D_eff ~ 6.7e-4 m^2/s, so
+    # halving dx without cutting dt walks straight into dt < dx^2/(2 D_eff) and
+    # the bed grows a spike. dt is put at 0.6 of that bound here and the run
+    # length held in SECONDS, not in steps.
+    D_EFF = 6.7e-4
+    T_PHYS = 2000 * 300.0
+    r_grid = []
+    for dxg in (1.0, 0.5):
+        dtg = min(300.0, 0.6 * dxg * dxg / (2.0 * D_EFF))
+        scg = B.run_scene(dx=dxg, dt=dtg, n_steps=int(round(T_PHYS / dtg)))
+        trg = scg['tr']
+        i0 = int(np.argmax(trg['brk']))
+        r_grid.append(float((trg['H'] / trg['d'])[i0:i0 + int(80 / dxg)].min()))
+    check(3, 'the reform gap is grid-CONVERGED: min H/d at dx = 1.0 vs 0.5 m',
+          r_grid[1], r_grid[0], 0.02,
+          'The obvious escape from this OPEN row is that 0.456 is a coarse-grid '
+          'number. It is not. Refining space and time together the minimum H/d '
+          'behind the bar runs 0.4574 / 0.4607 / 0.4629 / 0.4625 at dx = 2.0 / '
+          '1.0 / 0.5 / 0.25 m -- converged by 0.5 m and moving AWAY from 0.40, '
+          'not toward it. The bar\'s relief IS grid-dependent (0.62 / 0.52 / '
+          '0.48 / 0.44 m over the same four) and converges downward, so the '
+          'refined bar is a slightly worse case, not a better one. Volume '
+          'stayed closed to 2.5e-12 m^2 on the finest grid, so this is a '
+          'converged answer and not a blown-up one.', rel=True)
+    info(3, 'min H/d behind the bar at dx = 1.0 and 0.5 m, dt at 0.6 of the '
+            'diffusion bound', (r_grid[0], r_grid[1]),
+         'dt = 300 s and 112 s; the same 167 h of physical time in both')
+
+    # ---- cause 4: the forcing history. It reverses.
+    h_tide, _ = B.evolve_forced(
+        x_s, hd_s, T, B.THETA0_SWELL, n_steps=B.N_STEPS,
+        z_of_t=lambda t: 1.0 * math.sin(2.0 * math.pi * t / (12.42 * 3600.0)))
+    cr_ti = B.bar_crest(x_s, h_tide, hd_s)
+    info(2, 'relief under a +-1.0 m semidiurnal tide, against steady forcing',
+         (cr_ti['amp'], cr['amp']),
+         'Chapter 12 says the profile "breathes on a storm/calm cycle" and a '
+         'moving datum is the obvious way to widen a breakpoint bar. It does '
+         'the opposite: the tide walks the break point over ~100 m of profile '
+         'and the convergence smears into a low terrace instead of a bar. '
+         'Steady forcing is the most favourable case this model has, which is '
+         'the reverse of the guess and is why cause 4 is dead.')
+    h_ray, _ = B.evolve_forced(x_s, hd_s, T, B.THETA0_SWELL,
+                               n_steps=B.N_STEPS, n_quantiles=3)
+    cr_ry = B.bar_crest(x_s, h_ray, hd_s)
+    th_ry = B.trough(x_s, h_ray, hd_s, cr_ry['i'])
+    info(2, 'Rayleigh-averaged flux: crest amp, trough separation, relief',
+         (cr_ry['amp'], (th_ry['x'] - cr_ry['x']) if th_ry else -1.0,
+          (th_ry['d'] - cr_ry['d']) if th_ry else -1.0),
+         'against %.2f m / %.0f m / %.2f m monochromatic. THE TRADE IS THE '
+         'FINDING: spreading the break point over the width of a Rayleigh '
+         'height distribution is the right physics for why real bars are '
+         'broader than a monochromatic breakpoint model builds them, and it '
+         'does widen the crest-to-trough separation -- but it pays for every '
+         'metre of width in relief, and the minimum H/d behind the bar barely '
+         'moves. Every mechanism tried in this wave trades the same two '
+         'quantities against each other, which is why the 14%% gap is robust '
+         'rather than marginal.' % (cr['amp'], L_bar, d_tf - d_cf))
+
+    # what the photograph would actually record, and it does not rescue this
+    qb = B.breaking_fraction_bj(tr_s)
+    info(2, 'Battjes-Janssen Q_b over the bar / in the trough / inshore',
+         (float(qb[cr['i']]), float(qb[th_s['i']]) if th_s else -1.0,
+          float(qb[min(cr['i'] + 120, x_s.size - 1)])),
+         'Battjes & Janssen (1978)\'s clipped-Rayleigh breaking fraction, '
+         '(1-Q_b)/ln Q_b = -(H_rms/H_m)^2, computed on this scene\'s own H. '
+         'It matters because the transform is monochromatic and the photograph '
+         'is not: what a camera calls a breaking line is a large FRACTION of '
+         'waves breaking. The contrast section B describes IS there -- 1.00 '
+         'over the bar against 0.07 in the trough -- but Q_b stays near 0.07 '
+         'all the way to the shore, so the random-wave reading does not rescue '
+         'the second line either. Reported, not used as a pass.')
+
     openq(1, 'section B: a SECOND breaking line, with reform between',
           r_min, '< %.2f' % B.GAMMA_STABLE,
-          'NOT ACHIEVED, and the number says by how much. For the wave to '
-          'break twice it must first STOP breaking, and in the Dally model it '
-          'stops when H/d falls to the stable ratio 0.40. This profile gets '
-          'H/d down to %.3f in the trough -- close, and on the wrong side. The '
-          'cause is measurable: bar-to-trough relief is 0.90 m at the standard '
-          'run and still only 1.05 m after five times as long, against a '
-          'breaker height of 1.83 m, where a real barred profile carries '
-          '1-2 m of relief. Tide (four levels) and sea state (three) were both '
-          'swept and neither produces reform, so it is not a datum artefact. '
-          'This is the single criterion of section B this wave did not reach.'
-          % r_min)
+          'STILL NOT ACHIEVED, and wave 2 can now say exactly why and exactly '
+          'by how much. The reform is a DISTANCE condition, not a relief one: '
+          'the wave needs %.2f e-foldings of the Dally decay between crest and '
+          'trough and gets %.2f, because the trough it digs is one decay '
+          'length d/K wide and the un-breaking takes about two. Equivalently, '
+          'at the loop\'s own 15 m back slope it needs %.2f m of relief and '
+          'has %.2f m. Four candidate causes were separated and three of them '
+          'are dead: the transform HAS the memory (the probe row above reforms '
+          'on the loop\'s own relief spread over %d m); the forcing history '
+          'makes it WORSE, not better (storm/calm cycling at 1-3 m over 5 '
+          'days, semidiurnal tide at +-0.5 and +-1.0 m, and a 3-, 5- and '
+          '8-quantile Rayleigh height distribution all LOWER the relief, and '
+          'the Rayleigh case widens the trough only by trading relief away for '
+          'it); and the decay rate K is the same axis as the distance, since '
+          'the e-folding count is K*L/d -- reform needs K ~ 0.35-0.40 against '
+          'the flux-form standard 0.15. What is left is that a single-bar '
+          'breakpoint model in 1-D has no mechanism that widens the trough '
+          'without flattening the bar, and the two effects cancel to within a '
+          'few per cent of H/d across everything tried -- and it is not the '
+          'grid either: refined in space and time together the trough minimum '
+          'converges to 0.463, AWAY from 0.40. Named plainly: what '
+          'this needs is a SECOND bar (the field configuration that actually '
+          'shows two lines is a double-bar system, not one bar plus a '
+          'shorebreak), and a second bar needs the alongshore circulation and '
+          'the inner-surf-zone feedback that chapter 12 puts out of scope with '
+          'the 2DH model. That is a missing mechanism, not a missing '
+          'tolerance.'
+          % (B.dally_efoldings(d_cf, d_tf, L_need), n_have,
+             B.reform_relief(d_cf, max(L_bar, 1e-3)), d_tf - d_cf, L_need_i))
     check(1, 'H/d at the first break equals gamma', b_s['H_b'] / b_s['d_b'],
           B.GAMMA_B, 2e-3,
           'The crossing is interpolated between the two cells that bracket it, '
