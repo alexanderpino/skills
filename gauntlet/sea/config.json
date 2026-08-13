@@ -1,0 +1,45 @@
+{
+  "scene": "sea and surf -- a beach with rocks and a sandbar, Aljezur",
+  "bar": "gauntlet/sea/bar.md",
+  "bar_kind": "reference",
+  "stops": {
+    "bar_met_n": 2,
+    "clean_streak_n": 2,
+    "budget_waves": 15,
+    "hard_cap_waves": null
+  },
+  "lanes": [
+    "bathymetry",
+    "wave-field",
+    "optics",
+    "chapter"
+  ],
+  "dimensions": [
+    "physics",
+    "visual",
+    "prose"
+  ],
+  "standing_rulings": [
+    "Every wave produces visual evidence into gauntlet/sea/evidence/. Owner ruling, and the pool loop under-delivered on it.",
+    "The physics comes from physical effects, never from a constant chosen to make the picture right. Owner: 'Het moet komen door natuurkundige effecten.'",
+    "The geometry stays analytic -- a Dean profile and analytic solids. A sculpted mesh is unverifiable and ends the project's central claim.",
+    "The wave field arrives from OUTSIDE with a stated offshore spectrum, so shoaling and refraction are outputs and not inputs.",
+    "The pool does not disappear. Shared physics is imported, never copied; the pool's frames stay bit-identical and its suite stays green.",
+    "Measure in scene-linear, before the tone map. Never read a PNG for physics.",
+    "Do not calibrate against the photographs. They carry three camera failures and one unresolved eclipse; the target is the closed form.",
+    "A wave may conclude that a previous wave was wrong, and that is a good outcome. Budget for it: on the pool loop the highest-value waves added nothing and found something already there was broken."
+  ],
+  "closed_forms_to_report": [
+    "shoaling, Green's law, H proportional to h^-1/4",
+    "refraction, Snell with c(h), crests turning onto the depth contours",
+    "the breaker index, H/h near 0.78, crossed and un-crossed and crossed again over the bar",
+    "run-up, scaling with the Iribarren number"
+  ],
+  "open_at_intake": [
+    "the eclipse's contact times at this longitude -- ? -- and until settled the surf frames are not radiometric evidence",
+    "coastal IOPs; the cuvette inversion on the wave face is the intended instrument",
+    "the two decay timescales of the entrained-air and sediment clouds",
+    "no backwash frame exists; section D rests on owner testimony alone"
+  ],
+  "extensions": []
+}
