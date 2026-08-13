@@ -1156,3 +1156,53 @@ that suspends the sediment.
 **The bathymetry stays analytic**, which is the standing condition: the Dean
 profile plus a Gaussian ridge with a gap in it. Two or three more parameters, and
 still no mesh.
+
+### The sea reference set's own illuminants — and an eclipse that must be checked, not assumed
+
+Owner: the surf frames are **12 August 2026, 18:08 WEST**; the coast and rock
+frames **11 August 2026, 11:45 WEST**. And: *"Er was gisteren (12) wel een
+zonsverduistering, maar ik denk dat die om die tijd nog niet echt invloed had."*
+
+Computed for Aljezur (37.3167 N, 8.8000 W), NOAA position, Bennett refraction,
+Kasten–Young air mass:
+
+| frame | elevation | azimuth | air mass | hour angle |
+|---|---|---|---|---|
+| surf, 12 Aug 18:08 | **27.17°** | 268.31° | 2.182 | +66.9° |
+| coast/rock, 11 Aug 11:45 | **56.22°** | 123.13° | 1.202 | −28.9° |
+| *(pool, 12 Aug 15:28)* | 57.22° | 233.96° | 1.189 | +26.9° |
+| *(pool intake, 10 Aug 18:41)* | 21.02° | 273.75° | 2.770 | +75.1° |
+
+**The rock frame is clean** — a day before the eclipse.
+
+**The surf frames are 17:08 UTC, roughly half an hour before that eclipse's
+greatest phase.** Partial phases typically run well over an hour before maximum,
+so the obscuration was plausibly already under way, possibly substantially. The
+contact times for this location are **`?` — not verified here, and must be
+checked against a source rather than assumed** before these frames are used as an
+illumination reference.
+
+**Why a scale factor cannot repair it**, which is the part that matters for this
+project specifically:
+
+- **Irradiance falls, but not with the obscured *area*.** Limb darkening makes the
+  disc centre brighter per unit area than the limb, so once the centre is covered
+  the flux loss runs ahead of the area.
+- **The source stops being a disc.** This renderer derives its sun-glitter lobe and
+  its caustic penumbra *from the sun's angular radius* — the `n = 2/θ_s² − 1 =
+  93493` exponent and the 6.8 mm penumbra on the bed. A **crescent** source makes
+  shadow penumbrae **anisotropic**: soft along the crescent, sharp across it. Every
+  quantity this project is most careful about is exactly the one that breaks.
+
+**A test the photographs can run on themselves.** Find a shadow edge and check
+whether it is differently soft in two directions. Anisotropic penumbra ⇒ the
+eclipse was under way. Crescent-shaped pinhole images under foliage would settle
+it outright.
+
+**Why this is recorded rather than noted in passing.** This session found three
+camera failures that corrupted the reference — white balance, tone curve, colour
+space. This is the same class of fault at the *other* end of the chain: not the
+instrument lying, but the **source not being what the timestamp implies**. The
+project's own rule already covers it — *you cannot compare a render to a
+photograph until you know that photograph's illuminant* — and an eclipse is that
+rule's extreme case.
