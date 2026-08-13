@@ -1120,3 +1120,39 @@ tests, and every constant above the water derived but one. The beach is a **seco
 reference**, not a replacement. Its intake is the owner's surf and coast
 photographs, from a known place — so the sun is computable there too, and the bar
 can be written the same way this one was.
+
+### Sandbars — and they are what makes the beach's tests hard
+
+Owner: *"Inclusief zandbanken."*
+
+**The owner's own first surf frame already shows one**: two breaking lines with
+calmer water between them. That is the bar-and-trough signature — break over the
+shallow, reform in the trough behind it, break again at the shore. The reference
+set already contains the evidence for the feature.
+
+**They are not scenery. They upgrade three of the four closed-form tests from
+trivial to sharp:**
+
+- **The breaker index becomes a prediction rather than an assertion.** On a
+  monotone Dean profile the depth falls steadily and everything breaks somewhere
+  near the shore — which cannot distinguish a renderer that *computes* breaking
+  from one that draws foam near the beach. A bar makes `H/h ≈ 0.78` be crossed,
+  **un-crossed, and crossed again**, so breaking must appear offshore, stop in the
+  trough, and resume — with nothing in the scene saying *break here*. There is no
+  way to fake that shape.
+- **Refraction becomes real.** Straight depth contours give straight crests, a test
+  that passes almost by construction. A bar gives curved contours, and the wave
+  **focuses** — which is why some breaks peak and others close out. Snell for water
+  waves on a non-trivial contour is a far heavier check.
+- **Shoaling becomes non-monotone**, so Green's law must be applied along an actual
+  ray path rather than a straight line.
+
+**And a bonus that closes the turbidity loop.** Bars have gaps, and water piled
+behind the bar escapes through them: a **rip current**, which carries sediment
+offshore — the murky plume visible from a cliff. Turbidity gains a *transport
+mechanism*, not only a source, and the rip is itself driven by the same wave field
+that suspends the sediment.
+
+**The bathymetry stays analytic**, which is the standing condition: the Dean
+profile plus a Gaussian ridge with a gap in it. Two or three more parameters, and
+still no mesh.
