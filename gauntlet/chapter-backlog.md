@@ -972,3 +972,32 @@ a reader knows when the cheap simplification holds and when it does not.
   window's rim from below, and in projection as the caustics on the bed. An
   approximation that passes each reading separately can still fail their
   agreement, and that failure is invisible in any single view.
+
+### A second frame from the same session, and it carries an instrument
+
+A wave caught mid-break: the lip throwing forward, a wipeout throwing spray, and
+a **distinctly green translucent panel** on the wave face against grey-blue water
+two metres away.
+
+**It refutes the `waterColor` category error in a single exposure.** The same
+liquid shows two colours at once, so the green cannot be a tint on the water
+body — it is a **path-length effect**, present only where the column is thin
+*and* backlit, absent everywhere else in frame. That is the sharpest available
+statement of a rule the chapter already gives: **the colour is the path, so it
+must vanish when the path does.** A renderer whose sea is green everywhere has
+tinted it. This frame is the falsification, and it needs no measurement to read.
+
+**And a breaking wave is a wedge, which makes it a variable-path cuvette.** Thin
+at the lip, thick toward the trough, with the green grading across it. Estimate
+the thickness from the geometry and the attenuation spectrum falls out of one
+frame. That matters because the IOPs are **the only thing the sea reference
+cannot inherit from the pool work** — everything else (Fresnel both sides, the
+critical angle, `L/n²`, Beer–Lambert, the trapped series, dispersion) transfers
+unchanged, while `b_b ≈ 0` does not. A breaking wave is a free spectrophotometer
+pointed at exactly the unknown.
+
+Also caught in the act: **the lip throwing forward**, which is the instant the
+free surface becomes multivalued — air beneath water that hangs above other
+water. That is where `z = f(x, y)` stops existing, and with it the height field,
+the caustic pass's Jacobian and the whole surface-intersection route. Photograph
+and structural obstacle in one frame.
