@@ -1001,3 +1001,52 @@ free surface becomes multivalued — air beneath water that hangs above other
 water. That is where `z = f(x, y)` stops existing, and with it the height field,
 the caustic pass's Jacobian and the whole surface-intersection route. Photograph
 and structural obstacle in one frame.
+
+### The surf zone breaks the constant-IOP assumption — three more frames
+
+Owner, with an unbroken wave face, a coastline from the cliff, and a rock break:
+*"Golven die na stukslaan op een rots een soort wolk achterlaten. Wat ik nog niet
+heb is de terugtrekkende golf die zand omhoog neemt. In de branding is het water
+troebeler."*
+
+**That last sentence is the structural one.** In the pool `b` is a constant of the
+water body — negligible and uniform, and the whole of *Pool optics* rests on it.
+In the surf zone `b` is a **field coupled to the wave field**: the waves suspend
+the bed, the **backwash** is the erosive half of the swash cycle, and turbidity
+therefore *pulses with each wave*. The water's optical properties stop being
+material input and become a **state variable produced by the dynamics**. That is
+not an extra term — it is a change in what kind of quantity an IOP is, and it
+should be written into *Water-body optical identity* as such.
+
+**A confusable pair that must be separated, because both are in these frames and
+they look alike.**
+
+| | mechanism | how to tell |
+|---|---|---|
+| **shallow bottom** | you see the bed through the column; brighter for exactly the reason a pool is | *reveals* structure, and that structure **stays put** |
+| **suspended sediment** | a scattering veil *in* the column | *hides* the bed, **moves with the water**, and **pulses** with the wave |
+
+The cliff frame shows the first cleanly — teal over the submerged rock platform,
+deep blue where no bed is in reach. The surf frames show the second. The
+discriminator is the same test the owner used at the pool to settle the weathering
+question: **watch it while the water moves.** Bed does not move; a veil does.
+
+**And the "cloud" left after a break on rock is two clouds with different
+lifetimes**, which is why one decay curve cannot fit it:
+
+- **entrained air** — bubbles rise and burst in **seconds**; this is the bright
+  white plume that visibly shrinks;
+- **suspended sediment** — settles over **minutes** and advects away with the
+  current.
+
+They overlap in space and are separated by their decay, not by their appearance.
+A renderer that models them as one gets neither decay right, and the tell is a
+plume that either vanishes too fast to leave a stain or lingers too white for too
+long. This is the same "one white, several mechanisms" error already recorded for
+foam, spray and entrained air — now with a *temporal* signature as the separator
+rather than a spatial one.
+
+**Still missing from the reference set:** the backwash itself lifting sand. Worth
+asking for — a frame of the swash retreating down a beach face, where the sheet
+flow is visibly loaded, would pin the one mechanism none of these nine frames
+catches.
