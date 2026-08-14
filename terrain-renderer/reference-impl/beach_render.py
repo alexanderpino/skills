@@ -247,10 +247,14 @@ def free_surface(w, xw, yw, t=0.0):
     r = w.sample(xw, yw, w.r2)
     psi = w.sample(xw, yw, w.psi2)
     om = 2.0 * math.pi / B.T_SWELL
+    # ONE EXPRESSION FOR THE SHAPE, and it lives in `beach.py`. Writing the
+    # sum out here as well would put the surface in two places, which is the
+    # duplication this project's own standing ruling on shared physics is
+    # about -- one file down from where it usually bites.
     ph = S - om * t
-    eta = 0.5 * H * (np.cos(ph) + r * np.cos(2.0 * ph + psi))
+    eta = B.nonlinear_eta(0.5 * H, r, psi, ph)
     ph0 = _K0 * (xw * math.cos(_TH0) + yw * math.sin(_TH0)) - om * t
-    far = 0.5 * B.H0_SWELL * (np.cos(ph0) + _R0 * np.cos(2.0 * ph0))
+    far = B.nonlinear_eta(0.5 * B.H0_SWELL, _R0, 0.0, ph0)
     f = np.clip((w.x[0] + 60.0 - xw) / 60.0, 0.0, 1.0)
     return eta * (1.0 - f) + far * f
 

@@ -428,9 +428,9 @@ def fig_correlation(S, path):
              0.04, 1.30)
     ax.text(float(np.cos(OPT.TC_SNELL[0])) - .02, 0.16,
             'cos(tc): nothing escapes left of here', INK, 'rs')
-    ax.text(0.04, 1.13,
+    ax.text(0.04, 1.06,
             'BOTH rise with mu. A steep ray escapes AND crosses less water,', INK)
-    ax.text(0.04, 1.07,
+    ax.text(0.04, 1.00,
             'so <A><E> is not <AE>, and the sign of the error is fixed.', INK)
 
     bx = P.Axes(img, (740, 72, 1265, 405), (0, 1), (0, 1.34),
@@ -474,9 +474,9 @@ def fig_correlation(S, path):
     gap = OPT.slab_esc(dep) / (e3d * OPT.T_OUT_DIFFUSE) - 1.
     for c in range(3):
         cx.marker(dep, 100. * float(gap[c]), CH[c])
-    cx.text(1.95, 24.0, 'this pool: DEPTH = %.2f m' % dep, WARN)
-    cx.text(1.95, 21.5, '%s' % _pct(gap, '%.1f'), INK)
-    cx.text(1.95, 19.0, 'and optics.py says 19.4 / 5.1 / 1.1% -- agrees',
+    cx.text(2.35, 24.6, 'this pool: DEPTH = %.2f m' % dep, WARN)
+    cx.text(2.35, 22.1, '%s' % _pct(gap, '%.1f'), INK)
+    cx.text(2.35, 19.6, 'and optics.py says 19.4 / 5.1 / 1.1% -- agrees',
             MUTED)
 
     ex = P.Axes(img, (740, 505, 1265, 800), (0, 4), (0, 112),
@@ -846,8 +846,8 @@ def fig_sun(S, path):
     grad = ATM.sky_diffuse(np.ones(1))[0]              # zenith, gradient only
     ghor = ATM.sky_diffuse(np.zeros(1))[0]             # horizon
 
-    img = P.canvas(1280, 900)
-    ax = P.Axes(img, (110, 72, 760, 520), (-2, np.log10(90.)), (-4, 6.2),
+    img = P.canvas(1280, 720)
+    ax = P.Axes(img, (110, 72, 760, 490), (-2, np.log10(90.)), (-4, 6.2),
                 title='One disc, one aureole, and a sky under both',
                 xlabel='angle from the sun, deg',
                 ylabel='radiance, scene-linear (green band)')
@@ -863,61 +863,64 @@ def fig_sun(S, path):
     ax.vline(float(np.log10(np.rad2deg(ATM.THETA_SUN))), WARN, 2, dash=(4, 4))
     ax.text(np.log10(np.rad2deg(ATM.THETA_SUN)) + .06, 5.9,
             'solar radius %.3f deg' % np.rad2deg(ATM.THETA_SUN), WARN)
-    ax.text(-1.93, np.log10(grad[1]) + 0.16, 'sky gradient: zenith %.3f, '
+    ax.text(-1.93, np.log10(grad[1]) + 0.20, 'sky gradient: zenith %.3f, '
             'horizon %.3f  `?` hand-set' % (grad[1], ghor[1]), INK)
-    ax.text(-1.93, 5.4, 'disc peak L_sun = %s' % _trip(ATM.L_SUN, '%.3e'), INK)
-    ax.text(-1.93, 5.0, '  = pi SUN_COL / Omega_sun, Omega_sun = %.3e sr'
+    ax.text(-1.93, -0.80, 'solid: the disc, cos^%.0f' % ATM.N_DISC, INK)
+    ax.text(-1.93, -1.20, 'peak L_sun = %s' % _trip(ATM.L_SUN, '%.3e'), MUTED)
+    ax.text(-1.93, -1.60, '  = pi SUN_COL / Omega_sun, Omega_sun = %.3e sr'
             % ATM.OMEGA_SUN, MUTED)
-    ax.text(-1.93, 4.6, 'aureole amp L_aure = %s' % _trip(ATM.L_AURE, '%.4f'),
+    ax.text(-1.93, -2.20, 'dashed: the Rayleigh aureole, cos^%.0f' % ATM.N_AURE,
             INK)
-    ax.text(-1.93, 4.2, '  = (E_n/4pi) x m x tau_R x 3/4, cos^2', MUTED)
-    ax.text(-1.93, -3.0, 'solid: the disc, cos^%.0f' % ATM.N_DISC, INK)
-    ax.text(-1.93, -3.4, 'dashed: the Rayleigh aureole, cos^%.0f' % ATM.N_AURE,
-            INK)
+    ax.text(-1.93, -2.60, 'amp L_aure = %s' % _trip(ATM.L_AURE, '%.4f'), MUTED)
+    ax.text(-1.93, -3.00, '  = (E_n/4pi) x m x tau_R x 3/4', MUTED)
+    ax.text(-1.93, -3.60, 'the disc is a POINT: below 1 deg it is already under '
+                          'the sky.', INK)
 
     disc_f = 2. * np.pi / (ATM.N_DISC + 1.) * ATM.L_SUN
     aure_f = 2. * np.pi / (ATM.N_AURE + 1.) * ATM.L_AURE
-    bx = P.Axes(img, (860, 72, 1220, 520), (-0.6, 2.6), (0, 31),
+    bx = P.Axes(img, (860, 72, 1220, 490), (-0.6, 2.6), (0, 40),
                 title='...and the flux each carries',
                 xlabel='band', ylabel='hemispherical flux, 2 pi/(n+1) x amp')
     bx.frame(None, _ticks(0, 30, 6), '%g', '%g')
     for c in range(3):
         _bar(bx, c - 0.17, 0., float(disc_f[c]), CH[c], 0.15)
         _bar(bx, c + 0.17, 0., float(aure_f[c]), FAINT, 0.15, outline=CH[c])
-        bx.text(c - 0.17, float(disc_f[c]) + 0.5, '%.2f' % disc_f[c], INK, 'ms')
-        bx.text(c + 0.17, float(aure_f[c]) + 0.5, '%.2f' % aure_f[c], INK, 'ms')
-        bx.text(c, -1.3, CHN[c], MUTED, 'ma')
-    bx.text(-0.55, 29.5, 'solid  disc = %s' % _trip(disc_f, '%.3f'), INK)
-    bx.text(-0.55, 28.0, 'hollow aureole = %s' % _trip(aure_f, '%.3f'), INK)
-    bx.text(-0.55, 26.5, 'and pi x SUN_COL = %s' % _trip(ATM.E_SUN, '%.3f'),
+        bx.text(c - 0.17, float(disc_f[c]) + 0.6, '%.2f' % disc_f[c], INK, 'ms')
+        bx.text(c + 0.17, float(aure_f[c]) + 0.6, '%.2f' % aure_f[c], INK, 'ms')
+        bx.text(c, -1.7, CHN[c], MUTED, 'ma')
+    bx.text(-0.55, 38.8, 'solid  disc = %s' % _trip(disc_f, '%.3f'), INK)
+    bx.text(-0.55, 36.8, 'hollow aureole = %s' % _trip(aure_f, '%.3f'), INK)
+    bx.text(-0.55, 34.8, 'and pi x SUN_COL = %s' % _trip(ATM.E_SUN, '%.3f'),
             WARN)
-    bx.text(-0.55, 25.0, 'the disc IS the beam, to 1e-9 relative.', WARN)
+    bx.text(-0.55, 32.8, 'the disc IS the beam, to 1e-9 relative.', WARN)
 
     P.caption(img, [
         'WHAT IS MEASURED. The angular structure of the environment this pool '
-        'is lit by, on log axes, because it spans nine decades: a disc of peak '
-        '%.3e and half-width %.3f deg sitting on a sky of about %.2f.'
+        'is lit by, on log axes because it spans nine decades: a disc of peak '
+        '%.3e and half-width %.3f deg, on a sky of about %.2f.'
         % (ATM.L_SUN[1], np.rad2deg(ATM.THETA_SUN), grad[1]),
-        'NOTHING IN EITHER LOBE IS FREE. The disc is fixed three ways at once '
-        '-- peak L = pi SUN_COL / Omega_sun, width n = 2/theta_s^2 - 1 = %.0f, '
-        'and therefore flux 2pi/(n+1) x L = pi SUN_COL exactly, which is the '
-        'guard this figure runs.' % ATM.N_DISC,
-        'The aureole is single-scattered Rayleigh at the air mass SUN_COL own '
+        'NOTHING IN EITHER LOBE IS FREE. The disc is fixed three ways at once: '
+        'peak L = pi SUN_COL / Omega_sun, width n = 2/theta_s^2 - 1 = %.0f,'
+        % ATM.N_DISC,
+        'and therefore flux 2pi/(n+1) x L = pi SUN_COL exactly -- which is the '
+        'guard this figure runs before drawing.',
+        "The aureole is single-scattered Rayleigh at the air mass SUN_COL's own "
         'colour is read out of (m = %.2f, tau_R = %s): amplitude (E_n/4pi) m '
-        'tau 3/4 and cos^2, the whole forward structure a clean atmosphere has.'
-        % (ATM.AIRMASS, _trip(ATM.TAU_R, '%.4f')),
-        'CORRECTED VALUES. All six lobe numbers were guesses: the disc lobe peak '
-        'was 1563x under the sun own radiance and 7.8x too wide, and the three '
-        'lobes together carried a 35th of the direct beam -- a broad dim smear '
-        'where the physics has a small blinding point.',
+        'tau 3/4, and cos^2.' % (ATM.AIRMASS, _trip(ATM.TAU_R, '%.4f')),
+        'That cos^2 IS the whole forward structure a clean atmosphere has -- '
+        'broad and faint, because a compact aureole is diffraction and '
+        'diffraction needs particles.',
+        'CORRECTED VALUES. All six lobe numbers were guesses: the disc peak was '
+        "1563x under the sun's own radiance and 7.8x too wide, and the three "
+        'lobes together carried a 35th of the direct beam.',
         'AND ONE DERIVED TO ZERO. There is no aerosol lobe, and that is a '
-        'result: SUN_COL colour is Rayleigh extinction alone, so the beam was '
-        'never dimmed by aerosol, and adding an aerosol aureole would create '
-        'that light twice.',
+        "result: SUN_COL's colour is Rayleigh extinction alone, so the beam was "
+        'never dimmed by aerosol, and an aerosol aureole would create that '
+        'light twice.',
         '`?` The horizon/zenith GRADIENT under the lobes (SKY_HOR, SKY_TOP, the '
-        '0.55 exponent) is hand-set and stays hand-set; atmosphere.py computes a '
-        'single-scattering LOWER bound beside it and names what is missing.',
-    ], 40, 760)
+        '0.55 exponent) is hand-set and stays hand-set; atmosphere.py computes '
+        'a single-scattering LOWER bound beside it and names what is missing.',
+    ], 40, 540)
     return P.save(img, path)
 
 
