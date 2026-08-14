@@ -372,9 +372,9 @@ def fig_interface(S, path):
     cx.text(float(np.cos(tc[1])) - 0.02, 1.36,
             'mu = cos(tc): everything LEFT of this is totally reflected',
             INK, 'rs')
-    cx.text(0.03, 0.55, 'green area = R_int = %.5f' % OPT.R_INT[1], INK)
-    cx.text(0.03, 0.47, 'pink area  = R_ext = %.5f' % OPT.R_EXT[1], INK)
-    cx.text(0.03, 0.39, 'the area under each curve IS that mean.', MUTED)
+    cx.text(0.03, 1.32, 'green area = R_int = %.5f' % OPT.R_INT[1], INK)
+    cx.text(0.03, 1.24, 'pink area  = R_ext = %.5f' % OPT.R_EXT[1], INK)
+    cx.text(0.03, 1.16, 'the area under each curve IS that mean.', MUTED)
 
     P.caption(img, [
         'WHAT IS MEASURED. One smooth water surface, asked the same question '
@@ -474,46 +474,46 @@ def fig_correlation(S, path):
     gap = OPT.slab_esc(dep) / (e3d * OPT.T_OUT_DIFFUSE) - 1.
     for c in range(3):
         cx.marker(dep, 100. * float(gap[c]), CH[c])
-    cx.text(dep + 0.08, 23.5, 'this pool: DEPTH = %.2f m' % dep, WARN)
-    cx.text(dep + 0.08, 21.0, '%s' % _pct(gap, '%.1f'), INK)
-    cx.text(dep + 0.08, 18.5, 'and optics.py says 19.4 / 5.1 / 1.1% -- agrees',
+    cx.text(1.95, 24.0, 'this pool: DEPTH = %.2f m' % dep, WARN)
+    cx.text(1.95, 21.5, '%s' % _pct(gap, '%.1f'), INK)
+    cx.text(1.95, 19.0, 'and optics.py says 19.4 / 5.1 / 1.1% -- agrees',
             MUTED)
 
-    ex = P.Axes(img, (740, 505, 1265, 800), (0, 4), (0, 90),
+    ex = P.Axes(img, (740, 505, 1265, 800), (0, 4), (0, 112),
                 title='ROUND TRIP: factorising OVERstates it',
                 xlabel='water column, m',
                 ylabel='(2E_3(2ad) x R_int) / slab_trap - 1,  %')
-    ex.frame(_ticks(0, 4, 4), _ticks(0, 90, 6), '%g', '%g')
+    ex.frame(_ticks(0, 4, 4), _ticks(0, 100, 5), '%g', '%g')
     for c in range(3):
         ex.line(dd, 100. * (trp_f[:, c] / trp_t[:, c] - 1.), CH[c], 3)
     ex.vline(dep, WARN, 2, dash=(6, 5))
     tgap = OPT._e3(2. * a * dep) * OPT.R_INT / OPT.slab_trap(dep) - 1.
     for c in range(3):
         ex.marker(dep, 100. * float(tgap[c]), CH[c])
-    ex.text(0.12, 84., 'this pool: %s' % _pct(tgap, '%.1f'), INK)
-    ex.text(0.12, 78., 'optics.py comment says "30% in red" -- it does not '
-                       'reproduce;', WARN)
-    ex.text(0.12, 72., 'at DEPTH the measured red figure is %.1f%%. Flagged, '
+    ex.text(0.12, 107., 'this pool: %s' % _pct(tgap, '%.1f'), INK)
+    ex.text(0.12, 100., 'optics.py comment says "30% in red" -- it does not '
+                        'reproduce;', WARN)
+    ex.text(0.12, 93., 'at DEPTH the measured red figure is %.1f%%. Flagged, '
                        'not silently redrawn.' % (100 * tgap[0]), WARN)
 
     P.caption(img, [
         'WHAT IS MEASURED. Whether the two things that happen to a photon on its '
         'way up out of the bed -- being absorbed, and getting through the surface '
         '-- can be multiplied. They cannot.',
-        'Both factors RISE with mu (top left), so they are positively correlated: '
-        'the product of the means understates the mean of the product by %s and '
-        'the round trip, correlated the other way, is OVERstated by %s.'
-        % (_pct(gap, '%.1f'), _pct(tgap, '%.1f')),
-        'This is the LUT trap and it is invisible as prose: a table of "mean '
-        'transmission" times a table of "mean escape" is a defensible-looking '
-        'pipeline that is a fifth wrong in red at this depth.',
+        'Both factors RISE with mu (top left), so they are positively '
+        'correlated: the product of the means UNDERstates the escape by %s...'
+        % _pct(gap, '%.1f'),
+        '...and the round trip, correlated the other way, is OVERstated by %s. '
+        'This is the LUT trap, and it is invisible as prose.'
+        % _pct(tgap, '%.1f'),
+        'A table of "mean transmission" times a table of "mean escape" is a '
+        'defensible-looking pipeline that is a fifth wrong in red at this depth.',
         'DERIVED: every curve is optics.slab_esc / slab_trap / _e3 / r_int_at, '
-        'Gauss-Legendre on the water-side cosine, guarded here against a 200k '
-        'midpoint rule to 2e-5 before drawing.',
+        'Gauss-Legendre on the water-side cosine, guarded here against the same '
+        'integrand split at the kink before drawing.',
         'FINDING: the escape gap reproduces optics.py own 19.4 / 5.1 / 1.1%% '
-        'exactly. The round-trip comment in the same block says 30%% in red; the '
-        'measurement at DEPTH is %.1f%% and no reading of the two integrals '
-        'gives 30.' % (100 * tgap[0]),
+        'exactly. The round-trip comment in the same block says 30%% in red; '
+        'the measurement at DEPTH is %.1f%%.' % (100 * tgap[0]),
     ], 40, 855)
     return P.save(img, path)
 
@@ -529,9 +529,9 @@ def fig_trap(S, path):
                     for r in rho])
     alb = np.array([OPT.rho_water(np.full(3, r), cs, dep) for r in rho])
 
-    img = P.canvas(1280, 1010)
+    img = P.canvas(1280, 1030)
     ax = P.Axes(img, (100, 72, 650, 450), (0, 1), (1.0, 2.1),
-                title='The trapped series: gain on the bed own light',
+                title="The trapped series: gain on the bed's own light",
                 xlabel='bed albedo rho_bed',
                 ylabel='trap_gain = 1 / (1 - rho G_rt)')
     ax.frame(_ticks(0, 1, 5), _ticks(1.0, 2.1, 5), '%.1f', '%.1f')
@@ -560,24 +560,25 @@ def fig_trap(S, path):
     bx.line(rho, rho, GREY, 1, dash=(5, 5))
     loss = OPT.rho_water(1.0, cs, dep, absorb=0.0)
     bx.marker(1.0, float(loss[1]), INK, 5)
-    bx.text(0.97, float(loss[1]) - 0.05,
-            'lossless white pool: rho_w = 1 - R(sun) = %.4f' % loss[1],
-            INK, 'rs')
-    bx.text(0.97, float(loss[1]) - 0.10,
-            '(energy conservation -- guarded to 1e-12)', MUTED, 'rs')
-    bx.text(0.04, 0.95, 'this liner: %s' % _trip(OPT.rho_water(rb, cs, dep),
+    bx.text(0.50, float(loss[1]) - 0.02,
+            'lossless white pool (dot): rho_w = 1 - R(sun) = %.4f' % loss[1],
+            INK)
+    bx.text(0.50, float(loss[1]) - 0.07,
+            'energy conservation -- guarded to 1e-12', MUTED)
+    bx.text(0.04, 0.97, 'this liner: %s' % _trip(OPT.rho_water(rb, cs, dep),
                                                  '%.4f'), INK)
-    bx.text(0.04, 0.90, 'a %.3f red bed reads %.4f -- the water takes 82%% of it'
+    bx.text(0.04, 0.92, 'a %.3f red bed reads %.4f: the water keeps 82%% of it'
             % (rb[0], OPT.rho_water(rb, cs, dep)[0]), MUTED)
+    bx.text(0.04, 0.87, 'grey 1:1 line = a dry bed, for scale', MUTED)
 
     dd = np.linspace(0., 4., 260)
     st = np.array([OPT.slab_trap(d) for d in dd])
-    cx = P.Axes(img, (100, 545, 1220, 830), (0, 4), (0, 0.52),
+    cx = P.Axes(img, (100, 545, 1220, 812), (0, 4), (0, 0.68),
                 title='The bound is the ZERO-DEPTH limit, and the pool is not '
                       'at zero depth',
                 xlabel='water column, m',
-                ylabel='G_rt = share returned to the bed in one round trip')
-    cx.frame(_ticks(0, 4, 4), _ticks(0, 0.5, 5), '%g', '%.2f')
+                ylabel='G_rt, share returned to the bed')
+    cx.frame(_ticks(0, 4, 4), _ticks(0, 0.6, 6), '%g', '%.2f')
     for c in range(3):
         cx.line(dd, st[:, c], CH[c], 3)
         cx.hline(float(OPT.R_INT[c]), CH[c], 1, dash=(5, 5))
@@ -585,41 +586,39 @@ def fig_trap(S, path):
     cx.vline(dep, WARN, 2, dash=(6, 5))
     amp_t = OPT.trap_gain(rb, dep) - 1.
     amp_b = 1. / (1. - rb * OPT.R_INT) - 1.
-    cx.text(dep + 0.08, 0.49, 'DEPTH = %.2f m: G_rt = %s'
-            % (dep, _trip(OPT.slab_trap(dep), '%.4f')), INK)
-    cx.text(dep + 0.08, 0.455, 'against the bound R_int = %s'
+    cx.text(0.10, 0.655, 'dashed: the bound R_int = %s -- the d -> 0 limit'
             % _trip(OPT.R_INT, '%.4f'), MUTED)
-    cx.text(dep + 0.08, 0.42,
+    cx.text(0.10, 0.620, 'solid: G_rt(d). At DEPTH = %.2f m it is %s'
+            % (dep, _trip(OPT.slab_trap(dep), '%.4f')), INK)
+    cx.text(0.10, 0.585,
             'so the AMPLIFICATION (gain - 1) at this liner is %s,'
             % _trip(amp_t, '%.4f'), INK)
-    cx.text(dep + 0.08, 0.385,
+    cx.text(0.10, 0.550,
             'and quoting the bound would give %s -- over by %s'
             % (_trip(amp_b, '%.4f'), _pct(amp_b / amp_t - 1., '%.0f')), WARN)
 
     P.caption(img, [
-        'WHAT IS MEASURED. How much brighter the bed is than its own first '
-        'bounce, because the underside of the surface sends light back down. '
-        'All three curves are optics.trap_gain / slab_trap / rho_water.',
+        "WHAT IS MEASURED. How much brighter the bed is than its own first "
+        "bounce, because the underside of the surface sends light back down.",
         'THE BOUND AND THE POOL ARE DIFFERENT NUMBERS. R_int = %s is the share '
-        'returned by the SURFACE; G_rt = %s is the share that gets back to the '
-        'BED, having crossed %.2f m of water twice.'
-        % (_trip(OPT.R_INT, '%.4f'), _trip(OPT.slab_trap(dep), '%.4f'),
-           2 * dep),
-        'At this liner the true amplification is %s. Quoting the diffuse-R_int '
-        'bound instead gives %s: over by %s. The error is worst exactly where '
-        'the water is most absorbing.'
+        'returned by the SURFACE.' % _trip(OPT.R_INT, '%.4f'),
+        'G_rt = %s is the share that gets back to the BED, having crossed %.2f '
+        'm of water on the way.'
+        % (_trip(OPT.slab_trap(dep), '%.4f'), 2 * dep),
+        'At this liner the true amplification is %s; the diffuse-R_int bound '
+        'gives %s instead -- over by %s, worst where the water absorbs most.'
         % (_trip(amp_t, '%.4f'), _trip(amp_b, '%.4f'),
            _pct(amp_b / amp_t - 1., '%.0f')),
-        'DOTTED, and it is what the shipped bedret pass actually carries: one '
-        'bounce, a perfect mirror over the cone and nothing inside it '
-        '(trap_gain(bounces=1, cone_only=True)) = %s. A truncated series with a '
-        'smaller ratio is a LOWER bound -- the render is dark, never bright.'
+        'DOTTED is what the shipped bedret pass carries: one bounce, a perfect '
+        'mirror over the cone and nothing inside it, = %s.'
         % _trip(OPT.trap_gain(rb, dep, bounces=1, cone_only=True), '%.4f'),
+        'A truncated series with a smaller ratio is a LOWER bound, so the '
+        'render is dark there and never bright -- the sign is what matters.',
         'CORRECTED VALUE. The chain rho_water is written in shipped once with a '
-        'round trip in the denominator and NO up leg in the numerator, which '
-        'overstates the answer by 1/T_up -- 85% in red -- and passes the '
-        'lossless-white limit anyway. That limit pins the shape, not the legs.',
-    ], 40, 855)
+        'round trip in the denominator and NO up leg in the numerator.',
+        'That overstates the answer by 1/T_up -- 85% in red -- and passes the '
+        'lossless-white limit anyway: that limit pins the shape, not the legs.',
+    ], 40, 862)
     return P.save(img, path)
 
 
@@ -645,9 +644,9 @@ def fig_window(S, path):
     ax.line([np.rad2deg(tw1), np.rad2deg(tw1)], [0, el1], WARN, 2, dash=(4, 4))
     ax.line([0, np.rad2deg(tw1)], [el1, el1], WARN, 2, dash=(4, 4))
     ax.marker(np.rad2deg(tw1), el1, WARN)
-    ax.text(2.5, el1 + 4.0,
+    ax.text(2.5, 22.0,
             'the OUTER 1.00 deg of the window holds', WARN)
-    ax.text(2.5, el1 - 0.5,
+    ax.text(2.5, 17.0,
             'every air direction below %.2f deg of elevation' % el1, WARN)
     ax.text(2.5, 86., 'rim is dispersive: %s deg'
             % _trip(np.rad2deg(tc), '%.3f'), INK)

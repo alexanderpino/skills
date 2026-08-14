@@ -2100,3 +2100,74 @@ the 2DH rip-feeder circulation, and section B stays parked.
   depression under the group, and this file's set-up/set-down, if any, is a
   separate statement in the transform. Named, not modelled.
 * **No foam.** Unchanged from wave 4 and still the suite's other OPEN row.
+
+## The suite
+
+**173 pass / 0 FAIL / 0 ERROR / 5 open / 59 info**, up from wave 4's 135 / 0 / 0
+/ 2. Thirty-eight new rows in one new section, `_sec_surface`. The pool:
+**285 pass / 0 FAIL / 54 info**, re-run and unchanged; `optics.py` and
+`atmosphere.py` imported and never copied; `render.py` and `validate.py`
+untouched.
+
+The three new OPEN rows are all *measured, understood, not achieved* and two of
+them will never close:
+
+| open row | why it is open |
+|---|---|
+| **bar section A is unreachable from a steady wave's height field** | 30° < 41.48°, and the 30° is Stokes' corner (N7). It is not going to close. |
+| **the steepest face this scene reaches, against 41.48°** | 15.78°, and now bounded above by 30° |
+| **`UR_HALF` derived and not adopted** | the whole cost table is in the row (N8) |
+
+### The six new deliberate defects, and every one fires
+
+| bug | what it puts back | rows | which |
+|---|---|---|---|
+| `sinusoidal-surface` | wave 4's surface — no second harmonic at all. **Draws a frame that has already shipped**, so nothing looks broken. | **6** | the absolute `b`; `r = 2Ur` and its residual; the clamp; the turning-point count |
+| `harmonic-shallow-everywhere` | `C = 3/(kd)³` at every depth. Every *shallow* row still passes, including `r = 2Ur`, which becomes exact. | **2** | the deep limit `C → 2`; the residual's size |
+| `unclamped-stokes` | second-order Stokes past its own validity limit — what a file that does not check the Ursell number does by default. `r` reaches 75. | **3** | the clamp; the turning-point count; the face slope |
+| `bore-phase-flipped` | `ψ = +(π/2)f_brk`. **The waves lean seaward.** Every moment, magnitude and colour measurement is unchanged, because `Sk² + As²` does not know the sign. | **3** | the sawtooth endpoint; which face is steep; the face slope |
+| `skew-without-asymmetry` | `ψ = 0` everywhere — the *tempting* version, "the skewness the file already had" taken literally. Buys ×1.299 instead of ×2.000. | **4** | the sawtooth endpoint; which face is steep; the turning-point count; the face slope |
+| `ur-half-declared` | wave 1's `UR_HALF = 1.0` back inside the derivation | **2** | `√2/6` absolute; the two routes' slope at the origin |
+
+### Four rows that failed on correct code, and one that raised
+
+**Recorded rather than quietly fixed**, because each is a way of writing a test
+that looks right and is not:
+
+1. **An asymptotic identity checked at one point.** `r = 2Ur` was given a
+   tolerance at `kd = 0.02` and no convergence rate — so any tolerance could have
+   been made to pass by choosing `kd`. It now checks two `kd` and asserts the
+   residual **quarters**, and the residual's own size turns out to be a closed
+   form: `C(kd)(kd)³ = 3 + 4(kd)² ⇒ r/Ur = 2(1 + (4/3)(kd)²)`, giving `5.333e−4`
+   against `5.334e−4` measured.
+2. **An extremum count on a non-periodic difference.** Counting sign changes of
+   a forward difference without wrapping loses the turning point straddling
+   `φ = 0` — which is *the crest* at `ψ = 0` — so the row read `[1, 3]` where the
+   truth is `[2, 4]` and **failed on correct code**.
+3. **Two routes compared at one small `Ur`**, where both carry their own `O(Ur)`
+   corrections. The row is now a Richardson extrapolation to the **slope at the
+   origin**, which is the claim; the single-sample version only said the
+   tolerance had been chosen to fit.
+4. **A steepest-face pair guessed rather than measured.** Now the suite bay's own
+   8.81°/16.49°, with the note that the render's finer bay reads 8.23°/15.78° and
+   that the gap between them is the grid.
+
+And **one row raised rather than failed**, found by firing
+`harmonic-shallow-everywhere` at it: that bug makes `r = 2Ur` *exact* at every
+`kd`, so both residuals are zero and the ratio row divided `0/0`. By this
+harness's own wave-3 doctrine an ERROR costs every row after it, so a deliberate
+bug would have been reported as catching one row when it catches two. Guarded —
+and paired with an **absolute** row on the residual's *size*, which is precisely
+what a ratio of two residuals cannot see. That is the third time in this project
+that a ratio-only guard has been blind to a factor, and the second time in two
+waves.
+
+### An optimisation that put a 2% error into an exactly known value
+
+`stokes2_crest_limit` bisects, and bisecting per cell was 7×10⁹ flops on one bay
+— it dominated the whole render. It is now a table. **The first table was uniform
+in `ψ` and reported `0.2548` where the closed form says `0.2500`**, because
+`r_max(ψ)` leaves `1/4` with *infinite slope*: `0.2524` at `ψ = −0.001`. The
+ladder is uniform in `√(−ψ)` and the interpolation error against a direct
+per-phase bisection is `7×10⁻⁷` — as a row, so the next optimisation has to keep
+it.
