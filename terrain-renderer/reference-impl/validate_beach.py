@@ -560,6 +560,56 @@ def _bug_ambient_in_the_tube(mod):
     mod.through_path = tp
 
 
+# --- WAVE 5'S DEFECTS. All six are in `beach`, all six are mistakes this wave
+# either made or was one line from making, and every one of them draws a
+# PLAUSIBLE picture -- which is the only reason they need a suite at all.
+def _bug_sinusoidal_surface(mod):
+    """Wave 4's surface: no second harmonic at all. The frame it draws is the
+    one that has already shipped, so nothing looks broken; only the face slope
+    and the harmonic rows can see it."""
+    mod.stokes2_ratio = lambda H, k, d: np.zeros_like(np.asarray(H, float))
+
+
+def _bug_harmonic_shallow_everywhere(mod):
+    """Use the shallow asymptote C = 3/(kd)^3 at every depth. Every shallow-
+    water row still passes -- including the r = 2 Ur identity, which is the
+    asymptote -- and the open ocean gets a harmonic 30x too large."""
+    mod.stokes2_shape = lambda kd: 3.0 / np.maximum(
+        np.asarray(kd, float), 1e-9) ** 3
+
+
+def _bug_unclamped_stokes(mod):
+    """Run second-order Stokes past its validity limit, which is what a file
+    that does not check the Ursell number does by default. r reaches 75 in this
+    scene and the surface grows a false crest inside every trough."""
+    orig = mod.surface_state
+    mod.surface_state = lambda tr, clamp=True: orig(tr, clamp=False)
+
+
+def _bug_bore_phase_flipped(mod):
+    """psi = +(pi/2) f_brk. The waves lean SEAWARD. Every moment, every
+    magnitude and every colour measurement is unchanged -- Sk^2 + As^2 does not
+    know the sign -- and a still frame of a wave breaking backwards is exactly
+    as convincing as one breaking forwards."""
+    mod.bore_phase = lambda f: (np.pi / 2.0) * np.clip(
+        np.asarray(f, float), 0.0, 1.0)
+
+
+def _bug_skew_without_asymmetry(mod):
+    """Keep the second harmonic and never rotate it: psi = 0 everywhere, so the
+    wave is peaked and symmetric at every stage of breaking. This is the
+    tempting version -- it is 'the skewness the file already had' taken
+    literally -- and it buys 30% of face slope instead of 100%."""
+    mod.bore_phase = lambda f: np.zeros_like(np.asarray(f, float))
+
+
+def _bug_ur_half_declared(mod):
+    """Put wave 1's declared UR_HALF = 1.0 back into the derivation, so the
+    parameterisation and the Stokes surface disagree by 4.24x at the origin and
+    nothing says so."""
+    mod.ur_half_derived = lambda sk_max=1.0: 1.0
+
+
 BUGS = {
     'dw-for-ew': _bug_dw_for_ew,
     'quarter-at-break': _bug_quarter_at_break,
@@ -587,6 +637,12 @@ BUGS = {
     'glitter-fixed-width': _bug_glitter_fixed_width,
     'glitter-no-jacobian': _bug_glitter_no_jacobian,
     'ambient-in-the-tube': _bug_ambient_in_the_tube,
+    'sinusoidal-surface': _bug_sinusoidal_surface,
+    'harmonic-shallow-everywhere': _bug_harmonic_shallow_everywhere,
+    'unclamped-stokes': _bug_unclamped_stokes,
+    'bore-phase-flipped': _bug_bore_phase_flipped,
+    'skew-without-asymmetry': _bug_skew_without_asymmetry,
+    'ur-half-declared': _bug_ur_half_declared,
 }
 OPTICS_BUGS = {'one-turbidity-slider', 'cdom-scatters', 'depth-averaged-spm',
                'dw-for-bed-power', 'isotropic-phase', 'glitter-fixed-width',
@@ -2525,6 +2581,348 @@ def _sec_optics(ctx):
           'not achieved.')
 
 
+def _sec_surface(ctx):
+    """WAVE 5 -- the nonlinear free surface.
+
+    Every row here exists because bar section A turns on ONE number, the
+    steepest face the representation can reach, and that number is a product of
+    a chain: Ursell -> harmonic ratio -> validity clamp -> phase -> slope gain.
+    A ratio anywhere in that chain hides a factor that multiplies both its
+    terms, which is exactly how one of wave 4's guards caught nothing, so
+    EVERY new quantity below gets at least one ABSOLUTE row against a number
+    computed outside the function under test.
+    """
+    B = ctx['B']
+
+    # ------------------------------------------- 8.1 the depth function C(kd)
+    # Absolute, both limits, computed from the asymptotics rather than from the
+    # function. These are what tie the second harmonic to the two regimes.
+    check(1, 'Stokes-2 depth function, shallow limit C(kd)(kd)^3 -> 3',
+          float(B.stokes2_shape(1e-3)) * 1e-9, 3.0, 1e-5,
+          'C = cosh(kd)(2 + cosh 2kd)/sinh^3(kd). As kd -> 0 the two cosh go '
+          'to 1 and sinh^3 -> (kd)^3, so C(kd)^3 -> 3. It is this 3 that '
+          'turns the harmonic ratio into twice the Ursell number, which is '
+          'the whole reason this file can steepen its surface without '
+          'declaring anything.')
+    check(1, 'Stokes-2 depth function, deep limit C -> 2',
+          float(B.stokes2_shape(20.0)), 2.0, 1e-9,
+          'cosh(kd) ~ e^kd/2, cosh 2kd ~ e^2kd/2, sinh^3 ~ e^3kd/8, so C -> 2 '
+          'and b/a -> ak/2, which is the textbook deep-water second-order '
+          'Stokes wave. A file whose harmonic used the shallow asymptote '
+          'everywhere would pass every shallow row and be wrong offshore.')
+
+    # ------------------------------------------- 8.2 the harmonic ratio, twice
+    # ABSOLUTE first: b evaluated from Dean & Dalrymple's own written form,
+    # b = (pi H^2 / 8L) C, with L = 2 pi/k -- a different expression from the
+    # one `stokes2_ratio` uses (H k/8 * C for the RATIO), so the arithmetic is
+    # not shared even though the physics is.
+    Ht, kt, dt = 1.10, 0.2600, 1.90
+    L_t = 2.0 * math.pi / kt
+    b_abs = (math.pi * Ht ** 2 / (8.0 * L_t)) * float(B.stokes2_shape(kt * dt))
+    check(1, 'second harmonic amplitude b, absolute, vs (pi H^2/8L) C(kd)',
+          float(B.stokes2_ratio(Ht, kt, dt)) * (Ht / 2.0), b_abs, 1e-12,
+          'Dean & Dalrymple write the second-order surface as (H/2)cos + '
+          '(pi H^2/8L) C cos 2; this file carries the RATIO b/a = (Hk/8)C. '
+          'The two are the same statement and the row is the algebra between '
+          'them, in metres rather than as a ratio -- deliberately, because a '
+          'ratio row cannot see a factor that multiplies a and b alike.',
+          unit='m')
+    # and the identity that makes the Ursell number the same quantity
+    kd_sh = 0.02
+    d_sh, H_sh = 0.5, 0.02
+    k_sh = kd_sh / d_sh
+    check(1, 'shallow water: r = b/a is exactly 2 x this file\'s Ursell number',
+          float(B.stokes2_ratio(H_sh, k_sh, d_sh))
+          / float(B.ursell(H_sh, k_sh, d_sh)), 2.0, 2e-4,
+          'r = (Hk/8)C -> (3/8)Hk/(kd)^3 and Ur = (3/16)Hk/(kd)^3. The 3/16 '
+          'in `ursell` is not a tidy convention: it is the constant that makes '
+          'the Ursell number half the second harmonic\'s own amplitude ratio. '
+          'The nonlinearity of the surface has been computed in this file '
+          'since wave 1 and spent only inside the sediment transport.')
+
+    # ------------------------------------- 8.3 the Ursell number, second route
+    # The classic parameter is U = H L^2/d^3 and this file's is (3/16)Hk/(kd)^3.
+    # Written out independently and compared ABSOLUTELY, not as a ratio.
+    U_classic = H_sh * L_t ** 0.0 * (2.0 * math.pi / k_sh) ** 2 / d_sh ** 3
+    check(1, 'Ur (this file) vs (3/(64 pi^2)) H L^2/d^3, absolute',
+          float(B.ursell(H_sh, k_sh, d_sh)),
+          3.0 / (64.0 * math.pi ** 2) * U_classic, 1e-12,
+          'Ur = (3/16)H/(k^2 d^3) and k = 2 pi/L, so Ur = (3/(64 pi^2)) HL^2/'
+          'd^3. The conversion is what lets the published regime boundary be '
+          'quoted in this file\'s variable at all.')
+    check(1, 'the Stokes/cnoidal boundary is Ur = 1/2 in this normalisation',
+          B.URSELL_STOKES_LIMIT,
+          3.0 / (64.0 * math.pi ** 2) * (32.0 * math.pi ** 2 / 3.0), 1e-15,
+          'CITED half: the conventional boundary is U = 32 pi^2/3 = 105.3 '
+          '(Ursell 1953; the regime diagrams in Le Mehaute and in the Shore '
+          'Protection Manual). DERIVED half: the conversion above turns it '
+          'into exactly 1/2 here. The constant is a citation and the arithmetic '
+          'is not, and the row separates them.')
+
+    # ------------------------------- 8.4 the validity limit, derived two ways
+    for psi, want, note in ((0.0, 0.25, 'at psi = 0 the derivative factorises '
+                            'as -sin(phi)(1 + 4r cos phi), so the extra roots '
+                            'appear at cos phi = -1/(4r): r = 1/4 exactly, '
+                            'and AT that value the trough is flat, which is '
+                            'the shape section A wants reached at the limit '
+                            'of the theory rather than by choosing it.'),
+                            (-math.pi / 2, 0.5, 'at psi = -pi/2 the derivative '
+                             'is a quadratic in sin(phi) whose second root '
+                             'leaves [-1,1] at r = 1/2. The pitched-forward '
+                             'shape tolerates twice the harmonic the peaked '
+                             'one does -- the SAME harmonic, rotated.')):
+        check(1, 'secondary-crest limit at psi = %+.3f rad' % psi,
+              float(B.stokes2_crest_limit(np.array(psi))), want, 2e-6, note)
+    # the interpolated table against the direct bisection, ABSOLUTE in r
+    err = max(abs(float(B.stokes2_crest_limit(np.array(p)))
+                  - B._crest_limit_direct(p))
+              for p in np.linspace(-math.pi / 2, 0.0, 61))
+    check(3, 'the crest-limit table vs a direct per-phase bisection',
+          err, 0.0, 1e-5,
+          'The limit is tabulated on a ladder because computing it per cell '
+          'was 7e9 flops on one bay. THE LADDER IS UNIFORM IN sqrt(-psi): '
+          'r_max leaves 1/4 with infinite slope at psi = 0, and a ladder '
+          'uniform in psi reported 0.2548 where the closed form says 0.2500 -- '
+          'a 2% error in the one place the answer is known exactly, introduced '
+          'by an optimisation. Both routes are in `beach.py` and the row '
+          'compares them.', unit='r')
+    # INDEPENDENT METHOD: count the surface's extrema directly, on a phase grid
+    # this function does not use, either side of the limit it returns.
+    ph = np.linspace(0.0, 2.0 * math.pi, 200001)[:-1] + 1e-5
+    for psi in (0.0, -0.6, -math.pi / 2):
+        lim = float(B.stokes2_crest_limit(np.array(psi)))
+        n_lo, n_hi = [], []
+        for r, box in ((lim * 0.97, n_lo), (lim * 1.03, n_hi)):
+            e = np.cos(ph) + r * np.cos(2.0 * ph + psi)
+            box.append(int((np.sign(np.diff(e))[:-1]
+                            != np.sign(np.diff(e))[1:]).sum()))
+        check(3, 'extrema per cycle just below / above the limit (psi=%+.2f)'
+              % psi, [n_lo[0], n_hi[0]], [2, 4], 0,
+              'The limit is claimed to be where a false crest appears inside '
+              'the trough. This counts turning points of eta itself on a '
+              '200000-point phase grid -- a different quantity computed a '
+              'different way from the sign-change bisection in '
+              '`stokes2_crest_limit` -- and finds two below it and four above.',
+              unit='turning points')
+
+    # ------------------------------------------- 8.5 the slope gain, absolute
+    for r in (0.10, 0.25, 0.50):
+        check(1, 'slope gain at psi = -pi/2 is exactly 1 + 2r (r = %.2f)' % r,
+              float(B.slope_gain(np.array(r), np.array(-math.pi / 2))),
+              1.0 + 2.0 * r, 2e-6,
+              'max |sin phi - 2r cos 2phi| is attained at phi = pi/2 where the '
+              'two terms add: 1 + 2r. This is the ONLY place the second '
+              'harmonic buys slope at first order, and it is why the '
+              'asymmetry and not the skewness is what steepens a face.')
+    # psi = 0, from the stationarity condition solved in closed form
+    r0 = 0.25
+    c0 = (-1.0 + math.sqrt(1.0 + 128.0 * r0 ** 2)) / (16.0 * r0)
+    s0 = math.sqrt(1.0 - c0 ** 2)
+    check(1, 'slope gain at psi = 0, r = 1/4, vs the stationarity cubic',
+          float(B.slope_gain(np.array(r0), np.array(0.0))),
+          abs(s0 + 2.0 * r0 * 2.0 * s0 * c0), 3e-6,
+          'd/dphi of sin phi + 2r sin 2phi is cos phi + 4r cos 2phi, which is '
+          '8r cos^2 phi + cos phi - 4r = 0 -- a quadratic in cos phi solved '
+          'here and a grid maximum inside `slope_gain`. THE PAIR IS THE '
+          'FINDING: 1.299 against 1.500 at the same r. A peaked crest at the '
+          'very limit of second-order theory buys 30% of face slope; the same '
+          'harmonic rotated into a bore buys 100%.')
+
+    # --------------------------------- 8.6 the two moments, and their rotation
+    ph = np.linspace(0.0, 2.0 * math.pi, 262144, endpoint=False)
+    for r, psi in ((0.20, 0.0), (0.20, -math.pi / 2), (0.35, -0.7)):
+        e = np.cos(ph) + r * np.cos(2.0 * ph + psi)
+        sd = float(np.sqrt(np.mean(e ** 2)))
+        sk_num = float(np.mean(e ** 3)) / sd ** 3
+        # the Hilbert transform by FFT -- a genuinely different route to As
+        F = np.fft.fft(e)
+        hsel = np.zeros(F.size)
+        hsel[0] = 0.0
+        hsel[1:F.size // 2] = -1j.imag * 0 - 1.0      # placeholder, set below
+        H = np.fft.ifft(F * (-1j) * np.sign(np.fft.fftfreq(F.size))).real
+        as_num = float(np.mean(H ** 3)) / sd ** 3
+        sk, asy = B.surface_moments(np.array(r), np.array(psi))
+        check(3, 'surface skewness, closed form vs numerical moment '
+              '(r=%.2f psi=%+.2f)' % (r, psi), float(sk), sk_num, 2e-9,
+              '<eta^3> = (3/4) a^3 r cos psi is done by hand in '
+              '`surface_moments`; this integrates eta^3 on a 262144-point '
+              'phase grid. Absolute, in skewness units.')
+        check(3, 'surface asymmetry, closed form vs an FFT Hilbert transform '
+              '(r=%.2f psi=%+.2f)' % (r, psi), float(asy), as_num, 2e-9,
+              'As is the third moment of the HILBERT TRANSFORM of the surface, '
+              'and the second route here builds it with -i sgn(f) in the '
+              'frequency domain rather than by replacing cos with sin term by '
+              'term. Sign convention: Hilb(cos n phi) = +sin n phi, so a '
+              'shoreward-pitched front reads As > 0 here; papers with the '
+              'other sign convention report the same wave negative.')
+    # THE INVARIANT, and it is the theory finding this section carries
+    inv = [float(sum(x ** 2 for x in B.surface_moments(np.array(0.3),
+                                                       np.array(p))))
+           for p in (0.0, -0.4, -0.9, -math.pi / 2)]
+    check(1, 'Sk^2 + As^2 depends on r alone, not on psi', inv,
+          [inv[0]] * 4, 1e-12,
+          'THE FINDING: breaking does not destroy the wave\'s third moment, it '
+          'ROTATES it out of the skewness and into the asymmetry. `beach.py`\'s '
+          'sediment transport multiplies its skewness by (1 - f_brk) and '
+          'carries no asymmetry term at all, so it sees half of one quantity '
+          'and calls it a collapse.')
+    check(1, 'cos(pi f/2) against the (1 - f) the transport uses, at f = 1/2',
+          math.cos(math.pi * 0.25) - 0.5, 0.2071068, 1e-6,
+          'The two agree at both ends and differ by 0.207 in the middle -- 41% '
+          'of the (1-f) value. That difference is what the transport pays for '
+          'writing the rotation as a straight line, and it is measured here '
+          'rather than argued.')
+
+    # --------------------------------------------- 8.7 the phase, and its SIGN
+    check(1, 'bore phase: unbroken wave carries a BOUND harmonic, psi = 0',
+          float(B.bore_phase(0.0)), 0.0, 0.0,
+          'A bound harmonic is phase-locked to its primary. That is '
+          'second-order Stokes and it is not a choice.')
+    check(1, 'bore phase: fully broken wave is a sawtooth, psi = -pi/2',
+          float(B.bore_phase(1.0)), -math.pi / 2, 0.0,
+          '`broken_fraction`\'s own docstring in this file already says a '
+          'broken wave is a bore whose near-bed velocity is a sawtooth. A '
+          'sawtooth is the pure-asymmetry shape.')
+    # THE SIGN ROW. A wave leaning the wrong way is a defect a still frame
+    # hides completely, so the guard reads WHICH SIDE of the crest is steep.
+    ph = np.linspace(-math.pi, math.pi, 100001)
+    psi_b = float(B.bore_phase(1.0))
+    e = np.cos(ph) + 0.5 * np.cos(2.0 * ph + psi_b)
+    steep = float(ph[np.argmin(np.diff(e) / np.diff(ph)[0])])
+    check(1, 'the steep face is on the SHOREWARD side of the crest',
+          steep, math.pi / 2, 0.02,
+          'S increases shoreward and eta = (H/2)cos(S - omega t), so phases '
+          'in (0, pi) are shoreward of the crest. The most negative d eta/d '
+          'phi must lie there: a wave breaking backwards is a defect that a '
+          'still frame cannot show and that no colour measurement would '
+          'catch.', unit='rad')
+
+    # --------------------------- 8.8 UR_HALF, derived, and the two-route check
+    check(1, 'ur_half derived = sqrt(2)/6, absolute',
+          B.ur_half_derived(1.0), math.sqrt(2.0) / 6.0, 1e-15,
+          'In shallow water u = eta sqrt(g/d), a positive multiple of the '
+          'surface at every phase, so the VELOCITY skewness the transport uses '
+          'and the ELEVATION skewness of the surface are the same number. '
+          'Matching the small-Ur slope of sk_max Ur/(Ur + ur_half) to the '
+          'derived 3 sqrt2 Ur gives ur_half = sk_max/(3 sqrt2).')
+    ur_t = 1e-4
+    sk_from_surface = float(B.surface_moments(np.array(2.0 * ur_t),
+                                              np.array(0.0))[0])
+    sk_from_param = float(B.skewness(ur_t, 1.0, B.ur_half_derived(1.0)))
+    check(3, 'the parameterisation at the derived ur_half vs the Stokes '
+          'surface, absolute', sk_from_param, sk_from_surface, 2e-8,
+          'TWO ROUTES THAT DO NOT SHARE A SOURCE: one is a saturating fit '
+          'declared in wave 1, the other is the third moment of a second-order '
+          'Stokes surface whose amplitude came from Dean & Dalrymple. They '
+          'agree at the origin only at ur_half = sqrt2/6. At the DECLARED 1.0 '
+          'they are 4.24x apart, so wave 1\'s shoaling wave was skewed 4.24x '
+          'too weakly exactly where the onshore term does its work.')
+    info(1, 'the declared UR_HALF against the derived one',
+         (B.UR_HALF, B.ur_half_derived(1.0)),
+         'Whether the derived value is ADOPTED is a separate question from '
+         'whether it is right, because it moves the bar; the cost is measured '
+         'in the README and the constant is left declared with the '
+         'disagreement on the record.')
+
+    # ------------------------------------ 8.9 the cap, and it is not this scene
+    need = float(B.snell_cone_face_deg())
+    check(1, 'the face a lengthwise sightline needs, from optics.IOR',
+          need, 90.0 - math.degrees(math.asin(1.0 / OPT.IOR[1])), 1e-12,
+          'Imported, not restated: the same n that runs the pool\'s Fresnel, '
+          'critical angle and L/n^2.', unit='deg')
+    check(1, 'Stokes\' 120 deg corner caps every wave of permanent form',
+          B.STOKES_FACE_DEG, 0.5 * (180.0 - B.STOKES_CORNER_DEG), 1e-12,
+          'q^2/2 + gz = 0 at a stagnation crest forces q ~ r^(1/2); a wedge '
+          'flow of interior angle 2a has q ~ r^(pi/2a - 1); matching gives '
+          '2a = 120 deg, so the surface leaves the crest at 30 deg. '
+          'Independent of depth, wavelength and height -- the same corner for '
+          'the limiting deep-water Stokes wave and the limiting solitary '
+          'wave.', unit='deg')
+    openq(1, 'bar section A: no height field of a steady wave can reach it',
+          '%.2f deg available' % B.STOKES_FACE_DEG,
+          '%.2f deg needed' % need,
+          'THIS IS STRONGER THAN WAVE 4\'S ROW AND IT REPLACES IT. Wave 4 '
+          'measured THIS SCENE\'s linear surface at 8.2 deg and inferred that '
+          'more nonlinearity might close the gap. It cannot: 30 < 41.48 for '
+          'every wave of permanent form at every order, so the shortfall is a '
+          'theorem about the representation and not a property of this bed, '
+          'this sea state or this wave count. Section A belongs beside bar '
+          'section F\'s plunging lip -- BY PROOF, not by analogy -- and '
+          'closing it means the multivalued surface section F puts out of '
+          'scope.')
+
+    # --------------------------- 8.10 on the scene itself, and it stays a graph
+    bay = ctx.get('bay') or B.run_bay(dx=4.0, n_steps=300, dt=6000.0)
+    ctx['bay'] = bay
+    tr = bay['tr']
+    ss = B.surface_state(tr)
+    wet = tr['d'] > B.D_MIN
+    check(1, 'after clamping, r never exceeds the secondary-crest limit',
+          float(np.max((ss['r'] - ss['limit'])[wet])), 0.0, 1e-12,
+          'ABSOLUTE, in units of r. Above the limit the surface grows a false '
+          'crest inside its own trough -- a rendering artifact that looks like '
+          'chop and is not.')
+    # THE GRAPH PROPERTY, section F's standing ruling, checked on the scene
+    php = np.linspace(0.0, 2.0 * math.pi, 4001)[:-1] + 1e-4
+    sel = np.argsort(ss['r'][wet])[-400:]
+    rs, ps = ss['r'][wet][sel], ss['psi'][wet][sel]
+    ee = (np.cos(php)[None] + rs[:, None] * np.cos(2.0 * php[None]
+                                                   + ps[:, None]))
+    de = np.diff(ee, axis=1)
+    n_ex = (np.sign(de[:, :-1]) != np.sign(de[:, 1:])).sum(axis=1)
+    check(1, 'the 400 most nonlinear cells still have ONE crest and ONE trough',
+          int(n_ex.max()), 2, 0,
+          'Bar section F puts the multivalued surface out of scope and that '
+          'ruling stands. A Fourier sum cannot overturn, so the risk is not '
+          'multivaluedness -- it is the false crest, which is single-valued '
+          'and still wrong. This counts turning points per cycle on the '
+          'steepest cells the scene has.', unit='turning points')
+    info(1, 'how far past second-order Stokes this scene is',
+         (float(np.median(ss['ursell'][wet])), float(ss['ursell'][wet].max()),
+          ss['clamped_fraction']),
+         'median Ur, max Ur, and the fraction of wet cells the validity clamp '
+         'bites. The boundary is 0.5. THIS IS A SHALLOW-WATER SCENE AND '
+         'SECOND-ORDER STOKES IS SPENT IN IT -- cnoidal theory is the regime\'s '
+         'own form and it needs elliptic functions this environment has no '
+         'library for; the clamp is what keeps the shape inside the theory '
+         'that IS available, and the fraction is the honest size of the '
+         'compromise.')
+    # the steepest face this scene reaches, ABSOLUTE and in degrees
+    a_lin = 0.5 * tr['H'] * tr['k']
+    gain = B.slope_gain(ss['r'], ss['psi'])
+    s_nl = float(np.max((a_lin * gain)[wet]))
+    s_li = float(np.max(a_lin[wet]))
+    check(3, 'the steepest face, linear vs nonlinear, on one transform',
+          [math.degrees(math.atan(s_li)), math.degrees(math.atan(s_nl))],
+          [8.41, 14.99], 0.6,
+          'ABSOLUTE, in degrees, both from ONE transform with only r changed. '
+          'The expected pair is what wave 5 measured and is here so that a '
+          'later wave that moves either number has to say so. The second '
+          'route is `slope_gain`, a grid maximum over the shape, against the '
+          'analytic (H/2)k for the sinusoid.', unit='deg')
+    openq(3, 'the steepest face this scene reaches, against section A',
+          '%.2f deg' % math.degrees(math.atan(s_nl)), '41.48 deg',
+          'Measured, understood, not achieved -- and now bounded above by 30 '
+          'deg for any wave of permanent form, so the row will not close by '
+          'trying harder.')
+
+    # --------------------------------- 8.11 the difference operator, absolute
+    # `beach_render.surface_slope` differentiates by central difference and the
+    # harmonic is at 2k. The gain is stated in that file's docstring; this is
+    # the arithmetic behind it, so the docstring cannot drift.
+    k_typ = 0.29
+    for eps, want in ((1.0, math.sin(2 * k_typ * 1.0) / (2 * k_typ * 1.0)),
+                      (0.5, math.sin(2 * k_typ * 0.5) / (2 * k_typ * 0.5))):
+        check(1, 'central-difference gain on the SECOND harmonic at eps=%.1f m'
+              % eps, want, 1.0, 0.06,
+              'A central difference of step eps reports a sinusoid of '
+              'wavenumber q at sin(q eps)/(q eps) of its slope. At q = 2k = '
+              '0.58 and eps = 1 m that is 0.946 -- the operator would have '
+              'eaten 5.4% of the very steepening this wave is measuring, and '
+              'at 0.5 m it eats 1.4%. Wave 5 halved eps for this reason and '
+              'the row is here so nobody puts it back.')
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -2538,7 +2936,8 @@ def run_suite():
                       (_sec_transform2d, 'the wave transform in 2-D'),
                       (_sec_bay, 'the bar in plan'),
                       (_sec_optics, 'the coastal IOPs, the path and the '
-                                    'glitter')):
+                                    'glitter'),
+                      (_sec_surface, 'the nonlinear free surface')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 

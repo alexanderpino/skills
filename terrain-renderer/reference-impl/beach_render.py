@@ -162,6 +162,17 @@ class Water:
         # here. The absorption used for the ladder is the CLEAR water's: the
         # bed's own light is the one term the suspension layer hides rather than
         # colours, and the layer's opacity is already carried by `t_col`.
+        # --- WAVE 5: the surface is no longer a sinusoid. `beach.surface_state`
+        # returns the bound second harmonic's amplitude ratio r and its phase
+        # psi from THIS transform and no other -- the mixed-field trap in the
+        # place it would be most expensive, because a surface steep in the wrong
+        # cells is a defect no still frame reports.
+        ss = B.surface_state(tr)
+        self.r2, self.psi2 = ss['r'], ss['psi']
+        self.r2_raw, self.r2_lim = ss['r_raw'], ss['limit']
+        self.r2_clamped = ss['clamped_fraction']
+        self.Ur = ss['ursell']
+
         self.dep_lut = np.geomspace(0.05, 20.0, 48)
         self.rho_lut = np.stack([
             OPT.rho_water(SAND_WET, math.sin(math.radians(SUN_EL)), float(dd),
@@ -208,26 +219,55 @@ class Water:
 # already an input to this scene, and this is the same input drawn rather than
 # assumed. The two fields are blended over the last 60 m of the domain so the
 # seam does not draw a line at 1 km.
+#
+# WAVE 5 REPLACES THE SINUSOID, and the replacement carries no new constant.
+# The surface is second-order Stokes,
+#
+#       eta = (H/2) [ cos(phi) + r cos(2 phi + psi) ],   phi = S - omega t
+#
+# with r = beach.stokes2_ratio(H, k, d) -- which is 2*Ur in shallow water, the
+# file's OWN Ursell number -- and psi = -(pi/2) f_brk rotating the same harmonic
+# from a peaked crest to a pitched-forward bore. r is clamped at the validity
+# limit `beach.stokes2_crest_limit(psi)`, above which the shape grows a false
+# crest inside its own trough; how much of this scene the clamp bites is
+# reported by `surface_report` rather than hidden, and it is most of it.
 _K0 = (2.0 * math.pi / B.T_SWELL) ** 2 / B.G
 _TH0 = B.THETA0_SWELL
+# The open ocean beyond the domain is the SAME theory at the same order, and
+# there it is nearly nothing: deep water gives C -> 2 and r -> a k0/2, which at
+# this swell is under two per cent. Written out rather than set to zero, so the
+# offshore boundary is the same physics as the inshore one and the seam has
+# nothing to hide.
+_R0 = 0.5 * B.H0_SWELL * _K0 / 2.0
 
 
 def free_surface(w, xw, yw, t=0.0):
     H = w.sample(xw, yw, w.H)
     S = w.sample(xw, yw, w.S)
+    r = w.sample(xw, yw, w.r2)
+    psi = w.sample(xw, yw, w.psi2)
     om = 2.0 * math.pi / B.T_SWELL
-    eta = 0.5 * H * np.cos(S - om * t)
-    far = 0.5 * B.H0_SWELL * np.cos(
-        _K0 * (xw * math.cos(_TH0) + yw * math.sin(_TH0)) - om * t)
+    ph = S - om * t
+    eta = 0.5 * H * (np.cos(ph) + r * np.cos(2.0 * ph + psi))
+    ph0 = _K0 * (xw * math.cos(_TH0) + yw * math.sin(_TH0)) - om * t
+    far = 0.5 * B.H0_SWELL * (np.cos(ph0) + _R0 * np.cos(2.0 * ph0))
     f = np.clip((w.x[0] + 60.0 - xw) / 60.0, 0.0, 1.0)
     return eta * (1.0 - f) + far * f
 
 
-def surface_slope(w, xw, yw, t=0.0, eps=1.0):
-    """The RESOLVED slope of the free surface, by central difference at the
-    grid's own scale. `eps` is one metre: finer than the 2 m cross-shore cell
-    and far finer than the 30-90 m wavelengths, so this differentiates the
-    interpolant rather than the noise."""
+def surface_slope(w, xw, yw, t=0.0, eps=0.5):
+    """The RESOLVED slope of the free surface, by central difference.
+
+    `eps` WAS ONE METRE AND WAVE 5 HALVED IT, for a reason that is arithmetic
+    rather than taste. A central difference of step eps reports a sinusoid of
+    wavenumber q at sin(q eps)/(q eps) of its true slope. Waves 1-4 carried only
+    the primary, q = k <= 0.29 here, and lost 1.4% at eps = 1 m. The bound
+    second harmonic is at 2k, and at eps = 1 m it loses 5.4% -- the difference
+    operator would have quietly eaten a third of the steepening this wave is
+    measuring. At eps = 0.5 m the primary loses 0.35% and the harmonic 1.4%,
+    and both are inside every tolerance that reads this. The suite carries the
+    gain factor as a row rather than this comment carrying it as a claim.
+    """
     e = eps
     zx = (free_surface(w, xw + e, yw, t) - free_surface(w, xw - e, yw, t)) / (2 * e)
     zy = (free_surface(w, xw, yw + e, t) - free_surface(w, xw, yw - e, t)) / (2 * e)
@@ -574,6 +614,78 @@ CAP_CUV = (
 )
 
 
+# --- wave 5's captions carry their own measurements, computed at write time --
+# A CAPTION WITH A NUMBER TYPED INTO IT GOES STALE THE FIRST TIME THE RUN MOVES.
+# Wave 4's captions carry literals and two of them are already wrong by this
+# wave (8.21 deg, 0.1443). These are formatted from the run that drew the frame.
+def _cap_bay5(s):
+    return (
+        's5  THE BAY FROM THE CLIFF EDGE, NONLINEAR SURFACE -- the pair to '
+        's4-bay-render.png, which is the same camera, the same bed, the same '
+        'optics and the SAME SUN with a sinusoidal surface. One field changed: '
+        'the free surface is now second-order Stokes, eta = (H/2)[cos(phi) + '
+        'r cos(2 phi + psi)].',
+        'NOTHING IS AUTHORED AND NOTHING NEW IS DECLARED. r = (Hk/8) C(kd) is '
+        'the bound second harmonic of the transform\'s own H, k and d, and in '
+        'shallow water it is exactly 2x the Ursell number beach.py has computed '
+        'since wave 1 and spent only on the sediment. psi = -(pi/2) f_brk '
+        'rotates that same harmonic from a peaked crest to a pitched-forward '
+        'bore, using the breaking fraction the transform already carries. '
+        'THE STEEPEST FACE WENT FROM %.2f TO %.2f DEGREES (x%.2f). It does NOT '
+        'reach the %.2f deg a lengthwise in-water sightline needs, and it '
+        'cannot: Stokes\' 120 deg corner caps ANY wave of permanent form at a '
+        '30 deg face, so bar section A is unreachable from a single-valued '
+        'surface as a matter of proof and not of effort. '
+        'VALIDITY IS REPORTED, NOT ASSUMED: the median Ursell number here is '
+        '%.1f against the Stokes/cnoidal boundary at 0.5, and the '
+        'secondary-crest clamp bites on %.0f%% of the wet bay -- this is a '
+        'shallow-water scene and second-order Stokes is spent in it. '
+        'THE FOAM IS STILL A PLACEHOLDER: a saturating function of the '
+        'breaking fraction put on the crests, with no advection, no decay, no '
+        'entrained-air medium and no spray; it is an OPEN row in the suite and '
+        'nothing about foam extent, texture or brightness may be read off this '
+        'image. The coastal plain is one declared albedo. The framing is the '
+        'landform\'s: there is no headland in this bed to stand on.'
+        % (math.degrees(math.atan(s['lin'])), math.degrees(math.atan(s['nl'])),
+           s['nl'] / s['lin'], math.degrees(math.atan(s['need'])),
+           s['ur_med'], 100.0 * s['clamped']),
+    )
+
+
+def _cap_face5(s, c, m):
+    lin, nl = c['linear'], c['nonlinear']
+    got = ('face %.4f / body %.4f = %.3f' % (m['face'], m['body'], m['ratio'])
+           if 'ratio' in m else
+           'NO PIXEL IN THIS FRAME CARRIES A THROUGH-PATH LONG ENOUGH TO '
+           'MEASURE')
+    return (
+        's5  THE BACKLIT FACE, IN THE BAY ITSELF -- bar section A, attempted '
+        'on the scene rather than on a stand-in. Eye 1.1 m above the still '
+        'level, standing in the swash, looking WEST into a 21 deg sun that is '
+        'behind the waves because the coast faces west. Nonlinear free surface.',
+        'WHAT THIS FRAME IS EVIDENCE OF, AND IT IS A NEGATIVE. Section A asks '
+        'for a face that reads green against grey-blue water metres away in '
+        'one exposure. The steepening this wave added takes the steepest face '
+        'from %.2f to %.2f deg and multiplies the pixels carrying a '
+        'through-path by %.2f and the median chord by %.2f m -> %.2f m; '
+        'measured here: %s. IT IS SHORT AND THE SHORTFALL IS A THEOREM. A ray '
+        'entering water is confined to the Snell cone, so a lengthwise '
+        'sightline needs a face steeper than 90 - asin(1/n) = %.2f deg, while '
+        'Stokes\' 120 deg corner caps every wave of permanent form -- Stokes, '
+        'cnoidal or solitary -- at a 30 deg face. No single-valued height '
+        'field can close the 11 deg between them. Section A therefore belongs '
+        'beside bar section F\'s plunging lip, and this frame is the '
+        'measurement that puts it there rather than an argument that it '
+        'should be. THE FOAM IS A PLACEHOLDER (breaking fraction on the '
+        'crests, no advection, no decay, no entrained air, no spray) and it is '
+        'the whitest thing in this frame, so read no white off it. The swash '
+        'is not modelled; the eye stands where the run-up says water reaches.'
+        % (math.degrees(math.atan(s['lin'])), math.degrees(math.atan(s['nl'])),
+           nl['frac'] / max(lin['frac'], 1e-12), lin['med'], nl['med'], got,
+           math.degrees(math.atan(s['need']))),
+    )
+
+
 def _caption(img, lines, pad=12):
     """Burn the figure's own caption into the figure.
 
@@ -831,6 +943,9 @@ def main():
                  np.median(w.susp['spm_bar'][mask])))
     print()
 
+    srep = surface_report(w)
+    print()
+
     sc = 0.5 if FAST else 1.0
     SS = 1 if FAST else 2
     W, H = int(900 * sc) * SS, int(508 * sc) * SS
@@ -872,6 +987,51 @@ def main():
     LK, exK = render(camK, w)
     frames['K'] = (LK, exK, camK)
 
+    # ---- F: THE BACKLIT FACE, wave 5's frame and the one section A is about.
+    # The eye stands in the swash, 1.1 m above the still level, and looks WEST
+    # into the sun with the surf zone between. Three things about this framing
+    # are geometry rather than composition:
+    #
+    #   * the sun is behind the waves BY THE COAST'S ORIENTATION -- azimuth
+    #     273.7 deg on a west-facing beach -- so this is the only direction the
+    #     frame could face and still be section A's frame;
+    #   * the eye is LOW, at 1.1 m, and that is not for drama. The refracted
+    #     view ray inside the water dives at (90 - alpha) - asin(cos(alpha+
+    #     delta)/n) below the horizontal, and delta -- the eye's own tilt -- is
+    #     in that expression. An eye ABOVE the crest looking down adds to the
+    #     dive; an eye at or below crest level subtracts from it. Section A's
+    #     photographs are all taken from the beach with the face at eye level;
+    #   * the camera sits shoreward of where H is largest, found from the wave
+    #     field rather than placed, so the wave in frame is the one the
+    #     transform says is about to break.
+    #
+    # AND THE SUN IS KEPT OUT OF FRAME, which is a measurement decision rather
+    # than a compositional one. The first framing of this looked straight down
+    # the sun's own azimuth and the glitter path -- forty times the white point
+    # by the exposure this file derives -- clipped the entire frame to white.
+    # A clipped frame cannot carry a colour ratio, and a colour ratio is the
+    # only thing section A asks for. The view is therefore 48 deg off the sun's
+    # azimuth, which leaves the sun still BEHIND the waves (they run east, any
+    # westward view is backlit) and out of the field.
+    ib = int(np.argmax(np.max(w.H, axis=0)))
+    jb = int(np.argmax(w.H[:, ib]))
+    x_f = float(w.x[ib]) + 26.0
+    y_f = float(w.y[jb]) + 30.0
+    camF = Camera((x_f, y_f, 1.5), (x_f - 30.0, y_f - 30.0, 0.35),
+                  40.0, W, H)
+    LF, exF = render(camF, w)
+    frames['F'] = (LF, exF, camF)
+    print('THE BACKLIT FACE FRAME: eye at x = %.0f m, y = %.0f m, z = 1.1 m, '
+          'looking west' % (x_f, y_f))
+    print('  the wave it looks at: H = %.2f m in d = %.2f m, H/d = %.3f, '
+          'Ur = %.2f, r = %.3f, f_brk = %.2f'
+          % (w.H[jb, ib], w.d[jb, ib], w.H[jb, ib] / max(w.d[jb, ib], 1e-6),
+             w.Ur[jb, ib], w.r2[jb, ib], -2.0 / np.pi * w.psi2[jb, ib]))
+    mF = report_colour(exF, 'F, the backlit face, in the bay itself')
+    print()
+    crep = chord_report(w, camF)
+    print()
+
     # ---- A: the cuvette, backlit and front-lit, and the face-slope finding
     face_slope_report(w)
     cvA = render_cuvette(back=True)
@@ -893,17 +1053,21 @@ def main():
     bay_ladder(LJ, exJ, w)
 
     # ---- write the frames
-    gap = np.zeros((cvA['L'].shape[0], 8, 3))
-    kA = _save(np.concatenate([cvA['L'], gap, cvB['L']], axis=1),
-               '%s/s4-cuvette.png' % OUT, caption=CAP_CUV)
-    kJ = _save(downsample(LJ, SS), '%s/s4-bay-render.png' % OUT,
-               caption=CAP_BAY)
-    kK = _save(downsample(LK, SS), '%s/s4-glitter-render.png' % OUT,
+    # THE s4 FRAMES ARE NOT OVERWRITTEN. `s4-bay-render.png` is the LINEAR
+    # surface and it stays on disk as it was, because the pair -- s4 beside s5
+    # at identical framing, identical camera, identical optics, one field
+    # changed -- is the evidence. Re-running this file writes s5 only.
+    kJ = _save(downsample(LJ, SS), '%s/s5-bay-render.png' % OUT,
+               caption=_cap_bay5(srep))
+    kF = _save(downsample(LF, SS), '%s/s5-face-render.png' % OUT,
+               caption=_cap_face5(srep, crep, mF))
+    kK = _save(downsample(LK, SS), '%s/s5-glitter-render.png' % OUT,
                caption=CAP_GLIT)
-    print('exposure keys (99th pct of scene-linear): A %.4g  J %.4g  K %.4g'
-          % (kA, kJ, kK))
+    print('exposure keys (99th pct of scene-linear): J %.4g  F %.4g  K %.4g'
+          % (kJ, kF, kK))
     print('%.1f s' % (time.time() - t0))
-    return dict(A=mA, glitter=grows, w=w, frames=frames, cvA=cvA, cvB=cvB)
+    return dict(A=mA, glitter=grows, w=w, frames=frames, cvA=cvA, cvB=cvB,
+                surface=srep, chord=crep, faceF=mF)
 
 
 # ======================================== the face slope, and why A needs more
@@ -923,8 +1087,8 @@ def face_slope_report(w, n=40000):
     maximum slope is (H/2) k, which this function measures over the whole bay.
     """
     zx, zy = surface_slope(w, *np.meshgrid(
-        np.linspace(w.x[0] + 5, w.x[-1] - 5, 300),
-        np.linspace(w.y[0] + 20, w.y[-1] - 20, 120)))
+        np.linspace(w.x[0] + 5, w.x[-1] - 5, 900),
+        np.linspace(w.y[0] + 20, w.y[-1] - 20, 300)))
     s = np.hypot(zx, zy)
     need = math.tan(math.pi / 2 - math.asin(1.0 / OPT.IOR[1]))
     print('THE FACE SLOPE, and it is a finding rather than a setting:')
@@ -935,12 +1099,148 @@ def face_slope_report(w, n=40000):
              math.degrees(math.atan(np.percentile(s, 99.9)))))
     print('  needed for a lengthwise sightline  %.4f  (%.2f deg) = 90 - '
           'asin(1/n)' % (need, math.degrees(math.atan(need))))
-    print('  -> the linear surface is %.0fx too gentle. Section A\'s backlit '
-          'face is a\n     NEAR-BREAKING geometry and the height field cannot '
-          'reach it; the cuvette\n     below is the instrument the bar itself '
-          'names, and it says so in its caption.'
-          % (need / max(s.max(), 1e-9)))
+    print('  -> short by %.2fx.' % (need / max(s.max(), 1e-9)))
     return float(s.max()), float(need)
+
+
+# ============================== wave 5: what the nonlinear surface is and costs
+def surface_report(w):
+    """THE SURFACE'S OWN STATE, before any picture is drawn from it.
+
+    Three things have to be on the record before the steepening can be claimed:
+    how far past second-order Stokes this scene is (the Ursell number against
+    the regime boundary), how much of it the validity clamp bites, and what the
+    steepening actually bought on the face slope -- against 41.48 deg, and
+    against the 30 deg that Stokes' corner caps EVERY wave of permanent form at.
+    """
+    wet = w.d > B.D_MIN
+    Ur, r, rr, lim = w.Ur[wet], w.r2[wet], w.r2_raw[wet], w.r2_lim[wet]
+    print('THE NONLINEAR SURFACE (wave 5), and its validity first:')
+    print('  Ursell number over the wet bay   median %8.3f  p99 %8.3f  '
+          'max %8.3f' % (np.median(Ur), np.percentile(Ur, 99), Ur.max()))
+    print('  the Stokes/cnoidal boundary      Ur = %.3f   (U = 32 pi^2/3 in '
+          'this file\'s normalisation)' % B.URSELL_STOKES_LIMIT)
+    print('  fraction of the wet bay past it  %.3f' %
+          np.mean(Ur > B.URSELL_STOKES_LIMIT))
+    print('  r = b/a asked for by Stokes-2    median %8.3f  max %8.3f'
+          % (np.median(rr), rr.max()))
+    print('  the secondary-crest limit        %.3f .. %.3f  (1/4 bound, 1/2 '
+          'pitched)' % (lim.min(), lim.max()))
+    print('  fraction of the bay CLAMPED      %.3f   <- this scene is a '
+          'shallow-water scene and' % w.r2_clamped)
+    print('                                           second-order Stokes is '
+          'spent before it starts')
+    print('  r actually used                  median %8.4f  max %8.4f'
+          % (np.median(r), r.max()))
+
+    # --- the face slope, measured on the surface the renderer actually uses
+    gx, gy = np.meshgrid(np.linspace(w.x[0] + 5, w.x[-1] - 5, 900),
+                         np.linspace(w.y[0] + 20, w.y[-1] - 20, 300))
+    zx, zy = surface_slope(w, gx, gy)
+    s = np.hypot(zx, zy)
+    # and the LINEAR surface on the same grid, for the pair -- one field, one
+    # sampler, one difference operator; only r is zeroed.
+    r_keep = w.r2
+    w.r2 = np.zeros_like(w.r2)
+    zx0, zy0 = surface_slope(w, gx, gy)
+    w.r2 = r_keep
+    s0 = np.hypot(zx0, zy0)
+    need = math.tan(math.radians(B.snell_cone_face_deg()))
+    corner = math.tan(math.radians(B.STOKES_FACE_DEG))
+
+    def deg(v):
+        return math.degrees(math.atan(v))
+    print('  THE STEEPEST FACE, same grid, same operator, only r changed:')
+    print('    linear (waves 1-4)      max |grad eta| %.4f  = %5.2f deg'
+          % (s0.max(), deg(s0.max())))
+    print('    nonlinear (wave 5)      max |grad eta| %.4f  = %5.2f deg   '
+          'x%.3f' % (s.max(), deg(s.max()), s.max() / s0.max()))
+    print('    p99.9 linear / nonlinear               %.4f / %.4f  = %5.2f / '
+          '%5.2f deg' % (np.percentile(s0, 99.9), np.percentile(s, 99.9),
+                         deg(np.percentile(s0, 99.9)),
+                         deg(np.percentile(s, 99.9))))
+    print('    Stokes 120 deg corner   %.4f  = %5.2f deg   <- the cap on ANY '
+          'wave of permanent form' % (corner, B.STOKES_FACE_DEG))
+    print('    section A needs         %.4f  = %5.2f deg = 90 - asin(1/n)'
+          % (need, deg(need)))
+    print('    -> reached %.2f deg. Short of the corner by %.2f deg and of '
+          'section A by %.2f deg.' % (deg(s.max()), B.STOKES_FACE_DEG
+                                      - deg(s.max()), deg(need) - deg(s.max())))
+    return dict(lin=float(s0.max()), nl=float(s.max()), need=float(need),
+                corner=float(corner), clamped=float(w.r2_clamped),
+                ur_med=float(np.median(Ur)), ur_max=float(Ur.max()),
+                r_max=float(r.max()), r_raw_max=float(rr.max()),
+                past=float(np.mean(Ur > B.URSELL_STOKES_LIMIT)))
+
+
+def chord_report(w, cam, t=0.0):
+    """WHAT THE STEEPENING BOUGHT OPTICALLY, which is the only reason to do it.
+
+    Section A is "the colour is the path", so the quantity is the PATH: the
+    chord a view ray cuts through a wave before it comes out the far side. It
+    is not the face slope -- the slope is what MAKES the chord possible -- and
+    `through_face` already measures it by marching the refracted ray, so this
+    reads the render's own instrument rather than a new one.
+
+    Run on the same camera with r on and r off, so the pair differs in one
+    field. THE ABSOLUTE NUMBER IS REPORTED AS WELL AS THE RATIO, because wave
+    4's own retrospective names a guard that compared ratios and could not see
+    a factor multiplying both terms.
+    """
+    out = {}
+    for tag in ('nonlinear', 'linear'):
+        keep = w.r2
+        if tag == 'linear':
+            w.r2 = np.zeros_like(w.r2)
+        hit = trace(cam, w, t)
+        P = cam.pos[None, None] + hit['D'] * hit['t_water'][..., None]
+        m = hit['water'] & np.isfinite(hit['t_water'])
+        # confine to the near field: beyond a few hundred metres one pixel is
+        # many wavelengths and the chord is a sub-pixel statistic, not a path.
+        rng = np.linalg.norm(P - cam.pos[None, None], axis=-1)
+        m = m & (rng < 400.0)
+        sh = shade_water(w, P, hit['D'], t)
+        w.r2 = keep
+        ch = sh['chord'][m]
+        L = sh['L_path'][m]
+        gx = 2.0 * L[..., 1] / np.maximum(L[..., 0] + L[..., 2], 1e-12)
+        lit = ch > 0.02
+        out[tag] = dict(
+            n=int(m.sum()), frac=float(np.mean(ch > 0.02)),
+            med=float(np.median(ch[lit])) if lit.any() else 0.0,
+            p99=float(np.percentile(ch, 99.9)), mx=float(ch.max()),
+            green=float(np.median(gx[lit])) if lit.any() else float('nan'),
+            L_med=float(np.median(L[lit, 1])) if lit.any() else 0.0)
+    print('THE PATH THROUGH THE FACE, from the render\'s own march '
+          '(`through_face`):')
+    print('    %-10s  pixels-with-a-chord   median chord   p99.9   max     '
+          'median 2G/(R+B) of term 4' % '')
+    for tag in ('linear', 'nonlinear'):
+        o = out[tag]
+        print('    %-10s  %8.4f              %7.3f m     %5.3f  %6.3f   %s'
+              % (tag, o['frac'], o['med'], o['p99'], o['mx'],
+                 ('%.4f' % o['green']) if o['green'] == o['green'] else '-'))
+    a, b = out['linear'], out['nonlinear']
+    if a['frac'] > 0 or b['frac'] > 0:
+        print('    -> the steepening multiplies the lit fraction by %.2f and '
+              'the median chord by %.2f'
+              % (b['frac'] / max(a['frac'], 1e-12),
+                 b['med'] / max(a['med'], 1e-12)))
+    else:
+        print('    -> NEITHER SURFACE PRODUCES A SINGLE THROUGH-PATH IN THIS '
+              'FRAME, and that is the result.')
+        print('       The refracted view ray dives at (90 - alpha) - '
+              'asin(cos(alpha + delta)/n) below the horizontal -- 34 deg at '
+              'the linear')
+        print('       surface\'s 8 deg face and 28 deg at the nonlinear '
+              'surface\'s 16 deg one -- while the crest it must cross falls '
+              'at')
+        print('       16 deg at most. The ray reaches the deep column before '
+              'it reaches the far side, at every pixel, and no amount of '
+              'water')
+        print('       chemistry changes that. It is the 41.48 deg criterion '
+              'measured on the render rather than argued from the geometry.')
+    return out
 
 
 # ============================================================== the cuvette

@@ -771,14 +771,43 @@ def stokes2_crest_limit(psi, n=4096):
     So the pitched-forward (asymmetric) shape tolerates twice the harmonic the
     peaked (skewed) one does -- the SAME second harmonic, rotated. In between
     there is no closed form and this counts sign changes on a fine grid.
+
+    THE ANSWER IS A FUNCTION OF ONE VARIABLE, so it is bisected once on a
+    ladder of 257 phases and interpolated after that. Written cell-by-cell the
+    first time, it was 7e9 flops on a 89 x 501 bay and dominated the whole
+    render; the ladder is 1/170th of that and its interpolation error against
+    the direct bisection is a row in the suite.
     """
     psi = np.asarray(psi, float)
+    tab_u, tab_r = _crest_limit_table(n)
+    u = np.sqrt(np.clip(-psi, 0.0, np.pi / 2))
+    out = np.interp(u, tab_u, tab_r)
+    return out if psi.shape else float(out)
+
+
+_CREST_TAB = {}
+
+
+def _crest_limit_table(n=4096, m=513):
+    """The bisection itself, on a ladder spanning the only phases `bore_phase`
+    can produce -- [-pi/2, 0].
+
+    THE LADDER IS UNIFORM IN sqrt(-psi) AND NOT IN psi, and that is not a
+    refinement, it is required. r_max(psi) has a SQUARE-ROOT CUSP at psi = 0:
+    it leaves 1/4 with infinite slope, 0.2524 at psi = -0.001 and 0.2610 at
+    -0.01. A ladder uniform in psi interpolates across that cusp and reports
+    0.2548 where the closed form says 0.2500 -- a 2% error in the one place
+    the answer is known exactly. In sqrt(-psi) the curve is smooth and the
+    suite's row against `_crest_limit_direct` holds to 1e-4.
+    """
+    if (n, m) in _CREST_TAB:
+        return _CREST_TAB[(n, m)]
     phi = (np.arange(n) + 0.5) / n * 2.0 * np.pi          # off the zeros of sin
-    sh = psi.shape
-    ps = psi.reshape(-1, 1)
-    lo = np.full(ps.shape[0], 1e-4)
-    hi = np.full(ps.shape[0], 2.0)
-    for _ in range(40):
+    u = np.linspace(0.0, math.sqrt(np.pi / 2), m)
+    ps = (-u ** 2).reshape(-1, 1)
+    lo = np.full(m, 1e-4)
+    hi = np.full(m, 2.0)
+    for _ in range(48):
         mid = 0.5 * (lo + hi)
         f = -(np.sin(phi)[None] + 2.0 * mid[:, None]
               * np.sin(2.0 * phi[None] + ps))
@@ -787,7 +816,24 @@ def stokes2_crest_limit(psi, n=4096):
         ok = n_ch <= 2
         lo = np.where(ok, mid, lo)
         hi = np.where(ok, hi, mid)
-    return lo.reshape(sh) if sh else float(lo[0])
+    out = (u, lo)
+    _CREST_TAB[(n, m)] = out
+    return out
+
+
+def _crest_limit_direct(psi, n=4096):
+    """One phase, bisected without the table. The suite's second route."""
+    phi = (np.arange(n) + 0.5) / n * 2.0 * np.pi
+    lo, hi = 1e-4, 2.0
+    for _ in range(48):
+        mid = 0.5 * (lo + hi)
+        f = -(np.sin(phi) + 2.0 * mid * np.sin(2.0 * phi + psi))
+        s = np.sign(f)
+        if int((s != np.roll(s, -1)).sum()) <= 2:
+            lo = mid
+        else:
+            hi = mid
+    return lo
 
 
 def bore_phase(f_brk):
@@ -876,10 +922,14 @@ def slope_gain(r, psi, n=4096):
     psi = np.asarray(psi, float)
     phi = (np.arange(n) + 0.5) / n * 2.0 * np.pi
     sh = np.broadcast(r, psi).shape
-    rr = np.broadcast_to(r, sh).reshape(-1, 1)
-    pp = np.broadcast_to(psi, sh).reshape(-1, 1)
-    f = np.abs(np.sin(phi)[None] + 2.0 * rr * np.sin(2.0 * phi[None] + pp))
-    g = f.max(axis=1)
+    rr = np.broadcast_to(r, sh).reshape(-1)
+    pp = np.broadcast_to(psi, sh).reshape(-1)
+    g = np.empty(rr.size)
+    step = max(1, 2 ** 22 // n)         # chunked: a whole bay at once is 1.5 GB
+    for i in range(0, rr.size, step):
+        f = np.abs(np.sin(phi)[None] + 2.0 * rr[i:i + step, None]
+                   * np.sin(2.0 * phi[None] + pp[i:i + step, None]))
+        g[i:i + step] = f.max(axis=1)
     return g.reshape(sh) if sh else float(g[0])
 
 
