@@ -14,11 +14,42 @@ a champion/challenger regression guard, deterministic state tooling,
 per-dimension bars, a WIP limit, a park rule for stalled lanes, and named failure
 modes. Credit Shumer for the pattern; be honest about which parts are additions.
 
-A quality-*maximising* loop, not a correctness loop, run under a fixed budget: a
-builder closes one named gap, a *different* critic in fresh context judges the
-real artifact against a real bar, and the lanes that stop paying stop getting
-funded. What separates it from a review, and where each rule comes from:
-→ `references/authorities.md`
+## The loop, and the guardrails around it
+
+**The engine is Shumer's and stays recognisable.** Cut the goal into
+independently judgeable lanes. Per lane: a builder closes one named gap, then a
+*different* critic in fresh context judges the real artifact against a real
+external bar, blind where the artifact allows. Bar wins → the critic names the
+single largest remaining gap and it goes back. Repeat.
+
+Everything else in this file is one of two things: a **guardrail** against a
+known weakness of that loop, or the **project management** deciding what gets
+funded. Both serve the loop. A rule that stops the loop from running is a wrong
+rule — and each guardrail below has to name the weakness it buys off, or it is
+ceremony and belongs deleted.
+
+| Known weakness | Signal it is happening | Guardrail |
+|---|---|---|
+| Runs forever; no natural stop | wave 26 of an agreed 8 | budget stop, kill criteria, hard cap |
+| Critic turns agreeable | everything passes; gaps get vaguer | forced winner, severity + named evidence |
+| Builder learns the critic, not the bar | output matches the critic's phrasing | frozen bar, rotated framing, randomised labels |
+| Bar erosion | comparisons quietly get easier | bar files re-read from disk each wave |
+| Unreachable bar | every round loses; scores never move | target vs stretch, `--target-score` |
+| Every round wins, the whole gets worse | wave 10 worse than wave 6 | champion/challenger revert, per-dimension bars |
+| A lane grinds against a ceiling | same gap round after round, still funded | `no-progress` park, re-cut |
+| Progress theatre | rounds logged, artifact unchanged | per-round evidence, diff champions |
+| Lane collision | reverts undo another lane's work | one file, one owner, per wave |
+| Context bleed | critic echoes builder justifications | critic gets artifact + bar only |
+| Gold plating | rounds spent past a retired dimension | retirement is a stop, not a suggestion |
+| Settled work re-judged, checks re-derived | the log grows, the artifact does not | settled-work rule, hash-cached `gate` |
+| Scope snowball | more lanes at wave 6 than wave 1 | frozen lane set, backlog |
+| Token burn | cost per closed gap climbing | machine gates, one critic call, WIP, model routing |
+| Cost invisible until the bill | budget in waves, burn in tokens | `--budget-tokens`, cost per gap in `status` |
+| Inspection rot | stale or repeated evidence | re-verify the path at every boundary |
+| Nobody sees progress without interrupting | user asks "where are we?" | generated board |
+
+Diagnosis and repair for each: → `references/failure-modes.md`
+Provenance for each rule: → `references/authorities.md`
 
 ## When not to use this
 
@@ -64,7 +95,9 @@ Rationale and exceptions: → `references/cost-discipline.md`
    narrate state into chat or hand-write the workbench.
 8. **Route the model to the role:** cheapest that can do the job, never cheaper
    on a deciding critic, tier fixed within a lane. → `references/model-routing.md`
-9. **Never pay twice for the same verdict.** Settled work is not re-judged.
+9. **Never pay twice for the same verdict.** Settled work is not re-judged, and a
+   check whose inputs have not changed is not re-run — `gate` caches on a content
+   hash and hands the critic its results.
 10. **Read each reference once, at its phase.**
 
 ## State: one directory, one script
@@ -83,6 +116,7 @@ python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf \
 python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --round 3 \
     --mode blind --winner other --margin clear --score 7 --severity major \
     --gap "..." --evidence shots/w2r3.png
+python3 scripts/gauntlet.py gate     # mechanical checks; skips those whose inputs are unchanged
 python3 scripts/gauntlet.py status   # state, next-wave plan, park list, fired stops
 python3 scripts/gauntlet.py park --lane a --dimension visual --reason "..."
 python3 scripts/gauntlet.py board    # regenerate workbench.md from the log
@@ -345,29 +379,6 @@ block — and put that in front of the user. `extend` enforces the rest.
 - **The budget is extended by the user or not at all.**
 - **Visible text is Simplified Technical English (ASD-STE100):** active voice, one
   statement per sentence, 20–25 words max, no marketing language.
-
-## Failure modes
-
-Read `references/failure-modes.md` before long unattended runs. The short list:
-
-| Mode | Signal |
-|---|---|
-| Critic sycophancy | Everything passes; gaps get vaguer |
-| Rubric gaming | Builder matches the critic's wording, not the bar |
-| Bar erosion | Comparisons quietly get easier |
-| Unreachable bar | Every round fails; scores never move |
-| Progress theatre | Rounds logged, artifact unchanged |
-| Zombie lane | Same gap, round after round, still funded |
-| Ceiling denial | The same gap recurs; reverts climb |
-| Lane collision | Two lanes fight over one file |
-| Downhill drift | Late output worse than mid-run |
-| Context bleed | Critic echoes the builder's justifications |
-| Gold plating | Rounds spent past the target on a retired dimension |
-| Re-litigation | Closed gaps re-argued; retired dimensions re-judged |
-| Scope snowball | More lanes at wave 6 than wave 1; projection doubled |
-| Token burn | Cost per closed gap climbing wave over wave |
-| Budget creep | Extensions granted repeatedly, each "nearly there" |
-| Inspection rot | Stale or missing evidence |
 
 ## Degraded mode (no subagents)
 
