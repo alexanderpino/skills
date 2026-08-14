@@ -868,6 +868,147 @@ depends on it.
 `min` cap remains the right two-line answer for *where the surf zone begins* on a monotone ramp
 — which is what a graph node that only needs a break mask is asking.
 
+### The reform is a distance condition, and a one-bar loop is structurally short of it
+
+Giving the transform hysteresis is **necessary and not sufficient**. The march above *can* reform;
+whether it *does* is decided by one line of algebra that this section did not carry, and the answer
+is not the one the prose implies. The section's own picture — "storms push the bar seaward, calm
+swell walks it back", two lines of white water with calm between them — is asking for a reform that
+the loop it prescribes cannot deliver, and a reader deserves to be told that before spending a week
+tuning coefficients at it.
+
+**The algebra, and it is four lines.** Put `H_w = Γ·d` into the march in shallow water, where
+`c_g → √(gd)` and `cos θ → 1`, so `F = (ρg^{3/2}/8)·Γ²·d^{5/2}`. Substitute into
+`dF/dx = −(K/d)(F − F_s)` and divide out the common `(ρg^{3/2}/8)·d^{3/2}`:
+
+```
+2·Γ·Γ'·d  +  (5/2)·m·Γ²  =  −K·(Γ² − γ_s²)              m = ∂d/∂x, x SHOREWARD
+```
+
+Two results fall out, and both are new to this chapter.
+
+**1 · A broken wave does not decay to `γ_s`. It decays to a slope-dependent ratio above it.**
+Setting `Γ' = 0`:
+
+> **`Γ_eq = γ_s / √(1 + (5/2)·(∂d/∂x)/K)`**
+
+On a **shoaling** bed `∂d/∂x < 0`, the denominator is below 1, and `Γ_eq > γ_s` **always** — the bed
+takes depth away as fast as breaking takes height. So `γ_s = 0.40` is the **flat-bed limit of a
+family**, not a value any real surf zone sits at, and the pseudocode's `elif H_w ≤ γ_s·d` is a
+cessation test the inner surf zone can never satisfy. **The wave can only un-break where the bed
+*deepens*.**
+
+**Measured** (`terrain-renderer/reference-impl/beach.py`, `transform()` and `saturated_ratio()`;
+recomputed here rather than relayed — the plane-slope march below was rewritten independently and
+the numbers are this chapter's own):
+
+| plane slope | marched `H/d` where it settles | `Γ_eq`, closed form | gap |
+|---|---|---|---|
+| 1:100 | 0.4396 | 0.4382 | +0.3% |
+| 1:60 | 0.4735 | 0.4707 | +0.6% |
+| 1:30 | 0.6225 | 0.6000 | +3.7% |
+| 1:20 | still climbing at `d = 0.3 m` | 0.9798 | — |
+
+The two routes share no arithmetic — one is the fixed point of an ODE, the other a cell-by-cell
+march that has never been told a fixed point exists — and the residual is the shallow-water flux
+assumption failing as the slope steepens, not the model. On the reference scene's own inner slope
+(1:59.6) the transform reads **0.4815** against a closed form of **0.4755**.
+
+**Corroboration from outside, and it is not derived from Dally.** Raubenheimer, Guza & Elgar
+(1996), *Wave transformation across the inner surf zone*, measured saturated `H/h` on a natural
+beach at **0.2–1.0**, uncorrelated with offshore steepness and **positively correlated with the
+local bed slope**. A 1996 field measurement and the fixed point of a 1985 decay model, agreeing in
+sign, in range, and in the claim that γ is not a constant. ⚠️ Relayed through the implementation's
+reading; this chapter did not open it.
+
+**2 · Integrate the same equation and the reform criterion is a *distance*.** With `m` constant and
+positive down the back of the bar, change variable from `x` to `d` and the equation is linear in
+`G = Γ²`:
+
+```
+G(d) = G_eq + (G_c − G_eq)·(d/d_c)^(−a),    a = K/m + 5/2,    G_eq = K·γ_s²/(K + 5m/2)
+```
+
+**The exponent is the whole answer.** `a` carries `K/m`, and `m = relief/L`, so `a·ln(d_t/d_c)` is
+essentially `K·L/d̄` — **the decay is paid for in travel distance, not in depth gained.** Doubling
+the relief over the same 15 m of trough buys far less than keeping the relief and doubling `L`.
+Anyone who reads the couplet as "the trough is not deep enough" will reach for relief, which is the
+axis that does not move.
+
+**The direct demonstration, which needs no closed form at all.** Take the loop's own bar, keep its
+own 0.90 m of relief, and spread it over a longer back slope. Nothing else changes — same sea
+state, same transform, same constants:
+
+| back slope `L` | surf-zone spans the march returns |
+|---|---|
+| 15 m *(what the loop builds)* | 360–500 m — **one continuous band** |
+| 20 m | 360–500 m — one band |
+| 25 m | 360–500 m — one band |
+| **30 m** | **360–388 m and 453–500 m — two lines, 65 m of calm between them** |
+| 40 m | 360–392 m and 458–500 m |
+
+**Why a one-bar loop cannot get there, and why no coefficient closes it.** The trough this loop digs
+sits almost exactly **one Dally decay length** behind the crest, `L ≈ d_crest/K`, and the reform
+needs about **two**. Measured across a factor of three in sea state:
+
+| `H_0` | 1.0 m | 1.5 m | 2.0 m | 2.5 m | 3.0 m |
+|---|---|---|---|---|---|
+| crest→trough distance `L` | 10 m | 15 m | 21 m | 28 m | 34 m |
+| **`L·K/d_crest`** | **0.95** | **0.99** | **1.09** | **1.19** | **1.24** |
+| e-foldings the back slope **delivers**, `(K/m)·ln(d_t/d_c)` | 0.82 | **0.86** | 0.96 | 1.07 | 1.13 |
+| e-foldings the reform **needs**, same relief | 1.57 | **1.71** | 1.89 | 2.20 | 2.49 |
+| shortfall | ×1.9 | **×2.0** | ×2.0 | ×2.1 | ×2.2 |
+
+A factor of two, flat across the sweep. Equivalently, at the base state: the reform needs a **30 m**
+back slope and the loop builds 15, or **1.11 m** of relief at 15 m and the loop builds 0.71 m (both
+read in the depth field the transform uses — see the two-field rule below).
+
+**And `K` is not the lever, which is the part worth knowing before anyone tries it.** The closed form
+says `a = K/m + 5/2`, so doubling `K` doubles the e-foldings a *given* trough delivers — but the
+trough is not given, it is an output of the same loop. Run it: at `K = 0.30` the coupled loop stops
+building a trough at all, bar-to-trough relief collapsing from **0.71 m to 0.03 m**, and the minimum
+`H/d` behind the crest does not improve. The decay that would reform the wave is the same decay that
+concentrates the dissipation — and therefore the undertow, and therefore the scour — into a shorter
+band. **The reform gap is a structural property of a one-bar breakpoint model, not a tuning gap.**
+
+> ⚠️ **What is measurement here and what is reading.** `L·K/d_crest ≈ 1` is a measurement, over one
+> sweep at one `K`, and it should be marked as such until someone checks it against a survey. The
+> *reason* offered for it — the excavation is confined to the band where the wave is losing energy,
+> which is `d/K` wide — is a **reading**, and it is only partly borne out: the dissipation profile
+> behind this crest falls to `1/e` in about 8 m rather than the 15 m the bare `d/K` predicts,
+> because `F_s ∝ d^{5/2}` is rising at the same time. The `K` sweep above does not confirm the
+> identity either — it destroys the trough rather than narrowing it. **The factor-of-two shortfall
+> reproduces; the one-line mechanism for why the trough is exactly one e-folding wide does not yet.**
+
+**What is missing is named, and this section already declares it out of scope.** Everything in a
+1-D energetics loop is local: the undertow at `x` is driven by the dissipation at `x`, so the
+excavation is confined to the band where the wave is losing energy. Widening the trough without
+flattening the bar needs a **circulation** — the rip-feeder cell, where water piled behind the bar
+runs *alongshore* in the trough before escaping seaward, scouring the trough's whole length rather
+than the band under the break. That is the **2DH solve this section declares out of scope in its
+own opening paragraph**, and the rip section below describes the very circulation that would do it.
+So the honest statement is not "the model fails to reform" but: **the reform and the 2DH solve are
+the same exclusion, and the scope boundary is load-bearing rather than a matter of ambition.** The
+field record agrees on which way to build out of it — the configuration that most reliably shows two
+lines is a **double-bar** system (Duck, NC runs a narrow inner bar at 1–2 m and a broad outer one at
+4–5 m), and an inner bar is grown by that same circulation.
+
+**Four candidates were separated before this was concluded, and three are dead.** Recorded because
+each is a plausible first guess: *no memory in the transform* — dead, the march has hysteresis and
+reforms the moment it is given 30 m; *forcing history* — dead and it reverses, storm/calm cycling,
+a ±1.0 m tide and a Rayleigh height distribution each **lower** the relief, so steady monochromatic
+forcing is this model's most favourable case; *the grid* — dead, refining `Δx` and `Δt` together
+moves the trough minimum *away* from `γ_s` (see the hygiene note below); *relief too small* — live,
+but misdescribed, because it is a joint condition on relief **and** distance and distance is the
+binding axis.
+
+**Tier.** `Γ_eq` and the `(d/d_c)^(−a)` integral are **P** — closed forms off a
+published model (Dally, Dean & Dalrymple 1985), derived and checked here against an independent
+march. The Raubenheimer et al. corroboration is **P**, ⚠️ relayed. The `L ≈ d_crest/K` identity and
+the factor-of-two shortfall are **implemented and measured** on one reference loop — which is the
+warrant this scheme still has no mark for, so they are stated as measurements with their file and
+their sweep, and nothing here upgrades a tier on the strength of them.
+
 **`d_bar ≈ H_b/γ` — attacked twice and standing, and the second attack corrected the first.** This
 is the section's central quantitative prediction and it has now been run at rather than assumed.
 Two rounds against it are recorded below **in the order they happened**, because the second
