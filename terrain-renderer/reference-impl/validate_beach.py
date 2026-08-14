@@ -43,6 +43,7 @@ HERE = __file__.rsplit('/', 1)[0] if '/' in __file__ else '.'
 sys.path.insert(0, HERE)
 
 import beach as BCH                                             # noqa: E402
+import beach_optics as BOP                                      # noqa: E402
 import optics as OPT                                            # noqa: E402,F401
 import atmosphere as ATM                                        # noqa: E402
 
@@ -452,6 +453,113 @@ def _bug_flux_not_along_ray(mod):
     mod.sediment_flux_2d = flux
 
 
+
+# --- WAVE 4'S DEFECTS, all in `beach_optics`. Every one of them is a mistake
+# this wave either made or came within one line of making, and each is here
+# because a guard that has never fired at anything is a comment with a check()
+# around it.
+def _bug_one_turbidity_slider(mod):
+    """THE FAILURE CHAPTER 28 NAMES BY NAME: collapse the three constituents
+    into one murkiness control, so that CDOM and chlorophyll rise with the
+    mineral load instead of belonging to the water mass. It is the single most
+    plausible wrong architecture for this scene and it must not merely look
+    worse -- it must break a row."""
+    orig = mod.iops
+
+    def iops(a_ph440=None, a_cdom440=mod.A_CDOM_440, spm=0.0, pure=False):
+        s = np.asarray(spm, float)
+        return orig(a_ph440=mod.A_PH_440 * (1.0 + np.mean(s)),
+                    a_cdom440=a_cdom440 * (1.0 + np.mean(s)), spm=spm,
+                    pure=pure)
+    mod.iops = iops
+
+
+def _bug_cdom_scatters(mod):
+    """Give CDOM a scattering coefficient. Chapter 28: it "scatters not at
+    all", and that single word is what makes blackwater dark instead of
+    milky."""
+    orig = mod.iops
+
+    def iops(**kw):
+        out = orig(**kw)
+        out['b'] = out['b'] + 0.5 * kw.get('a_cdom440', mod.A_CDOM_440)
+        out['b_b'] = mod.BB_OVER_B * out['b']
+        out['c'] = out['a'] + out['b']
+        return out
+    mod.iops = iops
+
+
+def _bug_depth_averaged_spm(mod):
+    """Spread the suspended load through the whole column instead of the layer
+    the Rouse balance puts it in. The load is unchanged and so is every
+    sedimentological number; only the OPTICS move -- which is the point."""
+    orig = mod.suspended_load
+
+    def load(*a, **kw):
+        out = orig(*a, **kw)
+        out['delta'] = np.full_like(np.asarray(out['delta'], float),
+                                    1e9)
+        out['spm'] = out['spm_bar']
+        return out
+    mod.suspended_load = load
+
+
+def _bug_dw_for_bed_power(mod):
+    """Drive the suspension from the WAVE's dissipation instead of the BED's --
+    wave 4's own first writing, wrong by a factor of about fifty."""
+    orig = mod.bed_dissipation
+
+    def bd(u_orb, c_f=0.006, rho_w=1025.0):
+        return 50.0 * orig(u_orb, c_f, rho_w)
+    mod.bed_dissipation = bd
+
+
+def _bug_isotropic_phase(mod):
+    """Leave the phase asymmetry at zero, which chapter 28 warns "kills the
+    forward glow through a sunlit wave crest"."""
+    mod.PHASE_G = 0.0
+
+
+def _bug_glitter_fixed_width(mod):
+    """The defect bar section K exists to catch: a spread parameter chosen to
+    look right, instead of the published slope distribution. The width stops
+    depending on the wind and stops varying along the path."""
+    def pdf(zx, zy, u10=mod.U10, wind_az=mod.WIND_AZ):
+        s2 = 0.02
+        z2 = np.asarray(zx, float) ** 2 + np.asarray(zy, float) ** 2
+        return np.exp(-0.5 * z2 / s2) / (2.0 * np.pi * s2)
+    mod.slope_pdf = pdf
+
+
+def _bug_glitter_no_jacobian(mod):
+    """Drop the 1/cos^4(beta) from the glitter radiance -- the Jacobian between
+    slope space and direction space. It is invisible near the specular point
+    and it is the whole of the behaviour toward the horizon."""
+    orig = mod.glitter_radiance
+
+    def gl(sun_dir, view_dir, **kw):
+        s = np.asarray(sun_dir, float)
+        v = np.asarray(view_dir, float)
+        v = v / np.linalg.norm(v, axis=-1, keepdims=True)
+        n = s - v
+        n = n / np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-12)
+        cb = np.maximum(n[..., 2], 1e-6)
+        return orig(sun_dir, view_dir, **kw) * (cb ** 4)[..., None]
+    mod.glitter_radiance = gl
+
+
+def _bug_ambient_in_the_tube(mod):
+    """Light the through-path with an ambient term, so the green no longer
+    vanishes when the sun is not behind the water. Bar section I2: "a renderer
+    that lights a tube interior with ambient sky has missed the whole
+    mechanism"."""
+    orig = mod.through_path
+
+    def tp(L_src, path, a, b_b):
+        return orig(np.asarray(L_src, float) + 2.0, path, a, b_b)
+    mod.through_path = tp
+
+
 BUGS = {
     'dw-for-ew': _bug_dw_for_ew,
     'quarter-at-break': _bug_quarter_at_break,
@@ -471,7 +579,18 @@ BUGS = {
     'no-waterline-attack': _bug_no_waterline_attack,
     'alignment-mixed-fields': _bug_alignment_mixed_fields,
     'flux-not-along-ray': _bug_flux_not_along_ray,
+    'one-turbidity-slider': _bug_one_turbidity_slider,
+    'cdom-scatters': _bug_cdom_scatters,
+    'depth-averaged-spm': _bug_depth_averaged_spm,
+    'dw-for-bed-power': _bug_dw_for_bed_power,
+    'isotropic-phase': _bug_isotropic_phase,
+    'glitter-fixed-width': _bug_glitter_fixed_width,
+    'glitter-no-jacobian': _bug_glitter_no_jacobian,
+    'ambient-in-the-tube': _bug_ambient_in_the_tube,
 }
+OPTICS_BUGS = {'one-turbidity-slider', 'cdom-scatters', 'depth-averaged-spm',
+               'dw-for-bed-power', 'isotropic-phase', 'glitter-fixed-width',
+               'glitter-no-jacobian', 'ambient-in-the-tube'}
 
 
 # ------------------------------------------------------------------ the suite
@@ -1881,6 +2000,466 @@ def _sec_bay(ctx):
          'the 1-D loop reads 0.953-0.994 over dx = 2.0 to 0.25 m')
 
 
+# ================================ 7 - the coastal IOPs, the path and the glitter
+#
+# WAVE 4. The pool's `optics.py` and `atmosphere.py` are IMPORTED here exactly as
+# `beach_optics.py` imports them, and nothing in this section checks them again:
+# `validate.py` owns 285 rows on that physics and duplicating any of them would
+# be the two-routes-one-source error in its purest form. What this section
+# checks is the layer wave 4 added -- the inherent optical properties, the two
+# transports, and the glitter -- and every tier-3 row names the second route.
+def _sec_optics(ctx):
+    O = BOP
+
+    # -------------------------------------------------- 7.1 the phase function
+    # The Henyey-Greenstein backscatter fraction, closed form against a
+    # quadrature of the phase function itself. The two share the letter g and
+    # nothing else: one is an algebraic expression, the other integrates
+    # `hg_phase` over the backward hemisphere with a Gauss-Legendre rule.
+    mu, wq = np.polynomial.legendre.leggauss(12000)
+    for g in (0.30, 0.60, 0.9132, 0.98):
+        num = 2.0 * math.pi * float(
+            (wq[mu < 0] * O.hg_phase(g, mu[mu < 0])).sum())
+        check(1, 'HG backscatter fraction, closed form vs quadrature (g=%.2f)'
+              % g, O.hg_backscatter_fraction(g), num, 3e-8,
+              'Gauss-Legendre at 24000 nodes. The tolerance is the '
+              'quadrature\'s own residual on a lobe whose width goes as '
+              '(1-g): at g = 0.98 the peak is 0.02 rad wide and a rule uniform '
+              'in cos(theta) is working hardest exactly where the closed form '
+              'is cheapest. Two decades of headroom over a transcription '
+              'error, which is what this row is for.')
+    tot = 2.0 * math.pi * float((wq * O.hg_phase(0.9132, mu)).sum())
+    check(1, 'HG phase normalisation INT p dw', tot, 1.0, 1e-9,
+          'A phase function that does not integrate to 1 is an albedo hiding '
+          'in a shape, and it would move every scattering term by the same '
+          'unnoticed factor.')
+    check(1, 'g is DERIVED from chapter 28\'s b_f >= 50 b_b',
+          O.hg_backscatter_fraction(O.PHASE_G), O.BB_OVER_B, 1e-9,
+          'The chapter states the forward dominance as a ratio and gives no g. '
+          'Inverting B(g) = b_b/b is what removes the choice, so this row is '
+          'the one that fails if anybody types a g in by hand.')
+
+    # ------------------------------------------------- 7.2 the band integration
+    def _sp(l):
+        return O.a_ph(l, 0.1) + O.a_cdom(l, 0.08)
+    check(3, 'band integration, 161 nodes per band against 1601',
+          O.band_mean(_sp), O.band_mean(_sp, 1601), 1e-6,
+          'Ten times the node density on the SAME interval -- each band is '
+          'sampled on its own linspace between its own edges, so refining n '
+          'cannot move the window. An earlier writing masked one global grid '
+          'per band and this row measured the rounding of the grid instead of '
+          'the quadrature: it read 0.7% and looked like a convergence problem.')
+
+    # --------------------------------------- 7.3 chapter 28's OWN claims, as rows
+    # These check the CHAPTER, not this file's shape parameters. The widths and
+    # the red/blue ratio of the chlorophyll line shape are declared `?`, and a
+    # row that checked them would be checking `beach_optics.py` against itself.
+    lam = np.arange(400.0, 720.0, 1.0)
+    aph = O.a_ph(lam, 1.0)
+    win = (lam >= 550.0) & (lam <= 570.0)
+    i_min = int(np.argmin(aph[(lam >= 480) & (lam <= 640)]))
+    lam_min = float(lam[(lam >= 480) & (lam <= 640)][i_min])
+    check(1, 'chlorophyll: the window is below both peaks',
+          float(aph[win].max() < min(aph[np.argmin(abs(lam - 440))],
+                                     aph[np.argmin(abs(lam - 675))])),
+          1.0, 0.0, 'Two peaks and a window between them is the whole of the '
+          'chapter\'s statement about this constituent, and the only part of '
+          'the declared line shape a row is entitled to check.')
+    # THE CHAPTER'S 550-570 IS A STATEMENT ABOUT THE WATER, NOT ABOUT THE
+    # PIGMENT, and this pair of rows is where that was found.
+    ab = O.iops()['a']
+    check(2, 'the water\'s total absorption minimises in the band holding '
+          '550-570 nm', float(np.argmin(ab)), 1.0, 0.0,
+          'Chapter 28: chlorophyll "leav[es] a transmission window at 550-570 '
+          'nm". Band 1 is 502.5-582.5 nm and contains that window, so the '
+          'chapter\'s claim about THIS WATER is that channel 1 is the least '
+          'absorbed. It is.')
+    info(2, 'but a_ph ALONE minimises at %g nm, not 550-570' % lam_min,
+         lam_min,
+         'A correction to the chapter, found by writing the line shape down. '
+         'The minimum of a sum of two absorption lines sits BETWEEN them, '
+         'nearer the broader one\'s tail -- near 590-600 for peaks at 440 and '
+         '675. What sits at 550-570 is the minimum of a_ph PLUS pure water, '
+         'because a_w climbs steeply above 570 and pushes the window back down '
+         'the spectrum. The chapter is right about the water and loose about '
+         'the constituent, and an implementer who fits a pigment spectrum to '
+         'put ITS minimum at 560 needs widths no pigment has.', exp='550-570')
+    acd = O.a_cdom(lam, 1.0)
+    check(1, 'CDOM rises monotonically into the blue',
+          float(np.all(np.diff(acd) < 0.0)), 1.0, 0.0,
+          'a440 exp[-S(lam - 440)] with S > 0 is monotone decreasing in '
+          'wavelength by construction; the row fires at a sign slip in S, '
+          'which would turn gelbstoff into a red absorber.')
+    io_c = O.iops(a_cdom440=5.0, a_ph440=0.0)
+    io_0 = O.iops(a_cdom440=0.0, a_ph440=0.0)
+    check(1, 'CDOM scatters not at all', io_c['b'], io_0['b'], 1e-14,
+          'Chapter 28, verbatim, and it is the sentence that separates '
+          'blackwater from mud. A hundredfold change in CDOM must leave b '
+          'exactly where it was.')
+    # CDOM darkens, sediment brightens -- the chapter's own doctrine, as a pair
+    R_c = O.volume_reflectance(io_c['a'], io_c['b_b'], 30.0)
+    R_0 = O.volume_reflectance(io_0['a'], io_0['b_b'], 30.0)
+    io_s = O.iops(a_cdom440=0.0, a_ph440=0.0, spm=20.0)
+    R_s = O.volume_reflectance(io_s['a'], io_s['b_b'], 30.0)
+    check(1, 'chapter 28 doctrine: CDOM DARKENS, sediment BRIGHTENS',
+          (float(np.all(R_c < R_0)), float(np.all(R_s > R_0))), (1.0, 1.0),
+          0.0, '"They are opposite controls." Reaching for turbidity to make a '
+          'tannin-stained water gives mud, and this is the row that separates '
+          'the two knobs rather than trusting a comment that they differ.')
+
+    # ------------------------------------------------- 7.4 the Babin bridge
+    check(2, 'Babin et al. (2003): b_p(555)/SPM', float(O.b_p(555.0, 1.0)),
+          0.5, 1e-12,
+          'Chapter 28\'s concentration -> optics bridge, at the wavelength it '
+          'is stated at. 1 mg/L = 1 g/m^3, so each mg/L adds 0.5 m^-1.',
+          unit='m^2/g')
+    for spm, lo, hi in ((1.0, 0.4, 0.7), (1000.0, 400.0, 700.0)):
+        b555 = float(O.b_p(555.0, spm))
+        between(2, 'the bridge\'s own dimension check at SPM = %g mg/L' % spm,
+                b555, lo, hi,
+                'Chapter 28 checks its own bridge twice: "a coastal few-mg/L '
+                'water then has b of order 1 m^-1, and a 1000 mg/L silt river '
+                'has b ~ 500 m^-1 -- a millimetre-scale photon path". Both '
+                'ends, so a factor of 1000 in the units cannot hide.',
+                unit='m^-1')
+
+    # ----------------------------------- 7.5 the recovery, and what it predicts
+    # The a_ph(440) this scene uses is recovered from chapter 28's Jerlov 1C
+    # entry. Running the SAME relation FORWARD must return the entry, which is
+    # only a consistency check -- so the row that matters is the next one: what
+    # the recovered water predicts for a DIFFERENT Jerlov type it never saw.
+    kd_fwd = (O.A_W_490 + float(O.a_cdom(490.0, O.A_CDOM_440))
+              + O.A_PH_440 * float(O._chl_shape(490.0))
+              + O.BB_OVER_B * float(O.b_w(490.0))) / O.MU_D
+    check(1, 'the Jerlov 1C recovery, run forward', kd_fwd,
+          O.JERLOV_1C_KD490, 1e-9,
+          'Gordon\'s K_d ~= (a + b_b)/mu_d, inverted to get a_ph(440) and then '
+          'evaluated again. An algebraic identity, and it is here because a '
+          'recovery that does not round-trip is a typo, not a measurement.',
+          unit='m^-1')
+    between(2, 'Secchi depth of the recovered water (Lee et al. 2015)',
+            O.secchi(O.iops()['a'], O.iops()['b_b']), 4.0, 20.0,
+            'Chapter 28: Z_SD ~= 1/min_lambda K_d, and its Jerlov table puts a '
+            'type-I sea at ~30 m and a 9C harbour under a metre. A coastal '
+            'green water belongs between those, nearer the clear end. This is '
+            'a RANGE and not a value: nothing measured the water off Aljezur.',
+            unit='m')
+
+    # ------------------------------------- 7.6 the volume reflectance, derived
+    a, bb = O.iops(spm=3.0)['a'], O.iops(spm=3.0)['b_b']
+    R_inf = O.volume_reflectance(a, bb, 1.0e6)
+    check(1, 'deep limit R -> f b_b/(a + b_b)', R_inf,
+          O.F_GORDON * bb / (a + bb), 1e-12,
+          'The derived integral\'s own limit, in closed form. It fires at a '
+          'dropped mu in either leg, which is the arithmetic this file is most '
+          'exposed to.')
+    between(2, 'the derived f against the published ~0.33',
+            O.F_GORDON, 0.28, 0.36,
+            'f = 1/(1/mu_d + 1/mu_u) comes out of a single-scattering '
+            'integral that has never heard of 0.33; the ocean-colour '
+            'literature (Gordon et al. 1988; Morel & Prieur 1977) writes f ~ '
+            '0.33 from full radiative transfer. The 5% gap IS the multiple '
+            'scattering single scattering leaves out, and its SIGN is right: '
+            'single scattering must under-count.')
+    # tier 3: the same reflectance by quadrature rather than by the closed form
+    zq, wz = np.polynomial.legendre.leggauss(2000)
+    D_test = 4.0
+    zq, wz = 0.5 * D_test * (zq + 1.0), 0.5 * D_test * wz
+    inv = 1.0 / O.MU_D + 1.0 / O.MU_U
+    c = a + bb
+    R_num = np.array([float((wz * bb[ch] * np.exp(-c[ch] * inv * zq)).sum())
+                      for ch in range(3)])
+    check(3, 'volume reflectance: closed form against a quadrature of the '
+          'source integral', O.volume_reflectance(a, bb, D_test), R_num, 1e-10,
+          'The second route integrates b_b E_d(z) exp(-K_u z) dz numerically '
+          'instead of evaluating the antiderivative. It shares the model and '
+          'not the algebra, which is what a tier-3 row on a derivation can be.')
+    # tier 1: the two-layer composition must collapse when the layers agree
+    two = O.column_reflectance(a, bb, 1.5, a, bb, 2.5)
+    check(1, 'the two-layer column collapses to one when the layers agree',
+          two['R'], O.volume_reflectance(a, bb, 4.0), 1e-12,
+          'Splitting a uniform column at an arbitrary depth cannot change its '
+          'reflectance. This is the row that fires at a missing round trip in '
+          'the composition, which is exactly the error `optics.py` records '
+          'itself making on the pool\'s trapped series.')
+
+    # ------------------------------------------------- 7.7 the path, section A
+    io = O.iops()
+    L0 = np.array([1.0, 1.0, 1.0])
+    for Lp in (0.25, 1.0, 3.0):
+        T = O.through_path(L0, np.array(Lp), io['a'], io['b_b'])
+        check(1, 'Beer-Lambert on a + b_b at L = %.2f m' % Lp, T,
+              np.exp(-(io['a'] + io['b_b']) * Lp), 1e-14,
+              'The transport itself, against its own closed form -- which is '
+              'trivial and is here so that the CUVETTE row below is measuring '
+              'the inversion and not the forward model.')
+    # the green must vanish when the path does
+    ge = []
+    for Lp in (0.0, 0.05, 0.5, 2.0, 5.0):
+        T = O.through_path(L0, np.array(Lp), io['a'], io['b_b'])
+        ge.append(2.0 * T[1] / (T[0] + T[2]))
+    check(1, 'THE GREEN VANISHES WHEN THE PATH DOES', ge[0], 1.0, 1e-12,
+          'Bar section A, and it is the sharpest criterion in the file: at '
+          'zero path the transmitted spectrum IS the source spectrum, so the '
+          'green excess of a neutral source is exactly 1. A renderer that '
+          'tints its water body cannot pass this row at any tolerance.')
+    check(1, 'and it grows monotonically with the path',
+          float(np.all(np.diff(ge) > 0)), 1.0, 0.0,
+          'The GRADE, which section A asks for by name -- "the render must '
+          'reproduce the grade, not merely the hue".')
+    info(1, 'green excess 2G/(R+B) at L = 0, 0.05, 0.5, 2, 5 m', tuple(ge),
+         'the wedge, in one row')
+    # the bar's own pure-water number, as an independent check on the water half
+    T2 = np.exp(-OPT.ABS * 2.0)
+    check(2, 'bar section A: pure water over 2 m transmits (0.59, 0.90, 0.98)',
+          T2, np.array([0.59, 0.90, 0.98]), 0.015,
+          'The bar states this triple as the reason the observed hue "is not '
+          'pure water\'s". It is computed here from `optics.ABS` -- Pope & Fry '
+          'band means, which the bar did not use -- so the agreement is '
+          'between two independent statements of the same spectrum. The '
+          'tolerance is the band-mean-versus-point-sample difference.')
+
+    # -------------------------------------------------- 7.8 the cuvette
+    for (l1, l2) in ((0.2, 1.0), (0.5, 3.0), (1.0, 8.0)):
+        t1 = O.through_path(L0, np.array(l1), io['a'], io['b_b'])
+        t2 = O.through_path(L0, np.array(l2), io['a'], io['b_b'])
+        check(1, 'cuvette inversion at L = %.1f / %.1f m' % (l1, l2),
+              O.cuvette_c(t1, t2, l1, l2), io['a'] + io['b_b'], 1e-12,
+              'c = -ln(T2/T1)/(L2 - L1). The source cancels exactly, which is '
+              'the entire argument for using a wedge: nothing about the '
+              'illuminant, the interface or the exposure survives the ratio.')
+    # and what it cannot do
+    io_t = O.iops(spm=40.0)
+    inv2 = O.invert_a_bb(io_t['a'] + io_t['b_b'],
+                         O.volume_reflectance(io_t['a'], io_t['b_b'], 1.0e6))
+    check(1, 'transmission + reflectance separates a from b_b', inv2['a'],
+          io_t['a'], 1e-9,
+          'One geometry gives a + b_b and cannot be inverted further. TWO '
+          'geometries -- the wedge in transmission and the same water in deep '
+          'reflectance -- are two equations in two unknowns and they close. '
+          'This is what the bar means by using the cuvette to BOUND the IOPs.')
+    spm_hat = float(inv2['spm'][1])
+    check(2, 'and the Babin bridge returns the load, in the green band',
+          spm_hat, 40.0, 0.05,
+          'The bridge is stated at 555 nm and the green band is centred at '
+          '545, so the recovered load carries the particulate spectral slope '
+          'over 10 nm -- 1.4% at the declared exponent 0.75 and 1.8% across '
+          'the chapter\'s whole 0.5-1.0 interval. The red and blue bands are '
+          'further off BY EXACTLY THAT SLOPE and are not checked here, because '
+          'that would be checking the slope against itself.',
+          unit='mg/L', rel=True)
+
+    # ------------------------------------ 7.9 the suspension balance
+    # THE DIMENSIONAL ROW, because this is the family of error the standing
+    # rulings name twice and a wrong power of a length is silent in a picture.
+    eps_D = KG / S ** 3                       # eps_s * D_f : W/m^2
+    rho = KG / M ** 3
+    got = eps_D * rho / ((M / S ** 2) * rho * (M / S) * M)
+    check(1, 'the suspension balance is a CONCENTRATION',
+          float(got == rho), 1.0, 0.0,
+          'eps_s D rho_s / (g (rho_s - rho_w) w_s d) pushed through the unit '
+          'algebra rather than through a comment: W/m^2 divided by m^2/s^3 is '
+          'kg/m^2, and one more length makes kg/m^3. Wave 4 shipped this '
+          'formula once with the depth in the wrong place.')
+    check(1, '<|cos|^3> = 4/(3 pi)', O.U3_MEAN,
+          float(np.mean(np.abs(np.cos(np.linspace(0, 2 * math.pi, 2000001)))
+                        ** 3)), 1e-6,
+          'The cubic moment of a sinusoidal orbital velocity, by quadrature '
+          'against the closed form. It is the factor between a peak velocity '
+          'and the stream power it delivers, and dropping it overstates the '
+          'load by 2.36x.')
+    # the load must scale the way the balance says
+    ws = BCH.settling_velocity()
+    s1 = O.suspended_load(1.0, 2.0, ws)
+    s2 = O.suspended_load(2.0, 2.0, ws)
+    check(1, 'the load goes as u_orb^3', s2['M'] / s1['M'], 8.0, 1e-9,
+          'Bagnold\'s balance is linear in the stream power and the stream '
+          'power is cubic in the velocity. A load that scales as u^2 has a '
+          'friction law in it instead of a power.')
+    # THE ROW THE STRATIFICATION EXISTS FOR
+    deep = O.suspended_load(0.9, 8.0, ws)
+    shal = O.suspended_load(0.9, 1.2, ws)
+    io_dp = O.iops(spm=float(deep['spm']))
+    io_sh = O.iops(spm=float(shal['spm']))
+    R_deep = O.column_reflectance(io['a'], io['b_b'],
+                                  8.0 - float(deep['delta']),
+                                  io['a'], io_dp['b_b'],
+                                  float(deep['delta']))['R']
+    R_shal = O.column_reflectance(io['a'], io['b_b'],
+                                  1.2 - float(shal['delta']),
+                                  io['a'], io_sh['b_b'],
+                                  float(shal['delta']))['R']
+    check(1, 'the SAME stirring reads dark at 8 m and pale at 1.2 m',
+          float(R_shal[1] > 4.0 * R_deep[1]), 1.0, 0.0,
+          'One orbital velocity, one balance, one load per unit area -- and '
+          'two colours, because the Rouse layer fills a 1.2 m column and hides '
+          'under a 8 m one. This is the row that fires when the load is '
+          'depth-averaged, and depth-averaging is what makes an entire sea '
+          'milky from a physically correct suspension.')
+    info(1, 'reflectance (green) of the same load at d = 8 m and d = 1.2 m',
+         (float(R_deep[1]), float(R_shal[1])),
+         'the separation the two-layer column buys')
+
+    # ------------------------------------------- 7.10 the glitter, Cox & Munk
+    for u in (0.0, 3.0, 6.0, 12.0):
+        su2, sc2 = O.cox_munk_mss(u)
+        check(2, 'Cox & Munk (1954) component mss at U = %g m/s' % u, su2 + sc2,
+              0.003 + 5.08e-3 * u, 1e-12,
+              'sigma_u^2 = 3.16e-3 U and sigma_c^2 = 0.003 + 1.92e-3 U, which '
+              'is what this file stores; their sum is 0.003 + 5.08e-3 U.')
+        between(2, 'and against the paper\'s own COMBINED fit at U = %g' % u,
+                su2 + sc2, (0.003 + 5.12e-3 * u) * 0.99,
+                (0.003 + 5.12e-3 * u) * 1.01,
+                'AND THE TWO DO NOT AGREE EXACTLY, WHICH IS THE PAPER AND NOT '
+                'A SLIP. Cox & Munk fit the up/downwind and crosswind '
+                'components separately AND fit the total separately, and the '
+                'combined fit is 0.003 + 5.12e-3 U against the components\' '
+                '5.08e-3 -- 0.8% apart at any wind, inside their own quoted '
+                'uncertainties (+-0.004 and +-0.002). A file that quotes both '
+                'numbers as if one implied the other has misread the source; '
+                'this row records the gap instead.')
+    check(1, 'the wind readout inverts the slope law', O.wind_from_mss(
+        sum(O.cox_munk_mss(7.5))), 7.5, 1e-9,
+        'Bar section K asks for the width as a READOUT of the wind, which '
+        'means the map has to run both ways.')
+    # the pdf is a pdf
+    zz = np.linspace(-1.2, 1.2, 1201)
+    ZX, ZY = np.meshgrid(zz, zz)
+    tot = float(np.trapezoid(np.trapezoid(O.slope_pdf(ZX, ZY), zz, axis=1),
+                             zz))
+    check(1, 'the slope distribution integrates to 1', tot, 1.0, 1e-6,
+          'A slope pdf that does not normalise is a brightness multiplier '
+          'wearing a statistic\'s clothes, and it would be absorbed by an '
+          'exposure and never found.')
+    # THE WIDTH IS A READOUT OF THE MEAN SQUARE SLOPE
+    ws_ = []
+    for u in (3.0, 6.0, 10.0, 16.0):
+        r = O.glitter_width_deg(21.02, 10.0, u10=u)
+        ws_.append(r['dphi'] / math.sqrt(sum(O.cox_munk_mss(u))))
+    check(1, 'the glitter width goes as the RMS slope', np.array(ws_),
+          np.full(4, float(np.mean(ws_))), 0.02,
+          'Bar section K1: "the width must come from the slope distribution '
+          'rather than from a spread parameter chosen to look right". If it '
+          'does, then width/sqrt(mss) is a constant of the geometry alone -- '
+          'and it is, to 1.7% over a factor of 5 in wind. That constancy is what '
+          'makes the width a READOUT, and it is what a chosen spread parameter '
+          'cannot reproduce.', unit='deg', rel=True)
+    info(1, 'width / sqrt(mss) at U = 3, 6, 10, 16 m/s', tuple(ws_),
+         'deg per unit RMS slope, at view elevation 10 deg')
+    # THE SHAPE, which the bar says is diagnostic too
+    els = [25.0, 21.02, 15.0, 10.0, 6.0, 3.0, 1.5, 0.5]
+    wid = [O.glitter_width_deg(21.02, e)['dphi'] for e in els]
+    check(1, 'the path NARROWS toward the horizon',
+          float(np.all(np.diff(wid) < 0.0)), 1.0, 0.0,
+          'Bar section K1: "It narrows toward the horizon and spreads toward '
+          'the observer, because the same slope distribution subtends a '
+          'different range of specular directions at different incidences. A '
+          'path of uniform width is wrong in a way that is obvious once stated '
+          'and almost never modelled." The list runs from the near field to '
+          'the horizon, so a monotone DECREASE is the bar\'s claim and this '
+          'row is the bar\'s claim tested against the geometry.')
+    info(1, 'path width in deg at view elev 25/21/15/10/6/3/1.5/0.5',
+         tuple(round(v, 3) for v in wid),
+         'from the specular point to the horizon; the bar predicted the sign '
+         'of this trend and the geometry agrees')
+    # the specular point is where the geometry says
+    prof = O.glitter_azimuth_profile(21.02, 21.02, 0.0,
+                                     np.linspace(-30, 30, 601))[:, 1]
+    check(1, 'the path is centred on the sun\'s own azimuth',
+          float(np.linspace(-30, 30, 601)[int(np.argmax(prof))]), 0.0, 0.06,
+          'The specular direction, and the row that fires at the branch error '
+          'wave 4 actually made: putting the eye at the sun\'s azimuth instead '
+          'of opposite it moves the required facet normal onto the sun and '
+          'evaluates the whole path at exp(-135). A glitter model with the '
+          'wrong branch renders BLACK rather than wrong, which is the kind of '
+          'defect that survives a look at the picture.', unit='deg')
+    # ENERGY. The Jacobian, checked by integrating the radiance it produces.
+    n_mu, n_ph = 160, 320
+    mv = (np.arange(n_mu) + 0.5) / n_mu
+    pv = (np.arange(n_ph) + 0.5) / n_ph * 2 * math.pi
+    dw = (1.0 / n_mu) * (2 * math.pi / n_ph)
+    MV, PV = np.meshgrid(mv, pv, indexing='ij')
+    st = np.sqrt(np.maximum(1 - MV ** 2, 0))
+    R = np.stack([st * np.cos(PV), st * np.sin(PV), MV], -1).reshape(-1, 3)
+    Lg = BOP.glitter_radiance(ATM.SUN_DIR, -R, e_sun=np.ones(3), shadow=False)
+    flux = float((Lg[:, 1] * R[:, 2] * dw).sum())
+    # the second route: the flux the tilted facets INTERCEPT, in slope space
+    zz2 = np.linspace(-1.5, 1.5, 601)
+    ZX2, ZY2 = np.meshgrid(zz2, zz2)
+    nz = 1.0 / np.sqrt(1 + ZX2 ** 2 + ZY2 ** 2)
+    NX, NY = -ZX2 * nz, -ZY2 * nz
+    com = NX * ATM.SUN_DIR[0] + NY * ATM.SUN_DIR[1] + nz * ATM.SUN_DIR[2]
+    p = BOP.slope_pdf(ZX2, ZY2)
+    vz = 2.0 * com * nz - ATM.SUN_DIR[2]        # the mirror direction's z
+    integ = np.where(com > 0, OPT.fresnel(np.clip(com, 0, 1))[..., 1]
+                     * com * p / nz, 0.0)
+    all_f = float(np.trapezoid(np.trapezoid(integ, zz2, axis=1), zz2))
+    inter = float(np.trapezoid(np.trapezoid(np.where(vz > 0, integ, 0.0),
+                                            zz2, axis=1), zz2))
+    check(3, 'the glitter integral returns the flux the facets intercept',
+          flux, inter, 2e-3,
+          'Two routes with nothing in common but the slope pdf: one integrates '
+          'the RADIANCE this file produces over the upward hemisphere, the '
+          'other integrates rho(omega) cos(omega) p / cos(beta) over SLOPE '
+          'SPACE. Their agreement is the Jacobian dw_v = 4 cos(omega) '
+          'cos^3(beta) dz -- the whole physics of a glitter model -- and the '
+          'agreement is the Jacobian and nothing else. The slope integral is '
+          'restricted to facets whose MIRROR DIRECTION POINTS UP, because the '
+          'hemisphere integral can only see those -- and the difference is the '
+          'next row, which is a result rather than a residual.', rel=True)
+    info(3, 'share of the intercepted flux reflected BELOW the horizon',
+         1.0 - inter / all_f,
+         'Facets tilted far enough away from a 21 deg sun send their specular '
+         'lobe into the sea rather than into the sky, and a single-bounce '
+         'glitter model drops that light entirely. At this sun and this wind '
+         'it is 10% of what the surface intercepts -- not a rounding error, '
+         'and exactly the light that a multiple-surface-bounce model would put '
+         'back as the faint filling between the glints. Recorded, not '
+         'modelled.')
+    # and the tilt gain, which is the term a flat-surface normalisation drops
+    between(3, 'the tilt gain against a flat surface', all_f / float(
+        (OPT.fresnel(ATM.SUN_DIR[2])[1] * ATM.SUN_DIR[2])), 1.0, 3.0,
+        'A rough surface intercepts MORE of a low sun than a flat one, because '
+        'the facets tilted toward it are more nearly normal to the beam. At '
+        'this sun (21 deg) and this wind the gain is what it is; the row is a '
+        'range because nothing published fixes it, and it is recorded because '
+        'a renderer that normalises its glitter to a flat surface has thrown '
+        'exactly this away.')
+    # the Snell-cone limit on a face, which is why section A needs a steep one
+    need = math.degrees(math.atan(math.tan(
+        math.pi / 2 - math.asin(1.0 / OPT.IOR[1]))))
+    check(1, 'a lengthwise sightline needs a face steeper than 90 - asin(1/n)',
+          need, 41.49, 0.02,
+          'A ray entering water is confined to the Snell cone, so to travel '
+          'ALONG a wave rather than down into it the face must be tilted by at '
+          'least 90 - asin(1/n) from the horizontal. The number is the '
+          'complement of the critical angle `optics.TC_SNELL` already carries, '
+          'and it is what makes bar section A a NEAR-BREAKING geometry: this '
+          'scene\'s linear free surface reaches 0.08 of slope, which is 4.6 '
+          'deg.', unit='deg')
+
+    # ---------------------------------------------- 7.11 the foam constant
+    check(2, 'bar section C: one constant, three whites, 1 - 1/n^2',
+          O.FOAM_WHITE[1] * 100.0, 43.874, 0.02,
+          'The bar states 43.874% and derives it from the critical angle a '
+          'bubble seen from the water side has. It is computed here from '
+          '`optics.IOR` and nothing else. The foam MODEL is a placeholder and '
+          'says so in its caption; the CONSTANT is not.', unit='%')
+    openq(1, 'foam: three mechanisms, none of them modelled',
+          'coverage mask only', 'surface / entrained air / spray',
+          'Bar section C names three mechanisms with different '
+          'representations -- a surface coverage field with its own advection '
+          'and decay, a participating medium that HIDES THE BED, and a '
+          'particle system -- and section H2 adds a fourth requirement (foam '
+          'stranded by the retreating swash, so two residence times on one '
+          'surface) while H5 adds rotational structure a potential-flow '
+          'advection cannot produce. `beach_optics.foam_coverage` is a '
+          'saturating function of the breaking fraction and NOTHING ELSE. It '
+          'is rendered so the breaking zone is not blank, and every figure '
+          'that shows it says so in its own caption. Measured, understood, '
+          'not achieved.')
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -1892,7 +2471,9 @@ def run_suite():
                       (_sec_states, 'beach state, Iribarren, the sun'),
                       (_sec_coast, 'the coast in plan'),
                       (_sec_transform2d, 'the wave transform in 2-D'),
-                      (_sec_bay, 'the bar in plan')):
+                      (_sec_bay, 'the bar in plan'),
+                      (_sec_optics, 'the coastal IOPs, the path and the '
+                                    'glitter')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -1961,7 +2542,8 @@ if __name__ == '__main__':
         import importlib
         for name, patch in BUGS.items():
             importlib.reload(BCH)
-            patch(BCH)
+            importlib.reload(BOP)
+            patch(BOP if name in OPTICS_BUGS else BCH)
             try:
                 run_suite()
                 caught = [n for n in _fail_names() if n not in base]
