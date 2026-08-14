@@ -467,3 +467,44 @@ the swash nor any waterline. And **the glitter path is exactly where a phone's
 tone curve does its worst**, since it spans the brightest and darkest parts of the
 frame. **Do not read a level off the path.** Read its *geometry* — width, shape,
 extent — which survives the transfer function that its brightness does not.
+
+---
+
+## Arbitration · Section A is unreachable from a linear surface — a bar defect
+
+**Lead agent's ruling, wave 4.** Section A calls the two-colour falsification *"the
+sharpest single criterion in this set"*. It is, and it is also **not reachable from
+the representation the loop is built on**, which makes it a **bar defect and not an
+artifact defect** — the same class as the pool bar's section C, which asked for a
+frame no deck could stand on.
+
+**The geometry, measured.** A ray entering water is confined to the Snell cone, so
+a sightline *along* a crest — the lengthwise path that makes a wave face read green
+against grey-blue water metres away — requires a face steeper than **41.48°**. The
+scene's linear surface reaches **8.21°**.
+
+**So section A moves.** It sits with section F's plunging lip, and **one step
+earlier in the chain**: the lengthwise path needs the nonlinear crest before the
+overturning lip needs the multivalued surface. Section F already defers the lip for
+a structural reason; A now shares it.
+
+**What does not move.** The *physics* of section A was verified this wave and
+stands on its own:
+
+- The grade across a wedge is **1.355 backlit and 1.348 front-lit — identical**,
+  measured on transmittance so the source spectrum cancels. **The grade is the
+  path, and the path does not know where the sun is.**
+- What separates the two is the **forward glow**, not the lighting: the derived
+  Henyey–Greenstein lobe reads 0.6215 sr⁻¹ at 15.8° against 0.0019 at 159°, so the
+  glow is 5.07% of the backlit pixel and **0.00%** of the front-lit one. Only the
+  observer moved.
+- And the bay shows the path law without any wedge at all: the colour ladder runs
+  **0.961 deep → 1.014 at 2–5 m → 1.130 over the shallows** in one exposure from
+  one set of coefficients.
+
+**So the `waterColor` category error is still falsified**, by the bay rather than by
+the wave face. Section A's *claim* survives; only its *instrument* was out of reach.
+
+**Recorded so a critic does not re-open it:** a render may not be marked down for
+failing to show a green wave face until the nonlinear crest exists. When it does,
+section A is the first thing to check against it.
