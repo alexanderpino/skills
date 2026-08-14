@@ -59,9 +59,11 @@ sized so that gaps stay attributable — a round that changes six things teaches
 loop nothing about which change mattered, and makes a lost round impossible to
 revert cleanly.
 
-Note the other things you spotted, in one line. The loop will reach them, or it
-will decide they are not worth reaching — both are decisions it makes with the
-budget in view and you do not.
+Note the other things you spotted as one line each in `gauntlet/backlog.md` — not
+in this round, and not in your handoff as a suggestion. The loop will reach them,
+or it will decide they are not worth reaching; both are decisions it makes with
+the budget in view and you do not. The backlog goes into the final report, so
+nothing you noticed is lost by staying out of scope.
 
 **Close the gap; do not exceed it.** Once the named gap is closed, stop. Extra
 polish past the target costs a round that another lane needed, and it is judged

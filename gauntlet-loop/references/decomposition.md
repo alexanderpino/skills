@@ -120,3 +120,27 @@ reader of the log needs to know that the reset was deliberate.
 A re-cut is also the honest answer when a park was really a cutting mistake: park
 the old lane, cut a new one that contains the structural element, and let the log
 show both. Quietly re-running the same lane under a new name is not a re-cut.
+
+## The scope is frozen — a re-cut redistributes, it never expands
+
+The lane set is agreed in the contract. Between waves it can be **merged, split,
+re-ranked, or replaced**; what it cannot do is grow because the run noticed more
+work. This is the rule that stops a gauntlet becoming an unbounded improvement
+project:
+
+- **New lanes need a freed slot.** A lane enters the funded set when a retirement
+  or a park makes room, or when a re-cut replaces an existing one. Never by
+  addition.
+- **Noticed work goes to `gauntlet/backlog.md`**, one line, and into the report's
+  "noticed, deliberately not funded" section. Builders and critics put it there;
+  nobody funds it this run.
+- **Genuinely new scope is a new contract.** If the artifact turns out to need a
+  whole area nobody cut a lane for, that is a conversation with the user and
+  probably a new run — not a quiet ninth lane.
+- **Raising the bar mid-run does not raise the budget.** It is allowed and
+  announced, but the waves it needs come from the agreed budget or from an
+  extension the user grants.
+
+Reverse the test to catch it early: if the projected call count is higher at wave
+5 than the projection you gave at intake, and no extension was granted, scope
+grew while nobody was looking.

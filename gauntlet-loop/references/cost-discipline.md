@@ -27,7 +27,7 @@ Note what is not on that list: nothing about the *number of waves*. Waves are th
 budget unit the user agreed to. The savings live inside the wave, and a saved
 call is a call the next wave can spend on a real gap.
 
-## The eight rules
+## The ten rules
 
 ### 1. Machine gates before critics
 
@@ -107,7 +107,25 @@ Do not recompute state in prose, do not keep a running summary in context, and
 never hand-write the workbench. If you find yourself explaining the run's state
 to yourself in the transcript, run `status` instead.
 
-### 8. Read each reference once, at its phase
+### 8. Route the model to the role
+
+A mechanical builder does not need the tier a deciding critic needs, and a
+machine-checkable dimension needs no model at all. Routing by role is the largest
+saving after the WIP limit — and the one place where economising can destroy the
+run's evidence rather than its budget. The cheapest model that can do the job,
+never cheaper on the critic whose verdict decides something, and the tier held
+fixed within a lane so score trends stay readable.
+→ `references/model-routing.md`
+
+### 9. Never pay twice for the same verdict
+
+Settled work is not re-judged: a closed gap stays closed, a retired dimension is
+not re-opened, and regressions are caught by the champion comparison and the
+machine gates rather than by a review pass. `log-round` warns when a record lands
+on a retired dimension, because that round is money spent on ground the run
+already covered (`failure-modes.md` → Re-litigation).
+
+### 10. Read each reference once, at its phase
 
 The reference files are indexed by phase at the bottom of `SKILL.md`. Reading all
 of them at intake costs the whole set before the run has decided anything, and

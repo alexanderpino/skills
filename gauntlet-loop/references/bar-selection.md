@@ -89,6 +89,32 @@ TARGET   hero reads as professionally art-directed — the three frozen referenc
 STRETCH  indistinguishable from reference 2 at full resolution (direction only)
 ```
 
+## Where the target sits on the ladder
+
+A gauntlet does not generate a POC, then an MVP, then an MLP. It runs *after* you
+have something inspectable, and it moves one artifact up a quality ladder. But
+the ladder is still the clearest way to say where a target belongs, so use it —
+Kniberg's **earliest testable → usable → lovable** (`authorities.md`):
+
+| Rung | What it means here |
+|---|---|
+| **Testable** | The artifact exists and a critic can reach it. This is the *precondition* for a gauntlet, not a phase of it. If you are not here yet, wave 1 is the bootstrap wave that gets you here. |
+| **Usable / viable** | Where the **target bar** normally sits. Good enough to hand over; retirement is judged against it. |
+| **Lovable** | Where a **stretch** normally sits. Direction, reported as distance, never a stop condition. |
+
+Two consequences worth stating at intake:
+
+- **The bootstrap wave builds a thin end-to-end slice, not one perfect part.**
+  Kniberg's skateboard: something whole and crude beats one excellent wheel,
+  because lanes cannot be judged independently until the whole thing exists to
+  judge. A wave 1 that produces a beautiful header and no page has produced
+  nothing a critic can compare against a reference page.
+- **A gauntlet answers the quality question only.** It cannot tell you whether
+  anyone wants the artifact, whether it is buildable at scale, or whether the
+  business case holds. If what the user actually needs is a POC to decide
+  *whether to build at all*, say so — that is discovery work, and running a
+  quality loop against an unvalidated idea polishes something nobody ordered.
+
 ## The feasibility check
 
 Ambitious is fine; unfunded is not. After round zero you have one real data

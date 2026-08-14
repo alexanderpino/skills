@@ -90,6 +90,40 @@ budget left, that is a bar problem: raise it, announced and recorded, and let th
 run continue against something real. Do not fund unjudged polish — no gap, no
 builder.
 
+## Re-litigation
+
+**Signal.** Rounds spent on ground the run already covered: a retired dimension
+judged again, a closed gap re-argued by a new critic, a whole-artifact review
+"just to check" every few waves. The log grows; the artifact does not.
+
+**Cause.** No notion of settled work. Each critic starts cold by design, so
+without an explicit rule nothing stops one from re-opening a question the log
+answered three waves ago — and a lead agent nervous about quality will invite it.
+
+**Repair.** Settled is settled: a closed gap and a retired dimension are not
+re-judged (`critic.md`), and `log-round` warns when a record lands on a retired
+dimension. Regressions are caught *mechanically* rather than by re-review — the
+champion/challenger comparison catches them within a dimension, and machine gates
+re-run every wave catch them across dimensions. A critic that believes something
+previously closed has broken reports it as a regression in NOTES, with evidence.
+
+## Scope snowball
+
+**Signal.** More lanes at wave 6 than at wave 1. Builders fixing adjacent things
+they noticed. A projected call count that has quietly doubled since intake, with
+no extension granted.
+
+**Cause.** Every agent in the loop can see improvements outside its lane, and
+each individual addition looks small and obviously worthwhile. Nothing in the
+method stops the sum.
+
+**Repair.** The scope is frozen at the contract (`decomposition.md`): re-cuts
+redistribute, they never expand, and a new lane needs a slot freed by a
+retirement or a park. Noticed work goes to `gauntlet/backlog.md` and into the
+report, where the user can buy it deliberately in a future run. Compare the
+current projection against the intake projection at each wave boundary — a rise
+with no granted extension is the snowball, measured.
+
 ## Token burn
 
 **Signal.** Cost per closed gap climbing wave over wave in `status`. Waves that

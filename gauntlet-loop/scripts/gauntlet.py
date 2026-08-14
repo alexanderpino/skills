@@ -173,6 +173,11 @@ def cmd_init(args):
         ("contract.md", "# Gauntlet contract\n\n(goal / target bar / stretch / inspection / "
                         "stops / kill criteria / budget / autonomy / workbench)\n"),
         ("ownership.md", "# File ownership — refreshed every wave\n\n| lane | owned paths |\n|---|---|\n"),
+        # Noticed-but-not-funded work. One line each, never promoted into the
+        # run without a re-cut — this is what stops a wave from growing.
+        ("backlog.md", "# Backlog — noticed, deliberately not funded\n\n"
+                       "One line per item. Nothing here is in scope for this run; the report\n"
+                       "carries the list so the user can decide what a future run should cover.\n\n"),
     ):
         p = root / name
         if not p.exists():
@@ -211,6 +216,20 @@ def cmd_log_round(args):
             "(`park --resume`) or leave it parked.",
             file=sys.stderr,
         )
+    else:
+        # Settled work is not re-judged. A retired dimension has already met its
+        # bar; re-running it is the commonest way a long run spends money on
+        # ground it already covered.
+        prior = load_rounds(root)
+        if prior:
+            per_prior, _r, _c = _lane_dim_status(prior, cfg)
+            if per_prior.get((args.lane, args.dimension), {}).get("retired"):
+                print(
+                    f"warning: [{args.lane} / {args.dimension}] has retired — settled work is not "
+                    "re-judged. Log this only as a regression check (say so in the gap text); "
+                    "otherwise you are paying to re-review a closed dimension.",
+                    file=sys.stderr,
+                )
     if args.mode not in MODES:
         die(f"mode must be one of {MODES}")
     if args.winner not in WINNERS:
@@ -235,6 +254,8 @@ def cmd_log_round(args):
         "evidence": args.evidence,
         "critic_framing": args.critic_framing,
     }
+    if args.critic_model:
+        rec["critic_model"] = args.critic_model
     if args.calls is not None:
         if args.calls < 0:
             die("--calls cannot be negative")
@@ -949,6 +970,16 @@ def cmd_report(args):
     blind = sum(1 for r in rounds if r["mode"] == "blind")
     rubric = sum(1 for r in rounds if r["mode"] == "rubric")
     lines += [f"Verdict evidence: {blind} blind rounds, {rubric} rubric rounds (not equivalent evidence)", ""]
+    tiers = {}
+    for r in rounds:
+        if r["mode"] in BAR_MODES and r.get("critic_model"):
+            tiers[r["critic_model"]] = tiers.get(r["critic_model"], 0) + 1
+    if tiers:
+        lines += [
+            "Critic tiers: " + ", ".join(f"{m} ({n})" for m, n in sorted(tiers.items()))
+            + " — a streak from a cheaper critic is weaker evidence; say so where it matters.",
+            "",
+        ]
     lines += ["## Lanes", ""]
     for (lane, dim), s in sorted(per.items()):
         lines.append(
@@ -964,6 +995,22 @@ def cmd_report(args):
             lines.append(f"- [{lane} / {dim}]{state} {s['open_gap']}")
     if not any_gap:
         lines.append("- none recorded — verify this against the last wave's verdicts before believing it")
+    backlog = root / "backlog.md"
+    if backlog.exists():
+        items = [
+            ln.strip() for ln in backlog.read_text().splitlines()
+            if ln.strip().startswith(("-", "*"))
+        ]
+        if items:
+            lines += [
+                "",
+                "## Noticed, deliberately not funded",
+                "",
+                "Seen during the run and kept out of it on purpose. This is scope the user"
+                " can choose to buy in a future run — it was never silently added to this one.",
+                "",
+            ]
+            lines += items
     lines += [
         "",
         "## Distance to the stretch bar, if one was set",
@@ -1019,6 +1066,9 @@ def main():
     p.add_argument("--action", help="promoted|reverted — champion mode only")
     p.add_argument("--champion-ref", help="git ref or snapshot path of the pre-round champion")
     p.add_argument("--critic-framing", default="default")
+    p.add_argument("--critic-model",
+                   help="model tier that produced this verdict (optional); the report shows the "
+                        "distribution, because a streak from a cheap critic is weaker evidence")
     p.add_argument("--calls", type=int,
                    help="subagent calls this round actually cost (optional; estimated when omitted)")
     p.set_defaults(fn=cmd_log_round)

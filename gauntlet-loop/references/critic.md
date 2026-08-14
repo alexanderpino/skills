@@ -119,6 +119,17 @@ different source asset, a structural change below this lane, or a decision only
 the user can make, say that in one line in NOTES. It is the most useful thing you
 can tell the run: it stops the loop funding rounds that cannot reach the problem.
 
+**Do not re-open settled work.** A gap the log has closed is closed, and a
+dimension that has retired is not yours to re-argue. Judge this round's artifact
+on this round's dimension.
+
+The one exception is a **regression**: if something previously closed has
+visibly broken, say so in NOTES with the evidence and label it a regression. That
+is a report of new damage, not a re-review — and it is exactly what the promotion
+comparison exists to catch, so it should be rare. Re-litigating a closed gap
+because you would have judged it differently costs the run a round and teaches it
+nothing.
+
 ## When our side wins the bar comparison
 
 Say so plainly — that is a real result, not a failure to find fault. Then still

@@ -85,6 +85,18 @@ contract block ("8 waves × 3 lanes ≈ 56 subagent invocations") so "budget: 8
 waves" is a number they can actually evaluate. Parallel lanes raise the burn
 rate, not the total; `init` prints the projection for you.
 
+Say **which model tier each role runs on** in the same breath, because it changes
+what those calls cost by up to 5× (`model-routing.md`). The default worth stating
+plainly: judgement roles inherit the session model, mechanical builders drop a
+tier, machine-gated dimensions cost nothing, and the deciding critic is never the
+place to economise.
+
+**Scope is frozen at this contract.** Say so out loud: the lane set can be
+re-cut, merged or re-ranked between waves, but it does not grow because the run
+noticed more work. Anything noticed lands in `gauntlet/backlog.md` and comes back
+in the report as "noticed, deliberately not funded" — so the user buys extra
+scope on purpose or not at all.
+
 Say what happens when it runs out, at intake, so nobody has to guess later: the
 run **stops**, reports, and comes back with an extension offer — a next block of
 waves, priced, with the log's read on whether the artifact is still improving.
