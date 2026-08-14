@@ -554,6 +554,22 @@ least-confident-claims ledger in `00-index.md`.
   near-constant answer is the coefficient and the glow's share moving in opposite directions
   (0.012, 0.026, 0.038 inferred), not the bias being insensitive to geometry. Quote the formula,
   not the percentage.
+- **P/D** — [Diffraction is not refraction](12-water-rendering.md#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it).
+  The Sommerfeld half-plane solution and its coastal-engineering use for breakwaters
+  (Penney & Price 1952) are `P` — cited for the *structure*, and **not** re-verified against those
+  papers this run. The numbers beside them are `D`, evaluated here from Fresnel integrals rather
+  than read off a table: `K_d = 0.5000` exactly on the shadow boundary, 0.31 / 0.20 / 0.11 at
+  `v` = 0.5 / 1 / 2, and the lee centre-line amplitude behind a strip (0.20 → 0.80 over 0.1 → 10
+  `W²/λ`) from the Fresnel–Kirchhoff integral. The `W²/λ` closing scale follows from that table and
+  is stated as a scaling, not a formula to quote. The **2.5× lee focus** is measured here on
+  `reference-impl/beach.py`'s `transform_2d` with a 40 m emergent rock on a flat 8 m shelf
+  (`λ = 74.4 m`, `H = 3.66 m` on the lee centre line against a 1.478 m ambient) — a property of
+  *that* march's `D_MIN` depth floor, quoted to show that the diffraction-free failure is not
+  always a shadow, not to claim every implementation focuses. The refraction figures it is
+  contrasted with (0.186 / 0.310 / 0.277° on a rotated bed) are recomputed here from
+  `validate_beach.py`. The originating observation is a photograph of surf closing in the lee of an
+  isolated rock; `?` for that scene's wavelength and obstacle width, which is why the chapter states
+  the regime rather than a number for it.
 - **D** — The wall as a light carrier, in
   [Caustics](12-water-rendering.md#caustics-the-other-half-of-the-light-path). The 35% mean / 77% worst-texel wall share
   of the bed's cosine-weighted hemisphere is an exact rectangle view factor computed per texel; the

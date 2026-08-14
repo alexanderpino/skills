@@ -513,7 +513,9 @@ and supplies the entire cue list:
 - **Refraction**: the end of a crest sitting in deeper water outruns the end in shallower
   water, so crests rotate toward alignment with depth contours — surf arrives near
   shore-parallel regardless of wind direction, wraps around headlands, and focuses on points.
-  This is the strongest single cue in the list.
+  This is the strongest single cue in the list. It is *not* what bends a crest round an **isolated**
+  rock — that is diffraction, it is a different equation, and no model in this section has any of it
+  ([below](#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it)).
 - **Breaking**: a wave breaks when its height reaches roughly the local depth —
   `H ≈ 0.78·h` (the McCowan-type criterion). *How* it breaks is classified by the
   surf-similarity (Iribarren) number `ξ = tanβ / sqrt(H/L₀)` (β = beach slope, L₀ = deep-water
@@ -531,6 +533,75 @@ and supplies the entire cue list:
 | Foam born at the break, dying up the beach | Turbulent bore, swash | Foam lifecycle keyed to break mask + phase; decays into run-up streaks | Break mask, shore distance |
 | Wet dark sand band that follows the surf | Run-up / swash envelope | Max-recent-run-up envelope feeds the wetness overlay (`13`/`14`) | Run-up height, shore distance |
 | Steep breaking chop at river mouths; rips cut smooth lanes through the surf | Wave–current interaction (Doppler-shifted dispersion) | Modulate amplitude, steepness, and break threshold by opposition `dot(waveDir, −flow)`; force chop where opposing flow approaches group speed | Flow field + depth |
+
+### Diffraction is not refraction, and nothing above contains any of it
+
+The refraction bullet says crests "wrap around headlands". That is true of a **headland**, which is
+a depth gradient, and it is what every tier below computes. It is *not* what happens behind an
+isolated rock, a stack, a jetty head or a breakwater, and the difference is not a matter of degree:
+
+- **Refraction** is eikonal turning of a ray where the wave speed varies. It is in every model in
+  this section — the `k(ω,h)` LUT, the travel-time phase field, the per-wave depth response — and
+  it is verifiable. On the reference implementation, a marching transform given a plane bed whose
+  contours run at 10 / 20 / 30° to its own grid, and never told the rotation, reproduces Snell about
+  the rotated normal to **0.186 / 0.310 / 0.277°** (`D`, recomputed here). The mechanism works.
+- **Diffraction** is energy spreading *into a geometric shadow*. **It is not in the ray description
+  at all** — not approximated badly, not present at low accuracy: a ray carries energy along a path
+  and there is no path into the shadow. Adding depth resolution, ray count or LUT precision does not
+  produce a single quantum of it.
+
+**What it costs, in one exact number.** For a plane wave past a straight edge the field on the
+geometric shadow boundary is the Sommerfeld half-plane result, and it is exactly **half the incident
+amplitude** — a quarter of the energy — falling to `K_d` = 0.31, 0.20, 0.11 at Fresnel parameters
+`v` = 0.5, 1, 2 into the shadow (`D`, Fresnel integrals evaluated here; `K_d(0) = 0.5000`). A ray
+model says **zero** at all four. That is the size of the term, and it is the term that makes a real
+lee look like water rather than like a hole.
+
+**The controlling parameter is the obstacle's width over the wavelength, and it decides how far the
+shadow reaches before it closes.** Behind an obstacle of width `W`, the lee fills in over a distance
+of order `W²/λ` — the distance at which the Fresnel zone grows wider than the obstacle. Computed on
+the lee centre line (Fresnel–Kirchhoff, incident amplitude 1, `D`):
+
+| distance behind, in `W²/λ` | 0.1 | 0.25 | 0.5 | 1 | 2 | 4 | 10 |
+|---|---|---|---|---|---|---|---|
+| amplitude on the centre line | 0.20 | 0.31 | 0.41 | **0.51** | 0.62 | 0.71 | 0.80 |
+
+So `W/λ` is the whole story, because `W²/λ = λ·(W/λ)²`:
+
+- **`W/λ ≫ 1`** — a long island, a full breakwater. The shadow is real and persists for
+  `(W/λ)²` wavelengths. Ray optics is a good approximation and diffraction is a soft edge on it.
+- **`W/λ ≪ 1`** — a pier piling. The lee closes within a fraction of a wavelength; there is no
+  shadow, but there is also almost no feature, so nobody notices the model's.
+- **`W/λ ≈ 1`** — an isolated rock in ordinary swell, which is the common case on a rocky coast.
+  ⚠️ **This is where ignoring diffraction is worst**: the obstacle is large enough to be a visible
+  feature in frame, and the shadow it "should" cast closes within about one wavelength, so a model
+  that carves one is wrong across the whole of it. Photographs of surf past an isolated rock show
+  the crests bending round and **closing again in the lee within a wave or two**; a ray model does
+  not.
+
+**And the failure is not always a shadow — which is the part worth checking before assuming.** A
+ray/eikonal transform has no boundary condition for an emergent obstacle at all, so what it does
+with one depends on how the depth field is floored. Put a 40 m rock standing 1 m out of the water
+into the reference implementation's plan-view march on a flat 8 m shelf (`λ = 74 m`, so
+`W/λ = 0.54`) and the rock becomes a `D_MIN` **shoal**, not a boundary: the march refracts rays into
+it, focuses them, and delivers a lee centre-line wave height of **3.66 m against a 1.48 m ambient —
+2.5× too high, where the truth is a filled-in shadow at roughly ambient** (`D`, measured here). A
+different implementation that masks the rock as land and stops propagation gives the opposite
+error, a hard-edged hole. **Neither is diffraction, and the two look nothing alike**, so "does the
+model have diffraction" cannot be answered by looking at the lee and deciding whether it seems dark
+enough.
+
+**The test is one object and it is cheap.** Put an isolated obstacle a wavelength or so across into
+the scene and look at what is behind it. For any ray, eikonal or travel-time model the answer is
+*no diffraction*, by construction — the value of the test is that it converts a structural fact into
+something a reviewer can see in one frame, and it forces the question of whether this scene has any
+isolated obstacles in it. If it does not — an open beach, a smooth bay — the term is genuinely
+absent from the shot and nothing is owed. If it does, say which of the two errors above the
+implementation makes, because they need different fixes: the shoal-focus artefact is fixed by
+handling emergent cells as boundaries, and the hard shadow needs an actual diffraction term
+(a Sommerfeld/Penney–Price edge solution stamped per obstacle, or a spectral model that carries
+directional spreading) rather than a wider filter on the depth field. **Blurring the shadow is not
+modelling the diffraction**; it happens to look better and it gets `W/λ` wrong in both directions.
 
 ### Tier 1 — depth-modulated ambient synthesis
 
