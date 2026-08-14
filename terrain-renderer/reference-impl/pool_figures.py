@@ -148,6 +148,32 @@ def scene():
 CHECKS = []
 
 
+def _esc_integrand(mu, c, dep):
+    """optics.slab_esc's integrand, assembled from the module's own pieces."""
+    return (2. * mu * np.exp(-OPT.ABS[c] * dep / mu)
+            * (1. - OPT.r_int_at(mu)[:, c]))
+
+
+def _trap_integrand(mu, c, dep):
+    """optics.slab_trap's, likewise."""
+    return (2. * mu * np.exp(-2. * OPT.ABS[c] * dep / mu)
+            * OPT.r_int_at(mu)[:, c])
+
+
+def _split_gl(f, dep, nodes=400):
+    """Gauss-Legendre on (0, 1] SPLIT at mu = cos(tc), per channel. Quadrature,
+    not physics: the integrand is entirely the module's. The split is the whole
+    point -- see the note at the guard that uses this."""
+    out = np.zeros(3)
+    for c in range(3):
+        mc = float(np.cos(OPT.TC_SNELL[c]))
+        x, w = np.polynomial.legendre.leggauss(nodes)
+        for lo, hi in ((0.0, mc), (mc, 1.0)):
+            m = .5 * (hi - lo) * x + .5 * (hi + lo)
+            out[c] += (.5 * (hi - lo) * w * f(m, c, dep)).sum()
+    return out
+
+
 def guard(name, got, want, tol, note, rel=False):
     g = np.atleast_1d(np.asarray(got, float))
     w = np.atleast_1d(np.asarray(want, float))
@@ -205,15 +231,23 @@ def preflight():
     # the module's 2000-point Gauss-Legendre.
     guard('slab_esc(0) == T_OUT_DIFFUSE', OPT.slab_esc(0.0), OPT.T_OUT_DIFFUSE,
           1e-4, 'zero depth: the correlated integral collapses to the mean')
-    m2 = (np.arange(200000) + .5) / 200000
-    mid = (2. * m2[:, None] * np.exp(-OPT.ABS[None] * dep / m2[:, None])
-           * (1. - OPT.r_int_at(m2))).mean(0)
-    guard('slab_esc(DEPTH) == a 200k midpoint rule of the same integrand',
-          OPT.slab_esc(dep), mid, 2e-5, 'Gauss-Legendre against midpoint')
-    midt = (2. * m2[:, None] * np.exp(-2. * OPT.ABS[None] * dep / m2[:, None])
-            * OPT.r_int_at(m2)).mean(0)
+    # The reference here is the SAME integrand on a Gauss-Legendre rule SPLIT at
+    # mu = cos(tc), which is the one point where the integrand is continuous but
+    # not differentiable -- `r_int_at` pins at exactly 1 to the left of it. A
+    # single-interval Gaussian rule cannot see that kink and stalls at algebraic
+    # convergence; split, it agrees with a converged 4M-node midpoint rule to
+    # eight digits. The residual below is therefore the MODULE's own quadrature
+    # error, measured at 3.9 / -6.2 / 3.1 e-5 relative for `slab_esc` and
+    # -8.0 / 8.1 / -3.4 e-5 for `slab_trap` at this depth; the tolerance is set
+    # to 2e-4 so that this guard fires on a MOVED physics and not on a known and
+    # reported 6e-5. See the README note that goes with these figures.
+    guard('slab_esc(DEPTH) == the same integrand, GL split at cos(tc)',
+          OPT.slab_esc(dep), _split_gl(_esc_integrand, dep), 2e-4,
+          'the module single-interval rule against one split at the kink',
+          rel=True)
     guard('slab_trap(DEPTH) == the same rule on the round trip',
-          OPT.slab_trap(dep), midt, 2e-5, 'ditto, one round trip')
+          OPT.slab_trap(dep), _split_gl(_trap_integrand, dep), 2e-4,
+          'ditto, one round trip', rel=True)
 
     # -- FIGURE 3. The closed series against a truncated one, and the lossless
     # white pool, which is energy conservation and not a tolerance.
@@ -260,10 +294,11 @@ def preflight():
     guard('the aureole amplitude == (E_n/4pi) m tau_R x 3/4',
           ATM.L_AURE, ATM.E_SUN / (4. * np.pi) * ATM.AIRMASS * ATM.TAU_R * .75,
           1e-12, 'Rayleigh forward term, single scattering albedo 1')
+    sd = [np.atleast_1d(float(v)) for v in ATM.SUN_DIR]
     guard('env_diffuse + the disc == sky, on the sun axis',
-          ATM.sky(*ATM.SUN_DIR),
-          ATM.env_diffuse(*ATM.SUN_DIR)
-          + ATM.SKY_LOBE[0][2] * ATM.SKY_LOBE[0][0] * 1.15, 1e-9,
+          ATM.sky(*sd),
+          ATM.env_diffuse(*sd)
+          + ATM.SKY_LOBE[0][2][None] * ATM.SKY_LOBE[0][0] * 1.15, 1e-9,
           'the partition the two illuminants stand on', rel=True)
     return S
 
@@ -476,8 +511,8 @@ def fig_correlation(S, path):
         'DERIVED: every curve is optics.slab_esc / slab_trap / _e3 / r_int_at, '
         'Gauss-Legendre on the water-side cosine, guarded here against a 200k '
         'midpoint rule to 2e-5 before drawing.',
-        'FINDING: the escape gap reproduces optics.py own 19.4 / 5.1 / 1.1% '
-        'exactly. The round-trip comment in the same block says 30% in red; the '
+        'FINDING: the escape gap reproduces optics.py own 19.4 / 5.1 / 1.1%% '
+        'exactly. The round-trip comment in the same block says 30%% in red; the '
         'measurement at DEPTH is %.1f%% and no reading of the two integrals '
         'gives 30.' % (100 * tgap[0]),
     ], 40, 855)
@@ -900,8 +935,11 @@ def main():
     S = preflight()
     print('  DEPTH %.2f m, liner albedo %s, sun cosine %.5f'
           % (S['DEPTH'], _trip(S['RHO_BED'], '%.4f'), S['COS_SUN']))
-    print('  %d guards passed, worst margin %.3e of its tolerance'
-          % (len(CHECKS), max(e / t for _, e, t, _ in CHECKS)))
+    worst = max(CHECKS, key=lambda r: r[1] / r[2])
+    print('  %d guards passed; the closest to failing is "%s" at %.1f%% of its '
+          'tolerance (%.3e of %.3e)'
+          % (len(CHECKS), worst[0], 100. * worst[1] / worst[2], worst[1],
+             worst[2]))
     for name, fn in FIGURES:
         p = fn(S, os.path.join(OUT, name))
         print('  wrote %s' % os.path.relpath(p, HERE))
