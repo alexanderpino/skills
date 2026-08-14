@@ -48,8 +48,9 @@ orchestrator instead. The two compose: orchestrate to *done*, gauntlet to *good*
 ## Requirements and blast radius
 
 - **Version control is required** — the champion/challenger guard is built on it.
-  Refuse to start on a dirty tree, so the first champion is a known state and a
-  full abort is one command. No VCS? `git init` with consent, before wave 1.
+  Refuse to start **wave 1** on a dirty tree, so the first champion is a known
+  state and a full abort is one command. No VCS? `git init` with consent, also
+  before wave 1. Phase 0 is exempt: it runs on any tree.
 - **Writes are confined** to the workspace and `gauntlet/`; builders write only
   files they own this wave. **Under Mission Control**, initialise inside the
   assigned worktree (`mc/<id>`), never the repo root, and cut lanes that respect
@@ -121,14 +122,31 @@ makes every later decision concrete.
 
 Then the arithmetic, out loud:
 
-> rounds to close the first gap × lanes ÷ WIP limit ≈ waves needed
+> rounds you estimate per gap × lanes ÷ WIP limit ≈ waves needed
 
-Three answers fall out of that one step, each cheaper here than anywhere later:
+Estimate the numerator from first light's own verdict, and say which reading you
+took so it can be argued with: a `minor` gap with a named fix is usually one
+round, a `major` gap two or three, and a gap the critic calls structural is not
+closeable at lane level at all — that is a rescope, not a number.
+
+Three answers fall out of this one step, each cheaper here than anywhere later:
 whether inspection works, whether the bar is sharp enough to discriminate (a
 vague verdict means fix the bar, not run the wave), and whether the projection
 fits a budget. If it does not fit, **rescope before wave 1** — drop the
 lowest-ranked lane, lower the target (the old one becomes the stretch), or ask
 for more budget. Say which you chose.
+
+Two exemptions, because first light runs before `init` exists:
+
+- **Its comparison is the one that does not go through the log.** Record the
+  verdict in `contract.md` when you write it; every later comparison is logged.
+- **Its bar is a *candidate*** — a reference you propose, not yet frozen.
+  Freezing under `gauntlet/bar/` happens at Phase 2, once the contract names it.
+
+It also runs **regardless of tree state**. The dirty-tree refusal and any
+`git init` consent belong to the contract, before the first funded wave — not in
+front of the user's first look at anything. First light's output is the wave-1
+baseline the champion guard arms against.
 
 A contract negotiated against a visible artifact is faster to agree and better
 informed than one argued in the abstract, and the user waits minutes rather than
@@ -218,8 +236,8 @@ Per lane, per round:
 1. **Build.** Builder gets the lane goal, the bar path, the current artifact and
    the last named gap — not the previous builder's reasoning.
    → `references/builder.md`
-2. **Snapshot.** Commit the pre-round champion (`references/state-and-resume.md`).
-   Nothing is merged yet.
+2. **Snapshot.** One champion commit per wave, taken before the builders spawn —
+   that ref is every lane's `--champion-ref` (`references/state-and-resume.md`).
 3. **Gate, then judge.** Run any machine gate first — a dimension failing its own
    benchmark needs no critic. Then one critic call covering both comparisons
    (→ `references/critic.md`, `references/blind-protocol.md`):
@@ -233,17 +251,28 @@ Per lane, per round:
 5. A bar verdict with severity `major`/`minor` and no specific gap is invalid and
    rejected. A `none` verdict must still cite what it inspected.
 
-**Run the funded lanes concurrently.** Spawn the wave's builders in a *single
-message*, then their critics the same way. A wave's wall-clock is then the
-slowest lane rather than the sum of all of them — at a WIP limit of 3, roughly a
-third of the elapsed time for identical cost. Lanes own disjoint files, so they
-cannot collide; that is what the ownership ledger buys you.
+**Run independent lanes concurrently.** Spawn the wave's builders in a *single
+message*, and spawn each lane's critic the moment **that lane's** builder returns
+— not when the slowest one does. A critic reads paths and owned files, never
+another lane's output, so waiting buys nothing. A wave's wall-clock is then the
+slowest *lane* rather than the sum of all of them: at a WIP limit of 3, roughly a
+third of the elapsed time for identical cost.
 
-Keep the barriers to the two that earn one: the smoother at the end of a wave,
-and the wave-boundary review. Everything else runs inline — snapshots are commits
-rather than calls, machine gates are fast and kill bad rounds before a critic is
-spent, logging is a subprocess. Never block on the user mid-wave; check-ins
-belong at boundaries, if autonomy asked for them at all.
+**Serialise a pair instead when one lane's result changes what "good" means for
+the other** — lighting before materials, information architecture before
+paragraph polish (`references/decomposition.md`). Concurrency is the default for
+independent lanes, not a rule that overrides dependency.
+
+**Snapshot the wave, not the round.** Take one champion commit *before* the
+builders are spawned and use that ref for every lane in the wave. Concurrent
+per-round commits contend on the git index and capture each other's half-built
+trees — disjoint *file* ownership does not make the index disjoint. Reverts stay
+path-scoped to the losing lane's owned files, which is what makes one snapshot
+enough.
+
+That leaves the two barriers that earn one: the smoother at the end of a wave,
+and the wave-boundary review. Machine gates and logging run inline. Never block
+on the user mid-wave; check-ins belong at boundaries, if autonomy asked for them.
 
 ## Phase 5 — Smooth
 
@@ -335,8 +364,8 @@ Full protocol, including when the offer is "stop": `references/stop-conditions.m
   stay retired; regressions are caught by the champion comparison and the machine
   gates, and reported with evidence — never re-argued.
 - **Scope is frozen at the contract.** Re-cuts redistribute; they never expand.
-- **Every comparison goes through the log.** State the model remembers is state
-  the run will lose.
+- **Every comparison goes through the log** (first light excepted — it predates
+  `init`). State the model remembers is state the run will lose.
 - **The budget is extended by the user or not at all.**
 - **Visible text is Simplified Technical English (ASD-STE100):** active voice, one
   statement per sentence, 20–25 words max, no marketing language.
@@ -345,23 +374,24 @@ Full protocol, including when the offer is "stop": `references/stop-conditions.m
 
 Read `references/failure-modes.md` before long unattended runs. The short list:
 
-| Mode | Signal | Response |
-|---|---|---|
-| Critic sycophancy | Everything passes, gaps get vaguer | Force a choice; severity field; require evidence |
-| Rubric gaming | Builder optimises the critic's wording, not the bar | Rotate critic framing; re-randomise labels |
-| Bar erosion | Comparisons quietly get easier | Re-read frozen bar files each wave |
-| Unreachable bar | Every round fails; scores never move | Target where done is; ambition goes in the stretch |
-| Progress theatre | Rounds logged, artifact unchanged | Per-round artifact evidence; diff champions |
-| Zombie lane | Same gap, round after round, still funded | `status` flags it; park it |
-| Lane collision | Two lanes fight over one file | One file, one owner per wave |
-| Downhill drift | Late output worse than mid-run | Champion commits; revert losers; per-dimension bars |
-| Context bleed | Critic echoes builder's justifications | Critic gets artifact + bar only |
-| Gold plating | Rounds spent past the target on a retired dimension | Retirement is a stop, not a suggestion |
-| Re-litigation | Closed gaps re-argued; retired dimensions re-judged | Settled is settled; regressions caught mechanically |
-| Scope snowball | More lanes at wave 6 than wave 1; projection quietly doubled | Frozen scope; new lanes need a freed slot; backlog |
-| Token burn | Cost per closed gap climbing wave over wave | Machine gates, one critic call, WIP limit, model routing |
-| Budget creep | Extensions granted repeatedly, each "nearly there" | Block-sized extensions, evidence per grant, hard cap |
-| Inspection rot | Stale or missing evidence | Re-verify the path at every wave boundary |
+| Mode | Signal |
+|---|---|
+| Critic sycophancy | Everything passes; gaps get vaguer |
+| Rubric gaming | Builder matches the critic's wording, not the bar |
+| Bar erosion | Comparisons quietly get easier |
+| Unreachable bar | Every round fails; scores never move |
+| Progress theatre | Rounds logged, artifact unchanged |
+| Zombie lane | Same gap, round after round, still funded |
+| Ceiling denial | The same gap recurs; reverts climb |
+| Lane collision | Two lanes fight over one file |
+| Downhill drift | Late output worse than mid-run |
+| Context bleed | Critic echoes the builder's justifications |
+| Gold plating | Rounds spent past the target on a retired dimension |
+| Re-litigation | Closed gaps re-argued; retired dimensions re-judged |
+| Scope snowball | More lanes at wave 6 than wave 1; projection doubled |
+| Token burn | Cost per closed gap climbing wave over wave |
+| Budget creep | Extensions granted repeatedly, each "nearly there" |
+| Inspection rot | Stale or missing evidence |
 
 ## Degraded mode (no subagents)
 
@@ -382,20 +412,13 @@ honest offer is a stop.
 
 ## Reference files
 
-Read at the relevant phase, not upfront:
+Each phase above cites the reference it needs — read it there, not upfront.
+Three are not cited inline:
 
-- `references/intake.md` — the contract; cold start; cost expectations
-- `references/bar-selection.md` — bar taxonomies; target vs stretch; dimensions
-- `references/decomposition.md` — lane sizing, ranking, WIP, ownership, re-cutting
-- `references/cost-discipline.md` — where the tokens go and how not to spend them
-- `references/model-routing.md` — which model and effort per subagent role, and prices
-- `references/blind-protocol.md` — blind comparison; champion mode; machine gates; rubric fallback
-- `references/stop-conditions.md` — the conditions, parking, kill criteria, the extension protocol
-- `references/state-and-resume.md` — layout, git conventions, resuming a run
-- `references/workbench.md` — the generated progress surface; log schema
-- `references/failure-modes.md` — full diagnosis and repair
-- `references/example-run.md` — one annotated run, end to end
-- `references/authorities.md` — where these rules come from, and what each forces
+- `references/example-run.md` — one annotated run end to end. Read once before
+  your first gauntlet; point users at it when they ask what they are agreeing to.
+- `references/workbench.md` — the generated progress surface and the log schema.
+- `references/authorities.md` — where these rules come from and what each forces.
 
-Subagents: `references/builder.md`, `references/critic.md`, `references/smoother.md`.
+Subagent briefs: `builder.md`, `critic.md`, `smoother.md`.
 Tooling: `scripts/gauntlet.py` (init / log-round / status / park / board / extend / report).

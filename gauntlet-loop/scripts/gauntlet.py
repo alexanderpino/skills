@@ -290,8 +290,16 @@ def cmd_log_round(args):
                 file=sys.stderr,
             )
 
+    # Concurrent lanes mean concurrent log-round calls. Lock the append so two
+    # verdicts landing at once cannot interleave into a corrupt line.
     with (root / "rounds.jsonl").open("a") as f:
+        try:
+            import fcntl
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        except (ImportError, OSError):
+            pass  # no flock (Windows, exotic filesystem) — appends stay best-effort
         f.write(json.dumps(rec) + "\n")
+        f.flush()
     print(f"logged: wave {rec['wave']} lane {rec['lane']} [{rec['dimension']}] {rec['mode']} → {rec['winner']} ({rec['margin']})")
 
 

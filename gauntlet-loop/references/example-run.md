@@ -12,6 +12,35 @@ waves; the shape is identical.
 "Keep going" with a supplied comparator: a gauntlet. Correctness is not the
 problem (the page renders); the ceiling is.
 
+## First light — before any of the paperwork
+
+No contract yet, no `gauntlet/` directory, no permission asked. One build of the
+thinnest hero that renders end to end — headline, image, CTA, all crude — then
+the Playwright harness pointed at it and a screenshot taken, then one critic
+against a *candidate* bar (the three reference heroes, not yet frozen).
+
+The first verdict came back *"B's type hierarchy is stronger"* with no measurable
+specifics — too soft to build against. Diagnosis: the candidate bar shots were
+whole pages, so the critic judged everything at once. Cropped them to the hero
+region and re-ran: *"A (ref): headline tracking is optically compensated at
+display size; B renders default tracking — visibly looser at 96px."* Actionable.
+
+That screenshot and that sentence went to the user **before** the contract
+below — about four minutes in. Two failures were already dead (a whole-page bar
+that could not discriminate; an unverified screenshot harness), and the
+conversation that follows is about something visible rather than an adjective.
+
+The verdict is not logged — `init` does not exist yet — so it goes into
+`contract.md` as the run's starting evidence.
+
+Then the arithmetic:
+
+> `major` gap with a named fix ≈ 2 rounds per lane × 3 lanes ÷ WIP 2 ≈ 3 waves
+> for one pass, ~6 for two. Fits inside 8. No rescope needed.
+
+Had it come to 14 waves, the honest move was to drop `layout` or lower the target
+*then* — not to start and discover it at wave 8.
+
 ## Contract (proposed in one block, confirmed by the user)
 
 ```
@@ -37,25 +66,10 @@ python3 scripts/gauntlet.py init --lanes imagery,typography,layout \
     --target-score 7 --wip-limit 2 --no-progress-n 3 --budget-waves 8
 ```
 
-Working tree was dirty → asked the user to commit first. Bar screenshots frozen
-into `gauntlet/bar/`. Three lanes cut, two funded per wave: `layout` waits.
-
-## First light, and the feasibility check
-
-One build round on `typography` only, then one critic. The verdict came back
-*"B's type hierarchy is stronger"* with no measurable specifics — too soft.
-Diagnosis: the bar screenshots included whole pages, so the critic judged
-everything at once. Fix: cropped bar shots to the hero region only. Second
-verdict: *"A (ref): headline tracking is optically compensated at display size;
-B renders default tracking — visibly looser at 96px."* Actionable.
-
-Then the arithmetic, before wave 1:
-
-> ~2 rounds per lane to close a first gap × 3 lanes ÷ WIP 2 ≈ 3 waves for one
-> pass, ~6 for two. Fits inside 8. No rescope needed.
-
-Had it come to 14 waves, the honest move was to drop `layout` or lower the target
-then — not to start and discover it at wave 8.
+The tree was dirty — first light did not care, but wave 1 does, so the user
+committed here. The cropped candidate shots were frozen into `gauntlet/bar/`,
+which is where they stop being candidates. Three lanes cut, two funded per wave:
+`layout` waits.
 
 ## Wave 1 (bootstrap — no champions exist yet)
 

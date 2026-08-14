@@ -32,11 +32,16 @@ without its log is not a resumed run.
 
 The champion/challenger guard is implemented with ordinary commits:
 
-- **Snapshot before judging:** commit the pre-round state with the message
-  convention `gauntlet(<lane>): wave <W> round <R> champion`. That commit hash is
-  the round's `--champion-ref`.
-- **Promote:** commit the challenger — `gauntlet(<lane>): wave <W> round <R>
-  promoted — <gap closed>`.
+- **Snapshot once per wave, before the builders spawn:** commit the pre-wave
+  state as `gauntlet: wave <W> champion`. That one hash is every lane's
+  `--champion-ref` for the wave. Do **not** commit per lane inside the concurrent
+  region — simultaneous commits contend on `index.lock`, and a lane's snapshot
+  would capture its neighbours' half-built working trees. Disjoint file ownership
+  does not make the git index disjoint.
+- **Promote:** commit the challenger's *owned paths only* —
+  `gauntlet(<lane>): wave <W> round <R> promoted — <gap closed>`. Path-scoped so
+  a promotion cannot sweep in a concurrent lane's work in progress. Promotions
+  are sequenced by the lead agent as verdicts arrive, never issued by builders.
 - **Revert:** `git checkout <champion-ref> -- <owned paths>` then commit the
   revert. Never `git reset` across lanes: reverting one lane must not undo
   another's promoted work, which is exactly what one-file-one-owner guarantees.
