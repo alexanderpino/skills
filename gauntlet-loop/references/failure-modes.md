@@ -56,7 +56,7 @@ stops discriminating: a near miss and a disaster both log as a loss.
 
 **Repair.** Put the ambition in the stretch line, and set the target where the
 run can plausibly land inside the budget (`bar-selection.md`). Do it before wave
-1 — the feasibility check after round zero exists for exactly this. Mid-run, a
+1 — the feasibility check after first light exists for exactly this. Mid-run, a
 target that is provably out of reach is a rescope conversation with the user, not
 something to grind against.
 

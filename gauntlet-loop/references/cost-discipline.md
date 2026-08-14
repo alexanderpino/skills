@@ -135,7 +135,7 @@ most runs never need `blind-protocol.md`'s rubric section or the resume protocol
 
 Do not save money on these — each one prevents a much larger loss:
 
-- **Round zero** (one build, one critic) before the first wave — catches broken
+- **First light** (one build, one critic) before the first wave — catches broken
   inspection paths and soft bars.
 - **Re-verifying inspection** at each wave boundary — a rotted harness makes
   every later call worthless.

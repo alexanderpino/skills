@@ -77,7 +77,7 @@ in a project — do this, in order, before touching any lane:
    resuming from.
 
 If a stop condition already fired while nobody was watching, do not run more
-waves — go straight to Phase 5 and report. When the fired condition is the
+waves — go straight to Phase 7 and report. When the fired condition is the
 budget, that report ends with an extension offer, not a new wave: a resumed run
 that quietly keeps going past the budget has spent money nobody agreed to. A
 granted extension is recorded in `config.json` (`extensions`), so `status` after

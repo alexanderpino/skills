@@ -122,14 +122,22 @@ and the first bar comparison runs as soon as there is output to inspect. Do not
 manufacture a fake baseline to compare the first round against; the bar itself is
 the comparison from round 1.
 
-## Before wave one
+## First light comes before this conversation
 
-Run a **round zero** on a single lane: one build, one critic, one verdict. It costs
-almost nothing and it surfaces the two failures that would otherwise waste hours —
-a broken inspection path, and a bar the critic cannot actually compare against.
+**Do not open intake with a contract.** Run **first light** first (SKILL.md
+Phase 0): one build of the thinnest end-to-end thing, one verified inspection,
+one critic verdict — then show the user the artifact and the verdict, and
+negotiate the contract against that.
 
-If round zero produces a vague verdict, the bar is too soft. Fix it before scaling
-up to a full wave.
+It needs no permission (one reversible build in the workspace), it costs almost
+nothing, and it changes the conversation completely. Every field below is easier
+to agree when both of you have looked at something real: the bar stops being an
+adjective, the lanes stop being guesses, and the budget question becomes "is this
+worth eight more of what you just saw?".
+
+It also surfaces the two failures that otherwise waste hours — a broken
+inspection path, and a bar the critic cannot actually compare against. If first
+light produces a vague verdict, the bar is too soft; fix the bar, not the wave.
 
 Then run the **feasibility check** while it is still free:
 

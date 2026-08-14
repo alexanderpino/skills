@@ -36,6 +36,16 @@ answer four risks: value, usability, feasibility, business viability.
 tell you whether anyone wants the thing. And the target bar is a definition of
 done, not a shrunken product.
 
+**Alistair Cockburn** — the **walking skeleton**: a tiny end-to-end
+implementation that exercises the real path, built first, then thickened.
+**Andy Hunt and Dave Thomas** — **tracer bullets** (`The Pragmatic Programmer`,
+1999): fire something that goes all the way to the target and shows you where it
+lands, in the dark, before committing to the full build.
+→ Phase 0, first light. The first thing the loop produces is thin, whole and
+*visible*, and it doubles as the inspection-path test. It is also why the
+bootstrap wave builds a slice rather than one polished part, and why the contract
+is negotiated against a real artifact instead of an adjective.
+
 **Henrik Kniberg** — "Making sense of MVP" (2016): the skateboard→bike→car
 drawing, and the earliest **testable → usable → lovable** ladder. (The term
 *Minimum Lovable Product* is usually credited to Brian de Haaff.)
@@ -94,7 +104,7 @@ produce a quick win.
 **Daniel Kahneman and Dan Lovallo** on the planning fallacy and the inside view;
 **Bent Flyvbjerg** on reference-class forecasting — estimate from what comparable
 past efforts actually cost, not from this plan's internals.
-→ The feasibility check after round zero is a reference-class estimate: rounds it
+→ The feasibility check after first light is a reference-class estimate: rounds it
 took to close the *first real gap*, times lanes, over WIP. A bar set from
 ambition rather than from a measured first round is the inside view with better
 adjectives.
@@ -105,7 +115,7 @@ adjectives.
 2016; Li et al. 2017): with a fixed budget and several options of unknown value,
 give every option a small amount, cut the worst, and reallocate to the survivors.
 Repeat. This beats splitting the budget evenly, and it beats committing early.
-→ This is the exact shape of a gauntlet's wave loop: round zero is the small
+→ This is the exact shape of a gauntlet's wave loop: first light is the small
 initial allocation, the wave-boundary review is the cut, and parking plus
 reallocation is the halving. The formal result is why the prune is not
 pessimism — it is how a fixed budget finds the good option at all.

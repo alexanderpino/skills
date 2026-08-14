@@ -40,7 +40,7 @@ python3 scripts/gauntlet.py init --lanes imagery,typography,layout \
 Working tree was dirty → asked the user to commit first. Bar screenshots frozen
 into `gauntlet/bar/`. Three lanes cut, two funded per wave: `layout` waits.
 
-## Round zero, and the feasibility check
+## First light, and the feasibility check
 
 One build round on `typography` only, then one critic. The verdict came back
 *"B's type hierarchy is stronger"* with no measurable specifics — too soft.

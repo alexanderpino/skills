@@ -117,7 +117,7 @@ Two consequences worth stating at intake:
 
 ## The feasibility check
 
-Ambitious is fine; unfunded is not. After round zero you have one real data
+Ambitious is fine; unfunded is not. After first light you have one real data
 point — the first gap and how big it is. Do the arithmetic before wave 1:
 
 > rounds to close the first gap × lanes ÷ WIP limit ≈ waves needed
