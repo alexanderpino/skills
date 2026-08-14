@@ -2646,11 +2646,27 @@ def _sec_surface(ctx):
           'identity is ASYMPTOTIC and the tolerance is the O((kd)^2) term, '
           'which the next row measures rather than assumes.')
     check(1, 'and the residual is O((kd)^2): halving kd quarters it',
-          res[0] / res[1], 4.0, 0.05,
+          res[0] / res[1] if abs(res[1]) > 1e-15 else float('inf'), 4.0, 0.05,
           'A tolerance on an asymptotic identity is only honest if the '
           'CONVERGENCE RATE is checked too -- otherwise any tolerance can be '
           'made to pass by choosing kd. C(kd)(kd)^3 = 3 + (kd)^2/... , so the '
-          'residual must fall by four when kd halves. It does.')
+          'residual must fall by four when kd halves. It does. THE GUARD ON '
+          'THE DIVISION IS NOT COSMETIC: `harmonic-shallow-everywhere` makes '
+          'the identity EXACT at every kd, so both residuals are zero and this '
+          'row raised a ZeroDivisionError on its first firing -- an ERROR, '
+          'which by this harness\'s own doctrine costs every row after it. It '
+          'now reads inf and FAILS.')
+    check(1, 'the residual itself is nonzero and the right size at kd = 0.02',
+          res[0], 4.0 / 3.0 * 0.02 ** 2, 2e-5,
+          'ABSOLUTE, and it is the row the ratio above cannot be: an identity '
+          'that is exact where it should only be asymptotic means the DEPTH '
+          'FUNCTION has been replaced by its own shallow limit, which passes '
+          'every shallow row and is 30x wrong offshore. A ratio of two '
+          'residuals cannot see that; their size can. AND THE SIZE IS A CLOSED '
+          'FORM RATHER THAN A FITTED NUMBER: expanding C(kd)(kd)^3 = 3 + '
+          '4(kd)^2 + O((kd)^4) gives r/Ur = 2(1 + (4/3)(kd)^2), so the '
+          'residual is (4/3)(kd)^2 = 5.333e-4 at kd = 0.02 against 5.334e-4 '
+          'measured, and 1.333e-4 at half that.')
 
     # ------------------------------------- 8.3 the Ursell number, second route
     # The classic parameter is U = H L^2/d^3 and this file's is (3/16)Hk/(kd)^3.

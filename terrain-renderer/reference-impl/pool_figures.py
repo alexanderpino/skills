@@ -406,13 +406,14 @@ def fig_correlation(S, path):
     """Attenuation and escape do not factorise. The LUT trap, drawn."""
     dep = S['DEPTH']
     a = OPT.ABS
-    mu = np.linspace(1e-3, 1., 4000)
+    mu = np.linspace(1e-3, 1., 1600)
     att = np.exp(-a[None] * dep / mu[:, None])
     esc = 1. - OPT.r_int_at(mu)
     w = 2. * mu[:, None]
+    e3d = OPT._e3(a * dep)                      # 2E_3 at DEPTH, per channel
 
     img = P.canvas(1320, 1010)
-    ax = P.Axes(img, (95, 72, 620, 405), (0, 1), (0, 1.05),
+    ax = P.Axes(img, (95, 72, 620, 405), (0, 1), (0, 1.34),
                 title='The two factors are correlated (red band, %.2f m)' % dep,
                 xlabel='cosine mu of the upgoing ray',
                 ylabel='value of each factor')
@@ -424,41 +425,43 @@ def fig_correlation(S, path):
     P.legend(ax, [(RED, 'attenuation  exp(-a d / mu)'),
                   (BLU, 'escape  1 - R_int(mu)'),
                   (INK, 'their product -- what slab_esc integrates')],
-             0.30, 0.99)
+             0.04, 1.30)
     ax.text(float(np.cos(OPT.TC_SNELL[0])) - .02, 0.16,
             'cos(tc): nothing escapes left of here', INK, 'rs')
-    ax.text(0.30, 0.30,
+    ax.text(0.04, 1.13,
             'BOTH rise with mu. A steep ray escapes AND crosses less water,', INK)
-    ax.text(0.30, 0.25,
-            'so <A><E> is not <AE> and the sign of the error is fixed.', INK)
+    ax.text(0.04, 1.07,
+            'so <A><E> is not <AE>, and the sign of the error is fixed.', INK)
 
-    bx = P.Axes(img, (740, 72, 1265, 405), (0, 1), (0, 1.05),
+    bx = P.Axes(img, (740, 72, 1265, 405), (0, 1), (0, 1.34),
                 title='Product of means against mean of product',
                 xlabel='cosine mu', ylabel='cosine-weighted integrand 2 mu f')
     bx.frame(_ticks(0, 1, 5), _ticks(0, 1.0, 5), '%.1f', '%.2f')
     for c in range(3):
         bx.line(mu, (w * att * esc)[:, c], CH[c], 3)
-        bx.line(mu, (w[:, 0:1] * np.broadcast_to(
-            (OPT._e3(a[c] * dep) * OPT.T_OUT_DIFFUSE[c]), mu.shape)[:, None]
-        )[:, 0], CH[c], 1, dash=(4, 4))
-    bx.text(0.04, 0.98, 'solid: 2 mu exp(-a d/mu)(1 - R_int(mu))', INK)
-    bx.text(0.04, 0.93, 'dashed: the level whose area is 2E_3(a d) x (1 - R_int)',
+        bx.line(mu, 2. * mu * float(e3d[c] * OPT.T_OUT_DIFFUSE[c]), CH[c], 1,
+                dash=(4, 4))
+    bx.text(0.04, 1.30, 'solid: 2 mu exp(-a d/mu)(1 - R_int(mu)) -- slab_esc',
+            INK)
+    bx.text(0.04, 1.24, 'dashed: 2 mu x 2E_3(a d) x (1 - R_int), the same area '
+                        'rule on the', MUTED)
+    bx.text(0.04, 1.18, 'PRODUCT OF THE TWO MEANS. The areas are what differ:',
             MUTED)
-    bx.text(0.04, 0.88, 'the areas are what differ, and by how much:', INK)
     for c in range(3):
-        bx.text(0.04, 0.82 - .05 * c,
+        bx.text(0.04, 1.10 - .06 * c,
                 '%-6s  slab_esc %.5f   factorised %.5f   %+.2f%%'
                 % (CHN[c], OPT.slab_esc(dep)[c],
-                   OPT._e3(a[c] * dep)[0] * OPT.T_OUT_DIFFUSE[c],
+                   e3d[c] * OPT.T_OUT_DIFFUSE[c],
                    100 * (OPT.slab_esc(dep)[c]
-                          / (OPT._e3(a[c] * dep)[0] * OPT.T_OUT_DIFFUSE[c]) - 1)),
+                          / (e3d[c] * OPT.T_OUT_DIFFUSE[c]) - 1)),
                 CH[c])
 
     dd = np.linspace(0., 4., 260)
     esc_t = np.array([OPT.slab_esc(d) for d in dd])
-    esc_f = np.array([OPT._e3(a * d) * OPT.T_OUT_DIFFUSE for d in dd])
     trp_t = np.array([OPT.slab_trap(d) for d in dd])
-    trp_f = np.array([OPT._e3(2. * a * d) * OPT.R_INT for d in dd])
+    # `_e3` takes a vector, so this is three calls and not 780.
+    esc_f = np.array([OPT._e3(a[c] * dd) for c in range(3)]).T * OPT.T_OUT_DIFFUSE
+    trp_f = np.array([OPT._e3(2. * a[c] * dd) for c in range(3)]).T * OPT.R_INT
 
     cx = P.Axes(img, (95, 505, 620, 800), (0, 4), (0, 26),
                 title='ESCAPE: factorising UNDERstates it',
@@ -468,7 +471,7 @@ def fig_correlation(S, path):
     for c in range(3):
         cx.line(dd, 100. * (esc_t[:, c] / esc_f[:, c] - 1.), CH[c], 3)
     cx.vline(dep, WARN, 2, dash=(6, 5))
-    gap = OPT.slab_esc(dep) / (OPT._e3(a * dep) * OPT.T_OUT_DIFFUSE) - 1.
+    gap = OPT.slab_esc(dep) / (e3d * OPT.T_OUT_DIFFUSE) - 1.
     for c in range(3):
         cx.marker(dep, 100. * float(gap[c]), CH[c])
     cx.text(dep + 0.08, 23.5, 'this pool: DEPTH = %.2f m' % dep, WARN)
@@ -771,8 +774,7 @@ def fig_absorption(S, path):
     bx.frame(_ticks(0, 3.2, 4), _ticks(0, 1.0, 5), '%g', '%.2f')
     for c in range(3):
         bx.line(dd, np.exp(-a[c] * dd), CH[c], 3)
-        bx.line(dd, np.array([OPT._e3(a[c] * d)[0] for d in dd]), CH[c], 2,
-                dash=(5, 5))
+        bx.line(dd, OPT._e3(a[c] * dd), CH[c], 2, dash=(5, 5))
     bx.vline(dep, WARN, 2, dash=(6, 5))
     bx.vline(2. * dep, WARN, 2, dash=(6, 5))
     bx.text(dep + .05, 0.98, 'one way', WARN)
@@ -832,7 +834,7 @@ def fig_absorption(S, path):
 def fig_sun(S, path):
     """The sun the pool is lit by: one disc, one aureole, nothing free."""
     ang = np.logspace(-2, np.log10(90.), 900)          # deg from the sun
-    cs = np.cos(np.deg2rad(ang))
+    cs = np.clip(np.cos(np.deg2rad(ang)), 0., 1.)      # 90 deg lands on 6e-17
     disc = ATM.L_SUN[None] * cs[:, None] ** ATM.N_DISC
     aure = ATM.L_AURE[None] * cs[:, None] ** ATM.N_AURE
     grad = ATM.sky_diffuse(np.ones(1))[0]              # zenith, gradient only
