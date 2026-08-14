@@ -833,6 +833,125 @@ not a defect to delete.** Both silent bugs above were the most valuable output o
 found them; both would have been quietly removed as "not reproducible" by a project that read a
 zero-catch as a bad bug rather than as a hole in the wall.
 
+### The eleventh way: a test window pinned where the phenomenon is not
+
+The eighth way is a test that touches nothing, the ninth a frame that reaches nothing, the tenth an
+instrument that cancels the defect. This one is smaller than all three and it has a **signature**,
+which is what makes it worth its own heading: the window a row measures in is part of the row, and
+when it is pinned to the wrong place the row does not merely read low — it reads **easier the harder
+the condition gets**, and that monotonicity is visible without knowing the right answer.
+
+**Measured, and the row was this project's own.** A wave-refraction march is checked against Snell
+taken about a *rotated* normal: a plane beach whose depth contours run at 10°, 20° and 30° to the
+grid, with the marching integrator never told the rotation. Good test — the first refraction row in
+that implementation that does not pass by construction. The first version pinned its measurement
+window to the **grid centre**. On a rotated bed the ramp crosses each alongshore row over a
+different span of `x`, so a centre-pinned window samples less and less of the ramp as the rotation
+grows (`reference-impl/validate_beach.py`, both columns recomputed here):
+
+| rotation | ramp cells in the centre row | centre-pinned window | window centred on the row that samples the ramp most fully |
+|---|---|---|---|
+| 0° | 234 | 0.000° | 0.000° — the test is an identity again |
+| 10° | 236 | 0.186° | 0.186° |
+| 20° | 123 | 0.059° | 0.310° |
+| **30°** | **0** | **0.030°** | **0.277°** |
+
+At 30° the centre row contains **no ramp at all**. The 5202 cells the window did hold were the deep
+end, where the wave has barely turned, and the row reported **0.030°** — an order of magnitude
+under the truth, with a tolerance of 0.5° that both columns pass. It is the fourth defect that suite
+found in itself, and it was found by looking at the shape of the column rather than at any one cell.
+
+⚠️ **The general form, and it is worse than a false pass: a test that gets easier as the condition
+gets harder is reporting its own window, not the system.** A false pass is a number that is wrong.
+This is a number that is wrong *and* carries a trend that argues for the code — the 0.030° column
+reads as "the march handles obliquity beautifully, and better the more of it you apply", which is a
+conclusion no one would state out loud and which the table states silently. The tell is
+**monotone-in-the-wrong-direction**, and it costs nothing to look for:
+
+1. **Sweep the parameter that makes the phenomenon harder, and plot the error against it.** Every
+   row with a severity knob has one — rotation, incidence, contrast, velocity, depth. The expected
+   shape is flat or rising. A falling curve is a finding *before* anyone checks the values.
+2. **Ask where the row is looking, and whether the phenomenon is there.** Not "is the window big
+   enough" — is it *where the effect lives*, given this parameter value? A window whose position is
+   a constant and whose subject moves is a bug with a delay fuse: it is correct at the parameter
+   value it was written at, which is invariably the easy one.
+3. **Print the sample count with the number.** 5202 cells against 21 779 is the whole story, and it
+   is one integer. A row whose population collapses as the condition sharpens is measuring
+   something else, whatever its assertion says.
+
+The sibling case is worth one line because it is the same failure with the sign the other way: the
+same test excludes 60 rows at each alongshore edge, where the march's transverse differences go
+one-sided and the error reaches **2.71°**. That exclusion is *also* a choice of window — and it is
+legitimate only because it is stated, measured and attributed to a named boundary artefact rather
+than trimmed until the row passed. **The difference between an exclusion and a fudge is entirely
+whether the excluded region was measured and reported**, and a window is a claim either way.
+
+### The twelfth way: a row that raises is worth less than a row that fails
+
+Everything above is about rows that report the wrong thing. This one is about rows that report
+**nothing**, and it lives in the harness rather than in any row — which is why it survives review
+by every person who reviews rows.
+
+**A test that raises an exception looks like a caught defect and is not.** It is worse than a
+failure in one specific respect: a `FAIL` costs one row, and an unhandled exception costs that row
+**and every row after it**, silently, with the run's own summary reporting the smaller number as
+though it were the finding.
+
+**Measured.** In this project's second reference suite, three deliberate defects destroyed the
+morphological feature that later rows measured; those rows had no guard for a degenerate profile
+and **raised** instead of failing; the deliberate-defect driver counted the exception as a single
+catch and stopped. The defect `cap-not-dissipation` — which failed **eight** rows of that suite —
+was recorded in the bug table as catching **one**. (Re-fired here on the current, larger suite it
+catches **10 FAIL / 0 ERROR** in 408 s, which is the same defect against more guards; the 1-vs-8 is
+that suite's own record and is quoted rather than re-measured, because the harness that produced the
+1 no longer exists.) Note what did *not* go wrong: the defect was still caught, and
+nothing was green that should have been red. That is exactly why it survived — **the harness lies in
+a green-adjacent direction and the information it destroys is silent.** The suite had seven fewer
+opinions than it believed, and the missing seven were the ones that would have described *how* the
+defect propagates. A bug table is read as a map of which guards own which failure; this one had
+seven blanks that looked like coverage decisions.
+
+**And fixing the rows is not the fix.** That was the first response, and it left the harness able to
+be lied to by the next such defect — which is a worse place to stand than it looks, because the
+number that lies is green-adjacent and the information lost is silent. The structural fix is one
+change: **the suite is a list of guarded sections, and an exception inside one costs that section
+and nothing after it.**
+
+```
+def guard(fn, label, ctx):
+    try:
+        fn(ctx)
+    except Exception as exc:            # the section, not the run
+        error_row(label, exc)           # a fourth status: ERROR
+    return ctx
+```
+
+Three properties, and each is load-bearing:
+
+- **ERROR is a status distinct from FAIL**, because the two mean different things to a reader. FAIL
+  says *this quantity is wrong*. ERROR says *this section did not finish, so its remaining rows were
+  never evaluated* — and the summary line says exactly that, in those words. ⚠️ **A run that ends in
+  ERROR is INCOMPLETE, not merely failing**, and a suite that cannot express that distinction will
+  report a truncated run as a smaller problem than it is.
+- **ERROR sets the exit code exactly as FAIL does.** A status that CI treats as passing is a comment.
+- **The sections after it still run and still report their own failures**, which is the entire
+  point: the run's information content stops being hostage to the first crash.
+
+It earned its keep immediately and twice. On the first run after the refactor **four sections raised
+at once** — a `NameError` from the refactor itself, a missing context key, a broadcast mismatch in a
+new row, and a NumPy 2 API change — and the run still reported 58 passing rows and the two *real*
+failures underneath them, instead of stopping at the first line and reporting nothing. On the next
+run, the fix for the [eleventh way](#the-eleventh-way-a-test-window-pinned-where-the-phenomenon-is-not)
+above introduced a loop variable `j` that collided with the row index used above it; the section died
+on an `IndexError` **after its own row had passed**, and the guard let the run print 71 passing rows,
+the ERROR, and the corrected measurement.
+
+**The review test is one question of the harness, not of any row:** *what does this suite do when a
+row throws?* If the answer is "stops", the suite's reported row count is an upper bound on what it
+actually checked, and every defect that destroys a shared fixture will be under-reported by however
+many rows sit downstream of it — which is exactly the defects that matter most, because a defect
+that breaks one number breaks one row and a defect that breaks the scene breaks all of them.
+
 ## When the target is an approximation, the bar changes kind
 
 Everything above is about verifying a renderer against the world. This section is about the other
@@ -955,6 +1074,13 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
 16. Which code does the golden set actually **reach**? A branch with zero subsamples across every
     frame in the suite is a finding, and a viewpoint chosen for reach — not for beauty — is the
     cheapest way to close it. ([The ninth way](#the-ninth-way-the-code-no-pixel-reached))
+17. For every row with a severity knob, does the error **rise** as the condition hardens? A row
+    that gets easier the harder the case is reporting its own window, and the sample count printed
+    beside it will show the population collapsing.
+    ([The eleventh way](#the-eleventh-way-a-test-window-pinned-where-the-phenomenon-is-not))
+18. What does the suite do when a row **throws**? If the run stops, its reported row count is an
+    upper bound on what it checked, and ERROR must be a status distinct from FAIL that still sets
+    the exit code. ([The twelfth way](#the-twelfth-way-a-row-that-raises-is-worth-less-than-a-row-that-fails))
 
 ## Sources & provenance
 
@@ -993,3 +1119,5 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
 | The three preconditions (frozen ground truth, metric fixed in advance, cost budget) and the two ground-truth preconditions (no open discrepancy, one cross-consistency reading) | **F** (house doctrine; the metric-before-candidate rule is the same argument as "never widen a tolerance to pass a row", and the cross-consistency requirement generalises `12`'s split shot) |
 | The tenth way: a ratio cancels whatever multiplies both its terms, so a suite made only of ratios is blind to common-factor errors; and a guard evaluated where a defect is inert is not a guard | **F** (house doctrine, and the structural complement of the seventh way's within-frame-ratio method — the same cancellation, read as a cost) + **D** for the case: the ×50 bed-power defect passing a 53-row suite, the `u³` ratio row unchanged to twelve figures, the two absolute rows that fire (2.61 → 130.51 W/m², 373 → 18 671 mg/L), and the `spm = 0` degeneracy table are all `reference-impl/beach_optics.py` + `validate_beach.py`, **re-fired and recomputed here** (2026-08) rather than quoted. What transfers is the two-question check and the "one absolute row per quantity" rule; the numbers are that scene's |
 | The eighth way: a test's power is the surface area it shares with the code under test | **F** (house doctrine, and the general form of the fourth way's "two methods that read one premise are one method") + **D** for the case — the audit's one borrowed name, the lossless-limit/photon-walk pair agreeing to 0.15%, and the four-bug table are all `reference-impl/validate.py`, re-evaluated here; that **the lossless limit alone passes three of the four** was verified by evaluating each variant against the limit, not quoted |
+| The eleventh way: a test window is part of the test, and a row that gets *easier* as the condition hardens is reporting its window rather than the system | **F** (house doctrine; the monotone-wrong-way tell and the three instruments are composed here) + **D** for the case — the oblique-Snell row in `reference-impl/validate_beach.py`, **both columns recomputed here** (2026-08) rather than quoted: 0.186 / 0.310 / 0.277° centred on the best-covered row against 0.186 / 0.059 / 0.030° centred on the grid, with 236 / 123 / **0** ramp cells in the centre row and 5202 window cells surviving at 30°. The 2.71° edge artefact and the 60-row exclusion were recomputed with them. Those numbers are that march, that grid and that bed; what transfers is the signature |
+| The twelfth way: an unhandled exception costs its row *and every row after it*, so ERROR must be a status distinct from FAIL that still sets the exit code | **F** (house doctrine, and the harness-level sibling of the eighth way) + **D** for the remedy — the guarded-section harness is `reference-impl/validate_beach.py`, and `cap-not-dissipation` was **re-fired here** (2026-08): **10 FAIL / 0 ERROR** in 408 s, no section raising, which is what the fix is supposed to look like. ⚠️ Neither number in the 1-vs-8 is re-measured. The **8** is that defect's count against the *wave-2* suite and the **1** against the superseded harness that produced it; this run cannot reconstruct either, and the current suite has more rows, which is why re-firing gives 10 rather than 8. Both are quoted from that suite's own record. The transferable claim — that a raising row truncates a run, that the truncation is silent, and that ERROR must be a status — is structural and needs no measurement; the 1-vs-8 is an illustration and should be cited as one |
