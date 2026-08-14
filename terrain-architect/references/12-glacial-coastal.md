@@ -426,8 +426,10 @@ coastalStep(h, seaLevel, exposure):
     thermal(h, talusAngle=rockRepose)
 
     # 3. Deposit the eroded material in sheltered areas as beaches
-    beach = (1 - exposure) * nearShore * (h < seaLevel + beachHeight)
-    h += K_deposit * beach * sedimentBudget
+    beach = (1 - exposure) * nearShore * (h < seaLevel + beachHeight)   # ── DEFECT: zero over
+    h += K_deposit * beach * sedimentBudget                             #    open water, and not
+                                                                        #    coupled to step 1.
+                                                                        #    See below.
 ```
 
 The three-step loop — **notch, collapse, deposit** — is what produces the whole coastal suite:
@@ -501,6 +503,66 @@ the retreat loop are in conflict as written. See below.**
 > before the domain does. The depth-limited breaker is **P** and the coupling is plausible; the
 > claim that it produces an *equilibrium* width is **`?` and unverified**, and it is left that way
 > here rather than repeated.
+>
+> **A third defect, in step 3, and this one breaks a rule this chapter states in its own words.**
+> `beach = (1 − exposure) · nearShore · …` is **identically zero over open water.** `exposure` is
+> the fetch sweep above, and in open water every seaward azimuth is unobstructed, so it *saturates*
+> — measured on the same run, `exposure` over open water has **min 1.0000 and max 1.0000**, so
+> `1 − exposure` there is **exactly 0**. The one place a retreating cliff's debris has to go is the
+> one place the weight sends none of it, and the loop **loses the rock it eroded out of a closed
+> domain**: of **3 825 309 m³** eroded, **1 455 980 m³ — 38.1% — is unaccounted for** at the end of
+> the run (4000 steps, 4 × 16 m grid, run here).
+>
+> **And the leak is not a coefficient that can be tuned out, which is the part worth checking
+> before reaching for one.** `h += K_deposit · beach · sedimentBudget` has no coupling to the volume
+> step 1 just removed — it is a source term with a free rate, not a redistribution — so nothing in
+> the block makes `Σ deposited = Σ eroded`. Run it at three deposition rates and the missing volume
+> barely moves:
+>
+> | `K_deposit` | rock eroded | unaccounted | share |
+> |---|---|---|---|
+> | 0.5 | 3 235 054 m³ | 1 479 873 m³ | 45.7% |
+> | 1.0 | 3 825 309 m³ | **1 455 980 m³** | 38.1% |
+> | 2.0 | 3 939 768 m³ | 1 450 694 m³ | 36.8% |
+>
+> **Four times the deposition rate moves the missing volume by 2%.** That is the diagnosis: the loop
+> is not moving the eroded rock at all. It is adding an unrelated amount wherever the weight is
+> nonzero, filling those cells to their cap, and dropping the remainder — so the imbalance is set by
+> the geometry of the weight, not by the rate. Note also that `exposure` is **zero on land** (no
+> fetch reaches a cell behind the cliff), so taking the weight literally over the whole grid rather
+> than over the nearshore inverts the problem instead of fixing it: `1 − exposure` is then *largest*
+> in the middle of the plateau, and the debris piles onto the highest, driest, most sheltered ground.
+>
+> ⚠️ **This chapter already states the rule the block breaks.** [Glacial deposition](#glacial-deposition)
+> says it plainly — *"`glacierStep` (above) **is** the sediment supply, so `Σ deposited = Σ eroded`
+> … Don't let a deposition node mint sediment the erosion never produced."* The coastal block is the
+> same architecture with the discipline missing, and the reason it survived is that a leak in a
+> *closed* domain looks like a working loop: the coast retreats, the cliffs look right, and nothing
+> in the frame is the missing volume.
+>
+> **Three corrections, and none of them adds a constant:**
+>
+> 1. **`nearShore` is water.** Restrict the band to cells below the datum; that is what the name
+>    says and it removes the plateau-piling failure at the same time.
+> 2. **The material stays in the row it came from.** A single global `sedimentBudget` spread by
+>    `1 − exposure` moves rock *alongshore*, and moving sediment alongshore **is longshore drift** —
+>    a mechanism this block does not model, arriving through a weighting term where nobody will look
+>    for it. Row-local deposition needs no coefficient and leaves the alongshore redistribution
+>    named rather than faked.
+> 3. **The fill is capacity-limited, and the excess is exported and reported.** A cliff makes far
+>    more debris than a beach can hold: retreating 100 m of a plain at 1:12.5 removes ~750 m² of
+>    rock per metre of coast and the nearshore band holds ~120. So most of it leaves, and **that is
+>    a fact about coasts rather than a leak** — the difference is entirely whether the loop returns
+>    the number. With the three corrections the same run books **3 014 153 m³ eroded = 301 415
+>    deposited + 2 712 737 exported**, closing to **1.1×10⁻⁸ m³** — machine precision on a
+>    three-million-cubic-metre account, and 90% of the debris leaving the domain *with a number on
+>    it* (all four figures measured here).
+>
+> **Tier, for this third defect.** The zero-over-open-water mechanism is **arithmetic on the block as written** and needs
+> no warrant beyond reading it; the volumes and the `K_deposit` insensitivity are **implemented and
+> measured** at those settings. `Σ deposited = Σ eroded` is this chapter's own rule, `F`. The 1:12.5
+> capacity arithmetic is `D` for *that* profile — recompute it for another, since it is what decides
+> whether the export is 90% or 10%.
 >
 > **Tier.** The stall and the mutual exclusivity are **implemented and measured** — reproducible by
 > anyone who runs that file at those settings, which is the warrant this scheme still has no mark
