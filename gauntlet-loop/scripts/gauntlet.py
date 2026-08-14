@@ -19,7 +19,9 @@ Commands:
 import argparse
 import datetime
 import json
+import hashlib
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -61,6 +63,11 @@ DEFAULT_CONFIG = {
     # Lane/dimension pairs deliberately stopped short of retirement, appended by
     # `park`. Their gaps stay open in the report; their budget goes back.
     "parked": [],
+    # Mechanical checks a command can decide. Each names the paths it depends on;
+    # a gate whose inputs are unchanged since it last passed is NOT re-run, and
+    # its result is handed to the critic so no round pays to re-derive it.
+    # [{"name": ..., "cmd": "<shell>", "paths": ["a", "b/"]}]
+    "gates": [],
 }
 
 # One builder call plus one combined critic call per lane per round is the
@@ -643,6 +650,67 @@ def _print_extension_offer(rounds, cfg, per, retired, max_wave):
     print(f"(current: wave {max_wave} of {budget})")
 
 
+def _paths_hash(paths):
+    """Content hash of a gate's declared inputs. A gate is invalidated by a change
+    to what it reads, never by the passage of a round."""
+    h = hashlib.sha256()
+    for spec in sorted(paths):
+        pp = Path(spec)
+        files = sorted(pp.rglob("*")) if pp.is_dir() else [pp]
+        for f in files:
+            if f.is_file():
+                h.update(f.as_posix().encode())
+                h.update(f.read_bytes())
+    return h.hexdigest()[:16]
+
+
+def cmd_gate(args):
+    """Run the mechanical checks — and skip the ones whose inputs have not moved.
+
+    This is the counterpart to "settled work is not re-judged": a check that
+    passed against a state that has not changed does not need a second opinion,
+    and certainly not a subagent's.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    gates = cfg.get("gates") or []
+    if not gates:
+        print("no gates declared. Anything a command can decide belongs here, not in a\n"
+              "critic prompt — add them to config.json under \"gates\" as\n"
+              '  {"name": ..., "cmd": "<shell>", "paths": ["<files the check reads>"]}')
+        return
+    cache_p = root / "gates.json"
+    cache = json.loads(cache_p.read_text()) if cache_p.exists() else {}
+    rounds = load_rounds(root)
+    wave = max((r["wave"] for r in rounds), default=0)
+    ran = skipped = failed = 0
+    results = []
+    for g in gates:
+        name, cmd, paths = g["name"], g["cmd"], g.get("paths") or []
+        h = _paths_hash(paths)
+        prev = cache.get(name)
+        if prev and prev.get("hash") == h and prev.get("ok") and not args.force:
+            skipped += 1
+            results.append((name, "SKIP", f"unchanged since wave {prev.get('wave', '?')}"))
+            continue
+        proc = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        ok = proc.returncode == 0 and not proc.stdout.strip()
+        ran += 1
+        if not ok:
+            failed += 1
+        detail = (proc.stdout + proc.stderr).strip().splitlines()
+        results.append((name, "PASS" if ok else "FAIL", detail[0] if detail else ""))
+        cache[name] = {"hash": h, "ok": ok, "wave": wave, "ts": now()}
+    cache_p.write_text(json.dumps(cache, indent=2) + "\n")
+    for name, state, detail in results:
+        print(f"  [{state}] {name}" + (f" — {detail}" if detail else ""))
+    print(f"\n{ran} run, {skipped} skipped (inputs unchanged), {failed} failed")
+    if skipped:
+        print("Hand these results to the critic. A round that re-derives them pays twice.")
+    if failed:
+        sys.exit(1)
+
+
 def cmd_park(args):
     root = Path(args.root)
     cfg = load_config(root)
@@ -1158,6 +1226,10 @@ def main():
     p.add_argument("--force", action="store_true",
                    help="park a dimension the log still reads as moving (scope or priority call)")
     p.set_defaults(fn=cmd_park)
+
+    p = sub.add_parser("gate", help="run the mechanical checks; skip those whose inputs have not changed")
+    p.add_argument("--force", action="store_true", help="re-run every gate, ignoring the cache")
+    p.set_defaults(fn=cmd_gate)
 
     p = sub.add_parser("board", help="regenerate gauntlet/workbench.md from the log")
     p.set_defaults(fn=cmd_board)

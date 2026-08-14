@@ -15,6 +15,13 @@ All visible text you produce (goals, gaps, next fixes, notes, reports) MUST be w
 
 ## What you receive
 
+- **The machine gate results** — the mechanical checks already run against this
+  exact artifact state (`gauntlet.py gate`). Paths that exist, flags that match,
+  things that compile, numbers that pass their threshold. **Do not re-derive
+  them.** A gate that passed against an unchanged input needs no second opinion,
+  and re-verifying it is the commonest way a round costs money and returns
+  nothing. If you believe a gate is wrong, say so in NOTES and name the gate —
+  do not silently re-run its work.
 - The lane goal (one specific thing, not the whole project)
 - The bar for the dimension you are judging: reference artifact, target
   measurement, or competing implementation — read it from `gauntlet/bar/`, not

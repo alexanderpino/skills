@@ -119,11 +119,45 @@ fixed within a lane so score trends stay readable.
 
 ### 9. Never pay twice for the same verdict
 
-Settled work is not re-judged: a closed gap stays closed, a retired dimension is
-not re-opened, and regressions are caught by the champion comparison and the
-machine gates rather than by a review pass. `log-round` warns when a record lands
-on a retired dimension, because that round is money spent on ground the run
-already covered (`failure-modes.md` → Re-litigation).
+Two different things get paid for twice, and both need stopping.
+
+**A judgement, re-argued.** A closed gap stays closed and a retired dimension is
+not re-opened. `log-round` warns when a record lands on a retired dimension,
+because that round is money spent on ground the run already covered
+(`failure-modes.md` → Re-litigation).
+
+**A check, re-derived.** This one is subtler and costs more. Anything a command
+can decide — paths that exist, flags that match, code that compiles, a number
+against a threshold — is a **gate**, declared in `config.json` with the paths it
+reads. `gauntlet.py gate` runs it, caches the result against a content hash of
+those paths, and on the next round *skips it and says so*:
+
+```
+[SKIP] no-dangling-paths — unchanged since wave 2
+0 run, 4 skipped (inputs unchanged), 0 failed
+```
+
+**A check is invalidated by a change to its inputs, not by the passage of a
+round.** That is the whole rule, and it is why the cache is keyed by content
+hash rather than by wave number: change a byte in a declared path and the gate
+re-runs; change nothing and it does not. Hand the results to the critic
+(`critic.md`), which is told explicitly not to re-verify them.
+
+The cost of getting this wrong is not theoretical. In this skill's own self-run,
+two consecutive critics each independently re-confirmed that every reference path
+existed, every documented flag existed, and no phase number was stale — the same
+clean result, twice, inside calls costing roughly 70,000 tokens each. The same
+four checks as gates: **0.05 seconds**.
+
+Two failure modes to avoid while doing this:
+
+- **Do not gate a judgement.** "Is this prose clear" is not a command. Gates take
+  the mechanical work *off* the critic so its whole budget goes to judgement; they
+  do not replace it.
+- **Do not let a gate go stale silently.** A gate must declare every path it
+  reads. One that reads a file it did not declare will skip when it should run,
+  which is worse than not having the gate — you would at least have known you
+  were unchecked.
 
 ### 10. Read each reference once, at its phase
 
