@@ -672,70 +672,73 @@ def fig_window(S, path):
             % _trip(n, '%.4f'), MUTED)
 
     # -- the two weightings, and the shares they integrate to
-    cx = P.Axes(img, (100, 520, 640, 810), (0, 50), (0, 1.05),
+    cx = P.Axes(img, (100, 520, 640, 800), (0, 50), (0, 1.36),
                 title='Two receivers, two weightings of the same window',
                 xlabel='water-side polar angle, deg',
                 ylabel='normalised weight (peak = 1)')
     cx.frame(_ticks(0, 50, 5), _ticks(0, 1.0, 5), '%g', '%.2f')
-    tw = np.linspace(0., float(tc[1]), 3000)
+    tw = np.linspace(0., float(tc[1]), 2000)
     wb = np.cos(tw) * np.sin(tw)
     wv = np.sin(tw) ** 2
     cx.line(np.rad2deg(tw), wb / wb.max(), PURPLE, 3)
     cx.line(np.rad2deg(tw), wv / wv.max(), (24, 122, 156), 3)
     cx.vline(float(np.rad2deg(tc[1])), GREY, 1, dash=(3, 4))
     P.legend(cx, [(PURPLE, 'horizontal BED:  cos t sin t'),
-                  ((24, 122, 156), 'vertical WALL:  sin^2 t')], 2.0, 1.00)
-    cx.text(2.0, 0.70, 'the wall is weighted hardest at the RIM, where the', INK)
-    cx.text(2.0, 0.65, 'air-side horizon is; the bed peaks at 45 deg and the', INK)
-    cx.text(2.0, 0.60, 'gain n^2 cancels its compression exactly.', INK)
+                  ((24, 122, 156), 'vertical WALL:  sin^2 t')], 2.0, 1.32)
+    cx.text(2.0, 1.15, 'the wall is weighted hardest at the RIM, where the', INK)
+    cx.text(2.0, 1.10, 'air-side horizon is; the bed peaks at 45 deg, where the',
+            INK)
+    cx.text(2.0, 1.05, 'n^2 gain cancels the compression exactly.', INK)
 
     wbf, wvf = ATM.window_shares(False)
-    dx = P.Axes(img, (760, 520, 1270, 810), (-0.6, 2.6), (0, 0.62),
+    dx = P.Axes(img, (760, 520, 1270, 800), (-0.6, 2.6), (0, 0.80),
                 title='The share each one collects, and the number it replaced',
                 xlabel='band', ylabel='(1/pi) INT L cos dw for uniform L = 1')
     dx.frame(None, _ticks(0, 0.6, 6), '%g', '%.1f')
     for c in range(3):
         _bar(dx, c - 0.17, 0., float(wbf[c]), CH[c], 0.15)
         _bar(dx, c + 0.17, 0., float(wvf[c]), FAINT, 0.15, outline=CH[c])
-        dx.text(c - 0.17, float(wbf[c]) + .012, '%.4f' % wbf[c], INK, 'ms')
-        dx.text(c + 0.17, float(wvf[c]) + .012, '%.4f' % wvf[c], INK, 'ms')
-        dx.text(c, -0.026, CHN[c], MUTED, 'ma')
+        dx.text(c - 0.17, float(wbf[c]) + .014, '%.4f' % wbf[c], INK, 'ms')
+        dx.text(c + 0.17, float(wvf[c]) + .014, '%.4f' % wvf[c], INK, 'ms')
+        dx.text(c, -0.032, CHN[c], MUTED, 'ma')
     dx.hline(0.5, WARN, 2, dash=(6, 5))
     dx.text(2.55, 0.515, 'WALL_SKY = 0.5, superseded', WARN, 'rs')
-    dx.text(-0.55, 0.59, 'solid  BED   = 1/n^2 exactly = %s'
+    dx.text(-0.55, 0.775, 'solid  BED   = 1/n^2 exactly = %s'
             % _trip(1. / n ** 2, '%.4f'), INK)
-    dx.text(-0.55, 0.56,
+    dx.text(-0.55, 0.740,
             'hollow WALL  = 0.5 - tir_vert(tc)(1 - 1/n^2) = %s'
             % _trip(wvf, '%.4f'), INK)
-    dx.text(-0.55, 0.53, 'ratio SKY_VERT = %s' % _trip(ATM.SKY_VERT, '%.4f'),
+    dx.text(-0.55, 0.705, 'ratio SKY_VERT = %s' % _trip(ATM.SKY_VERT, '%.4f'),
             INK)
 
     P.caption(img, [
-        'WHAT IS MEASURED. What a submerged eye or facet actually has over it. '
-        'The whole air-side hemisphere arrives inside a cone of half-angle '
-        'asin(1/n) = %s deg -- dispersive, and drawn per band.'
+        'WHAT IS MEASURED. What a submerged eye or facet actually has over it: '
+        'the whole air-side hemisphere, inside a cone of half-angle asin(1/n) '
+        '= %s deg -- dispersive, and drawn per band.'
         % _trip(np.rad2deg(tc), '%.3f'),
         'The mapping is singular at the rim (top right): every air direction '
         'below %.2f deg of elevation is folded into the outermost 1.00 deg of '
-        'the window, so an environment lookup uniform in the water-side angle '
-        'starves exactly the low-elevation sky.' % el1,
+        'the window.' % el1,
+        'So an environment lookup uniform in the water-side angle starves '
+        'exactly the low-elevation sky, which is the half that is brightest.',
         'ON A HORIZONTAL BED the n^2 gain and the compression cancel exactly: '
-        'the window share is 1/n^2 = %s and "a full hemisphere of SKY_AMB" is '
-        'the right answer. That is why the bed term always worked.'
-        % _trip(1. / n ** 2, '%.4f'),
-        'ON A VERTICAL WALL the cancellation fails, and by the largest factor '
-        'available: sin^2 weights the rim, cos sin weights 45 deg, and the '
-        'wall collects %s where the bed collects %s.'
-        % (_trip(wvf, '%.4f'), _trip(wbf, '%.4f')),
-        'CORRECTED VALUE. WALL_SKY = 0.5 -- correct as a partition of a '
+        'the window share is 1/n^2 = %s, so "a full hemisphere of SKY_AMB" is '
+        'right, and the bed term always worked.' % _trip(1. / n ** 2, '%.4f'),
+        'ON A VERTICAL WALL it fails, and by the largest factor available: '
+        'sin^2 weights the rim, cos sin weights 45 deg, and the wall collects '
+        '%s where the bed collects %s.' % (_trip(wvf, '%.4f'),
+                                           _trip(wbf, '%.4f')),
+        'CORRECTED VALUE. WALL_SKY = 0.5 -- right as a partition of a '
         'HEMISPHERE, wrong as a share of a WINDOW -- is superseded by SKY_VERT '
-        '= %s, a factor of %.2f. Both closed forms are guarded here against '
-        "atmosphere.window_shares' own quadrature to 1e-8."
+        '= %s, a factor of %.2f.'
         % (_trip(ATM.SKY_VERT, '%.4f'), float(0.5 / ATM.SKY_VERT[1])),
+        'Both closed forms are guarded here to 1e-8 against '
+        "atmosphere.window_shares' own quadrature, which cannot see either of "
+        'them.',
         '`?` The RADIANCE filling the window is not derived: SKY_HOR, SKY_TOP '
         'and the 0.55 exponent between them are hand-set in atmosphere.py. This '
         'figure draws the GEOMETRY, which is, and sets L = 1.',
-    ], 40, 835)
+    ], 40, 845)
     return P.save(img, path)
 
 
@@ -746,28 +749,31 @@ def fig_absorption(S, path):
     a = OPT.ABS
     img = P.canvas(1280, 1010)
 
-    ax = P.Axes(img, (100, 72, 640, 420), (405, 670), (0, 0.30),
+    ax = P.Axes(img, (100, 72, 640, 420), (405, 670), (0, 0.31),
                 title='a is a BAND MEAN, over bands that tile',
                 xlabel='wavelength, nm', ylabel='absorption a, 1/m')
-    ax.frame(_ticks(410, 670, 5), _ticks(0, 0.30, 6), '%g', '%.2f')
+    ax.frame([420, 460, 500, 540, 580, 620, 660], _ticks(0, 0.30, 6),
+             '%g', '%.2f')
     for c in range(3):
         lo, hi = 1000. * OPT.BAND[c]
         ax.d.rectangle([float(ax.px(min(lo, hi))), float(ax.py(float(a[c]))),
                         float(ax.px(max(lo, hi))), float(ax.py(0.))],
                        fill=CH[c])
         ax.vline(1000. * float(OPT.LAM[c]), (255, 255, 255), 1, dash=(3, 3))
-        ax.text(1000. * float(OPT.LAM[c]), float(a[c]) + .012,
-                '%.5f' % a[c], INK, 'ms')
-        ax.text(1000. * float(OPT.LAM[c]), 0.012, '%.0f' % (1000 * OPT.LAM[c]),
-                (255, 255, 255), 'ms')
-    ax.text(412, 0.285, 'bar width = the Voronoi cell of its own wavelength;', INK)
-    ax.text(412, 0.270, 'the three tile %.1f - %.1f nm with no gap.'
+        ax.text(1000. * float(OPT.LAM[c]), float(a[c]) + .008,
+                '%.5f  (%s, %.0f nm)' % (a[c], CHN[c], 1000 * OPT.LAM[c]),
+                INK, 'ms')
+    ax.text(412, 0.295, 'bar width = the Voronoi cell of its own wavelength;',
+            INK)
+    ax.text(412, 0.280, 'the three tile %.1f - %.1f nm with no gap.'
             % (1000 * OPT.BAND[2, 0], 1000 * OPT.BAND[0, 1]), INK)
-    ax.text(412, 0.255, 'height = a averaged over THAT cell, not sampled at '
+    ax.text(412, 0.265, 'height = a averaged over THAT cell, not sampled at '
                         'its centre.', INK)
+    ax.text(412, 0.250, 'dotted white = the nominal wavelength it is centred on.',
+            MUTED)
 
     dd = np.linspace(0., 3.2, 400)
-    bx = P.Axes(img, (760, 72, 1220, 420), (0, 3.2), (0, 1.02),
+    bx = P.Axes(img, (760, 72, 1220, 420), (0, 3.2), (0, 1.28),
                 title='...and what it does to a path',
                 xlabel='water crossed, m', ylabel='transmission')
     bx.frame(_ticks(0, 3.2, 4), _ticks(0, 1.0, 5), '%g', '%.2f')
@@ -776,19 +782,19 @@ def fig_absorption(S, path):
         bx.line(dd, OPT._e3(a[c] * dd), CH[c], 2, dash=(5, 5))
     bx.vline(dep, WARN, 2, dash=(6, 5))
     bx.vline(2. * dep, WARN, 2, dash=(6, 5))
-    bx.text(dep + .05, 0.98, 'one way', WARN)
-    bx.text(2. * dep + .05, 0.98, 'round trip', WARN, 'rs')
+    bx.text(dep + .05, 1.06, 'one way', WARN)
+    bx.text(2. * dep - .05, 1.06, 'round trip', WARN, 'rs')
     P.legend(bx, [(GREY, 'solid: vertical exp(-a d)'),
                   (GREY, 'dashed: diffuse 2E_3(a d), a cosine law off the bed')],
-             0.12, 0.90)
-    bx.text(0.12, 0.60, 'vertical at DEPTH   %s' % _trip(np.exp(-a * dep)), INK)
-    bx.text(0.12, 0.55, 'diffuse at DEPTH    %s' % _trip(OPT._e3(a * dep)), INK)
-    bx.text(0.12, 0.50, 'the diffuse path is LONGER: a fifth of the red.', MUTED)
+             0.08, 1.24)
+    bx.text(0.08, 0.36, 'vertical at DEPTH   %s' % _trip(np.exp(-a * dep)), INK)
+    bx.text(0.08, 0.30, 'diffuse at DEPTH    %s' % _trip(OPT._e3(a * dep)), INK)
+    bx.text(0.08, 0.24, 'the diffuse path is LONGER: a fifth of the red.', MUTED)
 
     slant = 1. / np.sqrt(1. - (np.sqrt(1. - S['COS_SUN'] ** 2) / OPT.IOR) ** 2)
-    cx = P.Axes(img, (100, 520, 1220, 810), (-0.6, 2.6), (0, 1.05),
-                title='The four legs of this pool own chain, at DEPTH = %.2f m'
-                      % dep,
+    cx = P.Axes(img, (100, 520, 1220, 800), (-0.6, 2.6), (0, 1.48),
+                title="The four legs of this pool's own chain, at DEPTH = "
+                      '%.2f m' % dep,
                 xlabel='band', ylabel='transmission of that leg')
     cx.frame(None, _ticks(0, 1.0, 5), '%g', '%.2f')
     legs = [
@@ -800,32 +806,33 @@ def fig_absorption(S, path):
     ]
     for i, (lab, v, col) in enumerate(legs):
         for c in range(3):
-            _bar(cx, c - 0.30 + 0.20 * i, 0., float(v[c]), col, 0.09)
-        cx.text(-0.55, 1.00 - 0.055 * i, '%s   %s' % (_trip(v), lab), col)
+            _bar(cx, c - 0.30 + 0.20 * i, 0., float(v[c]), col, 0.085)
+        cx.text(-0.55, 1.43 - 0.055 * i, '%s   %s' % (_trip(v), lab), col)
     for c in range(3):
-        cx.text(c, -0.05, CHN[c], MUTED, 'ma')
+        cx.text(c, -0.06, CHN[c], MUTED, 'ma')
 
     P.caption(img, [
         'WHAT IS MEASURED. The one material property of the water: a = %s /m, '
-        'Pope & Fry (1997), averaged over the Voronoi band each channel '
-        'actually integrates rather than sampled at its nominal wavelength.'
-        % _trip(a, '%.5f'),
+        'Pope & Fry (1997) -- averaged over the Voronoi band each channel '
+        'integrates, not sampled at its nominal wavelength.' % _trip(a, '%.5f'),
         'The band mean matters most in RED, where a runs from 0.09 to 0.34 '
-        'across the band: the point sample and the band mean differ by 5.0% '
-        'there, and every other spectral quantity in optics.py is already taken '
-        'over these bands.',
+        'across the band and the point sample differs from the band mean by '
+        '5.0%.',
+        'Every other spectral quantity in optics.py -- n, the caustic eta, the '
+        'dispersion sweep -- is already taken over these same bands.',
         'CORRECTED VALUE. The triple this replaced was (0.2750, 0.0546, '
         '0.0145): red right to 0.2%, green 6.9% high, and blue lifted straight '
-        'out of Smith & Baker (1981) at 450 nm -- 48% above Pope & Fry, from a '
-        "paper this project's own provenance file bans for blue by name.",
-        'The bottom panel is why one absorption gives four different numbers per '
-        'band: the sun enters at a refracted slant (x%.4f), light leaves the '
-        'bed over a cosine law, and only slab_esc has the escape inside the '
-        'same integral as the attenuation.' % slant[0],
-        'DERIVED throughout: optics.ABS, optics._e3, optics.slab_esc, and the '
-        'slant from render own cos_i through Snell. 2E_3(0) = 1 is guarded '
-        'before drawing.',
-    ], 40, 835)
+        'out of Smith & Baker (1981) at 450 nm.',
+        "That is 48% above Pope & Fry, from a paper this project's own "
+        'provenance file bans for blue by name; two independent passes reached '
+        'the same identification.',
+        'The bottom panel is why one absorption gives four numbers per band: '
+        'the sun enters at a refracted slant (x%.4f), light leaves the bed over '
+        'a cosine law, and only slab_esc has the escape' % slant[0],
+        'inside the same integral as the attenuation. DERIVED throughout: '
+        "optics.ABS, _e3, slab_esc, and the slant from render's own cos_i "
+        'through Snell. 2E_3(0) = 1 is guarded before drawing.',
+    ], 40, 845)
     return P.save(img, path)
 
 

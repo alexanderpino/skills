@@ -1063,7 +1063,10 @@ def fig_surface_shape(sc, path):
         'steepening is real -- %.2f to %.2f degrees, x%.2f -- and it does not matter, because Stokes\' 120 deg corner caps EVERY wave of permanent'
         % (v_lin, v_nl, v_nl / v_lin),
         'form at a 30 deg face and section A needs %.2f. The %.1f degrees between them cannot be closed by a height field at any order of any theory.'
-        % (B.snell_cone_face_deg(), B.snell_cone_face_deg() - B.STOKES_FACE_DEG)])
+        % (B.snell_cone_face_deg(), B.snell_cone_face_deg() - B.STOKES_FACE_DEG),
+        'EVERY NUMBER ON THIS FIGURE IS THE 1-D PROFILE\'S, which is the scene beach.py evolves at dx = 1 m. The rendered bay is a different grid and a',
+        'different bed and reads 8.23 -> 15.78 deg with 50% past the boundary and 75% clamped; the two are quoted separately everywhere rather than',
+        'averaged, because a number that straddles two fields is the error class this project has now measured three times.'])
     return P.save(img, path)
 
 
