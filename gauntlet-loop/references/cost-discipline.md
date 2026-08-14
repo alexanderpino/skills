@@ -12,6 +12,13 @@ Two numbers govern the run, both printed by `gauntlet.py status`:
 If cost per closed gap climbs wave over wave, the loop is buying less each round.
 That is a stop signal, not a reason to try harder.
 
+**Read that number as predictive, not provisional.** Earned-value practice found
+that cost efficiency settles early on large programmes and rarely recovers
+(`authorities.md`): the rate you are getting a fifth of the way in is roughly the
+rate you will get. So a bad wave 2 is evidence about wave 6, which is why the
+kill criteria are checked at wave 2. Waiting for efficiency to improve on its own
+is the most expensive optimism available to this loop.
+
 ## Where the tokens actually go
 
 Per lane-round, in rough order of size:

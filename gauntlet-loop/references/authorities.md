@@ -72,6 +72,17 @@ is not extra machinery. And the bootstrap wave builds the thin end-to-end slice
 (skateboard), because lanes cannot be judged independently until the whole thing
 exists to judge.
 
+**Fred Brooks** — `The Mythical Man-Month` (1975): **conceptual integrity** is the
+most important property of a system, and it survives only when something enforces
+one coherent view across independently-produced parts.
+→ This is the smoother's whole justification, and it is the cost of decomposing a
+goal into lanes at all. Independent improvement of separately-judged parts is
+what makes the method fast; it is also what erodes coherence. One fresh agent
+over the changed surface at each wave end is the correction, with a mandate of
+coherence rather than redesign. (Brooks' better-known "plan to throw one away" he
+later qualified himself — first light captures a *baseline*, it does not build a
+prototype to discard.)
+
 ## Flow, queues and limits
 
 **Donald Reinertsen** — `The Principles of Product Development Flow` (2009): an
@@ -88,9 +99,25 @@ visualised flow. The practitioner slogan is *stop starting, start finishing*.
 breadth is the WIP limit doing its job.
 
 **Eliyahu Goldratt** — Theory of Constraints (`The Goal`, 1984): improvement
-anywhere but the bottleneck is an illusion.
+anywhere but the bottleneck is an illusion. The five focusing steps end with a
+warning: once a constraint is broken, go back to the start and **do not let
+inertia become the new constraint**.
 → Rank lanes by what actually carries the goal's quality, and re-rank when a lane
-retires. Polishing a retired dimension is improving a non-constraint.
+retires. Polishing a retired dimension is improving a non-constraint. The inertia
+clause is the re-cut rule: the lane split that was right at wave 1 is a
+constraint of its own by wave 5, which is why re-cutting is a boundary decision
+rather than a failure.
+
+**Goldratt again** — `Critical Chain` (1997): padding added to each task is
+consumed anyway (student syndrome, Parkinson's Law), so strip the local safety,
+pool it into one **project buffer**, and manage the project by how fast that
+buffer is burning against how much work is done — not by task completion.
+→ This is why the budget is one pooled number of waves rather than an allowance
+per lane, and why `status` reports **cost per closed gap** rather than rounds
+completed. Rounds completed is task completion; cost per closed gap is buffer
+burn against real progress. Do not quote a per-lane round budget at intake — it
+invites exactly the padding Goldratt is describing, and the WIP limit already
+decides who gets funded.
 
 ## Stopping, killing, and not fooling yourself
 
@@ -109,6 +136,50 @@ would otherwise happen at wave 9 with everyone invested.
 **Gary Klein** — the premortem (HBR, 2007): imagine the failure, then work
 backwards to its causes.
 → `failure-modes.md` is a premortem written down once so every run inherits it.
+
+**Earned value, and the stability of CPI** — the cost performance index on large
+programmes settles early and rarely recovers; once a fifth of the work is done,
+the efficiency you are getting is roughly the efficiency you will get.
+→ Read **cost per closed gap as predictive, not provisional**. If wave 2 is
+buying badly, wave 6 will not rescue it, and the kill criteria are checked at
+wave 2 for that reason. Waiting for efficiency to improve on its own is the most
+expensive form of optimism available to this loop.
+
+**Harold Kerzner** — `Project Management Metrics, KPIs, and Dashboards` (2011):
+most projects drown in measurement while missing the few numbers that predict
+anything. A metric is something you can count; a **KPI is a metric that changes a
+decision**. Dashboards should be built for the decision the reader must make, not
+for completeness. He also argues for **health checks at defined points** rather
+than continuous oversight, and for defining what success means — including
+acceptance criteria — before work starts rather than at delivery.
+→ Three rules. `status` prints a deliberately short set of numbers, and cost per
+closed gap is called "the only efficiency number that matters" because the rest
+are metrics, not KPIs. `board` renders the workbench for the retire/park/re-cut
+decision, not as a complete history. And the review is a **wave-boundary** event:
+continuous re-inspection is not rigour, it is the cost Kerzner is warning about —
+which is the same conclusion the settled-work rule reaches from the token side.
+
+**Rita Mulcahy** — `Risk Management: Tricks of the Trade` (2003) and the PMP
+material: teams stop at *identifying* risks and never plan responses, so the risk
+register becomes a document instead of a control. And a baselined plan is changed
+through **change control**, never by absorption — an approved change is a
+decision someone made, not a thing that happened.
+→ Both are load-bearing here. Stops, kill criteria and the park rule are
+**responses armed before wave 1**, with thresholds in `config.json`, rather than
+risks noted and revisited. And the contract is a baseline: scope is frozen, a
+re-cut redistributes without expanding, noticed work goes to `backlog.md`, and
+the budget is extended by the user or not at all. Scope snowball is precisely
+change-by-absorption, and it is the failure this pair prevents.
+
+**PRINCE2** — *manage by exception*: delegate within agreed tolerances and
+escalate only when one is breached; *manage by stages*, with a real
+continue/stop decision at each boundary; *continued business justification*, which
+must hold for the whole project, not just at approval.
+→ This is the skill's autonomy model, and the closest structural match to it in
+the field. The contract sets tolerances (budget, stops, kill criteria), the run
+proceeds unattended inside them, a boundary is where continuation is decided, and
+the budget stop is the justification lapsing — which is why the honest response
+to a depleted budget is an offer the user may refuse, never a self-extension.
 
 **Annie Duke** — `Quit` (2022): kill criteria work when they are *states and
 dates* set in advance; quitting on time feels like quitting early. She also
