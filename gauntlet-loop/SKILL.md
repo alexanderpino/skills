@@ -14,24 +14,11 @@ a champion/challenger regression guard, deterministic state tooling,
 per-dimension bars, a WIP limit, a park rule for stalled lanes, and named failure
 modes. Credit Shumer for the pattern; be honest about which parts are additions.
 
-## What it is
-
-A quality-*maximising* loop, not a correctness loop — run under a fixed budget.
-
-Decompose a goal into the smallest parts that can be improved and judged
-**separately**. Each gets a builder and a *different* critic in fresh context.
-The critic inspects the real artifact — rendered pixels, running binary, actual
-prose, actual measurements — against a concrete external bar, blind wherever the
-artifact allows. If the bar wins, the critic names the single largest remaining
-gap and the work goes back. Then another round, on the lanes still moving.
-
-Four properties make it a gauntlet rather than a review:
-
-1. **The bar is external and inspectable.** Not "make it production-ready".
-2. **The bar is reachable.** The target is where done actually is; ambition above
-   it is a *stretch*, and a stretch never defines done.
-3. **The builder never grades itself.** Justification is the enemy here.
-4. **Rounds are earned, not scheduled** — and withdrawn when a lane stops paying.
+A quality-*maximising* loop, not a correctness loop, run under a fixed budget: a
+builder closes one named gap, a *different* critic in fresh context judges the
+real artifact against a real bar, and the lanes that stop paying stop getting
+funded. What separates it from a review, and where each rule comes from:
+→ `references/authorities.md`
 
 ## When not to use this
 
@@ -117,17 +104,22 @@ makes every later decision concrete.
    part. If the artifact already exists, skip the build and capture it.
 2. **Verify inspection on it**: take the screenshot, run the benchmark, render
    the page. The failure that otherwise wastes hours, caught in minutes.
-3. **Judge it once** against a candidate bar — one critic, one verdict.
+3. **Judge it once** against a candidate bar — one critic, one verdict, in the
+   block from `references/critic.md`: `SCORE` (0–10), `WINNER`, `MARGIN`,
+   `GAP SEVERITY` (major / minor / none), `LARGEST GAP`, `EVIDENCE`. Score it
+   against a **provisional target of 7**; Phase 2 sets the real one. Read that
+   brief now — this is the one place the loop needs it before Phase 4.
 4. **Show the user** the artifact and the verdict.
 
-Then the arithmetic, out loud:
+Then the arithmetic, out loud, on **provisional** numbers — the lanes you expect
+to cut and the default WIP limit of 3, both re-checked at Phase 3:
 
 > rounds you estimate per gap × lanes ÷ WIP limit ≈ waves needed
 
-Estimate the numerator from first light's own verdict, and say which reading you
-took so it can be argued with: a `minor` gap with a named fix is usually one
-round, a `major` gap two or three, and a gap the critic calls structural is not
-closeable at lane level at all — that is a rescope, not a number.
+Estimate the numerator from first light's own `GAP SEVERITY`, and say which
+reading you took so it can be argued with: a `minor` gap with a named fix is
+usually one round, a `major` gap two or three, and a gap the critic calls
+structural is not closeable at lane level at all — a rescope, not a number.
 
 Three answers fall out of this one step, each cheaper here than anywhere later:
 whether inspection works, whether the bar is sharp enough to discriminate (a
@@ -145,13 +137,9 @@ Two exemptions, because first light runs before `init` exists:
 
 It also runs **regardless of tree state**. The dirty-tree refusal and any
 `git init` consent belong to the contract, before the first funded wave — not in
-front of the user's first look at anything. First light's output is the wave-1
-baseline the champion guard arms against.
-
-A contract negotiated against a visible artifact is faster to agree and better
-informed than one argued in the abstract, and the user waits minutes rather than
-phases to see whether this is worth running at all. The cheapest run to cancel is
-the one that was never contracted.
+front of the user's first look at anything. **Commit first light's output before
+that check runs**: it is the wave-1 baseline the champion guard arms against, and
+committing it is what makes the tree clean for wave 1.
 
 ## Phase 1 — The contract
 
@@ -165,17 +153,11 @@ whole contract — goal, target bar, budget, stops — confirmed in one exchange
 The full table below is for long unattended runs, where the fields you skip are
 the ones nobody can add later.
 
-| Field | What it fixes |
-|---|---|
-| **Goal** | The destination, not the route. An implementation plan is not a goal. |
-| **Target bar** | The concrete external comparator per dimension, set where "done" is — reachable from here, inside the budget. |
-| **Stretch** | Optional. Direction only; never a stop condition, never blocks retirement. |
-| **Inspection** | How a critic reaches the output each round, and which dimensions have machine gates. |
-| **Lanes** | The proposed split, ranked, with the WIP limit for a wave. |
-| **Stop** | Which conditions are armed, with thresholds → `config.json`. |
-| **Kill** | Named evidence that ends the whole run early, agreed now rather than argued later. |
-| **Budget** | Waves / wall clock / tokens, always armed, with the projected call count. Optional hard cap no extension may cross. |
-| **Autonomy** | Unattended until a stop fires, or check in at wave boundaries. |
+Fields, each explained in `intake.md`: **goal** (destination, not route) ·
+**target bar** per dimension · optional **stretch** · **inspection** (and which
+dimensions have machine gates) · ranked **lanes** + WIP limit · armed **stops** ·
+**kill** criteria · **budget** with projected call count and optional hard cap ·
+**autonomy**.
 
 Stops (`references/stop-conditions.md`): `bar-met`, `clean-streak`,
 `no-progress` (parks a lane), `budget`, `judgment` — armed in combination, first
@@ -231,25 +213,35 @@ independently. You cut them, not the user. → `references/decomposition.md`
 A wave is one pass over the **funded** lanes — the top `wip_limit` of the ranked
 list, as printed by `status`. Phases 4–6 cycle until a stop fires.
 
-Per lane, per round:
+**Wave setup, once, before any lane starts:** take the champion commit. That one
+ref is every lane's `--champion-ref` for the wave. Concurrent per-round commits
+contend on the git index and capture each other's half-built trees — disjoint
+*file* ownership does not make the index disjoint (`state-and-resume.md`).
+
+Then, per lane, per round:
 
 1. **Build.** Builder gets the lane goal, the bar path, the current artifact and
    the last named gap — not the previous builder's reasoning.
    → `references/builder.md`
-2. **Snapshot.** One champion commit per wave, taken before the builders spawn —
-   that ref is every lane's `--champion-ref` (`references/state-and-resume.md`).
-3. **Gate, then judge.** Run any machine gate first — a dimension failing its own
+2. **Gate, then judge.** Run any machine gate first — a dimension failing its own
    benchmark needs no critic. Then one critic call covering both comparisons
    (→ `references/critic.md`, `references/blind-protocol.md`):
    - **Promotion:** challenger vs champion. Wins → promote; loses → revert. The
      regression guard; skipped only on a lane's first round.
-   - **Bar:** (if promoted) ours vs the target bar, per dimension. Produces the
-     winner, margin, gap and severity, which drive the streaks.
-4. **Log both** through `log-round` (`--mode champion`, then `--mode
+   - **Bar:** ours vs the target bar, per dimension — produced on every round,
+     including a reverted one, where it judges the surviving champion. Gives the
+     winner, margin, gap and severity that drive the streaks.
+3. **Log both** through `log-round` (`--mode champion`, then `--mode
    blind`/`rubric`). Every record names its `--dimension`; the script rejects
    undeclared ones, because a lane cannot retire on dimensions nobody judged.
-5. A bar verdict with severity `major`/`minor` and no specific gap is invalid and
+   Under a blind protocol the critic returns `WINNER: A | B` — you hold the label
+   mapping and log `ours`/`other`; never ask the critic which side was ours.
+4. A bar verdict with severity `major`/`minor` and no specific gap is invalid and
    rejected. A `none` verdict must still cite what it inspected.
+
+**Promotion and revert commits are issued by you, serially, as verdicts land** —
+never by builders and never in parallel. They are path-scoped to the lane's owned
+files, which is what keeps one wave snapshot sufficient.
 
 **Run independent lanes concurrently.** Spawn the wave's builders in a *single
 message*, and spawn each lane's critic the moment **that lane's** builder returns
@@ -261,18 +253,16 @@ third of the elapsed time for identical cost.
 **Serialise a pair instead when one lane's result changes what "good" means for
 the other** — lighting before materials, information architecture before
 paragraph polish (`references/decomposition.md`). Concurrency is the default for
-independent lanes, not a rule that overrides dependency.
+independent lanes, not a rule that overrides dependency. The mechanics, so two
+agents resolve it the same way: a serialised pair **occupies both its slots in
+the same wave**, the dependent lane's builder spawns when the upstream lane's
+*verdict* lands (not when its builder returns), and the wave's other lanes are
+unaffected and still run concurrently.
 
-**Snapshot the wave, not the round.** Take one champion commit *before* the
-builders are spawned and use that ref for every lane in the wave. Concurrent
-per-round commits contend on the git index and capture each other's half-built
-trees — disjoint *file* ownership does not make the index disjoint. Reverts stay
-path-scoped to the losing lane's owned files, which is what makes one snapshot
-enough.
-
-That leaves the two barriers that earn one: the smoother at the end of a wave,
-and the wave-boundary review. Machine gates and logging run inline. Never block
-on the user mid-wave; check-ins belong at boundaries, if autonomy asked for them.
+**Two in-wave barriers, and they earn it:** the smoother at the end of a wave and
+the wave-boundary review. The champion snapshot is wave *setup*, before any lane
+starts, so it is not a third. Machine gates and logging run inline. Never block on
+the user mid-wave; check-ins belong at boundaries, if autonomy asked for them.
 
 ## Phase 5 — Smooth
 
@@ -299,7 +289,9 @@ anything. Run `status`, then act:
   Resume only on *new evidence* — a re-cut, a fixed inspection path, a new source
   asset, a revised bar. "It might work this time" is sunk cost with extra steps.
 - **Re-cut** when the smoother reports the same seam twice, or two lanes' critics
-  keep citing each other's territory. Between waves, never mid-wave.
+  keep citing each other's territory. Between waves, never mid-wave; the protocol
+  — evidence, `init --force`, the deliberate streak reset — is in
+  `references/decomposition.md`.
 - **Reallocate** — a retired or parked lane promotes the next one in. Re-check
   the feasibility arithmetic if the budget now looks tight.
 - **Check the kill criteria** from intake. They fire early on purpose.

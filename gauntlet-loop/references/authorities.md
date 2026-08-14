@@ -1,5 +1,22 @@
 # Where this skill's rules come from
 
+## What separates a gauntlet from a review
+
+Four properties. A method missing any one of them is a review with extra steps,
+and each is enforced somewhere concrete in the skill rather than merely believed:
+
+1. **The bar is external and inspectable** — not "make it production-ready".
+   Enforced by freezing bar files at intake and by critics that must cite what
+   they inspected (`bar-selection.md`, the script's `--evidence` requirement).
+2. **The bar is reachable.** The target is where done actually is; ambition above
+   it is a *stretch* that never defines done. Enforced by `--target-score` and
+   the warning at 10 (`bar-selection.md`).
+3. **The builder never grades itself.** Justification is the enemy: a builder has
+   seen every decision it made and is excellent at defending them. Enforced by
+   separate critic agents in fresh context (`critic.md`, `blind-protocol.md`).
+4. **Rounds are earned, not scheduled** — and withdrawn when a lane stops paying.
+   Enforced by the `no-progress` stop and the park rule (`stop-conditions.md`).
+
 The Gauntlet Loop is Matt Shumer's. Nearly everything wrapped around it —
 budgets, kill criteria, the WIP limit, parking, the honest report — is
 project-management practice with a literature behind it. This file names that
