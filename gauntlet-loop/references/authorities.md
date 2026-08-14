@@ -141,7 +141,49 @@ pessimism — it is how a fixed budget finds the good option at all.
 duration rather than by value alone.
 → The lane ranking formula in `decomposition.md`.
 
-## Agents specifically
+## Agents, prompting, and LLM judges
+
+This section carries more weight than the rest, because a gauntlet's critic *is*
+an LLM judge and the known failure modes of LLM judges are the method's `lasten`.
+Every guardrail below buys off a measured effect, not a worry.
+
+**Huang et al., "Large Language Models Cannot Self-Correct Reasoning Yet"
+(2023)** — models asked to revise their own output *without external feedback*
+frequently make it worse, not better; the apparent gains in earlier self-critique
+results came from oracle labels leaking in.
+→ This is the empirical backing for the skill's first non-negotiable. "No builder
+grades its own homework" is not decorum about objectivity; self-grading is a
+measured *regression* risk. It is also why the bar must be external and
+inspectable rather than a rubric the builder can reason about, and why the
+critic gets the artifact and the bar and nothing else.
+
+**Zheng et al., "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena"
+(2023)** — LLM judges carry three measured biases: **position bias** (the same
+pair scores differently when swapped), **verbosity bias** (longer answers score
+higher at equal quality), and **self-enhancement bias** (a judge prefers text
+from its own family). Their mitigation for position bias is to swap and re-judge.
+→ Three rules come straight out of this. Randomised A/B labels every comparison
+answer position bias. Capping the builder's handoff to five lines and forbidding
+self-assessment answers verbosity bias — an uncapped handoff is a lever the
+builder can pull on the judge without improving the artifact. Blinding, and
+routing the deciding critic to a tier that can actually judge rather than the
+cheapest one, answer self-enhancement.
+
+**Madaan et al., "Self-Refine" (2023)** — iterative refinement pays when the
+feedback is *specific and actionable*, and the gains taper across iterations.
+→ Both halves are enforced. "Name the gap or the round didn't happen" is a hard
+rejection in `log-round`, because vague feedback is a round that buys nothing.
+The tapering is why `no-progress` parks a lane rather than funding one more push:
+the method's own literature says the curve flattens, so flattening is a signal to
+reallocate, not to try harder.
+
+**Anthropic, "Effective context engineering for AI agents"** — treat the context
+window as a finite, degrading resource; give an agent the smallest set of
+high-signal tokens that lets it act, not everything that might be relevant.
+→ "Paths, not payloads" is this rule. So is reading each reference at its phase
+instead of at intake, and capping every handoff. It is also the honest limit on
+this method: each subagent's cold re-read is simultaneously the source of its
+independence and the largest single cost in the run.
 
 **Anthropic, "Building effective agents"** — the *evaluator-optimizer* pattern: a
 generator and a separate evaluator in a loop, used when there are clear

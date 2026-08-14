@@ -86,6 +86,25 @@ A clean streak produced by a cheap critic is weaker evidence than one produced b
 a strong critic, exactly as a rubric round is weaker than a blind round. Say so
 in the report rather than letting the streak speak for itself.
 
+## The bias routing cannot fix
+
+LLM judges prefer text from their own model family — *self-enhancement bias*,
+measured in Zheng et al. (`authorities.md`). In practice every agent in this run
+is usually the same family, so you cannot route around it: builder and critic
+share a lineage whatever tier you pick.
+
+Do not pretend otherwise. What actually works is already in the method — the
+critic judges an **external artifact** it did not generate, against a **frozen
+bar** it cannot rewrite, with **randomised labels** and no builder rationale. A
+same-family judge scoring a real artifact against a real reference is a far
+weaker version of the effect than one scoring two candidate *texts*.
+
+Two practical consequences. Where a dimension is machine-checkable, the gate
+outranks any critic and the bias disappears entirely — one more reason cost rule
+1 comes first. And where the user supplies a competing implementation as the bar,
+say in the report that the comparison was same-family, so a reader can discount
+it themselves.
+
 ## Anti-patterns
 
 - **Cheap critic on a retirement round.** The one verdict that ends spending on a
