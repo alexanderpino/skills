@@ -560,7 +560,60 @@ def _set_runup():
 WHITE = float(E_DOWN_AIR[1] / np.pi)
 
 
-def _save(L, path, key=None, gamma=2.2):
+CAP_BAY = (
+    "s4  THE BAY FROM THE CLIFF EDGE -- for bar section J.  Bed and wave field from beach.py (wave 3's coastal loop and 2-D transform); optics from beach_optics.py; sun, sky and Fresnel imported from the pool's atmosphere.py / optics.py, unchanged.",
+    "READ THIS BEFORE READING THE FRAME.  (1) THE FOAM IS A PLACEHOLDER: a saturating function of the breaking fraction put on the crests, with no advection, no decay, no entrained-air medium and no spray.  Bar section C names three mechanisms in three different representations; none is modelled, it is an OPEN row in the suite, and NOTHING about foam extent, texture or brightness may be read off this image.  (2) THE COASTAL PLAIN IS ONE DECLARED ALBEDO standing where a vegetation model would go; bar K2 puts dune vegetation and the village out of scope.  (3) THE FRAMING IS THE LANDFORM'S, NOT A COMPOSITION: bar J's photograph is from a headland with sea on three sides, and wave 3's loop gives 46 m of plan curvature over 1408 m of coast -- a nearly straight cliffed shore with a beach strip metres wide -- so there is no headland in this bed to stand on.  COMPARABLE TO J in its shore-parallel surf lines and its colour ladder (2G/(R+B) = 0.961 deep, 1.014 at 2-5 m, 1.130 over the shallows).  NOT COMPARABLE in its beach.",
+)
+CAP_GLIT = (
+    's4  THE GLITTER PATH -- for bar section K.  Cox & Munk (1954) slope statistics at U10 = 6 m/s (mss = 0.03348), exact Fresnel from optics.py, sun irradiance from atmosphere.py, and the Jacobian dw_v = 4 cos(omega) cos^3(beta) dz derived beside itself.',
+    "THERE IS NO SPREAD PARAMETER ANYWHERE IN THIS RENDER.  The path's width is a readout of the mean square slope: 14.96 deg in the near field, 6.63 deg at the horizon -- it NARROWS toward the horizon by 2.26x while brightening 14x, which is bar K1's own prediction from the geometry.  width/sqrt(mss) is constant to 1.7% over a factor of five in wind.  THE WIDTHS ARE MEASURED IN ANGLE, from the closed form, NOT off this image -- bar K3: do not read a level off the path.  The sea is flat-Earth here, so the image places the horizon 0.203 deg = sqrt(2h/R) too high.  The path CLIPS: the exposure is a derived white point (a white Lambertian card in this sun, 5.16 green) and the path is forty times it, which is what a photograph of a glitter path does.  The wind is `?`.",
+)
+CAP_CUV = (
+    's4  THE VARIABLE-PATH CUVETTE -- for bar section A.  LEFT backlit (sun behind the water), RIGHT front-lit (sun behind the camera).  ONLY THE OBSERVER MOVES BETWEEN THE PANELS; the sun does not.  Thickness ramps 0 m at the top to 3 m at the bottom.',
+    "THIS IS A STAND-IN AND THE WEDGE IS NOT A WAVE.  A ray entering water is confined to the Snell cone, so a sightline travelling ALONG a crest -- which is what a backlit wave face is -- needs a face steeper than 90 - asin(1/n) = 41.48 deg.  This scene's linear free surface reaches 0.1443 of slope, which is 8.21 deg: six times too gentle.  Section A's geometry cannot be rendered from a height field, and that puts it beside section F's plunging lip, one step earlier and for the same structural reason. EVERYTHING INSIDE THE WEDGE IS THE SCENE'S: the same IOPs, the same sun, optics.fresnel on both faces, optics.refract with its TIR branch, the same Beer-Lambert and the same HG lobe whose g = 0.9132 was DERIVED from chapter 28's b_f >= 50 b_b. The grade is 1.355 backlit and 1.348 front-lit -- the same, because the grade is the PATH and the path does not know where the sun is.  What differs is the forward glow: 5.07% of the backlit pixel, 0.00% of the front-lit one.  Transmittance 2G/(R+B) = 1.0000 at zero path.",
+)
+
+
+def _caption(img, lines, pad=12):
+    """Burn the figure's own caption into the figure.
+
+    Wave 1 stated its stamped rip channels this way and wave 3 stated their
+    absence the same way, and the convention is worth more than any of the three
+    models it qualifies: A PNG TRAVELS AND A README DOES NOT TRAVEL WITH IT. A
+    frame that shows a placeholder and does not say so is the only kind of
+    dishonesty a rendering project can commit silently.
+
+    The text is WRAPPED TO THE IMAGE'S OWN WIDTH by measuring it, not by
+    counting characters -- the first writing of this function hard-wrapped at a
+    guessed column and cut every line off at the frame's right edge."""
+    from PIL import ImageDraw
+    from beach_plot import FONT_S, INK, MUTED
+    w, h = img.size
+    d0 = ImageDraw.Draw(img)
+    wrapped = []
+    for i, para in enumerate(lines):
+        cur = ''
+        for word in para.split(' '):
+            trial = (cur + ' ' + word).strip() if cur else word
+            if d0.textlength(trial, font=FONT_S) > w - 2 * pad and cur:
+                wrapped.append((i, cur))
+                cur = word
+            else:
+                cur = trial
+        if cur:
+            wrapped.append((i, cur))
+    lh = 15
+    band = pad * 2 + lh * len(wrapped)
+    out = Image.new('RGB', (w, h + band), (250, 249, 246))
+    out.paste(img, (0, 0))
+    d = ImageDraw.Draw(out)
+    for k, (i, ln) in enumerate(wrapped):
+        d.text((pad, h + pad + k * lh), ln, font=FONT_S,
+               fill=INK if i == 0 else MUTED)
+    return out
+
+
+def _save(L, path, key=None, gamma=2.2, caption=None):
     """DISPLAY ONLY, and nothing in this file reads back through it.
 
     A single exposure `key` and a gamma. No filmic curve, no local adaptation,
@@ -570,7 +623,10 @@ def _save(L, path, key=None, gamma=2.2):
     curve is allowed to do is make the frame legible."""
     k = WHITE if key is None else key
     img = np.clip(L / max(k, 1e-9), 0.0, 1.0) ** (1.0 / gamma)
-    Image.fromarray((img * 255.0 + 0.5).astype(np.uint8)).save(path)
+    im = Image.fromarray((img * 255.0 + 0.5).astype(np.uint8))
+    if caption is not None:
+        im = _caption(im, caption)
+    im.save(path)
     return k
 
 
@@ -839,9 +895,11 @@ def main():
     # ---- write the frames
     gap = np.zeros((cvA['L'].shape[0], 8, 3))
     kA = _save(np.concatenate([cvA['L'], gap, cvB['L']], axis=1),
-               '%s/s4-cuvette.png' % OUT)
-    kJ = _save(downsample(LJ, SS), '%s/s4-bay-render.png' % OUT)
-    kK = _save(downsample(LK, SS), '%s/s4-glitter-render.png' % OUT)
+               '%s/s4-cuvette.png' % OUT, caption=CAP_CUV)
+    kJ = _save(downsample(LJ, SS), '%s/s4-bay-render.png' % OUT,
+               caption=CAP_BAY)
+    kK = _save(downsample(LK, SS), '%s/s4-glitter-render.png' % OUT,
+               caption=CAP_GLIT)
     print('exposure keys (99th pct of scene-linear): A %.4g  J %.4g  K %.4g'
           % (kA, kJ, kK))
     print('%.1f s' % (time.time() - t0))
