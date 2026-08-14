@@ -2701,6 +2701,59 @@ different coefficients, and `c` is typically 5–20× larger because forward sca
 is lost, i.e. refracted lookthrough — and `K_d` for the *diffuse light column*, i.e. depth-tinted
 volumetric fog. Driving both from one constant makes water look far murkier than it is.
 
+**And a transmitted path is an instrument, so the trap has a second half: the forward glow is not
+Beer–Lambert, and reading `c` off a path that contains it is biased low by a quarter.** The way
+anyone recovers `c` from a picture or a buffer is the cuvette relation
+`c = −ln(T₂/T₁)/(L₂ − L₁)` — two thicknesses of the same water, everything multiplicative
+cancelling. It is exact, and it is exact only on the *transmitted* term. A single-scattering source
+inside the slab integrates to something with a different shape entirely:
+
+```
+L_glow = ∫₀^L  b·p(Θ)·E · e^{−c(L−s)} · e^{−cs} ds  =  b·p(Θ)·E · L · e^{−cL}
+#                    \_______/  \_____/
+#                     in to s   out from s      -- the two exponentials multiply to e^{-cL},
+#                                                  independent of s, so the integral is just L
+```
+
+**Linear in `L` times the exponential, not the exponential.** It rises out of zero, peaks at
+`L = 1/c` and falls — so it is *brightest* where a naive reading assumes the signal is weakest, and
+the cuvette picks up an extra term that depends only on the two thicknesses:
+
+```
+−ln(T₂/T₁)/(L₂−L₁)  =  c  −  ln(L₂/L₁)/(L₂−L₁) · (the glow's share of the signal)
+#   at L1 = 1 m, L2 = 3 m the bias coefficient is ln(3)/2 = 0.5493 m^-1, and it is SUBTRACTED
+```
+
+Measured on the reference implementation's backlit wedge, where the glow is **5.07% of the pixel**
+and every other term is the scene's own (`D`, `beach_render.py`, from the scene-linear buffer):
+
+| what is in the signal | `c` red | `c` green | `c` blue | error |
+|---|---|---|---|---|
+| put in (`a + b`) | 0.28356 | 0.08560 | 0.16191 | — |
+| **transmitted only** | 0.28356 | 0.08560 | 0.16191 | **0.0 / 0.0 / 0.0 %** |
+| **+ the forward glow** | 0.26822 | 0.06480 | 0.13630 | −5.4 / **−24.3** / −15.8 % |
+| **+ the front face's own reflection** | 0.26263 | 0.06386 | 0.13367 | −7.4 / −25.4 / −17.4 % |
+
+⚠️ **Five per cent of forward-scattered light costs a quarter of the green coefficient** — and green
+is the band the whole colour argument of this section lives in, so the error lands where it does the
+most damage. Read the table in absolute terms and it is clear why green loses: the bias subtracted
+is **0.0153 / 0.0208 / 0.0256 m⁻¹** in red / green / blue — the same order in all three — while `c`
+itself spans 0.28 to 0.086. **A roughly band-independent subtraction from a strongly band-dependent
+quantity is largest, in relative terms, wherever the water is clearest**, and for water that is
+green. Three consequences, and the third is the one that generalises:
+
+1. **Separate the glow before inverting.** Two thicknesses give one equation; a scattering
+   contaminant makes it two unknowns. Either measure where the glow is identically zero — the same
+   wedge front-lit reads **0.00%** glow, because the sun cannot reach the back face at all — or
+   model `L·e^{−cL}` and fit both.
+2. **`b_f ≳ 50·b_b` is what makes this unavoidable.** The same inequality that makes `c` 5–20×
+   `K_d` puts nearly all the scattered light *forward*, i.e. into the transmitted sightline. There
+   is no water for which the glow is small because the scattering is.
+3. **Any transmitted path used as a measurement inherits this**, not just a cuvette: a sun shaft
+   read for optical depth, a backlit wave face read for a green grade, a submerged object's contrast
+   read for visibility. If the path is backlit, the glow *is* the picture, and the instrument is
+   measuring something other than what it is named after until the glow is taken out of it.
+
 **Clear does not mean bright.** Reflectance goes as `b_b/a`; in the clearest water `b_b` is
 molecular only and tiny, so deep clear water returns almost nothing and reads **near-black with a
 blue cast**, with all apparent brightness coming off the surface. Shallow clear water over bright
@@ -2841,6 +2894,31 @@ Tier 1 gives correct *statistics*; tier 2 gives correct *granularity*. Shipping 
 gives sparkle that does not integrate to the right brightness; shipping tier 1 alone gives a
 correct but slightly too-smooth glitter path in the near field. Production is tier 1 everywhere
 plus tier 2 within a fade radius.
+
+**And all three tiers are single-bounce, which at a low sun loses a tenth of the light the surface
+intercepts.** This is not a tier — it is a term missing from every one of them, and it is
+measurable. Integrate the flux the tilted facets intercept from the beam,
+`∫ ρ_F(ω) cos ω · p(z)/cos β dz` over slope space, and integrate the radiance a Cox–Munk glitter
+model *produces* over the upward hemisphere: the two share nothing but the slope pdf and they agree
+to **7×10⁻⁵ relative** (`D`, and that agreement is the Jacobian `dω_v = 4 cos ω cos³β dz` and
+nothing else) — **but only after restricting the first to facets whose mirror direction points
+up.** The rest is real light going somewhere:
+
+| sun elevation | `U₁₂.₅` = 3 m/s | 6 m/s | 12 m/s |
+|---|---|---|---|
+| 10° | 10.4% | 12.1% | 12.5% |
+| **21°** | 3.7% | **10.3%** | 18.0% |
+| 30° | 0.5% | 4.1% | 13.3% |
+| 45° | 0.00% | 0.2% | 3.1% |
+| 60° | 0.00% | 0.00% | 0.2% |
+
+Facets tilted far enough away from a low sun send their specular lobe **below the horizon** — into
+the sea, or into the back of the next wave. A single-bounce model drops that light entirely, and it
+is exactly the light a multiple-surface-bounce model puts back as the **faint filling between the
+glints**: the reason a real glitter path has a floor between its sparkles and a rendered one has
+black. Read the table's shape rather than any one cell — the loss is a **low-sun, high-wind**
+phenomenon and it is *negligible above about 45°*, which is a scheduling fact as much as a physical
+one. The shots that want a glitter path are exactly the shots where the term is largest.
 
 **Check reachability before budgeting for glitter at all.** A glint needs the surface to supply the
 normal that bisects sun and eye, and the surface can only supply what its slope distribution

@@ -529,6 +529,31 @@ least-confident-claims ledger in `00-index.md`.
   path narrows and brightens toward the horizon. Re-measure the constants for another geometry.
   The closed forms beside them — `β₀ = |θ_sun − θ_view|/2`, and the azimuth-to-tilt steepening —
   are half-vector geometry derived here and checked against the model (`D`).
+- **P/D** — [What a single-bounce glitter model loses below the horizon](12-water-rendering.md#sun-glitter-the-sparkle-path).
+  The two integrals — the radiance over the upward hemisphere, and `ρ_F(ω) cos ω · p/cos β` over
+  slope space — are the Cox–Munk construction (`P`); their agreement to 7×10⁻⁵ relative, and the
+  share of intercepted flux whose mirror direction points *down*, are measured here on
+  `reference-impl/beach_optics.py` and converged against grid extent and resolution (10.262 /
+  10.261 / 10.271% at ±1.5/601, ±2.0/1201, ±3.0/2001 samples). The 10.3% is that sun (21.03°), that
+  wind (6 m/s) and that wind azimuth; the elevation × wind table beside it is what carries, and the
+  "negligible above 45°" reading is that table's, not a published result. **Not modelled anywhere in
+  this chapter** — the multiple-surface-bounce term that would return the light is named and left
+  open.
+- **P/D** — [The forward glow is not Beer–Lambert](12-water-rendering.md#water-body-optical-identity-where-the-iops-come-from).
+  The single-scattering integral collapsing to `b·p(Θ)·E·L·e^{−cL}` is textbook radiative transfer
+  done in one line here — the two exponentials multiply to `e^{−cL}` independent of `s`, so the
+  integral is the path length — and the cuvette relation `c = −ln(T₂/T₁)/(L₂−L₁)` is standard
+  spectrophotometry (`P` both). The **bias** is `D`: measured on the reference implementation's
+  backlit wedge (`beach_render.py`, off the scene-linear buffer, term by term), −5.4 / −24.3 /
+  −15.8% at `L₁ = 1 m`, `L₂ = 3 m` with the glow at 5.07% of the pixel. The **shape** of the error
+  — low, worst in the clearest band, growing with the glow's share — is general; the −24.3% is that
+  water, that geometry and those two thicknesses. Two other thickness pairs were run and are worth
+  recording because they *look* like a robustness result and are not one: `L₁/L₂ = 0.25/1.0` and
+  `0.5/2.5` give −25.0% and −24.6% in green, against −24.3%. The bias **coefficient**
+  `ln(L₂/L₁)/(L₂−L₁)` across those three pairs is 1.848, 0.805, 0.549 — a factor of 3.4 — so the
+  near-constant answer is the coefficient and the glow's share moving in opposite directions
+  (0.012, 0.026, 0.038 inferred), not the bias being insensitive to geometry. Quote the formula,
+  not the percentage.
 - **D** — The wall as a light carrier, in
   [Caustics](12-water-rendering.md#caustics-the-other-half-of-the-light-path). The 35% mean / 77% worst-texel wall share
   of the bed's cosine-weighted hemisphere is an exact rectangle view factor computed per texel; the
