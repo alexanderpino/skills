@@ -44,6 +44,66 @@ each time it was restated.
 **Repair.** Bar files frozen at `gauntlet/bar/` and re-read from disk each wave.
 Never restate the bar from memory into a subagent prompt — point at the path.
 
+## Unreachable bar
+
+**Signal.** Every round loses. Scores sit at 4 and never move. Every dimension
+looks stalled at the same time, and the loop reads as failing when it is actually
+working.
+
+**Cause.** The target was set at an ideal rather than at "done", or
+`target_score` was set to 10 so nothing can ever pass. A bar nobody can reach
+stops discriminating: a near miss and a disaster both log as a loss.
+
+**Repair.** Put the ambition in the stretch line, and set the target where the
+run can plausibly land inside the budget (`bar-selection.md`). Do it before wave
+1 — the feasibility check after round zero exists for exactly this. Mid-run, a
+target that is provably out of reach is a rescope conversation with the user, not
+something to grind against.
+
+## Zombie lane
+
+**Signal.** The same lane keeps getting funded, round after round, with the same
+gap named each time. Its score has not moved in four rounds. Everyone can see it
+is stuck; nobody stops it, because stopping feels like giving up.
+
+**Cause.** No prune rule, or a lead agent treating parking as failure. Sunk cost
+does the rest: the more rounds a lane has consumed, the more it seems to deserve
+one more.
+
+**Repair.** The `no-progress` condition is mechanical for this reason —
+`status` flags it, `extend` refuses to price an extension until it is parked, and
+`park` records the reason. Park it, name which of the three causes it was
+(structural, not-a-code-problem, cut wrong — `decomposition.md`), and give the
+slot to the next lane. The open gap goes to the user, who can act on it in ways
+the loop cannot.
+
+## Gold plating
+
+**Signal.** Rounds still running on a dimension that already retired. Builders
+polishing past the target because the artifact "could be better".
+
+**Cause.** Retirement treated as a suggestion, or a target bar nobody believes in
+so the run keeps going by feel.
+
+**Repair.** Retirement is a stop. If the artifact genuinely passed the bar with
+budget left, that is a bar problem: raise it, announced and recorded, and let the
+run continue against something real. Do not fund unjudged polish — no gap, no
+builder.
+
+## Token burn
+
+**Signal.** Cost per closed gap climbing wave over wave in `status`. Waves that
+cost as much as the first ones and close nothing.
+
+**Cause.** Critic calls doing work a command could do, two critic calls where one
+inspection would answer both questions, artifacts pasted into prompts, six lanes
+funded for one round each.
+
+**Repair.** `cost-discipline.md`, in full. The two that matter most: machine
+gates for anything measurable, and the WIP limit for everything else. And when
+cost per gap keeps climbing while the open gaps get cosmetic, the honest response
+is a stop, not a cheaper loop.
+
 ## Progress theatre
 
 **Signal.** Rounds logged, gaps named, verdicts recorded — and diffing the artifact
@@ -100,10 +160,10 @@ Revert rate climbs past wins.
 that lane-level work cannot reach.
 
 **Repair.** Recognise it rather than grinding — `status` flags a revert rate
-over 50% in the recent window as exactly this signal. Either re-cut the lanes to
-include the structural element, or stop and report it as an open gap with a
-recommendation. Burning budget on a ceiling is the most common way a long run
-wastes money while looking busy.
+over 50% in the recent window as exactly this signal, and the same signal parks
+the dimension. Either re-cut the lanes to include the structural element, or park
+and report it as an open gap with a recommendation. Burning budget on a ceiling
+is the most common way a long run wastes money while looking busy.
 
 ## Budget creep
 

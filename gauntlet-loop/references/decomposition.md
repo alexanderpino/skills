@@ -25,11 +25,56 @@ lost round cannot be reverted cleanly because six things moved at once.
 **Too small** is rarer but real. Symptoms: rounds pass immediately, the critic
 strains to find any gap, wave overhead exceeds the work done. Merge upward.
 
-Retirement itself is governed by the armed stop conditions, computed per
+Retirement and parking are governed by the armed stop conditions, computed per
 dimension by `gauntlet.py status` — not by feel. Your job here is the converse:
-when a lane retires, reallocate its compute to lanes with gaps left, and when a
-merged or re-cut lane appears, register it before its first round. Lane sets are
+when a lane retires or parks, its slot goes to the next lane on the ranked list,
+and a merged or re-cut lane is registered before its first round. Lane sets are
 not fixed for the run.
+
+## Ranking, and the WIP limit
+
+A wave funds `wip_limit` lanes (default 3), not every lane you cut. So the cut is
+only half the decision — the order is the other half.
+
+Rank by, roughly:
+
+> (value to the goal) × (how closeable the gap looks at lane level) ÷ (cost per round)
+
+- **Value**: how much of the goal's quality this lane actually carries. The hero
+  image usually outranks the footer.
+- **Closeability**: a gap a builder can reach with the files this lane owns. A
+  gap that needs a new source asset or an architecture change is not closeable
+  here, whatever its value — flag it for the user instead of funding rounds
+  against it.
+- **Cost**: an expensive lane needs to be worth its rounds. Cheap lanes are worth
+  running early because they retire fast and free their slot.
+
+`status` prints the funded set and the queue behind it each wave: dimensions
+still moving first, unread ones next, stalled ones last. Follow it unless you
+have a reason you can state.
+
+**Depth beats breadth.** Three rounds on one lane close a gap; one round on three
+lanes gives you three half-closed gaps and a budget that is a third gone. The WIP
+limit exists to stop the second pattern, which is the default temptation once
+several lanes are open at once.
+
+## Parking a lane
+
+The counterpart to retirement: a lane that stopped moving stops getting funded.
+The conditions and the command are in `stop-conditions.md` (`no-progress`); what
+belongs here is the decomposition consequence.
+
+A park usually says one of three things about the cut:
+
+- **The gap is structural** — it sits below the lane, in a foundational choice.
+  Re-cut to include that element, or accept it as an open gap and report it.
+- **The gap is not a code problem** — a source asset, a licence, a data quality
+  issue. Report it; more rounds cannot reach it.
+- **The lane is cut wrong** — its critic keeps citing another lane's territory,
+  so nothing inside its own files moves the verdict. Merge or re-cut.
+
+Say which one it was when you park. That sentence is what makes the report
+actionable, and it is what tells the next run how to cut better.
 
 ## Parallel or serial
 
@@ -65,7 +110,13 @@ The decomposition is a hypothesis. Evidence that it is wrong:
 - Two lanes' critics keep citing each other's territory
 - A lane's gaps never shrink no matter how many rounds it runs
 - Every round in a lane requires files owned by another lane
+- More than one lane parks for the same underlying reason
 
-Re-cut between waves, never mid-wave. Record the change and why in the workbench —
-a re-cut resets the clean-streak counters for the affected lanes, and a reader of
-the log needs to know that the counter reset was deliberate.
+Re-cut between waves, never mid-wave. Re-run `init --force` with the new lane set
+(parks and extensions are carried across as run history) and note the change in
+`contract.md` — a re-cut resets the streak counters for the affected lanes, and a
+reader of the log needs to know that the reset was deliberate.
+
+A re-cut is also the honest answer when a park was really a cutting mistake: park
+the old lane, cut a new one that contains the structural element, and let the log
+show both. Quietly re-running the same lane under a new name is not a re-cut.

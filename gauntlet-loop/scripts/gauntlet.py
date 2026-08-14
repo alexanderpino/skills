@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """gauntlet.py — deterministic state for a Gauntlet Loop run.
 
-Stdlib only. The model decides; this script counts. Streaks, stop conditions,
-revert rates and budget consumption are computed here so they cannot drift in a
-long context.
+Stdlib only. The model decides; this script counts. Streaks, stall reads, stop
+conditions, revert rates, cost and budget consumption are computed here so they
+cannot drift in a long context — and so the lead agent never spends tokens
+recomputing them.
 
 Commands:
   init        Create the gauntlet/ state directory and config
   log-round   Append one validated comparison record to rounds.jsonl
-  status      Per-lane/per-dimension streaks, revert rate, fired stop conditions
+  status      State per lane/dimension, the next-wave plan, fired stop conditions
+  park        Stop spending on a lane/dimension that stopped moving (or resume it)
+  board       Regenerate gauntlet/workbench.md from the log (no model tokens)
   extend      Raise the wave budget after the user grants an extension
   report      Draft the end-of-run gauntlet report from the log
 """
@@ -24,32 +27,51 @@ WINNERS = ("ours", "other")
 MARGINS = ("decisive", "clear", "thin")
 SEVERITIES = ("major", "minor", "none")
 ACTIONS = ("promoted", "reverted")
+BAR_MODES = ("blind", "rubric")
 
 DEFAULT_CONFIG = {
     "stops": {
         "bar_met_n": 2,
         "clean_streak_n": 2,
+        # Rounds of no movement on a dimension before parking is recommended.
+        # This is the prune: a lane that stopped moving stops getting funded.
+        "no_progress_n": 3,
         "budget_waves": 12,
         # Absolute ceiling no extension may cross. null = no ceiling agreed, in
         # which case every extension needs the user again.
         "hard_cap_waves": None,
+        # The score the target bar is set at. Retirement is judged against this,
+        # not against a perfect 10 — a bar nobody can reach is not a target.
+        "target_score": 7,
     },
+    # Maximum lanes funded in one wave. Fewer lanes moving fast beats every lane
+    # crawling: it is both the Kanban WIP limit and the main token control.
+    "wip_limit": 3,
     "dimensions": ["overall"],
     "lanes": [],
     "bar_kind": "reference",
     # Granted budget extensions, appended by `extend`. The run's history of
     # "the budget ran out and the user chose to keep going".
     "extensions": [],
+    # Lane/dimension pairs deliberately stopped short of retirement, appended by
+    # `park`. Their gaps stay open in the report; their budget goes back.
+    "parked": [],
 }
 
-# One builder call plus up to two critic calls per lane per wave, plus one
-# smoother call per wave. Used to price an extension before it is granted.
-CALLS_PER_LANE_ROUND = 3
+# One builder call plus one combined critic call per lane per round is the
+# default shape; a split-critic round costs one more. Used to price a wave and
+# an extension before either is funded.
+CALLS_PER_LANE_ROUND = 2
+CALLS_PER_WAVE_OVERHEAD = 1  # the smoother, when it runs
 
 
 def die(msg):
     print(f"error: {msg}", file=sys.stderr)
     sys.exit(1)
+
+
+def now():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 
 
 def load_config(root):
@@ -58,8 +80,11 @@ def load_config(root):
         die(f"{p} not found — run init first")
     cfg = json.loads(p.read_text())
     # Backfill fields a config written by an older run will not have, so a
-    # resumed run can still be extended.
-    cfg.setdefault("extensions", [])
+    # resumed run can still be parked, priced and extended.
+    for k, v in DEFAULT_CONFIG.items():
+        if k == "stops":
+            continue
+        cfg.setdefault(k, json.loads(json.dumps(v)))
     cfg.setdefault("stops", {})
     for k, v in DEFAULT_CONFIG["stops"].items():
         cfg["stops"].setdefault(k, v)
@@ -74,6 +99,10 @@ def initial_budget(cfg):
     """The budget agreed at intake, before any extension."""
     ext = cfg.get("extensions") or []
     return ext[0]["from_waves"] if ext else cfg["stops"]["budget_waves"]
+
+
+def parked_keys(cfg):
+    return {(p["lane"], p["dimension"]) for p in cfg.get("parked") or []}
 
 
 def load_rounds(root):
@@ -100,19 +129,37 @@ def cmd_init(args):
         (root / d).mkdir(parents=True, exist_ok=True)
     cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy — stops is nested
     if (root / "config.json").exists():
-        # A re-cut re-inits with --force. Extensions the user already granted
-        # are run history, not configuration — carry them across.
-        cfg["extensions"] = json.loads((root / "config.json").read_text()).get("extensions", [])
+        # A re-cut re-inits with --force. Extensions and parks the user already
+        # decided are run history, not configuration — carry them across.
+        old = json.loads((root / "config.json").read_text())
+        cfg["extensions"] = old.get("extensions", [])
+        cfg["parked"] = old.get("parked", [])
     if args.lanes:
         cfg["lanes"] = [s.strip() for s in args.lanes.split(",") if s.strip()]
     if args.dimensions:
         cfg["dimensions"] = [s.strip() for s in args.dimensions.split(",") if s.strip()]
-    if args.bar_met_n is not None:
-        cfg["stops"]["bar_met_n"] = args.bar_met_n
-    if args.clean_streak_n is not None:
-        cfg["stops"]["clean_streak_n"] = args.clean_streak_n
-    if args.budget_waves is not None:
-        cfg["stops"]["budget_waves"] = args.budget_waves
+    for key, val in (
+        ("bar_met_n", args.bar_met_n),
+        ("clean_streak_n", args.clean_streak_n),
+        ("no_progress_n", args.no_progress_n),
+        ("budget_waves", args.budget_waves),
+        ("target_score", args.target_score),
+    ):
+        if val is not None:
+            cfg["stops"][key] = val
+    if not (1 <= cfg["stops"]["target_score"] <= 10):
+        die("target-score must be between 1 and 10")
+    if cfg["stops"]["target_score"] == 10:
+        print(
+            "warning: target-score 10 makes every round a failure and no lane can retire — "
+            "set the target where the bar actually is, and record any higher ambition as a "
+            "stretch in contract.md",
+            file=sys.stderr,
+        )
+    if args.wip_limit is not None:
+        if args.wip_limit < 1:
+            die("wip-limit must be at least 1")
+        cfg["wip_limit"] = args.wip_limit
     if args.hard_cap_waves is not None:
         if args.hard_cap_waves < cfg["stops"]["budget_waves"]:
             die("hard-cap-waves is below budget-waves — the cap is the ceiling extensions may not cross")
@@ -123,14 +170,22 @@ def cmd_init(args):
         cfg["bar_kind"] = args.bar_kind
     save_config(root, cfg)
     for name, header in (
-        ("contract.md", "# Gauntlet contract\n\n(goal / bar / inspection / stops / budget / autonomy / workbench)\n"),
+        ("contract.md", "# Gauntlet contract\n\n(goal / target bar / stretch / inspection / "
+                        "stops / kill criteria / budget / autonomy / workbench)\n"),
         ("ownership.md", "# File ownership — refreshed every wave\n\n| lane | owned paths |\n|---|---|\n"),
     ):
         p = root / name
         if not p.exists():
             p.write_text(header)
     (root / "rounds.jsonl").touch()
+    lanes = len(cfg["lanes"]) or 1
+    per_wave = min(lanes, cfg["wip_limit"]) * CALLS_PER_LANE_ROUND + CALLS_PER_WAVE_OVERHEAD
     print(f"initialised {root}/ — freeze bar artifacts into {root}/bar/ before wave 1")
+    print(
+        f"projected cost: ~{per_wave} subagent calls per wave "
+        f"(WIP limit {cfg['wip_limit']} lane(s)), ~{per_wave * cfg['stops']['budget_waves']} "
+        f"over the {cfg['stops']['budget_waves']}-wave budget"
+    )
 
 
 def cmd_log_round(args):
@@ -149,6 +204,13 @@ def cmd_log_round(args):
             "re-run init --force after a re-cut, or fix the typo",
             file=sys.stderr,
         )
+    if (args.lane, args.dimension) in parked_keys(cfg):
+        print(
+            f"warning: [{args.lane} / {args.dimension}] is parked — you are spending on a lane "
+            "the run already decided to stop funding. Resume it explicitly "
+            "(`park --resume`) or leave it parked.",
+            file=sys.stderr,
+        )
     if args.mode not in MODES:
         die(f"mode must be one of {MODES}")
     if args.winner not in WINNERS:
@@ -161,7 +223,7 @@ def cmd_log_round(args):
         die("evidence is required — a verdict with nothing inspected is not a round")
 
     rec = {
-        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "ts": now(),
         "wave": args.wave,
         "lane": args.lane,
         "dimension": args.dimension,
@@ -173,6 +235,10 @@ def cmd_log_round(args):
         "evidence": args.evidence,
         "critic_framing": args.critic_framing,
     }
+    if args.calls is not None:
+        if args.calls < 0:
+            die("--calls cannot be negative")
+        rec["calls"] = args.calls
 
     if args.mode == "champion":
         # Promotion decision: challenger vs previous champion.
@@ -190,8 +256,18 @@ def cmd_log_round(args):
             die("bar-mode records require --severity major|minor|none")
         if args.severity != "none" and not args.gap:
             die("severity is major/minor but no gap named — name the gap or the round didn't happen")
+        if args.gap and args.severity != "none" and len(args.gap.strip()) < 12:
+            die("the named gap is too thin to build against — say what differs and where")
         rec["severity"] = args.severity
         rec["gap"] = args.gap or "none"
+        target = cfg["stops"]["target_score"]
+        if args.severity == "major" and args.score >= target:
+            print(
+                f"warning: score {args.score} is at or above the target of {target} but severity is "
+                "'major' — the critic is scoring one bar and grading against another. Check which "
+                "bar the verdict used.",
+                file=sys.stderr,
+            )
 
     with (root / "rounds.jsonl").open("a") as f:
         f.write(json.dumps(rec) + "\n")
@@ -214,62 +290,15 @@ def _streaks(records):
     return bar_met, clean
 
 
-def _lane_dim_status(rounds, cfg):
-    """Returns {(lane, dim): stats} and set of retired lanes."""
-    stops = cfg["stops"]
-    keys = {}
-    for r in rounds:
-        keys.setdefault((r["lane"], r["dimension"]), []).append(r)
-    out = {}
-    for key, recs in keys.items():
-        bar_recs = [r for r in recs if r["mode"] in ("blind", "rubric")]
-        champ_recs = [r for r in recs if r["mode"] == "champion"]
-        bar_met, clean = _streaks(bar_recs)
-        reverts = sum(1 for r in champ_recs if r.get("action") == "reverted")
-        margins = [r["margin"] for r in bar_recs][-5:]
-        rubric_share = (
-            sum(1 for r in bar_recs if r["mode"] == "rubric") / len(bar_recs)
-            if bar_recs else 0.0
-        )
-        # Open only if the *latest* verdict still names a gap — an older gap
-        # followed by a clean round has been closed, and reporting it as open
-        # would put stale work in the hand-off.
-        last_gap = (
-            bar_recs[-1].get("gap")
-            if bar_recs and bar_recs[-1].get("severity") not in (None, "none")
-            else None
-        )
-        out[key] = {
-            "bar_rounds": len(bar_recs),
-            "promotions": sum(1 for r in champ_recs if r.get("action") == "promoted"),
-            "reverts": reverts,
-            "bar_met_streak": bar_met,
-            "clean_streak": clean,
-            "recent_margins": margins,
-            "rubric_share": round(rubric_share, 2),
-            "open_gap": last_gap,
-            "retired": bar_met >= stops["bar_met_n"] or clean >= stops["clean_streak_n"],
-        }
-    # A lane retires only when every *declared* dimension has retired — a
-    # dimension nobody ever judged must not let the lane out early.
-    declared = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
-    lanes = {lane for lane, _ in out}
-    retired_lanes = {
-        lane for lane in lanes
-        if all(out.get((lane, d), {}).get("retired") for d in declared)
-    }
-    return out, retired_lanes
-
-
 MARGIN_RANK = {"decisive": 3, "clear": 2, "thin": 1}
 SEVERITY_RANK = {"major": 3, "minor": 2, "none": 1}
 
 
-def _recent_revert_rate(rounds, window=6):
-    champ = [r for r in rounds if r["mode"] == "champion"][-window:]
-    if len(champ) < 4:
+def _revert_rate(champ_recs, window=6):
+    recs = champ_recs[-window:]
+    if len(recs) < 4:
         return None
-    return sum(1 for r in champ if r.get("action") == "reverted") / len(champ)
+    return sum(1 for r in recs if r.get("action") == "reverted") / len(recs)
 
 
 def _dimension_trend(bar_recs, window=4):
@@ -296,28 +325,181 @@ def _dimension_trend(bar_recs, window=4):
     return {"improving": improving, "note": ", ".join(bits)}
 
 
+def _stall_read(bar_recs, champ_recs, n):
+    """Has this dimension stopped paying for its rounds?
+
+    Returns (stalled, note). Stalling is the prune signal: it is not a verdict
+    on the artifact, only on whether more rounds of *this* lane are worth money.
+    """
+    if len(bar_recs) < n:
+        return False, f"{len(bar_recs)} bar round(s) — too early to call it"
+    trend = _dimension_trend(bar_recs, window=n)
+    if trend["improving"] is False:
+        return True, f"no movement in {n} rounds ({trend['note']})"
+    rate = _revert_rate(champ_recs)
+    if rate is not None and rate > 0.5:
+        return True, f"revert rate {int(rate * 100)}% — challengers losing more than winning"
+    # The same gap named three times running is a structural ceiling, not a lane
+    # that needs one more push.
+    gaps = [r.get("gap") for r in bar_recs[-n:] if r.get("severity") not in (None, "none")]
+    if len(gaps) >= 3 and len(set(gaps)) == 1:
+        return True, f"the same gap named {len(gaps)} rounds running — structural, not closeable here"
+    return False, trend["note"]
+
+
+def _lane_dim_status(rounds, cfg):
+    """Returns {(lane, dim): stats}, retired lanes, closed lanes.
+
+    'retired' = the target bar is met or no closeable gap is left.
+    'parked'  = deliberately unfunded, gap still open.
+    'closed'  = every dimension of the lane is one or the other; the lane costs
+                nothing more either way.
+    """
+    stops = cfg["stops"]
+    parked = parked_keys(cfg)
+    keys = {}
+    lane_rounds = {}
+    for r in rounds:
+        keys.setdefault((r["lane"], r["dimension"]), []).append(r)
+        lane_rounds.setdefault(r["lane"], set()).add((r["wave"], r["round"]))
+    logged_calls = {}
+    for r in rounds:
+        if "calls" in r:
+            logged_calls[r["lane"]] = logged_calls.get(r["lane"], 0) + r["calls"]
+    out = {}
+    for key, recs in keys.items():
+        lane, _dim = key
+        bar_recs = [r for r in recs if r["mode"] in BAR_MODES]
+        champ_recs = [r for r in recs if r["mode"] == "champion"]
+        bar_met, clean = _streaks(bar_recs)
+        margins = [r["margin"] for r in bar_recs][-5:]
+        rubric_share = (
+            sum(1 for r in bar_recs if r["mode"] == "rubric") / len(bar_recs)
+            if bar_recs else 0.0
+        )
+        # Open only if the *latest* verdict still names a gap — an older gap
+        # followed by a clean round has been closed, and reporting it as open
+        # would put stale work in the hand-off.
+        last_gap = (
+            bar_recs[-1].get("gap")
+            if bar_recs and bar_recs[-1].get("severity") not in (None, "none")
+            else None
+        )
+        gaps_closed = sum(
+            1 for i, r in enumerate(bar_recs)
+            if r.get("severity") == "none"
+            and any(p.get("severity") in ("major", "minor") for p in bar_recs[:i])
+        )
+        retired = bar_met >= stops["bar_met_n"] or clean >= stops["clean_streak_n"]
+        stalled, stall_note = _stall_read(bar_recs, champ_recs, stops["no_progress_n"])
+        is_parked = key in parked
+        trend = _dimension_trend(bar_recs, window=stops["no_progress_n"])
+        out[key] = {
+            "bar_rounds": len(bar_recs),
+            "promotions": sum(1 for r in champ_recs if r.get("action") == "promoted"),
+            "reverts": sum(1 for r in champ_recs if r.get("action") == "reverted"),
+            "bar_met_streak": bar_met,
+            "clean_streak": clean,
+            "recent_margins": margins,
+            "rubric_share": round(rubric_share, 2),
+            "open_gap": last_gap,
+            "last_score": bar_recs[-1]["score"] if bar_recs else None,
+            "gaps_closed": gaps_closed,
+            "retired": retired,
+            "parked": is_parked,
+            "stalled": stalled and not retired and not is_parked,
+            "stall_note": stall_note,
+            "trend": trend,
+            "lane_calls": logged_calls.get(lane, len(lane_rounds[lane]) * CALLS_PER_LANE_ROUND),
+            "state": "RETIRED" if retired else "PARKED" if is_parked else "STALLED" if stalled else "OPEN",
+        }
+    # A lane retires only when every *declared* dimension has retired — a
+    # dimension nobody ever judged must not let the lane out early. A lane
+    # *closes* when each dimension is retired or parked: nothing left to fund.
+    declared = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
+    lanes = {lane for lane, _ in out}
+    retired_lanes = {
+        lane for lane in lanes
+        if all(out.get((lane, d), {}).get("retired") for d in declared)
+    }
+    closed_lanes = {
+        lane for lane in lanes
+        if all(
+            out.get((lane, d), {}).get("retired") or out.get((lane, d), {}).get("parked")
+            for d in declared
+        )
+    }
+    return out, retired_lanes, closed_lanes
+
+
+def _active_keys(per):
+    return [k for k, s in per.items() if not s["retired"] and not s["parked"]]
+
+
+def _next_wave_plan(per, cfg):
+    """Which lanes the next wave should fund, ranked by evidence.
+
+    Moving dimensions first, then unread ones, then stalled. The WIP limit cuts
+    the tail: funding every lane a little is how a budget dies without a result.
+    """
+    active = _active_keys(per)
+    if not active:
+        return [], []
+    rank = {True: 0, None: 1, False: 2}
+
+    def sort_key(k):
+        s = per[k]
+        sev_rank = 0 if s["open_gap"] and s["trend"]["improving"] is not False else 1
+        return (
+            2 if s["stalled"] else rank[s["trend"]["improving"]],
+            sev_rank,
+            s["bar_rounds"],
+        )
+
+    ordered = sorted(active, key=sort_key)
+    lanes_in_order = []
+    for lane, _dim in ordered:
+        if lane not in lanes_in_order:
+            lanes_in_order.append(lane)
+    wip = cfg.get("wip_limit") or DEFAULT_CONFIG["wip_limit"]
+    funded = lanes_in_order[:wip]
+    deferred = lanes_in_order[wip:]
+    return funded, deferred
+
+
+def _park_candidates(per):
+    return sorted(k for k, s in per.items() if s["stalled"])
+
+
 def _extension_evidence(rounds, cfg, per, retired):
     """Evidence and a verdict for the extend-or-stop decision.
 
-    Verdict is one of: nothing-open, improving, mixed, at-ceiling. It is a
-    reading of the log, not a decision — granting an extension is the user's.
+    Verdict is one of: nothing-open, improving, mixed, at-ceiling, unclear. It
+    is a reading of the log, not a decision — granting an extension is the
+    user's. Parked dimensions are not open: the run already chose to stop
+    funding them, and pricing an extension over them is how parks get undone by
+    accident.
     """
-    open_dims = sorted(k for k, s in per.items() if not s["retired"])
+    open_dims = sorted(_active_keys(per))
     lines = []
     trends = {}
     for key in open_dims:
         lane, dim = key
         bar_recs = [
             r for r in rounds
-            if r["lane"] == lane and r["dimension"] == dim and r["mode"] in ("blind", "rubric")
+            if r["lane"] == lane and r["dimension"] == dim and r["mode"] in BAR_MODES
         ]
-        t = _dimension_trend(bar_recs)
+        t = _dimension_trend(bar_recs, window=cfg["stops"]["no_progress_n"])
         trends[key] = t
         mark = {True: "still moving", False: "flat", None: "unknown"}[t["improving"]]
-        gap = per[key]["open_gap"] or "no gap named in the last verdict"
+        gap = per[key]["open_gap"] or "last verdict named no gap"
         lines.append(f"  [{lane} / {dim}] {mark} ({t['note']}) — open gap: {gap}")
 
-    revert_rate = _recent_revert_rate(rounds)
+    parked = sorted(k for k, s in per.items() if s["parked"])
+    for lane, dim in parked:
+        lines.append(f"  [{lane} / {dim}] parked — not priced into an extension")
+
+    revert_rate = _revert_rate([r for r in rounds if r["mode"] == "champion"])
     if revert_rate is not None:
         lines.append(f"  recent revert rate: {int(revert_rate * 100)}%")
 
@@ -340,17 +522,19 @@ def _extension_evidence(rounds, cfg, per, retired):
 
 
 VERDICT_READS = {
-    "nothing-open": "every judged dimension has retired — an extension buys polish, not gap closure",
+    "nothing-open": "every judged dimension has retired or been parked — an extension buys polish, not gap closure",
     "improving": "every open dimension is still moving — an extension is likely to buy real gains",
-    "mixed": "some dimensions are still moving and some are flat — extend on the moving ones, or re-cut",
+    "mixed": "some dimensions are still moving and some are flat — extend on the moving ones only, park the rest",
     "unclear": "too few bar rounds on the open dimensions to read a trend — say so rather than selling the extension",
     "at-ceiling": "no open dimension is still moving — recommend stopping or re-cutting, not extending",
 }
 
 
-def _projected_calls(waves, open_lanes):
+def _projected_calls(waves, open_lanes, wip=None):
     lanes = max(1, len(open_lanes))
-    return waves * (lanes * CALLS_PER_LANE_ROUND + 1)
+    if wip:
+        lanes = min(lanes, wip)
+    return waves * (lanes * CALLS_PER_LANE_ROUND + CALLS_PER_WAVE_OVERHEAD)
 
 
 def _print_extension_offer(rounds, cfg, per, retired, max_wave):
@@ -358,6 +542,7 @@ def _print_extension_offer(rounds, cfg, per, retired, max_wave):
     material the user needs to decide whether to fund more waves."""
     budget = cfg["stops"]["budget_waves"]
     cap = cfg["stops"].get("hard_cap_waves")
+    wip = cfg.get("wip_limit")
     lines, verdict, open_lanes = _extension_evidence(rounds, cfg, per, retired)
     print("\nBUDGET DEPLETED — stop cleanly, report, then OFFER AN EXTENSION.")
     print("Do not extend on your own. Do not keep running while you ask.\n")
@@ -367,24 +552,86 @@ def _print_extension_offer(rounds, cfg, per, retired, max_wave):
     print(f"\n  read: {VERDICT_READS[verdict]}")
     if verdict == "nothing-open":
         print("\n  Nothing is open. Raise the bar (announced) or stop — do not fund waves"
-              " against an artifact that has already retired every dimension.")
+              " against an artifact that has already retired or parked every dimension.")
         return
     if cap is not None and budget >= cap:
         print(f"\n  Hard cap of {cap} waves reached — no extension may be granted. Stop and report.")
         return
     if verdict == "at-ceiling":
-        print("\n  Offer the stop, not the waves: recommend re-cutting the lanes or ending the run."
-              " `extend` refuses this read without --force.")
+        print("\n  Offer the stop, not the waves: recommend parking the flat dimensions and"
+              " re-cutting or ending the run. `extend` refuses this read without --force.")
     else:
         suggested = min(4, cap - budget) if cap is not None else 4
-        print(f"\nSuggested next wave block: {min(2, suggested)}–{suggested} waves"
-              f" (~{_projected_calls(min(2, suggested), open_lanes)}–{_projected_calls(suggested, open_lanes)}"
-              f" subagent calls over {len(open_lanes) or 1} open lane(s)).")
+        low = min(2, suggested)
+        print(f"\nSuggested next wave block: {low}–{suggested} waves"
+              f" (~{_projected_calls(low, open_lanes, wip)}–{_projected_calls(suggested, open_lanes, wip)}"
+              f" subagent calls over {len(open_lanes) or 1} open lane(s), WIP limit {wip}).")
     if cap is not None:
         print(f"Hard cap: {cap} waves — {cap - budget} wave(s) of extension remain.")
     print("If the user grants it:")
     print("  python3 scripts/gauntlet.py extend --waves <N> --reason \"<evidence from the log>\"")
     print(f"(current: wave {max_wave} of {budget})")
+
+
+def cmd_park(args):
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    reason = (args.reason or "").strip()
+    if len(reason) < 12:
+        die("--reason must cite the log — a park is a spending decision and the report carries it")
+    key = (args.lane, args.dimension)
+    parked = cfg.setdefault("parked", [])
+    max_wave = max((r["wave"] for r in rounds), default=0)
+
+    if args.resume:
+        match = [p for p in parked if (p["lane"], p["dimension"]) == key]
+        if not match:
+            die(f"[{args.lane} / {args.dimension}] is not parked")
+        cfg["parked"] = [p for p in parked if (p["lane"], p["dimension"]) != key]
+        cfg.setdefault("park_history", []).extend(
+            [{**m, "resumed_at_wave": max_wave, "resume_reason": reason, "resumed_ts": now()} for m in match]
+        )
+        save_config(root, cfg)
+        print(f"resumed [{args.lane} / {args.dimension}] — it is funded again from the next wave")
+        print("Resume only on new evidence (a re-cut, a fixed inspection path, a new bar). "
+              "Restarting a lane on hope is sunk cost with extra steps.")
+        return
+
+    per, _retired, _closed = _lane_dim_status(rounds, cfg) if rounds else ({}, set(), set())
+    stats = per.get(key)
+    if stats is None and not args.force:
+        die(f"no rounds logged for [{args.lane} / {args.dimension}] — nothing to park (use --force)")
+    if stats and stats["retired"] and not args.force:
+        die(f"[{args.lane} / {args.dimension}] has retired — it already costs nothing (use --force)")
+    if stats and not stats["stalled"] and not args.force:
+        die(
+            f"[{args.lane} / {args.dimension}] is still moving ({stats['trend']['note']}) — "
+            "parking a lane that is still paying for its rounds throws away the run's best work. "
+            "Use --force if you are parking it for a reason outside the log (scope, priority)."
+        )
+    if key in parked_keys(cfg):
+        die(f"[{args.lane} / {args.dimension}] is already parked")
+
+    parked.append({
+        "ts": now(),
+        "lane": args.lane,
+        "dimension": args.dimension,
+        "at_wave": max_wave,
+        "reason": reason,
+        "open_gap": (stats or {}).get("open_gap") or "",
+        "bar_rounds": (stats or {}).get("bar_rounds", 0),
+        "forced": bool(args.force),
+    })
+    save_config(root, cfg)
+    per, _retired, _closed = _lane_dim_status(rounds, cfg) if rounds else ({}, set(), set())
+    funded, deferred = _next_wave_plan(per, cfg)
+    print(f"parked [{args.lane} / {args.dimension}] at wave {max_wave} — {reason}")
+    if (stats or {}).get("open_gap"):
+        print(f"  open gap carried into the report: {stats['open_gap']}")
+    print(f"  next wave now funds: {', '.join(funded) or 'nothing — every lane is retired or parked'}")
+    if deferred:
+        print(f"  waiting behind the WIP limit: {', '.join(deferred)}")
 
 
 def cmd_extend(args):
@@ -428,17 +675,25 @@ def cmd_extend(args):
             file=sys.stderr,
         )
 
-    per, retired = _lane_dim_status(rounds, cfg) if rounds else ({}, set())
+    per, retired, _closed = _lane_dim_status(rounds, cfg) if rounds else ({}, set(), set())
     _, verdict, open_lanes = _extension_evidence(rounds, cfg, per, retired)
     if verdict == "at-ceiling" and not args.force:
         die(
             "the log shows no open dimension still moving — extending here spends the user's money on "
-            "a ceiling. Re-cut the lanes or stop. Use --force if the user was shown this and chose to "
-            "continue anyway."
+            "a ceiling. Park the flat dimensions, re-cut the lanes, or stop. Use --force if the user "
+            "was shown this and chose to continue anyway."
+        )
+    stalled = _park_candidates(per)
+    if stalled and not args.force:
+        die(
+            "park before you extend — these dimensions stopped paying for their rounds and would "
+            "eat the new waves:\n"
+            + "\n".join(f"  [{lane} / {dim}] {per[(lane, dim)]['stall_note']}" for lane, dim in stalled)
+            + "\n  python3 scripts/gauntlet.py park --lane <lane> --dimension <dim> --reason \"<log read>\""
         )
 
     cfg["extensions"].append({
-        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "ts": now(),
         "at_wave": max_wave,
         "from_waves": budget,
         "to_waves": new_budget,
@@ -455,12 +710,12 @@ def cmd_extend(args):
 
     n = len(cfg["extensions"])
     print(f"budget extended: {budget} → {new_budget} waves (+{args.waves}); extension {n} of this run")
-    print(f"  projected: ~{_projected_calls(args.waves, open_lanes)} subagent calls over "
+    print(f"  projected: ~{_projected_calls(args.waves, open_lanes, cfg.get('wip_limit'))} subagent calls over "
           f"{len(open_lanes) or 1} open lane(s)")
     print(f"  log read at grant time: {verdict}")
     if cap is not None:
         print(f"  hard cap {cap} waves — {cap - new_budget} wave(s) of extension remain")
-    print("Record the extension in contract.md and on the workbench, then resume at the wave boundary.")
+    print("Record the extension in contract.md, run `board`, then resume at the wave boundary.")
 
 
 def cmd_status(args):
@@ -470,26 +725,55 @@ def cmd_status(args):
     if not rounds:
         print("no rounds logged yet")
         return
-    per, retired = _lane_dim_status(rounds, cfg)
+    per, retired, closed = _lane_dim_status(rounds, cfg)
     max_wave = max(r["wave"] for r in rounds)
     budget = cfg["stops"]["budget_waves"]
+    wip = cfg.get("wip_limit")
 
     ext = cfg.get("extensions") or []
     ext_note = (
-        f" (initial {initial_budget(cfg)}, extended {len(ext)}×: "
-        + ", ".join(f"+{e['waves']}" for e in ext) + ")"
+        f", initial {initial_budget(cfg)}, extended {len(ext)}×: "
+        + ", ".join(f"+{e['waves']}" for e in ext)
         if ext else ""
     )
-    print(f"wave {max_wave} of {budget} budgeted{ext_note}\n")
+    lane_calls = {}
+    for (lane, _dim), s in per.items():
+        lane_calls[lane] = s["lane_calls"]
+    spent = sum(lane_calls.values())
+    closed_gaps = sum(s["gaps_closed"] for s in per.values())
+    per_gap = f" (~{spent / closed_gaps:.0f} calls each)" if closed_gaps else ""
+    print(f"wave {max_wave} of {budget} budgeted{ext_note} | ~{spent} calls spent"
+          f" | {closed_gaps} gap(s) closed{per_gap} | WIP limit {wip}\n")
+
     for (lane, dim), s in sorted(per.items()):
-        flag = " RETIRED" if s["retired"] else ""
-        print(f"[{lane} / {dim}]{flag}")
-        print(f"  bar rounds {s['bar_rounds']}  promoted {s['promotions']}  reverted {s['reverts']}")
-        print(f"  bar-met streak {s['bar_met_streak']}  clean streak {s['clean_streak']}  rubric share {s['rubric_share']}")
-        print(f"  recent margins: {' → '.join(s['recent_margins']) or '—'}")
+        head = f"[{lane} / {dim}] {s['state']}"
+        print(head)
+        print(f"  bar {s['bar_rounds']}  promoted {s['promotions']}  reverted {s['reverts']}"
+              f"  streaks bar-met {s['bar_met_streak']} clean {s['clean_streak']}"
+              f"  rubric {s['rubric_share']}")
+        print(f"  score {s['last_score']}/{cfg['stops']['target_score']} target"
+              f"  margins {' → '.join(s['recent_margins']) or '—'}  trend: {s['trend']['note']}")
+        if s["stalled"]:
+            print(f"  PARK RECOMMENDED: {s['stall_note']}")
         if s["open_gap"]:
             print(f"  open gap: {s['open_gap']}")
         print()
+
+    funded, deferred = _next_wave_plan(per, cfg)
+    stalled = _park_candidates(per)
+    if funded:
+        cost = _projected_calls(1, funded, wip)
+        print(f"NEXT WAVE (WIP {wip}): {', '.join(funded)}  → ~{cost} subagent calls")
+        if deferred:
+            print(f"  waiting: {', '.join(deferred)} — do not widen the wave to fit them in")
+    else:
+        print("NEXT WAVE: nothing to fund — every dimension is retired or parked")
+    if stalled:
+        print("PARK FIRST:")
+        for lane, dim in stalled:
+            print(f"  [{lane} / {dim}] {per[(lane, dim)]['stall_note']}")
+            print(f"    python3 scripts/gauntlet.py park --lane {lane} --dimension {dim} --reason \"<log read>\"")
+    print()
 
     fired = []
     if max_wave >= budget:
@@ -497,6 +781,8 @@ def cmd_status(args):
     all_lanes = {lane for lane, _ in per}
     if all_lanes and all_lanes == retired:
         fired.append("all lanes retired (bar-met / clean-streak)")
+    elif all_lanes and all_lanes == closed:
+        fired.append("all lanes retired or parked — nothing left to fund; stop and report the open gaps")
     total_champ = [r for r in rounds if r["mode"] == "champion"]
     recent = total_champ[-6:]
     if len(recent) >= 4 and sum(1 for r in recent if r.get("action") == "reverted") > len(recent) / 2:
@@ -512,15 +798,121 @@ def cmd_status(args):
         _print_extension_offer(rounds, cfg, per, retired, max_wave)
 
 
+def cmd_board(args):
+    """Regenerate the workbench from the log. Deterministic, so keeping the
+    user's progress surface current costs zero model tokens."""
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    out = root / "workbench.md"
+    if not rounds:
+        out.write_text("# Gauntlet workbench\n\nNo rounds logged yet.\n")
+        print(f"wrote {out}")
+        return
+    per, _retired, _closed = _lane_dim_status(rounds, cfg)
+    max_wave = max(r["wave"] for r in rounds)
+    budget = cfg["stops"]["budget_waves"]
+    ext = cfg.get("extensions") or []
+    spent = sum({lane: s["lane_calls"] for (lane, _d), s in per.items()}.values())
+    funded, deferred = _next_wave_plan(per, cfg)
+
+    L = [
+        "# Gauntlet workbench",
+        "",
+        f"Updated {now()} — generated by `gauntlet.py board`. Do not edit by hand.",
+        "",
+        f"- Wave **{max_wave} of {budget}**"
+        + (f" (initial {initial_budget(cfg)}, extended {len(ext)}×)" if ext else ""),
+        f"- Cost so far: ~{spent} subagent calls",
+        f"- Target score: {cfg['stops']['target_score']}/10 | WIP limit: {cfg.get('wip_limit')} lane(s)",
+        f"- Next wave funds: {', '.join(funded) or 'nothing — all lanes retired or parked'}"
+        + (f" (waiting: {', '.join(deferred)})" if deferred else ""),
+        "",
+    ]
+
+    def table(keys, cols, row):
+        if not keys:
+            return ["_none_", ""]
+        lines = ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
+        lines += ["| " + " | ".join(row(k)) + " |" for k in keys]
+        return lines + [""]
+
+    active = sorted(k for k, s in per.items() if s["state"] in ("OPEN", "STALLED"))
+    L += ["## Active", ""]
+    L += table(
+        active,
+        ["lane / dimension", "rounds", "score", "trend", "open gap", "last evidence"],
+        lambda k: [
+            f"{k[0]} / {k[1]}" + (" ⚠ park?" if per[k]["stalled"] else ""),
+            str(per[k]["bar_rounds"]),
+            f"{per[k]['last_score']}/{cfg['stops']['target_score']}",
+            per[k]["trend"]["note"],
+            (per[k]["open_gap"] or "—").replace("|", "/"),
+            next(
+                (r["evidence"] for r in reversed(rounds)
+                 if (r["lane"], r["dimension"]) == k),
+                "—",
+            ).replace("|", "/"),
+        ],
+    )
+
+    L += ["## Parked (unfunded, gap still open)", ""]
+    parked = cfg.get("parked") or []
+    if parked:
+        L += ["| lane / dimension | parked at | reason | open gap |", "|---|---|---|---|"]
+        L += [
+            f"| {p['lane']} / {p['dimension']} | wave {p['at_wave']} | {p['reason']} |"
+            f" {(p.get('open_gap') or '—').replace('|', '/')} |"
+            for p in parked
+        ]
+        L += [""]
+    else:
+        L += ["_none_", ""]
+
+    L += ["## Retired", ""]
+    retired_keys = sorted(k for k, s in per.items() if s["retired"])
+    L += table(
+        retired_keys,
+        ["lane / dimension", "rounds", "how", "gaps closed"],
+        lambda k: [
+            f"{k[0]} / {k[1]}",
+            str(per[k]["bar_rounds"]),
+            "bar-met" if per[k]["bar_met_streak"] >= cfg["stops"]["bar_met_n"] else "clean-streak",
+            str(per[k]["gaps_closed"]),
+        ],
+    )
+
+    L += ["## Recent rounds", ""]
+    L += ["| wave.round | lane / dim | mode | winner | margin | score | note |", "|---|---|---|---|---|---|---|"]
+    for r in rounds[-12:]:
+        note = r.get("gap") if r["mode"] in BAR_MODES else r.get("action", "")
+        L.append(
+            f"| {r['wave']}.{r['round']} | {r['lane']} / {r['dimension']} | {r['mode']} |"
+            f" {r['winner']} | {r['margin']} | {r['score']} | {(note or '—').replace('|', '/')} |"
+        )
+    L.append("")
+    out.write_text("\n".join(L))
+    print(f"wrote {out}")
+
+
 def cmd_report(args):
     root = Path(args.root)
     cfg = load_config(root)
     rounds = load_rounds(root)
     if not rounds:
         die("no rounds to report on")
-    per, retired = _lane_dim_status(rounds, cfg)
+    per, _retired, _closed = _lane_dim_status(rounds, cfg)
+    lane_calls = {lane: s["lane_calls"] for (lane, _d), s in per.items()}
+    spent = sum(lane_calls.values())
+    closed_gaps = sum(s["gaps_closed"] for s in per.values())
     lines = ["# Gauntlet report (draft — lead agent completes the judgement fields)", ""]
     lines += [f"Waves run: {max(r['wave'] for r in rounds)} of {cfg['stops']['budget_waves']} budgeted", ""]
+    lines += [
+        f"Cost: ~{spent} subagent calls for {closed_gaps} closed gap(s)"
+        + (f" (~{spent / closed_gaps:.0f} calls per gap)" if closed_gaps else "")
+        + f"; target score {cfg['stops']['target_score']}/10",
+        "",
+    ]
     ext = cfg.get("extensions") or []
     if ext:
         lines += [
@@ -539,22 +931,52 @@ def cmd_report(args):
             " lesson in the report for the next run)",
             "",
         ]
+    parked = cfg.get("parked") or []
+    if parked:
+        lines += ["## Parked lanes (stopped on purpose, not finished)", ""]
+        for p in parked:
+            lines.append(
+                f"- **{p['lane']} / {p['dimension']}** — parked at wave {p['at_wave']} after"
+                f" {p.get('bar_rounds', 0)} bar rounds: {p['reason']}"
+                + (f" | open gap: {p['open_gap']}" if p.get("open_gap") else "")
+            )
+        lines += [
+            "",
+            "(lead agent: for each park, say what would have to change for it to be worth"
+            " restarting — a re-cut, a new asset, a different bar. 'More waves' is not an answer.)",
+            "",
+        ]
     blind = sum(1 for r in rounds if r["mode"] == "blind")
     rubric = sum(1 for r in rounds if r["mode"] == "rubric")
     lines += [f"Verdict evidence: {blind} blind rounds, {rubric} rubric rounds (not equivalent evidence)", ""]
     lines += ["## Lanes", ""]
     for (lane, dim), s in sorted(per.items()):
-        state = "retired" if s["retired"] else "open"
-        lines.append(f"- **{lane} / {dim}** — {state}; {s['bar_rounds']} bar rounds, {s['reverts']} reverts")
+        lines.append(
+            f"- **{lane} / {dim}** — {s['state'].lower()}; {s['bar_rounds']} bar rounds,"
+            f" {s['reverts']} reverts, last score {s['last_score']}/{cfg['stops']['target_score']}"
+        )
     lines += ["", "## Open gaps (do not soften this section)", ""]
     any_gap = False
     for (lane, dim), s in sorted(per.items()):
         if s["open_gap"]:
             any_gap = True
-            lines.append(f"- [{lane} / {dim}] {s['open_gap']}")
+            state = " *(parked)*" if s["parked"] else ""
+            lines.append(f"- [{lane} / {dim}]{state} {s['open_gap']}")
     if not any_gap:
         lines.append("- none recorded — verify this against the last wave's verdicts before believing it")
-    lines += ["", "## Was the loop still improving at the stop?", "", "(lead agent: answer from margin trends and revert rate — do not fudge this)", ""]
+    lines += [
+        "",
+        "## Distance to the stretch bar, if one was set",
+        "",
+        "(lead agent: the target bar is what retirement was judged against. If contract.md"
+        " also names a stretch, say plainly how far the artifact is from it and whether that"
+        " distance is closeable by iteration at all.)",
+        "",
+        "## Was the loop still improving at the stop?",
+        "",
+        "(lead agent: answer from score trends, margins and revert rate — do not fudge this)",
+        "",
+    ]
     out = root / "report.md"
     out.write_text("\n".join(lines))
     print(f"wrote {out}")
@@ -571,6 +993,11 @@ def main():
     p.add_argument("--bar-kind", help="reference|acceptance criteria|hybrid")
     p.add_argument("--bar-met-n", type=int)
     p.add_argument("--clean-streak-n", type=int)
+    p.add_argument("--no-progress-n", type=int,
+                   help="rounds of no movement before a dimension is flagged for parking (default 3)")
+    p.add_argument("--target-score", type=int,
+                   help="score the target bar sits at, 1-10 (default 7); record higher ambition as a stretch")
+    p.add_argument("--wip-limit", type=int, help="max lanes funded per wave (default 3)")
     p.add_argument("--budget-waves", type=int)
     p.add_argument("--hard-cap-waves", type=int,
                    help="absolute ceiling extensions may not cross (optional; agreed at intake)")
@@ -592,16 +1019,31 @@ def main():
     p.add_argument("--action", help="promoted|reverted — champion mode only")
     p.add_argument("--champion-ref", help="git ref or snapshot path of the pre-round champion")
     p.add_argument("--critic-framing", default="default")
+    p.add_argument("--calls", type=int,
+                   help="subagent calls this round actually cost (optional; estimated when omitted)")
     p.set_defaults(fn=cmd_log_round)
 
     p = sub.add_parser("status")
     p.set_defaults(fn=cmd_status)
 
+    p = sub.add_parser("park", help="stop funding a lane/dimension that stopped moving")
+    p.add_argument("--lane", required=True)
+    p.add_argument("--dimension", default="overall")
+    p.add_argument("--reason", required=True, help="the log read that justifies stopping the spend")
+    p.add_argument("--resume", action="store_true",
+                   help="unpark: fund it again, on new evidence only")
+    p.add_argument("--force", action="store_true",
+                   help="park a dimension the log still reads as moving (scope or priority call)")
+    p.set_defaults(fn=cmd_park)
+
+    p = sub.add_parser("board", help="regenerate gauntlet/workbench.md from the log")
+    p.set_defaults(fn=cmd_board)
+
     p = sub.add_parser("extend", help="raise the wave budget after the user grants an extension")
     p.add_argument("--waves", type=int, required=True, help="additional waves granted")
     p.add_argument("--reason", required=True, help="the user's grant, justified from the log")
     p.add_argument("--force", action="store_true",
-                   help="override the depleted-budget and at-ceiling guards (user chose anyway)")
+                   help="override the depleted-budget, unparked-stall and at-ceiling guards")
     p.set_defaults(fn=cmd_extend)
 
     p = sub.add_parser("report")

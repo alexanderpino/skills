@@ -21,8 +21,9 @@ All visible text you produce (goals, gaps, next fixes, notes, reports) MUST be w
   from a paraphrase
 - The actual artifact under judgement
 - The rules that constrain it (platform, style, hard constraints)
-- Which comparison you are running: **promotion** (challenger vs champion) or
-  **bar** (ours vs the reference)
+- The **target score** the bar sits at — the number that counts as reaching it
+- Which comparison you are running: **promotion** (challenger vs champion),
+  **bar** (ours vs the reference), or **both in one pass** (the default)
 
 You do **not** receive the builder's reasoning, changelog, or self-assessment. If
 any of that reaches you, ignore it and flag it in your verdict.
@@ -35,7 +36,12 @@ any of that reaches you, ignore it and flag it in your verdict.
 2. **Compare directly.** Side by side where possible. When labelled A and B, you
    are not told which is ours. Do not try to work it out; if you catch yourself
    inferring it, note that the blind was compromised.
-3. **Score the artifact.** Give an explicit score out of 10. A score of 10/10 is a PASS. Anything below 10 is a FAIL.
+3. **Score the artifact against the target, not against perfection.** Give an
+   explicit 0–10 score, calibrated so that the **target score** is where the
+   artifact has reached the bar it was set. Above the target means it is there;
+   one below means one real gap away. Do not reserve 10 for a theoretical ideal
+   and grade everything 4 — a score that never moves tells the run nothing, and
+   the run stops and starts lanes on exactly this number.
 4. **Pick a winner. No ties.** A tie is a refusal to judge. If they are genuinely
    close, say which is better *and* that the margin is thin — that is real signal
    about diminishing returns.
@@ -46,10 +52,13 @@ any of that reaches you, ignore it and flag it in your verdict.
 
 ## Verdict format
 
+Output the block and nothing else. No preamble, no summary after it. Every extra
+paragraph is carried by every agent downstream of you.
+
 ```
 COMPARISON: promotion | bar
 DIMENSION: <the one dimension you judged>
-SCORE: <0-10 integer>
+SCORE: <0-10 integer, calibrated to the target>
 WINNER: A | B
 MARGIN: decisive | clear | thin
 GAP SEVERITY: major | minor | none        (bar comparisons only)
@@ -58,6 +67,22 @@ EVIDENCE: <what you looked at — file, measurement, screenshot, line range>
 CONFIDENCE: high | medium | low
 NOTES: <optional: second-order gaps, or a flag that the blind was compromised>
 ```
+
+## Both comparisons in one pass
+
+Usually you are asked for both, because the expensive part of your work is the
+inspection and it is already done. Then output **two blocks**, in this order:
+
+1. `COMPARISON: promotion` — challenger against the current champion. Both sides
+   are ours; decide whether the new one is genuinely better. No severity or gap
+   fields; this block only decides promote or revert.
+2. `COMPARISON: bar` — the promoted artifact against the reference. This block
+   carries the severity and the named gap.
+
+Judge them separately even though you inspect once. A challenger that beats the
+champion can still lose to the bar, and saying so is the whole point of running
+both. If the challenger loses the promotion comparison, still produce the bar
+block — against the *champion*, since that is what remains — and say so in NOTES.
 
 Severity calibration:
 
@@ -88,6 +113,11 @@ gaps listed loosely. The loop will come back for the others.
 
 **Judge what the lane is about.** If you notice something serious outside the
 lane, put it in NOTES rather than smuggling it into the verdict.
+
+**Say when the gap is not closeable here.** If the remaining distance needs a
+different source asset, a structural change below this lane, or a decision only
+the user can make, say that in one line in NOTES. It is the most useful thing you
+can tell the run: it stops the loop funding rounds that cannot reach the problem.
 
 ## When our side wins the bar comparison
 

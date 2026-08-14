@@ -2,13 +2,17 @@
 
 The bar is the whole method. Everything else is machinery for repeatedly hitting it.
 
-A usable bar has three properties:
+A usable target bar has four properties:
 
 1. **External** — it exists independently of this run and of the agent's opinion
 2. **Inspectable** — a critic can look at it, run it, or measure against it
 3. **Unarguable** — the artifact cannot talk its way past it
+4. **Reachable** — the distance from the current artifact to it can plausibly be
+   closed inside the agreed budget
 
-"Make it amazing", "production-ready", "polished", "best-in-class" fail all three.
+"Make it amazing", "production-ready", "polished", "best-in-class" fail the first
+three. "Match Pixar" on a two-day budget fails the fourth, which is the one runs
+usually get wrong.
 
 ## Bars by artifact class
 
@@ -60,15 +64,55 @@ candidate versions first, have the user pick the best, and use it as the champio
 the loop must beat. A self-generated bar is weaker than an external one and you
 should say so, but it beats no bar at all.
 
-## Unreachable bars are fine
+## Target and stretch
 
-A bar does not need to be realistically achievable. Its job is to supply direction
-and to prevent the loop from stopping at "good considering the circumstances".
-Runs against very high bars typically stop while still improving — that is the
-expected outcome, not a failure.
+Split ambition from the definition of done. They are different jobs and one bar
+cannot do both.
 
-Say this explicitly when you propose an ambitious bar. The user should read it as
-a heading, not as a promise.
+**The target bar** is what retirement is judged against. It is where "good
+enough to hand over" actually sits, and it must be reachable from the current
+artifact inside the agreed budget. Set `--target-score` to the score it sits at
+(default 7): a critic scoring against a target of 7 can tell you that a 6 is one
+gap away, which is information. A target of 10 makes every round a failure, no
+lane can ever retire, and the log stops discriminating between a near miss and a
+disaster — the script warns you if you try.
+
+**The stretch bar** is optional, and it is direction only. Record it in
+`contract.md`, name it out loud as a heading rather than a promise, and report
+the distance to it at the end. It never arms a stop condition, never blocks a
+retirement, and never turns a lane that reached its target into a lane that keeps
+spending.
+
+```
+TARGET   hero reads as professionally art-directed — the three frozen references
+         at gauntlet/bar/, score 7/10, reachable in ~2 rounds per lane
+STRETCH  indistinguishable from reference 2 at full resolution (direction only)
+```
+
+## The feasibility check
+
+Ambitious is fine; unfunded is not. After round zero you have one real data
+point — the first gap and how big it is. Do the arithmetic before wave 1:
+
+> rounds to close the first gap × lanes ÷ WIP limit ≈ waves needed
+
+If that exceeds the budget, fix it now, and say which fix you chose:
+
+- **Cut scope** — drop the lowest-ranked lane rather than starving all of them
+- **Lower the target** — move it to where the budget can reach, and move the old
+  target into the stretch line
+- **Raise the budget** — the user's call, made before the money is spent instead
+  of after
+
+A run that starts knowing it cannot reach its target has already decided to
+disappoint someone. The only cheap moment to fix that is before wave 1.
+
+## Raising the bar mid-run
+
+If the artifact passes the target with rounds left, the bar was set too low. That
+is a good problem: raise it (announced, recorded in `contract.md`), and let the
+stretch become the new target if it now looks reachable. Never lower a target
+mid-run — that is bar erosion with paperwork.
 
 ## Multi-dimensional bars
 
@@ -89,6 +133,5 @@ still loses.
 ## Freezing
 
 Copy bar artifacts into `gauntlet/bar/` at intake and reference them by path
-everywhere after. Bars described from memory drift; bars stored as files do not.
-Raising a bar mid-run is legitimate and must be announced. Lowering one is how
-long runs fail without anyone noticing.
+everywhere after. Bars described from memory drift; bars stored as files do not —
+and pointing a subagent at a path is cheaper than pasting the bar into its prompt.
