@@ -84,3 +84,38 @@ Uncontrolled burners found and not yet fixed, on the backlog: a critic's
 inspection scope is unbounded by the method (my own prompts capped it ad hoc);
 every subagent re-reads the artifact cold, which is the source of its
 independence and also of its cost.
+
+## Amendment, wave 3 — the mantra
+
+The user set the skill's mantra: **work smarter, not harder.**
+
+This is not decoration and it changes the acceptance criteria. It names the
+method's own natural drift: a gauntlet loop's failure mode is to work *harder* —
+more rounds, more thorough re-checking, more coverage — all of which feel like
+rigour and are only cost. Read that way, nearly every guardrail in the skill is
+a stop-working-harder rule:
+
+| Rule | What it stops you doing harder |
+|---|---|
+| machine gates before critics | using judgement where a command decides |
+| one critic call per round | paying for the same inspection twice |
+| hash-cached `gate` | re-deriving a check whose inputs never moved |
+| settled work is not re-judged | re-opening ground already covered |
+| `no-progress` park | pushing a lane that stopped paying |
+| WIP limit | spreading thin instead of finishing |
+| target score 7, not 10 | chasing a perfection nobody asked for |
+| first light before the contract | debating in the abstract before building |
+| frozen scope + backlog | absorbing every good idea into this run |
+
+Two consequences for the bar, effective from wave 3:
+
+1. The guardrail test sharpens from "does it name a weakness" to **"does it make
+   the loop smarter, or only busier?"** A guardrail that adds work without
+   removing more work elsewhere fails, even if it names a real weakness.
+2. The mantra goes at the top of SKILL.md as the organising principle, not as a
+   slogan — it has to be the sentence an agent can decide with.
+
+Applied to this very moment, as evidence it is operative: a critic is mid-read on
+SKILL.md. Editing now would cost that verdict and force a re-run. The amendment
+is recorded here instead, and the edit lands with the wave-3 fixes in one build —
+one cycle instead of two.
