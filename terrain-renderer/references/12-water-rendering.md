@@ -2939,6 +2939,81 @@ function of wind speed, the glitter path *widens and dulls* as wind rises, and *
 intensifies* as it drops. Wire the same wind that drives the wave spectrum into the glitter
 variance or the two disagree — a mirror-calm sea with a wide glitter path is an instant tell.
 
+**Stronger, and it is the reason the previous paragraph is not a matter of taste: the path's
+angular width is a *readout* of the mean-square slope.** Not "related to" — proportional to its
+square root, and tightly. Measured on `reference-impl/beach_optics.py`, where there is no spread
+parameter to have chosen: `ρ_F` is the shared `optics.fresnel`, `E_n` is the shared atmosphere's
+solar beam, `p` is the Cox–Munk slope pdf above, and the rest is the Jacobian
+`dω_v = 4 cos ω · cos³β dz`, giving `L = ρ_F E_n p(z)/(4 cos⁴β cos θ_v)`. Sun at 21.02°, the eye at
+10° of elevation, the full width at half maximum taken in view **azimuth** on the green band:
+
+| `U₁₂.₅` | mss | rms slope `s` | path FWHM | FWHM / `s` |
+|---|---|---|---|---|
+| 3 m/s | 0.01824 | 0.1351 | 7.230° | **53.53** |
+| 6 m/s | 0.03348 | 0.1830 | 9.792° | **53.52** |
+| 10 m/s | 0.05380 | 0.2319 | 12.467° | **53.75** |
+| 16 m/s | 0.08428 | 0.2903 | 15.802° | **54.43** |
+
+**Constant to 1.7% over a factor of 5.3 in wind** (`D`, recomputed here). That constancy is the
+whole argument: it makes the width a *measurement* of the wind rather than a look, and it is the
+one thing a chosen spread parameter cannot reproduce, because a chosen number has no reason to
+track `√mss` when the wind changes. Run it backwards and a photograph with a measurable glitter
+width and a known sun and camera geometry yields a wind speed — the inverse of the regression
+above, `U = (mss − 0.003)/5.08×10⁻³`, which is the same forensic move the reachability table makes
+with sparsity, only continuous. (`5.08` rather than the `5.12` in the code block above is not a
+typo and not a correction: the two **components** sum to `0.003 + 5.08×10⁻³ W`, while `5.12` is the
+paper's *separately fitted* combined slope. They differ by 0.8% at any wind, inside Cox & Munk's own
+±0.004 / ±0.002 — but a file that quotes both as if one implied the other has misread the source.
+Invert with whichever one the forward model used.)
+
+**And the path's *shape* is diagnostic too: it narrows toward the horizon while it brightens.** Same
+sun, same wind (6 m/s), sweeping the view elevation down to the horizon:
+
+| view elevation | FWHM in azimuth `Δφ` | as an angle on the sky `Δφ·cos θ` | peak radiance (green) | facet tilt at the half-max |
+|---|---|---|---|---|
+| 25° | **14.96°** | 13.56° | 13.6 | 8.9° |
+| 21.02° (the mirror elevation) | 13.54° | 12.64° | 19.7 | 8.7° |
+| 15° | 11.46° | 11.07° | 33.2 | 9.2° |
+| 10° | 9.79° | 9.64° | 51.8 | 10.3° |
+| 6° | 8.49° | 8.44° | 79.5 | 11.5° |
+| 3° | 7.52° | 7.51° | 119.5 | 12.5° |
+| 1.5° | 7.04° | 7.04° | 152.5 | 13.0° |
+| 0.5° | 6.72° | 6.72° | 182.7 | 13.4° |
+| 0.2° (the horizon) | **6.63°** | 6.63° | 193.4 | 13.5° |
+
+**A factor of 2.26 narrower and 14.2× brighter, from the horizon to the near field, with one slope
+distribution and one wind** (`D`). The last column is the mechanism stated as a number: the facet
+tilt the path's own half-maximum asks for moves by only **1.55×** across that sweep while the
+azimuth it occupies falls by **2.26×**. The same slopes are still there; they simply subtend a
+different range of specular direction. Two pieces of geometry do it, and both are one line:
+
+- **At the centre of the path the required facet tilt is `β₀ = |θ_sun − θ_view|/2`** — half the
+  elevation difference, because the facet has to bisect them. It is 0 at the mirror elevation and
+  climbs to 10.4° at the horizon, which is what walks the path's centre out onto the flank of the
+  slope pdf.
+- **The azimuth-to-tilt map steepens toward grazing.** Off-azimuth by `Δφ`, the half-vector
+  acquires a horizontal component `≈ Δφ cos θ_view` against a vertical one `≈ sin θ_sun + sin
+  θ_view`, so the denominator shrinks as the eye drops and a smaller azimuth excursion carries the
+  facet through the same range of tilt. Fewer degrees of azimuth for the same slopes: a narrower
+  path.
+
+The brightening is the same geometry read on the other axis, and it does **not** decompose into one
+term — worth saying, because the tempting single explanation is off by an order of magnitude. From
+25° to 0.2°: the `1/cos θ_v` projection alone contributes **121×**, Fresnel at the steeper facet
+**3.2×**, `1/cos⁴β` **1.07×** — and against them the slope pdf at the walked-out centre falls to
+**0.37×** and Smith shadowing at a 0.2° view to **0.091×**. The product is 13.9, against 14.2
+measured on the full profile (the residual is the peak not sitting exactly at `Δφ = 0`). Quote the
+`1/cos θ_v` on its own and the path comes out **8.5× too bright** at the horizon.
+
+⚠️ **So a glitter path of uniform width is wrong, and it is the default.** Anything that draws the
+path as a stretched blob, a scrolled mask, or a lobe with one width applied along its length is
+making a claim about the surface statistics that the surface statistics contradict — and it is
+wrong in a way that is obvious once stated and almost never modelled, because the error is a shape
+rather than a level and no exposure check sees it. The rule falls out of the two tables together:
+**the path must come from the slope pdf and never from a spread parameter**, because a spread
+parameter is a single number and the path's width is a *function* — of the wind through `√mss`, and
+of the view elevation through the geometry above. One number cannot be both.
+
 **Slicks are a slope-variance effect, not a colour effect.** Cox & Munk also measured oil-slicked
 water: films damp capillary and short gravity waves, cutting total mean-square slope by a factor
 of **2–3** and eliminating the skewness entirely. So an oil slick, a wind shadow behind an island,

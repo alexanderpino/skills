@@ -516,6 +516,19 @@ least-confident-claims ledger in `00-index.md`.
   measured on the reference implementation against its own constants (`D`), so they price *that*
   fitted lobe rather than fitted lobes in general; the failure mode they illustrate is the general
   claim. The atmosphere half of the argument lives in `10`.
+- **P/D** — [The glitter path's width as a readout of the mean-square slope](12-water-rendering.md#sun-glitter-the-sparkle-path).
+  The slope regressions are Cox & Munk's (`P`, entry above). Everything the chapter reports *around*
+  them is measured on the reference implementation's second scene
+  (`terrain-renderer/reference-impl/beach_optics.py`, `glitter_width_deg`; all figures recomputed
+  here): FWHM/`√mss` = 53.53 / 53.52 / 53.75 / 54.43 at `U` = 3 / 6 / 10 / 16 m/s, the 2.26×
+  narrowing and 14.2× brightening from a 25° view down to the horizon, and the five-term
+  decomposition of that brightening. Those are properties of *that* sun (21.02°), *that* wind
+  (6 m/s, itself `?` — the reference frame's wind is unobserved) and a Gaussian slope pdf without
+  Cox & Munk's own skewness and peakedness corrections, which move the wings more than the
+  half-maximum. What transfers is the **mechanism and the sign**: the width tracks `√mss`, and the
+  path narrows and brightens toward the horizon. Re-measure the constants for another geometry.
+  The closed forms beside them — `β₀ = |θ_sun − θ_view|/2`, and the azimuth-to-tilt steepening —
+  are half-vector geometry derived here and checked against the model (`D`).
 - **D** — The wall as a light carrier, in
   [Caustics](12-water-rendering.md#caustics-the-other-half-of-the-light-path). The 35% mean / 77% worst-texel wall share
   of the bed's cosine-weighted hemisphere is an exact rectangle view factor computed per texel; the
