@@ -654,6 +654,10 @@ Three questions to ask of any test that has never failed, in the order they are 
 3. **Which of its inputs are at a degenerate value?** Zero absorption, unit albedo, normal
    incidence, one texel, a flat surface — every degeneracy silently deletes the terms that only
    exist away from it, and those terms are usually the ones a reviewer would have asked about.
+   This one has since been paid for in the field: see the
+   [tenth way](#the-tenth-way-a-ratio-cannot-see-a-common-factor), where every row touching one
+   function called it at `spm = 0` and a deliberate defect at that argument was bit-identical to
+   clean.
 
 A fourth question belongs beside them and is answered against the *frame* rather than against the
 suite: **how many subsamples reached the code at all?** That is the
@@ -744,6 +748,90 @@ Three tests for whether an object is an instrument or a prop:
 3. **Is the effect you want to read the dominant term in its state?** The inflatable fails this one
    even before its parameters are questioned: with the meniscus at 18% of the draught, a waterline
    reading on it is a surface-tension measurement wearing a buoyancy label.
+
+### The tenth way: a ratio cannot see a common factor
+
+The eighth way is a test that touches nothing, the ninth a frame that reaches nothing. This one is
+about the **whole suite's favourite instrument**, and it is the most uncomfortable of the three
+because the instrument is right and this chapter recommends it.
+
+**Ratios are this project's preferred reading and the reasons are good.** A ratio of two pixels in
+one frame cancels the exposure, the white balance, the source spectrum and the tone curve's local
+slope — that is the within-frame-ratio method in the seventh way, and it is why a ratio survives
+being read off a photograph when an absolute level does not. Every argument for them is sound.
+
+**And exactly that is what makes a suite built out of them blind.** A ratio cancels whatever
+multiplies both of its terms — that is its purpose — and it therefore cannot see an error that is a
+**common factor**. Wrong units, a missing or duplicated constant, the wrong one of two similarly
+named quantities: these are the errors that scale a whole expression, and they are the class the
+instrument is designed to remove.
+
+**Measured, and it is not a subtle miss.** A coastal water renderer drove a Bagnold suspension
+balance from the **wave's** dissipation instead of the **bed's** stream power — a factor of about
+fifty in front of the whole load. It shipped, and it passed a fifty-three-row suite. The two rows
+that owned the suspension were both ratios. Re-fired here, with the defect reintroduced as
+`bed_dissipation × 50` (`terrain-renderer/reference-impl/`, `beach_optics.py` and
+`validate_beach.py`; all four numbers recomputed):
+
+| row | clean | with the ×50 defect | verdict |
+|---|---|---|---|
+| **ratio** — "the load goes as `u_orb³`": `M(2)/M(1)` vs 8 | 8.000000000000 | **8.000000000000** | **bit-identical.** The balance is linear in the stream power, so the factor divides out exactly |
+| **ratio** — "the same stirring reads dark at 8 m and pale at 1.2 m": `R_shallow > 4·R_deep` | 0.2346 vs 0.0456 → pass | 0.2384 vs 0.0482 → **pass** | reflectance saturates in `b_b`, so a 50× load moves each side by 1–5% and the threshold never notices |
+| **absolute** — the bed stream power at `u = 1 m/s`, against `ρ·c_f·⟨\|u\|³⟩` | 2.6101 W/m² | **130.5071 W/m²** | fails on the first digit |
+| **absolute** — depth-averaged load in the breaking zone, against a published bracket | 373 mg/L | **18 671 mg/L** | fails; past the 1000 mg/L "opaque silt river" end of the bracket it is checked against |
+
+The first ratio is the one to look at: **twelve significant figures, unchanged.** No tolerance
+anywhere in that row could have caught it, because the defect is not small — it is *absent* from
+the quantity the row computes.
+
+**The rule.** ⚠️ **A suite needs at least one absolute row per quantity, and a suite made only of
+ratios is blind to precisely the errors that are constant factors.** The absolute row does not have
+to be hard to write — both of the ones that fired above are one line, one against a closed form at
+a convenient argument, one against a published order-of-magnitude bracket. It has to *exist*, and
+the bracket may be wide: the second row's range spans two decades and still caught a factor of
+fifty, because a factor of fifty is bigger than most brackets.
+
+**And an order-of-magnitude bracket is the cheapest absolute row there is.** It needs no
+calibration and it is not a tuning target — it is a statement that the quantity is the *kind* of
+thing it is named after. Turbid seawater is not silt slurry; a metre of water is not a millimetre
+of it. That is enough resolution to catch every common-factor error worth the name, and it is
+writable before the code is.
+
+**The sibling from the same run, and it is the eighth way's third question earning its keep.** A
+second defect in that suite also caught nothing: a `one-turbidity-slider` bug that ties the water
+mass's absorption and CDOM to the mineral load — the architecture the physics chapter names as the
+canonical wrong one. It passed because **every row that touched the function called it at
+`spm = 0`**, where the defect multiplies by `1 + 0` and is bit-identical to clean:
+
+| `spm` | absorption, clean | absorption, bugged |
+|---|---|---|
+| **0** | (0.2824, 0.0835, 0.1577) | **(0.2824, 0.0835, 0.1577)** — identical |
+| 1 | (0.2824, 0.0835, 0.1577) | (0.3031, 0.1141, 0.3051) |
+| 50 | (0.2824, 0.0835, 0.1577) | (1.3177, 1.6106, 7.5292) |
+
+A guard that calls its function at the parameter value where the defect is inert is not a weak
+guard; it is **not a guard**, and it will report a pass forever. That is question 3 of the eighth
+way — *which of its inputs are at a degenerate value?* — answered in the field, and the answer cost
+a shipped factor of fifty. The two failures are the same shape seen twice: **the first evaluates
+the right expression at a point where the defect cancels; the second evaluates it at a point where
+the defect is zero.** Both produce a number that is right, reproducible, and about nothing.
+
+**The mechanical check, and it is cheaper than any of the above.** For every guard, ask what the
+defect it is aimed at would multiply, and where the row evaluates. Two questions, both answerable
+by reading:
+
+1. **Does the row's expression contain the defect's factor more than once?** If the quantity
+   appears in both the numerator and the denominator, the row is structurally exempt from anything
+   that scales it — no tolerance rescues that.
+2. **Is the row's argument at a value where the defect vanishes?** Zero load, zero absorption,
+   unit albedo, normal incidence: sweep the argument, or state in the row's own reason why the
+   chosen value is where the defect is *largest* rather than where it is convenient.
+
+**And the general rule this chapter already half-carries, now stated.** ⚠️ **Fire every deliberate
+defect and record the rows it catches — a defect that catches nothing is a finding about the suite,
+not a defect to delete.** Both silent bugs above were the most valuable output of the run that
+found them; both would have been quietly removed as "not reproducible" by a project that read a
+zero-catch as a bad bug rather than as a hole in the wall.
 
 ## When the target is an approximation, the bar changes kind
 
@@ -903,4 +991,5 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
 | The linear-error → encoded-level table (5% ≈ 2.7 levels and 25% ≈ 12.8 levels at L = 0.18 of 255) | **D** — computed here through the exact sRGB transfer function, 2026-08. It is a property of the *view transform*, so it carries to any sRGB-encoded output and not to a different one; recompute for PQ or for a filmic curve, where the toe and shoulder change it by more than the percentages do |
 | That a deterministic quadrature reference makes a 3% difference a number while a Monte Carlo one makes it a number plus noise, hence the seed/standard-error requirement | **F** (elementary, but the *consequence for loop design* — variance paid on every read — is this skill's composition) |
 | The three preconditions (frozen ground truth, metric fixed in advance, cost budget) and the two ground-truth preconditions (no open discrepancy, one cross-consistency reading) | **F** (house doctrine; the metric-before-candidate rule is the same argument as "never widen a tolerance to pass a row", and the cross-consistency requirement generalises `12`'s split shot) |
+| The tenth way: a ratio cancels whatever multiplies both its terms, so a suite made only of ratios is blind to common-factor errors; and a guard evaluated where a defect is inert is not a guard | **F** (house doctrine, and the structural complement of the seventh way's within-frame-ratio method — the same cancellation, read as a cost) + **D** for the case: the ×50 bed-power defect passing a 53-row suite, the `u³` ratio row unchanged to twelve figures, the two absolute rows that fire (2.61 → 130.51 W/m², 373 → 18 671 mg/L), and the `spm = 0` degeneracy table are all `reference-impl/beach_optics.py` + `validate_beach.py`, **re-fired and recomputed here** (2026-08) rather than quoted. What transfers is the two-question check and the "one absolute row per quantity" rule; the numbers are that scene's |
 | The eighth way: a test's power is the surface area it shares with the code under test | **F** (house doctrine, and the general form of the fourth way's "two methods that read one premise are one method") + **D** for the case — the audit's one borrowed name, the lossless-limit/photon-walk pair agreeing to 0.15%, and the four-bug table are all `reference-impl/validate.py`, re-evaluated here; that **the lossless limit alone passes three of the four** was verified by evaluating each variant against the limit, not quoted |
