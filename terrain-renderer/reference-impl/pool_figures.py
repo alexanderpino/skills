@@ -217,8 +217,14 @@ def preflight():
     # the decomposition the figure draws as two stacked pieces must close.
     inside = 2. * mu[:, None] * np.where(
         (mu[:, None] ** 2) > (1. - 1. / n[None] ** 2), OPT.r_int_at(mu), 0.)
+    # 8e-5 and not 1e-15: R_INT comes by Walsh from R_EXT, and R_EXT is the
+    # module's own 512-node rule, which carries about 2e-5 against a converged
+    # one (validate.py has that row). The right-hand side here is a 20000-node
+    # midpoint rule with a kink in it at cos(tc). Neither residual is a
+    # disagreement about the physics; the guard is set to see a MOVED
+    # decomposition, which would be a whole percentage point.
     guard('R_INT == (1 - 1/n^2) + <partial Fresnel inside the cone>',
-          OPT.R_INT, (1. - 1. / n ** 2) + inside.mean(0), 3e-5,
+          OPT.R_INT, (1. - 1. / n ** 2) + inside.mean(0), 8e-5,
           'the two pieces figure 1 stacks; if they do not sum the bar is a lie')
     guard('T_OUT_DIFFUSE == (1 - R_EXT)/n^2 == 1 - R_INT',
           OPT.T_OUT_DIFFUSE, (1. - OPT.R_EXT) / n ** 2, 1e-15,
@@ -560,10 +566,10 @@ def fig_trap(S, path):
     bx.line(rho, rho, GREY, 1, dash=(5, 5))
     loss = OPT.rho_water(1.0, cs, dep, absorb=0.0)
     bx.marker(1.0, float(loss[1]), INK, 5)
-    bx.text(0.50, float(loss[1]) - 0.02,
+    bx.text(0.28, float(loss[1]) - 0.02,
             'lossless white pool (dot): rho_w = 1 - R(sun) = %.4f' % loss[1],
             INK)
-    bx.text(0.50, float(loss[1]) - 0.07,
+    bx.text(0.28, float(loss[1]) - 0.07,
             'energy conservation -- guarded to 1e-12', MUTED)
     bx.text(0.04, 0.97, 'this liner: %s' % _trip(OPT.rho_water(rb, cs, dep),
                                                  '%.4f'), INK)
@@ -702,7 +708,7 @@ def fig_window(S, path):
         dx.text(c + 0.17, float(wvf[c]) + .014, '%.4f' % wvf[c], INK, 'ms')
         dx.text(c, -0.032, CHN[c], MUTED, 'ma')
     dx.hline(0.5, WARN, 2, dash=(6, 5))
-    dx.text(2.55, 0.515, 'WALL_SKY = 0.5, superseded', WARN, 'rs')
+    dx.text(-0.55, 0.512, 'WALL_SKY = 0.5, superseded', WARN)
     dx.text(-0.55, 0.775, 'solid  BED   = 1/n^2 exactly = %s'
             % _trip(1. / n ** 2, '%.4f'), INK)
     dx.text(-0.55, 0.740,
@@ -749,7 +755,7 @@ def fig_absorption(S, path):
     a = OPT.ABS
     img = P.canvas(1280, 1010)
 
-    ax = P.Axes(img, (100, 72, 640, 420), (405, 670), (0, 0.31),
+    ax = P.Axes(img, (100, 72, 640, 420), (405, 670), (0, 0.34),
                 title='a is a BAND MEAN, over bands that tile',
                 xlabel='wavelength, nm', ylabel='absorption a, 1/m')
     ax.frame([420, 460, 500, 540, 580, 620, 660], _ticks(0, 0.30, 6),
@@ -763,13 +769,13 @@ def fig_absorption(S, path):
         ax.text(1000. * float(OPT.LAM[c]), float(a[c]) + .008,
                 '%.5f  (%s, %.0f nm)' % (a[c], CHN[c], 1000 * OPT.LAM[c]),
                 INK, 'ms')
-    ax.text(412, 0.295, 'bar width = the Voronoi cell of its own wavelength;',
+    ax.text(412, 0.330, 'bar width = the Voronoi cell of its own wavelength;',
             INK)
-    ax.text(412, 0.280, 'the three tile %.1f - %.1f nm with no gap.'
+    ax.text(412, 0.315, 'the three tile %.1f - %.1f nm with no gap.'
             % (1000 * OPT.BAND[2, 0], 1000 * OPT.BAND[0, 1]), INK)
-    ax.text(412, 0.265, 'height = a averaged over THAT cell, not sampled at '
+    ax.text(412, 0.300, 'height = a averaged over THAT cell, not sampled at '
                         'its centre.', INK)
-    ax.text(412, 0.250, 'dotted white = the nominal wavelength it is centred on.',
+    ax.text(412, 0.285, 'dotted white = the nominal wavelength it is centred on.',
             MUTED)
 
     dd = np.linspace(0., 3.2, 400)
@@ -863,17 +869,17 @@ def fig_sun(S, path):
     ax.vline(float(np.log10(np.rad2deg(ATM.THETA_SUN))), WARN, 2, dash=(4, 4))
     ax.text(np.log10(np.rad2deg(ATM.THETA_SUN)) + .06, 5.9,
             'solar radius %.3f deg' % np.rad2deg(ATM.THETA_SUN), WARN)
-    ax.text(-1.93, np.log10(grad[1]) + 0.20, 'sky gradient: zenith %.3f, '
+    ax.text(-1.93, np.log10(grad[1]) + 0.42, 'sky gradient: zenith %.3f, '
             'horizon %.3f  `?` hand-set' % (grad[1], ghor[1]), INK)
-    ax.text(-1.93, -0.80, 'solid: the disc, cos^%.0f' % ATM.N_DISC, INK)
-    ax.text(-1.93, -1.20, 'peak L_sun = %s' % _trip(ATM.L_SUN, '%.3e'), MUTED)
-    ax.text(-1.93, -1.60, '  = pi SUN_COL / Omega_sun, Omega_sun = %.3e sr'
+    ax.text(-1.93, -1.15, 'solid: the disc, cos^%.0f' % ATM.N_DISC, INK)
+    ax.text(-1.93, -1.55, 'peak L_sun = %s' % _trip(ATM.L_SUN, '%.3e'), MUTED)
+    ax.text(-1.93, -1.95, '  = pi SUN_COL / Omega_sun, Omega_sun = %.3e sr'
             % ATM.OMEGA_SUN, MUTED)
-    ax.text(-1.93, -2.20, 'dashed: the Rayleigh aureole, cos^%.0f' % ATM.N_AURE,
+    ax.text(-1.93, -2.50, 'dashed: the Rayleigh aureole, cos^%.0f' % ATM.N_AURE,
             INK)
-    ax.text(-1.93, -2.60, 'amp L_aure = %s' % _trip(ATM.L_AURE, '%.4f'), MUTED)
-    ax.text(-1.93, -3.00, '  = (E_n/4pi) x m x tau_R x 3/4', MUTED)
-    ax.text(-1.93, -3.60, 'the disc is a POINT: below 1 deg it is already under '
+    ax.text(-1.93, -2.90, 'amp L_aure = %s' % _trip(ATM.L_AURE, '%.4f'), MUTED)
+    ax.text(-1.93, -3.30, '  = (E_n/4pi) x m x tau_R x 3/4', MUTED)
+    ax.text(-1.93, -3.85, 'the disc is a POINT: below 1 deg it is already under '
                           'the sky.', INK)
 
     disc_f = 2. * np.pi / (ATM.N_DISC + 1.) * ATM.L_SUN
