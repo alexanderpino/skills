@@ -787,8 +787,7 @@ def main():
     # own brow cuts the near water off completely -- the first framing of this
     # file put the camera 270 m back and rendered a field of sand with a strip
     # of sea in it. Where a camera can stand is part of the landform.
-    x_edge = 694.0
-    cliff_j = float(w.sample(np.array([x_edge]), np.array([-500.0]), w.h)[0])
+    xj, cliff_j = cliff_edge(w, -640.0)
     # THE FRAMING IS CONSTRAINED BY THE LANDFORM AND THAT IS A FINDING, NOT A
     # COMPOSITION PROBLEM. Bar section J's photograph is taken from a HEADLAND,
     # with sea on three sides. Wave 3's coastal loop produced 46 m of plan
@@ -798,10 +797,10 @@ def main():
     # horizon. The camera therefore looks WEST-NORTH-WEST, out over the water
     # with the coast receding on the right; that is the most J-like frame this
     # bed can give, and the gap between it and J is recorded in the README.
-    az_j = math.radians(292.0)
-    camJ = Camera((x_edge, -500.0, cliff_j + 1.7),
-                  (x_edge + 800.0 * math.sin(az_j),
-                   -500.0 + 800.0 * math.cos(az_j), cliff_j + 1.7 - 160.0),
+    az_j = math.radians(335.0)
+    camJ = Camera((xj, -640.0, cliff_j + 1.7),
+                  (xj + 800.0 * math.sin(az_j),
+                   -640.0 + 800.0 * math.cos(az_j), cliff_j + 1.7 - 84.0),
                   48.0, W, H)
     LJ, exJ = render(camJ, w)
     frames['J'] = (LJ, exJ, camJ)
@@ -810,9 +809,9 @@ def main():
     # azimuth. The path runs from the horizon into the near field and its width
     # is measured in ANGLE, above, rather than in pixels here.
     az = math.radians(SUN_AZ)
-    cliff_k = float(w.sample(np.array([x_edge]), np.array([0.0]), w.h)[0])
-    camK = Camera((x_edge, 0.0, cliff_k + 1.7),
-                  (x_edge + 300.0 * math.sin(az), 300.0 * math.cos(az),
+    xk, cliff_k = cliff_edge(w, 0.0)
+    camK = Camera((xk, 0.0, cliff_k + 1.7),
+                  (xk + 300.0 * math.sin(az), 300.0 * math.cos(az),
                    cliff_k + 1.7 - 64.0), 34.0, W, H)
     LK, exK = render(camK, w)
     frames['K'] = (LK, exK, camK)
@@ -1090,7 +1089,9 @@ def bay_ladder(L, ex, w):
     Lw = L[mw]
     print('  -- bar J\'s colour ladder, scene-linear radiance (R, G, B)')
     for nm, sel in (('deep, d > 5 m', dep > 5),
-                    ('shallow, d < 1.5 m, unbroken', (dep < 1.5) & (brk < 0.2)),
+                    ('mid, 2 < d < 5 m, unbroken', (dep > 2) & (dep < 5)
+                     & (brk < 0.2)),
+                    ('shallow, d < 2.5 m, unbroken', (dep < 2.5) & (brk < 0.2)),
                     ('surf, breaking', brk > 0.8)):
         if sel.sum() > 30:
             v = np.median(Lw[sel], 0)
@@ -1102,24 +1103,49 @@ def bay_ladder(L, ex, w):
           'no new constant)' % np.round(SAND_WET / SAND_DRY, 4))
 
 
-def horizon_check(L, cam):
+def cliff_edge(w, y_cam, top=12.0, back=2.0):
+    """Where a camera can actually stand, on the row it is standing on.
+
+    THE FIRST FRAMING OF THIS FILE PUT BOTH CAMERAS AT A FIXED x = 694 m AND
+    RENDERED A FIELD. The cliff top is not at one x: wave 3's coastal loop
+    retreats the shore by different amounts at different y, so the brow runs
+    from x = 632 to x = 680 across the domain and a camera 60 m inland of it
+    looks at the coastal plain and nothing else. Standing at the brow is a
+    property of the LANDFORM and has to be read off the bed, not assumed."""
+    j = int(np.argmin(np.abs(w.y - y_cam)))
+    i = int(np.argmax(w.h[j] > top))
+    xc = float(w.x[i]) + back
+    return xc, float(w.sample(np.array([xc]), np.array([y_cam]), w.h)[0])
+
+
+def horizon_check(L, cam, edge_frac=0.12):
     """Bar section K2: the sea's radiance at grazing must approach the sky's
     reflected value CONTINUOUSLY, and a seam there is a tell at a glance."""
     D = cam.rays()
     up = D[..., 2] >= 0.0
-    rows = np.where(up.any(1) != up.all(1))[0]
-    j = int(np.argmax(up.sum(1) > 0))
-    if j < 2 or j + 3 >= L.shape[0]:
+    full = np.where(up.all(1))[0]
+    if full.size == 0 or full[-1] + 4 >= L.shape[0] or full[-1] < 3:
         print('  -- horizon not in frame')
         return
-    a = L[j - 3:j - 1].reshape(-1, 3).mean(0)       # sky side
-    b = L[j + 1:j + 3].reshape(-1, 3).mean(0)       # sea side
+    j = int(full[-1])
+    n = L.shape[1]
+    k = max(int(edge_frac * n), 2)
     print('  -- the sea-sky horizon (bar K2)')
-    print('     sky just above  %s' % np.round(a, 4))
-    print('     sea just below  %s' % np.round(b, 4))
-    print('     step, per channel  %s  (luminance ratio %.4f)'
-          % (np.round(b / np.maximum(a, 1e-9), 4),
-             float(b.mean() / max(a.mean(), 1e-9))))
+    # OFF THE PATH FIRST, and that is the only place the question can be asked.
+    # Down the sun's own azimuth the sea just below the horizon carries the
+    # GLITTER, whose radiance is the sun's image and is two orders above the
+    # sky: comparing those two is measuring the glitter, not the seam. The
+    # frame's outer columns are 15-17 deg off the path's centre and outside its
+    # half-width, and that is where the continuity criterion lives.
+    for nm, sel in (('off the path (frame edges)',
+                     np.r_[0:k, n - k:n]),
+                    ('down the path (frame centre)',
+                     np.arange(n // 2 - k // 2, n // 2 + k // 2))):
+        a = L[j - 3:j - 1, sel].reshape(-1, 3).mean(0)
+        b = L[j + 1:j + 3, sel].reshape(-1, 3).mean(0)
+        print('     %-28s sky %s  sea %s  ratio %s'
+              % (nm, np.round(a, 4), np.round(b, 4),
+                 np.round(b / np.maximum(a, 1e-9), 4)))
 
 
 if __name__ == '__main__':

@@ -2092,6 +2092,18 @@ def _sec_optics(ctx):
           'which would turn gelbstoff into a red absorber.')
     io_c = O.iops(a_cdom440=5.0, a_ph440=0.0)
     io_0 = O.iops(a_cdom440=0.0, a_ph440=0.0)
+    # THE THREE ARE NOT ONE SLIDER, and this is the row that says so. The water
+    # MASS's absorption belongs to the water mass; the mineral load is a FIELD
+    # driven by the waves. A renderer that ties them together has one turbidity
+    # control wearing three names, which is the architecture chapter 28 spends a
+    # section warning against.
+    check(1, 'the water mass\'s absorption does not depend on the mineral load',
+          O.iops(spm=200.0)['a'], O.iops(spm=0.0)['a'], 1e-14,
+          'Chlorophyll and CDOM are properties of the water body; suspended '
+          'mineral is a property of what the waves are doing to the bed. They '
+          'move independently or this coast cannot show BOTH a green wave face '
+          'and a pale surf zone, which bar section A says it does. Two hundred '
+          'mg/L of sediment must not move `a` by one part in 1e14.')
     check(1, 'CDOM scatters not at all', io_c['b'], io_0['b'], 1e-14,
           'Chapter 28, verbatim, and it is the sentence that separates '
           'blackwater from mud. A hundredfold change in CDOM must leave b '
@@ -2219,6 +2231,33 @@ def _sec_optics(ctx):
           'between two independent statements of the same spectrum. The '
           'tolerance is the band-mean-versus-point-sample difference.')
 
+    # ------------------------------- 7.7b THE FORWARD GLOW, and why g matters
+    # Chapter 28 asks for `phase_g` and warns that leaving it at zero "kills the
+    # forward glow through a sunlit wave crest". These two rows are that warning
+    # made checkable: the glow's whole behaviour is an ASYMMETRY between looking
+    # into the sun and looking away from it, and an isotropic phase function has
+    # no asymmetry to give.
+    c16 = math.cos(math.radians(15.8))
+    c159 = math.cos(math.radians(159.0))
+    ratio = float(O.hg_phase(O.PHASE_G, c16) / O.hg_phase(O.PHASE_G, c159))
+    between(1, 'the HG lobe is forward-peaked by two orders', ratio,
+            50.0, 1e4,
+            "The cuvette's two panels sit at scattering angles 15.8 and 159 "
+            "deg -- the same lobe, the same water, only the observer moved. If "
+            "the ratio between them is near 1 the phase function is isotropic "
+            "and the backlit face has stopped being backlit, which is exactly "
+            "the defect chapter 28 names when it says leaving g at zero kills "
+            "the forward glow through a sunlit wave crest.")
+    g1 = O.forward_glow(np.ones(3), 1.0, c16, io['a'], io['b'])
+    g2 = O.forward_glow(np.ones(3), 2.0, c16, io['a'], io['b'])
+    check(1, 'the glow is NOT Beer-Lambert: L exp(-cL), not exp(-cL)',
+          g2 / g1, 2.0 * np.exp(-(io['a'] + io['b']) * 1.0), 1e-12,
+          "Doubling the path does not attenuate the glow the way it attenuates "
+          "a transmitted image -- it doubles the SOURCE length first. That "
+          "extra factor of L is what biases a cuvette inversion run on a "
+          "scattering-dominated signal, by ln(L2/L1)/(L2-L1) weighted by the "
+          "glow's share of the signal, and it is worst in the green.")
+
     # -------------------------------------------------- 7.8 the cuvette
     for (l1, l2) in ((0.2, 1.0), (0.5, 3.0), (1.0, 8.0)):
         t1 = O.through_path(L0, np.array(l1), io['a'], io['b_b'])
@@ -2261,6 +2300,32 @@ def _sec_optics(ctx):
           'algebra rather than through a comment: W/m^2 divided by m^2/s^3 is '
           'kg/m^2, and one more length makes kg/m^3. Wave 4 shipped this '
           'formula once with the depth in the wrong place.')
+    # THE MAGNITUDE, and not only the scaling. A row that checks how the load
+    # RESPONDS to velocity is blind to a constant factor in front of it, and a
+    # constant factor of fifty is exactly the defect this wave shipped.
+    check(1, 'the bed stream power is rho c_f <|u|^3>',
+          O.bed_dissipation(1.0), 1025.0 * 0.006 * 4.0 / (3.0 * math.pi),
+          1e-12,
+          'Closed form, at u_orb = 1 m/s, with c_f the same 0.006 '
+          '`beach.longshore_current` uses. It is here because the two rows '
+          'beside it are RATIOS -- the u^3 scaling and the two-depth '
+          'comparison -- and a ratio cannot see a factor in front of the whole '
+          'expression. Driving the balance from the WAVE\'s dissipation '
+          'instead of the BED\'s is such a factor, about fifty, and it is what '
+          'this row exists to catch.', unit='W/m^2')
+    ws0 = BCH.settling_velocity()
+    spm_surf = float(O.suspended_load(1.4, 1.5, ws0)['spm_bar'])
+    between(2, 'the breaking zone\'s depth-averaged load, against chapter 28\'s '
+            'own anchors', spm_surf, 5.0, 500.0,
+            'Chapter 28 checks its bridge at two ends: "a coastal few-mg/L '
+            'water then has b of order 1 m^-1, and a 1000 mg/L silt river has '
+            'b ~ 500 m^-1 -- a millimetre-scale photon path, i.e. opaque mud". '
+            'A breaking surf zone is between those and nearer the first: '
+            'turbid, not mud. The range is wide BECAUSE nothing measured the '
+            'load at Aljezur -- it is a sanity bound, not a calibration -- and '
+            'it is what separates a suspension balance from an arithmetic '
+            'slip. Wave 4\'s own first writing put 3700 mg/L here, past the '
+            'chapter\'s silt river.', unit='mg/L')
     check(1, '<|cos|^3> = 4/(3 pi)', O.U3_MEAN,
           float(np.mean(np.abs(np.cos(np.linspace(0, 2 * math.pi, 2000001)))
                         ** 3)), 1e-6,

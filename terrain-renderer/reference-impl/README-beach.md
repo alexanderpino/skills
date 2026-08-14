@@ -6,22 +6,28 @@ it against things that were not written here.
 
     python3 beach.py             # the loop, and a page of diagnostics
     python3 validate_beach.py    # the suite; -v prints every tolerance's reason
-    python3 validate_beach.py --bugs   # eighteen defects put back, one at a time
+    python3 validate_beach.py --bugs   # twenty-six defects, one at a time
     python3 beach_evidence.py    # the figures, into gauntlet/sea/evidence/
+    python3 beach_render.py      # wave 4: the three rendered frames, and every
+                                 # number in "Wave 4" below
 
 | File | Owns |
 |---|---|
 | `beach.py` | The bed, the wave transform, radiation stress, the currents, the sediment flux, Exner and the ray tracer in 1-D; and — wave 3 — the coastal loop, the plan-view bed, the 2-D wave transform and the 2-D morphodynamic loop. No prints on import; every diagnostic is in `_print_report`. |
 | `beach_plot.py` | Axes, polylines and labels into a PIL image. No physics. |
 | `beach_evidence.py` | The seventeen evidence figures (eight `s1-`, five `s2-`, four `s3-`). Reads `beach.py`, computes nothing of its own. |
-| `validate_beach.py` | The suite — now a list of guarded **sections** — three tiers, plus the deliberate-bug harness. |
+| `beach_optics.py` | **Wave 4.** The coastal IOPs — chapter 28's three constituents, the Babin bridge, the suspension balance, the two transports, the cuvette inversion, Cox & Munk's glitter, and the foam placeholder. No rendering, no scene, no prints. |
+| `beach_render.py` | **Wave 4.** The camera, the ray cast, the shading and the three frames; every measurement taken from the scene-linear buffer before the tone map. |
+| `validate_beach.py` | The suite — a list of guarded **sections** — three tiers, plus the deliberate-bug harness. |
 
 **Nothing here touches the pool.** `optics.py` and `atmosphere.py` are imported
 and never copied; `render.py`, `field.py`, `wake.py` and `validate.py` are not
 sliced and not modified. This scene adds five files and edits none, so
 `render.py`'s seventeen frame hashes cannot have moved; `validate.py` was re-run
 after the beach existed and is **285 pass / 0 FAIL / 54 info** — re-run at the
-end of wave 2 and again at the end of wave 3, still exactly that.
+end of wave 2, of wave 3 and of wave 4, still exactly that. Wave 4 adds two files
+and edits none of the pool's, and the one place the shared modules would not
+stretch is written up as a finding (`F6`) rather than patched.
 
 The import is load-bearing rather than ceremonial: `atmosphere.solar_position`,
 given the surf frames' own place and clock, returns **27.165° apparent /
@@ -1212,3 +1218,519 @@ consume is computed here. `sediment_flux(tr)` returns `q`, `q_on`, `q_off`,
 and the broken/roller fractions — all in SI, all scene-linear, none of them drawn.
 Turning a suspended load into an optical `b` is 28-liquids' Babin bridge and a
 later wave's problem.
+
+---
+
+# Wave 4 — first light on the bay
+
+Three waves computed a coast and drew diagnostics of it. This one renders it, and
+the deliverable is not the picture: it is **what the picture had to be measured
+against before it could be believed**. Two new files, three frames, six findings,
+and one criterion the bar asks for that this representation provably cannot meet.
+
+    python3 beach_render.py           # the frames and every number below
+    python3 beach_render.py --fast    # half resolution, no supersampling
+
+| File | Owns |
+|---|---|
+| `beach_optics.py` | The coastal IOPs — chapter 28's three constituents, the Babin bridge, the suspension balance, the two transports, the cuvette inversion, Cox & Munk's glitter, and the foam **placeholder**. No rendering, no scene. |
+| `beach_render.py` | The camera, the ray cast, the shading, the cuvette figure, the tone map — and every measurement, taken from the radiance buffer before the tone map. |
+
+**The pool is still untouched.** `optics.py` and `atmosphere.py` are imported and
+never copied. The coastal absorption enters the pool's own functions through the
+`absorb=` argument the extraction already left open — `rho_water`, `slab_esc`,
+`slab_trap`, `trap_gain` all take it — which is why a second scene with entirely
+different water needed **no fork and no special case**. `render.py`,
+`validate.py`, `field.py` and `wake.py` are not edited.
+
+## The three constituents, and why one slider cannot do this coast
+
+Chapter `28`'s rule is the architecture of `beach_optics.py`: **CDOM darkens,
+sediment brightens, and chlorophyll owns the 550–570 nm window.** They are
+carried as three separate controls, and two of them are absorption coefficients
+rather than concentrations — deliberately, because the chapter's bridge is stated
+for mineral *mass* and says nothing about chlorophyll-specific absorption, so a
+`Chl` in mg/m³ cannot be quoted from this file without importing a number the
+chapter does not carry. It is not quoted.
+
+| | value | where it comes from |
+|---|---|---|
+| `a_ph(440)` | **0.1083 m⁻¹** | **Recovered**, not chosen — see below |
+| `a_CDOM(440)` | 0.0800 m⁻¹ | `?` declared, against chapter 28's own gates (blackwater is 5–19; turquoise needs < 0.5) |
+| `S` | 0.017 nm⁻¹ | midpoint of the chapter's 0.012–0.022 |
+| `b_p(555)/SPM` | 0.5 m²/g | Babin et al. (2003), via chapter 28 |
+| `b_b/b` | **1/51 = 0.01961** | the chapter's own `b_f ≳ 50 b_b`, read at its boundary |
+| `g` | **0.9132** | **derived**: the HG lobe whose backscattered share *is* 1/51 |
+| `SPM` | a **field** | the wave's own bed dissipation — see the balance below |
+
+The recovered water is `a = (0.2824, 0.0835, 0.1577) m⁻¹`, `K_d = (0.328, 0.097,
+0.183)`, Secchi **10.3 m** — a coastal green sea, which is what an upwelling
+Atlantic coast is.
+
+### The chlorophyll amplitude is recovered, and it round-trips
+
+Chapter 28 gives no `a*_ph`, but it gives a Jerlov table, and the entry it labels
+*"coastal green"* is **1C, `K_d(490) = 0.120 m⁻¹`**. Gordon's `K_d ≈ (a + b_b)/μ_d`
+inverts that to an absorption, and everything else at 490 nm is either pure water
+or already declared:
+
+```
+a(490)    = K_d(490) μ_d − b_b(490)
+a_ph(490) = a(490) − a_w(490) − a_CDOM(490)
+a_ph(440) = a_ph(490) / shape(490)          →  0.1083 m⁻¹
+```
+
+Two inputs are not the chapter's and both are marked: `a_w(490) = 0.0150 m⁻¹`
+(Pope & Fry 1997, a **point** value used only here — the render never sees it,
+since 490 nm sits inside the blue band and the band mean is not the quantity
+Gordon's relation is written at), and `μ_d = 0.86`, `?`. The answer is nearly
+linear in `μ_d`, so a 10% error there is 17% here; that is the dominant
+uncertainty and it is reported rather than absorbed. Nothing about this scene
+entered the recovery, and the suite runs it forward again as a round-trip.
+
+### `?` and open
+
+* the wind at the frames' hour — bar section K says so outright. `U10 = 6 m/s` is
+  declared and **every glitter number is reported as a function of it**, together
+  with the inverse map, so a later wave with a wind observation can check the
+  width without re-running anything.
+* `a_NAP`, the absorption of the same mineral particles, is **0 and that is an
+  omission, not a result.** Chapter 28's bridge gives the scattering coefficient
+  only, and this file does not import a mass-specific absorption the chapter does
+  not carry. The consequence is named: the surf zone renders slightly too bright
+  and slightly too neutral, most in the blue.
+* `ε_s = 0.02`, Bagnold's suspension efficiency via Bailard (1981) — the same
+  paper `beach.py` already takes its energetics flux from. The load is **linear**
+  in it; halve it and every SPM below halves and nothing else changes.
+* `Chl` in mg/m³ — not derivable from chapter 28 (see above).
+* the three albedos (`SAND_DRY`, `ROCK_DRY`, `PLAIN_DRY`) are declared. The
+  wet/dry sand pair is **not** a second declaration: bar `H3` records that wet
+  sand darkens by the trapped series this project already derived for the pool's
+  liner, so `SAND_WET` is `optics.wet_albedo(SAND_DRY)` and carries no new number.
+
+## The mineral load is not a slider — it is a balance
+
+Bar section D: `b` is a **field coupled to the wave field**. So the suspension is
+Bagnold's, in Bailard's surf-zone form — the power that holds sand up comes from
+the bed, and the sand falls out at its settling velocity:
+
+```
+i_s w_s = ε_s D_f            D_f = ρ c_f ⟨|u|³⟩,   ⟨|u|³⟩ = (4/3π) u_orb³
+M       = ε_s D_f ρ_s / (g (ρ_s − ρ_w) w_s)        [kg/m²]
+```
+
+Every symbol is already in `beach.py`: `u_orb` from `orbital_velocity`, `w_s`
+from `settling_velocity`, `c_f = 0.006` from `longshore_current`.
+
+> **`D_f` is the BED's dissipation and not the wave's, and the first writing of
+> this file got that wrong by a factor of about fifty.** `tr['D_w']` is a
+> *breaking* loss deposited in a surface roller; the power that works on grains
+> is the wave boundary layer's stream power. Driving the balance from `D_w` gave
+> a depth-averaged load of **3.7 g/L** across the breaking zone, which is a silt
+> river and not a beach, and it would have been reported as a result. What is
+> therefore still missing is named rather than added: breaking turbulence does
+> reach the bed in the inner surf, this balance does not carry it, and the
+> direction of the error is known — **the surf zone's load is understated.**
+
+| | `D_f` W/m² | `M` kg/m² | Rouse layer | SPM in the layer | depth-averaged |
+|---|---|---|---|---|---|
+| breaking zone | 1.50 | 0.117 | 0.11 m | 835 mg/L | 98.5 mg/L |
+| depth 2–4 m | 3.86 | 0.302 | 0.39 m | 841 mg/L | 111.6 mg/L |
+| offshore, `d > 6 m` | 0.90 | 0.070 | 0.67 m | 104 mg/L | 8.9 mg/L |
+
+### F1 · The stratification is what separates a blue sea from a milky one
+
+**The single most consequential finding of this wave, and it is optical rather
+than sedimentological.** The balance fixes the load *per unit area* and says
+nothing about where in the column it sits. Where it sits is the Rouse problem:
+
+```
+ℓ = ε_v / w_s,     ε_v ≈ κ u* d / 6
+```
+
+which is about a metre for 0.30 mm sand under this swell. So in the **surf zone**,
+where `d` is 1–2 m, the load fills the column and the water is opaque; at the
+**8 m offshore boundary** the *same balance* with the *same kind of load* puts it
+in the bottom metre and leaves seven metres of clear water above it.
+
+A depth-averaged SPM cannot tell those two apart. Measured, green channel, deep
+reflectance:
+
+| | two-layer | depth-averaged |
+|---|---|---|
+| offshore, `d = 8 m` | **0.038** | 0.158 |
+| surf, `d = 1.2 m` | 0.231 | 0.286 |
+
+A factor of **four** offshore. A physically correct load, spread the wrong way
+through the column, renders the whole Atlantic as Jerlov 5C. Reflectance is
+dominated by the upper optical depth, so a load hidden under seven metres of clear
+water is nearly invisible while the same load through 1.5 m is the entire colour
+of the pixel. `column_reflectance` is a two-layer composition of the same derived
+single-scattering integral, and the suite checks that it collapses to the
+one-layer form when the two layers agree.
+
+## Section A — the colour is the path, measured three ways
+
+### A1 · The instrument is the transmittance, not the radiance
+
+A green excess `2G/(R+B)` measured on a *radiance* mixes the water's colour with
+the **source's** colour. Dividing every pixel by the zero-path pixel of its own
+panel removes the source exactly — the same cancellation the cuvette runs on — and
+leaves a number that is **1 when there is no water** and departs from 1 only
+through the path.
+
+| path | `2G/(R+B)` of the transmittance |
+|---|---|
+| 0.00 m | **1.0000** |
+| 0.10 m | 1.0132 |
+| 0.40 m | 1.0549 |
+| 1.00 m | 1.1420 |
+| 2.00 m | 1.2987 |
+| 2.90 m | **1.4518** |
+
+**The green vanishes when the path does**, by construction and by physics: at zero
+path the transmitted spectrum *is* the source spectrum. Nothing in these two files
+can tint it — there is no water colour anywhere in them, only `a`, `b` and a
+length.
+
+**The two ratios the bar asks for:**
+
+* **the grade across the wedge**, thick against thin: **1.355**, and it is
+  **1.348 in the front-lit control** — the same, because the grade is the path and
+  *the path does not know where the sun is.*
+* **the face against the body**: the wedge at 2–3 m of path reads `2G/(R+B) =
+  1.382` where the bay's own deep water — the same water, seen as a *body*, with
+  no transmitted path at all — reads **0.961**. Ratio **1.44**. One liquid, two
+  colours, one exposure, and the difference is a length of water.
+
+And the bay shows the same thing **without the cuvette at all**, which is the
+result worth having: bar section J's colour ladder, measured on `s4-bay-render.png`'s
+own scene-linear buffer, is monotone in the path through the column to the bed.
+
+| surface | scene-linear (R, G, B) | `2G/(R+B)` |
+|---|---|---|
+| deep, `d > 5 m` | (0.909, 1.027, 1.227) | **0.961** — grey-blue, sky and backscatter, no path |
+| mid, 2–5 m, unbroken | (0.540, 0.714, 0.869) | 1.014 |
+| shallow, `d < 2.5 m`, unbroken | (0.381, 0.615, 0.707) | **1.130** — teal |
+| surf, breaking | (0.564, 0.725, 0.785) | 1.075 |
+
+**Deep blue offshore → teal over the shallows**, in one exposure, out of one set
+of coefficients, with the ordering set by nothing but the length of water the
+light crossed. Shallow against deep is **1.175**.
+
+What *does* distinguish backlit from front-lit is the **forward glow**, and it is
+the term chapter 28 names when it warns that leaving `g` at zero "kills the
+forward glow through a sunlit wave crest":
+
+| | scattering angle | HG lobe at `g = 0.9132` | glow, share of the pixel |
+|---|---|---|---|
+| backlit | **15.8°** | 0.6215 sr⁻¹ | **5.07%** |
+| front-lit | 180° (the face is unlit) | 0.0019 sr⁻¹ | **0.00%** |
+
+The sun cannot reach the back face at all in the control, so the term is
+identically zero. **The same lobe, the same water, the same exposure; only the
+observer moved.**
+
+### A2 · The wave face is a near-breaking geometry, and this representation cannot reach it
+
+> **This overturns the working assumption of the whole colour pass, and it is
+> geometry rather than optics.**
+
+A ray entering water is confined to the Snell cone: it can be no further than
+`asin(1/n) = 48.5°` from the surface normal. So for a sightline to travel **along**
+a wave — across the crest and out the far side, which is what a backlit face *is* —
+the face's normal must be tilted at least
+
+```
+90° − asin(1/n) = 41.48°
+```
+
+from the vertical. **The face must be steeper than 41.5° or no observer can see
+through it lengthwise, whatever the water is made of.**
+
+This scene's free surface is `η = (H/2)·cos(S)` — a linear wave, whose maximum
+slope is `(H/2)k`. Measured over the whole bay:
+
+| | slope | angle |
+|---|---|---|
+| maximum `|∇η|` | 0.1443 | **8.21°** |
+| 99.9th percentile | 0.1294 | 7.37° |
+| **needed** | 0.8841 | **41.48°** |
+
+Six times too gentle. So bar section A's backlit face **belongs beside bar section
+F's plunging lip**, one step earlier and for the same structural reason: the
+height field is not the obstacle at breaking, it is already the obstacle at
+*steepening*. The missing physics is the wave's nonlinear shape — and `beach.py`
+already computes the skewness `Sk` that describes it, and spends it **only inside
+the sediment transport**, never on the free surface. That is the shortest path to
+closing this and it is named rather than attempted.
+
+The frame that carries section A is therefore **the bar's own instrument**: a
+variable-path cuvette, a wedge of *this scene's water* thinning from 3 m to 0,
+in *this scene's sun*, with `optics.fresnel` on both faces and `optics.refract`
+with its TIR branch. **`s4-cuvette.png` says so in its caption.**
+
+### A3 · The cuvette inverted, term by term — and the forward glow biases it by a quarter
+
+`c(λ) = −ln(T₂/T₁)/(L₂−L₁)`, run on the render's own scene-linear buffer, with the
+terms added one at a time. Each addition is a different way a real frame lies to
+this instrument.
+
+| what is in the signal | `c` red | `c` green | `c` blue | error |
+|---|---|---|---|---|
+| **transmitted only** | 0.28356 | 0.08560 | 0.16191 | **0.00 / 0.00 / 0.00 %** |
+| **+ the forward glow** | 0.26822 | 0.06480 | 0.13630 | −5.4 / **−24.3** / −15.8 % |
+| **+ the front face's own reflection** | 0.26263 | 0.06386 | 0.13367 | −7.4 / −25.4 / −17.4 % |
+| put in (`a + b`) | 0.28356 | 0.08560 | 0.16191 | |
+
+### F2 · The forward glow is not Beer–Lambert
+
+A single-scattering source inside a slab integrates to
+
+```
+L = ∫₀^L b p(Θ) E e^{−c(L−s)} e^{−cs} ds  =  b p(Θ) E · L · e^{−cL}
+```
+
+**linear in `L`, not exponential.** It rises out of zero, peaks at `L = 1/c` and
+falls. So a cuvette run on a scattering-contaminated signal reads
+
+```
+−ln(T₂/T₁)/(L₂−L₁)  =  c  +  ln(L₂/L₁)/(L₂−L₁) · (the glow's share)
+```
+
+— biased **low**, by a term that depends only on the two thicknesses. Five per
+cent of forward-scattered light costs **a quarter of the green coefficient**, and
+green is the band the entire colour argument lives in. A cuvette read off a real
+backlit wave face, where the glow is the *point*, is not measuring what it thinks
+it is measuring unless the glow is separated first.
+
+### A4 · What the cuvette bounded, and what it left open
+
+* **Bounded:** transmission alone gives `a + b` per band, exactly, and nothing
+  more. It cannot separate `a` from `b` and it cannot separate the constituents.
+* **Closed by a second geometry:** the same water's **deep reflectance** gives
+  `f b_b/(a+b_b)`, and the pair is two equations in two unknowns. It inverts
+  exactly, and chapter 28's Babin bridge then returns the load: **500 mg/L put in
+  → 509 mg/L recovered in the green band** (1.8% high — the bridge is stated at
+  555 nm and the green band is centred at 545, so what is recovered is the
+  particulate spectral slope over 10 nm). Red and blue read 461 and 577, off *by
+  exactly that slope*, which is what the chapter's `λ^−0.5…−1` interval costs.
+* **Left open, and named:** the **partition of `a`** among chlorophyll, CDOM and
+  NAP. Three constituents, three bands, and CDOM's and NAP's spectra are too
+  collinear to separate with them. Closing it needs a fourth band or a third
+  geometry. Not attempted.
+
+## Section K — the glitter path is the slope distribution, and nothing else
+
+There is **no spread parameter in these files.** The path's radiance is
+
+```
+L = ρ_F(ω) E_n p(z_x, z_y) / (4 cos⁴β cos θ_v)
+```
+
+with `ρ_F` from `optics.fresnel`, `E_n` from `atmosphere.E_SUN`, `p` the published
+Cox & Munk slope distribution, and the rest a Jacobian derived beside itself:
+`dω_n = cos³β dz`, `dω_v = 4 cos ω dω_n`. Nothing in it is free, which is exactly
+what section K demands.
+
+At **`U10 = 6 m/s`** — `σ_u² = 0.01896`, `σ_c² = 0.01452`, **mss = 0.03348**:
+
+| view elevation | width in azimuth | angular width | peak radiance (green) |
+|---|---|---|---|
+| 25.0° (near field) | **14.96°** | 13.56° | 13.6 |
+| 21.0° (the specular point) | 13.54° | 12.64° | 19.7 |
+| 15.0° | 11.46° | 11.07° | 33.2 |
+| 10.0° | 9.79° | 9.64° | 51.8 |
+| 6.0° | 8.49° | 8.44° | 79.5 |
+| 3.0° | 7.52° | 7.51° | 119.5 |
+| 1.5° | 7.04° | 7.04° | 152.5 |
+| 0.5° | 6.72° | 6.72° | 182.7 |
+| 0.2° (the horizon) | **6.63°** | 6.63° | 193.4 |
+
+**The path narrows toward the horizon by a factor of 2.26 and brightens by a
+factor of 14 doing it.** Bar section K predicted the sign of that trend from the
+geometry alone — "the same slope distribution subtends a different range of
+specular directions at different incidences" — and the geometry agrees. A path of
+uniform width would be wrong, and it would have been the default.
+
+**The width is a readout.** `width / √mss` is constant to **1.7% over a factor of
+five in wind** (53.53, 53.52, 53.75, 54.43 deg per unit RMS slope at `U10` = 3, 6,
+10, 16 m/s). That constancy is what makes the width a *measurement of the wind*
+rather than a look, and it is the one thing a chosen spread parameter cannot
+reproduce. The inverse map is `wind_from_mss` and the suite checks it round-trips.
+
+### F3 · A tenth of the intercepted flux reflects below the horizon
+
+Integrating the radiance this file produces over the upward hemisphere agrees with
+the flux the tilted facets intercept — two routes sharing only the slope pdf —
+**but only after restricting the second to facets whose mirror direction points
+up.** The rest, **10.3%** of what the surface intercepts at this sun and this
+wind, is reflected *into the sea*: facets tilted far enough away from a 21° sun
+send their specular lobe below the horizon, and a single-bounce glitter model
+drops that light entirely. It is exactly the light a multiple-surface-bounce model
+would put back as the faint filling between the glints. Recorded, not modelled.
+
+### F4 · Cox & Munk's own two fits do not agree
+
+The components — `σ_u² = 3.16×10⁻³ U`, `σ_c² = 0.003 + 1.92×10⁻³ U` — sum to
+`0.003 + 5.08×10⁻³ U`. The paper's **separately fitted** combined slope is
+`0.003 + 5.12×10⁻³ U`. **0.8% apart at any wind**, inside their own quoted
+uncertainties (±0.004 and ±0.002). A file that quotes both numbers as if one
+implied the other has misread the source; the suite carries the components against
+their own sum and the total against the published fit as a *range*, and records
+the gap instead of hiding it.
+
+## F5 · Chapter 28's 550–570 nm window is a statement about the water, not the pigment
+
+Chapter 28 says chlorophyll *"leav[es] a transmission window at 550–570 nm"*, which
+reads as a claim about `a_ph`. It is not one, and it cannot be. The minimum of a
+sum of two absorption lines sits **between** them, nearer the broader one's tail;
+for peaks at 440 and 675 that is **590–600 nm**, and this file's declared shape
+lands at **592**. What actually sits at 550–570 is the minimum of `a_ph` **plus
+pure water**, because `a_w` climbs steeply above 570 and pushes the window back
+down the spectrum. The chapter is right about the water and loose about the
+constituent, and the distinction matters to an implementer: fitting a pigment
+spectrum to put *its* minimum at 560 needs widths no pigment has.
+
+The suite carries this as a pair — a row on the chapter's claim about **this
+water** (the total absorption minimises in the band containing 550–570; it does),
+and an INFO row on where `a_ph` alone minimises.
+
+## F6 · What the shared modules would not stretch to
+
+The extraction's own test was *"would a beach need exactly this, unchanged?"* and
+the answer held everywhere except one place, which is recorded here rather than
+patched:
+
+* **`atmosphere.sky()` reads the module-global `SUN_DIR`.** So a second scene
+  cannot supply its own sun without either monkey-patching the module or forking
+  it. `atmosphere.py`'s own comment calls the site-and-shoot block *"the first of
+  the two blocks a second scene replaces"*, and the block is replaceable — but the
+  **function that consumes it is not parameterised**, and the two derived
+  illuminants (`SKY_DECK`, `SKY_SUB_DERIVED`) plus both aureole amplitudes are
+  module-level constants computed at import from that one geometry. Adding an
+  optional `sun=` argument would be a small, non-breaking change; it is not made
+  here because this wave's contract is that no pool pixel moves, and the finding
+  is worth more than the patch.
+* **`optics.rho_water`, `slab_esc`, `slab_trap` and `trap_gain` take a SCALAR
+  depth** (the quadrature broadcasts `_SQM[:, None]` against the band axis). A
+  beach's depth is a field, which is the exact case the extraction's docstring
+  says it was made for. `beach_render.py` works around it with a 48-point depth
+  ladder and interpolates; that is a workaround, not a fix, and the ladder's
+  interpolation error is a suite row rather than an assumption.
+
+Neither of these is a physics error and neither cost this wave a result. Both are
+the kind of interface friction that only a *second* scene can expose, which is the
+argument for having built one.
+
+## Frames, and what each caption has to say
+
+Into `gauntlet/sea/evidence/`:
+
+* **`s4-bay-render.png`** — the bay from the cliff edge, to be laid beside bar
+  section **J**. *Caption:* **the foam is a PLACEHOLDER** — a saturating function
+  of the breaking fraction, put on the crests, with no advection, no decay, no
+  entrained-air medium and no spray, so nothing about foam extent, texture or
+  brightness may be read off this frame (bar section C, and the OPEN row). **The
+  coastal plain's albedo is one flat declared value** standing where a vegetation
+  model would go; bar K2 puts dune vegetation and the village out of scope. **The
+  framing is constrained by the landform, not chosen**: bar J's photograph is
+  taken from a headland with sea on three sides, and wave 3's coastal loop
+  produced 46 m of plan curvature over 1408 m of coast — a nearly straight cliffed
+  shore with a beach strip a few metres wide. There is no headland in this bed to
+  stand on, and an eye 1.7 m above a flat coastal plain sees that plain fill every
+  landward direction to the horizon. **The render is comparable to J in its surf
+  lines and its colour ladder and is not comparable to J in its beach.**
+* **`s4-glitter-render.png`** — the open sea down the sun's own azimuth, for bar
+  section **K**. *Caption:* the widths reported above are measured in **angle**,
+  from the closed form, not off this image — the image places them about 0.20°
+  high because the sea is flat-Earth here and the true horizon dips by
+  `√(2h/R) = 0.203°` at this eye height. The glitter clips: the exposure is a
+  derived white point (the radiance of a white Lambertian card in this sun,
+  5.16 green) and the path is forty times it, which is what a photograph of a
+  glitter path does. **The sea–sky horizon (bar K2) is continuous in the model
+  and is not continuous in the pixels**: measured on the frame's outer columns,
+  15–17° off the path's centre and outside its half-width, the sea just below the
+  horizon is (1.49, 1.38, 1.23) times the sky just above it. There is no seam —
+  no discontinuity in any term — but there is a real step, and its mechanism is
+  named rather than smoothed: at grazing the resolved swell still tilts facets,
+  and a tilted facet near the horizon samples a *brighter* part of the sky than
+  the one it stands in front of, with the glitter's own tail on top. Down the
+  path's centre the same measurement reads 145×, and that number is the glitter,
+  not a seam — which is why the criterion has to be asked off the path.
+* **`s4-cuvette.png`** — the variable-path cuvette, backlit (left) and front-lit
+  (right). *Caption:* **this is a stand-in and the wedge is not a wave.** The face
+  a backlit wave presents is steeper than 41.5° and this scene's linear free
+  surface reaches 8.2°, so the geometry section A describes cannot be rendered
+  from this representation (see A2). Everything **in** the wedge is the scene's:
+  the same IOPs, the same sun, the same Fresnel on both faces, the same
+  Beer–Lambert and the same derived HG lobe. Only the observer moves between the
+  two panels; the sun does not.
+
+**The exposure is derived and identical across all three frames** — a percentile
+of a frame's own histogram is an auto-exposure, and an auto-exposure is exactly
+what bar section A's *"one exposure"* forbids.
+
+## The suite
+
+**135 pass / 0 FAIL / 0 ERROR / 2 open / 58 info**, up from wave 3's 77 / 0 / 0 /
+1. Fifty-eight new rows in one new section, `_sec_optics`, which checks **only**
+the layer this wave added: `validate.py` owns 285 rows on the pool's optics and
+duplicating any of them would be the two-routes-one-source error in its purest
+form.
+
+The pool: **285 pass / 0 FAIL / 54 info**, re-run and unchanged.
+
+The second OPEN row is **foam** — three mechanisms, none of them modelled, with
+the reason recorded (they are three different *representations*, plus section H2's
+two residence times on one surface and section H5's rotational structure).
+
+### The eight new deliberate defects
+
+| bug | what it puts back |
+|---|---|
+| `one-turbidity-slider` | collapses the three constituents into one murkiness control — the failure chapter 28 names by name |
+| `cdom-scatters` | gives CDOM a scattering coefficient, which is what makes blackwater mud |
+| `depth-averaged-spm` | spreads the load through the whole column instead of the Rouse layer (F1) |
+| `dw-for-bed-power` | drives the suspension from the wave's dissipation rather than the bed's — this wave's own first writing |
+| `isotropic-phase` | `g = 0`, which chapter 28 warns kills the forward glow |
+| `glitter-fixed-width` | a spread parameter chosen to look right instead of the slope distribution — the defect section K exists to catch |
+| `glitter-no-jacobian` | drops `1/cos⁴β`: invisible at the specular point, and the whole of the behaviour toward the horizon |
+| `ambient-in-the-tube` | lights the through-path with an ambient term, so the green stops vanishing (bar I2) |
+
+Every one of the eight fires, and the rows they fire are the rows they were
+written for. Run against the optics section alone — which is exact rather than a
+shortcut, since these eight patch `beach_optics` and nothing outside that section
+imports it:
+
+| bug | rows caught | which |
+|---|---|---|
+| `one-turbidity-slider` | 1 | the water mass's absorption does not depend on the mineral load |
+| `cdom-scatters` | 2 | CDOM scatters not at all; CDOM darkens, sediment brightens |
+| `depth-averaged-spm` | 1 | the same stirring reads dark at 8 m and pale at 1.2 m |
+| `dw-for-bed-power` | 2 | the bed stream power closed form; the breaking zone's load against chapter 28's anchors |
+| `isotropic-phase` | 2 | `g` is derived from `b_f ≥ 50 b_b`; the HG lobe is forward-peaked by two orders |
+| `glitter-fixed-width` | 1 | the glitter width goes as the RMS slope |
+| `glitter-no-jacobian` | 2 | the width goes as the RMS slope; the glitter integral returns the intercepted flux |
+| `ambient-in-the-tube` | 3 | Beer–Lambert at L = 0.25, 1.0 and 3.0 m |
+
+**Two of these caught nothing when they were first fired**, and that is recorded
+rather than quietly fixed: `one-turbidity-slider` and `dw-for-bed-power` both
+passed a suite of fifty-three rows. The first slipped through because every row
+that touched `iops` called it at `spm = 0`, so tying the water mass's absorption
+to the mineral load changed nothing any row looked at; the second because both
+rows on the suspension were **ratios** — the `u³` scaling and the two-depth
+comparison — and a ratio cannot see a factor of fifty in front of the whole
+expression. Three rows were added for them, and the general lesson is the one the
+pool's suite already learned twice: *a suite made only of ratios is blind to
+exactly the errors that are constant factors.*
+
+### One defect this wave shipped and the guard that now catches it
+
+**The glitter's branch.** The eye is *opposite* the sun's azimuth, not under it: a
+flat sea reflects a beam arriving from `az` into `az + 180` at the same elevation.
+Written the other way round, the required facet normal lands on the sun instead of
+on the vertical and the whole path evaluates at `exp(−135)`. **A glitter model
+with the wrong branch renders black rather than wrong**, which is the kind of
+defect that survives a look at the picture. The row is *"the path is centred on
+the sun's own azimuth"*.
