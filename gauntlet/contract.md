@@ -119,3 +119,32 @@ Applied to this very moment, as evidence it is operative: a critic is mid-read o
 SKILL.md. Editing now would cost that verdict and force a re-run. The amendment
 is recorded here instead, and the edit lands with the wave-3 fixes in one build —
 one cycle instead of two.
+
+## Wave 3 close — the fidelity gate result
+
+Fidelity stayed a machine gate rather than a fourth lane, per the wave-2
+amendment, so its verdict is recorded here and not in the log.
+
+**Fidelity: 9/9.** All six of the method's core mechanisms are reachable and
+enforced at the phase where they are needed, each traced to its enforcement
+point: separate blind critic per lane, external inspectable bar, builder never
+grades itself, one named largest gap driving the next round, forced winner with
+no tie value in the script's vocabulary, and rounds earned rather than scheduled.
+
+Word proportion, measured by section on 3401 words: loop ~855 (25%), guardrails
+~710 (21%), project-management scaffolding ~1525 (45%), framing ~305 (9%). The
+loop is the smallest of the four shares and the scaffolding the largest. That is
+a fact this run should hold rather than a defect the bar names — the additions
+are declared as additions and none displaces a mechanism — but it is the number
+to watch if the skill grows again.
+
+One guardrail failed the amended "smarter, not busier" test: the Phase 7
+report-contents list, which restates a template `report` already writes. It is
+the tokens lane's open gap and the two findings are the same finding.
+
+## Ledger correction
+
+The first wave-3 record for `first-show` was logged `--winner other` with score 9
+and severity `none`. Winner should have been `ours`. The log is append-only by
+design, so the record stands and the correction lives here; `bar-met` for that
+lane reads one lower than the verdicts support.
