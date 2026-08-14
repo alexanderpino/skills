@@ -2851,3 +2851,78 @@ Slope convention, everywhere in this directory and in the chapter: `s` is
 smaller by sqrt(2). Two of the five bands were once normalised in the per-axis
 convention while the rest used the total, which put two units on the two sides of
 the slope budget; `field.rms_slope` exists so that cannot recur.
+
+## The figures — `pool_figures.py`, into `gauntlet/evidence/`
+
+The pool had 285 validated quantities and not one picture. All of it lived in
+`validate.py`'s stdout and `render.py`'s, which is a transcript that scrolls
+away — the renders were visible, the *measurements* were not. The sea loop
+ships a profile with the bar on it, a flux convergence, refraction rays and an
+`H/d` transect with the threshold drawn, and the pool shipped none of that.
+
+```
+python3 pool_figures.py [outdir]        # ~60 s, of which ~35 s is load_render
+```
+
+Six figures, `fig-` prefixed. Each one had to answer one question — **does it
+let a reader see a quantity that currently only exists as a number?** — and
+each carries its caption *burned into the frame*, because a PNG travels and a
+README does not.
+
+| figure | what it shows | what it is evidence for |
+| --- | --- | --- |
+| `fig-pool-interface-two-sides` | `R_ext(θ)` and `R_int(θ)` on one axis with the per-band critical angle marked; `R_int` split into `1 − 1/n²` plus the partial Fresnel inside the cone; the `2μR(μ)` weighting whose areas *are* the two means | that `R_ext = 6.625/6.669/6.751 %` and `R_int = 47.371/47.617/48.068 %` are two readings of **one** interface, tied by Walsh's reciprocity, not two constants — and that `43.874 %` of the internal figure is exactly-known geometry and only `3.743 %` is Fresnel. Names the `1/n²` the exit transport shipped without |
+| `fig-pool-escape-correlation` | the attenuation and the escape as functions of `μ`, their product, and the gap between `slab_esc` and `2E₃ × (1 − R_int)` against depth | that attenuation and escape are **positively correlated** and do not factorise: `+19.4/+5.1/+1.1 %` on the escape at this depth, and the round trip overstated the other way. The LUT trap, which is a paragraph in `optics.py` and a picture here |
+| `fig-pool-trapped-series` | `trap_gain` against bed albedo, with the diffuse-`R_int` bound and the shipped one-bounce cone model beside it; `rho_water` with the lossless-white limit; `G_rt(d)` against the depth-free bound | that the bound `1/(1 − ρ R_int)` is the **zero-depth** limit and this pool is 1.40 m deep: at the liner's own albedo the bound overstates the amplification by `437/63/12 %`. Also that the shipped truncation is a *lower* bound — the render is dark there, never bright |
+| `fig-pool-snell-window` | the air-side elevation each water-side angle came from, per band; the Jacobian, singular at the rim; the `cos sin` and `sin²` weightings; the bed's and the wall's shares | that the whole air world below **10.13° of elevation** is folded into the outermost 1.00° of the window, which is why a lookup uniform in the water-side angle starves the rim. And that `WALL_SKY = 0.5` — right for a hemisphere, wrong for a window — is superseded by `SKY_VERT = 0.214/0.203/0.192`, a factor of 2.46 |
+| `fig-pool-absorption-path` | `a` drawn as bars *over the Voronoi cells they are means of*; vertical and diffuse transmission against depth with the round trip marked; the four legs of the pool's own chain | that a channel is a **band**: `a = 0.26170/0.05299/0.01022 /m` is a band mean, not a point sample. Names the superseded `(0.2750, 0.0546, 0.0145)` and its Smith & Baker blue. Shows why one absorption gives four different numbers per band |
+| `fig-pool-sun-lobes` | disc and Rayleigh aureole on log–log axes against the sky gradient; the flux each carries against `π·SUN_COL` | that **nothing in either lobe is free**: the disc's peak, width and flux all land on the sun at once, and its flux is `π·SUN_COL` to 1e-9. Names the guessed lobes it replaced (1563× under-radiant, 7.8× too wide) and the aerosol pair that was derived to zero |
+
+**No physics is written in that file.** Every curve, every level and every number
+in every label is imported from `optics.py` or `atmosphere.py`, or taken from the
+`render.py` slice through `validate.py`'s own `load_render` — a second loader
+would be a second premise. There is not one physical constant in it, and the only
+arithmetic is data-to-pixel. It borrows `beach_plot.py`'s drawing toolkit
+outright for the same reason.
+
+**Its guard is its own**, because a suite cannot assert about a picture.
+`preflight()` re-derives 22 headline numbers by routes that share no expression
+with the ones being drawn — Walsh's reciprocity against a *direct* quadrature of
+the other side of the interface; the closed geometric series against a truncated
+sum; both window closed forms against the quadrature that cannot see either; the
+disc lobe's flux against `π·SUN_COL` — and raises `SystemExit` before a pixel is
+drawn. Perturbing `R_INT` by 2 % stops the run, which is how it was checked.
+
+### Three things drawing them turned up
+
+- **`optics.py`'s round-trip figure does not reproduce.** The block above
+  `slab_esc` says the factorised round trip "OVERstates it by 30 % in red". The
+  escape figures in the same sentence (19.4/5.1/1.1 %) are exact. The round trip
+  at `DEPTH` measures **55.6/11.4/2.4 %**, and no reading of the two integrals —
+  `2E₃(2ad)·R_int`, `T_diff²·R_int`, the cone-only variant, the gain rather than
+  the share — gives 30 at this depth. (30 % is what the red band gives at about
+  0.78 m.) The figure draws the measurement and names the comment.
+- **`TC_SNELL`'s inline comment is stale in two bands.** It reads
+  `48.655 / 48.507 / 48.262 deg`; `np.arcsin(1/IOR)` on the file's own `IOR`
+  gives `48.655 / 48.519 / 48.268`. Red is right, green is 0.012° out and blue
+  0.006°. Nothing computes from the comment, so nothing is wrong in the frames —
+  but the figures draw the computed rim, not the written one.
+- **`slab_esc` and `slab_trap` carry ~6e-5 of quadrature error, and it is
+  structural.** Both use one 2000-node Gauss-Legendre rule over `(0, 1]`, and the
+  integrand has a kink at `μ = cos(tc)` where `R_INT_MU` pins to 1. A Gaussian
+  rule assumes smoothness and converges only algebraically across a kink: split
+  at `cos(tc)`, 400 nodes a side reproduce a converged 4M-node midpoint rule to
+  eight digits, and the shipped rule sits `+3.9 / −6.2 / +3.1 e-5` relative away
+  on `slab_esc` and `−8.0 / +8.1 / −3.4 e-5` on `slab_trap`. The same signature
+  shows in `slab_esc(0)` against `T_OUT_DIFFUSE` — where `validate.py`'s
+  tolerance is `1e-4`, i.e. exactly the size of the effect it is covering, and
+  the Monte-Carlo row beside it is three orders too loose to see it. Nothing in
+  the frames can resolve 6e-5; `pool_figures.py` guards against the *split* rule
+  and states the residual rather than absorbing it into a tolerance.
+
+`?` What these figures do **not** draw, and why: the sun-disc penumbra and the
+meniscus (both are `render.py` geometry, not module physics, and would need the
+renderer run); `SKY_AMB` against `SKY_SUB_DERIVED` (a marked `?`, not a validated
+quantity, and it is shared with the beach); and the caustic system (already in
+the evidence directory as renders). None of them is re-typed anywhere: everything
+plotted comes through an import.
