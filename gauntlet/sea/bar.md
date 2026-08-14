@@ -508,3 +508,34 @@ the wave face. Section A's *claim* survives; only its *instrument* was out of re
 **Recorded so a critic does not re-open it:** a render may not be marked down for
 failing to show a green wave face until the nonlinear crest exists. When it does,
 section A is the first thing to check against it.
+
+## L · Waves wrapping a rock — refraction is not the only bender
+
+A fifteenth owner frame: a rocky embayment with a small beach, a cliff-top
+village, and an isolated rock platform standing off the shore. No time;
+illuminant `?`.
+
+**The new mechanism: the surf lines bend *around* the rock outcrops**, not merely
+over a slope, and close again in the lee. Wave 3 verified refraction over depth
+contours — crest azimuth on contour azimuth at 0.366 against a frozen control at
+0.000. **That is bending by a gradient; this is bending round an obstacle**, and
+the two have different mathematics:
+
+- **Refraction** — eikonal turning of a ray where the wave speed varies. Built and
+  tested.
+- **Diffraction** — energy spreading into a geometric shadow. **Not in the ray
+  description at all.** A pure ray model leaves a hard shadow behind a rock; the
+  photograph shows the crests re-forming behind it.
+
+Recorded as a **criterion, not a wave.** An isolated obstacle is the cheapest test
+of whether a nearshore model contains any diffraction, and for a ray tracer the
+answer is *no* by construction. Whether it matters at this scale is a measurement:
+the parameter is the obstacle's width over the wavelength, and here it is of order
+one — the worst case for ignoring it.
+
+**Confirmatory rather than new, also in frame:** the shelf reads strong teal-green
+against blue offshore — the shallow-bottom half of section D's confusable pair,
+with the bed visible through it — and the surf breaks on the platform's seaward
+edge as section H5's *reflective* case while breaking on sand a hundred metres
+away as the *intermediate* one. **Both breaker classes in one exposure**, which H5
+had to infer across two frames.
