@@ -12,3 +12,10 @@ carries the list so the user can decide what a future run should cover.
   output against it, so the rule is unenforced
 - gate cache is per-repo, not per-lane: concurrent lanes each run the full suite
   and invalidate each other's entries — correct but wasteful at high WIP
+- Phase 2 does not say what happens to gauntlet/bar-candidate/ once gauntlet/bar/
+  is frozen — promote or discard; two agents leave two different states
+- Phase 0 runs before config.json exists, so `gate` cannot run there; SKILL.md
+  does not say whether to run inline machine checks at first light
+- three non-contiguous duplications survive: the no-named-gap rejection is stated
+  twice, cost rule 10 is restated near the reference index, and the subagent
+  briefs are re-listed after being cited inline

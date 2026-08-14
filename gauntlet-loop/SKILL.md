@@ -94,9 +94,15 @@ Rationale and exceptions: → `references/cost-discipline.md`
 model judges; the script counts.
 
 `gauntlet/` holds `config.json` (lanes, dimensions, stops, WIP, parks,
-extensions), `contract.md`, the frozen `bar/`, `ownership.md`, `backlog.md`,
-`rounds.jsonl` (the log — script-written only), and the generated `workbench.md`
-and `report.md`. Layout and git conventions: `references/state-and-resume.md`.
+extensions, **gates**), `contract.md`, the frozen `bar/`, `ownership.md`,
+`backlog.md`, `rounds.jsonl` (the log — script-written only), and the generated
+`workbench.md` and `report.md`. Layout and git conventions:
+`references/state-and-resume.md`.
+
+**Declare gates before wave 1**, one `config.json` entry per mechanical check:
+`{"name": ..., "cmd": "<shell; fails on non-zero exit or any stdout>", "paths":
+["<every file the check reads>"]}`. `paths` is what the cache hashes, so an
+undeclared input makes the gate skip when it should run (`cost-discipline.md`).
 
 ```bash
 python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf \
@@ -149,10 +155,17 @@ reading you took so it can be argued with: a `minor` gap with a named fix is
 usually one round, a `major` gap two or three, and a gap the critic calls
 structural is not closeable at lane level at all — a rescope, not a number.
 
-Act on what the step returns. A **vague verdict** means fix the bar, not run the
-wave. A **projection that misses the budget** means rescope before wave 1 — drop
-the lowest-ranked lane, lower the target (the old one becomes the stretch), or
-ask for more budget. Say which you chose.
+Act on what the step returns, and say which branch you took.
+
+- A **vague verdict** means fix the bar, not run the wave.
+- A **verdict already at or above the provisional 7** — common when the artifact
+  already existed — means there is no gap to fund, so do not open wave 1. Raise
+  the bar to something the artifact demonstrably misses and re-judge, or tell the
+  user it is already there and stop. A run opened against no named gap buys
+  nothing.
+- A **projection that misses the budget** means rescope before wave 1 — drop the
+  lowest-ranked lane, lower the target (the old one becomes the stretch), or ask
+  for more budget.
 
 Two exemptions, because first light runs before `init` exists: its verdict is the
 one comparison not logged — record it in `contract.md` instead — and it runs
@@ -322,15 +335,9 @@ anything. Run `status`, then act:
 ## Phase 7 — Stop and hand off
 
 When a stop fires, finish the wave and the smoother (unless it is a safety stop),
-promote the best champion — not necessarily the latest challenger — then `board`,
-`report`, and complete it:
-
-- Target bar used, whether it was raised mid-run, distance left to any stretch
-- Lanes: rounds each, and how each ended — retired, parked, still open
-- Gaps closed, and — the part the user actually needs — **gaps still open**
-- Cost: calls spent, and calls per closed gap
-- Blind vs rubric round counts (not equivalent evidence)
-- Your honest read on whether the loop was still improving at the stop
+promote the best champion — not necessarily the latest challenger — then `board`
+and `report`. `report` drafts every section from the log; you add the one thing
+it cannot know, whether the bar was raised mid-run, and your honest read.
 
 Do not soften the open-gaps section. A report that reads as a victory lap is
 worth less than one that says exactly where the artifact is still weak.
@@ -349,7 +356,8 @@ Four the script cannot check, so they are on you:
 - **Critics inspect the artifact, never a summary of it** — and blind where
   blindable, with the mode labelled honestly where not.
 - **Losers get reverted.** What stops a long run wandering downhill one
-  plausible-sounding round at a time.
+  plausible-sounding round at a time. `log-round` checks the *record* says so;
+  only you can make the working tree match it.
 - **The target bar never moves down.** Raising it mid-run is allowed, announced.
 
 The rest are enforced in `gauntlet.py` and it will say so at the point of use: a
