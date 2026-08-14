@@ -43,8 +43,7 @@ orchestrator instead. The two compose: orchestrate to *done*, gauntlet to *good*
   assigned worktree (`mc/<id>`), never the repo root, and cut lanes that respect
   the Implementer's semantic leases.
 - **The budget stop is always armed.** Never offer an unattended loop without a
-  ceiling. When it depletes the run *stops*; then you may **offer** an extension.
-  You may never take one.
+  ceiling; when it depletes the run *stops*.
 - **Subagents make critics honest.** Without them the method degrades — see
   "Degraded mode".
 
@@ -104,15 +103,18 @@ makes every later decision concrete.
    part. If the artifact already exists, skip the build and capture it.
 2. **Verify inspection on it**: take the screenshot, run the benchmark, render
    the page. The failure that otherwise wastes hours, caught in minutes.
-3. **Judge it once** against a candidate bar — one critic, one verdict, in the
-   block from `references/critic.md`: `SCORE` (0–10), `WINNER`, `MARGIN`,
-   `GAP SEVERITY` (major / minor / none), `LARGEST GAP`, `EVIDENCE`. Score it
-   against a **provisional target of 7**; Phase 2 sets the real one. Read that
-   brief now — this is the one place the loop needs it before Phase 4.
+3. **Judge it once** — one critic, one verdict, in the block `references/critic.md`
+   defines. Read that brief now; this is the one place the loop needs it before
+   Phase 4. Put the candidate bar in `gauntlet/bar-candidate/` and give the critic
+   *that* path — `gauntlet/bar/` does not exist yet. A candidate bar is the user's
+   named comparator, or one you propose in a line: an external artifact you can
+   open, not a checklist you wrote. Score against a **provisional target of 7**;
+   Phase 2 sets the real one.
 4. **Show the user** the artifact and the verdict.
 
-Then the arithmetic, out loud, on **provisional** numbers — the lanes you expect
-to cut and the default WIP limit of 3, both re-checked at Phase 3:
+Then the arithmetic, out loud, on **provisional** numbers: the *lanes* you expect
+to cut (independently judgeable parts of the artifact — Phase 3) and the default
+*WIP limit* of 3 (lanes funded per wave), both re-checked at Phase 3:
 
 > rounds you estimate per gap × lanes ÷ WIP limit ≈ waves needed
 
@@ -139,7 +141,9 @@ It also runs **regardless of tree state**. The dirty-tree refusal and any
 `git init` consent belong to the contract, before the first funded wave — not in
 front of the user's first look at anything. **Commit first light's output before
 that check runs**: it is the wave-1 baseline the champion guard arms against, and
-committing it is what makes the tree clean for wave 1.
+committing it is what makes the tree clean for wave 1. With no repo at all the
+order is: ask consent → `git init` → commit first light → then the clean-tree
+check.
 
 ## Phase 1 — The contract
 
@@ -211,7 +215,8 @@ independently. You cut them, not the user. → `references/decomposition.md`
 ## Phase 4 — Run the waves
 
 A wave is one pass over the **funded** lanes — the top `wip_limit` of the ranked
-list, as printed by `status`. Phases 4–6 cycle until a stop fires.
+list, as printed by `status` — at **one round per lane per wave**. Phases 4–6
+cycle until a stop fires.
 
 **Wave setup, once, before any lane starts:** take the champion commit. That one
 ref is every lane's `--champion-ref` for the wave. Concurrent per-round commits
@@ -260,9 +265,11 @@ the same wave**, the dependent lane's builder spawns when the upstream lane's
 unaffected and still run concurrently.
 
 **Two in-wave barriers, and they earn it:** the smoother at the end of a wave and
-the wave-boundary review. The champion snapshot is wave *setup*, before any lane
-starts, so it is not a third. Machine gates and logging run inline. Never block on
-the user mid-wave; check-ins belong at boundaries, if autonomy asked for them.
+the wave-boundary review. Three things are deliberately not barriers: the champion
+snapshot is wave *setup*, before any lane starts; machine gates and logging run
+inline; and promotion/revert commits serialise against **each other** while
+blocking no lane — a serial region, not a barrier. Never block on the user
+mid-wave; check-ins belong at boundaries, if autonomy asked for them.
 
 ## Phase 5 — Smooth
 
@@ -313,33 +320,10 @@ promote the best champion — not necessarily the latest challenger — then `bo
 Do not soften the open-gaps section. A report that reads as a victory lap is
 worth less than one that says exactly where the artifact is still weak.
 
-### When the budget depletes, offer an extension
-
-A budget stop means the money ran out, not that the artifact is done. Stop,
-report, then put **one priced block of waves** in front of the user. `status`
-prints the material as soon as the budget fires:
-
-```
-Budget depleted at wave 8. Stopped, smoothed, report written. ~54 calls, 6 gaps closed.
-  imagery/visual   still moving — score 5→7, severity major→minor; open gap: <gap>
-  imagery/perf     parked at wave 6 — flat 3 rounds; open gap stays in the report
-Extension of 3 waves ≈ 21 subagent calls on imagery/visual alone.
-My read: worth it for visual. Extend 3, re-cut, or stop here?
-```
-
-- **The user grants it. You never self-extend**, and never keep looping while you
-  ask. A budget that extends itself is not a budget.
-- **Park before you price**, over funded lanes only, in intake's units. `extend`
-  refuses otherwise — pricing over stalled lanes funds exactly the rounds the log
-  calls worthless.
-- **A block, not a tap:** two to four waves. Wanting another twelve is a re-cut.
-- **Lead with the honest read, and recommend stopping when it says stop.**
-  Selling an extension you do not believe in is the most expensive thing you can
-  do in this skill.
-- **Record it** in `config.json`, the report and `contract.md`.
-
-A hard cap agreed at intake is the real ceiling and the script will not cross it.
-Full protocol, including when the offer is "stop": `references/stop-conditions.md`.
+**Budget stop:** a budget stop means the money ran out, not that the artifact is
+done. Run `status` — it prints the offer material, the honest read and the priced
+block — and put that in front of the user. `extend` enforces the rest.
+→ `references/stop-conditions.md`
 
 ## Non-negotiables
 

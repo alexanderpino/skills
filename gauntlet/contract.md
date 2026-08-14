@@ -57,3 +57,30 @@ Feasibility, from the first-light verdict:
 
 > the named gaps read `minor` with concrete fixes ≈ 1 round each × 3 lanes ÷ WIP 3
 > ≈ 1–2 waves. Fits inside 3. No rescope.
+
+## Amendment, wave 2 — raised by the user, recorded not absorbed
+
+The user observed that all three lanes push toward *cheaper and faster*, so
+nothing in the bar guards the method's power, and that parts of the real loop are
+uncontrolled token burners. Both are correct, and the first is the failure mode
+this skill names itself: a dimension nobody is watching gets traded away.
+
+Handled without growing the lane set, per the frozen-scope rule:
+
+- **Fidelity is a machine gate, not a fourth lane.** Every core mechanism is
+  checked for reachability at the phase where it is needed, by grep, at no
+  subagent cost. Wave-2 result: `randomis`, `external`, `one file one owner`,
+  `revert`, `severity`, `evidence` all dropped from SKILL.md but every one is
+  present in the reference cited at its phase. Compression was relocation, not
+  erosion.
+- **Token burn became a governor in the tooling**, which is where a control
+  belongs rather than in prose: `--budget-tokens` at init, `--tokens` per round,
+  and `status` now reporting the unit that actually burns plus tokens per closed
+  gap. Measured this run: ~65k–83k tokens per critic call. `init` had projected
+  "~21 subagent calls" for this 3-wave budget — roughly 1.4M tokens, a number the
+  user was never shown and therefore could not consent to.
+
+Uncontrolled burners found and not yet fixed, on the backlog: a critic's
+inspection scope is unbounded by the method (my own prompts capped it ad hoc);
+every subagent re-reads the artifact cold, which is the source of its
+independence and also of its cost.

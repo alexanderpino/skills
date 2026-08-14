@@ -19,6 +19,7 @@ Commands:
 import argparse
 import datetime
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -37,6 +38,10 @@ DEFAULT_CONFIG = {
         # This is the prune: a lane that stopped moving stops getting funded.
         "no_progress_n": 3,
         "budget_waves": 12,
+        # The budget the user agrees is in waves; the thing actually consumed is
+        # tokens. Without this the two never meet and consent is uninformed.
+        # null = not agreed, and status says so rather than pretending.
+        "budget_tokens": None,
         # Absolute ceiling no extension may cross. null = no ceiling agreed, in
         # which case every extension needs the user again.
         "hard_cap_waves": None,
@@ -143,6 +148,7 @@ def cmd_init(args):
         ("clean_streak_n", args.clean_streak_n),
         ("no_progress_n", args.no_progress_n),
         ("budget_waves", args.budget_waves),
+        ("budget_tokens", args.budget_tokens),
         ("target_score", args.target_score),
     ):
         if val is not None:
@@ -186,11 +192,21 @@ def cmd_init(args):
     lanes = len(cfg["lanes"]) or 1
     per_wave = min(lanes, cfg["wip_limit"]) * CALLS_PER_LANE_ROUND + CALLS_PER_WAVE_OVERHEAD
     print(f"initialised {root}/ — freeze bar artifacts into {root}/bar/ before wave 1")
+    total_calls = per_wave * cfg["stops"]["budget_waves"]
     print(
         f"projected cost: ~{per_wave} subagent calls per wave "
-        f"(WIP limit {cfg['wip_limit']} lane(s)), ~{per_wave * cfg['stops']['budget_waves']} "
+        f"(WIP limit {cfg['wip_limit']} lane(s)), ~{total_calls} "
         f"over the {cfg['stops']['budget_waves']}-wave budget"
     )
+    tb = cfg["stops"].get("budget_tokens")
+    if tb:
+        print(f"token budget: {tb:,} — ~{tb // max(1, total_calls):,} per call at that projection")
+    else:
+        print(
+            "no token budget agreed. A critic call that inspects a whole artifact runs tens of "
+            "thousands of tokens, so this projection is in the wrong unit for what actually "
+            "burns. Measure one round, then set --budget-tokens before agreeing to a long run."
+        )
 
 
 def cmd_log_round(args):
@@ -256,6 +272,10 @@ def cmd_log_round(args):
     }
     if args.critic_model:
         rec["critic_model"] = args.critic_model
+    if args.tokens is not None:
+        if args.tokens < 0:
+            die("--tokens cannot be negative")
+        rec["tokens"] = args.tokens
     if args.calls is not None:
         if args.calls < 0:
             die("--calls cannot be negative")
@@ -364,6 +384,23 @@ def _stall_read(bar_recs, champ_recs, n):
         return False, f"{len(bar_recs)} bar round(s) — too early to call it"
     trend = _dimension_trend(bar_recs, window=n)
     if trend["improving"] is False:
+        # A flat score with a *different* named gap every round is not a stall:
+        # the lane is closing gaps and finding the next one, and the score simply
+        # has not crossed a threshold yet. Only call it stalled when the flatness
+        # outlives that excuse — otherwise the prune eats the lanes doing the
+        # most honest work. Found by running this loop on itself.
+        window = bar_recs[-n:]
+        named = [r.get("gap") for r in window if r.get("severity") not in (None, "none")]
+        if len(named) == len(window) and len(set(named)) == len(named):
+            if len(bar_recs) < 2 * n:
+                return False, (
+                    f"score flat over {n} rounds, but each round named a different gap — "
+                    "closing gaps and finding the next, not stalling"
+                )
+            return True, (
+                f"score flat for {2 * n} rounds despite a new gap each round — the gaps are "
+                "real but too small to move the score; the bar or the lane is wrong"
+            )
         return True, f"no movement in {n} rounds ({trend['note']})"
     rate = _revert_rate(champ_recs)
     if rate is not None and rate > 0.5:
@@ -392,9 +429,12 @@ def _lane_dim_status(rounds, cfg):
         keys.setdefault((r["lane"], r["dimension"]), []).append(r)
         lane_rounds.setdefault(r["lane"], set()).add((r["wave"], r["round"]))
     logged_calls = {}
+    logged_tokens = {}
     for r in rounds:
         if "calls" in r:
             logged_calls[r["lane"]] = logged_calls.get(r["lane"], 0) + r["calls"]
+        if "tokens" in r:
+            logged_tokens[r["lane"]] = logged_tokens.get(r["lane"], 0) + r["tokens"]
     out = {}
     for key, recs in keys.items():
         lane, _dim = key
@@ -440,6 +480,7 @@ def _lane_dim_status(rounds, cfg):
             "stall_note": stall_note,
             "trend": trend,
             "lane_calls": logged_calls.get(lane, len(lane_rounds[lane]) * CALLS_PER_LANE_ROUND),
+            "lane_tokens": logged_tokens.get(lane, 0),
             "state": "RETIRED" if retired else "PARKED" if is_parked else "STALLED" if stalled else "OPEN",
         }
     # A lane retires only when every *declared* dimension has retired — a
@@ -772,7 +813,25 @@ def cmd_status(args):
     closed_gaps = sum(s["gaps_closed"] for s in per.values())
     per_gap = f" (~{spent / closed_gaps:.0f} calls each)" if closed_gaps else ""
     print(f"wave {max_wave} of {budget} budgeted{ext_note} | ~{spent} calls spent"
-          f" | {closed_gaps} gap(s) closed{per_gap} | WIP limit {wip}\n")
+          f" | {closed_gaps} gap(s) closed{per_gap} | WIP limit {wip}")
+    tok = sum({lane: s2["lane_tokens"] for (lane, _d), s2 in per.items()}.values())
+    tbudget = cfg["stops"].get("budget_tokens")
+    if tok:
+        line = f"tokens: {tok:,} measured"
+        if closed_gaps:
+            line += f" ({tok // closed_gaps:,} per closed gap)"
+        if tbudget:
+            pct = 100 * tok // tbudget
+            line += f" — {pct}% of the {tbudget:,} agreed"
+            if tok >= tbudget:
+                line += "  ** TOKEN BUDGET DEPLETED **"
+        else:
+            line += " — no token budget agreed; waves are the only ceiling"
+        print(line)
+    else:
+        print("tokens: not measured. Waves are what the user agreed to; tokens are what "
+              "burns. Pass --tokens on log-round or the budget is in the wrong unit.")
+    print()
 
     for (lane, dim), s in sorted(per.items()):
         head = f"[{lane} / {dim}] {s['state']}"
@@ -1054,6 +1113,9 @@ def main():
                    help="score the target bar sits at, 1-10 (default 7); record higher ambition as a stretch")
     p.add_argument("--wip-limit", type=int, help="max lanes funded per wave (default 3)")
     p.add_argument("--budget-waves", type=int)
+    p.add_argument("--budget-tokens", type=int,
+                   help="token ceiling for the run (optional). Waves are what the user agrees "
+                        "to; tokens are what gets consumed — state both or consent is uninformed")
     p.add_argument("--hard-cap-waves", type=int,
                    help="absolute ceiling extensions may not cross (optional; agreed at intake)")
     p.add_argument("--force", action="store_true")
@@ -1077,6 +1139,9 @@ def main():
     p.add_argument("--critic-model",
                    help="model tier that produced this verdict (optional); the report shows the "
                         "distribution, because a streak from a cheap critic is weaker evidence")
+    p.add_argument("--tokens", type=int,
+                   help="tokens this round actually consumed (subagent + inspection). Optional, "
+                        "but without it cost is an estimate in the wrong unit")
     p.add_argument("--calls", type=int,
                    help="subagent calls this round actually cost (optional; estimated when omitted)")
     p.set_defaults(fn=cmd_log_round)
@@ -1112,4 +1177,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # `status | head` is the normal way to read this output; without the guard
+    # Python raises BrokenPipeError on the way out and the agent sees a crash
+    # where it should see a clean exit.
+    try:
+        main()
+    except BrokenPipeError:
+        try:
+            sys.stdout.close()
+        finally:
+            os._exit(0)

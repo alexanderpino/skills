@@ -28,8 +28,9 @@ strains to find any gap, wave overhead exceeds the work done. Merge upward.
 Retirement and parking are governed by the armed stop conditions, computed per
 dimension by `gauntlet.py status` — not by feel. Your job here is the converse:
 when a lane retires or parks, its slot goes to the next lane on the ranked list,
-and a merged or re-cut lane is registered before its first round. Lane sets are
-not fixed for the run.
+and a merged or re-cut lane is registered before its first round. The lane set is
+frozen in size, not in shape: it can be merged, split, re-ranked or replaced
+between waves, and it never *grows* (see "The scope is frozen" below).
 
 ## Ranking, and the WIP limit
 
