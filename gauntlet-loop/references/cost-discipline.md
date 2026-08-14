@@ -173,8 +173,8 @@ Do not save money on these — each one prevents a much larger loss:
   inspection paths and soft bars.
 - **Re-verifying inspection** at each wave boundary — a rotted harness makes
   every later call worthless.
-- **The champion snapshot** each round — it is a commit, not a call, and it is
-  what makes a revert possible.
+- **The champion snapshot** each wave, taken before the builders spawn — it is a
+  commit, not a call, and it is what makes a revert possible.
 - **The smoother**, when lanes touched a shared surface — one call that prevents
   a wave of incoherence.
 

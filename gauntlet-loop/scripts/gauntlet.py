@@ -679,7 +679,16 @@ def cmd_gate(args):
               "critic prompt — add them to config.json under \"gates\" as\n"
               '  {"name": ..., "cmd": "<shell>", "paths": ["<files the check reads>"]}')
         return
+    # Lanes run concurrently, so this read-modify-write races. Hold an exclusive
+    # lock on a sidecar for the whole command: two lanes gating at once must not
+    # lose each other's cache entries or read a half-written file.
     cache_p = root / "gates.json"
+    lock_f = (root / ".gates.lock").open("a+")
+    try:
+        import fcntl
+        fcntl.flock(lock_f.fileno(), fcntl.LOCK_EX)
+    except (ImportError, OSError):
+        fcntl = None  # no flock (Windows, exotic filesystem) — cache stays best-effort
     cache = json.loads(cache_p.read_text()) if cache_p.exists() else {}
     rounds = load_rounds(root)
     wave = max((r["wave"] for r in rounds), default=0)
@@ -702,6 +711,9 @@ def cmd_gate(args):
         results.append((name, "PASS" if ok else "FAIL", detail[0] if detail else ""))
         cache[name] = {"hash": h, "ok": ok, "wave": wave, "ts": now()}
     cache_p.write_text(json.dumps(cache, indent=2) + "\n")
+    if fcntl:
+        fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
+    lock_f.close()
     for name, state, detail in results:
         print(f"  [{state}] {name}" + (f" — {detail}" if detail else ""))
     print(f"\n{ran} run, {skipped} skipped (inputs unchanged), {failed} failed")

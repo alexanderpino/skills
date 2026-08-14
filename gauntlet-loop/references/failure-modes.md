@@ -6,6 +6,29 @@ improving, and nobody notices until the budget is gone.
 
 Read this before a long unattended run.
 
+Each guardrail in `SKILL.md` exists to buy off one of these, and this table is
+the mapping. A guardrail with no row here is ceremony and belongs deleted.
+
+| Known weakness | Signal it is happening | Guardrail |
+|---|---|---|
+| Runs forever; no natural stop | wave 26 of an agreed 8 | budget stop, kill criteria, hard cap |
+| Critic turns agreeable | everything passes; gaps get vaguer | forced winner, severity + named evidence |
+| Builder learns the critic, not the bar | output matches the critic's phrasing | frozen bar, rotated framing, randomised labels |
+| Bar erosion | comparisons quietly get easier | bar files re-read from disk each wave |
+| Unreachable bar | every round loses; scores never move | target vs stretch, `--target-score` |
+| Every round wins, the whole gets worse | wave 10 worse than wave 6 | champion/challenger revert, per-dimension bars |
+| A lane grinds against a ceiling | same gap round after round, still funded | `no-progress` park, re-cut |
+| Progress theatre | rounds logged, artifact unchanged | per-round evidence, diff champions |
+| Lane collision | reverts undo another lane's work | one file, one owner, per wave |
+| Context bleed | critic echoes builder justifications | critic gets artifact + bar only |
+| Gold plating | rounds spent past a retired dimension | retirement is a stop, not a suggestion |
+| Settled work re-judged, checks re-derived | the log grows, the artifact does not | settled-work rule, hash-cached `gate` |
+| Scope snowball | more lanes at wave 6 than wave 1 | frozen lane set, backlog |
+| Token burn | cost per closed gap climbing | machine gates, one critic call, WIP, model routing |
+| Cost invisible until the bill | budget in waves, burn in tokens | `--budget-tokens`, `--tokens`, cost per gap in `status` |
+| Inspection rot | stale or repeated evidence | re-verify the path at every wave boundary |
+| Nobody sees progress without interrupting | user asks "where are we?" | generated board |
+
 ## Critic sycophancy
 
 **Signal.** Everything passes. Gaps get vaguer round over round: "lighting could be

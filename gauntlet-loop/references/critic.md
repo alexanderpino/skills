@@ -24,8 +24,9 @@ All visible text you produce (goals, gaps, next fixes, notes, reports) MUST be w
   do not silently re-run its work.
 - The lane goal (one specific thing, not the whole project)
 - The bar for the dimension you are judging: reference artifact, target
-  measurement, or competing implementation — read it from `gauntlet/bar/`, not
-  from a paraphrase
+  measurement, or competing implementation — read it from the **bar path you were
+  given**, not from a paraphrase. That is `gauntlet/bar/` in a funded wave, and
+  `gauntlet/bar-candidate/` at first light, before the bar is frozen.
 - The actual artifact under judgement
 - The rules that constrain it (platform, style, hard constraints)
 - The **target score** the bar sits at — the number that counts as reaching it
