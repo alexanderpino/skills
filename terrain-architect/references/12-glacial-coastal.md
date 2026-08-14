@@ -1172,6 +1172,53 @@ Fine sand plus big waves → dissipative; coarse sand plus gentle swell → refl
 in between. Author Ω from grain size and the wave-exposure sweep and the surf-zone template
 follows per coast segment — it is the marine sibling of the channel-pattern classifier (`03`).
 
+> **This classifier and the wave-decay model above are not independent statements, and that is
+> the most useful thing in this subsection.** The same algebra that gives `Γ_eq` gives a slope at
+> which it ceases to exist. The denominator of
+> `Γ_eq = γ_s/√(1 + (5/2)·(∂d/∂x)/K)` vanishes at
+>
+> > **`tan β_crit = 2K/5` — 0.060, or one in 16.7, at `K = 0.15`.**
+>
+> Steeper than that and the shoaling gain outruns the breaking loss: `Γ` grows without bound,
+> nothing saturates, and **the wave surges up the face instead of spilling down it** — which is the
+> reflective end of the table above, arriving out of a 1985 energy-flux decay model that has never
+> heard of Wright & Short. Reflective beaches are the steep ones. `tan β_crit` lands within a
+> factor of 1.5 of the 1:10–1:15 slopes reflective beaches are usually quoted at. ⚠️ That slope
+> band is **relayed** through the reference implementation's reading — Wright & Short's parameter
+> is `Ω`, not a slope, and this chapter did not open the 1984 paper for a slope figure. The
+> correspondence is the finding; the factor of 1.5 is as good as the relay.
+>
+> **Measured, on the same march the previous subsection used** — plane slopes, `H_0 = 2 m`,
+> `T = 12 s`, `H/d` read down the profile from 3 m of water to 0.3 m:
+>
+> | slope | `H/d` at `d` = 3.0 / 2.0 / 1.5 / 1.0 / 0.6 / 0.3 m | behaviour |
+> |---|---|---|---|
+> | 1:60 *(gentler than `β_crit`)* | 0.641 / 0.485 / 0.474 / 0.473 / 0.474 / 0.479 | **settles**, on `Γ_eq = 0.471` |
+> | 1:20 | 0.792 / 0.828 / 0.850 / 0.879 / 0.913 / 0.964 | climbing toward a fixed point of 0.98 it does not reach |
+> | 1:12 *(steeper than `β_crit`)* | 0.833 / 1.026 / 1.174 / 1.407 / 1.774 / 2.388 | **diverges** — no saturated state exists |
+>
+> **The transition is not sharp in practice and the reason matters.** `Γ_eq` diverges *continuously*
+> as `tan β → 2K/5` from below, so the fixed point is already unphysical well before the slope is
+> critical: at 1:20 it is 0.98, i.e. a wave as high as the water is deep. The honest reading is
+> that the model stops describing a saturated surf zone somewhere in the **1:25 to 1:17** band, and
+> `2K/5` is where it formally ceases to have one. ⚠️ Do not quote 1:16.7 as a beach-state boundary;
+> quote it as the pole of the family.
+>
+> **What to do with it.** Two things a graph should not do. First, **do not carry `Ω` and a
+> saturated `γ` as unrelated authored numbers** — a segment the fall-velocity classifier calls
+> reflective and the transform is asked to run a saturated surf zone across is an internally
+> inconsistent scene, and the transform will tell you so by refusing to settle. Second, **the slope
+> field is already the shared input**: it is the same `tanβ` the longshore current above is
+> structural in, and it is what picks the breaker class. One field, three consumers.
+>
+> **Tier.** `tan β_crit = 2K/5` is **P** — it is the pole of a closed form off a published model,
+> derived here and confirmed by the march. The **correspondence with Wright & Short's reflective
+> boundary is `L`**: it is one implementation, one `K` — and `K` is `?` on its numeric value in
+> this very section, so the boundary moves with it. What is not `L`-tier is the *structural* claim,
+> which needs no number: a decay model with a stable ratio and a beach-state classifier both
+> partition beaches by slope, so they cannot be independent, and a chapter carrying both should say
+> which one it is deriving the other from.
+
 **Rip currents (Bowen 1969; MacMahan, Thornton & Reniers 2006).** Waves break hard over the
 bar and weakly over a gap, so setup shoreward of the bar exceeds setup behind the gap; the
 alongshore pressure gradient drives **feeder currents** that converge on the gap and jet
