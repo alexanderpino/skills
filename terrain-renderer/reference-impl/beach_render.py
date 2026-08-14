@@ -600,6 +600,15 @@ def _set_runup():
 WHITE = float(E_DOWN_AIR[1] / np.pi)
 
 
+# WAVE 4'S CAPTIONS, KEPT AND NO LONGER WRITTEN. `s4-bay-render.png` and
+# `s4-cuvette.png` are on disk with this text burned into them and they are not
+# regenerated -- s4 is the LINEAR surface and the pair s4/s5 is the evidence, so
+# overwriting it would destroy the comparison. They stay here so a reader can
+# see which text belongs to which frame, and with one correction on the record:
+# CAP_CUV's "0.1443 of slope, 8.21 deg" is wave 4's measurement of the LINEAR
+# surface and is still true of s4; the nonlinear surface reads 15.78 deg, and
+# neither reaches 41.48 -- see `_cap_bay5` and README-beach.md N7 for why no
+# surface of a steady wave ever will.
 CAP_BAY = (
     "s4  THE BAY FROM THE CLIFF EDGE -- for bar section J.  Bed and wave field from beach.py (wave 3's coastal loop and 2-D transform); optics from beach_optics.py; sun, sky and Fresnel imported from the pool's atmosphere.py / optics.py, unchanged.",
     "READ THIS BEFORE READING THE FRAME.  (1) THE FOAM IS A PLACEHOLDER: a saturating function of the breaking fraction put on the crests, with no advection, no decay, no entrained-air medium and no spray.  Bar section C names three mechanisms in three different representations; none is modelled, it is an OPEN row in the suite, and NOTHING about foam extent, texture or brightness may be read off this image.  (2) THE COASTAL PLAIN IS ONE DECLARED ALBEDO standing where a vegetation model would go; bar K2 puts dune vegetation and the village out of scope.  (3) THE FRAMING IS THE LANDFORM'S, NOT A COMPOSITION: bar J's photograph is from a headland with sea on three sides, and wave 3's loop gives 46 m of plan curvature over 1408 m of coast -- a nearly straight cliffed shore with a beach strip metres wide -- so there is no headland in this bed to stand on.  COMPARABLE TO J in its shore-parallel surf lines and its colour ladder (2G/(R+B) = 0.961 deep, 1.014 at 2-5 m, 1.130 over the shallows).  NOT COMPARABLE in its beach.",

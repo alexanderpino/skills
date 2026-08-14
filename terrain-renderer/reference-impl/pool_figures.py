@@ -314,8 +314,8 @@ def fig_interface(S, path):
     tir = 1. - 1. / n ** 2
     part = OPT.R_INT - tir
 
-    img = P.canvas(1260, 1010)
-    ax = P.Axes(img, (100, 72, 700, 440), (0, 90), (0, 1.03),
+    img = P.canvas(1260, 1030)
+    ax = P.Axes(img, (100, 72, 700, 440), (0, 90), (0, 1.16),
                 title='One interface, two sides',
                 xlabel='angle from the normal, deg',
                 ylabel='reflectance R (unpolarised)')
@@ -326,19 +326,15 @@ def fig_interface(S, path):
         ax.vline(float(np.rad2deg(tc[c])), CH[c], 1, dash=(3, 4))
     ax.hline(float(OPT.R_INT[1]), GREY, 1, dash=(8, 6))
     ax.hline(float(OPT.R_EXT[1]), GREY, 1, dash=(8, 6))
-    ax.text(2.5, float(OPT.R_INT[1]) + .035,
-            'diffuse R_int (green) = %.5f' % OPT.R_INT[1], INK)
-    ax.text(2.5, float(OPT.R_EXT[1]) + .035,
-            'diffuse R_ext (green) = %.5f' % OPT.R_EXT[1], INK)
-    ax.text(float(np.rad2deg(tc[1])) + 1.5, 0.86,
-            'critical angle, per band', INK)
-    ax.text(float(np.rad2deg(tc[1])) + 1.5, 0.80,
-            '%s deg' % _trip(np.rad2deg(tc), '%.3f'), MUTED)
+    ax.text(51, 0.62, 'diffuse R_int (green) = %.5f' % OPT.R_INT[1], INK)
+    ax.text(51, 0.56, 'diffuse R_ext (green) = %.5f' % OPT.R_EXT[1], INK)
+    ax.text(51, 0.44, 'critical angle, per band:', INK)
+    ax.text(51, 0.38, '%s deg' % _trip(np.rad2deg(tc), '%.3f'), MUTED)
     P.legend(ax, [(GREY, 'solid: from INSIDE the water  (r_int_at)'),
-                  (GREY, 'dashed: from the AIR  (fresnel)')], 3.0, 0.52)
+                  (GREY, 'dashed: from the AIR  (fresnel)')], 2.5, 1.11)
 
     # -- the decomposition, as the two pieces that must sum
-    bx = P.Axes(img, (790, 72, 1200, 440), (-0.5, 2.5), (0, 0.55),
+    bx = P.Axes(img, (790, 72, 1200, 440), (-0.5, 2.5), (0, 0.70),
                 title='...and what the 47.6% is made of',
                 xlabel='band', ylabel='share of an isotropic in-water flux')
     bx.frame(None, _ticks(0, 0.5, 5), '%g', '%.2f')
@@ -350,19 +346,20 @@ def fig_interface(S, path):
                 (255, 255, 255), 'mm')
         bx.text(c, float(OPT.R_INT[c]) + .012,
                 '%.3f%%' % (100 * OPT.R_INT[c]), INK, 'ms')
-        bx.text(c, -0.022, CHN[c], MUTED, 'ma')
-    bx.text(-0.35, 0.505, 'solid   1 - 1/n^2: total reflection past tc', INK)
-    bx.text(-0.35, 0.475, 'hollow  partial Fresnel INSIDE the cone', INK)
-    bx.text(-0.35, 0.445, '        = %s' % _pct(part, '%.3f'), MUTED)
+        bx.text(c, -0.028, CHN[c], MUTED, 'ma')
+    bx.text(-0.42, 0.665, 'solid   1 - 1/n^2: total reflection past tc', INK)
+    bx.text(-0.42, 0.630, 'hollow  partial Fresnel INSIDE the cone,', INK)
+    bx.text(-0.42, 0.595, '        = %s' % _pct(part, '%.3f'), MUTED)
+    bx.text(-0.42, 0.560, 'the two must sum to R_int -- guarded to 3e-5.', INK)
 
     # -- and why the two means differ: the cosine weighting itself
-    cx = P.Axes(img, (100, 545, 1200, 830), (0, 1), (0, 1.05),
-                title='Why the two means differ: the same weighting, '
-                      '2 mu R(mu), on both sides',
+    cx = P.Axes(img, (100, 545, 1200, 815), (0, 1), (0, 1.45),
+                title='Why the two means differ: the same weighting on both '
+                      'sides',
                 xlabel='cosine mu from the normal (1 = straight up)',
-                ylabel='2 mu R(mu)   -- the area under each IS the mean')
-    cx.frame(_ticks(0, 1, 5), _ticks(0, 1.0, 4), '%.1f', '%.2f')
-    mu = np.linspace(1e-6, 1., 3000)
+                ylabel='2 mu R(mu)')
+    cx.frame(_ticks(0, 1, 5), _ticks(0, 1.4, 4), '%.1f', '%.2f')
+    mu = np.linspace(1e-6, 1., 1600)
     ei = 2. * mu[:, None] * OPT.fresnel(mu)
     ii = 2. * mu[:, None] * OPT.r_int_at(mu)
     cx.fill_between(mu, np.zeros_like(mu), ii[:, 1], (214, 232, 220))
@@ -372,36 +369,35 @@ def fig_interface(S, path):
         cx.line(mu, ei[:, c], CH[c], 2, dash=(6, 5))
     for c in range(3):
         cx.vline(float(np.cos(tc[c])), CH[c], 1, dash=(3, 4))
-    cx.text(float(np.cos(tc[1])) - 0.02, 0.98,
+    cx.text(float(np.cos(tc[1])) - 0.02, 1.36,
             'mu = cos(tc): everything LEFT of this is totally reflected',
             INK, 'rs')
-    cx.text(0.03, 0.30, 'green area = R_int = %.5f' % OPT.R_INT[1], INK)
-    cx.text(0.03, 0.24, 'pink area  = R_ext = %.5f' % OPT.R_EXT[1], INK)
+    cx.text(0.03, 0.55, 'green area = R_int = %.5f' % OPT.R_INT[1], INK)
+    cx.text(0.03, 0.47, 'pink area  = R_ext = %.5f' % OPT.R_EXT[1], INK)
+    cx.text(0.03, 0.39, 'the area under each curve IS that mean.', MUTED)
 
     P.caption(img, [
-        'WHAT IS MEASURED. The same smooth water surface, asked the same question '
-        'from both sides, through ONE Fresnel implementation '
-        '(optics.fresnel; r_int_at reads it back through Snell).',
-        'Diffuse external reflectance R_ext = %s and diffuse internal R_int = %s '
-        '-- a factor of %.2f between the two faces of one boundary.'
+        'WHAT IS MEASURED. One smooth water surface, asked the same question '
+        'from both sides, through ONE Fresnel implementation (optics.fresnel; '
+        'r_int_at reads it back through Snell).',
+        'Diffuse external R_ext = %s against diffuse internal R_int = %s: a '
+        'factor of %.2f between the two faces of the same boundary.'
         % (_pct(OPT.R_EXT, '%.3f'), _pct(OPT.R_INT, '%.3f'),
            float(OPT.R_INT[1] / OPT.R_EXT[1])),
         'They are TIED, not independent: R_int = 1 - (1 - R_ext)/n^2 (Walsh '
-        'reciprocity) reproduces the direct quadrature of r_int_at to 3e-5, '
-        'which is the guard this figure runs before it draws.',
-        'The right panel splits R_int: %s of it is total reflection past the '
-        'critical angle (1 - 1/n^2, an exactly known number), and only %s is '
-        'partial Fresnel inside the cone.'
+        'reciprocity) reproduces a direct quadrature of r_int_at to 3e-5, which '
+        'is a guard this figure runs before drawing.',
+        'The right panel splits R_int: %s is total reflection past the critical '
+        'angle (1 - 1/n^2, exactly known), and only %s is partial Fresnel '
+        'inside the cone.'
         % (_pct(1 - 1 / OPT.IOR ** 2, '%.3f'), _pct(part, '%.3f')),
         'CORRECTED VALUE. The transport OUT of the water shipped for several '
-        'rounds as Fresnel T alone, without the 1/n^2 = %s that goes with it; '
-        'a lossless white-bedded pool then read an apparent albedo of 1.73 '
-        'instead of 1.' % _trip(1. / OPT.N2, '%.4f'),
-        'The same 1/n^2 is inside R_int here, which is why one number settles '
-        'both -- and why the wet-liner term already had it while the camera '
-        'path went without, the two disagreeing by n^2 with nothing comparing '
-        'them.',
-    ], 40, 855)
+        'rounds as Fresnel T alone, without the 1/n^2 = %s that goes with it.'
+        % _trip(1. / OPT.N2, '%.4f'),
+        'A lossless white-bedded pool then read an apparent albedo of 1.73 '
+        'instead of 1 -- and the wet-liner term already had the divisor while '
+        'the camera path went without, the two disagreeing by n^2.',
+    ], 40, 858)
     return P.save(img, path)
 
 

@@ -3032,8 +3032,48 @@ def _fail_names():
             if r.status in ('FAIL', 'ERROR')]
 
 
+SURFACE_BUGS = ('sinusoidal-surface', 'harmonic-shallow-everywhere',
+                'unclamped-stokes', 'bore-phase-flipped',
+                'skew-without-asymmetry', 'ur-half-declared')
+
+
+def _run_section(fn, label):
+    """One section, standalone. `--bugs-surface` uses this because the full
+    `--bugs` table is 32 defects x the whole suite, and wave 5's six all patch
+    functions that ONLY `_sec_surface` calls -- which is exact rather than a
+    shortcut, and is the same argument wave 4 made for running its eight
+    against the optics section alone."""
+    del ROWS[:]
+    ctx = dict(B=BCH, T=BCH.T_SWELL, omega=2.0 * math.pi / BCH.T_SWELL,
+               x=BCH.make_grid())
+    guard(fn, label, ctx)
+    return ctx
+
+
 if __name__ == '__main__':
     t0 = time.time()
+    if '--bugs-surface' in sys.argv:
+        import importlib
+        _run_section(_sec_surface, 'the nonlinear free surface')
+        base = set(_fail_names())
+        print('clean surface section: %d pass / %d FAIL'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base)))
+        print()
+        print('%-30s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 110)
+        for name in SURFACE_BUGS:
+            importlib.reload(BCH)
+            BUGS[name](BCH)
+            try:
+                _run_section(_sec_surface, 'the nonlinear free surface')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-30s %d  %s' % (name, len(caught),
+                                    '; '.join(c[:66] for c in caught[:5])))
+        importlib.reload(BCH)
+        sys.exit(0)
     if '--bugs' in sys.argv:
         run_suite()
         base = set(_fail_names())
