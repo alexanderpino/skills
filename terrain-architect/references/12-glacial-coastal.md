@@ -972,6 +972,9 @@ waveTransform(h[], H_0, T, θ_0):
         if broken:                                     #    reason two indices are needed
             F_s    = (ρ·g·(γ_s·d[i])²/8)·c_g[i]·cosθ[i]        # the stable flux it decays to
             F[i+1] = F_s + (F[i] − F_s)·exp(−K·Δx/d[i])        # exact for locally constant d
+            #                              ^^ CROSS-SHORE distance. A plan-view divergence form
+            #                              applies the same rate per unit RAY distance, ds =
+            #                              Δx/cosθ. Same statement only at θ = 0; see below.
         else:
             F[i+1] = F[i]                                      # no dissipation: pure shoaling
     D_w = −∂F/∂x                                       # dissipation rate falls out, as a RATE
@@ -983,6 +986,64 @@ waveTransform(h[], H_0, T, θ_0):
 Three properties the `min` form does not have and a bar section needs: the wave **loses** energy
 where it breaks; it **stays** lost when the water deepens again; and `γ_b ≠ γ_s` opens a band of
 depths in which the wave is broken but has not restarted — which is the trough, and the reform.
+
+> **The decay carries an obliquity, and the 1-D form above and the 2-D divergence form are not the
+> same statement.** `exp(−K·Δx/d)` applies Dally's rate **per unit cross-shore distance**. The
+> conservation law a plan-view model writes, `∇·(E c_g ŝ) = −(K/d)(E c_g − (E c_g)_s)`, applies it
+> **per unit ray distance**, and a ray crossing an oblique coast covers `ds = Δx/cos θ` of its own
+> path per `Δx` of coast. **The two agree only at normal incidence.** Both are defensible
+> statements — the disagreement is not a bug in either, it is a choice of independent variable that
+> the 1-D form makes silently and a reader porting it to a plan view will make wrongly with no
+> symptom to warn them.
+>
+> **Measured** (same bed, same sea state, the 1-D march against a 2-D one on an alongshore-uniform
+> bed, so only this term can differ; `terrain-renderer/reference-impl/beach.py`, run here):
+>
+> | deep-water angle `θ₀` | worst height disagreement | as a share of peak `H` | crest angle where it breaks |
+> |---|---|---|---|
+> | 0° | **4.4×10⁻¹⁶ m** | 0.000% | — the identity |
+> | 20° | 2.6 mm | **0.14%** | 6.56° |
+> | 40° | 8.0 mm | **0.47%** | 11.84° |
+>
+> **It is small here *because refraction is doing its job*, and that is the condition under which
+> it stays small.** The last column is the whole reason: by the time the wave breaks on this gentle
+> beach Snell has turned it to 6.6°, and `1/cos 6.6° − 1` is 0.66%. On a **steep** coast, where the
+> wave breaks before it has turned, the same term is worth per cent — and on a reef edge or a
+> plunging shore, more. So the rule is not "the term is negligible" but: **state which distance the
+> decay is per, and check the crest angle at breaking rather than the offshore angle.** A model
+> that turns the wave has earned the approximation; one that does not, has not. This is the same
+> family as the `E₀/4` versus `E_b/2` trap
+> [above](#surf-zone-morphodynamics--bars-rips--the-nearshore-circulation) — a factor that is
+> nearly 1 in the case it was written for, quietly wrong in the case it is carried to.
+>
+> **Tier: P.** Both sides are derivations, and the size of the residual is scene-specific.
+
+> **And a verification instrument for the refraction itself, because the usual one tests nothing.**
+> Checking that `sin θ / c` is invariant is worthless when `sin θ` was *computed* from `c` — the
+> ratio is then an identity and it will hold to machine precision through any defect that leaves
+> the identity alone. Two checks replace it, and both work against any refraction model:
+>
+> 1. **Give the model a plane beach whose contours run at an angle `φ` to its own grid.** The exact
+>    answer is Snell about the **rotated** normal, and no correct model needs to be told `φ`.
+>    Measured on a march that integrates `∂k_y/∂x = ∂k_x/∂y` on the grid axes and is never given the
+>    rotation: worst error **0.186° / 0.310° / 0.277°** at `φ` = 10 / 20 / 30°, and **0.000°** at
+>    `φ = 0`, where it collapses back into the old identity. ⚠️ Measure it in a window that follows
+>    the ramp: pinned to the grid centre the same row reads **0.030°** at 30° and gets *easier* the
+>    more rotation is applied, which is `terrain-renderer/11`'s eleventh way in one line.
+> 2. **The closed form for how far a crest turns, which settles what "crests parallel to the
+>    contours" is allowed to mean.** Differentiate Snell about a contour at azimuth `β`:
+>
+> > **`dθ/dβ = 1 − c(d)/c(d_ref)`**
+>
+> A crest is parallel to its contour **only in the limit `c → 0`.** So "surf arrives shore-parallel"
+> is a **bound, not an assertion**: regress crest azimuth on contour azimuth and the slope must sit
+> *below* `1 − c(d)/c(d_ref)` and *above* zero. Measured across a modelled embayment at `d = 1.7 m`
+> against a `d_ref = 8 m` shelf: slope **0.366** (R² 0.67) against a bound of **0.513**, and
+> **−0.000000** with the refraction term frozen and everything else left running. The frozen control
+> is what makes the row mean something — without it a slope of 0.37 is equally consistent with a
+> crest that never turned and a coast whose contours happen to correlate with the shot.
+>
+> **Tier: P** for both derivations; the numbers are one implementation's, recomputed here.
 
 **Tier.** The `min` cap: **F** — a first approximation with a known failure mode, not a model.
 The energy-flux march with hysteresis: **P** for the model (Dally, Dean & Dalrymple 1985 — the
