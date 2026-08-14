@@ -654,35 +654,36 @@ def _cap_bay5(s):
 
 def _cap_face5(s, c, m):
     lin, nl = c['linear'], c['nonlinear']
-    got = ('face %.4f / body %.4f = %.3f' % (m['face'], m['body'], m['ratio'])
-           if 'ratio' in m else
-           'NO PIXEL IN THIS FRAME CARRIES A THROUGH-PATH LONG ENOUGH TO '
-           'MEASURE')
+    del m                       # the face/body pair needs a face; there is none
     return (
-        's5  THE BACKLIT FACE, IN THE BAY ITSELF -- bar section A, attempted '
-        'on the scene rather than on a stand-in. Eye 1.1 m above the still '
-        'level, standing in the swash, looking WEST into a 21 deg sun that is '
-        'behind the waves because the coast faces west. Nonlinear free surface.',
-        'WHAT THIS FRAME IS EVIDENCE OF, AND IT IS A NEGATIVE. Section A asks '
-        'for a face that reads green against grey-blue water metres away in '
-        'one exposure. The steepening this wave added takes the steepest face '
-        'from %.2f to %.2f deg and multiplies the pixels carrying a '
-        'through-path by %.2f and the median chord by %.2f m -> %.2f m; '
-        'measured here: %s. IT IS SHORT AND THE SHORTFALL IS A THEOREM. A ray '
-        'entering water is confined to the Snell cone, so a lengthwise '
-        'sightline needs a face steeper than 90 - asin(1/n) = %.2f deg, while '
-        'Stokes\' 120 deg corner caps every wave of permanent form -- Stokes, '
-        'cnoidal or solitary -- at a 30 deg face. No single-valued height '
-        'field can close the 11 deg between them. Section A therefore belongs '
-        'beside bar section F\'s plunging lip, and this frame is the '
-        'measurement that puts it there rather than an argument that it '
-        'should be. THE FOAM IS A PLACEHOLDER (breaking fraction on the '
-        'crests, no advection, no decay, no entrained air, no spray) and it is '
-        'the whitest thing in this frame, so read no white off it. The swash '
-        'is not modelled; the eye stands where the run-up says water reaches.'
+        's5  THE SURF ZONE CLOSE UP, LINEAR (LEFT) AND NONLINEAR (RIGHT) -- '
+        'one camera, one bed, one sun, one instant of phase, and ONE FIELD '
+        'CHANGED: the second harmonic r is zero on the left and (Hk/8)C(kd) on '
+        'the right. Eye 8 m above the still level, 26 deg field, looking WEST '
+        'into a 21 deg sun that is behind the waves because the coast faces '
+        'west.',
+        'WHAT CHANGED: crests sharper, troughs longer and flatter, the steepest '
+        'face %.2f -> %.2f deg. WHAT DID NOT, AND IT IS BAR SECTION A. Section '
+        'A asks for a face reading green against grey-blue water metres away '
+        'in one exposure -- light that has come THROUGH the wave. Neither '
+        'panel contains one such pixel: the fraction of water pixels whose '
+        'view ray leaves the far side of a crest is %.4f on the left and %.4f '
+        'on the right, and both are zero. THE SHORTFALL IS A THEOREM, NOT AN '
+        'EFFORT. A ray entering water is confined to the Snell cone, so a '
+        'lengthwise sightline needs a face steeper than 90 - asin(1/n) = %.2f '
+        'deg, while Stokes\' 120 deg corner caps EVERY wave of permanent form '
+        '-- Stokes at any order, cnoidal, solitary -- at a 30 deg face. No '
+        'single-valued height field closes the 11 deg between them, so section '
+        'A belongs beside bar section F\'s plunging lip by proof rather than '
+        'by analogy. AND THE EYE HEIGHT IS PART OF IT: 8 m is what makes the '
+        'crest shape legible at all, and the same 8 m tilts the view ray '
+        'further into the water, so the frame that shows the steepening cannot '
+        'be the frame that shows section A. THE FOAM IS A PLACEHOLDER -- a '
+        'saturating function of the breaking fraction put on the crests, no '
+        'advection, no decay, no entrained-air medium, no spray -- and it is '
+        'the whitest thing in both panels, so read no white off either.'
         % (math.degrees(math.atan(s['lin'])), math.degrees(math.atan(s['nl'])),
-           nl['frac'] / max(lin['frac'], 1e-12), lin['med'], nl['med'], got,
-           math.degrees(math.atan(s['need']))),
+           lin['frac'], nl['frac'], math.degrees(math.atan(s['need']))),
     )
 
 
@@ -1010,19 +1011,37 @@ def main():
     # the sun's own azimuth and the glitter path -- forty times the white point
     # by the exposure this file derives -- clipped the entire frame to white.
     # A clipped frame cannot carry a colour ratio, and a colour ratio is the
-    # only thing section A asks for. The view is therefore 48 deg off the sun's
-    # azimuth, which leaves the sun still BEHIND the waves (they run east, any
-    # westward view is backlit) and out of the field.
+    # only thing section A asks for. The view is therefore ~48 deg off the
+    # sun's azimuth, which leaves the sun still BEHIND the waves (they run
+    # east, any westward view is backlit) and out of the field.
+    #
+    # THE EYE IS AT 8 m AND THAT IS ITSELF PART OF THE FINDING. An eye in the
+    # swash cannot SEE the shape of a wave face: at 1.5 m the crests are edge
+    # on, one metre of relief at forty metres is 1.4 deg, and the frame is a
+    # set of white bands. Eight metres of elevation resolves the crest and the
+    # trough behind it -- and the same eight metres makes section A's sightline
+    # WORSE, because the view ray's own downward tilt delta enters the dive
+    # angle (90 - alpha) - asin(cos(alpha + delta)/n) with the same sign as the
+    # face's shortfall. The frame that shows the steepening cannot be the frame
+    # that shows section A, and that is not a framing problem.
     ib = int(np.argmax(np.max(w.H, axis=0)))
     jb = int(np.argmax(w.H[:, ib]))
-    x_f = float(w.x[ib]) + 26.0
-    y_f = float(w.y[jb]) + 30.0
-    camF = Camera((x_f, y_f, 1.5), (x_f - 30.0, y_f - 30.0, 0.35),
-                  40.0, W, H)
+    x_f = float(w.x[ib]) + 55.0
+    y_f = float(w.y[jb]) + 55.0
+    camF = Camera((x_f, y_f, 8.0), (x_f - 75.0, y_f - 75.0, 0.0), 26.0, W, H)
     LF, exF = render(camF, w)
     frames['F'] = (LF, exF, camF)
-    print('THE BACKLIT FACE FRAME: eye at x = %.0f m, y = %.0f m, z = 1.1 m, '
-          'looking west' % (x_f, y_f))
+    # THE PAIR, and it is one field apart. The same camera, the same bed, the
+    # same optics, the same sun, the same instant of phase; only r is zeroed.
+    r_keep = w.r2
+    w.r2 = np.zeros_like(w.r2)
+    LF0, exF0 = render(camF, w)
+    w.r2 = r_keep
+    print('THE BACKLIT FACE FRAME: eye at x = %.0f m, y = %.0f m, z = %.1f m, '
+          '%.0f deg off the sun\'s azimuth'
+          % (x_f, y_f, camF.pos[2],
+             abs(math.degrees(math.atan2(camF.f[0], camF.f[1])) % 360.0
+                 - SUN_AZ)))
     print('  the wave it looks at: H = %.2f m in d = %.2f m, H/d = %.3f, '
           'Ur = %.2f, r = %.3f, f_brk = %.2f'
           % (w.H[jb, ib], w.d[jb, ib], w.H[jb, ib] / max(w.d[jb, ib], 1e-6),
@@ -1059,7 +1078,9 @@ def main():
     # changed -- is the evidence. Re-running this file writes s5 only.
     kJ = _save(downsample(LJ, SS), '%s/s5-bay-render.png' % OUT,
                caption=_cap_bay5(srep))
-    kF = _save(downsample(LF, SS), '%s/s5-face-render.png' % OUT,
+    gapF = np.zeros((LF.shape[0], 8 * SS, 3))
+    kF = _save(downsample(np.concatenate([LF0, gapF, LF], axis=1), SS),
+               '%s/s5-face-render.png' % OUT,
                caption=_cap_face5(srep, crep, mF))
     kK = _save(downsample(LK, SS), '%s/s5-glitter-render.png' % OUT,
                caption=CAP_GLIT)

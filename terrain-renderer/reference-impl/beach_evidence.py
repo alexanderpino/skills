@@ -965,6 +965,108 @@ def fig_bar_alongshore(bay, path):
     return P.save(img, path)
 
 
+# ------------------------------------------------------------------ wave 5
+def fig_surface_shape(sc, path):
+    """The surface stops being a sinusoid -- and the ceiling that stops it.
+
+    Four panels, and the fourth is the one that matters: no wave of permanent
+    form reaches the face angle bar section A needs, at any order.
+    """
+    img = P.canvas(1240, 830)
+    tr = sc['tr']
+    ss = B.surface_state(tr)
+    x = tr['x']
+    d = tr['d']
+    wet = d > B.D_MIN
+
+    # ---- 1, the shape at three stations, one period of phase
+    ph = np.linspace(-math.pi, math.pi, 601)
+    ax = P.Axes(img, (78, 60, 590, 300), (-180, 180), (-1.0, 1.4),
+                title='the surface, one period, at three depths',
+                xlabel='phase, degrees from the crest',
+                ylabel='eta / a')
+    ax.frame([-180, -90, 0, 90, 180], [-1.0, -0.5, 0.0, 0.5, 1.0])
+    ax.hline(0.0, GREY, 1, (4, 4))
+    ax.line(np.degrees(ph), np.cos(ph), GREY, 2, (7, 5))
+    picks = []
+    for want, col in ((6.0, WAVE), (3.0, GREEN), (1.2, BAR)):
+        i = int(np.argmin(np.abs(d - want)) if wet.any() else 0)
+        r, ps = float(ss['r'][i]), float(ss['psi'][i])
+        picks.append((want, r, ps, col))
+        ax.line(np.degrees(ph), np.cos(ph) + r * np.cos(2 * ph + ps), col, 3)
+    P.legend(ax, [(GREY, 'a sinusoid -- waves 1-4')]
+             + [(c, 'd = %.1f m:  r = %.3f, psi = %+.2f rad' % (w_, r, p))
+                for (w_, r, p, c) in picks], -170, 1.32)
+
+    # ---- 2, the harmonic ratio and its ceiling, across the profile
+    ax2 = P.Axes(img, (700, 60, 1200, 300), (float(x[wet].min()),
+                                             float(x[wet].max())),
+                 (0.0, 1.05),
+                 title='the second harmonic, asked for and allowed',
+                 xlabel='cross-shore x, m', ylabel='r = b / a')
+    ax2.frame(_ticks(float(x[wet].min()), float(x[wet].max()), 5),
+              [0.0, 0.25, 0.5, 0.75, 1.0])
+    ax2.line(x[wet], np.minimum(ss['r_raw'][wet], 1.05), PURPLE, 3)
+    ax2.line(x[wet], ss['limit'][wet], GREY, 2, (6, 4))
+    ax2.line(x[wet], ss['r'][wet], BAR, 3)
+    P.legend(ax2, [(PURPLE, 'asked for by Stokes-2, (Hk/8) C(kd) = 2 Ur'),
+                   (GREY, 'the secondary-crest limit, 1/4 .. 1/2'),
+                   (BAR, 'used')], float(x[wet].min()) + 8, 1.0)
+
+    # ---- 3, the Ursell number against the regime boundary
+    ax3 = P.Axes(img, (78, 372, 590, 612), (float(x[wet].min()),
+                                            float(x[wet].max())),
+                 (-2.6, 1.8),
+                 title='the Ursell number, and where Stokes theory ends',
+                 xlabel='cross-shore x, m', ylabel='log10 Ur')
+    ax3.frame(_ticks(float(x[wet].min()), float(x[wet].max()), 5),
+              [-2, -1, 0, 1])
+    ax3.line(x[wet], np.log10(np.maximum(ss['ursell'][wet], 1e-3)), WAVE, 3)
+    ax3.hline(math.log10(B.URSELL_STOKES_LIMIT), BAR, 2, (6, 4))
+    ax3.text(float(x[wet].min()) + 10, math.log10(B.URSELL_STOKES_LIMIT) + 0.12,
+             'Ur = 1/2, the Stokes/cnoidal boundary (U = 32 pi^2/3)', BAR)
+
+    # ---- 4, THE CEILING
+    ax4 = P.Axes(img, (700, 372, 1200, 612), (0, 4.6), (0, 46),
+                 title='the steepest face, against what section A needs',
+                 xlabel='', ylabel='face angle, degrees')
+    ax4.frame([], [0, 10, 20, 30, 40])
+    a_lin = 0.5 * tr['H'] * tr['k']
+    gain = B.slope_gain(ss['r'], ss['psi'])
+    v_lin = math.degrees(math.atan(float(np.max(a_lin[wet]))))
+    v_nl = math.degrees(math.atan(float(np.max((a_lin * gain)[wet]))))
+    bars = [('linear\n(waves 1-4)', v_lin, GREY),
+            ('nonlinear\n(wave 5)', v_nl, BAR),
+            ("Stokes' 120 deg\ncorner", B.STOKES_FACE_DEG, PURPLE),
+            ('section A\nneeds', B.snell_cone_face_deg(), WAVE)]
+    for i, (lab, v, col) in enumerate(bars):
+        x0, x1 = 0.35 + i * 1.1, 1.15 + i * 1.1
+        ax4.d.rectangle([ax4.px(x0), ax4.py(v), ax4.px(x1), ax4.py(0)],
+                        fill=col)
+        ax4.text(0.5 * (x0 + x1), v + 1.4, '%.2f' % v, col, anchor='ms')
+        for j, part in enumerate(lab.split('\n')):
+            ax4.d.text((float(ax4.px(0.5 * (x0 + x1))),
+                        float(ax4.py(0)) + 8 + 14 * j), part,
+                       fill=P.INK, font=P.FONT_S, anchor='ma')
+    ax4.hline(B.STOKES_FACE_DEG, PURPLE, 1, (4, 4))
+    ax4.hline(B.snell_cone_face_deg(), WAVE, 1, (4, 4))
+
+    P.caption(img, [
+        'THE SURFACE IS NO LONGER A SINUSOID AND NOTHING WAS DECLARED TO MAKE IT ONE. r = (Hk/8) C(kd) is the bound second harmonic of the',
+        'transform\'s own H, k and d, and in shallow water it is EXACTLY twice the Ursell number beach.py has computed since wave 1 and spent only',
+        'inside the sediment transport. psi = -(pi/2) f_brk rotates that same harmonic from a peaked crest (skewness) to a pitched-forward bore',
+        '(asymmetry), using the breaking fraction the transform already carries -- and Sk^2 + As^2 depends on r alone, so breaking does not destroy',
+        'the third moment, it turns it. TOP RIGHT AND BOTTOM LEFT ARE THE HONEST LIMIT: this is a shallow-water scene, half of it is past the',
+        'Stokes/cnoidal boundary (%.0f%% of this profile), and the secondary-crest clamp bites on %.0f%% of it. BOTTOM RIGHT IS THE RESULT. The'
+        % (100.0 * float(np.mean(ss['ursell'][wet] > B.URSELL_STOKES_LIMIT)),
+           100.0 * ss['clamped_fraction']),
+        'steepening is real -- %.2f to %.2f degrees, x%.2f -- and it does not matter, because Stokes\' 120 deg corner caps EVERY wave of permanent'
+        % (v_lin, v_nl, v_nl / v_lin),
+        'form at a 30 deg face and section A needs %.2f. The %.1f degrees between them cannot be closed by a height field at any order of any theory.'
+        % (B.snell_cone_face_deg(), B.snell_cone_face_deg() - B.STOKES_FACE_DEG)])
+    return P.save(img, path)
+
+
 def main():
     # `python3 beach_evidence.py [outdir] [prefix]` -- the prefix filter exists
     # because the full set costs a morphodynamic run per wave and regenerating
@@ -981,7 +1083,8 @@ def main():
     need_1d = any(want(n) for n in ('s1-profile-bar.png', 's1-wave-transform.png',
                                     's1-flux-convergence.png', 's1-plan-depth.png',
                                     's1-refraction-rays.png', 's2-reform-map.png',
-                                    's2-hd-transect.png'))
+                                    's2-hd-transect.png',
+                                    's5-surface-shape.png'))
     sc = B.run_scene() if need_1d else None
     sc_storm = B.run_scene(H0=B.H0_STORM) if want('s1-profile-bar.png') else None
     bay = B.run_bay() if any(want(n) for n in ('s3-bay-plan.png',
@@ -1002,7 +1105,8 @@ def main():
                      (fig_coastal_loop, ('s3-coastal-loop.png',)),
                      (fig_oblique_snell, ('s3-refraction-oblique.png',)),
                      (fig_bay_plan, (bay, 's3-bay-plan.png')),
-                     (fig_bar_alongshore, (bay, 's3-bar-alongshore.png'))):
+                     (fig_bar_alongshore, (bay, 's3-bar-alongshore.png')),
+                     (fig_surface_shape, (sc, 's5-surface-shape.png'))):
         if not want(args[-1]):
             continue
         a = list(args)
