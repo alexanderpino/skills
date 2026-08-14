@@ -657,6 +657,328 @@ def skewness(Ur, sk_max=SK_MAX, ur_half=UR_HALF):
     return sk_max * Ur / (Ur + ur_half)
 
 
+# ============================================================================
+# THE NONLINEAR FREE SURFACE -- wave 5
+# ============================================================================
+# WHAT THIS SECTION IS FOR, and it is one sentence: the skewness above is spent
+# ONLY inside the sediment transport, and the same quantity is what makes the
+# crest sharp and the trough flat. Waves 1-4 drew the surface as
+#
+#       eta = (H/2) cos(S)
+#
+# -- a sinusoid, symmetric about the still level, whose steepest face is
+# (H/2)k = 8.4 deg on this scene. Everything below turns the file's OWN Ursell
+# number into the shape of that surface, with NO new magnitude constant.
+#
+# ONE NONLINEARITY, TWO MOMENTS. Second-order Stokes adds a bound second
+# harmonic to the primary:
+#
+#       eta = a cos(phi) + a r cos(2 phi + psi),      a = H/2
+#
+# and the two free moments of that shape are not independent of it:
+#
+#       skewness   Sk = <eta^3>/sigma^3 = (3/4) r cos(psi) / ((1+r^2)/2)^(3/2)
+#       asymmetry  As = <Hilb(eta)^3>/sigma^3 = -(3/4) r sin(psi) / (...)
+#
+# so Sk^2 + As^2 is a function of r alone and psi merely ROTATES between them.
+# That is the finding this section carries into the README: the file's own
+# `broken_fraction` collapse of the skewness at breaking, written as a factor
+# (1 - f_brk), IS this rotation seen from one side -- what leaves the skewness
+# arrives in the asymmetry, and a bore is the same wave with psi = -pi/2.
+
+
+def stokes2_shape(kd):
+    """The depth function of the bound second harmonic,
+
+        C(kd) = cosh(kd) (2 + cosh 2kd) / sinh^3(kd)
+
+    from second-order Stokes theory (Dean & Dalrymple, *Water Wave Mechanics
+    for Engineers and Scientists*, the second-order surface profile). Its two
+    limits are checked in the suite because they are what tie it to quantities
+    this file already has:
+
+        kd -> 0   C -> 3/(kd)^3        (shallow; see `stokes2_ratio`)
+        kd -> inf C -> 2               (deep; b/a -> ak/2, the textbook form)
+    """
+    kd = np.maximum(np.asarray(kd, float), 1e-9)
+    return np.cosh(kd) * (2.0 + np.cosh(2.0 * kd)) / np.sinh(kd) ** 3
+
+
+def stokes2_ratio(H, k, d):
+    """r = b/a, the second harmonic's amplitude as a fraction of the first.
+
+        b = (H^2 k / 16) C(kd)   ->   r = b/a = (H k / 8) C(kd)
+
+    NOTHING IS DECLARED HERE. r is a function of the three fields the transform
+    already marches, and its shallow-water limit is the punchline:
+
+        C -> 3/(kd)^3   =>   r -> (3/8) H k /(kd)^3 = 2 * Ur
+
+    with `ursell` EXACTLY as this file already defines it, Ur = (3/16)Hk/(kd)^3.
+    The 3/16 in that definition is not a convention picked for tidiness -- it is
+    the constant that makes the Ursell number one half of the second harmonic's
+    own amplitude ratio. The nonlinearity of the surface was already in this
+    file four waves ago, computed and thrown away.
+    """
+    kd = np.maximum(np.asarray(k, float) * np.maximum(d, D_MIN), 1e-9)
+    return np.asarray(H, float) * np.asarray(k, float) / 8.0 * stokes2_shape(kd)
+
+
+# --- the two validity limits, and neither is a tolerance ---------------------
+# Stokes' expansion is a series in the steepness and it does not hold in the
+# surf zone. Running past that silently is the failure mode this section is
+# written against, so BOTH limits below are computed and both are reported.
+
+URSELL_STOKES_LIMIT = 0.5
+# THE REGIME BOUNDARY, IN THIS FILE'S OWN NORMALISATION, DERIVED. The standard
+# Ursell parameter is U = H L^2 / d^3 and the conventional Stokes/cnoidal
+# boundary is U ~ 32 pi^2 / 3 = 105.3 (Ursell 1953; the regime diagram in
+# Le Mehaute and in the Shore Protection Manual). This file's Ur uses k rather
+# than L:
+#
+#   Ur = (3/16) H k /(kd)^3 = (3/16) H /(k^2 d^3) = (3/16) H L^2/(4 pi^2 d^3)
+#      = (3/(64 pi^2)) U
+#
+# so U = 32 pi^2/3  <=>  Ur = (3/(64 pi^2))(32 pi^2/3) = 1/2, EXACTLY. The
+# boundary is a round number in this file's variable and that is not luck: the
+# same 3/16 that makes Ur half the harmonic ratio makes the regime boundary a
+# half. The 32 pi^2/3 is the cited half; the conversion is the derived half.
+
+
+def stokes2_crest_limit(psi, n=4096):
+    """The largest r for which eta is still ONE crest and ONE trough per cycle.
+
+    DERIVED HERE, and it is the limit that does not need a citation. With
+
+        eta = a[cos(phi) + r cos(2 phi + psi)]
+        d(eta)/d(phi) = -a[sin(phi) + 2 r sin(2 phi + psi)]
+
+    the surface has extra stationary points -- a false crest standing in the
+    trough -- as soon as that derivative gains more than two zeros per cycle.
+    Two closed forms bracket the answer and the suite checks both against this
+    function:
+
+      psi = 0      d(eta)/d(phi) = -sin(phi)(1 + 4 r cos(phi)), so the extra
+                   roots appear at cos(phi) = -1/(4r), i.e. at r = 1/4. At
+                   exactly 1/4 the trough is FLAT -- which is the shape bar
+                   section A is after, reached at the limit of the theory
+                   rather than by choosing it.
+
+      psi = -pi/2  the derivative is -[sin(phi) + 2r(1 - 2 sin^2 phi)], a
+                   quadratic in sin(phi); its second root leaves [-1, 1] at
+                   r = 1/2, twice as generous.
+
+    So the pitched-forward (asymmetric) shape tolerates twice the harmonic the
+    peaked (skewed) one does -- the SAME second harmonic, rotated. In between
+    there is no closed form and this counts sign changes on a fine grid.
+    """
+    psi = np.asarray(psi, float)
+    phi = (np.arange(n) + 0.5) / n * 2.0 * np.pi          # off the zeros of sin
+    sh = psi.shape
+    ps = psi.reshape(-1, 1)
+    lo = np.full(ps.shape[0], 1e-4)
+    hi = np.full(ps.shape[0], 2.0)
+    for _ in range(40):
+        mid = 0.5 * (lo + hi)
+        f = -(np.sin(phi)[None] + 2.0 * mid[:, None]
+              * np.sin(2.0 * phi[None] + ps))
+        s = np.sign(f)
+        n_ch = (s != np.roll(s, -1, axis=1)).sum(axis=1)
+        ok = n_ch <= 2
+        lo = np.where(ok, mid, lo)
+        hi = np.where(ok, hi, mid)
+    return lo.reshape(sh) if sh else float(lo[0])
+
+
+def bore_phase(f_brk):
+    """The second harmonic's phase, psi, from the breaking fraction the
+    transform already computes.
+
+        psi = -(pi/2) * f_brk
+
+    DECLARED SHAPE, DERIVED ENDPOINTS, and it is the one interpolation in this
+    section. What is derived is both ends:
+
+      f_brk = 0   an unbroken shoaling wave carries a BOUND harmonic, and a
+                  bound harmonic is phase-locked to its primary: psi = 0. That
+                  is second-order Stokes and nothing else.
+      f_brk = 1   a fully broken wave is a BORE, and `broken_fraction`'s own
+                  docstring already says so in this file: "the shape energy has
+                  gone into a pitched-forward front, the near-bed velocity is a
+                  sawtooth". A sawtooth is the pure-asymmetry shape, psi=-pi/2.
+
+    The sign is not free either. With eta = a cos(S - omega t) and S increasing
+    SHOREWARD, psi = -pi/2 puts the steep face on the shoreward side (the wave's
+    front) and psi = +pi/2 puts it on the seaward side. The suite has a row that
+    fails if the sign is flipped, because a wave leaning the wrong way is a
+    defect a still frame hides.
+
+    Ruessink et al. (2012) publish a psi(Ur) for exactly this and it goes the
+    same way; it could not be verified from a source in this loop, so it is not
+    claimed and this linear form is used and swept instead.
+    """
+    return -(np.pi / 2.0) * np.clip(np.asarray(f_brk, float), 0.0, 1.0)
+
+
+def nonlinear_eta(a, r, psi, phase):
+    """eta = a [cos(phase) + r cos(2*phase + psi)]. The whole surface."""
+    return a * (np.cos(phase) + r * np.cos(2.0 * phase + psi))
+
+
+def surface_moments(r, psi):
+    """The EXACT skewness and asymmetry of that shape, in closed form.
+
+        <eta^2>   = a^2 (1 + r^2)/2
+        <eta^3>   = (3/4) a^3 r cos(psi)
+        <Hilb^3>  = -(3/4) a^3 r sin(psi)      with Hilb(cos n phi) = sin n phi
+
+        Sk = (3/4) r cos(psi) / ((1+r^2)/2)^(3/2)
+        As = -(3/4) r sin(psi) / ((1+r^2)/2)^(3/2)
+
+    THE CONSEQUENCE IS THE POINT: Sk^2 + As^2 depends on r ALONE. Breaking does
+    not destroy the wave's third moment, it ROTATES it out of the skewness and
+    into the asymmetry. This file's sediment transport multiplies its skewness
+    by (1 - f_brk) and has no asymmetry term at all; cos(pi f_brk/2) and
+    (1 - f_brk) agree at both ends and differ by 41% at f_brk = 1/2, and that
+    difference is measured rather than argued.
+
+    THE SIGN CONVENTION IS STATED because the literature's is not uniform: with
+    Hilb(cos) = +sin, a shoreward-pitched front (psi = -pi/2) gives As > 0 here.
+    Papers that define the Hilbert transform with the opposite sign report the
+    same wave with As < 0. Nothing downstream reads the sign of As except the
+    suite row that checks which face is steep, and that row measures the SLOPE,
+    which has no convention in it.
+    """
+    r = np.asarray(r, float)
+    psi = np.asarray(psi, float)
+    s3 = ((1.0 + r ** 2) / 2.0) ** 1.5
+    return (0.75 * r * np.cos(psi) / s3, -0.75 * r * np.sin(psi) / s3)
+
+
+def slope_gain(r, psi, n=4096):
+    """max |d eta/d phi| / a, the factor by which the second harmonic steepens
+    the STEEPEST FACE. 1.0 for a sinusoid, by construction.
+
+    This is the quantity bar section A lives or dies on, so it is measured on
+    the shape rather than estimated: the maximum face slope of the surface is
+    a k * slope_gain(r, psi), with a k the linear wave's own maximum slope.
+
+    The two limits worth knowing, both reproduced by the suite:
+      psi = 0,     r = 1/4  ->  1.299   (peaked crest, barely steeper flanks)
+      psi = -pi/2, r = 1/2  ->  2.000   exactly: max|sin phi - 2r cos 2 phi|
+                                        at phi = pi/2 is 1 + 2r.
+
+    A PEAKED CREST IS NOT A STEEP FACE, and the pair above is the cleanest way
+    to say it. Pure skewness at ITS OWN validity limit buys 30% of slope; the
+    same harmonic rotated into pure asymmetry buys 100%. Section A needs 500%.
+    """
+    r = np.asarray(r, float)
+    psi = np.asarray(psi, float)
+    phi = (np.arange(n) + 0.5) / n * 2.0 * np.pi
+    sh = np.broadcast(r, psi).shape
+    rr = np.broadcast_to(r, sh).reshape(-1, 1)
+    pp = np.broadcast_to(psi, sh).reshape(-1, 1)
+    f = np.abs(np.sin(phi)[None] + 2.0 * rr * np.sin(2.0 * phi[None] + pp))
+    g = f.max(axis=1)
+    return g.reshape(sh) if sh else float(g[0])
+
+
+# --- what NO height field can do, and it is a theorem rather than a scene ----
+STOKES_CORNER_DEG = 120.0
+STOKES_FACE_DEG = 30.0
+# STOKES' CORNER, 1880, and it caps every wave of permanent form.
+#
+# At the crest of the LIMITING wave the fluid is at rest in the frame moving
+# with the wave, so the crest is a stagnation point. Bernoulli on the free
+# surface, measured from the crest downward, is q^2/2 + g z = 0, so
+# q ~ (2 g |z|)^(1/2) ~ r^(1/2) near the corner. A potential flow in a wedge of
+# interior angle 2 alpha has q ~ r^(pi/(2 alpha) - 1); matching the exponents,
+#
+#       pi/(2 alpha) - 1 = 1/2   =>   2 alpha = 2 pi/3 = 120 deg
+#
+# and the free surface therefore leaves the crest at 30 deg to the horizontal.
+# The result is independent of depth, of wavelength and of the wave's height:
+# it is the same 120 deg for the limiting deep-water Stokes wave and for the
+# limiting solitary wave. Longuet-Higgins & Fox (1977) find the maximum surface
+# inclination of the ALMOST-highest wave slightly above this, near 30.4 deg --
+# cited, not reproduced here, and it does not change the conclusion.
+#
+# THE CONCLUSION IT DOES NOT CHANGE: bar section A needs a face steeper than
+# 90 - asin(1/n) = 41.48 deg for a sightline to run lengthwise inside the water.
+# 30 deg < 41.48 deg. No wave of permanent form -- no Stokes wave at any order,
+# no cnoidal wave, no solitary wave, and so no single-valued height field of
+# one -- can reach it. Section A is not "not yet steep enough". It is out of
+# reach of the representation, for the same structural reason as section F's
+# plunging lip, and the two belong together as a matter of proof.
+
+
+def snell_cone_face_deg(n_w=None):
+    """The face angle a lengthwise in-water sightline needs: 90 - asin(1/n).
+
+    Imported rather than restated: n is `optics.IOR`'s green entry, the same
+    refractive index the pool's Fresnel, critical angle and L/n^2 all use.
+    """
+    if n_w is None:
+        import optics as _OPT
+        n_w = float(_OPT.IOR[1])
+    return 90.0 - math.degrees(math.asin(1.0 / n_w))
+
+
+def ur_half_derived(sk_max=SK_MAX):
+    """THE VALUE OF `UR_HALF`, WHICH HAS BEEN `?` SINCE WAVE 1, DERIVED.
+
+    In shallow water the horizontal orbital velocity of a long wave is
+    u = eta sqrt(g/d) -- a POSITIVE MULTIPLE of the surface, the same at every
+    phase -- so the velocity skewness and the ELEVATION skewness are the same
+    number. That makes the parameterisation checkable against the surface:
+
+        Sk_surface -> (3/4) r * 2^(3/2) = (3 sqrt2 / 2) r     (small r)
+        r          -> 2 Ur                                    (shallow water)
+        =>  Sk     -> 3 sqrt2 Ur = 4.2426 Ur
+
+    while `skewness(Ur) = sk_max Ur/(Ur + ur_half)` has initial slope
+    sk_max/ur_half. Matching them,
+
+        ur_half = sk_max / (3 sqrt 2) = sqrt2/6 = 0.235702      (sk_max = 1)
+
+    against the 1.0 declared in wave 1. The declared value is 4.24x too large,
+    which makes the shoaling wave's skewness 4.24x too WEAK where the Ursell
+    number is small -- offshore of the bar, which is precisely where the
+    onshore term is supposed to be doing its work.
+
+    WHAT IS STILL `?` IS `sk_max`, and it is untouched by this: the saturating
+    value is a statement about the wave near breaking, where the expansion this
+    derivation uses has already failed. What is closed is the SLOPE AT THE
+    ORIGIN, which is the half of the parameterisation the bar depends on.
+    """
+    return sk_max / (3.0 * math.sqrt(2.0))
+
+
+def surface_state(tr, clamp=True):
+    """The nonlinear surface's two fields over a transform, in one place.
+
+    Returns r (clamped to the validity limit if asked), psi, the unclamped r,
+    and the fraction of wet cells the clamp bit on -- because that fraction is
+    the honest report of how far past second-order Stokes this scene is.
+
+    THE MIXED-FIELD TRAP IS THE REASON THIS IS ONE FUNCTION. r, psi and the
+    phase all have to come from ONE transform: r off `tr['H'], tr['k'],
+    tr['d']`, psi off `broken_fraction(tr)` which reads `tr['D_w']`, and the
+    phase off `tr['S']`. Wave 3 measured that trap at 0.37 of a ratio in 2-D.
+    A surface whose harmonic amplitude came from a filtered depth and whose
+    phase came from the raw one would be steep in the wrong places and nothing
+    in a still frame would say so.
+    """
+    r_raw = stokes2_ratio(tr['H'], tr['k'], tr['d'])
+    psi = bore_phase(broken_fraction(tr))
+    lim = stokes2_crest_limit(psi)
+    wet = np.asarray(tr['d']) > D_MIN
+    frac = float(np.mean(r_raw[wet] > lim[wet])) if wet.any() else 0.0
+    r = np.minimum(r_raw, lim) if clamp else r_raw
+    return dict(r=r, psi=psi, r_raw=r_raw, limit=lim, clamped_fraction=frac,
+                ursell=ursell(tr['H'], tr['k'], tr['d']))
+
+
 # ------------------------------------------------------ sediment flux and Exner
 K_Q = 2.0e-5        # s^2/m, the energetics transport coefficient. DECLARED
                     # TUNED (chapter 12: "the k coefficients, rip speeds, and
