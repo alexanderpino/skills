@@ -1,0 +1,59 @@
+# Gauntlet contract — the gauntlet-loop skill, on itself
+
+```
+GOAL     The gauntlet-loop skill reaches 9/10 on cost, first-show and speed
+BAR KIND acceptance criteria — measurable, one per dimension
+TARGET   score 9 on each of three lanes, where 9 means:
+         tokens      no 100 contiguous words in SKILL.md could move to a
+                     reference without losing an actionable rule
+         first-show  1 step, 0 blocking confirmations, zero ambiguity about
+                     what gates what; two agents would produce the same shape
+         speed       ≤2 barriers per wave, concurrency executable without
+                     inventing anything, dependent lanes handled, no contradictions
+STRETCH  none set — 9 is the target and the run stops there
+INSPECT  a fresh critic subagent reads SKILL.md in full and any reference it
+         needs to verify a claim; `wc -lw SKILL.md` is a machine gate run inline
+LANES    1 tokens  2 first-show  3 speed        WIP 3 (all funded)
+STOP     bar-met 2, clean-streak 2, no-progress 2, budget 3 waves
+KILL     any dimension still ≤7 after wave 2 → stop and report the ceiling
+BUDGET   3 waves ≈ 21 subagent calls projected; actual is lower, see deviation
+AUTONOMY unattended to a stop
+BENCH    gauntlet/workbench.md
+```
+
+## Declared deviations from the method
+
+Both are recorded here rather than hidden, per the skill's own honesty rules.
+
+1. **Lead-as-builder.** The lead agent builds; it does not spawn builder
+   subagents. The artifact is prose the lead wrote, and a builder subagent would
+   have to ingest ~3,700 words plus references to make edits the lead can make
+   directly. The non-negotiable that matters — *the builder never grades its own
+   homework* — is preserved in full: every verdict comes from a separate agent in
+   fresh context that receives the artifact and the bar, never the lead's
+   reasoning. Actual cost is ~1 critic call per wave, not the projected 7.
+
+2. **Blinding is not possible.** There is one artifact and its git history is
+   readable, so the critic knows which side is "ours". The run is therefore
+   logged `--mode rubric`, not `--mode blind`: the critic scores against
+   enumerated acceptance criteria rather than picking a winner between two
+   unlabelled candidates. Rubric rounds are weaker evidence than blind rounds and
+   the report says so.
+
+## First light (Phase 0 — not logged, predates init)
+
+The artifact already existed, so first light captured it rather than building it:
+`wc -lw SKILL.md` → 424 lines / 3,679 words, and one critic verdict against the
+candidate bar.
+
+An earlier critic pass on the previous champion returned **7 / 7 / 6** with six
+defects, two of them correctness bugs in the concurrency advice (concurrent lanes
+racing the git index; unguarded concurrent appends to `rounds.jsonl`). All six
+were closed before this run opened. This run's first light re-judges the result
+of those fixes, which had never themselves been judged — the previous round ended
+on an unjudged build, which is what made a real run necessary.
+
+Feasibility, from the first-light verdict:
+
+> the named gaps read `minor` with concrete fixes ≈ 1 round each × 3 lanes ÷ WIP 3
+> ≈ 1–2 waves. Fits inside 3. No rescope.
