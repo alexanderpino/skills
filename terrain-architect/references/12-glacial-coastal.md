@@ -437,7 +437,76 @@ faster than bays, which is correct and self-reinforcing until the coast straight
 
 **Wave-cut platform.** The flat bench at sea level is the signature. It emerges if `band` is
 narrow and `K_coast` is high — the terrain is planed off at exactly `seaLevel` and can go no
-lower. If you're not getting one, `notchHeight` is too large.
+lower. ~~If you're not getting one, `notchHeight` is too large.~~ — **struck: that diagnostic and
+the retreat loop are in conflict as written. See below.**
+
+> **Correction — `coastalStep` taken literally stops retreating, and its two stated remedies are
+> mutually exclusive.** This was found by implementing the block
+> (`terrain-renderer/reference-impl/beach.py`, `coastal_step()` / `evolve_coast()`; 1408 m of
+> coast, 4 m grid, run here at every setting quoted). It is a defect in the pseudocode, not in the
+> physics above it.
+>
+> **The mechanism, and it is one line.** `band = exp(−(h − seaLevel)²/(2·notchHeight²))` is a
+> function of the **cell's own elevation**. Once the notch has cut the cliff toe *below* the band,
+> and the thermal step is holding the face at repose *above* it, **no cell that is still intact
+> rock is inside the band.** The erosion term has nothing left to act on and the coast stops. It
+> does not stop *eroding* — it goes on planing seabed it had already cut, which is why the failure
+> reads as a working loop.
+>
+> **Measured.** Mean shoreline retreat, and the width of the shallow shelf (bed within 2 m of the
+> datum, seaward of the shoreline) that the loop planes:
+>
+> | | retreat @ 800 steps | @ 1600 | shelf @ 800 | @ 1600 |
+> |---|---|---|---|---|
+> | **the block exactly as written** | 23.56 m | **23.77 m** | 86.2 m | **32.7 m** |
+> | the same, `notchHeight` × 6 | 112.57 m | **160.98 m** | 5.3 m | **5.8 m** |
+> | with the undercutting term below | 79.59 m | **119.79 m** | 159.3 m | **213.0 m** |
+>
+> **0.21 m of retreat in 800 further steps** — it has stopped, and the shrinking shelf is the
+> notch deepening water it already opened. Row two is the section's own diagnostic run backwards:
+> widening `notchHeight` **does** restart the retreat, and it takes the bench with it (86 m → 5 m).
+> **So "narrow band for a bench" and "the coast must keep retreating" cannot both be satisfied by
+> tuning `notchHeight`**, and a reader who follows the diagnostic above will trade one landform for
+> the other without being told that is the trade.
+>
+> **The fix is a physics statement, not a patch: what is missing is undercutting.** A real notch
+> cuts *into* the cliff at the waterline and the overhang falls. A heightfield cannot hold an
+> overhang — `11`'s representation warning, which this chapter already invokes for arches — so the
+> undercut has to be expressed some other way, and the direct expression is that **waves attack the
+> first land cell above the waterline, whatever its elevation**, because that is the cell the water
+> reaches. In the pseudocode that is one extra term:
+>
+> ```
+> band = exp(-(h - seaLevel)² / (2 * notchHeight²))        # as before
+> band = max(band, firstLandCellAboveWaterline)            # ── the undercut
+> ```
+>
+> With it the loop retreats indefinitely **and** planes a bench (row three), and the `notchHeight`
+> diagnostic works in **both** directions again — narrow band, bench; wide band, no bench.
+>
+> **A second defect in the same block, whose fix is *not* settled.** Nothing in `coastalStep`
+> limits how wide a platform it planes: the notch cuts as fast 200 m from the cliff as at its foot,
+> because nothing attenuates the wave crossing the bench. Measured with the undercutting term in:
+> the shelf runs **300 → 347 → 380 m at 1600 / 3200 / 6400 steps and is still widening when the
+> domain runs out.** A real shore platform has a width, and this loop has no term that gives it
+> one.
+>
+> ⚠️ **The obvious remedy does not demonstrably work, and it is recorded as an open problem rather
+> than as a fix.** The natural energetics choice is to weight the notch by `(H/H_0)²` with
+> `H = min(H_0, γ_b·d)` — a cliff behind a wide shallow bench is attacked by a small wave, and it
+> introduces no new constant, since `γ_b` is the same 0.78 this chapter already shares with the
+> renderer's break mask. It slows the whole loop down; it does **not** bound the platform. Measured
+> here, same runs, same metric: **213 → 284 → 341 m** at 1600 / 3200 / 6400 steps, i.e. widening
+> by +71 and +57 m per interval against the unattenuated loop's +47 and +33. Neither saturates
+> before the domain does. The depth-limited breaker is **P** and the coupling is plausible; the
+> claim that it produces an *equilibrium* width is **`?` and unverified**, and it is left that way
+> here rather than repeated.
+>
+> **Tier.** The stall and the mutual exclusivity are **implemented and measured** — reproducible by
+> anyone who runs that file at those settings, which is the warrant this scheme still has no mark
+> for. Undercutting followed by cliff collapse is **P** and not in dispute; its *expression* as
+> "attack the first land cell above the waterline" is **N** — a statement about what a heightfield
+> can represent, and it belongs beside the arch warning rather than beside the erosion law.
 
 **Sea stacks and arches** are `L`-tier and **need `11`'s representation warning**: an arch
 cannot exist in a heightfield. A sea *stack* can (it's just an isolated column), and it emerges
