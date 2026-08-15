@@ -1,6 +1,6 @@
 ---
 name: gauntlet-loop
-description: Run an adversarial build-and-judge quality loop (Gauntlet Loop) to push inspectable artifacts to a reachable target bar via autonomous rounds, parking lanes that stop paying for themselves. Trigger on "gauntlet", "blind critic", "beat the reference", "keep iterating until it wins", "make it as good as X". Do not trigger for ordinary code review or bug fixing.
+description: Run an adversarial build-and-judge quality loop (Smart Gauntlet Loop) to push inspectable artifacts to a reachable target bar via autonomous rounds, spending judgement only where a decision lands and parking lanes that stop paying for themselves. Trigger on "gauntlet", "smart gauntlet loop", "blind critic", "beat the reference", "keep iterating until it wins", "make it as good as X". Do not trigger for ordinary code review or bug fixing.
 ---
 
 # Gauntlet Loop
@@ -13,6 +13,15 @@ more coverage — all of which feel like rigour and are only cost. So when you a
 choosing between two moves here, take the one that closes the gap with less work,
 and when you are tempted to add a step, ask the test every rule in this file has
 to pass: **does it make the loop smarter, or only busier?**
+
+This is the **smart gauntlet loop**: Shumer's engine run the way a real-time
+engine runs a frame. A game engine ships a frame every 16ms not by rendering
+less scene but by never spending where the eye is not looking — detail scaled to
+distance, unchanged regions reused, the cheapest test rejecting first, static
+light baked once. Every cost rule below is one of those moves with the names
+changed (`references/authorities.md`), and the saved tokens are not savings —
+they are rounds the budget can now afford, which is how the original's grind
+comes back without its bill.
 
 The method is Matt Shumer's, published 27 July 2026 as the technique behind the
 "Claude of Duty" run (`https://somethingbig.ai/gauntlet-loop`, prompt at
@@ -73,19 +82,27 @@ Rationale and exceptions: → `references/cost-discipline.md`
 
 1. **Machine gates before critics.** A dimension a command can decide is decided
    by that command, logged `--mode rubric` with the number as evidence.
-2. **One critic call per round.** One inspection answers both comparisons and
-   writes two records. Split only when the round could retire a dimension.
-3. **Paths, not payloads.** Subagents get paths, owned files and one gap line.
+2. **One critic call per round — or fewer.** One inspection answers both
+   comparisons and writes two records. When the named gap splits into
+   gate-checkable pieces, batch up to three gate-verified micro-builds into one
+   judgement. Split into two calls only when the round could retire a dimension.
+3. **Paths, not payloads — and scoped paths after round one.** Subagents get
+   paths, owned files and one gap line; a repeat critic gets the bar, the diff
+   and the judged region, with a full re-read at decision rounds.
 4. **Cap the handoffs.** Critic: the verdict block. Builder: five lines.
 5. **No gap, no builder.** Nothing to close means retire, raise the bar, or park.
 6. **Respect the WIP limit** (default 3). Depth closes gaps; breadth half-closes.
 7. **Let the script count and publish.** `status` and `board` are free — never
    narrate state into chat or hand-write the workbench.
-8. **Route the model to the role:** cheapest that can do the job, never cheaper
-   on a deciding critic, tier fixed within a lane. → `references/model-routing.md`
-9. **Never pay twice for the same verdict.** Settled work is not re-judged, and a
-   check whose inputs have not changed is not re-run — `gate` caches on a content
-   hash and hands the critic its results.
+8. **Route the model to the decision, not just the role.** Screening-tier
+   verdicts steer routine rounds; a deciding-tier verdict is bought where a
+   lifecycle turns — retire, park, promote into a shared surface. Logged
+   `--tier`; the script refuses to retire on screening evidence.
+   → `references/model-routing.md`
+9. **Never pay twice for the same verdict.** Settled work is not re-judged, a
+   check whose inputs have not changed is not re-run (`gate` caches on a content
+   hash), and the frozen bar is measured **once** — bake its machine numbers at
+   the freeze, never re-derive them per round.
 10. **Read each reference once, at its phase.**
 
 ## State: one directory, one script
@@ -216,6 +233,11 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
   (visual + frame time; clarity + completeness) in `config.json`, judged
   separately. One collapsed score is how a loop trades away the dimension nobody
   is watching.
+- **Bake the bar's numbers at the freeze.** Run every machine measurement the
+  bar allows — frame times, sizes, counts, scores — once, into
+  `gauntlet/bar/measurements.md`. Critics get the numbers; nobody re-derives a
+  frozen artifact's metrics per round. Judgement is never baked, only
+  measurement — paraphrasing the bar is erosion (`failure-modes.md`).
 - **Place it on the ladder:** *testable* is the precondition Phase 0 produces,
   *usable* is where the target belongs, *lovable* is where a stretch belongs. A
   gauntlet does not generate POC → MVP → MLP; it moves one artifact up. If the
@@ -257,6 +279,10 @@ Then, per lane, per round:
 1. **Build.** Builder gets the lane goal, the bar path, the current artifact and
    the last named gap — not the previous builder's reasoning.
    → `references/builder.md`
+   When the gap splits into gate-checkable pieces, the builder may take up to
+   three **micro-rounds** — build, run `gate`, build again — before one critic
+   judges the accumulated result. The champion guard still arms at that
+   judgement; log `--diff-lines` so the tripwire can read the round.
 2. **Gate, then judge.** Run `gate` first — a dimension failing its own benchmark
    needs no critic — and hand its output to the critic. `gate` is lane-agnostic
    and safe to run concurrently: its cache is locked, and a suite whose inputs
@@ -264,11 +290,16 @@ Then, per lane, per round:
    them a wave barrier to save those seconds would cost a wave. Then one critic
    call covering both comparisons
    (→ `references/critic.md`, `references/blind-protocol.md`):
-   - **Promotion:** challenger vs champion. Wins → promote; loses → revert. The
+   - **Promotion:** challenger vs champion, **blind by default** — both sides
+     are ours, so this comparison is always blindable even when the bar is not:
+     export both under randomised labels, no history, and log `--blind`
+     (`references/blind-protocol.md`). Wins → promote; loses → revert. The
      regression guard; skipped only on a lane's first round.
    - **Bar:** ours vs the target bar, per dimension — produced on every round,
      including a reverted one, where it judges the surviving champion. Gives the
-     winner, margin, gap and severity that drive the streaks.
+     winner, margin, gap and severity that drive the streaks. Routine rounds may
+     run at `--tier screening`; a deciding-tier verdict is required wherever a
+     lifecycle turns, and the script enforces it.
 3. **Log both** through `log-round` (`--mode champion`, then `--mode
    blind`/`rubric`). Every record names its `--dimension`; the script rejects
    undeclared ones, because a lane cannot retire on dimensions nobody judged.
@@ -326,6 +357,10 @@ anything. Run `status`, then act:
   is in `references/decomposition.md`.
 - **Reallocate** — a retired or parked lane promotes the next one in. Re-check
   the feasibility arithmetic if the budget now looks tight.
+- **Harvest gates.** Any gap a critic named this wave that a command could check
+  becomes a gate in `config.json`. Gates accumulate; each one moves work
+  permanently from a critic call to a free check, so late waves are cheaper
+  *because* early waves happened. The run is meant to learn.
 - **Re-verify inspection** — open one evidence artifact this wave cited and
   confirm it is real and current. A harness that broke silently makes every later
   critic call worthless.

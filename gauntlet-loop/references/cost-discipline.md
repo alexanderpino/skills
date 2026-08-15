@@ -68,6 +68,13 @@ Split it into two calls when:
 
 That is the exception, not the shape of the run.
 
+And go *below* one call when the gap allows it. A named gap that decomposes into
+gate-checkable pieces — three broken paths, two failing thresholds — does not
+need a verdict per piece: the builder takes up to three **micro-rounds**, each
+verified by `gate`, and one critic judges the accumulated result. The champion
+guard arms at that judgement, which bounds the drift the batching could hide.
+More build-iterations per verdict is the cheapest grind the method has.
+
 ### 3. Paths, not payloads
 
 Subagents get: the lane goal, the path to `contract.md`, the path to the bar, the
@@ -77,6 +84,14 @@ Pasting the artifact, the bar, or the previous verdict into a prompt costs the
 tokens once for you and again for them, and it introduces paraphrase drift on
 top. Point at paths. This is also the bar-erosion fix, which is why the same
 sentence appears in `failure-modes.md`.
+
+After a lane's first round, scope the paths — the dirty-rectangle move. The cold
+full read is the largest per-round cost, and most of it re-reads what no builder
+touched. A repeat critic gets the bar, the round's diff, and the region it
+judges; it demands the full artifact when the slice cannot carry the dimension
+(`critic.md`). Buy the full re-read back at every decision round and roughly
+every third routine round, as the drift check — scoping that never re-widens is
+how a slice quietly becomes the artifact.
 
 ### 4. Cap the handoffs
 
@@ -156,11 +171,21 @@ existed, every documented flag existed, and no phase number was stale — the sa
 clean result, twice, inside calls costing roughly 70,000 tokens each. The same
 four checks as gates: **0.05 seconds**.
 
+**The ratchet: gates are harvested, not just declared.** At every wave boundary,
+any gap a critic named that a command could check becomes a new gate. Judgement
+is spent once discovering the check; the check then runs free forever. A run
+that harvests converts its own history into a regression suite, and its late
+waves are cheaper *because* its early waves happened — the same reason an
+engine bakes lighting it computed once. The frozen bar gets the same treatment
+at Phase 2: measure it once into `gauntlet/bar/measurements.md` and hand critics
+the numbers.
+
 Two failure modes to avoid while doing this:
 
 - **Do not gate a judgement.** "Is this prose clear" is not a command. Gates take
   the mechanical work *off* the critic so its whole budget goes to judgement; they
-  do not replace it.
+  do not replace it. (Baking obeys the same line: bake the bar's *measurements*,
+  never a paraphrase of its qualities — that is bar erosion.)
 - **Do not let a gate go stale silently.** A gate must declare every path it
   reads. One that reads a file it did not declare will skip when it should run,
   which is worse than not having the gate — you would at least have known you
@@ -184,6 +209,23 @@ Do not save money on these — each one prevents a much larger loss:
   commit, not a call, and it is what makes a revert possible.
 - **The smoother**, when lanes touched a shared surface — one call that prevents
   a wave of incoherence.
+
+## When the budget tightens: degrade detail, never drop the frame
+
+An engine that misses its frame budget lowers resolution; it does not skip the
+frame. When token burn runs ahead of progress mid-run, degrade in this order,
+each step recorded in the log where the evidence it weakens will be read:
+
+1. Routine critic rounds drop to the screening tier (`--tier screening`).
+2. Micro-round batching widens — more gate-verified builds per verdict.
+3. Repeat-critic scoping tightens; full re-reads stay at decision rounds.
+4. The lowest-ranked funded lane is parked, returning its rounds to the pool.
+
+What never degrades: deciding-tier verdicts at lifecycle turns, the champion
+guard, evidence in the log, and the budget stop itself. A dropped frame here is
+an unjudged build or a silent self-extension — the two dishonesties the method
+cannot survive. If the ladder is exhausted and burn still outruns progress, that
+is the stop talking, not a call for a cheaper loop.
 
 ## When the honest answer is "stop spending"
 

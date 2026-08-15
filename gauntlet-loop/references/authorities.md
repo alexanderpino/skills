@@ -212,6 +212,50 @@ pessimism — it is how a fixed budget finds the good option at all.
 duration rather than by value alone.
 → The lane ranking formula in `decomposition.md`.
 
+## Real-time engines, because a frame is a budget
+
+The most token-disciplined system in software is a game engine: it must ship a
+frame every 16 milliseconds, forever, so forty years of its tricks are all one
+trick — *never spend where the eye is not looking*. The smart variant of this
+loop is those tricks with the names changed.
+
+**Level of detail** (James Clark, "Hierarchical Geometric Models", 1976) —
+render distant objects with fewer polygons; the player cannot see the
+difference at that range.
+→ The LOD ladder in `model-routing.md`: verdict tier proportional to decision
+proximity. A routine round's verdict steers one build and gets a screening
+tier; a verdict that turns a lifecycle gets the deciding tier. The script keeps
+the ladder honest — screening wins never advance retirement.
+
+**Culling and dirty rectangles** — do not render what the camera cannot see;
+redraw only the regions that changed since the last frame.
+→ Hash-cached gates skip checks whose inputs never moved, and the repeat
+critic's scoped slice (bar + diff + judged region) is the dirty rectangle, with
+the full re-read bought back at decision rounds as the drift check.
+
+**Baked lighting** — light that never moves is computed once, offline, and
+looked up forever after.
+→ The frozen bar's measurements are taken once at the freeze
+(`bar/measurements.md`), and the gate ratchet bakes each discovered check into
+the free suite. Judgement is spent discovering; lookups are free.
+
+**Early-z rejection** — the cheapest test runs first and discards work before
+the expensive shading ever sees it.
+→ Gates before critics, screening before deciding — cost rule 1, twice.
+
+**The frame budget, and graceful degradation** — an engine over budget lowers
+resolution or LOD bias; it does not skip frames, because a dropped frame is the
+one artifact the player always notices.
+→ The degradation order in `cost-discipline.md`: tier down, batch wider, scope
+tighter, park — in that order, recorded. Never an unjudged build, never a
+silent self-extension. Those are dropped frames.
+
+**Profile before optimising** (Michael Abrash, `Graphics Programming Black
+Book`, 1997 — measure first; assumed hotspots are usually wrong) —
+→ `status` is the profiler and cost per closed gap is the frame-time graph.
+The degradation ladder fires on its numbers, not on a feeling that the run is
+expensive.
+
 ## Agents, prompting, and LLM judges
 
 This section carries more weight than the rest, because a gauntlet's critic *is*

@@ -24,7 +24,9 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | Gold plating | rounds spent past a retired dimension | retirement is a stop, not a suggestion |
 | Settled work re-judged, checks re-derived | the log grows, the artifact does not | settled-work rule, hash-cached `gate` |
 | Scope snowball | more lanes at wave 6 than wave 1 | frozen lane set, backlog |
-| Token burn | cost per closed gap climbing | machine gates, one critic call, WIP, model routing |
+| Token burn | cost per closed gap climbing | machine gates, one critic call, WIP, LOD ladder, degradation order |
+| Critic softens; reads as progress | severity easing over near-empty diffs | softening tripwire (`--diff-lines`) in `status` |
+| Blind quietly never happens | every round logged rubric, promotions unblinded | blind promotions by default, `--blind` share in `status` |
 | Cost invisible until the bill | budget in waves, burn in tokens | `--budget-tokens`, `--tokens`, cost per gap in `status` |
 | Inspection rot | stale or repeated evidence | re-verify the path at every wave boundary |
 | Nobody sees progress without interrupting | user asks "where are we?" | generated board |
@@ -42,6 +44,12 @@ or the bar is too soft to discriminate.
 counter-pressure: `none` is a strong, evidence-backed claim, not a shrug — and
 `log-round` rejects a major/minor verdict with no named gap outright. If gaps
 stay vague after that, the bar is the problem, not the critic.
+
+The mechanical tripwire: log `--diff-lines` each round, and `status` flags any
+lane whose severity eases while the diffs stay near-empty. An artifact that
+barely changed did not genuinely get better — that signature is a critic
+drifting agreeable, and the flagged verdict is re-run with rotated framing
+before anything trusts it.
 
 ## Rubric gaming
 

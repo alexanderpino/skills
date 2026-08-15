@@ -34,8 +34,22 @@ the critic recognises, one side being conspicuously shorter.
 
 The promotion comparison — this round's output against the current champion — is
 the *most* blindable comparison in the whole method: both sides are ours, so no
-branding, style, or provenance separates them. Run it under the same protocol:
-randomised labels, normalised presentation, no history.
+branding, style, or provenance separates them. **It runs blind by default, even
+in runs whose bar comparison cannot be blinded.** The mechanics cost one copy:
+
+```bash
+d=$(mktemp -d) && flip=$((RANDOM % 2))
+git show <champion-ref>:path/to/artifact > "$d/$([ $flip -eq 0 ] && echo A || echo B)"
+cp path/to/artifact "$d/$([ $flip -eq 0 ] && echo B || echo A)"
+# critic sees only $d — no repo, no history, no mtimes; you hold the flip
+```
+
+You hold the label mapping, log the verdict as `ours`/`other`, and add `--blind`
+to the champion record so `status` can report the share honestly. A run whose
+promotions all ran unblinded gets a nudge from `status` — that was this skill's
+own first failure: its reference run logged six bar rounds and zero blind
+anything, which made "blind where blindable" aspirational. The rest of the
+protocol is unchanged: randomised labels, normalised presentation, no history.
 
 By default it happens in the same critic call as the bar comparison — one
 inspection, two verdict blocks, two log records (`critic.md`). Blinding survives

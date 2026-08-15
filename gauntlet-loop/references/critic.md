@@ -27,8 +27,15 @@ All visible text you produce (goals, gaps, next fixes, notes, reports) MUST be w
   measurement, or competing implementation — read it from the **bar path you were
   given**, not from a paraphrase. That is `gauntlet/bar/` in a funded wave, and
   `gauntlet/bar-candidate/` at first light, before the bar is frozen.
-- The actual artifact under judgement
+- The actual artifact under judgement — or, on a repeat round, a **scoped
+  slice**: the diff and the region you judge. If the slice cannot carry the
+  dimension (a coherence question, a whole-artifact property), say so and
+  demand the full artifact rather than guessing — a verdict from an
+  insufficient slice is a broken inspection path, not a cheap round.
 - The rules that constrain it (platform, style, hard constraints)
+- Your **tier**, if the round is a screening round: judge honestly at full
+  standard — your verdict steers the next build, but it cannot retire, park, or
+  complete a streak, so do not soften or sharpen it with lifecycle in mind.
 - The **target score** the bar sits at — the number that counts as reaching it
 - Which comparison you are running: **promotion** (challenger vs champion),
   **bar** (ours vs the reference), or **both in one pass** (the default)

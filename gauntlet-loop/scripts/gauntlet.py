@@ -279,6 +279,22 @@ def cmd_log_round(args):
     }
     if args.critic_model:
         rec["critic_model"] = args.critic_model
+    if args.tier == "screening":
+        rec["tier"] = "screening"
+        if args.severity == "none":
+            print(
+                "note: screening verdict with severity none — recorded, but it will not "
+                "advance retirement streaks. A lane's lifecycle needs a deciding-tier verdict.",
+                file=sys.stderr,
+            )
+    if args.blind:
+        if args.mode != "champion":
+            die("--blind marks a blinded promotion comparison; for bar comparisons use --mode blind")
+        rec["blind"] = True
+    if args.diff_lines is not None:
+        if args.diff_lines < 0:
+            die("--diff-lines cannot be negative")
+        rec["diff_lines"] = args.diff_lines
     if args.tokens is not None:
         if args.tokens < 0:
             die("--tokens cannot be negative")
@@ -331,15 +347,25 @@ def cmd_log_round(args):
 
 
 def _streaks(records):
-    """Compute trailing streaks over bar-mode records, ordered as logged."""
+    """Compute trailing streaks over bar-mode records, ordered as logged.
+
+    Lifecycle streaks count deciding verdicts only. A screening-tier win can
+    steer the next round but never advances a lane toward retirement — cheap
+    verdicts buy iteration, not lifecycle. A screening loss still breaks the
+    streak: bad news is bad news at any tier.
+    """
     bar_met = clean = 0
     for r in reversed(records):
         if r["winner"] == "ours":
+            if r.get("tier") == "screening":
+                continue
             bar_met += 1
         else:
             break
     for r in reversed(records):
         if r.get("severity") == "none":
+            if r.get("tier") == "screening":
+                continue
             clean += 1
         else:
             break
@@ -348,6 +374,21 @@ def _streaks(records):
 
 MARGIN_RANK = {"decisive": 3, "clear": 2, "thin": 1}
 SEVERITY_RANK = {"major": 3, "minor": 2, "none": 1}
+
+
+def _softening_read(bar_recs, window=3):
+    """Severity easing while the artifact barely changed is the softening
+    signature — a critic drifting agreeable, not an artifact improving. Only
+    readable when rounds carry --diff-lines; silent otherwise."""
+    recs = [r for r in bar_recs if "diff_lines" in r][-window:]
+    if len(recs) < 2:
+        return None
+    sev = [SEVERITY_RANK.get(r.get("severity"), 3) for r in recs]
+    if sev[-1] < sev[0] and max(r["diff_lines"] for r in recs) <= 10:
+        return ("severity eased while diffs stayed under 10 lines — possible critic "
+                "softening, not progress; re-run the verdict with rotated framing "
+                "before trusting it")
+    return None
 
 
 def _revert_rate(champ_recs, window=6):
@@ -472,6 +513,10 @@ def _lane_dim_status(rounds, cfg):
         trend = _dimension_trend(bar_recs, window=stops["no_progress_n"])
         out[key] = {
             "bar_rounds": len(bar_recs),
+            "screening_rounds": sum(1 for r in bar_recs if r.get("tier") == "screening"),
+            "blind_promos": sum(1 for r in champ_recs if r.get("blind")),
+            "champ_rounds": len(champ_recs),
+            "softening": _softening_read(bar_recs),
             "promotions": sum(1 for r in champ_recs if r.get("action") == "promoted"),
             "reverts": sum(1 for r in champ_recs if r.get("action") == "reverted"),
             "bar_met_streak": bar_met,
@@ -916,16 +961,27 @@ def cmd_status(args):
     for (lane, dim), s in sorted(per.items()):
         head = f"[{lane} / {dim}] {s['state']}"
         print(head)
-        print(f"  bar {s['bar_rounds']}  promoted {s['promotions']}  reverted {s['reverts']}"
+        screen = f" ({s['screening_rounds']} screening)" if s["screening_rounds"] else ""
+        blind_p = f" ({s['blind_promos']} blind)" if s["champ_rounds"] else ""
+        print(f"  bar {s['bar_rounds']}{screen}  promoted {s['promotions']}{blind_p}"
+              f"  reverted {s['reverts']}"
               f"  streaks bar-met {s['bar_met_streak']} clean {s['clean_streak']}"
               f"  rubric {s['rubric_share']}")
         print(f"  score {s['last_score']}/{cfg['stops']['target_score']} target"
               f"  margins {' → '.join(s['recent_margins']) or '—'}  trend: {s['trend']['note']}")
+        if s["softening"]:
+            print(f"  SOFTENING TRIPWIRE: {s['softening']}")
         if s["stalled"]:
             print(f"  PARK RECOMMENDED: {s['stall_note']}")
         if s["open_gap"]:
             print(f"  open gap: {s['open_gap']}")
         print()
+
+    champ_all = [r for r in rounds if r["mode"] == "champion"]
+    if champ_all and not any(r.get("blind") for r in champ_all):
+        print("NOTE: every promotion so far ran unblinded. Champion vs challenger is the most\n"
+              "blindable comparison in the method — both sides are ours (blind-protocol.md).\n"
+              "Export both under randomised labels and log the round with --blind.\n")
 
     funded, deferred = _next_wave_plan(per, cfg)
     stalled = _park_candidates(per)
@@ -1216,6 +1272,12 @@ def main():
     p.add_argument("--action", help="promoted|reverted — champion mode only")
     p.add_argument("--champion-ref", help="git ref or snapshot path of the pre-round champion")
     p.add_argument("--critic-framing", default="default")
+    p.add_argument("--tier", choices=("screening", "deciding"), default="deciding",
+                   help="screening verdicts steer rounds but never advance retirement streaks")
+    p.add_argument("--blind", action="store_true",
+                   help="champion mode only: the promotion comparison ran under the blind protocol")
+    p.add_argument("--diff-lines", type=int,
+                   help="lines changed by this round's build — feeds the softening tripwire")
     p.add_argument("--critic-model",
                    help="model tier that produced this verdict (optional); the report shows the "
                         "distribution, because a streak from a cheap critic is weaker evidence")

@@ -45,7 +45,7 @@ Default: `high` for judgement roles, `low`/`medium` for mechanical ones,
 | **Builder, open-ended** — redesign after a revert, structural change, first version in a bootstrap wave | session tier | high–xhigh | The approach is the work. |
 | **Critic, deciding** — any round that can retire a dimension, promote into a shared surface, or trigger a park | session tier or better | high | Its verdict spends or saves the rest of the budget. |
 | **Critic, routine round** | session tier | medium–high | Still judgement; still not the place to bargain-hunt. |
-| **Critic, screening pass** (optional) | cheap tier | low | Only when many rounds are obvious losses — see below. |
+| **Critic, screening tier** — routine mid-lane rounds | cheap tier | low–medium | Steers the next round only; cannot move a lifecycle — see the LOD ladder below. |
 | **Smoother** | mid tier | medium | Consistency detection over a bounded diff, not redesign. |
 | **Lead agent (you)** | session tier | — | You hold the contract, the log reads and the spending decisions. |
 
@@ -54,19 +54,29 @@ naming one, so the routing survives a model release. In Claude Code, the `Agent`
 tool takes a `model` override and workflow steps take `opts.model` / `opts.effort`;
 omitting them inherits, which is the correct default for every judgement role.
 
-## The screening critic — an option, not a default
+## The LOD ladder — detail proportional to the decision
 
-When a lane produces many obviously-losing challengers, a cheap critic can run
-first and reject the clear failures before a strong critic is spent. It is worth
-it only when *both* hold:
+Real-time engines render distant objects with fewer polygons because the player
+cannot see the difference at that range. The same rule prices verdicts: **a
+verdict's tier is proportional to what it decides, not to how much the round
+matters to you.**
 
-- the strong-model call is much more expensive than the cheap one, and
-- a real share of rounds are decided by an obvious defect, not by a fine margin
+- **Routine mid-lane rounds** — the verdict steers the next build and nothing
+  else. A wrong one costs one round, because the next verdict corrects it. Run
+  these at a cheap tier and log `--tier screening`. This *replaces* the strong
+  critic on those rounds rather than preceding it — a screener that runs before
+  a strong critic adds a call to save one, which is how a cost optimisation
+  becomes a cost increase.
+- **Decision rounds** — retirement, park, promotion into a shared surface, any
+  bar-met or clean streak about to complete. A wrong verdict here spends or
+  wastes the rest of the budget. Buy the deciding tier, `--tier deciding` (the
+  default), effort high.
 
-Otherwise it adds a call per round to save a call on some rounds, which is how a
-cost optimisation becomes a cost increase. A screening critic **never retires or
-parks anything** — it can only say "this challenger is broken", never "this is
-good enough".
+The script holds the boundary so nobody has to remember it: screening wins
+never advance a retirement streak (a screening loss still breaks one — bad news
+is bad news at any tier), so a lane can only retire on deciding-tier evidence.
+Three screened rounds cost roughly what one deciding round costs; that ratio is
+where the original loop's round count comes back inside the same budget.
 
 ## Keep the tier fixed within a lane
 
@@ -78,8 +88,11 @@ mean the artifact stopped moving — or that the new critic is stricter. The run
 then parks a healthy lane, or funds a dead one, on a confounded reading.
 
 So: pick the tier when the lane is cut, keep it for the lane's life, and change
-it only at a re-cut, announced and recorded. Record it either way — `log-round
---critic-model <id>` puts the tier in the record, and `report` prints the
+it only at a re-cut, announced and recorded. Under the LOD ladder this applies
+**per track**: one fixed model for the lane's screening verdicts, one for its
+deciding verdicts — the two tracks are read separately, so a trend within either
+stays clean. Record it either way — `log-round --critic-model <id>` puts the
+model in the record and `--tier` names the track; `report` prints the
 distribution so a reader can see which verdicts came from where.
 
 A clean streak produced by a cheap critic is weaker evidence than one produced by
