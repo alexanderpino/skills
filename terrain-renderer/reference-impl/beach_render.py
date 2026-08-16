@@ -105,12 +105,106 @@ PLAIN_DRY = np.array([0.17, 0.19, 0.12])        # `?` the coastal plain's dry
                                                 # model would go, and the caption
                                                 # says so.
 PLAIN_Z = 6.0                                   # m, above which the land is
-                                                # plain rather than beach --
-                                                # `beach.BEACH_HEIGHT` is 2 m and
-                                                # the swash reaches 0.5 m, so
-                                                # this is three berms up.
+                                                # plain rather than beach.
+                                                # WAVE 8: the two elevations it
+                                                # has to clear are now DERIVED
+                                                # rather than declared -- the
+                                                # swell's run-up limit at
+                                                # `beach.BERM_Z` = 0.727 m and
+                                                # the storm's at
+                                                # `beach.BACKSHORE_Z` = 1.029 m
+                                                # -- so 6.0 m is 5.8x the
+                                                # highest surface any swash on
+                                                # this coast builds, and the
+                                                # cliff face between them is
+                                                # classed by SLOPE and never
+                                                # reaches this test. `?` on the
+                                                # value; it separates two
+                                                # things that are 5 m apart.
 SAND_WET = OPT.wet_albedo(SAND_DRY)[0]
 ROCK_WET = OPT.wet_albedo(ROCK_DRY)[0]
+
+# --- WAVE 8: `wet_albedo` HAS A SPECULAR TERM IN IT AND IT WAS BEING SPENT AS
+# DIFFUSE. A finding about how this file USES `optics.py`, not a defect inside
+# it -- the module is right and is not touched.
+#
+#       a_wet = R_EXT + (1 - R_EXT)(1 - R_INT) a / (1 - a R_INT)
+#               \____/   \______________________________________/
+#              the film's         the trapped series: what actually
+#              own surface        comes back OUT of the substrate
+#              reflection
+#
+# Waves 4-7 handed the whole of that to a Lambertian. The first term is light
+# that never entered the film: it is the SPECULAR reflection off the water
+# surface, and putting it in the diffuse lobe makes wet sand UNIFORMLY BRIGHTER
+# and never glossy -- which is backwards twice over, because the thing bar H3
+# calls "one of the strongest tonal edges in these frames" is wet sand going
+# DARKER and SHINIER at once. The two halves move together and this file now
+# spends them where they belong:
+#
+#   diffuse   a_wet - R_EXT            strictly darker than the dry sand
+#   specular  fresnel(theta_v)         a lobe, over a slope distribution
+#
+# R_EXT is the hemispherical-average external reflectance, which is the right
+# thing to REMOVE from an albedo lit by a hemisphere; what is ADDED back is the
+# directional fresnel(theta_v) at the view angle, which is the right thing for
+# a lobe. They are the same physics integrated over different variables and the
+# swap is stated rather than hidden.
+SAND_WET_DIFF = SAND_WET - OPT.R_EXT
+ROCK_WET_DIFF = ROCK_WET - OPT.R_EXT
+
+# The wet film's residual rms slope. `?` AND IT IS THE ONE NEW UNKNOWN THIS
+# WAVE ADDS. A film over a grain pack is not a mirror: it drowns the pores and
+# leaves the pack's larger undulations, and no measurement of that residual was
+# available. 0.20 is DECLARED; the suite carries 0.10 and 0.40 as the bracket
+# and `_sec_land` reports what the frame does across it. Nothing else in the
+# render depends on it -- the SKY half of the specular needs no roughness at
+# all (a smooth film mirrors a smooth sky, and the sky is smooth), so the
+# bracket moves only the sun's own glint on the wet band.
+SIGMA_WET = 0.20
+SIGMA_WET_BRACKET = (0.10, 0.40)
+
+
+def wet_specular(D, N, sigma=SIGMA_WET, sun=True):
+    """The wet band's specular lobe: sky mirror + the sun over a slope pdf.
+
+    TWO TERMS AND ONLY ONE OF THEM NEEDS THE ROUGHNESS.
+
+      sky   fresnel(theta_v) * env_diffuse(mirror(D, N)). Exact for a smooth
+            film; a rough one blurs an already smooth sky and moves it by
+            nothing measurable. No `?` enters here.
+      sun   fresnel(theta_h) * E_SUN * p(slope) / (4 cos^4(beta) cos(theta_v)),
+            the SAME Jacobian `beach_optics.glitter_radiance` derives for the
+            sea -- dw_v = 4 cos(omega) cos^3(beta) dz -- with the Cox & Munk
+            wind-driven slope pdf replaced by an isotropic Gaussian of rms
+            `sigma`. The Jacobian is geometry and transfers unchanged; the
+            distribution is the surface's and does not.
+
+    `beach_optics.glitter_radiance` is NOT called and the reason is that it
+    assumes the mean surface is HORIZONTAL (it builds the required normal from
+    s + r and reads its z as cos(beta)). A beach face is 3.0 deg off horizontal
+    and a wet rock face is not, so the half-vector has to be taken against the
+    LOCAL normal. That is a finding about the function's applicability, and it
+    is reported rather than patched: nothing in `beach_optics` is changed.
+    """
+    n = N / np.maximum(np.linalg.norm(N, axis=-1, keepdims=True), 1e-12)
+    r = -D                                       # back toward the eye
+    ct_v = np.clip((n * r).sum(-1), 1e-6, 1.0)   # view zenith on the LOCAL n
+    mir = 2.0 * ct_v[..., None] * n - r
+    mir = mir / np.maximum(np.linalg.norm(mir, axis=-1, keepdims=True), 1e-12)
+    L = OPT.fresnel(ct_v) * sky_radiance(mir)
+    if sun:
+        hv = SUN[None] + r
+        hv = hv / np.maximum(np.linalg.norm(hv, axis=-1, keepdims=True), 1e-12)
+        cb = np.clip((hv * n).sum(-1), 1e-6, 1.0)        # cos(beta) on n
+        com = np.clip((SUN[None] * hv).sum(-1), 0.0, 1.0)
+        # the half-vector's tilt off the local normal, as a SLOPE
+        s2 = (1.0 - cb * cb) / (cb * cb)
+        p = np.exp(-0.5 * s2 / (sigma * sigma)) / (2.0 * np.pi * sigma ** 2)
+        lit = ((n * SUN[None]).sum(-1) > 0.0)
+        g = p / (4.0 * cb ** 4 * ct_v)
+        L = L + OPT.fresnel(com) * E_SUN[None] * (g * lit)[..., None]
+    return L
 
 
 # ==================================================== the scene's water column
@@ -656,7 +750,7 @@ def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0):
     return L * np.where(exited, 1.0, 0.0)[..., None], chord, lit
 
 
-def shade_land(w, P, D):
+def shade_land(w, P, D, parts=None):
     """Sand and rock, and the wet band that comes for free.
 
     Bar section H3: wet sand darkens because a thin film traps light between the
@@ -675,32 +769,104 @@ def shade_land(w, P, D):
     N /= np.linalg.norm(N, axis=-1, keepdims=True)
     rock = np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0.0, 1.0)[..., None]
     plain = np.clip((hz - PLAIN_Z) / 4.0, 0.0, 1.0)[..., None] * (1 - rock)
-    wet = np.clip((RUNUP - hz) / 0.35, 0.0, 1.0)[..., None]
+    # WAVE 8: THE WET/DRY BOUNDARY IS A DISTRIBUTION AND NOT A LINE. Waves 4-7
+    # ramped it over a declared 0.35 m either side of a single run-up height.
+    # Run-up heights inherit the incident waves' Rayleigh statistics, which
+    # this project has carried since wave 1, so the share of swash cycles that
+    # reach a level -- and therefore the share of the surface still carrying a
+    # film -- is exp(-(z/R)^2). Nothing is placed: `beach.swash_wetness`.
+    wet = B.swash_wetness(hz)[..., None]
     sand = 1.0 - rock - plain
-    alb = ((SAND_DRY[None, None] * (1 - wet) + SAND_WET[None, None] * wet)
+    # the DIFFUSE albedo. The wet forms are the trapped series with the film's
+    # own surface reflection taken OUT of them (see SAND_WET_DIFF): wet sand is
+    # darker than dry sand diffusely, which is the direction bar H3 says.
+    alb = ((SAND_DRY[None, None] * (1 - wet) + SAND_WET_DIFF[None, None] * wet)
            * sand
-           + (ROCK_DRY[None, None] * (1 - wet) + ROCK_WET[None, None] * wet)
-           * rock
+           + (ROCK_DRY[None, None] * (1 - wet) + ROCK_WET_DIFF[None, None]
+              * wet) * rock
            + PLAIN_DRY[None, None] * plain)
     ndl = np.clip((N * SUN[None, None]).sum(-1), 0.0, 1.0)
-    L = alb * (E_SUN[None, None] * ndl[..., None] / np.pi + env_irr(N))
-    return L
+    # WAVE 8: THE SHADOW RAY. Wave 7 measured its cost at exactly 0.0% under
+    # both suns and said why -- "not because the shading is right but because
+    # wave 3's landform is a ramp and a cliff face with nothing on it to cast
+    # one". There is now a beach at the foot of a 15 m cliff, so there is
+    # something to cast one, and the ordering wave 7 argued for is the reason
+    # this is built in the same wave as the beach and not before it.
+    sh = land_shadow(w, P, N)
+    L = alb * (E_SUN[None, None] * (ndl * sh)[..., None] / np.pi + env_irr(N))
+    # ...AND THE SPECULAR HALF, which is where the rest of `wet_albedo` went.
+    # It is multiplied by `wet` and by nothing else: dry sand is matte, wet
+    # sand is glossy, and they are one field apart. `sand + rock` and not the
+    # plain, because a wetted plain is a surface this scene never has.
+    spec = wet * (sand + rock) * wet_specular(D, N)
+    if parts is not None:
+        parts['diffuse'] = L
+        parts['specular'] = spec
+        parts['wet'] = wet[..., 0]
+        parts['sand'] = sand[..., 0]
+        parts['N'] = N
+        parts['shadow'] = sh
+    return L + spec
 
 
-# the swash's own reach, from the wave field rather than from a paint line
+SHADOW_ON = True                # the paired frame's one switch, and nothing
+                                # else in the file reads it
+
+
+def land_shadow(w, P, N, n=40, reach=None, sun=None):
+    """1 where the sun reaches the point, 0 where the bed is in the way.
+
+    A HARD RAY, and the softness it is missing is stated rather than faked: the
+    sun's disc is 0.53 deg across, so a real shadow edge is penumbral over
+    about 1/100 of the distance to the caster -- 0.4 m at the foot of this
+    cliff, which is under a pixel at bar J's range and is worth a sentence, not
+    a filter.
+
+    THE REACH IS THE LANDFORM'S OWN AND NOT A DECLARED DISTANCE. Nothing can
+    cast a shadow further than its height divided by the tangent of the sun's
+    elevation, so the march stops at h_max/tan(el) -- 42 m for this bed at the
+    render's 21 deg sun and 12 m at bar J's 56 deg one. A fixed 600 m reach
+    (wave 7's `shadow_cost`) marched fifteen times as far for the same answer.
+    """
+    S = SUN if sun is None else np.asarray(sun, float)
+    if S[2] <= 1e-3 or not SHADOW_ON:
+        return np.ones(P.shape[:-1])
+    if reach is None:
+        reach = float(np.nanmax(w.h)) / max(S[2], 1e-3)
+    lit = (N * S).sum(-1) > 0.0
+    occ = np.zeros(P.shape[:-1], bool)
+    s = np.geomspace(max(2.0 * float(w.x[1] - w.x[0]), 1.0), max(reach, 4.0), n)
+    for t in s:
+        Q = P + S * t
+        occ |= (Q[..., 2] < w.sample(Q[..., 0], Q[..., 1], w.h)) & lit
+    return (~occ).astype(float)
+
+
+# The swash's own reach. WAVE 8 MOVED THE SLOPE THIS IS BUILT ON, and the move
+# is a correction rather than a refinement. Waves 4-7 took tan(beta) from the
+# bed's slope AT THE BREAK POINT -- 100 m offshore, in 2 m of water, where the
+# profile is 1:130 -- and fed that to the Iribarren number. But the run-up is
+# what the swash does ON THE BEACH FACE, and Hunt's xi is defined on the slope
+# the swash climbs. The old reading gave xi = 0.332 and R = 0.50 m; the face's
+# own slope gives xi = 0.485 and R = 0.727 m, 46% higher, and it is the second
+# that is Hunt's quantity. Both are printed so the change is visible.
 _XI = None
 RUNUP = 0.0
+_XI_BRK = None
+RUNUP_BRK = 0.0
 
 
 def _set_runup():
-    global _XI, RUNUP
+    global _XI, RUNUP, _XI_BRK, RUNUP_BRK
     sc = B.run_scene()
     tr = sc['tr']
     b = B.breaker_state(tr)
     i = b['i_cell']
     slope = abs(float(np.gradient(tr['h'], tr['dx'])[i]))
     L0 = B.deep_wavelength(B.T_SWELL)
-    _XI = B.iribarren(slope, B.H0_SWELL, L0)
+    _XI_BRK = B.iribarren(slope, B.H0_SWELL, L0)
+    RUNUP_BRK = B.runup_hunt(B.H0_SWELL, _XI_BRK)
+    _XI = B.iribarren(B.TAN_FACE, B.H0_SWELL, L0)
     RUNUP = B.runup_hunt(B.H0_SWELL, _XI)
 
 
@@ -1147,7 +1313,78 @@ def downsample(L, ss):
     return L[:h * ss, :wd * ss].reshape(h, ss, wd, ss, 3).mean((1, 3))
 
 
-def render(cam, w, t=0.0, label=''):
+# ==================================================== WAVE 8: THE AIR, AND IT
+# NEEDS ONE NEW NUMBER AND NOT TWO
+#
+# `shade_water` and `shade_land` return the radiance LEAVING the surface and
+# waves 1-7 handed it straight to the film. Over a pool five metres across that
+# is exact to a part in ten thousand; over a frame whose farthest water is
+# beyond the visible horizon it removes two terms of the same size as the
+# picture -- the extinction of the surface's own radiance, and the airlight
+# scattered into the line of sight.
+#
+#   L(r) = L_surface * exp(-beta r)  +  L_airlight * (1 - exp(-beta r))
+#
+# THE RAYLEIGH COEFFICIENT IS NOT A NEW CONSTANT. `atmosphere.TAU_R` is the
+# ZENITH optical depth this project derived for the sun's own colour, and over
+# an exponential atmosphere of scale height H_R the surface coefficient is
+# beta = tau/H_R by definition of the integral. Per channel, so the airlight is
+# spectrally right without anything being declared.
+#
+# THE AEROSOL COEFFICIENT IS THE ONE `?`. Koschmieder's beta = 3.912/V turns a
+# meteorological visibility into an extinction coefficient, and a maritime
+# boundary layer runs 20-60 km. The CLEAN end is shipped -- it is the
+# conservative choice for a gap being closed, since it understates rather than
+# overstates what the new term does -- and the hazy end is rendered beside it
+# and reported. It is NOT read off a photograph: bar J and bar K show a sharp
+# horizon and the standing ruling says a level may not be read off them.
+#
+# WHAT THE AIRLIGHT RADIANCE IS, AND IT IS NOT A DECLARED COLOUR. In a
+# horizontally homogeneous atmosphere a horizontal path of INFINITE length
+# reaches exactly the radiance of the sky at the horizon in that azimuth --
+# that is what the horizon sky IS. So the airlight is `sky_radiance` evaluated
+# on the ray flattened to the horizontal, which costs nothing, carries the
+# azimuthal structure (bright toward the sun, dark away from it) and needs no
+# new number at all.
+#
+# AND IT CLOSES THE SEAM BY CONSTRUCTION, WHICH IS THE POINT. At grazing the
+# sea's range goes to infinity, its transmittance to zero, and its radiance to
+# the airlight -- which is the sky just above the horizon. Bar K2's continuity
+# criterion is then satisfied identically and NOT by a fitted number, whatever
+# beta and whatever the airlight's colour turn out to be.
+#
+# THE TWO APPROXIMATIONS, BOTH MARKED. (1) A slant path is shorter through the
+# atmosphere than a horizontal one, so the airlight on a steeply downward ray
+# is over-stated -- but a steeply downward ray is looking at the ground under
+# the camera, where 1 - T is 0.0002, so the error is where the term is not.
+# (2) The aerosol's airlight is given the RAYLEIGH sky's colour, which
+# over-blues the haze term; the aerosol phase function is forward and nearly
+# grey and a proper source function needs a model this file does not have. Both
+# vanish at the seam, which is the measurement the term is being built for.
+H_RAYLEIGH = 8500.0                     # m, the standard scale height
+VIS_CLEAN, VIS_HAZY = 60000.0, 20000.0  # m, `?` -- the bracket
+VIS_SHIPPED = VIS_CLEAN                 # the clean end, declared
+
+
+def beta_ext(vis=None):
+    """The extinction coefficient, per channel, 1/m. Rayleigh + aerosol."""
+    b = np.asarray(ATM.TAU_R, float) / H_RAYLEIGH
+    v = VIS_SHIPPED if vis is None else vis
+    return b + (0.0 if not v else CAM.koschmieder_beta(v))
+
+
+def aerial(L, D, r, vis=None):
+    """Apply extinction and airlight over a path of length `r`."""
+    b = beta_ext(vis)
+    T = np.exp(-r[..., None] * b[None])
+    flat = D.copy()
+    flat[..., 2] = 0.0
+    nrm = np.linalg.norm(flat, axis=-1, keepdims=True)
+    flat = np.where(nrm > 1e-9, flat / np.maximum(nrm, 1e-9), flat)
+    return L * T + sky_radiance(flat) * (1.0 - T)
+
+
+def render(cam, w, t=0.0, label='', air=True, vis=None):
     tr = trace(cam, w, t)
     D, P = tr['D'], None
     L = np.zeros(D.shape[:2] + (3,))
@@ -1163,7 +1400,11 @@ def render(cam, w, t=0.0, label=''):
     if mw.any():
         Pw = cam.pos[None] + tr['t_water'][mw][..., None] * D[mw]
         sh = shade_water(w, Pw[None], D[mw][None], t)
-        L[mw] = sh['L'][0]
+        Lw = sh['L'][0]
+        if air:
+            Lw = aerial(Lw, D[mw], np.linalg.norm(Pw - cam.pos[None], axis=-1),
+                        vis)
+        L[mw] = Lw
         ex['water'] = sh
         ex['water_mask'] = mw
         ex['water_P'] = Pw
@@ -1171,11 +1412,19 @@ def render(cam, w, t=0.0, label=''):
     ml = tr['hit_land'] & ~tr['water'] & ~up
     if ml.any():
         Pl = cam.pos[None] + tr['t_land'][ml][..., None] * D[ml]
-        L[ml] = shade_land(w, Pl[None], D[ml][None])[0]
+        lp = {}
+        Ll = shade_land(w, Pl[None], D[ml][None], parts=lp)[0]
+        ex['land_parts'] = {k: (v[0] if hasattr(v, 'ndim') and v.ndim >= 1
+                                else v) for k, v in lp.items()}
+        if air:
+            Ll = aerial(Ll, D[ml], np.linalg.norm(Pl - cam.pos[None], axis=-1),
+                        vis)
+        L[ml] = Ll
         ex['land_mask'] = ml
         ex['land_P'] = Pl                       # wave 7: for the shadow cost
     ex['sky_mask'] = up
     ex['trace'] = tr
+    ex['air'] = bool(air)
     return L, ex
 
 
@@ -1775,22 +2024,10 @@ def main():
     # and it is fixed here at 720 x 960 with 2 x 2 supersampling regardless of
     # the flag. Nothing measured off it depends on the raster except the far
     # range tail, and `aerial_cost` reports that dependence in the same line.
-    SS7 = 2
-    W7, H7 = 720 * SS7, 960 * SS7
-    L_surf, s_lines = surf_line_scale(w)
-    # the range to the far surf, on this bed: the camera stands at one end of
-    # the domain and bar J's lines have to read "all the way round"
-    D_lines = float(0.5 * (w.y[-1] - w.y[0]))
-    print()
-    CAM.report([], print)
-    fov_h_probe = CAM.portrait_fov(13.0)[1]
-    az_j, bear_j = frame_azimuth_J(w, float(w.y[2]), fov_h_probe)
-    camJ7, infJ7 = build_frame(w, float(w.y[2]), CAM.J_CONTENT,
-                               'J -- the embayment overview, upright',
-                               az_j, W7, H7, D_lines, s_lines)
-    camK7, infK7 = build_frame(w, 0.0, CAM.K_CONTENT,
-                               'K -- open water and the glitter path, upright',
-                               SUN_AZ, W7, H7, D_lines, s_lines)
+    SS7 = SS_HERO
+    W7, H7 = W_HERO * SS7, H_HERO * SS7
+    L_surf, s_lines, D_lines, camJ7, infJ7, camK7, infK7, az_j, bear_j = \
+        hero_cameras(w, W7, H7)
     CAM.report([infJ7, infK7], print)
     print()
     print('  the surf zone is %.0f m wide (this transform\'s own median) and '
@@ -1812,10 +2049,22 @@ def main():
     print()
     horizon_check(LK7, camK7)
     print()
-    _save(downsample(LJ7, SS7), '%s/s7-frame-J.png' % OUT,
-          caption=_cap_J7(w, camJ7, infJ7, mJ7))
-    _save(downsample(LK7, SS7), '%s/s7-frame-K.png' % OUT,
-          caption=_cap_K7(w, infK7, mK7, wchk7))
+    # THE s7 FRAMES ARE NOT OVERWRITTEN. Wave 8 changes four fields inside the
+    # same camera, so s7 and s8 are the pair that measures the wave -- the same
+    # two-wave rule that protected s4 against s5 and s5 against s6. `--redo-s7`
+    # is there for a reader who wants the old frame regenerated on the new bed,
+    # and it is deliberately NOT the default.
+    if '--redo-s7' in sys.argv:
+        _save(downsample(LJ7, SS7), '%s/s7-frame-J.png' % OUT,
+              caption=_cap_J7(w, camJ7, infJ7, mJ7))
+        _save(downsample(LK7, SS7), '%s/s7-frame-K.png' % OUT,
+              caption=_cap_K7(w, infK7, mK7, wchk7))
+
+    # ---- WAVE 8 IS `--wave8` AND NOT PART OF THIS RUN, and the reason is the
+    # s4/s5/s6 rule. Those three frames are ONE comparison -- same camera, same
+    # bed, same sun, one field changed each time -- and wave 8 changes four at
+    # once. `main` regenerates s6; `main_wave8` draws only the s8 frames and
+    # touches nothing else on disk.
     print('exposure keys (99th pct of scene-linear): J %.4g  F %.4g  K %.4g'
           % (kJ, kF, kK))
     print('%.1f s' % (time.time() - t0))
@@ -2373,6 +2622,31 @@ def frame_azimuth_J(w, y_cam, fov_h):
     return (bearing - math.degrees(fov_h) / 2.0) % 360.0, bearing
 
 
+SS_HERO = 2
+W_HERO, H_HERO = 720, 960
+
+
+def hero_cameras(w, W, H, out=print):
+    """THE TWO HERO CAMERAS, built once. Wave 7 built these inline inside
+    `main`; wave 8 needs the same two objects without re-rendering the s4/s5/s6
+    series, and two copies of a camera inference would be two cameras."""
+    L_surf, s_lines = surf_line_scale(w)
+    # the range to the far surf, on this bed: the camera stands at one end of
+    # the domain and bar J's lines have to read "all the way round"
+    D_lines = float(0.5 * (w.y[-1] - w.y[0]))
+    out()
+    CAM.report([], out)
+    fov_h_probe = CAM.portrait_fov(13.0)[1]
+    az_j, bear_j = frame_azimuth_J(w, float(w.y[2]), fov_h_probe)
+    camJ, infJ = build_frame(w, float(w.y[2]), CAM.J_CONTENT,
+                             'J -- the embayment overview, upright',
+                             az_j, W, H, D_lines, s_lines)
+    camK, infK = build_frame(w, 0.0, CAM.K_CONTENT,
+                             'K -- open water and the glitter path, upright',
+                             SUN_AZ, W, H, D_lines, s_lines)
+    return (L_surf, s_lines, D_lines, camJ, infJ, camK, infK, az_j, bear_j)
+
+
 # ------------------------------------------------------- measuring the frame
 def horizon_rows(L, cam, inf):
     """The horizon's row, PREDICTED by the camera and MEASURED off the buffer.
@@ -2485,9 +2759,15 @@ def bar_J_ladder(w, ex, L):
         sand = (1.0 - np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0, 1)
                 - np.clip((hz - PLAIN_Z) / 4.0, 0, 1))
         sand = np.clip(sand, 0.0, 1.0)
-        wet = np.clip((RUNUP - hz) / 0.35, 0.0, 1.0)
-        out['wet sand'] = float((sand * wet).sum()) / n
-        out['dry sand'] = float((sand * (1 - wet)).sum()) / n
+        # WAVE 8: the wet share is `beach.swash_wetness`, the same field
+        # `shade_land` shades with, so the ladder and the shader cannot drift.
+        # A RUNG IS COUNTED WHERE THE SURFACE READS AS THAT SURFACE, and the
+        # split is the median of the distribution -- wetness > 0.5, i.e. below
+        # z = R sqrt(ln 2) = 0.605 m -- not an extra threshold: it is where
+        # more than half the swash cycles reach, which is what "wet sand" is.
+        wet = B.swash_wetness(hz)
+        out['wet sand'] = float((sand * (wet > 0.5)).sum()) / n
+        out['dry sand'] = float((sand * (wet <= 0.5)).sum()) / n
     else:
         out['wet sand'] = out['dry sand'] = 0.0
     out['rungs_present'] = sum(1 for k, v in out.items()
@@ -2510,20 +2790,40 @@ def plan_curvature(w):
 def beach_width(w):
     """The cross-shore width of dry beach this bed produces, per row.
 
-    Bar J's ladder needs two sand surfaces and this is what supplies them. It
-    is measured as the distance from the waterline to the `PLAIN_Z` contour,
-    which is the same threshold `shade_land` uses to stop calling a surface
-    sand -- so the number and the shader cannot drift apart."""
-    out = []
+    WAVE 7 MEASURED THIS TO THE `PLAIN_Z` CONTOUR AND GOT 6.0 m AT A SLOPE OF
+    1.000, which is a cliff face and not a beach -- the walk crossed the
+    waterline, went straight up the cliff and stopped six metres of elevation
+    later. That reading was right about the bed and wrong about what it was
+    measuring, and both facts mattered: there WAS no beach, so the only surface
+    the walk could find was the cliff.
+
+    Wave 8 walks to the CLIFF FOOT instead: landward from the waterline until
+    the surface slope crosses the same 0.35 threshold `shade_land` uses to stop
+    calling a surface sand. That is the beach and nothing else, and the slope
+    reported is the MEDIAN slope over the span rather than a rise over a run --
+    so a bed whose beach is a ramp and a bed whose beach is a step do not
+    report the same number.
+    """
+    out, slopes, tops = [], [], []
     for j in range(w.y.size):
-        i0 = int(np.argmax(w.h[j] > 0.0))
-        i1 = int(np.argmax(w.h[j] > PLAIN_Z))
+        row = w.h[j]
+        i0 = int(np.argmax(row > 0.0))
+        g = np.abs(np.gradient(row, float(w.x[1] - w.x[0])))
+        i1 = i0
+        while i1 + 1 < row.size and g[i1 + 1] < 0.35:
+            i1 += 1
         if i1 > i0:
             out.append(float(w.x[i1] - w.x[i0]))
+            slopes.append(float(np.median(g[i0 + 1:i1 + 1])))
+            tops.append(float(row[i1]))
     a = np.array(out) if out else np.zeros(1)
+    s = np.array(slopes) if slopes else np.zeros(1)
+    tz = np.array(tops) if tops else np.zeros(1)
     return dict(median=float(np.median(a)), min=float(a.min()),
-                max=float(a.max()),
-                slope=float(PLAIN_Z / max(np.median(a), 1e-9)))
+                max=float(a.max()), slope=float(np.median(s)),
+                top=float(np.median(tz)),
+                predicted_w=B.BACKSHORE_W, predicted_slope=B.TAN_FACE,
+                predicted_top=B.BACKSHORE_Z)
 
 
 def shadow_cost(w, ex, n=48, reach=600.0, sun=None):
@@ -2581,10 +2881,12 @@ def shadow_cost(w, ex, n=48, reach=600.0, sun=None):
 # exponential atmosphere of scale height H_R is beta = tau/H_R at the surface.
 # THE AEROSOL HALF DOES, and it is `?`: a maritime boundary layer runs 20-60 km
 # of meteorological visibility and Koschmieder turns that into an extinction
-# coefficient. Both are reported, neither is applied, and the reason they are
-# not applied is that fixing this is a wave and measuring it is a row.
-H_RAYLEIGH = 8500.0                     # m, the standard scale height
-VIS_CLEAN, VIS_HAZY = 60000.0, 20000.0  # m, `?` -- the bracket, not a value
+# coefficient.
+#
+# WAVE 8 APPLIES IT. The constants and the term itself are hoisted to `aerial`
+# beside `render`, where they belong; this function stays as the MEASUREMENT of
+# what the air is worth on a given frame's own ranges, and wave 8 runs it on
+# both the frame with the air and the frame without.
 
 
 def aerial_cost(w, ex, cam, L):
@@ -2654,11 +2956,11 @@ def land_breakdown(w, ex, L):
     rock = np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0.0, 1.0)
     plain = np.clip((hz - PLAIN_Z) / 4.0, 0.0, 1.0) * (1 - rock)
     sand = 1.0 - rock - plain
-    wet = np.clip((RUNUP - hz) / 0.35, 0.0, 1.0) * sand
+    wet = (B.swash_wetness(hz) > 0.5) * sand
     n = float(L.shape[0] * L.shape[1])
     return dict(rock=float(rock.sum()) / n, plain=float(plain.sum()) / n,
                 sand=float(sand.sum()) / n, wet_sand=float(wet.sum()) / n,
-                runup=RUNUP)
+                runup=B.BERM_Z)
 
 
 def sun_for_the_coast_frames():
@@ -2701,6 +3003,16 @@ def frame_report(name, w, cam, inf, L, ex):
     # face in shade. Measuring both is what stops the gap being mis-ranked.
     sd_coast = shadow_cost(w, ex, sun=_sun_vector(su['coast_el'],
                                                   su['coast_az']))
+    # ...AND A THIRD SUN, BECAUSE THE FIRST TWO CANNOT ANSWER THE QUESTION.
+    # Both illuminants this project has are on the SEAWARD side of a
+    # west-facing coast: the render's is 21 deg in the west and the bar's
+    # timed cliff frames are 56 deg in the south-east, which is landward but
+    # HIGH. A cliff shadows its own beach when the sun is landward AND low,
+    # which on this coast is the morning. 20 deg at azimuth 110 deg is that
+    # hour, it is a COUNTERFACTUAL and is marked as one -- nothing is rendered
+    # under it -- and it is the only way to say whether the shadow ray is
+    # cheap because the code is right or cheap because of where the sun is.
+    sd_morning = shadow_cost(w, ex, sun=_sun_vector(20.0, 110.0))
     seam = horizon_seam(L, cam)
     ae = aerial_cost(w, ex, cam, L)
     print('FRAME %s -- MEASURED, on the scene-linear buffer:' % name)
@@ -2723,12 +3035,14 @@ def frame_report(name, w, cam, inf, L, ex):
               '%.2f m' % (100 * lb['plain'], 100 * lb['sand'],
                           100 * lb['rock'], 100 * lb['wet_sand'], lb['runup']))
     if sd:
-        print('  SHADOWS (there is no shadow ray in shade_land, and this is '
-              'what that costs):')
+        print('  SHADOWS (wave 8 BUILT the ray; this is what it is worth, '
+              'which is a different question and the answer is a surprise):')
         for nm, s in (('the render\'s sun  %5.2f el / %6.2f az'
                        % (SUN_EL, SUN_AZ), sd),
                       ('bar J\'s own class %5.2f el / %6.2f az'
-                       % (su['coast_el'], su['coast_az']), sd_coast)):
+                       % (su['coast_el'], su['coast_az']), sd_coast),
+                      ('COUNTERFACTUAL    20.00 el / 110.00 az (morning)',
+                       sd_morning)):
             print('     %-40s %5.1f%% of land faces it, %5.1f%% of THAT is '
                   'occluded and lit anyway (direct term %.0f%% of the pixel)'
                   % (nm, 100 * s['lit_share'], 100 * s['wrongly_lit_of_lit'],
@@ -2748,10 +3062,13 @@ def frame_report(name, w, cam, inf, L, ex):
               'white surf, breaking', 'wet sand', 'dry sand'):
         print('     %-26s %6.2f%% of frame%s'
               % (k, 100 * lad[k], '' if lad[k] > 1e-4 else '   <-- ABSENT'))
-    print('     the bed\'s dry beach is %.1f m wide (median), %.1f-%.1f, so '
-          'the face slope is %.3f -- steep enough that `shade_land` classes it '
-          'as ROCK and bar J\'s two most trustworthy rungs have no pixels.'
-          % (bw['median'], bw['min'], bw['max'], bw['slope']))
+    print('     the bed\'s dry beach is %.1f m wide (median), %.1f-%.1f, face '
+          'slope %.4f (1:%.1f), berm top %.2f m -- against the closed forms '
+          'sqrt(H0s L0) = %.1f m, (2/3)A^1.5/sqrt(d) = %.4f and '
+          'tanb sqrt(H0s L0) = %.2f m.'
+          % (bw['median'], bw['min'], bw['max'], bw['slope'],
+             1.0 / max(bw['slope'], 1e-9), bw['top'], bw['predicted_w'],
+             bw['predicted_slope'], bw['predicted_top']))
     print('  AIR: ranges in frame median %.0f m, 90th %.0f m, 99th %.0f m, '
           'max %.0f m (the row below the horizon reaches %.0f m at THIS '
           'raster height and doubles with it)'
@@ -2772,11 +3089,221 @@ def frame_report(name, w, cam, inf, L, ex):
              math.degrees(fs['over_paint']) * cam.h
              / math.degrees(inf['fov_v'])))
     return dict(shares=sh, land=lb, horizon=hz, shadow=sd,
-                shadow_coast=sd_coast, seam=seam, aerial=ae, flat=fs,
-                ladder=lad, beach=bw)
+                shadow_coast=sd_coast, shadow_morning=sd_morning,
+                seam=seam, aerial=ae, flat=fs, ladder=lad, beach=bw)
 
 
 # ------------------------------------------------------------------ captions
+# ============================================ WAVE 8 -- THE LAND, AND THE AIR
+def beach_report(w, bay, out=print):
+    """THE SUBAERIAL BEACH, measured off the bed against its own closed forms.
+
+    ABSOLUTE ROWS AND NOT ONE RATIO. A ratio-only guard has been blind five
+    times in this project, so every line here is a metre or a slope with its
+    prediction beside it, and the identity that ties the three together is
+    checked as a difference and not as a quotient.
+    """
+    bch = bay.get('beach')
+    bw = beach_width(w)
+    L0 = B.deep_wavelength(B.T_SWELL)
+    rows = [
+        ('face slope tan(beta)', bw['slope'], B.TAN_FACE, ''),
+        ('subaerial width, m', bw['median'], B.BACKSHORE_W, 'm'),
+        ('landward top, m', bw['top'], B.BACKSHORE_Z, 'm'),
+        ('swell run-up limit, m', B.BERM_Z, B.TAN_FACE * B.SWASH_W, 'm'),
+        ('swash excursion, m', B.SWASH_W, B.BERM_Z / B.TAN_FACE, 'm'),
+    ]
+    out('THE SUBAERIAL BEACH (wave 8, gap 1) -- measured against closed form:')
+    for nm, meas, pred, u in rows:
+        out('  %-26s measured %9.4f %-2s   closed form %9.4f   '
+            'diff %+8.4f' % (nm, meas, u, pred, meas - pred))
+    out('  the identity: R/tan(beta) = %.6f m and sqrt(H0 L0) = %.6f m, '
+        'difference %.2e m -- the slope divides out of Hunt\'s run-up and '
+        'that is why the dry beach\'s width needs no constant.'
+        % (B.BERM_Z / B.TAN_FACE, math.sqrt(B.H0_SWELL * L0),
+           abs(B.BERM_Z / B.TAN_FACE - math.sqrt(B.H0_SWELL * L0))))
+    out('  the handover depth is the soft place and it is bracketed, not '
+        'asserted: tan(beta) = %.4f at D_MIN = %.2f m, %.4f at D_MORPH_MIN = '
+        '%.2f m (shipped), %.4f at 1.00 m.'
+        % (B.beach_face_slope(d_hand=B.D_MIN), B.D_MIN,
+           B.TAN_FACE, B.D_MORPH_MIN, B.beach_face_slope(d_hand=1.0)))
+    if bch is not None:
+        out('  the budget: the wedge needs %.1f m^3 per metre of coast '
+            '(median) and the coastal loop delivered %.1f -- a factor of '
+            '%.1f, so the WIDTH IS SET BY THE PROFILE and not by the supply '
+            '(supply_limited = %s).'
+            % (np.median(bch['need_row']),
+               np.median(bay['coast']['sand_row'])
+               / float(w.y[1] - w.y[0]),
+               np.median(bay['coast']['sand_row'])
+               / float(w.y[1] - w.y[0]) / max(np.median(bch['need_row']), 1e-9),
+               bch['supply_limited']))
+    out('  the wet/dry boundary is a Rayleigh exceedance and not a line: '
+        'wetness = exp(-(z/R)^2) with R = %.4f m, so the median (w = 0.5) '
+        'sits at z = %.4f m and the surface is %.3f wet at the berm level '
+        'and %.3f at the backshore.'
+        % (B.BERM_Z, B.BERM_Z * math.sqrt(math.log(2.0)),
+           float(B.swash_wetness(B.BERM_Z)),
+           float(B.swash_wetness(B.BACKSHORE_Z))))
+    out('  `?` INHERITED: read as R_2%% instead of the rms, Hunt\'s R gives a '
+        'Rayleigh scale of %.4f m and the band is half as tall. Both are '
+        'reported; the first is shipped.'
+        % (B.BERM_Z / math.sqrt(math.log(50.0))))
+    return dict(width=bw, beach=bch)
+
+
+def wet_dry_report(w, ex, L, out=print):
+    """THE TONAL EDGE BAR H3 CALLS ONE OF THE STRONGEST IN THESE FRAMES.
+
+    Bar J's ruling is that the wet/dry pair is "close in level and therefore
+    the most trustworthy comparison of the set", so this reports BOTH LEVELS
+    absolutely and their ratio, and it separates the diffuse half from the
+    specular half -- because the whole finding of wave 8's gap 2 is that
+    `wet_albedo` contains a specular term that waves 4-7 spent as diffuse.
+    """
+    P = ex.get('land_P')
+    if P is None or P.size == 0:
+        return None
+    hz = w.sample(P[..., 0], P[..., 1], w.h)
+    e = 1.5
+    hx = (w.sample(P[..., 0] + e, P[..., 1], w.h)
+          - w.sample(P[..., 0] - e, P[..., 1], w.h)) / (2 * e)
+    hy = (w.sample(P[..., 0], P[..., 1] + e, w.h)
+          - w.sample(P[..., 0], P[..., 1] - e, w.h)) / (2 * e)
+    rock = np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0.0, 1.0)
+    plain = np.clip((hz - PLAIN_Z) / 4.0, 0.0, 1.0) * (1 - rock)
+    sand = np.clip(1.0 - rock - plain, 0.0, 1.0) > 0.5
+    wetf = B.swash_wetness(hz)
+    Lp = L[ex['land_mask']]
+    mw = sand & (wetf > 0.5)
+    md = sand & (wetf <= 0.5)
+    if not (mw.any() and md.any()):
+        return None
+    aw, ad = Lp[mw].mean(0), Lp[md].mean(0)
+    pt = ex.get('land_parts') or {}
+    dif, spc = pt.get('diffuse'), pt.get('specular')
+    out('  THE WET/DRY SAND PAIR (bar H3, bar J\'s own instrument), '
+        'scene-linear, absolute:')
+    out('     dry sand, TOTAL  %s   %d px' % (np.round(ad, 4), int(md.sum())))
+    out('     wet sand, TOTAL  %s   %d px' % (np.round(aw, 4), int(mw.sum())))
+    out('     ratio wet/dry    %s' % np.round(aw / np.maximum(ad, 1e-9), 4))
+    dw = dd = rd = None
+    if dif is not None:
+        dw, dd = dif[mw].mean(0), dif[md].mean(0)
+        rd = dw / np.maximum(dd, 1e-9)
+        out('     ...and SPLIT, because under THIS sun the total is the wrong '
+            'way round and the reason is not the albedo:')
+        out('       DIFFUSE  dry %s   wet %s   ratio %s  <- BELOW 1 in every '
+            'channel, which is bar H3\'s direction and the direction waves '
+            '4-7 had backwards'
+            % (np.round(dd, 4), np.round(dw, 4), np.round(rd, 4)))
+        out('       SPECULAR dry %s   wet %s   -- the lobe is ON the wet band '
+            'and OFF the dry one by construction, and it is what inverts the '
+            'total'
+            % (np.round(spc[md].mean(0), 4), np.round(spc[mw].mean(0), 4)))
+        out('       THE INVERSION IS GAP 5, NOT GAP 2. This frame is drawn '
+            'under a 21.0 deg sun at azimuth 273.8 -- straight out to sea on '
+            'a west-facing coast -- so the wet band is BACKLIT and glints. '
+            'Bar J\'s own class of frame is front-lit (56.22 / 123.13), where '
+            'the specular goes away from the camera and the pair reads in the '
+            'diffuse order. The albedos are right; the illuminant is in the '
+            'wrong half of the sky.')
+    out('     the albedos it rests on: dry %s, wet DIFFUSE %s '
+        '(= wet_albedo - R_EXT), and the R_EXT %s that used to be inside the '
+        'diffuse term is now the specular lobe.'
+        % (np.round(SAND_DRY, 4), np.round(SAND_WET_DIFF, 4),
+           np.round(OPT.R_EXT, 4)))
+    return dict(wet=aw, dry=ad, ratio=aw / np.maximum(ad, 1e-9),
+                wet_diff=dw, dry_diff=dd, ratio_diff=rd,
+                n_wet=int(mw.sum()), n_dry=int(md.sum()))
+
+
+def paired_cost(L_on, L_off, ex, name, out=print):
+    """WHAT ONE TERM IS WORTH, as a paired frame and in absolute radiance.
+
+    One field changed and nothing else -- the same bed, the same camera, the
+    same instant of phase -- which is the only way a number like this means
+    anything. Reported as the median and the 95th percentile of the ABSOLUTE
+    change per pixel as well as the share, because a term that moves 0.5% of
+    the frame by a factor of three and a term that moves all of it by 0.5% are
+    not the same term and a share alone cannot tell them apart.
+    """
+    d = L_on - L_off
+    a = np.abs(d).max(-1)
+    n = float(a.size)
+    rel = np.abs(d[..., 1]) / np.maximum(L_off[..., 1], 1e-9)
+    out('  %s -- paired frame, one field changed:' % name)
+    out('     %.2f%% of pixels move at all; median |dL| over those %.4f, '
+        '95th %.4f, max %.4f (white point %.3f)'
+        % (100 * (a > 1e-6).sum() / n,
+           float(np.median(a[a > 1e-6])) if (a > 1e-6).any() else 0.0,
+           float(np.percentile(a, 95)), float(a.max()), WHITE))
+    out('     mean green over the whole frame %.5f -> %.5f (%+.2f%%); '
+        'median relative change where it moves %.2f%%'
+        % (L_off[..., 1].mean(), L_on[..., 1].mean(),
+           100 * (L_on[..., 1].mean() / max(L_off[..., 1].mean(), 1e-12) - 1),
+           100 * float(np.median(rel[a > 1e-6])) if (a > 1e-6).any() else 0.0))
+    return dict(share=float((a > 1e-6).sum() / n),
+                med=float(np.median(a[a > 1e-6])) if (a > 1e-6).any() else 0.0,
+                p95=float(np.percentile(a, 95)), mx=float(a.max()),
+                mean_on=float(L_on[..., 1].mean()),
+                mean_off=float(L_off[..., 1].mean()))
+
+
+def plain_relief(w, ex, out=print):
+    """GAP 2: 46% OF THE FRAME IS ONE DECLARED ALBEDO. What it has and what it
+    has not, measured rather than asserted.
+
+    The gap list asks for "at minimum, the same treatment any other surface
+    gets: an albedo with a stated source, a normal, and shadowing". Two of the
+    three are now there and the third is not, and this says which is which.
+
+    AND IT SETTLES WHAT THE PLATEAU'S FLATNESS IS. It is NOT a missing constant
+    -- it is a missing PROCESS, and the arithmetic is three orders wide so no
+    plausible constant reaches it. Differential subaerial weathering keyed to
+    the hardness field this file already owns would lower soft rock faster than
+    hard and produce relief; the rate is a fraction of the marine erosion rate,
+    and published denudation rates for a coastal plateau (0.01-0.1 mm/yr) sit
+    against cliff retreat rates of 0.05-0.5 m/yr, a ratio near 1e-3 to 1e-4.
+    This coast retreated 182 m over the loop's clock, so the plateau lowered
+    somewhere between 2 cm and 18 cm -- and the relief is the CONTRAST times
+    that, a few centimetres over correlation lengths of hundreds of metres.
+    Slopes of 1e-4. Invisible, and invisible under any coefficient in the
+    bracket.
+
+    The relief on a real coastal plain is DRAINAGE -- fluvial incision, a
+    different process on a different clock, and out of chapter 12's scope
+    entirely. So gap 2 is not "declare a weathering rate": it is a landform
+    process this project does not have, and that is why wave 8 measures it and
+    does not build it.
+    """
+    P = ex.get('land_P')
+    if P is None or P.size == 0:
+        return None
+    hz = w.sample(P[..., 0], P[..., 1], w.h)
+    e = 1.5
+    hx = (w.sample(P[..., 0] + e, P[..., 1], w.h)
+          - w.sample(P[..., 0] - e, P[..., 1], w.h)) / (2 * e)
+    hy = (w.sample(P[..., 0], P[..., 1] + e, w.h)
+          - w.sample(P[..., 0], P[..., 1] - e, w.h)) / (2 * e)
+    rock = np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0.0, 1.0)
+    m = (np.clip((hz - PLAIN_Z) / 4.0, 0.0, 1.0) * (1 - rock)) > 0.5
+    if not m.any():
+        return None
+    tilt = np.degrees(np.arctan(np.hypot(hx[m], hy[m])))
+    out('  THE COASTAL PLAIN (gap 2), %d px in frame:' % int(m.sum()))
+    out('     albedo   %s   DECLARED `?`, still one number, still no source'
+        % np.round(PLAIN_DRY, 3))
+    out('     normal   tilt %.3f deg median, %.3f-%.3f across the frame, '
+        'spread %.4f deg -- a normal it HAS, and it is very nearly a delta '
+        'function' % (float(np.median(tilt)), float(tilt.min()),
+                      float(tilt.max()), float(tilt.std())))
+    out('     shadow   built this wave, and see the paired frame for what it '
+        'is worth here')
+    return dict(share_px=int(m.sum()), tilt_med=float(np.median(tilt)),
+                tilt_std=float(tilt.std()), tilt_max=float(tilt.max()))
+
+
 def _cap_J7(w, cam, inf, m):
     ey = inf['eye']
     d = math.degrees
@@ -2907,5 +3434,283 @@ def _cap_K7(w, inf, m, wchk):
     )
 
 
+def _cap_J8(w, cam, inf, m, bp, wd, pc_air, pc_sh, seam0):
+    d = math.degrees
+    lad = m['ladder']
+    bw = bp['width']
+    return (
+        's8  BAR SECTION J, THE SAME CAMERA AS s7-frame-J.png -- set the two '
+        'side by side; that pair is the whole of this wave. Same bed evolution, '
+        'same inferred viewpoint (upright %.1f x %.1f deg, eye %.2f m on this '
+        'bed\'s own brow, depressed %.2f deg), same sun, same optics. FOUR '
+        'FIELDS CHANGED: a subaerial beach, the wet/dry sand pair, a shadow '
+        'ray, and the air.'
+        % (d(inf['fov_v']), d(inf['fov_h']), inf['z_landform'],
+           d(inf['dep']['mid'])),
+        'BAR J\'S FIVE-RUNG LADDER NOW HAS %d RUNGS AND HAD THREE: deep water '
+        '%.2f%%, teal %.2f%%, surf %.2f%%, WET SAND %.2f%% (was 0.00), DRY '
+        'SAND %.2f%% (was 0.00). The beach is %.1f m wide at a face slope of '
+        '%.4f (1:%.0f) against wave 7\'s 6.0 m at 1.000 -- and NOTHING IS '
+        'PLACED: the slope is the Dean equilibrium profile\'s own where the '
+        'surf-zone model hands over to the swash (closed form %.4f, and the '
+        'evolved 1-D bed reads %.4f at that depth), the dry width is '
+        'sqrt(H0 L0) = %.2f m with the slope divided out of Hunt\'s run-up, '
+        'and the backshore is the file\'s own storm at %.2f m. The wet/dry '
+        'boundary is not a line: it is exp(-(z/R)^2), the Rayleigh exceedance '
+        'of the run-up. DIFFUSELY wet sand reads %s against dry %s -- darker '
+        'in every channel, which is bar H3\'s direction and the direction '
+        'waves 4-7 had backwards, because optics.wet_albedo\'s leading R_EXT '
+        'is the film\'s SPECULAR reflection and was being spent as diffuse. '
+        'IN TOTAL IT IS THE OTHER WAY ROUND IN THIS FRAME, and that is gap 5 '
+        'and not gap 2: the sun is 21 deg in the WEST, straight out to sea on '
+        'a west-facing coast, so the wet band is BACKLIT and its new specular '
+        'lobe glints straight down the lens. Bar J\'s own class of frame is '
+        'front-lit and the pair would read in the diffuse order.'
+        % (lad['rungs_present'], 100 * lad['deep water, d > 5 m'],
+           100 * lad['shallow/teal, d < 2.5 m'],
+           100 * lad['white surf, breaking'], 100 * lad['wet sand'],
+           100 * lad['dry sand'], bw['median'], bw['slope'],
+           1.0 / max(bw['slope'], 1e-9), B.TAN_FACE,
+           bp.get('face_measured', float('nan')), B.SWASH_W,
+           B.BACKSHORE_Z,
+           np.round(wd['wet_diff'], 3) if wd else '-',
+           np.round(wd['dry_diff'], 3) if wd else '-'),
+        'THE AIR IS ONE EXPONENTIAL AND IT CLOSES THE SEAM BY CONSTRUCTION. '
+        'beta = atmosphere.TAU_R / 8.5 km per channel -- NO NEW CONSTANT -- '
+        'plus Koschmieder 3.912/V with V = 60 km marked `?` and the 20 km end '
+        'rendered beside it. The airlight is the sky at the horizon in the '
+        'ray\'s own azimuth, which is what an infinitely long horizontal path '
+        'IS, so at grazing the sea\'s radiance goes to the sky\'s identically: '
+        'bar K2\'s seam was %.1f%% off continuity in s7 and is %.1f%% here. '
+        'The air moves %.1f%% of the frame, median |dL| %.4f against a white '
+        'point of %.2f. THE SHADOW RAY moves %.1f%% of the frame under this '
+        'sun. WAVE 7 MEASURED 0.0%% AND GAVE A REASON THAT IS NOW WRONG: it '
+        'said the landform had no relief to cast one. It has -- a 15 m cliff '
+        'over a 12 m beach -- and the ray is still worth almost nothing, for a '
+        'different and geometric reason. Both illuminants this project owns '
+        'are on the SEAWARD side of a west-facing coast, and a cliff shadows '
+        'its own beach only when the sun is landward AND low. Under bar J\'s '
+        'own class (56.22 el / 123.13 az) %.1f%% of the lit land is occluded; '
+        'under a 20 deg MORNING sun at azimuth 110 it is %.1f%%. '
+        'STILL MISSING AND STILL ORDERED: no embayment (%.0f m of plan '
+        'curvature in 1408 m), one surf line where bar J shows three to four, '
+        'the coastal plain is %.1f%% of the frame on ONE DECLARED ALBEDO with '
+        'a normal %.3f deg wide, the sun is in the wrong half of the sky, and '
+        'the sea is flat-Earth. The re-ordered list is in README-beach.md.'
+        % (100 * seam0, 100 * (m['seam']['worst'] if m['seam'] else 0.0),
+           100 * pc_air['share'], pc_air['med'], WHITE,
+           100 * pc_sh['share'],
+           100 * (m['shadow_coast']['wrongly_lit_of_lit']
+                  if m['shadow_coast'] else 0.0),
+           100 * (m['shadow_morning']['wrongly_lit_of_lit']
+                  if m.get('shadow_morning') else 0.0),
+           plan_curvature(w), 100 * (m['land']['plain'] if m['land'] else 0.0),
+           m.get('plain', {}).get('tilt_std', float('nan'))),
+    )
+
+
+def _cap_air8(w8):
+    b_r = np.asarray(ATM.TAU_R, float) / H_RAYLEIGH
+    b_c = beta_ext(VIS_CLEAN)
+    b_h = beta_ext(VIS_HAZY)
+    return (
+        's8  THE AIR, AS A TRIPLET AT ONE CAMERA.  LEFT no atmosphere at all '
+        '(waves 1-7).  CENTRE the shipped air: Rayleigh from '
+        'atmosphere.TAU_R / 8.5 km plus Koschmieder at V = 60 km.  RIGHT the '
+        'hazy end of the same bracket, V = 20 km.  ONE FIELD CHANGES ACROSS '
+        'THE THREE and nothing else -- same bed, same camera, same instant of '
+        'phase, same sun.',
+        'NO NEW CONSTANT IN THE RAYLEIGH HALF. beta = tau/H over an '
+        'exponential atmosphere of scale height 8.5 km, per channel: %s /m, '
+        'and tau is the zenith optical depth this project derived for the '
+        'sun\'s own colour four waves ago. The aerosol half IS `?` and is the '
+        'reason the right-hand panel exists rather than a sentence: beta '
+        'green goes %.2e -> %.2e -> %.2e across the three. THE AIRLIGHT IS '
+        'NOT A DECLARED COLOUR -- it is sky_radiance on the ray flattened to '
+        'the horizontal, because in a horizontally homogeneous atmosphere an '
+        'infinitely long horizontal path REACHES the horizon sky, by '
+        'definition. That is why the sea-sky seam closes: %.1f%% off '
+        'continuity on the left, %.1f%% in the centre, where grazing Fresnel '
+        'says 0 and bar K2 calls a seam "a tell visible at a glance". Nothing '
+        'was fitted to make it close and nothing could have been.'
+        % (np.array2string(b_r, precision=2, formatter={
+            'float_kind': lambda v: '%.2e' % v}),
+           b_r[1], b_c[1], b_h[1],
+           100 * w8['seam_noair'],
+           100 * (w8['m']['seam']['worst'] if w8['m']['seam'] else 0.0)),
+        'WHAT IT COSTS THE FRAME, MEASURED: the air moves %.1f%% of the '
+        'pixels, median |dL| %.4f and 95th percentile %.4f against a derived '
+        'white point of %.3f; the whole frame\'s mean green goes %.5f -> '
+        '%.5f. Going from 60 km to 20 km moves %.1f%% of the pixels by a '
+        'median %.4f. THE TWO APPROXIMATIONS ARE MARKED AND BOTH VANISH AT '
+        'THE SEAM: a slant path is shorter than a horizontal one so the '
+        'airlight on a steeply downward ray is over-stated (and 1 - T is '
+        '0.0002 there), and the aerosol\'s airlight is given the Rayleigh '
+        'sky\'s colour, which over-blues the haze. Bar J and bar K are not '
+        'read for a level anywhere in this: the visibility is `?`, bracketed, '
+        'and the clean end is shipped because it understates the term.'
+        % (100 * w8['air']['share'], w8['air']['med'], w8['air']['p95'],
+           WHITE, w8['air']['mean_off'], w8['air']['mean_on'],
+           100 * w8['haze']['share'], w8['haze']['med']),
+    )
+
+
+def beach_figure(w, bay, w8, path):
+    """The subaerial profile, drawn against its own closed form."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    j = int(w.y.size // 2)
+    row = w.h[j]
+    i0 = int(np.argmax(row > 0.0))
+    sel = slice(max(i0 - 40, 0), min(i0 + 30, row.size))
+    x = w.x[sel] - w.x[i0]
+    fig, ax = plt.subplots(2, 1, figsize=(9.0, 7.4))
+    a = ax[0]
+    a.plot(x, row[sel], 'k-', lw=1.8, label='the bed, row %d' % j)
+    a.plot(x, np.clip(B.TAN_FACE * x, None, B.BACKSHORE_Z), '--',
+           color='#c0392b', lw=1.3,
+           label='closed form: tan(beta) = (2/3)A^1.5/sqrt(d) = %.4f, '
+                 'capped at the storm run-up %.3f m'
+                 % (B.TAN_FACE, B.BACKSHORE_Z))
+    for z, nm, c in ((0.0, 'datum', '#2980b9'),
+                     (B.BERM_Z, 'swell run-up %.3f m (berm level)' % B.BERM_Z,
+                      '#16a085'),
+                     (B.BACKSHORE_Z, 'storm run-up %.3f m (backshore)'
+                      % B.BACKSHORE_Z, '#8e44ad')):
+        a.axhline(z, color=c, lw=0.8, ls=':', label=nm)
+    a.axvline(B.SWASH_W, color='#16a085', lw=0.8, ls='-.')
+    a.axvline(B.BACKSHORE_W, color='#8e44ad', lw=0.8, ls='-.')
+    a.set_ylim(-1.6, 2.6)
+    a.set_xlim(x[0], x[-1])
+    a.set_xlabel('metres landward of the waterline')
+    a.set_ylabel('elevation, m')
+    a.set_title('THE SUBAERIAL BEACH -- nothing placed. Face slope from the '
+                'equilibrium profile, width sqrt(H0 L0) = %.2f m, elevations '
+                'from Hunt.' % B.SWASH_W, fontsize=9)
+    a.legend(fontsize=7, loc='upper left')
+    a.grid(alpha=0.25)
+    b = ax[1]
+    z = np.linspace(0.0, 2.2, 400)
+    b.plot(z, B.swash_wetness(z), '-', color='#c0392b', lw=1.8,
+           label='wetness = exp(-(z/R)^2), R = %.3f m  (Rayleigh exceedance '
+                 'of the run-up)' % B.BERM_Z)
+    b.plot(z, B.swash_wetness(z, R=B.BERM_Z / math.sqrt(math.log(50.0))), '--',
+           color='#7f8c8d', lw=1.1,
+           label='`?` bracket: Hunt\'s R read as R_2%% instead of the rms')
+    b.axvline(B.BERM_Z * math.sqrt(math.log(2.0)), color='#2980b9', lw=0.9,
+              ls=':', label='the median, z = R sqrt(ln 2) = %.3f m'
+              % (B.BERM_Z * math.sqrt(math.log(2.0))))
+    b.set_xlabel('elevation above the datum, m')
+    b.set_ylabel('share of swash cycles reaching it')
+    b.set_title('THE WET/DRY BOUNDARY IS A DISTRIBUTION. Wet sand reads %s '
+                'and dry %s in frame J -- darker in every channel, which is '
+                'bar H3\'s direction.'
+                % (np.round(w8['wd']['wet'], 3) if w8['wd'] else '-',
+                   np.round(w8['wd']['dry'], 3) if w8['wd'] else '-'),
+                fontsize=9)
+    b.legend(fontsize=7)
+    b.grid(alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(path, dpi=118)
+    plt.close(fig)
+    print('  wrote %s' % path)
+
+
+def wave8(w, bay, camJ, infJ, out=print):
+    """THE FOUR GAPS, MEASURED AS PAIRED FRAMES AT BAR J'S OWN FRAMING.
+
+    ONE FIELD CHANGED PER PAIR AND NOTHING ELSE. Four renders of the same
+    camera on the same bed at the same instant of phase: with everything, with
+    the air removed, with the shadow ray removed, and with the hazy end of the
+    visibility bracket instead of the clean one. That is the only way "what the
+    land cost and what the air bought" can be two numbers rather than one
+    impression.
+    """
+    global SHADOW_ON
+    out()
+    bp = beach_report(w, bay, out)
+    # the evolved 1-D bed's own slope at the innermost cell it resolves, which
+    # is the independent instrument the caption quotes. Measured here rather
+    # than typed into the caption -- wave 5's rule about literals in captions.
+    _sc = B.run_scene()
+    _ii = np.where(_sc['tr']['d'] > B.D_MORPH_MIN)[0]
+    bp['face_measured'] = float(abs(np.gradient(
+        _sc['tr']['h'], _sc['tr']['dx'])[_ii[-1]]))
+    out('  and the evolved 1-D bed reads %.6f at that depth, %.2f%% from the '
+        'closed form -- two instruments, and the second could have '
+        'disagreed.' % (bp['face_measured'],
+                        100 * abs(bp['face_measured'] / B.TAN_FACE - 1)))
+    out()
+    L, ex = render(camJ, w)
+    m = frame_report('J (wave 8)', w, camJ, infJ, L, ex)
+    wd = wet_dry_report(w, ex, L, out)
+    pr = plain_relief(w, ex, out)
+    m['plain'] = pr or {}
+    out()
+    out('WHAT EACH TERM IS WORTH, AS PAIRED FRAMES:')
+    L_noair, ex_noair = render(camJ, w, air=False)
+    pc_air = paired_cost(L, L_noair, ex, 'THE AIR (gap 9)', out)
+    seam0 = horizon_seam(L_noair, camJ)
+    seam1 = horizon_seam(L, camJ)
+    out('     the sea-sky seam WITHOUT the air %.1f%% off continuity, WITH it '
+        '%.1f%% -- bar K2\'s criterion, and it closes because an infinite '
+        'path and the horizon sky are the same radiance and not because '
+        'anything was fitted.'
+        % (100 * seam0['worst'] if seam0 else float('nan'),
+           100 * seam1['worst'] if seam1 else float('nan')))
+    L_hazy, _ = render(camJ, w, vis=VIS_HAZY)
+    pc_haze = paired_cost(L_hazy, L, ex, 'THE `?` IN THE AIR: 20 km against '
+                          'the shipped 60 km', out)
+    SHADOW_ON = False
+    L_nosh, _ = render(camJ, w)
+    SHADOW_ON = True
+    pc_sh = paired_cost(L, L_nosh, ex, 'THE SHADOW RAY (gap 13)', out)
+    return dict(L=L, ex=ex, m=m, bp=bp, wd=wd, plain=pr, air=pc_air,
+                haze=pc_haze, shadow=pc_sh,
+                seam_noair=seam0['worst'] if seam0 else float('nan'),
+                L_noair=L_noair, L_hazy=L_hazy, L_nosh=L_nosh)
+
+
+def main_wave8():
+    """WAVE 8 ONLY, and it exists because of the s4/s5/s6 rule.
+
+    `main` regenerates `s6-bay-render.png` and its two companions, and those
+    three frames are one comparison with s4 and s5 -- same camera, same bed,
+    same sun, ONE FIELD CHANGED each time. Wave 8 changes four fields at once,
+    so running `main` would overwrite the middle term of a three-frame argument
+    with a picture that is not comparable to either end of it. The rule that
+    protected s4 from s5 and s5 from s6 protects all three from wave 8, and the
+    way it is kept is that wave 8 has its own entry point.
+    """
+    t0 = time.time()
+    _set_runup()
+    print('sun: elevation %.2f deg, azimuth %.2f deg, air mass %.3f'
+          % (SUN_EL, SUN_AZ, ATM.SUN_AM))
+    print('run-up: xi = %.4f on the BEACH FACE slope %.5f, R = %.4f m; '
+          'waves 4-7 read the slope AT THE BREAK POINT and got xi = %.4f, '
+          'R = %.4f m -- 46%% low, and Hunt\'s xi is defined on the slope the '
+          'swash climbs.' % (_XI, B.TAN_FACE, RUNUP, _XI_BRK, RUNUP_BRK))
+    bay = B.run_bay()
+    w = Water(bay)
+    SS7 = SS_HERO
+    W7, H7 = W_HERO * SS7, H_HERO * SS7
+    (_, _, _, camJ7, infJ7, _, _, _, _) = hero_cameras(w, W7, H7)
+    w8 = wave8(w, bay, camJ7, infJ7)
+    _save(downsample(w8['L'], SS7), '%s/s8-frame-J.png' % OUT,
+          caption=_cap_J8(w, camJ7, infJ7, w8['m'], w8['bp'], w8['wd'],
+                          w8['air'], w8['shadow'], w8['seam_noair']))
+    gap8 = np.zeros((w8['L'].shape[0], 8 * SS7, 3))
+    _save(downsample(np.concatenate([w8['L_noair'], gap8, w8['L'],
+                                     gap8, w8['L_hazy']], axis=1), SS7),
+          '%s/s8-air.png' % OUT, caption=_cap_air8(w8))
+    beach_figure(w, bay, w8, '%s/s8-beach-profile.png' % OUT)
+    print('%.1f s' % (time.time() - t0))
+    return w8
+
+
 if __name__ == '__main__':
-    main()
+    if '--wave8' in sys.argv:
+        main_wave8()
+    else:
+        main()

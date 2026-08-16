@@ -776,7 +776,95 @@ def _bug_flat_sea_no_horizon(mod):
     mod.flat_sea_error = fse
 
 
+# ---------------------------------------------- WAVE 8: the land and the air
+def _bug_face_slope_at_break(mod):
+    """The beach face slope read off the bed AT THE BREAK POINT, which is what
+    waves 4-7's `_set_runup` did to get its Iribarren number. It is the slope
+    of the shoreface a hundred metres offshore in two metres of water -- 1:130
+    -- and Hunt's xi is defined on the slope the SWASH climbs."""
+    mod.beach_face_slope = lambda A=mod.DEAN_A, d_hand=mod.D_MORPH_MIN: 0.0077
+    mod.TAN_FACE = 0.0077
+    mod.BERM_Z = mod.berm_crest(tan_beta=0.0077)
+    mod.BACKSHORE_Z = mod.berm_crest(mod.H0_STORM, tan_beta=0.0077)
+    mod._BAY_CACHE.clear()
+
+
+def _bug_swash_linear_band(mod):
+    """The wet/dry boundary as a linear ramp over a declared width, which is
+    what `shade_land` carried for four waves. Run-up heights are Rayleigh and
+    an exceedance is an exponential of the SQUARE; a ramp is neither."""
+    mod.swash_wetness = lambda z, R=None: np.clip(
+        1.0 - np.maximum(np.asarray(z, float), 0.0)
+        / (mod.BERM_Z if R is None else R), 0.0, 1.0)
+
+
+def _bug_wet_albedo_all_diffuse(mod):
+    """`optics.wet_albedo` shipped whole into the Lambertian lobe -- waves
+    4-7's own code. Wet sand then reads BRIGHTER than dry and never glossy,
+    which is bar H3 exactly backwards."""
+    mod.SAND_WET_DIFF = mod.SAND_WET
+    mod.ROCK_WET_DIFF = mod.ROCK_WET
+
+
+def _bug_airlight_view_direction(mod):
+    """The airlight taken in the VIEW direction instead of the ray flattened to
+    the horizontal. It looks more physical -- the light does come from where
+    you are looking -- and it reopens the sea-sky seam, because a downward ray
+    samples the ground-facing hemisphere and not the horizon."""
+    orig = mod.aerial
+
+    def bad(L, D, r, vis=None):
+        b = mod.beta_ext(vis)
+        T = np.exp(-r[..., None] * b[None])
+        return L * T + mod.sky_radiance(D) * (1.0 - T)
+    mod.aerial = bad
+
+
+def _bug_beta_no_scale_height(mod):
+    """The ZENITH OPTICAL DEPTH used as if it were an extinction coefficient.
+    tau is dimensionless and beta is per metre; the two differ by 8.5 km and
+    the confusion is one of the easiest in atmospheric optics to make."""
+    mod.beta_ext = lambda vis=None: np.asarray(ATM.TAU_R, float)
+
+
+def _bug_specular_no_jacobian(mod):
+    """The slope pdf used as a radiance with no Jacobian -- the same defect
+    wave 4 shipped in the sea's glitter and the suite caught there. The lobe
+    then has the right shape and the wrong magnitude at every angle but one."""
+    orig = mod.wet_specular
+
+    def bad(D, N, sigma=None, sun=True):
+        sg = mod.SIGMA_WET if sigma is None else sigma
+        return orig(D, N, sigma=sg, sun=False)
+    mod.wet_specular = bad
+    mod.SIGMA_WET = mod.SIGMA_WET
+
+
+def _bug_shadow_reach_one_cell(mod):
+    """The shadow march stopped at one cell instead of h_max/tan(elevation).
+    A shadow that is short by a factor of ten looks like a shadow."""
+    orig = mod.land_shadow
+    mod.land_shadow = lambda w, P, N, n=40, reach=None, sun=None: orig(
+        w, P, N, n=n, reach=4.0, sun=sun)
+
+
+LAND_BUGS = ('face-slope-at-break', 'swash-linear-band',
+             'wet-albedo-all-diffuse', 'airlight-view-direction',
+             'beta-no-scale-height', 'specular-no-jacobian',
+             'shadow-reach-one-cell')
+LAND_RENDER_BUGS = {'wet-albedo-all-diffuse', 'airlight-view-direction',
+                    'beta-no-scale-height', 'specular-no-jacobian',
+                    'shadow-reach-one-cell'}
+
+
 BUGS = {
+    'face-slope-at-break': _bug_face_slope_at_break,
+    'swash-linear-band': _bug_swash_linear_band,
+    'wet-albedo-all-diffuse': _bug_wet_albedo_all_diffuse,
+    'airlight-view-direction': _bug_airlight_view_direction,
+    'beta-no-scale-height': _bug_beta_no_scale_height,
+    'specular-no-jacobian': _bug_specular_no_jacobian,
+    'shadow-reach-one-cell': _bug_shadow_reach_one_cell,
     'dw-for-ew': _bug_dw_for_ew,
     'quarter-at-break': _bug_quarter_at_break,
     'cap-not-dissipation': _bug_cap_not_dissipation,
@@ -3168,6 +3256,427 @@ def _sec_surface(ctx):
 
 
 
+def _sec_land(ctx):
+    """WAVE 8 -- THE LAND AND THE AIR: the beach, the wet/dry pair, the shadow
+    ray and the aerial perspective.
+
+    EVERY NEW QUANTITY GETS AT LEAST ONE ABSOLUTE ROW. A ratio-only guard has
+    now been blind FIVE times in this project -- the most recent, a per-channel
+    Fresnel bug, was visible to two absolute rows and to no ratio row at all --
+    so nothing below is checked only as a quotient. The three beach numbers are
+    metres and a slope, the two extinction coefficients are per-metre, and the
+    wetness is checked against Rayleigh variates drawn by a generator that has
+    never heard of `swash_wetness`.
+
+    AND NO TWO ROUTES SHARE A SOURCE where one can be found. The face slope's
+    closed form is checked against a finite difference on `dean_bed`, which was
+    written three waves earlier and knows nothing about beaches; the swash
+    excursion is checked against `runup_hunt`/`iribarren` composed the long way
+    round; the wetness is checked against a Monte-Carlo Rayleigh sample; the
+    airlight's limit is checked against `sky_radiance` evaluated directly.
+    """
+    import beach_render as RND
+    B = BCH
+    L0 = B.deep_wavelength(B.T_SWELL)
+    # THE MEASURED QUANTITIES THE SECTION COMPARES AGAINST, computed once and
+    # cached in ctx so a re-run of the section inside the bug driver does not
+    # pay for the loops twice.
+    if '_face_measured' not in ctx:
+        sc = ctx.get('sc') or B.run_scene()
+        ctx['sc'] = sc
+        tr1 = sc['tr']
+        ii = np.where(tr1['d'] > B.D_MORPH_MIN)[0]
+        ctx['_face_measured'] = float(abs(np.gradient(
+            tr1['h'], tr1['dx'])[ii[-1]]))
+        bay = B.run_bay()
+        ctx['_bay'] = bay
+        ctx['_beach'] = bay.get('beach')
+        ctx['_sand_row'] = bay['coast']['sand_row'] / float(
+            bay['y'][1] - bay['y'][0])
+
+        class _W:
+            pass
+        _w = _W()
+        _w.x, _w.y, _w.h = bay['x'], bay['y'], bay['h']
+        ctx['_beach_width'] = RND.beach_width(_w)
+
+    # ================================================ 11.1 THE BEACH FACE
+    check(1, 'beach_face_slope is (2/3) A^1.5 / sqrt(d_hand), ABSOLUTE',
+          B.beach_face_slope(), 0.0528193, 1e-6,
+          'The number the whole subaerial landform hangs off. Stated '
+          'absolutely because a beach face of 1:19 and one of 1:10 are '
+          'different landforms and both look like beaches.', unit='')
+    # ...AND THE SAME NUMBER OFF A FUNCTION THAT KNOWS NOTHING ABOUT BEACHES.
+    # `dean_bed` is wave 1's equilibrium profile. Differencing it at the
+    # handover depth must reproduce the closed form, because the closed form IS
+    # its derivative -- and if anyone rewrites the algebra with a 3/2 where a
+    # 2/3 belongs this is the row that says so.
+    y0 = (B.D_MORPH_MIN / B.DEAN_A) ** 1.5
+    e = 1e-4
+    xs = B.X_SHORE0
+    dd = -(B.dean_bed(np.array([xs - y0 - e]), x_shore=xs)[0]
+           - B.dean_bed(np.array([xs - y0 + e]), x_shore=xs)[0]) / (2 * e)
+    check(1, 'the same slope by finite difference on dean_bed, ABSOLUTE',
+          dd, B.beach_face_slope(), 1e-7,
+          'Two routes to one number and only one of them is algebra. The '
+          'equilibrium profile was written in wave 1 for the submarine bed and '
+          'has no idea a beach exists; its derivative at the handover depth is '
+          'the face slope by construction, so this is an identity when the '
+          'derivation is right and silent-looking nonsense when it is not.',
+          unit='')
+    between(1, 'the handover bracket: 1:10 at D_MIN, 1:32 at 1 m',
+            B.beach_face_slope(d_hand=B.D_MIN)
+            / B.beach_face_slope(d_hand=1.0), 3.1, 3.2,
+            'The one soft place in the derivation, stated as a range rather '
+            'than hidden. tan(beta) goes as 1/sqrt(d) and the depth at which '
+            'the surf-zone model hands over to the swash is a judgement, so '
+            'the answer is bracketed by a factor of 3.16 exactly -- which is '
+            'the observed range of sandy beach faces and is why the middle of '
+            'it is not a coincidence.')
+    check(1, 'the evolved 1-D bed agrees at its innermost resolved cell',
+          ctx['_face_measured'], B.beach_face_slope(), 0.004,
+          'THE ROW THAT COULD HAVE DISAGREED. The 1-D morphodynamic loop is '
+          'run to quasi-steady from a Dean ramp and reshaped all the way in by '
+          'a transport model with three terms; it builds a bar that departs '
+          'from the ramp by 0.4 m a hundred metres offshore. Its own slope at '
+          'the shallowest cell it will answer for is the beach face slope, and '
+          'nothing made it be.', unit='')
+
+    # =============================================== 11.2 THE SWASH EXCURSION
+    check(1, 'swash_excursion = sqrt(H0 L0), ABSOLUTE', B.swash_excursion(),
+          math.sqrt(B.H0_SWELL * L0), 1e-12,
+          'The width of the dry beach, in metres, with no constant in it. '
+          'Absolute because it replaced a 6.0 m leftover and the difference '
+          'between 6 m and 13.8 m is the difference between a beach and a '
+          'strip.', unit='m')
+    check(1, 'and the same by the long route, R/tan(beta), ABSOLUTE',
+          B.runup_hunt(B.H0_SWELL,
+                       B.iribarren(B.TAN_FACE, B.H0_SWELL, L0)) / B.TAN_FACE,
+          B.swash_excursion(), 1e-9,
+          'Hunt composed with Iribarren and then divided by the slope again. '
+          'It is the SAME statement written the long way, and the point of the '
+          'row is that the slope cancels: the horizontal reach of the swash '
+          'does not depend on how steep the beach is, which is why the width '
+          'needs no constant. A row that fires the moment anyone puts a slope '
+          'back into the excursion.', unit='m')
+    for f in (2.0, 0.5):
+        check(1, 'the slope divides out: tan(beta) x%g leaves the excursion '
+              'ABSOLUTELY unchanged' % f,
+              B.berm_crest(tan_beta=f * B.TAN_FACE) / (f * B.TAN_FACE),
+              B.swash_excursion(), 1e-9,
+              'The run-up limit moves with the slope and the excursion does '
+              'not. Two quantities, one of them slope-free, and this row is '
+              'what stops the two being confused.', unit='m')
+    check(1, 'berm_crest, swell and storm, ABSOLUTE',
+          [B.BERM_Z, B.BACKSHORE_Z], [0.7273578, 1.0286400], 1e-6,
+          'The two elevations the wet/dry boundary and the backshore sit at, '
+          'in metres. The storm one is the file\'s OWN H0_STORM -- chapter '
+          '12\'s "Storms push the bar seaward" case -- so the backshore needs '
+          'no constant either.', unit='m')
+    check(1, 'the run-up scales as sqrt(H): 4x the swell is 2x the limit',
+          B.berm_crest(H=4.0 * B.H0_SWELL) / B.BERM_Z, 2.0, 1e-12,
+          'Hunt\'s R = tan(beta) sqrt(H L_0) at fixed period. The row that '
+          'catches an R written linear in H, which is what a reader who '
+          'remembers "R ~ H xi" and forgets that xi carries 1/sqrt(H) will '
+          'write.')
+
+    # ============================================= 11.3 THE WET/DRY BOUNDARY
+    check(1, 'swash_wetness at 0, R, 2R, ABSOLUTE',
+          [float(B.swash_wetness(0.0)), float(B.swash_wetness(B.BERM_Z)),
+           float(B.swash_wetness(2.0 * B.BERM_Z))],
+          [1.0, math.exp(-1.0), math.exp(-4.0)], 1e-12,
+          'The boundary is a distribution and these are three points of it. '
+          'Absolute, because a wet band that is too tall and one that is too '
+          'short both look like a wet band and only the numbers separate '
+          'them.')
+    # ...AND AGAINST A GENERATOR THAT HAS NEVER SEEN THE FUNCTION.
+    rg = np.random.default_rng(20260816)
+    sig = B.BERM_Z / math.sqrt(2.0)
+    smp = rg.rayleigh(sig, 400000)
+    for z in (0.3, 0.727394, 1.2):
+        check(1, 'Monte-Carlo Rayleigh exceedance at z = %.3f m' % z,
+              float((smp > z).mean()), float(B.swash_wetness(z)), 0.0025,
+              'The claim is that the wetted share IS the exceedance of a '
+              'Rayleigh run-up of rms scale R, and this draws 400000 of them '
+              'and counts. Nothing in numpy\'s generator knows about beaches. '
+              'A linear ramp -- which is what waves 4-7 used -- misses by 0.13 '
+              'at this level, fifty times the tolerance.')
+    check(1, 'the median of the band, ABSOLUTE',
+          B.BERM_Z * math.sqrt(math.log(2.0)), 0.6055646, 1e-6,
+          'Where wetness crosses 0.5, which is the level the ladder counts '
+          'wet sand below. In metres, so the rung and the shader cannot drift '
+          'apart in opposite directions and both stay green.', unit='m')
+
+    # ================================== 11.4 THE BEACH IN THE BED, IN METRES
+    bw = ctx['_beach_width']
+    # THE WIDTH IS NOT THE EXCURSION ON THIS COAST, AND THAT IS A RESULT.
+    # `swash_excursion` is the width a beach WOULD have on an unobstructed
+    # profile; here the cliff's own thermally relaxed talus rises INTO the
+    # swash plane 12 m from the waterline, so the wedge is truncated at 0.92 m
+    # -- past the swell's berm level and short of the storm's backshore. The
+    # prediction is therefore geometric: the distance from the waterline to
+    # where the ROCK first crosses the plane. It is computed here from the
+    # pre-beach composed bed by code that walks and does not solve, and it is
+    # compared with a slope-walk on the FINAL evolved bed that knows nothing
+    # about planes at all.
+    bch = ctx['_beach']
+    if bch is not None:
+        rock, plane = bch['h_rock'], bch['plane']
+        pred = []
+        for jj in range(rock.shape[0]):
+            ok = (plane[jj] > rock[jj]) & (plane[jj] > 0.0)
+            if ok.any():
+                idx = np.where(ok)[0]
+                pred.append(float(ctx['_bay']['x'][idx[-1]]
+                                  - ctx['_bay']['x'][idx[0]]))
+        pred_w = float(np.median(pred)) if pred else 0.0
+        check(2, 'the subaerial beach measured off the 2-D bed, ABSOLUTE',
+              bw['median'], pred_w, 2.5,
+              'The width of the landform, in metres. MEASURED by a slope walk '
+              'from the waterline to the cliff foot on the bed the render '
+              'actually shades; PREDICTED from where the rock crosses the '
+              'swash plane on the bed before any sand was laid. Wave 7 '
+              'measured 6.0 m here and called it a face slope of 1.000. The '
+              'tolerance is the grid: the coastal loop runs at 4 m.', unit='m')
+        info(2, 'and the excursion it is truncated FROM',
+             [bw['median'], B.SWASH_W, B.BACKSHORE_W],
+             'measured / swell excursion / storm excursion, metres. The '
+             'cliff\'s talus takes the top of the wedge, so the beach reaches '
+             'past the swell\'s berm level and is cut short of the storm\'s '
+             'backshore -- which is what a cliffed coast looks like and is '
+             'why the dry rung is thin. A wide backshore belongs to the '
+             'embayment this bed does not have.')
+    between(2, 'the beach\'s top is between the swell berm and the storm '
+            'backshore', bw['top'], B.BERM_Z, B.BACKSHORE_Z,
+            'Both bounds are DERIVED -- 0.727 m and 1.029 m -- so this is an '
+            'absolute statement with no declared number in it: the wedge is '
+            'complete to the level the ordinary swell builds and truncated '
+            'before the level the storm would.')
+    check(2, 'its face slope measured off the same bed, ABSOLUTE',
+          bw['slope'], B.TAN_FACE, 0.006,
+          'The median slope over the span, not a rise over a run -- so a bed '
+          'whose beach is a ramp and one whose beach is a step do not report '
+          'the same number. Wave 7 measured 1.000 here, which is a cliff.',
+          unit='')
+    if bch is not None:
+        check(2, 'the sand budget is not what limits the width',
+              float(bch['frac'].min()), 1.0, 1e-9,
+              'The wedge needs about 35 m^3 per metre of coast and the coastal '
+              'loop delivered about 206. If this row ever fails the beach has '
+              'become supply-limited and its width stops being a closed form '
+              'and starts being an accounting answer -- which is a real state '
+              'for a starved coast and must not be reached silently.')
+        between(2, 'and the margin it passes by', float(np.median(
+            ctx['_sand_row']) / np.median(bch['need_row'])), 3.0, 12.0,
+            'A factor, reported so that "not supply-limited" is a measurement '
+            'with a number rather than a boolean. Two orders would be a '
+            'suspiciously large budget; unity would mean the closed form is '
+            'about to stop applying.')
+
+    # ============================== 11.5 THE ALBEDO SPLIT -- WAVE 8'S FINDING
+    check(1, 'the split is exact: diffuse + R_EXT = wet_albedo, ABSOLUTE',
+          RND.SAND_WET_DIFF + OPT.R_EXT, RND.SAND_WET, 1e-15,
+          'Nothing is invented and nothing is lost. `optics.wet_albedo` is not '
+          'touched; its LEADING TERM is moved out of the diffuse lobe and into '
+          'a specular one, and this row is the arithmetic that says the move '
+          'conserved it.')
+    check(1, 'wet sand is DARKER than dry, diffusely, in every channel',
+          (RND.SAND_WET_DIFF < RND.SAND_DRY).all(), True, 0,
+          'Bar H3: "wet sand darkens". Waves 4-7 shipped the full wet_albedo '
+          'as a Lambertian, which makes it BRIGHTER -- and this row is what '
+          'fires when that is put back.')
+    info(1, 'the size of the error waves 4-7 shipped',
+         np.round(RND.SAND_WET - RND.SAND_DRY, 4),
+         'The signed difference the old code produced between wet sand and dry '
+         'sand in the diffuse lobe. Positive in a channel means wet read '
+         'brighter than dry there, which is backwards.')
+    check(1, 'the specular that replaces it is R_EXT, ABSOLUTE',
+          OPT.R_EXT, [0.0662480, 0.0666910, 0.0675109], 1e-6,
+          'The hemispherical external reflectance of the film, per channel. '
+          'It is the quantity removed from the diffuse albedo and the '
+          'magnitude of the lobe that replaces it, so it is stated rather '
+          'than trusted.')
+
+    # ======================================= 11.6 THE SPECULAR LOBE'S GEOMETRY
+    # THE SLOPE DISTRIBUTION MUST NORMALISE. Integrated over the slope plane it
+    # is 1 by definition of a probability density, and the row that fires when
+    # someone drops the 2 pi sigma^2 is worth more than any picture.
+    g = np.linspace(-3.0, 3.0, 1201)
+    gx, gy = np.meshgrid(g, g)
+    sg = RND.SIGMA_WET
+    p = np.exp(-0.5 * (gx ** 2 + gy ** 2) / sg ** 2) / (2 * np.pi * sg ** 2)
+    check(1, 'the wet film\'s slope pdf integrates to 1, ABSOLUTE',
+          float(p.sum() * (g[1] - g[0]) ** 2), 1.0, 1e-6,
+          'The same statement `beach_optics.slope_pdf` carries for the sea, on '
+          'the distribution this file uses for a wet film. An unnormalised '
+          'lobe is brighter or darker by a constant that no picture reports.')
+    # AND THE MIRROR DIRECTION IS THE MIRROR DIRECTION. A flat wet surface seen
+    # at theta must reflect the sky from theta on the other side, and the
+    # radiance must be fresnel(cos theta) times it -- ABSOLUTE, per channel.
+    N = np.array([[0.0, 0.0, 1.0]])
+    for th in (10.0, 45.0, 80.0):
+        c, s = math.cos(math.radians(th)), math.sin(math.radians(th))
+        D = np.array([[s, 0.0, -c]])
+        got = RND.wet_specular(D, N, sun=False)[0]
+        exp = OPT.fresnel(np.array([c]))[0] * RND.sky_radiance(
+            np.array([[s, 0.0, c]]))[0]
+        check(1, 'the wet band mirrors the sky at %g deg, ABSOLUTE' % th,
+              got, exp, 1e-12,
+              'A smooth film is a mirror and the sky term needs no roughness '
+              'at all. This is the half of the specular that carries no `?`, '
+              'and it is checked against optics.fresnel and the environment '
+              'evaluated directly rather than against itself.')
+
+    # ============================================= 11.7 THE AIR, PER METRE
+    check(1, 'the Rayleigh coefficient is TAU_R / 8.5 km, ABSOLUTE',
+          RND.beta_ext(vis=None) - RND.CAM.koschmieder_beta(RND.VIS_SHIPPED),
+          np.asarray(ATM.TAU_R, float) / 8500.0, 1e-15,
+          'NO NEW CONSTANT. tau is the zenith optical depth this project '
+          'derived four waves ago for the sun\'s own colour; over an '
+          'exponential atmosphere of scale height H the surface coefficient is '
+          'tau/H. Per channel and per metre.', unit='/m')
+    check(1, 'and its green value, ABSOLUTE',
+          float(np.asarray(ATM.TAU_R, float)[1] / 8500.0), 1.18809e-5, 1e-9,
+          'One number, in inverse metres. The row that fires when the scale '
+          'height is left out entirely -- which gives 0.1015, four orders '
+          'high, and paints the frame flat grey at 50 m.', unit='/m')
+    check(1, 'Koschmieder at 60 km and 20 km, ABSOLUTE',
+          [RND.CAM.koschmieder_beta(60000.0),
+           RND.CAM.koschmieder_beta(20000.0)],
+          [3.912 / 60000.0, 3.912 / 20000.0], 1e-12,
+          'The `?` half of the air, both ends of the bracket, stated in '
+          'inverse metres so that "clean" and "hazy" are numbers rather than '
+          'adjectives.', unit='/m')
+    # THE TWO LIMITS OF THE TRANSFER, AND THEY ARE THE WHOLE PHYSICS.
+    Dh = np.array([[0.6, 0.8, -0.02]])
+    Dh = Dh / np.linalg.norm(Dh)
+    Lsurf = np.array([[0.4, 0.5, 0.9]])
+    check(1, 'aerial at zero range returns the surface EXACTLY',
+          RND.aerial(Lsurf, Dh, np.array([0.0]))[0], Lsurf[0], 1e-15,
+          'A path of no length changes nothing. The row that fires if the '
+          'airlight is added unattenuated -- which is what "L + airlight" '
+          'instead of "L T + airlight (1 - T)" does, and it is bright enough '
+          'at the camera to look like a lifted black point.')
+    flat = Dh.copy()
+    flat[..., 2] = 0.0
+    flat = flat / np.linalg.norm(flat)
+    check(1, 'aerial at infinite range returns the HORIZON sky, ABSOLUTE',
+          RND.aerial(Lsurf, Dh, np.array([1e9]))[0],
+          RND.sky_radiance(flat)[0], 1e-12,
+          'THE ROW THE SEAM RESTS ON. In a horizontally homogeneous atmosphere '
+          'an infinitely long horizontal path REACHES the horizon sky -- that '
+          'is what the horizon sky is -- so the sea at grazing goes to the sky '
+          'just above it identically, and bar K2\'s continuity criterion is '
+          'satisfied by construction rather than by a fitted number. If the '
+          'airlight is taken in the VIEW direction instead of the flattened '
+          'one this row fires and the seam reopens.')
+    r1 = np.array([1000.0])
+    T1 = np.exp(-1000.0 * RND.beta_ext())
+    T2 = np.exp(-2000.0 * RND.beta_ext())
+    check(1, 'Beer-Lambert composes: T(2r) = T(r)^2, ABSOLUTE',
+          T2, T1 ** 2, 1e-15,
+          'The property that makes a single exponential the right model at '
+          'all. Cheap, and it is the row that catches a transmittance written '
+          'as 1 - beta r, which agrees to first order and is 39 per cent wrong '
+          'at one e-folding.')
+
+    # ================================================= 11.8 THE SHADOW RAY
+    # A SYNTHETIC BED WITH ONE WALL ON IT, so the answer is arithmetic rather
+    # than a picture. The sun is at 30 deg; a 10 m wall shadows 17.32 m behind
+    # it and nothing in front of it.
+    class _Bed:
+        pass
+    bed = _Bed()
+    bed.x = np.arange(0.0, 200.0, 1.0)
+    bed.y = np.arange(-20.0, 21.0, 1.0)
+    hh = np.zeros((bed.y.size, bed.x.size))
+    hh[:, 100:104] = 10.0
+    bed.h = hh
+
+    def _samp(xq, yq, fld):
+        i = np.clip(np.round(np.asarray(xq)).astype(int), 0, bed.x.size - 1)
+        j = np.clip(np.round(np.asarray(yq) + 20).astype(int), 0,
+                    bed.y.size - 1)
+        return fld[j, i]
+    bed.sample = _samp
+    S = np.array([math.cos(math.radians(30.0)), 0.0,
+                  math.sin(math.radians(30.0))])          # +x, 30 deg up
+    Nup = np.tile(np.array([0.0, 0.0, 1.0]), (6, 1))
+    xs_t = np.array([80.0, 95.0, 108.0, 115.0, 121.0, 130.0])
+    P = np.stack([xs_t, np.zeros(6), np.zeros(6)], -1)
+    sh = RND.land_shadow(bed, P, Nup, n=200, sun=S)
+    # 104 is the wall's far face; the shadow reaches 104 - 10/tan(30) = 86.7 m
+    # BEHIND it, i.e. down to x = 104 - 17.32... the sun is toward +x, so the
+    # shadow falls on x < 100 and ends at 100 - 17.32 = 82.68.
+    check(1, 'a 10 m wall under a 30 deg sun: which of six points are dark',
+          sh, [1.0, 0.0, 1.0, 1.0, 1.0, 1.0], 0,
+          'The shadow falls toward -x because the sun is toward +x, and it '
+          'reaches 10/tan(30) = 17.32 m from the wall\'s near face at x = 100. '
+          'So x = 95 is dark, x = 80 is 20 m away and lit, and everything '
+          'beyond the wall is lit. Six points, one arithmetic answer, and no '
+          'picture involved.')
+    check(1, 'the shadow\'s edge, in metres, ABSOLUTE',
+          float(bed.x[np.argmin(RND.land_shadow(
+              bed, np.stack([bed.x, np.zeros(bed.x.size),
+                             np.zeros(bed.x.size)], -1),
+              np.tile(np.array([0., 0., 1.]), (bed.x.size, 1)), n=300,
+              sun=S)[:100])]),
+          100.0 - 10.0 / math.tan(math.radians(30.0)), 1.5,
+          'Where the dark ends, measured off the same march the renderer uses '
+          'and compared with h/tan(elevation) in metres. The tolerance is the '
+          'march\'s own step near the wall. A reach that is too short moves '
+          'this edge toward the wall and a normal test that is inverted '
+          'removes the shadow entirely.', unit='m')
+
+    # ================================ 11.9 WHAT IS STILL OPEN, STATED AS ROWS
+    ROWS.append(Row(1, 'the berm SCARP -- a break in slope at the run-up limit',
+                    'a break in slope', 'a level on one plane', '-', 'OPEN',
+                    'Hunt\'s run-up with one face slope puts EVERY run-up '
+                    'limit on the SAME PLANE, so the swell\'s limit and the '
+                    'storm\'s differ only in how far up it they reach. A berm '
+                    'crest is a break in slope and needs the swell to CUT the '
+                    'storm-built profile -- swash transport, which this model '
+                    'does not have. The level is derived and marked; the '
+                    'scarp is absent, not approximated.', ''))
+    ROWS.append(Row(1, 'SIGMA_WET, the wet film\'s residual rms slope',
+                    '0.10 - 0.40', RND.SIGMA_WET, '-', 'OPEN',
+                    'The one new unknown wave 8 adds. It moves the SUN\'s '
+                    'glint on the wet band and nothing else -- the sky half of '
+                    'the specular needs no roughness at all -- and no '
+                    'measurement of a wet grain pack\'s residual slope was '
+                    'available. Declared at 0.20, bracketed, and the bracket '
+                    'is rendered.', ''))
+    ROWS.append(Row(1, 'the aerosol visibility', '20 - 60 km',
+                    RND.VIS_SHIPPED / 1000.0, '-', 'OPEN',
+                    'Koschmieder turns a meteorological visibility into an '
+                    'extinction coefficient and a maritime boundary layer runs '
+                    '20-60 km. The clean end is shipped because it UNDERSTATES '
+                    'the term being added; the hazy end is rendered beside it. '
+                    'It is not read off bar J or bar K -- the standing ruling '
+                    'forbids reading a level off them and horizon sharpness is '
+                    'a level.', 'km'))
+    ROWS.append(Row(1, 'the beach\'s feedback on the cliff', 'closed',
+                    'not closed', '-', 'OPEN',
+                    'The wedge is laid at COMPOSITION time, in `bay_bed`, and '
+                    'not inside `coastal_step`\'s iteration. Inside it the '
+                    'beach moves the waterline the notch attacks and the cliff '
+                    'stops retreating -- a real feedback, and the reason it is '
+                    'not closed here is that it changes the plan-form every '
+                    'row in `_sec_coast` is measured on. The budget is the '
+                    'loop\'s; the iteration is not.', ''))
+    ROWS.append(Row(1, 'the coastal plain\'s relief', 'a landform',
+                    'a straight ramp', '-', 'OPEN',
+                    'Gap 2, and it is a missing PROCESS rather than a missing '
+                    'constant. Differential subaerial weathering keyed to the '
+                    'hardness field this file already owns lowers the plateau '
+                    'by 2-18 cm over the 182 m this coast retreated (denudation '
+                    '0.01-0.1 mm/yr against cliff retreat 0.05-0.5 m/yr), so '
+                    'the relief it can produce has slopes of 1e-4 -- invisible '
+                    'under ANY coefficient in the bracket. The relief on a real '
+                    'coastal plain is drainage, which is out of chapter 12.',
+                    ''))
+
+
 def _sec_camera(ctx):
     """WAVE 7 -- WHERE THE PHOTOGRAPH WAS TAKEN FROM.
 
@@ -3973,7 +4482,9 @@ def run_suite():
                                     'glitter'),
                       (_sec_surface, 'the nonlinear free surface'),
                       (_sec_foam, 'the white: foam, entrained air, whitecaps'),
-                      (_sec_camera, 'the camera at the owner\'s viewpoints')):
+                      (_sec_camera, 'the camera at the owner\'s viewpoints'),
+                      (_sec_land, 'the land and the air: beach, wet/dry, '
+                                  'shadow, aerial perspective')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -4049,6 +4560,31 @@ def _run_section(fn, label):
 
 if __name__ == '__main__':
     t0 = time.time()
+    if '--bugs-land' in sys.argv:
+        import importlib
+        import beach_render as RND
+        _run_section(_sec_land, 'the land and the air')
+        base = set(_fail_names())
+        print('clean land section: %d pass / %d FAIL'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base)))
+        print()
+        print('%-28s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 118)
+        for name in LAND_BUGS:
+            importlib.reload(BCH)
+            importlib.reload(RND)
+            BUGS[name](RND if name in LAND_RENDER_BUGS else BCH)
+            try:
+                _run_section(_sec_land, 'the land and the air')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-28s %d  %s' % (name, len(caught),
+                                    '; '.join(c[:70] for c in caught[:5])))
+        importlib.reload(BCH)
+        importlib.reload(RND)
+        sys.exit(0)
     if '--bugs-camera' in sys.argv:
         import importlib
         _run_section(_sec_camera, 'the camera')
@@ -4128,6 +4664,12 @@ if __name__ == '__main__':
             importlib.reload(BCH)
             importlib.reload(BOP)
             importlib.reload(CMR)
+            if name in LAND_BUGS:
+                # the land section is exercised by `--bugs-land`, which
+                # reloads `beach_render` between runs. The whole-suite driver
+                # does not import the renderer, so these are skipped here and
+                # the table that fires them is the one printed by that flag.
+                continue
             patch(CMR if name in CAMERA_BUGS
                   else (FOAM if name in FOAM_BUGS
                         else (BOP if name in OPTICS_BUGS else BCH)))

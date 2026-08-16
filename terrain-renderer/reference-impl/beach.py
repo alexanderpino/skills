@@ -1993,7 +1993,8 @@ def subaerial_beach(x, h2, h_rock=None, sea_level=None, tan_face=None,
     z = h - sea_level
     on = (fill > 1e-6) & (frac[:, None] > 0.0)
     wid = ((z > 0.0) & on).sum(axis=1) * dx
-    return dict(h=h, sand=frac[:, None] * fill, i_foot=i_foot,
+    return dict(h=h, h_rock=rock, plane=plane, sand=frac[:, None] * fill,
+                i_foot=i_foot,
                 need_row=need_row, frac=frac, width=wid,
                 supply_limited=bool((frac < 0.999).any()),
                 tan_face=tb, berm=zb, backshore=zs)
@@ -2149,6 +2150,20 @@ ROCK_REPOSE = 55.0      # degrees. The talus angle chapter 05's thermal step
 
 BEACH_HEIGHT = 2.0      # m, the elevation band the eroded material is laid down
                         # in ("h < seaLevel + beachHeight" in the pseudocode).
+                        #
+                        # WAVE 8: IT WAS A DEAD PARAMETER FOR SEVEN WAVES.
+                        # `coastal_step` took `beach_height=BEACH_HEIGHT` in
+                        # its signature and NEVER READ IT -- the deposition
+                        # band was the literal `sea_level - 3.0` to
+                        # `sea_level`, an undeclared number, and the chapter's
+                        # own subaerial limit was quietly not implemented. That
+                        # is why the scene had no beach. The parameter is gone
+                        # and the constant stays here as the record of what the
+                        # pseudocode asked for; the elevations that now bound
+                        # the deposit are DERIVED -- `BERM_Z` = 0.727 m from
+                        # the swell's run-up and `BACKSHORE_Z` = 1.029 m from
+                        # the file's own storm -- and 2.0 m is between them and
+                        # was never checked against either.
 
 SAND_FRACTION = 0.10    # of the eroded rock that survives as beach-grade sand.
                         # `?` -- a cliff is not made of sand, and the fines and
@@ -2353,9 +2368,9 @@ def thermal_relax(h2, dx, dy, tan_repose, n_iter=3, frac=0.4):
 
 def coastal_step(h2, hard, expo, dx, dy, sea_level=SEA_LEVEL,
                  notch=NOTCH_HEIGHT, k_coast=K_COAST, repose=ROCK_REPOSE,
-                 beach_height=BEACH_HEIGHT, deposit=True, use_exposure=True,
+                 deposit=True, use_exposure=True,
                  waterline=True, depth_limit=True, h0_wave=H0_SWELL,
-                 sand_fraction=SAND_FRACTION):
+                 sand_fraction=SAND_FRACTION, toe_depth=3.0):
     """One notch -> collapse -> deposit iteration. Returns (h, eroded volume).
 
     CHAPTER 12'S coastalStep TAKEN LITERALLY STALLS ON A HEIGHTFIELD, and the
@@ -2442,7 +2457,17 @@ def coastal_step(h2, hard, expo, dx, dy, sea_level=SEA_LEVEL,
         # the excess LEAVES THE DOMAIN and is returned as `export` rather than
         # quietly dropped. Real cliff debris is abraded and carried offshore;
         # this loop does not transport it and says so with a number.
-        near = (h < sea_level) & (h > sea_level - 3.0)
+        # `toe_depth` WAS THE LITERAL 3.0 AND IT IS STILL `?`. It is the
+        # seaward limit of the nearshore band the fill goes into, it was never
+        # declared, and wave 8 has NOT changed its value -- naming it and
+        # changing it in one move would have made every measurement in
+        # `_sec_coast` incomparable with wave 7's. What wave 8 does is give it
+        # a name and a note: the physical quantity is the closure depth, the
+        # depth beyond which the wave no longer moves sand, and Hallermeier's
+        # relation puts it at 3.2 m for this sea state -- 7% from the literal
+        # somebody wrote. Close enough to be a coincidence and close enough
+        # that changing it is not this wave's business.
+        near = (h < sea_level) & (h > sea_level - toe_depth)
         cap = np.maximum(sea_level - h, 0.0) * near
         cap_row = cap.sum(axis=1) * dx * dy
         ero_row = ero.sum(axis=1) * dx * dy * sand_fraction
