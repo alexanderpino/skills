@@ -443,8 +443,55 @@ BOIL = _plane(10, LAM_MIN, 0.045, 1.0, None, 17)
 _IMG = [(JET_XY[0], JET_XY[1]), (-JET_XY[0], JET_XY[1]), (JET_XY[0], -JET_XY[1]),
         (2 * X1 - JET_XY[0], JET_XY[1]), (JET_XY[0], 2 * Y1 - JET_XY[1])]
 _NEAR = [(2 * np.pi / l, w) for l, w in ((0.30, 1.0), (0.21, 0.8), (0.15, 0.6))]
-_SC = {'near': 1.0}
+
+# ------------------------------------- THE NEAR BAND HAS NO LEVEL UNTIL IT IS SET
+# `_SC['near']` USED TO SHIP AT 1.0, AND THAT WAS A 989x TRAP. The NEAR band is a
+# coherent sum of image sources whose amplitude is geometry -- 1/sqrt(r) and the
+# viscous decay -- so unlike the four plane-wave bands it has no analytic rms and
+# its level is only fixed by `_norm_jets` measuring the shape and dividing:
+# JNEAR_RMS / rms_slope(shape) = 0.001011. With 1.0 sitting there instead, every
+# consumer that imported this module and sampled it WITHOUT calling `_norm_jets`
+# first got NEAR at 989x its calibrated amplitude -- and with it the WHOLE field,
+# all five bands together, at an rms slope of 33.7 against a calibrated 0.066
+# (`validate.py` measures both). Nothing raised, nothing printed, and the frame
+# simply came out of a different pool. `render.py` (line 1228) and `validate.py`
+# both call it -- correctly, and only because a comment said to -- and the
+# raster reference lost a full round of measurements to the one place that
+# did not.
+#
+# A COMMENT IS NOT A GUARD WHEN THE FAILURE IS SILENT AND 989x. So the level is
+# absent rather than wrong: `None` until `_norm_jets` sets it, and every path out
+# of this module that carries the NEAR band goes through `_near_scale()`, which
+# RAISES. The three public entry points -- `grad_grid`, `grad_points`,
+# `slope_var_points` -- therefore cannot return an unnormalised field at all; the
+# module refuses, by name, with the fix in the message.
+#
+# `_norm_jets` itself has to read the band BEFORE its level exists, since that
+# reading is what sets it. That is the one bypass, and it is explicit: `_cyl`
+# takes the scale as an argument there. Passing 1.0 makes it the same
+# `gx * 1.0` the file always evaluated -- same promotion, same bits -- so the
+# calibration is unchanged to the last digit and no rendered pixel moves. It also
+# makes `_norm_jets` IDEMPOTENT, which it silently was not: called twice, the
+# second pass used to measure the ALREADY-SCALED field and divide again.
+_SC = {'near': None}
 _PH = np.random.default_rng(13).uniform(0, 2 * np.pi, 8)
+
+
+def _near_scale():
+    """The NEAR band's calibrated amplitude, or a loud stop.
+
+    `validate.py` fires this both ways -- the raise on a fresh module, and the
+    989x the field would otherwise have carried -- because a guard nobody has
+    seen fail is a guard nobody has tested."""
+    s = _SC['near']
+    if s is None:
+        raise RuntimeError(
+            'field.py: the NEAR band is not calibrated -- call '
+            'field._norm_jets() once before sampling the field. It measures '
+            'the band\'s shape and sets its level (JNEAR_RMS = %.3f); without '
+            'it the band would ship at 989x amplitude, which is why this '
+            'raises instead of returning a number.' % JNEAR_RMS)
+    return s
 
 
 def shelter(x, y):
@@ -592,9 +639,14 @@ def _wake(X, Y, fv=None):
     return gx * w, gy * w
 
 
-def _cyl(X, Y, fv=None):
+def _cyl(X, Y, fv=None, scale=None):
     """Long waves radiated from the forcing region and its wall images. Long waves
-    on a filmed surface are still bulk-damped, so the clean-water alpha applies."""
+    on a filmed surface are still bulk-damped, so the clean-water alpha applies.
+
+    `scale` is the NEAR band's level. `None` -- every caller but one -- takes it
+    from `_near_scale()`, which raises if `_norm_jets` has not run. The one
+    caller that passes it is `_norm_jets`, which is measuring the shape in order
+    to compute that level and so cannot ask for it."""
     gx = np.zeros(X.shape, np.float32); gy = np.zeros(X.shape, np.float32)
     for j, (k, w) in enumerate(_NEAR):
         om, cg, _ = _disp(k); al = _alpha(k)[0]
@@ -605,7 +657,8 @@ def _cyl(X, Y, fv=None):
             a = w / np.sqrt(r) * np.exp(-al * r / cg) * fw
             c = (a * k * np.cos(k * r - om * 3.7 + _PH[j])).astype(np.float32)
             gx += c * dx / r; gy += c * dy / r
-    return gx * _SC['near'], gy * _SC['near']
+    s = _near_scale() if scale is None else scale
+    return gx * s, gy * s
 
 
 def _gemm(F, xs, ys, fv=None):
@@ -665,7 +718,11 @@ def _norm_jets():
     _report_jet()
     X, Y = np.meshgrid(np.linspace(0.3, X1 - 0.3, 260).astype(np.float32),
                        np.linspace(0.3, Y1 - 0.3, 130).astype(np.float32))
-    g = _cyl(X, Y); _SC['near'] = JNEAR_RMS / rms_slope(*g)
+    # `scale=1.0` is the bypass described beside `_SC`: the band's SHAPE, read
+    # before its level exists, which is exactly what this line then divides into
+    # JNEAR_RMS to produce that level. It is the same `gx * 1.0` the file always
+    # evaluated, so the calibration is bit-for-bit the shipped one.
+    g = _cyl(X, Y, scale=1.0); _SC['near'] = JNEAR_RMS / rms_slope(*g)
     _wake_field()                       # trace the rays once, before anything asks
     # how far does the wake stay visible?
     sax = np.linspace(0.1, 7.8, 300)
@@ -1050,13 +1107,16 @@ def slope_var_points(x, y, fp):
             vxy = vxy + h * (ux * uy)
     # NEAR: a coherent sum of image sources, so its local amplitude is geometry
     # (1/sqrt(r) and the viscous decay), not a constant per component.
+    _sc = _near_scale()          # the same refusal the field itself carries: a
+                                 # removed-variance tensor built on an
+                                 # uncalibrated band is as wrong as the field
     for j, (k, w) in enumerate(_NEAR):
         om, cg, _ = _disp(k); al = _alpha(k)[0]
         lost = 1.0 - np.exp(-k * k * fv)
         for xi, yi in _IMG:
             dx = xf - np.float32(xi); dy = yf - np.float32(yi)
             r = np.sqrt(dx * dx + dy * dy) + np.float32(0.12)
-            a = _SC['near'] * w / np.sqrt(r) * np.exp(-al * r / cg) * k
+            a = _sc * w / np.sqrt(r) * np.exp(-al * r / cg) * k
             h = 0.5 * a * a * lost
             vxx = vxx + h * (dx / r) ** 2
             vyy = vyy + h * (dy / r) ** 2
