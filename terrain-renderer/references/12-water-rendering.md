@@ -4205,6 +4205,17 @@ with nothing averaged in it — a photon walk that attenuates each path over its
 §10). That is a general property of this class of bug and it is why it belongs beside
 [`11`'s eighth way](11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement).
 
+⚠️ **And a note on computing these two integrals, because the obvious rule is the wrong one.**
+`R_int(μ)` **pins to exactly 1 past the critical angle**, so the integrand has a **kink** at
+`μ = cos θ_c` — and a smooth high-order rule spread across it converges algebraically, not
+spectrally. Splitting the interval at `cos θ_c` and using 400 nodes a side reaches eight digits
+where a single 2000-node Gauss–Legendre rule reaches four and a half (`D`; the shipped figures in
+the table above are unaffected at the precision quoted, but the rule sits `+3.9 / −6.2 / +3.1 e-5`
+relative away on `T_esc`). Baking these into a LUT hides the residual behind interpolation error,
+which is why it is worth getting right in the generator; the episode, and the suite row whose
+tolerance was exactly the size of it, are
+[`11`'s thirteenth way](11-verification-failures.md#the-thirteenth-way-a-tolerance-the-size-of-the-thing-it-covers).
+
 **Where the temptation arises in a real-time pipeline**, in rough order of how often it is taken:
 
 - **The water shader's own composition.** `refracted * exp(-c * rayDistance) * (1 - F)` is the

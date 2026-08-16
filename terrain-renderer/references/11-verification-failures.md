@@ -952,6 +952,109 @@ actually checked, and every defect that destroys a shared fixture will be under-
 many rows sit downstream of it — which is exactly the defects that matter most, because a defect
 that breaks one number breaks one row and a defect that breaks the scene breaks all of them.
 
+### The thirteenth way: a tolerance the size of the thing it covers
+
+Every way above is about a row that measures the wrong thing. This one measures the **right** thing,
+in the right place, against an independent route, and reports nothing — because its tolerance was
+sized from the disagreement it was written to accommodate. It is the smallest of the thirteen and it
+is the one this project committed **against its own stated rule**: *a tolerance is justified from the
+estimator's own error or a published uncertainty, **never** from the disagreement it is being asked
+to excuse.* The rule was written down in `12`; the row below was written by the same hands.
+
+**The row.** A closed-form exit transport is cross-checked at zero depth against a completely
+different route: `slab_esc(0)` — a 2000-node Gauss–Legendre quadrature over the water-side cosine —
+must equal `T_OUT_DIFFUSE = (1 − R_ext)/n²`, a 512-point midpoint rule over the **air**-side cosine
+joined to it by Walsh's reciprocity relation. Two estimators, two variables, one identity, no shared
+line: by the [eighth way](#the-eighth-way-is-about-the-test-not-the-measurement)'s standard this is a
+good row. Its tolerance is `1e-4`, and its own justification string says why:
+
+> *"the two disagree by 3e-5 and the tolerance is three of it"*
+
+⚠️ **That sentence is the defect, written out in the row that contains it.** A tolerance set to three
+times a *known* disagreement is a fixed report of the state the code was in on the day the row was
+written. It passes at 3e-5. It also passes at 9e-5 — at which point the quantity has tripled its
+error and the row has said nothing, in exactly the tone it says nothing when everything is fine.
+
+**And the disagreement was not two estimators meeting at their joint accuracy — it was one estimator
+being wrong** (`D`, all recomputed here on `reference-impl/optics.py`):
+
+| | red | green | blue |
+|---|---|---|---|
+| `slab_esc(0)` − `T_OUT_DIFFUSE`, as shipped | +2.35e-5 | −3.30e-5 | +1.61e-5 |
+| tolerance `1e-4`, as a multiple of that | **4.3×** | **3.0×** | **6.2×** |
+| the air-side 512-point rule's *own* error (vs 4 000 000 nodes) | 1.8e-7 | 1.8e-7 | 1.8e-7 |
+| the same row with the water-side rule **split at the kink** | +1.80e-7 | +1.79e-7 | +1.77e-7 |
+
+The air-side side of the identity is converged to two parts in ten million. **The whole of the
+disagreement belonged to the Gauss–Legendre rule**, and the corrected row lands exactly on the other
+estimator's own residual — i.e. it stops being blind and starts being a test of the *only* remaining
+approximation. Carried to the quantities that ship, the same rule is off by `+3.9 / −6.2 / +3.1 e-5`
+relative on `slab_esc` and `−8.0 / +8.1 / −3.4 e-5` on `slab_trap`.
+
+**Why the rule was wrong, and it is a numerical-methods lesson worth its own line.** The integrand
+contains the internal Fresnel reflectance `R_int(μ)`, which **pins to exactly 1 past the critical
+angle**. That is a *kink* — continuous, with a discontinuous first derivative, at
+`μ = cos θ_c`. A Gauss–Legendre rule is built on the assumption of smoothness and spends its
+accuracy on it; across a kink that assumption is void and the rule degrades to algebraic
+convergence.
+
+> ⚠️ **An integrand with a kink needs the interval split at the kink.** Not more nodes — the
+> *interval*. Split at `cos θ_c` and use **400 nodes a side**, which is 800 against the shipped
+> 2000, and the answer matches a converged reference to **eight digits** (2.3–3.9e-9). A fifth of
+> the accuracy for 40% of the cost, purely from where the subdivision was put.
+
+**The control, because a rate claim without one is a story.** Replace `R_int` with a smooth function
+of the same range and change nothing else — same exponential, same `2μ` measure, same endpoints, same
+rule. The single un-split 125-node rule then returns the integral to **6.7e-15**, i.e. machine
+precision, and splitting it changes nothing. Put the kink back and 2000 nodes cannot reach 1e-4. The
+endpoint behaviour of `exp(−τ/μ)` at `μ → 0`, the obvious other suspect, costs nothing at all.
+
+**And here is the part that makes it a verification finding rather than a numerics footnote: a
+convergence study would not obviously have caught it either.** The single rule's error against a
+converged reference, per node count (green channel, `D`):
+
+| N | 250 | 500 | 1000 | 2000 | 4000 | 8000 |
+|---|---|---|---|---|---|---|
+| relative error | +6.4e-4 | −3.0e-4 | +1.0e-4 | −6.2e-5 | +1.5e-5 | +5.2e-6 |
+
+**It shrinks, and it changes sign almost every time.** Doubling the nodes always "improves" the
+answer, so the usual informal test — *refine it and watch the digits settle* — reports success at
+every step while the digits that settle are the wrong ones; and the sign flips mean two adjacent
+refinements can straddle the truth and look like they bracket it. The test that does work is the one
+that costs nothing here: **compare against a rule with a different structure, not a finer version of
+the same rule.**
+
+**The second guard was worse than the first, which is the point about coverage.** Beside that row
+sits a 300 000-photon Monte-Carlo walk of the same slab, at a `6e-3` relative tolerance. That
+tolerance is *correctly* justified — it names the estimator's own coefficient of variation and sits
+under four standard errors, which is exactly the discipline this chapter asks for — and it is still
+**97–196× too loose to see a 6e-5 effect.** So the quantity carried **two** independent guards, one
+blind by a factor of 3–6 and one blind by a factor of 100–200, and a suite audit counting *rows*
+would have scored it as unusually well covered.
+
+**Three things to carry, and the first is the general form:**
+
+1. ⚠️ **A tolerance chosen to accommodate a known imprecision cannot detect that imprecision
+   growing.** This is the same failure as widening a tolerance to pass a row, committed *before*
+   anything fails — which is why it never triggers the review ritual that catches the widening. The
+   tell is textual and grep-able: any tolerance whose justification mentions the current
+   disagreement rather than an estimator or a standard.
+2. **A tolerance is a claim about the instrument, so state the instrument's error.** The Monte-Carlo
+   row does this and the quadrature row does not, and the difference is that nobody ever computed
+   the quadrature's error — it was inferred from the fact that the row passed. When the estimator's
+   own error is genuinely below the interesting scale, say so and set the tolerance there; when it
+   is not, that is a finding about the estimator.
+3. **Count resolution, not rows.** Two guards whose resolutions are both coarser than the effect are
+   zero guards. For every quantity a suite claims to cover, the reviewable number is *the smallest
+   error any row on it could detect* — and it is the **minimum** over the rows, not the count of
+   them.
+
+The consolation, and it is real: **nothing shipped was wrong**. 6e-5 is four orders below anything
+a frame resolves, and the chapter figures computed from these integrals are unaffected at the four
+decimal places they are quoted to. What was wrong was the **suite's opinion of itself** — and a
+suite that cannot resolve a defect four orders below the visible one is fine, while a suite that
+*believes* it can is the thing this catalogue is about.
+
 ## When the target is an approximation, the bar changes kind
 
 Everything above is about verifying a renderer against the world. This section is about the other
@@ -1120,4 +1223,5 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
 | The tenth way: a ratio cancels whatever multiplies both its terms, so a suite made only of ratios is blind to common-factor errors; and a guard evaluated where a defect is inert is not a guard | **F** (house doctrine, and the structural complement of the seventh way's within-frame-ratio method — the same cancellation, read as a cost) + **D** for the case: the ×50 bed-power defect passing a 53-row suite, the `u³` ratio row unchanged to twelve figures, the two absolute rows that fire (2.61 → 130.51 W/m², 373 → 18 671 mg/L), and the `spm = 0` degeneracy table are all `reference-impl/beach_optics.py` + `validate_beach.py`, **re-fired and recomputed here** (2026-08) rather than quoted. What transfers is the two-question check and the "one absolute row per quantity" rule; the numbers are that scene's |
 | The eighth way: a test's power is the surface area it shares with the code under test | **F** (house doctrine, and the general form of the fourth way's "two methods that read one premise are one method") + **D** for the case — the audit's one borrowed name, the lossless-limit/photon-walk pair agreeing to 0.15%, and the four-bug table are all `reference-impl/validate.py`, re-evaluated here; that **the lossless limit alone passes three of the four** was verified by evaluating each variant against the limit, not quoted |
 | The eleventh way: a test window is part of the test, and a row that gets *easier* as the condition hardens is reporting its window rather than the system | **F** (house doctrine; the monotone-wrong-way tell and the three instruments are composed here) + **D** for the case — the oblique-Snell row in `reference-impl/validate_beach.py`, **both columns recomputed here** (2026-08) rather than quoted: 0.186 / 0.310 / 0.277° centred on the best-covered row against 0.186 / 0.059 / 0.030° centred on the grid, with 236 / 123 / **0** ramp cells in the centre row and 5202 window cells surviving at 30°. The 2.71° edge artefact and the 60-row exclusion were recomputed with them. Those numbers are that march, that grid and that bed; what transfers is the signature |
+| The thirteenth way: a tolerance sized from the disagreement it accommodates reports the state the row was written in, and coverage is the *minimum resolution* over the rows rather than their count | **F** (house doctrine; the "count resolution, not rows" rule and the grep-able tell are composed here) + **D** for the case, all recomputed 2026-08 on `reference-impl/optics.py` and `validate.py` rather than quoted: the shipped 2000-node single Gauss–Legendre rule against a split rule (400 nodes either side of `μ = cos θ_c`) and a 4 000 000-node reference — `slab_esc(0) − T_OUT_DIFFUSE` = +2.35 / −3.30 / +1.61 e-5 as shipped against +1.80 / +1.79 / +1.77 e-7 split, the air-side 512-point midpoint's own error at 1.8e-7, and `+3.9 / −6.2 / +3.1 e-5` / `−8.0 / +8.1 / −3.4 e-5` relative on `slab_esc` / `slab_trap`. ⚠️ **The kink attribution is a control, not an inference**: substituting a smooth reflectance for `R_int` and changing nothing else returns the *un-split* 125-node rule to 6.7e-15, which is what rules out the `exp(−τ/μ)` endpoint as the cause. The sign-alternating convergence table (250 → 8000 nodes) is `D` on the same rule. The `1e-4` and `6e-3` tolerances and the quoted justification strings are that suite's own text; the 97–196× figure is arithmetic on them. **Nothing shipped was wrong** — the effect is four orders below anything a frame resolves and does not move any chapter figure at its quoted precision — which is stated in the section because the finding is about the suite's self-assessment, not about the render | 
 | The twelfth way: an unhandled exception costs its row *and every row after it*, so ERROR must be a status distinct from FAIL that still sets the exit code | **F** (house doctrine, and the harness-level sibling of the eighth way) + **D** for the remedy — the guarded-section harness is `reference-impl/validate_beach.py`, and `cap-not-dissipation` was **re-fired here** (2026-08): **10 FAIL / 0 ERROR** in 408 s, no section raising, which is what the fix is supposed to look like. ⚠️ Neither number in the 1-vs-8 is re-measured. The **8** is that defect's count against the *wave-2* suite and the **1** against the superseded harness that produced it; this run cannot reconstruct either, and the current suite has more rows, which is why re-firing gives 10 rather than 8. Both are quoted from that suite's own record. The transferable claim — that a raising row truncates a run, that the truncation is silent, and that ERROR must be a status — is structural and needs no measurement; the 1-vs-8 is an illustration and should be cited as one |
