@@ -4251,6 +4251,38 @@ tolerance passes. **Check the term, not the chain** — an end-to-end agreement 
 not evidence about a factor that is wrong by twenty, and a bake is exactly where term-level errors
 get composed out of sight.
 
+**This section is now MEASURED rather than predicted, and it survived.** Every figure above had been
+derived and none of it had been run until a raster pass was built to run it. At this pool's own
+`d = 1.40 m` the term-level errors reproduce as **+19.400 / +5.072 / +1.101 %** on the escape leg
+against the printed 19.4 / 5.1 / 1.1, and the composed albedo moves **−2.833% in luminance** against
+the printed −2.8 (`D`, `raster-impl/lut.py:factorisation_error` and `composed_albedo`, on a bed
+albedo taken from `render.py` and the sun's own cosine — no table and no interpolation in the way).
+Recorded as **survived**: the prediction was made from `r·CV_f·CV_g` and confirmed by a machine that
+did not exist when it was written. What it did not carry is the next paragraph.
+
+⚠️ **How much of a term-level error reaches the pixel is an architectural choice, and it is worth
+more than the term.** The list below names *where the temptation arises*; it does not say that one of
+those places is nearly immune. Same scene, same camera, same 128-texel table, same separated bake —
+only the question of *where the angular average sits* differs, over 157 641 water pixels (`D`,
+`raster-impl/evidence.py:fig_frame_factorisation`, reproduced here):
+
+| where the upwelling comes from | whole frame, red / green / blue | worst binned red |
+|---|---|---|
+| **a column table**, `T[depth]·kExit` — the second bullet below, taken literally | **−9.27 / −4.68 / −0.76 %** | **−17.5 %** |
+| **each ray attenuated over its own path**, the table read only for the sky's entry leg and the trap gain — the one place an angular average genuinely sits | **−0.84 / +0.65 / +0.58 %** | **−2.1 %** |
+
+**A factor of eleven whole-frame in red, and 8.2 on the worst bin, from one decision the chapter did
+not make for the reader.** Both rows carry the *same* wrong table. The actionable statement is
+therefore not *"do not separate"* — it is: **separate only where the pixel's own `μ` is unknown.** A
+pass that knows the view ray can attenuate along it and never asks the table for the thing the table
+gets wrong, and the same defective bake then costs under a per cent. The error the section predicts
+is smaller than the error a reader makes applying it in the wrong place.
+
+**And the frame error is not monotone in `τ`, which the scaling table below cannot show.** It peaks
+near `τ_red ≈ 0.4` and flattens, because the deepest water in this frame is also the most grazing and
+a grazing water pixel is mostly surface reflection. **Optical depth alone does not price this error;
+the view angle prices it too** — and the table below is tabulated against `τ` alone.
+
 **How the error scales, so it can be priced before it is measured.** It is a function of optical
 depth alone, and it is already worth having at depths nobody thinks of as absorbing (`D`,
 quadrature here on the exact internal Fresnel):
@@ -4290,7 +4322,8 @@ tolerance was exactly the size of it, are
 - **A depth-indexed absorption table times a constant exit factor.** The most direct instance:
   `T[depth] * kExit`. Store `T_esc[τ]` and `G_rt[τ]` instead — one table, one fetch, two channels,
   identical cost. The trap is free to avoid and there is no performance argument on the other side
-  of it.
+  of it. **This is the one that reaches the pixel**: it is the −9.27% row above, and the same bake
+  read only where an angular average genuinely sits is the −0.84% row.
 - **Splitting a table by "what changes and what does not".** `n` is fixed at load and `d` is a
   field, so the Fresnel half looks like a uniform and the Beer half like a texture. That reasoning
   is about *cadence* and it silently reorders an integral. Cadence decides where a term is
