@@ -239,7 +239,10 @@ Independent of configuration:
 
 - **User interrupt.** Stop at the next safe point and report state.
 - **Nothing left to fund.** Every dimension retired or parked. The run is over
-  whatever the budget says; the open gaps go to the user.
+  whatever the budget says; the open gaps go to the user. A **declared** lane or
+  dimension with no logged verdict is still open work: it is funded before this
+  stop can fire, and the report names it as never judged. Work the WIP limit
+  deferred must not leave the run through the door marked "finished".
 - **Broken inspection.** Critics cannot reach the real artifact. Stop — the loop
   is no longer measuring anything.
 - **Downhill drift.** Champion quality falling wave over wave. Stop, revert to

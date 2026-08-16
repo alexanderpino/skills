@@ -481,6 +481,17 @@ def _lane_dim_status(rounds, cfg):
     for r in rounds:
         keys.setdefault((r["lane"], r["dimension"]), []).append(r)
         lane_rounds.setdefault(r["lane"], set()).add((r["wave"], r["round"]))
+    # A declared lane/dimension pair with no rounds yet is OPEN work, not absent
+    # work. Reading the key set out of the log alone made unjudged pairs
+    # invisible: the next-wave plan could not fund a lane the WIP limit had
+    # deferred, so the wave that owed it a round was skipped, and "all lanes
+    # retired" fired over lanes nobody had ever judged. Seed every declared pair
+    # and let the log fill it in. Lanes seen in the log but missing from
+    # config.json still count — log-round only warns on those.
+    declared_dims = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
+    for lane in cfg.get("lanes") or []:
+        for dim in declared_dims:
+            keys.setdefault((lane, dim), [])
     logged_calls = {}
     logged_tokens = {}
     for r in rounds:
@@ -536,24 +547,25 @@ def _lane_dim_status(rounds, cfg):
             "stalled": stalled and not retired and not is_parked,
             "stall_note": stall_note,
             "trend": trend,
-            "lane_calls": logged_calls.get(lane, len(lane_rounds[lane]) * CALLS_PER_LANE_ROUND),
+            "lane_calls": logged_calls.get(
+                lane, len(lane_rounds.get(lane, ())) * CALLS_PER_LANE_ROUND
+            ),
             "lane_tokens": logged_tokens.get(lane, 0),
             "state": "RETIRED" if retired else "PARKED" if is_parked else "STALLED" if stalled else "OPEN",
         }
     # A lane retires only when every *declared* dimension has retired — a
     # dimension nobody ever judged must not let the lane out early. A lane
     # *closes* when each dimension is retired or parked: nothing left to fund.
-    declared = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
     lanes = {lane for lane, _ in out}
     retired_lanes = {
         lane for lane in lanes
-        if all(out.get((lane, d), {}).get("retired") for d in declared)
+        if all(out.get((lane, d), {}).get("retired") for d in declared_dims)
     }
     closed_lanes = {
         lane for lane in lanes
         if all(
             out.get((lane, d), {}).get("retired") or out.get((lane, d), {}).get("parked")
-            for d in declared
+            for d in declared_dims
         )
     }
     return out, retired_lanes, closed_lanes
@@ -619,7 +631,10 @@ def _extension_evidence(rounds, cfg, per, retired):
         t = _dimension_trend(bar_recs, window=cfg["stops"]["no_progress_n"])
         trends[key] = t
         mark = {True: "still moving", False: "flat", None: "unknown"}[t["improving"]]
-        gap = per[key]["open_gap"] or "last verdict named no gap"
+        gap = per[key]["open_gap"] or (
+            "never judged — no verdict was logged against this dimension"
+            if not per[key]["bar_rounds"] else "last verdict named no gap"
+        )
         lines.append(f"  [{lane} / {dim}] {mark} ({t['note']}) — open gap: {gap}")
 
     parked = sorted(k for k, s in per.items() if s["parked"])
@@ -702,16 +717,24 @@ def _print_extension_offer(rounds, cfg, per, retired, max_wave):
 
 def _paths_hash(paths):
     """Content hash of a gate's declared inputs. A gate is invalidated by a change
-    to what it reads, never by the passage of a round."""
+    to what it reads, never by the passage of a round.
+
+    Returns (hash, files_seen). A gate whose paths resolve to no file at all —
+    empty `paths`, a typo, a glob the shell would have expanded — hashes the same
+    empty state forever, so it would pass once and then be skipped for the rest of
+    the run without ever being checked again. The caller refuses to cache that.
+    """
     h = hashlib.sha256()
+    seen = 0
     for spec in sorted(paths):
         pp = Path(spec)
         files = sorted(pp.rglob("*")) if pp.is_dir() else [pp]
         for f in files:
             if f.is_file():
+                seen += 1
                 h.update(f.as_posix().encode())
                 h.update(f.read_bytes())
-    return h.hexdigest()[:16]
+    return h.hexdigest()[:16], seen
 
 
 def cmd_gate(args):
@@ -744,11 +767,12 @@ def cmd_gate(args):
     wave = max((r["wave"] for r in rounds), default=0)
     ran = skipped = failed = 0
     results = []
+    unreadable = []
     for g in gates:
         name, cmd, paths = g["name"], g["cmd"], g.get("paths") or []
-        h = _paths_hash(paths)
+        h, files_seen = _paths_hash(paths)
         prev = cache.get(name)
-        if prev and prev.get("hash") == h and prev.get("ok") and not args.force:
+        if files_seen and prev and prev.get("hash") == h and prev.get("ok") and not args.force:
             skipped += 1
             results.append((name, "SKIP", f"unchanged since wave {prev.get('wave', '?')}"))
             continue
@@ -759,7 +783,13 @@ def cmd_gate(args):
             failed += 1
         detail = (proc.stdout + proc.stderr).strip().splitlines()
         results.append((name, "PASS" if ok else "FAIL", detail[0] if detail else ""))
-        cache[name] = {"hash": h, "ok": ok, "wave": wave, "ts": now()}
+        if files_seen:
+            cache[name] = {"hash": h, "ok": ok, "wave": wave, "ts": now()}
+        else:
+            # Never cache a gate with nothing to hash: it would be skipped from
+            # here on without being checked. Run it every wave and say why.
+            cache.pop(name, None)
+            unreadable.append(name)
     cache_p.write_text(json.dumps(cache, indent=2) + "\n")
     if fcntl:
         fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
@@ -767,6 +797,12 @@ def cmd_gate(args):
     for name, state, detail in results:
         print(f"  [{state}] {name}" + (f" — {detail}" if detail else ""))
     print(f"\n{ran} run, {skipped} skipped (inputs unchanged), {failed} failed")
+    if unreadable:
+        print(
+            "warning: these gates declare no readable path, so the cache cannot tell when they\n"
+            "go stale and they re-run every wave: " + ", ".join(unreadable) + "\n"
+            "Declare every file each check reads under \"paths\" in config.json."
+        )
     if skipped:
         print("Hand these results to the critic. A round that re-derives them pays twice.")
     if failed:
@@ -800,7 +836,8 @@ def cmd_park(args):
 
     per, _retired, _closed = _lane_dim_status(rounds, cfg) if rounds else ({}, set(), set())
     stats = per.get(key)
-    if stats is None and not args.force:
+    unjudged = stats is not None and not stats["bar_rounds"] and not stats["champ_rounds"]
+    if (stats is None or unjudged) and not args.force:
         die(f"no rounds logged for [{args.lane} / {args.dimension}] — nothing to park (use --force)")
     if stats and stats["retired"] and not args.force:
         die(f"[{args.lane} / {args.dimension}] has retired — it already costs nothing (use --force)")
@@ -972,7 +1009,12 @@ def cmd_status(args):
               f"  reverted {s['reverts']}"
               f"  streaks bar-met {s['bar_met_streak']} clean {s['clean_streak']}"
               f"  rubric {s['rubric_share']}")
-        print(f"  score {s['last_score']}/{cfg['stops']['target_score']} target"
+        score = (
+            f"score {s['last_score']}/{cfg['stops']['target_score']} target"
+            if s["last_score"] is not None
+            else f"never judged (target {cfg['stops']['target_score']})"
+        )
+        print(f"  {score}"
               f"  margins {' → '.join(s['recent_margins']) or '—'}  trend: {s['trend']['note']}")
         if s["softening"]:
             print(f"  SOFTENING TRIPWIRE: {s['softening']}")
@@ -1083,7 +1125,8 @@ def cmd_board(args):
         lambda k: [
             f"{k[0]} / {k[1]}" + (" ⚠ park?" if per[k]["stalled"] else ""),
             str(per[k]["bar_rounds"]),
-            f"{per[k]['last_score']}/{cfg['stops']['target_score']}",
+            f"{per[k]['last_score']}/{cfg['stops']['target_score']}"
+            if per[k]["last_score"] is not None else "—",
             per[k]["trend"]["note"],
             (per[k]["open_gap"] or "—").replace("|", "/"),
             next(
@@ -1224,17 +1267,28 @@ def cmd_report(args):
         ]
     lines += ["## Lanes", ""]
     for (lane, dim), s in sorted(per.items()):
-        lines.append(
-            f"- **{lane} / {dim}** — {s['state'].lower()}; {s['bar_rounds']} bar rounds,"
-            f" {s['reverts']} reverts, last score {s['last_score']}/{cfg['stops']['target_score']}"
+        detail = (
+            f"{s['bar_rounds']} bar rounds, {s['reverts']} reverts,"
+            f" last score {s['last_score']}/{cfg['stops']['target_score']}"
+            if s["bar_rounds"]
+            else "never judged — no verdict was logged against this dimension"
         )
+        lines.append(f"- **{lane} / {dim}** — {s['state'].lower()}; {detail}")
     lines += ["", "## Open gaps (do not soften this section)", ""]
     any_gap = False
     for (lane, dim), s in sorted(per.items()):
+        state = " *(parked)*" if s["parked"] else ""
         if s["open_gap"]:
             any_gap = True
-            state = " *(parked)*" if s["parked"] else ""
             lines.append(f"- [{lane} / {dim}]{state} {s['open_gap']}")
+        elif not s["bar_rounds"]:
+            # A dimension the run declared and never judged is a hole in the
+            # evidence, not a closed gap. The report says so.
+            any_gap = True
+            lines.append(
+                f"- [{lane} / {dim}]{state} never judged — the run declared this dimension"
+                " and logged no verdict against it"
+            )
     if not any_gap:
         lines.append("- none recorded — verify this against the last wave's verdicts before believing it")
     backlog = root / "backlog.md"
