@@ -2171,3 +2171,386 @@ in `ψ` and reported `0.2548` where the closed form says `0.2500`**, because
 ladder is uniform in `√(−ψ)` and the interpolation error against a direct
 per-phase bisection is `7×10⁻⁷` — as a row, so the next optimisation has to keep
 it.
+
+---
+
+# Wave 6 — the white, and it is three mechanisms
+
+Every render from waves 4 and 5 carries *"the foam is a placeholder"* burned into
+its caption, and by wave 5 that was the largest gap left in the picture. **Bar
+section C was written at intake and untouched for five waves.** This wave builds
+it.
+
+**New file: `beach_foam.py`.** New suite section `_sec_foam`, 53 rows, 8
+deliberate bugs. New frames `s6-bay-render.png` (the same camera as `s4-` and
+`s5-`), `s6-entrained-air.png`, `s6-glitter-whitecap.png`, `s6-clocks.png`.
+
+## The whole of it, before the details
+
+- **The bar's constant is not just imported, it is RECOVERED.** `1 − 1/n² =
+  0.438735` is `optics.TIR_FRAC` and `beach_optics.FOAM_WHITE`, and a
+  geometric-optics ray trace over a bubble's disc — Fresnel from
+  `optics.fresnel` by reciprocity, all forty orders, energy summing to
+  `1 ± 8×10⁻⁷` — returns `0.436378 / 0.438728 / 0.443078` **without ever
+  evaluating the formula**. The constant is *the area of a disc*, and that is
+  exactly why the same number runs the window from below.
+- **And the trace adds a qualifier the bar does not carry.** A ray reflected off
+  a sphere at incidence `θᵢ` leaves deviated by `π − 2θᵢ`, and every totally
+  reflected ray has `θᵢ > θ_c`, so **every one of them deviates by less than
+  82.96°**. The 43.874% is a **reflectance, not a backscatter fraction**: the
+  traced `b_b/b` is **0.0230**, twenty times smaller. A bubble is a *side*
+  scatterer and the white of surf is multiple scattering in a medium of albedo
+  ≈ 1, not one bright bounce. Using the bar's number as a backscatter fraction is
+  now a deliberate bug (`foam-backscatter-is-tir`) and it fires four rows.
+- **The bed does stop being visible, measured in absolute scene-linear units.**
+  At 1.5–3 m depth over 50 713 pixels the bed's radiance out of the water is
+  `3.50×10⁻⁸` with the plume and `3.86×10⁻⁶` without — **a factor of 0.00906**,
+  and the plume's own transmittance factor `T²/(1 − R·R_sub)` is `0.152`.
+- **One wind drives the glitter width and the whitecap coverage, and they
+  agree — but the agreement is not worth much, and THAT is the finding.**
+  Measured back off the buffer: glitter says `U₁₀ = 5.84 m/s`, whitecaps say
+  `6.00 m/s`, **2.7% apart**. But `d(ln width)/dU = 0.0759` per m/s against
+  `d(ln W)/dU = 0.5683` per m/s, so a **1% width measurement fixes the wind to
+  0.13 m/s** while a **factor of three in coverage — inside the literature's own
+  spread — leaves 1.93 m/s**. The width is **15×** the instrument the coverage
+  is. They could not have disagreed informatively.
+- **Section E asked for two timescales; the file produces three, and the middle
+  one is not a number.** `τ(r) = (d_p/2)/w_rise(r)` spans **0.29 s** at a
+  centimetre to **1813 s** at ten microns. The air volume is gone in **0.81 s**;
+  the projected area that scatters light is dominated by the smallest bubbles
+  present and outlives it by three orders of magnitude.
+- **The picture found a defect that no printed number in the run reported**, and
+  it is written up below as W1 because it is the wave's sharpest methodological
+  result.
+
+## W1 · The first plume was a sheet of milk, and only the frame said so
+
+The first size cutoff was *"a bubble whose rise time across the plume is shorter
+than the wave period is gone before the next wave renews it, so it is not part of
+the standing population"* — `w_rise(r_max) = d_p/T`. That is the right idea in
+the wrong shape. It **discarded the large bubbles while keeping the energy they
+were entrained with**, so the surviving small ones inherited a void fraction ten
+times their own:
+
+| | first draft | size-resolved |
+|---|---|---|
+| `⟨τ⟩` for the air | 15.7 s | **0.81 s** |
+| `α` median, breaking band | **0.30, clipped** | 0.071 |
+| clipped fraction of the wet bay | 12.6% | **0.09%** |
+| `r₃₂` | 0.22 mm | 0.73 mm |
+
+Every printed diagnostic in that run was self-consistent. The **frame** was not:
+the bay went uniformly white from the outer bar to the beach, with the green
+water gone. `s6-bay-render.png` is the fix and the pair against `s5-` is the
+evidence.
+
+**The correction has no cutoff at all.** Air is entrained with the Deane & Stokes
+spectrum `n_s(r)` and each size leaves on its own clock, so in steady state the
+standing spectrum is
+
+```
+    tau(r) = (d_p/2) / w_rise(r)          mean rise distance is HALF the plume:
+                                          air is entrained THROUGH the layer,
+                                          not injected at its base
+    n_st(r) = n_s(r) tau(r)               the large end is suppressed smoothly
+```
+
+and the budget reads the **source** while the optics read the **standing**
+population. The two are never mixed. `<tau>_vol = INT n_s r³ tau / INT n_s r³` is
+the air's own clock; `r₃₂ = INT n_st r³ / INT n_st r²` is the optics' own radius.
+
+**This is what the standing ruling on visual evidence is for.** Not decoration
+and not a beauty pass: a picture is a simultaneous assertion about every field in
+the scene, and it caught a factor of nineteen in a timescale that four printed
+tables agreed on.
+
+## W2 · The three mechanisms, and each one's own derivation
+
+### Surface foam — a coverage mask, and it is not on the crest
+
+**Coverage is a Poisson process, so the two sources add as covering measures and
+the coverage saturates by construction.** Crest lines are one wavelength apart
+and move at `c`, so a fixed point is swept once per period `T` and a fraction
+`Q_b` of those crests are breaking — Battjes & Janssen, and
+`beach.breaking_fraction_bj` has computed `Q_b` since wave 2 and spent it only on
+diagnostics. Summing over all past sweeps,
+
+```
+    m(a) = Q_b SUM_j exp(-(a + jT)/tau) = Q_b exp(-a/tau) / (1 - exp(-T/tau))
+    W(a) = 1 - exp(-m(a))
+```
+
+and the phase-mean of `m` is **exactly `Q_b τ/T`** — the steady state of
+`dW/dt = S − W/τ` with `S = Q_b/T`, checked to `10⁻⁸` as a closed form.
+
+**This turns the placeholder's declared `k` into a measured number.** The
+placeholder was `1 − exp(−k f_brk)` with `k = 1`. The form was right and the `k`
+was not: **`k` IS `τ/T`**, and at Monahan & Zietlow's salt-water `3.85 s` against
+this swell's `9 s` it is **0.4278**. The placeholder was running a foam residence
+time of nine seconds, **2.3× too long**.
+
+**The mask FLOATS, and that is a lag rather than an advection solver.** Bar
+section C says the deck "floats, deforms with the flow", so it is *not* on the
+crest: foam is laid down *by* the breaking crest, which then runs away from it at
+`c` while the water it sits on creeps forward at the Stokes drift. Foam of age
+`a` lies `(c − u)a` **behind** the crest — seaward of it, because the crest is
+going shoreward — and the coverage field is an exponential tail of e-folding
+length **17.1 m against a 39.9 m local wavelength**. So the white lies over more
+than a third of the wave and behind its top.
+
+**And the age is free.** The transform already accumulates the phase `S`, so the
+time since the crest passed is `(−phase mod 2π)/ω` with no field added and
+nothing advected. For a wave of permanent form **the phase IS the age, exactly**;
+a Lagrangian foam solver would reproduce this and cost a wave.
+
+### Entrained air — a participating medium, and the test is what it hides
+
+**Lamarre & Melville (1991)**, *Nature* 351, 469: between **30 and 50%** of the
+energy dissipated at breaking is work done against buoyancy entraining air. That
+is the budget, and every symbol on the right of it is the scene's own:
+
+```
+    rho g (d_p/2) Q = eps_LM D_w                  the power       Q in m/s
+    h_air = Q <tau>_vol                           the inventory
+    alpha = h_air/d_p = 2 eps_LM D_w <tau>_vol / (rho g d_p^2)
+```
+
+`D_w` is the transform's breaking dissipation. `d_p = H/2` is the crest's own
+elevation and is the **one length here that is not forced** — marked `P`, with
+`α ∝ d_p⁻²` stated beside it. `ε_LM = 0.40` is the midpoint of a **range that is
+carried and not collapsed**.
+
+**The optics are geometric and the whitening is multiple scattering.** At
+`x = 2πr/λ ≈ 8000` the extinction efficiency is 2, so
+`b = Q_ext · 3α/(4 r₃₂) = 3α/(2 r₃₂)` — `144 m⁻¹` median in the breaking band.
+Air does not absorb, so the slab is conservative, and the similarity scaling is
+the whole of it: `τ' = (1 − g)τ` with the traced `g = 0.688`, then
+`R = τ'/(1 + τ')`, `T = 1/(1 + τ')`, `R + T = 1` **exactly**.
+
+**And it is coupled to the column and the bed by the adding series, which is what
+makes it hide rather than whiten:**
+
+```
+    R_total   = R_p + T_p^2 R_sub / (1 - R_p R_sub)
+    R_bed_seen = T_p^2 R_bed / (1 - R_p R_sub)
+```
+
+A renderer that lerps toward white has `R` and not `T`, and bar section C names
+that exactly: *"If a renderer whitens without hiding what is behind, it has
+modelled the symptom."*
+
+**The plume is phase-structured and that is forced, not chosen.** `⟨τ⟩_vol` is
+0.81 s against a 9 s period, so the air one bore front entrains is gone long
+before the next arrives: the plume belongs to **the front**, not to the surf zone.
+`plume_phase_factor` redistributes the budget's void fraction with a phase-mean of
+**exactly 1** — `11.06×` at the crest — so the energy budget is untouched and only
+its placement changes. A model that spread the time-mean evenly is wrong by that
+factor in both directions at once, which is precisely what W1 was.
+
+**The sphere formula is clipped at its own validity limit and the clip is
+counted.** `3α/(4 r₃₂)` is the projected area of *independent spheres*; above
+about `α = 0.3` the bubbles are polyhedral cells and the scatterers are the films
+between them. The clip now bites on **0.09%** of the wet bay — the very front of
+the bore, where it is honest to say the model has left its domain.
+
+### Airborne spray — DEFERRED, and the frames say so
+
+It is section C's **smallest share of the white**, it is a particle system and
+therefore a **third representation**, and bar section F already defers individual
+droplets beyond a statistical treatment. Every s6 frame's caption says it
+contains none.
+
+## W3 · Two things hide a bed, and a render must not credit one for the other
+
+Bar section D's **suspended sediment** and bar section C's **entrained air** both
+stop the bed being seen, and the confusable pair section D warns about has a
+third member. `bed_visibility` prints them separately:
+
+| depth band | `t_col` (section D, suspension) | `bed_factor` (section C, plume) |
+|---|---|---|
+| 1.5 – 3 m | `2.76×10⁻⁵` | `1.52×10⁻¹` |
+| 3 – 6 m | `1.29×10⁻⁵` | `8.1×10⁻¹` |
+| > 6 m | `1.40×10⁻²` | `8.9×10⁻¹` |
+
+**In this scene the suspension is the stronger of the two by four orders of
+magnitude**, and a render that had only entrained air would still hide the bed —
+for the wrong reason, with the wrong depth dependence, and with the wrong clock.
+They are separated here because they *decay differently*, which is section E's
+own instruction applied to section D's confusable pair.
+
+## W4 · This guard was blind in its first draft, and that is the fourth time
+
+`bed_visibility` originally reported `R_bed_seen / R_bed`. In the breaking band
+the bed term **underflows** — the suspension has already killed it — so the ratio
+divided one near-zero by another and reported **`1.6×10⁻⁴` for a run with the
+plume switched OFF**, where the answer is `1` by construction.
+
+Waves 4 and 5 each found a ratio-only guard blind; the pool loop found two. This
+is the fourth in the project and the first found by *the control frame
+disagreeing with its own definition*. Every row in `bed_visibility` is now
+absolute, and the plume's effect is a **forward** quantity computed from `R` and
+`T` rather than by dividing two measurements.
+
+## W5 · Koepke's 0.22 is not a foam albedo, and using it double-counts the decay
+
+**Koepke (1984)**, *Applied Optics* 23, 1816: whitecap reflectance falls from
+**0.20–0.55 at first breaking** to **0.03–0.10 after ten seconds**, with a
+life-and-area-averaged **effective** value of **0.22**.
+
+Two things follow, and they point in opposite directions:
+
+1. **The bar's constant survives a published bracket.** `1 − 1/n² = 0.4387` sits
+   inside Koepke's fresh-whitecap band. Recorded as *survived*.
+2. **The thick raft does not match 0.22, and it should not.** Two routes — Stokes'
+   pile of plates `Nρ/(1 + (N−1)ρ)` with `ρ` the bar's constant, and a two-stream
+   that never sees that constant — agree to under a per cent at **0.983**. A
+   0.11 m raft is seventy-odd walls of a non-absorbing scatterer; a soap foam is
+   that white and so is fresh surf.
+
+**Koepke's number already contains the decay.** A renderer that models the
+coverage and its decay *explicitly* — as this one now does — and *also* uses 0.22
+as the foam's reflectance has **counted the decay twice**. That is a liftable
+statement about why rendered foam so often reads grey, and it is carried as an
+OPEN row rather than as a match, because closing it needs Koepke's time-resolved
+reflectance against this model's `R(age)` and the paper's own age bins are not in
+hand.
+
+## W6 · One wind, two readouts — and the coverage cannot check the width
+
+Wave 4 established that `width/√mss` is constant to 1.7% over a factor of five in
+wind. Bar section C's open-water white is **whitecapping**, whose coverage is a
+published function of the same wind. So one `U₁₀` must drive both, and
+`s6-glitter-whitecap.png` renders them in one frame and measures both back off
+the scene-linear buffer.
+
+**They agree.** Glitter `5.84 m/s`, whitecaps `6.00 m/s`, **2.7% apart**. The
+glitter width measured off the buffer is `9.671°` against `9.792°` from the closed
+form, `−1.2%`, and the difference is the **resolved swell**, which the closed form
+does not carry and this surface does.
+
+**And the agreement establishes less than it looks like it does.**
+
+| | `d(ln X)/dU` at 6 m/s | what a good measurement buys |
+|---|---|---|
+| glitter path width | `0.0759` per m/s | 1% width → **`dU = 0.13 m/s`** |
+| whitecap coverage | `0.5683` per m/s | factor of 3 → **`dU = 1.93 m/s`** |
+
+**The width is 15× the wind instrument the coverage is.** The two agree in this
+render because one `U₁₀` drives both; what the frame establishes is that they
+**could not have disagreed informatively**. A future wave tempted to calibrate the
+wind off a coverage should read this row first — and the suite has it as a check,
+not as a comment.
+
+**The exponent's spread is real and is carried, not collapsed.**
+Monahan & O'Muircheartaigh (1980) is quoted everywhere as `W = 3.84×10⁻⁶ U^3.41`
+and the same paper's own optimal fit is `2.95×10⁻⁶ U^3.52` — 6% apart at 6 m/s
+and 4% at 16, in opposite directions. Callaghan et al. (2008) is not a power law
+at all: a piecewise fit with an **onset at `U₁₀ = 3.70 m/s`** and branches meeting
+at `10.18 m/s`. `wind_from_whitecap` therefore returns a **band**, `5.67–7.66
+m/s` for this coverage from the exponent alone, and the coefficient's spread
+across the literature is worse.
+
+*This is the same disease `beach_optics` already records for Cox & Munk, an order
+of magnitude worse: a paper that fits its components and its total separately, and
+a reader who quotes one as if it implied the other.*
+
+**And the level is the other half of the finding.** At `U₁₀ = 6 m/s` the whitecap
+coverage is `0.173%` — under a fifth of one per cent of the sea surface. **A
+render with conspicuous open-water foam has a different wind from the one its
+glitter path reports.**
+
+## W7 · Section E's two clocks are three, and the middle one is a spectrum
+
+| | s | law | source |
+|---|---|---|---|
+| surface raft | **3.85** | whitecap area decay, salt water | Monahan & Zietlow (1969) — PUBLISHED |
+| the plume's **air** | **0.81** | `⟨τ⟩_vol`, Schiller & Naumann drag | DERIVED |
+| the suspension | **143** (at the bay's 6.07 m median) | `d/w_s`, Soulsby | DERIVED |
+
+**No two of the three share a source**, which is what makes the separation an
+argument rather than an assertion — the same rule that caught the pool installing
+a wrong constant twice.
+
+**The bar's ordering holds, and it was nearly overturned by a bug.** The first
+draft of `beach_foam.py` used a single rise speed at the Sauter radius, produced
+`τ_air = 15.7 s`, and this README was drafted with a section claiming section C's
+"decays slowly" for the surface deck was wrong. The size-resolved steady state
+gives 0.81 s and **the bar is right**. Recorded, because a claim that survives a
+serious attempt to break it is worth recording as survived — and because the
+attempt was only caught by the picture.
+
+**What the bar does not say is that the plume has no single clock at all.**
+`τ(r)` runs **0.29 s** at `r_max` to **1813 s** at `r_min`. The air volume leaves
+on the fast end; the projected area that scatters light leaves on the slow end,
+because `n_st r² ∝ r^−1.5` in the Stokes regime and the standing cross-section is
+dominated by the smallest bubbles present. **That is why a break on rock leaves a
+cloud**: four seconds on, the surface deck has gone and what remains is a
+*submerged* haze, which is exactly the owner's *"een soort wolk"*.
+
+**The sediment's "minutes" is a depth statement, not a grain statement.** At the
+bay's median 6.07 m this file's own bed `D50 = 300 µm` clears in **143 s** — the
+bar's minutes, met with nothing adjusted. At 2 m it is **47 s**, and minutes there
+would need **158 µm**: the fine tail, which `beach.py` does not carry because
+there is no grain-size survey of this coast. Carried as OPEN, and it is already an
+open item at intake.
+
+## W8 · What is `?` and what could not be closed
+
+- **`R_MAX`, the largest bubble in the plume.** `P` at 1 cm radius. Cutting it to
+  3 mm nearly doubles `⟨τ⟩_vol` and cuts `r₃₂` by a third — **2.7× on the
+  scattering coefficient**. This is the sharpest thing in section C the file
+  cannot close, and it needs a size distribution measured in surf, not a
+  laboratory plunger.
+- **`R_MIN` is NOT harmless, which corrects this file's own first comment.** In
+  the *source* spectrum the cutoff is worth 0.4%. In the *standing* spectrum the
+  projected area diverges as `r_min → 0`, and `r₃₂` runs **0.50 mm at 3 µm to
+  1.20 mm at 100 µm — a factor of 2.4**. The cutoff is physical (Laplace pressure
+  drives a sub-ten-micron bubble into solution in seconds) but its exact place is
+  `P`.
+- **`d_p = H/2`, the plume depth.** `P`, and `α ∝ d_p⁻²`.
+- **`ALPHA_RAFT = 0.95`.** `P`; the raft thickness goes as `1/α_raft` and both
+  reflectance routes saturate above about a centimetre, so it moves nothing.
+- **The path lengthening inside an absorbing plume.** The slab is treated as
+  conservative, so this plume is neutral where a real one is very slightly cyan.
+  Named; small; fresh surf foam photographs neutral.
+- **The wind at the frame's hour** is still `?`, as the bar says. Every number
+  above is reported as a function of it.
+- **Airborne spray**, deferred, with the reason in every caption.
+
+## Frames
+
+| file | what it is |
+|---|---|
+| `s6-bay-render.png` | the bay from the cliff edge, **same camera as `s4-` and `s5-`**, with section C's three mechanisms replacing the placeholder |
+| `s6-entrained-air.png` | the paired control: **left** the plume removed, **right** in place, one field changed, with the bed's radiance measured absolutely in both |
+| `s6-glitter-whitecap.png` | the glitter path and the open-water white in one frame at one `U₁₀`, both measured back off the buffer |
+| `s6-clocks.png` | section E drawn: three decay curves on a log axis, with the plume's own spread shaded, and Monahan's law beside them |
+
+**Every caption is formatted from the run that drew the frame.** Wave 5 found
+wave 4's literals had gone stale; there is no number typed into any caption
+string in this wave.
+
+**`s4-` and `s5-` are not overwritten, and that is now a two-wave rule.** s4 is
+the linear surface, s5 the nonlinear one with the placeholder, s6 the same camera
+again with the three mechanisms — three frames, one camera, one bed, one sun, one
+field changed each time.
+
+## The suite
+
+`53` new rows in `_sec_foam`, `2` OPEN, `8` deliberate bugs in `--bugs-foam`,
+**all eight caught**:
+
+| bug | rows |
+|---|---|
+| `foam-no-transmittance` — whiten without hiding | 2 |
+| `foam-backscatter-is-tir` — read the bar's 43.9% as `b_b/b` | 4 |
+| `foam-on-the-crest` — age zero everywhere | 1 |
+| `foam-declared-k` — the placeholder's `k = 1` restored | 3 |
+| `foam-percent-for-fraction` — Monahan's per-cent form as a fraction | 2 |
+| `foam-single-rise-speed` — **the defect this wave shipped** | 6 |
+| `foam-stokes-everywhere` — Stokes drag at every bubble size | 14 |
+| `foam-unclipped-spheres` — the dilute formula past its own limit | 1 |
+
+**Every new quantity has at least one absolute row**, including the two that a
+ratio would have hidden: `⟨τ⟩_vol` (which the shipped defect got wrong by 19×
+while every ratio row stayed green) and the void fraction itself.

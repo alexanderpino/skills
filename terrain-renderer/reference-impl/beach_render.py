@@ -822,47 +822,58 @@ def _cap_face5(s, c, m):
 def _cap_bay6(w, s, f):
     ct = f['clocks']
     brk = w.q_b > 0.5
-    return (
+    head = (
         's6  THE BAY FROM THE CLIFF EDGE, WITH THE WHITE -- the third frame at '
-        'this camera. s4-bay-render.png is the linear surface, s5-bay-render.png '
-        'the nonlinear one with a FOAM PLACEHOLDER, and this is the same camera, '
-        'the same bed, the same optics and the same sun with bar section C\'s '
-        'THREE MECHANISMS in place of it.',
+        'this camera. s4-bay-render.png is the linear surface, '
+        's5-bay-render.png the nonlinear one with a FOAM PLACEHOLDER, and this '
+        'is the same camera, the same bed, the same optics and the same sun '
+        'with bar section C\'s THREE MECHANISMS in place of it.')
+    body = (
         'THE PLACEHOLDER IS GONE AND NOTHING REPLACED IT WITH A TEXTURE. '
-        'SURFACE FOAM is a coverage mask: a Poisson covering measure Q_b/T from '
-        'Battjes & Janssen plus Monahan & O\'Muircheartaigh\'s whitecapping at '
-        'the SAME U10 = %.1f m/s the glitter path\'s width reports, saturated '
-        'through 1 - exp(-m). It is NOT on the crests -- foam of age a lies '
-        '(c - u)a behind the crest it was laid by, an exponential tail of '
-        'e-folding length %.1f m on a %.0f m wave, and the age is the '
+        'SURFACE FOAM is a coverage mask: a Poisson covering measure Q_b/T '
+        'from Battjes & Janssen plus Monahan & O\'Muircheartaigh\'s '
+        'whitecapping at the SAME U10 = %.1f m/s the glitter path\'s width '
+        'reports, saturated through 1 - exp(-m). IT IS NOT ON THE CRESTS: foam '
+        'of age a lies (c - u)a behind the crest that laid it, an exponential '
+        'tail of e-folding length %.1f m on a %.0f m wave, and the age is the '
         'transform\'s own phase with nothing advected. Phase-averaged coverage '
-        'runs %.3f where every wave breaks to %.5f on the open sea. '
-        'ENTRAINED AIR is a participating medium, not a whitening: void '
-        'fraction %.3g median in the breaking band from the transform\'s own '
+        'runs %.3f where every wave breaks and %.5f on the open sea. '
+        'ENTRAINED AIR is a participating medium and not a whitening: void '
+        'fraction %.3g median in the breaking band, from the transform\'s own '
         'D_w through Lamarre & Melville (1991)\'s 30-50%% of the breaking '
-        'dissipation, a bubble population from Deane & Stokes (2002) with the '
-        'large cutoff DERIVED (r_32 = %.2g m), and a two-stream slab whose '
-        'diffuse transmittance is what hides the bed -- see s6-entrained-air.png '
-        'for that measurement. AIRBORNE SPRAY IS DEFERRED and this frame '
-        'contains none: it is section C\'s smallest share of the white, it is a '
-        'particle system and therefore a third representation, and bar section F '
-        'already defers individual droplets beyond a statistical treatment. '
-        'ALL THREE WHITEN FROM ONE IMPORTED CONSTANT, 1 - 1/n^2 = %.5f, which '
-        'this file recovers from a ray trace over a bubble\'s disc rather than '
-        'restating -- and the trace adds a qualifier the bar does not: that '
-        '43.9%% is a REFLECTANCE, not a backscatter fraction (b_b/b = %.4f), so '
-        'the white is multiple scattering in a conservative medium. THREE '
-        'CLOCKS, NOT TWO: %.2f s surface raft, %.1f s plume, %.0f s suspension. '
-        'The coastal plain is still one declared albedo and the framing is '
-        'still the landform\'s.'
-        % (BO.U10, float(np.median(w.foam_tail[brk])) if brk.any() else 0.0,
+        'dissipation, with a size-resolved steady state over the Deane & '
+        'Stokes (2002) spectrum -- standing r_32 = %.2g m -- and a two-stream '
+        'slab whose diffuse transmittance is what hides the bed. See '
+        's6-entrained-air.png for that measurement. The plume is concentrated '
+        'at the bore front, %.1fx its own time-mean, because its air clears in '
+        '%.2f s against a %.0f s period. AIRBORNE SPRAY IS DEFERRED and this '
+        'frame contains none: it is section C\'s smallest share of the white, '
+        'it is a particle system and therefore a third representation, and bar '
+        'section F already defers individual droplets beyond a statistical '
+        'treatment. ALL THREE WHITEN FROM ONE IMPORTED CONSTANT, 1 - 1/n^2 = '
+        '%.5f, which this file RECOVERS from a ray trace over a bubble\'s disc '
+        'rather than restating -- and the trace adds a qualifier the bar does '
+        'not carry: 43.9%% is a REFLECTANCE, not a backscatter fraction '
+        '(b_b/b = %.4f), so the white is multiple scattering in a conservative '
+        'medium and not one bright bounce. THREE CLOCKS, AND THE MIDDLE ONE IS '
+        'NOT A NUMBER: %.2f s surface raft (Monahan & Zietlow 1969), %.2f s '
+        'for the plume\'s AIR VOLUME, %.0f s for the suspension -- and the '
+        'plume\'s own tau(r) = (d_p/2)/w(r) runs %.2f s to %.0f s across the '
+        'bubble spectrum, so its air is gone in under a second while the area '
+        'that scatters light is not. The coastal plain is still one declared '
+        'albedo and the framing is still the landform\'s.'
+        % (BO.U10,
+           float(np.median(w.foam_tail[brk])) if brk.any() else 0.0,
            float(np.median(w.c_phase[brk] * w.T_wave)) if brk.any() else 0.0,
            f['cov_bar'][0], f['cov_bar'][3],
            float(np.median(w.air['alpha'][brk])) if brk.any() else 0.0,
-           w.air['r_32'], float(FM.TIR_FRAC), float(f['bub']['bb_over_b'][1]),
+           w.air['r_32'],
+           float(FM.plume_phase_factor(0.0, w.T_wave, w.air['tau_vol'])),
+           w.air['tau_vol'], w.T_wave,
+           float(FM.TIR_FRAC), float(f['bub']['bb_over_b'][1]),
            ct['tau_foam'], ct['tau_air'], ct['tau_sed'],
-           ct['tau_lo'], ct['tau_hi']),
-    )
+           ct['tau_lo'], ct['tau_hi']))
+    return (head, body)
 
 
 def _cap_air6(w, f, bvis, bvis0):
@@ -962,34 +973,50 @@ def _cap_wind6(w, ck):
 
 
 def clocks_figure(w, f, path):
-    """Section E, drawn: three mechanisms, three decay curves, one axis.
+    """Section E, drawn: three mechanisms, and the middle one is a SPECTRUM.
 
-    The bar says they "overlap in space and are separated by their DECAY, not
-    their appearance", and this is that sentence as a figure. Nothing is read
-    back out of it."""
+    The bar says the two clouds "overlap in space and are separated by their
+    DECAY, not their appearance", and this is that sentence as a figure -- plus
+    the thing the bar does not say, which is that the entrained air does not
+    have A decay. THE X AXIS IS LOGARITHMIC because the quantities being
+    compared span four decades, and a linear axis would show two of the three
+    curves as vertical lines at the origin. Nothing is read back out of this
+    image."""
     import beach_plot as P
+    from PIL import ImageDraw
     ct = f['clocks']
-    img = P.canvas(980, 560)
-    ax = P.Axes(img, (86, 56, 560, 300), (0.0, 90.0), (0.0, 1.02),
-                title='Section E: three mechanisms, three clocks',
-                xlabel='seconds since the break', ylabel='fraction remaining')
-    ax.frame(xticks=[0, 15, 30, 45, 60, 75, 90], yticks=[0, 0.25, 0.5, 0.75, 1.0])
-    tt = np.linspace(0.0, 90.0, 600)
+    sp = w.air['pop']['spectrum']
+    img = P.canvas(1000, 620)
+    ax = P.Axes(img, (92, 56, 580, 320), (-0.7, 3.4), (0.0, 1.02),
+                title='Section E: three mechanisms, and one of them is a spectrum',
+                xlabel='log10 seconds since the break',
+                ylabel='fraction remaining')
+    ax.frame(xticks=[-0.5, 0.0, 1.0, 2.0, 3.0],
+             yticks=[0, 0.25, 0.5, 0.75, 1.0])
+    lt = np.linspace(-0.7, 3.4, 800)
+    tt = 10.0 ** lt
+    # the plume's SPREAD: the fastest and slowest sizes in the population
+    ax.fill_between(lt, np.exp(-tt / sp['tau_at_rmax']),
+                    np.exp(-tt / sp['tau_at_rmin']), (206, 224, 240))
     cols = ((196, 60, 60), (40, 110, 190), (150, 110, 40))
-    for (nm, tau), col in zip((('surface raft %.2f s' % ct['tau_foam'],
-                                ct['tau_foam']),
-                               ('entrained air %.1f s' % ct['tau_air'],
-                                ct['tau_air']),
-                               ('suspension %.0f s' % ct['tau_sed'],
-                                ct['tau_sed'])), cols):
-        ax.line(tt, np.exp(-tt / tau), col, 2)
-        ax.vline(tau, col, 1, (4, 4))
-    P.legend(ax, list(zip(cols, ('surface raft, Monahan & Zietlow 1969 (P)',
-                                 'entrained air, d_p/w_rise (derived)',
-                                 'suspension, d/w_s (derived)'))), 34.0, 0.95)
-    ax2 = P.Axes(img, (660, 56, 930, 300), (2.0, 20.0), (1e-5, 2e-1),
-                 title='Whitecap coverage', xlabel='U10, m/s')
-    ax2.ylim = (math.log10(1e-5), math.log10(2e-1))
+    for (tau, col) in ((ct['tau_foam'], cols[0]), (ct['tau_air'], cols[1]),
+                       (ct['tau_sed'], cols[2])):
+        ax.line(lt, np.exp(-tt / tau), col, 2)
+        ax.vline(math.log10(tau), col, 1, (4, 4))
+    P.legend(ax, [(cols[0], 'surface raft %.2f s -- Monahan & Zietlow 1969 (P)'
+                   % ct['tau_foam']),
+                  (cols[1], 'entrained AIR %.2f s -- <tau>_vol (derived)'
+                   % ct['tau_air']),
+                  (cols[2], 'suspension %.0f s -- d/w_s, Soulsby (derived)'
+                   % ct['tau_sed']),
+                  ((206, 224, 240),
+                   'the plume\'s OWN spread, %.2f s to %.0f s across the sizes'
+                   % (sp['tau_at_rmax'], sp['tau_at_rmin']))],
+                 1.05, 0.98)
+    ax2 = P.Axes(img, (672, 56, 950, 320), (2.0, 20.0),
+                 (math.log10(1e-5), math.log10(2e-1)),
+                 title='Whitecap coverage', xlabel='U10, m/s',
+                 ylabel='log10 fraction')
     ax2.frame(xticks=[3, 6, 10, 14, 18],
               yticks=[math.log10(v) for v in (1e-5, 1e-4, 1e-3, 1e-2, 1e-1)],
               yfmt='%.0f')
@@ -1001,28 +1028,47 @@ def clocks_figure(w, f, path):
         (196, 60, 60), 2, (6, 5))
     ax2.vline(BO.U10, (28, 30, 34), 1, (3, 4))
     ax2.marker(BO.U10, math.log10(max(w.W_wind, 1e-9)), (28, 30, 34))
-    P.caption(img, [
-        'SECTION E ASKED FOR TWO TIMESCALES AND THE FILE PRODUCES THREE, and '
-        'the order is not the one the bar implies. Left: e-folding decay of each '
-        'mechanism, all three from this',
-        'scene\'s own fields. The surface raft is Monahan & Zietlow (1969), '
-        'salt water, PUBLISHED. The plume is d_p/w_rise with w_rise from '
-        'Schiller & Naumann drag on the Deane &',
-        'Stokes population -- DERIVED, and it OUTLIVES the surface white by '
-        '%.1fx, so what is left four seconds after a break is a SUBMERGED cloud '
-        'and not a deck. The suspension is'
-        % (ct['tau_air'] / ct['tau_foam']),
-        'd/w_s with Soulsby\'s law -- a THIRD published law, so no two of these '
-        'three share a source. The bar says the sediment lasts MINUTES; at '
-        'd = %.2f m this file\'s bed D50 of %.0f um'
-        % (ct['depth'], 1e6 * B.D50),
-        'clears in %.0f s, and minutes would need %.0f um -- the fine tail, '
-        'which this file does not carry. Right: Monahan & O\'Muircheartaigh '
-        '(1980), the quoted fit (solid) and the same'
-        % (ct['tau_sed'], 1e6 * FM.d50_for_settling_time(120.0, ct['depth'])),
-        'paper\'s optimal fit (dashed); log10 of the fraction. The dot is this '
-        'render\'s wind, U10 = %.1f m/s, W = %.5f. `?` on the wind.'
-        % (BO.U10, w.W_wind)], x=36, y=336)
+    # --- the caption, WRAPPED to the canvas by measuring rather than guessing
+    txt = (
+        'SECTION E ASKED FOR TWO TIMESCALES AND THE FILE PRODUCES THREE, AND '
+        'THE MIDDLE ONE IS NOT A NUMBER. Every curve is from this scene\'s own '
+        'fields. The surface raft is Monahan & Zietlow (1969), salt water, '
+        'PUBLISHED, and the salt/fresh pair in that paper is a factor of 1.5 '
+        'that makes the decay a bubble-stability property rather than a '
+        'hydrodynamic one. The plume is a size-resolved steady state over the '
+        'Deane & Stokes (2002) spectrum: each radius leaves at its own rise '
+        'speed, tau(r) = (d_p/2)/w(r) with w from Schiller & Naumann\'s drag, '
+        'so the shaded band IS the plume and the blue line is only its '
+        'volume-weighted mean. The AIR is gone in %.2f s -- which is bar '
+        'section E\'s "rises and bursts in seconds", recovered rather than '
+        'assumed -- while the projected area that scatters light is dominated '
+        'by the smallest bubbles present and lasts three orders of magnitude '
+        'longer. THAT IS WHY A BREAK LEAVES A CLOUD: four seconds on, the deck '
+        'has gone and what remains is a submerged haze. The suspension is '
+        'd/w_s with Soulsby\'s law, a THIRD published relation, so no two of '
+        'the three clocks share a source; at this bay\'s median depth of '
+        '%.2f m the bed\'s own D50 of %.0f um clears in %.0f s, which is the '
+        'bar\'s "minutes" met without adjustment -- but at 2 m it is %.0f s '
+        'and minutes there would need %.0f um, the fine tail this file does '
+        'not carry. RIGHT: Monahan & O\'Muircheartaigh (1980), the quoted fit '
+        '(solid) and the same paper\'s own optimal fit (dashed). The dot is '
+        'this render\'s wind, U10 = %.1f m/s, W = %.5f -- under a fifth of one '
+        'per cent. `?` on the wind.'
+        % (ct['tau_air'], ct['depth'], 1e6 * B.D50, ct['tau_sed'],
+           2.0 / ct['w_s'], 1e6 * FM.d50_for_settling_time(120.0, 2.0),
+           BO.U10, w.W_wind))
+    d0 = ImageDraw.Draw(img)
+    lines, cur = [], ''
+    for word in txt.split(' '):
+        trial = (cur + ' ' + word).strip() if cur else word
+        if d0.textlength(trial, font=P.FONT_S) > img.width - 72 and cur:
+            lines.append(cur)
+            cur = word
+        else:
+            cur = trial
+    if cur:
+        lines.append(cur)
+    P.caption(img, lines, x=36, y=356)
     P.save(img, path)
     return path
 
