@@ -135,6 +135,7 @@ the reference implementation or read off a photograph, not supposed.
 | Water is right in the near field and goes black — or absurdly saturated — toward the horizon, and no fog or exposure setting fixes both halves | **The straight ray used as the traversal distance.** `d/cos θ_a` diverges at grazing; the transmitted ray refracts and `d/μ_w` is bounded by `1.33 d`. Median 12.1%, p95 46.5% on a measured frame, fixed by one `sqrt` | [Screen-space water, step 4](#screen-space-water-the-fullscreen-triangle-pass) |
 | Volumetric foam or a bubble plume that goes bright white but you can still see the bed through it | `1 − 1/n²` spent as a **backscatter fraction** instead of a wall reflectance — 19× too much return, and the transmittance that should have fallen with it never does. A conservative slab has `R = τ'/(1 + τ')` and `T = 1 − R`; whitening without hiding means the model has `R` and not `T` | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
 | A white plume after a wave hits rock that either vanishes leaving nothing or lingers white far too long | **Two clouds with one decay curve.** Entrained air rises and bursts in seconds; suspended sediment settles over minutes and advects. They overlap in space and are separated by *lifetime*, not appearance | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
+| The bed disappears convincingly inside the break but stays visible everywhere else in the surf zone, and turning the foam up does not fix it | **The entrained air credited for the suspension's work.** Both hide a bed and they are four orders of magnitude apart — a measured `2.76×10⁻⁵` for the suspension against `0.152` for the plume, with the plume simply *absent* below its own depth. Model both, and check each absolutely rather than as a ratio | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
 | Water in the surf zone that is exactly as clear on every frame while the waves break through it | `b` treated as a **material constant** where it is a state variable produced by the dynamics: the waves suspend the bed, the backwash erodes, turbidity pulses at the wave period. The one optical property a still frame cannot verify | [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) |
 | A real-time approximation passes every image comparison and is 5–25% off on the quantities it approximates | The bar is still a **photograph** when the target is an approximation. 5% scene-linear is ~2.7 encoded levels of 255 at mid grey; the errors that matter are selected for invisibility. The bar has to become the reference plus a per-channel metric on named quantities | [`11`, the bar changes kind](11-verification-failures.md#when-the-target-is-an-approximation-the-bar-changes-kind) |
 
@@ -855,6 +856,34 @@ same one-white-several-mechanisms error [Aerated water](#aerated-water-foam-spra
 records for foam and spray — now with a *temporal* separator instead of a spatial one, which is
 worth noticing on its own: **when two mechanisms are inseparable in space, look for an axis on which
 they are not**, and lifetime is the cheapest one to instrument.
+
+⚠️ **And there is a third confusion on top of those two: both of them hide the bed, and a render may
+not credit one for the other.** In a measured surf scene they are not remotely comparable. Over
+50 713 pixels at 1.5–3 m depth, per-band medians (`D`, recomputed here off the scene-linear buffer):
+
+| depth band | the **suspension**'s own transmittance | the **plume**'s, `T²/(1 − R·R_sub)` |
+|---|---|---|
+| 1.5 – 3 m | **2.76×10⁻⁵** | **0.152** |
+| 3 – 6 m | 1.29×10⁻⁵ | 1.000 — no plume at this depth in this frame |
+| > 6 m | 1.40×10⁻² | 1.000 — likewise |
+
+**The suspension beats the entrained air by four orders of magnitude**, and the depth dependences are
+not even the same shape: the suspension's is Beer–Lambert on a column that grows with depth, while
+the plume's is set by the *plume's own* thickness — of order `H/2` at the surface — and is simply
+**absent** below it. So a render carrying only the entrained air would still hide the bed in the
+breaking band, **for the wrong reason, with the wrong depth dependence, and on the wrong clock**
+(seconds against minutes, per the table above). It would then fail everywhere the plume is not, which
+is most of the water.
+
+**Measure each one absolutely and never as a ratio of the two.** The obvious guard — bed radiance
+seen over bed radiance emitted — is blind here, because in the breaking band the suspension has
+already driven *both* terms to the floor and the quotient of two near-zeros carries no information:
+that guard reported `1.6×10⁻⁴` for a control run with the plume switched **off**, where the answer is
+`1` by construction. The absolute row is the one that works — the bed's radiance out of the water is
+`3.50×10⁻⁸` with the plume and `3.86×10⁻⁶` without, in the same scene-linear units as everything else
+in the frame. Same disease as
+[`11`'s tenth way](11-verification-failures.md#the-tenth-way-a-ratio-cannot-see-a-common-factor), met
+in a new place: **one absolute row per quantity, and the ratio only ever computed forward.**
 
 **And the structural obstacle, which is not an extension of anything above.** A plunging breaker
 throws its lip forward over an air tube, so for the duration of the overturn the free surface is
