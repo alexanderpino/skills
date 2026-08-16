@@ -288,7 +288,22 @@ least-confident-claims ledger in `00-index.md`.
   directions on purpose, because the same two facts have circulated as "understates by 19.4%" and
   "overstates by 30%" — which are the *reciprocal* readings (joint over separated) of the same two
   numbers. Both readings are correct; mixing one of each in a chain is how a factor gets
-  double-counted, so a percentage of this kind is quoted with its denominator or not at all. The
+  double-counted, so a percentage of this kind is quoted with its denominator or not at all.
+  ⚠️ **That warning has since been earned twice over, and the second time cost a false alarm worth
+  recording.** A later figure-drawing pass reported that the reference implementation's inline
+  comment — *"the factorised form OVERstates it by 30% in red"* — **did not reproduce**, measuring
+  55.6 / 11.4 / 2.4 % instead and concluding that *no* reading of the two integrals gives 30 at this
+  depth. Re-derived here, **both halves of that report are wrong in different ways** and the truth
+  is a third thing: 30.5% *is* a reading — it is the joint form sitting below `(2E₃(τ))²·R_int`, the
+  reciprocal of the +43.9% already in the table — so the comment's number is right and only its
+  *direction* is wrong; and 55.6% is a reading too, but of a **different separated form**,
+  `2E₃(2τ)·R_int`, which the figure pass had not distinguished from the squared one. Two forms, two
+  directions, four percentages, one comment. The corrective in the chapter is the
+  **8.1% spread between the two separated forms** and the ordering result that goes with it (the
+  direction-preserving form is the further off); the comment's 30% needs a denominator, not a
+  recalculation. **Nothing in the chapter's figures moved** — the entry above already carried the
+  correct pair in both directions, which is why the reconciliation was possible at all, and it is a
+  small argument for quoting reciprocals explicitly. The
   correlation coefficients (**+0.76**, **−0.85** at the red `τ`, both tending toward ±0.90 as `τ`
   grows) and the error-versus-`τ` ladder are quadratures here (`D`). The **cancellation** — 19.4% in
   the term against 2.8% in the composed albedo — is a property of *this* chain's algebra (the round

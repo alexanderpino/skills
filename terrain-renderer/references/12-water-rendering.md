@@ -4178,6 +4178,20 @@ chapter's pool (`τ = a·d = 0.3664 / 0.0742 / 0.0143` at 1.40 m, `D`, recompute
 | Escape, `T_esc` | **0.3403 / 0.4795 / 0.5106** | 0.2850 / 0.4563 / 0.5050 | **16.2 / 4.8 / 1.1 % low** (the truth is 19.4 / 5.1 / 1.1 % above it) | **+0.76** in red |
 | Round trip, `G_rt` | **0.0965 / 0.3277 / 0.4445** | 0.1389 / 0.3614 / 0.4546 | **43.9 / 10.3 / 2.3 % high** (the truth is 30.5 / 9.3 / 2.2 % below it) | **−0.85** in red |
 
+⚠️ **And the round-trip row hides a second choice, where the *more* physical option is the *further*
+off.** `(2E₃(τ))²` in the table is **two one-way diffuse legs**, which re-randomises the ray's
+direction at the surface. A specular surface does no such thing: the down leg travels at the same
+cosine as the up leg, so the direction-preserving transmittance is `2E₃(2τ)` — one leg of twice the
+optical depth — and it is the better physics. It is also **worse**: `2E₃(2τ)·R_int` reads
+`0.1502 / 0.3651 / 0.4549`, i.e. **+55.6 / +11.4 / +2.4 %** over the joint form against the squared
+version's +43.9 / +10.3 / +2.3 %, so **fixing the direction error alone moves the red 8.1% away from
+the truth** (`D`, recomputed here). The squared form was getting part of its accuracy from a
+cancellation between its two decorrelations. **Partial corrections to a factorisation are not
+monotone: "the more physical of two approximations" is not automatically the closer one**, and the
+only way to know is to compose the error rather than reason term by term — which is also why a
+half-finished migration off a separated LUT can ship a regression that reads as a bug in the new
+code.
+
 **The two errors have opposite signs, and that is the dangerous part.** The escape leg is
 positively correlated and the separated form is dark; the round trip is negatively correlated and
 the separated form is bright; the round trip sits in a *denominator*, so the two partly cancel in
