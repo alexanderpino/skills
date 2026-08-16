@@ -415,6 +415,32 @@ least-confident-claims ledger in `00-index.md`.
   `sqrt(g·h)`, Green's-law shoaling `a ∝ h^(-1/4)`, refraction: coastal-engineering canon;
   textbook treatment in Dean & Dalrymple, *Water Wave Mechanics for Engineers and Scientists*
   (1991). Constants quoted from model knowledge of the textbooks, not re-derived.
+- **P/?/D** — The **static-equilibrium (headland-)bay** plan-form
+  ([`12`](12-water-rendering.md#the-shoreline-is-part-of-the-wave-field-and-a-straight-one-is-a-test-that-cannot-fail),
+  [`12a` §11](12a-water-derivations.md#11-the-static-equilibrium-bay)). Three separable claims and
+  they do not share a tier.
+  **`P`** — that a sandy shore between rock control points relaxes to zero longshore transport, and
+  that the resulting plan-form has closed forms: the **logarithmic spiral** (Krumbein 1944; Yasso
+  1965; Silvester 1970) and the **parabolic bay-shape equation** (Hsu & Evans 1989). Attributions
+  quoted from model knowledge of the coastal-engineering literature and **not** verified against the
+  papers in this container — treat the attributions as `?` and the *mechanism* as `P`.
+  **`?` and NOT CARRIED** — Hsu & Evans' `C₀/C₁/C₂` quartic coefficients. Fifteen fitted numbers with
+  no internal consistency check; nothing here holds the paper; **they are deliberately absent from
+  all three files and must not be cited from them**.
+  **`D`** — the derivation that the *circular* member (`α = 90°`) follows exactly from "shore normal
+  to a radial orthogonal", and that the spiral is uniquely the constant-residual-obliquity
+  generalisation; the impossibility result that a plane-crest field admits only a straight rotated
+  equilibrium; and every number in the transport table, measured on `reference-impl/beach.py` over
+  1408 m of coast at `H₀ = 1.5 m, T = 9 s, θ₀ = 20°`. Those numbers are properties of *that* scene;
+  what transfers is the mechanism and the calibration discipline, never the figures.
+  **`?`** — `δ`, the residual obliquity that fixes `α`. Bracketed by the circle (0.9 % in
+  indentation on this scene), not closed.
+- **D** — **The offshore Snell invariant is the wavenumber component along the CONTOUR, not along
+  the grid.** Found by calibrating the transport meter: on the closed-form zero-transport coast,
+  which must break at exactly `θ = 0`, a 2-D march that conserved `k_y` on the grid axis left 4.89°
+  of residual obliquity and 76 % of the straight coast's transport; against the local contour it
+  leaves 0.20°. Exact for a straight coast, silently wrong on any bay. Measured on
+  `reference-impl/beach.py`, waves 1–8 shipped the grid-axis form.
 - **P** — Breaker criterion `H ≈ 0.78·h` (McCowan lineage) and surf-similarity/breaker
   classification via the Iribarren number: Battjes, "Surf Similarity", *Proceedings of the 14th
   International Conference on Coastal Engineering*, Copenhagen, ASCE, 1974, 466–480 (verified

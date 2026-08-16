@@ -631,6 +631,142 @@ handling emergent cells as boundaries, and the hard shadow needs an actual diffr
 directional spreading) rather than a wider filter on the depth field. **Blurring the shadow is not
 modelling the diffraction**; it happens to look better and it gets `W/λ` wrong in both directions.
 
+### The shoreline is part of the wave field, and a straight one is a test that cannot fail
+
+Everything above turns *crests* onto contours. Nothing above asks where the **contours** came from,
+and on a coast that matters, because the strongest and cheapest verification a reviewer has is
+"do the surf lines follow the curve of the bay" — and **on a straight shore that test passes by
+construction**. A straight shoreline plus a shore-keyed ramp gives straight contours, and crests
+that arrive already parallel to them have proved nothing about the refraction. The test only has
+teeth if the shore curves.
+
+So the plan-form has to come from somewhere, and there are only two honest sources: a drawn
+coastline (unverifiable) or a **form**. The form exists and it is coastal-engineering canon.
+
+**The static-equilibrium (headland-)bay.** A sandy shore between two rock control points, worked by
+a persistent oblique swell, migrates until the **longshore sediment transport is zero everywhere
+along it**. That state has two published closed forms — the **logarithmic spiral** (Krumbein 1944;
+Yasso 1965; Silvester 1970) and the **parabolic bay-shape equation** (Hsu & Evans 1989) — and one
+testable property, which is the reason to prefer it to any drawn curve:
+
+> At static equilibrium the wave orthogonal is normal to the shoreline at every station, so the
+> CERC transport `Q ∝ H_b^(5/2)·sin(2·θ_loc)` is zero all along the bay.
+
+That is a claim with a number attached, and it can be *fired at the shore you built* rather than
+asserted about it. **`P/D`**
+
+**Only one member of the family is derivable, and it is the circle.** If the orthogonals radiate
+from a pole — the diffraction point of the sheltering headland, or more generally the virtual
+source the fan converges on — then the radius vector *is* the orthogonal, "shore normal to the
+orthogonal" reads "shore normal to the radius", and the curve is a **circular arc about the pole,
+exactly**. If the orthogonal is rotated off the radius by a *constant* δ, the tangent makes the
+constant angle `α = 90° − δ` with the radius, and a constant tangent-to-radius angle is the
+logarithmic spiral's own definition and nothing else's. That is *why* the spiral, rather than a fit
+to four coastlines — the algebra is in
+[`12a` §11](12a-water-derivations.md#11-the-static-equilibrium-bay). What is **not** derivable is δ.
+Silvester's published α for real bays is 30–50°, i.e. δ = 40–60°, an order above anything refraction
+leaves at the break point; that is an empirical fit and must not be confused with a computed
+residual obliquity. **`P` for the forms, `D` for the derivation of the circular member, `?` for δ.**
+
+**The parabolic form is not implemented in `reference-impl/` and the reason is provenance, not
+preference.** Hsu & Evans' `C₀/C₁/C₂` are three quartic polynomials in β — fifteen fitted
+coefficients from a least-squares fit to 27 prototype and model bays — and a fifteen-coefficient fit
+has no internal consistency check that would catch a wrong digit. Writing them from memory would
+manufacture a citation. The log spiral has **one** parameter and a defining geometric property that
+checks itself, so it is the form built. **`?` on the parabolic coefficients: do not cite them from
+this chapter, because this chapter does not carry them.**
+
+#### The result that matters to a renderer: a bay is not a property of a shoreline
+
+Impose zero transport on a wave field with **plane offshore crests and shore-parallel contours**
+and integrate. Snell is `sin θ = (c/c₀)·sin θ₀` with θ measured from the *local* shore normal, and
+`c/c₀` is never zero, so `θ_b = 0` requires `θ₀,local = 0`: the shore normal must lie along the
+**deep-water** direction, at every station. Integrating `φ_s = −θ₀` gives
+
+```
+x_s(y) = x_ref − tan(θ₀)·(y − y_mid)          # a STRAIGHT coast, rotated to face the swell
+```
+
+— one straight line, and **any curvature raises the transport**. terrain-architect `12`'s coastal
+loop says the same thing in words ("headlands retreat faster than bays … until the coast
+**straightens**") and it is *right* for the wave field it assumes. A curved static-equilibrium bay
+is therefore **not** a property of a shoreline. It is a property of a shoreline **and** the headland
+that shelters it: the bay exists only where the wave orthogonal **fans** alongshore, and the fan is
+diffraction plus refractive focusing at the headland — the term
+[the section above](#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it) says no ray
+model contains. The two sections are one statement seen from two ends.
+
+**Measured on the reference implementation** (`beach.py`, 1408 m of coast, 89 alongshore stations,
+one offshore spectrum `H₀ = 1.5 m, T = 9 s, θ₀ = 20°`, one Dean ramp, one 2-D energy-flux march, one
+CERC closure — the only thing that differs between rows is the array `x_s(y)`; `D`):
+
+| shoreline | mean \|θ_loc\| at breaking | `Q` rms, m³/s | vs straight |
+|---|---|---|---|
+| straight, plane crest | 6.469° | 9.233 × 10⁻² | — (the control) |
+| **the closed-form zero-transport coast** (rotated 20°) | **0.202°** | **5.127 × 10⁻³** | **18× down** |
+| the log-spiral bay, plane crest | 5.595° | 1.875 × 10⁻¹ | **2× UP** |
+| the log-spiral bay, under the fan its own pole implies | 2.801° | 7.921 × 10⁻² | 1.2× down (3.5× over the spiral span) |
+
+Read the second row first. **A near-zero reading is worthless until zero has been shown to be
+reachable** — that is the fourteenth way a measurement lies (`11`) with the sign flipped, two
+instruments agreeing because neither could have said anything else. The rotated coast is the
+calibration, and it costs one line.
+
+**And calibrating it found a defect in the transform that eight waves of surf work had not.** The
+2-D march's offshore boundary conserved the wavenumber component along the **grid's** alongshore
+axis. The Snell invariant is the component along the **contour**. The two agree only for a coast
+whose contours are the grid's rows — which every scene in this project had been until the shore
+curved. On the closed-form zero-transport coast, which must break at exactly `θ = 0`, the grid-axis
+boundary left **4.89°** of residual obliquity and 76 % of the straight coast's transport; against
+the local contour it leaves **0.20°**. **If your transform takes a scalar offshore direction and
+applies Snell against the grid, it is exact only for a straight coast, and it will be silently wrong
+on any bay you give it.** `D`
+
+#### Where the residual goes, and the honest answer
+
+The bay under its own fan is **small and not zero**: `2.65 × 10⁻²` m³/s over the spiral span against
+a meter floor of `1.78 × 10⁻³` — about **15× the floor**. It decomposes, and the decomposition is
+the useful part:
+
+- **0.71° — the ramp is not concentric with the curve it is keyed to.** `d = A·(x_s(y) − x)^(2/3)`
+  makes contours that are *x-translates* of the shoreline, and translates of a concave curve
+  **converge**. A ray that arrives normal to the shoreline does not stay normal to the contours on
+  the way in, and refraction hands some obliquity back. Rebuilding the same bay with the depth a
+  function of **distance from the pole** — concentric arcs, on which a radial ray is normal to every
+  contour it crosses — removes exactly this much. `D`
+- **1.46° — the solver, on a curved bed.** A column-marched transform carries the ray's alongshore
+  drift only through its `∂k/∂y` terms. At 20° the drift is 0.36 of a cell per step, not the 0.015
+  the near-normal case gives, and on straight contours at the same obliquity the same march leaves
+  only 0.20°. So the extra is the march meeting curvature, not physics. `D`
+
+Neither is a tolerance and neither was widened. **The claim that survives is the mechanism** — that
+a bay's equilibrium is a statement about the shoreline *and* its sheltering headland together — and
+the claim that does not is "the built bay carries zero transport", which it does not, by a factor
+that is now attributable rather than absorbed.
+
+#### For the reviewer
+
+- **If the scene has a curved shore, ask where the curve came from.** A drawn one is authoring and
+  should be labelled as such; it is not wrong, it just cannot be verified and must not be presented
+  as an output.
+- **If the shore is straight, the refraction check is void** and a different one is owed — a rotated
+  test bed, or the isolated-obstacle test above.
+- **If the plan-form is claimed as an equilibrium, ask for the transport profile and for the
+  meter's floor.** Two numbers, and the second is the one that gets left out.
+- **The bay's indentation is the one number to compare against a photograph, and it must not be
+  fitted to one.** On this scene the closed form gives **122.8 m over 1409 m** where the owner's
+  overview photograph gives roughly **50 m over 1408 m** — 2.46×, reported and not corrected.
+  Inverting the same closed form instead, the deep-water obliquity that *would* produce 50 m is
+  **8.45°** against the scene's declared 20°: a measurement of the offshore spectrum out of a
+  plan-form, which is a result worth having and a calibration worth refusing.
+
+**Gap reported to the sibling skill.** terrain-architect `12-glacial-coastal.md` carries the coastal
+loop, longshore drift, spits, the Dean profile and the surf-zone morphodynamics, and **neither
+plan-form closed form**. Its only statement about coastal plan-form equilibrium is the "until the
+coast straightens" clause — which this section shows is exactly right *and* exactly why a bay needs
+a term that chapter does not have. The log-spiral and parabolic bays belong there, next to the
+coastal loop that cannot produce them.
+
 ### Tier 1 — depth-modulated ambient synthesis
 
 The baseline that every water system should ship: keep the FFT/Gerstner cascades and modulate

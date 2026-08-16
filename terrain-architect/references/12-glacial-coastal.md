@@ -437,6 +437,45 @@ the notch undercuts, thermal collapses the overhang into a cliff face, and the d
 armours the base (slowing retreat) or gets carried to a bay. Iterate it and headlands retreat
 faster than bays, which is correct and self-reinforcing until the coast straightens.
 
+> **The "until the coast straightens" clause is right, and it is exactly why this chapter is
+> missing a landform.** Found by implementing the block against a photographed embayment
+> (`terrain-renderer/reference-impl/beach.py`; 1408 m of coast, one offshore spectrum
+> `H₀ = 1.5 m, T = 9 s, θ₀ = 20°`). Impose zero longshore transport on the CERC closure below —
+> `Q ∝ sin(2·θ_loc)`, so `Q = 0 ⟺ θ_loc = 0` — with **plane offshore crests and shore-parallel
+> contours**, and Snell gives `sin θ_b = (c_b/c₀)·sin θ₀,local` with `c_b/c₀ > 0`, so `θ_b = 0`
+> requires `θ₀,local = 0` at *every* station. Integrating `φ_s = −θ₀` gives **one straight line,
+> rotated to face the swell**, and any curvature raises the transport. This chapter's clause is a
+> theorem for the wave field this chapter assumes.
+>
+> **What is missing is the landform that the clause therefore cannot produce: the
+> static-equilibrium (headland-)bay.** A sandy shore between two rock control points under a
+> persistent oblique swell relaxes to a *crenulate* plan-form with **zero longshore transport
+> everywhere along it**, and it has two published closed forms — the **logarithmic spiral**
+> (Krumbein 1944; Yasso 1965; Silvester 1970) and the **parabolic bay-shape equation**
+> (Hsu & Evans 1989), keyed to a diffraction point at the updrift headland tip, a control line, and
+> the wave obliquity β at the downcoast control point. Neither is anywhere in this chapter, and the
+> bay is the commonest sandy-coast plan-form there is. **P** for the forms; the attributions are
+> quoted from model knowledge and not verified against the papers, so treat them as **`?`** until
+> checked.
+>
+> **The bay is not a property of a shoreline; it is a property of a shoreline *and* the headland
+> that shelters it.** The equilibrium exists only where the wave orthogonal **fans** alongshore,
+> and the fan is diffraction plus refractive focusing at the headland — which is why
+> [Wave exposure](#wave-exposure)'s "fold refraction in as an exposure multiplier from coastline
+> convexity" is the right instinct pointed at the wrong quantity: convexity modulates the *energy*,
+> and what makes a bay is the *direction*. Measured on the implementation, the fan that scene's bay
+> requires is **39.6° of alongshore swing** in the orthogonal, and the same shoreline under a plane
+> crest carries **twice** the straight coast's transport rather than none. The derivation of why the
+> spiral (a constant residual obliquity forces a constant tangent-to-radius angle, which is the
+> logarithmic spiral and nothing else) and the measured residuals are in
+> `terrain-renderer/references/12a-water-derivations.md` §11.
+>
+> **One derived member, for anyone adding this here.** If the orthogonals radiate from the
+> diffraction point, "shore normal to the orthogonal" reads "shore normal to the radius" and the bay
+> is a **circular arc about that point, exactly** — `α = 90°`. Silvester's published `α` for real
+> bays is 30–50°, an empirical fit to the residual obliquity, and it must not be presented as a
+> computed quantity.
+
 **Wave-cut platform.** The flat bench at sea level is the signature. It emerges if `band` is
 narrow and `K_coast` is high — the terrain is planed off at exactly `seaLevel` and can go no
 lower. ~~If you're not getting one, `notchHeight` is too large.~~ — **struck: that diagnostic and

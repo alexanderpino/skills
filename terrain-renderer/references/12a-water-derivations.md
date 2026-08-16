@@ -30,6 +30,7 @@ Contents: [Conventions](#conventions-that-have-to-be-fixed-first) ·
 [The internal-reflection integrals](#7-the-internal-reflection-integrals) ·
 [The gathers](#8-the-gathers) · [The caustic pass](#9-the-caustic-pass-as-a-forward-splat) ·
 [Absorption and the dry-band calibration](#10-absorption-and-the-dry-band-calibration) ·
+[The static-equilibrium bay](#11-the-static-equilibrium-bay) ·
 [What checks what](#what-checks-what) · [What did not reproduce](#what-did-not-reproduce)
 
 ## Conventions that have to be fixed first
@@ -1989,6 +1990,170 @@ divide out against — and the two medians are not the same estimator, one being
 over a per-point irradiance and the other a median *picture* pixel over a median *map* irradiance,
 which a skewed caustic net does not let commute. The row is a consistency check with a known sign.
 What actually measures the absorption is the map row above it, which is exact.
+
+---
+
+## 11. The static-equilibrium bay
+
+**Why.** `12`'s refraction cues all turn crests onto contours, and the cheapest field check on them
+— "do the surf lines follow the curve of the bay" — is void on a straight shore, because a
+shore-keyed ramp under a straight shoreline has straight contours and the crests arrive parallel to
+them having done no work. Giving a scene a curved shore therefore has to be a *derivation*, not a
+drawing, and the headland-bay literature supplies the form. What follows is the algebra, the one
+member of the family that is genuinely derivable, and the impossibility result that says what a
+curved bay actually requires.
+
+### The condition
+
+The CERC longshore transport closure (Komar & Inman 1970, and terrain-architect `12`'s own statement
+of it) is
+
+```
+Q = K/(16 (s-1)(1-p) sqrt(gamma_b)) * sqrt(g) * H_b^(5/2) * sin(2 theta_loc)      [m^3/s]
+```
+
+with `s = rho_s/rho_w`, `p` the pore fraction, and `theta_loc` the angle between the wave orthogonal
+at breaking and the **local** shore normal. The whole prefactor is positive and constant, so
+
+```
+Q = 0   <=>   sin(2 theta_loc) = 0   <=>   theta_loc = 0
+```
+
+**and the empirical coefficient `K` cannot reach the answer.** `K` sets the rate at which a shore
+relaxes and nothing about where it relaxes to. That is worth stating because `K` is the one number
+in this derivation that could have been tuned to make the result come out; the implementation
+doubles it and checks the plan-form does not move, and separately checks that `Q` doubles exactly,
+because either row alone is also consistent with `K` being ignored.
+
+### The sign, which is the one thing a reader gets backwards
+
+With `x` shoreward-positive and `y` alongshore, a shoreline `x = x_s(y)` has tangent
+`t = (x_s', 1)/N`. Rotating by −90° gives `(1, −x_s')/N`, which points shoreward, so the shoreward
+normal lies at `−phi_s` from the `+x` axis where `phi_s = atan(x_s')`. A wave travelling at `theta`
+to `+x` therefore meets the shore at
+
+```
+theta_loc = theta + phi_s
+```
+
+### The impossibility result: plane crests admit only a straight equilibrium
+
+Take plane offshore crests (one direction `theta_0`, everywhere) and contours that follow the shore.
+Snell about the local normal is `sin(theta_b,loc) = (c_b/c_0)·sin(theta_0,loc)`. Since `c_b/c_0 > 0`,
+
+```
+theta_b,loc = 0   <=>   theta_0,loc = 0   <=>   phi_s = -theta_0
+```
+
+Refraction shrinks an obliquity; it never sends a non-zero one to zero. Integrating the constant
+`phi_s`:
+
+```
+x_s(y) = x_ref - tan(theta_0) * (y - y_mid)
+```
+
+**A straight coast, rotated by the FULL deep-water obliquity** — not the breaking one. That
+distinction is a factor-of-two-class trap of its own: rotating by the *breaking* angle (6.56° on the
+reference scene, against `theta_0` = 20°) leaves 2.78° of residual obliquity and 43 % of the
+straight coast's transport, and the implementation shipped that version first.
+
+The consequence is the useful part. Any curvature makes `phi_s` vary, `theta_loc` can then be zero at
+one station only, and **the transport goes up**. A curved static-equilibrium bay does not exist for a
+plane-crest field. It exists only where the orthogonal **fans** alongshore, and the fan is the
+sheltering headland's diffraction and refractive focusing — which is the term `12`'s
+diffraction section says no ray model has. The geometry gives its size with no wave model in it at
+all: the fan a stated shoreline requires is `psi(y) = -phi_s(y)`, and its alongshore range is the
+swing the headland must supply. On the reference scene's bay that is **39.6°**.
+
+### Why the logarithmic spiral, and which member is derived
+
+Suppose the orthogonals radiate from a pole `D` (the diffraction point, or the virtual source the
+fan converges on). Then the radius vector *is* the orthogonal and `theta_loc = 0` reads "shore normal
+to the radius":
+
+```
+tangent . radius = 0   at every station   =>   a CIRCULAR ARC about D, exactly.
+```
+
+That is the derived member, `alpha = 90°`. Now let the orthogonal be rotated off the radius by a
+**constant** `delta`. The shore normal is the radius rotated by `delta`, so the tangent makes the
+constant angle `alpha = 90° - delta` with the radius, at every station. A curve whose tangent makes a
+constant angle with the radius vector from a fixed pole is, by definition and uniquely, the
+logarithmic spiral:
+
+```
+R(phi) = R_a * exp((phi - phi_a) * cot(alpha))
+dP/dphi = R'(phi) u + R(phi) u_perp = R (cot(alpha) u + u_perp)
+angle(dP/dphi, u) = atan(1/cot alpha) = alpha,  independent of phi.       QED
+```
+
+So the spiral is not a curve fitted to four coastlines; it is *the* curve of constant residual
+obliquity, and the fit is what its **one** parameter absorbs. `delta` itself is **not** derivable
+here and is marked `?`. Silvester's published `alpha` for real bays is 30–50°, i.e. `delta` = 40–60°,
+which is an order above anything refraction leaves at the break point and is an empirical fit to a
+different quantity; the implementation ships `delta = theta_b` as a declared choice and computes the
+circle (`delta = 0`) beside it every run. On the reference scene the two differ by **0.9 %** in
+indentation, which is why the `?` is reported rather than chased.
+
+### Closing the pole: two equations, no freedom left
+
+A log spiral has four freedoms — the pole `(D_x, D_y)`, the scale `R_a`, and the angular origin
+`phi_a`. Two rock anchors `A1, A2` (the seaward-most shoreline in the outer quarter of each end of
+the coastal loop's own plan-form) absorb `R_a` and `phi_a` outright and leave one condition on the
+pole, because the spiral's similarity property is
+
+```
+ln(r2/r1) = cot(alpha) * (phi2 - phi1),      r_i = |A_i - D|,  phi_i = arg(A_i - D)
+```
+
+The second condition is Hsu & Evans' **downcoast control point**: the point at which the beach
+becomes parallel to the incoming crests, i.e. its normal lies along the wave vector, i.e.
+
+```
+tangent(A2) . khat = 0,        khat = (cos theta_0, sin theta_0)
+```
+
+Two equations, two unknowns. Damped Newton on a 2×2 numerical Jacobian closes both to `< 1e-13`.
+**The indentation is therefore an OUTPUT**, and so is the downcoast tangent's bearing, which is
+recomputed from the sampled shoreline rather than from the condition and comes back at exactly
+`−theta_0`.
+
+**Two branches exist and only one is a bay.** A pole at infinity is always a root — a spiral with an
+infinitely distant pole is a straight line, and the tangency condition then fixes its bearing, so
+that branch *is* the rotated straight coast above. The bay is the **nearest** root, and the selection
+rule has a statement behind it: the pole is the sheltering headland's diffraction point, and a pole
+79 km offshore is not a headland. The solve is multi-start and both branches are reported.
+
+### Where the residual goes
+
+Firing the transport meter at the built bay under the fan its own pole implies gives
+`Q_rms = 2.65e-2` m³/s over the spiral span against a **measured floor** of `1.78e-3` (the
+closed-form zero-transport coast through the same solver): small, and about 15× the floor. Two
+mechanisms, separated by measurement rather than by argument:
+
+1. **The ramp is not concentric with the curve it is keyed to — 0.71°.** `d = A(x_s(y) − x)^(2/3)`
+   has contours that are `x`-translates of the shoreline. Translates of a *concave* curve converge,
+   so a ray arriving normal to the shoreline does not stay normal to the contours it crosses, and
+   refraction returns some obliquity. Rebuilding the same circular bay with `d = A(R_s − r)^(2/3)`,
+   `r` measured from the pole — concentric arcs, on which a radial ray is normal to every contour —
+   removes exactly this much. Two beds, one shoreline, one incidence: the difference is attributable.
+2. **The march meeting curvature — 1.46°.** A column-marched transform carries the ray's alongshore
+   drift only through `∂k/∂y`. On *straight* contours at the same 20° obliquity the identical march
+   leaves 0.20°; on concentric contours with exactly radial incidence it leaves 1.66°. The excess is
+   the solver, not the physics, and it is named rather than absorbed into a tolerance.
+
+### What this section does not close
+
+- `delta`, the residual obliquity — `?`, bracketed by the circle.
+- The **parabolic bay-shape equation** (Hsu & Evans 1989). Fifteen fitted quartic coefficients with
+  no internal consistency check that would catch a wrong digit, and nothing in this container holds
+  them. Writing them from memory would manufacture a citation, so the form is named and **not**
+  implemented. Anyone with the paper should add it: its advantage over the spiral is precisely that
+  it produces the straight downcoast tangent as part of one formula instead of as a join.
+- The **fan itself**. The implementation supplies it as a stated per-row offshore direction radiating
+  from the bay's own pole, which is a boundary condition and not a diffraction solve. A Sommerfeld /
+  Penney–Price edge stamped at the headland tip would make the fan an output; that is the next wave's
+  work and it is the same term `12`'s diffraction section prices.
 
 ---
 
