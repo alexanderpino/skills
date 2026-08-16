@@ -8,7 +8,7 @@ integral before the frame starts** — split it, table it, sample it, drop the
 part that refracts — and the offline path cannot test any of them, structurally:
 approximation error is invisible to a code path that does not approximate.
 
-    python3 validate_raster.py        # 198 rows, three tiers, ~95 s, non-zero exit on FAIL
+    python3 validate_raster.py        # 200 rows, three tiers, ~2 min, non-zero exit on FAIL
     python3 validate_raster.py -v     # every tolerance's justification
     python3 validate_raster.py --fast # skip the frame-level tiers (~15 s)
     python3 evidence.py               # the eight figures in gauntlet/raster/evidence/
@@ -22,7 +22,7 @@ approximation error is invisible to a code path that does not approximate.
 | `offline.py` | The frame the pass is validated against. Same model, different machinery: analytic geometry, per-band refracted rays, `optics.slab_esc` / `slab_trap` evaluated at **every pixel's own three optical depths**. |
 | `waves.py` | **The wave surface**, on the flat datum. `field.py` wired in: the narrowed slope field, the removed-variance tensor, the screen-space footprint the pass can actually form, the slope-covariance-to-lobe-covariance map, and the three filter paths the chapter's *Distance and filtering* is an argument between. Its own camera, and why. |
 | `waveref.py` | The frame `waves.py` is validated against: the pixel's own footprint integral, by stratified sub-sampling of the **unfiltered** field. Two estimators, because the sun's disc defeats the obvious one. |
-| `validate_raster.py` | 198 rows on `validate.py`'s harness. At least one absolute row per quantity. |
+| `validate_raster.py` | 200 rows on `validate.py`'s harness. At least one absolute row per quantity. |
 | `evidence.py` | The eight figures, every caption number formatted from the run that drew it. |
 
 **Nothing here re-implements any physics.** `optics.py`, `atmosphere.py` and
@@ -431,7 +431,8 @@ direction at the sun, estimated by counting sub-samples inside a cone of
 half-angle ε. At ε = 2° the acceptance is 57× the disc's own. Its bias is the
 kernel width and it is *reported*, not assumed: the estimate is taken at 1° and
 2° and the spread between them is the tolerance every row built on it may spend.
-Where the brute force converges the two agree inside that spread.
+Where the brute force converges the two agree inside that spread: 0.933 against
+a bias bracket of 0.122 at 4–8 m, and 0.928 against 0.084 at 8–16 m.
 
 ### The fix, priced
 
@@ -639,7 +640,7 @@ depths, agreement inside 4 standard errors of the estimator, tolerance ~2e-4.
 
 ## Reading the suite
 
-198 rows, three tiers, ~95 s (the wave tiers build a 196-sub-sample reference). The harness, the tier meanings and the rule that a
+200 rows, three tiers, ~2 min (the wave tiers build a 196-sub-sample reference). The harness, the tier meanings and the rule that a
 tolerance comes from the **estimator's** error and never from the measured
 disagreement are `validate.py`'s, deliberately.
 
