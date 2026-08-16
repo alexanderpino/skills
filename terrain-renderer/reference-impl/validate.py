@@ -871,6 +871,363 @@ def tier1_energy(R):
           'this averages')
 
 
+# =============== TIER 1: THE WIDENED LOBE, ON AN ELLIPSE AND NOT ON A CIRCLE
+# THE ROW THAT WOULD HAVE CAUGHT `_lobe_shape`, and the reason it did not exist.
+# Every lobe row above -- the disc's solid angle, its flux, `sky()`'s peak on
+# axis, the total against 1 + m tau/8 -- is taken at `cov = None`. That path
+# returns `(1.0, n)` and never touches the widening at all; where it does touch
+# it, in `tier3_refl_ellipse`, what is checked is the ELLIPSE C, not the lobe
+# built on it. So the suite had eleven rows on the sun's lobes and not one of
+# them ever handed `_lobe_shape` an anisotropic Q.
+#
+# That matters more than it sounds, because the defect it hid is INVISIBLE in
+# the isotropic case by an identity and not by a small margin. For Q = q I the
+# inverse is (1/q) I, so
+#     u^T Q^-1 u = 1/q       and       1 / (u^T Q u) = 1/q
+# are the same number for every u, exactly -- and they agree on either principal
+# axis too. `_lobe_shape` shipped with the second expression, which is the
+# PROJECTION variance (the width of the shadow the Gaussian casts on the u axis)
+# where the convolved DENSITY along u wants the first. A degenerate case is not
+# a weak test of the general one; it is no test of it, and this file spent every
+# one of its lobe rows inside the degeneracy.
+#
+# It was found from outside: `raster-impl/waves.py` is an independent code path
+# over the same shared `atmosphere.py`, and it is the first consumer in this
+# project to reach an anisotropic Q at all.
+#
+# THE FOUR THINGS CHECKED HERE, none of which can be written from the shading
+# code: the exponent against a matrix inverse taken by `numpy.linalg`; the whole
+# construction (peak factor included) against a direct 2-D convolution that
+# knows nothing of cos^n; the flux in STERADIANS against the unwidened lobe's
+# own 2 pi/(n+1); and the degeneracy itself, stated as a row so that the next
+# reader can see which case the old evidence lived in.
+def _lobe_projection(n, cov):
+    """`atmosphere._lobe_shape` AS IT SHIPPED -- the defect, reintroduced here
+    so the row below can be fired at it rather than asserted against it. It is
+    kept in this file and not in `atmosphere.py`: the point is to prove the
+    guard is sensitive, and a guard nobody has watched fail is not a guard."""
+    u1, u2, c11, c12, c22 = cov
+    q11, q22 = 1.0 / n + c11, 1.0 / n + c22
+    det = np.maximum(q11 * q22 - c12 * c12, 1e-30)
+    g = (1.0 / n) / np.sqrt(det)
+    r2 = u1 * u1 + u2 * u2
+    w = np.where(r2 > 1e-16,
+                 (u1 * u1 * q11 + 2.0 * u1 * u2 * c12 + u2 * u2 * q22)
+                 / np.maximum(r2, 1e-16),
+                 0.5 * (q11 + q22))
+    return g, 1.0 / np.maximum(w, 1e-12)
+
+
+def _lobe_flux(shape, n, c11, c12, c22, nph=16384, exponent=False):
+    """The widened lobe's flux over the HEMISPHERE, in STERADIANS, for whatever
+    `shape` returns -- with NO radial quadrature and no small-angle step in it.
+
+    The exponent both forms return depends on the offset's AZIMUTH only (both
+    divide by |u|^2), and the lobe is still literally a cos^m, so the radial
+    integral is exact: INT_0^{pi/2} cos^m(rho) sin(rho) drho = 1/(m + 1), the
+    same closed form the unwidened lobe's own 2 pi/(n + 1) comes from. What is
+    left is one smooth periodic integral in the azimuth, which the midpoint rule
+    converges spectrally. So this is an EXACT integral of what the code returns,
+    and the only approximation left anywhere near it is the one the widening
+    construction itself makes -- which is what the tolerance below is set from.
+
+    `exponent=True` returns the azimuthal exponents instead, so a caller can set
+    that tolerance from the lobe rather than choose it."""
+    ph = (np.arange(nph) + .5) / nph * 2.0 * np.pi
+    g, ne = shape(n, (np.cos(ph), np.sin(ph), c11, c12, c22))
+    if exponent:
+        return np.asarray(ne)
+    return float(np.mean(np.asarray(g) / (np.asarray(ne) + 1.0)) * 2.0 * np.pi)
+
+
+def tier1_lobe_receiver():
+    n = ATM.N_DISC
+    # An ellipse with a genuine cross term, so the row also pins the SIGN that
+    # the adjugate flips. Its eigen-ratio is measured, not assumed.
+    c11, c12, c22 = 3.0e-3, 6.0e-4, 4.0e-4
+    Q = np.array([[1.0 / n + c11, c12], [c12, 1.0 / n + c22]])
+    lam = np.linalg.eigvalsh(Q)
+    ratio = float(lam[1] / lam[0])
+
+    # --- 1. THE EXPONENT, against a matrix inverse this file did not write.
+    # u^T Q^-1 u by numpy.linalg.inv over 512 directions, against the exponent
+    # `_lobe_shape` returns. ABSOLUTE, in the exponent's own units.
+    a = (np.arange(512) + .5) / 512 * 2.0 * np.pi
+    rho = 0.02
+    u1, u2 = rho * np.cos(a), rho * np.sin(a)
+    _, ne = ATM._lobe_shape(n, (u1, u2, c11, c12, c22))
+    Qi = np.linalg.inv(Q)
+    uh = np.stack([np.cos(a), np.sin(a)])          # (2, 512) unit directions
+    ref = np.einsum('ik,ij,jk->k', uh, Qi, uh)
+    check(1, 'lobe exponent n_eff == u^T Q^-1 u (ABSOLUTE, 512 directions)',
+          float(np.max(np.abs(ne - ref))), 0.0, 1e-6,
+          'the same quantity by two routes -- the shipped adjugate form and a '
+          'numpy.linalg.inv of the same Q -- so the only difference allowed is '
+          'float round-off on numbers of order 1e3', 'n')
+    info(1, '  ... n_eff over those directions, min / mean / max (ABSOLUTE)',
+         np.array([float(ne.min()), float(ne.mean()), float(ne.max())]),
+         'The exponent itself, before any ratio: the lobe runs from cos^%.0f '
+         'across the ellipse to cos^%.0f along it.' % (ne.min(), ne.max()))
+    _, ne_bug = _lobe_projection(n, (u1, u2, c11, c12, c22))
+    info(1, '  ... and what the projection form returned (ABSOLUTE)',
+         np.array([float(ne_bug.min()), float(ne_bug.mean()),
+                   float(ne_bug.max())]),
+         'Never larger than the row above, direction by direction -- by '
+         'Cauchy-Schwarz (u^T Q u)(u^T Q^-1 u) >= 1 -- so the shipped lobe was '
+         'never too narrow and always too wide.')
+
+    # --- 2. THE WHOLE CONSTRUCTION, against a direct 2-D convolution.
+    # cos^n convolved with the ellipse, evaluated on a grid, with no cos^n_eff
+    # and no peak factor anywhere in it. This is what says `g` and the exponent
+    # are right TOGETHER; either alone can be wrong and leave a ratio intact.
+    m, half = 801, 0.040        # 0.1 mrad steps, 12 sigma of the ellipse's minor
+    t = (np.arange(m) - (m - 1) / 2.0) * (2.0 * half / (m - 1))
+    ax, ay = np.meshgrid(t, t, indexing='ij')
+    Cm = np.array([[c11, c12], [c12, c22]])
+    Ci, dQ = np.linalg.inv(Cm), np.linalg.det(Cm)
+    ker = np.exp(-.5 * (Ci[0, 0] * ax ** 2 + 2 * Ci[0, 1] * ax * ay
+                        + Ci[1, 1] * ay ** 2)) / (2 * np.pi * np.sqrt(dQ))
+    ker = ker * (2.0 * half / (m - 1)) ** 2
+    conv, lobe, bug = [], [], []
+    for off in (0.0, 0.004, 0.010):
+        for phi in (0.0, np.pi / 3):
+            p1, p2 = off * np.cos(phi), off * np.sin(phi)
+            cs = np.cos(np.sqrt((p1 - ax) ** 2 + (p2 - ay) ** 2)) ** n
+            conv.append(float(np.sum(cs * ker)))
+            for fn, acc in ((ATM._lobe_shape, lobe), (_lobe_projection, bug)):
+                gg, nn = fn(n, (np.array([p1]), np.array([p2]), c11, c12, c22))
+                acc.append(float(gg * np.cos(off) ** nn[0]))
+    conv, lobe, bug = np.array(conv), np.array(lobe), np.array(bug)
+    check(3, 'widened lobe == cos^n * ellipse, by direct 2-D convolution',
+          lobe / conv, np.ones(6), 5e-3,
+          '801^2 midpoint quadrature of the convolution integral at 6 offsets, '
+          'with no cos^n_eff and no peak factor in it -- so it prices `g` and '
+          'the exponent TOGETHER, which no ratio between them can. The step is '
+          '0.1 mrad against a lobe sigma of 3.3 mrad and the grid is 9 lobe '
+          'sigmas clear of the furthest offset; 5e-3 is well over both, and '
+          'the small-angle step from cos^n to a Gaussian is what is left',
+          'ratio')
+    info(3, '  ... the six convolved values (ABSOLUTE, fraction of the peak)',
+         np.round(conv, 6),
+         'The convolution itself, before any ratio: offsets 0 / 4 / 10 mrad at '
+         'two azimuths, and nothing of `_lobe_shape` anywhere in them.')
+    info(3, '  ... the same six through the projection form (ratio to it)',
+         np.round(bug / conv, 5),
+         'The reintroduced defect against the same convolution: 1.000 on axis '
+         'and at zero offset -- the two places it is degenerate -- and %.1f%% '
+         'out at 10 mrad across the ellipse, which is where the frame\'s '
+         'glints live.' % (100 * (bug / conv).max() - 100))
+
+    # --- 3. THE FLUX, IN STERADIANS, which is the property `g` exists to give.
+    ref = 2.0 * np.pi / (n + 1.0)
+    f_ok = _lobe_flux(ATM._lobe_shape, n, c11, c12, c22)
+    f_bug = _lobe_flux(_lobe_projection, n, c11, c12, c22)
+    info(1, 'widened lobe flux, ABSOLUTE (sr): unwidened / shipped / projection',
+         np.array([ref, f_ok, f_bug]),
+         'Convolution moves a lobe\'s variance and does not add to its '
+         'integral, so all three of these are the same number or one of them '
+         'is a light source. Q eigen-ratio %.3f.' % ratio)
+    # THE TOLERANCE IS DERIVED, NOT CHOSEN. The widening is written in the
+    # Gaussian limit, where a cos^m lobe carries 2 pi/m; the lobe it actually
+    # returns carries 2 pi/(m + 1). So the conservation this row asserts can
+    # only hold to 1/(1 + min_phi n_eff), and that number is computed from the
+    # lobe under test rather than picked to fit it.
+    tol = 1.0 / (1.0 + float(_lobe_flux(ATM._lobe_shape, n, c11, c12, c22,
+                                        exponent=True).min()))
+    check(1, 'the widened lobe conserves its flux (anisotropic Q)',
+          f_ok / ref, 1.0, tol,
+          'the widening is a Gaussian construction and the lobe is a cos^m, so '
+          'the flux can only close to 1/(1 + n_eff) -- %.2e at this ellipse, '
+          'whose widest direction is cos^%.0f. Nothing else is allowed for'
+          % (tol, 1.0 / tol - 1.0), 'ratio')
+    # ...and the closed form for what the projection form does instead. The
+    # flux is g INT dphi / n_eff(phi); with Q's eigenvalues l1, l2 the correct
+    # exponent integrates to 2 pi sqrt(l1 l2) and the projection one to
+    # pi (l1 + l2), so the gain is exactly cosh(ln(l1/l2)/2) -- 1 at l1 = l2,
+    # which is the degeneracy above, restated as energy.
+    check(1, 'projection form\'s flux gain == cosh(ln r / 2), r the eigen-ratio',
+          f_bug / ref, float(np.cosh(.5 * np.log(ratio))), 5e-3,
+          'a closed form the shipped code cannot reach; the tolerance is the '
+          'quadrature\'s, as above', 'x')
+
+    # --- 4. FIRED AT THE REINTRODUCED DEFECT. The row above is only worth
+    # having if it would have failed on the code that shipped, so that is
+    # asserted rather than assumed: how many tolerances outside the guard the
+    # projection form lands.
+    margin = abs(f_bug / ref - 1.0) / 3e-3
+    between(1, 'reintroduced projection form trips row 3, in tolerances',
+            float(margin), 3.0, 1e9,
+            'the guard is only evidence if it fires; at this ellipse the '
+            'defect is %.1f tolerances out, and the bar is 3' % margin, 'x')
+
+    # --- 5. THE DEGENERACY ITSELF, so that the blind spot is on the record.
+    iso = (u1, u2, 2.0e-3, 0.0, 2.0e-3)
+    _, n_iso = ATM._lobe_shape(n, iso)
+    _, n_iso_bug = _lobe_projection(n, iso)
+    check(1, 'isotropic Q: the two forms are the SAME NUMBER, not merely close',
+          float(np.max(np.abs(n_iso - n_iso_bug))), 0.0, 1e-9,
+          'no tolerance argument: for Q = q I both expressions reduce to 1/q '
+          'algebraically, and the residual here is float round-off on an '
+          'exponent of order %.0f. This is why every row above passed for as '
+          'long as it did' % n_iso.mean(), 'n')
+    # ...and the two clamps in the shipped line, which are unreachable for any
+    # C a slope tensor can produce (C is PSD, so det Q >= (c11+c22)/n + 1/n^2)
+    # and are there as the sign that says so. Fired at a caller that breaks it.
+    bad = (u1, u2, 1.0e-3, 9.9e-3, 1.0e-3)         # |c12| >> sqrt(c11 c22)
+    gb, nb = ATM._lobe_shape(n, bad)
+    check(1, 'a NON-PSD ellipse still leaves a finite, positive exponent',
+          np.array([float(np.isfinite(nb).all()), float((nb > 0).all()),
+                    float(np.isfinite(gb).all())]), np.ones(3), 0.0,
+          'not a tolerance: the two clamps exist so that a caller who hands '
+          'this an indefinite covariance gets a lobe rather than a NaN that '
+          'propagates into the frame. c12 is 9.9x its legal bound here', 'bool')
+    info(1, '  ... and on a principal axis they agree as well (ABSOLUTE, n)',
+         np.array([float(ATM._lobe_shape(n, (np.array([rho]), np.array([0.]),
+                                             c11, 0.0, c22))[1][0]),
+                   float(_lobe_projection(n, (np.array([rho]), np.array([0.]),
+                                              c11, 0.0, c22))[1][0])]),
+         'The second place the defect is invisible, and the reason a row aimed '
+         'along the wind would not have caught it either.')
+
+    # --- 6. WHERE THE POOL ITSELF SITS. `render.py` hands this function an
+    # ellipse stretched by 1/cos(theta_v) along the view azimuth, so the frame's
+    # gain is a function of the incidence angle and of nothing else (for an
+    # isotropic slope tensor). Reported at the angles the frame contains.
+    tvs = np.deg2rad(np.array([20.0, 33.35, 57.0, 75.0]))
+    rr = 1.0 / np.cos(tvs) ** 2
+    info(1, 'the pool\'s own ellipse: theta_v, eigen-ratio, the gain it paid',
+         np.round(np.stack([np.degrees(tvs), rr,
+                            np.cosh(.5 * np.log(rr))]), 4),
+         'C = J SIGMA J^T with J = diag(-2, -2 cos theta_v), so an isotropic '
+         'slope tensor still arrives as an ellipse of ratio 1/cos^2(theta_v). '
+         'These are the ratios `water_shade` actually reached and the flux gain '
+         'each one carried, closed form.')
+
+    # --- 7. MARKED, NOT CLOSED. One silent degeneracy is rarely alone, so the
+    # rest of `atmosphere.py` was read for the same shape -- a limit handled by
+    # clamping a MAGNITUDE, which throws the sign and the scale away with it --
+    # and `_ss_rayleigh` has it. Its single-scattering form carries the
+    # difference quotient (e^{-tau/mu_v} - e^{-tau/mu_s}) / (mu_v - mu_s), a
+    # REMOVABLE singularity whose limit is the derivative (tau/mu^2) e^{-tau/mu}
+    # and whose numerator changes sign with its denominator. The file guards it
+    # with `where(|d| < 1e-5, 1e-5, d)`, which is the magnitude and not the
+    # limit: inside that band the function returns a tenth of the right answer,
+    # then zero AT the singular point, then a NEGATIVE radiance on the near
+    # side. mu_s here is SUN_DIR[2], so the band sits at a view elevation of
+    # 21 deg -- the sun's own.
+    #
+    # NOT PATCHED, and the reason is this round's control: `_ss_rayleigh` is the
+    # computed LOWER BOUND printed beside the hand-set sky gradient, it is
+    # reached by no rendered pixel, and a second change in this diff could not
+    # be attributed by the frame comparison the whole round rests on. Measured
+    # here so it is a number on the record rather than a note.
+    mus = float(ATM.SUN_DIR[2])
+    lim = (ATM.TAU_R / mus ** 2) * np.exp(-ATM.TAU_R / mus)
+    f0 = ATM.E_SUN * np.exp(ATM.TAU_R * ATM.AIRMASS)
+    lim = f0 * (0.75 * (1.0 + 0.5 ** 2) / (4.0 * np.pi)) * mus * lim
+    got = np.array([ATM._ss_rayleigh(np.array([mus + d]), np.array([0.5]))[0, 1]
+                    for d in (1e-4, 1e-6, 0.0, -1e-6)])
+    info(1, '`?` _ss_rayleigh at mu_v -> mu_s (ABSOLUTE, green radiance)',
+         np.round(np.append(got, lim[1]), 5),
+         'd = +1e-4, +1e-6, 0, -1e-6, then the true limit. The clamp is on '
+         '|d| and not on the limit, so the last three are 1/10th, zero and '
+         'NEGATIVE against a right answer of %.4f. Diagnostic only -- no '
+         'rendered pixel reaches it -- and MARKED rather than closed, so that '
+         'this diff stays one change.' % lim[1])
+
+
+# ========== TIER 1: THE FIELD REFUSES TO BE SAMPLED BEFORE IT IS CALIBRATED
+# `field._norm_jets()` sets the NEAR band's level, and until this round nothing
+# said so louder than a comment. `_SC['near']` shipped at 1.0 against a
+# calibrated 0.001011: a consumer that imported `field` and sampled it got that
+# band at 989x amplitude, SILENTLY, and it cost the raster reference a full round
+# of measurements. The band is the basin's long waves, so the error does not look
+# like an error -- it looks like a different pool.
+#
+# The module now refuses: the level is `None` until `_norm_jets` sets it, and
+# every path out of `field.py` that carries NEAR goes through `_near_scale()`,
+# which raises. Two rows fire the refusal on a FRESH copy of the module -- the
+# only way to test a one-way latch -- and two more give the absolute levels on
+# each side of it, because "989x" is a ratio and this project has been blind
+# five times to a quantity that only ever appeared as one.
+def tier_field_guard(fld):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('_field_fresh', fld.__file__)
+    fresh = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fresh)                 # imported, NOT normalised
+
+    x = np.array([2.0, 3.0]); y = np.array([1.0, 2.0])
+    raised = 0
+    for fn, args in ((fresh.grad_points, (x, y)),
+                     (fresh.grad_grid, (np.linspace(1, 3, 8),
+                                        np.linspace(1, 3, 8))),
+                     (fresh.slope_var_points, (x, y, 0.01))):
+        try:
+            fn(*args)
+        except RuntimeError:
+            raised += 1
+        except Exception:                          # noqa: BLE001
+            pass
+    check(1, 'a fresh field.py REFUSES all 3 entry points until _norm_jets',
+          raised, 3, 0,
+          'not a tolerance: each of grad_grid, grad_points and '
+          'slope_var_points must raise RuntimeError, and the count is exact',
+          'calls')
+    check(1, 'the uncalibrated NEAR level is absent, not wrong',
+          float(fresh._SC['near'] is None), 1.0, 0.0,
+          'the repair is that the number does not exist before it is measured; '
+          '1.0 sitting there was the whole of the 989x', 'bool')
+
+    # ...and the two ABSOLUTE levels the ratio is built out of, in rms slope,
+    # over `_norm_jets`' own calibration patch.
+    X, Y = np.meshgrid(np.linspace(0.3, fld.X1 - 0.3, 260).astype(np.float32),
+                       np.linspace(0.3, fld.Y1 - 0.3, 130).astype(np.float32))
+    raw = fld.rms_slope(*fld._cyl(X, Y, scale=1.0))
+    got = fld.rms_slope(*fld._cyl(X, Y))
+    info(1, 'NEAR band rms slope, ABSOLUTE: uncalibrated / calibrated / target',
+         np.array([float(raw), float(got), fld.JNEAR_RMS]),
+         'sqrt(<|grad h|^2>) over the same 260 x 130 patch _norm_jets '
+         'calibrates on. The first is what a consumer that skipped the call '
+         'would have put on the water.')
+    check(1, 'the calibrated NEAR band hits JNEAR_RMS exactly',
+          float(got), fld.JNEAR_RMS, 5e-9,
+          'the level is DEFINED by this identity, so the only tolerance is the '
+          'float32 accumulation in `_cyl` over 260 x 130 points, which is '
+          '1.9e-9 here', 's')
+    check(1, 'the skipped-call amplitude, measured', float(raw / got), 989.4,
+          0.5, 'the ratio is 1/_SC[near] by construction; 0.5 on 989 catches a '
+          'band whose shape moved and nothing else', 'x')
+
+    # ...and the same thing where a CONSUMER would have met it: the WHOLE
+    # field, all five bands, with the old default put back by hand. This is the
+    # guard fired at the reintroduced bug, and it is the number the raster
+    # reference took a round of measurements against.
+    xs = np.linspace(fld.X0 + 0.3, fld.X1 - 0.3, 200)
+    ys = np.linspace(fld.Y0 + 0.3, fld.Y1 - 0.3, 200)
+    right = float(fld.rms_slope(*fld.grad_grid(xs, ys)))
+    fresh._SC['near'] = 1.0                        # the level that used to ship
+    wrong = float(fresh.rms_slope(*fresh.grad_grid(xs, ys)))
+    info(1, 'whole-field rms slope, ABSOLUTE: skipped call / calibrated',
+         np.array([wrong, right]),
+         'The consumer-visible quantity, both ways, in slope. The basin does '
+         'not have a %.2f rms surface and nothing in the old module said so.'
+         % wrong)
+    between(1, 'the field a skipped _norm_jets would have shipped', wrong,
+            10.0 * right, 1e6,
+            'the bar is "at least an order out", not a fitted number: the row '
+            'exists to prove the guard is aimed at something real, and it '
+            'lands %.0fx out' % (wrong / right), 's')
+    was = float(fld._SC['near'])
+    with contextlib.redirect_stdout(io.StringIO()):
+        fld._norm_jets()                           # a second time, on purpose
+    check(1, '_norm_jets is idempotent (it silently was not)',
+          float(fld._SC['near']), was, 0.0,
+          'tolerance zero, on the calibration constant itself. Before this '
+          'round the second call re-measured the ALREADY-SCALED field and '
+          'divided again, which would land here at %.3g instead' % (was * was),
+          'x')
+
+
 # ========================================== TIER 2: PUBLISHED MEASUREMENT
 # Pure-water absorption, a_w, in m^-1. Both tables are transcribed from the
 # Oregon Medical Laser Center compendium (omlc.org/spectra/water/abs/), which
@@ -4140,6 +4497,7 @@ def main():
     for fn, args in ((tier1_fresnel, (R,)), (tier1_snell, (R,)),
                      (tier1_beer, (R,)), (tier1_caustic, (R, fld)),
                      (tier1_flat, (R, fld)), (tier1_energy, (R,)),
+                     (tier1_lobe_receiver, ()), (tier_field_guard, (fld,)),
                      (tier2_absorption, (R,)), (tier2_coxmunk, (R, fld)),
                      (tier2_jet, (fld, wkm)), (tier2_dispersion, (fld, wkm)),
                      (tier3_refl_ellipse, (R, fld)),
