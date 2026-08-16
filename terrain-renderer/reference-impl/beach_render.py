@@ -986,7 +986,7 @@ def clocks_figure(w, f, path):
     from PIL import ImageDraw
     ct = f['clocks']
     sp = w.air['pop']['spectrum']
-    img = P.canvas(1000, 620)
+    img = P.canvas(1000, 600)
     ax = P.Axes(img, (92, 56, 580, 320), (-0.7, 3.4), (0.0, 1.02),
                 title='Section E: three mechanisms, and one of them is a spectrum',
                 xlabel='log10 seconds since the break',
@@ -1003,16 +1003,16 @@ def clocks_figure(w, f, path):
                        (ct['tau_sed'], cols[2])):
         ax.line(lt, np.exp(-tt / tau), col, 2)
         ax.vline(math.log10(tau), col, 1, (4, 4))
-    P.legend(ax, [(cols[0], 'surface raft %.2f s -- Monahan & Zietlow 1969 (P)'
+    P.legend(ax, [(cols[0], 'surface raft %.2f s  Monahan & Zietlow 1969 (P)'
                    % ct['tau_foam']),
-                  (cols[1], 'entrained AIR %.2f s -- <tau>_vol (derived)'
+                  (cols[1], 'entrained AIR %.2f s  <tau>_vol (derived)'
                    % ct['tau_air']),
-                  (cols[2], 'suspension %.0f s -- d/w_s, Soulsby (derived)'
+                  (cols[2], 'suspension %.0f s  d/w_s, Soulsby (derived)'
                    % ct['tau_sed']),
-                  ((206, 224, 240),
-                   'the plume\'s OWN spread, %.2f s to %.0f s across the sizes'
+                  ((176, 206, 232),
+                   'the plume\'s own spread, %.2f-%.0f s over the sizes'
                    % (sp['tau_at_rmax'], sp['tau_at_rmin']))],
-                 1.05, 0.98)
+                 0.45, 0.97)
     ax2 = P.Axes(img, (672, 56, 950, 320), (2.0, 20.0),
                  (math.log10(1e-5), math.log10(2e-1)),
                  title='Whitecap coverage', xlabel='U10, m/s',
@@ -1068,7 +1068,7 @@ def clocks_figure(w, f, path):
             cur = trial
     if cur:
         lines.append(cur)
-    P.caption(img, lines, x=36, y=356)
+    P.caption(img, lines, x=36, y=376)
     P.save(img, path)
     return path
 

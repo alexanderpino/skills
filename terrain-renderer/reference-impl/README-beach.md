@@ -2539,6 +2539,13 @@ open item at intake.
 wave 4's literals had gone stale; there is no number typed into any caption
 string in this wave.
 
+**The frames are drawn at `--fast`, and that is for comparability rather than
+for time.** `s4-bay-render.png` and `s5-bay-render.png` are 450 px wide; drawing
+s6 at the full 900 would have made the three-frame comparison a comparison of
+resolutions as well as of physics. Every number reported from any of them is
+taken from the float64 radiance buffer before `_save`, so nothing measured here
+depends on the raster size.
+
 **`s4-` and `s5-` are not overwritten, and that is now a two-wave rule.** s4 is
 the linear surface, s5 the nonlinear one with the placeholder, s6 the same camera
 again with the three mechanisms — three frames, one camera, one bed, one sun, one
