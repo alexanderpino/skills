@@ -6,7 +6,9 @@ to make it feel like one thing again.
 
 ## What you receive
 
-- The complete artifact, not a lane
+- The parts of the artifact that changed this wave, and the paths that surround
+  them — on a small artifact that is the whole thing; on a large one it is the
+  changed files plus whatever shares a surface with them
 - The bar
 - The list of lanes that ran this wave and what changed in each
 
@@ -47,3 +49,14 @@ STRUCTURAL: <anything that suggests the lane split itself is wrong>
 That last field matters. If you keep finding the same seam wave after wave, the
 decomposition is cutting through something that should have stayed whole. Say so —
 the lead agent can re-cut the lanes.
+
+Keep the report to those five lines. You run once a wave; a long report is read
+by everyone in the next one.
+
+## When you should not run
+
+The lead agent skips this pass when the funded lanes touched genuinely disjoint
+files — checked against the wave's diff, not assumed. One skipped smoother on a
+truly independent wave is a call saved; one skipped smoother on a shared visual
+surface, a single document, or one rendering pipeline costs a whole wave of
+incoherence. When in doubt, run.

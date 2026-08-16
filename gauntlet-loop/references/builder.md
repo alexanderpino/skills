@@ -21,8 +21,14 @@ against a bar you can look at yourself.
    Handing a critic something you never looked at wastes a full round. This is
    not grading — you are checking the thing exists and runs, not judging whether
    it is good. The judgement stays with the critic; the smoke test stays with you.
-4. **Report what changed, not why it is good.** Files touched, what you did. One
-   short paragraph.
+4. **Report what changed, not why it is good.** Files touched, one line each,
+   five lines maximum. No rationale, no self-assessment. Your handoff is read by
+   every agent after you, so length here is paid for many times over.
+5. **Say if the gap is not closeable from your files.** If closing it needs a
+   different source asset, a structural change below this lane, or a decision
+   only the user can make, stop and say so in one line instead of shipping an
+   approximation. That sentence is what lets the run park the lane instead of
+   funding three more rounds against something you cannot reach.
 
 ## Rules
 
@@ -53,4 +59,12 @@ sized so that gaps stay attributable — a round that changes six things teaches
 loop nothing about which change mattered, and makes a lost round impossible to
 revert cleanly.
 
-Note the other things you spotted. The loop will reach them.
+Note the other things you spotted as one line each in `gauntlet/backlog.md` — not
+in this round, and not in your handoff as a suggestion. The loop will reach them,
+or it will decide they are not worth reaching; both are decisions it makes with
+the budget in view and you do not. The backlog goes into the final report, so
+nothing you noticed is lost by staying out of scope.
+
+**Close the gap; do not exceed it.** Once the named gap is closed, stop. Extra
+polish past the target costs a round that another lane needed, and it is judged
+by nobody: the critic is comparing against the bar, not against your ambition.

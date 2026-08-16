@@ -6,7 +6,11 @@ choice encodes how much time and money the run may spend, which is not yours to
 decide. `gauntlet.py status` computes all of the mechanical ones; your job is to
 run it at every wave boundary and act on what it says.
 
-## The four
+Two of them end spending on *one lane* (`bar-met`, `clean-streak` retire it;
+`no-progress` parks it). Two end the *run* (`budget`, `judgment`). Kill criteria,
+agreed at intake, end the run early on evidence the user named in advance.
+
+## The lane-level conditions
 
 ### `bar-met`
 Our output wins the bar comparison in **N consecutive rounds** on a dimension
@@ -18,9 +22,9 @@ A retired lane can still carry a recorded open gap (a `minor` that never
 mattered); the report keeps it. Retirement is a resource decision, not a claim of
 perfection.
 
-Best for reachable bars. Against a deliberately unreachable bar it may never
-fire — say so at intake so the user knows the run is really governed by budget
-and judgment.
+This is the condition that does the work in a well-set run, which is why the
+target bar has to be reachable. Against a target nobody can hit it never fires,
+every lane looks stalled, and the run is really governed by the budget alone.
 
 ### `clean-streak`
 **N consecutive bar rounds with GAP SEVERITY `none`** on a dimension (config
@@ -32,6 +36,41 @@ The severity field is what makes this condition able to fire at all — a critic
 always asked for the largest gap, and `none` is its way of saying there isn't a
 meaningful one. Degenerate streaks are cheap for a lazy critic, which is why a
 `none` verdict with empty evidence is rejected and re-run.
+
+### `no-progress` — the prune
+
+The only condition that ends a lane **without** it having succeeded. It fires
+when a dimension stops paying for its rounds, computed by `status` from the log:
+
+- **no movement in N rounds** (config `no_progress_n`, default 3): no score gain,
+  no severity easing, no margin narrowing across the last N bar rounds
+- **reverts outpacing promotions** — over 50% of the recent champion rounds ended
+  in a revert, so builders are making it worse more often than better
+- **the same gap named three rounds running** — the distance is structural, and
+  no amount of lane-level work reaches it
+
+`status` prints `PARK RECOMMENDED` with the reason and the exact command:
+
+```bash
+python3 scripts/gauntlet.py park --lane imagery --dimension visual \
+    --reason "flat 3 rounds, score 5→5; grain gap is a source-asset problem"
+```
+
+**Parking is not a verdict on the artifact.** It is the decision to stop paying
+for rounds that stopped buying anything, and it is the single most valuable thing
+a long run does with its budget. The freed slots go to the next lanes on the
+ranked list; the open gap goes into the report where the user can act on it.
+
+The script defends the decision in both directions: it refuses to park a
+dimension the log still reads as moving (use `--force` for a scope or priority
+call from outside the log), and it warns if you log a round against a parked one.
+
+**Resuming.** `park --resume --reason "<what changed>"` funds it again — on *new
+evidence only*: a re-cut that includes the structural element, a fixed inspection
+path, a new source asset, a revised bar. "It might work this time" is sunk cost
+with extra steps. The resume reason lands in the run history either way.
+
+## The run-level conditions
 
 ### `budget`
 Ceiling on waves (config `budget_waves`), optionally also wall clock or tokens
@@ -63,10 +102,15 @@ log alone:
 
 - every **open** dimension, with whether it is still moving — score trend across
   its last rounds, severity easing (major → minor → none), margin narrowing
-- the recent **revert rate**
+- every **parked** dimension, listed but deliberately not priced in
+- the recent **revert rate**, and the cost so far in calls per closed gap
 - a one-line **read**: `improving`, `mixed`, `at-ceiling`, `unclear`, or
   `nothing-open`
-- a suggested wave block, priced in subagent calls over the lanes still open
+- a suggested wave block, priced in subagent calls over the lanes still funded
+
+**Park before you price.** `extend` refuses a grant while a dimension is flagged
+for parking, because an extension priced over stalled lanes buys exactly the
+rounds the log says are worthless.
 
 That read is a reading of the log, not a decision. You present it; the user
 decides.
@@ -78,11 +122,12 @@ still moving, what more would cost. Then one question.
 
 ```
 Budget depleted at wave 8. Stopped after smoothing, report at gauntlet/report.md.
+~54 calls, 6 gaps closed (~9 each).
   imagery/visual   still moving — score 5→7, severity major→minor
                    open gap: grain texture reads as compression, not intent
-  imagery/perf     flat 3 rounds, revert rate 60% — at its ceiling
-Extension: 3 waves on imagery/visual ≈ 12 subagent calls.
-My read: worth it on visual, not on perf. Extend 3, re-cut, or stop here?
+  imagery/perf     parked at wave 6 — flat 3 rounds, revert rate 60%
+Extension: 3 waves on imagery/visual ≈ 9 subagent calls.
+My read: worth it on visual. Extend 3, re-cut, or stop here?
 ```
 
 Sizing: **2–4 waves**. Enough to close a named gap, short enough that the next
@@ -94,7 +139,8 @@ when a single grant exceeds the whole original budget.
 
 Recommend against extending — and say why in one line — when:
 
-- **Nothing is open.** Every dimension retired. Raise the bar (announced) or stop.
+- **Nothing is open.** Every dimension retired or parked. Raise the bar
+  (announced) or stop.
 - **The log reads `at-ceiling`.** No open dimension still moving, or reverts
   outpacing promotions. More waves buy reverts. `extend` refuses this read
   without `--force`; use `--force` only when the user has seen the read and chose
@@ -143,28 +189,57 @@ You call diminishing returns — with **evidence from the log**, not a feeling:
 - Named gaps getting smaller and more cosmetic
 - Revert rate climbing past the promotion rate (`status` flags >50% in the
   recent window as a judgment signal)
+- Cost per closed gap climbing wave over wave — the loop is buying less each time
 - The same gap recurring after being closed — a structural ceiling
 
 State the evidence when you stop on judgment. "It seemed done" is not a stop
 condition.
+
+### `kill` criteria
+
+The stage gate: evidence, named by the user at intake, that ends the run early
+without any further discussion. Agreeing them costs one line at intake and saves
+the argument that otherwise happens at wave 9, when everyone is invested.
+
+Good kill criteria are specific and checkable at a wave boundary:
+
+```
+KILL  visual not at target by wave 4 → stop and report; the approach is wrong
+KILL  frame time still over 16ms after the renderer lane retires → stop
+KILL  more than half the lanes parked → stop; the decomposition is wrong
+```
+
+Check them in the wave-boundary review, alongside `status`. When one fires, stop
+and report like any other stop — the user pre-authorised this exact decision, so
+do not re-litigate it, and do not offer an extension against a criterion they
+named specifically to prevent one.
 
 ## Combining
 
 Typical unattended configuration:
 
 ```json
-{ "stops": { "bar_met_n": 2, "clean_streak_n": 2, "budget_waves": 12, "hard_cap_waves": null } }
+{
+  "stops": {
+    "bar_met_n": 2, "clean_streak_n": 2, "no_progress_n": 3,
+    "target_score": 7, "budget_waves": 8, "hard_cap_waves": null
+  },
+  "wip_limit": 3
+}
 ```
 
-plus judgment armed by agreement. Per-dimension conditions retire dimensions;
-lanes retire when all their dimensions do; the run ends when all lanes are
-retired or a run-level condition (budget, judgment) fires.
+plus judgment armed by agreement and any kill criteria in `contract.md`.
+Per-dimension conditions retire or park dimensions; lanes retire when all their
+dimensions retire, and close when each is retired or parked; the run ends when
+nothing is left to fund or a run-level condition fires.
 
 ## Always-on stops
 
 Independent of configuration:
 
 - **User interrupt.** Stop at the next safe point and report state.
+- **Nothing left to fund.** Every dimension retired or parked. The run is over
+  whatever the budget says; the open gaps go to the user.
 - **Broken inspection.** Critics cannot reach the real artifact. Stop — the loop
   is no longer measuring anything.
 - **Downhill drift.** Champion quality falling wave over wave. Stop, revert to
@@ -179,7 +254,9 @@ Never halt silently. On any stop:
 
 1. Finish the wave and run the smoother, unless the stop is a safety stop
 2. Promote the best champion, not necessarily the latest challenger
-3. `gauntlet.py report`, then complete the judgement fields yourself
+3. `gauntlet.py board`, then `gauntlet.py report`, then complete the judgement
+   fields yourself — including what each parked lane would need to be worth
+   restarting
 4. State whether the loop was still improving when it stopped
 5. On a budget stop, make the extension offer — a priced block of waves, or an
    honest recommendation to stop
