@@ -42,8 +42,10 @@ already disagreed with itself about. See README.md, section `The 30%`.
 
 The half-texel discipline is `12`'s *Format, precision, and the bug everyone
 ships once*, and it is implemented here twice on purpose -- correctly in
-`fetch`, and wrong in `fetch_naive` -- so the suite has something to measure
-instead of something to assert.
+`fetch`, and wrong in `fetch_halftexel_bug` -- so the suite has something to
+measure instead of something to assert. Getting it right also settled a
+question the chapter's one sentence leaves open, and the answer changed this
+file: see `_tau_grid`.
 """
 import sys as _sys
 import os as _os
@@ -70,21 +72,43 @@ import optics as OPT                                            # noqa: E402
 # A body that needs more is a different table and the suite says so: `clamp_frac`
 # reports the share of a frame's pixels that saturate the domain.
 TAU_MAX = 1.0
-N_TEXELS = 64          # see `Interpolation error` in the README: 64 texels puts
-                       # the bilinear error two orders below the factorisation
-                       # error this table exists to expose, which is the only
-                       # bar it has to clear.
+N_TEXELS = 128
+# MEASURED, not chosen. The table's own interpolation error has to be far below
+# the factorisation error it exists to expose, and "far below" is a number:
+#
+#   n     T_esc max rel     G_rt max rel      half-texel bug (for scale)
+#   32      1.88e-4           6.33e-3           1.88e-2
+#   64      4.54e-5           1.85e-3           9.37e-3
+#  128      1.12e-5           5.38e-4           4.67e-3
+#
+# Second order in 1/n on the correct fetch (a factor of 4 per doubling) and
+# FIRST order on the buggy one (a factor of 2) -- which is the signature that
+# identifies a half-texel slip in the wild without reading the shader. 128 puts
+# G_rt's worst case at 5.4e-4 against a factorisation error of 2.3e-2 to 5.6e-1,
+# i.e. between 40x and 1000x of margin. G_rt is the harder of the two because
+# its integrand carries exp(-2 tau/mu): its curvature at the shallow end is
+# twice the escape leg's and that is where its worst case sits.
 
 
 def _tau_grid(n, tau_max=TAU_MAX):
-    """Texel CENTRES for an n-texel table over [0, tau_max].
+    """The n sample points an n-texel table holds, ENDPOINT-INCLUSIVE.
 
-    The endpoints of the domain fall half a texel outside the outermost centres
-    and that is not a defect -- it is what the half-texel remap in `fetch`
-    exists to handle. Building the table on `linspace(0, tau_max, n)` instead
-    (centres at the endpoints) is the other half of the same bug: it silently
-    changes what the table means, and then a correct sampler reads it wrong."""
-    return tau_max * (np.arange(n) + 0.5) / n
+    THIS IS `12`'s HALF-TEXEL RULE, READ THE WAY IT IS WRITTEN: "A bilinear
+    table must be sampled over [0.5/N, 1 - 0.5/N], or its endpoints are wrong by
+    half a texel." A sample coordinate confined to [0.5/N, 1 - 0.5/N] is a
+    coordinate that runs from the FIRST TEXEL CENTRE to the LAST, so the two
+    endpoints of the DOMAIN are the two outermost TEXELS and the table is
+    `linspace(0, tau_max, n)`.
+
+    The other design -- texels at centres tau_max*(i+.5)/n -- is defensible in
+    isolation but it puts the domain's endpoints half a texel OUTSIDE the table,
+    where a clamped sampler returns a constant. That is first-order wrong at both
+    ends where the interior is second-order, and it was measured here before it
+    was reasoned about: it cost 9.3e-3 relative on T_esc at tau -> 0 with n = 64,
+    against 2.6e-5 in the interior, a factor of 350 concentrated exactly on the
+    shallow water a shader is judged by. Written up in the README under
+    `The half-texel rule has two readings and only one of them is safe`."""
+    return np.linspace(0.0, tau_max, n)
 
 
 def bake_joint(n=N_TEXELS, tau_max=TAU_MAX):
@@ -123,44 +147,43 @@ def bake_factorised(n=N_TEXELS, tau_max=TAU_MAX):
 
 
 # ------------------------------------------------------------ the sampler
+def _lerp(tab, x):
+    tab = np.asarray(tab)
+    x = np.clip(np.asarray(x, float), 0.0, tab.shape[0] - 1.0)
+    i0 = np.floor(x).astype(np.int64)
+    i1 = np.minimum(i0 + 1, tab.shape[0] - 1)
+    f = (x - i0).reshape(x.shape + (1,) * (tab.ndim - 1))
+    return tab[i0] * (1.0 - f) + tab[i1] * f
+
+
 def fetch(tab, tau, tau_max=TAU_MAX):
-    """Bilinear fetch with the half-texel remap done right.
+    """Bilinear fetch, half-texel remap included.
 
-    A table of n texels over [0, tau_max] has its centres at tau_max*(i+.5)/n.
-    A query at tau lands at the continuous texel coordinate
+    In GPU terms the sample coordinate is
 
-        x = n * tau / tau_max - 0.5
+        u = (0.5 + x) / n,   x = (tau / tau_max) * (n - 1)   ->  u in
+                                                                [0.5/n, 1-0.5/n]
 
-    which is negative for tau below the first centre and above n-1 for tau above
-    the last. THE CLAMP IS PART OF THE CONTRACT, not a guard bolted on: a
-    hardware sampler in CLAMP_TO_EDGE addressing does exactly this, and a table
-    that is only correct in its interior is a table with two wrong endpoints --
-    `12`'s `most-shipped LUT bug there is`. `fetch_naive` below is the version
-    without it, kept so the suite can measure the difference rather than assert
-    that it matters."""
-    tab = np.asarray(tab)
-    x = np.asarray(tau, float) * (tab.shape[0] / tau_max) - 0.5
-    x = np.clip(x, 0.0, tab.shape[0] - 1.0)
-    i0 = np.floor(x).astype(np.int64)
-    i1 = np.minimum(i0 + 1, tab.shape[0] - 1)
-    f = (x - i0).reshape(x.shape + (1,) * (tab.ndim - 1))
-    return tab[i0] * (1.0 - f) + tab[i1] * f
+    which is `12`'s rule verbatim, and it makes the fetch EXACT at both ends of
+    the domain -- the property the chapter separately requires of every filtered
+    path, that it "degenerate exactly to the unfiltered one" at the limit. Here
+    the limit that matters is tau -> 0, where the whole factorisation error goes
+    to zero and a table that is wrong there would manufacture one."""
+    return _lerp(tab, np.asarray(tau, float) * ((np.shape(tab)[0] - 1) / tau_max))
 
 
-def fetch_naive(tab, tau, tau_max=TAU_MAX):
-    """The same fetch WITHOUT the half-texel remap: `u = tau / tau_max` straight
-    into an n-wide table, which is what `texture(lut, tau/tauMax)` compiles to
-    when the table was built on texel centres and nobody thought about it. The
-    whole table is shifted by half a texel; the error is largest where the
-    curvature is, i.e. at tau = 0, and it does not vanish with n -- it is
-    O(f'(tau) * tau_max/n), first order, against the correct fetch's second."""
-    tab = np.asarray(tab)
-    x = np.asarray(tau, float) * (tab.shape[0] - 1) / tau_max
-    x = np.clip(x, 0.0, tab.shape[0] - 1.0)
-    i0 = np.floor(x).astype(np.int64)
-    i1 = np.minimum(i0 + 1, tab.shape[0] - 1)
-    f = (x - i0).reshape(x.shape + (1,) * (tab.ndim - 1))
-    return tab[i0] * (1.0 - f) + tab[i1] * f
+def fetch_halftexel_bug(tab, tau, tau_max=TAU_MAX):
+    """The same table sampled at `u = tau / tau_max` -- what
+    `texture(lut, tau/tauMax)` compiles to when nobody thought about it. The
+    whole table shifts by half a texel.
+
+    `12` calls this "the most-shipped LUT bug there is". It is kept here so the
+    suite can MEASURE it: the error is O(f'(tau) * tau_max/n), first order,
+    against the correct fetch's second, so it does not go away with resolution
+    the way an interpolation error does -- doubling n halves it instead of
+    quartering it, which is the signature to look for in the wild."""
+    n = np.shape(tab)[0]
+    return _lerp(tab, np.asarray(tau, float) * (n / tau_max) - 0.5)
 
 
 # ------------------------------------------------- the two runtime evaluators
