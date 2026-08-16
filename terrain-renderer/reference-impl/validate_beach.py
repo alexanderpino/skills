@@ -45,6 +45,7 @@ sys.path.insert(0, HERE)
 import beach as BCH                                             # noqa: E402
 import beach_optics as BOP                                      # noqa: E402
 import beach_foam as FOAM                                       # noqa: E402
+import beach_camera as CMR                                      # noqa: E402
 import optics as OPT                                            # noqa: E402,F401
 import atmosphere as ATM                                        # noqa: E402
 
@@ -711,6 +712,70 @@ def _bug_foam_unclipped_spheres(mod):
     mod.entrained_air = ea
 
 
+
+# ---------------------------------------- wave 7: the camera's own six defects
+# Every one is a thing a reader would write on a first pass and none of them
+# looks wrong in the output: a frame is still a frame at the wrong field of
+# view, and a horizon is still a horizon at the wrong dip.
+def _bug_fov_on_the_long_side(mod):
+    """Treat the 35-mm-equivalent focal length as equivalent on the LONG SIDE
+    instead of the diagonal. 4% at 24 mm, 10% at 13 mm, and it moves the lens
+    selection -- which is the one step of the inference the frame's content
+    is supposed to decide."""
+    def ef(f_mm, aspect=mod.STILL_ASPECT, diag=mod.DIAG_35):
+        half_l = math.atan(36.0 / (2.0 * f_mm))
+        a = float(aspect)
+        n = math.hypot(a, 1.0)
+        half_d = math.atan(math.tan(half_l) * n / a)
+        half_s = math.atan(math.tan(half_l) / a)
+        return dict(f=float(f_mm), diag=2 * half_d, long=2 * half_l,
+                    short=2 * half_s)
+    mod.equiv_fov = ef
+
+
+def _bug_dip_unrefracted(mod):
+    """Drop the refraction. 7% on the dip, which is 0.01 deg -- invisible in
+    the frame and wrong against every published dip table."""
+    orig = mod.horizon_dip
+    mod.horizon_dip = lambda z, refraction=True: orig(z, refraction=False)
+
+
+def _bug_landscape_not_upright(mod):
+    """Hold the phone the other way. Both bar J and bar K record the frame
+    UPRIGHT; landscape gives the same lens 89.9 deg tall and 106.2 wide, which
+    moves the horizon, the depression bracket and the lens selection."""
+    mod.portrait_fov = lambda f_mm, aspect=mod.STILL_ASPECT: (
+        mod.equiv_fov(f_mm, aspect)['short'], mod.equiv_fov(f_mm, aspect)['long'])
+
+
+def _bug_hfov_scaled_linearly(mod):
+    """h = v * W/H instead of tan(h/2) = tan(v/2) W/H. Exact at zero and 12%
+    narrow at 90 degrees, so it passes every small-angle check anybody tries
+    and fails exactly where this project uses it."""
+    mod.rectilinear_hfov = lambda fov_v, aspect_wh: fov_v * aspect_wh
+
+
+def _bug_separation_small_angle(mod):
+    """Keep the small-angle form z*s/D^2 instead of the two arctangents. It is
+    right to a per cent on a cliff and it has NO CEILING -- so the closed form
+    that says no eye height can do better than atan(s/2sqrt(D(D-s))) quietly
+    stops being true, and the eye-height inference loses its upper branch."""
+    mod.line_separation = lambda z, D, s: float(z) * float(s) / float(D) ** 2
+
+
+def _bug_flat_sea_no_horizon(mod):
+    """Report the flat plane as costing nothing. It costs a third of a pixel
+    row, which is the RIGHT answer and is why the defect matters: a wave that
+    assumed it was large would spend itself on the wrong end of the gap list."""
+    orig = mod.flat_sea_error
+
+    def fse(z, far, refraction=True):
+        out = orig(z, far, refraction)
+        out['over_paint'] = 0.0
+        return out
+    mod.flat_sea_error = fse
+
+
 BUGS = {
     'dw-for-ew': _bug_dw_for_ew,
     'quarter-at-break': _bug_quarter_at_break,
@@ -753,12 +818,21 @@ BUGS = {
     'foam-stokes-everywhere': _bug_foam_stokes_everywhere,
     'foam-unclipped-spheres': _bug_foam_unclipped_spheres,
     'bubble-fresnel-one-channel': _bug_bubble_fresnel_one_channel,
+    'fov-on-the-long-side': _bug_fov_on_the_long_side,
+    'dip-unrefracted': _bug_dip_unrefracted,
+    'landscape-not-upright': _bug_landscape_not_upright,
+    'hfov-scaled-linearly': _bug_hfov_scaled_linearly,
+    'separation-small-angle': _bug_separation_small_angle,
+    'flat-sea-no-horizon': _bug_flat_sea_no_horizon,
 }
 FOAM_BUGS = ('foam-no-transmittance', 'foam-backscatter-is-tir',
              'foam-on-the-crest', 'foam-declared-k',
              'foam-percent-for-fraction', 'foam-single-rise-speed',
              'foam-stokes-everywhere', 'foam-unclipped-spheres',
              'bubble-fresnel-one-channel')
+CAMERA_BUGS = ('fov-on-the-long-side', 'dip-unrefracted',
+               'landscape-not-upright', 'hfov-scaled-linearly',
+               'separation-small-angle', 'flat-sea-no-horizon')
 OPTICS_BUGS = {'one-turbidity-slider', 'cdom-scatters', 'depth-averaged-spm',
                'dw-for-bed-power', 'isotropic-phase', 'glitter-fixed-width',
                'glitter-no-jacobian', 'ambient-in-the-tube'}
@@ -3093,6 +3167,271 @@ def _sec_surface(ctx):
               'the row is here so nobody puts it back.')
 
 
+
+def _sec_camera(ctx):
+    """WAVE 7 -- WHERE THE PHOTOGRAPH WAS TAKEN FROM.
+
+    The gauntlet's first hyper-realism criterion is FRAME TO MATCH, and meeting
+    it means inferring a camera from photographs that carry no EXIF and are not
+    in this repository. Everything the inference produces is an angle or a
+    length; nothing in it is a level, which is the standing ruling. This section
+    guards the geometry that turns the bar's inventory into a camera, and every
+    quantity the inference reports gets at least one ABSOLUTE row -- the fourth
+    time a ratio-only guard was blind in this project is one time too many.
+    """
+    C = CMR
+
+    # ============================================ 10.1 THE INSTRUMENT'S OPTICS
+    # An "equivalent focal length" is equivalent ON the 36 x 24 frame, and the
+    # equivalence is on the DIAGONAL. Feed the function a 3:2 target and the
+    # long side must come back to the textbook 2 atan(18/f) exactly -- the only
+    # row that catches a diagonal/long-side confusion, which is a 4% error at
+    # 24 mm and 10% at 13 mm and looks entirely reasonable either way.
+    for f in (13.0, 24.0, 48.0, 120.0):
+        check(1, 'equiv_fov at %g mm on 3:2 recovers 2 atan(18/f), ABSOLUTE'
+              % f, math.degrees(C.equiv_fov(f, aspect=1.5)['long']),
+              math.degrees(2.0 * math.atan(18.0 / f)), 1e-9,
+              'The diagonal-to-side conversion, checked against the definition '
+              'of focal length on the frame the equivalence names. It is an '
+              'identity when the conversion is right and off by 4-10 per cent '
+              'when the diagonal FOV is applied to the long side instead.',
+              unit='deg')
+    check(1, 'the two FOV routes agree: rectilinear_hfov(long, 3/4) = short',
+          math.degrees(C.rectilinear_hfov(C.portrait_fov(13.0)[0], 0.75)),
+          math.degrees(C.portrait_fov(13.0)[1]), 1e-9,
+          'One route goes through the lens (diagonal, then the frame aspect), '
+          'the other through the raster (vertical FOV, then W/H). They are the '
+          'same rectilinear projection and must land on the same number. This '
+          'is the row that fires if anyone writes h = v * W/H, which is 12 per '
+          'cent narrow at 90 degrees and exact at zero -- so it passes every '
+          'small-angle sanity check anybody would try.', unit='deg')
+    check(1, 'the widest lens upright, ABSOLUTE', 
+          math.degrees(C.portrait_fov(13.0)[1]), 89.91172, 1e-4,
+          'The number the whole lens selection turns on: 89.9117 deg across, '
+          'against the 90.00 a chord seen from exactly half a chord back '
+          'subtends. Stated absolutely because the inference EXCLUDES a range '
+          'of standoffs on the strength of that 0.09 deg.', unit='deg')
+    check(1, 'no lens can hold a chord from nearer than 0.5008 chords',
+          C.min_standoff_over_chord(), 0.5007710, 1e-6,
+          '1/(2 tan(h_max/2)). A bound on where the photographer stood, '
+          'recovered from the frame\'s content and the phone\'s spec sheet and '
+          'nothing else -- the bay\'s size cancels out of it.')
+
+    # ================================================ 10.2 THE EARTH, AND ITS DIP
+    check(1, 'the refracted dip is Bowditch\'s table, ABSOLUTE',
+          math.degrees(C.horizon_dip(25.0)) * 60.0 / 5.0,
+          C.BOWDITCH_DIP_ARCMIN, 1e-3,
+          'Dip in arcminutes per sqrt(metre). The geometric value is 1.9261 '
+          'and Bowditch\'s tabulated dip is 0.97 sqrt(h_ft) = 1.757 '
+          'sqrt(h_m); the ratio is what REFRACTION_K is fitted to. This row is '
+          'the fit, stated against the table rather than against itself.',
+          unit='arcmin/sqrt(m)')
+    check(1, 'the geometric dip is sqrt(2z/R) to its own series',
+          math.degrees(C.horizon_dip(25.0, refraction=False)),
+          math.degrees(math.sqrt(2.0 * 25.0 / C.R_EARTH)), 2e-5,
+          'acos(R/(R+z)) = sqrt(2z/R) (1 - z/(6R) + ...). At 25 m the second '
+          'term is 6e-7 relative, so the tolerance IS the series and not a '
+          'disagreement.', unit='deg')
+    check(1, 'horizon range = R_eff * dip, ABSOLUTE at 21 m',
+          C.horizon_range(21.0), 17931.41, 0.5,
+          'The arc to the visible horizon. Stated absolutely and in metres '
+          'because the flat-plane cost below is a DIFFERENCE against it, and '
+          'a difference of two large numbers is exactly where an absolute row '
+          'earns its place.', unit='m')
+    check(1, 'the curved and flat range agree where the curve does not bite',
+          C.range_at_depression(21.0, math.radians(30.0)),
+          C.range_flat(21.0, math.radians(30.0)), 5e-4,
+          'At 30 degrees of depression the target is 36 m away and the earth '
+          'is flat to 0.15 mm, which IS the tolerance. The two functions must be '
+          'indistinguishable here and wildly different at the horizon; this '
+          'row is the first half and the next is the second.', unit='m')
+    check(1, 'and they diverge at grazing: flat says infinity, curved says the '
+          'horizon', C.range_at_depression(21.0, C.horizon_dip(21.0) * 1.000001)
+          / C.horizon_range(21.0), 1.0, 2e-3,
+          'At the dip angle itself the spherical solution lands ON the horizon '
+          'while z/tan(dep) overshoots by 2.5 per cent and keeps going. The '
+          'ratio is stated because the absolute is stated above.')
+    fs = C.flat_sea_error(21.0, 40000.0)
+    check(1, 'the flat sea plane over-paints the sky by 0.1039 deg, ABSOLUTE',
+          math.degrees(fs['over_paint']), 0.104121, 1e-5,
+          'THE WHOLE COST OF A FLAT EARTH IN THIS RENDER, in one number. '
+          '`beach_render.trace` meets a plane at z = 0 that runs to 40 km and '
+          'has no horizon, so it paints sea over a band of sky one tenth of a '
+          'degree tall -- about a third of a pixel row in an upright 106 deg '
+          'frame. The 23 km of ocean beyond the true horizon is fictitious and '
+          'it is compressed into that third of a row. Measured so the defect '
+          'can be ranked at the BOTTOM of the gap list on evidence rather '
+          'than left unranked.', unit='deg')
+
+    # ============================== 10.3 THE INSTRUMENT THAT MEASURES THE EYE
+    # The dip is famous and useless; the resolved surf-line separation is
+    # neither. These rows are its closed form.
+    D, s_gap = 704.0, 42.86
+    for z in (20.0, 60.0, 200.0):
+        got = C.line_separation(z, D, s_gap)
+        want = math.atan(z * s_gap / (D * (D - s_gap) + z * z))
+        check(1, 'the separation is one arctangent at z = %g m' % z,
+              math.degrees(got), math.degrees(want), 1e-9,
+              'atan(a) - atan(b) = atan((a-b)/(1+ab)) with a = z/(D-s) and '
+              'b = z/D. Written as a difference in the code and as the single '
+              'form here, so the algebra the ceiling is derived from is '
+              'checked against the function rather than assumed.', unit='deg')
+    d_max, z_star = C.separation_ceiling(D, s_gap)
+    check(1, 'the ceiling is at z* = sqrt(D(D-s)), ABSOLUTE',
+          z_star, math.sqrt(D * (D - s_gap)), 1e-9,
+          'DERIVED HERE AND NOT CITED, because no source states it. '
+          'Maximising tan(d) = zs/(D(D-s) + z^2) over z gives z^2 = D(D-s): '
+          'the best eye height for separating two lines is the GEOMETRIC MEAN '
+          'of the two ranges. At 704 m that is 682 m, which is why a cliff is '
+          'always on the linear branch and a metre of height is worth a metre '
+          'of height.', unit='m')
+    zz = np.geomspace(1.0, 1e5, 20001)
+    scan = np.array([C.line_separation(z, D, s_gap) for z in zz])
+    check(1, 'and it IS the maximum: a scan over five decades of eye height',
+          math.degrees(scan.max()), math.degrees(d_max), 2e-5,
+          'The closed form against twenty thousand samples. A ceiling that is '
+          'only asserted is a ceiling nobody has tested.', unit='deg')
+    check(1, 'eye_height_for_separation inverts line_separation, ABSOLUTE',
+          [C.line_separation(C.eye_height_for_separation(D, s_gap, dd), D,
+                             s_gap) for dd in (0.002, 0.005, 0.01, 0.02)],
+          [0.002, 0.005, 0.01, 0.02], 1e-12,
+          'Round trip through the quadratic. The SMALLER root is the one '
+          'returned, and this row is what says the branch is the right one: '
+          'the larger root also satisfies the equation and puts the eye a '
+          'kilometre up.', unit='rad')
+    openq(1, 'THIS BED CANNOT SUPPLY BAR J\'S EYE HEIGHT',
+          '17-21 m at the brow', '25-102 m',
+          'Bar J reads three to four SEPARATED breaking lines across the wider '
+          'parts of the embayment. At this transform\'s own surf-zone width '
+          '(150 m median, so 43 m between lines at "three to four") and at the '
+          'range across this bay, resolving that gap at 5-20 px in a 4032-row '
+          'upright frame needs an eye at 25-102 m. Wave 3\'s coastal loop '
+          'leaves a cliff whose brow is 17-21 m, and the plateau behind it is '
+          'a straight 0.08 ramp that occludes its own brow, so there is no '
+          'higher place to stand. The shortfall is a statement about the '
+          'coastal loop and not about the camera, and it is why the s7 frames '
+          'give the near cliff a share of the frame that bar J\'s does not.')
+
+    # ============================================ 10.4 THE FRAME AND THE HORIZON
+    fov_v = C.portrait_fov(13.0)[0]
+    for f_h in (0.05, 0.25, 0.5, 0.9):
+        check(1, 'horizon fraction inverts, ABSOLUTE at f = %.2f' % f_h,
+              C.horizon_fraction(
+                  C.depression_from_horizon_fraction(f_h, fov_v, 21.0),
+                  fov_v, 21.0), f_h, 1e-12,
+              'The two directions of the same projection: a depression gives a '
+              'row, a row gives a depression. This is the pair the actual '
+              'photograph would close -- one measured horizon row collapses '
+              'the depression interval from +/- 13 deg to +/- 0.03.')
+    check(1, 'the dip moves the horizon by 0.33 rows in a 304-row frame',
+          (C.horizon_fraction(math.radians(25.46), fov_v, 21.12)
+           - C.frame_fraction(math.radians(25.46), fov_v)) * 304.0,
+          0.328621, 1e-5,
+          'ABSOLUTE, in pixels, and it is the number that says the earth\'s '
+          'curvature is not a framing parameter. A third of a row at this '
+          'raster; even at the phone\'s own 4032 it is 4.4 rows, which is '
+          'inside the tilt error of a hand-held frame.', unit='rows')
+
+    # ================================ 10.5 THE TWO CAMERAS, PARAMETER BY PARAMETER
+    # EVERY DERIVED PARAMETER GETS AN ABSOLUTE ROW. The eye height is the
+    # scene's and is checked where the scene is built; the field of view, the
+    # aspect and the depression are the inference's own and are checked here.
+    infJ = C.infer_frame('J', C.J_CONTENT, 21.12, 704.0, 42.86)
+    infK = C.infer_frame('K', C.K_CONTENT, 21.12, 704.0, 42.86)
+    for nm, inf, dep_deg, half_deg in (('J', infJ, 25.455246, 13.296088),
+                                       ('K', infK, 27.805133, 12.761096)):
+        check(1, 'frame %s: vertical field of view, ABSOLUTE' % nm,
+              math.degrees(inf['fov_v']), 106.175435, 1e-5,
+              'The 13 mm equivalent held upright on a 4:3 frame. It is the '
+              'parameter the frame\'s CONTENT selects -- "the whole embayment '
+              'from its own rim" needs more than 89.91 deg across and no other '
+              'lens on this phone has it -- so it is the best determined of '
+              'the three and it is determined by the instrument.', unit='deg')
+        check(1, 'frame %s: horizontal field of view, ABSOLUTE' % nm,
+              math.degrees(inf['fov_h']), 89.911717, 1e-5,
+              'The short side of the same lens. Portrait matters: the same '
+              'lens held landscape is 89.91 tall and 106.18 wide, which moves '
+              'the horizon, the depression and every content bound.',
+              unit='deg')
+        check(1, 'frame %s: depression of the optical axis, ABSOLUTE' % nm,
+              math.degrees(inf['dep']['mid']), dep_deg, 1e-5,
+              'The midpoint of the bracket. It is stated absolutely because '
+              'it is the parameter a reader is most likely to want to move, '
+              'and a row is the only thing that makes a move visible.',
+              unit='deg')
+        check(1, 'frame %s: the bracket\'s half-width, ABSOLUTE' % nm,
+              math.degrees(inf['dep']['half_width']), half_deg, 1e-5,
+              'THE UNCERTAINTY GETS ITS OWN ROW, and that is deliberate. The '
+              'depression is the only one of the three parameters the picture '
+              'itself measures, and without the pixels it is bracketed by two '
+              'content facts rather than measured. A wave that quietly '
+              'narrowed this interval would be claiming evidence it does not '
+              'have; the row makes that impossible to do silently.', unit='deg')
+    info(1, 'the foreground bound does not bind, and that is a result',
+         math.degrees(infK['dep']['bound_foreground']),
+         'K records dune vegetation in the foreground, which sounds like it '
+         'pins the camera\'s downward tilt. It does not: an upright 106 deg '
+         'frame held LEVEL already contains the ground at the photographer\'s '
+         'feet, so the bound comes out at -50.8 deg and is never active. A '
+         'content fact that constrains nothing is worth recording, because the '
+         'next reader will otherwise reach for it again.')
+
+    # ====================== 10.6 THE CAMERA AS BUILT, NOT AS INFERRED
+    # The inference is arithmetic; the camera is a ray field. This row closes
+    # the loop between them, and it is the one that fires if the Camera class
+    # is fed a horizontal FOV where it wants a vertical one -- which would be
+    # silent in every row above.
+    import beach_render as RND                              # noqa: PLC0415
+    cam = RND.Camera((0.0, 0.0, 21.12),
+                     (0.0, 1000.0, 21.12 - 1000.0 * math.tan(infJ['dep']['mid'])),
+                     math.degrees(infJ['fov_v']), 228, 304)
+    Dr = cam.rays()
+    rows = np.where((Dr[..., 2] >= 0.0).all(1))[0]
+    check(1, 'the BUILT camera puts the horizon where the inference says',
+          float(rows[-1] + 1) / 304.0,
+          C.frame_fraction(infJ['dep']['mid'], infJ['fov_v']), 1.0 / 304.0,
+          'The ray field of the camera actually used, against the projection '
+          'the inference reported. Tolerance is ONE ROW because the ray field '
+          'is sampled at pixel centres and the prediction is continuous. This '
+          'is the only row in the section that touches the renderer, and it '
+          'is the one that catches a vertical field of view passed where a '
+          'horizontal one belongs -- an error every arithmetic row above is '
+          'blind to.')
+    check(1, 'the built camera\'s aspect is UPRIGHT 3:4', cam.w / cam.h,
+          0.75, 1e-12,
+          'Bar J and bar K both record the frame upright and every other frame '
+          'in this file is 16:9. If this ever comes back 4:3 the frames have '
+          'been rotated and every content bound in `beach_camera` is being '
+          'applied to the wrong axis.')
+
+    # =============================================== 10.7 THE AIR THAT IS MISSING
+    check(1, 'Koschmieder: beta * V = -ln(0.02), ABSOLUTE',
+          C.koschmieder_beta(20000.0) * 20000.0, 3.912023, 1e-5,
+          'V = -ln(eps)/beta at the standard 2 per cent contrast threshold. '
+          'Cited, not derived. It is here because the aerial-perspective gap '
+          'is measured through it and a factor hiding in the definition would '
+          'move the whole ranking.')
+    check(1, 'Rayleigh beta from the project\'s OWN zenith optical depth',
+          np.asarray(ATM.TAU_R) / 8500.0 * 8500.0, np.asarray(ATM.TAU_R), 1e-15,
+          'beta = tau_zenith / H_R over an exponential atmosphere. NOTHING NEW '
+          'IS DECLARED for the Rayleigh half of the missing air: '
+          '`atmosphere.TAU_R` is the optical depth this project already '
+          'derived for the sun\'s own colour, and the scale height is the '
+          'standard 8.5 km. The AEROSOL half does need a number and it is `?` '
+          '-- a 20-60 km visibility bracket, reported as a bracket.')
+    openq(2, 'THE AIR BETWEEN THE CAMERA AND THE SEA IS NOT MODELLED',
+          'extinction + airlight over 15 km', 'neither',
+          'The pool was five metres across and this is a fifteen-kilometre '
+          'frame. `shade_water` and `shade_land` return the radiance LEAVING '
+          'the surface and the trace hands it straight to the film: there is '
+          'no extinction along the line of sight and no airlight scattered '
+          'into it. In hazy 20 km air the direct transmittance at one '
+          'kilometre is 0.81 and at the horizon it is nothing at all, so the '
+          'far sea is too dark and too saturated BY CONSTRUCTION, and the '
+          'sea-sky seam that bar K2 makes a criterion cannot close. Measured '
+          'on the frames rather than asserted; see README-beach.md.')
+
+
 def _sec_foam(ctx):
     """WAVE 6 -- the white, and it is three mechanisms (bar sections C and E).
 
@@ -3633,7 +3972,8 @@ def run_suite():
                       (_sec_optics, 'the coastal IOPs, the path and the '
                                     'glitter'),
                       (_sec_surface, 'the nonlinear free surface'),
-                      (_sec_foam, 'the white: foam, entrained air, whitecaps')):
+                      (_sec_foam, 'the white: foam, entrained air, whitecaps'),
+                      (_sec_camera, 'the camera at the owner\'s viewpoints')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -3709,6 +4049,28 @@ def _run_section(fn, label):
 
 if __name__ == '__main__':
     t0 = time.time()
+    if '--bugs-camera' in sys.argv:
+        import importlib
+        _run_section(_sec_camera, 'the camera')
+        base = set(_fail_names())
+        print('clean camera section: %d pass / %d FAIL'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base)))
+        print()
+        print('%-30s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 110)
+        for name in CAMERA_BUGS:
+            importlib.reload(CMR)
+            BUGS[name](CMR)
+            try:
+                _run_section(_sec_camera, 'the camera')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-30s %d  %s' % (name, len(caught),
+                                    '; '.join(c[:64] for c in caught[:5])))
+        importlib.reload(CMR)
+        sys.exit(0)
     if '--bugs-foam' in sys.argv:
         import importlib
         _run_section(_sec_foam, 'the white')
@@ -3765,8 +4127,10 @@ if __name__ == '__main__':
         for name, patch in BUGS.items():
             importlib.reload(BCH)
             importlib.reload(BOP)
-            patch(FOAM if name in FOAM_BUGS
-                  else (BOP if name in OPTICS_BUGS else BCH))
+            importlib.reload(CMR)
+            patch(CMR if name in CAMERA_BUGS
+                  else (FOAM if name in FOAM_BUGS
+                        else (BOP if name in OPTICS_BUGS else BCH)))
             try:
                 run_suite()
                 caught = [n for n in _fail_names() if n not in base]

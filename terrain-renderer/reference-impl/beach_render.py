@@ -62,6 +62,7 @@ from PIL import Image
 import beach as B
 import beach_optics as BO
 import beach_foam as FM
+import beach_camera as CAM
 import optics as OPT
 import atmosphere as ATM
 
@@ -1172,6 +1173,8 @@ def render(cam, w, t=0.0, label=''):
         Pl = cam.pos[None] + tr['t_land'][ml][..., None] * D[ml]
         L[ml] = shade_land(w, Pl[None], D[ml][None])[0]
         ex['land_mask'] = ml
+        ex['land_P'] = Pl                       # wave 7: for the shadow cost
+    ex['sky_mask'] = up
     ex['trace'] = tr
     return L, ex
 
@@ -1754,6 +1757,56 @@ def main():
     kK = _save(downsample(LK, SS), '%s/s6-glitter-whitecap.png' % OUT,
                caption=_cap_wind6(w, wchk))
     clocks_figure(w, frep, '%s/s6-clocks.png' % OUT)
+
+    # ---- WAVE 7: THE OWNER'S TWO CLIFF VIEWPOINTS, UPRIGHT ------------------
+    # The gauntlet's first hyper-realism criterion, attempted for the first
+    # time. THE PORTRAIT ASPECT IS PART OF THE FRAMING, not a layout choice:
+    # bar J and bar K both record the frame upright, and an upright 4:3 held by
+    # the same lens is 1.33x taller and 0.75x wider than the same lens held
+    # landscape -- which moves the horizon, the depression and every content
+    # bound in `beach_camera`. So these two are 3:4 where every earlier frame
+    # in this file is 16:9, and the numbers in their captions are the reason.
+    W7 = int(456 * sc) * SS
+    H7 = int(608 * sc) * SS
+    L_surf, s_lines = surf_line_scale(w)
+    # the range to the far surf, on this bed: the camera stands at one end of
+    # the domain and bar J's lines have to read "all the way round"
+    D_lines = float(0.5 * (w.y[-1] - w.y[0]))
+    print()
+    CAM.report([], print)
+    fov_h_probe = CAM.portrait_fov(13.0)[1]
+    az_j, bear_j = frame_azimuth_J(w, float(w.y[2]), fov_h_probe)
+    camJ7, infJ7 = build_frame(w, float(w.y[2]), CAM.J_CONTENT,
+                               'J -- the embayment overview, upright',
+                               az_j, W7, H7, D_lines, s_lines)
+    camK7, infK7 = build_frame(w, 0.0, CAM.K_CONTENT,
+                               'K -- open water and the glitter path, upright',
+                               SUN_AZ, W7, H7, D_lines, s_lines)
+    CAM.report([infJ7, infK7], print)
+    print()
+    print('  the surf zone is %.0f m wide (this transform\'s own median) and '
+          'bar J reads "three to four" lines in it, so the line spacing used '
+          'is %.1f m at a range of %.0f m.' % (L_surf, s_lines, D_lines))
+    print('  bar J\'s far shoreline bears %.2f deg from this eye, so the axis '
+          'is %.2f deg -- half a frame width off it, which puts the coast at '
+          'one edge and the sea in the rest.' % (bear_j, az_j))
+    print()
+    LJ7, exJ7 = render(camJ7, w)
+    mJ7 = frame_report('J', w, camJ7, infJ7, LJ7, exJ7)
+    print()
+    bay_ladder(LJ7, exJ7, w)
+    print()
+    LK7, exK7 = render(camK7, w)
+    mK7 = frame_report('K', w, camK7, infK7, LK7, exK7)
+    print()
+    wchk7 = wind_check(w, LK7, camK7, exK7)
+    print()
+    horizon_check(LK7, camK7)
+    print()
+    _save(downsample(LJ7, SS), '%s/s7-frame-J.png' % OUT,
+          caption=_cap_J7(w, camJ7, infJ7, mJ7))
+    _save(downsample(LK7, SS), '%s/s7-frame-K.png' % OUT,
+          caption=_cap_K7(w, infK7, mK7, wchk7))
     print('exposure keys (99th pct of scene-linear): J %.4g  F %.4g  K %.4g'
           % (kJ, kF, kK))
     print('%.1f s' % (time.time() - t0))
@@ -2196,6 +2249,642 @@ def horizon_check(L, cam, edge_frac=0.12):
         print('     %-28s sky %s  sea %s  ratio %s'
               % (nm, np.round(a, 4), np.round(b, 4),
                  np.round(b / np.maximum(a, 1e-9), 4)))
+
+
+# ============================================ WAVE 7 -- THE OWNER'S VIEWPOINTS
+# The gauntlet's first hyper-realism criterion is FRAME TO MATCH, and no frame
+# in this project has met it. Everything below is the attempt: the camera is
+# inferred in `beach_camera.py` from the bar's inventory of what is in each
+# photograph, placed on this bed's own landform, and then the frame it produces
+# is MEASURED against what bar J and bar K say their frames contain. The
+# deliverable of the wave is the disagreement, ordered.
+
+def viewpoint(w, y_cam, h_eye):
+    """THE BROW: the seaward-most standing point at the top of the cliff face.
+
+    A refinement of `cliff_edge`, which takes a declared 12 m contour and steps
+    2 m back from it. The brow is a landform FEATURE -- the break in slope where
+    the cliff face meets the plateau -- and it can be found rather than
+    declared: walk seaward from inland and stop at the first cell whose forward
+    slope exceeds three times the plateau's own median. Nothing is chosen but
+    the factor three, and that only has to separate 0.08 from 1.24.
+
+    SEAWARD-MOST AND NOT HIGHEST, AND THE REASON IS THE LANDFORM'S. Wave 3's
+    coastal loop leaves a straight 0.08 ramp behind the cliff. Walking inland
+    on it buys 8 cm of height per metre and spends a whole metre of standoff,
+    so the sea's angular extent SHRINKS the whole way; and past about 60 m the
+    ramp occludes its own brow and the sea disappears entirely. The first
+    framing of this file put the camera 270 m back and rendered a field of sand.
+    Wave 7's first attempt walked inland looking for height and got a frame 64%
+    coastal plain. Where a camera can stand is part of the landform, and on this
+    landform there is exactly one place.
+    """
+    j = int(np.argmin(np.abs(w.y - y_cam)))
+    prof = w.h[j]
+    x = w.x
+    dx = float(x[1] - x[0])
+    slope = np.abs(np.gradient(prof, dx))
+    land = prof > 2.0
+    ramp = float(np.median(slope[land])) if land.any() else 0.08
+    i_brow = None
+    for i in range(x.size - 2, 1, -1):
+        if prof[i] <= 2.0:
+            break
+        if slope[i] > 3.0 * ramp:
+            i_brow = i + 1                          # the last flat cell
+            break
+    if i_brow is None:
+        xc, zc = cliff_edge(w, y_cam)
+        return xc, zc, float('nan')
+    ze = prof[i_brow] + h_eye
+    sel = np.arange(0, max(i_brow - 4, 1))
+    m = float(((ze - prof[sel]) / (x[i_brow] - x[sel])).max())
+    return float(x[i_brow]), float(prof[i_brow]), float(x[i_brow] - ze / m)
+
+
+def surf_line_scale(w):
+    """The scene's own answer to "how far apart are the breaking lines".
+
+    Bar J records three to four separated lines across the wider parts. This bed
+    produces ONE continuous surf zone -- section B is parked with its mechanism
+    named -- so there is no measured line SPACING to read off it. What there is
+    is the surf zone's own width, and a system of n lines inside a zone of width
+    L has them L/n apart. That is the scale used, it is the transform's number
+    and not a declared one, and the fact that this bed supplies the width but
+    not the lines is itself the finding the eye-height inference then rests on.
+    """
+    wid = []
+    for j in range(w.y.size):
+        ii = np.where(w.brk[j])[0]
+        if ii.size:
+            wid.append(float(w.x[ii.max()] - w.x[ii.min()]))
+    L = float(np.median(wid))
+    n_lines = 3.5                       # bar J: "three to four", its own words
+    return L, L / n_lines
+
+
+def build_frame(w, y_cam, content, name, az_deg, W, H, D_lines, s_lines,
+                h_eye=None):
+    """Infer the camera, then stand it on the bed. Returns (Camera, record)."""
+    if h_eye is None:
+        h_eye = CAM._mid(content['eye_above_ground'])
+    x_c, z_g, x_near = viewpoint(w, y_cam, h_eye)
+    z_eye = z_g + h_eye
+    inf = CAM.infer_frame(name, content, z_eye, D_lines, s_lines)
+    inf['x_cam'], inf['y_cam'], inf['z_ground'] = x_c, float(y_cam), z_g
+    inf['x_nearest_water'] = x_near
+    inf['az'] = float(az_deg)
+    az = math.radians(az_deg)
+    dep = inf['dep']['mid']
+    reach = 1000.0
+    cam = Camera((x_c, y_cam, z_eye),
+                 (x_c + reach * math.sin(az), y_cam + reach * math.cos(az),
+                  z_eye - reach * math.tan(dep)), math.degrees(inf['fov_v']),
+                 W, H)
+    return cam, inf
+
+
+def frame_azimuth_J(w, y_cam, fov_h):
+    """WHICH WAY BAR J'S CAMERA FACES, from the landform and the frame width.
+
+    Not a composition. Bar J's frame runs headland to headland with the coast
+    curving away through it, so the far end of the shore belongs at ONE EDGE of
+    the frame and the open sea fills the rest. The azimuth is therefore the
+    bearing of the far shoreline minus half the horizontal field, and both
+    terms are measured: the shoreline comes out of the bed, the half-field out
+    of the lens.
+    """
+    j_far = int(np.argmax(w.y))
+    i_far = int(np.argmax(w.h[j_far] > 0.0))
+    j_c = int(np.argmin(np.abs(w.y - y_cam)))
+    i_c = int(np.argmax(w.h[j_c] > 0.0))
+    dx = float(w.x[i_far] - w.x[i_c])
+    dy = float(w.y[j_far] - y_cam)
+    bearing = math.degrees(math.atan2(dx, dy)) % 360.0
+    return (bearing - math.degrees(fov_h) / 2.0) % 360.0, bearing
+
+
+# ------------------------------------------------------- measuring the frame
+def horizon_rows(L, cam, inf):
+    """The horizon's row, PREDICTED by the camera and MEASURED off the buffer.
+
+    The prediction is `beach_camera.horizon_fraction` on the inferred geometry;
+    the measurement is the last row of the raster whose rays all point above the
+    horizontal. They should differ by the earth's dip and by nothing else --
+    which is the row that catches a camera built at a depression it did not
+    report, and it is ABSOLUTE, in pixels."""
+    D = cam.rays()
+    up = D[..., 2] >= 0.0
+    rows = np.where(up.all(1))[0]
+    ny = L.shape[0]
+    meas = float(rows[-1] + 1) / ny if rows.size else float('nan')
+    pred_flat = CAM.frame_fraction(inf['dep']['mid'], inf['fov_v'])
+    pred_true = CAM.horizon_fraction(inf['dep']['mid'], inf['fov_v'],
+                                     inf['z_landform'])
+    return dict(measured=meas, predicted_flat=pred_flat,
+                predicted_true=pred_true, ny=ny,
+                dip_rows=(pred_true - pred_flat) * ny)
+
+
+def _sun_vector(el_deg, az_deg):
+    """A unit vector toward a sun at (elevation, azimuth), in world axes.
+
+    Same convention as `atmosphere.SUN_DIR`: +x east, +y north, +z up, azimuth
+    measured from north through east. Written here rather than imported because
+    `atmosphere` builds ONE sun from one clock and this is used to ask a
+    counterfactual -- what the missing shadow ray would cost under bar J's own
+    illuminant instead of the pool's. Nothing in the shading uses it."""
+    e, a = math.radians(el_deg), math.radians(az_deg)
+    return np.array([math.cos(e) * math.sin(a), math.cos(e) * math.cos(a),
+                     math.sin(e)])
+
+
+def horizon_seam(L, cam, edge_frac=0.12):
+    """THE SEA-SKY SEAM, in one number, because bar K2 makes it a criterion.
+
+    "The sea's radiance at grazing must approach the sky's reflected value
+    CONTINUOUSLY, and any seam there is a tell visible at a glance." At grazing
+    the Fresnel reflectance goes to 1, so a flat sea just below the horizon is
+    a mirror of the sky just above it and the ratio should go to 1. It does not,
+    and how far it does not is the measurement. `horizon_check` prints the two
+    triples; this returns the worst channel's departure from unity so the gap
+    list can rank it against everything else in the frame."""
+    D = cam.rays()
+    up = D[..., 2] >= 0.0
+    rows = np.where(up.all(1))[0]
+    if rows.size == 0 or rows[-1] + 4 >= L.shape[0] or rows[-1] < 3:
+        return None
+    j = int(rows[-1])
+    n = L.shape[1]
+    k = max(int(edge_frac * n), 2)
+    # OFF THE GLITTER PATH, AND "THE FRAME EDGES" IS NOT THE SAME THING. Down
+    # the sun's azimuth the sea just below the horizon carries the sun's own
+    # image and is two orders above the sky; comparing those is measuring the
+    # glitter, not the seam. `horizon_check` takes the frame's outer columns,
+    # which is right for frame K (aimed down the path, so the edges are 15-17
+    # deg off it) and WRONG for frame J, whose left edge lands within 3 deg of
+    # the sun -- it reported the seam as 6188% off, which was the glitter. The
+    # columns are chosen here by their actual azimuth from the sun.
+    az_col = np.degrees(np.arctan2(D[j, :, 0], D[j, :, 1])) % 360.0
+    off = np.abs((az_col - SUN_AZ + 180.0) % 360.0 - 180.0)
+    sel = np.argsort(off)[-2 * k:]                  # the columns furthest from it
+    sky = L[j - 3:j - 1, sel].reshape(-1, 3).mean(0)
+    sea = L[j + 1:j + 3, sel].reshape(-1, 3).mean(0)
+    r = sea / np.maximum(sky, 1e-9)
+    return dict(sky=sky, sea=sea, ratio=r, off_axis_deg=float(off[sel].min()),
+                worst=float(np.max(np.abs(r - 1.0))))
+
+
+def bar_J_ladder(w, ex, L):
+    """BAR J'S FIVE SURFACES, COUNTED. It is the frame's own instrument.
+
+    "The full colour ladder in one exposure, which makes it a within-frame
+    instrument and therefore usable despite the camera failures: deep blue
+    offshore -> teal over the shallows -> white surf -> saturated brown wet sand
+    -> pale ochre dry sand. FIVE SURFACES, ONE EXPOSURE, with the wet/dry sand
+    pair close in level and therefore the most trustworthy comparison of the
+    set."
+
+    A ladder with a rung missing is not a ladder, so before any radiance is
+    compared the rungs are counted. This returns the pixel share of each of the
+    five in the render's own frame, and the answer for this bed is the sharpest
+    single result of the wave.
+    """
+    out = {}
+    n = float(L.shape[0] * L.shape[1])
+    mw = ex.get('water_mask')
+    if mw is not None and mw.any():
+        P = ex['water_P']
+        dep = w.sample(P[..., 0], P[..., 1], w.d)
+        brk = w.sample(P[..., 0], P[..., 1], w.brk.astype(float))
+        out['deep water, d > 5 m'] = float(((dep > 5) & (brk < 0.2)).sum()) / n
+        out['shallow/teal, d < 2.5 m'] = float(
+            ((dep < 2.5) & (brk < 0.2)).sum()) / n
+        out['white surf, breaking'] = float((brk > 0.8).sum()) / n
+    else:
+        for k in ('deep water, d > 5 m', 'shallow/teal, d < 2.5 m',
+                  'white surf, breaking'):
+            out[k] = 0.0
+    P = ex.get('land_P')
+    if P is not None and P.size:
+        hz = w.sample(P[..., 0], P[..., 1], w.h)
+        e = 1.5
+        hx = (w.sample(P[..., 0] + e, P[..., 1], w.h)
+              - w.sample(P[..., 0] - e, P[..., 1], w.h)) / (2 * e)
+        hy = (w.sample(P[..., 0], P[..., 1] + e, w.h)
+              - w.sample(P[..., 0], P[..., 1] - e, w.h)) / (2 * e)
+        sand = (1.0 - np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0, 1)
+                - np.clip((hz - PLAIN_Z) / 4.0, 0, 1))
+        sand = np.clip(sand, 0.0, 1.0)
+        wet = np.clip((RUNUP - hz) / 0.35, 0.0, 1.0)
+        out['wet sand'] = float((sand * wet).sum()) / n
+        out['dry sand'] = float((sand * (1 - wet)).sum()) / n
+    else:
+        out['wet sand'] = out['dry sand'] = 0.0
+    out['rungs_present'] = sum(1 for k, v in out.items()
+                               if k != 'rungs_present' and v > 1e-4)
+    return out
+
+
+def beach_width(w):
+    """The cross-shore width of dry beach this bed produces, per row.
+
+    Bar J's ladder needs two sand surfaces and this is what supplies them. It
+    is measured as the distance from the waterline to the `PLAIN_Z` contour,
+    which is the same threshold `shade_land` uses to stop calling a surface
+    sand -- so the number and the shader cannot drift apart."""
+    out = []
+    for j in range(w.y.size):
+        i0 = int(np.argmax(w.h[j] > 0.0))
+        i1 = int(np.argmax(w.h[j] > PLAIN_Z))
+        if i1 > i0:
+            out.append(float(w.x[i1] - w.x[i0]))
+    a = np.array(out) if out else np.zeros(1)
+    return dict(median=float(np.median(a)), min=float(a.min()),
+                max=float(a.max()),
+                slope=float(PLAIN_Z / max(np.median(a), 1e-9)))
+
+
+def shadow_cost(w, ex, n=48, reach=600.0, sun=None):
+    """HOW MUCH OF THE LAND IN FRAME IS LIT THAT SHOULD BE IN SHADOW.
+
+    `shade_land` has no shadow ray. It has never had one, and no diagnostic in
+    six waves reported it, because a frame with no shadows is internally
+    consistent and looks like a frame taken under a high sun. This function does
+    not fix it: it MEASURES it, by marching from every land hit toward the sun
+    and asking whether the bed gets in the way. The answer is a share of the
+    frame and a radiance error, and that is what puts the defect in its place on
+    the gap list rather than at the top of it by assertion.
+    """
+    P = ex.get('land_P')
+    if P is None or P.size == 0:
+        return None
+    hx = w.sample(P[..., 0], P[..., 1], w.h)
+    e = 1.5
+    gx = (w.sample(P[..., 0] + e, P[..., 1], w.h)
+          - w.sample(P[..., 0] - e, P[..., 1], w.h)) / (2 * e)
+    gy = (w.sample(P[..., 0], P[..., 1] + e, w.h)
+          - w.sample(P[..., 0], P[..., 1] - e, w.h)) / (2 * e)
+    N = np.stack([-gx, -gy, np.ones_like(gx)], -1)
+    N /= np.linalg.norm(N, axis=-1, keepdims=True)
+    S = SUN if sun is None else np.asarray(sun, float)
+    ndl = (N * S[None]).sum(-1)
+    lit = ndl > 0.0
+    occ = np.zeros(P.shape[0], bool)
+    s = np.geomspace(0.5, reach, n)
+    for t in s:
+        Q = P + S[None] * t
+        occ |= (Q[..., 2] < w.sample(Q[..., 0], Q[..., 1], w.h)) & lit
+    # what removing the direct term would cost, where it is wrongly present
+    direct = E_SUN[None] * np.clip(ndl, 0, 1)[..., None] / np.pi
+    amb = env_irr(N)
+    frac = direct[:, 1] / np.maximum(direct[:, 1] + amb[:, 1], 1e-12)
+    return dict(n_land=int(P.shape[0]), lit_share=float(lit.mean()),
+                wrongly_lit=float(occ.mean()),
+                wrongly_lit_of_lit=float(occ.sum() / max(lit.sum(), 1)),
+                median_direct_share=float(np.median(frac[occ]))
+                if occ.any() else 0.0,
+                sun_el=SUN_EL)
+
+
+# THE AIR BETWEEN THE CAMERA AND THE SEA IS NOT MODELLED AND THE FRAME IS
+# FIFTEEN KILOMETRES DEEP. `shade_water` and `shade_land` return the radiance
+# LEAVING the surface and the trace hands it straight to the film. For a pool
+# five metres across that is exact to a part in ten thousand; for bar J's and
+# bar K's frames the far water is beyond the visible horizon, and the two terms
+# a path that long carries -- extinction of the surface's own radiance, and the
+# airlight scattered into the line of sight -- are BOTH missing.
+#
+# THE RAYLEIGH HALF NEEDS NO NEW CONSTANT: `atmosphere.TAU_R` is the zenith
+# optical depth this project already derived, and a zenith optical depth over an
+# exponential atmosphere of scale height H_R is beta = tau/H_R at the surface.
+# THE AEROSOL HALF DOES, and it is `?`: a maritime boundary layer runs 20-60 km
+# of meteorological visibility and Koschmieder turns that into an extinction
+# coefficient. Both are reported, neither is applied, and the reason they are
+# not applied is that fixing this is a wave and measuring it is a row.
+H_RAYLEIGH = 8500.0                     # m, the standard scale height
+VIS_CLEAN, VIS_HAZY = 60000.0, 20000.0  # m, `?` -- the bracket, not a value
+
+
+def aerial_cost(w, ex, cam, L):
+    """WHAT THE MISSING AIR COSTS, measured on this frame's own ranges."""
+    out = {}
+    beta_r = np.asarray(ATM.TAU_R, float) / H_RAYLEIGH
+    for nm, vis in (('clean 60 km', VIS_CLEAN), ('hazy 20 km', VIS_HAZY)):
+        out[nm] = CAM.koschmieder_beta(vis)
+    mw, ml = ex.get('water_mask'), ex.get('land_mask')
+    rng = []
+    if mw is not None and mw.any():
+        rng.append(np.linalg.norm(ex['water_P'] - cam.pos[None], axis=-1))
+    if ml is not None and ml.any():
+        rng.append(np.linalg.norm(ex['land_P'] - cam.pos[None], axis=-1))
+    r = np.concatenate(rng) if rng else np.zeros(1)
+    r = r[np.isfinite(r)]
+    # THE FAR TAIL IS RESOLUTION-LIMITED AND SAYING SO MATTERS. The row just
+    # below the horizon is half a pixel below the horizontal, so the farthest
+    # range this raster samples is z/tan(fov_v/2h) and it doubles when the
+    # frame does. Percentiles below the 99.9th are stable; the maximum is not.
+    q = np.percentile(r, [50, 90, 99])
+    out['r_row_limit'] = float(cam.pos[2]
+                               / math.tan(math.atan(cam.tan) / cam.h))
+    rows = []
+    for nm, beta in (('Rayleigh (atmosphere.TAU_R / 8.5 km)', beta_r[1]),
+                     ('+ aerosol, clean 60 km', beta_r[1] + out['clean 60 km']),
+                     ('+ aerosol, hazy 20 km', beta_r[1] + out['hazy 20 km'])):
+        rows.append((nm, beta, [math.exp(-beta * d) for d in q]))
+    # the share of the frame beyond one e-folding at each haze
+    share = {}
+    for nm, beta in (('clean', beta_r[1] + out['clean 60 km']),
+                     ('hazy', beta_r[1] + out['hazy 20 km'])):
+        share[nm] = float((r > 1.0 / beta).mean())
+    out.update(beta_rayleigh=beta_r, ranges=q, rows=rows, share=share,
+               r_max=float(r.max()), r_median=float(np.median(r)))
+    return out
+
+
+def frame_shares(ex, L):
+    """What the frame is MADE of, by pixel count. The denominator of every
+    entry on the gap list: a defect in a surface that is 2% of the frame is
+    not the same defect as one in a surface that is 40% of it."""
+    n = L.shape[0] * L.shape[1]
+    mw = ex.get('water_mask')
+    ml = ex.get('land_mask')
+    sk = ex.get('sky_mask')
+    out = dict(sky=float(sk.sum()) / n if sk is not None else 0.0,
+               water=float(mw.sum()) / n if mw is not None else 0.0,
+               land=float(ml.sum()) / n if ml is not None else 0.0)
+    out['clipped'] = float((L.max(-1) > WHITE).sum()) / n
+    return out
+
+
+def land_breakdown(w, ex, L):
+    """The land in frame, split the way `shade_land` splits it -- so the gap
+    list can say how much of the frame is the ONE DECLARED ALBEDO standing in
+    for the coastal plain, and how much is beach."""
+    P = ex.get('land_P')
+    if P is None or P.size == 0:
+        return None
+    hz = w.sample(P[..., 0], P[..., 1], w.h)
+    e = 1.5
+    hx = (w.sample(P[..., 0] + e, P[..., 1], w.h)
+          - w.sample(P[..., 0] - e, P[..., 1], w.h)) / (2 * e)
+    hy = (w.sample(P[..., 0], P[..., 1] + e, w.h)
+          - w.sample(P[..., 0], P[..., 1] - e, w.h)) / (2 * e)
+    rock = np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0.0, 1.0)
+    plain = np.clip((hz - PLAIN_Z) / 4.0, 0.0, 1.0) * (1 - rock)
+    sand = 1.0 - rock - plain
+    wet = np.clip((RUNUP - hz) / 0.35, 0.0, 1.0) * sand
+    n = float(L.shape[0] * L.shape[1])
+    return dict(rock=float(rock.sum()) / n, plain=float(plain.sum()) / n,
+                sand=float(sand.sum()) / n, wet_sand=float(wet.sum()) / n,
+                runup=RUNUP)
+
+
+def sun_for_the_coast_frames():
+    """THE ILLUMINANT THIS FRAME IS DRAWN UNDER AGAINST THE ONE IT WANTS.
+
+    Bar J and bar K are CLIFF frames and their times are `?`. The bar's two
+    other cliff frames are timed -- 2026-08-11 11:45 WEST, elevation 56.22 deg,
+    azimuth 123.13 deg, air mass 1.202, and clean of the eclipse -- and bar J's
+    own colour ladder says which class J belongs to: DEEP BLUE OFFSHORE with a
+    teal band inshore is a sea reflecting sky, which is a front-lit sea. A low
+    sun down the view axis does not give a deep blue offshore; it gives a
+    glitter path. So the render's illuminant -- 21.02 deg, azimuth 273.75 deg,
+    a west sun straight out to sea on a west-facing coast -- is not merely
+    lower than J's, it is in the WRONG HALF OF THE SKY for what J shows, and
+    the bar's own warning is that a wrong quadrant leaves the elevation correct
+    and is otherwise silent.
+
+    Nothing here changes the sun: `atmosphere.py` is the pool's, its four
+    illuminants all descend from one geometry, and moving it is a wave. This
+    function states the discrepancy in degrees so the gap list can rank it.
+    """
+    return dict(render_el=SUN_EL, render_az=SUN_AZ,
+                coast_el=56.22, coast_az=123.13, coast_am=1.202,
+                d_el=56.22 - SUN_EL, d_az=(123.13 - SUN_AZ) % 360.0,
+                surf_el=BAR_SURF_EL, surf_az=BAR_SURF_AZ)
+
+
+def frame_report(name, w, cam, inf, L, ex):
+    """Everything measured on one of the two hero frames, printed."""
+    sh = frame_shares(ex, L)
+    lb = land_breakdown(w, ex, L)
+    hz = horizon_rows(L, cam, inf)
+    su = sun_for_the_coast_frames()
+    sd = shadow_cost(w, ex)
+    # AND THE SAME QUESTION UNDER THE ILLUMINANT THE FRAME ACTUALLY WANTS. The
+    # missing shadow ray costs nothing on a west-facing coast under a west sun
+    # -- everything faces the light and there is nothing to occlude it -- and
+    # that is a fact about THIS sun, not about the renderer. Bar J's own class
+    # of frame is a late-morning south-easterly, which puts the whole cliff
+    # face in shade. Measuring both is what stops the gap being mis-ranked.
+    sd_coast = shadow_cost(w, ex, sun=_sun_vector(su['coast_el'],
+                                                  su['coast_az']))
+    seam = horizon_seam(L, cam)
+    ae = aerial_cost(w, ex, cam, L)
+    print('FRAME %s -- MEASURED, on the scene-linear buffer:' % name)
+    print('  eye at x = %.1f m, y = %.1f m, ground %.2f m, eye %.2f m; '
+          'azimuth %.2f deg' % (inf['x_cam'], inf['y_cam'], inf['z_ground'],
+                                inf['z_landform'], inf['az']))
+    print('  upright %d x %d, %.2f deg tall x %.2f wide, depressed %.2f deg'
+          % (cam.w, cam.h, math.degrees(inf['fov_v']),
+             math.degrees(inf['fov_h']), math.degrees(inf['dep']['mid'])))
+    print('  horizon row: predicted %.4f of frame, measured %.4f, '
+          'earth dip worth %.2f rows'
+          % (hz['predicted_true'], hz['measured'], hz['dip_rows']))
+    print('  the frame is %.1f%% sky, %.1f%% water, %.1f%% land; %.2f%% of '
+          'pixels clip the derived white point'
+          % (100 * sh['sky'], 100 * sh['water'], 100 * sh['land'],
+             100 * sh['clipped']))
+    if lb:
+        print('  the land is %.1f%% coastal plain (ONE DECLARED ALBEDO), '
+              '%.1f%% beach sand, %.1f%% rock; wet band %.2f%% at run-up '
+              '%.2f m' % (100 * lb['plain'], 100 * lb['sand'],
+                          100 * lb['rock'], 100 * lb['wet_sand'], lb['runup']))
+    if sd:
+        print('  SHADOWS (there is no shadow ray in shade_land, and this is '
+              'what that costs):')
+        for nm, s in (('the render\'s sun  %5.2f el / %6.2f az'
+                       % (SUN_EL, SUN_AZ), sd),
+                      ('bar J\'s own class %5.2f el / %6.2f az'
+                       % (su['coast_el'], su['coast_az']), sd_coast)):
+            print('     %-40s %5.1f%% of land faces it, %5.1f%% of THAT is '
+                  'occluded and lit anyway (direct term %.0f%% of the pixel)'
+                  % (nm, 100 * s['lit_share'], 100 * s['wrongly_lit_of_lit'],
+                     100 * s['median_direct_share']))
+    if seam:
+        print('  THE SEA-SKY SEAM (bar K2), sampled %.0f deg off the sun: sky '
+              '%s  sea %s  ratio %s -- worst channel is %.1f%% off continuity, '
+              'where Fresnel at grazing says it should be 0.'
+              % (seam['off_axis_deg'], np.round(seam['sky'], 4),
+                 np.round(seam['sea'], 4), np.round(seam['ratio'], 4),
+                 100 * seam['worst']))
+    lad = bar_J_ladder(w, ex, L)
+    bw = beach_width(w)
+    print('  BAR J\'S FIVE-RUNG COLOUR LADDER, counted in this frame '
+          '(%d of 5 present):' % lad['rungs_present'])
+    for k in ('deep water, d > 5 m', 'shallow/teal, d < 2.5 m',
+              'white surf, breaking', 'wet sand', 'dry sand'):
+        print('     %-26s %6.2f%% of frame%s'
+              % (k, 100 * lad[k], '' if lad[k] > 1e-4 else '   <-- ABSENT'))
+    print('     the bed\'s dry beach is %.1f m wide (median), %.1f-%.1f, so '
+          'the face slope is %.3f -- steep enough that `shade_land` classes it '
+          'as ROCK and bar J\'s two most trustworthy rungs have no pixels.'
+          % (bw['median'], bw['min'], bw['max'], bw['slope']))
+    print('  AIR: ranges in frame median %.0f m, 90th %.0f m, 99th %.0f m, '
+          'max %.0f m (the row below the horizon reaches %.0f m at THIS '
+          'raster height and doubles with it)'
+          % (ae['r_median'], ae['ranges'][1], ae['ranges'][2],
+             ae['r_max'], ae['r_row_limit']))
+    for nm, beta, T in ae['rows']:
+        print('     %-38s beta %8.2e /m  T at those three %.3f %.3f %.3f'
+              % (nm, beta, T[0], T[1], T[2]))
+    print('     %.1f%% of the frame is beyond one e-folding in clean air, '
+          '%.1f%% in hazy' % (100 * ae['share']['clean'],
+                              100 * ae['share']['hazy']))
+    fs = CAM.flat_sea_error(inf['z_landform'], 40000.0)
+    print('  CURVATURE: true horizon %.2f km, the flat plane runs to 40 km, so '
+          '%.1f km of the sea in frame does not exist -- and it is compressed '
+          'into %.4f deg = %.2f rows.'
+          % (fs['horizon_range'] / 1e3, fs['fictitious_range'] / 1e3,
+             math.degrees(fs['over_paint']),
+             math.degrees(fs['over_paint']) * cam.h
+             / math.degrees(inf['fov_v'])))
+    return dict(shares=sh, land=lb, horizon=hz, shadow=sd,
+                shadow_coast=sd_coast, seam=seam, aerial=ae, flat=fs,
+                ladder=lad, beach=bw)
+
+
+# ------------------------------------------------------------------ captions
+def _cap_J7(w, cam, inf, m):
+    ey = inf['eye']
+    d = math.degrees
+    su = sun_for_the_coast_frames()
+    return (
+        's7  BAR SECTION J, THE EMBAYMENT OVERVIEW -- the first frame in this '
+        'project shot at a viewpoint and a framing INFERRED FROM AN OWNER '
+        'PHOTOGRAPH rather than chosen. Upright, %.1f deg tall x %.1f '
+        'wide (an iPhone 16 Pro 0.5x held portrait), eye %.2f m on this bed\'s '
+        'own cliff brow at x = %.0f m, optical axis depressed %.2f deg, '
+        'azimuth %.1f deg. Same bed, same wave field, same optics, same sun '
+        'and the same exposure as every s4/s5/s6 frame.'
+        % (d(inf['fov_v']), d(inf['fov_h']),
+           inf['z_landform'], inf['x_cam'], d(inf['dep']['mid']), inf['az']),
+        'THE CAMERA IS AN INFERENCE AND THE INTERVALS ARE THE HONEST PART. '
+        'There is no EXIF. The LENS is the best-determined parameter and it is '
+        'determined by the instrument, not the picture: the bar names an '
+        'iPhone 16 Pro, a bay seen from p chords back subtends 2 atan(1/2p) '
+        'with the bay\'s size CANCELLING, and the widest lens this phone has '
+        'is %.2f deg across upright -- so "the whole embayment from its own '
+        'rim" both selects the 0.5x and proves the photographer stood at least '
+        '%.4f chords back. The DEPRESSION is %.2f deg +/- %.2f, and that '
+        'interval is a read off an image this file does not have; ONE MEASURED '
+        'HORIZON ROW would collapse it to +/- 0.03 deg. The EYE HEIGHT IS NOT '
+        'MEASURED BY THE HORIZON -- the dip is %.3f deg here and %.3f deg at '
+        '90 m, a sixth of a degree between a low cliff and a high one -- but '
+        'by the RESOLVED SURF LINES: lines %.0f m apart at %.0f m need an eye '
+        'at %s-%s m, against the %.2f m THIS BED SUPPLIES. That shortfall is '
+        'the frame\'s largest geometric gap and it is a statement about the '
+        'coastal loop, not about the camera.'
+        % (d(max(CAM.portrait_fov(f)[1] for f, _ in CAM.LENSES)),
+           inf['standoff_min'], d(inf['dep']['mid']),
+           d(inf['dep']['half_width']), d(inf['dip']),
+           d(CAM.horizon_dip(90.0)), ey['s'], ey['D'],
+           CAM._fmt_z(ey['z_lo']), CAM._fmt_z(ey['z_hi']), inf['z_landform']),
+        'WHAT BAR J CONTAINS THAT THIS FRAME DOES NOT, MEASURED ON THIS BUFFER '
+        'AND ORDERED BY WHAT IT COSTS THE FRAME. (1) BAR J\'S FIVE-RUNG COLOUR '
+        'LADDER HAS %d RUNGS HERE. Deep water %.2f%% of frame, teal shallows '
+        '%.2f%%, white surf %.2f%%, WET SAND %.2f%%, DRY SAND %.2f%%. J calls '
+        'the wet/dry pair "the most trustworthy comparison of the set" because '
+        'the two are close in level, and this frame cannot make it: wave 3\'s '
+        'coastal loop leaves a dry beach %.1f m wide, a face slope of %.3f, '
+        'and `shade_land` classes anything that steep as ROCK. THE BEACH IS '
+        'MISSING FROM THE BEACH SCENE. (2) %.1f%% OF THE FRAME IS COASTAL '
+        'PLAIN UNDER ONE DECLARED ALBEDO -- the largest single surface in a '
+        'hero frame is a placeholder, and the hyper-realism criterion warns '
+        'that the tell is usually not the water. (3) NO HEADLANDS AND NO '
+        'EMBAYMENT: %.0f m of plan curvature over %.0f m of coast, so J\'s '
+        'whole subject is absent and the axis is aimed along a nearly straight '
+        'shore instead. (4) THE ILLUMINANT IS IN THE WRONG HALF OF THE SKY. J '
+        'shows DEEP BLUE OFFSHORE grading to teal, which is a sea reflecting '
+        'sky and therefore front-lit; this is drawn under %.2f deg / %.2f deg, '
+        'a low WEST sun straight out to sea on a west-facing coast, against '
+        'the bar\'s own timed cliff frames at %.2f deg / %.2f deg -- %.1f deg '
+        'lower and %.1f deg round, and %.2f%% of the frame clips on a glitter '
+        'path J does not show. (5) THE EYE IS TOO LOW, above. (6) ONE SURF '
+        'ZONE, NOT THREE TO FOUR LINES: section B is parked with its mechanism '
+        'named. (7) THE SEA-SKY SEAM IS %.0f%% OFF CONTINUITY where Fresnel at '
+        'grazing says 0, and there is NO AIR between camera and sea over a '
+        'frame %.1f km deep. (8) NO SWASH, NO SHORE PLATFORM, NO AIRBORNE '
+        'SPRAY (bar H2/H1/F). (9) SHADOWS: there is no shadow ray, and it '
+        'costs %.1f%% of the land in frame -- because this landform has no '
+        'relief to cast one. Two gaps hiding each other. (10) FLAT EARTH: '
+        '%.2f pixel rows. THIS IS A DIAGNOSTIC AND NOT YET A REFERENCE; the '
+        'ordered list is in README-beach.md.'
+        % (m['ladder']['rungs_present'], 100 * m['ladder']['deep water, d > 5 m'],
+           100 * m['ladder']['shallow/teal, d < 2.5 m'],
+           100 * m['ladder']['white surf, breaking'],
+           100 * m['ladder']['wet sand'], 100 * m['ladder']['dry sand'],
+           m['beach']['median'], m['beach']['slope'],
+           100 * (m['land']['plain'] if m['land'] else 0.0),
+           float(w.x[np.argmax(w.h[-1] > 0)] - w.x[np.argmax(w.h[0] > 0)]),
+           float(w.y[-1] - w.y[0]),
+           SUN_EL, SUN_AZ, su['coast_el'], su['coast_az'], su['d_el'],
+           su['d_az'], 100 * m['shares']['clipped'],
+           100 * m['seam']['worst'] if m['seam'] else float('nan'),
+           m['aerial']['r_max'] / 1e3,
+           100 * m['shadow']['wrongly_lit_of_lit'] if m['shadow'] else 0.0,
+           math.degrees(m['flat']['over_paint']) * 4032.0
+           / math.degrees(inf['fov_v'])),
+    )
+
+
+def _cap_K7(w, inf, m, wchk):
+    d = math.degrees
+    return (
+        's7  BAR SECTION K, OPEN WATER AND THE GLITTER PATH -- the second '
+        'inferred viewpoint, upright, from the same cliff brow, aimed straight '
+        'down the sun\'s own azimuth (%.2f deg) because that is what section K '
+        'IS. %.1f deg tall x %.1f wide, eye %.2f m, axis depressed %.2f deg '
+        '+/- %.2f. Same camera code, same bed, same optics, same sun and the '
+        'same derived exposure as the s4/s5/s6 frames and as s7-frame-J.'
+        % (SUN_AZ, d(inf['fov_v']), d(inf['fov_h']), inf['z_landform'],
+           d(inf['dep']['mid']), d(inf['dep']['half_width'])),
+        'K1 IS THE STRONGEST INSTRUMENT IN THE BAR AND THIS FRAME CARRIES IT. '
+        'The path\'s angular width is a readout of the mean square slope and '
+        'there is no spread parameter anywhere in this render: the width comes '
+        'from Cox & Munk\'s slope distribution and the Jacobian, and it '
+        'NARROWS toward the horizon and spreads toward the observer because '
+        'the same slope subtends a different range of specular directions at '
+        'different incidences -- K1\'s own prediction, from the geometry. The '
+        'wind is `?`; measured back off THIS frame\'s buffer the width says '
+        'U10 = %.2f m/s against the %.2f m/s put in, and wave 6 showed the '
+        'width is 15x the wind instrument the whitecap coverage is, so an '
+        'agreement between them establishes little. BAR K3 FORBIDS READING A '
+        'LEVEL OFF THE PATH and nothing here does: every number is an angle '
+        'or a fraction.'
+        % (wchk.get('u_glitter', float('nan')), BO.U10),
+        'WHAT K CONTAINS THAT THIS DOES NOT. (1) THE HORIZON IS FLAT-EARTH: '
+        'the true horizon is %.2f km from this eye and the render\'s sea plane '
+        'runs to 40 km, so %.1f km of ocean in this frame does not exist -- '
+        'and IT IS WORTH %.2f PIXEL ROWS, which is why it is at the BOTTOM of '
+        'the gap list and not the top. (2) NO AERIAL PERSPECTIVE over a frame '
+        '%.1f km deep: in clean 60 km air the direct transmittance at the 90th '
+        'percentile range is %.3f and in hazy 20 km air %.3f, and the airlight '
+        'that should replace what is lost is absent too, so the far sea is too '
+        'dark and too saturated by construction. (3) DUNE VEGETATION AND THE '
+        'VILLAGE are out of scope by bar K2 and the coastal plain here is one '
+        'declared albedo -- %.1f%% of the frame. (4) NO SPRAY, NO SWASH, NO '
+        'PLATFORM. A frame that says what it is missing is a diagnostic; this '
+        'one is, and the ordered list is in README-beach.md.'
+        % (m['flat']['horizon_range'] / 1e3,
+           m['flat']['fictitious_range'] / 1e3,
+           math.degrees(m['flat']['over_paint']) * 4032.0
+           / math.degrees(inf['fov_v']),
+           m['aerial']['r_max'] / 1e3, m['aerial']['rows'][1][2][1],
+           m['aerial']['rows'][2][2][1],
+           100 * (m['land']['plain'] if m['land'] else 0.0)),
+    )
 
 
 if __name__ == '__main__':
