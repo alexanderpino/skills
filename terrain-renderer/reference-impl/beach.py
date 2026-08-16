@@ -2740,7 +2740,7 @@ def smooth_depth_2d(d, dx, dy, scale_x, scale_y):
 
 def transform_2d(x, y, h2, T, H0, theta0, breaking=True, gamma_b=GAMMA_B,
                  gamma_s=GAMMA_STABLE, k_dally=K_DALLY, filter_scale=None,
-                 eta=None, k_field=None, refraction=True):
+                 eta=None, k_field=None, refraction=True, contour0=None):
     """Shoal, refract and break a stated offshore sea state across a PLAN bed.
 
     IN:  x (m, shoreward+), y (m, alongshore), h2 (ny, nx) bed elevation,
@@ -2782,12 +2782,37 @@ def transform_2d(x, y, h2, T, H0, theta0, breaking=True, gamma_b=GAMMA_B,
     # Snell against the local celerity is exact and the boundary condition is
     # the SAME statement the 1-D transform makes: the deep-water flux, conserved
     # in from infinity. Nothing downstream may change it.
-    sin0 = np.clip(c[:, 0] / c0 * math.sin(theta0), -1.0, 1.0)
-    theta[:, 0] = np.arcsin(sin0)
-    ky = k[:, 0] * sin0
+    #
+    # WAVE 9: theta0 AND H0 MAY BE PER-ROW. A plane offshore crest is the
+    # scalar case and stays bit-identical to waves 1-8 -- `np.sin` of a 0-d
+    # array is `math.sin` of the float. The array case exists because a
+    # headland DIFFRACTS: the orthogonals in its lee fan out from the tip
+    # instead of arriving parallel, and that fan is the boundary condition, not
+    # something the shoreward march can invent. It is still a stated OFFSHORE
+    # condition -- everything between it and the beach is an output.
+    #
+    # AND THE SNELL AT THE BOUNDARY IS AGAINST THE LOCAL CONTOUR, NOT THE GRID.
+    # Waves 1-8 wrote `arcsin(c/c0 * sin(theta0))`, which conserves the
+    # component of k along the GRID's y axis. That is exact for a coast whose
+    # contours are the grid's rows and WRONG for any other, because the Snell
+    # invariant is the wavenumber component along the CONTOUR. Measured on the
+    # closed-form zero-transport coast -- a straight shore rotated by the full
+    # deep-water obliquity, which must break with theta = 0 exactly -- the old
+    # boundary left 4.89 deg of residual obliquity and 76 per cent of the
+    # straight coast's longshore transport. The meter could not read zero, so
+    # a near-zero reading on the bay would have proved nothing. `contour0` is
+    # the angle of the local offshore contour NORMAL from +x; zero reproduces
+    # waves 1-8 bit for bit.
+    th0 = np.broadcast_to(np.asarray(theta0, float), (ny,))
+    n0 = np.broadcast_to(np.asarray(0.0 if contour0 is None else contour0,
+                                    float), (ny,))
+    sin0 = np.clip(c[:, 0] / c0 * np.sin(th0 - n0), -1.0, 1.0)
+    theta[:, 0] = np.arcsin(sin0) + n0
+    ky = k[:, 0] * np.sin(theta[:, 0])
     if not refraction:
         ky = None                      # the deliberate defect uses this
-    Phi[:, 0] = E0 * cg0 * math.cos(theta0) / np.cos(theta[:, 0])
+    Phi[:, 0] = (E0 * cg0 * np.cos(th0 - n0)
+                 / np.cos(theta[:, 0] - n0))
     state = np.zeros(ny, bool)
 
     for i in range(nx - 1):
@@ -3070,6 +3095,607 @@ def bar_alongshore(x, y, h2, h_ref, x_lo=None, x_hi=None):
             continue
         xc[j], dc[j], amp[j] = cr['x'], cr['d'], cr['amp']
     return dict(x=xc, d=dc, amp=amp)
+
+
+# ===================================================== THE STATIC-EQUILIBRIUM
+# BAY -- the plan-form, and the one property that makes it provable
+#
+# WHY THIS SECTION EXISTS. Waves 1-8 built a bed whose shoreline is a straight
+# regional trend with the hardness field's own roughness on it: 55 m of range
+# over 1408 m of coast, but jagged, with no single curve in it. Bar section J
+# photographs an EMBAYMENT -- "headland to headland, cliff behind, a curved
+# sand beach, and the surf running in multiple lines that follow the curve all
+# the way round" -- and calls the surf-follows-the-curve test "the cheapest
+# verification in the entire project". A straight-contour test passes by
+# construction. This section builds the curve.
+#
+# WHAT THE LITERATURE CALLS IT, AND WHERE IT IS NOT. The headland-bay coast in
+# static equilibrium has two closed forms in coastal engineering: the
+# LOGARITHMIC SPIRAL (Krumbein 1944; Yasso 1965; Silvester 1970) and the
+# PARABOLIC BAY-SHAPE EQUATION (Hsu & Evans 1989). NEITHER IS IN
+# terrain-architect/references/12-glacial-coastal.md. That chapter carries the
+# coastal loop, longshore drift, spits and the Dean profile, and its only
+# statement about coastal PLAN-FORM equilibrium is one clause -- "headlands
+# retreat faster than bays, which is correct and self-reinforcing until the
+# coast STRAIGHTENS". The absence is reported to the sibling skill as a gap,
+# and the clause is measured here rather than repeated: see `zero_transport_
+# plan` below, which finds that on a plane-wave field the chapter's clause is
+# EXACTLY RIGHT and that this is precisely why a bay needs something the
+# chapter does not have.
+#
+# THE PARABOLIC FORM IS NOT IMPLEMENTED HERE AND THE REASON IS PROVENANCE. Hsu
+# & Evans' C0/C1/C2 are three quartic polynomials in beta -- fifteen fitted
+# coefficients from a least-squares fit to 27 bays. Nothing in this container
+# holds them. Writing them from memory is exactly the failure this project
+# exists to prevent, and a fifteen-coefficient fit has no internal check that
+# would catch a wrong digit. The LOG SPIRAL has one parameter and a defining
+# geometric property that checks itself, so it is the form implemented, and
+# the parabolic form is marked `?` and NOT shipped.
+K_CERC = 0.39           # the CERC longshore-transport coefficient on the
+                        # SIGNIFICANT wave height. EMPIRICAL -- chapter 12 says
+                        # so outright ("the CERC transport closure is empirical
+                        # coastal engineering"). IT CANNOT SET THE EQUILIBRIUM
+                        # PLAN-FORM: equilibrium is Q = 0, and Q = C * sin(2
+                        # theta) is zero at theta = 0 for EVERY C. The suite
+                        # doubles it and checks the plan-form does not move --
+                        # a coefficient that cannot reach the answer is the
+                        # strongest kind of `?` there is.
+
+
+def log_spiral(phi, R_a, phi_a, alpha):
+    """The logarithmic spiral R(phi) = R_a * exp((phi - phi_a) * cot(alpha)).
+
+    ITS DEFINING PROPERTY, and it is what makes it the equilibrium form: the
+    angle between the radius vector and the tangent is the CONSTANT alpha, at
+    every point. dP/dphi = R'(phi) u + R(phi) u_perp = R (cot(alpha) u +
+    u_perp), whose angle to u has tangent 1/cot(alpha) = tan(alpha) whatever
+    phi is. alpha = 90 deg is the circle; alpha -> 0 is a ray.
+    """
+    return float(R_a) * np.exp((np.asarray(phi, float) - float(phi_a))
+                               / math.tan(float(alpha)))
+
+
+def spiral_tangent(phi, alpha):
+    """The unit tangent of the spiral at polar angle phi, in (x, y).
+
+    Written from the derivative and NOT from the constant-angle property, so
+    that the suite can check the second against the first."""
+    ca = 1.0 / math.tan(float(alpha))
+    u = np.stack([np.cos(phi), np.sin(phi)], axis=-1)
+    up = np.stack([-np.sin(phi), np.cos(phi)], axis=-1)
+    t = ca * u + up
+    return t / np.linalg.norm(t, axis=-1, keepdims=True)
+
+
+def equilibrium_alpha(delta):
+    """The spiral angle from a residual obliquity delta.
+
+    THE DERIVATION, and it is one line. At static equilibrium the shoreline is
+    normal to the wave ORTHOGONAL -- that is what zero longshore transport
+    means, because Q goes as sin(2 theta) and theta is the angle between the
+    orthogonal and the shore normal. If the orthogonals radiate from a single
+    pole (the diffraction point of the sheltering headland, or more generally
+    the virtual source the fan converges on) then the radius vector IS the
+    orthogonal, and the shoreline is normal to the radius at every station:
+
+        alpha = 90 deg  --  A CIRCULAR ARC ABOUT THE POLE.
+
+    THAT MEMBER IS DERIVED AND IT IS THE ONLY ONE THAT IS. If the orthogonal
+    is rotated from the radius by a CONSTANT delta, the tangent makes the
+    constant angle 90 - delta with the radius, which is the logarithmic
+    spiral's own definition and nothing else's -- so the log spiral is exactly
+    "a bay whose residual obliquity is constant", and the derivation says WHY
+    the spiral rather than fitting one.
+
+    WHAT IS NOT DERIVED IS delta. This file ships delta = theta_b, the
+    breaking obliquity the 1-D transform outputs for the stated offshore
+    spectrum, as a DECLARED choice and marks it `?`; the circle (delta = 0) is
+    computed and reported beside it every time, so the reader sees what the
+    choice is worth rather than being told it does not matter. Silvester's
+    published alpha for real bays is 30-50 deg, which is a delta of 40-60 deg
+    and an order above anything refraction leaves -- an EMPIRICAL fit, not this
+    quantity, and the two must not be confused.
+    """
+    return math.pi / 2.0 - float(delta)
+
+
+def spiral_residual(D, A1, A2, alpha, khat):
+    """The two closure conditions on the pole, as a residual vector.
+
+    (1) THE SPIRAL PASSES THROUGH BOTH ANCHORS. For a log spiral about D,
+        ln(r2/r1) = cot(alpha) * (phi2 - phi1) -- one equation, because the
+        remaining two freedoms (R_a and the phi origin) are absorbed by the
+        anchors themselves.
+    (2) THE DOWNCOAST END IS TANGENTIAL. Hsu & Evans' downcoast control point
+        is where the beach becomes parallel to the incoming crests, i.e. its
+        NORMAL lies along the wave vector. So tangent . khat = 0 at A2.
+
+    Two equations, two unknowns (D_x, D_y). Nothing is free, and the bay's
+    indentation is therefore an OUTPUT.
+    """
+    D = np.asarray(D, float)
+    v1 = np.asarray(A1, float) - D
+    v2 = np.asarray(A2, float) - D
+    r1 = float(np.hypot(v1[0], v1[1]))
+    r2 = float(np.hypot(v2[0], v2[1]))
+    if r1 <= 0.0 or r2 <= 0.0:
+        return np.array([1e6, 1e6])
+    p1 = math.atan2(v1[1], v1[0])
+    p2 = math.atan2(v2[1], v2[0])
+    dp = math.atan2(math.sin(p2 - p1), math.cos(p2 - p1))
+    e1 = math.log(r2 / r1) - dp / math.tan(float(alpha))
+    e2 = float(np.dot(spiral_tangent(p2, alpha), np.asarray(khat, float)))
+    return np.array([e1, e2])
+
+
+def spiral_pole(A1, A2, alpha, khat, D0=None, n_iter=200, tol=1e-13):
+    """Solve `spiral_residual` = 0 for the pole.
+
+    TWO BRANCHES EXIST AND ONLY ONE IS A BAY. The pole at infinity is always a
+    root -- a log spiral with its pole infinitely far away is a straight line,
+    the tangency condition then fixes its bearing, and the "bay" it produces is
+    the rotated straight coast `zero_transport_plan` writes in closed form.
+    That branch is real and this file measures it separately. The BAY is the
+    NEAREST root, because the pole is the sheltering headland's diffraction
+    point and a pole 79 km offshore is not a headland. So the solve is
+    multi-start and the returned root is the converged one of smallest |D - A1|
+    -- a selection rule with a physical statement behind it, and the suite
+    reports the far branch's own sagitta beside it so the choice is visible.
+    """
+    A1 = np.asarray(A1, float)
+    A2 = np.asarray(A2, float)
+    if D0 is None:
+        ch = float(np.hypot(*(A2 - A1)))
+        roots = []
+        for fx in (0.15, 0.3, 0.6, 1.0, -0.3, -0.6):
+            for fy in (-0.6, -0.3, 0.0, 0.3, 0.6):
+                D, r = spiral_pole(A1, A2, alpha, khat,
+                                   D0=A1 + np.array([fx * ch, fy * ch]),
+                                   n_iter=n_iter, tol=tol)
+                if np.max(np.abs(r)) < 1e-10:
+                    roots.append((float(np.hypot(*(D - A1))), D, r))
+        if roots:
+            roots.sort(key=lambda t: t[0])
+            return roots[0][1], roots[0][2]
+        D0 = A1 + np.array([0.3 * ch, -0.3 * ch])
+    D = np.asarray(D0, float).copy()
+    for _ in range(int(n_iter)):
+        f = spiral_residual(D, A1, A2, alpha, khat)
+        if np.max(np.abs(f)) < tol:
+            break
+        J = np.zeros((2, 2))
+        for kk in range(2):
+            e = np.zeros(2)
+            e[kk] = 1e-5 * max(1.0, abs(D[kk]))
+            J[:, kk] = (spiral_residual(D + e, A1, A2, alpha, khat) - f) / e[kk]
+        try:
+            step = np.linalg.solve(J, -f)
+        except np.linalg.LinAlgError:
+            break
+        nrm = float(np.hypot(*step))
+        if nrm > 400.0:
+            step = step * (400.0 / nrm)
+        D = D + step
+    return D, spiral_residual(D, A1, A2, alpha, khat)
+
+
+def spiral_points(D, A1, A2, alpha, n=2001, extend=0.0):
+    """Sample the spiral from anchor A1 to anchor A2, as (n, 2) in (x, y).
+
+    `extend` continues the SAME curve past both anchors by that fraction of
+    the anchor-to-anchor angular span. The anchors are two rock highs inside
+    the frame, not the frame's edges, so the coast beyond them is still bay --
+    and continuing the analytic curve is the only way to fill it that does not
+    introduce a second form with its own join."""
+    D = np.asarray(D, float)
+    v1 = np.asarray(A1, float) - D
+    v2 = np.asarray(A2, float) - D
+    r1 = float(np.hypot(v1[0], v1[1]))
+    p1 = math.atan2(v1[1], v1[0])
+    p2 = math.atan2(v2[1], v2[0])
+    dp = math.atan2(math.sin(p2 - p1), math.cos(p2 - p1))
+    e = float(extend) * dp
+    ph = p1 + np.linspace(-e, dp + e, int(n))
+    R = log_spiral(ph, r1, p1, alpha)
+    return np.stack([D[0] + R * np.cos(ph), D[1] + R * np.sin(ph)], axis=1)
+
+
+def headland_anchors(x_s, y, frac=0.25):
+    """The two rock anchors, from the coastal loop's own plan-form.
+
+    Bar J frames the scene HEADLAND TO HEADLAND, so the anchors are the
+    seaward-most shoreline point in the outer `frac` of each end -- the hard
+    rows the loop could not cut back. Nothing is placed: the anchors move if
+    the hardness field's seed or correlation length moves, and the suite
+    checks exactly that."""
+    x_s = np.asarray(x_s, float)
+    y = np.asarray(y, float)
+    q = max(int(round(frac * y.size)), 2)
+    j1 = int(np.argmin(x_s[:q]))
+    j2 = y.size - q + int(np.argmin(x_s[y.size - q:]))
+    return (np.array([x_s[j1], y[j1]]), np.array([x_s[j2], y[j2]]), j1, j2)
+
+
+def chord_offset(pts):
+    """Signed perpendicular offset of a polyline from the chord of its ends,
+    and the maximum |offset| -- the bay's INDENTATION, the number bar J's
+    photograph gives as roughly 50 m over 1408 m."""
+    pts = np.asarray(pts, float)
+    ch = pts[-1] - pts[0]
+    L = float(np.hypot(ch[0], ch[1]))
+    t = ch / L
+    nrm = np.array([-t[1], t[0]])
+    off = (pts - pts[0]) @ nrm
+    return off, float(np.max(np.abs(off))), L
+
+
+def plan_ramp(x, y, x_s, A=DEAN_A, d_shelf=D_SHELF, s_plain=S_PLAIN):
+    """The Dean equilibrium ramp keyed to a STATED plan-form.
+
+    d(x, y) = A * (x_s(y) - x)^(2/3), capped at the shelf depth, with the
+    coastal plain landward of it. The depth contours are therefore exact
+    offsets of the shoreline, which is what makes a curved shoreline curve the
+    contours and what gives refraction something to turn onto. This is the
+    same surface `bay_bed` composes, isolated so that the plan-form can be
+    varied with nothing else changing -- the straight/curved pair the transport
+    measurement needs is ONE argument."""
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    x_s = np.asarray(x_s, float)
+    s = np.maximum(x_s[:, None] - x[None, :], 0.0)
+    sea = -np.minimum(A * s ** (2.0 / 3.0), d_shelf)
+    land = s_plain * np.maximum(x[None, :] - x_s[:, None], 0.0)
+    return np.where(x[None, :] >= x_s[:, None], land, sea)
+
+
+def plan_ramp_polar(x, y, D, R_s, A=DEAN_A, d_shelf=D_SHELF, s_plain=S_PLAIN):
+    """The Dean ramp keyed to a plan-form, but measured along the RADIUS from
+    the pole D instead of along the grid's cross-shore axis.
+
+    WHY THIS EXISTS, and it is the sharpest measurement in this section. On a
+    curved bay, "the depth is a function of distance from the shoreline
+    measured across the grid" and "the depth is a function of distance from the
+    pole" are DIFFERENT SURFACES. The first has contours that are x-translates
+    of the shoreline; those converge where the shore is concave, so a ray that
+    arrives normal to the shoreline does NOT stay normal to the contours on the
+    way in, and refraction hands it back some obliquity. The second has
+    contours that are concentric arcs, on which a radial ray is normal to every
+    contour it crosses and Snell is the identity.
+
+    So the pair separates the residual transport on the bay into "the bay is
+    curved" and "the ramp is not concentric with the curve", and only a
+    measurement can say which. `R_s` is the shoreline radius as a function of
+    polar angle, supplied as (phi, R) samples -- the spiral itself.
+    """
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    D = np.asarray(D, float)
+    ph_s, R_sh = R_s
+    XX = x[None, :] - D[0]
+    YY = y[:, None] - D[1]
+    r = np.hypot(XX, YY)
+    ph = np.arctan2(YY, XX)
+    o = np.argsort(ph_s)
+    Rs = np.interp(ph, np.asarray(ph_s)[o], np.asarray(R_sh)[o])
+    s = np.maximum(Rs - r, 0.0)
+    sea = -np.minimum(A * s ** (2.0 / 3.0), d_shelf)
+    land = s_plain * np.maximum(r - Rs, 0.0)
+    return np.where(r >= Rs, land, sea)
+
+
+def plan_field(x, y, x_s, T=T_SWELL, H0=H0_SWELL, theta0=THETA0_SWELL,
+               contour=True, **kw):
+    """The bed AND the wave field for a stated plan-form, in one call.
+
+    ONE CODE PATH. The straight coast, the rotated coast, the spiral bay and
+    the circular bay differ by the array `x_s` and by nothing else: same ramp,
+    same transform, same breaking, same offshore spectrum. That is what makes
+    the curved/straight pair a MEASUREMENT rather than two renders.
+
+    `contour=True` takes the offshore Snell against the plan-form's own
+    contour normal, which is the only way a rotated or curved coast gets its
+    boundary condition right. Setting it False is the deliberate defect.
+    """
+    h2 = plan_ramp(x, y, x_s)
+    n0 = -shore_normal_angle(y, x_s) if contour else None
+    return h2, transform_2d(x, y, h2, T, H0, theta0, contour0=n0, **kw)
+
+
+def shore_normal_angle(y, x_s):
+    """phi_s = atan(dx_s/dy), the angle the shoreline tangent makes with the
+    alongshore axis -- equivalently MINUS the angle the shoreward normal makes
+    with the cross-shore axis.
+
+    The sign matters and it is the one thing in this section a reader will get
+    backwards. Tangent t = (x_s', 1)/N; rotating it by -90 deg gives
+    (1, -x_s')/N, which points SHOREWARD (+x). Its angle to +x is -phi_s. A
+    wave travelling at theta to +x therefore meets the shore at
+
+        theta_loc = theta + phi_s
+
+    which `plan_transport` uses and the suite checks against a hand-rotated
+    coast."""
+    return np.arctan(np.gradient(np.asarray(x_s, float), np.asarray(y, float)))
+
+
+def breaker_row(tr2, gamma_b=GAMMA_B):
+    """Per alongshore row: the SEAWARD-most breaking cell and the wave there.
+
+    The seaward-most and not the largest, because that is where the bar's
+    break line is and where `break_lines` reads it in 1-D. Rows that never
+    break are flagged rather than silently given row zero."""
+    brk = np.asarray(tr2['brk'])
+    ny = brk.shape[0]
+    idx = np.full(ny, -1)
+    for j in range(ny):
+        ii = np.nonzero(brk[j])[0]
+        if ii.size:
+            idx[j] = int(ii[0])
+    ok = idx >= 0
+    r = np.arange(ny)
+    take = np.where(ok, idx, 0)
+    return dict(i=idx, ok=ok,
+                H=tr2['H'][r, take], theta=tr2['theta'][r, take],
+                d=tr2['d'][r, take], x=np.asarray(tr2['x'])[take])
+
+
+def cerc_transport(H_b, theta_loc, k_cerc=K_CERC, gamma_b=GAMMA_B):
+    """CERC longshore transport, volumetric, m^3/s, positive toward +y.
+
+        Q = k / (16 (s-1)(1-p) sqrt(gamma)) * sqrt(g) * H_b^(5/2) * sin(2 th)
+
+    The sin(2 theta) is chapter 12's own statement of the closure ("Q_long ~
+    sin(2 (waveAngle - shorelineNormal))", Komar & Inman 1970) and the rest is
+    the standard conversion of the immersed-weight rate to a bulk volume with
+    the pore space in it. s and p are this file's RHO_S/RHO_SW and POROSITY.
+
+    WHAT MATTERS FOR THIS SECTION is that the whole prefactor is positive and
+    constant, so Q = 0 if and only if sin(2 theta_loc) = 0. The equilibrium
+    plan-form cannot depend on k_cerc, and the suite proves it by doubling it.
+    """
+    s = RHO_S / RHO_SW
+    coef = (float(k_cerc) / (16.0 * (s - 1.0) * (1.0 - POROSITY)
+                             * math.sqrt(gamma_b)))
+    return (coef * math.sqrt(G) * np.asarray(H_b, float) ** 2.5
+            * np.sin(2.0 * np.asarray(theta_loc, float)))
+
+
+def plan_transport(y, x_s, tr2, k_cerc=K_CERC, edge=3):
+    """The longshore transport at stations along a stated shoreline, from a
+    solved plan wave field.
+
+    `edge` rows are dropped at each alongshore end: `transform_2d`'s transverse
+    flux divergence is one-sided there and its Snell march has no upwind
+    neighbour, so those rows carry a boundary artefact and not a measurement.
+    Saying which rows are excluded, and why, is the eleventh way a measurement
+    lies (a test window pinned where the phenomenon is not) run in reverse.
+    """
+    y = np.asarray(y, float)
+    br = breaker_row(tr2)
+    phi = shore_normal_angle(y, x_s)
+    th_loc = br['theta'] + phi
+    Q = cerc_transport(br['H'], th_loc, k_cerc=k_cerc)
+    m = np.zeros(y.size, bool)
+    m[int(edge):y.size - int(edge)] = True
+    m &= br['ok']
+    return dict(theta_loc=th_loc, Q=Q, phi_s=phi, mask=m,
+                theta_b=br['theta'], H_b=br['H'], d_b=br['d'], x_b=br['x'],
+                Q_rms=float(np.sqrt(np.mean(Q[m] ** 2))) if m.any()
+                else float('nan'),
+                Q_mean=float(np.mean(Q[m])) if m.any() else float('nan'),
+                Q_max=float(np.max(np.abs(Q[m]))) if m.any() else float('nan'),
+                th_mean=float(np.mean(np.abs(th_loc[m]))) if m.any()
+                else float('nan'),
+                th_max=float(np.max(np.abs(th_loc[m]))) if m.any()
+                else float('nan'))
+
+
+def zero_transport_plan(y, x_ref, theta0):
+    """THE EXACT ZERO-TRANSPORT SHORELINE FOR A PLANE OFFSHORE CREST, and it
+    is not a bay.
+
+    THE ANGLE IS THE DEEP-WATER ONE AND NOT THE BREAKING ONE, and getting that
+    wrong is this section's own factor-of-two trap. Snell is
+    sin(theta) = (c/c_0) sin(theta_0) with theta measured from the LOCAL shore
+    normal; refraction shrinks the obliquity but sends it to zero only if it
+    was zero to begin with, because c/c_0 is never zero. So theta_b = 0
+    requires theta_0,local = 0, i.e. phi_s = -theta_0 -- the FULL deep-water
+    obliquity, 20 deg here, not the 6.56 deg the wave has left at breaking. A
+    coast rotated by the breaking angle is still 2.78 deg oblique and still
+    carries 43 per cent of the straight coast's transport; this file wrote that
+    version first and the suite caught it.
+
+        x_s(y) = x_ref - tan(theta_0) * (y - y_mid)
+
+    A STRAIGHT COAST, ROTATED until it faces the swell. This is chapter 12's
+    own sentence -- "headlands retreat faster than bays ... until the coast
+    straightens" -- as an equation, and it is RIGHT: with plane offshore crests
+    and shore-parallel contours, ANY curvature at all raises the transport,
+    because theta_loc can be zero at one station only.
+
+    So it is also the proof that a curved static-equilibrium bay is IMPOSSIBLE
+    without an alongshore FAN in the wave direction. The bay is not an
+    equilibrium of the shoreline; it is an equilibrium of the shoreline AND the
+    headland that shelters it. This function is the control that shows the
+    transport measurement CAN return zero -- without it, a near-zero reading on
+    the bay would prove nothing about the bay and everything about the meter.
+    """
+    y = np.asarray(y, float)
+    return (float(x_ref)
+            - math.tan(float(theta0)) * (y - 0.5 * (y[0] + y[-1])))
+
+
+def required_fan(y, x_s, edge=3):
+    """The alongshore swing of the wave orthogonal that a stated shoreline
+    needs in order to be in static equilibrium, radians.
+
+    theta_loc = 0 demands the orthogonal lie at -phi_s(y). Its RANGE across the
+    bay is the fan the sheltering headland has to supply, and it is the
+    quantitative form of "the bay needs diffraction". An OUTPUT of the
+    geometry, with no wave model in it at all."""
+    phi = shore_normal_angle(y, x_s)
+    m = slice(int(edge), np.asarray(y).size - int(edge))
+    psi = -phi[m]
+    return dict(psi=psi, swing=float(psi.max() - psi.min()),
+                lo=float(psi.min()), hi=float(psi.max()))
+
+
+def fan_theta0(y, x_s, D, cap=None):
+    """The per-row DEEP-WATER wave direction of a field whose orthogonals
+    radiate from the pole D.
+
+    This is the boundary condition a diffracting headland imposes: in the lee
+    of a tip the crests are arcs about the tip and the orthogonals are radii.
+    It is a stated OFFSHORE condition -- everything between it and the beach,
+    shoaling and refraction and breaking, stays an output. The standing ruling
+    holds.
+
+    THE RADIUS IS TAKEN TO THE SHORELINE POINT OF THE ROW, NOT TO THE ROW'S
+    OFFSHORE CELL, and the difference is the whole thing. The orthogonal that
+    ends at shoreline station (x_s(y), y) is the radius through THAT point; the
+    radius through the offshore cell at the same y is a different ray, off by
+    up to 24 deg on this bay, and feeding it leaves 4.9 deg of residual
+    obliquity on a STRAIGHT coast, which is how this file found the error --
+    the fan was reducing the obliquity everywhere instead of reducing it on the
+    bay it belongs to.
+
+    The pole is `spiral_pole`'s own, so the fan and the plan-form come from the
+    SAME geometry. That is the point: the bay and the wave field that holds it
+    are one object, and feeding one without the other is what waves 1-8 did.
+    """
+    y = np.asarray(y, float)
+    D = np.asarray(D, float)
+    th = np.arctan2(y - D[1], np.asarray(x_s, float) - D[0])
+    if cap is not None:
+        th = np.clip(th, -float(cap), float(cap))
+    return th
+
+
+def fit_log_spiral(pts, alpha0=None, D0=None, n_iter=400):
+    """Fit a log spiral to a polyline by least squares on (pole, alpha), and
+    return the rms radial residual in metres.
+
+    A SECOND ROUTE AND NOT THE CONSTRUCTION'S. `spiral_pole` solves two exact
+    conditions; this minimises a residual over all the sampled points and over
+    alpha as well, so a shoreline that came from somewhere else -- the coastal
+    loop, a morphodynamic run, a straight line -- gets a number that means
+    something. On the constructed bay the two must agree, and that agreement is
+    a tier-3 row rather than a tautology.
+    """
+    pts = np.asarray(pts, float)
+
+    def rms(p):
+        D = p[:2]
+        a = p[2]
+        v = pts - D
+        r = np.hypot(v[:, 0], v[:, 1])
+        if np.any(r <= 0.0):
+            return 1e9
+        ph = np.unwrap(np.arctan2(v[:, 1], v[:, 0]))
+        # the best-fit R_a is the geometric mean residual, in closed form
+        z = np.log(r) - ph / math.tan(a)
+        return float(np.sqrt(np.mean((z - z.mean()) ** 2))) * float(r.mean())
+
+    ch = pts[-1] - pts[0]
+    L = float(np.hypot(ch[0], ch[1]))
+    p = np.array([D0[0], D0[1], alpha0] if (D0 is not None and alpha0)
+                 else [pts[0, 0] + 0.5 * L, pts[0, 1] - 0.5 * L,
+                       math.radians(85.0)])
+    step = np.array([0.05 * L, 0.05 * L, math.radians(2.0)])
+    best = rms(p)
+    for _ in range(int(n_iter)):
+        moved = False
+        for kk in range(3):
+            for sgn in (+1.0, -1.0):
+                q = p.copy()
+                q[kk] += sgn * step[kk]
+                if not (math.radians(1.0) < q[2] < math.radians(179.0)):
+                    continue
+                v = rms(q)
+                if v < best:
+                    best, p, moved = v, q, True
+        if not moved:
+            step *= 0.5
+            if float(np.max(step / np.array([L, L, 1.0]))) < 1e-9:
+                break
+    return dict(D=p[:2].copy(), alpha=float(p[2]), rms=float(best))
+
+
+def equilibrium_plan(y=None, x_s=None, coast=None, theta0=THETA0_SWELL,
+                     T=T_SWELL, H0=H0_SWELL, frac=0.25, delta=None):
+    """THE DELIVERABLE: the static-equilibrium bay for this scene.
+
+    Inputs, and every one of them already existed:
+      * the two rock anchors, from the coastal loop's plan-form (geology);
+      * alpha = 90 deg - theta_b, from the 1-D transform's own breaking
+        obliquity (the stated offshore spectrum, refracted -- an OUTPUT);
+      * khat, the deep-water wave vector (the stated offshore spectrum).
+
+    Outputs: the pole, the shoreline x_s(y), the indentation, and the fan the
+    field must carry for the shoreline to be an equilibrium. Nothing is fitted
+    and nothing is placed.
+    """
+    if coast is None and (y is None or x_s is None):
+        coast = run_coast()
+    if y is None:
+        y = coast['y']
+    if x_s is None:
+        x_s = coast['x_s']
+    y = np.asarray(y, float)
+    A1, A2, j1, j2 = headland_anchors(x_s, y, frac=frac)
+    sc1d = _scene_1d(T, H0, theta0)
+    theta_b = sc1d['theta_b']
+    alpha = equilibrium_alpha(theta_b if delta is None else delta)
+    khat = np.array([math.cos(theta0), math.sin(theta0)])
+    D, res = spiral_pole(A1, A2, alpha, khat)
+    pts = spiral_points(D, A1, A2, alpha)
+
+    # THE COAST IS THREE PIECES AND THE LITERATURE'S BAY IS THE MIDDLE ONE.
+    # Updrift of the diffraction point A1 is the HEADLAND, which is rock and
+    # keeps the coastal loop's own plan-form. Between the anchors is the
+    # SPIRAL. Downdrift of the downcoast control point A2 is the STRAIGHT
+    # TANGENTIAL BEACH, parallel to the incoming crests -- and it joins the
+    # spiral with a continuous tangent BY CONSTRUCTION, because "tangent
+    # perpendicular to khat at A2" is the very condition that fixed the pole.
+    # No join is smoothed and no third parameter is introduced.
+    xs_sp = np.interp(y, pts[:, 1], pts[:, 0])
+    tan_dir = spiral_tangent(math.atan2(A2[1] - D[1], A2[0] - D[0]), alpha)
+    slope_t = float(tan_dir[0] / tan_dir[1]) if abs(tan_dir[1]) > 1e-12 else 0.0
+    xs_tan = A2[0] + slope_t * (y - A2[1])
+    x_rock = np.asarray(x_s, float)
+    d_head = x_rock - x_rock[j1] + A1[0]         # the headland, shifted to meet
+    xs_bay = np.where(y < A1[1], d_head,
+                      np.where(y > A2[1], xs_tan, xs_sp))
+
+    off, sag, chord = chord_offset(np.stack([xs_bay, y], axis=1))
+    off_s, sag_s, chord_s = chord_offset(pts)
+    fan = required_fan(y, xs_bay)
+    return dict(y=y, x_s=xs_bay, x_s_spiral=xs_sp, x_s_tangent=xs_tan,
+                pts=pts, D=D, alpha=alpha, theta_b=theta_b,
+                res=res, A1=A1, A2=A2, j1=j1, j2=j2, sagitta=sag,
+                sagitta_spiral=sag_s, chord_spiral=chord_s,
+                chord=chord, offset=off, fan=fan, khat=khat,
+                slope_tangent=slope_t,
+                x_s_rock=x_rock,
+                H_b=sc1d['H_b'], d_b=sc1d['d_b'],
+                r_pole=float(np.hypot(*(A1 - D))))
+
+
+_SC1D = {}
+
+
+def _scene_1d(T, H0, theta0):
+    """The 1-D transform's breaking state, cached. The offshore spectrum's
+    residual obliquity at the break point is the only wave number the
+    plan-form construction uses, and it is an OUTPUT."""
+    key = (T, H0, theta0)
+    if key not in _SC1D:
+        xg = make_grid()
+        tr = transform(xg, dean_bed(xg), T, H0, theta0)
+        b = breaker_state(tr)
+        _SC1D[key] = dict(theta_b=b['theta_b'], H_b=b['H_b'], d_b=b['d_b'],
+                          x_b=b['x'], c_b=b['c_b'])
+    return _SC1D[key]
 
 
 # ------------------------------------------------------------- the bay, run
