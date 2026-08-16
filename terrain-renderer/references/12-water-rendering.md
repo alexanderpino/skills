@@ -4444,6 +4444,33 @@ here). Two corrections to the simplification, both signed, both easy to state:
   violates this chapter's own requirement that a filtered path
   [degenerate exactly to the unfiltered one](#pick-the-kernel-on-purpose-and-give-the-variance-a-receiver)
   at the limit.
+
+  ⚠️ **That sentence has two readings and only one of them is safe, and this chapter meant the safe
+  one without saying so.** Two table designs satisfy it:
+
+  | design | the sample coordinate | what happens at the ends | order |
+  |---|---|---|---|
+  | texels at the **centres** `τ_max(i+0.5)/n` | `x = nτ/τ_max − 0.5` | the domain's endpoints fall **half a texel outside** the table and a clamped sampler returns a constant | **first** in the interior's second |
+  | texels at `linspace(0, τ_max, n)`, i.e. `u ∈ [0.5/N, 1 − 0.5/N]` | `x = (τ/τ_max)(n−1)` | **exact** at both ends | second everywhere |
+
+  Both are "sampled over `[0.5/N, 1 − 0.5/N]`" in the sense a reader will take from the sentence;
+  only the second is exact at the domain's edge. On `T_esc` with `n = 64` the centre design is wrong
+  by **9.3×10⁻³ relative at `τ → 0`** against **4.4×10⁻⁵** in its own interior — a factor of **210**,
+  and the endpoint error falls with a measured order of **−1.00** in `n` against the interior's
+  **−2.00** (`D`, recomputed here over `n = 32…512`).
+
+  **And the concentration is what makes it expensive here: the bad endpoint is `τ → 0`, which is the
+  shoreline** — which is exactly where the factorisation error above goes to zero, so a clamped
+  centre-design table *manufactures* an error precisely where the quantity it stands in for has
+  none. This is the same failure the [interface's `1/n²`](#radiance-is-not-conserved-across-the-interface)
+  audit has: an error that hides wherever the check is cheapest to run.
+
+  **The order is the diagnostic, and it needs no access to the shader.** The actual remap bug —
+  sampling at `u = τ/τ_max`, which is what `texture(lut, tau/tauMax)` compiles to — is **first order
+  in `1/n` (measured slope −1.00)** where an honest interpolation error is **second (−2.01)**.
+  *A table whose error only halves when you double its resolution has a remap bug and not a
+  resolution problem.* Doubling the table and watching the error is a two-line experiment that
+  distinguishes the two without reading a line of sampling code.
 - **Index tables on quantities that are already prefiltered.** A table indexed by instantaneous
   slope aliases *in its own axis*, and its mip chain knows nothing about the pixel's footprint.
   Index on the **variance tensor**, not the slope — the same discipline the chapter applies to
