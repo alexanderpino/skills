@@ -4274,7 +4274,11 @@ cancellation between its two decorrelations. **Partial corrections to a factoris
 monotone: "the more physical of two approximations" is not automatically the closer one**, and the
 only way to know is to compose the error rather than reason term by term — which is also why a
 half-finished migration off a separated LUT can ship a regression that reads as a bug in the new
-code.
+code. **The table in this row is the `2E₃(τ)²` form; the scaling table below is the `2E₃(2τ)` one**,
+and the four numbers that follow from the two forms crossed with the two directions of the ratio are
+printed [there](#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them),
+because carrying one of them without saying which is what produced two contradictory correct answers
+in this project.
 
 **The two errors have opposite signs, and that is the dangerous part.** The escape leg is
 positively correlated and the separated form is dark; the round trip is negatively correlated and
@@ -4317,15 +4321,41 @@ near `τ_red ≈ 0.4` and flattens, because the deepest water in this frame is a
 a grazing water pixel is mostly surface reflection. **Optical depth alone does not price this error;
 the view angle prices it too** — and the table below is tabulated against `τ` alone.
 
-**How the error scales, so it can be priced before it is measured.** It is a function of optical
-depth alone, and it is already worth having at depths nobody thinks of as absorbing (`D`,
-quadrature here on the exact internal Fresnel):
+**How the error scales, so it can be priced before it is measured.** ~~It is a function of optical
+depth alone~~ — **it is not** (struck; see the two corrections under the table) — and it is already
+worth having at depths nobody thinks of as absorbing (`D`, quadrature here on the exact internal
+Fresnel). **Round trip: `2E₃(2τ)·R_int`, read as `joint/sep − 1`. Green band.**
 
 ```
 tau = a*d      0.05    0.10    0.20    0.37    0.50    1.00    2.00
 escape leg    +3.6%   +6.6%  +12.0%  +19.4%  +24.6%  +39.6%  +58.4%    (joint over separated)
-round trip    -7.3%  -13.2%  -22.9%  -35.5%  -43.6%  -64.2%  -83.2%
+round trip    -7.3%  -13.2%  -22.9%  -35.5%  -43.6%  -64.2%  -83.2%    (2E3(2tau) form, joint over sep)
 ```
+
+⚠️ **Correction one: that label is new, and its absence produced two builders who each measured a
+different number and were each right.** The table above is **not** the same separated form as the
+1.40 m table eight lines up — that one leads with `2E₃(τ)²·R_int` and this one is `2E₃(2τ)·R_int`.
+The two differ by 12.4 pp in red at 1.40 m. A reader takes the two blocks as one quantity, and there
+is a second fork on top of it: `1 − joint/sep` and `sep/joint − 1` are **the same fact and different
+numbers**, 13 pp apart at 44%. Four cells, all defensible, none of them previously named. In red, at
+this pool's `d = 1.40 m` (`D`, all four recomputed here):
+
+| round-trip separated form | `1 − joint/sep` | `sep/joint − 1` |
+|---|---|---|
+| `2E₃(τ)²·R_int` — up leg × mirror × down leg, the product of the means taken **twice** | **30.52 %** | **43.94 %** |
+| `2E₃(2τ)·R_int` — one table read at the round-trip depth, direction-preserving and the **better physics** | **35.74 %** | **55.63 %** |
+
+The project has now confused two of these once each, in opposite directions, and both readings were
+reported as "the" answer. **When a ratio between two approximations is quoted, the form and the
+direction are part of the number.** State both or print all four.
+
+⚠️ **Correction two: the scaling is *not* a function of optical depth alone.** The joint integrals
+carry `R_int(μ)`, which is per band, so one `τ` gives three different errors — the three bands spread
+by **0.63 pp at `τ = 2`** on the round-trip row and no single band reproduces every printed cell
+(`D`, recomputed). Green matches six of seven; the `0.37` column is this pool's own
+`τ_red = 0.36638`, where the escape row's +19.4% is red rather than green. **The table needs a band
+label, which it now has** — and a reader carrying it to a different water should re-run it rather
+than interpolate this one.
 
 At `τ → 0` both collapse to the diffuse constants — `T_esc → 1 − R_int`, `G_rt → R_int` — and this
 is the trap's second half: **a lossless check cannot see it.** Open water's absorption to zero and
