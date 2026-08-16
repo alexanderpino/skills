@@ -347,12 +347,20 @@ def tier2_chapter_tables():
           100 * d['rt_sq_sep_over_joint'], np.array([43.9, 10.3, 2.3]), 0.06,
           'The same row in the chapter\'s other column. Both conventions '
           'checked because this project has already mixed them up.', '%')
-    info(2, 'round trip, SEP_2TAU, 1.40 m, sep/joint - 1',
-         100 * d['rt_2tau_sep_over_joint'],
-         'The number a previous builder measured (55.6/11.4/2.4) and could not '
-         'reconcile with the chapter\'s 30%. It is right; it is a different '
-         'separated form read the other way round. Neither reading is wrong '
-         'and the chapter names neither.', '%')
+    check(2, 'G_rt sep = 2E_3(2tau) R_int == chapter (ABSOLUTE)',
+          d['rt_sep_2tau'], np.array([0.1502, 0.3651, 0.4549]), 6e-5,
+          'The chapter carries this row as of `renderer 12: two separated round '
+          'trips` -- the direction-PRESERVING form, which is the better physics '
+          'for a specular underside and, as the chapter now says, the further '
+          'off. Checked here because a number a chapter prints is a number this '
+          'suite can hold it to.')
+    check(2, 'round trip, SEP_2TAU == chapter 55.6/11.4/2.4',
+          100 * d['rt_2tau_sep_over_joint'], np.array([55.6, 11.4, 2.4]), 0.06,
+          'The number a previous builder measured and could not reconcile with '
+          '`optics.py`\'s 30%. Both are right: two separated forms, two ratio '
+          'conventions, four percentages. The chapter now prints this one too '
+          'and both agree with this file to 0.05 pp, reached independently.',
+          '%')
     info(2, 'round trip, SEP_2TAU, 1.40 m, 1 - joint/sep',
          100 * d['rt_2tau_joint_under_sep'], 'The fourth of the four.', '%')
 
