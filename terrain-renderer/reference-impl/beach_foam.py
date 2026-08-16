@@ -103,7 +103,7 @@ def _fresnel_internal(sin_i):
     return np.where(tir, 1.0, R)
 
 
-def bubble_scatter(n_p=20001, n_order=12):
+def bubble_scatter(n_p=20001, n_order=40):
     """One bubble, by ray optics. Returns the reflected share, the asymmetry
     parameter and the backscatter ratio, per channel.
 
@@ -118,7 +118,12 @@ def bubble_scatter(n_p=20001, n_order=12):
     theta_t > theta_i and the first term is negative -- a bubble spreads a beam
     where a droplet focuses it. The weights are R, then (1-R)^2 R^(p-1), and
     they sum to 1 by construction rather than by normalisation; the suite checks
-    that they do.
+    that they do. `n_order` IS the truncation of that geometric series and it is
+    set by the check rather than by taste: R is about 0.47 near grazing, so
+    twelve orders leave 3e-5 unaccounted in the red and forty leave 8e-7. The
+    orders past the second carry no angular structure a renderer can use; they
+    are here so the energy row can be tight enough to catch a Fresnel branch
+    taken backwards.
 
     WHAT THE ANSWER IS FOR. The bar says a bubble reflects 43.874% of what
     strikes it and that this is why surf is white. Both halves are checked here
@@ -419,17 +424,27 @@ def plume_optics(alpha, r_32, path, g_bub, bb_over_b, a_water):
 
     exactly. A renderer that whitens by lerping toward white without applying
     the T has modelled the symptom, which is bar section C's own words.
+
+    CONSERVATIVE, AND THE ABSORPTION IS DELIBERATELY NOT HERE. The first
+    writing multiplied R and T by exp(-a * path) for the water between the
+    bubbles, and that DOUBLE-COUNTS: `beach_optics.column_reflectance` already
+    carries the whole column's absorption in `t_col` and `R_col`, and the plume
+    sits inside that column rather than beside it. It also broke the control:
+    at alpha = 0 the transmittance came out 0.94 instead of the 1 that makes
+    the paired evidence frame a measurement. What IS omitted by treating the
+    slab as conservative is the path LENGTHENING that multiple scattering
+    causes inside an absorbing medium -- a thick plume's photons travel farther
+    than the slab is deep, so a real plume is very slightly cyan where this one
+    is neutral. `?`, named, and small: fresh surf foam photographs neutral.
     """
+    del a_water                 # see the note above: not this layer's to apply
     alpha = np.asarray(alpha, float)
     b = 2.0 * 3.0 * alpha / (4.0 * r_32)                # Q_ext * 3a/(4 r32)
     tau = b * np.asarray(path, float)
     tau_p = (1.0 - np.asarray(g_bub, float)) * tau[..., None]
     R = tau_p / (1.0 + tau_p)
     Td = 1.0 / (1.0 + tau_p)
-    # the water BETWEEN the bubbles still absorbs over the same path
-    absorb = np.exp(-np.asarray(a_water, float)
-                    * np.asarray(path, float)[..., None] * (1.0 - alpha[..., None]))
-    return dict(b=b, tau=tau, tau_prime=tau_p, R=R * absorb, T=Td * absorb,
+    return dict(b=b, tau=tau, tau_prime=tau_p, R=R, T=Td,
                 b_b=b[..., None] * np.atleast_1d(bb_over_b))
 
 

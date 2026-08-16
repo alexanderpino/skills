@@ -44,6 +44,7 @@ sys.path.insert(0, HERE)
 
 import beach as BCH                                             # noqa: E402
 import beach_optics as BOP                                      # noqa: E402
+import beach_foam as FOAM                                       # noqa: E402
 import optics as OPT                                            # noqa: E402,F401
 import atmosphere as ATM                                        # noqa: E402
 
@@ -610,6 +611,92 @@ def _bug_ur_half_declared(mod):
     mod.ur_half_derived = lambda sk_max=1.0: 1.0
 
 
+
+# ------------------------------------------------------- wave 6's bugs
+# EIGHT DEFECTS IN THE WHITE, and every one of them is a mistake this wave's
+# author either made or was one keystroke from making. They patch `beach_foam`,
+# so `--bugs-foam` runs them against `_sec_foam` alone -- the same argument
+# waves 4 and 5 made for their own sections.
+def _bug_foam_no_transmittance(mod):
+    """Whiten without hiding: the failure bar section C opens by naming."""
+    orig = mod.plume_optics
+
+    def po(*a, **kw):
+        out = orig(*a, **kw)
+        out['T'] = np.ones_like(out['T'])
+        return out
+    mod.plume_optics = po
+
+
+def _bug_foam_backscatter_is_tir(mod):
+    """Read the bar's 43.874% as a BACKSCATTER fraction, which its wording
+    invites. A bubble would then be twenty times the backscatterer it is."""
+    orig = mod.bubble_scatter
+
+    def bs(*a, **kw):
+        out = orig(*a, **kw)
+        out['bb_over_b'] = np.full(3, float(mod.TIR_FRAC))
+        out['g'] = 1.0 - 2.0 * out['bb_over_b']
+        return out
+    mod.bubble_scatter = bs
+
+
+def _bug_foam_on_the_crest(mod):
+    """Put the foam ON the crest -- age zero everywhere -- instead of in the
+    tail behind it. The placeholder's own mistake, kept."""
+    mod.age_from_phase = lambda phase, omega: np.zeros_like(
+        np.asarray(phase, float))
+
+
+def _bug_foam_declared_k(mod):
+    """Restore the placeholder: 1 - exp(-k f_brk) with k = 1 declared, no
+    residence time and no period."""
+    mod.covering_measure_break = lambda q_b, T, age, tau=None: np.clip(
+        np.asarray(q_b, float), 0.0, 1.0) * np.ones_like(
+            np.asarray(age, float))
+
+
+def _bug_foam_percent_for_fraction(mod):
+    """Monahan in PER CENT read as a fraction. A factor of 100, and a sea
+    covered in whitecaps at a summer breeze."""
+    mod.MOM80_A = 3.84e-4
+    orig = mod.whitecap_coverage
+    mod.whitecap_coverage = (
+        lambda u10, a=3.84e-4, n=mod.MOM80_N: orig(u10, a, n))
+
+
+def _bug_foam_single_rise_speed(mod):
+    """THE DEFECT THIS WAVE ACTUALLY SHIPPED. Clear the whole plume at one rise
+    speed -- the Sauter radius' -- instead of size by size."""
+    orig = mod.bubble_spectrum
+
+    def sp(d_plume, *a, **kw):
+        out = orig(d_plume, *a, **kw)
+        out['tau_vol'] = float(d_plume) / float(
+            mod.bubble_rise_velocity(out['r_32']))
+        return out
+    mod.bubble_spectrum = sp
+
+
+def _bug_foam_stokes_everywhere(mod):
+    """Drop Schiller & Naumann's correction and rise by Stokes at every size.
+    A 1 cm bubble would then rise at 20 m/s."""
+    mod.bubble_rise_velocity = lambda r, nu=BCH.NU_W, rho_w=BCH.RHO_SW, \
+        g=BCH.G, n_iter=0: 2.0 * np.asarray(r, float) ** 2 * g / (9.0 * nu)
+
+
+def _bug_foam_unclipped_spheres(mod):
+    """Use the dilute-sphere projected area at any void fraction, including the
+    polyhedral-foam regime where the scatterers are films."""
+    orig = mod.entrained_air
+
+    def ea(*a, **kw):
+        out = orig(*a, **kw)
+        out['alpha'] = out['Q'] * out['tau_vol'] / out['d_p']
+        return out
+    mod.entrained_air = ea
+
+
 BUGS = {
     'dw-for-ew': _bug_dw_for_ew,
     'quarter-at-break': _bug_quarter_at_break,
@@ -643,7 +730,19 @@ BUGS = {
     'bore-phase-flipped': _bug_bore_phase_flipped,
     'skew-without-asymmetry': _bug_skew_without_asymmetry,
     'ur-half-declared': _bug_ur_half_declared,
+    'foam-no-transmittance': _bug_foam_no_transmittance,
+    'foam-backscatter-is-tir': _bug_foam_backscatter_is_tir,
+    'foam-on-the-crest': _bug_foam_on_the_crest,
+    'foam-declared-k': _bug_foam_declared_k,
+    'foam-percent-for-fraction': _bug_foam_percent_for_fraction,
+    'foam-single-rise-speed': _bug_foam_single_rise_speed,
+    'foam-stokes-everywhere': _bug_foam_stokes_everywhere,
+    'foam-unclipped-spheres': _bug_foam_unclipped_spheres,
 }
+FOAM_BUGS = ('foam-no-transmittance', 'foam-backscatter-is-tir',
+             'foam-on-the-crest', 'foam-declared-k',
+             'foam-percent-for-fraction', 'foam-single-rise-speed',
+             'foam-stokes-everywhere', 'foam-unclipped-spheres')
 OPTICS_BUGS = {'one-turbidity-slider', 'cdom-scatters', 'depth-averaged-spm',
                'dw-for-bed-power', 'isotropic-phase', 'glitter-fixed-width',
                'glitter-no-jacobian', 'ambient-in-the-tube'}
@@ -2978,6 +3077,511 @@ def _sec_surface(ctx):
               'the row is here so nobody puts it back.')
 
 
+def _sec_foam(ctx):
+    """WAVE 6 -- the white, and it is three mechanisms (bar sections C and E).
+
+    EVERY NEW QUANTITY GETS AN ABSOLUTE ROW. A ratio-only guard has now been
+    blind three times in this project -- once dividing 0/0 and raising -- and
+    this wave found a fourth in its own first draft: `bed_visibility` reported
+    R_bed_seen/R_bed, which in the breaking band divides one underflowed number
+    by another and returned 1.6e-4 for a run with the plume switched OFF, where
+    the answer is 1 by construction. So the plume's effect is measured as a
+    FORWARD quantity, `bed_factor`, and the rows below check absolutes.
+
+    AND NO TWO ROUTES SHARE A SOURCE. The bubble's constant is recovered by a
+    ray trace that was not written from it; the raft's reflectance is computed
+    from Stokes' pile of plates AND from a two-stream that never sees the
+    constant; the three decay times come from three different published laws
+    (Monahan & Zietlow's measurement, Schiller & Naumann's drag, Soulsby's
+    settling); and the void fraction's units are checked by algebra rather than
+    by a number.
+    """
+    B = ctx['B']
+    F = FOAM
+
+    # ============================== 9.1 ONE CONSTANT, AND IT MUST BE ONE
+    oc = F.check_one_constant()
+    check(1, 'the three whites and the window are ONE constant',
+          float(F.FOAM_WHITE[1]), float(F.TIR_FRAC), 1e-15,
+          'Bar section C: "All three whiten from 1 - 1/n^2 = 43.874% ... one '
+          'constant, three appearances, and the same one that runs the mirror '
+          'outside Snell\'s window." `optics.TIR_FRAC` is the window\'s and '
+          '`beach_optics.FOAM_WHITE` is the foam\'s, and if they are ever two '
+          'numbers the bar\'s claim has quietly become two claims. This row is '
+          'the identity, at machine precision, and it fires on the most likely '
+          'future edit of all -- someone giving foam its own whiteness.')
+    check(1, 'the critical angle, absolute', float(np.degrees(F.THETA_C[1])),
+          48.5194, 5e-4,
+          'asin(1/1.3348) in degrees. ABSOLUTE and not a ratio: everything '
+          'else in this section is an area or a fraction derived from this '
+          'angle, so one row states the angle itself.', unit='deg')
+
+    # ============================== 9.2 THE BUBBLE, TRACED
+    bs = F.bubble_scatter(n_p=20001)
+    check(1, 'the ray trace RECOVERS 1 - 1/n^2 without being told it',
+          bs['tir_fraction'], np.asarray(F.FOAM_WHITE), 2e-4,
+          'THE STRONGEST FORM THIS CHECK CAN TAKE. `bubble_scatter` integrates '
+          'over the impact parameter with Fresnel from `optics.fresnel` and '
+          'never evaluates 1 - 1/n^2; the share of the disc that lands beyond '
+          'the critical angle comes out of the quadrature. That it equals the '
+          'bar\'s constant is the bar\'s claim PROVED rather than restated -- '
+          'the constant is the AREA OF A DISC, which is why the same number '
+          'runs the window from below.')
+    check(1, 'the bubble conserves energy across all orders',
+          bs['total'], np.ones(3), 2e-6,
+          'R + (1-R)^2 SUM R^(k-1) = R + (1-R) = 1 for every impact parameter, '
+          'so the trace must sum to one channel by channel. It is the row that '
+          'fires if the internal reflectance is taken as the external one -- '
+          'the reciprocity step is the easiest thing in this file to get '
+          'backwards and it is silent, because a bubble with the wrong Fresnel '
+          'still looks like a bubble.')
+    check(1, 'a TIR ray off a sphere deviates by at most pi - 2 theta_c',
+          math.degrees(math.pi - 2 * float(F.THETA_C[1])), 82.961, 1e-2,
+          'AND THIS IS THE QUALIFIER THE BAR DOES NOT CARRY. Section C says '
+          '43.874% "is totally reflected", which is true, and then uses it to '
+          'explain the white. A ray reflected off a sphere at incidence '
+          'theta_i leaves deviated by pi - 2 theta_i, and every TIR ray has '
+          'theta_i > theta_c, so every one of them deviates by LESS than 83 '
+          'deg: a bubble is a SIDE scatterer, not a backscatterer. The white '
+          'is multiple scattering in a medium of albedo 1. This row is the '
+          'geometry that forces that reading.', unit='deg')
+    between(2, 'the bubble\'s backscatter ratio b_b/b', float(bs['bb_over_b'][1]),
+            0.005, 0.06,
+            'Clean bubbles in water are strongly FORWARD scattering; the '
+            'published backscattering ratio for uncoated bubbles is a few per '
+            'cent (Zhang, Lewis & Johnson 1998 give ~0.03 for clean bubbles, '
+            'and surfactant coatings raise it). The trace gives 0.023 and the '
+            'band is deliberately loose -- it is a sanity bracket on an '
+            'independent computation, not a fit. A file that used the bar\'s '
+            '43.9% as a backscatter fraction would land twenty times outside '
+            'it, which is what this row is for.')
+    info(1, 'the bubble: g, b_b/b, reflected share (R,G,B)',
+         (tuple(np.round(bs['g'], 5)), tuple(np.round(bs['bb_over_b'], 5)),
+          tuple(np.round(bs['reflected'], 5))),
+         'the reflected share exceeds 1-1/n^2 because partial Fresnel below '
+         'the critical angle adds to the total internal reflection above it')
+    bs2 = F.bubble_scatter(n_p=5003)
+    check(3, 'the trace has converged in the impact parameter',
+          bs2['g'], bs['g'], 2e-3,
+          'A second quadrature at a quarter of the samples. Convergence is a '
+          'tier-3 check because it compares the method with itself; it is here '
+          'because g feeds the similarity scaling and a badly sampled g would '
+          'move every optical depth in this section.', rel=True)
+
+    # ============================== 9.3 THE RISE, AND ITS CLOSED LIMIT
+    for r in (1e-6, 3e-6):
+        w_st = 2.0 * r * r * B.G / (9.0 * B.NU_W)
+        check(1, 'bubble rise -> Stokes at r = %g m' % r,
+              float(F.bubble_rise_velocity(r)), w_st, 4e-3,
+              'At Re << 1 Schiller & Naumann\'s C_D collapses to 24/Re and the '
+              'force balance gives w = 2 r^2 g / (9 nu) for a body of zero '
+              'density -- a CLOSED FORM this function was not written from. '
+              'The tolerance is the 0.15 Re^0.687 term that is still there at '
+              'this radius, not a disagreement.', unit='m/s', rel=True)
+    r_t = 2.25e-4
+    w_t = float(F.bubble_rise_velocity(r_t))
+    re = 2 * r_t * w_t / B.NU_W
+    cd = (24.0 / re) * (1.0 + 0.15 * re ** 0.687)
+    check(1, 'the terminal velocity balances its own drag (residual)',
+          float(abs(cd * math.pi * r_t ** 2 * 0.5 * w_t ** 2
+                    - (4.0 / 3.0) * math.pi * r_t ** 3 * B.G)
+                / ((4.0 / 3.0) * math.pi * r_t ** 3 * B.G)), 0.0, 1e-6,
+          'Buoyancy against drag, evaluated at the returned w. ABSOLUTE and '
+          'dimensional: it fires on a fixed point that stopped early and on '
+          'any algebra slip in the balance, neither of which a monotone check '
+          'would see.')
+    info(1, 'rise speed at r = 0.225 mm', round(w_t, 5),
+         'm/s, rigid-sphere (surfactant-immobilised) drag; a mobile interface '
+         'would be about 1.5x faster and the choice is marked `P` in the module')
+
+    # ============================== 9.4 THE POPULATION, SIZE-RESOLVED
+    sp = F.bubble_spectrum(0.75)
+    check(1, 'the standing spectrum\'s clock, <tau>_vol, ABSOLUTE',
+          sp['tau_vol'], 0.813927, 1e-5,
+          'INT n_s r^3 tau / INT n_s r^3 with tau(r) = (d_p/2)/w(r) over the '
+          'Deane & Stokes spectrum. THE AIR IS GONE IN UNDER A SECOND, and '
+          'that number is the entire reason the plume is a feature of the bore '
+          'front rather than a property of the surf zone. ABSOLUTE because the '
+          'first writing of this section used a single rise speed at the '
+          'Sauter radius, got 15.7 s, and turned the bay into milk.', unit='s')
+    check(1, 'the standing Sauter radius, ABSOLUTE', sp['r_32'], 7.3345e-4,
+          1e-8,
+          'INT n_st r^3 / INT n_st r^2 -- the only moment the optics needs, '
+          'because the projected area per unit volume of ANY suspension of '
+          'volume fraction alpha is exactly 3 alpha/(4 r_32). b goes as 1/r_32, '
+          'so this row is the scattering coefficient in disguise and it is '
+          'stated absolutely rather than through it.', unit='m')
+    check(1, 'the residence time SPANS four decades across the spectrum',
+          float(sp['tau_at_rmin'] / sp['tau_at_rmax']), 6335.0, 40.0,
+          'BAR SECTION E SAYS ONE DECAY CURVE FITS NEITHER OF ITS TWO CLOUDS. '
+          'Measured, one decay curve does not fit even ONE of them: tau(r) '
+          'runs 0.29 s at a centimetre to 1813 s at ten microns. The AIR '
+          'VOLUME leaves on the fast end and the projected AREA that scatters '
+          'light leaves on the slow end, and quoting either as "the plume\'s '
+          'decay time" picks a side without saying so.')
+    info(1, 'tau(r) at r_max and r_min, and the area-weighted median',
+         (round(sp['tau_at_rmax'], 4), round(sp['tau_at_rmin'], 1),
+          round(sp['tau_area_median'], 1)),
+         's -- the area-weighted median tracks r_min and is reported as a '
+         'statement about the cutoff, not as a timescale')
+    r32s = [F.bubble_spectrum(0.75, r_min=rm)['r_32']
+            for rm in (3e-6, 1e-5, 3e-5, 1e-4)]
+    tvs = [F.bubble_spectrum(0.75, r_min=rm)['tau_vol']
+           for rm in (3e-6, 1e-5, 3e-5, 1e-4)]
+    check(1, '<tau>_vol is insensitive to the SMALL cutoff, r_32 is NOT',
+          float(max(tvs) / min(tvs)), 1.0, 0.03,
+          'The source spectrum\'s volume converges at the small end, so the '
+          'air\'s clock does not care where the population stops -- 2% over a '
+          'factor of thirty in r_min. The STANDING spectrum is a different '
+          'matter and the row below is the correction to this file\'s own '
+          'first draft, which called the small cutoff harmless for both.')
+    check(1, 'and r_32 moves 2.4x over the same range of r_min',
+          float(max(r32s) / min(r32s)), 2.377, 0.02,
+          'n_st r^2 goes as r^-1.5 in the Stokes regime, so the projected AREA '
+          'diverges as r_min -> 0 and r_32 runs 0.50 mm at 3 micron to 1.20 mm '
+          'at 100 micron. The cutoff is physical -- Laplace pressure drives a '
+          'sub-ten-micron bubble into solution in seconds -- but its exact '
+          'place is `P`, and this row is the honest size of that uncertainty '
+          'rather than a claim that it is small.')
+    info(1, 'r_32 at r_min = 3 / 10 / 30 / 100 micron',
+         tuple(round(v, 7) for v in r32s), 'm')
+    spa, spb = F.bubble_spectrum(0.75, r_max=3e-3), F.bubble_spectrum(0.75)
+    info(1, '<tau>_vol and r_32 at r_max = 3 mm vs 10 mm',
+         ((round(spa['tau_vol'], 4), round(spa['r_32'], 7)),
+          (round(spb['tau_vol'], 4), round(spb['r_32'], 7))),
+         'the LARGE cutoff moves b by 2.7x and it is `?` at this coast -- the '
+         'sharpest thing in section C this file cannot close')
+    check(3, 'the spectrum has converged in its own quadrature',
+          F.bubble_spectrum(0.75, n=12001)['r_32'], sp['r_32'], 2e-3,
+          'Four times the nodes on the same log grid. Tier 3 because it '
+          'compares the method with itself; it is here because r_32 is an '
+          'integral over five decades and a coarse grid on a power law is a '
+          'classic silent bias.', rel=True)
+
+    # ============================== 9.5 THE PLUME
+    # THE STANDING TRAP, ONE FILE FURTHER ON, AND IT IS CHECKED BY ALGEBRA.
+    # alpha = 2 eps D_w <tau>/(rho g d_p^2). Push units through it: a
+    # dissipation RATE gives a dimensionless alpha; an energy DENSITY gives
+    # seconds. No tolerance and no sample point, and it cannot be satisfied by
+    # a constant.
+    alpha_dim = (DISSIPATION_RATE * S) / ((KG / M ** 3) * ACCELERATION * M ** 2)
+    check(1, 'the void fraction is DIMENSIONLESS',
+          float(alpha_dim.e == (0, 0, 0)), 1.0, 0.0,
+          'chapter 12\'s standing trap is that D_w (W/m^2) and E_w (J/m^2) are '
+          'one keystroke apart and the wrong one "yields an acceleration '
+          'rather than a velocity". Here the wrong one yields a void fraction '
+          'in seconds. Evaluated on UNITS, so it cannot be tuned away and no '
+          'sample point can make it pass by luck.')
+    alpha_wrong = (ENERGY_DENSITY * S) / ((KG / M ** 3) * ACCELERATION * M ** 2)
+    check(1, 'and an ENERGY DENSITY in that slot gives seconds',
+          float(alpha_wrong.e == (0, 0, 1)), 1.0, 0.0,
+          'The other half of the same row, stated so the first cannot pass by '
+          'accident: the bug this guards against has a NAMED wrong answer and '
+          'this is it.')
+    ea = F.entrained_air(np.array([250.0, 25.0]), np.array([1.5, 1.5]), 9.0)
+    check(1, 'the void fraction is linear in the dissipation',
+          float(ea['alpha'][0] / ea['alpha'][1]), 10.0, 1e-9,
+          'alpha = Q <tau>/d_p and Q is linear in D_w, so ten times the '
+          'dissipation is ten times the air. Neither value is clipped here '
+          '(0.30 is the limit and these are 0.029 and 0.0029), which the row '
+          'below states absolutely so this one cannot be passing on a clip.')
+    check(1, 'the void fraction, ABSOLUTE, at D_w = 250 W/m2 and H = 1.5 m',
+          float(ea['alpha'][0]), 0.0287904, 1e-6,
+          'THE ABSOLUTE ROW FOR THIS QUANTITY. 2 x 0.40 x 250/(1025 x 9.80665 '
+          'x 0.75) x 0.8139/0.75, with every factor named in the module: '
+          'Lamarre & Melville\'s 0.40, the plume depth H/2, the size-resolved '
+          '<tau>_vol, seawater density and standard gravity. A FEW PER CENT, '
+          'which is where measured surf-zone void fractions are; the first '
+          'draft of this file produced 0.30, hit its own validity clip across '
+          'the whole surf zone, and the frame was a sheet of milk. A ratio row '
+          'alone would have survived that unchanged.')
+    check(1, 'the entrainment rate Q, ABSOLUTE', float(ea['Q'][0]), 0.0265292,
+          1e-6,
+          '2 eps D_w/(rho g d_p) -- cubic metres of air per square metre per '
+          'second. It is the quantity the raft is fed by as well as the plume, '
+          'so it gets its own row rather than being inferred from alpha.',
+          unit='m/s')
+    bs = F.bubble_scatter(n_p=20001)
+    io = BOP.iops()
+    po = F.plume_optics(np.array([0.0, 0.03]), sp['r_32'],
+                        np.array([0.75, 0.75]), bs['g'], bs['bb_over_b'],
+                        io['a'])
+    check(1, 'a plume of zero air is EXACTLY transparent',
+          float(po['T'][0, 1]), 1.0, 1e-12,
+          'alpha = 0 gives tau = 0, T = 1, R = 0. It is the limit that makes '
+          'the medium an ADDITION to the scene rather than a replacement of '
+          'it, and it is the exact control the paired evidence frame relies '
+          'on. IT DID NOT HOLD in the first writing, which multiplied the slab '
+          'by the water\'s own absorption and returned 0.94 -- a double-count '
+          'of the column `beach_optics` already carries.')
+    check(1, 'the conservative two-stream conserves: R + T = 1',
+          float(po['R'][1, 1] + po['T'][1, 1]), 1.0, 1e-12,
+          'tau\'/(1+tau\') + 1/(1+tau\') = 1 identically. A slab that reflects '
+          'without transmitting less is a light source.')
+    check(1, 'the plume HIDES: T at alpha = 0.03 over 0.75 m',
+          float(po['T'][1, 1]), 0.0652069, 1e-6,
+          'BAR SECTION C\'S OWN TEST, absolute. Three per cent air over a '
+          '0.75 m plume leaves a diffuse transmittance of 6.5% in the green, '
+          'so what is behind it is fifteen times fainter. "If a renderer whitens '
+          'without hiding what is behind, it has modelled the symptom" -- this '
+          'row is the number that says it does not.')
+    check(1, 'and it whitens: R at the same depth', float(po['R'][1, 1]),
+          0.9347931, 1e-6,
+          'The other half. R and T are one two-stream and a renderer cannot '
+          'have the second without the first; stating both absolutely is what '
+          'stops a future edit turning the opacity up and the whiteness down '
+          'independently.')
+    aa = np.linspace(0.0, 9.0, 200001)
+    check(1, 'the plume\'s phase factor has mean EXACTLY 1',
+          float(np.trapezoid(F.plume_phase_factor(aa, 9.0, sp['tau_vol']), aa)
+                / 9.0), 1.0, 1e-8,
+          'The plume is concentrated at the bore front because <tau>_vol is '
+          'under a second against a nine-second period, and the factor that '
+          'concentrates it must REDISTRIBUTE the energy budget rather than add '
+          'to it. If this mean drifts from 1 the render has quietly acquired a '
+          'free brightness multiplier, which is the oldest way for a foam '
+          'model to look better than its physics.')
+    check(1, 'and it is 11x at the crest, ABSOLUTE',
+          float(F.plume_phase_factor(0.0, 9.0, sp['tau_vol'])), 11.058, 1e-3,
+          '(T/tau)/(1 - exp(-T/tau)) at a = 0. The plume at the front is '
+          'eleven times the surf zone\'s time-mean void fraction, which is '
+          'what makes the front opaque and the water behind it green. A model '
+          'that spread the mean evenly would be wrong by this factor in both '
+          'directions at once.')
+
+    # ============================== 9.6 THE RAFT, TWO ROUTES
+    rf = F.foam_raft(float(ea['Q'][0]), r_32=sp['r_32'])
+    h = float(rf['h_raft'])
+    b_raft = 2.0 * 3.0 * F.ALPHA_RAFT / (4.0 * sp['r_32'])
+    taup = float((1.0 - bs['g'][1]) * b_raft * h)
+    R_two = taup / (1.0 + taup)
+    check(3, 'the raft\'s reflectance, pile-of-plates vs two-stream',
+          float(rf['R_pile'][1]), R_two, 0.01,
+          'TWO ROUTES AND THEY DO NOT SHARE A SOURCE. Stokes (1862): N '
+          'reflectors of reflectance rho with no absorption give '
+          'N rho/(1 + (N-1) rho), and rho here IS the bar\'s 1 - 1/n^2 with N '
+          'the raft thickness over the cell size. The two-stream never sees '
+          'that constant -- it goes through the bubble population\'s b and the '
+          'traced g. They agree to 0.35%, which is what makes the raft\'s '
+          'brightness a consequence of section C\'s constant rather than a '
+          'second declaration of it.', rel=True)
+    check(1, 'the raft thickness is DERIVED, and absolute', h, 0.107513, 1e-5,
+          'Q * tau_foam / alpha_raft: in steady state every cubic metre pushed '
+          'under comes back up, so the surface is fed at exactly the '
+          'entrainment rate and loses it by bursting over Monahan & Zietlow\'s '
+          '3.85 s. Nothing was chosen. ABSOLUTE, because the two-route row '
+          'above would pass with both routes reading a wrong thickness -- and '
+          'the two routes SATURATE above about a centimetre, so they would not '
+          'notice.', unit='m')
+    between(2, 'the SINGLE-WALL constant against Koepke (1984)\'s fresh whitecap',
+            float(F.FOAM_WHITE[1]), 0.20, 0.55,
+            'Koepke (1984), Applied Optics 23, 1816, measured whitecap '
+            'reflectance falling from 0.20-0.55 at first breaking to 0.03-0.10 '
+            'after ten seconds, with a life-and-area-averaged EFFECTIVE value '
+            'of 0.22. The bar\'s 1 - 1/n^2 = 0.4387 sits inside his '
+            'fresh-whitecap band, which is a published bracket on a derived '
+            'constant and is worth recording as survived.')
+    openq(2, 'the thick raft against Koepke\'s effective 0.22',
+          round(float(rf['R_pile'][1]), 4), '0.22',
+          'MEASURED, UNDERSTOOD, NOT MATCHED -- and the mismatch is the '
+          'finding rather than the defect. The raft is seventy-odd bubble '
+          'walls of a non-absorbing scatterer, and both routes above put its '
+          'reflectance at 0.98; a soap foam is that white and so is fresh surf. '
+          'Koepke\'s 0.22 is NOT a foam albedo: it is the whitecap\'s '
+          'contribution averaged over its LIFE and its AREA, and it therefore '
+          'already contains the decay. A renderer that models the coverage and '
+          'its decay explicitly -- as this one now does -- and ALSO uses 0.22 '
+          'as the foam\'s reflectance has counted the decay twice, which is '
+          'the standard reason rendered foam reads grey. What cannot be closed '
+          'here is the comparison itself: closing it needs Koepke\'s '
+          'time-resolved reflectance against this model\'s R(age), and the '
+          'paper\'s own age bins are not in hand.')
+
+    # ============================== 9.7 THE COVERAGE, AS A CLOCK
+    T_w, tau = 9.0, F.TAU_FOAM_SALT
+    aa = np.linspace(0.0, T_w, 20001)
+    for q in (0.2, 0.7, 1.0):
+        m = F.covering_measure_break(q, T_w, aa, tau)
+        check(1, 'phase-mean covering measure = Q_b tau/T at Q_b = %.1f' % q,
+              float(np.trapezoid(m, aa) / T_w), q * tau / T_w, 1e-8,
+              'A CLOSED FORM AND THE WHOLE JUSTIFICATION FOR THE MODEL. '
+              'Summing exp(-(a+jT)/tau) over all past sweeps and averaging '
+              'over the phase gives exactly Q_b tau/T -- the steady state of '
+              'dW/dt = S - W/tau with S = Q_b/T. So the phase structure the '
+              'render draws is a REDISTRIBUTION of a coverage whose mean is '
+              'fixed by the two clocks, and it is the row that fires if the '
+              'foam is put back on the crests.', rel=True)
+    check(1, 'the placeholder\'s k was tau/T, and it was 2.3x too long',
+          tau / T_w, 0.42778, 1e-5,
+          'The foam this file replaced was 1 - exp(-k f_brk) with k = 1 '
+          'declared. The form was right and the k was not: k IS tau/T, and at '
+          'Monahan & Zietlow\'s salt-water 3.85 s against this swell\'s 9 s it '
+          'is 0.428. The placeholder ran a foam residence time of 9 s. '
+          'ABSOLUTE, and it is the number that turns a declared shape into a '
+          'measured one.')
+    check(1, 'coverage saturates and never exceeds 1',
+          float(np.max(F.coverage(np.linspace(0.0, 50.0, 1000)))), 1.0, 1e-12,
+          '1 - exp(-m) for a Poisson field of overlapping patches. The '
+          'saturation is why two sources can be ADDED as covering measures and '
+          'why a breaking band with Q_b = 1 does not produce 300% foam.')
+    check(1, 'coverage(0) is exactly zero', float(F.coverage(0.0)), 0.0, 0.0,
+          'No breaking and no wind is no foam, exactly -- not a small number. '
+          'A model with a floor would put a grey film on the whole sea.')
+    # the two sources ADD, and the open sea reduces to Monahan exactly
+    W_mon = float(F.whitecap_coverage(6.0))
+    cov0, _ = F.surface_foam(0.0, T_w, 0.0, 6.0)
+    check(1, 'with nothing breaking the field IS Monahan\'s coverage',
+          float(cov0), W_mon, 1e-12,
+          'The round trip through the covering measure: -ln(1-W) added and '
+          '1-exp(-m) taken. If it did not return W exactly, the surf zone and '
+          'the open sea would be two models with a seam between them, which is '
+          'precisely the failure this wave is about.', rel=True)
+
+    # --------------------- the mask FLOATS, and the age is the phase
+    om = 2.0 * math.pi / T_w
+    ages = F.age_from_phase(np.array([0.0, -math.pi / 2, -math.pi,
+                                      -3 * math.pi / 2]), om)
+    check(1, 'the age behind a crest, from the phase, ABSOLUTE',
+          ages, np.array([0.0, T_w / 4, T_w / 2, 3 * T_w / 4]), 1e-12,
+          'BAR SECTION C: the deck "floats, deforms with the flow". So it is '
+          'NOT on the crest. phase = S - omega t decreases with time at a '
+          'fixed point, a crest is phase = 0 mod 2 pi, and the time since one '
+          'passed is (-phase mod 2 pi)/omega. Four phases, four ages, exact -- '
+          'and this is the row that fires when someone puts the foam back on '
+          'the crests, which is what the placeholder did and what almost every '
+          'rendered surf zone does.', unit='s')
+    check(1, 'the age is periodic and never negative',
+          float(np.min(F.age_from_phase(np.linspace(-40.0, 40.0, 4001), om))),
+          0.0, 1e-12,
+          'A negative age would put foam in front of the wave that has not '
+          'broken yet. The modulo is what prevents it and this row is what '
+          'notices if it is removed.')
+    check(1, 'the foam tail length is c tau, ABSOLUTE',
+          float(F.foam_tail_length(4.43, F.TAU_FOAM_SALT)), 17.0555, 1e-3,
+          'At the celerity of a 2 m depth the tail is 17 m against a local '
+          'wavelength near 40 m, so the white lies over more than a third of '
+          'the wave and behind its crest rather than on it. ABSOLUTE, because '
+          'the visual claim the frames make rests on this number and not on a '
+          'ratio.', unit='m')
+
+    # --------------------- the validity clip, exercised
+    ea_big = F.entrained_air(np.array([4000.0]), np.array([1.5]), 9.0)
+    check(1, 'the dilute-sphere formula is CLIPPED at its own limit',
+          float(ea_big['alpha'][0]), 0.30, 1e-12,
+          '3 alpha/(4 r_32) is the projected area of independent spheres and '
+          'stops meaning that around alpha = 0.3, where the bubbles become '
+          'polyhedral cells and the scatterers are the films between them. The '
+          'clip is the validity limit, not a brightness limit, and this row '
+          'exercises it: without it a bore front would be given an optical '
+          'depth from a formula that does not apply there. The FRACTION '
+          'clipped is reported by the render rather than applied silently.')
+    check(1, 'and the clipped fraction is reported',
+          float(ea_big['clipped_fraction']), 1.0, 0.0,
+          'A clip that nobody counts is a silent model change. This is the '
+          'counter, and the bay frame prints it in its own caption.')
+
+    # ============================== 9.8 WHITECAPS AND THE WIND
+    check(2, 'Monahan & O\'Muircheartaigh at 10 m/s, ABSOLUTE',
+          float(F.whitecap_coverage(10.0)), 0.00987, 1e-5,
+          '3.84e-6 x 10^3.41 = 0.99% -- "about one per cent at ten metres a '
+          'second" is the number this law is remembered by, and it is the row '
+          'that fires on the fraction/per-cent confusion: the same law is '
+          'written 3.84e-4 U^3.41 in per cent, and taking that for a fraction '
+          'is a factor of 100 and a sea covered in foam.')
+    check(1, 'the wind readout inverts the coverage law',
+          float(F.wind_from_whitecap(F.whitecap_coverage(7.5))[0]), 7.5, 1e-9,
+          'Section K asks for a readout, which means the map has to run both '
+          'ways -- the same demand `beach_optics.wind_from_mss` already meets '
+          'for the slope law.')
+    U, lo, hi = F.wind_from_whitecap(F.whitecap_coverage(6.0))
+    check(1, 'the exponent band brackets the central wind',
+          float((lo <= U) and (U <= hi)), 1.0, 0.0,
+          'The band is what the published EXPONENT alone (3.0 to 3.52) does to '
+          'the inferred wind. It must contain the central value or the band is '
+          'not a band.')
+    info(2, 'wind from a 0.173% coverage: central and exponent band',
+         (round(float(U), 3), round(float(lo), 3), round(float(hi), 3)),
+         'm/s -- and the coefficient\'s spread across the literature is worse '
+         'than the exponent\'s, so this band is a LOWER bound on the '
+         'uncertainty')
+    # THE CROSS-CHECK THE BAR ASKS FOR: one wind, two readouts
+    su2, sc2 = BOP.cox_munk_mss(BOP.U10)
+    d_width = 0.5 * (BOP.CM_A_U + BOP.CM_A_C) / (su2 + sc2)
+    d_W = F.MOM80_N / BOP.U10
+    check(1, 'd(ln glitter width)/dU at U10 = 6 m/s', d_width, 0.075866, 1e-5,
+          'width goes as sqrt(mss) and mss = 0.003 + 5.08e-3 U, so '
+          'd(ln width)/dU = (a_u + a_c)/(2 mss). ABSOLUTE, and it is one half '
+          'of the comparison bar section K\'s cross-check actually settles.',
+          unit='per m/s')
+    check(1, 'd(ln whitecap coverage)/dU at U10 = 6 m/s', d_W, 0.568333, 1e-5,
+          'W goes as U^n, so d(ln W)/dU = n/U. The other half.',
+          unit='per m/s')
+    check(1, 'the width is at least ten times the wind instrument the '
+          'coverage is',
+          float((math.log(3.0) / d_W) / (0.01 / d_width)), 14.6, 0.4,
+          'THE FINDING, AS A ROW. A 1% measurement of the path width fixes the '
+          'wind to 0.13 m/s; a factor of THREE in the coverage -- which is '
+          'inside the literature\'s own spread -- leaves 1.93 m/s. The two '
+          'readouts agree in this render because one U10 drives both, and the '
+          'reason that agreement is not a strong test is this ratio. A future '
+          'wave tempted to calibrate the wind off a coverage should fail this '
+          'row first.')
+
+    # ============================== 9.9 THE THREE CLOCKS
+    ct = F.decay_times(1.5, 2.0, 9.0)
+    check(1, 'tau_foam, the surface raft, ABSOLUTE', ct['tau_foam'], 3.85,
+          1e-12,
+          'Monahan & Zietlow (1969), JGR 74, 6961: laboratory whitecap AREA '
+          'decays with an e-folding time of 3.85 s in salt water and 2.54 s in '
+          'fresh. PUBLISHED, and the salt/fresh pair is a factor of 1.5 that '
+          'says the decay is a bubble-stability property rather than a '
+          'hydrodynamic one.', unit='s')
+    check(1, 'tau_air, the plume\'s AIR VOLUME, ABSOLUTE', ct['tau_air'],
+          0.813927, 1e-5,
+          '<tau>_vol over the Deane & Stokes spectrum with Schiller & '
+          'Naumann\'s drag -- a law that shares no source with the row above. '
+          'UNDER A SECOND, so the bar\'s "entrained air rises and bursts in '
+          'seconds" holds for the air VOLUME. It does not hold for the '
+          'projected area, and the row on the spectrum\'s span above is where '
+          'that is said.', unit='s')
+    check(1, 'tau_sed, the suspension, ABSOLUTE', ct['tau_sed'], 47.03, 0.05,
+          'd / w_s = 2.0 / 0.0425 with w_s from `beach.settling_velocity`, '
+          'which is Soulsby\'s law -- a THIRD published relation, so no two of '
+          'the three clocks come from one place.', unit='s')
+    check(1, 'the clocks are ORDERED air < foam < sediment',
+          float((ct['tau_air'] < ct['tau_foam'] < ct['tau_sed'])), 1.0, 0.0,
+          'AND THIS IS THE BAR\'S OWN ORDERING, RECOVERED RATHER THAN '
+          'ASSUMED. Section C calls the surface deck the one that "decays '
+          'slowly" and section E has the entrained air "rising and bursting in '
+          'seconds"; measured, 0.81 s of air against 3.85 s of raft against '
+          '47 s of suspension. THE FIRST DRAFT OF THIS FILE GOT THE OPPOSITE '
+          'and was ready to report it as a finding against the bar -- it came '
+          'from a single rise speed at the Sauter radius instead of the '
+          'size-resolved mean, and the render caught it before the claim was '
+          'made. A survived claim is worth recording as survived.')
+    check(1, 'the settling inversion round-trips',
+          float(ct['depth'] / B.settling_velocity(
+              d50=F.d50_for_settling_time(120.0, ct['depth']))), 120.0, 0.02,
+          '`d50_for_settling_time` is the answer to "the bar says MINUTES, so '
+          'what size is that?" and it must invert the law it is built on.',
+          unit='s')
+    info(1, 'D50 the bar\'s "minutes" implies, against this file\'s bed D50',
+         (round(1e6 * F.d50_for_settling_time(120.0, ct['depth']), 1),
+          round(1e6 * B.D50, 1)),
+         'micron -- the suspended fine tail, not the bed median, and the file '
+         'carries a single grain size so it cannot produce the slow half')
+    openq(2, 'the suspended load\'s SIZE DISTRIBUTION at Aljezur',
+          'single D50', 'a distribution',
+          'The bar says the sediment cloud lasts minutes and this file\'s bed '
+          'D50 of 300 micron clears 2 m in 47 s. Both are right: what stays up '
+          'for minutes is the FINE TAIL, around 160 micron and below, and '
+          '`beach.py` carries one grain size because there is no grain-size '
+          'survey of this coast -- which is already an open item at intake. '
+          'Closing it needs a measured distribution, not a wider tolerance, '
+          'and until then the sediment clock in this file is the coarse '
+          'bound.')
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -2992,7 +3596,8 @@ def run_suite():
                       (_sec_bay, 'the bar in plan'),
                       (_sec_optics, 'the coastal IOPs, the path and the '
                                     'glitter'),
-                      (_sec_surface, 'the nonlinear free surface')):
+                      (_sec_surface, 'the nonlinear free surface'),
+                      (_sec_foam, 'the white: foam, entrained air, whitecaps')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -3068,6 +3673,28 @@ def _run_section(fn, label):
 
 if __name__ == '__main__':
     t0 = time.time()
+    if '--bugs-foam' in sys.argv:
+        import importlib
+        _run_section(_sec_foam, 'the white')
+        base = set(_fail_names())
+        print('clean foam section: %d pass / %d FAIL'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base)))
+        print()
+        print('%-30s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 110)
+        for name in FOAM_BUGS:
+            importlib.reload(FOAM)
+            BUGS[name](FOAM)
+            try:
+                _run_section(_sec_foam, 'the white')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-30s %d  %s' % (name, len(caught),
+                                    '; '.join(c[:64] for c in caught[:5])))
+        importlib.reload(FOAM)
+        sys.exit(0)
     if '--bugs-surface' in sys.argv:
         import importlib
         _run_section(_sec_surface, 'the nonlinear free surface')
@@ -3102,7 +3729,8 @@ if __name__ == '__main__':
         for name, patch in BUGS.items():
             importlib.reload(BCH)
             importlib.reload(BOP)
-            patch(BOP if name in OPTICS_BUGS else BCH)
+            patch(FOAM if name in FOAM_BUGS
+                  else (BOP if name in OPTICS_BUGS else BCH))
             try:
                 run_suite()
                 caught = [n for n in _fail_names() if n not in base]
