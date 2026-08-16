@@ -40,10 +40,14 @@ for _p in (_HERE, os.path.join(_HERE, '..', 'reference-impl')):
 import optics as OPT                                            # noqa: E402
 import atmosphere as ATM                                        # noqa: E402
 
+import field as FLD                                             # noqa: E402
+
 import lut as LUT                                               # noqa: E402
 import offline as OFF                                           # noqa: E402
 import scene as SC                                              # noqa: E402
 import sswater as WA                                            # noqa: E402
+import waves as WV                                              # noqa: E402
+import waveref as WR                                            # noqa: E402
 
 VERBOSE = '-v' in sys.argv or '--verbose' in sys.argv
 FAST = '--fast' in sys.argv
@@ -734,6 +738,611 @@ def tier3_jitter():
          'The same, in the frame.', 'rel')
 
 
+# ====================================================== WAVES: THE FILTER PAIR
+# `12`'s *Distance and filtering* and *Pick the kernel on purpose, and give the
+# variance a receiver*. Everything below is on `waves.py` / `waveref.py`; see
+# the README section of the same name for what each number turned out to mean.
+def tier1_lobe_energy():
+    """THE RECEIVER, AND THE ONE THING IN A SHARED MODULE THAT IS WRONG.
+
+    Widening a `cos^n` lobe by a Gaussian must CONSERVE its angular integral --
+    the chapter says so ("the integral is conserved, so the peak falls by
+    sqrt(det Q0/det Q)") and it is the property that makes the whole doctrine a
+    move of variance rather than an invention of light. Integrated here over the
+    sphere by quasi-Monte-Carlo, both for `atmosphere._lobe_shape` as shipped
+    and for the inverted form `waves.widened_lobes` carries."""
+    n = ATM.N_DISC
+    rng = np.random.default_rng(20260816)
+    M = 2000000
+    th = np.sqrt(rng.random(M)) * 0.30
+    ph = rng.random(M) * 2 * np.pi
+    u1, u2, cs = th * np.cos(ph), th * np.sin(ph), np.cos(th)
+    r2 = u1 * u1 + u2 * u2
+    ref = 2.0 * np.pi / (n + 1.0)
+    pdf = (2.0 * th / 0.30 ** 2) / (2.0 * np.pi)
+
+    def integral(c11, c22, inverted):
+        q11, q22 = 1.0 / n + c11, 1.0 / n + c22
+        det = q11 * q22
+        g = (1.0 / n) / np.sqrt(det)
+        ne = ((u1 * u1 * q22 + u2 * u2 * q11) / r2 / det if inverted
+              else r2 / (u1 * u1 * q11 + u2 * u2 * q22))
+        return float(np.mean(g * cs ** ne * np.sin(th) / pdf))
+
+    # the estimator's own error, from the spread of the same integrand -- the
+    # tolerance below is this and nothing else.
+    for c11, c22, tag in ((1e-5, 1e-5, 'isotropic'),
+                          (1e-3, 1e-4, 'axis ratio 10'),
+                          (4.8e-3, 4.8e-7, 'axis ratio 1e4 (this frame)')):
+        gi = integral(c11, c22, True)
+        gs = integral(c11, c22, False)
+        info(1, 'widened lobe integral, %s (ABSOLUTE, sr)' % tag,
+             np.array([ref, gi, gs]),
+             'Unwidened 2pi/(n+1), then the inverted form, then the shipped '
+             'one. All three in steradians before any ratio.', 'sr')
+        check(1, 'inverted receiver conserves flux, %s' % tag, gi / ref, 1.0,
+              0.03,
+              'Quasi-MC over a 0.30 rad cap with 2e6 samples; the tolerance is '
+              'the estimator\'s spread, ~1.5% on the widest lobe here, doubled.',
+              'ratio')
+        info(1, 'atmosphere._lobe_shape flux gain, %s' % tag, gs / ref,
+             '`_lobe_shape` returns n_eff = 1/(u^T Q u), the PROJECTION '
+             'variance; the convolved density along u wants u^T Q^-1 u. Equal '
+             'for an isotropic Q -- which is why nothing caught it -- and by '
+             'Cauchy-Schwarz never narrower, so the lobe is too wide and the '
+             'peak factor no longer normalises it. REPORTED, NOT PATCHED: '
+             'atmosphere.py is shared.', 'x')
+
+    # the other boundary condition the chapter insists on, at machine precision
+    d = np.array([[0.3, 0.1, -0.9]]) / np.linalg.norm([0.3, 0.1, -0.9])
+    z = np.zeros(1)
+    a = WV.surface_shade(d, z, z, None)[0]
+    b = WV.surface_shade(d, z, z, (z, z, z))[0]
+    check(1, 'zero removed variance == unfiltered, BIT FOR BIT',
+          float(np.abs(a - b).max()), 0.0, 0.0,
+          '`12`: "a filtered path that does not reduce EXACTLY to the '
+          'unfiltered one is a second shading model". Tolerance zero, in '
+          'radiance, not a percentage.', 'L')
+
+
+def tier1_refl_ellipse():
+    """`C = J S J^T`, J = diag(-2, -2 cos theta_v), against Monte-Carlo
+    perturbed reflections -- the chapter's own check, RUN here rather than
+    cited, at the chapter's own sample count.
+
+    `12` states its own agreement: "checked against 400k Monte-Carlo perturbed
+    reflections to 4% on the major axis and 8% on the minor". That is a TIER-2
+    bar -- a number the chapter publishes -- and it is the bar used, because the
+    residual is not estimator noise: the map is FIRST ORDER in the slope and the
+    second order is real. The order is measured below rather than asserted."""
+    rng = np.random.default_rng(4242)
+    M = 400000
+    S0 = np.array([[2.0e-3, 5.0e-4], [5.0e-4, 8.0e-4]])
+    for el_deg, thv, tag in ((-33.0, 57.0, "12's own camera, theta_v = 57 deg"),
+                             (-12.0, 78.0, "this frame's road, theta_v = 78")):
+        d = np.array([[np.cos(np.deg2rad(20.0)) * np.cos(np.deg2rad(el_deg)),
+                       np.sin(np.deg2rad(20.0)) * np.cos(np.deg2rad(el_deg)),
+                       np.sin(np.deg2rad(el_deg))]])
+        r0 = WV.surface_shade(d, np.zeros(1), np.zeros(1), None)[4][0]
+        vx, vy, vz = -d[0]
+        s0 = np.cross([vx, vy, vz], [0.0, 0.0, 1.0])
+        s0 = s0 - np.dot(s0, r0) * r0
+        sh = s0 / np.linalg.norm(s0)
+        eh = np.cross(r0, sh)
+        devs = []
+        for scale in (1.0, 0.25):
+            S = S0 * scale
+            u1, u2, c11, c12, c22, a, ndv = WV.refl_ellipse(
+                d, np.zeros(1), np.zeros(1), np.ones(1),
+                np.array([S[0, 0]]), np.array([S[1, 1]]), np.array([S[0, 1]]))
+            L = np.linalg.cholesky(S)
+            g = rng.standard_normal((M, 2)) @ L.T
+            rd = WV.surface_shade(np.repeat(d, M, axis=0), g[:, 0], g[:, 1],
+                                  None)[4]
+            p1, p2 = rd @ eh, rd @ sh
+            m11, m22 = float(np.mean(p1 * p1)), float(np.mean(p2 * p2))
+            devs.append((abs(c11[0] / m11 - 1.0), abs(c22[0] / m22 - 1.0)))
+            if scale == 1.0:
+                info(1, 'reflected covariance, %s (ABSOLUTE)' % tag,
+                     np.array([m11, m22, float(np.mean(p1 * p2))]),
+                     'Monte-Carlo sample covariance of the reflected direction '
+                     'offset, rad^2, in the frame perpendicular to R. Absolute, '
+                     'before any comparison.', 'rad^2')
+                fn = check if thv < 60.0 else info
+                if thv < 60.0:
+                    check(2, 'C11 = 4 * in-plane slope var, %s' % tag,
+                          float(c11[0]) / m11, 1.0, 0.04,
+                          "`12`: checked to 4% on the major axis. Same check, "
+                          "same sample count, the chapter's own bar, at the "
+                          "chapter's own camera.", 'ratio')
+                    check(2, 'C22 = 4 cos^2(theta_v) * across var, %s' % tag,
+                          float(c22[0]) / m22, 1.0, 0.08,
+                          "`12`: 8% on the minor axis. This is the factor the "
+                          "chapter says is NOT the identity and that a scalar "
+                          "roughness bump cannot carry.", 'ratio')
+                else:
+                    info(2, 'C11 / C22 against MC, %s' % tag,
+                         np.array([float(c11[0]) / m11, float(c22[0]) / m22]),
+                         "THE CHAPTER'S 4%/8% DOES NOT REACH THIS ANGLE. At "
+                         "its own 57 deg camera the map is inside its stated "
+                         "agreement; at 78 deg -- which is where most of a "
+                         "water frame with a horizon in it lives -- the "
+                         "in-plane axis is 5.1% out. It is the linearisation "
+                         "and not a defect: the order row below shows it "
+                         "falling with the variance, and `12` states no angle "
+                         "range beside its 4%.", 'ratio')
+                info(1, 'reflection stretch 1/cos(theta_v), %s' % tag,
+                     float(1.0 / ndv[0]),
+                     "`12`: \"a camera 33 deg above the horizontal "
+                     "(theta_v = 57 deg) stretches it 1.8x along the view "
+                     "azimuth, an anisotropy the slope tensor never had\".")
+        # the residual is the linearisation, so it must fall like the variance
+        r1_, r2_ = devs[0], devs[1]
+        between(1, 'C11 residual is SECOND order in the slope, %s' % tag,
+                r1_[0] / max(r2_[0], 1e-9), 2.5, 16.0,
+                'dR = J delta is first order, so the residual is O(sigma^2) '
+                'and quartering the variance must quarter it. The bracket is '
+                'wide because at S/4 the residual is 0.5-0.6% against a sample '
+                'covariance error of 0.22% at M = 4e5, so the ratio itself is '
+                'only known to about a factor of 1.5 -- and 1 (no order at '
+                'all) and 16 (fourth order) are both comfortably outside it.',
+                'x')
+        info(1, 'C11/C22 deviation at S and S/4, %s' % tag,
+             np.array([r1_[0], r2_[0], r1_[1], r2_[1]]),
+             'The map dR = J delta is FIRST order in the slope, so the residual '
+             'is O(sigma^2) and must fall by 4 when the variance falls by 4. '
+             'That is the order check that separates a model error from a bug, '
+             'and it is why the chapter quotes 4%/8% rather than machine '
+             'precision.')
+
+
+def tier1_footprint():
+    """The scalar footprint, and the two claims under it."""
+    g = WV.sun_prepass()
+    base = WV.flat_base(g)
+    w = base['water']
+    fp, an, ok, P = WV.pixel_footprint(g, base['t'], base['dirs'], w)
+    cosa = np.clip(-base['dirs'][..., 2], 1e-12, 1.0)
+    fa, aa = WV.analytic_footprint(base['t'], cosa)
+    info(1, 'footprint over the frame (ABSOLUTE, m)',
+         np.array([float(fp[ok].min()), float(np.median(fp[ok])),
+                   float(fp[ok].max())]),
+         'min / median / max of sqrt(|det J|) from the 2x2 quad derivative of '
+         'the water hit position. Metres, not a ratio.', 'm')
+    info(1, 'footprint anisotropy s1/s2 (ABSOLUTE)',
+         np.array([float(np.median(an[ok])), float(an[ok].max())]),
+         'The axis ratio a SCALAR footprint has to discard. `field.py`\'s '
+         'kernel is isotropic by construction ("all a scalar fp with no '
+         'orientation is entitled to assume"), so this number is the size of '
+         'the assumption, per frame.')
+    # on the optical axis the closed form is exact; off it the pinhole
+    # foreshortens the angular step and the quad derivative follows it.
+    res = g['res']
+    X, Y = SC.pixel_ndc(res)
+    axial = ok & (np.abs(X) < 0.02) & (np.abs(Y) < 0.02)
+    if axial.any():
+        check(1, 'quad footprint == closed form on the optical axis',
+              float(np.median(fp[axial] / fa[axial])), 1.0, 0.01,
+              'fp = t*dth/sqrt(cos_a) is the leading-order form and is exact '
+              'only where the pinhole\'s own foreshortening is 1. 1% because '
+              'the "axis" here is a 2%-of-NDC box, over which cos^2 moves by '
+              'about that.', 'ratio')
+    info(1, 'quad footprint / closed form, whole frame',
+         np.array([float(np.percentile(fp[ok] / fa[ok], 1)),
+                   float(np.median(fp[ok] / fa[ok])),
+                   float(np.percentile(fp[ok] / fa[ok], 99))]),
+         'Off axis the two disagree by the pinhole term, and the DERIVATIVE '
+         'one is the right one because it is what a shader computes.')
+    info(1, 'quads with no usable derivative (ABSOLUTE, px)',
+         np.array([int((w & ~ok).sum()), int(w.sum())]),
+         'The horizon quad: one lane looks above the datum, so `t` is negative '
+         'there and the quad derivative is not a footprint. Excluded from '
+         'every measurement, reported as a count, exactly as `12`\'s occluder '
+         'silhouettes are.', 'px')
+
+    # THE HERO FRAME HAS NO SPECULAR ROAD -- the reason this section needs its
+    # own camera, as a number rather than as a preference.
+    gh = SC.prepass()
+    Ph = WA.water_pass(gh, traversal='snell')
+    r = Ph['dirs'].copy()
+    r[..., 2] = -r[..., 2]
+    csh = (r * ATM.SUN_DIR[None, None]).sum(-1)[Ph['water']]
+    info(1, 'hero frame: max cos(mirror, sun) over water',
+         float(csh.max()),
+         'Negative: the sun\'s reflection is BEHIND the hero camera, so '
+         '`atmosphere.sky`\'s disc contributes exactly zero to every water '
+         'pixel of `r1-`\'s framing. A section about the specular response '
+         'collapsing cannot be tested on a frame with no specular response.')
+    check(1, 'hero frame: water pixels that see the sun disc', 
+          int((csh > np.cos(ATM.THETA_SUN)).sum()), 0, 0,
+          'Integer count, tolerance zero.', 'px')
+
+
+def tier2_kernel():
+    """*Pick the kernel on purpose*: the chapter's own Fourier arithmetic."""
+    check(2, 'Gaussian sigma matched to the box second moment',
+          1.0 / np.sqrt(12.0), 0.2887, 5e-5,
+          '`12`: "The box of width fp has sigma = fp/(2 sqrt 3) = 0.2887 fp".',
+          'x fp')
+    check(2, 'that Gaussian passes 0.663 at the Nyquist wavenumber',
+          float(np.exp(-0.5 * np.pi ** 2 / 12.0)), 0.663, 5e-4,
+          '`12`: "a Gaussian that wide still passes 0.663 of the amplitude at '
+          'the Nyquist wavenumber -- 44% of the variance straight into the '
+          'fold". The variance figure is 0.663^2 = 0.44, checked below.')
+    check(2, '...i.e. 44% of the variance', float(np.exp(-np.pi ** 2 / 12.0)),
+          0.44, 5e-3, 'The same number squared, which is the chapter\'s own '
+          'second sentence and its own consistency check.')
+    check(2, 'half-amplitude-at-Nyquist scale = 0.3748 fp',
+          float(FLD.FP_SIGMA), 0.3748, 5e-5,
+          '`12`: "sigma = sqrt(2 ln 2)/pi * fp = 0.3748 fp". This is '
+          '`field.FP_SIGMA`, imported, not recomputed.', 'x fp')
+    # the sentence the whole filter collapses to
+    lam = 0.20
+    k = 2.0 * np.pi / lam
+    check(2, 'a component is half gone at fp = lambda/2',
+          float(FLD.band_weight(k, lam / 2.0)), 0.5, 1e-7,
+          '`12`: "a component is half gone when the footprint reaches half its '
+          'wavelength". Closed form through `field.band_weight`; the tolerance '
+          'is 1e-7 and not machine precision because `field._fp_var` casts the '
+          'footprint to FLOAT32 -- deliberately, since the grid path is f32 -- '
+          'so the exponent carries 3.5e-8 of rounding and no more.', 'W')
+    check(2, '...and 94% gone at fp = lambda',
+          float(1.0 - FLD.band_weight(k, lam)), 0.94, 5e-3,
+          '`12`: "and 94% gone at one wavelength".', '1-W')
+    check(2, 'half-VARIANCE footprint is smaller by sqrt(2)',
+          float(FLD.half_footprint(k) / lam), 0.5, 1e-12,
+          '`field.half_footprint` is lambda/2 with no free constant left in '
+          'it; the chapter\'s own note that the half-variance point is at '
+          '0.354 lambda is the same statement over sqrt(2).', 'x lambda')
+    # the saturating form the chapter writes the tensor with
+    a = 0.1
+    wr = 1.0
+    sat = 1.0 - np.sqrt(max(1.0 - a * a * wr * wr, 0.0))
+    check(2, 'chapter\'s saturating variance vs a^2/2, at the steepest slope',
+          float(sat / (0.5 * a * a)), 1.0, 3e-3,
+          '`12` writes the removed variance as 1 - sqrt(1 - |k|^2 w_r^2 h^2); '
+          '`field.py` uses a^2 w_r^2/2 and says the two differ by 0.25% at the '
+          'steepest slope in the basin (a ~ 0.1). They differ by 0.25%.')
+
+
+def tier2_wave_chapter():
+    """Numbers `12` prints in the same two sections, checked."""
+    # Monahan & O'Muircheartaigh, quoted with two worked values
+    for u, want, tol in ((5.0, 0.001, 3e-4), (15.0, 0.04, 5e-3)):
+        check(2, 'whitecap coverage at U10 = %.0f m/s' % u,
+              float(3.84e-6 * u ** 3.41), want, tol,
+              '`12`: W = 3.84e-6 U^3.41, "essentially absent at 5 m/s (~0.1% '
+              'coverage) and conspicuous by 15 m/s (~4%)". Both of the '
+              'chapter\'s own worked values, at the precision it states them.',
+              'frac')
+    # Brewster, the closed-form guard the chapter offers for the base curve
+    n = OPT.IOR[1]
+    br = ((n ** 2 - 1.0) / (n ** 2 + 1.0)) ** 2 / 2.0
+    got = float(OPT.fresnel(np.array([np.cos(np.arctan(n))]))[0, 1])
+    check(2, 'Brewster identity R(atan n) (ABSOLUTE)', got, br, 1e-12,
+          '`12`: "the guard to put on it is the Brewster identity, '
+          'R(atan n) = ((n^2-1)/(n^2+1))^2/2, a closed-form number an '
+          'approximation cannot reach". `optics.fresnel` reaches it exactly.',
+          'R')
+    sch = 0.02 + 0.98 * (1.0 - np.cos(np.arctan(n))) ** 5
+    info(2, 'Schlick at Brewster / exact - 1', float(sch / br - 1.0),
+         '`12` says Schlick misses the Brewster identity by 22%.')
+    for deg, want in ((51.3, -0.228), (79.0, 0.143), (67.1, 0.0)):
+        c = np.cos(np.deg2rad(deg))
+        ex = float(OPT.fresnel(np.array([c]))[0, 1])
+        f0 = float(OPT.fresnel(np.array([1.0]))[0, 1])
+        s = f0 + (1.0 - f0) * (1.0 - c) ** 5
+        check(2, 'Schlick/exact - 1 at %.1f deg' % deg, s / ex - 1.0, want,
+              0.012,
+              '`12`: "-22.8% at 51.3 deg and +14.3% at 79 deg, crossing zero '
+              'at 67.1 deg". Reproduced against `optics.fresnel`; 1.2% because '
+              'the chapter quotes to 0.1 pp and F0 is quoted to two figures.',
+              'rel')
+    # Bruneton's roughness factor, its two constants and its limits
+    check(2, 'roughness factor -> 1 at zero variance',
+          float(np.exp(-2.69 * 0.0) / (1.0 + 22.7 * 0.0 ** 1.5)), 1.0, 0.0,
+          '`12`\'s exp(-2.69 s)/(1 + 22.7 s^1.5). At s = 0 it must be exactly '
+          '1 or the near water\'s Fresnel moves.', 'r')
+    for sv in (0.0344, 0.10, 0.50):
+        info(2, 'roughness factor r at sigma_v = %.4f' % sv,
+             float(np.exp(-2.69 * sv) / (1.0 + 22.7 * sv ** 1.5)),
+             'The fit `12` quotes "for sigma_v < 0.5". It has no stated LOWER '
+             'bound and it needs one: at this frame\'s own sigma_v = 0.0344 '
+             'it already removes 20% of the grazing rise, where the exact '
+             'expectation removes 1-5%. See tier 3 and the README.', 'r')
+
+
+# ------------------------------------------------------ TIER 3, the wave frame
+_WCACHE = {}
+
+
+def _wframes(nsub=196):
+    """The sun-facing frame, its reference and the paths, built once."""
+    if not _WCACHE:
+        WV.init_field()
+        g = WV.sun_prepass()
+        base = WV.flat_base(g)
+        w = base['water']
+        fp, an, ok, P = WV.pixel_footprint(g, base['t'], base['dirs'], w)
+        _WCACHE.update(g=g, base=base, w=w, fp=fp, an=an, ok=ok, P=P,
+                       t=base['t'][w], fpw=fp[w], okw=ok[w])
+        _WCACHE['ref'] = WR.reference(g, base, w, nsub=nsub, seed=5,
+                                      want_mip=True)
+        for nm, kw in (('point', dict(path='point')),
+                       ('naive', dict(path='naive')),
+                       ('fix', dict(path='variance', fresnel='exact')),
+                       ('fix+fit', dict(path='variance', fresnel='rough')),
+                       ('fix+box', dict(path='variance', fresnel='exact',
+                                        fp_scale=1.0 / 1.29254)),
+                       ('naive+box', dict(path='naive',
+                                          fp_scale=1.0 / 1.29254)),
+                       ('fix+shipped', dict(path='variance', fresnel='exact',
+                                            receiver='shipped'))):
+            _WCACHE[nm] = WV.wave_pass(g, base=base, want_parts=True, **kw)
+    return _WCACHE
+
+
+WBINS = np.array([4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 520.0])
+
+
+def _wbin(C, i):
+    t, okw = C['t'], C['okw']
+    return (t >= WBINS[i]) & (t < WBINS[i + 1]) & okw
+
+
+def tier3_wave_variance():
+    """THE MECHANISM, measured: where the slope variance goes with distance.
+
+    `12`: "per-pixel normals computed from displaced geometry converge to the
+    MEAN normal -- vertical -- and all the slope variance those waves carried is
+    silently discarded". This is that sentence as a table."""
+    C = _wframes()
+    ref = C['ref']
+    s_stat = WV.stationary_rms()
+    info(3, 'stationary rms slope of the field (ABSOLUTE)', s_stat,
+         'WIND and REVERB in quadrature, through `field._plane_rms` -- the '
+         'file\'s own analytic convention function, because writing the rms '
+         'expression out by hand is how two conventions once coexisted there. '
+         'This frame puts water out to 400 m while `field.py`\'s basin is '
+         '8 x 4 m; NEAR falls as 1/sqrt(r), BOIL rides its envelope and the '
+         'WAKE measures identically zero outside the basin, so out there the '
+         'surface IS these two bands.')
+    for i in range(len(WBINS) - 1):
+        s = _wbin(C, i)
+        if s.sum() < 200:
+            continue
+        gx, gy = C['naive']['gx'][s], C['naive']['gy'][s]
+        vxx, vyy, vxy = FLD.slope_var_points(C['P'][..., 0][C['w']][s],
+                                            C['P'][..., 1][C['w']][s],
+                                            C['fpw'][s])
+        res = FLD.rms_slope(gx, gy)
+        rem = float(np.sqrt(np.mean(vxx + vyy)))
+        tot = float(np.sqrt(np.mean(ref['s_res'][s] ** 2)))
+        info(3, 'slope rms at %.0f-%.0f m: total / resolved / removed'
+             % (WBINS[i], WBINS[i + 1]), np.array([tot, res, rem]),
+             'ABSOLUTE rms slopes at the pass\'s own footprints. The middle '
+             'column is the collapse; the third is what has to arrive '
+             'somewhere.', 's')
+        check(3, 'variance identity at %.0f-%.0f m' % (WBINS[i], WBINS[i + 1]),
+              float(np.hypot(res, rem)) / tot, 1.0, 0.02,
+              'resolved^2 + removed^2 = total^2, i.e. `field.py`\'s own '
+              'conservation, checked at RASTER footprints (up to 23 m, two '
+              'orders past anything `render.py` asks of it). 2% because the '
+              'sum is band-by-band while the total is measured on the summed '
+              'field, so the inter-band sample covariance is in it -- '
+              '`field.py` says so at `slope_var_points`.', 'ratio')
+    # the tensor is a COVARIANCE, and the trace is the total mean square: the
+    # one place a sqrt(2) can still get in.
+    s = _wbin(C, len(WBINS) - 2)
+    vxx, vyy, vxy = FLD.slope_var_points(C['P'][..., 0][C['w']][s],
+                                        C['P'][..., 1][C['w']][s],
+                                        C['fpw'][s])
+    info(3, 'removed tensor: trace vs one-direction (ABSOLUTE)',
+         np.array([float(np.mean(vxx + vyy)), float(np.mean(vxx)),
+                   float(np.mean(vyy))]),
+         'THE sqrt(2) SITE, from the consumer\'s side. `field.py` is explicit '
+         'that sqrt(vxx+vyy) is the TOTAL mean-square slope; Bruneton\'s '
+         'sigma_v is the ONE-DIRECTION variance, `12`\'s own "not s^2". Using '
+         'the trace where the fit wants one direction is a factor of 2 in '
+         'variance and sqrt(2) in rms -- the same mixed convention that once '
+         'put sqrt(2)*0.024 of slope on this project\'s water, arriving from '
+         'the other end.', 's^2')
+    # Toksvig, for free, out of the reference's own sub-samples
+    nl = np.linalg.norm(ref['nrm'][s], axis=1)
+    tot = float(np.sqrt(np.mean(ref['s_res'][s] ** 2)))
+    check(3, 'mip normal length carries the variance: 2(1-|Nbar|) == s^2',
+          float(2.0 * np.mean(1.0 - nl)) / tot ** 2, 1.0, 0.06,
+          'A LITERAL normal-map mip texel is the mean of the unit normals over '
+          'the footprint, and its LENGTH is Toksvig\'s signal: |Nbar| = '
+          '1 - s^2/2 to second order. Measured off the reference\'s own '
+          'sub-samples, so it costs nothing. 6% because the mean of %d unit '
+          'normals has a sampling bias of order s^2/N. The consequence is the '
+          'actionable one: a mip chain ALREADY carries the removed variance '
+          'and renormalising the texel is what throws it away.'
+          % ref['nsub'], 'ratio')
+
+
+def tier3_wave_frame():
+    """THE THREE PATHS AGAINST THE PIXEL\'S OWN INTEGRAL."""
+    C = _wframes()
+    ref, w, okw = C['ref'], C['w'], C['okw']
+    Y = Y709
+
+    info(3, 'reference: sub-samples per pixel and its own error',
+         np.array([ref['nsub'],
+                   float(np.median(ref['sem'][okw, 1] / np.maximum(
+                       ref['color'][okw, 1], 1e-9)))]),
+         'Stratified sub-samples and the MEDIAN relative standard error of the '
+         'per-pixel estimate. Every tolerance below is built from this and '
+         'never from a disagreement.')
+
+    # ---- the specular term, where the claim lives
+    for i in range(len(WBINS) - 1):
+        s = _wbin(C, i)
+        if s.sum() < 200:
+            continue
+        rc = float(ref['sun_cone1'][s, 1].mean())
+        rm = float(ref['sun'][s, 1].mean())
+        hits = float(ref['sun_hits1'][s].sum())
+        info(3, 'sun disc, %.0f-%.0f m: cone / MC / naive / fix (ABSOLUTE)'
+             % (WBINS[i], WBINS[i + 1]),
+             np.array([rc, rm, float(C['naive']['L_sun'][s, 1].mean()),
+                       float(C['fix']['L_sun'][s, 1].mean())]),
+             'Scene-linear radiance, green. TWO INDEPENDENT REFERENCE '
+             'ESTIMATORS: the 2 deg cone density (%d hits here, Poisson error '
+             '%.1f%%) and the brute-force sub-sample mean. Where the second '
+             'converges they agree; where it does not, it reads zero and says '
+             'so.' % (hits, 100.0 / max(np.sqrt(hits), 1.0)), 'L')
+
+    # the two estimators against each other, where both have enough hits
+    ok_bins = []
+    for i in range(len(WBINS) - 1):
+        s = _wbin(C, i)
+        if s.sum() >= 200 and ref['sun_hits1'][s].sum() > 5000:
+            ok_bins.append((float(ref['sun_cone1'][s, 1].mean()),
+                            float(ref['sun'][s, 1].mean()),
+                            float(ref['sun_hits1'][s].sum())))
+    for rc, rm, h in ok_bins:
+        check(3, 'cone density == brute force where both converge',
+              rc / rm, 1.0, max(4.0 / np.sqrt(h), 0.06),
+              'Two estimators of the same integral sharing no line beyond the '
+              'sub-sample positions: a delta-of-known-flux times the measured '
+              'reflected-direction density, against the direct mean. '
+              'Tolerance is 4x the cone\'s own Poisson error.', 'ratio')
+
+    # ---- the composed frame
+    for nm in ('point', 'naive', 'fix', 'fix+fit', 'fix+shipped'):
+        a = C[nm]['color'][w][okw]
+        b = ref['color'][okw]
+        rel = np.abs(a - b) / np.maximum(b, 1e-9)
+        info(3, 'frame error, %s: median / p95 / absolute median' % nm,
+             np.array([float(np.median(rel)), float(np.percentile(rel, 95)),
+                       float(np.median(np.abs(a - b)))]),
+             'Over %d water pixels, all three bands, scene-linear. The '
+             'absolute column is there because the relative one is a lottery '
+             'wherever the reference itself is a glint.' % int(okw.sum()), '')
+
+    for i in range(len(WBINS) - 1):
+        s = _wbin(C, i)
+        if s.sum() < 200:
+            continue
+        row = []
+        for nm in ('naive', 'fix', 'fix+fit'):
+            e = np.abs(C[nm]['color'][w][s] - ref['color'][s]) / np.maximum(
+                ref['color'][s], 1e-9)
+            row.append(float(np.median(e)))
+        info(3, 'frame median error at %.0f-%.0f m: naive / fix / fix+fit'
+             % (WBINS[i], WBINS[i + 1]), np.array(row),
+             'The verdict, against distance. It does not say what the chapter '
+             'says it will -- see the README.', 'rel')
+
+    # ---- the Fresnel, which is the one FITTED thing in the doctrine
+    for i in range(len(WBINS) - 1):
+        s = _wbin(C, i)
+        if s.sum() < 200:
+            continue
+        Rr = float(ref['fresnel'][s, 1].mean())
+        info(3, 'Fresnel at %.0f-%.0f m: E[R] / smooth / Bruneton (ABSOLUTE)'
+             % (WBINS[i], WBINS[i + 1]),
+             np.array([Rr, float(C['naive']['R'][s, 1].mean()),
+                       float(C['fix+fit']['R'][s, 1].mean())]),
+             'E[R] is the EXACT mean of `optics.fresnel` over the footprint\'s '
+             'own slope distribution, from the reference\'s sub-samples. The '
+             'middle column is Fresnel at the filtered normal (i.e. doing '
+             'nothing); the third is `12`\'s one-line fix.', 'R')
+    s = C['okw']
+    Rr = ref['fresnel'][s, 1]
+    check(3, 'doing nothing beats Bruneton\'s fit at this variance',
+          float(np.median(np.abs(C['fix+fit']['R'][s, 1] - Rr) / Rr)
+                > np.median(np.abs(C['naive']['R'][s, 1] - Rr) / Rr)),
+          1.0, 0.0,
+          'THIS ROW ASSERTS A FINDING AGAINST THE CHAPTER, and it is left as a '
+          'PASS because the finding is the result: at sigma_v = 0.034 the '
+          'roughness-Fresnel fit is further from the exact expectation than '
+          'the smooth curve is. The fit deviates from 1 as sigma^1.5 while the '
+          'true correction is O(sigma^2), so it over-corrects by an order of '
+          'magnitude at the bottom of its own stated range.', 'bool')
+
+    # ---- the kernel is supposed to stop mattering once the variance is carried
+    for nm, other in (('fix', 'fix+box'), ('naive', 'naive+box')):
+        a = np.array([float(C[nm]['L_sun'][_wbin(C, i), 1].mean())
+                      for i in range(3)])
+        b = np.array([float(C[other]['L_sun'][_wbin(C, i), 1].mean())
+                      for i in range(3)])
+        info(3, 'kernel scale 1.0 vs 0.774 (box match), %s: sun term' % nm,
+             np.abs(b / np.maximum(a, 1e-12) - 1.0),
+             'THE DOCTRINE\'S CENTRAL PROMISE, tested directly. If the removed '
+             'variance really is carried rather than lost, the answer must not '
+             'depend on how much the kernel removes. Two kernels 29% apart in '
+             'width -- `field.py`\'s Nyquist half-amplitude pinning against '
+             'the box\'s second-moment match -- over the three bins the sun\'s '
+             'road covers.', 'rel')
+
+    # ---- what the anisotropic-receiver defect costs in a frame
+    a = C['fix']['color'][w][okw]
+    b = C['fix+shipped']['color'][w][okw]
+    info(3, 'atmosphere._lobe_shape defect, in the frame',
+         np.array([float(np.median(np.abs(b - a) / np.maximum(a, 1e-9))),
+                   float(np.percentile(np.abs(b - a) / np.maximum(a, 1e-9), 99)),
+                   float(np.abs(b - a).max())]),
+         'Median / p99 relative and the worst absolute radiance, between the '
+         'inverted receiver and the shipped one, everything else identical.',
+         '')
+
+
+def tier3_wave_cost():
+    """THE PRICE. `12` tells a reader the fix is worth it and never prices it."""
+    C = _wframes()
+    g, base = C['g'], C['base']
+    npx = int(C['w'].sum())
+    times = {}
+    for nm, kw in (('point', dict(path='point')),
+                   ('naive', dict(path='naive')),
+                   ('fix', dict(path='variance', fresnel='exact')),
+                   ('fix+fit', dict(path='variance', fresnel='rough'))):
+        best = np.inf
+        for _ in range(3):
+            t0 = time.time()
+            WV.wave_pass(g, base=base, **kw)
+            best = min(best, time.time() - t0)
+        times[nm] = best
+    for nm in times:
+        info(3, 'surface shading cost, %s (ABSOLUTE)' % nm,
+             np.array([1e3 * times[nm], 1e6 * times[nm] / npx]),
+             'Wall clock for the whole water surface at %d px, and per pixel. '
+             'THIS IS NUMPY ON A CPU and it is not a GPU frame time; what '
+             'transfers is the RATIO and the op count, not the milliseconds. '
+             'The absolute column is here because a ratio with no scale on it '
+             'has been blind in this project four times.' % npx, 'ms / us/px')
+    info(3, 'the fix, as a fraction of the naive path',
+         np.array([times['fix'] / times['naive'],
+                   times['fix+fit'] / times['naive']]),
+         'What carrying the variance costs over discarding it: one extra call '
+         'to `field.slope_var_points`, the 2x2 rotation into the view frame, '
+         'and a per-pixel lobe exponent.')
+    # the chapter promises the opposite scaling and does not get it
+    x = np.full(200000, 4.0)
+    y = np.full(200000, 2.0)
+    tt = []
+    for fp in (0.001, 10.0):
+        best = np.inf
+        for _ in range(3):
+            t0 = time.time()
+            FLD.slope_var_points(x, y, np.full(200000, fp))
+            best = min(best, time.time() - t0)
+        tt.append(best)
+    info(3, 'slope_var_points cost at fp = 1 mm vs 10 m',
+         np.array([1e3 * tt[0], 1e3 * tt[1], tt[1] / tt[0]]),
+         '`12`\'s "practical trick: total variance for ALL waves on the CPU, '
+         'subtract the RESOLVED waves in the shader, so shader cost scales '
+         'with resolved wave count and is MINIMAL for distant views". '
+         '`field.slope_var_points` sums over every component at every '
+         'footprint, so it costs the same at 10 m as at 1 mm -- the opposite '
+         'of the stated scaling, and at 10 m almost every term it evaluates is '
+         'the saturated constant. Reported, not patched: it is another lane\'s '
+         'file and the interface is right.', 'ms')
+
+
 def main():
     t0 = time.time()
     tier1_triangle()
@@ -745,10 +1354,18 @@ def main():
     tier3_quadrature()
     tier3_lut_interp()
     tier3_sky_entry()
+    tier1_lobe_energy()
+    tier1_refl_ellipse()
+    tier1_footprint()
+    tier2_kernel()
+    tier2_wave_chapter()
     if not FAST:
         tier3_frame()
         tier3_factorisation_frame()
         tier3_jitter()
+        tier3_wave_variance()
+        tier3_wave_frame()
+        tier3_wave_cost()
     n = report()
     print('%.1f s' % (time.time() - t0))
     return 1 if n else 0
