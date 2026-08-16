@@ -42,7 +42,7 @@
   ],
   "open_at_intake": [
     "the eclipse's contact times at this longitude -- ? -- and until settled the surf frames are not radiometric evidence",
-    "the two decay timescales of the entrained-air and sediment clouds",
+    "the two decay timescales of the entrained-air and sediment clouds -- ANSWERED BY WAVE 6 AND THE ANSWER IS THREE, WITH THE MIDDLE ONE NOT A NUMBER. Surface raft 3.85 s (Monahan & Zietlow 1969, salt water, PUBLISHED); the plume's AIR 0.81 s (<tau>_vol over the Deane & Stokes spectrum, Schiller & Naumann drag, DERIVED); the suspension 143 s at the bay's median depth (Soulsby, DERIVED) -- three laws, no shared source. But tau(r) = (d_p/2)/w_rise(r) runs 0.29 s at a centimetre to 1813 s at ten microns: the AIR leaves on the fast end while the projected area that scatters light is dominated by the smallest bubbles present and outlives it by three orders. That is why a break leaves a cloud, and it is why one decay curve does not fit even ONE of section E's two. WHAT REMAINS OPEN is the suspended load's SIZE DISTRIBUTION, below.",
     "no backwash frame exists; section D rests on owner testimony alone",
     "the suspended load at Aljezur -- ? -- routed through 28-liquids' Babin bridge once the cuvette inversion gives b"
   ],
@@ -70,11 +70,11 @@
     "ONE CODE PATH. Every hero frame comes from the same code and the same constants as every other. A frame tuned for its own viewpoint proves nothing about the model."
   ],
   "open_gaps": [
-    "section C -- the three whites: surface foam, entrained air, airborne spray (wave 6 in flight)",
+    "section C -- WAVE 6 BUILT THE FIRST TWO OF THE THREE WHITES AND DEFERRED THE THIRD. Surface foam is a Poisson covering measure from Battjes & Janssen's Q_b and Monahan & O'Muircheartaigh's whitecapping, decaying on Monahan & Zietlow's 3.85 s and lying (c-u)a BEHIND the crest rather than on it; entrained air is a size-resolved plume from Lamarre & Melville's energy budget over the Deane & Stokes spectrum, coupled to the column and the bed by the adding series, and the bed's radiance drops by a measured factor of 0.00906 through it. THE CONSTANT IS RECOVERED, NOT RESTATED: a ray trace over a bubble's disc returns 1 - 1/n^2 without evaluating it, and adds the qualifier that 43.874% is a REFLECTANCE and not a backscatter fraction (traced b_b/b = 0.0230). STILL OPEN: AIRBORNE SPRAY, deferred with the reason in every s6 caption -- smallest share of the white, a particle system, a third representation. By the hyper-realism criterion 'no placeholder in a hero frame' the s6 frames are still diagnostics and not references until spray is built.",
     "sections D/H2 -- the swash and backwash, the moving waterline, sediment pulsing with each wave",
     "section H3 -- the wet/dry sand boundary; transfers free from the pool's wet_albedo, unbuilt",
     "section H1 -- the wave-cut platform and its pockets, from notch-collapse-deposit with varying hardness",
-    "section K -- open water proper: whitecapping against the glitter path on one wind (wave 6 in flight)",
+    "section K -- WAVE 6 RENDERED THEM IN ONE FRAME AT ONE U10 AND MEASURED BOTH BACK OFF THE SCENE-LINEAR BUFFER: glitter 5.84 m/s against whitecaps 6.00 m/s, 2.7% apart. THEY AGREE AND THE AGREEMENT ESTABLISHES LITTLE, WHICH IS THE FINDING: d(ln width)/dU = 0.0759 per m/s against d(ln W)/dU = 0.5683, so a 1% width measurement fixes the wind to 0.13 m/s while a factor of three in coverage -- inside the literature's own spread of exponents, 3.41 quoted, 3.52 optimal, an offset cubic in Callaghan et al. 2008 -- leaves 1.93 m/s. The width is 15x the wind instrument the coverage is; the two could not have disagreed informatively, and a future wave must not calibrate a wind off a coverage. STILL OPEN: the wind itself, and a camera at the owner's cliff viewpoints.",
     "sections J/K -- a camera at the owner's cliff viewpoints, which no wave has yet attempted",
     "CLOSED as unreachable: section A (Stokes' 120 degree corner caps a single-valued crest face at 30 degrees, against the 41.48 needed) and section F (the multivalued surface).",
     "PARKED: the second breaking line, mechanism named (2DH rip-feeder circulation), out of chapter 12's scope."
