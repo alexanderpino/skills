@@ -60,7 +60,10 @@ bar (bar). The verdict block carries both.
 Split it into two calls when:
 
 - the round could **retire** a dimension — retirement is a resource decision and
-  deserves an independent second look
+  deserves an independent second look, and that second look runs **hostile**:
+  the critic is framed to assume the bar is not met and to find where
+  (`blind-protocol.md`, critic rotation). Scrutiny scales with the size of the
+  claim, and "done" is the biggest claim a lane ever makes
 - the two answers would **pull against each other** (the challenger beats the
   champion but loses ground on the bar dimension being judged)
 - the lane is **expensive to get wrong** — a promotion that lands in a shared
@@ -179,6 +182,12 @@ waves are cheaper *because* its early waves happened — the same reason an
 engine bakes lighting it computed once. The frozen bar gets the same treatment
 at Phase 2: measure it once into `gauntlet/bar/measurements.md` and hand critics
 the numbers.
+
+The ratchet outlives the run: `init` carries the gate suite across a re-cut and
+into the next run on the same artifact. The original loop starts every run from
+zero; this one compounds — each gauntlet leaves the next one a larger free
+suite and a cheaper wave 1. Prune gates whose subject has left the scope; an
+inherited gate nobody understands is inspection rot with a pedigree.
 
 Two failure modes to avoid while doing this:
 

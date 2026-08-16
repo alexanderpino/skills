@@ -27,6 +27,7 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | Token burn | cost per closed gap climbing | machine gates, one critic call, WIP, LOD ladder, degradation order |
 | Critic softens; reads as progress | severity easing over near-empty diffs | softening tripwire (`--diff-lines`) in `status` |
 | Blind quietly never happens | every round logged rubric, promotions unblinded | blind promotions by default, `--blind` share in `status` |
+| Guardrails cap the ceiling | target met, budget unspent, run just stops | stretch dividend, tournament round at a ceiling |
 | Cost invisible until the bill | budget in waves, burn in tokens | `--budget-tokens`, `--tokens`, cost per gap in `status` |
 | Inspection rot | stale or repeated evidence | re-verify the path at every wave boundary |
 | Nobody sees progress without interrupting | user asks "where are we?" | generated board |
@@ -226,9 +227,16 @@ that lane-level work cannot reach.
 
 **Repair.** Recognise it rather than grinding — `status` flags a revert rate
 over 50% in the recent window as exactly this signal, and the same signal parks
-the dimension. Either re-cut the lanes to include the structural element, or park
-and report it as an open gap with a recommendation. Burning budget on a ceiling
-is the most common way a long run wastes money while looking busy.
+the dimension. Before the park, when the stall sits within reach of the target,
+spend **one tournament round**: two builders on the same gap under deliberately
+different framings, judged blind three-way against the champion. The log has
+already proven repetition dead here; diversity is the one move not yet tried,
+and it costs one extra builder call. It either breaks the ceiling or turns "we
+stalled" into "two independent approaches both hit this wall" — which is a far
+stronger park report. Once per lane per run. Then: re-cut the lanes to include
+the structural element, or park and report the open gap with a recommendation.
+Burning budget on a ceiling is the most common way a long run wastes money
+while looking busy.
 
 ## Budget creep
 

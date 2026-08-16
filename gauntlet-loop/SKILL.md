@@ -228,7 +228,8 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
   means no lane can ever retire; the script warns you.
 - **Ambition above it is a *stretch***, recorded in `contract.md` as a heading
   rather than a promise. Retirement is judged against the target only; the report
-  states the distance to the stretch.
+  states the distance to the stretch — and the stretch is what a surplus buys
+  (Phase 7), so write it as a real bar, not a mood.
 - **Freeze the bar** under `gauntlet/bar/`, and **declare each dimension**
   (visual + frame time; clarity + completeness) in `config.json`, judged
   separately. One collapsed score is how a loop trades away the dimension nobody
@@ -352,6 +353,12 @@ anything. Run `status`, then act:
   the user in the report. Resume only on *new evidence*: a re-cut, a fixed
   inspection path, a new source asset, a revised bar. "It might work this time" is
   sunk cost with extra steps.
+  **One tournament round before the park** when the stall is a ceiling within
+  reach of the target: two builders, *differently framed* approaches to the same
+  gap, judged blind three-way against the champion. The log has proven repetition
+  dead on this lane; diversity is the one move not yet tried, it costs one extra
+  builder call, and either it breaks the ceiling or it hardens the park report.
+  Once per lane per run — a second tournament is grinding with extra steps.
 - **Re-cut** when the smoother reports the same seam twice, or two lanes' critics
   keep citing each other's territory. Between waves, never mid-wave; the protocol
   is in `references/decomposition.md`.
@@ -373,6 +380,15 @@ When a stop fires, finish the wave and the smoother (unless it is a safety stop)
 promote the best champion — not necessarily the latest challenger — then `board`
 and `report`. `report` drafts every section from the log; you add the one thing
 it cannot know, whether the bar was raised mid-run, and your honest read.
+
+**The stretch dividend.** When every lane retires with budget unspent, the
+surplus is not change to return quietly — it is what the efficiency was *for*.
+`status` prints the offer: re-arm the unspent waves with the contract's stretch
+as an announced target, same guards, judged rounds — or stop and hand the
+surplus back. The user chooses; you never roll into the stretch silently. This
+is how the smart variant beats the original's ceiling instead of merely
+undercutting its bill: the original stumbles into extraordinary through
+unbounded grind, this run budgets for it and arrives with the guards still on.
 
 Do not soften the open-gaps section. A report that reads as a victory lap is
 worth less than one that says exactly where the artifact is still weak.

@@ -146,6 +146,11 @@ def cmd_init(args):
         old = json.loads((root / "config.json").read_text())
         cfg["extensions"] = old.get("extensions", [])
         cfg["parked"] = old.get("parked", [])
+        # The gate suite is an asset the run built: judgement was spent once
+        # discovering each check, and re-running them is free. A re-cut — and
+        # the next run on this artifact — inherits the suite rather than
+        # starting from zero. Prune gates whose subject left the scope.
+        cfg["gates"] = old.get("gates", [])
     if args.lanes:
         cfg["lanes"] = [s.strip() for s in args.lanes.split(",") if s.strip()]
     if args.dimensions:
@@ -1017,6 +1022,15 @@ def cmd_status(args):
             print(f"  - {f}")
     else:
         print("no stop condition fired")
+
+    if all_lanes and all_lanes == retired and max_wave < budget:
+        surplus = budget - max_wave
+        print(f"\nSTRETCH SURPLUS: every lane retired with {surplus} wave(s) of agreed budget")
+        print("unspent — the efficiency bought headroom. Do not bank it, and do not spend it")
+        print("silently. Offer the user the choice: re-arm the surplus waves with the")
+        print("contract's stretch as an announced target (same guards, judged rounds), or")
+        print("stop here and return it. Unjudged polish past a retired bar is gold plating;")
+        print("a stretch block is a new announced bar. (bar-selection.md)")
 
     if max_wave >= budget:
         _print_extension_offer(rounds, cfg, per, retired, max_wave)

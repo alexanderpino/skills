@@ -83,6 +83,16 @@ the distance to it at the end. It never arms a stop condition, never blocks a
 retirement, and never turns a lane that reached its target into a lane that keeps
 spending.
 
+It has one more job, which is why it should be written as a real bar rather than
+a mood: **the stretch is what a surplus buys.** When every lane retires with
+waves unspent, `status` prints the stretch-dividend offer — re-arm the surplus
+with the stretch as the announced target, same guards, judged rounds, or stop
+and return it. The user chooses. A stretch written as "make it amazing" prices
+that offer at nothing; a stretch written as an inspectable bar makes the
+surplus spendable. This is the deliberate version of what the original loop
+does by accident when it overshoots: excellence as a budgeted decision, not a
+lucky residue of grinding.
+
 ```
 TARGET   hero reads as professionally art-directed — the three frozen references
          at gauntlet/bar/, score 7/10, reachable in ~2 rounds per lane

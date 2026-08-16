@@ -206,7 +206,11 @@ Repeat. This beats splitting the budget evenly, and it beats committing early.
 → This is the exact shape of a gauntlet's wave loop: first light is the small
 initial allocation, the wave-boundary review is the cut, and parking plus
 reallocation is the halving. The formal result is why the prune is not
-pessimism — it is how a fixed budget finds the good option at all.
+pessimism — it is how a fixed budget finds the good option at all. The stretch
+dividend completes it: the algorithm's whole point is that survivors end up
+with a *larger* share than an even split would have given them, so a run whose
+lanes all retire early has earned surplus for its best remaining ambition —
+offered, never silently spent.
 
 **Cost of delay / WSJF** (Reinertsen; adopted by SAFe): rank by value over
 duration rather than by value alone.
