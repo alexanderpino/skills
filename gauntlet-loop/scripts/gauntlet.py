@@ -476,7 +476,17 @@ def _lane_dim_status(rounds, cfg):
     """
     stops = cfg["stops"]
     parked = parked_keys(cfg)
-    keys = {}
+    # Seed every DECLARED lane/dimension pair, not only the ones the log has
+    # reached. A pair with no rounds is the one thing the next wave most needs
+    # to fund -- nothing is known about it -- and building `keys` from the log
+    # alone made it invisible to `_next_wave_plan`, whose own docstring promises
+    # to rank "unread ones" second. An unjudged lane silently dropped out of
+    # every plan, which is the budget dying without a result that the WIP limit
+    # exists to prevent. Empty records are safe here: `_streaks([])` is (0, 0)
+    # so the pair cannot retire, and `_stall_read` returns "too early to call
+    # it" below `no_progress_n`, so it cannot be pruned before it is read.
+    keys = {(lane, dim): [] for lane in cfg.get("lanes") or []
+            for dim in cfg.get("dimensions") or []}
     lane_rounds = {}
     for r in rounds:
         keys.setdefault((r["lane"], r["dimension"]), []).append(r)
@@ -536,7 +546,11 @@ def _lane_dim_status(rounds, cfg):
             "stalled": stalled and not retired and not is_parked,
             "stall_note": stall_note,
             "trend": trend,
-            "lane_calls": logged_calls.get(lane, len(lane_rounds[lane]) * CALLS_PER_LANE_ROUND),
+            # `.get`, not `[]`: a declared lane with no rounds yet has cost
+            # nothing, and it is now seeded into `keys` so the next wave can
+            # fund it.
+            "lane_calls": logged_calls.get(
+                lane, len(lane_rounds.get(lane, ())) * CALLS_PER_LANE_ROUND),
             "lane_tokens": logged_tokens.get(lane, 0),
             "state": "RETIRED" if retired else "PARKED" if is_parked else "STALLED" if stalled else "OPEN",
         }
@@ -798,7 +812,7 @@ def cmd_park(args):
               "Restarting a lane on hope is sunk cost with extra steps.")
         return
 
-    per, _retired, _closed = _lane_dim_status(rounds, cfg) if rounds else ({}, set(), set())
+    per, _retired, _closed = _lane_dim_status(rounds, cfg)
     stats = per.get(key)
     if stats is None and not args.force:
         die(f"no rounds logged for [{args.lane} / {args.dimension}] — nothing to park (use --force)")
@@ -824,7 +838,7 @@ def cmd_park(args):
         "forced": bool(args.force),
     })
     save_config(root, cfg)
-    per, _retired, _closed = _lane_dim_status(rounds, cfg) if rounds else ({}, set(), set())
+    per, _retired, _closed = _lane_dim_status(rounds, cfg)
     funded, deferred = _next_wave_plan(per, cfg)
     print(f"parked [{args.lane} / {args.dimension}] at wave {max_wave} — {reason}")
     if (stats or {}).get("open_gap"):
@@ -875,7 +889,7 @@ def cmd_extend(args):
             file=sys.stderr,
         )
 
-    per, retired, _closed = _lane_dim_status(rounds, cfg) if rounds else ({}, set(), set())
+    per, retired, _closed = _lane_dim_status(rounds, cfg)
     _, verdict, open_lanes = _extension_evidence(rounds, cfg, per, retired)
     if verdict == "at-ceiling" and not args.force:
         die(
