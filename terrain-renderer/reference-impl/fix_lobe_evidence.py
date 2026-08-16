@@ -1,19 +1,19 @@
-"""The lobe-receiver fix, as pictures, into `gauntlet/evidence/` with a
-`fix-lobe-` prefix.
+"""The lobe-receiver fix, as pictures, into `gauntlet/evidence/`, under the
+`fig-pool-` prefix the pool loop's other six figures already use.
 
     python3 fix_lobe_evidence.py            # both figures
     python3 fix_lobe_evidence.py <outdir>
 
 TWO FIGURES AND WHAT EACH ONE HAS TO SHOW.
 
-  `fix-lobe-hero-before-after.png`  The pool's hero frame either side of the
+  `fig-pool-lobe-before-after.png`  The pool's hero frame either side of the
       change, at IDENTICAL framing -- same camera, same seed, same exposure,
       same crop -- with the scene-linear difference beside them. The frames are
       not re-derived here: they are the `HDRP` buffers of two full `render.py`
       runs, handed in as `.npz`, so what is drawn is the renderer's own output
       and not a reconstruction of it.
 
-  `fix-lobe-energy-vs-ratio.png`  The quantity the defect was, against the
+  `fig-pool-lobe-energy-vs-ratio.png`  The quantity the defect was, against the
       quantity that hid it: the widened lobe's flux over the sphere as a
       function of the reflection ellipse's axis ratio, for both forms, in
       ABSOLUTE steradians and against the unwidened `2 pi/(n+1)`. At ratio 1
@@ -80,9 +80,47 @@ def _lum(a):
 
 
 # ----------------------------------------------------------------- figure one
+# THE SIGNED DIFFERENCE, AND WHY IT IS SIGNED. An |absolute| difference map
+# would hide the one thing the closed form already predicts: Cauchy-Schwarz
+# puts (u^T Q u)(u^T Q^-1 u) >= 1, so the shipped exponent was never larger
+# than the right one, the shipped lobe was never too narrow, and every pixel
+# the change touches has to FALL. A map that cannot show a rise cannot show
+# that it did not happen. The scale is a signed QUARTER power of |dL| / max|dL|
+# -- four decades of it, because the difference spans them -- which is a display
+# ramp and nothing else: the colour bar is labelled in ABSOLUTE scene-linear
+# radiance at each tick, so a reader takes the number off the bar and not off
+# the colour.
+_DIV_NEG = np.array([38., 90., 168.])       # after < before: the lobe narrowed
+_DIV_POS = np.array([192., 56., 44.])       # after > before: does not occur
+_DIV_MID = np.array([250., 249., 246.])     # P.BG, so zero reads as paper
+
+
+def _diverging(d, dmax, gamma=0.25):
+    """Signed d -> RGB. `dmax` is the symmetric limit and is stated on the bar."""
+    t = np.clip(np.abs(d) / max(dmax, 1e-30), 0, 1) ** gamma
+    end = np.where((np.asarray(d) < 0)[..., None], _DIV_NEG, _DIV_POS)
+    return (_DIV_MID + (end - _DIV_MID) * t[..., None]).astype(np.uint8)
+
+
+def _colourbar(img, x0, y0, w, h, dmax, ticks):
+    """A horizontal bar for `_diverging`, labelled in scene-linear radiance."""
+    ramp = np.linspace(-1.0, 1.0, int(w))
+    strip = _diverging(np.sign(ramp) * dmax * np.abs(ramp) ** (1 / 0.25), dmax)
+    img.paste(Image.fromarray(np.repeat(strip[None], int(h), 0)),
+              (int(x0), int(y0)))
+    d = P.ImageDraw.Draw(img)
+    d.rectangle([x0, y0, x0 + w - 1, y0 + h], outline=P.INK, width=1)
+    for v in ticks:
+        f = np.sign(v) * (abs(v) / dmax) ** 0.25          # the ramp's own map
+        px = x0 + (f + 1.0) / 2.0 * (w - 1)
+        d.line([px, y0 + h, px, y0 + h + 4], fill=P.INK)
+        d.text((px, y0 + h + 6), ('%+.3g' % v) if v else '0', fill=P.MUTED,
+               font=P.FONT_S, anchor='ma')
+
+
 def fig_frames(R, path):
-    """The hero frame either side of the change, and the difference between
-    them, all at one framing."""
+    """The hero frame either side of the change, and the SIGNED scene-linear
+    difference between them, all at one framing and with a colour bar."""
     A = np.load(os.path.join(NPZ, 'hdr-before-hero.npz'))['HDRP']
     B = np.load(os.path.join(NPZ, 'hdr-after-hero.npz'))['HDRP']
     if A.shape != B.shape:
@@ -93,95 +131,151 @@ def fig_frames(R, path):
     d = np.abs(B - A).max(-1)                    # per pixel, worst channel
     moved = d > 0.0
     la, lb = _lum(A), _lum(B)
-    dl = lb - la
+    dl = lb - la                                 # SIGNED, luminance
     frac = 100.0 * moved.mean()
+    iy, ix = np.unravel_index(int(np.argmax(d)), d.shape)
+    peak_frac = float(d[iy, ix] / max(la[iy, ix], 1e-12))
+    rel = np.abs(dl[moved]) / np.maximum(la[moved], 1e-12)
     ea, eb = _encode(A, R), _encode(B, R)
     ya, yb = _lum(ea / 255.0), _lum(eb / 255.0)
+    lev = np.abs(eb.astype(int) - ea.astype(int)).max(-1)   # DISPLAY only
+
+    # per band, and the bands are not the same number: the liner is blue and
+    # the widened lobe multiplies a reddened SUN_COL, so R moves most.
+    pb = [(nm, float(np.abs(B[..., i] - A[..., i]).max()),
+           float(B[..., i][moved].sum() / max(A[..., i][moved].sum(), 1e-30)))
+          for i, nm in enumerate('RGB')]
 
     # ---- where it moved most, as a crop the reader can see it in
     ny, nx = d.shape
     k = 96
     box = np.array([[d[y:y + k, x:x + k].sum() for x in range(0, nx - k, 24)]
                     for y in range(0, ny - k, 24)])
-    iy, ix = np.unravel_index(int(np.argmax(box)), box.shape)
-    cy, cx = iy * 24, ix * 24
+    iyb, ixb = np.unravel_index(int(np.argmax(box)), box.shape)
+    cy, cx = iyb * 24, ixb * 24
+    # the column band the difference lives in, at 5th-95th of its own mass
+    cm = np.cumsum(d.sum(0)) / d.sum()
+    c5, c95 = int(np.searchsorted(cm, .05)), int(np.searchsorted(cm, .95))
+    rm = np.cumsum(d.sum(1)) / d.sum()
+    r5, r95 = int(np.searchsorted(rm, .05)), int(np.searchsorted(rm, .95))
 
-    # ---- the canvas: three full frames over three crops
-    fh = 560
+    # ---- the canvas: three full frames over three crops, then a colour bar
+    fh = 620
     fw = int(round(fh * nx / ny))
     S = 3
     ch = k * S
-    img = P.canvas(3 * fw + 4 * 26, fh + ch + 26 * 3 + 150)
-    for j, (name, enc) in enumerate((('BEFORE  1/(uᵀQu)', ea),
-                                     ('AFTER  uᵀQ⁻¹u', eb),
-                                     ('scene-linear |Δ|', None))):
+    y_img, y_crop = 66, 66 + fh + 30
+    dmax = float(np.abs(dl).max())
+    dmap = _diverging(dl, dmax)
+    img = P.canvas(3 * fw + 4 * 26, y_crop + ch + 96 + 18 * 18)
+    panels = (
+        ('BEFORE   n_eff = 1/(uᵀQu)', ea,
+         'the shipped form, restored by monkeypatching `atmosphere._lobe_shape`',
+         'in a throwaway runner -- the defective expression was never committed'),
+        ('AFTER   n_eff = uᵀQ⁻¹u', eb,
+         'HEAD of this branch, `atmosphere.py` at 7fe9538. Same camera, same',
+         'field, same seed, same EXPOSURE %.3f, same crop as the panel left' % R.EXPOSURE),
+        ('SIGNED Δ  (after − before)', None,
+         'scene-linear luminance out of the two `HDRP` buffers, NO tone map.',
+         'Blue = fell, red = rose. Scale on the bar below, in radiance'),
+    )
+    for j, (name, enc, pv1, pv2) in enumerate(panels):
         x0 = 26 + j * (fw + 26)
         if enc is None:
-            # the difference, on its own scale, stated in the label
-            mx = float(d.max())
-            g = np.clip(d / max(mx, 1e-12), 0, 1) ** 0.45
-            enc = (np.stack([g, g * 0.55, g * 0.15], -1) * 255).astype(np.uint8)
-            name = 'scene-linear |Δ|, 0 .. %.3g' % mx
+            enc = dmap
         im = Image.fromarray(enc).resize((fw, fh), Image.LANCZOS)
-        img.paste(im, (x0, 26))
+        img.paste(im, (x0, y_img))
         d0 = P.ImageDraw.Draw(img)
         d0.text((x0, 8), name, fill=P.INK, font=P.FONT_B)
+        d0.text((x0, 30), pv1, fill=P.MUTED, font=P.FONT_S)
+        d0.text((x0, 46), pv2, fill=P.MUTED, font=P.FONT_S)
         # the crop box, drawn on the frame it was chosen from
-        bx0 = x0 + int(cx / nx * fw); by0 = 26 + int(cy / ny * fh)
+        bx0 = x0 + int(cx / nx * fw); by0 = y_img + int(cy / ny * fh)
         d0.rectangle([bx0, by0, bx0 + int(k / nx * fw), by0 + int(k / ny * fh)],
-                     outline=RED, width=2)
+                     outline=RED if enc is not dmap else P.INK, width=2)
         # ---- the same crop at 3x, underneath
         cr = enc[cy:cy + k, cx:cx + k]
         img.paste(Image.fromarray(cr).resize((ch, ch), Image.NEAREST),
-                  (x0, 26 + fh + 26))
-        d0.text((x0, 26 + fh + 8), 'the same %d x %d px at %dx, rows %d-%d'
-                % (k, k, S, cy, cy + k), fill=P.MUTED, font=P.FONT_S)
+                  (x0, y_crop))
+        d0.text((x0, y_crop - 20), 'the same %d x %d px at %dx, rows %d-%d, '
+                'cols %d-%d' % (k, k, S, cy, cy + k, cx, cx + k),
+                fill=P.MUTED, font=P.FONT_S)
+    _colourbar(img, 26 + 2 * (fw + 26) + 44, y_crop + ch + 26, fw - 88, 18, dmax,
+               (-dmax, -dmax * 1e-2, 0.0, dmax * 1e-2, dmax))
+    P.ImageDraw.Draw(img).text(
+        (26 + 2 * (fw + 26), y_crop + ch + 6),
+        'ΔL, scene-linear radiance; signed quarter-power ramp, symmetric at %.4g'
+        % dmax, fill=P.MUTED, font=P.FONT_S)
 
     P.caption(img, [
         'THE POOL\'S HERO FRAME, EITHER SIDE OF `atmosphere._lobe_shape`\'s '
-        'RECEIVER. Same camera, same field, same EXPOSURE %.3f, same crop: the '
-        'only difference between the two frames is the'
-        % R.EXPOSURE,
-        'exponent the widened sun lobe is written with. `n_eff = 1/(uᵀQu)` '
-        'is the PROJECTION variance; the convolved density along u wants '
-        '`n_eff = uᵀQ⁻¹u`, the 2x2 adjugate over det Q. The two '
-        'are the SAME',
-        'NUMBER for an isotropic Q and on either principal axis, which is why '
-        'every lobe row in `validate.py` -- all of them at cov = None -- passed '
-        'throughout. Found by the raster reference, an independent',
-        'code path over the same shared module.',
+        'EXPONENT. `n_eff = 1/(uᵀQu)` is the PROJECTION variance; the convolved '
+        'density along u wants `n_eff = uᵀQ⁻¹u`, the 2x2 adjugate over det Q.',
+        'The two are the SAME NUMBER for an isotropic Q -- for every u, exactly '
+        '-- and on either principal axis, which is why all eleven lobe rows in '
+        '`validate.py`, every one of them at cov = None, passed throughout.',
+        'Found by the RASTER reference, an independent code path over the same '
+        'shared module and the first consumer in this project to reach an '
+        'anisotropic Q at all. Both frames here are full `render.py` hero passes.',
         '',
-        'MEASURED IN SCENE-LINEAR RADIANCE, BEFORE THE TONE MAP ABOVE. '
-        '%.2f%% of the %d output pixels moved at all. Over those, mean |Δ| '
-        '%.4g and worst |Δ| %.4g in radiance; the frame\'s own median '
-        'radiance is %.4g,'
-        % (frac, d.size, float(d[moved].mean()) if moved.any() else 0.0,
-           float(d.max()), float(np.median(la))),
-        'so the worst pixel moved %.0fx its median. The change is a REDUCTION '
-        'everywhere it is not zero (%.2f%% of moved pixels fell), because '
-        'Cauchy-Schwarz puts the shipped exponent below the right one and a '
-        'lower'
-        % (float(d.max() / max(np.median(la), 1e-12)),
-           100.0 * float((dl[moved] < 0).mean()) if moved.any() else 0.0),
-        'exponent is a wider lobe. ENCODED MEAN LUMINANCE over the whole frame '
-        '%.3f -> %.3f of 1.0 (%.1f -> %.1f of 255); over the moved pixels only, '
-        '%.3f -> %.3f (%.1f -> %.1f of 255).'
-        % (ya.mean(), yb.mean(), 255 * ya.mean(), 255 * yb.mean(),
-           ya[moved].mean() if moved.any() else 0.0,
-           yb[moved].mean() if moved.any() else 0.0,
-           255 * (ya[moved].mean() if moved.any() else 0.0),
-           255 * (yb[moved].mean() if moved.any() else 0.0)),
-        'The crop is picked by the difference itself -- the 96 x 96 box with '
+        'MEASURED IN SCENE-LINEAR RADIANCE, BEFORE THE TONE MAP THE FIRST TWO '
+        'PANELS ARE DISPLAYED THROUGH. %.2f%% of the %d output pixels moved at '
+        'all -- that set is the water, and nothing but the water, because'
+        % (frac, d.size),
+        '`water_shade` is the only caller in the file that hands the lobe a '
+        'non-zero reflection ellipse. PEAK |Δ| is %.4g in radiance, at row %d '
+        'col %d, which is %.1f%% of that pixel\'s own %.4g -- the pixel the'
+        % (float(d.max()), iy, ix, 100 * peak_frac, float(la[iy, ix])),
+        'defect moved most lost three quarters of itself. It is NOT a '
+        'uniform lift: the median moved pixel changed by %.2f%% of its own '
+        'radiance and the 99th percentile by %.1f%%, because the difference is'
+        % (100 * float(np.percentile(rel, 50)),
+           100 * float(np.percentile(rel, 99))),
+        'a function of the ellipse\'s axis ratio and that ratio is a function '
+        'of the view angle. The frame\'s MEDIAN radiance moved %.4g -> %.4g '
+        '(%.2f%%); its TOTAL moved %.4g -> %.4g, a factor %.3f.'
+        % (float(np.median(la)), float(np.median(lb)),
+           100 * (np.median(lb) / np.median(la) - 1),
+           float(la.sum()), float(lb.sum()), float(lb.sum() / la.sum())),
+        'EVERY MOVED PIXEL FELL (%.3f%% of them), which is the sign '
+        'Cauchy-Schwarz forces: (uᵀQu)(uᵀQ⁻¹u) >= 1, so the shipped exponent '
+        'was never the larger and the shipped lobe was never too narrow.'
+        % (100.0 * float((dl[moved] <= 0).mean())),
+        'PER BAND, over the moved pixels: %s. The bands do not move together '
+        'because the lobe multiplies a reddened `SUN_COL` against a blue liner.'
+        % ', '.join('%s peak |Δ| %.4g, total x%.3f' % t for t in pb),
+        '',
+        'WHERE IT SITS, and it is not spread over the water evenly: 5th-95th of '
+        'the difference\'s own mass is columns %d-%d of %d and rows %d-%d of '
+        '%d. That is the near-left strip where the surface turns toward the'
+        % (c5, c95, nx, r5, r95, ny),
+        'sun\'s azimuth -- `render.py` prints the mirror band as landing at '
+        '(4.60, 2.26), 1.13 half-widths past the frame edge, and this is its '
+        'in-frame tail, the grazing water where 1/cos²θ_v is largest.',
+        'The crop is chosen by the difference itself -- the 96 x 96 box with '
         'the largest summed |Δ| in the frame -- and not by eye.',
+        '',
+        'AND IT IS VISIBLE, which is a DISPLAY statement and is made here with '
+        'display numbers and nowhere else: through `render.py`\'s own ACES + '
+        'sRGB curve at EXPOSURE %.3f, %d pixels (%.2f%%) move by 10 sRGB levels'
+        % (R.EXPOSURE, int((lev >= 10).sum()), 100.0 * float((lev >= 10).mean())),
+        'or more and %d (%.2f%%) by 100 or more, the worst by %d levels. The '
+        'whole frame\'s encoded mean luminance moves only %.3f -> %.3f of 1.0, '
+        'because the glitter road is 1%% of the frame and the other 99%% is'
+        % (int((lev >= 100).sum()), 100.0 * float((lev >= 100).mean()),
+           int(lev.max()), ya.mean(), yb.mean()),
+        'unchanged -- a frame-mean is exactly the statistic that would have '
+        'called this defect invisible, and it is quoted here to be refused.',
     ], x=26)
     return P.save(img, path), dict(
         frac=frac, mean=float(d[moved].mean()) if moved.any() else 0.0,
-        worst=float(d.max()), y_before=float(ya.mean()),
-        y_after=float(yb.mean()),
-        y_moved_before=float(ya[moved].mean()) if moved.any() else 0.0,
-        y_moved_after=float(yb[moved].mean()) if moved.any() else 0.0,
+        worst=float(d.max()), worst_at='%d,%d' % (iy, ix),
+        worst_rel=peak_frac, y_before=float(ya.mean()), y_after=float(yb.mean()),
         npix=int(d.size), moved=int(moved.sum()),
-        med=float(np.median(la)), crop=(cy, cx))
+        med_before=float(np.median(la)), med_after=float(np.median(lb)),
+        total_ratio=float(lb.sum() / la.sum()),
+        lev10=int((lev >= 10).sum()), lev100=int((lev >= 100).sum()),
+        lev_max=int(lev.max()), crop=(cy, cx))
 
 
 # ----------------------------------------------------------------- figure two
@@ -332,8 +426,8 @@ def fig_energy(R, path):
                                    qr1e4=float(qr[-1]))
 
 
-FIGURES = (('fix-lobe-hero-before-after.png', fig_frames),
-           ('fix-lobe-energy-vs-ratio.png', fig_energy))
+FIGURES = (('fig-pool-lobe-before-after.png', fig_frames),
+           ('fig-pool-lobe-energy-vs-ratio.png', fig_energy))
 
 
 def main():
