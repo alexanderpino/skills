@@ -1149,6 +1149,33 @@ averaging a whole sea over time, and the wrong number for a hero breaking wave. 
 not the average: foam should be born bright and fade to a dim streak, with reflectance falling as
 the bubble plume thins. A constant-albedo foam texture is why most game foam looks like paint.
 
+⚠️ **And the reason it looks like paint even when the decay *is* shipped: 0.22 is not a foam albedo
+at all, so a renderer that models the decay and also uses 0.22 has counted it twice.** Koepke's
+number is averaged over the whitecap's **life** *and* over its **area** — it already contains
+everything the decay curve above is there to produce. Two ingredients, one number:
+
+- **Coverage.** A whitecap occupies a fraction of the cell and that fraction falls with age.
+- **Reflectance.** What the foam that *is* there returns, which also falls with age — Koepke's own
+  measurement runs **0.20–0.55 at first breaking to 0.03–0.10 after ten seconds**.
+
+`0.22` is the product of the two, integrated. A model with an explicit coverage mask `W(t)` and an
+explicit `R(age)` supplies both, and then multiplying by 0.22 supplies them a second time. **The
+symptom is grey foam that no exposure fixes**, because the error is a factor on one material inside
+the frame.
+
+**What the fresh foam actually returns, two ways, and neither is 0.22.** A raft a few centimetres
+thick is seventy-odd walls of a non-absorbing scatterer. Stokes' pile of plates,
+`R_N = Nρ/(1 + (N−1)ρ)` with `ρ` the bubble wall's own `1 − 1/n²`, and a two-stream
+`R = τ'/(1 + τ')` with `τ' = (1 − g)·b·h` that never sees that constant, land on **0.983 and 0.985 —
+0.21% apart** at `N = 73` walls (`D`, recomputed here). A soap foam is that white and so is fresh
+surf. Meanwhile `1 − 1/n²` = 0.4387 sits **inside Koepke's own 0.20–0.55 fresh-whitecap band**: a
+published bracket on a derived constant, recorded as **survived**.
+
+**So the numbers on the decay curve above are the ones to ship, and 0.22 is a sea-average
+radiometry figure that belongs in a satellite forward model and nowhere in a frame.** What is still
+`?` is the shape of `R(age)` between the endpoints — closing it needs Koepke's time-resolved bins,
+which are not in hand here.
+
 **Foam is not spectrally flat.** Reflectance drops sharply into the near-infrared, with troughs at
 roughly **750, 980 and 1200 nm** corresponding to liquid-water absorption bands — bubbles lengthen
 the path through water and *enhance* its absorption. Visible-band rendering can treat foam as

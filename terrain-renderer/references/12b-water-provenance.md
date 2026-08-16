@@ -175,7 +175,19 @@ least-confident-claims ledger in `00-index.md`.
   **Koepke (1984)'s ~22%** is a *time-averaged effective* whitecap reflectance from film-density
   measurements and under-represents fresh foam — correct for sea-average radiometry, wrong for a
   hero breaking wave. Earlier spectral work: Frouin et al. (JGR Oceans, 1996); Kokhanovsky
-  (JGR Oceans, 2004).
+  (JGR Oceans, 2004). **P/D — and stronger than "under-represents": 0.22 is not a foam albedo.**
+  Koepke, *Applied Optics* 23, 1816, measures whitecap reflectance falling from **0.20–0.55 at first
+  breaking to 0.03–0.10 after ten seconds** and reports 0.22 as a **life-and-area-averaged
+  effective** value — the product of a coverage that decays and a reflectance that decays,
+  integrated. So a renderer carrying an explicit coverage mask and an explicit `R(age)` and *also*
+  multiplying by 0.22 has **counted the decay twice**; grey foam is the symptom. `D`, recomputed
+  here: a fresh raft at this project's own derived thickness (0.1075 m, an inventory rather than a
+  guess) is `N = 73.3` bubble walls, and Stokes' pile of plates `Nρ/(1 + (N−1)ρ)` with
+  `ρ = 1 − 1/n²` gives **0.9828** against a two-stream `τ'/(1 + τ')` with `τ' = (1 − g)bh` that never
+  sees that constant at **0.9849** — **0.21% apart**, two routes with no shared source. And
+  `1 − 1/n² = 0.4387` sits inside Koepke's own fresh-whitecap 0.20–0.55: a published bracket on a
+  derived constant, recorded as **survived**. Still `?`: the shape of `R(age)` between his endpoints,
+  which needs his time-resolved bins.
 - **T** — Barré-Brisebois & Bouchard, "Approximating Translucency for a Fast, Cheap and Convincing
   Subsurface Scattering Look" (GDC 2011; also GPU Pro 2; shipped in Frostbite 2): the
   view-dependent `dot(V, −L)` + thickness translucency approximation used for backlit wave crests.
