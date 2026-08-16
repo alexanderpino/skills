@@ -179,8 +179,8 @@ def fig_frames(R, path):
     img = P.canvas(3 * fw + 4 * 26, y_crop + ch + 96 + 18 * 18)
     panels = (
         ('BEFORE   n_eff = 1/(uᵀQu)', ea,
-         'the shipped form, restored by monkeypatching `atmosphere._lobe_shape`',
-         'in a throwaway runner -- the defective expression was never committed'),
+         'the form that shipped, restored for one run by `fix_lobe_render.py`',
+         'before -- which monkeypatches it in; `atmosphere.py` is never touched'),
         ('AFTER   n_eff = uᵀQ⁻¹u', eb,
          'HEAD of this branch, `atmosphere.py` at 7fe9538. Same camera, same',
          'field, same seed, same EXPOSURE %.3f, same crop as the panel left' % R.EXPOSURE),

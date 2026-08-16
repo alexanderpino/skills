@@ -241,9 +241,10 @@ asserted against, because a guard nobody has watched fail is not a guard.
 
 Two full `render.py` hero passes at one framing — same camera, same field, same
 seed, same `EXPOSURE` — the second with `_lobe_shape` monkeypatched back to the
-projection form in a throwaway runner, so the defective expression exists nowhere
-in the tree. Differenced off the two `HDRP` buffers, **before the tone map**;
-nothing below is read off a PNG.
+projection form by `fix_lobe_render.py before`, which monkeypatches it into the
+atmosphere module for that one run and never touches `atmosphere.py` on disk.
+Differenced off the two `HDRP` buffers, **before the tone map**; nothing below is
+read off a PNG.
 
 | | scene-linear |
 |---|---|
