@@ -588,16 +588,51 @@ the sphere against the unwidened `2π/(n+1)`:
 | the inverted form | 1.009 | 1.004 | 1.000 |
 
 The repair is the 2×2 adjugate and it is one line:
-`u1²q22 − 2u1u2q12 + u2²q11`, over `|u|² det Q`. It is **not** applied to
-`atmosphere.py`, which is shared; `waves.widened_lobes` carries the inverted form
-and feeds it back through the shipped `sky()` as a per-pixel amplitude and
-exponent, so the environment, the gradient, the 1.15 and the disc/aureole
-partition all stay `atmosphere.py`'s. The shipped form is kept beside it as
-`receiver='shipped'` so the suite can price it rather than assert it: over this
-frame it is invisible on the median (9.7e-9) and worth **12.0× at p99** and 397
-in absolute radiance at worst. `render.py` reads the same function at
-`θ_v ≈ 57°`, where the ellipse ratio is about 3 and the gain is 1.2–1.7× — a
+`u1²q22 − 2u1u2q12 + u2²q11`, over `|u|² det Q`. It was **not** applied here, in
+this pass, because `atmosphere.py` is shared; `waves.widened_lobes` carries the
+inverted form and feeds it back through the shipped `sky()` as a per-pixel
+amplitude and exponent, so the environment, the gradient, the 1.15 and the
+disc/aureole partition all stay `atmosphere.py`'s. The shipped form is kept
+beside it as `receiver='shipped'` so the suite can price it rather than assert
+it: over this frame it is invisible on the median (9.7e-9) and worth **12.0× at
+p99** and 397 in absolute radiance at worst. `render.py` reads the same function
+at `θ_v ≈ 57°`, where the ellipse ratio is about 3 and the gain is 1.2–1.7× — a
 brightening of the pool's own glints that reads as taste.
+
+#### Closed upstream — `7fe9538`, and the prediction above held
+
+**`atmosphere._lobe_shape` now carries the adjugate**, so the raster path and the
+offline reference read one expression again and `waves.widened_lobes` is no
+longer the only correct copy of it. The full entry, with the derivation and the
+after-render, is in `../reference-impl/README.md` under *Closed — the widened sun
+lobe carried the wrong exponent*; what belongs **here** is the provenance, because
+it is a first:
+
+**This is the first defect a second implementation has caught in this project's
+offline path.** Every previous one was found by `validate.py`, by a `render.py`
+print, or by looking at a frame — all of them the offline path checking itself,
+and all of them therefore blind in the same directions it was. This pass was
+built as a second reading of chapter `12` at 560×315, and the only reason it saw
+the exponent is that a screen-space frame at grazing incidence hands the lobe an
+**anisotropic `Q`**, which nothing in the project ever had before: eleven rows
+existed on that function in `validate.py` and every one of them sat at
+`cov = None`, where the two expressions are equal by an identity rather than by a
+tolerance. The argument for building a second implementation is that it reaches
+states the first one does not. That is the argument being paid, and it makes this
+directory an **instrument** rather than only a deliverable.
+
+**And the price quoted above was right before the frame was drawn.** The
+prediction was *"the ellipse ratio is about 3 and the gain is 1.2–1.7× — a
+brightening of the pool's own glints that reads as taste."* Measured afterwards in
+scene-linear radiance off two full `render.py` hero passes: the pixel-weighted
+ellipse axis ratio over that frame's water runs **1.75–12.2** with a median of
+**3.12**; 58.96% of the frame (the water, and nothing else) moved; and the
+brightening was a blown-white glitter road down one edge worth **1378 in
+radiance** at worst — **77% of its own pixel** — with **10 300 pixels moving by 10
+sRGB levels or more.** "Reads as taste" was the right description and the wrong
+verdict: it read as taste precisely because a frame-mean and a frame-median
+cannot see it (the median moved 0.63%), which is the same blindness in the
+picture that the eleven rows had in the suite.
 
 **`field._norm_jets()` is not optional and nothing says so.**
 `field._SC['near']` ships at 1.0 and `_norm_jets` sets it to **0.001011**, so a

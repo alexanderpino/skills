@@ -816,9 +816,39 @@ a shipped factor of fifty. The two failures are the same shape seen twice: **the
 the right expression at a point where the defect cancels; the second evaluates it at a point where
 the defect is zero.** Both produce a number that is right, reproducible, and about nothing.
 
+**A third shape of the same failure, from the pool scene, and it is the hardest of the three to
+see by reading a row.** Here the degenerate argument is not a zero and the defect does not cancel
+inside the row's expression: **two different expressions coincide, by an identity, over a whole
+sub-manifold of the input domain — and every row lived on it.** `atmosphere._lobe_shape` convolves
+a `cos^n` sun lobe with the reflection ellipse the unresolved slope variance puts on the mirror
+direction, and wrote the widened lobe's exponent as the **projection** variance `1/(uᵀQu)` where
+the convolved density along `u` wants `uᵀQ⁻¹u`. For an isotropic `Q = qI` the inverse is `(1/q)I`,
+so `uᵀQ⁻¹u = 1/q` and `uᵀQu = q`: the two are not close, they are **the same number, for every
+`u`, exactly** — and likewise on either principal axis. The suite carried **eleven rows on that
+function** — the disc's solid angle, its flux against `2π/(n+1)`, `sky()`'s peak, the aureole, the
+ellipse itself — and **every one of them was taken at `cov = None`, where `Q = (1/n)I`.** Re-fired
+here (`terrain-renderer/reference-impl/`, `atmosphere.py` and `validate.py`), the widened lobe's
+flux against the unwidened `2π/(n+1)`, at a fixed minor axis of `1e-5`:
+
+| ellipse axis ratio | 1 (where all eleven rows sat) | 10 | 1e4 (the raster path's grazing frame) |
+|---|---|---|---|
+| the correct `uᵀQ⁻¹u` | 1.0000 | 0.9999 | 0.9535 |
+| the shipped `1/(uᵀQu)` | **1.0000** | 1.3725 | **32.36** |
+
+Eleven rows, no tolerance anywhere in any of them, and **the first column is an identity rather
+than an agreement** — which is why adding a twelfth row at `cov = None` would have bought nothing.
+A degenerate case is not a weak test of the general one; it is **no test of it**. What found the
+defect was not a row at all: it was a **second implementation** — the raster reference over the
+same shared module — reaching an anisotropic `Q` that no consumer of that module had ever reached
+in the project's history. That is the eighth way's third question again, asked at the level of the
+whole suite instead of one row: ⚠️ **before trusting a function's rows, ask what region of its
+input domain they occupy, and whether the shipped callers occupy the same one.** The pool's did
+not, and the answer was a sun glint carrying up to **1378 in scene-linear radiance too much** —
+77% of its own pixel — down one edge of the shipped hero frame.
+
 **The mechanical check, and it is cheaper than any of the above.** For every guard, ask what the
-defect it is aimed at would multiply, and where the row evaluates. Two questions, both answerable
-by reading:
+defect it is aimed at would multiply, and where the row evaluates. Three questions — the first two
+answerable by reading one row, the third only by reading all of them together:
 
 1. **Does the row's expression contain the defect's factor more than once?** If the quantity
    appears in both the numerator and the denominator, the row is structurally exempt from anything
@@ -826,6 +856,12 @@ by reading:
 2. **Is the row's argument at a value where the defect vanishes?** Zero load, zero absorption,
    unit albedo, normal incidence: sweep the argument, or state in the row's own reason why the
    chosen value is where the defect is *largest* rather than where it is convenient.
+3. **Taking the rows on one function together, what region of its input domain do they cover, and
+   do the shipped callers stay inside it?** This one is not answerable row by row and that is why
+   it is separate: eleven individually reasonable rows can all sit on the same isotropic default,
+   an identity can hold there that holds nowhere else, and a row count says nothing about it. The
+   cheapest answer is a second implementation with different needs — it reaches arguments the
+   first one never had a reason to.
 
 **And the general rule this chapter already half-carries, now stated.** ⚠️ **Fire every deliberate
 defect and record the rows it catches — a defect that catches nothing is a finding about the suite,
@@ -1280,7 +1316,7 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
 | The linear-error → encoded-level table (5% ≈ 2.7 levels and 25% ≈ 12.8 levels at L = 0.18 of 255) | **D** — computed here through the exact sRGB transfer function, 2026-08. It is a property of the *view transform*, so it carries to any sRGB-encoded output and not to a different one; recompute for PQ or for a filmic curve, where the toe and shoulder change it by more than the percentages do |
 | That a deterministic quadrature reference makes a 3% difference a number while a Monte Carlo one makes it a number plus noise, hence the seed/standard-error requirement | **F** (elementary, but the *consequence for loop design* — variance paid on every read — is this skill's composition) |
 | The three preconditions (frozen ground truth, metric fixed in advance, cost budget) and the two ground-truth preconditions (no open discrepancy, one cross-consistency reading) | **F** (house doctrine; the metric-before-candidate rule is the same argument as "never widen a tolerance to pass a row", and the cross-consistency requirement generalises `12`'s split shot) |
-| The tenth way: a ratio cancels whatever multiplies both its terms, so a suite made only of ratios is blind to common-factor errors; and a guard evaluated where a defect is inert is not a guard | **F** (house doctrine, and the structural complement of the seventh way's within-frame-ratio method — the same cancellation, read as a cost) + **D** for the case: the ×50 bed-power defect passing a 53-row suite, the `u³` ratio row unchanged to twelve figures, the two absolute rows that fire (2.61 → 130.51 W/m², 373 → 18 671 mg/L), and the `spm = 0` degeneracy table are all `reference-impl/beach_optics.py` + `validate_beach.py`, **re-fired and recomputed here** (2026-08) rather than quoted. What transfers is the two-question check and the "one absolute row per quantity" rule; the numbers are that scene's |
+| The tenth way: a ratio cancels whatever multiplies both its terms, so a suite made only of ratios is blind to common-factor errors; and a guard evaluated where a defect is inert is not a guard | **F** (house doctrine, and the structural complement of the seventh way's within-frame-ratio method — the same cancellation, read as a cost) + **D** for the case: the ×50 bed-power defect passing a 53-row suite, the `u³` ratio row unchanged to twelve figures, the two absolute rows that fire (2.61 → 130.51 W/m², 373 → 18 671 mg/L), and the `spm = 0` degeneracy table are all `reference-impl/beach_optics.py` + `validate_beach.py`, **re-fired and recomputed here** (2026-08) rather than quoted. The third shape — the eleven lobe rows all sitting at `cov = None`, where `1/(uᵀQu)` and `uᵀQ⁻¹u` are equal by an identity — is `reference-impl/atmosphere.py` + `validate.py` (defect `7fe9538`, guards `f83b42c`); its flux table is **recomputed here** (2026-08) off `validate._lobe_flux` against both forms, and the 1378-in-radiance glint is measured in scene-linear off two full `render.py` hero passes, not read from a PNG. What transfers is the three-question check and the "one absolute row per quantity" rule; the numbers are those scenes' |
 | The eighth way: a test's power is the surface area it shares with the code under test | **F** (house doctrine, and the general form of the fourth way's "two methods that read one premise are one method") + **D** for the case — the audit's one borrowed name, the lossless-limit/photon-walk pair agreeing to 0.15%, and the four-bug table are all `reference-impl/validate.py`, re-evaluated here; that **the lossless limit alone passes three of the four** was verified by evaluating each variant against the limit, not quoted |
 | The eleventh way: a test window is part of the test, and a row that gets *easier* as the condition hardens is reporting its window rather than the system | **F** (house doctrine; the monotone-wrong-way tell and the three instruments are composed here) + **D** for the case — the oblique-Snell row in `reference-impl/validate_beach.py`, **both columns recomputed here** (2026-08) rather than quoted: 0.186 / 0.310 / 0.277° centred on the best-covered row against 0.186 / 0.059 / 0.030° centred on the grid, with 236 / 123 / **0** ramp cells in the centre row and 5202 window cells surviving at 30°. The 2.71° edge artefact and the 60-row exclusion were recomputed with them. Those numbers are that march, that grid and that bed; what transfers is the signature |
 | The thirteenth way: a tolerance sized from the disagreement it accommodates reports the state the row was written in, and coverage is the *minimum resolution* over the rows rather than their count | **F** (house doctrine; the "count resolution, not rows" rule and the grep-able tell are composed here) + **D** for the case, all recomputed 2026-08 on `reference-impl/optics.py` and `validate.py` rather than quoted: the shipped 2000-node single Gauss–Legendre rule against a split rule (400 nodes either side of `μ = cos θ_c`) and a 4 000 000-node reference — `slab_esc(0) − T_OUT_DIFFUSE` = +2.35 / −3.30 / +1.61 e-5 as shipped against +1.80 / +1.79 / +1.77 e-7 split, the air-side 512-point midpoint's own error at 1.8e-7, and `+3.9 / −6.2 / +3.1 e-5` / `−8.0 / +8.1 / −3.4 e-5` relative on `slab_esc` / `slab_trap`. ⚠️ **The kink attribution is a control, not an inference**: substituting a smooth reflectance for `R_int` and changing nothing else returns the *un-split* 125-node rule to 6.7e-15, which is what rules out the `exp(−τ/μ)` endpoint as the cause. The sign-alternating convergence table (250 → 8000 nodes) is `D` on the same rule. The `1e-4` and `6e-3` tolerances and the quoted justification strings are that suite's own text; the 97–196× figure is arithmetic on them. **Nothing shipped was wrong** — the effect is four orders below anything a frame resolves and does not move any chapter figure at its quoted precision — which is stated in the section because the finding is about the suite's self-assessment, not about the render | 

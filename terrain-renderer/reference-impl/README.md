@@ -169,6 +169,148 @@ derivation down, and then guard it with something that could not have been writt
 from it — a limit, a conservation identity, an analytic special case, or the same
 quantity reached by unrelated code.
 
+## Closed — the widened sun lobe carried the wrong exponent, and the raster path is what found it
+
+**`7fe9538`, with the guard rows in `f83b42c` and the after-render below.**
+`atmosphere._lobe_shape` convolves one `cos^n` environment lobe with the
+reflection ellipse that the *unresolved* slope variance puts on the mirror
+direction, and writes the widened lobe back as `cos^(n_eff)`. Two Gaussians
+convolve to a Gaussian whose covariance is the sum, `Q = Q₀ + C` with
+`Q₀ = (1/n)I`, and whose **density** along a tangent offset `u` is
+`exp(−½ uᵀQ⁻¹u)`. The file wrote
+
+    n_eff = 1 / (uᵀ Q u)          -- the PROJECTION variance
+
+which is the width of the shadow that Gaussian casts on the `u` axis, and not
+its value along `u`. What the identity `n_eff |u|² = uᵀQ⁻¹u` forces is the 2×2
+adjugate over the determinant,
+
+    n_eff = uᵀ Q⁻¹ u = (u₁²q₂₂ − 2u₁u₂q₁₂ + u₂²q₁₁) / (|u|² det Q)
+
+— **the same three terms the file already had, with `q₁₁` and `q₂₂` swapped and
+the cross term's sign flipped.** The peak factor `g = √(det Q₀ / det Q)` beside
+it was derived for the *correct* Gaussian, so with the wrong exponent it no
+longer normalised what it multiplied and **the lobe created light**. Priced in
+closed form rather than by inspection: the widened flux is `2π√(det Q)·g = 2π/n`
+with the right exponent — conserved, which is the property `g` exists to give it
+— and `π tr Q · g` with the shipped one, so the gain is exactly `cosh(ln r / 2)`
+in the eigen-ratio `r` of `Q`, monotone in the anisotropy and, by Cauchy–Schwarz
+`(uᵀQu)(uᵀQ⁻¹u) ≥ 1`, never below 1. The shipped lobe was never too narrow. It
+was always too wide.
+
+### The raster reference found it, and that is the first time a second path has caught anything on this side
+
+`raster-impl/waves.py`'s `widened_lobes` is an independent code path over the
+same shared `atmosphere.py`, written for a screen-space frame at 560×315, and it
+is **the first consumer in this project ever to hand `_lobe_shape` an anisotropic
+`Q` at all.** Its grazing frame reaches an ellipse axis ratio of 1e4, where the
+shipped form's flux gain is 10.4× against the unwidened lobe; it priced the error
+at **12.0× on its own p99** and reported it upward instead of forking the module.
+Every previous defect in this directory was found by `validate.py`, by a print, or
+by looking at a frame — all of them the offline path checking itself. The raster
+reference was built as a second reading of chapter `12`, and the argument for
+building a second implementation at all is that it reaches states the first one
+does not. This is that argument being paid: the raster path is now an
+**instrument**, not a deliverable.
+
+### Eleven rows, and every one of them was inside the degeneracy
+
+The finding that outlives the defect. `validate.py` carried **eleven rows on the
+sun's lobes** — the disc's solid angle, its flux against `2π/(n+1)`, `sky()`'s
+peak, the aureole's amplitude, the reflection ellipse — and **not one of them ever
+handed `_lobe_shape` an anisotropic `Q`.** Every one was taken at `cov = None`,
+where `Q = Q₀ = (1/n)I`, or on a principal axis. For `Q = qI` the inverse is
+`(1/q)I`, so `uᵀQ⁻¹u = 1/q` and `uᵀQu = q`: **the two expressions are not close,
+they are the same number, for every `u`, exactly.** No tolerance could have
+separated them and no number of additional rows at `cov = None` would have
+helped. A degenerate case is not a weak test of the general one; it is no test of
+it, and a suite whose rows all live inside a degeneracy cannot see a defect that
+is only reachable outside it. That is now a numbered way for a verification to
+fail in `../references/11-verification-failures.md`, with this incident as its
+instance.
+
+`f83b42c` added thirteen rows that leave it: the construction against a direct
+2-D convolution of `cos^n` with the ellipse — no `cos^n_eff` and no peak factor
+anywhere in it, which is what pins `g` and the exponent *together*, since either
+alone can be wrong and leave a ratio intact — the flux against `2π/(n+1)` at
+ellipse ratios out to 1e4, the closed form `cosh(ln r / 2)`, and the shipped
+expression kept in the suite as `_lobe_projection` and **fired at** rather than
+asserted against, because a guard nobody has watched fail is not a guard.
+
+### The after-render, in scene-linear radiance
+
+Two full `render.py` hero passes at one framing — same camera, same field, same
+seed, same `EXPOSURE` — the second with `_lobe_shape` monkeypatched back to the
+projection form in a throwaway runner, so the defective expression exists nowhere
+in the tree. Differenced off the two `HDRP` buffers, **before the tone map**;
+nothing below is read off a PNG.
+
+| | scene-linear |
+|---|---|
+| output pixels that moved at all | **566 008 of 960 000 (58.96%)** — the water, and nothing but it |
+| peak \|Δ\| | **1378 in radiance**, at row 497 col 0, **77.2%** of that pixel's own 1784 |
+| median moved pixel, \|ΔL\|/L | **< 0.005%** |
+| 99th percentile, \|ΔL\|/L | **80.9%** |
+| the frame's **median** radiance | 0.6543 → 0.6502, **−0.63%** |
+| the frame's **total** radiance | 4.564e6 → 2.995e6, **×0.656** |
+| per band over the moved pixels | R **×0.607**, G ×0.637, B ×0.664 |
+| direction | **every moved pixel fell** (99.99%), the sign Cauchy–Schwarz forces |
+
+The moved set is the water because `water_shade` is the only caller in the file
+that hands the lobe a non-zero ellipse; everything else — the deck, the coping,
+the sail, the sky itself — reaches `sky()` at `cov = None` and is bit-identical.
+
+**It is not spread over the water evenly, and the median is exactly the statistic
+that would have called this invisible.** Five to ninety-five per cent of the
+difference's own mass is **columns 3–117 of 800** and rows 222–857 of 1200: the
+near-left strip where the surface turns toward the sun's azimuth. `render.py`
+prints the mirror band as landing at (4.60, 2.26), 1.13 half-widths past the
+frame edge; this is its in-frame tail, the grazing water where `1/cos²θ_v` — and
+therefore the ellipse ratio, and therefore the gain — is largest. Over this
+frame's water, weighted by pixels rather than by area, that ratio runs **1.75 to
+12.2** (5th–95th) with a median of **3.12**, a flux gain of **1.040 to 1.891**,
+median **1.166**. The raster reference predicted this before the frame was drawn:
+*"a brightening of the pool's own glints that reads as taste."*
+
+**And it is visible**, which is a *display* statement and is made with display
+numbers and nowhere else: through the file's own ACES + sRGB curve, **10 300
+pixels (1.07%) move by 10 sRGB levels or more, 4 745 (0.49%) by 100 or more, the
+worst by 237.** The whole frame's encoded mean luminance moves 0.543 → 0.541,
+because the glitter road is one per cent of the frame and the other ninety-nine
+are unchanged. The blown-white streak down the near-left edge of the hero is
+half of what it was.
+
+Both figures are in `gauntlet/evidence/`, drawn by `fix_lobe_evidence.py` from
+the `HDRP` buffers themselves: `fig-pool-lobe-before-after.png` (before, after,
+and the **signed** difference with a colour bar labelled in absolute radiance —
+signed, because an absolute map cannot show that nothing rose) and
+`fig-pool-lobe-energy-vs-ratio.png` (the flux of both forms against the ellipse
+ratio, in steradians, with this scene's band on it).
+
+### Which frames moved, and which did not
+
+A physics fix is the one thing allowed to break this directory's bit-identity
+contract, so the frames are stated rather than assumed. `validate.py` runs
+**298 pass / 0 FAIL / 64 info in 92.9 s**.
+
+| frame | sha256 | |
+|---|---|---|
+| `pool_final.png` | `ee404cb963c3b4e1ccd49f072ab31b94c69b3c2a585b444e16f36966a781c418` | **moved** |
+| `pool_final_dispersion.png` | `0ebc06d76e9ca2e063535a461a7a89d7f33c3ab92f10384679dea2602e0d244a` | **moved** |
+| `pool_final_zoom.png` | `22e748c5d08feca6459049ebe9a9fc818f9ccfb9972d15daeac27d930bd52a48` | **moved** |
+| `pool_final_float.png` | `d478198a07bd6cfe4b3702e8e7a7173f4308f31b97feecfbd08c9f0f23cf62ab` | **moved** |
+| `pool_under.png` | `22be1d6aeadcb8b059514c8276eb3856c9460b9aa01823fc9d6305c45132e27c` | **unchanged, to the byte** |
+| `pool_under_float.png` | `d36f0b3270ced8ab9762eec71088ee8c72675b5bd397fac4cfba68a2a9ab827f` | **unchanged, to the byte** |
+
+The two underwater frames are unchanged **by construction and not by luck**: the
+camera below the surface reaches the environment through `uw_shade` → `air_world`
+→ `sky(tx, ty, tz)` at `cov = None`, and its two `surf_stats` calls pass
+`fp = None`, which makes the slope tensor exactly zero and `Q = (1/n)I` — the
+degeneracy, where the two expressions agree exactly. That is the same `?` the
+file already carried against itself: *"the unresolved slope variance feeds
+nothing"* on the underwater camera. The two hashes above are the ones the split
+round recorded, matched to the byte after the fix.
+
 ## Split — the physics left `render.py` before the beach arrived, and no pixel moved
 
 The owner's ruling, recorded in `gauntlet/chapter-backlog.md`: *"Als we een 2e
@@ -208,6 +350,12 @@ carries:
 `POOL_UNDERWATER=1` reproduces the hero set byte for byte as well, before and
 after — the claim that switch has always made about itself, re-checked here
 because a refactor is exactly when it would stop being true.
+
+⚠️ **Those hashes are this refactor's contract and are no longer current.** The
+lobe-exponent fix above is a change in the *physics*, which is the one thing
+allowed to move a frame, and every above-water frame in the table moved with it.
+The two underwater frames did not, to the byte. Current hashes are in *Which
+frames moved, and which did not*.
 
 **`validate.py` is unchanged at 285 pass / 0 FAIL / 54 info**, and not merely in
 the count. Diffed whole, the two `-v` transcripts of 795 lines differ in **eight**:
