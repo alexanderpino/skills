@@ -1766,8 +1766,17 @@ def main():
     # landscape -- which moves the horizon, the depression and every content
     # bound in `beach_camera`. So these two are 3:4 where every earlier frame
     # in this file is 16:9, and the numbers in their captions are the reason.
-    W7 = int(456 * sc) * SS
-    H7 = int(608 * sc) * SS
+    # THE s7 FRAMES DO NOT TAKE `--fast`, AND THAT IS WAVE 6'S RULE APPLIED
+    # RATHER THAN BROKEN. s4, s5 and s6 are three terms of one comparison at
+    # one camera and one raster size; drawing s6 at the full 900 would have
+    # made that a comparison of resolutions as well as of physics, so every
+    # frame in that series is drawn at `--fast`. The s7 pair has no earlier
+    # term -- it is the first frame at this viewpoint -- so its size is free,
+    # and it is fixed here at 720 x 960 with 2 x 2 supersampling regardless of
+    # the flag. Nothing measured off it depends on the raster except the far
+    # range tail, and `aerial_cost` reports that dependence in the same line.
+    SS7 = 2
+    W7, H7 = 720 * SS7, 960 * SS7
     L_surf, s_lines = surf_line_scale(w)
     # the range to the far surf, on this bed: the camera stands at one end of
     # the domain and bar J's lines have to read "all the way round"
@@ -1803,9 +1812,9 @@ def main():
     print()
     horizon_check(LK7, camK7)
     print()
-    _save(downsample(LJ7, SS), '%s/s7-frame-J.png' % OUT,
+    _save(downsample(LJ7, SS7), '%s/s7-frame-J.png' % OUT,
           caption=_cap_J7(w, camJ7, infJ7, mJ7))
-    _save(downsample(LK7, SS), '%s/s7-frame-K.png' % OUT,
+    _save(downsample(LK7, SS7), '%s/s7-frame-K.png' % OUT,
           caption=_cap_K7(w, infK7, mK7, wchk7))
     print('exposure keys (99th pct of scene-linear): J %.4g  F %.4g  K %.4g'
           % (kJ, kF, kK))
@@ -2486,6 +2495,18 @@ def bar_J_ladder(w, ex, L):
     return out
 
 
+def plan_curvature(w):
+    """How far the shoreline departs from straight, across the whole domain.
+
+    Bar J's subject is an EMBAYMENT -- headland, curve, headland -- and this is
+    the number that says whether the bed has one. The full range rather than
+    the difference of the two end rows, which is what wave 7's first caption
+    printed and which reads 12 m where the range is 50."""
+    sh = np.array([float(w.x[int(np.argmax(w.h[j] > 0.0))])
+                   for j in range(w.y.size)])
+    return float(sh.max() - sh.min())
+
+
 def beach_width(w):
     """The cross-shore width of dry beach this bed produces, per row.
 
@@ -2827,8 +2848,7 @@ def _cap_J7(w, cam, inf, m):
            100 * m['ladder']['wet sand'], 100 * m['ladder']['dry sand'],
            m['beach']['median'], m['beach']['slope'],
            100 * (m['land']['plain'] if m['land'] else 0.0),
-           float(w.x[np.argmax(w.h[-1] > 0)] - w.x[np.argmax(w.h[0] > 0)]),
-           float(w.y[-1] - w.y[0]),
+           plan_curvature(w), float(w.y[-1] - w.y[0]),
            SUN_EL, SUN_AZ, su['coast_el'], su['coast_az'], su['d_el'],
            su['d_az'], 100 * m['shares']['clipped'],
            100 * m['seam']['worst'] if m['seam'] else float('nan'),

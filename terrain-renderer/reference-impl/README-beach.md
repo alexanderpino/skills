@@ -10,6 +10,7 @@ it against things that were not written here.
     python3 beach_evidence.py    # the figures, into gauntlet/sea/evidence/
     python3 beach_render.py      # wave 4: the three rendered frames, and every
                                  # number in "Wave 4" below
+    python3 validate_beach.py --bugs-camera   # wave 7's six camera defects
 
 | File | Owns |
 |---|---|
@@ -18,6 +19,7 @@ it against things that were not written here.
 | `beach_evidence.py` | The seventeen evidence figures (eight `s1-`, five `s2-`, four `s3-`). Reads `beach.py`, computes nothing of its own. |
 | `beach_optics.py` | **Wave 4.** The coastal IOPs — chapter 28's three constituents, the Babin bridge, the suspension balance, the two transports, the cuvette inversion, Cox & Munk's glitter, and the foam placeholder. No rendering, no scene, no prints. |
 | `beach_render.py` | **Wave 4.** The camera, the ray cast, the shading and the three frames; every measurement taken from the scene-linear buffer before the tone map. |
+| `beach_camera.py` | **Wave 7.** Where the photograph was taken from — the lens table, the horizon dip, the frame projection, the surf-line separation and its closed-form ceiling, and the two frame inferences with their intervals. No scene, no rendering, no prints on import. |
 | `validate_beach.py` | The suite — a list of guarded **sections** — three tiers, plus the deliberate-bug harness. |
 
 **Nothing here touches the pool.** `optics.py` and `atmosphere.py` are imported
@@ -68,6 +70,13 @@ Wave 6 added four, all `s6-`:
 | `s6-entrained-air.png` | the paired control: **left** the entrained-air medium removed, **right** in place. One field changed, and the bed's radiance out of the water measured absolutely in both — section C's own test, answered with a number |
 | `s6-glitter-whitecap.png` | the glitter path and the open-water whitecapping in one frame at one `U₁₀`, both measured back off the scene-linear buffer and both inverted to a wind |
 | `s6-clocks.png` | section E drawn: three decay curves on a **log** axis, with the plume's own spread shaded across the bubble sizes, and Monahan's coverage law beside them |
+
+Wave 7 added two, both `s7-`, and they are the first frames in this project shot at a viewpoint and a framing inferred from an owner photograph rather than chosen:
+
+| figure | what to look at |
+|---|---|
+| `s7-frame-J.png` | **the deliverable**: bar section J's framing — upright, 0.5× ultrawide, from the bed's own cliff brow, at the inferred depression. Read the caption first: the frame is a *gap list*, and the two biggest gaps are that half of it is a declared albedo and that bar J's five-rung colour ladder has three rungs |
+| `s7-frame-K.png` | bar section K's framing — upright, same camera code and same lens, aimed down the sun's own azimuth. The glitter path narrows toward the horizon and spreads toward the observer, which is K1's own prediction; the seam at the sea–sky horizon is the tell K2 warns about, measured at 53% |
 
 Wave 3 added four, all `s3-`:
 
@@ -2573,3 +2582,569 @@ field changed each time.
 **Every new quantity has at least one absolute row**, including the two that a
 ratio would have hidden: `⟨τ⟩_vol` (which the shipped defect got wrong by 19×
 while every ratio row stayed green) and the void fraction itself.
+
+---
+
+# Wave 7 — the camera at the owner's viewpoints, and the gap list it produces
+
+The gauntlet's `config.json` carries four hyper-realism criteria and **the first
+one has been unmet by every frame this project has drawn**:
+
+> **Frame to match.** A reference render must be shot from a viewpoint one of
+> the owner's photographs was taken from, at the same framing, so the two can
+> sit side by side. A render at a viewpoint no photograph shares is
+> illustration, not proof.
+
+This wave builds that camera for bar sections **J** (the embayment overview) and
+**K** (open water and the glitter path), renders both, and puts the result
+beside what the bar says those photographs contain.
+
+**The deliverable is the gap list, not the picture.** Everything in it is
+measured on the scene-linear buffer of the frame it describes, and it is ordered
+by what it costs the frame rather than by how interesting it is to fix.
+
+**New file: `beach_camera.py`.** New suite section `_sec_camera`, 36 rows, 6
+deliberate bugs. New frames `s7-frame-J.png` and `s7-frame-K.png`, upright.
+
+## The whole of it, before the details
+
+- **The camera is an INFERENCE and its three parameters come from three
+  different pieces of evidence**, which is why they have independent
+  uncertainties rather than one blur. The field of view is **quantized by the
+  instrument** and is the best determined; the depression is the only one the
+  *picture* measures and is bracketed to **±13°** without the pixels; the eye
+  height is **not measured by the horizon at all**.
+- **The bay's size cancels out of the lens selection.** A chord seen from `p`
+  chords back subtends `2·atan(1/2p)`, so *"the whole embayment from its own
+  rim"* fixes the field of view without a map, a scale or a photograph. And the
+  widest lens on the named phone is **89.9117°** across upright against the
+  **90.00°** that half a chord back needs — so the instrument both selects the
+  0.5× ultrawide **and proves the photographer stood at least 0.50077 chords
+  back**. A bound on where a person was standing, from a spec sheet.
+- **The dip is famous and it is useless here.** `0.123°` at 17 m against
+  `0.278°` at 90 m — a sixth of a degree between a low cliff and a high one,
+  inside the tilt error of a hand-held frame. What *does* measure the eye height
+  is the **resolved separation of the surf lines**, and it has a closed-form
+  ceiling this file derives because no source states it.
+- **The beach is missing from the beach scene.** Bar J's five-rung colour ladder
+  has **three rungs** in this render. Wet sand and dry sand are **0.00% of the
+  frame** — the two surfaces bar J calls *"the most trustworthy comparison of
+  the set"*. Six waves aimed every frame at the water and nobody looked at the
+  land.
+- **Two of the things that sound most like defects cost almost nothing, and
+  saying so is the point of an ordered list.** The missing shadow ray costs
+  **0.0%** of the land in frame under either sun, because the landform has no
+  relief to cast one — two gaps hiding each other. The flat sea plane paints sea
+  over **0.10°** of sky, which is **1.8 pixel rows** here and 3.7 at the phone's
+  own 4032.
+- **And one cheap thing is high on the list**: the sea–sky seam is **53–67% off
+  continuity** in the two frames where grazing Fresnel says it should be 0, and the
+  physics that closes it is one exponential with a coefficient this project has
+  already derived.
+
+## C1 · The three parameters, and which evidence each one comes from
+
+### The field of view is QUANTIZED, and that is the most useful fact available
+
+The bar names the device — iPhone 16 Pro — and a phone has a small fixed set of
+focal lengths. The field of view is therefore **not a continuous unknown to be
+fitted**; it is a choice among four, decided by the horizontal coverage the
+frame's content requires.
+
+`equiv_fov` takes the equivalence on the **diagonal**, because that is what
+makes an "equivalent focal length" an equivalence across two frame shapes, and
+the suite checks the conversion by feeding it a 3:2 target and requiring
+`2·atan(18/f)` back exactly. Held **upright** on a 4:3 still:
+
+| lens | diagonal | up–down | left–right | standoff/chord it needs |
+|---|---|---|---|---|
+| 13 mm, 0.5× | 117.99° | **106.175°** | **89.912°** | **0.5008** |
+| 24 mm, 1× | 84.06° | 71.59° | 56.81° | 0.925 |
+| 48 mm, 2× crop | 48.52° | 39.65° | 30.26° | 1.849 |
+| 120 mm, 5× | 20.44° | 16.41° | 12.35° | 4.623 |
+
+**The chord cancels.** A chord `W` seen from a perpendicular standoff `p`
+subtends `2·atan(W/2p)`, and `p` expressed as a multiple of `W` removes `W`
+entirely: the required field is a function of the **ratio alone**. So the
+inference needs only the fact that the photographer was standing on the bay's
+own rim, which bar J states outright — *"the whole embayment from the cliff"* —
+and it needs neither the bay's size nor a map.
+
+From a viewpoint on a bay's own rim the standoff is a fraction of a chord, not a
+multiple of one, and **the 1× cannot hold it**: 56.8° across needs 0.93 chords
+of standoff, which is off the bay entirely. **The 0.5× ultrawide is the only
+lens on this phone that can take bar J's frame from where bar J says it was
+taken**, and the same argument carries K, which holds a long crescent, a
+headland, a village, foreground dune and the whole open sea.
+
+**And the near-miss is itself evidence.** The 0.5× is 89.912° across and half a
+chord back needs 90.00°. It falls short by 0.088°, so **a standoff under
+0.50077 chords is excluded by the instrument** — a quantitative bound on where a
+person was standing, recovered from the frame's content and a spec sheet.
+
+### The depression is the only parameter the picture measures, and it is bracketed
+
+Two content facts bound it:
+
+- **The horizon must be in frame**, with sky above it. `δ < fov_v/2 − 2° = 51.1°`.
+- **The named foreground must be in frame.** For K, *"dune vegetation in the
+  foreground"*. This gives `δ > atan(h_eye/x_fg) − fov_v/2`, which comes out at
+  **−50.8°** and **never binds** — and that is a result rather than a gap. An
+  upright 106° frame held level *already contains the ground at the
+  photographer's feet*, so "vegetation in the foreground" does not prove the
+  camera was tilted down at all. A content fact that constrains nothing is worth
+  recording, because the next reader will otherwise reach for it again.
+
+What is left is **where the horizon sits in the frame**, and that is a read off
+an image this repository does not have. Carried as an interval, it gives
+
+| | depression | bracket | half-width |
+|---|---|---|---|
+| J | 25.455° | 12.16 – 38.75° | **±13.296°** |
+| K | 27.805° | 15.04 – 40.57° | **±12.761°** |
+
+**The half-width has its own suite row.** The depression is the parameter a
+future wave is most likely to want to move, and a wave that quietly narrowed
+this interval would be claiming evidence it does not have.
+
+**What would tighten it, and by how much.** One measured horizon row. At the
+ultrawide's 106.18° over the phone's own 4032 rows, one row is **0.0263°**, so a
+horizon line read to ±5 rows fixes the depression to **±0.13°** — a factor of a
+hundred, from one number nobody has yet extracted. That single measurement is
+worth more to this criterion than anything else on the list.
+
+### The eye height is NOT measured by the horizon, and the instrument that does measure it has a ceiling
+
+The dip is `acos(R_eff/(R_eff+z))`, and `REFRACTION_K` is **fitted to Bowditch's
+dip table** rather than declared: the geometric dip is `1.9261·√z` arcminutes,
+the tabulated dip is `0.97·√h_ft = 1.757·√z`, and the ratio gives `k = 0.1678`.
+The suite states the fit against the table.
+
+    z = 17.31 m   dip 0.1229°   horizon 16.28 km
+    z = 90 m      dip 0.2778°   horizon 36.31 km
+
+**A sixth of a degree between a low cliff and a high one.** At the phone's own
+raster that is 6 rows, well inside a hand-held tilt error, and the dip's
+sensitivity *falls* as `1/√z`. It cannot be inverted for a cliff height.
+
+**What can.** Bar J records *"three to four separated breaking lines across the
+wider parts"*, and bar I1 *"two clearly separated lines of whitewater with a
+calm band between them"*. Two shore-parallel lines a cross-shore distance `s`
+apart, at range `D` from an eye at height `z`, subtend
+
+```
+    d = atan(z/(D - s)) - atan(z/D) = atan( z s / (D(D - s) + z^2) )
+```
+
+which is **linear in z** on the branch a cliff lives on. And it has a ceiling
+that no source states and that falls out of two lines of calculus:
+
+```
+    d/dz [ z s / (D(D-s) + z^2) ] = 0   ->   z* = sqrt(D(D-s))
+    tan(d_max) = s / (2 sqrt(D(D-s)))
+```
+
+**The best eye height for separating two surf lines is the geometric mean of the
+two ranges.** At `D = 704 m` that is `z* = 682 m`, so a cliff is always on the
+linear branch — a metre of height is worth a metre of height, and the ceiling
+(`1.80°` here) is a hard bound on how separated the lines can be made to look
+from that distance whatever you climb.
+
+Fed this scene's own numbers — a surf zone `150 m` wide (the transform's own
+median) with bar J's "three to four" lines in it, so `s = 42.9 m`, at
+`D = 704 m` — and asking that the gap be resolved at 5–20 px in a 4032-row
+upright frame:
+
+> **bar J's frame needs an eye at 25.0 – 102.1 m. This bed supplies 17.31 m.**
+
+That is an **OPEN** row, and it is a statement about wave 3's coastal loop
+rather than about the camera.
+
+## C2 · Where a camera can stand is part of the landform, again
+
+`viewpoint` replaces `cliff_edge`'s declared 12 m contour with a **slope
+break**: walk seaward from inland and stop at the first cell whose forward slope
+exceeds three times the plateau's own median. Nothing is chosen but the factor
+of three, and that only has to separate `0.08` from `1.24`.
+
+**Seaward-most and not highest**, and the reason is the landform's. Wave 3's
+loop leaves a straight `0.08` ramp behind the cliff. Walking inland on it buys
+8 cm of height per metre of standoff and spends a whole metre of it, so the
+sea's angular extent *shrinks* the whole way; past about 60 m the ramp occludes
+its own brow and the sea disappears entirely.
+
+**Wave 7's first attempt got this wrong in the interesting direction.** It went
+looking for height, because the eye-height inference above says height is what
+the frame wants — and produced a frame **64% coastal plain** from 58 m inland.
+The correction is in the file and the wrong version is recorded here, because
+"stand higher" is exactly what a reader who has just read C1 will try next.
+
+The brow this bed gives is `x = 648 m`, ground `15.71 m`, eye **17.31 m**.
+
+## C3 · THE ORDERED GAP LIST
+
+Bar J and bar K are the frames a whole-scene render must be judged against, and
+this is the disagreement, worst first. **Every share is measured on the frame's
+own scene-linear buffer**; every "cost" is what it does to the frame, not what
+it costs to build.
+
+### 1 · The beach is missing from the beach scene
+
+Bar J's strongest instrument is its **five-rung colour ladder in one exposure**
+— deep blue offshore → teal over the shallows → white surf → saturated brown wet
+sand → pale ochre dry sand — *"with the wet/dry sand pair close in level and
+therefore the most trustworthy comparison of the set"*. Counted in frame J:
+
+| rung | share of frame |
+|---|---|
+| deep water, `d > 5 m` | 2.29% |
+| teal shallows, `d < 2.5 m` | 0.05% |
+| white surf, breaking | 15.86% |
+| **wet sand** | **0.00% — ABSENT** |
+| **dry sand** | **0.00% — ABSENT** |
+
+**Three rungs of five.** The bed's dry beach is `6.0 m` wide (4–10 across the
+domain) with a face slope of `1.000`, which is steep enough that `shade_land`'s
+own classifier calls it rock. There is no subaerial beach face in this scene:
+wave 3's coastal loop produces a cliff that meets the water, and the Dean ramp
+that waves 1–2 built is entirely submarine.
+
+**Why it is first.** It removes the frame's own instrument — the one comparison
+the bar says survives all three camera failures — and it takes sections H2 and
+H3 with it: `optics.wet_albedo` transfers to sand for free, and free is worth
+nothing until there is sand. It is also the reason bar J's *subject* is missing:
+"a curved sand beach" is what the photograph is of.
+
+**What it needs.** The subaerial profile from the same morphodynamic loop as the
+bar — berm build and cut scaled by the run-up `beach.runup_hunt` already
+computes — or deposition at the cliff foot in `coastalStep`. Not a painted
+strip.
+
+### 2 · Forty-six per cent of the hero frame is one declared albedo
+
+`PLAIN_DRY` is a flat Lambertian standing where a vegetation model would go, and
+it is **46.1% of frame J and 44.4% of frame K** — the single largest surface in
+both. It is the clifftop the photographer is standing on, and an upright 106°
+frame from a clifftop unavoidably devotes its lower third to it.
+
+**The tension with the bar is exact and worth stating.** Bar K2 puts dune
+vegetation and the village *out of scope*. Bar K also records dune vegetation as
+being *in the foreground of the frame*. Those two are compatible only if the
+frame does not give half of itself to that surface — which is true of a
+photograph taken on a **headland with sea on three sides** and false of one
+taken on the seaward edge of a coastal plain. So this is not "add plants": it is
+gap 3 wearing a different hat, and the hyper-realism criterion that *"the tell
+is usually not the water"* is pointing straight at it.
+
+### 3 · There is no embayment and there are no headlands
+
+Bar J's subject is *"headland to headland, cliff behind, a curved sand beach"*.
+Wave 3's coastal loop gives **50 m of plan curvature over 1408 m of coast** — a
+nearly straight cliffed shore. There is no headland in this bed to stand on and
+no bay to point at, so the axis is aimed **along** the coast instead
+(azimuth 315.46°, derived: the far shoreline's bearing minus half a frame
+width, which puts the coast at one edge and the sea in the rest).
+
+This was recorded by wave 4 in a caption; it now has a number, and it is the
+reason gaps 2 and 4 exist. **It is also the reason the refraction criterion —
+the cheapest verification in the whole project, "do the surf lines follow the
+curve" — cannot be checked by eye against these frames.** A shore with 50 m of
+curvature in 1408 m has nothing for a crest to turn onto that a layman could
+see.
+
+### 4 · The eye is 17.31 m where the frame demands 25 – 102 m
+
+C1's instrument, above. This bed's brow is 17.31 m and there is nowhere higher
+to stand: the plateau behind it is a straight ramp that occludes its own brow.
+The consequence in the frame is that **the ground within 40 m of the eye takes
+about half of it**, which is what gap 2 is counting.
+
+### 5 · The illuminant is in the wrong half of the sky
+
+Bar J and bar K carry no time — their illuminant is `?`. But **bar J's own
+colour ladder says which class of frame it is**: *deep blue offshore* grading to
+teal is a sea reflecting sky, and therefore a **front-lit** sea. A low sun down
+the view axis does not give a deep blue offshore; it gives a glitter path.
+
+The render is drawn under the pool's sun, `21.02° / 273.75°` — a low **west** sun
+straight out to sea on a west-facing coast. The bar's own two *timed* cliff
+frames are `56.22° / 123.13°`, air mass 1.202, a late-morning south-easterly and
+clean of the eclipse. That is **35.2° lower and 209.4° round**, and the bar's
+own warning is that *"a wrong quadrant leaves the elevation correct and is
+otherwise silent"*.
+
+Measured consequence: **6.55% of frame J clips** the derived white point, on a
+glitter path bar J does not show.
+
+**This is a wave of its own and not a constant.** `atmosphere.py`'s four
+illuminants — disc, aureole, deck, sub-surface — all descend from one geometry,
+and moving the sun means re-deriving all four; doing it in place would move the
+pool's seventeen frame hashes. See `F6` for why the module would not stretch.
+
+### 6 · One surf zone where bar J shows three to four separated lines
+
+`brk` is one continuous band, 150 m wide at the median. Section B is **parked**
+with its mechanism named (2DH rip-feeder circulation, out of chapter 12's
+scope), and this frame is the visual statement of what that parking costs: bar J
+puts three to four discrete lines across the wider parts and the render puts
+one. It also removes the eye-height instrument's own subject, so gaps 4 and 6
+are measuring each other.
+
+
+### 7 · The sea at grazing reads as hard shore-parallel bands
+
+Visible in both frames without a measurement, which is the definition of a tell.
+The free surface carries **only the swell** — `η = (H/2)[cos φ + r cos(2φ + ψ)]`
+from the transform, with nothing added, which is the correct discipline and has
+a stated cost: the resolved field's mean square slope is `0.0013` against the
+`0.0335` Cox & Munk put on a 6 m/s sea. **The missing 96% is carried
+statistically, in the glitter's slope distribution and in nothing else.**
+
+At the near-normal incidences of the s4–s6 cameras that is nearly invisible,
+because the statistical half does the work. At the **grazing** incidences that
+fill the upper half of an upright cliff-top frame it is not: what silhouettes a
+crest against the water behind it is the *resolved* geometry, and the resolved
+geometry is one 90 m swell. So the sea from 200 m out to the horizon reads as a
+set of hard, evenly spaced, shore-parallel bands rather than a texture.
+
+**This is a framing-dependent defect and it is the reason it appears at wave 7
+and not earlier.** It is not a call to add noise — the standing ruling forbids
+that and should. It is a statement that the statistical treatment of the
+unresolved slopes is complete for *radiance* and absent for *silhouette*, and
+that a grazing view is where the difference lives.
+
+### 8 · The sea–sky seam, and it is the cheap one
+
+Bar K2: *"the sea's radiance at grazing must approach the sky's reflected value
+continuously, and any seam there is a tell visible at a glance."* At grazing the
+Fresnel reflectance goes to 1, so the sea just below the horizon is a mirror of
+the sky just above it and the ratio should go to **1**. Measured off the buffer,
+sampled at the columns furthest from the sun:
+
+| frame | sky | sea | ratio | worst |
+|---|---|---|---|---|
+| J (67° off the sun) | `1.0387` G | `1.6183` G | `1.67 / 1.56 / 1.37` | **66.7%** |
+| K (34° off the sun) | `1.2356` G | `1.7494` G | `1.53 / 1.42 / 1.25` | **52.7%** |
+
+**This is the cheapest item high on the list**, and it is why it is written up
+rather than merely listed. The physics that closes it is gap 9: over a path long
+enough, the sea's radiance and the sky's both converge on the same airlight, so
+the seam cannot survive an atmosphere. There are two candidate causes and they
+are not exclusive — the missing air, and the near-grazing water shading — and
+separating them is one paired frame.
+
+**A method note, because the first draft of this measurement was wrong.**
+`horizon_check` samples the frame's outer columns, which is right for frame K
+(aimed down the sun, so the edges are 15–17° off the path) and **wrong for frame
+J**, whose left edge lands within 3° of the sun. It reported the seam as 6188%
+off, which was the glitter. `horizon_seam` chooses its columns by their actual
+azimuth from the sun.
+
+### 9 · There is no air between the camera and the sea
+
+The pool was five metres across; these frames are kilometres deep and their
+farthest water is beyond the visible horizon. `shade_water` and `shade_land`
+return the radiance **leaving** the surface and `trace` hands it straight to the
+film: no extinction along the line of sight, and no airlight scattered into it.
+
+**The Rayleigh half needs no new constant.** `atmosphere.TAU_R` is the zenith
+optical depth this project already derived for the sun's own colour, and over an
+exponential atmosphere of scale height 8.5 km the surface coefficient is
+`β = τ/H_R`. **The aerosol half does need one and it is `?`** — a maritime
+boundary layer runs 20–60 km of meteorological visibility, and Koschmieder's
+`β = 3.912/V` turns that into a coefficient. Both are reported as a bracket:
+
+| | β (green) | T at 119 m | at 1307 m |
+|---|---|---|---|
+| Rayleigh alone | `1.19e-5 /m` | 0.999 | 0.985 |
+| + aerosol, clean 60 km | `7.71e-5 /m` | 0.991 | 0.904 |
+| + aerosol, hazy 20 km | `2.07e-4 /m` | 0.976 | **0.762** |
+
+**Why it is ninth and not third.** Because half of each frame is the ground at
+the photographer's feet: the median range in frame is 3 m and the 90th
+percentile is 119 m, so **0.3% of the frame is beyond one e-folding even in hazy
+air**. The gap is real, the fix is cheap, and its cost *at this framing* is
+concentrated in the thin band near the horizon — which is exactly gap 8. Fix the
+framing (gaps 2–4) and this one climbs.
+
+### 10 · No swash, no wet/dry boundary — and it is BLOCKED by gap 1
+
+Sections H2 and H3, unbuilt. The wet band in frame is **0.00%** — not because
+the run-up is wrong (`beach.runup_hunt` gives `ξ = 0.332`, `R = 0.50 m`) but
+because there is no sand for it to wet. **H3 transfers for free and free buys
+nothing here.** A wave that builds the swash before the beach face will have
+nothing to show for it.
+
+### 11 · No shore platform
+
+Section H1, unbuilt. The 2.1% of frame J that `shade_land` classes as rock is
+the cliff face, not a bench. Bar H1's pockets need spatially varying hardness,
+which chapter 12 is explicit about; the bed has it in the coastal loop and it
+does not reach the subaerial surface.
+
+### 12 · No airborne spray — and at this framing it is nearly free
+
+Deferred by wave 6 with the reason in every `s6-` caption, and **at bar J's and
+bar K's distances it is the smallest item on this list that is still real**. Bar
+J itself says so: *"nothing in it resolves foam texture, spray, the waterline's
+fine structure or the swash… a critic may not credit texture-scale work against
+this image."* The breaking surface is 15.85% of frame J, at ranges over 200 m,
+where a droplet cloud is sub-pixel structure that a coverage already carries in
+the mean.
+
+**This is the surprise worth stating loudly.** The one gap every frame in waves
+4–6 apologised for is, at the two viewpoints the gauntlet actually requires,
+close to the bottom of the list. It stays a blocker for the *close* frames of
+sections C, D and H2 and for the "no placeholder in a hero frame" criterion —
+but as a thing that breaks *these* frames, it is behind ten other things.
+
+### 13 · There is no shadow ray, and it costs exactly zero
+
+`shade_land` has never had one. Measured by marching from every land hit toward
+the sun:
+
+| sun | land facing it | of that, occluded and lit anyway |
+|---|---|---|
+| the render's, 21.02° / 273.75° | 100.0% | **0.0%** |
+| bar J's own class, 56.22° / 123.13° | 100.0% | **0.0%** |
+
+**Zero under both.** Not because the shading is right but because wave 3's
+landform is a ramp and a cliff face with nothing on it to cast a shadow. **Two
+gaps hiding each other**, and the ordering matters: building the shadow ray
+first would produce no visible change and would be recorded as a wasted wave.
+Build the relief (gaps 1, 3, 11) and this one becomes visible in the same move.
+
+### 14 · The earth is flat, and it is worth two pixel rows
+
+`trace` meets a plane at `z = 0` that runs to 40 km and has no horizon. The true
+horizon from this eye is at **16.28 km**, so **23.7 km of the ocean in frame
+does not exist** — and the whole of it is compressed into
+
+```
+    dip - atan(z/far) = 0.1229 - 0.0258 = 0.0971 deg = 1.76 pixel rows
+```
+
+at this raster, 3.7 rows at the phone's own 4032. **Last on the list, on
+evidence.** It sounds like a serious physical omission and it is the cheapest
+thing in the frame; the reason it is measured at all is so that no future wave
+spends itself there.
+
+## C4 · What surprised me, and where the ordering inverts the intuition
+
+1. **Nobody had looked at the land.** Six waves of increasingly careful water —
+   three constituents, a cuvette inversion, second-order Stokes, a size-resolved
+   bubble plume — and the beach in the beach scene is 6 m wide and classified as
+   rock. Every previous frame was aimed at the water, so nothing in six waves'
+   worth of diagnostics reported it. **The frame found it, exactly as wave 6's
+   W1 found the sheet of milk**, and that is now twice that a picture caught
+   something no printed table did.
+2. **The gap every caption apologised for is near the bottom.** Airborne spray
+   is 12th. At J's and K's distances the bar itself forbids crediting or
+   debiting texture-scale work.
+3. **Two of the most physical-sounding omissions cost nothing here** — the
+   shadow ray (0.0%) and the earth's curvature (1.8 rows) — and one of them
+   costs nothing *because another gap is hiding it*.
+4. **The cheap one that is high on the list is the air.** One exponential with a
+   coefficient already in `atmosphere.py`, plus one `?` for the aerosol, and it
+   closes the sea–sky seam that bar K2 calls a tell visible at a glance — a
+   **53–67%** discontinuity where the physics says zero.
+5. **A defect can be framing-dependent and still be a defect.** The banded sea
+   of gap 7 has been in every frame this project has drawn and is invisible in
+   all of them, because until this wave nothing looked at the water at grazing
+   incidence. Changing the camera found a shading gap.
+6. **The instrument nobody reached for is the surf-line separation.** The dip is
+   the famous horizon measurement and it is useless at cliff heights; the line
+   separation is a strong function of the eye height, has a closed-form ceiling,
+   and is readable off any frame that shows two breaking lines.
+
+## Frames
+
+| file | what it is |
+|---|---|
+| `s7-frame-J.png` | **the deliverable**: bar section J's framing — upright, 0.5× ultrawide, from the bed's own cliff brow, at the inferred depression. Every parameter and every gap number in the caption is formatted from the run that drew the frame |
+| `s7-frame-K.png` | bar section K's framing — upright, same camera code and same lens, aimed down the sun's own azimuth because that is what section K is |
+
+**The s7 pair does not take `--fast`, and that is wave 6's rule applied rather
+than broken.** `s4-`, `s5-` and `s6-` are three terms of one comparison at one
+camera and one raster size, so all three are drawn at 450 px. The s7 pair has no
+earlier term, so its size is free and it is fixed at 720 × 960 with 2 × 2
+supersampling. Nothing measured off it depends on the raster except the far
+range tail, and `aerial_cost` reports that dependence in the same line it
+reports the tail.
+
+**Every caption is formatted from the run that drew the frame.** No number is
+typed into a caption string in this wave.
+
+## C5 · One thing outside the camera: the bubble's Fresnel, per channel
+
+Found by a chapter builder independently verifying wave 6's bubble trace, and
+fixed here because it is one line in `beach_foam.py`.
+
+`_fresnel_internal` evaluated **all three channels at red's refracted cosine**.
+`optics.fresnel` broadcasts a scalar cosine to three channels, so the array
+shape was right; the energy sum still closed, because `R` and `1 − R` were
+consistent with each other *at the wrong angle*. A wrong **angle** per channel is
+invisible to every shape and energy check in the file.
+
+Fixed per channel, the disc-average of the internal reflectance **recovers
+`optics.R_INT` in all three bands to seven digits**:
+
+|  | R | G | B |
+|---|---|---|---|
+| traced, by quadrature over the impact parameter | `0.473713` | `0.476167` | `0.480681` |
+| `optics.R_INT = 1 − (1 − R_EXT)/n²`, by reciprocity | `0.473712` | `0.476166` | `0.480681` |
+
+An impact parameter uniform over the **disc** is a cosine weighting over the
+hemisphere, so the disc-average **is** the diffuse internal reflectance. Two
+routes sharing no code, three numbers, seven digits — the strongest row in the
+foam section, and the shipped version was throwing two thirds of it away.
+
+`b_b/b` moves `0.0230 → 0.0233` in green; wave 6's twenty-fold finding is
+untouched. **Two absolute rows moved with it**, 0.11% each — the plume's `T` and
+`R` at `α = 0.03` — and **every ratio row in the section survived the defect
+unchanged**. Fifth time in this project an absolute row was the only thing that
+could have seen it.
+
+## The suite
+
+**263 pass / 0 FAIL / 0 ERROR / 9 open / 67 info**, up from wave 6's
+`226 / 0 / 0 / 7`. The pool stays `285 pass / 0 FAIL / 54 info`, unchanged —
+wave 7 adds one file and edits `beach_render.py`, `beach_foam.py` and
+`validate_beach.py`, none of which the pool imports.
+
+`_sec_camera` is **36 pass / 0 FAIL / 2 open / 1 info**, and `_sec_foam` gains
+one row for the recovery above.
+
+**Every camera parameter the inference derives has an absolute row**: the
+vertical and horizontal fields of view, the depression, **and the depression's
+own uncertainty**, for both frames. The uncertainty gets a row deliberately —
+without one, a future wave could narrow the interval silently and be claiming
+evidence it does not have.
+
+Two rows are worth naming:
+
+- **`the refracted dip is Bowditch's table, ABSOLUTE`** — `1.757` arcminutes per
+  `√m`, against a published dip table rather than against itself. It is what
+  `REFRACTION_K` is fitted to, and the row is the fit.
+- **`the BUILT camera puts the horizon where the inference says`** — the ray
+  field of the camera actually used against the projection the inference
+  reported, to one pixel row. It is the only row in the section that touches the
+  renderer, and it is the one that catches a vertical field of view passed where
+  a horizontal one belongs — an error every arithmetic row above it is blind to.
+
+Six deliberate defects in `--bugs-camera`, **all six caught**:
+
+| bug | rows |
+|---|---|
+| `fov-on-the-long-side` — the equivalence on the long side, not the diagonal | 11 |
+| `landscape-not-upright` — the same lens held the other way | 12 |
+| `dip-unrefracted` — drop the 7% refraction correction | 7 |
+| `separation-small-angle` — keep `z s/D²` and lose the ceiling | 5 |
+| `hfov-scaled-linearly` — `h = v·W/H` instead of the tangents | 1 |
+| `flat-sea-no-horizon` — report the flat plane as costing nothing | 1 |
+
+and one more in `--bugs-foam`:
+
+| bug | rows |
+|---|---|
+| `bubble-fresnel-one-channel` — every channel at red's refracted cosine | 3 |
