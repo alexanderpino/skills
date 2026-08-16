@@ -11,6 +11,7 @@ it against things that were not written here.
     python3 beach_render.py      # wave 4: the three rendered frames, and every
                                  # number in "Wave 4" below
     python3 validate_beach.py --bugs-camera   # wave 7's six camera defects
+    python3 validate_beach.py --bugs-land     # wave 8's seven land/air defects
 
 | File | Owns |
 |---|---|
@@ -3148,3 +3149,595 @@ and one more in `--bugs-foam`:
 | bug | rows |
 |---|---|
 | `bubble-fresnel-one-channel` — every channel at red's refracted cosine | 3 |
+
+# Wave 8 — the land, and the air
+
+Wave 7 put the camera at the owner's viewpoints and produced an ordered gap
+list. **The top of it was not water.** Six waves of increasingly careful sea —
+three constituents, a cuvette inversion, second-order Stokes, a size-resolved
+bubble plume — and the beach in the beach scene was `6.0 m` wide with a face
+slope of `1.000`, which `shade_land`'s own classifier called **rock**.
+
+This wave closes gaps **1, 2, 8, 9 and 13** of that list: a subaerial beach, the
+wet/dry sand pair, the sea–sky seam, the aerial perspective, and the shadow ray
+that gap 1 unblocks. It then **re-orders the list**, which is the second half of
+the deliverable — closing five items changes what is now worst, and the wave
+that does not re-rank has only done half its job.
+
+**New suite section `_sec_land`.** New frames `s8-frame-J.png` (the pair to
+`s7-frame-J.png`, same camera), `s8-air.png` (a triplet: no air, clean, hazy),
+`s8-beach-profile.png`.
+
+## The whole of it, before the details
+
+- **Three numbers make a subaerial beach and every one of them is derived from
+  something this file already owned.** The face slope is the Dean equilibrium
+  profile's own slope where the surf-zone model hands over to the swash,
+  `(2/3)·A^{3/2}/√d = 0.05282` — and **the evolved bed agrees to 0.2%** at its
+  innermost resolved cell, which is a second instrument that could have
+  disagreed. The dry beach's width is `√(H₀L₀) = 13.77 m`, **with the slope
+  divided out of Hunt's run-up**, so it needs no constant at all. The elevations
+  are the swell's run-up limit `0.727 m` and the file's own storm's `1.029 m`.
+- **`optics.wet_albedo` has a specular term inside it and four waves spent it as
+  diffuse.** `a_wet = R_EXT + (1−R_EXT)(1−R_INT)a/(1−a·R_INT)`: the leading
+  `R_EXT` is light that never entered the film. Handing the whole expression to
+  a Lambertian makes wet sand **brighter** and never glossy — bar H3 exactly
+  backwards, twice. Split, wet sand is darker than dry in every channel *and*
+  carries a lobe. **A finding about how this file uses `optics.py`, not a defect
+  inside it**; the module is not touched.
+- **The wet/dry boundary is a distribution and not a line, and the distribution
+  was already in the file.** Run-up heights inherit the incident waves' Rayleigh
+  statistics, so the wetted share is the exceedance `exp(−(z/R)²)`. Nothing is
+  placed. Checked against 400 000 Rayleigh variates from a generator that has
+  never heard of beaches.
+- **The air needed one new number and not two, and it closes the seam by
+  construction.** `β = atmosphere.TAU_R/8.5 km` per channel is not new. The
+  airlight is not a declared colour either: in a horizontally homogeneous
+  atmosphere **an infinitely long horizontal path reaches the horizon sky, by
+  definition**, so at grazing the sea's radiance goes to the sky's identically.
+  Bar K2's continuity criterion is then satisfied whatever `β` and whatever the
+  airlight's colour turn out to be — **nothing was fitted and nothing could
+  have been**.
+- **The shadow ray became worth building, and only because the beach was built
+  first.** Wave 7 measured its cost at exactly 0.0% under both suns and gave the
+  right reason: the landform was a ramp and a cliff face with nothing on it to
+  cast one. There is now a beach at the foot of a 15 m cliff.
+- **Hunt's run-up cannot produce a berm crest, and that contradicts the ordinary
+  picture of a beach.** With one face slope **every run-up limit lies on the
+  same plane** — `R = tan(β)√(HL₀)`, so the swell's limit and the storm's differ
+  only in how far up that one plane they reach. A berm crest is a *break in
+  slope* and needs the swell to **cut** the storm-built profile, which is swash
+  transport this model does not have. What this bed carries is a face, a marked
+  berm *level*, and a flat backshore. **The scarp is `?` and absent, not
+  approximated.**
+- **Gap 2 — 46% of the frame on one albedo — is a missing PROCESS and not a
+  missing constant, and the arithmetic is three orders wide.** See `L6`.
+
+## L1 · The beach face, and the route the file already had does not reach it
+
+`D_MORPH_MIN` has carried this sentence since wave 1:
+
+> the bed inside the swash is shaped by swash, which is not modelled here, so
+> the loop is not allowed to invent an answer for it.
+
+That is a statement about the physics and not only about the numerics, and it is
+what fixes the face slope. **The Dean profile has no shoreline slope**:
+`d = A y^{2/3}` gives `dd/dy = (2/3)A y^{−1/3}`, which diverges at `y = 0`,
+because the profile is derived from uniform energy dissipation **per unit water
+volume** and there is no water volume at the shoreline for the dissipation to be
+uniform in. So a beach face is a separate landform — a straight ramp — and what
+fixes its angle is *where the equilibrium profile stops answering*:
+
+```
+    y_0 = (d/A)^(3/2)          tan(beta) = (2/3) A^(3/2) / sqrt(d)
+```
+
+`0.052819`, **1:18.9**, an ordinary intermediate sandy beach face.
+
+**And it is not only a closed form — the evolved bed agrees.** The 1-D
+morphodynamic loop is run to quasi-steady from a Dean ramp and reshaped all the
+way in by a three-term transport model; it builds a bar that departs from the
+ramp by 0.4 m a hundred metres offshore. Its own slope at the shallowest cell it
+will answer for is **0.0529** against the closed form's **0.0528**. Two
+instruments, one derived and one run, and the second could have disagreed.
+
+**The route this file already had does not work, and saying so matters.**
+`EPS_SLOPE`'s own comment gives the Bailard equilibrium slope as `Sk/ε` — "the
+slope at which gravity balances the skewness drive". Evaluated in the swash it is
+**zero**: the skewness carries a `(1 − f_brk)` factor and the inner surf is fully
+broken, so the model's equilibrium there is a flat terrace. Measured at the six
+innermost resolved cells: `0.148, 0.128, 0.067, 0, 0, 0`. That is the transport
+model saying it has no swash — which is exactly what `D_MORPH_MIN` says — and it
+is why the slope comes from the profile and not from the flux.
+
+**The one soft place, bracketed rather than asserted.** `tan(β)` goes as
+`1/√d`: `0.0988` (1:10) at the transform's own depth floor, `0.0528` (1:19) at
+`D_MORPH_MIN`, `0.0312` (1:32) at 1 m. That factor of `3.162` **is** the observed
+range of sandy beach faces, so the bracket is honest and the middle of it is not
+a coincidence — but a reader should know this is the softest of the three
+numbers.
+
+## L2 · The width has the slope divided out of it, and that is the whole trick
+
+Hunt's `R = ξH` with `ξ = tan(β)/√(H/L₀)` is `R = tan(β)√(HL₀)`. So the
+**horizontal** reach of the swash is
+
+```
+    R / tan(beta) = sqrt(H L_0)
+```
+
+and **the slope cancels**. The width of the dry beach a swell builds is the
+geometric mean of the deep-water height and wavelength: `13.77 m` at this
+scene's swell, `19.47 m` at the file's own storm. Closed form, no constant, and
+it replaces a `6.0 m` leftover.
+
+The suite checks it three ways — against `√(H₀L₀)` directly, against
+`runup_hunt(iribarren(…))/tan β` composed the long way round, and by doubling
+and halving `tan β` and watching the excursion **not move** while the run-up
+limit does. That last pair is what stops the two quantities being confused.
+
+## L3 · Hunt cannot make a berm crest, and this overturns the ordinary picture
+
+A textbook beach profile is *face, berm crest, backshore* with a **break in
+slope** at the crest. This model cannot produce one, and the reason is
+structural rather than a missing coefficient:
+
+> `R = tan(β)·√(H·L₀)` at fixed `β` puts **every** run-up limit on the **same
+> plane**. The swell reaches `0.727 m` and the storm reaches `1.029 m` — but
+> both are points on one straight face at `1:18.9`, `13.77 m` and `19.47 m` from
+> the waterline. There is nothing for a crest to be.
+
+A berm crest is what the *ordinary swell* leaves when it **cuts** the profile the
+storm built, which is a swash-zone transport this file does not have and cannot
+borrow from the surf-zone flux (see `L1`). So what this bed carries is:
+
+| feature | elevation | from |
+|---|---|---|
+| beach face | 0 → 1.029 m over 19.47 m | `tan β` and the storm excursion |
+| the **berm level** at 0.727 m | a marked level *on* the face | the swell's run-up |
+| backshore | flat at 1.029 m, to the cliff foot | the storm's run-up |
+| the berm **scarp** | — | **`?`, absent, not approximated** |
+
+**And the backshore is nearly zero-width on this coast, which is a result and
+not a defect.** The wedge is anchored at the cliff foot — the cell where the
+rock crosses the backshore elevation — and the cliff on this bed comes down at a
+slope of 1.2. So there is no terrace between the beach and the rock. That is
+what a cliffed coast looks like; a wide dry backshore belongs to the embayment
+this bed does not have, which is gap 3.
+
+## L4 · The beach had to be anchored at the cliff foot, and the first attempt had zero capacity
+
+The obvious construction — a wedge built *landward* of the present waterline, up
+to the run-up limit — **produces nothing on this coast**, and measurably so: the
+rock crosses `1.029 m` within `60 cm` of the shoreline, so the capacity is zero
+in every row. A beach on a cliffed coast is a body of sand standing **seaward**
+of the cliff, prograding, and its landward limit is where the rock reaches the
+backshore elevation. That is what is built, and the shoreline moves seaward by
+about 13 m as a consequence.
+
+**The budget is the loop's and it is a check, not a knob.** `coastal_step` now
+reports the beach-grade sand it produced **per row** — the same `ero` the
+deposition already uses, summed on a different axis, so no measurement in
+`_sec_coast` moved by a bit. The wedge needs about `35 m³` per metre of coast
+and the loop delivered about `206`. A factor of six, so **the width is set by
+the profile geometry and not by the supply**, and `supply_limited` is returned
+as a boolean beside the factor so a starved coast cannot reach that state
+silently.
+
+**What is placed, marked.** The fill is applied at **composition time**, in
+`bay_bed`, and not inside `coastal_step`'s iteration. Inside the iteration the
+beach moves the waterline the notch attacks and the cliff stops retreating — a
+real feedback (a beach protects a cliff) and a wave of its own, because it
+changes the plan-form every row in `_sec_coast` is measured on.
+
+**And a dead parameter fell out of it.** `coastal_step` took
+`beach_height=BEACH_HEIGHT` in its signature and **never read it** for seven
+waves; the deposition band was the literal `sea_level − 3.0`, an undeclared
+number, and the chapter's own subaerial limit was quietly not implemented. That
+is *why* the scene had no beach. The dead parameter is gone; the literal is now
+named `toe_depth` and **its value is unchanged**, because naming it and changing
+it in one move would have made every `_sec_coast` measurement incomparable with
+wave 7's. Its physical meaning is the closure depth, and Hallermeier's relation
+puts that at `3.2 m` for this sea state — 7% from the literal somebody wrote.
+
+## L5 · `wet_albedo` contains a specular term, and four waves spent it as diffuse
+
+Bar H3 is one of the cleanest transfers in this project:
+
+> Wet sand darkens because a thin film traps light between the surface and the
+> substrate — the trapped series, which this project derived for the liner as
+> `wet_albedo`… **It applies to sand unchanged.** The wet band also goes
+> *specular* where the dry sand is matte, so `base_color` and
+> `specular_roughness` move together.
+
+`shade_land` had `SAND_WET = optics.wet_albedo(SAND_DRY)` since wave 4 and put
+the whole of it in a Lambertian lobe. But
+
+```
+    a_wet = R_EXT  +  (1 - R_EXT)(1 - R_INT) a / (1 - a R_INT)
+            \____/    \______________________________________/
+           the film's        the trapped series: what actually
+           own surface       comes back OUT of the substrate
+           reflection
+```
+
+and the first term is light that **never entered the film**. Handing it to the
+diffuse lobe makes wet sand *uniformly brighter* and *never glossy* — which is
+bar H3 backwards twice over, because the thing it calls "one of the strongest
+tonal edges in these frames" is wet sand going **darker and shinier at once**.
+
+The split needs nothing new:
+
+| | goes to | value |
+|---|---|---|
+| `a_wet − R_EXT` | the diffuse lobe | strictly darker than dry sand |
+| `fresnel(θ_v)` | a specular lobe | the directional form of the same term |
+
+`R_EXT` is the hemispherical-average external reflectance, which is the right
+thing to *remove* from an albedo lit by a hemisphere; what is *added back* is
+`fresnel(θ_v)` at the view angle, which is the right thing for a lobe. They are
+the same physics integrated over different variables, and the swap is stated
+rather than hidden. **`optics.py` is not touched** — this is a finding about how
+this file used the module.
+
+**The lobe's sky half needs no roughness at all.** A smooth film mirrors a
+smooth sky, so `fresnel(θ_v)·env_diffuse(mirror)` is exact in the smooth-film
+limit and a rough film moves it by nothing measurable. Only the **sun's** glint
+needs a slope distribution, and that is `SIGMA_WET`, **the one new unknown this
+wave adds**: declared `0.20`, bracketed `0.10–0.40`, `?`, and it moves nothing
+but the glint.
+
+**`beach_optics.glitter_radiance` is not called, and the reason is a finding
+about it.** It assumes the mean surface is **horizontal** — it builds the
+required normal from `s + r` and reads its `z` as `cos β`. A beach face is 3.0°
+off horizontal and a wet rock face is not, so the half-vector has to be taken
+against the **local** normal. Reported, not patched.
+
+## L6 · The plateau's flatness is a missing PROCESS, and the arithmetic is three orders wide
+
+Gap 2 asked for "at minimum, the same treatment any other surface gets: an
+albedo with a stated source, a normal, and shadowing". Two of the three are
+there and one is not, and the interesting result is *why* the third is hard.
+
+Differential subaerial weathering keyed to the hardness field this file already
+owns would lower soft rock faster than hard and produce relief. The rate is a
+fraction of the marine erosion rate, and published denudation rates for a
+coastal plateau (0.01–0.1 mm/yr) sit against cliff-retreat rates of
+0.05–0.5 m/yr — **a ratio near `1e-3` to `1e-4`**. This coast retreated `182 m`
+over the loop's clock, so the plateau lowered somewhere between **2 cm and
+18 cm**, and the relief is the *contrast* times that: a few centimetres over
+correlation lengths of hundreds of metres. **Slopes of `1e-4`.** Invisible, and
+invisible under **any** coefficient in the bracket.
+
+So gap 2 is not "declare a weathering rate". The relief on a real coastal plain
+is **drainage** — fluvial incision, a different process on a different clock,
+and out of chapter 12's scope entirely. That is why this wave measures it and
+does not build it, and it is why gap 2 moves *down* the re-ordered list rather
+than up: it is expensive, not cheap, and wave 7 ranked it second on its **share
+of the frame** rather than on what it would take to close.
+
+The albedo stays `?`. What is now stated is what it would take to close it: a
+reflectance measurement or a vegetation model, neither of which the bar licenses
+being read off a photograph.
+
+## L7 · The air, and why the seam closes by construction
+
+Bar K2 makes the sea–sky seam a criterion — "any seam there is a tell visible at
+a glance" — and wave 7 measured it at **53–67% off continuity** where grazing
+Fresnel says the difference should be zero.
+
+```
+    L(r) = L_surface * exp(-beta r)  +  L_airlight * (1 - exp(-beta r))
+```
+
+**The Rayleigh coefficient is not a new constant.** `atmosphere.TAU_R` is the
+zenith optical depth this project derived four waves ago for the sun's own
+colour; over an exponential atmosphere of scale height `H` the surface
+coefficient is `β = τ/H` by the definition of the integral. Per channel, so the
+airlight's colour is right without anything being declared:
+`1.1943e-5 /m` in green.
+
+**The aerosol coefficient is the one `?`.** Koschmieder's `β = 3.912/V` and a
+maritime boundary layer runs 20–60 km. The **clean end is shipped** — it is the
+conservative choice for a gap being closed, since it understates rather than
+overstates what the new term does — and the hazy end is **rendered beside it**
+in `s8-air.png` rather than described. It is *not* read off bar J or bar K: the
+standing ruling forbids reading a level off them, and horizon sharpness is a
+level.
+
+**The airlight is not a declared colour, and this is the part worth reading.**
+In a horizontally homogeneous atmosphere, a horizontal path of *infinite* length
+reaches exactly the radiance of the sky at the horizon in that azimuth — **that
+is what the horizon sky is**. So the airlight is `sky_radiance` evaluated on the
+ray flattened to the horizontal. It costs nothing, it carries the azimuthal
+structure (bright toward the sun, dark away from it), it needs no new number,
+and:
+
+> at grazing the sea's range goes to infinity, its transmittance to zero, and
+> its radiance to the airlight — **which is the sky just above the horizon**.
+> Bar K2's criterion is satisfied *identically*, whatever `β` and whatever the
+> airlight's colour turn out to be. **Nothing was fitted and nothing could have
+> been.**
+
+The suite carries that as a row: `aerial` at `r = 1e9` must return
+`sky_radiance` of the flattened ray to `1e-12`. Take the airlight in the **view**
+direction instead — which looks more physical, because the light does come from
+where you are looking — and the row fires and the seam reopens.
+
+**Two approximations, both marked, and both vanish at the seam.** A slant path
+is shorter through the atmosphere than a horizontal one, so the airlight on a
+steeply downward ray is over-stated — and a steeply downward ray is looking at
+the ground under the camera, where `1 − T` is `0.0002`, so the error is where
+the term is not. And the aerosol's airlight is given the Rayleigh sky's colour,
+which over-blues the haze; the aerosol phase function is forward and nearly grey
+and a proper source function needs a model this file does not have.
+
+## L8 · The shadow ray, and the ordering wave 7 argued for was right
+
+Wave 7 measured the missing shadow ray at **exactly 0.0% under both suns** and
+said why: "not because the shading is right but because wave 3's landform is a
+ramp and a cliff face with nothing on it to cast one. **Two gaps hiding each
+other**, and the ordering matters: building the shadow ray first would produce
+no visible change and would be recorded as a wasted wave."
+
+That was correct and this wave is the test of it. The ray is a hard one and the
+softness it is missing is stated rather than faked: the sun's disc is 0.53°
+across, so a real shadow edge is penumbral over about 1/100 of the distance to
+the caster — **0.4 m at the foot of this cliff**, under a pixel at bar J's range.
+
+**The reach is the landform's own and not a declared distance.** Nothing can
+cast a shadow further than its height divided by the tangent of the sun's
+elevation, so the march stops at `h_max/tan(el)` — 42 m at the render's 21° sun
+and 12 m at bar J's 56° one. Wave 7's `shadow_cost` marched a fixed 600 m for the
+same answer.
+
+The suite checks it on a **synthetic bed with one wall on it**, so the answer is
+arithmetic rather than a picture: a 10 m wall under a 30° sun shadows 17.32 m
+and the edge is checked in metres.
+
+
+## L9 · One more finding, in the water path, reported and not patched
+
+`Water.__init__` builds its bed-reflectance ladder as
+
+    OPT.rho_water(SAND_WET, ..., absorb=...)
+
+and `SAND_WET` is `optics.wet_albedo(SAND_DRY)`. But `rho_water`'s own docstring
+says what it expects: *"the share of the beam falling on the SURFACE that comes
+back out of it, EXCLUDING the surface's own reflection"* — it already carries
+`(1 - fresnel)` on the way in and `slab_esc` on the way out. So the `R_EXT` term
+at the head of `wet_albedo` is **a specular reflection off the top of a film
+that does not exist under three metres of water**, and the `(1 - R_EXT)(1 -
+R_INT)` pair with it is a second in-and-out transmission through an interface
+already counted.
+
+The bed of a bay *is* wet — its grains sit in pore water and the trapped series
+between grain and water is real — so the right argument is the **diffuse** half,
+which is exactly `SAND_WET_DIFF`, the quantity `L5` above had to construct
+anyway:
+
+| | R | G | B |
+|---|---|---|---|
+| dry sand | 0.4500 | 0.3900 | 0.3000 |
+| `wet_albedo`, as passed | 0.3473 | 0.3008 | 0.2373 |
+| the diffuse half, which is what belongs there | 0.2811 | 0.2342 | 0.1698 |
+| **over-bright by** | **1.236×** | **1.285×** | **1.398×** |
+
+**Reported and not patched, deliberately.** It is in the water path, and
+changing it moves every colour measurement waves 4–7 published, the `s4/s5/s6`
+three-frame comparison, and the bar-J ladder's first three rungs — a wave's
+worth of re-measurement, not a line. It is recorded here, in the gap list, and
+in `rounds.jsonl`, and it is the **sixth** time in this project that the same
+class of error — a shared closed form used one interface off — has been found.
+
+## L11 · The suite
+
+**`_sec_land` is 38 pass / 0 FAIL / 5 open**, and the beach suite goes
+`263 → 301 pass / 0 FAIL / 0 ERROR / 14 open`. The pool stays
+**285 pass / 0 FAIL / 54 info** — wave 8 edits three beach files and none of
+the pool's.
+
+Every new quantity has at least one absolute row, and where a second instrument
+existed it is used:
+
+| quantity | checked against |
+|---|---|
+| the face slope | a finite difference on `dean_bed`, written in wave 1 for the submarine bed |
+| | the evolved 1-D loop's own slope at its innermost cell — **0.24% apart** |
+| the swash excursion | `runup_hunt(iribarren(…))/tan β` composed the long way, and `tan β` doubled and halved |
+| `swash_wetness` | **400 000 Rayleigh variates** from `numpy`'s generator |
+| the albedo split | `diffuse + R_EXT = wet_albedo` to `1e-15` |
+| the slope pdf | integrated over the slope plane to `1` — *the function the shader calls* |
+| the sun lobe | the closed form at exact specular, per channel |
+| the airlight | `sky_radiance` of the flattened ray, on a near-horizontal **and** a 50° ray |
+| the shadow | a synthetic bed with one wall: `h/tan(el)` in metres |
+
+Seven deliberate defects in `--bugs-land`:
+
+| bug | rows |
+|---|---|
+| `face-slope-at-break` — the slope 100 m offshore, which is what waves 4–7 fed to Hunt | 8 |
+| `swash-linear-band` — the wet/dry boundary as a ramp, which is what `shade_land` carried | 4 |
+| `wet-albedo-all-diffuse` — the whole trapped series in the Lambertian lobe | 1 |
+| `beta-no-scale-height` — `τ` used as if it were `β` | 1 |
+| `shadow-reach-one-cell` — the march stopped at one cell | 1 |
+| `airlight-view-direction` — the airlight where you are looking, not at the horizon | — |
+| `specular-no-jacobian` — the slope density used as a radiance | — |
+
+**Two of the seven caught nothing in their first draft, and that is recorded
+rather than quietly fixed**, because both failures were failures of the *rows*:
+
+- `airlight-view-direction` was invisible because the row's test ray was
+  **near-horizontal**, where the view direction and the horizon *are* the same
+  direction. A ray at 50° of depression was added, and it is the row that
+  matters.
+- `specular-no-jacobian` was invisible because the normalisation row **rebuilt
+  the slope density beside itself** instead of calling the shader's. A row that
+  rebuilds the thing it is testing tests the row. The density and the Jacobian
+  are now their own functions, `wet_slope_pdf` and `sun_jacobian`, the row
+  integrates the one the shader calls, and a second row checks the whole lobe at
+  exact specular where every factor is known.
+
+That is the same disease the harness has now caught in itself three times — a
+guard pinned to the one place in its own domain where the wrong answer cannot be
+told from the right one.
+
+## L10 · THE RE-ORDERED GAP LIST
+
+Wave 7's list is superseded. Five of its fourteen items are closed or
+substantially closed, **two of its rankings were wrong for reasons this wave
+measured**, and four new items enter. The ordering is still by *what it costs
+the frame*, not by how interesting it is to fix.
+
+### Closed by wave 8
+
+| wave 7 | item | what closed it |
+|---|---|---|
+| **1** | the beach is missing | a face, a berm level and a backshore, all three derived; the ladder goes **3 rungs → 5** |
+| **8** | the sea–sky seam, 66.7% off | the air. **66.7% → 18.1%** at 60 km, and the remainder is gap 14 below |
+| **9** | no air at all over a 38 km frame | one exponential, no new constant except the aerosol `?` |
+| **10** (half) | no wet/dry boundary | the Rayleigh exceedance and the specular split; **wet sand is 3.07% of the frame and dry 0.55%**, both from 0.00 |
+| **13** | no shadow ray | built — **and it is still worth nothing, for a new reason**. See #10 below. |
+
+### The list now
+
+**1 · There is no embayment and there are no headlands.** *(was 3)*
+It rises to the top because everything above it that could be fixed has been,
+and because wave 8 added a fifth thing that it blocks. It is bar J's **subject**
+— "headland to headland, cliff behind, a curved sand beach" — and this bed has
+50 m of plan curvature in 1408 m. It is why the coastal plain is half the frame
+(old gap 2), why the eye is 17.31 m where the frame demands 25–102 m (old gap
+4), why the refraction criterion — **the cheapest verification in the whole
+project, "do the surf lines follow the curve"** — cannot be checked by eye, and
+now also **why the dry beach rung is thin**: a wide dry backshore belongs to a
+bay beach, and on a cliffed coast the talus takes the top of the wedge (`L3`).
+One gap feeds five.
+
+**2 · The illuminant is in the wrong half of the sky.** *(was 5, and it rises
+for a reason wave 8 measured rather than argued)*
+Wave 7 ranked this fifth on the strength of a clipped-pixel count. Wave 8 gives
+it a sharper instrument: **the wet/dry sand pair is now in the frame, and under
+this sun it reads backwards.** Diffusely wet sand is darker than dry in every
+channel, which is bar H3's direction; *in total* it is 1.57–1.64× **brighter**,
+because a 21° sun straight out to sea backlights the wet band and its new
+specular lobe glints down the lens. Bar J's own class of frame is front-lit.
+**The one comparison bar J calls "the most trustworthy of the set" is present
+and lit wrong**, which is a far stronger statement than "6.55% of the frame
+clips". Still a wave of its own: `atmosphere.py`'s four illuminants descend from
+one geometry and moving the sun moves the pool's seventeen frame hashes.
+
+**3 · One surf zone where bar J shows three to four separated lines.** *(was 6)*
+Unchanged in substance and up by three places because the things above it went.
+Section B is parked with its mechanism named (2DH rip-feeder circulation, out of
+chapter 12's scope). It is the largest remaining **water** disagreement and it
+removes the eye-height instrument's own subject, so it and #1 measure each
+other.
+
+**4 · The eye is 17.31 m where the frame demands 25–102 m.** *(was 4)*
+Coupled to #1 and not fixable without it.
+
+**5 · The sea at grazing reads as hard shore-parallel bands.** *(was 7)*
+The air has softened it — the far sea is now 90% airlight in clean 60 km
+visibility — but the resolved field's mean square slope is still `0.0013`
+against Cox & Munk's `0.0335`, and the missing 96% is carried statistically for
+**radiance** and not at all for **silhouette**. Not a call to add noise.
+
+**6 · Forty-six per cent of the frame is one declared albedo.** *(was 2 — and it
+falls, on measurement)*
+Wave 7 ranked it second on its **share of the frame**. Wave 8 ranks it sixth on
+what it would **take**, which is the ordering the list claims to use. It now has
+a normal (median tilt 12.55°, spread 3.72°) and a shadow ray. What it does not
+have is relief, and `L6` shows the relief a weathering model could produce is
+**slopes of 1e-4** — three orders below visible, under *any* coefficient in the
+published bracket. The relief on a real coastal plain is **drainage**, a
+different process on a different clock and out of chapter 12 entirely. So this
+is expensive, not cheap, and its share of the frame is mostly #1 wearing a hat.
+
+**7 · The bed under the water is 1.24–1.40× too bright.** *(NEW — `L9`)*
+`optics.rho_water` is handed `wet_albedo(SAND_DRY)` as its bed reflectance, and
+`rho_water` already carries the air–water interface. The `R_EXT` at the head of
+`wet_albedo` is a specular reflection off the top of a film that does not exist
+under three metres of water. It touches the teal rung and the surf, which are
+12.3% and 2.3% of frame J. **Reported and not patched** — changing it moves
+every colour measurement waves 4–7 published and the `s4/s5/s6` comparison.
+
+**8 · No swash: the moving waterline and the laden backwash.** *(was 10, half
+closed)*
+The wet/dry boundary is built. What is not is bar H2's **swash proper** — a
+wetting/drying bed with a moving shoreline, sediment in the retreating sheet,
+and foam stranded as lace with a different residence time from the water that
+left it. A close frame, not this one.
+
+**9 · The berm scarp.** *(NEW — `L3`)*
+Hunt's run-up with one face slope puts **every** run-up limit on the same plane,
+so this model cannot produce a break in slope at the berm crest. It is a
+structural limit rather than a missing constant, and it needs the swash
+transport #8 needs.
+
+**10 · The shadow ray costs 0.0%, and wave 7's reason for that is now wrong.**
+*(was 13)*
+Wave 7 said the ray was free "because the landform has no relief to cast one".
+It has relief now — a 15 m cliff over a 12 m beach — and the ray is still worth
+almost nothing, for a **different and geometric** reason: **both illuminants
+this project owns are on the seaward side of a west-facing coast**, and a cliff
+shadows its own beach only when the sun is landward *and* low. The render's is
+21° in the west; bar J's own class is 56° in the south-east, which is landward
+but high. Under a **20° morning sun at azimuth 110°** it is not free at all, and
+that counterfactual is the only measurement that could tell the two explanations
+apart. **A wave that had built the shadow ray without building the beach would
+have concluded the ray was worthless. It would have been right by accident.**
+
+**11 · No shore platform.** *(was 11)* Section H1, unbuilt. The bed has spatially
+varying hardness in the coastal loop and it does not reach the subaerial
+surface.
+
+**12 · The beach's feedback on the cliff is not closed.** *(NEW — `L4`)*
+The wedge is laid at composition time, not inside `coastal_step`'s iteration.
+Inside it, the beach moves the waterline the notch attacks and the cliff stops
+retreating — a real feedback that changes the plan-form every row of
+`_sec_coast` is measured on.
+
+**13 · No airborne spray.** *(was 12)* At bar J's and bar K's distances the bar
+itself forbids crediting or debiting texture-scale work. Still a blocker for the
+close frames of sections C, D and H2.
+
+**14 · The earth is flat, and it is now worth slightly more than it was.**
+*(was 14)*
+Still 1.76 pixel rows of over-painted sky. But it has acquired a second job:
+**the residual 18.1% of the sea–sky seam is the flat plane's finite range.** The
+sea at the horizon row is at 36 km, not infinity, so its transmittance is 0.062
+rather than 0 and 6% of the surface radiance survives to the film. In hazy 20 km
+air the same row is fully extinguished and the seam closes further. Two gaps
+that were independent in wave 7 are now coupled, and the coupling is measurable.
+
+**15 · `SIGMA_WET` and the aerosol visibility.** *(NEW, both `?`)*
+The wet film's residual rms slope (0.20, bracket 0.10–0.40) and the maritime
+visibility (60 km shipped, bracket 20–60 km). Both are rendered across their
+brackets rather than described.
+
+## What surprised me
+
+1. **Nobody had looked at the land, and the reason the beach was missing was a
+   dead function parameter.** `coastal_step` took `beach_height` and never read
+   it; the deposition band was an undeclared literal that stopped at the datum.
+   Seven waves, and the chapter's own subaerial limit was simply not
+   implemented.
+2. **The width of a beach needs no constant, and I did not expect that.**
+   `R/tan β = √(H₀L₀)` — Hunt's run-up is linear in the slope, so the horizontal
+   excursion has the slope divided out of it. A landform dimension in closed
+   form from a deep-water sea state.
+3. **Hunt cannot make a berm.** Every run-up limit on one plane. The most
+   recognisable feature of a beach profile is out of reach of the most-quoted
+   run-up formula, and saying so is worth more than approximating it.
+4. **`wet_albedo` had a specular term in it and four waves spent it as
+   diffuse** — and the effect was to make wet sand *brighter*, which is the one
+   thing bar H3 says it must not be.
+5. **The shadow ray is still free, and wave 7's reason was wrong.** The relief
+   arrived and the ray stayed at zero. It is the sun's quadrant, not the
+   landform, and it took a third counterfactual illuminant to see that.
+6. **The seam does not close all the way, and what stops it is the flat Earth**
+   — the item wave 7 measured and put last on purpose. It is still last, and it
+   is now coupled to the item it was measured to be independent of.
+7. **The one instrument bar J licenses is now present and lit wrong.** Building
+   the beach did not make the wet/dry comparison usable; it made the illuminant
+   gap *measurable*, which is a better outcome than it sounds.

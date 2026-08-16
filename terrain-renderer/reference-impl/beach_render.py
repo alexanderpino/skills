@@ -200,11 +200,29 @@ def wet_specular(D, N, sigma=SIGMA_WET, sun=True):
         com = np.clip((SUN[None] * hv).sum(-1), 0.0, 1.0)
         # the half-vector's tilt off the local normal, as a SLOPE
         s2 = (1.0 - cb * cb) / (cb * cb)
-        p = np.exp(-0.5 * s2 / (sigma * sigma)) / (2.0 * np.pi * sigma ** 2)
         lit = ((n * SUN[None]).sum(-1) > 0.0)
-        g = p / (4.0 * cb ** 4 * ct_v)
+        g = wet_slope_pdf(s2, sigma) * sun_jacobian(cb, ct_v)
         L = L + OPT.fresnel(com) * E_SUN[None] * (g * lit)[..., None]
     return L
+
+
+def wet_slope_pdf(s2, sigma=SIGMA_WET):
+    """Isotropic Gaussian slope density at squared slope `s2`.
+
+    Its own function so the suite can integrate THE ONE THE SHADER USES over
+    the slope plane and get 1. A normalisation row that rebuilds the density
+    beside itself tests the row and not the code -- which is a mistake this
+    file has made before and this is the fix for it."""
+    return np.exp(-0.5 * s2 / (sigma * sigma)) / (2.0 * np.pi * sigma ** 2)
+
+
+def sun_jacobian(cos_beta, cos_theta_v):
+    """dw_v = 4 cos(omega) cos^3(beta) dz -- the SAME change of variables
+    `beach_optics.glitter_radiance` derives for the sea, written out here so
+    the suite can check it apart from the density it multiplies. Geometry, so
+    it transfers from the sea to a wet beach unchanged; the DENSITY does
+    not."""
+    return 1.0 / (4.0 * cos_beta ** 4 * cos_theta_v)
 
 
 # ==================================================== the scene's water column
@@ -3108,8 +3126,8 @@ def beach_report(w, bay, out=print):
     L0 = B.deep_wavelength(B.T_SWELL)
     rows = [
         ('face slope tan(beta)', bw['slope'], B.TAN_FACE, ''),
-        ('subaerial width, m', bw['median'], B.BACKSHORE_W, 'm'),
-        ('landward top, m', bw['top'], B.BACKSHORE_Z, 'm'),
+        ('storm swash excursion, m', B.BACKSHORE_W,
+         B.BACKSHORE_Z / B.TAN_FACE, 'm'),
         ('swell run-up limit, m', B.BERM_Z, B.TAN_FACE * B.SWASH_W, 'm'),
         ('swash excursion, m', B.SWASH_W, B.BERM_Z / B.TAN_FACE, 'm'),
     ]
@@ -3117,6 +3135,16 @@ def beach_report(w, bay, out=print):
     for nm, meas, pred, u in rows:
         out('  %-26s measured %9.4f %-2s   closed form %9.4f   '
             'diff %+8.4f' % (nm, meas, u, pred, meas - pred))
+    out('  the beach the bed ACTUALLY carries is %.2f m wide and tops out at '
+        '%.3f m -- SHORTER than the %.2f m excursion and LOWER than the '
+        '%.3f m storm limit, and neither is a discrepancy: the cliff\'s own '
+        'talus rises into the swash plane %.0f m from the waterline and takes '
+        'the top of the wedge. The beach is complete to the swell\'s berm '
+        'level (%.3f m) and truncated before the storm\'s backshore. That is '
+        'what a cliffed coast looks like, and it is why the DRY rung is thin: '
+        'a wide backshore belongs to the embayment this bed does not have.'
+        % (bw['median'], bw['top'], B.BACKSHORE_W, B.BACKSHORE_Z,
+           bw['median'], B.BERM_Z))
     out('  the identity: R/tan(beta) = %.6f m and sqrt(H0 L0) = %.6f m, '
         'difference %.2e m -- the slope divides out of Hunt\'s run-up and '
         'that is why the dry beach\'s width needs no constant.'
@@ -3453,9 +3481,13 @@ def _cap_J8(w, cam, inf, m, bp, wd, pc_air, pc_sh, seam0):
         '%.4f (1:%.0f) against wave 7\'s 6.0 m at 1.000 -- and NOTHING IS '
         'PLACED: the slope is the Dean equilibrium profile\'s own where the '
         'surf-zone model hands over to the swash (closed form %.4f, and the '
-        'evolved 1-D bed reads %.4f at that depth), the dry width is '
+        'evolved 1-D bed reads %.4f at that depth), the swash excursion is '
         'sqrt(H0 L0) = %.2f m with the slope divided out of Hunt\'s run-up, '
-        'and the backshore is the file\'s own storm at %.2f m. The wet/dry '
+        'and the storm limit is the file\'s own H0_STORM at %.2f m. THE WEDGE '
+        'IS TRUNCATED SHORT OF BOTH and that is a result: the cliff\'s own '
+        'talus rises into the swash plane, so the beach is complete to the '
+        'swell\'s berm level and cut before the storm\'s backshore -- what a '
+        'cliffed coast looks like, and why the dry rung is thin. The wet/dry '
         'boundary is not a line: it is exp(-(z/R)^2), the Rayleigh exceedance '
         'of the run-up. DIFFUSELY wet sand reads %s against dry %s -- darker '
         'in every channel, which is bar H3\'s direction and the direction '

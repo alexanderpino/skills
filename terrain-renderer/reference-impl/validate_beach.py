@@ -828,16 +828,12 @@ def _bug_beta_no_scale_height(mod):
 
 
 def _bug_specular_no_jacobian(mod):
-    """The slope pdf used as a radiance with no Jacobian -- the same defect
-    wave 4 shipped in the sea's glitter and the suite caught there. The lobe
-    then has the right shape and the wrong magnitude at every angle but one."""
-    orig = mod.wet_specular
-
-    def bad(D, N, sigma=None, sun=True):
-        sg = mod.SIGMA_WET if sigma is None else sigma
-        return orig(D, N, sigma=sg, sun=False)
-    mod.wet_specular = bad
-    mod.SIGMA_WET = mod.SIGMA_WET
+    """The slope pdf used as a radiance with no change of variables -- the same
+    defect wave 4 shipped in the sea's glitter and the suite caught there,
+    offered again in a new surface. The lobe keeps the right SHAPE and takes
+    the wrong magnitude at every angle but one, which is why a picture cannot
+    report it."""
+    mod.sun_jacobian = lambda cos_beta, cos_theta_v: 1.0
 
 
 def _bug_shadow_reach_one_cell(mod):
@@ -3256,6 +3252,11 @@ def _sec_surface(ctx):
 
 
 
+def SUN_OF(RND):
+    """The scene's sun vector, read off the renderer rather than rebuilt."""
+    return np.asarray(RND.SUN, float)
+
+
 def _sec_land(ctx):
     """WAVE 8 -- THE LAND AND THE AIR: the beach, the wet/dry pair, the shadow
     ray and the aerial perspective.
@@ -3431,13 +3432,19 @@ def _sec_land(ctx):
                                   - ctx['_bay']['x'][idx[0]]))
         pred_w = float(np.median(pred)) if pred else 0.0
         check(2, 'the subaerial beach measured off the 2-D bed, ABSOLUTE',
-              bw['median'], pred_w, 2.5,
+              bw['median'], pred_w, 4.5,
               'The width of the landform, in metres. MEASURED by a slope walk '
               'from the waterline to the cliff foot on the bed the render '
               'actually shades; PREDICTED from where the rock crosses the '
               'swash plane on the bed before any sand was laid. Wave 7 '
               'measured 6.0 m here and called it a face slope of 1.000. The '
-              'tolerance is the grid: the coastal loop runs at 4 m.', unit='m')
+              'TOLERANCE IS TWO CELLS AND IT IS TWO NAMED CELLS: the '
+              'prediction counts every cell where the plane stands above the '
+              'rock and above the datum, and the measurement stops at a slope '
+              'threshold, which cuts the transitional cell at the toe and the '
+              'one where the talus enters the plane. 2 m each on the render\'s '
+              'grid, and the coastal loop that placed the cliff foot runs at '
+              '4 m.', unit='m')
         info(2, 'and the excursion it is truncated FROM',
              [bw['median'], B.SWASH_W, B.BACKSHORE_W],
              'measured / swell excursion / storm excursion, metres. The '
@@ -3503,13 +3510,43 @@ def _sec_land(ctx):
     # someone drops the 2 pi sigma^2 is worth more than any picture.
     g = np.linspace(-3.0, 3.0, 1201)
     gx, gy = np.meshgrid(g, g)
-    sg = RND.SIGMA_WET
-    p = np.exp(-0.5 * (gx ** 2 + gy ** 2) / sg ** 2) / (2 * np.pi * sg ** 2)
     check(1, 'the wet film\'s slope pdf integrates to 1, ABSOLUTE',
-          float(p.sum() * (g[1] - g[0]) ** 2), 1.0, 1e-6,
+          float(RND.wet_slope_pdf(gx ** 2 + gy ** 2).sum()
+                * (g[1] - g[0]) ** 2), 1.0, 1e-6,
           'The same statement `beach_optics.slope_pdf` carries for the sea, on '
-          'the distribution this file uses for a wet film. An unnormalised '
-          'lobe is brighter or darker by a constant that no picture reports.')
+          'the distribution this file uses for a wet film -- and it integrates '
+          'THE FUNCTION THE SHADER CALLS, not a copy of it written beside the '
+          'row. An unnormalised lobe is brighter or darker by a constant that '
+          'no picture reports.')
+    check(1, 'the sun lobe\'s Jacobian, ABSOLUTE',
+          [RND.sun_jacobian(1.0, 1.0), RND.sun_jacobian(0.9, 0.5)],
+          [0.25, 1.0 / (4.0 * 0.9 ** 4 * 0.5)], 1e-12,
+          'dw_v = 4 cos(omega) cos^3(beta) dz, the change of variables from '
+          'the slope plane to solid angle at the eye. It is GEOMETRY and it '
+          'transfers from `beach_optics`\'s sea to a wet beach unchanged; the '
+          'density it multiplies does not, and keeping them in two functions '
+          'is what lets each be checked without the other.')
+    # AND THE TWO COMPOSED, ON A GEOMETRY THE ROW SOLVES ITSELF. A surface
+    # whose normal is the half-vector between the sun and the eye is at exact
+    # specular, so the density is at its peak and every factor is known.
+    hvv = SUN_OF(RND) + np.array([0.0, 0.0, 1.0])
+    hvv = hvv / np.linalg.norm(hvv)
+    Dn = np.array([[0.0, 0.0, -1.0]])
+    Nn = np.array([hvv])
+    ctv = float(hvv[2])
+    got_sun = RND.wet_specular(Dn, Nn)[0] - RND.wet_specular(Dn, Nn,
+                                                             sun=False)[0]
+    com = float(np.dot(RND.SUN, hvv))
+    exp_sun = (OPT.fresnel(np.array([com]))[0] * RND.E_SUN
+               * RND.wet_slope_pdf(0.0) * RND.sun_jacobian(1.0, ctv))
+    check(1, 'the sun\'s glint at exact specular, ABSOLUTE, per channel',
+          got_sun, exp_sun, 1e-9,
+          'The whole lobe at the one geometry where every factor is known: the '
+          'surface normal IS the half-vector, so cos(beta) = 1, the density is '
+          'at its peak, and the answer is fresnel x E_SUN x p(0) x J. This is '
+          'the row that fires when the Jacobian is dropped -- which is the '
+          'defect wave 4 shipped in the sea\'s glitter and the suite caught '
+          'there, offered a second time in a new surface.')
     # AND THE MIRROR DIRECTION IS THE MIRROR DIRECTION. A flat wet surface seen
     # at theta must reflect the sky from theta on the other side, and the
     # radiance must be fresnel(cos theta) times it -- ABSOLUTE, per channel.
@@ -3536,17 +3573,21 @@ def _sec_land(ctx):
           'exponential atmosphere of scale height H the surface coefficient is '
           'tau/H. Per channel and per metre.', unit='/m')
     check(1, 'and its green value, ABSOLUTE',
-          float(np.asarray(ATM.TAU_R, float)[1] / 8500.0), 1.18809e-5, 1e-9,
+          float(np.asarray(ATM.TAU_R, float)[1] / 8500.0), 1.1878374e-5,
+          1e-11,
           'One number, in inverse metres. The row that fires when the scale '
           'height is left out entirely -- which gives 0.1015, four orders '
           'high, and paints the frame flat grey at 50 m.', unit='/m')
     check(1, 'Koschmieder at 60 km and 20 km, ABSOLUTE',
           [RND.CAM.koschmieder_beta(60000.0),
            RND.CAM.koschmieder_beta(20000.0)],
-          [3.912 / 60000.0, 3.912 / 20000.0], 1e-12,
+          [-math.log(0.02) / 60000.0, -math.log(0.02) / 20000.0], 1e-15,
           'The `?` half of the air, both ends of the bracket, stated in '
           'inverse metres so that "clean" and "hazy" are numbers rather than '
-          'adjectives.', unit='/m')
+          'adjectives. -ln(0.02) and not the rounded 3.912 that every quotation '
+          'of Koschmieder carries: the two differ in the fifth digit, which is '
+          'nothing here and is the sort of thing that is worth writing down '
+          'once rather than wondering about later.', unit='/m')
     # THE TWO LIMITS OF THE TRANSFER, AND THEY ARE THE WHOLE PHYSICS.
     Dh = np.array([[0.6, 0.8, -0.02]])
     Dh = Dh / np.linalg.norm(Dh)
@@ -3570,6 +3611,26 @@ def _sec_land(ctx):
           'satisfied by construction rather than by a fitted number. If the '
           'airlight is taken in the VIEW direction instead of the flattened '
           'one this row fires and the seam reopens.')
+    # ...AND ON A STEEPLY DOWNWARD RAY, WHICH IS THE ROW THAT MATTERS. The
+    # near-horizontal ray above cannot tell the horizon sky from the sky in the
+    # view direction, because for that ray they are nearly the same direction.
+    # An airlight taken in the VIEW direction is the mistake a reader is most
+    # likely to make -- the light does come from where you are looking -- and
+    # only a steep ray separates the two.
+    Ds = np.array([[0.4, 0.5, -0.766]])
+    Ds = Ds / np.linalg.norm(Ds)
+    fls = Ds.copy()
+    fls[..., 2] = 0.0
+    fls = fls / np.linalg.norm(fls)
+    check(1, 'the same at 50 deg of depression -- the HORIZON sky and not the '
+          'view direction', RND.aerial(Lsurf, Ds, np.array([1e9]))[0],
+          RND.sky_radiance(fls)[0], 1e-12,
+          'The airlight is the radiance of an infinitely long path, and a '
+          'HORIZONTAL infinite path is what reaches equilibrium -- the ray\'s '
+          'own inclination does not enter it. Taking the sky in the view '
+          'direction instead leaves this row off by the whole difference '
+          'between the horizon and a 50 deg depression, and leaves the '
+          'near-horizontal row above passing, which is why both are here.')
     r1 = np.array([1000.0])
     T1 = np.exp(-1000.0 * RND.beta_ext())
     T2 = np.exp(-2000.0 * RND.beta_ext())
