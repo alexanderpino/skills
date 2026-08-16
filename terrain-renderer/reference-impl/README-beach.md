@@ -3741,3 +3741,185 @@ brackets rather than described.
 7. **The one instrument bar J licenses is now present and lit wrong.** Building
    the beach did not make the wet/dry comparison usable; it made the illuminant
    gap *measurable*, which is a better outcome than it sounds.
+
+---
+
+# WAVE 9 · THE EMBAYMENT
+
+Gap 1 of the re-ordered list. **The theory is in the skill**
+(`references/12-water-rendering.md`, "The shoreline is part of the wave field";
+`12a-water-derivations.md` §11; `12b-water-provenance.md`; and the gap reported
+into `terrain-architect/references/12-glacial-coastal.md`). What is here is the
+implementation's own account.
+
+## M1 · The bed had 55 m of shoreline range and it was not a bay
+
+Waves 1–8 measured `plan_curvature` = 50 m and read it as an embayment. It is
+not one. Fit a straight line to the coastal loop's shoreline and the residual is
+**roughness at the hardness field's 380 m correlation length** — a jagged coast,
+alternating seaward and landward every two or three rows, with no single curve
+in it. The bay-scale component (the same profile smoothed over a fifth of the
+frame) is a few metres. `_sec_embay` carries that as a row, because "there is 50
+m of range" and "there is a bay" are different claims and only the first was
+ever measured.
+
+## M2 · What was built, and what has no freedom in it
+
+`beach.equilibrium_plan()` returns a logarithmic spiral
+`R(φ) = R_a·exp((φ−φ_a)·cot α)` with:
+
+| quantity | where it comes from |
+|---|---|
+| `α = 90° − θ_b = 83.4415°` | **derived** from `θ_b = 6.5585°`, the residual breaking obliquity the 1-D transform **outputs** for the stated offshore spectrum |
+| the two anchors `A1, A2` | the seaward-most shoreline in the outer quarter of each end of **the coastal loop's own** plan-form — geology, not placement |
+| the pole `D = (−772.83, −154.80)` m | solves **two** conditions to `5×10⁻¹⁴`: the spiral passes through both anchors, and its tangent at the downcoast control point is ⟂ the deep-water wave vector (Hsu & Evans' definition of that point) |
+| the indentation, **122.79 m over 1409 m** | an **output**. Nothing set it. |
+
+Two branches exist. A pole at infinity is always a root — a spiral with an
+infinitely distant pole is a straight line — and that branch *is* the rotated
+straight coast of `zero_transport_plan`. The bay is the **nearest** root, and
+the selection rule has a physical statement behind it: the pole is the
+sheltering headland's diffraction point, and a pole 79 km offshore is not a
+headland. Both are reported.
+
+`δ`, the residual obliquity that fixes `α`, is **`?`**. Only `δ = 0` is derived
+(shore normal to a radial orthogonal is a *circle*, exactly). The circle is
+computed beside the spiral every run: its indentation is 121.68 m, **0.9 %**
+away, which is why the `?` is reported rather than chased.
+
+**The parabolic bay-shape equation is deliberately not implemented.** Fifteen
+fitted quartic coefficients, no internal consistency check that would catch a
+wrong digit, and nothing in this container holds the paper. Writing them from
+memory would manufacture a citation.
+
+## M3 · The measurement, and the row that had to come first
+
+Four shorelines, **one** offshore spectrum, one ramp, one transform, one CERC
+closure — the only thing that differs is the array `x_s(y)`:
+
+| shoreline | mean \|θ_loc\| | `Q` rms, m³/s | |
+|---|---|---|---|
+| straight, plane crest | 6.469° | 9.233×10⁻² | the control the bar asks for |
+| **the closed-form zero-transport coast** | **0.202°** | **5.127×10⁻³** | **the meter's floor, 18× down** |
+| the bay, plane crest | 5.595° | 1.875×10⁻¹ | **2× UP** |
+| the bay, under the fan its own pole implies | 2.801° | 7.921×10⁻² | 3.5× down over the spiral span |
+
+**The second row is the one that makes the others mean anything.** A near-zero
+reading is worthless until zero has been shown to be reachable — the fourteenth
+way a measurement lies, with the sign flipped.
+
+**And building that row found a defect eight waves of surf work had not.**
+`transform_2d`'s offshore boundary conserved the wavenumber component along the
+**grid's** y axis. The Snell invariant is the component along the **contour**.
+Exact for a coast whose contours are the grid's rows, which every scene here had
+been until the shore curved. On the closed-form zero-transport coast — which
+must break at exactly `θ = 0` — the grid-axis boundary left **4.89°** and 76 %
+of the straight coast's transport. `contour0 = None` is bit-identical to waves
+1–8.
+
+## M4 · The honest answer to "is it zero"
+
+**No.** `2.65×10⁻²` m³/s over the spiral span against a floor of `1.78×10⁻³` —
+**about 15× the floor**. Small, not zero, and attributable:
+
+- **0.71° — the ramp is not concentric with the curve it is keyed to.**
+  `d = A(x_s(y)−x)^(2/3)` makes contours that are *x*-translates of the
+  shoreline, and translates of a concave curve **converge**. Rebuilding the same
+  circular bay with the depth a function of distance from the **pole**
+  (`plan_ramp_polar`) removes exactly this much.
+- **1.46° — the march meeting curvature.** On straight contours at the same 20°
+  obliquity the identical march leaves 0.20°; on concentric contours with
+  radial incidence it leaves 1.66°.
+
+## M5 · What did NOT reproduce
+
+- **A guard was green on the broken bed.** `_crest_swing` first measured the
+  *raw* alongshore swing of the breaking crest azimuth: **19.5°** on the
+  un-embayed bed against **17.0°** on the embayed one — the bed with no bay in
+  it scored *better*. The raw number is the hardness field's roughness wiggling
+  the local shore normal cell by cell; roughness turns crests locally and
+  averages to nothing, a bay turns them one way across the whole frame.
+  Smoothed over a fifth of the frame: **6.06** against **13.57**.
+- **`cerc-sin-not-double` was caught by one row, and by a threshold.** Replacing
+  `sin(2θ)` with `sin(θ)` leaves the equilibrium untouched (both vanish at
+  θ = 0), so no ratio row and no K-doubling row can see it. It fell below a
+  magnitude threshold by luck until a row written from chapter 12's own sentence
+  — "peaks near 45° approach" — was added: `sin θ` peaks at 90°, and that
+  separates them with no coefficient in the comparison.
+- **The first pole solve went to the wrong branch** and reported a 1.37 m
+  indentation with a residual of 5×10⁻³, i.e. it had not converged and the
+  number looked plausible anyway. Multi-start with an explicit selection rule.
+
+## M6 · THE RE-ORDERED GAP LIST
+
+### Closed or substantially closed by wave 9
+
+| wave 8 | item | what closed it |
+|---|---|---|
+| **1** | no embayment, no headlands | a logarithmic spiral with no free parameter; 122.8 m of indentation against 52 m of roughness; contours curve with it and the crest azimuth swing more than doubles |
+| **3** (sharpened) | one surf zone where bar J shows three to four | unchanged as a defect, but the refraction criterion it blocked is now **checkable**, which was most of its cost |
+
+### The list now
+
+**1 · The illuminant is in the wrong half of the sky.** *(was 2)* Unchanged and
+now top. The wet/dry pair is in frame and lit backwards; bar J's own class is
+front-lit. A wave of its own — moving the sun moves the pool's frame hashes.
+
+**2 · One surf zone where bar J shows three to four separated lines.** *(was 3)*
+Section B, parked, mechanism named (2DH rip-feeder circulation).
+
+**3 · The wave field has no diffraction, and the bay needs it.** *(NEW — M3)*
+This is gap 1's residue and it is a *physics* gap rather than a geometry one. The
+fan the bay requires — **39.6°** of alongshore swing in the orthogonal — is
+supplied here as a stated per-row offshore direction from the bay's own pole. A
+Sommerfeld / Penney–Price edge stamped at the headland tip would make it an
+**output**, and it is the same term `12`'s diffraction section prices for the
+isolated-rock case. **The largest single unbuilt piece of water physics in this
+project.**
+
+**4 · The eye is 17.31 m where the frame demands 25–102 m.** *(was 4)* Wave 8
+said this was "coupled to #1 and not fixable without it". **It is not fixed by
+it**: the bay moved the shoreline, not the cliff brow. On the embayed bed the
+brow the camera stands on reads **15.71 m** against wave 8's 17.31 m — it went
+the *wrong way*, because the bay's landward limb pushes the shoreline inland and
+the cliff foot with it. Recorded as a prediction that failed, and it failed in
+the direction the coupling argument did not allow for.
+
+**5 · The ramp is keyed cross-shore, not concentrically.** *(NEW — M4)* Worth
+0.71° of residual obliquity and it is a two-line change with a large blast
+radius (`bay_bed`'s whole composition). Named, priced, not taken.
+
+**6 · The sea at grazing reads as hard shore-parallel bands.** *(was 5)*
+
+**7 · Forty-six per cent of the frame is one declared albedo.** *(was 6)* Still
+expensive; the bay took some of its share and none of its cause.
+
+**8 · The bed under the water is 1.24–1.40× too bright.** *(was 7)* Reported,
+not patched.
+
+**9 · No swash.** *(was 8)* **10 · The berm scarp.** *(was 9)* **11 · The shadow
+ray costs 0.0 %.** *(was 10)* **12 · No shore platform.** *(was 11)* **13 · The
+beach's feedback on the cliff.** *(was 12)* **14 · No airborne spray.**
+**15 · The flat Earth at the seam.** All unchanged.
+
+## M7 · The seven things worth carrying out of this wave
+
+1. **A static-equilibrium bay is not a property of a shoreline.** It is a
+   property of a shoreline *and* the headland that shelters it. Plane crests
+   admit exactly one zero-transport plan-form and it is a straight line.
+2. **terrain-architect chapter 12's "until the coast straightens" is a
+   theorem**, not a simplification — and that is precisely why the chapter
+   cannot produce the commonest sandy-coast plan-form there is.
+3. **The log spiral is derived, not fitted.** A constant residual obliquity
+   forces a constant tangent-to-radius angle, and that is the logarithmic
+   spiral and nothing else. Only the *circle* is derivable end to end.
+4. **Calibrate the meter before you read it.** The zero-transport control cost
+   one line and it is what turned "the bay reads small" into a number.
+5. **The Snell invariant is along the contour, not along the grid.** Eight waves
+   shipped the grid version and nothing could see it until a coast rotated.
+6. **The indentation is 2.46× the photograph's and stays that way.** The
+   inversion — what offshore obliquity *would* give 50 m over 1408 m, namely
+   8.45° against the declared 20° — is a measurement of the spectrum from a
+   plan-form and a calibration refused.
+7. **A guard that measures a rough quantity can be green on the broken bed.**
+   The raw crest swing preferred the coast with no bay in it.
