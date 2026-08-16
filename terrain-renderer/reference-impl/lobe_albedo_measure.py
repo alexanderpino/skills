@@ -91,11 +91,22 @@ def main():
 
     ns = _pass()
     cap = ns['_LOBE_CAP']
-    WSPEC, WTRAN = ns['WSPEC'], ns['WTRAN']
-    hit = [k for k in cap
-           if k[0].shape[0] == WSPEC.size
-           and np.allclose(k[0] @ _Y3, WSPEC, rtol=1e-5, atol=1e-6)
-           and np.allclose(k[1] @ _Y3, WTRAN, rtol=1e-5, atol=1e-6)]
+    # WHICH CALL, and it is NOT identified off `WSPEC`/`WTRAN`. `render.py`
+    # renders the frame twice -- `render('disp')` for the picture and
+    # `render('mono')` for the silhouette regression 1300 lines below -- and both
+    # assign the same globals, so after the second pass those names hold the MONO
+    # frame. What does not move is `_plw`, which the file freezes from the disp
+    # pass before the albedo block and never rewrites. So the primary disp call
+    # is the full-frame capture whose two columns REPRODUCE `_plw` through the
+    # file's own box average. That is an equality on 960 000 output pixels, not a
+    # heuristic, and it is asserted unique.
+    plw = ns['_plw']
+    n0 = max(k[0].shape[0] for k in cap)
+    hit = [k for k in cap if k[0].shape[0] == n0
+           and np.allclose(_box(ns, (k[0] @ _Y3)[:, None])[..., 0], plw[..., 0],
+                           rtol=1e-6, atol=1e-9)
+           and np.allclose(_box(ns, (k[1] @ _Y3)[:, None])[..., 0], plw[..., 1],
+                           rtol=1e-6, atol=1e-9)]
     assert len(hit) == 1, 'the primary water_shade call is not identified (%d)' \
         % len(hit)
     spec3, tran3 = (h.astype(np.float64) for h in hit[0])
