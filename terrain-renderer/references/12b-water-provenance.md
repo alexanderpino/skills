@@ -673,6 +673,26 @@ least-confident-claims ledger in `00-index.md`.
   of it (`D`, quadratured here). Use `1 − 1/n²` for a bubble wall — a per-direction mirror — and
   `R_int` for a hemispherical average; the two are 3.74 points apart, which is worth 1.9% of a red
   trap and 12.2% of a blue one.
+- **D** — **The bubble constant is a reflectance and not a backscatter fraction**, and this is a
+  correction to how `12` read its own number rather than to the number. A geometric-optics trace over
+  a bubble's disc — area-uniform impact parameter (`p = √u`, so the measure is `2μ dμ` by
+  construction rather than by weighting), water→air Fresnel by reciprocity, the sphere's textbook
+  deviations `Θ₀ = π − 2θᵢ` and `Θ_p = 2(θᵢ − θ_t) + (p−1)(π − 2θ_t)`, forty orders, weights summing
+  to `1 ± 8×10⁻⁷` *by construction and checked* — returns `b_b/b = 0.0228 / 0.0230 / 0.0235` and
+  `g = 0.691 / 0.688 / 0.684` across the IOR triple. **Twenty times under the 43.874% reflectance**,
+  because `θᵢ > θ_c` forces `Θ₀ < π − 2θ_c = 82.96°`: every totally reflected ray leaves forward of
+  the perpendicular. The same trace recovers the totally-reflected share as
+  `0.436378 / 0.438728 / 0.443078` **without evaluating `1 − 1/n²`** — it is measuring the area of the
+  disc beyond `θ_c`, which is what the formula is — and, with the Fresnel evaluated per channel
+  rather than at the red band's refracted cosine, recovers the full disc-average reflectance as
+  `0.473713 / 0.476167 / 0.480681` against the independent quadrature's `R_int` of
+  `0.473712 / 0.476166 / 0.480681`, agreeing to six digits from a ray trace that shares no code with
+  it. Both figures recomputed here from `reference-impl/beach_foam.py:bubble_scatter`; the
+  per-channel Fresnel variant is this pass's, and the difference it makes to `b_b/b` is 0.0230 →
+  0.0233 in green, which moves nothing in the finding. The **liftable** half is that a conservative
+  slab's white comes from `τ' = (1 − g)τ`, `R = τ'/(1 + τ')`, `T = 1 − R` — so a foam volume that
+  spends the reflectance as `b_b/b` whitens without hiding, which is the symptom rather than the
+  mechanism.
 - **P/D** — [Surface reflection names two opposite things: a loss and a
   trap](12-water-rendering.md#surface-reflection-names-two-opposite-things-a-loss-and-a-trap),
   derived in [`12a` §7](12a-water-derivations.md#one-interface-two-diffuse-reflectances). That one

@@ -131,7 +131,8 @@ the reference implementation or read off a photograph, not supposed.
 | An outdoor pool with a geometrically clean waterline and no band at all | The `neglect` control shipped at a **zero default**. Most pools in service carry a band, so a pristine liner is the special case; a renderer defaulting to zero age reads as CG by default, and the same holds for every persistent liquid line — tanks, locks, harbour walls, hulls | [Fouling in the corners](#fouling-in-the-corners-from-an-algorithm-rather-than-from-a-texture) |
 | The sea is green everywhere, or blue everywhere, whatever the wave is doing | A tint on the water **body**. One backlit breaking wave refutes it in a single exposure: the face reads saturated green while the same water two metres away reads grey-blue, so the colour is the **path** and must vanish when the path does | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
 | The saturated green backlit face never appears in the surf, however tall or steep the wave field is made | **Not a tuning shortfall — a bar on the representation.** A sightline through a wave crosses the surface twice, so the entry and exit inclinations must sum to `2(90° − θ_c)` = **82.96°**; Stokes' 120° corner caps a wave of permanent form at 30° a face, so its best sum is 60°. No single-valued height field of a steady wave reaches it, at any height, order or grid | [The 30° ceiling](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise) |
-| Surf built as one particle system, and it reads as confetti over glass | **Three whites, three materials**: the blanket behind a break is a *coverage mask*, the opacity inside the wave mouth is a *participating medium*, the spray is *particles* — and the particles are the **smallest** share. All three whiten from the same `1 − 1/n²` and share nothing else | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
+| Surf built as one particle system, and it reads as confetti over glass | **Three whites, three materials**: the blanket behind a break is a *coverage mask*, the opacity inside the wave mouth is a *participating medium*, the spray is *particles* — and the particles are the **smallest** share. All three are built on the same `1 − 1/n²` wall reflectance and share nothing else — and none of them whitens *because* of it: a bubble backscatters `b_b/b = 0.023`, so the white is multiple scattering | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
+| Volumetric foam or a bubble plume that goes bright white but you can still see the bed through it | `1 − 1/n²` spent as a **backscatter fraction** instead of a wall reflectance — 19× too much return, and the transmittance that should have fallen with it never does. A conservative slab has `R = τ'/(1 + τ')` and `T = 1 − R`; whitening without hiding means the model has `R` and not `T` | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
 | A white plume after a wave hits rock that either vanishes leaving nothing or lingers white far too long | **Two clouds with one decay curve.** Entrained air rises and bursts in seconds; suspended sediment settles over minutes and advects. They overlap in space and are separated by *lifetime*, not appearance | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
 | Water in the surf zone that is exactly as clear on every frame while the waves break through it | `b` treated as a **material constant** where it is a state variable produced by the dynamics: the waves suspend the bed, the backwash erodes, turbidity pulses at the wave period. The one optical property a still frame cannot verify | [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) |
 | A real-time approximation passes every image comparison and is 5–25% off on the quantities it approximates | The bar is still a **photograph** when the target is an approximation. 5% scene-linear is ~2.7 encoded levels of 255 at mid grey; the errors that matter are selected for invisibility. The bar has to become the reference plus a per-channel metric on named quantities | [`11`, the bar changes kind](11-verification-failures.md#when-the-target-is-an-approximation-the-bar-changes-kind) |
@@ -1026,7 +1027,47 @@ remaining **3.743%**. Use `1 − 1/n²` for a bubble wall, which is a per-direct
 for a hemispherical average — [both, and the loss neither of them is](#surface-reflection-names-two-opposite-things-a-loss-and-a-trap).
 Every bubble wall mirrors that share of everything striking it: one bubble reads silvered, a cloud
 of them reads white and opaque. A renderer that gets Snell's window right and takes foam whiteness
-from a painted albedo has special-cased one of the two faces of a single number. And **foam is
+from a painted albedo has special-cased one of the two faces of a single number.
+
+⚠️ **The constant is right and one reading of it is wrong: `1 − 1/n²` is a *reflectance*, not a
+backscatter fraction, and this chapter said so loosely enough to be read the other way.** The
+sentence above — *"every bubble wall mirrors that share"* — is exactly true and says nothing about
+*where* the mirrored light goes. Trace it. A ray reflected off a sphere at incidence `θᵢ` leaves
+deviated by
+
+```
+Theta_0 = pi - 2 theta_i          the p = 0 (external reflection) branch for a sphere
+theta_i > theta_c = 48.52 deg     is what "totally internally reflected" MEANS
+=> Theta_0 < 82.96 deg            EVERY totally reflected ray, without exception
+```
+
+so not one of the 43.874% comes back toward the source: they all leave **forward of the
+perpendicular**. A geometric-optics trace over the bubble's disc — area-uniform impact parameter,
+Fresnel by reciprocity, forty orders, energy closing to `1 ± 8×10⁻⁷` — returns a backscatter ratio
+of **`b_b/b = 0.023`** and an asymmetry parameter of **`g = 0.688`** (`D`, recomputed here; the
+traced pair is `0.0228 / 0.0230 / 0.0235` and `0.691 / 0.688 / 0.684` across the IOR triple).
+**Twenty times smaller than the reflectance.** A bubble is a *side* scatterer, not a retroreflector,
+and it is why the asymmetry is 0.69 rather than negative.
+
+**So surf is white by *multiple* scattering in a medium of single-scattering albedo ≈ 1, not because
+each bubble returns 44% of the light to the eye** — which is what the paragraph above already says
+about thousands of interfaces, and what a renderer loses the moment it spends the 43.874% as an
+albedo. The operational form is the similarity scaling and not the constant: `τ' = (1 − g)τ`, then
+`R = τ'/(1 + τ')` and `T = 1/(1 + τ')` for a conservative slab, which is where a foam layer's
+*opacity* and its *whiteness* come from together. Using `1 − 1/n²` as `b_b/b` in a volumetric foam
+inflates the backscatter by 19× and gives a plume that whitens without hiding what is behind it —
+a defect that reference-impl now carries deliberately (`foam-backscatter-is-tir`) precisely because
+it reads as plausible.
+
+**And the constant survives the trace, from the other end.** The same run recovers
+`0.4364 / 0.4387 / 0.4431` for the totally-reflected share **without ever evaluating `1 − 1/n²`** —
+it is measuring the area of the disc beyond the critical angle, which *is* what the formula is. With
+the Fresnel evaluated per channel rather than at the red band's refracted cosine, the trace's full
+disc-average reflectance recovers `R_int = 0.47371 / 0.47617 / 0.48068` to six digits as well, from
+a ray trace against a quadrature that shares no code with it (`D`, recomputed here). Two
+independent routes to both numbers; the arithmetic was never the problem, the noun was.
+
+And **foam is
 white rather than tinted because the paths are short**: transmission over 5 mm of water is 0.999 in
 red, so light bouncing between bubble walls never accumulates enough path to pick up the water's
 colour or the bed's. **Foam is many short paths where blue water is one long one** — which is why
@@ -1042,7 +1083,8 @@ collapsing them into one particle system is the standard reason CG surf reads wr
 | the opacity *inside* the wave mouth | a **participating medium** in the water, high scattering albedo — you stop seeing the bottom through it | not a surface layer | the one that carries the wave's form |
 | spray thrown clear along the crest | **water in air** — a droplet size distribution, ballistic, decoupled from the fluid | this one *is* particles | **the smallest** |
 
-They whiten from the same `1 − 1/n²` and share nothing else: different carrier (surface / volume /
+They are built on the same `1 − 1/n²` wall reflectance — and, per the correction above, they *whiten*
+by multiple scattering rather than by that number — and share nothing else: different carrier (surface / volume /
 air), different advection (surface flow / fluid velocity / ballistics), different decay (seconds /
 the break itself / sub-second), different rendering (coverage lerp that kills Fresnel beneath it /
 `a`,`b`,`g` medium / sprites, becoming a medium at high wind). **The one that gets over-built is the
@@ -2215,6 +2257,14 @@ angle and mirrors the same 43.874% of everything striking it. One number runs th
 Snell's window and the opacity of whitewater — see
 [Aerated water](#aerated-water-foam-spray-and-whitewater), where it arrives from the other end. A
 renderer that derives one face of it and paints the other has split a single constant in two.
+
+⚠️ **`mirrors` is the whole of the claim and `toward you` is no part of it.** Reflection off a
+*sphere* deviates a ray by `π − 2θᵢ`, and total internal reflection is the statement `θᵢ > θ_c`, so
+every one of those rays turns by **less than `π − 2θ_c` = 82.96°** — forward of the perpendicular,
+every time. A traced bubble backscatters **`b_b/b = 0.023`** against its own 43.874% reflectance,
+with `g = 0.688` (`D`). The constant is a per-direction mirror strength and never a return fraction;
+[Aerated water](#aerated-water-foam-spray-and-whitewater) carries the trace, the similarity scaling
+that replaces the misreading, and what confusing the two costs.
 
 **What the confusion costs, priced.** On this chapter's liner (`ρ_bed = 0.222 / 0.585 / 0.681`):
 
