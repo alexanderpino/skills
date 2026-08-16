@@ -1031,3 +1031,34 @@ least-confident-claims ledger in `00-index.md`.
   of it. **The reference set has a named gap** — no frame catches the backwash lifting sand, i.e.
   the erosive half of the swash cycle, and the inference that would fill it from the other eight is
   exactly the inference not to make.
+- **T/D** — [The 30° ceiling](12-water-rendering.md#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise).
+  Two independent results, and they are different tiers.
+  **Stokes' corner is `T`**: the stagnation/wedge exponent match giving `2α = 120°` is Stokes (1880),
+  standard in every water-wave text, and it is *reproduced here in full* rather than quoted — the
+  four lines in the chapter are the whole of it, and they carry no depth, wavelength or wave height,
+  which is the property the conclusion rests on. Longuet-Higgins & Fox (1977), max inclination of the
+  almost-highest wave ≈ **30.37°**, is **`P`** — cited, not reproduced, and quoted only as the
+  slightly-more-generous cap. Nothing below turns on 30 vs 30.4.
+  **The two-cone condition is `D`, and it is this chapter's own**: `α₁ + α₂ ≥ 2(90° − θ_c)` =
+  82.689 / 82.962 / 83.464° on the IOR triple. It follows from requiring one straight in-water
+  direction to lie inside the entry cone *and* the exit cone, with the `180° − (α₁+α₂)` normal
+  separation from the spherical triangle inequality — so it is a **necessary** condition for any
+  single-valued surface in 3-D, independent of the shape between the two crossings, and it is not
+  sufficient. ⚠️ **It supersedes the framing this project used for two rounds**, which was "the face
+  must exceed `90° − θ_c` = 41.48°": that figure is the symmetric special case and the reasoning
+  behind it (*"a ray entering water is confined to the Snell cone"*) named only the entry crossing.
+  The number was right; half the mechanism was missing, and the missing half is what makes the
+  result general and what makes it a statement about a **sum** rather than about one face.
+  Checked here by shooting the full incidence hemisphere at a wedge and refracting: zero survivors
+  at sums of 16.5 → 82.96°, first survivors at 83.10°, and 30+53.1 / 20+63.1 / 10+73.1 open at the
+  same sum with the same ray count — i.e. the split is verified not to matter, which is the part an
+  algebraic argument alone would leave open.
+  **The Fresnel table** (best `T_in·T_out` and the flux share, 41.6° → 70°) is `D`, this chapter's
+  own unpolarised Fresnel on both crossings over a cosine-weighted incidence hemisphere. Its role is
+  to say the geometric floor is *not* the operative threshold; the ≈50° / ≈55° figures for a tenth
+  and a fifth of the flux are read off that table and are not sharp constants.
+  **The render measurement** — through-face fraction **0.0000** at 8.23° and at 15.78° steepest
+  face, ~70 000 water pixels a side — is `D`, recomputed here from `reference-impl/beach_render.py`
+  (`surface_report`, `chord_report`/`through_face`) at half the shipped frame resolution. It is
+  consistent with the theorem and does **not** test it: 15.78 + 15.78 = 31.6° is nowhere near the
+  floor, so the frame confirms the scene, not the bound. The bound is carried by the geometry.

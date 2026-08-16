@@ -130,6 +130,7 @@ the reference implementation or read off a photograph, not supposed.
 | Weathering present but perfectly even — an aged surface that is uniformly grey rather than blotchy | Patchiness is **feedback, not noise**: deposit roughens, roughness holds more deposit, and above a threshold coupling the uniform state is linearly unstable. A few iterations give it; a noise octave fakes it and has to be re-authored per basin | [Fouling in the corners](#fouling-in-the-corners-from-an-algorithm-rather-than-from-a-texture) |
 | An outdoor pool with a geometrically clean waterline and no band at all | The `neglect` control shipped at a **zero default**. Most pools in service carry a band, so a pristine liner is the special case; a renderer defaulting to zero age reads as CG by default, and the same holds for every persistent liquid line — tanks, locks, harbour walls, hulls | [Fouling in the corners](#fouling-in-the-corners-from-an-algorithm-rather-than-from-a-texture) |
 | The sea is green everywhere, or blue everywhere, whatever the wave is doing | A tint on the water **body**. One backlit breaking wave refutes it in a single exposure: the face reads saturated green while the same water two metres away reads grey-blue, so the colour is the **path** and must vanish when the path does | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
+| The saturated green backlit face never appears in the surf, however tall or steep the wave field is made | **Not a tuning shortfall — a bar on the representation.** A sightline through a wave crosses the surface twice, so the entry and exit inclinations must sum to `2(90° − θ_c)` = **82.96°**; Stokes' 120° corner caps a wave of permanent form at 30° a face, so its best sum is 60°. No single-valued height field of a steady wave reaches it, at any height, order or grid | [The 30° ceiling](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise) |
 | Surf built as one particle system, and it reads as confetti over glass | **Three whites, three materials**: the blanket behind a break is a *coverage mask*, the opacity inside the wave mouth is a *participating medium*, the spray is *particles* — and the particles are the **smallest** share. All three whiten from the same `1 − 1/n²` and share nothing else | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
 | A white plume after a wave hits rock that either vanishes leaving nothing or lingers white far too long | **Two clouds with one decay curve.** Entrained air rises and bursts in seconds; suspended sediment settles over minutes and advects. They overlap in space and are separated by *lifetime*, not appearance | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
 | Water in the surf zone that is exactly as clear on every frame while the waves break through it | `b` treated as a **material constant** where it is a state variable produced by the dynamics: the waves suspend the bed, the backwash erodes, turbidity pulses at the wave period. The one optical property a still frame cannot verify | [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) |
@@ -773,7 +774,10 @@ the falsification a `waterColor` parameter cannot survive, and it is a photograp
 
 **A breaking wave is a wedge, which makes it a variable-path cuvette, which makes it an
 instrument.** Thin at the lip, thick toward the trough, with the colour grading continuously across
-it. Two points on one backlit face at estimated thicknesses `L₁` and `L₂` invert directly:
+it. (⚠️ It is an instrument for a *photograph*. As a **criterion on a height-field renderer** the
+same face is unreachable, and that is a theorem rather than a budget —
+[below](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise).) Two points on one backlit
+face at estimated thicknesses `L₁` and `L₂` invert directly:
 
 ```
 T(lambda, L) = exp(-c(lambda) L)          # c = a + b, beam attenuation along the transmitted path
@@ -830,7 +834,10 @@ surface-intersection route and every LOD scheme in [Surface geometry](#surface-g
 a **different representation** — a parametric sheet, a particle/level-set hybrid, or a genuinely
 volumetric surface — and it is the real work in surf. Everything else in this section is arithmetic
 on machinery that already exists; this one is not, and the honest planning move is to price it as a
-representation change rather than to schedule it as a feature (`?`).
+representation change rather than to schedule it as a feature (`?`). **And it is not the only thing
+on the far side of that line** — the backlit face two paragraphs up is there too, for a reason that
+turns out to be the same one at an earlier instant
+([below](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise)).
 
 **The reference gap, named.** Nine frames of surf and coast supported the paragraphs above — an
 unbroken wave face, a coastline from a cliff, a rock break, two breaking lines with persistent foam,
@@ -838,6 +845,90 @@ a backlit face, a mid-break lip. **None of them catches the backwash lifting san
 retreating down a beach face with the sheet flow visibly loaded is the one frame that would pin the
 erosive half of the cycle, and it is missing. Written down because a marked gap in a reference set
 is worth more than a confident inference from the frames that are there.
+
+### The 30° ceiling: a single-valued crest cannot be read lengthwise
+
+The cuvette above is the sharpest optical criterion in this chapter, and it is the one criterion
+here that **a height-field renderer is not merely failing but is barred from meeting**. That is a
+theorem, it has no depth, wavelength, wave height, grid, sea state or shader in it, and it is worth
+more than the phenomenon it forbids — because a limit of the *representation* survives every
+improvement to the implementation, and the alternative is a team steepening waves forever.
+
+**Half of it is Stokes' corner (1880), and it is four lines.** At the crest of the **limiting** wave
+of permanent form the fluid is at rest in the frame moving with the wave, so the crest is a
+stagnation point and Bernoulli on the free surface, measured downward from it, is `q²/2 + gz = 0`
+— hence `q ~ (2g|z|)^½ ~ r^½` near the corner. A potential flow in a wedge of interior angle `2α`
+has `q ~ r^(π/2α − 1)`. Matching the exponents:
+
+```
+pi/(2 alpha) - 1 = 1/2     =>     2 alpha = 2 pi / 3 = 120 deg
+```
+
+so **the free surface leaves the crest at 30° to the horizontal**, and *nothing entered the
+derivation except the stagnation condition and the wedge*: it is the same 120° for the limiting
+deep-water Stokes wave at any order, the limiting cnoidal wave and the limiting solitary wave.
+(Longuet-Higgins & Fox 1977 put the maximum inclination of the *almost*-highest wave slightly above
+the corner value, near **30.37°**, attained just off the crest — `P`, cited and not reproduced here.
+Use 30.4° as the cap if a margin matters; nothing below turns on the difference.)
+
+**The other half is two Snell cones, and it is the half worth restating** — the criterion has been
+carried in this project as "the face must be steeper than `90° − θ_c` = 41.48°", which is right for
+a symmetric crest and is *not* the reason. The reason is that a sightline through a wave crosses the
+surface **twice**, and each crossing costs a cone:
+
+- entering, the refracted ray lies within `θ_c` of the **inward** normal at the entry point;
+- leaving, it must lie within `θ_c` of the **outward** normal at the exit point, or it is totally
+  internally reflected and there is no path at all.
+
+The ray between them is straight, so one direction has to sit inside both cones. If the surface
+inclinations from horizontal at the entry and exit points are `α₁` and `α₂`, the inward entry normal
+and the outward exit normal are separated by **at least** `180° − (α₁ + α₂)` (spherical triangle
+inequality — so this holds in 3-D, for a ray in any azimuth, not only in the wave's cross-section),
+and two cones of half-angle `θ_c` overlap only when that separation is `≤ 2θ_c`. Hence, for **any**
+single-valued surface, whatever its shape between the two points:
+
+> **`α₁ + α₂  ≥  2·(90° − θ_c)`** — **82.69 / 82.96 / 83.46°** on this chapter's IOR triple
+> (`D`, and the symmetric case is the familiar 41.34 / 41.48 / 41.73° per face).
+
+**Put the two halves together.** A wave of permanent form caps *each* inclination at 30° (30.4°),
+so its best possible sum is **60°** — **23° short**, and no split of the budget helps, because the
+condition is on the sum. A face at the corner's own 30° would need its partner at **52.96°**, which
+is 23° past what any steady wave has anywhere on it.
+
+**Verified two ways rather than argued.** The condition was checked by shooting the full incidence
+hemisphere at a wedge and marching the refracted ray (`D`, here): zero rays enter and leave at
+`α₁+α₂` = 16.5, 31.6, 41.5, 60.0, 60.7 and **82.96°**, the first survivors appear at 83.10°, and
+the threshold is insensitive to the split — 30+53.1, 20+63.1 and 10+73.1 all open at the same sum
+and pass the same 83 rays. And on the reference implementation's own bay, `beach_render.py`'s
+`through_face` marches the refracted view ray until the free surface comes back down to meet it:
+over ~70 000 water pixels the fraction that leave the far side of a crest is **0.0000** at a linear
+surface (steepest face **8.23°**) and **0.0000** at a second-order Stokes surface (**15.78°**, a
+×1.95 steepening that bought exactly nothing here) — `D`, both recomputed.
+
+**And the geometric wall is not the operative one, which is the practical half.** Even where the
+cones just overlap, both crossings are at near-grazing incidence and Fresnel collapses: at
+`α₁=α₂=41.6°` the best two-crossing transmittance any ray achieves is **0.098**, and the share of
+intercepted flux that gets through is **1.5 × 10⁻⁴** (`D`). It takes **≈50°** faces to pass a
+tenth of the intercepted flux and **≈55°** to pass a fifth. So 82.96° is a hard floor and the
+phenomenon lives well above it.
+
+| `α₁ = α₂` | 41.6° | 43° | 45° | 50° | 55° | 60° | 70° |
+|---|---|---|---|---|---|---|---|
+| best `T_in · T_out` | 0.098 | 0.532 | 0.735 | 0.890 | 0.933 | 0.949 | 0.958 |
+| share of intercepted flux through | 0.0002 | 0.011 | 0.038 | 0.126 | 0.228 | 0.339 | 0.571 |
+
+⚠️ **What this changes about the criterion, stated plainly, because it is easy to over-read.** The
+two-colour backlit wave remains a **valid falsification of a `waterColor` tint** — it needs only a
+photograph, and the [diagnostic row](#diagnostic-index-symptom-to-mechanism) that uses it stands
+untouched. What it is **not** is a criterion a single-valued surface can be asked to *reproduce*.
+The face that shows it is at or past the overturn, which is exactly the
+[multivalued instant](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot)
+priced above as a representation change: **the backlit face and the plunging lip are one criterion
+at two moments**, and the 23° of summed inclination between a steady wave's best and the two-cone
+floor is the width of the gap. A renderer that wants the green face must **author** it — a shader
+term keyed to the breaking mask, a bespoke lip mesh, a particle sheet — and say so, because it is
+not going to emerge from a taller wave. The honest budget line is *"needs the overturn
+representation"*, not *"needs more steepness"*.
 
 ## Aerated water: foam, spray and whitewater
 
