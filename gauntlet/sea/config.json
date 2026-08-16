@@ -78,5 +78,6 @@
     "sections J/K -- a camera at the owner's cliff viewpoints, which no wave has yet attempted",
     "CLOSED as unreachable: section A (Stokes' 120 degree corner caps a single-valued crest face at 30 degrees, against the 41.48 needed) and section F (the multivalued surface).",
     "PARKED: the second breaking line, mechanism named (2DH rip-feeder circulation), out of chapter 12's scope."
-  ]
+  ],
+  "contract": "THE THEORY GOES IN THE SKILL AND THE CODE PROVES IT. Owner ruling. Every claim in a chapter must have a code path that demonstrates it -- offline OR through a rasterizer, and the choice is a decision, not a default. A claim with no implementation is a claim nobody has tested. Consequence, and it names the project's largest unproven region: the offline reference proves the PHYSICS, and nothing proves the APPROXIMATIONS. The chapter's real-time half -- the fullscreen-triangle pass, LOD and surface geometry, what to pre-cook, the LUT factorisation law, distance and filtering, transparency and pass ordering, the engine-native water architecture -- is written, cited and provenance-marked with ZERO lines of code behind it. A rasterizer reference proves what the offline path cannot, because approximation error is invisible to a path that does not approximate."
 }

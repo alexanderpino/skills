@@ -1242,3 +1242,53 @@ beach needs a special case inside the Fresnel code, something was wrong all
 along — and one scene could never have revealed it. The same argument this project
 already makes about the underwater camera: a view that cannot be tuned
 independently is the one that finds what tuning hid.
+
+
+---
+
+## The contract, restated by the owner: theory in the skill, code as proof
+
+> *"De theorie moet in de skill beschreven worden en als referentie rendering code
+> (al dan niet via rasterizer) geschreven worden als bewijs van werking."*
+
+Every chapter claim needs a code path that demonstrates it. Offline **or** through
+a rasterizer — and that is a decision to record, not a default to fall into.
+
+**This names the project's largest unproven region, and it is not the physics.**
+The offline reference has 285 guarded quantities on the pool and 173 on the sea;
+the physics is in good shape. **The chapter's real-time half has none.** These
+sections are written, cited and provenance-marked with **zero lines of code**
+behind them:
+
+- *Screen-space water: the fullscreen-triangle pass*
+- *Surface geometry & LOD*
+- *What to pre-cook, and what to recompute* — including the **LUT factorisation
+  law**, which is a claim *about* a pre-computation and has never been
+  pre-computed
+- *Distance and filtering: why far water turns to plastic*
+- *Transparency & pass ordering*
+- *Engine-native water, read as architecture*
+
+**Why the offline path cannot close this.** Approximation error is invisible to a
+code path that does not approximate. The reference computes the integral; a LUT
+splits it. The reference marches the surface; a screen-space pass reconstructs it
+from depth. **The errors that matter in the real-time half only exist in a
+formulation the reference does not contain** — which is exactly why this session's
+four faults were 5–25% and every one of them looked fine.
+
+**What a rasterizer reference would prove that nothing currently does:**
+
+1. **The factorisation trap, as a measurement.** Bake `T` and `(1−R)` separately,
+   multiply at runtime, and measure the error against the offline joint integral.
+   The chapter predicts 19.4 / 5.1 / 1.1% per band. Nobody has run it.
+2. **What survives a screen-space reconstruction.** The chapter says a caustic
+   sampled by world `xy` streaks every vertical surface; a real pass would show it.
+3. **The cost of each simplification, in the only currency that decides:** frame
+   time against measured error, per approximation, so a reader can choose.
+4. **That the two halves are one model.** A rasterizer that imports the same
+   `optics.py` constants and lands within a stated tolerance of the offline frame
+   is the strongest possible statement that the chapter describes one thing.
+
+**Recorded as the project's next structural step**, alongside the sea loop rather
+than after it: the sea loop proves the physics of open water; a rasterizer
+reference proves the half of the chapter that no amount of offline work can reach.
