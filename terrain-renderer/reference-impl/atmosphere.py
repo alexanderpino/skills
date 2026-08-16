@@ -318,6 +318,61 @@ SKY_LOBE = ((_UNSCALE, N_DISC, L_SUN),             # the disc
             (_UNSCALE, N_AURE, L_AURE))            # the Rayleigh aureole
 
 
+# --- THE DIRECTIONAL EXPONENT, AND THE ONE PLACE THIS FILE CREATED LIGHT ------
+# `n_eff` used to be `1 / (u^T Q u)`. That is the PROJECTION variance -- the
+# width of the shadow the summed Gaussian casts on the u axis -- and what the
+# lobe is asked for is the Gaussian's VALUE along u, which is the other one.
+# Written out, because the whole repair is three terms and a sign:
+#
+#   * a cos^n lobe is exp(-n rho^2 / 2) near its peak, so as a function of the
+#     2-D tangent offset u it is a Gaussian of covariance Q_0 = (1/n) I;
+#   * convolved with the reflection ellipse C it is a Gaussian of covariance
+#     Q = Q_0 + C, whose DENSITY at u is exp(-1/2 u^T Q^-1 u) -- the inverse,
+#     because that is what a Gaussian's exponent is written with;
+#   * writing that back as cos^(n_eff)(|u|) = exp(-n_eff |u|^2 / 2) therefore
+#     forces n_eff |u|^2 = u^T Q^-1 u, i.e.
+#
+#         n_eff = u_hat^T Q^-1 u_hat
+#               = (u1^2 q22 - 2 u1 u2 q12 + u2^2 q11) / (|u|^2 det Q)
+#
+#     the 2x2 adjugate over the determinant: the SAME three terms the file
+#     already had, with q11 and q22 swapped and the cross term's sign flipped.
+#
+# WHY THE ISOTROPIC CASE HID IT, and this sentence is the whole lesson: for
+# Q = q I the inverse is (1/q) I, so u^T Q^-1 u = 1/q and u^T Q u = q, and the
+# two expressions are not merely close -- they are the same number, for every
+# u, exactly. They agree on either principal axis as well. Every row this file
+# ever had on the lobes was taken at cov = None (Q_0 = (1/n) I, isotropic by
+# construction) or on axis, so the suite was pinned to the one place in the
+# expression's domain where the wrong form cannot be told from the right one.
+# A degenerate case is not a weak test of the general one; it is no test of it.
+#
+# WHAT IT COST, in closed form rather than by inspection. In the small-angle
+# limit the widened lobe's flux is g INT dphi / n_eff(phi), and with Q's
+# eigenvalues l1, l2:
+#     correct   INT dphi / (u^T Q^-1 u) = 2 pi sqrt(l1 l2) = 2 pi sqrt(det Q),
+#               so the flux is g 2 pi sqrt(det Q) = 2 pi / n -- CONSERVED, which
+#               is exactly the property `g` was derived to give it;
+#     shipped   INT dphi (u^T Q u) = pi (l1 + l2) = pi tr Q,
+#               so the flux is (l1 + l2) / (2 sqrt(l1 l2)) times that.
+# The gain is therefore cosh(ln(r)/2) with r = l1/l2 the ellipse's eigen-ratio,
+# and nothing else: 1 at r = 1 (the degeneracy above, and it is why `g` still
+# normalised the lobe there), 1.06 at r = 2, 1.37 at r = 5.3, 34.8 at r = 4832.
+# By Cauchy-Schwarz (u^T Q u)(u^T Q^-1 u) >= 1, so the shipped exponent was
+# never larger than the right one: the lobe was never too narrow, always too
+# wide, and since `g` was computed for the CORRECT Gaussian it no longer
+# normalised what it multiplied. The lobe CREATED energy, monotonically in the
+# anisotropy, and this file's only anisotropic caller -- `render.py`'s open
+# water, where the reflection ellipse is stretched by 1/cos(theta_v) along the
+# view azimuth -- runs r = 1.75 to 12.2 over its own frame, weighted by pixels,
+# and paid 1.04x to 1.89x for it with a median of 1.17x.
+#
+# FOUND BY THE RASTER REFERENCE (`raster-impl/waves.py`, `widened_lobes`),
+# which is an independent code path over the same shared module and is the
+# first thing in this project to reach an anisotropic Q at all. Its own frame
+# prices the same defect at 12.0x on its p99. `validate.py` now carries the
+# energy row on an ANISOTROPIC lobe, which is the row that would have caught
+# it, and an absolute one beside it.
 def _lobe_shape(n, cov):
     """One cos^n lobe of the environment, convolved with the reflection ellipse
     that the UNRESOLVED slope variance puts on the mirror direction.
@@ -329,13 +384,15 @@ def _lobe_shape(n, cov):
     is EXACTLY the expression this file had before, so the unfiltered path is
     bit-for-bit the old one and the sky behind the pool never moves.
 
-    n_eff is directional -- 1 / (u_hat^T Q u_hat), the variance of the summed
-    Gaussian along the direction of the offset to the sun -- which is how the
+    n_eff is directional -- u_hat^T Q^-1 u_hat, the summed Gaussian's own
+    exponent along the direction of the offset to the sun -- which is how the
     anisotropy survives. WIND is a 45 deg spread about the wind azimuth and the
     wake is directional, so what the filter removes is a Cox-Munk ellipse and a
     lobe widened by its trace would be visibly wrong across the wind. On the
     axis (offset zero) every direction gives cos^n = 1 and only the peak factor
-    is doing anything, so the fallback there is the mean variance."""
+    is doing anything, so the fallback there is the DIRECTIONAL MEAN of the same
+    quantity, tr(Q^-1)/2 -- which is the trace of the inverse and not the
+    inverse of the trace, for the reason given in the block above."""
     if cov is None:
         return 1.0, n
     u1, u2, c11, c12, c22 = cov
@@ -344,11 +401,15 @@ def _lobe_shape(n, cov):
     det = np.maximum(q11 * q22 - c12 * c12, 1e-30)
     g = (1.0 / n) / np.sqrt(det)
     r2 = u1 * u1 + u2 * u2
-    w = np.where(r2 > 1e-16,
-                 (u1 * u1 * q11 + 2.0 * u1 * u2 * c12 + u2 * u2 * q22)
-                 / np.maximum(r2, 1e-16),
-                 0.5 * (q11 + q22))
-    return g, 1.0 / np.maximum(w, 1e-12)
+    ne = np.where(r2 > 1e-16,
+                  (u1 * u1 * q22 - 2.0 * u1 * u2 * c12 + u2 * u2 * q11)
+                  / np.maximum(r2, 1e-16) / det,
+                  0.5 * (q11 + q22) / det)
+    # both clamps are unreachable for the covariance a slope tensor can produce
+    # -- C is PSD, so Q = (1/n) I + C has det >= (c11 + c22)/n + 1/n^2 > 0 and
+    # an adjugate form that is non-negative -- and they are kept as the sign
+    # that says so. A row in `validate.py` fires at a caller that breaks it.
+    return g, np.maximum(ne, 1e-12)
 
 
 SKY_DIFFUSE_LOBES = SKY_LOBE[1:]    # everything but the disc -- see below
