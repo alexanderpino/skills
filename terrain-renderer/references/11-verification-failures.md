@@ -830,7 +830,7 @@ ellipse itself — and **every one of them was taken at `cov = None`, where `Q =
 here (`terrain-renderer/reference-impl/`, `atmosphere.py` and `validate.py`), the widened lobe's
 flux against the unwidened `2π/(n+1)`, at a fixed minor axis of `1e-5`:
 
-| ellipse axis ratio | 1 (where all eleven rows sat) | 10 | 1e4 (the raster path's grazing frame) |
+| ellipse axis ratio | 1 — isotropic, the degeneracy all eleven rows sat inside | 10 | 1e4 (the raster path's grazing frame) |
 |---|---|---|---|
 | the correct `uᵀQ⁻¹u` | 1.0000 | 0.9999 | 0.9535 |
 | the shipped `1/(uᵀQu)` | **1.0000** | 1.3725 | **32.36** |
