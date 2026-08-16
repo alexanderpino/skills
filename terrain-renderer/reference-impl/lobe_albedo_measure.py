@@ -12,8 +12,11 @@ everything a *picture* needs and 700 lines short of the block that measures the
 pool's apparent albedo against its own closed form. The README's headline
 photometric row (`the render, measured  0.2151`) is written by THAT block, at
 `render.py`'s "and the same quantity MEASURED off the frame". So this file cuts
-lower: at the head of the second measurement, immediately after the four
-water/sunlit-stone readings are printed.
+lower: at the line that names the hero PNG -- i.e. after EVERY above-water analysis
+block the file carries and before the first byte is written to disk. Nothing
+below that line runs, no PNG is written, and the two runs' stdout can therefore
+be diffed print for print: that diff IS the sweep for "which render-measured
+numbers moved".
 
 THE DEFECT IS NOT REDEFINED HERE. `fix_lobe_render._lobe_projection` is imported
 and monkeypatched, character for character the same object that drew
@@ -50,11 +53,11 @@ _Y3 = np.array([.2126, .7152, .0722])
 CAPTURE = '    _LOBE_CAP.append((spec_.astype(np.float32), '\
           'tran_.astype(np.float32)))'
 ANCHOR = "    _Y = np.array([.2126, .7152, .0722])"
-CUTMARK = '# --- the second measurement: submerged wall against the dry band'
+CUTMARK = '_HERO_PNG = '
 
 
 def _pass():
-    """`render.py` down to the end of the apparent-albedo block, plus the two
+    """`render.py` down to the line that names the hero PNG, plus the two
     per-band columns captured on the way."""
     path = os.path.join(HERE, 'render.py')
     src = open(path).read().split('\n')
@@ -152,6 +155,7 @@ def main():
     tag = 'wide' if ns['POOL_WIDE'] else 'hero'
     np.savez_compressed(os.path.join(OUT, 'albedo-%s-%s.npz' % (mode, tag)),
                         HDRP=HDRP.astype(np.float32), REG=REG,
+                        WREG=ns['WREG'],
                         PSPEC=PS.astype(np.float32), PTRAN=PT.astype(np.float32),
                         meta=json.dumps(o))
     print('\n*** %s / %s' % (mode, tag))
