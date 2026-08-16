@@ -884,7 +884,8 @@ bar seaward; calm swell walks it back — the profile breathes on a storm/calm c
 > | undertow **off** | **2.070 m** | **0.887** | 1.146 m (**−19%**) | **0.011 m** |
 >
 > **A bar still forms, in the same depth.** The onshore flux converges against **zero**: breaking
-> destroys the very skewness that drives it, so `q_on` collapses over a few metres at the break
+> ~~destroys~~ **rotates away** the very skewness that drives it (corrected in the block below — the
+> result stands, the verb does not), so `q_on` collapses over a few metres at the break
 > point regardless of what is happening on the other side. `∂q/∂x < 0` needs one flux that stops,
 > not two that meet.
 >
@@ -900,6 +901,75 @@ bar seaward; calm swell walks it back — the profile breathes on a storm/calm c
 >
 > Tier unchanged at **P** (Svendsen 1984, Bailard 1981 both still do exactly what they are cited
 > for). What moved is not the physics but the *attribution of necessity* inside it.
+
+> **Correction — "breaking destroys the skewness" is the right arithmetic and the wrong verb, and
+> the difference is a missing term.** The correction above rests on the sentence *breaking destroys
+> the very skewness that drives it*, and that sentence is repeated twice more in this section. It is
+> **not** what happens to the wave's third moment. Breaking **turns** the moment; only its
+> *projection onto the skewness* dies, and the half that arrives has a name and a transport
+> consequence this loop does not carry.
+>
+> **The algebra, and it needs no new constant.** A shoaling wave is a primary plus a bound second
+> harmonic, `η = a[cos φ + r cos(2φ + ψ)]`, with `r → 2·Ur` in shallow water — so any loop with an
+> Ursell number in it already has `r`. Both third moments are closed forms of that one shape
+> parameter and one phase (`H` = Hilbert transform, `H(cos nφ) = sin nφ`):
+>
+> ```
+> Sk = <eta^3>/sigma^3    = +(3/4) r cos(psi) / ((1 + r^2)/2)^(3/2)      skewness  (peaked crest)
+> As = <H(eta)^3>/sigma^3 = -(3/4) r sin(psi) / ((1 + r^2)/2)^(3/2)      asymmetry (pitched front)
+>
+>    =>   Sk^2 + As^2  =  (9/16) r^2 / ((1 + r^2)/2)^3        -- a function of r ALONE
+> ```
+>
+> **`ψ` cannot create or destroy third moment. It can only rotate it between the two.** And the
+> endpoints are exactly what this section already describes: `ψ = 0` is the peaked, fore–aft
+> symmetric crest of the shoaling wave, `ψ = −π/2` the pitched-forward sawtooth of the bore.
+> Breaking is that rotation. In shallow water `u = η√(g/d)` — a positive multiple of the surface at
+> every phase — so the elevation moments *are* the velocity moments the transport reads, and none of
+> this needs a second theory.
+>
+> **Where the moment goes, verified rather than cited.** The asymmetry is, at fixed `r`, exactly
+> proportional to the **skewness of the near-bed acceleration** — `Sk(du/dt) / As(u)` = −1.914,
+> −1.698, −1.435, −0.988 at `r` = 0.1, 0.2, 0.3, 0.5, and **independent of `ψ` to all printed
+> digits** in each case (`D`, direct quadrature here). So the rotation moves the moment continuously
+> out of the term an energetics model reads (`⟨u³⟩`) and into the term it does not. That
+> acceleration-skewness transport is a real and published mechanism for onshore bar migration
+> (Hoefel & Elgar 2003, *Science*; Drake & Calantoni 2001) — **`P`, cited and not opened here**, and
+> this chapter is **not** prescribing a coefficient for it. What is claimed is only that the moment
+> has a destination and the destination has a literature.
+>
+> **The defect in the coupling, measured on the reference implementation.** `beach.py`'s
+> `sediment_flux` writes the onshore term as `Sk(Ur) × (1 − f_brk) × u_orb³`, with **no asymmetry
+> term at all**. `(1 − f_brk)` is a **straight line standing in for `cos ψ`** — it is the rotation
+> seen from one side, flattened. Under that file's own declared schedule `ψ = −(π/2)·f_brk` (both
+> endpoints derived, the interpolation between them declared — see the tier note):
+>
+> | `f_brk` | 0 | ¼ | **½** | ¾ | 1 |
+> |---|---|---|---|---|---|
+> | rotation, `cos(π f/2)` | 1.000 | 0.924 | **0.707** | 0.383 | 0 |
+> | as implemented, `1 − f` | 1.000 | 0.750 | **0.500** | 0.250 | 0 |
+> | the linear factor reads low by | — | 18.8% | **29.3%** | 34.7% | — |
+>
+> They agree at both endpoints, which is why nothing ever caught it, and the gap peaks in between:
+> **0.207 at half breaking — 41% of the value the implementation uses.** ⚠️ The percentages are
+> contingent on the declared `ψ(f)`; the **missing `As` term is not**, because `Sk² + As² = g(r)`
+> holds whatever `ψ` does.
+>
+> **What this does and does not overturn.** The correction above **survives intact**, and it is worth
+> saying so plainly: `⟨u³⟩` genuinely does collapse at the break point, so the onshore flux really
+> does converge against zero and the bar really does form without an undertow. What changes is the
+> *mechanism* under that result — a rotation rather than a destruction — and one consequence:
+> the collapse is **slower than a straight line through breaking**, so a loop using `(1 − f_brk)`
+> sharpens the convergence, and with it the crest, more than the shape warrants. **Read this as a
+> defect in the coupling between the wave shape and the sediment transport, not in either half.**
+> Both halves are individually defensible; what is wrong is that the transport reads **one** of the
+> two moments its own wave shape carries.
+>
+> **Tier.** The moment identities and the `Sk² + As²` invariant are **`D`** — second-order Stokes
+> is `P` (Dean & Dalrymple) for the surface form; everything after the substitution is arithmetic
+> checked here against direct quadrature. `ψ(f_brk)` is **`?`** on the interpolation and `D` on both
+> endpoints (a bound harmonic is phase-locked; a fully broken bore is a sawtooth). Ruessink et al.
+> (2012) publish a `ψ(Ur)` going the same way — **not verified here and not claimed**.
 
 ```
 # 1D cross-shore profile step — the runnable core (energetics-style)
