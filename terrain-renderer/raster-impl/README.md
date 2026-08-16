@@ -405,18 +405,22 @@ bin means, from two independent reference estimators:
 
 | distance | reference (2° cone) | reference (brute force) | **naive** | **fix** |
 |---|---|---|---|---|
-| 4–8 m | 1.585 | 1.698 | 2.371 (**+40 %**) | 1.576 (−7 %) |
-| 8–16 m | 4.526 | 4.878 | 10.014 (**+104 %**) | 5.035 (+3 %) |
+| 4–8 m | 1.585 | 1.698 | 2.371 (**+50 %**) | 1.576 (−0.6 %) |
+| 8–16 m | 4.526 | 4.878 | 10.014 (**+121 %**) | 5.035 (+11 %) |
 | 16–32 m | 0.1451 | 0.0333 | **0.0000** | 0.2474 |
 | 32–64 m | 0.00422 | 0 | **0.0000** | 0.00512 |
 | 64–128 m | 0 | 0 | 0.0000 | 4.6e-4 |
+
+(Percentages are against the cone column; against the brute-force column they are
++40% and +105%, and the gap between the two is the cone's own kernel bias,
+quoted below.)
 
 **The collapse is not a dimming, it is a redistribution.** On the road the naive
 path is *twice too bright*, because a lobe that should be spread over several
 degrees is being sampled once per pixel at its Dirac peak; past 16 m it is not
 small but **identically zero at every pixel**, while the surface still returns
-0.145. The fix is inside 7% where the surface is resolved and lands within a
-factor of 1.7 where it is not.
+0.145. The fix is inside the cone estimator's own bias where the surface is
+resolved and lands within a factor of 1.7 where it is not.
 
 **Why there are two reference estimators.** The sun's disc is `cos^93493` — 0.53°
 across, 6.72e-5 sr — and past 30 m a footprint scatters the reflected ray over
