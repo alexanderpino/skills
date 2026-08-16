@@ -641,6 +641,20 @@ def _bug_foam_backscatter_is_tir(mod):
     mod.bubble_scatter = bs
 
 
+def _bug_bubble_fresnel_one_channel(mod):
+    """The defect wave 7 removed: every channel's internal Fresnel evaluated at
+    RED's refracted cosine. `optics.fresnel` broadcasts a scalar to three
+    channels, so the array shape is right and the energy sum still closes --
+    only the ANGLE is wrong, in two bands out of three."""
+    def fi(sin_i):
+        si = np.asarray(sin_i, float)[..., None]
+        st = mod.N_W * si
+        tir = st >= 1.0
+        ct = np.sqrt(np.maximum(1.0 - np.minimum(st, 1.0) ** 2, 0.0))
+        return np.where(tir, 1.0, OPT.fresnel(ct[..., 0]))
+    mod._fresnel_internal = fi
+
+
 def _bug_foam_on_the_crest(mod):
     """Put the foam ON the crest -- age zero everywhere -- instead of in the
     tail behind it. The placeholder's own mistake, kept."""
@@ -738,11 +752,13 @@ BUGS = {
     'foam-single-rise-speed': _bug_foam_single_rise_speed,
     'foam-stokes-everywhere': _bug_foam_stokes_everywhere,
     'foam-unclipped-spheres': _bug_foam_unclipped_spheres,
+    'bubble-fresnel-one-channel': _bug_bubble_fresnel_one_channel,
 }
 FOAM_BUGS = ('foam-no-transmittance', 'foam-backscatter-is-tir',
              'foam-on-the-crest', 'foam-declared-k',
              'foam-percent-for-fraction', 'foam-single-rise-speed',
-             'foam-stokes-everywhere', 'foam-unclipped-spheres')
+             'foam-stokes-everywhere', 'foam-unclipped-spheres',
+             'bubble-fresnel-one-channel')
 OPTICS_BUGS = {'one-turbidity-slider', 'cdom-scatters', 'depth-averaged-spm',
                'dw-for-bed-power', 'isotropic-phase', 'glitter-fixed-width',
                'glitter-no-jacobian', 'ambient-in-the-tube'}
@@ -3155,6 +3171,22 @@ def _sec_foam(ctx):
             'independent computation, not a fit. A file that used the bar\'s '
             '43.9% as a backscatter fraction would land twenty times outside '
             'it, which is what this row is for.')
+    check(1, 'the trace RECOVERS optics.R_INT in ALL THREE bands',
+          bs['reflected'], np.asarray(OPT.R_INT), 3e-6,
+          'THE STRONGEST ROW IN THIS SECTION, and wave 7 had to fix a defect '
+          'to earn it. An impact-parameter uniform over the DISC is a cosine '
+          'weighting over the hemisphere, so the disc-average of the internal '
+          'Fresnel reflectance IS the diffuse internal reflectance -- which '
+          '`optics.py` carries in closed form as R_INT = 1 - (1 - R_EXT)/n^2, '
+          'derived from the external one by reciprocity and sharing not one '
+          'line of code with this quadrature. Two independent routes to three '
+          'numbers, agreeing to seven digits. It could not be written before, '
+          'because `_fresnel_internal` evaluated all three channels at RED\'s '
+          'refracted cosine: the shape was right, `optics.fresnel` broadcasts '
+          'a scalar to three channels, and only the red band landed. A wrong '
+          'ANGLE per channel is invisible to every shape and energy check in '
+          'this file -- energy still summed to 1, because R and (1-R) were '
+          'consistent with each other at the wrong angle.')
     info(1, 'the bubble: g, b_b/b, reflected share (R,G,B)',
          (tuple(np.round(bs['g'], 5)), tuple(np.round(bs['bb_over_b'], 5)),
           tuple(np.round(bs['reflected'], 5))),
@@ -3319,14 +3351,18 @@ def _sec_foam(ctx):
           'tau\'/(1+tau\') + 1/(1+tau\') = 1 identically. A slab that reflects '
           'without transmitting less is a light source.')
     check(1, 'the plume HIDES: T at alpha = 0.03 over 0.75 m',
-          float(po['T'][1, 1]), 0.0652069, 1e-6,
+          float(po['T'][1, 1]), 0.0651344, 1e-6,
           'BAR SECTION C\'S OWN TEST, absolute. Three per cent air over a '
           '0.75 m plume leaves a diffuse transmittance of 6.5% in the green, '
           'so what is behind it is fifteen times fainter. "If a renderer whitens '
           'without hiding what is behind, it has modelled the symptom" -- this '
-          'row is the number that says it does not.')
+          'row is the number that says it does not. WAVE 7 MOVED THIS LITERAL '
+          'BY 0.11%, from 0.0652069, and the move is the point: the per-channel '
+          'Fresnel fix in `_fresnel_internal` shifted the traced g and b_b/b, '
+          'and an ABSOLUTE row is what noticed. Every ratio row in this section '
+          'survived the defect untouched.')
     check(1, 'and it whitens: R at the same depth', float(po['R'][1, 1]),
-          0.9347931, 1e-6,
+          0.9348656, 1e-6,
           'The other half. R and T are one two-stream and a renderer cannot '
           'have the second without the first; stating both absolutely is what '
           'stops a future edit turning the opacity up and the whiteness down '

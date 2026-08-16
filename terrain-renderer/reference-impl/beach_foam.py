@@ -99,7 +99,19 @@ def _fresnel_internal(sin_i):
     st = N_W * si                                   # Snell into the air
     tir = st >= 1.0
     ct = np.sqrt(np.maximum(1.0 - np.minimum(st, 1.0) ** 2, 0.0))
-    R = OPT.fresnel(ct[..., 0])                     # air-side incidence cosine
+    # EACH CHANNEL AT ITS OWN CONJUGATE ANGLE, and wave 7 fixed this. The first
+    # writing passed `ct[..., 0]` -- red's air-side cosine -- into a function
+    # that then evaluates all three IORs at it, so green and blue were Fresnel
+    # at red's refracted angle. `optics.fresnel` broadcasts a scalar cosine to
+    # three channels, so the shape was right and nothing complained; the error
+    # was a wrong ANGLE per channel, which no shape check can see. What it cost
+    # is small in the mean and exact in the check: the disc-average now recovers
+    # `optics.R_INT` to six digits in ALL THREE bands (0.473713 / 0.476167 /
+    # 0.480681 against 0.473712 / 0.476166 / 0.480681) where before only the red
+    # landed. A ray trace that shares no code with the closed form and lands on
+    # it to six figures in three bands is the strongest kind of row this suite
+    # can carry, and the shipped version was throwing two thirds of it away.
+    R = np.stack([OPT.fresnel(ct[..., c])[..., c] for c in range(3)], -1)
     return np.where(tir, 1.0, R)
 
 
