@@ -956,7 +956,7 @@ that breaks one number breaks one row and a defect that breaks the scene breaks 
 
 Every way above is about a row that measures the wrong thing. This one measures the **right** thing,
 in the right place, against an independent route, and reports nothing — because its tolerance was
-sized from the disagreement it was written to accommodate. It is the smallest of the thirteen and it
+sized from the disagreement it was written to accommodate. It is the smallest in this catalogue and it
 is the one this project committed **against its own stated rule**: *a tolerance is justified from the
 estimator's own error or a published uncertainty, **never** from the disagreement it is being asked
 to excuse.* The rule was written down in `12`; the row below was written by the same hands.
@@ -1055,6 +1055,59 @@ decimal places they are quoted to. What was wrong was the **suite's opinion of i
 suite that cannot resolve a defect four orders below the visible one is fine, while a suite that
 *believes* it can is the thing this catalogue is about.
 
+### The fourteenth way: two instruments agree, and could not have disagreed
+
+Every way above is about one row. This one is about **two** rows that pass, cross-check each other,
+and jointly establish less than either of them looks like it establishes on its own. It is the
+cheapest kind of false confidence a suite can buy, because it is bought with a *correct* result.
+
+**The case.** A rendered sea state has two independent readouts of the same wind `U₁₀`: the width of
+the **sun glitter path**, which goes as `√mss` with Cox & Munk's `mss = 0.003 + 5.12×10⁻³ U`, and the
+**whitecap coverage**, which goes as Monahan & O'Muircheartaigh's `W = 3.84×10⁻⁶ U^3.41`. One wind
+drives both. Measured back off the scene-linear buffer they gave **5.84 m/s** and **6.00 m/s** —
+**2.7% apart**. That reads like a cross-validation of the surface model. It is not.
+
+**Compare the instruments before believing the agreement.** Two numbers per instrument: how hard the
+observable pushes on `U`, and how well the observable can be measured.
+
+| | `d(ln X)/dU` at 6 m/s | realistic measurement error | ⇒ `dU` |
+|---|---|---|---|
+| glitter path width | **0.0759** per m/s | 1% on a width read off a buffer | **0.13 m/s** |
+| whitecap coverage | **0.5683** per m/s | a factor of **3**, which is inside the literature's own spread | **1.93 m/s** |
+
+(`D`, both recomputed here; `d(ln W)/dU = n/U` exactly, and the width's derivative straight off Cox
+& Munk's linear `mss`.) **The width is a 15× sharper wind instrument than the coverage**, so a 2.7%
+agreement between them is *inside the coverage's own noise by a factor of fifty*. The two could not
+have disagreed informatively. Nothing was learned.
+
+⚠️ **And the trap has a second floor: the raw sensitivities run the *other way*.** Coverage is
+`0.5683/0.0759` = **7.5× steeper** in `U` than the width is — by the sensitivity alone it is the
+better instrument, and a reviewer who checks only `∂X/∂U` will pick it. What inverts the ranking is
+the **measurement uncertainty**, and the useful quantity is the product. `dU = σ_lnX / |d(ln X)/dU|`
+is the only figure that ranks instruments, and neither factor ranks them alone.
+
+**Why the coverage's error really is a factor of three.** It is not sloppy measurement; it is the
+published law. Monahan & O'Muircheartaigh (1980) is quoted everywhere as `3.84×10⁻⁶ U^3.41` while the
+same paper's own optimal fit is `2.95×10⁻⁶ U^3.52`; Callaghan et al. (2008) is not a power law at all
+but a piecewise fit with an onset at `U₁₀ = 3.70 m/s`. From the exponent's spread alone one coverage
+maps to **5.67–7.66 m/s**, and the coefficient's spread across the literature is worse. **An
+instrument calibrated against a quantity whose own law spans a factor of three cannot resolve better
+than that**, however cleanly it is measured off the buffer — which is
+[picking instruments whose parameters someone else has fixed](#pick-instruments-whose-parameters-someone-else-has-fixed)
+read from the failure side.
+
+**The rule, and it generalises past water:** *two instruments agreeing establishes nothing until
+their `dU` are compared.* Before a cross-check is allowed to count as evidence, print the smallest
+difference in the underlying quantity each side could have detected. If one is much larger than the
+other, the agreement is a statement about the coarse instrument's tolerance and not about the
+model — the same arithmetic as the [thirteenth way](#the-thirteenth-way-a-tolerance-the-size-of-the-thing-it-covers)'s
+*count resolution, not rows*, applied across instruments rather than within one.
+
+**And the level is the other half of it.** At `U₁₀ = 6 m/s` the whitecap coverage is **0.173%** of
+the sea surface. A render with conspicuous open-water foam therefore has a *different* wind from the
+one its glitter path reports — which is the check worth writing, because unlike the agreement above
+it can fail.
+
 ## When the target is an approximation, the bar changes kind
 
 Everything above is about verifying a renderer against the world. This section is about the other
@@ -1136,6 +1189,13 @@ should be in the frozen set: a scene that exposes one underlying field through m
 so that an approximation which passes each reading separately can still be caught failing their
 agreement. That failure is invisible in any single view by construction, which is precisely why it
 must be in the set before the loop starts rather than added when something looks wrong.
+
+⚠️ **And the converse belongs in the same breath: such a scene has to be checked for whether its two
+paths *could* have disagreed.** Two readings of one field whose resolutions differ by an order of
+magnitude will agree whatever the approximation does, and the agreement will be reported as
+corroboration — [the fourteenth way](#the-fourteenth-way-two-instruments-agree-and-could-not-have-disagreed).
+Print each path's smallest detectable difference *in the underlying field* alongside the agreement,
+or the multi-path scene is one path plus a decoration.
 
 ## Review checklist
 
@@ -1224,4 +1284,5 @@ symptom → mechanism → minimal fix; do not rewrite a renderer that has one wr
 | The eighth way: a test's power is the surface area it shares with the code under test | **F** (house doctrine, and the general form of the fourth way's "two methods that read one premise are one method") + **D** for the case — the audit's one borrowed name, the lossless-limit/photon-walk pair agreeing to 0.15%, and the four-bug table are all `reference-impl/validate.py`, re-evaluated here; that **the lossless limit alone passes three of the four** was verified by evaluating each variant against the limit, not quoted |
 | The eleventh way: a test window is part of the test, and a row that gets *easier* as the condition hardens is reporting its window rather than the system | **F** (house doctrine; the monotone-wrong-way tell and the three instruments are composed here) + **D** for the case — the oblique-Snell row in `reference-impl/validate_beach.py`, **both columns recomputed here** (2026-08) rather than quoted: 0.186 / 0.310 / 0.277° centred on the best-covered row against 0.186 / 0.059 / 0.030° centred on the grid, with 236 / 123 / **0** ramp cells in the centre row and 5202 window cells surviving at 30°. The 2.71° edge artefact and the 60-row exclusion were recomputed with them. Those numbers are that march, that grid and that bed; what transfers is the signature |
 | The thirteenth way: a tolerance sized from the disagreement it accommodates reports the state the row was written in, and coverage is the *minimum resolution* over the rows rather than their count | **F** (house doctrine; the "count resolution, not rows" rule and the grep-able tell are composed here) + **D** for the case, all recomputed 2026-08 on `reference-impl/optics.py` and `validate.py` rather than quoted: the shipped 2000-node single Gauss–Legendre rule against a split rule (400 nodes either side of `μ = cos θ_c`) and a 4 000 000-node reference — `slab_esc(0) − T_OUT_DIFFUSE` = +2.35 / −3.30 / +1.61 e-5 as shipped against +1.80 / +1.79 / +1.77 e-7 split, the air-side 512-point midpoint's own error at 1.8e-7, and `+3.9 / −6.2 / +3.1 e-5` / `−8.0 / +8.1 / −3.4 e-5` relative on `slab_esc` / `slab_trap`. ⚠️ **The kink attribution is a control, not an inference**: substituting a smooth reflectance for `R_int` and changing nothing else returns the *un-split* 125-node rule to 6.7e-15, which is what rules out the `exp(−τ/μ)` endpoint as the cause. The sign-alternating convergence table (250 → 8000 nodes) is `D` on the same rule. The `1e-4` and `6e-3` tolerances and the quoted justification strings are that suite's own text; the 97–196× figure is arithmetic on them. **Nothing shipped was wrong** — the effect is four orders below anything a frame resolves and does not move any chapter figure at its quoted precision — which is stated in the section because the finding is about the suite's self-assessment, not about the render | 
+| The fourteenth way: two instruments agreeing establishes nothing until their `dU` are compared, and the raw sensitivities can rank them the opposite way from the achievable precisions | **F** (house doctrine; the `dU = σ_lnX / |d(ln X)/dU|` framing and the "print each path's smallest detectable difference" rule are composed here) + **P/D** for the case. `P`: Cox & Munk's `mss = 0.003 + 5.12×10⁻³ U`; Monahan & O'Muircheartaigh (1980) `W = 3.84×10⁻⁶ U^3.41` **and the same paper's own optimal `2.95×10⁻⁶ U^3.52`**; Callaghan et al. (2008, GRL 35, L23609) piecewise with an onset at 3.70 m/s. `D`, all recomputed here (2026-08) on `reference-impl/beach_optics.py` and `beach_foam.py` rather than quoted: `d(ln width)/dU = 0.0759` and `d(ln W)/dU = 0.5683` per m/s at 6 m/s, `dU` of 0.132 and 1.933 m/s, ratio **14.7×**, `W(6) = 0.173%`, and the exponent-spread band **5.67–7.66 m/s**. ⚠️ **The sensitivity ratio is 7.49× the other way** — coverage is the steeper instrument and the *worse* one — and that inversion is this pass's, recomputed rather than carried; it is the half that makes the rule non-obvious. The two readouts' own agreement (5.84 vs 6.00 m/s, 2.7%) is that scene's; what transfers is the ranking arithmetic |
 | The twelfth way: an unhandled exception costs its row *and every row after it*, so ERROR must be a status distinct from FAIL that still sets the exit code | **F** (house doctrine, and the harness-level sibling of the eighth way) + **D** for the remedy — the guarded-section harness is `reference-impl/validate_beach.py`, and `cap-not-dissipation` was **re-fired here** (2026-08): **10 FAIL / 0 ERROR** in 408 s, no section raising, which is what the fix is supposed to look like. ⚠️ Neither number in the 1-vs-8 is re-measured. The **8** is that defect's count against the *wave-2* suite and the **1** against the superseded harness that produced it; this run cannot reconstruct either, and the current suite has more rows, which is why re-firing gives 10 rather than 8. Both are quoted from that suite's own record. The transferable claim — that a raising row truncates a run, that the truncation is silent, and that ERROR must be a status — is structural and needs no measurement; the 1-vs-8 is an illustration and should be cited as one |
