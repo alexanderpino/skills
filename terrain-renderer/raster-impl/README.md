@@ -623,16 +623,19 @@ directory an **instrument** rather than only a deliverable.
 
 **And the price quoted above was right before the frame was drawn.** The
 prediction was *"the ellipse ratio is about 3 and the gain is 1.2–1.7× — a
-brightening of the pool's own glints that reads as taste."* Measured afterwards in
-scene-linear radiance off two full `render.py` hero passes: the pixel-weighted
-ellipse axis ratio over that frame's water runs **1.75–12.2** with a median of
-**3.12**; 58.96% of the frame (the water, and nothing else) moved; and the
-brightening was a blown-white glitter road down one edge worth **1378 in
-radiance** at worst — **77% of its own pixel** — with **10 300 pixels moving by 10
-sRGB levels or more.** "Reads as taste" was the right description and the wrong
-verdict: it read as taste precisely because a frame-mean and a frame-median
-cannot see it (the median moved 0.63%), which is the same blindness in the
-picture that the eleven rows had in the suite.
+brightening of the pool's own glints that reads as taste."* Measured afterwards
+by wrapping `_lobe_shape` for one full hero pass and recording `Q`'s eigen-ratio
+at all **6 509 605** of its surface samples: median `r` **4.35**, p99 **28.7**, so
+a flux gain with a median of **1.28×** and a p99 of **2.77×**. Right about the
+mechanism, low on the size — because the ellipse's own axis ratio is not `Q`'s,
+and because the pool's slope tensor is not isotropic either. In the picture,
+differenced in scene-linear off two full hero passes: 58.96% of the frame (the
+water, and nothing else) moved, and the brightening was a blown-white glitter
+road down one edge worth **1378 in radiance** at worst — **77% of its own pixel**
+— with **10 300 pixels moving by 10 sRGB levels or more.** "Reads as taste" was
+the right description and the wrong verdict: it read as taste precisely because a
+frame-mean and a frame-median cannot see it (the median moved 0.63%), which is
+the same blindness in the picture that the eleven rows had in the suite.
 
 **`field._norm_jets()` is not optional and nothing says so.**
 `field._SC['near']` ships at 1.0 and `_norm_jets` sets it to **0.001011**, so a

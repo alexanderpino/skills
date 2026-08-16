@@ -1,8 +1,17 @@
 """The lobe-receiver fix, as pictures, into `gauntlet/evidence/`, under the
 `fig-pool-` prefix the pool loop's other six figures already use.
 
+    python3 fix_lobe_render.py before       # the three buffers, one full
+    python3 fix_lobe_render.py after        # `render.py` hero pass each
+    python3 fix_lobe_render.py qratio
     python3 fix_lobe_evidence.py            # both figures
     python3 fix_lobe_evidence.py <outdir>
+
+    FIXLOBE_NPZ=<dir>                       where those buffers live
+
+`fix_lobe_render.py` is the only place the defective expression exists; it is
+monkeypatched into the atmosphere module for one run and `atmosphere.py` on disk
+is never touched.
 
 TWO FIGURES AND WHAT EACH ONE HAS TO SHOW.
 
@@ -323,8 +332,35 @@ def fig_energy(R, path):
     cw = np.cumsum(wgt[o]) / wgt.sum()
     lo, med, hi = (float(np.interp(q, cw, pool_r[o])) for q in (.05, .5, .95))
     med_area = float(np.median(pool_r))          # what area-weighting would say
+    # the GAIN at those ratios is read off the curves this figure just computed,
+    # at the minor axis they were computed with. It is NOT cosh(ln/2) of the
+    # ELLIPSE ratio: the closed form is in the eigen-ratio of Q = (1/n)I + C,
+    # and the isotropic (1/n)I pulls that below C's own ratio. Reading the
+    # closed form at the wrong argument is how this caption first shipped.
+    g_of = lambda rr: float(np.interp(rr, ratios, f_bug / f_ok))
+    g_lo, g_med, g_hi = g_of(lo), g_of(med), g_of(hi)
 
-    img = P.canvas(1420, 740)
+    # ---- AND WHAT THE SHIPPED PATH ACTUALLY HANDED IT, which is the only
+    # honest answer to "what did this frame pay". The band above is a PROXY:
+    # camera geometry on the flat datum, with an isotropic slope tensor
+    # assumed. `q-ratio-hero.npz` is the real thing -- the eigen-ratio of Q at
+    # every one of the hero pass's surface samples, recorded by wrapping
+    # `_lobe_shape` for one full run -- and it is larger, because the slope
+    # tensor is NOT isotropic (the wind is a 45 deg spread about its azimuth
+    # and the wake is directional) and the surface is not the datum.
+    qm = None
+    _qp = os.path.join(NPZ, 'q-ratio-hero.npz')
+    if os.path.exists(_qp):
+        _z = np.load(_qp)
+        _q, _p = _z['q'], _z['p']
+        qm = dict(n=int(_z['n'][0]),
+                  **{k: float(np.interp(v, _q, _p))
+                     for k, v in (('p5', 5), ('p50', 50), ('p95', 95),
+                                  ('p99', 99))})
+        qm.update({'g' + k: float(np.cosh(.5 * np.log(max(qm[k], 1.0))))
+                   for k in ('p5', 'p50', 'p95', 'p99')})
+
+    img = P.canvas(1420, 812)
     # ---- left: the whole sweep, four decades of ratio, gain on a log axis
     ax = P.Axes(img, (92, 66, 690, 446), (0, 4), (-0.14, 1.66),
                 title='widened flux / the flux of the lobe it replaced',
@@ -407,9 +443,24 @@ def fig_energy(R, path):
         '%.2f, because most of the water is far and grazing while most of the '
         'frame is near -- that runs %.2f to %.2f (5th-95th percentile) with a '
         'median of %.2f, a flux gain of %.3f to %.3f, median %.3f.'
-        % (med_area, lo, hi, med, float(np.cosh(.5 * np.log(lo))),
-           float(np.cosh(.5 * np.log(hi))), float(np.cosh(.5 * np.log(med)))),
-        'In absolute terms the median water pixel\'s disc lobe carried %.5g sr '
+        % (med_area, lo, hi, med, g_lo, g_hi, g_med),
+        'THAT BAND IS A PROXY AND IT UNDERSTATES THE SCENE. It is camera '
+        'geometry on the flat datum with an ISOTROPIC slope tensor assumed, and '
+        'neither is true: the wind is a 45 deg spread about its azimuth, the '
+        'wake is directional, and the'
+        if qm else '',
+        'surface is not the datum. Wrapping `_lobe_shape` for one full hero '
+        'pass and recording Q\'s own eigen-ratio at every one of its %s '
+        'surface samples gives %.2f (p5), %.2f (MEDIAN), %.2f (p95), %.2f '
+        '(p99) -- a flux gain of'
+        % ('{:,}'.format(qm['n']).replace(',', ' '), qm['p5'], qm['p50'],
+           qm['p95'], qm['p99']) if qm else '',
+        '%.3f, %.3f, %.3f and %.3f by the closed form above. The gain in this '
+        'frame has a MEDIAN of %.0f%% and a p99 of %.1fx, not the %.0f%% the '
+        'proxy band suggests.'
+        % (qm['gp5'], qm['gp50'], qm['gp95'], qm['gp99'],
+           100 * (qm['gp50'] - 1), qm['gp99'], 100 * (g_med - 1)) if qm else '',
+        'In absolute terms, at the proxy median, the disc lobe carried %.5g sr '
         'where the sun\'s own disc is %.5g sr. That is what the frame beside '
         'this one paid, and it is why the defect read as taste.'
         % (float(np.interp(med, ratios, f_bug)), ref),
@@ -418,9 +469,10 @@ def fig_energy(R, path):
         'right end of this plot, and is how it was found at all.',
     ], x=26)
     return P.save(img, path), dict(lo=lo, hi=hi, med=med,
-                                   g_lo=float(np.cosh(.5 * np.log(lo))),
-                                   g_hi=float(np.cosh(.5 * np.log(hi))),
-                                   g_med=float(np.cosh(.5 * np.log(med))),
+                                   g_lo=g_lo, g_hi=g_hi, g_med=g_med,
+                                   q_med=(qm or {}).get('p50', float('nan')),
+                                   q_gmed=(qm or {}).get('gp50', float('nan')),
+                                   q_gp99=(qm or {}).get('gp99', float('nan')),
                                    ref=ref, r1=float(f_bug[0] / ref),
                                    r1e4=float(f_bug[-1] / ref),
                                    qr1e4=float(qr[-1]))

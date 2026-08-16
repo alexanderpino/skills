@@ -266,11 +266,30 @@ difference's own mass is **columns 3–117 of 800** and rows 222–857 of 1200: 
 near-left strip where the surface turns toward the sun's azimuth. `render.py`
 prints the mirror band as landing at (4.60, 2.26), 1.13 half-widths past the
 frame edge; this is its in-frame tail, the grazing water where `1/cos²θ_v` — and
-therefore the ellipse ratio, and therefore the gain — is largest. Over this
-frame's water, weighted by pixels rather than by area, that ratio runs **1.75 to
-12.2** (5th–95th) with a median of **3.12**, a flux gain of **1.040 to 1.891**,
-median **1.166**. The raster reference predicted this before the frame was drawn:
-*"a brightening of the pool's own glints that reads as taste."*
+therefore the ellipse ratio, and therefore the gain — is largest.
+
+**How much the lobe was over-widened, measured rather than estimated.** The gain
+is `cosh(ln r / 2)` in the eigen-ratio of `Q = (1/n)I + C` — *not* of the
+reflection ellipse `C`, whose own axis ratio is an upper bound on `r` because the
+isotropic `(1/n)I` pulls it down. Estimating it from the camera alone, on the
+flat datum with an isotropic slope tensor, gives an ellipse ratio of **1.75 to
+12.2** (5th–95th, pixel-weighted) with a median of 3.12 — and that estimate
+**understates the scene**, because the slope tensor is not isotropic (the wind is
+a 45° spread about its azimuth and the wake is directional) and the surface is
+not the datum. Wrapping `_lobe_shape` for one full hero pass and recording `Q`'s
+eigen-ratio at every one of its **6 509 605 surface samples** gives the real
+distribution:
+
+| | p5 | median | p95 | p99 | max |
+|---|---|---|---|---|---|
+| `Q` eigen-ratio `r` | 1.39 | **4.35** | 16.01 | 28.74 | 70.66 |
+| flux gain `cosh(ln r / 2)` | 1.014 | **1.283** | 2.126 | **2.774** | 4.263 |
+
+**The median water sample's sun lobe carried 28% more light than it had, and its
+p99 carried 2.8×.** The raster reference predicted the shape of this before the
+frame was drawn — *"the ellipse ratio is about 3 and the gain is 1.2–1.7× — a
+brightening of the pool's own glints that reads as taste"* — and was right about
+the mechanism and low on the size, for the reason above.
 
 **And it is visible**, which is a *display* statement and is made with display
 numbers and nowhere else: through the file's own ACES + sRGB curve, **10 300
@@ -299,8 +318,16 @@ contract, so the frames are stated rather than assumed. `validate.py` runs
 | `pool_final_dispersion.png` | `0ebc06d76e9ca2e063535a461a7a89d7f33c3ab92f10384679dea2602e0d244a` | **moved** |
 | `pool_final_zoom.png` | `22e748c5d08feca6459049ebe9a9fc818f9ccfb9972d15daeac27d930bd52a48` | **moved** |
 | `pool_final_float.png` | `d478198a07bd6cfe4b3702e8e7a7173f4308f31b97feecfbd08c9f0f23cf62ab` | **moved** |
+| `pool_wide.png` | `a70e8e6961d8ea79353e997699458f7001d63637b09f6a9b8aa9ddc2be94cc61` | **moved** |
+| `pool_wide_dispersion.png` | `701a025a0b4dee43cdc525f44100c04469b49a2bd1cf0b4359241e63bbe5393e` | **moved** |
+| `pool_wide_zoom.png` | `53a081a796b711738ea520ea942bef87ea300c3a27454a5331c754e511ea7f88` | **moved** |
+| `pool_wide_float.png` | `a6d45250657bc0e7ba03656520b27374931ec73c17b98b3b618240038cd8fed7` | **moved** |
 | `pool_under.png` | `22be1d6aeadcb8b059514c8276eb3856c9460b9aa01823fc9d6305c45132e27c` | **unchanged, to the byte** |
 | `pool_under_float.png` | `d36f0b3270ced8ab9762eec71088ee8c72675b5bd397fac4cfba68a2a9ab827f` | **unchanged, to the byte** |
+
+`POOL_NOFLOAT=1` is not re-run here and its three hashes are left stale rather
+than guessed: it is the default camera over the same water with one object taken
+out, so its frames move for the same reason the default's do.
 
 The two underwater frames are unchanged **by construction and not by luck**: the
 camera below the surface reaches the environment through `uw_shade` → `air_world`
