@@ -40,10 +40,14 @@ from PIL import Image, ImageDraw                                # noqa: E402
 import beach_plot as P                                          # noqa: E402
 import optics as OPT                                            # noqa: E402
 
+import field as FLD                                             # noqa: E402
+
 import lut as LUT                                               # noqa: E402
 import offline as OFF                                           # noqa: E402
 import scene as SC                                              # noqa: E402
 import sswater as WA                                            # noqa: E402
+import waves as WV                                              # noqa: E402
+import waveref as WR                                            # noqa: E402
 
 OUT = os.path.abspath(os.path.join(_HERE, '..', '..', 'gauntlet', 'raster',
                                    'evidence'))
@@ -558,12 +562,351 @@ def fig_pass_anatomy():
     return P.save(img, os.path.join(OUT, 'r1-pass-anatomy.png'))
 
 
+# ================================================== FIGURES 6-8, THE WAVE PAIR
+# `12`'s *Distance and filtering* and *Pick the kernel on purpose, and give the
+# variance a receiver*. Same discipline as the r1- set: every number in every
+# caption is formatted from the run that drew the frame, and nothing measured
+# goes through `encode`.
+_WC = {}
+WBINS = np.array([4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 520.0])
+
+
+def wave_frames(nsub=196):
+    """The sun-facing frame, its pixel-integral reference, and every path,
+    built once and shared by the three figures below."""
+    if not _WC:
+        import time as _t
+        WV.init_field()
+        g = WV.sun_prepass()
+        base = WV.flat_base(g)
+        w = base['water']
+        fp, an, ok, P_ = WV.pixel_footprint(g, base['t'], base['dirs'], w)
+        _WC.update(g=g, base=base, w=w, fp=fp, an=an, ok=ok, P=P_,
+                   t=base['t'][w], fpw=fp[w], okw=ok[w])
+        _WC['ref'] = WR.reference(g, base, w, nsub=nsub, seed=5, want_mip=True)
+        for nm, kw in (('point', dict(path='point')),
+                       ('naive', dict(path='naive')),
+                       ('fix', dict(path='variance', fresnel='exact')),
+                       ('fix+fit', dict(path='variance', fresnel='rough'))):
+            best, out = np.inf, None
+            for _ in range(3):
+                t0 = _t.time()
+                out = WV.wave_pass(g, base=base, want_parts=True, **kw)
+                best = min(best, _t.time() - t0)
+            out['ms'] = 1e3 * best
+            _WC[nm] = out
+        # the reference frame as an image, for the panels
+        full = np.array(g['color'])
+        full[w] = _WC['ref']['color']
+        _WC['refimg'] = full
+        _WC['exp'] = derive_exposure(full)
+    return _WC
+
+
+def _wbin(C, i):
+    return (C['t'] >= WBINS[i]) & (C['t'] < WBINS[i + 1]) & C['okw']
+
+
+def _bincentres():
+    return np.log10(np.sqrt(WBINS[:-1] * WBINS[1:]))
+
+
+def _binvals(C, fn):
+    xs, ys = [], []
+    for i in range(len(WBINS) - 1):
+        s = _wbin(C, i)
+        if s.sum() < 200:
+            continue
+        xs.append(np.log10(np.sqrt(WBINS[i] * WBINS[i + 1])))
+        ys.append(fn(s))
+    return np.array(xs), np.array(ys)
+
+
+def _logx(ax, vals, yticks, yfmt='%g'):
+    """A log-distance x axis. `beach_plot.Axes` is linear only, so the data is
+    log10(metres) and the ticks are drawn here with the METRES on them -- the
+    frame's own formatter would print the logarithm, which is not a distance."""
+    ax.frame(xticks=None, yticks=yticks, yfmt=yfmt)
+    for v in vals:
+        ax.vline(np.log10(v), P.GRID, 1, None)
+        ax.d.text((float(ax.px(np.log10(v))), ax.y1 + 4), '%g' % v,
+                  fill=P.MUTED, font=P.FONT_S, anchor='ma')
+
+
+# ============================================================ FIGURE 6
+def fig_two_paths():
+    """The two paths side by side at the same framing, and the reference."""
+    C = wave_frames()
+    g, w, ex, ref = C['g'], C['w'], C['exp'], C['ref']
+    W, H = 1500, 1010
+    img = P.canvas(W, H)
+    bw, bh = 460, 259
+
+    def frame_of(nm):
+        return C[nm]['color']
+
+    _panel(img, (40, 60, 40 + bw, 60 + bh), encode(frame_of('naive'), ex),
+           'NAIVE -- filtered field, variance discarded')
+    _panel(img, (520, 60, 520 + bw, 60 + bh), encode(frame_of('fix'), ex),
+           'FIX -- the same filter, variance carried into the lobe')
+    _panel(img, (1000, 60, 1000 + bw, 60 + bh), encode(C['refimg'], ex),
+           'REFERENCE -- the pixel\'s own integral, %d sub-samples' % ref['nsub'])
+
+    # the road, zoomed: this is where the two paths differ at all
+    r0, r1_, c0, c1 = 102, 228, 168, 392
+    for k, (nm, lab) in enumerate((('naive', 'naive, the road'),
+                                   ('fix', 'fix, the road'),
+                                   ('ref', 'reference, the road'))):
+        im = C['refimg'] if nm == 'ref' else frame_of(nm)
+        _panel(img, (40 + 480 * k, 390, 40 + 480 * k + bw, 390 + bh),
+               encode(im[r0:r1_, c0:c1], ex), lab)
+
+    # the numbers, formatted from this run
+    rel = {}
+    for nm in ('naive', 'fix', 'point', 'fix+fit'):
+        a = C[nm]['color'][w][C['okw']]
+        b = ref['color'][C['okw']]
+        e = np.abs(a - b) / np.maximum(b, 1e-9)
+        rel[nm] = (float(np.median(e)), float(np.percentile(e, 95)),
+                   float(np.median(np.abs(a - b))))
+    s16 = _wbin(C, 2)
+    sun16 = (float(ref['sun_cone1'][s16, 1].mean()),
+             float(C['naive']['L_sun'][s16, 1].mean()),
+             float(C['fix']['L_sun'][s16, 1].mean()))
+    s8 = _wbin(C, 1)
+    sun8 = (float(ref['sun_cone1'][s8, 1].mean()),
+            float(C['naive']['L_sun'][s8, 1].mean()),
+            float(C['fix']['L_sun'][s8, 1].mean()))
+    sres = FLD.rms_slope(C['naive']['gx'][_wbin(C, 5)],
+                         C['naive']['gy'][_wbin(C, 5)])
+
+    P.caption(img, [
+        'r2-two-paths -- THE SAME FILTER, WITH AND WITHOUT A RECEIVER. Both frames narrow the slope distribution with distance through field.grad_points at the pixel\'s own',
+        'footprint; the middle one additionally reads field.slope_var_points and folds the removed 2x2 tensor into the reflected lobe through C = J S J^T and atmosphere.py\'s',
+        'own cos^n convolution. The right-hand frame is the pixel integral itself, %d stratified sub-samples of the UNFILTERED field per pixel, same shading model, nothing'
+        % ref['nsub'],
+        'approximated -- though its own speckle past 30 m is the ESTIMATOR and not the water: a cos^93493 lobe is 1e-6 of the solid angle a far footprint scatters over, so',
+        '196 sub-samples is still needle-hunting there and only its BIN MEANS converge (r2-variance-vs-distance carries a second estimator that does). The smooth road in',
+        'the middle panel is the expectation the right-hand one is a noisy draw from; near the specular point, where the footprint is 45 mm, the speckle is real in both.',
+        'Camera: the sun\'s own bearing, eye 3.00 m, water from 4.6 m to 400 m. THE HERO FRAME OF THE r1- SET CANNOT SHOW THIS AT ALL -- it looks 170 deg away',
+        'from the sun and the largest cosine between its mirror direction and the sun over all its water is -0.13, i.e. the sun\'s reflection is behind that camera and',
+        'atmosphere.sky\'s disc contributes exactly zero to every one of its water pixels. Bottom row, the sun\'s road at 3x: the naive path sprays isolated single-pixel',
+        'glints (the chapter\'s "sparkling fireflies at best") and the fix draws the road. By 16-32 m the naive path\'s disc term is %.4f against the reference\'s %.4f --'
+        % (sun16[1], sun16[0]),
+        'it is not dim, it is ZERO, because the resolved slope rms there is %.4f and by 128 m it is %.5f. Over the whole water, median |path - reference| / reference is'
+        % (FLD.rms_slope(C['naive']['gx'][s16], C['naive']['gy'][s16]), sres),
+        '%.3f%% naive against %.3f%% for the fix and %.3f%% unfiltered, so ON THE MEDIAN PIXEL THE FIX BUYS NOTHING: this sky is one narrow disc on a smooth gradient, and'
+        % (100 * rel['naive'][0], 100 * rel['fix'][0], 100 * rel['point'][0]),
+        'only the disc is lost. Scene-linear throughout; display exposure %.4f solved from the reference frame\'s own 99th luminance percentile, and no measurement passes'
+        % ex,
+        'through it. At 8-16 m the naive path OVER-states the road by %.0f%% instead (%.3f against %.3f) -- the collapse is not a dimming, it is a redistribution.'
+        % (100 * (sun8[1] / max(sun8[0], 1e-9) - 1), sun8[1], sun8[0]),
+    ], x=40, y=700)
+    return P.save(img, os.path.join(OUT, 'r2-two-paths.png'))
+
+
+# ============================================================ FIGURE 7
+def fig_variance_vs_distance():
+    """The mechanism: where the slope variance goes, and what the sun does."""
+    C = wave_frames()
+    ref = C['ref']
+    W, H = 1500, 1080
+    img = P.canvas(W, H)
+    xt = np.array([4.0, 10.0, 30.0, 100.0, 300.0])
+    xlim = (np.log10(4.0), np.log10(520.0))
+
+    ax = P.Axes(img, (100, 60, 690, 400), xlim, (0.0, 0.062),
+                title='where the slope variance goes',
+                xlabel='distance to the water hit, m  (log)',
+                ylabel='rms slope  s = sqrt(<|grad h|^2>)')
+    _logx(ax, xt, [0, .02, .04, .06])
+    xs, tot = _binvals(C, lambda s: float(np.sqrt(np.mean(ref['s_res'][s] ** 2))))
+    _, res = _binvals(C, lambda s: FLD.rms_slope(C['naive']['gx'][s],
+                                                 C['naive']['gy'][s]))
+    _, rem = _binvals(C, lambda s: float(np.sqrt(np.mean(np.sum(
+        FLD.slope_var_points(C['P'][..., 0][C['w']][s],
+                             C['P'][..., 1][C['w']][s],
+                             C['fpw'][s])[:2], axis=0)))))
+    ax.line(xs, tot, P.INK, 3)
+    ax.line(xs, res, RED, 2)
+    ax.line(xs, rem, BLU, 2)
+    ax.line(xs, np.hypot(res, rem), GRN, 2, (7, 5))
+    for a, b in zip(xs, tot):
+        ax.marker(a, b, P.INK, 3)
+    P.legend(ax, [(P.INK, 'total, on the unfiltered field'),
+                  (RED, 'RESOLVED -- what the normal still carries'),
+                  (BLU, 'REMOVED -- field.slope_var_points, trace'),
+                  (GRN, 'resolved (+) removed, in quadrature')],
+             np.log10(30.0), 0.0175)
+
+    ax2 = P.Axes(img, (830, 60, 1420, 400), xlim, (-4.4, 1.4),
+                 title='and what that does to the sun',
+                 xlabel='distance to the water hit, m  (log)',
+                 ylabel='log10 mean sun-disc radiance over the bin, green')
+    _logx(ax2, xt, [-4, -3, -2, -1, 0, 1])
+    lg = lambda v: np.log10(np.maximum(v, 1e-6))
+    _, rc = _binvals(C, lambda s: float(ref['sun_cone1'][s, 1].mean()))
+    _, rm = _binvals(C, lambda s: float(ref['sun'][s, 1].mean()))
+    _, nv = _binvals(C, lambda s: float(C['naive']['L_sun'][s, 1].mean()))
+    _, fx = _binvals(C, lambda s: float(C['fix']['L_sun'][s, 1].mean()))
+    ax2.line(xs, lg(rc), P.INK, 3)
+    for a, b in zip(xs, rm):
+        if b > 0 and lg(b) > -4.4:
+            ax2.marker(a, float(lg(b)), P.INK, 5)
+    ax2.line(xs, lg(nv), RED, 2)
+    ax2.line(xs, lg(fx), GRN, 2)
+    P.legend(ax2, [(P.INK, 'reference: 2 deg cone density (line), brute force (dots)'),
+                   (RED, 'naive -- off the bottom means EXACTLY zero'),
+                   (GRN, 'fix -- variance carried')], np.log10(4.4), -3.0)
+
+    ax3 = P.Axes(img, (100, 520, 1420, 790), xlim, (-2.3, 1.8),
+                 title='the footprint the pass can form, and the shape it cannot',
+                 xlabel='distance to the water hit, m  (log)',
+                 ylabel='log10 (fp, m)   /   log10 (anisotropy)')
+    _logx(ax3, xt, [-2, -1, 0, 1])
+    _, fpv = _binvals(C, lambda s: float(np.median(C['fpw'][s])))
+    _, anv = _binvals(C, lambda s: float(np.median(C['an'][C['w']][s])))
+    ax3.line(xs, np.log10(fpv), ORANGE, 2)
+    ax3.line(xs, np.log10(anv), PURPLE, 2)
+    ax3.hline(np.log10(0.0171), P.MUTED)
+    ax3.hline(np.log10(0.45), P.MUTED)
+    ax3.text(np.log10(4.3), np.log10(0.0171) + 0.11, 'LAM_MIN 17.1 mm', P.MUTED)
+    ax3.text(np.log10(4.3), np.log10(0.45) + 0.11, 'REVERB long end 45 cm', P.MUTED)
+    P.legend(ax3, [(ORANGE, 'fp = sqrt(|det J|), the area-matched isotropic footprint'),
+                   (PURPLE, 'footprint anisotropy s1/s2, which a scalar fp discards')],
+             np.log10(60.0), -1.35)
+
+    s_stat = WV.stationary_rms()
+    sfar = FLD.rms_slope(C['naive']['gx'][_wbin(C, 6)],
+                         C['naive']['gy'][_wbin(C, 6)])
+    q = np.abs(np.hypot(res, rem) / tot - 1.0).max()
+    P.caption(img, [
+        'r2-variance-vs-distance -- THE MECHANISM, IN ABSOLUTE UNITS. Left: the chapter\'s sentence -- "normals computed from displaced geometry converge to the MEAN normal',
+        'and all the slope variance those waves carried is silently discarded" -- as three curves. The surface keeps s = %.4f at every distance; the RESOLVED field falls to'
+        % float(tot.mean()),
+        '%.5f by 256 m, and field.slope_var_points\'s tensor picks up exactly what leaves. The dashed quadrature sum lies on the total to within %.1f%% over the whole sweep,'
+        % (sfar, 100 * q),
+        'which is field.py\'s own conservation identity holding at RASTER footprints -- up to %.1f m, two orders past anything render.py asks of it. Middle: the consequence.'
+        % float(C['fpw'][C['okw']].max()),
+        'Past 16 m the naive path\'s disc term is not small, it is identically zero at every pixel, while the reference still carries %.3f. Two independent reference'
+        % float(ref['sun_cone1'][_wbin(C, 2), 1].mean()),
+        'estimators are drawn: the brute-force sub-sample mean (dots), which stops resolving the needle past 30 m because a cos^%d lobe is 1e-6 of the sampled solid angle,'
+        % int(ATM_NDISC),
+        'and the 2 deg cone density (line), which measures the reflected-direction density at the sun and converges where the first cannot. Right: the footprint, and the',
+        'thing a scalar cannot say. field.py\'s kernel is isotropic by construction; the real footprint reaches an axis ratio of %.0f at the horizon, and the fix\'s residual'
+        % float(C['an'][C['w']][C['okw']].max()),
+        'error tracks that ratio and not the distance. The band lines are field.py\'s own LAM_MIN and REVERB\'s long end: the road covers exactly the crossing. Field: WIND and',
+        'REVERB are stationary plane-wave sets with a combined rms slope of %.4f (field._plane_rms); NEAR falls as 1/sqrt(r), BOIL rides its envelope and the WAKE measures'
+        % s_stat,
+        'identically 0.0000 outside the 8 x 4 m basin, so the far water here is those two bands and nothing extrapolated. Scene-linear; no tone map touches any of it.',
+    ], x=40, y=845)
+    return P.save(img, os.path.join(OUT, 'r2-variance-vs-distance.png'))
+
+
+ATM_NDISC = 93493
+
+
+# ============================================================ FIGURE 8
+def fig_error_and_cost():
+    """The error against the reference and the price of each path."""
+    C = wave_frames()
+    ref, w = C['ref'], C['w']
+    W, H = 1500, 1080
+    img = P.canvas(W, H)
+    xt = np.array([4.0, 10.0, 30.0, 100.0, 300.0])
+    xlim = (np.log10(4.0), np.log10(520.0))
+
+    ax = P.Axes(img, (100, 60, 690, 400), xlim, (0.0, 9.4),
+                title='error against the pixel integral, by distance',
+                xlabel='distance to the water hit, m  (log)',
+                ylabel='median |path - reference| / reference, %  (green)')
+    _logx(ax, xt, [0, 3, 6, 9])
+    curves = {}
+    for nm, col in (('point', ORANGE), ('naive', RED), ('fix', GRN),
+                    ('fix+fit', PURPLE)):
+        xs, ys = _binvals(C, lambda s, nm=nm: 100 * float(np.median(
+            np.abs(C[nm]['color'][w][s, 1] - ref['color'][s, 1])
+            / np.maximum(ref['color'][s, 1], 1e-9))))
+        curves[nm] = (xs, ys)
+        ax.line(xs, ys, col, 2)
+    P.legend(ax, [(ORANGE, 'unfiltered, one slope sample per pixel'),
+                  (RED, 'naive -- filtered, variance discarded'),
+                  (GRN, 'fix -- variance carried, exact Fresnel'),
+                  (PURPLE, 'fix + Bruneton roughness-Fresnel')],
+             np.log10(4.3), 9.1)
+
+    ax2 = P.Axes(img, (830, 60, 1420, 400), xlim, (0.0, 1.05),
+                 title='the one FITTED thing in the doctrine, against the truth',
+                 xlabel='distance to the water hit, m  (log)',
+                 ylabel='reflectance R, green band')
+    _logx(ax2, xt, [0, .25, .5, .75, 1])
+    xs, Rex = _binvals(C, lambda s: float(ref['fresnel'][s, 1].mean()))
+    _, Rsm = _binvals(C, lambda s: float(C['naive']['R'][s, 1].mean()))
+    _, Rbr = _binvals(C, lambda s: float(C['fix+fit']['R'][s, 1].mean()))
+    ax2.line(xs, Rex, P.INK, 3)
+    ax2.line(xs, Rsm, RED, 2)
+    ax2.line(xs, Rbr, PURPLE, 2)
+    for a, b in zip(xs, Rex):
+        ax2.marker(a, b, P.INK, 3)
+    P.legend(ax2, [(P.INK, 'E[R]: the exact mean of optics.fresnel over the footprint'),
+                   (RED, 'optics.fresnel at the filtered normal, i.e. DO NOTHING'),
+                   (PURPLE, '12\'s one-line fix, exp(-2.69 s)/(1 + 22.7 s^1.5)')],
+             np.log10(4.3), 1.02)
+
+    mx = 1.35 * max(C[n]['ms'] for n in ('point', 'naive', 'fix', 'fix+fit'))
+    ax3 = P.Axes(img, (100, 520, 1420, 790), (0.0, 4.0), (0.0, mx),
+                 title='and what each of them costs, best of three runs',
+                 xlabel='', ylabel='ms per frame, %d water px' % int(w.sum()))
+    ax3.frame(xticks=None, yticks=list(np.arange(0.0, mx, 100.0)), yfmt='%.0f')
+    base_ms = C['naive']['ms']
+    for k, (nm, col) in enumerate((('point', ORANGE), ('naive', RED),
+                                   ('fix', GRN), ('fix+fit', PURPLE))):
+        ms = C[nm]['ms']
+        x0 = 0.32 + k
+        ax3.d.rectangle([float(ax3.px(x0)), float(ax3.py(ms)),
+                         float(ax3.px(x0 + 0.36)), float(ax3.py(0.0))],
+                        fill=col)
+        ax3.text(x0 + 0.18, ms + 0.13 * mx,
+                 '%s   %.0f ms' % (nm, ms), P.INK, 'ma')
+        ax3.text(x0 + 0.18, ms + 0.06 * mx,
+                 '%.2fx naive,  %.2f us/px' % (ms / base_ms,
+                                               1e3 * ms / int(w.sum())),
+                 P.MUTED, 'ma')
+
+    n_ = curves['naive']
+    f_ = curves['fix']
+    P.caption(img, [
+        'r2-error-and-cost -- THE PRICE, WHICH THE CHAPTER NEVER QUOTES, AND A RESULT THAT DOES NOT GO THE WAY IT SAYS. Left: median error against the pixel integral, per',
+        'distance, green band. Carrying the variance and discarding it are INDISTINGUISHABLE on the median pixel (%.2f%% against %.2f%% over the whole water) because this'
+        % (100 * float(np.median(np.abs(C['fix']['color'][w][C['okw'], 1] - ref['color'][C['okw'], 1]) / np.maximum(ref['color'][C['okw'], 1], 1e-9))),
+           100 * float(np.median(np.abs(C['naive']['color'][w][C['okw'], 1] - ref['color'][C['okw'], 1]) / np.maximum(ref['color'][C['okw'], 1], 1e-9)))),
+        'environment is ONE narrow lobe on a smooth gradient: the only thing a collapsing slope distribution can lose is the part of the environment that varies on its own',
+        'angular scale, and a sky gradient does not. The fix earns its keep on the disc alone (see r2-variance-vs-distance) and nowhere else here. Adding 12\'s',
+        'roughness-Fresnel makes it up to %.1fx worse, at every distance in the sweep. Middle: why. E[R] is the EXACT mean of optics.fresnel over the footprint\'s own slope,'
+        % float(np.nanmax(np.array(curves['fix+fit'][1]) / np.maximum(np.array(f_[1]), 1e-9))),
+        'taken from the reference\'s own sub-samples. Doing nothing is within %.1f%% of it out to 128 m and %.1f%% at 400 m; Bruneton\'s fit is %.0f%% low at 32-64 m. It deviates'
+        % (100 * abs(Rsm[3] / Rex[3] - 1), 100 * abs(Rsm[-1] / Rex[-1] - 1),
+           100 * abs(Rbr[3] / Rex[3] - 1)),
+        'from 1 as sigma^1.5 where the true correction is O(sigma^2), so at this surface\'s sigma_v = %.4f it removes %.0f%% of the grazing rise above F0 where the truth'
+        % (float(np.sqrt(WV.stationary_rms() ** 2 / 2)),
+           100 * (1 - np.exp(-2.69 * WV.stationary_rms() / np.sqrt(2)) / (1 + 22.7 * (WV.stationary_rms() / np.sqrt(2)) ** 1.5))),
+        'removes a few. 12 quotes the fit "for sigma_v < 0.5" and states no LOWER bound; it needs one. Right: the cost, best of three runs, numpy on a CPU -- what transfers',
+        'is the ratio and the op count, not the milliseconds. Carrying the variance costs %.2fx the naive path here, and every bit of that is field.slope_var_points, which'
+        % (C['fix']['ms'] / base_ms),
+        'sums over EVERY component at every footprint and so costs the same at 400 m as at 4 m -- the opposite of the scaling 12 promises for exactly this quantity.',
+    ], x=40, y=845)
+    return P.save(img, os.path.join(OUT, 'r2-error-and-cost.png'))
+
+
 FIGURES = {
     'r1-pass-vs-offline': fig_pass_vs_offline,
     'r1-factorisation-vs-tau': fig_factorisation,
     'r1-frame-factorisation': fig_frame_factorisation,
     'r1-lut-quality': fig_lut_quality,
     'r1-pass-anatomy': fig_pass_anatomy,
+    'r2-two-paths': fig_two_paths,
+    'r2-variance-vs-distance': fig_variance_vs_distance,
+    'r2-error-and-cost': fig_error_and_cost,
 }
 
 

@@ -8,10 +8,11 @@ integral before the frame starts** — split it, table it, sample it, drop the
 part that refracts — and the offline path cannot test any of them, structurally:
 approximation error is invisible to a code path that does not approximate.
 
-    python3 validate_raster.py        # 95 rows, three tiers, ~26 s, non-zero exit on FAIL
+    python3 validate_raster.py        # 198 rows, three tiers, ~95 s, non-zero exit on FAIL
     python3 validate_raster.py -v     # every tolerance's justification
-    python3 validate_raster.py --fast # skip the two frame-level tiers
-    python3 evidence.py               # the five r1- figures in gauntlet/raster/evidence/
+    python3 validate_raster.py --fast # skip the frame-level tiers (~15 s)
+    python3 evidence.py               # the eight figures in gauntlet/raster/evidence/
+    python3 evidence.py r2-           # just the wave set
 
 | File | Owns |
 |---|---|
@@ -19,15 +20,20 @@ approximation error is invisible to a code path that does not approximate.
 | `scene.py` | The body (a shoaling shelf), the camera, the reversed-Z projection and its inverse, the opaque prepass that writes the two buffers the pass consumes, and `project_to_pixel` — the only thing a screen-space pass needs to re-sample a buffer somewhere other than at its own pixel. |
 | `sswater.py` | **The pass.** The fullscreen triangle emitted from `SV_VertexID` and rasterized with a real coverage test; the chapter's four numbered pixel-shader steps in its own order; the composition, per leg; the helper-lane audit. |
 | `offline.py` | The frame the pass is validated against. Same model, different machinery: analytic geometry, per-band refracted rays, `optics.slab_esc` / `slab_trap` evaluated at **every pixel's own three optical depths**. |
-| `validate_raster.py` | 95 rows on `validate.py`'s harness. At least one absolute row per quantity. |
-| `evidence.py` | The five `r1-` figures, every caption number formatted from the run that drew it. |
+| `waves.py` | **The wave surface**, on the flat datum. `field.py` wired in: the narrowed slope field, the removed-variance tensor, the screen-space footprint the pass can actually form, the slope-covariance-to-lobe-covariance map, and the three filter paths the chapter's *Distance and filtering* is an argument between. Its own camera, and why. |
+| `waveref.py` | The frame `waves.py` is validated against: the pixel's own footprint integral, by stratified sub-sampling of the **unfiltered** field. Two estimators, because the sun's disc defeats the obvious one. |
+| `validate_raster.py` | 198 rows on `validate.py`'s harness. At least one absolute row per quantity. |
+| `evidence.py` | The eight figures, every caption number formatted from the run that drew it. |
 
-**Nothing here re-implements any physics.** `optics.py` and `atmosphere.py` are
-imported across a path, never copied; `beach_plot.py` draws the figures;
+**Nothing here re-implements any physics.** `optics.py`, `atmosphere.py` and
+`field.py` are imported across a path, never copied; `beach_plot.py` draws the figures;
 `render.py` is not imported at all (8966 lines, minutes to run, prints on
 import) and the two constants taken from it — the liner albedo and the paving
 albedo — are quoted with their line number. The only physics **derived** in this
-directory is one line, the sky's entry leg, and it has a photon walk on it.
+directory is three: the sky's entry leg, which has a photon walk on it; the
+screen-space footprint, which has a closed form beside it; and the
+slope-covariance-to-lobe-covariance map, which has a Monte-Carlo row and an
+order check.
 
 ---
 
@@ -71,8 +77,9 @@ Mine, and stated so they can be argued with:
 
 | | Why not | What it would take |
 |---|---|---|
-| Wave normal cascades (the chapter's "two to four scrolling layers") | Every version needs a **noise-derived normal map**, and `render.py`'s header rule is *no texture, no Voronoi, no noise* | The chapter's own stated substitute — an analytic Gerstner normal sum — is `field.py`'s job, and wiring `field.py` into a flat-datum pass is a wave, not a paragraph |
-| Per-pixel raymarching of a displaced surface | Needs the above first: there is nothing to march against | Fixed steps + 4–6 binary refinements against `field.py`'s summed cascades |
+| ~~Wave normal cascades~~ | **Built** — `waves.py`, `field.py`'s five analytic bands on the flat datum. Nothing authored, no noise, no texture. See *Distance and filtering* below. | — |
+| Per-pixel raymarching of a **displaced** surface | The surface is now tilted but not displaced: `12`'s hierarchy is "displaced geometry near, normal detail mid, statistical BRDF far" and `waves.py` owns the second and third rungs only | Fixed steps + 4–6 binary refinements against a height field `field.py` does not expose — it answers slopes |
+| Wave-perturbed **refraction** | The wave normal enters the transmitted half through the Fresnel split and not through the refracted direction, so the bed does not wobble. Omitted identically in the pass AND in the reference, so no path gains from it | `offline.py`'s per-band refracted trace, at the reference's sub-sample rate |
 | The underwater branch (`camPos.z < h_water`) | The chapter says it is "the same triangle, different branch", and it is — but the branch is the whole underwater state machine | `water_pass` **raises `NotImplementedError`** rather than drawing the above-water branch upside down; the guard is a suite row |
 | SSR / cubemap reflection | The reflected half here is `atmosphere.sky()` evaluated in the mirrored direction, which for a flat datum under an unoccluded sky is exact | A screen-space march of the same depth buffer |
 | Multiple bodies at multiple elevations | One datum, one plane; the chapter's own "where it strains" | Per-body planes, screen bounds, and a nearest-surface-per-pixel sort |
@@ -327,6 +334,289 @@ this directory may read it and not edit it. The one-line repair is to split the
 
 ---
 
+## Distance and filtering: the collapse, the fix, and the price of each
+
+`../references/12-water-rendering.md`, *Distance and filtering: why far water
+turns to plastic* and *Pick the kernel on purpose, and give the variance a
+receiver*. Wave 1 closed with this section carrying zero lines of code anywhere
+in the directory. `waves.py` and `waveref.py` close it.
+
+**The claim, in the chapter's terms.** As distance grows the number of waves
+inside a pixel footprint grows without bound, per-pixel normals converge to the
+mean normal, "all the slope variance those waves carried is silently discarded",
+the specular lobe collapses toward a Dirac, and the far water reads as plastic.
+The fix is to *move* the variance rather than lose it: fold what leaves the
+resolved field into a 2×2 tensor that widens the BRDF lobe.
+
+**What is imported, and it is nearly all of it.** `field.grad_points(x, y, fp)`
+is the narrowed field; `field.slope_var_points(x, y, fp)` is the removed-variance
+tensor, which already exists there for exactly this purpose; `atmosphere.sky`'s
+own `_lobe_shape` is the receiver, with one correction described below.
+Two things are derived here and both sit beside themselves in `waves.py`: the
+**footprint** a screen-space pass can actually form, and the chapter's
+`C = J Σ Jᵀ`.
+
+### This section needs its own camera, and that is a finding about the hero frame
+
+`scene.py`'s camera looks down `+x`; `atmosphere.SUN_DIR` bears 176.25°. Over the
+whole of the `r1-` frame's water the largest cosine between the mirror direction
+and the sun is **−0.134** — the sun's reflection is *behind* that camera, and
+`atmosphere.sky`'s disc contributes **exactly zero** to every one of its 159 479
+water pixels (a tier-1 count, tolerance 0). A section whose entire claim is that
+the specular response collapses cannot be tested on a frame with no specular
+response in it.
+
+So `waves.sun_prepass` turns the camera to the sun's own bearing and stands off:
+same body, same FOV, same resolution, **same 3.00 m eye height**, eye at
+`x = 400 m` so the water spans 4.6 m to 400 m against the deck's plane as a
+horizon, elevation −12° so the disc itself is just outside the top edge. The eye
+height is not a leftover: the sun's road runs from `h/tan θ_sun` out to about
+`h/tan(θ_sun − 4σ_slope)`, i.e. 2.6 h to 11 h, and over that range the footprint
+runs 0.0148 h to 0.129 h. At h = 3 m that is 0.044 → 0.39 m, which is exactly the
+span of `field.py`'s bands (WIND 17–70 mm, REVERB 12–45 cm). Twice as high puts
+the whole road inside the resolved regime; half puts all of it past the filter.
+
+### The collapse, measured
+
+`gauntlet/raster/evidence/r2-variance-vs-distance.png`. Absolute rms slopes at
+the pass's own footprints, `s = sqrt(<|∇h|²>)` throughout — `field.py`'s one
+convention, and every number below goes through `field.rms_slope` or
+`field._plane_rms` rather than an expression written out here.
+
+| distance | fp median | **total** | **resolved** | **removed** | quadrature / total |
+|---|---|---|---|---|---|
+| 4–8 m | 0.023 m | 0.04800 | 0.04371 | 0.01994 | 1.0010 |
+| 8–16 m | 0.057 m | 0.04882 | 0.03679 | 0.03205 | 0.9994 |
+| 16–32 m | 0.167 m | 0.04856 | **0.01799** | 0.04523 | 1.0023 |
+| 32–64 m | 0.452 m | 0.04873 | **0.00262** | 0.04864 | 0.9996 |
+| 64–128 m | 1.30 m | 0.04872 | **1.4e-6** | 0.04871 | 0.9999 |
+| 128–256 m | 3.52 m | 0.04872 | **5.8e-24** | 0.04872 | 1.0000 |
+| 256–520 m | 7.34 m | 0.04881 | **0** | 0.04880 | 0.9996 |
+
+The surface keeps its slope at every distance and the shading normal stops
+carrying it — by 128 m the resolved field is zero to 24 decimal places, which is
+the chapter's sentence with no hedging left in it. The right-hand column is
+`field.py`'s own conservation identity, **checked at raster footprints up to
+18.5 m** — two orders past anything `render.py` asks of it — and it holds to
+0.23%.
+
+And what that does to the specular response. Scene-linear radiance, green band,
+bin means, from two independent reference estimators:
+
+| distance | reference (2° cone) | reference (brute force) | **naive** | **fix** |
+|---|---|---|---|---|
+| 4–8 m | 1.585 | 1.698 | 2.371 (**+40 %**) | 1.576 (−7 %) |
+| 8–16 m | 4.526 | 4.878 | 10.014 (**+104 %**) | 5.035 (+3 %) |
+| 16–32 m | 0.1451 | 0.0333 | **0.0000** | 0.2474 |
+| 32–64 m | 0.00422 | 0 | **0.0000** | 0.00512 |
+| 64–128 m | 0 | 0 | 0.0000 | 4.6e-4 |
+
+**The collapse is not a dimming, it is a redistribution.** On the road the naive
+path is *twice too bright*, because a lobe that should be spread over several
+degrees is being sampled once per pixel at its Dirac peak; past 16 m it is not
+small but **identically zero at every pixel**, while the surface still returns
+0.145. The fix is inside 7% where the surface is resolved and lands within a
+factor of 1.7 where it is not.
+
+**Why there are two reference estimators.** The sun's disc is `cos^93493` — 0.53°
+across, 6.72e-5 sr — and past 30 m a footprint scatters the reflected ray over
+several degrees, so the probability that a sub-sample lands on the disc is ~1e-6.
+196 sub-samples of 4 400 pixels collect about two hits: the brute-force mean is a
+Poisson draw and its sample standard error, which is *zero* on every pixel that
+drew nothing, is a lie. That is not a defect of the estimator — it **is** the
+chapter's "one shading sample per pixel hits or misses it essentially at random",
+arriving on the measurement side. So the disc term is also measured as
+`S = L_sun · Ω_lobe · p_R(sun) · R`, with `p_R` the density of the reflected
+direction at the sun, estimated by counting sub-samples inside a cone of
+half-angle ε. At ε = 2° the acceptance is 57× the disc's own. Its bias is the
+kernel width and it is *reported*, not assumed: the estimate is taken at 1° and
+2° and the spread between them is the tolerance every row built on it may spend.
+Where the brute force converges the two agree inside that spread.
+
+### The fix, priced
+
+`gauntlet/raster/evidence/r2-error-and-cost.png`. Best of three runs, numpy on a
+CPU: what transfers is the ratio and the operation count, not the milliseconds.
+
+| path | ms / frame | µs / px | × naive | median frame error | p95 | absolute median |
+|---|---|---|---|---|---|---|
+| `point` — no filter at all | 267 | 2.21 | 0.87 | 0.517 % | 20.8 % | 2.5e-3 |
+| `naive` — filtered, variance discarded | 306 | 2.53 | 1.00 | **0.155 %** | **6.38 %** | 7.8e-4 |
+| `fix` — variance carried, exact Fresnel | 452 | 3.74 | **1.48** | 0.178 % | 8.69 % | 8.4e-4 |
+| `fix` + `12`'s roughness-Fresnel | 459 | 3.80 | 1.50 | 0.983 % | 21.5 % | 4.3e-3 |
+| `fix`, `atmosphere`'s shipped receiver | — | — | — | 0.201 % | **40.9 %** | 9.0e-4 |
+
+**Carrying the variance costs 48% of the surface shading pass and buys nothing on
+the median pixel.** 0.178% against 0.155% is not a win; it is a wash, and it is
+a wash at every distance bin separately. That is not a failure of the fix, and it
+is the most useful thing this wave found:
+
+> **The size of the plastic failure is a property of the ENVIRONMENT's angular
+> spectrum, not of the water.** A collapsing slope distribution can only lose the
+> part of the environment that varies on its own angular scale. This sky is one
+> 0.53° disc on a smooth horizon-to-zenith gradient, so the *only* thing lost is
+> the disc — 2% of the water pixels — and the gradient survives a collapse to a
+> mirror untouched. The chapter presents the failure as a whole-surface look
+> failure ("a glossy, uniform dome", "a mirror-flat plastic sheet everywhere
+> else") and never says what sets its size. Under a structured sky — broken
+> cloud, a coastline, a sunset band — the same collapse would cost far more, and
+> under an overcast dome it would cost almost nothing. **Nobody should buy this
+> fix without first asking what their environment map looks like at 5°.**
+
+### The doctrine's central promise, tested directly
+
+If the removed variance is really *carried* rather than lost, the answer must not
+depend on how much the kernel removes. Two kernels 29% apart in width —
+`field.py`'s half-amplitude-at-Nyquist pinning (`σ = 0.3748 fp`) against the box's
+second-moment match (`σ = 0.2887 fp`) — over the three bins the sun's road covers:
+
+| kernel 1.0 vs 0.774 | 4–8 m | 8–16 m | 16–32 m |
+|---|---|---|---|
+| **`fix`**, change in the disc term | **0.18 %** | **0.31 %** | **0.58 %** |
+| **`naive`**, same change | 8.2 % | 36.7 % | **100 %** |
+
+That is the whole doctrine in one table. Widen the filter by a quarter and the
+naive path's specular response changes by up to *everything it had*; the
+variance-carrying path moves by half a percent. **The kernel choice stops being a
+decision once the variance has a receiver** — which is a stronger statement than
+*Pick the kernel on purpose* makes, and it is the actual reason to pay the 48%.
+
+### Where the fix stops working
+
+Wave 1's standard: a property, not a tolerance.
+
+| | |
+|---|---|
+| **A scalar footprint cannot describe an oriented one.** | `field.py`'s kernel is isotropic by construction — "all a scalar `fp` with no orientation is entitled to assume" — and the real footprint is a parallelogram whose axis ratio runs from 3.6 at the median to **401** at the horizon. `pixel_footprint` returns the area-matched isotropic `fp = sqrt(\|det J\|)`, the geometric mean of the two axes, which is the only defensible scalar; along the view azimuth it under-filters by up to 20× and across it over-filters by the same. This is not tunable: it needs an *elliptical* removed-variance tensor, i.e. `slope_var_points` taking a 2×2 footprint instead of a scalar. A production pass would pass the full Jacobian and let the band weight be `exp(-½ kᵀ Σ_fp k)`. |
+| **The far glitter lives 5σ out in a Gaussian tail.** | At 100 m the sun sits 19° from the mirror direction and the reflected spread is 3.95°, so the road's outer end is a 5σ event. The lobe convolution is a small-angle construction and the slope distribution is a sum of 64 sinusoids — **bounded**, so its true tail is thinner than Gaussian. Against a direct convolution over the same tensor the closed form is within 1% at 12 m, 56% at 20 m and **81% at 80 m**, all of it over-prediction. The `fix` column's 0.247 against a reference 0.145 at 16–32 m is that. Cox & Munk measured the non-Gaussianity of real slope statistics and the doctrine does not carry it. |
+| **The horizon quad has no derivative.** | 560 of 120 960 water pixels sit in a 2×2 quad with one lane above the datum, so `ddx`/`ddy` of the water hit position is not a footprint there. They fall back to the closed form so the picture stays honest and are excluded from every number. That is a property of quad derivatives, not of this pass — a production shader has the same 560 pixels and usually does not know it. |
+| **The roughness-Fresnel is a fit, and it is out of range here.** | See below. It is the one part of the doctrine that is not derived and it is the only part that measurably hurts. |
+| **The reference itself stops converging before the water does.** | Past 30 m no affordable sub-sample count resolves the disc, so the *image* of the reference is speckle where the truth is smooth. Any team validating this fix by eye against a supersampled render will conclude the fix is over-blurring, and they will be wrong. |
+
+### What `12` gets wrong, and what it leaves underspecified
+
+**1. Bruneton's roughness-Fresnel is quoted with no lower bound and it needs
+one.** The chapter gives
+
+    F = R + (1-R)(1-cos θ_v)^5 · exp(-2.69 σ_v)/(1 + 22.7 σ_v^1.5)   "fitted for σ_v < 0.5"
+
+Against `E[R]`, the **exact** mean of `optics.fresnel` over the footprint's own
+slope distribution (taken from the reference's sub-samples, so it is a
+measurement and not a model):
+
+| distance | cos θ_a | E[R] exact | Fresnel at the filtered normal | `12`'s fix | do-nothing err | fix err |
+|---|---|---|---|---|---|---|
+| 4–8 m | 0.49 | 0.0673 | 0.0671 | 0.0636 | −0.3 % | −5.6 % |
+| 16–32 m | 0.14 | 0.4390 | 0.4305 | 0.3530 | −1.9 % | −19.6 % |
+| 32–64 m | 0.070 | 0.6623 | 0.6491 | 0.5212 | −2.0 % | **−21.3 %** |
+| 128–256 m | 0.018 | 0.8691 | 0.8951 | 0.7168 | +3.0 % | −17.5 % |
+| 256–520 m | 0.0086 | 0.8985 | 0.9458 | 0.7569 | +5.2 % | −15.8 % |
+
+**Doing nothing is an order of magnitude closer to the truth than the chapter's
+one-line fix**, at every distance in this frame. The reason is an order, not a
+constant: microfacet masking is a second-order effect, so `E[R] − R(mean)` must
+vanish as `σ_v²`, and the fit's `22.7 σ_v^1.5` term vanishes only as `σ_v^1.5`.
+At this surface's `σ_v = 0.0344` the fit already removes **20%** of the grazing
+rise above F0 where the truth removes 1–5%, and the correction even has the wrong
+*sign* out to 64 m. It is right that masking eventually lowers the grazing
+reflectance — the last two rows show the truth falling 3–5% below the smooth
+curve — and it overshoots that by 3 to 5 times. **Suggested repair:** state the
+range as `0.05 < σ_v < 0.5` and say that below it the smooth curve is the better
+answer; a calm inland water body, a sheltered bay or any surface in a lee sits
+under that floor. The chapter is right about the *mechanism* and wrong about
+where to apply it.
+
+**2. The chapter's own `C = J Σ Jᵀ` check does not extend to grazing.** `12`
+reports "checked against 400k Monte-Carlo perturbed reflections to 4% on the
+major axis and 8% on the minor". At its own stated camera (33° above the
+horizontal, θ_v = 57°) that reproduces exactly — 1.6% and 0.2% here at the same
+sample count, and the stated 1.8× stretch is 1/cos θ_v = 1.836. At θ_v = 78°,
+which is where most of a water frame with a horizon in it lives, the major axis
+is **5.1% out**. It is the linearisation and not a defect — the residual falls by
+3.3× when the variance falls by 4, i.e. second order, and that is a suite row —
+but the chapter states an agreement figure with no angle attached to it.
+
+**3. The "practical trick" does not describe `field.slope_var_points`, and the
+chapter presents it as if it did.** `12` writes: *"total variance for ALL waves on
+the CPU, subtract the RESOLVED waves in the shader, so shader cost scales with
+resolved wave count and is MINIMAL for distant views"*. `slope_var_points` sums
+over **every** component at every footprint. Measured on 200 000 points, it costs
+185 ms at `fp = 1 mm` and **243 ms at `fp = 10 m`** — 1.32× *more* at the
+distance where the trick promises almost nothing, because at 10 m every term it
+evaluates is the saturated constant `1 − 0` that the trick exists to skip.
+Reported, not patched: the interface is right and the file is another lane's.
+
+**4. The kernel section derives a scale that is not the pixel's own, and does not
+say that this stops mattering.** `12` pins the Gaussian at half amplitude at the
+Nyquist wavelength, `σ = 0.3748 fp`, deliberately 1.30× wider than the box the
+pixel actually integrates. Under the naive path that choice is worth up to 100%
+of the specular response (table above). Under the fix it is worth 0.6%. The
+chapter argues the choice carefully and never says that the argument is only
+load-bearing for the path it is telling you not to use.
+
+**5. Numbers that do reproduce**, and they are checked as tier-2 rows rather than
+trusted: `σ = fp/(2√3) = 0.2887 fp`; that Gaussian passing 0.663 at the Nyquist
+wavenumber, i.e. 44% of the variance; `√(2 ln 2)/π = 0.3748`; "half gone when the
+footprint reaches half its wavelength" (exactly, to float32); "94% gone at one
+wavelength" (93.75%); the saturating variance form differing from `a²/2` by 0.25%
+at `a = 0.1`; Monahan at both worked wind speeds (0.093% at 5 m/s, 3.93% at
+15 m/s); the Brewster identity, which `optics.fresnel` reaches exactly and Schlick
+misses by 23.8%; and Schlick's −22.8% / +14.3% / zero at 51.3° / 79° / 67.1°.
+
+### What the shared modules turned up — reported, not patched
+
+**`atmosphere._lobe_shape` creates energy for an anisotropic ellipse, by up to a
+factor of 10 in this frame.** It writes the widened lobe back as `cos^n_eff` with
+
+    n_eff = 1 / (u^T Q u)          -- the PROJECTION variance
+
+where the convolved density along `u` wants `n_eff = u^T Q^-1 u`. The two are
+identical for an isotropic `Q` and on either principal axis, which is why nothing
+caught it; by Cauchy–Schwarz `1/(uᵀQu) ≤ uᵀQ⁻¹u` always, so the shipped lobe is
+never too narrow, always too wide, and the peak factor `g = sqrt(det Q₀/det Q)` —
+computed for the *correct* Gaussian — no longer normalises it. Integrated over
+the sphere against the unwidened `2π/(n+1)`:
+
+| ellipse axis ratio | 1 | 10 | 1e4 (this frame) |
+|---|---|---|---|
+| `_lobe_shape` as shipped | 1.009 | **1.682** | **10.374** |
+| the inverted form | 1.009 | 1.004 | 1.000 |
+
+The repair is the 2×2 adjugate and it is one line:
+`u1²q22 − 2u1u2q12 + u2²q11`, over `|u|² det Q`. It is **not** applied to
+`atmosphere.py`, which is shared; `waves.widened_lobes` carries the inverted form
+and feeds it back through the shipped `sky()` as a per-pixel amplitude and
+exponent, so the environment, the gradient, the 1.15 and the disc/aureole
+partition all stay `atmosphere.py`'s. The shipped form is kept beside it as
+`receiver='shipped'` so the suite can price it rather than assert it: over this
+frame it is invisible on the median (9.7e-9) and worth **12.0× at p99** and 397
+in absolute radiance at worst. `render.py` reads the same function at
+`θ_v ≈ 57°`, where the ellipse ratio is about 3 and the gain is 1.2–1.7× — a
+brightening of the pool's own glints that reads as taste.
+
+**`field._norm_jets()` is not optional and nothing says so.**
+`field._SC['near']` ships at 1.0 and `_norm_jets` sets it to **0.001011**, so a
+consumer that imports `field` and calls `grad_points` without calling it first
+gets the NEAR band at **989×** its calibrated amplitude — silently, with the
+field's rms slope reading 0.99 instead of 0.049 and no exception anywhere.
+`render.py` calls it at line 1228 and `validate.py` at line 4137, both by
+convention. It cost this wave one full round of wrong measurements. The repair is
+a one-line guard inside `grad_points`/`slope_var_points`, or a module-level call;
+neither is applied here, by scope.
+
+**A normal-map mip already carries the removed variance, and renormalising throws
+it away.** Measured off the reference's own sub-samples, for free: the mean of the
+unit normals over the footprint has length `|N̄| = 1 − s²/2`, and
+`2(1 − |N̄|) / s² = 0.991` at 256–520 m. Toksvig's signal is exact to under 1% at
+raster footprints. That is a cheaper route to the same tensor than
+`slope_var_points` — one extra channel in a normal map, hardware-mipped — for
+anyone who has a normal map rather than an analytic band sum. `12` names Toksvig
+in its "unifying idea" paragraph and does not mention that the two are the same
+number.
+
+
+---
+
 ## The one piece of physics derived here
 
 `sswater.bed_radiance` needs the diffuse transmittance of the column for
@@ -349,16 +639,19 @@ depths, agreement inside 4 standard errors of the estimator, tolerance ~2e-4.
 
 ## Reading the suite
 
-95 rows, three tiers, ~27 s. The harness, the tier meanings and the rule that a
+198 rows, three tiers, ~95 s (the wave tiers build a 196-sub-sample reference). The harness, the tier meanings and the rule that a
 tolerance comes from the **estimator's** error and never from the measured
 disagreement are `validate.py`'s, deliberately.
 
 **Every quantity has at least one absolute row.** A ratio-only guard has been
-blind three times in this project, once dividing 0/0 and raising, so: coverage is
+blind four times in this project, once dividing 0/0 and raising, so: coverage is
 a pixel *count* with tolerance 0; depth precision is *metres*; the LUT is checked
 on its *values* before any ratio; the frame comparison carries a *radiance* row
-beside every relative one; and the factorisation error is reported as joint,
-separated, and then four named ratios.
+beside every relative one; the factorisation error is reported as joint,
+separated, and then four named ratios; slope is an *rms slope*, the removed
+variance is a *tensor in s²*, the specular response is a *radiance*, the
+footprint is *metres*, the widened lobe's flux is *steradians*, and the cost is
+*milliseconds and microseconds per pixel* before it is ever a multiple.
 
 Two tolerances in this file are not scientific constants and are labelled as
 such:
@@ -384,8 +677,9 @@ so the helper-lane audit is not run on a size that hides a parity bug.
 
 Every caption is burnt into its frame and every number in it is formatted from
 the run that drew it: if a constant moves the caption moves with it, and if a
-caption and its figure disagree the figure was not redrawn. All five are
-regenerated by `python3 evidence.py` in about 40 s.
+caption and its figure disagree the figure was not redrawn. The `r1-` five are regenerated by
+`python3 evidence.py r1-` in about 40 s; the `r2-` three take about 100 s each
+run because each builds the pixel-integral reference.
 
 | Frame | What it settles |
 |---|---|
@@ -394,20 +688,36 @@ regenerated by `python3 evidence.py` in about 40 s.
 | `r1-frame-factorisation.png` | The same claim in pixels: two frames differing only in where the multiplication happens inside the bake, the red-band difference map, and the frame error against the term error on the same axis. |
 | `r1-lut-quality.png` | The table audited before it is believed: interpolation error against the closed form, and the two error laws separated by their **order in 1/n**. |
 | `r1-pass-anatomy.png` | What the pass is allowed to see — the two buffers, the reject mask, the output; reversed-Z against forward-Z in metres per f32 step; and the one-triangle-not-a-quad claim counted at two resolutions. |
+| `r2-two-paths.png` | **The two paths side by side at the same framing**, with the pixel integral beside them and the sun's road at 3×. The naive path's fireflies, the fix's road, and the reference's own failure to converge on a `cos^93493` lobe. |
+| `r2-variance-vs-distance.png` | The mechanism in absolute units: total / resolved / removed rms slope against distance, the conservation identity holding at raster footprints, the specular response from two independent estimators, and the footprint's anisotropy — which is where the fix runs out. |
+| `r2-error-and-cost.png` | The error against the pixel integral per distance for all four paths, `E[R]` against `12`'s roughness-Fresnel fit, and the frame time of each. |
 
 The frames are display-encoded through `render.py`'s own ACES + sRGB curve at an
-exposure **solved** from the offline frame's 99th luminance percentile (0.5544
+exposure **solved** from the reference frame's 99th luminance percentile (0.5544
 here, printed in the caption). No measurement anywhere in this directory passes
 through it.
 
 ## Still open
 
-- **No waves.** The datum is flat in both paths. Every claim in *Ambient waves*,
-  *Distance and filtering* and the whole variance/prefiltering doctrine is
-  untouched by this directory, and the *Distance and filtering* section named in
-  the brief is the one that remains with no code behind it — it needs slope
-  variance, which needs a wave field, which needs `field.py` wired to a
-  flat-datum pass.
+- **The surface is tilted, not displaced.** `12`'s three-rung hierarchy is
+  "displaced geometry near, normal detail mid, statistical BRDF far"; rungs two
+  and three are built and priced, rung one is not, and neither is the *seam*
+  between one and two, which is the half of Bruneton's argument this directory
+  cannot reach. `field.py` answers slopes and has no height field.
+- **The removed-variance tensor is fed a scalar footprint.** The real footprint
+  reaches an axis ratio of 401 in this frame and the whole residual error of the
+  fix tracks that ratio. The interface change is `slope_var_points` taking a 2×2
+  footprint covariance; it is `field.py`'s and not this directory's.
+- **The far glitter is a 5σ tail** and the doctrine's Gaussian is thinnest
+  exactly there. Cox & Munk's measured non-Gaussianity is not carried by
+  anything in this project.
+- **Whitecaps.** `12`'s cause three — the erf-of-Jacobian prefilterable coverage
+  — needs a Jacobian, which needs displacement. Its two published arithmetic
+  values are checked; nothing else about it is.
+- **A structured environment.** The single most useful thing to do next is to
+  run the same two paths against a sky with angular structure at the scale of
+  the removed slope distribution, because that is what decides whether the fix
+  is worth its 48%. This one has a disc and a gradient and nothing between.
 - **The underwater branch** raises instead of drawing.
 - **`Transparency & pass ordering`** is exercised only in its simplest form: one
   water plane compositing over one opaque frame. The per-body sorting rule is not

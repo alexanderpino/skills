@@ -1155,11 +1155,11 @@ def tier3_wave_variance():
           'A LITERAL normal-map mip texel is the mean of the unit normals over '
           'the footprint, and its LENGTH is Toksvig\'s signal: |Nbar| = '
           '1 - s^2/2 to second order. Measured off the reference\'s own '
-          'sub-samples, so it costs nothing. 6% because the mean of %d unit '
-          'normals has a sampling bias of order s^2/N. The consequence is the '
-          'actionable one: a mip chain ALREADY carries the removed variance '
-          'and renormalising the texel is what throws it away.'
-          % ref['nsub'], 'ratio')
+          'sub-samples, so it costs nothing. 6 per cent because the mean of '
+          + str(ref['nsub']) + ' unit normals has a sampling bias of order '
+          's^2/N. The consequence is the actionable one: a mip chain ALREADY '
+          'carries the removed variance, and renormalising the texel is what '
+          'throws it away.', 'ratio')
 
 
 def tier3_wave_frame():
@@ -1195,20 +1195,35 @@ def tier3_wave_frame():
              'so.' % (hits, 100.0 / max(np.sqrt(hits), 1.0)), 'L')
 
     # the two estimators against each other, where both have enough hits
-    ok_bins = []
     for i in range(len(WBINS) - 1):
         s = _wbin(C, i)
-        if s.sum() >= 200 and ref['sun_hits1'][s].sum() > 5000:
-            ok_bins.append((float(ref['sun_cone1'][s, 1].mean()),
-                            float(ref['sun'][s, 1].mean()),
-                            float(ref['sun_hits1'][s].sum())))
-    for rc, rm, h in ok_bins:
-        check(3, 'cone density == brute force where both converge',
-              rc / rm, 1.0, max(4.0 / np.sqrt(h), 0.06),
+        if s.sum() < 200 or ref['sun_hits1'][s].sum() <= 5000:
+            continue
+        rc = float(ref['sun_cone1'][s, 1].mean())
+        rc0 = float(ref['sun_cone0'][s, 1].mean())
+        rm = float(ref['sun'][s, 1].mean())
+        h = float(ref['sun_hits1'][s].sum())
+        # THE TOLERANCE IS THE ESTIMATOR'S OWN, AND IT IS THE LARGER OF ITS TWO
+        # ERRORS: the Poisson count, and the KERNEL BIAS the cone estimator
+        # reports about itself by running at two half-angles. Near the specular
+        # point the reflected-direction density has structure well inside 2 deg
+        # -- that is what the resolved waves ARE -- so the bias dominates there
+        # and the count dominates far out. Neither is the disagreement being
+        # measured.
+        bias = 2.0 * abs(rc0 - rc) / max(rc, 1e-12)
+        info(3, 'cone estimator at 1 deg and 2 deg, %.0f-%.0f m (ABSOLUTE)'
+             % (WBINS[i], WBINS[i + 1]), np.array([rc0, rc, bias]),
+             'The same density at two kernel widths. Their spread IS the '
+             'estimator\'s bias and it is what the next row is allowed to '
+             'spend.', 'L')
+        check(3, 'cone density == brute force, %.0f-%.0f m'
+              % (WBINS[i], WBINS[i + 1]), rc / rm, 1.0,
+              max(4.0 / np.sqrt(h), bias),
               'Two estimators of the same integral sharing no line beyond the '
               'sub-sample positions: a delta-of-known-flux times the measured '
-              'reflected-direction density, against the direct mean. '
-              'Tolerance is 4x the cone\'s own Poisson error.', 'ratio')
+              'reflected-direction density, against the direct sub-sample '
+              'mean. Where both converge they must agree to the worse of the '
+              'two errors above.', 'ratio')
 
     # ---- the composed frame
     for nm in ('point', 'naive', 'fix', 'fix+fit', 'fix+shipped'):

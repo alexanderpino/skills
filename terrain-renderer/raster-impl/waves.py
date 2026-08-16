@@ -144,6 +144,58 @@ def stationary_rms():
     return float(np.hypot(band_rms(FLD.WIND), band_rms(FLD.REVERB)))
 
 
+# --------------------------------------------------- 0. THE SUN-FACING CAMERA
+# WHY THIS SECTION NEEDS ITS OWN FRAMING, AND IT IS A FINDING ABOUT THE HERO
+# FRAME RATHER THAN A PREFERENCE. `scene.py`'s camera looks down +x at azimuth
+# 6 deg. `atmosphere.SUN_DIR` bears 176.25 deg. So the camera looks 170 deg AWAY
+# from the sun, and over the whole of its water the largest cosine between the
+# mirror direction and the sun is -0.134 -- negative, i.e. the sun's reflection
+# is not merely dim in that frame, it is BEHIND THE CAMERA. `atmosphere.sky`'s
+# disc contributes exactly zero to every water pixel of the hero frame, and a
+# section whose entire claim is that the specular response collapses cannot be
+# tested on a frame that has no specular response to begin with. (Suite row,
+# tier 1, as a count and a cosine.)
+#
+# SO: same eye height, same resolution, same FOV, same body, same everything
+# else; the camera turns to face the sun and stands off. Each number below is
+# fixed by something.
+#
+#   AZIMUTH  -- the sun's own bearing, taken from `atmosphere.SUN_DIR` and not
+#               written down, so the road runs up the middle of the frame.
+#   ELEVATION-- -12 deg. The frame's top edge is then 17 deg above the axis and
+#               the sun sits at 21 deg, so the DISC ITSELF IS JUST OUTSIDE THE
+#               FRAME: what is measured is the sun reflected in the water and
+#               never the sun directly, which would set the exposure and hide it.
+#   EYE X    -- 400 m, so the shoreline (`scene.DECK_X = 0`) is 400 m off and
+#               the water spans 4.6 m to 400 m: a 87:1 distance sweep with the
+#               deck's plane closing it as a horizon.
+#   EYE Z    -- 3.00 m, `scene.EYE`'s own height, UNCHANGED -- and it is also
+#               the right height, which is worth showing rather than asserting.
+#               The sun's road is bounded by geometry: a facet has to tilt by
+#               half the angle from the mirror direction to the sun, so the road
+#               runs from the specular depression `th_sun` out to roughly
+#               `th_sun - 2 k sigma_slope`, i.e. from `h/tan(th_sun)` to
+#               `h/tan(th_sun - 2 k sigma)`. With `field.py`'s own stationary
+#               rms slope 0.0487 (sigma per axis 0.0344) and k = 4 that is
+#               2.6 h to 11 h. Over that range the pixel footprint runs
+#               0.0148 h to 0.129 h -- so at h = 3 m the road spans footprints
+#               of 0.044 m to 0.39 m, which is exactly the span of `field.py`'s
+#               bands (WIND 17-70 mm, REVERB 12-45 cm). A camera twice as high
+#               puts the whole road inside the resolved regime and a camera half
+#               as high puts all of it past the filter; 3 m puts the transition
+#               in the middle of the road, which is the only place the two paths
+#               can be told apart.
+CAM_AZ = float(np.arctan2(ATM.SUN_DIR[1], ATM.SUN_DIR[0]))
+CAM_EL = np.deg2rad(-12.0)
+CAM_EYE = np.array([400.0, 0.0, 3.00])
+
+
+def sun_prepass(res=SC.RES):
+    """`scene.prepass` at the framing above. Same prepass, same geometry, same
+    two buffers -- only the camera moves."""
+    return SC.prepass(res=res, az=CAM_AZ, el=CAM_EL, fov=SC.FOV, eye=CAM_EYE)
+
+
 # ------------------------------------------------------- 1. THE FOOTPRINT
 # WHAT A SCREEN-SPACE PASS CAN ACTUALLY FORM, and it is not the pixel's true
 # footprint. A pixel's footprint on the water is the image of the pixel SQUARE
