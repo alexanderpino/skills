@@ -2546,8 +2546,11 @@ field changed each time.
 
 ## The suite
 
-`53` new rows in `_sec_foam`, `2` OPEN, `8` deliberate bugs in `--bugs-foam`,
-**all eight caught**:
+**226 pass / 0 FAIL / 0 ERROR / 7 open / 66 info**, up from wave 5's
+`173 / 0 / 0 / 5`. The pool stays `285 pass / 0 FAIL / 54 info`, unchanged.
+
+`53` new rows in `_sec_foam`, `2` new OPEN, `8` deliberate bugs in
+`--bugs-foam`, **all eight caught**:
 
 | bug | rows |
 |---|---|
