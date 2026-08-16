@@ -844,6 +844,115 @@ def _bug_shadow_reach_one_cell(mod):
         w, P, N, n=n, reach=4.0, sun=sun)
 
 
+
+# ------------------------------------------- wave 9: the plan-form's defects
+def _bug_grid_snell(mod):
+    """The offshore Snell taken against the GRID's y axis instead of the local
+    contour -- what waves 1-8 shipped, and what stopped the transport meter
+    from being able to read zero."""
+    orig = mod.transform_2d
+    mod.transform_2d = lambda *a, **kw: orig(
+        *a, **dict(kw, contour0=None))
+
+
+def _bug_spiral_no_tangency(mod):
+    """Drop the downcoast-tangency condition and close the pole on the anchors
+    alone. One equation for two unknowns -- Newton then wanders to whatever
+    the start point is nearest, and the bay stops being determined."""
+    def bad(D, A1, A2, alpha, khat):
+        r = mod.spiral_residual(D, A1, A2, alpha, khat)
+        return np.array([r[0], 0.0])
+    orig = mod.spiral_pole
+
+    def pole(A1, A2, alpha, khat, D0=None, n_iter=200, tol=1e-13):
+        A1 = np.asarray(A1, float)
+        A2 = np.asarray(A2, float)
+        ch = float(np.hypot(*(A2 - A1)))
+        D = A1 + np.array([0.3 * ch, -0.3 * ch]) if D0 is None else np.asarray(
+            D0, float).copy()
+        for _ in range(int(n_iter)):
+            f = bad(D, A1, A2, alpha, khat)
+            J = np.zeros((2, 2))
+            for kk in range(2):
+                e = np.zeros(2)
+                e[kk] = 1e-5 * max(1.0, abs(D[kk]))
+                J[:, kk] = (bad(D + e, A1, A2, alpha, khat) - f) / e[kk]
+            J[1, 1] += 1.0
+            try:
+                step = np.linalg.solve(J, -f)
+            except np.linalg.LinAlgError:
+                break
+            nrm = float(np.hypot(*step))
+            if nrm > 400.0:
+                step = step * (400.0 / nrm)
+            D = D + step
+        return D, mod.spiral_residual(D, A1, A2, alpha, khat)
+    mod.spiral_pole = pole
+    mod._SPIRAL_ORIG_POLE = orig
+
+
+def _bug_alpha_declared(mod):
+    """alpha set to Silvester's published mid-range for real bays instead of
+    being derived from this scene's own breaking obliquity. The bay still
+    looks like a bay -- which is the point of the row."""
+    mod.equilibrium_alpha = lambda delta: math.radians(40.0)
+
+
+def _bug_theta_loc_no_shore(mod):
+    """theta_loc taken as the grid-relative wave angle, forgetting that the
+    shoreline has rotated under it. The classic: an obliquity measured against
+    the wrong normal."""
+    mod.shore_normal_angle = lambda y, x_s: np.zeros(np.asarray(y).size)
+
+
+def _bug_zero_transport_breaking_angle(mod):
+    """The closed-form zero-transport coast rotated by the BREAKING obliquity
+    instead of the deep-water one. This file wrote that version first: Snell
+    shrinks an angle but never to zero, so the coast is still oblique."""
+    sc = mod._scene_1d(mod.T_SWELL, mod.H0_SWELL, mod.THETA0_SWELL)
+    orig = mod.zero_transport_plan
+    mod.zero_transport_plan = lambda y, x_ref, theta0: orig(
+        y, x_ref, sc['theta_b'])
+
+
+def _bug_cerc_sin_not_double(mod):
+    """sin(theta) in place of sin(2 theta) in the CERC closure. Still zero at
+    theta = 0, so the equilibrium is untouched -- and the K-doubling rows and
+    the ratio rows cannot see it either. It is here to be caught by ONE thing
+    only, and if nothing catches it that is the finding."""
+    s = mod.RHO_S / mod.RHO_SW
+    def bad(H_b, theta_loc, k_cerc=mod.K_CERC, gamma_b=mod.GAMMA_B):
+        coef = (float(k_cerc) / (16.0 * (s - 1.0) * (1.0 - mod.POROSITY)
+                                 * math.sqrt(gamma_b)))
+        return (coef * math.sqrt(mod.G) * np.asarray(H_b, float) ** 2.5
+                * np.sin(np.asarray(theta_loc, float)))
+    mod.cerc_transport = bad
+
+
+def _bug_plan_ramp_flat_contours(mod):
+    """The Dean ramp keyed to the MEAN shoreline instead of the local one, so
+    the depth contours stay straight under a curved shore. The bay is then a
+    shape with no bathymetry behind it and refraction has nothing to turn onto
+    -- the exact failure bar section J calls checkable by eye."""
+    orig = mod.plan_ramp
+    mod.plan_ramp = lambda x, y, x_s, **kw: orig(
+        x, y, np.full(np.asarray(y).size, float(np.mean(x_s))), **kw)
+
+
+def _bug_bay_bed_ignores_plan(mod):
+    """`bay_bed` takes the plan-form and drops it. A silent no-op is the
+    hardest kind of defect: nothing raises, the render still draws, and the
+    only thing that changes is the answer."""
+    orig = mod.bay_bed
+    mod.bay_bed = lambda *a, **kw: orig(*a, **dict(kw, plan=None))
+
+
+EMBAY_BUGS = ('grid-snell', 'spiral-no-tangency', 'alpha-declared',
+              'theta-loc-no-shore', 'zero-transport-breaking-angle',
+              'cerc-sin-not-double', 'plan-ramp-flat-contours',
+              'bay-bed-ignores-plan')
+
+
 LAND_BUGS = ('face-slope-at-break', 'swash-linear-band',
              'wet-albedo-all-diffuse', 'airlight-view-direction',
              'beta-no-scale-height', 'specular-no-jacobian',
@@ -908,6 +1017,14 @@ BUGS = {
     'hfov-scaled-linearly': _bug_hfov_scaled_linearly,
     'separation-small-angle': _bug_separation_small_angle,
     'flat-sea-no-horizon': _bug_flat_sea_no_horizon,
+    'grid-snell': _bug_grid_snell,
+    'spiral-no-tangency': _bug_spiral_no_tangency,
+    'alpha-declared': _bug_alpha_declared,
+    'theta-loc-no-shore': _bug_theta_loc_no_shore,
+    'zero-transport-breaking-angle': _bug_zero_transport_breaking_angle,
+    'cerc-sin-not-double': _bug_cerc_sin_not_double,
+    'plan-ramp-flat-contours': _bug_plan_ramp_flat_contours,
+    'bay-bed-ignores-plan': _bug_bay_bed_ignores_plan,
 }
 FOAM_BUGS = ('foam-no-transmittance', 'foam-backscatter-is-tir',
              'foam-on-the-crest', 'foam-declared-k',
@@ -2327,6 +2444,389 @@ def _sec_bay(ctx):
           '1.5 dx.', unit='ratio')
     info(3, 'crest-depth ratio at dx = 4 m, then 2 m', (r4, r2),
          'the 1-D loop reads 0.953-0.994 over dx = 2.0 to 0.25 m')
+
+
+
+# ------------------------------------------------- the static-equilibrium bay
+def _sec_embay(ctx):
+    """WAVE 9. The plan-form, and the one property that makes it provable.
+
+    THE PROPERTY: at static equilibrium the wave orthogonal is normal to the
+    shoreline everywhere, so sin(2 theta) is zero and the longshore transport
+    is zero all along the bay. That is a claim with a number attached, and the
+    section's job is to fire it at four shorelines under ONE offshore spectrum
+    and report which of them the meter can and cannot tell apart.
+
+    THE METER IS CALIBRATED FIRST AND THAT IS NOT OPTIONAL. `_zero` below is
+    the closed-form zero-transport plan-form -- a straight coast rotated by the
+    FULL deep-water obliquity -- and it exists so that "near zero on the bay"
+    can be read against a floor that was measured rather than assumed. A test
+    whose zero has never been demonstrated is the fourteenth way a measurement
+    lies with the sign flipped: two readings agree because neither instrument
+    could have said anything else.
+    """
+    B = ctx['B']
+    ep = B.equilibrium_plan()
+    ec = B.equilibrium_plan(delta=0.0)
+    y = ep['y']
+    x = np.arange(0.0, 1000.0 + 4.0, 4.0)
+    ctx['ep'] = ep
+
+    # ---- 1. the closed form is the closed form ------------------------------
+    # the constant-angle property, from the DERIVATIVE against the DEFINITION
+    ph = np.linspace(-1.2, 1.4, 97)
+    t = B.spiral_tangent(ph, ep['alpha'])
+    u = np.stack([np.cos(ph), np.sin(ph)], axis=-1)
+    ang = np.arccos(np.clip(np.sum(t * u, axis=-1), -1.0, 1.0))
+    check(1, 'log spiral: angle(radius, tangent) is constant alpha',
+          ang, np.full(ph.size, ep['alpha']), 1e-12,
+          'The logarithmic spiral is DEFINED by a constant angle between the '
+          'radius vector and the tangent, and `spiral_tangent` is written '
+          'from dP/dphi = R(cot(a) u + u_perp) without ever using that fact. '
+          'Two routes, one of which is the definition.', 'rad')
+    # the radial law itself, against a finite difference of ln R
+    R = B.log_spiral(ph, 1000.0, 0.0, ep['alpha'])
+    dlnR = np.gradient(np.log(R), ph)
+    check(1, 'log spiral: d(ln R)/d(phi) = cot(alpha)',
+          dlnR[3:-3], np.full(ph.size - 6, 1.0 / math.tan(ep['alpha'])), 1e-8,
+          'R = R_a exp((phi-phi_a) cot a) has a constant logarithmic '
+          'derivative. Checked numerically so a typo in the exponent cannot '
+          'hide behind the exponential.', '1/rad')
+    # alpha = 90 deg IS the circle -- the derived member
+    Rc = B.log_spiral(ph, 1000.0, 0.0, math.pi / 2.0)
+    check(1, 'alpha = 90 deg is a circle (R constant)',
+          Rc, np.full(ph.size, 1000.0), 1e-9,
+          'The derived member. Shore normal to a radial orthogonal is a '
+          'circular arc about the pole, exactly; the spiral is its '
+          'generalisation to a constant residual obliquity.', 'm')
+
+    # ---- 2. the construction has no free parameter --------------------------
+    check(1, 'pole solve: both closure residuals vanish',
+          np.abs(ep['res']), np.zeros(2), 1e-10,
+          'Two equations -- the spiral passes through both rock anchors, and '
+          'its tangent at the downcoast control point is perpendicular to the '
+          'deep-water wave vector -- for the two coordinates of the pole. '
+          'Nothing is left over to tune.', '-')
+    tang = math.degrees(math.atan(ep['slope_tangent']))
+    check(1, 'downcoast tangent is perpendicular to the crests',
+          tang, -math.degrees(B.THETA0_SWELL), 1e-9,
+          'Hsu and Evans\' downcoast control point is where the beach becomes '
+          'parallel to the incoming crests. Here that is a CONSEQUENCE of the '
+          'pole solve, recomputed from the sampled shoreline rather than from '
+          'the condition, so it is a check and not a restatement.', 'deg')
+    fit = B.fit_log_spiral(ep['pts'], alpha0=ep['alpha'], D0=ep['D'])
+    check(3, 'independent spiral fit recovers the pole',
+          fit['D'], ep['D'], 1.0,
+          'A least-squares fit over pole AND alpha, minimising a radial '
+          'residual over 2001 sampled points -- a different objective from '
+          'the two exact closure conditions the construction solved.', 'm')
+    info(3, 'independent fit: rms radial residual', fit['rms'],
+         'The bay against the closed form it came from. Metres.')
+    check(3, 'independent spiral fit recovers alpha',
+          fit['alpha'], ep['alpha'], 1e-3,
+          'Same fit, the shape parameter. If the construction and the fit '
+          'disagreed here the sampling would be wrong.', 'rad')
+
+    # ---- 3. alpha is derived, and delta is the `?` --------------------------
+    sc = B._scene_1d(B.T_SWELL, B.H0_SWELL, B.THETA0_SWELL)
+    check(1, 'alpha = 90 deg - theta_b, from the transform\'s own break',
+          ep['alpha'], math.pi / 2.0 - sc['theta_b'], 1e-14,
+          'The spiral angle is not fitted to a coastline: it is the residual '
+          'breaking obliquity the 1-D transform OUTPUTS for the stated '
+          'offshore spectrum. Change the spectrum and the bay changes shape.',
+          'rad')
+    openq(2, 'delta, the residual obliquity: DECLARED', 
+          '%.4f deg' % math.degrees(sc['theta_b']), '?',
+          'Only delta = 0 (the circle) is derived. delta = theta_b is a '
+          'declared choice. Silvester\'s published alpha for real bays is '
+          '30-50 deg, i.e. delta = 40-60 deg -- an order above anything '
+          'refraction leaves, and an EMPIRICAL fit, not this quantity. The '
+          'circle is computed beside the spiral every run so the choice is '
+          'visible: its indentation is %.2f m against the spiral\'s %.2f m, '
+          'a %.1f%% difference.'
+          % (ec['sagitta'], ep['sagitta'],
+             100 * abs(ec['sagitta'] / ep['sagitta'] - 1)))
+    check(3, 'the circle and the spiral agree on the indentation to 5%',
+          ec['sagitta'] / ep['sagitta'], 1.0, 0.05,
+          'The `?` in delta is worth less than the two headlands are: the '
+          'derived member and the declared one put the shoreline within a few '
+          'per cent of each other, which is why the `?` is reported rather '
+          'than chased.', '-')
+
+    # ---- 4. the indentation, against the photograph -------------------------
+    info(2, 'bay indentation over the frame', ep['sagitta'],
+         'The maximum perpendicular offset of the shoreline from the chord of '
+         'its ends, over %.0f m of coast. Bar section J\'s overview gives '
+         'roughly 50 m over 1408 m. This is an OUTPUT -- nothing in the '
+         'construction was set from it, and the standing ruling forbids '
+         'calibrating against the photographs.' % ep['chord'])
+    openq(2, 'indentation against bar J: ratio', 
+          '%.2fx' % (ep['sagitta'] / 50.0), '1.0x',
+          'The closed form over-predicts the photograph\'s indentation. The '
+          'mechanism is the downcoast tangency condition: it puts the whole '
+          'frame between the diffraction point and the control point, so the '
+          'frame is asserted to be ONE WHOLE BAY. Inverting instead -- what '
+          'deep-water obliquity gives 50 m over 1408 m -- gives %.2f deg '
+          'against the file\'s declared %.1f, and THAT is a measurement of '
+          'the offshore spectrum from a plan-form, reported and not applied.'
+          % (math.degrees(_theta0_for_sagitta(B, ep, 50.0)),
+             math.degrees(B.THETA0_SWELL)))
+    check(2, 'the coastal loop alone gives no bay',
+          _smooth_curvature(ep['x_s_rock'], y) < 0.35 * ep['sagitta'], True,
+          0, 'Waves 1-8 measured 55 m of shoreline RANGE and read it as plan '
+          'curvature. It is not: fit a straight line to the loop\'s own '
+          'shoreline and the residual is roughness at the hardness field\'s '
+          '380 m correlation length, not one curve. The bay-scale component '
+          'is %.1f m against the built bay\'s %.1f.'
+          % (_smooth_curvature(ep['x_s_rock'], y), ep['sagitta']), '-')
+
+    # ---- 5. THE TRANSPORT. four shorelines, one offshore spectrum ----------
+    x_ref = float(np.mean(ep['x_s']))
+    x_str = np.full(y.size, x_ref)
+    x_rot = B.zero_transport_plan(y, x_ref, B.THETA0_SWELL)
+    fan = B.fan_theta0(y, ep['x_s'], ep['D'])
+    res = {}
+    for nm, xs, th0 in (('straight', x_str, B.THETA0_SWELL),
+                        ('rotated', x_rot, B.THETA0_SWELL),
+                        ('bay_plane', ep['x_s'], B.THETA0_SWELL),
+                        ('bay_fan', ep['x_s'], fan)):
+        _, tr = B.plan_field(x, y, xs, theta0=th0)
+        res[nm] = B.plan_transport(y, xs, tr)
+    # the spiral span only, for the bay: the frame's outer sixth is the rock
+    # headland the loop built, and its plan-form is the hardness field's
+    # roughness rather than the closed form.
+    msp = np.zeros(y.size, bool)
+    msp[ep['j1'] + 2:ep['j2'] - 1] = True
+    sp = {k: float(np.sqrt(np.mean(res[k]['Q'][msp & res[k]['mask']] ** 2)))
+          for k in res}
+    ctx['embay_Q'] = dict(res=res, sp=sp)
+
+    check(1, 'straight coast under an oblique swell: Q is NOT zero',
+          res['straight']['Q_rms'] > 5e-2, True, 0,
+          'The control the bar asks for. A straight shoreline under this '
+          'offshore spectrum carries %.4e m3/s of longshore transport at '
+          'every station, because theta_b = %.3f deg and sin(2 theta) is not '
+          'zero. If this row ever passes trivially the whole section is '
+          'measuring nothing.'
+          % (res['straight']['Q_rms'], math.degrees(sc['theta_b'])), '-')
+    check(1, 'the closed-form zero-transport coast reads zero: 18x down',
+          res['rotated']['Q_rms'] / res['straight']['Q_rms'], 0.0, 0.10,
+          'THE METER\'S OWN FLOOR, and it is measured rather than assumed. '
+          'theta_loc = 0 forces phi_s = -theta_0 -- a straight coast rotated '
+          'by the FULL deep-water obliquity, not the breaking one -- and the '
+          'transform returns %.5f deg of residual obliquity on it against '
+          '%.4f on the straight coast. Everything below is read against this '
+          'number.' % (math.degrees(res['rotated']['th_mean']),
+                       math.degrees(res['straight']['th_mean'])), '-')
+    openq(1, 'the bay under a PLANE crest: Q is not reduced',
+          '%.4e' % res['bay_plane']['Q_rms'],
+          '<= %.4e' % res['straight']['Q_rms'],
+          'AND IT CANNOT BE. With plane offshore crests and contours that '
+          'follow the shore, theta_loc = 0 demands phi_s = -theta_0 at every '
+          'station, which is one straight line. ANY curvature raises the '
+          'transport. That is terrain-architect chapter 12\'s own sentence -- '
+          '"headlands retreat faster than bays ... until the coast '
+          'STRAIGHTENS" -- and it is right. A static-equilibrium BAY is '
+          'therefore not a property of a shoreline; it is a property of a '
+          'shoreline AND the headland that shelters it.')
+    info(1, 'the fan the bay requires, alongshore swing',
+         math.degrees(ep['fan']['swing']),
+         'Degrees. The wave orthogonal must swing this far across the bay for '
+         'the built shoreline to be an equilibrium. It is pure geometry -- no '
+         'wave model enters it -- and it is the quantitative form of "the bay '
+         'needs its headland to diffract".')
+    check(1, 'with that fan, the bay\'s transport falls by 3x',
+          sp['bay_fan'] / sp['straight'] < 0.45, True, 0,
+          'The bay under the fan its OWN pole implies, over the spiral span: '
+          'Q rms %.4e against the straight coast\'s %.4e, a factor of %.2f. '
+          'Measured through the same transform, the same ramp and the same '
+          'CERC closure -- one array changed.'
+          % (sp['bay_fan'], sp['straight'], sp['straight'] / sp['bay_fan']),
+          '-')
+    openq(1, 'the bay is NOT zero to within numerics',
+          '%.4e' % sp['bay_fan'], '%.4e (the floor)' % sp['rotated'],
+          'HONEST ANSWER TO THE BAR\'S QUESTION. The bay\'s residual is %.1fx '
+          'the meter\'s own floor, so it is SMALL and not ZERO. The residual '
+          'is decomposed in the two rows below rather than left as a '
+          'tolerance.' % (sp['bay_fan'] / max(sp['rotated'], 1e-12)))
+
+    # ---- 6. where the residual comes from ----------------------------------
+    v = ec['pts'] - ec['D']
+    Rc0 = float(np.mean(np.hypot(v[:, 0], v[:, 1])))
+    xs_c = ec['D'][0] + np.sqrt(np.maximum(Rc0 ** 2 - (y - ec['D'][1]) ** 2,
+                                           0.0))
+    n0 = np.arctan2(y - ec['D'][1], xs_c - ec['D'][0])
+    h_pol = B.plan_ramp_polar(x, y, ec['D'],
+                              (np.array([-1.5, 1.5]), np.array([Rc0, Rc0])))
+    tr_pol = B.transform_2d(x, y, h_pol, B.T_SWELL, B.H0_SWELL, n0,
+                            contour0=n0)
+    p_pol = B.plan_transport(y, xs_c, tr_pol)
+    _, tr_car = B.plan_field(x, y, xs_c, theta0=n0)
+    p_car = B.plan_transport(y, xs_c, tr_car)
+    check(3, 'a concentric ramp lowers the residual: contours, not curvature',
+          p_pol['th_mean'] < p_car['th_mean'], True, 0,
+          'THE SEPARATING MEASUREMENT. Same circular shoreline, same radial '
+          'incidence, two beds: one whose depth is a function of CROSS-SHORE '
+          'distance (contours are x-translates of the shore, and they '
+          'converge where it is concave) and one whose depth is a function of '
+          'distance from the POLE (contours are concentric arcs, on which a '
+          'radial ray is normal to every contour it crosses). %.4f deg '
+          'against %.4f -- so %.2f deg of the residual is the ramp not being '
+          'concentric with the curve it is keyed to, and the rest is not.'
+          % (math.degrees(p_pol['th_mean']), math.degrees(p_car['th_mean']),
+             math.degrees(p_car['th_mean'] - p_pol['th_mean'])), '-')
+    openq(3, 'the rest of the residual is the SOLVER, on a curved bed',
+          '%.4f deg' % math.degrees(p_pol['th_mean']),
+          '%.4f deg (straight-contour floor)'
+          % math.degrees(res['rotated']['th_mean']),
+          'On STRAIGHT contours at the same 20 deg obliquity the transform '
+          'leaves %.4f deg; on concentric contours with exactly radial '
+          'incidence it leaves %.4f. The difference is the march itself: '
+          '`transform_2d` advances column by column in x and carries the '
+          'ray\'s alongshore drift only through the dk/dy terms, and at 20 '
+          'deg the drift is 0.36 of a cell per step rather than the 0.015 the '
+          'function\'s own comment quotes for the near-normal case. Named, '
+          'measured, and out of scope for this wave.'
+          % (math.degrees(res['rotated']['th_mean']),
+             math.degrees(p_pol['th_mean'])))
+
+    # ---- 7. the closure coefficient cannot reach the answer ----------------
+    _, tr_b = B.plan_field(x, y, ep['x_s'], theta0=fan)
+    q1 = B.plan_transport(y, ep['x_s'], tr_b, k_cerc=B.K_CERC)
+    q2 = B.plan_transport(y, ep['x_s'], tr_b, k_cerc=2.0 * B.K_CERC)
+    check(1, 'CERC K doubles: theta_loc does not move at all',
+          float(np.max(np.abs(q2['theta_loc'] - q1['theta_loc']))), 0.0, 0.0,
+          'The equilibrium is Q = 0 and Q = C sin(2 theta) with C > 0, so the '
+          'plan-form cannot depend on C for ANY C. The empirical closure '
+          'coefficient is the one number in this section that could have been '
+          'tuned to make the answer come out, and it is structurally unable '
+          'to reach it.', 'rad')
+    check(1, 'CERC K doubles: Q doubles exactly',
+          q2['Q_rms'] / q1['Q_rms'], 2.0, 1e-12,
+          'The other half of the same statement: K sets the RATE and nothing '
+          'else. Both halves are needed -- one alone is consistent with K '
+          'being ignored.', '-')
+
+    # ---- 7b. the closure's own shape, against chapter 12's sentence --------
+    th = np.linspace(0.0, math.radians(89.0), 4001)
+    Qc = B.cerc_transport(1.0, th)
+    check(2, 'CERC transport peaks at a 45 deg approach',
+          math.degrees(th[int(np.argmax(Qc))]), 45.0, 0.05,
+          'terrain-architect chapter 12 states the closure as "Q_long ~ '
+          'sin(2 (waveAngle - shorelineNormal))  # peaks near 45 deg '
+          'approach" (Komar & Inman 1970). The peak location is the one '
+          'property of the closure that distinguishes sin(2 theta) from '
+          'sin(theta) WITHOUT knowing the coefficient -- sin(theta) peaks at '
+          '90. Written from the chapter\'s sentence, not from the function.',
+          'deg')
+    check(1, 'CERC transport is odd in the approach angle',
+          B.cerc_transport(1.3, -th) + B.cerc_transport(1.3, th),
+          np.zeros(th.size), 1e-14,
+          'Reverse the approach and the drift reverses. A closure that is not '
+          'odd cannot make a spit point the right way, which is chapter 12\'s '
+          'own stated reason for computing the drift DIRECTION at all.',
+          'm3/s')
+    check(1, 'CERC transport scales as H_b^(5/2)',
+          B.cerc_transport(2.0, 0.2) / B.cerc_transport(1.0, 0.2),
+          2.0 ** 2.5, 1e-12,
+          'The height exponent, isolated at fixed angle.', '-')
+
+    # ---- 8. the sign convention, against a hand-rotated coast --------------
+    yy = np.linspace(-100.0, 100.0, 41)
+    for deg in (-12.0, -5.0, 7.0, 15.0):
+        xr = 500.0 + math.tan(math.radians(deg)) * yy
+        check(1, 'shore_normal_angle on a %+.0f deg coast' % deg,
+              math.degrees(float(np.median(B.shore_normal_angle(yy, xr)))),
+              deg, 1e-9,
+              'phi_s = atan(dx_s/dy) by construction, and theta_loc = theta + '
+              'phi_s. The sign is the one thing in this section a reader will '
+              'get backwards, so it is checked against a coast whose angle is '
+              'typed in.', 'deg')
+
+    # ---- 9. the bed carries the plan-form ----------------------------------
+    b0 = B.run_bay(dx=4.0, n_steps=75, dt=6000.0)
+    b1 = B.run_bay(dx=4.0, n_steps=75, dt=6000.0, embay=True)
+    r0 = float(b0['x_s'].max() - b0['x_s'].min())
+    r1 = float(b1['x_s'].max() - b1['x_s'].min())
+    check(2, 'the composed bed inherits the bay: shoreline range triples',
+          r1 / r0 > 2.5, True, 0,
+          'The plan-form reaches `bay_bed`, which shifts the coastal loop\'s '
+          'own surface bodily per row so the cliff, the bench, the hardness '
+          'roughness and the retreat all survive and ONLY the position of the '
+          'coast moves. %.1f m against %.1f m.' % (r1, r0), '-')
+    a0, m0 = B.contour_alignment(b0['tr'])
+    a1, m1 = B.contour_alignment(b1['tr'])
+    ali0 = dict(mean=float(np.mean(a0[m0])))
+    ali1 = dict(mean=float(np.mean(a1[m1])))
+    info(2, 'crest-to-contour alignment, embayed bed', ali1['mean'],
+         'Degrees between the wave crest and the local depth contour, over '
+         'the surf zone. Bar section J\'s by-eye criterion -- "the breaking '
+         'lines bend to stay parallel to the shore around the whole curve" -- '
+         'as a number. The un-embayed bed reads %.4f deg, and it reads it on '
+         'contours that were already straight, which is the '
+         'straight-contour test that passes by construction.' % ali0['mean'])
+    check(2, 'the embayed bed turns the crests through a real angle',
+          _crest_swing(b1) > 2.0 * _crest_swing(b0), True, 0,
+          'ALIGNMENT IS NOT THE TEST. A crest can lie on the contour on a '
+          'straight coast without the refraction doing any work at all. What '
+          'a bay adds is that the crest DIRECTION has to change alongshore, '
+          'one way, across the whole frame. Bay-scale swing of the breaking '
+          'crest azimuth: %.3f deg embayed against %.3f flat, a factor of '
+          '%.2f. The threshold is a factor of two -- a round number and not '
+          'the measured one, because a threshold set at the measurement is a '
+          'tolerance the size of the thing it covers.'
+          % (_crest_swing(b1), _crest_swing(b0),
+             _crest_swing(b1) / max(_crest_swing(b0), 1e-9)), '-')
+
+
+def _theta0_for_sagitta(B, ep, target):
+    """Invert the closed form: the deep-water obliquity a stated indentation
+    implies. A measurement of the offshore spectrum FROM a plan-form, reported
+    and never applied -- the standing ruling forbids calibrating on the
+    photographs."""
+    lo, hi = 1e-4, math.radians(45.0)
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        s = B.equilibrium_plan(theta0=mid)['sagitta']
+        if s < target:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def _smooth_curvature(x_s, y, n=3):
+    """The bay-scale component of a shoreline: the maximum |residual| after a
+    low-order polynomial is removed, evaluated on a HEAVILY smoothed profile
+    so that hardness-field roughness cannot be counted as a bay."""
+    x_s = np.asarray(x_s, float)
+    y = np.asarray(y, float)
+    w = max(int(round(0.2 * y.size)) | 1, 3)
+    ker = np.ones(w) / w
+    sm = np.convolve(np.pad(x_s, w // 2, mode='edge'), ker, mode='valid')
+    ch = sm[0] + (sm[-1] - sm[0]) * (y - y[0]) / (y[-1] - y[0])
+    return float(np.max(np.abs(sm - ch)))
+
+
+def _crest_swing(bay):
+    """The BAY-SCALE alongshore swing of the breaking crest azimuth, degrees.
+
+    Smoothed over a fifth of the frame first, and that is the measurement and
+    not a cosmetic. The raw swing is 19.5 deg on the un-embayed bed and 17.0
+    on the embayed one -- the un-embayed bed looks BETTER -- because the raw
+    number is dominated by the hardness field\'s 380 m roughness wiggling the
+    local shore normal cell by cell. Roughness turns crests locally and
+    averages to nothing; a bay turns them one way across the whole frame. The
+    first draft of this row measured the raw swing, reported the wrong sign of
+    the effect, and is left recorded because the next reader will reach for the
+    raw number too.
+    """
+    br = BCH.breaker_row(bay['tr'])
+    th = np.degrees(br['theta'])
+    w = max(int(round(0.2 * th.size)) | 1, 3)
+    sm = np.convolve(np.pad(th, w // 2, mode='edge'), np.ones(w) / w,
+                     mode='valid')
+    return float(sm.max() - sm.min())
 
 
 # ================================ 7 - the coastal IOPs, the path and the glitter
@@ -4539,6 +5039,7 @@ def run_suite():
                       (_sec_coast, 'the coast in plan'),
                       (_sec_transform2d, 'the wave transform in 2-D'),
                       (_sec_bay, 'the bar in plan'),
+                      (_sec_embay, 'the static-equilibrium bay'),
                       (_sec_optics, 'the coastal IOPs, the path and the '
                                     'glitter'),
                       (_sec_surface, 'the nonlinear free surface'),
@@ -4690,6 +5191,30 @@ if __name__ == '__main__':
                                     '; '.join(c[:64] for c in caught[:5])))
         importlib.reload(FOAM)
         sys.exit(0)
+    if '--bugs-embay' in sys.argv:
+        import importlib
+        _run_section(_sec_embay, 'the static-equilibrium bay')
+        base = set(_fail_names())
+        print('clean embayment section: %d pass / %d FAIL'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base)))
+        print()
+        print('%-32s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 110)
+        for name in EMBAY_BUGS:
+            importlib.reload(BCH)
+            BCH._BAY_CACHE.clear()
+            BUGS[name](BCH)
+            try:
+                _run_section(_sec_embay, 'the static-equilibrium bay')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-32s %d  %s' % (name, len(caught),
+                                    '; '.join(c[:62] for c in caught[:5])))
+        importlib.reload(BCH)
+        BCH._BAY_CACHE.clear()
+        sys.exit(0)
     if '--bugs-surface' in sys.argv:
         import importlib
         _run_section(_sec_surface, 'the nonlinear free surface')
@@ -4725,6 +5250,12 @@ if __name__ == '__main__':
             importlib.reload(BCH)
             importlib.reload(BOP)
             importlib.reload(CMR)
+            if name in EMBAY_BUGS:
+                # the embayment section is exercised by `--bugs-embay`, which
+                # clears `beach._BAY_CACHE` between runs. The whole-suite
+                # driver reuses the cache across bugs, so a patched plan-form
+                # would be invisible to every section after the first.
+                continue
             if name in LAND_BUGS:
                 # the land section is exercised by `--bugs-land`, which
                 # reloads `beach_render` between runs. The whole-suite driver

@@ -2573,7 +2573,8 @@ def platform_width(x, h2, sea_level=SEA_LEVEL, band=0.75):
 
 
 def bay_bed(x, y, h_coast, h_init, A=DEAN_A, d_shelf=D_SHELF,
-            sea_level=SEA_LEVEL, smooth=True, sand_row=None, beach=True):
+            sea_level=SEA_LEVEL, smooth=True, sand_row=None, beach=True,
+            plan=None):
     """Compose the coastal loop's plan-form into a submarine bed.
 
     Chapter 12 draws the line itself and this function is on both sides of it:
@@ -2603,6 +2604,22 @@ def bay_bed(x, y, h_coast, h_init, A=DEAN_A, d_shelf=D_SHELF,
     y = np.asarray(y, float)
     h_coast = np.asarray(h_coast, float)
     x_s = shoreline_x(x, h_coast, sea_level)
+    if plan is not None:
+        # WAVE 9: THE PLAN-FORM IS SUPPLIED, AND ONLY THE PLAN-FORM.
+        # `plan` is a stated shoreline x_s(y) -- the static-equilibrium bay.
+        # The coastal loop's own surface is shifted bodily, per row, so that
+        # its shoreline lands on the stated one: the cliff, the bench, the
+        # hardness field's roughness and the retreat the loop computed all
+        # survive unchanged, and the ONLY thing that moves is where the coast
+        # is. That is what makes the curved/straight pair one field changed.
+        plan = np.asarray(plan, float)
+        dxs = plan - x_s
+        h_coast = np.stack([np.interp(x - dxs[j], x, h_coast[j])
+                            for j in range(y.size)])
+        h_init = np.stack([np.interp(x - dxs[j], x, np.asarray(h_init,
+                                                               float)[j])
+                           for j in range(y.size)])
+        x_s = shoreline_x(x, h_coast, sea_level)
     s = np.maximum(x_s[:, None] - x[None, :], 0.0)          # seaward distance
     h_dean = -np.minimum(A * s ** (2.0 / 3.0), d_shelf)
     touched = (h_coast - np.asarray(h_init, float)) < -0.25
@@ -3744,7 +3761,8 @@ def run_coast(dx=DX_COAST, dy=DY_BAY, x_len=X_LEN_BAY, y_half=Y_HALF_BAY,
 
 
 def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
-            theta0=THETA0_SWELL, coast=None, k_every=4, **flux_kw):
+            theta0=THETA0_SWELL, coast=None, k_every=4, embay=False,
+            **flux_kw):
     """The whole scene: coastal loop -> plan bed -> 2-D transform -> Exner.
 
     `dt` is set from the same diffusion bound the 1-D loop uses,
@@ -3752,7 +3770,7 @@ def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
     1500 s is half of it. n_steps*dt is held at 500 hours, the same physical
     duration waves 1 and 2 ran, so the bar is comparable across the three.
     """
-    key = ('bay', dx, n_steps, dt, T, H0, theta0, k_every,
+    key = ('bay', dx, n_steps, dt, T, H0, theta0, k_every, bool(embay),
            tuple(sorted((k, v) for k, v in flux_kw.items())))
     if coast is None and key in _BAY_CACHE:
         return _BAY_CACHE[key]
@@ -3761,13 +3779,21 @@ def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
     x = np.arange(0.0, xc[-1] + dx, dx)
     hc = np.stack([np.interp(x, xc, cs['h'][j]) for j in range(y.size)])
     h0c = np.stack([np.interp(x, xc, cs['h0'][j]) for j in range(y.size)])
+    # WAVE 9. `embay` is off by default and that is deliberate: every
+    # measurement waves 1-8 published was taken on the un-embayed bed, and a
+    # wave that changes the plan-form under them makes 301 rows incomparable
+    # in one move. The embayment is its own entry point, exactly as wave 8's
+    # four fields were, and the flag IS the curved/straight control the
+    # transport measurement needs.
+    ep = equilibrium_plan(coast=cs) if embay else None
     h_init, x_s, h_dean, bch = bay_bed(x, y, hc, h0c,
-                                       sand_row=cs.get('sand_row'))
+                                       sand_row=cs.get('sand_row'),
+                                       plan=None if ep is None else ep['x_s'])
     h, tr2, hist, edge = evolve_2d(x, y, h_init, T, H0, theta0,
                                    n_steps=n_steps, dt=dt, k_every=k_every,
                                    **flux_kw)
     out = dict(x=x, y=y, h_init=h_init, h=h, tr=tr2, x_s=x_s, h_dean=h_dean,
-               beach=bch,
+               beach=bch, embay=bool(embay), plan=ep,
                hist=hist, coast=cs, dx=dx, dy=float(y[1] - y[0]), edge=edge,
                tr_init=transform_2d(x, y, h_init, T, H0, theta0))
     if coast is None:
