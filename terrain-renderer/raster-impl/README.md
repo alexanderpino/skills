@@ -8,7 +8,7 @@ integral before the frame starts** — split it, table it, sample it, drop the
 part that refracts — and the offline path cannot test any of them, structurally:
 approximation error is invisible to a code path that does not approximate.
 
-    python3 validate_raster.py        # 94 rows, three tiers, ~26 s, non-zero exit on FAIL
+    python3 validate_raster.py        # 95 rows, three tiers, ~26 s, non-zero exit on FAIL
     python3 validate_raster.py -v     # every tolerance's justification
     python3 validate_raster.py --fast # skip the two frame-level tiers
     python3 evidence.py               # the five r1- figures in gauntlet/raster/evidence/
@@ -19,7 +19,7 @@ approximation error is invisible to a code path that does not approximate.
 | `scene.py` | The body (a shoaling shelf), the camera, the reversed-Z projection and its inverse, the opaque prepass that writes the two buffers the pass consumes, and `project_to_pixel` — the only thing a screen-space pass needs to re-sample a buffer somewhere other than at its own pixel. |
 | `sswater.py` | **The pass.** The fullscreen triangle emitted from `SV_VertexID` and rasterized with a real coverage test; the chapter's four numbered pixel-shader steps in its own order; the composition, per leg; the helper-lane audit. |
 | `offline.py` | The frame the pass is validated against. Same model, different machinery: analytic geometry, per-band refracted rays, `optics.slab_esc` / `slab_trap` evaluated at **every pixel's own three optical depths**. |
-| `validate_raster.py` | 94 rows on `validate.py`'s harness. At least one absolute row per quantity. |
+| `validate_raster.py` | 95 rows on `validate.py`'s harness. At least one absolute row per quantity. |
 | `evidence.py` | The five `r1-` figures, every caption number formatted from the run that drew it. |
 
 **Nothing here re-implements any physics.** `optics.py` and `atmosphere.py` are
@@ -349,7 +349,7 @@ depths, agreement inside 4 standard errors of the estimator, tolerance ~2e-4.
 
 ## Reading the suite
 
-94 rows, three tiers, ~26 s. The harness, the tier meanings and the rule that a
+95 rows, three tiers, ~27 s. The harness, the tier meanings and the rule that a
 tolerance comes from the **estimator's** error and never from the measured
 disagreement are `validate.py`'s, deliberately.
 
