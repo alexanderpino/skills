@@ -132,6 +132,7 @@ the reference implementation or read off a photograph, not supposed.
 | The sea is green everywhere, or blue everywhere, whatever the wave is doing | A tint on the water **body**. One backlit breaking wave refutes it in a single exposure: the face reads saturated green while the same water two metres away reads grey-blue, so the colour is the **path** and must vanish when the path does | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
 | The saturated green backlit face never appears in the surf, however tall or steep the wave field is made | **Not a tuning shortfall — a bar on the representation.** A sightline through a wave crosses the surface twice, so the entry and exit inclinations must sum to `2(90° − θ_c)` = **82.96°**; Stokes' 120° corner caps a wave of permanent form at 30° a face, so its best sum is 60°. No single-valued height field of a steady wave reaches it, at any height, order or grid | [The 30° ceiling](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise) |
 | Surf built as one particle system, and it reads as confetti over glass | **Three whites, three materials**: the blanket behind a break is a *coverage mask*, the opacity inside the wave mouth is a *participating medium*, the spray is *particles* — and the particles are the **smallest** share. All three are built on the same `1 − 1/n²` wall reflectance and share nothing else — and none of them whitens *because* of it: a bubble backscatters `b_b/b = 0.023`, so the white is multiple scattering | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
+| Water is right in the near field and goes black — or absurdly saturated — toward the horizon, and no fog or exposure setting fixes both halves | **The straight ray used as the traversal distance.** `d/cos θ_a` diverges at grazing; the transmitted ray refracts and `d/μ_w` is bounded by `1.33 d`. Median 12.1%, p95 46.5% on a measured frame, fixed by one `sqrt` | [Screen-space water, step 4](#screen-space-water-the-fullscreen-triangle-pass) |
 | Volumetric foam or a bubble plume that goes bright white but you can still see the bed through it | `1 − 1/n²` spent as a **backscatter fraction** instead of a wall reflectance — 19× too much return, and the transmittance that should have fallen with it never does. A conservative slab has `R = τ'/(1 + τ')` and `T = 1 − R`; whitening without hiding means the model has `R` and not `T` | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
 | A white plume after a wave hits rock that either vanishes leaving nothing or lingers white far too long | **Two clouds with one decay curve.** Entrained air rises and bursts in seconds; suspended sediment settles over minutes and advects. They overlap in space and are separated by *lifetime*, not appearance | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
 | Water in the surf zone that is exactly as clear on every frame while the waves break through it | `b` treated as a **material constant** where it is a state variable produced by the dynamics: the waves suspend the bed, the backwash erodes, turbidity pulses at the wave period. The one optical property a still frame cannot verify | [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) |
@@ -287,9 +288,33 @@ The pixel shader is the whole system:
    the same ray; if the scene hit is nearer than `t`, terrain or props occlude the water — output
    nothing. The reconstruction must use the frame's actual depth convention (reversed-Z, jitter).
 4. **Shade**: everything in [Shading and optics](#shading-and-optics) applies unchanged at the
-   hit point — traversal distance from scene depth vs `t` for absorption, shore fade from the
-   depth field, normal detail from scrolling/FFT normal cascades sampled at the hit's world XZ,
-   SSR/cubemap reflection, refraction from the scene-color copy.
+   hit point — traversal distance **`d/μ_w`, with `μ_w` the *Snell* cosine of the view angle and
+   `d` the vertical water column**, shore fade from the depth field, normal detail from
+   scrolling/FFT normal cascades sampled at the hit's world XZ, SSR/cubemap reflection, refraction
+   from the scene-color copy.
+
+   ⚠️ **This step used to read "traversal distance from scene depth vs `t`", and that is the
+   straight ray.** The transmitted ray *refracts* — the same clause that says "refraction from the
+   scene-color copy" a line later. The two lengths are `d/cos θ_a` and `d/μ_w`, and
+
+   ```
+   mu_w = sqrt(1 - (sin theta_a / n)^2) >= 1/n = 0.749   for EVERY air-side angle, however grazing
+   cos theta_a -> 0                                      at the horizon
+   ```
+
+   so the straight length **diverges** exactly where the true one is bounded by `1.33 d`. Measured
+   against a per-pixel offline reference over 157 641 water pixels, the literal reading costs a
+   **median of 12.1% and 46.5% at p95** in scene-linear radiance, against `4.1×10⁻⁵` median for
+   `d/μ_w` — **it is fixed by one `sqrt`** (`D`, `raster-impl/`, reproduced here). This is not a
+   subtlety about a hard case: it is the whole far half of any water frame with a horizon in it,
+   and it is the sentence a shader author implements.
+
+   `d/μ_w` is a *flat-datum* rule and it still assumes the refracted ray lands on the bed patch the
+   straight ray found. Re-projecting along the refracted ray and re-tapping the depth buffer buys
+   the p95 back — 33.1% → 1.6% on the same frame with six taps — and cannot go further, because a
+   depth buffer cannot answer for a bed patch the straight ray never looked at. At the *median* the
+   two rules are indistinguishable and both sit on the physics floor: **the screen-space depth error
+   is a tail, not a level.**
 
 The geometry of the pass, in section view:
 
@@ -2157,14 +2182,23 @@ float3 refracted = SceneColor.Sample(s, uvR).rgb;
 - **Absorption and scattering with depth**: extinguish the refracted color per channel with the
   water-traversal distance — Beer–Lambert on `c`, whose red component exceeds green exceeds blue
   for natural water — and add the column's own returned radiance as that transmission saturates.
-  The traversal distance comes from scene depth vs surface depth along the view ray *and* from the
-  exported depth field for the vertical component; the shallow→deep color ramp is the single
-  strongest realism cue water has, and it is entirely a function of the generator's bathymetry.
-  Flat-colored water is almost always a missing/ignored depth field.
+  The traversal distance is the vertical column divided by the **Snell** cosine — *not* the
+  straight-ray length from scene depth vs surface depth, which
+  [diverges at grazing incidence where the refracted one cannot](#screen-space-water-the-fullscreen-triangle-pass) —
+  and the vertical component comes from the exported depth field; the shallow→deep color ramp is the
+  single strongest realism cue water has, and it is entirely a function of the generator's
+  bathymetry. Flat-colored water is almost always a missing/ignored depth field.
 
 ```hlsl
-float rayDistance   = max(SceneLinearDepth(bottomUV) - waterLinearDepth, 0.0); // metres in water
 float verticalDepth = WaterDepth(worldXZ);                                     // bathymetry field
+
+// The refracted path, not the straight one. cos(theta_a) goes to zero at the horizon; mu_w
+// cannot go below 1/n = 0.749, so this length is bounded by 1.33 * verticalDepth and the
+// straight-ray version is not. Taking `SceneLinearDepth - waterLinearDepth` here instead costs
+// a median of 12.1% and 46.5% at p95 over a measured frame -- one sqrt.
+float  sinA         = sqrt(saturate(1.0 - cosA * cosA));                       // cosA = view . up
+float  mu_w         = sqrt(saturate(1.0 - (sinA / n) * (sinA / n)));           // Snell cosine
+float rayDistance   = verticalDepth / max(mu_w, 1e-4);                         // metres in water
 
 float3 T_beam  = exp(-c_RGB   * rayDistance);    // beam attenuation: the bed's OWN radiance
 float3 T_diff  = exp(-K_d_RGB * verticalDepth);  // diffuse attenuation: the light column
@@ -2175,8 +2209,8 @@ causticMask = 1.0 - saturate(verticalDepth / causticFadeDepth);
 ```
 
 Three things about that block. `rayDistance` controls extinction along the camera path;
-`verticalDepth` controls the shore regime, caustic survival, and shallow-wave response — related,
-never interchangeable. The two terms are **not** a lerp and their weights do not sum to one: they
+`verticalDepth` controls the shore regime, caustic survival, and shallow-wave response — related by
+exactly one factor `1/μ_w ∈ [1, 1.33]`, and never interchangeable. The two terms are **not** a lerp and their weights do not sum to one: they
 are two transport paths, not two ends of a blend. And **`c` and `K_d` are two coefficients, not
 one** — the trap named in
 [Water-body optical identity](#water-body-optical-identity-where-the-iops-come-from) below, easy to
