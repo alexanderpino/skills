@@ -171,18 +171,38 @@ def bubble_scatter(n_p=20001, n_order=12):
 #       n(r) ~ r^(-3/2)     below it -- jet and drop impact on the wave face
 #       n(r) ~ r^(-10/3)    above it -- turbulent fragmentation
 #
-# `P`, cited. The exponents are theirs; the CUTOFFS are this file's and they are
-# derived rather than declared, which matters because the Sauter radius that
-# sets the optical thickness is dominated by the large end.
+# `P`, cited. The exponents are theirs. THE ENDS OF THE SPECTRUM ARE THIS FILE'S
+# AND THEY ARE MARKED, because the standing population weights them very
+# differently from the source and the difference is the whole of section 3.
 DS_SLOPE_SMALL = -1.5           # Deane & Stokes (2002). `P`
 DS_SLOPE_LARGE = -10.0 / 3.0    # Deane & Stokes (2002). `P`
 R_HINZE = 1.0e-3                # m, the Hinze scale. `P`, ~1 mm in their paper
-R_MIN = 1.0e-5                  # m, 10 micron. Below this the population is
-                                # invisible to the r^2 moment: the -3/2 slope
-                                # makes INT r^2 n dr converge at the small end,
-                                # so this cutoff moves r_32 by under 0.2% over a
-                                # decade. Checked in the suite rather than
-                                # asserted here.
+R_MIN = 1.0e-5                  # m, 10 micron, and it is NOT harmless -- which
+                                # is a correction to this file's own first
+                                # draft. In the SOURCE spectrum the -3/2 slope
+                                # makes both moments converge at the small end
+                                # and the cutoff is worth 0.4%. In the STANDING
+                                # spectrum the residence time goes as 1/w ~
+                                # 1/r^2 in the Stokes regime, so n_st r^2 goes
+                                # as r^-1.5 and the projected AREA diverges as
+                                # r_min -> 0: r_32 runs 0.50 mm at 3 micron to
+                                # 1.20 mm at 100 micron, a factor of 2.4 on the
+                                # scattering coefficient. The cutoff is
+                                # PHYSICAL rather than numerical -- below about
+                                # ten microns Laplace pressure drives a bubble
+                                # into solution in seconds, so the population
+                                # does end -- but the exact end is `P` and the
+                                # sensitivity is reported by the suite rather
+                                # than hidden here.
+R_MAX = 1.0e-2                  # m, a 2 cm bubble. `P`, AND THE PLUME'S OPTICAL
+                                # DEPTH IS SENSITIVE TO IT: cutting it to 3 mm
+                                # nearly doubles <tau>_vol and cuts r_32 by a
+                                # third, which moves the scattering coefficient
+                                # by 2.7x. Deane & Stokes photographed bubbles
+                                # to about this size in the crest of a breaking
+                                # wave. The largest cavity at THIS coast is `?`
+                                # and it is the sharpest thing in section C that
+                                # this file cannot close.
 
 
 def bubble_rise_velocity(r, nu=B.NU_W, rho_w=B.RHO_SW, g=B.G, n_iter=60):
@@ -215,54 +235,83 @@ def bubble_rise_velocity(r, nu=B.NU_W, rho_w=B.RHO_SW, g=B.G, n_iter=60):
     return w
 
 
-def _ds_moments(r_lo, r_hi, n=20001):
-    """(INT r^2 n dr, INT r^3 n dr) for the two-slope spectrum, normalised so
-    the small branch has unit coefficient. Trapezoid on a log grid -- the
-    integrand is a pure power law on each side, so log spacing is exact in the
-    exponent and the error is the trapezoid's own."""
-    r = np.geomspace(max(r_lo, 1e-9), max(r_hi, r_lo * 1.0001), n)
-    nr = np.where(r <= R_HINZE, r ** DS_SLOPE_SMALL,
-                  R_HINZE ** (DS_SLOPE_SMALL - DS_SLOPE_LARGE)
-                  * r ** DS_SLOPE_LARGE)
-    m2 = np.trapezoid(nr * r ** 2, r)
-    m3 = np.trapezoid(nr * r ** 3, r)
-    return m2, m3
+def _ds_density(r):
+    """The two-slope source spectrum, unnormalised: the small branch carries
+    unit coefficient and the large branch is matched to it at the Hinze scale.
+    Every moment below divides one integral of this by another, so the
+    normalisation cancels and is never needed."""
+    r = np.asarray(r, float)
+    return np.where(r <= R_HINZE, r ** DS_SLOPE_SMALL,
+                    R_HINZE ** (DS_SLOPE_SMALL - DS_SLOPE_LARGE)
+                    * r ** DS_SLOPE_LARGE)
 
 
-def bubble_population(d_plume, T, r_min=R_MIN):
-    """The bubble spectrum's Sauter radius, with the LARGE cutoff DERIVED.
+def bubble_spectrum(d_plume, r_min=R_MIN, r_max=R_MAX, n=3001):
+    """The SOURCE spectrum, and the STANDING one that survives in the plume.
 
-    r_32 = INT r^3 n / INT r^2 n is the only moment the optics needs: the
-    projected area per unit volume of a suspension of volume fraction alpha is
-    3 alpha / (4 r_32) exactly, whatever the spectrum. It is dominated by the
-    large end, and on the -10/3 branch INT r^3 n dr grows as r_max^(2/3), so a
-    DECLARED r_max would be the whole answer wearing a cutoff's clothes.
+    THE FIRST WRITING OF THIS SECTION PUT A SHARP CUTOFF ON THE SPECTRUM, AND
+    THE RENDER FOUND IT. The cutoff was "a bubble that rises out within a wave
+    period is not part of the standing population", which is the right idea in
+    the wrong shape: it discarded the large bubbles while KEEPING the energy
+    they were entrained with, so the surviving small ones inherited a void
+    fraction ten times their own. The bay frame turned into a sheet of milk from
+    the outer bar to the beach -- a defect no printed number in that run
+    reported and the picture reported at a glance.
 
-    THE CUTOFF IS A CLOCK, NOT A SIZE. A bubble whose rise time across the
-    plume is shorter than the wave period is gone before the next wave renews
-    the plume, so it is not part of the standing population:
+    THE STEADY STATE IS SIZE-RESOLVED AND THERE IS NO CUTOFF. Air is entrained
+    with the Deane & Stokes spectrum n_s(r), and each size leaves on its own
+    clock:
 
-        w_rise(r_max) = d_plume / T
+        tau(r) = (d_p/2) / w_rise(r)
 
-    Nothing is chosen. d_plume and T are the scene's, and w_rise is Schiller &
-    Naumann. On this scene it lands BELOW the Hinze scale, so the standing
-    population is entirely the -3/2 branch -- which is a result and not an
-    assumption, and it is why r_32 comes out where measured plume values are.
+    -- half the plume, because air is entrained THROUGH the layer rather than
+    injected at its base, so the mean rise distance is half of it. In steady
+    state the standing spectrum is
+
+        n_st(r) = n_s(r) tau(r)
+
+    which suppresses the large end smoothly instead of chopping it. The budget
+    reads the SOURCE and the optics read the STANDING population, and the two
+    are never mixed:
+
+        <tau>_vol   INT n_s r^3 tau / INT n_s r^3    -- the AIR's own clock
+        r_32        INT n_st r^3 / INT n_st r^2      -- the OPTICS' own radius
+
+    AND THE ENTRAINED AIR HAS NO SINGLE DECAY TIME, which is a finding rather
+    than an inconvenience. tau(r) runs from a third of a second at a centimetre
+    to half an hour at ten microns, and the two ends belong to different
+    questions: the AIR is gone in under a second (<tau>_vol) while the
+    projected AREA that scatters light is dominated by the smallest bubbles
+    present and outlives it by orders of magnitude. `tau_area_median` is
+    returned so the spread can be seen, and it is NOT a number this file
+    quotes: it tracks r_min and is a statement about the cutoff. Bar section E
+    says one decay curve fits neither of its two clouds; measured, one decay
+    curve does not fit even ONE of them.
     """
-    w_target = float(d_plume) / float(T)
-    lo, hi = 1e-6, 5.0e-3
-    for _ in range(80):                             # w_rise is monotone in r
-        mid = 0.5 * (lo + hi)
-        if float(bubble_rise_velocity(mid)) < w_target:
-            lo = mid
-        else:
-            hi = mid
-    r_max = 0.5 * (lo + hi)
-    m2, m3 = _ds_moments(r_min, r_max)
-    r32 = m3 / m2
-    return dict(r_max=r_max, r_32=r32, w_at_rmax=float(bubble_rise_velocity(r_max)),
-                w_at_r32=float(bubble_rise_velocity(r32)),
-                below_hinze=bool(r_max < R_HINZE))
+    r = np.geomspace(r_min, r_max, n)
+    ns = _ds_density(r)
+    w = bubble_rise_velocity(r)
+    tau = 0.5 * float(d_plume) / w
+    nst = ns * tau
+    tau_vol = float(np.trapezoid(ns * r ** 3 * tau, r)
+                    / np.trapezoid(ns * r ** 3, r))
+    r32 = float(np.trapezoid(nst * r ** 3, r) / np.trapezoid(nst * r ** 2, r))
+    area = nst * r ** 2
+    cdf = np.cumsum(0.5 * (area[1:] + area[:-1]) * np.diff(r))
+    cdf = np.concatenate([[0.0], cdf]) / cdf[-1]
+    tau_med = float(np.interp(0.5, cdf[::-1], tau[::-1]))
+    return dict(r=r, n_source=ns, n_standing=nst, w=w, tau=tau,
+                tau_vol=tau_vol, r_32=r32, tau_area_median=tau_med,
+                tau_at_rmin=float(tau[0]), tau_at_rmax=float(tau[-1]))
+
+
+def bubble_population(d_plume, T=None, r_min=R_MIN, r_max=R_MAX):
+    """The standing population's radius and the air's clock, in one dict."""
+    del T                       # the spectrum no longer needs a wave period
+    sp = bubble_spectrum(d_plume, r_min, r_max)
+    return dict(r_32=sp['r_32'], tau_vol=sp['tau_vol'], r_max=r_max,
+                w_at_r32=float(bubble_rise_velocity(sp['r_32'])),
+                below_hinze=bool(sp['r_32'] < R_HINZE), spectrum=sp)
 
 
 # ==================================== 3 · ENTRAINED AIR, FROM THE DISSIPATION
@@ -273,17 +322,17 @@ def bubble_population(d_plume, T, r_min=R_MIN):
 #
 # THE BUDGET, and it is a source and a sink and not a shape. Air is pushed under
 # at a volume rate Q per unit plan area, doing work rho g zbar per unit volume
-# against buoyancy, and it leaves by rising out over the residence time. In
-# steady state the inventory is Q tau, so with a plume of thickness d_p and a
-# centroid at d_p/2,
+# against buoyancy, and it leaves by rising out with each size's own clock:
 #
-#       rho g (d_p/2) Q = eps_LM D_w          (the power)
-#       h_air = Q tau_air                     (the inventory)
-#       alpha = h_air / d_p = 2 eps_LM D_w tau_air / (rho g d_p^2)
+#       rho g (d_p/2) Q = eps_LM D_w                     (the power)
+#       h_air = Q <tau>_vol                              (the inventory)
+#       alpha = h_air/d_p = 2 eps_LM D_w <tau>_vol / (rho g d_p^2)
 #
 # EVERY SYMBOL ON THE RIGHT IS THE SCENE'S OWN. D_w is the transform's breaking
-# dissipation, tau_air is d_p / w_rise from the section above, and d_p is the
-# crest's own elevation. Nothing is fitted and there is no coefficient to turn.
+# dissipation and d_p is the crest's own elevation; <tau>_vol comes out of the
+# size-resolved steady state above. Nothing is fitted, there is no coefficient
+# to turn, and the ONE number that is not forced -- the plume depth -- is marked
+# and its sensitivity is stated beside it.
 EPS_LM = 0.40                   # midpoint of Lamarre & Melville's 0.30-0.50
 EPS_LM_RANGE = (0.30, 0.50)     # `P`, and the range is carried, not dropped
 
@@ -308,12 +357,14 @@ def entrained_air(D_w, H, T, eps=EPS_LM, rho=B.RHO_SW, g=B.G):
     about D_w and E_w is one function away here too: an energy DENSITY in this
     slot would produce a void fraction with units of seconds.
     """
+    del T                       # the spectrum sets its own clock now
     D_w = np.maximum(np.asarray(D_w, float), 0.0)
     d_p = np.maximum(plume_depth(H), 1e-3)
-    pop = bubble_population(np.median(d_p[d_p > 1e-3]) if d_p.ndim else d_p, T)
-    w_rise = pop['w_at_r32']
-    tau_air = d_p / w_rise
-    alpha = 2.0 * eps * D_w * tau_air / (rho * g * d_p ** 2)
+    d_rep = float(np.median(d_p)) if np.ndim(d_p) else float(d_p)
+    pop = bubble_population(d_rep)
+    tau_air = pop['tau_vol']
+    Q = 2.0 * eps * D_w / (rho * g * d_p)               # m/s of air entrained
+    alpha = Q * tau_air / d_p
     # THE SPHERE FORMULA HAS A DOMAIN AND THIS IS IT. 3 alpha/(4 r_32) is the
     # projected area of a DILUTE suspension of independent spheres; above about
     # alpha = 0.3 the bubbles are polyhedral cells and the scatterers are the
@@ -323,9 +374,32 @@ def entrained_air(D_w, H, T, eps=EPS_LM, rho=B.RHO_SW, g=B.G):
     # different way in `foam_raft` below for exactly this reason.
     clipped = float(np.mean(alpha > 0.30)) if np.ndim(alpha) else float(alpha > 0.30)
     alpha = np.minimum(alpha, 0.30)
-    return dict(alpha=alpha, d_p=d_p, tau_air=tau_air, w_rise=w_rise,
-                r_32=pop['r_32'], r_max=pop['r_max'], pop=pop,
-                clipped_fraction=clipped)
+    return dict(alpha=alpha, d_p=d_p, tau_air=tau_air, tau_vol=tau_air,
+                w_rise=pop['w_at_r32'], Q=Q, r_32=pop['r_32'],
+                r_max=pop['r_max'], pop=pop, clipped_fraction=clipped,
+                tau_area_median=pop['spectrum']['tau_area_median'])
+
+
+def plume_phase_factor(age, T, tau):
+    """The plume is NOT uniform over the wave, and this is why it is not.
+
+    <tau>_vol is under a second and the period is nine, so the air one bore
+    front entrains is gone long before the next front arrives: the plume is a
+    feature OF THE FRONT, not a property of the surf zone. Summing over past
+    sweeps exactly the way the foam's covering measure does, and normalised so
+    the mean over the phase is 1 -- this REDISTRIBUTES the budget's void
+    fraction and adds nothing to it:
+
+        g(a) = (T/tau) exp(-a/tau) / (1 - exp(-T/tau)),      <g> = 1
+
+    A renderer that spreads the time-mean void fraction evenly over the wave has
+    a surf zone of milk. That is not a hypothetical: it is what the first run of
+    this wave drew, and the picture is what found it.
+    """
+    T = float(T)
+    tau = float(tau)
+    a = np.maximum(np.asarray(age, float), 0.0)
+    return (T / tau) * np.exp(-a / tau) / (1.0 - math.exp(-T / tau))
 
 
 def plume_optics(alpha, r_32, path, g_bub, bb_over_b, a_water):
@@ -356,8 +430,7 @@ def plume_optics(alpha, r_32, path, g_bub, bb_over_b, a_water):
     absorb = np.exp(-np.asarray(a_water, float)
                     * np.asarray(path, float)[..., None] * (1.0 - alpha[..., None]))
     return dict(b=b, tau=tau, tau_prime=tau_p, R=R * absorb, T=Td * absorb,
-                b_b=b * np.asarray(bb_over_b, float)[..., None]
-                if np.ndim(bb_over_b) else b * bb_over_b)
+                b_b=b[..., None] * np.atleast_1d(bb_over_b))
 
 
 # ================================================ 4 · THE SURFACE FOAM, AND ITS
@@ -383,16 +456,22 @@ def foam_residence(salt=True):
     return TAU_FOAM_SALT if salt else TAU_FOAM_FRESH
 
 
-def foam_raft(alpha_plume, w_rise, tau_foam=TAU_FOAM_SALT, r_32=2.4e-4,
+def foam_raft(Q_air, tau_foam=TAU_FOAM_SALT, r_32=2.4e-4,
               alpha_raft=ALPHA_RAFT):
     """The raft's THICKNESS, derived, and its reflectance two ways.
 
-    THE THICKNESS IS AN INVENTORY AND NOT A GUESS. Air arrives at the surface at
-    alpha * w_rise cubic metres per square metre per second and leaves by
-    bursting over tau_foam, so the standing depth of AIR in the raft is
-    alpha w_rise tau_foam and the raft itself is that over its own air fraction.
-    On this scene it lands at a couple of centimetres, which is where a raft of
-    fresh surf foam is, and NOTHING was chosen to put it there.
+    THE THICKNESS IS AN INVENTORY AND NOT A GUESS. In steady state every cubic
+    metre of air pushed under comes back up, so the surface is fed at exactly
+    the entrainment rate Q and the raft loses it by bursting over tau_foam:
+    the standing depth of AIR is Q tau_foam and the raft is that over its own
+    air fraction. On this scene it lands at a few centimetres, which is where a
+    raft of fresh surf foam is, and NOTHING was chosen to put it there.
+
+    THE THICKNESS BARELY MATTERS AND THAT IS WORTH SAYING. Both reflectance
+    routes below saturate above about a centimetre, so an error of a factor of
+    two in the raft depth moves its brightness by under a per cent. Spreading
+    the raft over the whole cell rather than over the COVERED fraction only
+    makes it thinner, and it is already past saturation.
 
     TWO ROUTES TO THE REFLECTANCE AND THEY DO NOT SHARE A SOURCE:
 
@@ -406,7 +485,7 @@ def foam_raft(alpha_plume, w_rise, tau_foam=TAU_FOAM_SALT, r_32=2.4e-4,
     second never sees it. They must agree, and the suite is where they are made
     to.
     """
-    h_air = alpha_plume * w_rise * tau_foam
+    h_air = np.asarray(Q_air, float) * tau_foam
     h_raft = h_air / alpha_raft
     n_walls = np.maximum(h_raft / (2.0 * r_32), 1.0)
     rho = FOAM_WHITE                                        # (3,)
@@ -548,19 +627,26 @@ def decay_times(H, d, T, D50=None, salt=True):
     """The three clocks, side by side, all from this file's own fields.
 
     tau_foam    the surface raft, Monahan & Zietlow (1969). PUBLISHED.
-    tau_air     the plume, d_p / w_rise(r_32). DERIVED, Schiller & Naumann.
+    tau_air     the plume's AIR, <tau>_vol over the Deane & Stokes spectrum.
+                DERIVED, through Schiller & Naumann's drag.
     tau_sed     the suspension, d / w_s. DERIVED, `beach.settling_velocity`,
                 which is Soulsby's law and not Schiller & Naumann's.
 
     THREE MECHANISMS, THREE LAWS, NO SHARED SOURCE. The bar asked for two
-    timescales and named them seconds and minutes; what comes out is three, and
-    the ORDER is not the one the bar implies -- see the README.
+    timescales; what comes out is three, plus the finding that the middle one is
+    not a number at all but a spectrum -- `tau_lo`/`tau_hi` are the ends of it,
+    and `tau_air_area` is the projected-area MEDIAN residence, which is what
+    keeps the plume faintly visible long after its air volume has gone.
     """
+    del T
     d_p = float(np.median(plume_depth(np.atleast_1d(H))))
-    pop = bubble_population(d_p, T)
+    pop = bubble_population(d_p)
+    sp = pop['spectrum']
     w_s = B.settling_velocity() if D50 is None else B.settling_velocity(d50=D50)
     dd = float(np.median(np.atleast_1d(d)))
-    return dict(tau_foam=foam_residence(salt), tau_air=d_p / pop['w_at_r32'],
+    return dict(tau_foam=foam_residence(salt), tau_air=sp['tau_vol'],
+                tau_air_area=sp['tau_area_median'],
+                tau_lo=sp['tau_at_rmax'], tau_hi=sp['tau_at_rmin'],
                 tau_sed=dd / w_s, w_rise=pop['w_at_r32'], w_s=w_s,
                 r_32=pop['r_32'], d_plume=d_p, depth=dd)
 
@@ -629,20 +715,25 @@ def main():
     print('  scatterer and the white is multiple scattering in a medium of')
     print('  albedo 1, not one bright bounce.')
     print()
-    print('BUBBLE POPULATION -- Deane & Stokes (2002), cutoff derived')
-    for dp, T in ((0.75, 9.0), (0.35, 9.0)):
-        pop = bubble_population(dp, T)
-        print('  d_p = %.2f m, T = %.0f s -> r_max = %.4g m (w = %.4f m/s), '
-              'r_32 = %.4g m, below Hinze %s'
-              % (dp, T, pop['r_max'], pop['w_at_rmax'], pop['r_32'],
-                 pop['below_hinze']))
+    print('BUBBLE POPULATION -- Deane & Stokes (2002), size-resolved steady state')
+    for dp in (0.75, 0.35):
+        sp = bubble_spectrum(dp)
+        print('  d_p = %.2f m -> <tau>_vol %.3f s, area-median tau %.2f s, '
+              'r_32 %.4g m, tau spans %.2f s (r_max) to %.0f s (r_min)'
+              % (dp, sp['tau_vol'], sp['tau_area_median'], sp['r_32'],
+                 sp['tau_at_rmax'], sp['tau_at_rmin']))
+    for rmx in (3e-3, 1e-2, 2e-2):
+        sp = bubble_spectrum(0.75, r_max=rmx)
+        print('  SENSITIVITY r_max = %.3g m -> <tau>_vol %.3f s, r_32 %.4g m'
+              % (rmx, sp['tau_vol'], sp['r_32']))
     print()
     print('THE THREE CLOCKS -- bar section E')
     ct = decay_times(1.5, 2.0, 9.0)
     print('  tau_foam (surface raft)  = %6.2f s   Monahan & Zietlow 1969, salt'
           % ct['tau_foam'])
-    print('  tau_air  (plume)         = %6.2f s   d_p/w_rise, w = %.4f m/s'
-          % (ct['tau_air'], ct['w_rise']))
+    print('  tau_air  (plume AIR)     = %6.2f s   <tau>_vol; the SPECTRUM spans '
+          '%.2f - %.0f s and the area-median is %.1f s'
+          % (ct['tau_air'], ct['tau_lo'], ct['tau_hi'], ct['tau_air_area']))
     print('  tau_sed  (suspension)    = %6.2f s   d/w_s,      w_s = %.4f m/s'
           % (ct['tau_sed'], ct['w_s']))
     print('  ratios: air/foam %.2f   sed/air %.2f   sed/foam %.2f'

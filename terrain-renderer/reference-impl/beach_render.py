@@ -61,6 +61,7 @@ from PIL import Image
 
 import beach as B
 import beach_optics as BO
+import beach_foam as FM
 import optics as OPT
 import atmosphere as ATM
 
@@ -179,6 +180,47 @@ class Water:
                           absorb=self.io_clear['a'] + self.io_clear['b_b'])
             for dd in self.dep_lut])
         self.t_col = col['t_col']
+
+        # --- WAVE 6: THE WHITE, and it is three fields because bar section C
+        # says it is three mechanisms. None of them is a texture and none of
+        # them is on the crests.
+        #
+        #   q_b       Battjes & Janssen's breaking FRACTION -- the source of the
+        #             surface deck. The transform's own `brk` is a boolean and a
+        #             boolean cannot say how much of the surface goes white.
+        #   alpha     the entrained-air void fraction, from the transform's own
+        #             D_w through Lamarre & Melville's energy budget.
+        #   plume     the participating medium that fraction implies, and the
+        #             DIFFUSE TRANSMITTANCE is the number bar section C is
+        #             actually about: it is what stops the bed being visible.
+        self.T_wave = tr['T']
+        self.omega = 2.0 * math.pi / tr['T']
+        self.c_phase = tr['c']
+        self.D_w = tr['D_w']
+        self.q_b = FM.breaking_fraction_2d(self.d, self.H)
+        self.bub = FM.bubble_scatter()
+        self.air = FM.entrained_air(self.D_w, self.H, self.T_wave)
+        # THE PLUME IS EVALUATED PER PIXEL, NOT PER CELL, because it is
+        # PHASE-STRUCTURED: <tau>_vol is under a second against a nine-second
+        # period, so the air one bore front entrains is gone before the next
+        # arrives and the plume belongs to the front rather than to the surf
+        # zone. `plume_phase_factor` redistributes the budget's void fraction
+        # over the phase with a mean of exactly 1, so the energy budget is
+        # untouched and only its placement changes. The cell-mean version is
+        # kept for the printed diagnostics and for the suite.
+        self.plume = FM.plume_optics(self.air['alpha'], self.air['r_32'],
+                                     self.air['d_p'], self.bub['g'],
+                                     self.bub['bb_over_b'], self.io_clear['a'])
+        self.raft = FM.foam_raft(self.air['Q'], r_32=self.air['r_32'])
+        # THE OPEN SEA IS THE OTHER HALF OF THIS WAVE. Beyond the domain there
+        # is no bar and no breaking, so the only white out there is
+        # WHITECAPPING, driven by the SAME U10 the glitter path's width reports.
+        # One wind, two readouts, one frame -- and the answer is in `wind_check`.
+        self.m_wind = float(FM.covering_measure_wind(BO.U10))
+        self.W_wind = float(FM.whitecap_coverage(BO.U10))
+        # the foam tail's e-folding length, for the caption and for the suite
+        self.tau_foam = FM.foam_residence(salt=True)
+        self.foam_tail = FM.foam_tail_length(self.c_phase, self.tau_foam)
 
     def sample(self, xw, yw, field):
         """Bilinear sample of a cell field at world (x, y), edges clamped."""
@@ -452,7 +494,49 @@ def shade_water(w, P, D, t_now):
                         for c in range(3)], -1)
     E_dn_w = (E_SUN * COS_SUN * (1.0 - OPT.fresnel(COS_SUN))[None]
               + np.pi * ATM.SKY_DECK * (1.0 - OPT.R_EXT)[None])
-    E_up = E_dn_w * (R_col + rho_bed * t_col)
+    R_bed = rho_bed * t_col
+    R_sub = R_col + R_bed
+
+    # ---- 3b, THE ENTRAINED AIR, AND IT IS A LAYER ON TOP OF ALL OF THAT.
+    # Bar section C: "where the wave mouth goes white and opaque, and THE BED
+    # STOPS BEING VISIBLE THROUGH IT. If a renderer whitens without hiding what
+    # is behind, it has modelled the symptom."
+    #
+    # So the plume is not a lerp toward white. It is a slab of reflectance R_p
+    # and diffuse transmittance T_p over a substrate of reflectance R_sub, and
+    # the two are coupled by the standard adding series -- light goes down
+    # through the plume, bounces off the column and the bed, comes back up
+    # through the plume, and some of it is sent down again:
+    #
+    #       R_total = R_p + T_p^2 R_sub / (1 - R_p R_sub)
+    #
+    # The bed's share of what leaves the water is the SECOND term with R_sub
+    # replaced by the bed's own R_bed, and `bed_visibility` below reports it
+    # with the plume in and out. R_p and T_p come from `beach_foam.plume_optics`
+    # and their sum is 1 minus what the water between the bubbles absorbs; a
+    # plume that reflected without transmitting less would not conserve energy
+    # and the suite has a row that says so.
+    ph = w.sample(xw, yw, w.S) - w.omega * t_now
+    age = FM.age_from_phase(ph, w.omega)
+    if getattr(w, 'plume_on', True):
+        alpha_p = (w.sample(xw, yw, w.air['alpha'])
+                   * FM.plume_phase_factor(age, w.T_wave, w.air['tau_vol']))
+        po = FM.plume_optics(np.minimum(alpha_p, 0.30), w.air['r_32'],
+                             w.sample(xw, yw, w.air['d_p']), w.bub['g'],
+                             w.bub['bb_over_b'], w.io_clear['a'])
+        R_p, T_p = po['R'], po['T']
+    else:
+        # THE CONTROL PANEL, and it is one field zeroed. R_p = 0 and T_p = 1 is
+        # exactly "no entrained air": the adding series collapses to R_sub and
+        # every other term in this function is untouched, which is what makes
+        # the pair a measurement rather than two pictures.
+        R_p = np.zeros_like(R_sub)
+        T_p = np.ones_like(R_sub)
+    coup = 1.0 / np.maximum(1.0 - R_p * R_sub, 1e-9)
+    bed_factor = T_p * T_p * coup          # 1 with no plume, by construction
+    R_tot = R_p + bed_factor * R_sub
+    R_bed_seen = bed_factor * R_bed
+    E_up = E_dn_w * R_tot
     L_up = OPT.out_of_water(E_up / np.pi) * (1.0 - Rf)
 
     # ---- 4, THE PATH. The chord a view ray cuts through a wave face.
@@ -470,20 +554,51 @@ def shade_water(w, P, D, t_now):
     # a face turned away from the sun has none.
     L_path, chord, lit = through_face(w, P, D, t_now, Nn, dep, c_bar)
 
-    # ---- the foam PLACEHOLDER, and the caption says so
-    fb = w.sample(xw, yw, w.brk.astype(float))
-    # PLACEHOLDER, and it is put on the CRESTS rather than over the whole
-    # breaking band only because a uniform sheet is a worse placeholder, not
-    # because anything here models where foam goes. See the caption.
-    crest = np.clip(free_surface(w, xw, yw, t_now)
-                    / np.maximum(0.25 * w.sample(xw, yw, w.H), 0.02), 0.0, 1.0)
-    cov = (BO.foam_coverage(fb) * crest)[..., None]
-    L_foam = (BO.FOAM_WHITE * E_DOWN_AIR / np.pi)[None, None]
+    # ---- THE SURFACE DECK. Bar section C's first mechanism, and it is a
+    # COVERAGE MASK -- not a particle system, not a texture, not a crest tint.
+    #
+    # WHERE IT IS. Not on the crest. Foam is laid down BY the breaking crest,
+    # which then runs away from it at the celerity while the water it floats on
+    # creeps forward at the Stokes drift; foam of age a therefore lies (c - u) a
+    # behind the crest, and the mask is an exponential tail with an e-folding
+    # length of c * tau_foam -- about 17 m on a 40 m wave here. The AGE is the
+    # transform's own phase and nothing is advected: for a wave of permanent
+    # form the phase IS the age, exactly.
+    #
+    # HOW MUCH OF IT. A Poisson covering measure, so the two sources add and the
+    # coverage saturates at 1 by construction: Q_b/T from Battjes & Janssen in
+    # the surf zone, and Monahan & O'Muircheartaigh's whitecapping from the wind
+    # everywhere -- the SAME U10 the glitter path's width is a readout of.
+    #
+    # HOW BRIGHT. A pile of plates: the raft is n_walls bubble walls each
+    # reflecting the bar's own 1 - 1/n^2, and the raft's THICKNESS is the air
+    # arriving at the surface times the residence time, not a chosen depth.
+    q_b = w.sample(xw, yw, w.q_b)
+    cov1, m_cov = FM.surface_foam(q_b, w.T_wave, age, BO.U10, w.tau_foam)
+    if not getattr(w, 'foam_on', True):
+        cov1 = np.zeros_like(cov1)
+    cov = cov1[..., None]
+    R_raft = np.stack([w.sample(xw, yw, w.raft['R_pile'][..., c])
+                       for c in range(3)], -1)
+    # THE OPEN SEA'S RAFT IS NOT THIS SCENE'S. `R_pile` is built from the
+    # surf-zone plume's own air flux, and beyond the domain there is no plume
+    # here -- the wave field out there is the offshore boundary condition and
+    # carries no breaking. A whitecap's raft is nonetheless a raft, so the floor
+    # is the bar's OWN CONSTANT, which is what a SINGLE bubble wall reflects and
+    # therefore the least a stack of them can. Marked rather than blended: the
+    # open sea's foam brightness is a lower bound in this render, and at
+    # W = 0.0017 coverage it moves the frame by nothing measurable.
+    R_raft = np.maximum(R_raft, FM.FOAM_WHITE[None, None])
+    L_foam = R_raft * (E_DOWN_AIR / np.pi)[None, None]
 
     L = L_sky + L_glit + L_up + L_path
     L = L * (1.0 - cov) + L_foam * cov
     return dict(L=L, L_sky=L_sky, L_glit=L_glit, L_up=L_up, L_path=L_path,
-                chord=chord, cov=cov[..., 0], lit=lit, cos_v=cos_v)
+                chord=chord, cov=cov[..., 0], lit=lit, cos_v=cos_v,
+                age=age, q_b=q_b, m_cov=m_cov, R_p=R_p, T_p=T_p,
+                R_bed_seen=R_bed_seen, R_bed=R_bed, R_sub=R_sub, R_tot=R_tot,
+                R_raft=R_raft, bed_factor=bed_factor, dep=dep, t_col=t_col,
+                E_dn_w=E_dn_w)
 
 
 def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0):
@@ -700,6 +815,218 @@ def _cap_face5(s, c, m):
     )
 
 
+# --- wave 6's captions, formatted from the run that drew the frame -----------
+# WAVE 5 FOUND WAVE 4'S LITERALS HAD GONE STALE and said so in a comment. These
+# take the measurement dicts and print them; there is no number typed into any
+# string below.
+def _cap_bay6(w, s, f):
+    ct = f['clocks']
+    brk = w.q_b > 0.5
+    return (
+        's6  THE BAY FROM THE CLIFF EDGE, WITH THE WHITE -- the third frame at '
+        'this camera. s4-bay-render.png is the linear surface, s5-bay-render.png '
+        'the nonlinear one with a FOAM PLACEHOLDER, and this is the same camera, '
+        'the same bed, the same optics and the same sun with bar section C\'s '
+        'THREE MECHANISMS in place of it.',
+        'THE PLACEHOLDER IS GONE AND NOTHING REPLACED IT WITH A TEXTURE. '
+        'SURFACE FOAM is a coverage mask: a Poisson covering measure Q_b/T from '
+        'Battjes & Janssen plus Monahan & O\'Muircheartaigh\'s whitecapping at '
+        'the SAME U10 = %.1f m/s the glitter path\'s width reports, saturated '
+        'through 1 - exp(-m). It is NOT on the crests -- foam of age a lies '
+        '(c - u)a behind the crest it was laid by, an exponential tail of '
+        'e-folding length %.1f m on a %.0f m wave, and the age is the '
+        'transform\'s own phase with nothing advected. Phase-averaged coverage '
+        'runs %.3f where every wave breaks to %.5f on the open sea. '
+        'ENTRAINED AIR is a participating medium, not a whitening: void '
+        'fraction %.3g median in the breaking band from the transform\'s own '
+        'D_w through Lamarre & Melville (1991)\'s 30-50%% of the breaking '
+        'dissipation, a bubble population from Deane & Stokes (2002) with the '
+        'large cutoff DERIVED (r_32 = %.2g m), and a two-stream slab whose '
+        'diffuse transmittance is what hides the bed -- see s6-entrained-air.png '
+        'for that measurement. AIRBORNE SPRAY IS DEFERRED and this frame '
+        'contains none: it is section C\'s smallest share of the white, it is a '
+        'particle system and therefore a third representation, and bar section F '
+        'already defers individual droplets beyond a statistical treatment. '
+        'ALL THREE WHITEN FROM ONE IMPORTED CONSTANT, 1 - 1/n^2 = %.5f, which '
+        'this file recovers from a ray trace over a bubble\'s disc rather than '
+        'restating -- and the trace adds a qualifier the bar does not: that '
+        '43.9%% is a REFLECTANCE, not a backscatter fraction (b_b/b = %.4f), so '
+        'the white is multiple scattering in a conservative medium. THREE '
+        'CLOCKS, NOT TWO: %.2f s surface raft, %.1f s plume, %.0f s suspension. '
+        'The coastal plain is still one declared albedo and the framing is '
+        'still the landform\'s.'
+        % (BO.U10, float(np.median(w.foam_tail[brk])) if brk.any() else 0.0,
+           float(np.median(w.c_phase[brk] * w.T_wave)) if brk.any() else 0.0,
+           f['cov_bar'][0], f['cov_bar'][3],
+           float(np.median(w.air['alpha'][brk])) if brk.any() else 0.0,
+           w.air['r_32'], float(FM.TIR_FRAC), float(f['bub']['bb_over_b'][1]),
+           ct['tau_foam'], ct['tau_air'], ct['tau_sed'],
+           ct['tau_lo'], ct['tau_hi']),
+    )
+
+
+def _cap_air6(w, f, bvis, bvis0):
+    """LEFT no plume, RIGHT plume. Every number below is read out of the two
+    measurement dicts the same run produced; none is typed in."""
+    k = '1.5 - 3 m'
+    if k not in bvis:
+        k = sorted(bvis)[0]
+    n, Rp, tcol, bfac, rbs, lbed, rb, share = bvis[k]
+    n0, Rp0, tcol0, bfac0, rbs0, lbed0, rb0, share0 = bvis0[k]
+    brk = w.q_b > 0.5
+    b_med = float(np.median(w.plume['b'][brk])) if brk.any() else 0.0
+    tau_med = float(np.median(w.plume['tau_prime'][..., 1][brk])) if brk.any() \
+        else 0.0
+    head = (
+        's6  DOES THE BED STOP BEING VISIBLE THROUGH ENTRAINED AIR? LEFT the '
+        'entrained-air medium REMOVED, RIGHT in place. ONE FIELD CHANGED -- the '
+        'plume\'s reflectance and diffuse transmittance -- and every other term '
+        'in the shader, the camera, the bed, the sun, the free surface and the '
+        'surface foam identical. Eye 8 m up, wave 5\'s framing kept.')
+    body = (
+        'BAR SECTION C: "where the wave mouth goes white and opaque, and THE BED '
+        'STOPS BEING VISIBLE THROUGH IT. If a renderer whitens without hiding '
+        'what is behind, it has modelled the symptom." MEASURED IN ABSOLUTE '
+        'SCENE-LINEAR UNITS, not as a ratio -- the first writing of this '
+        'measurement WAS a ratio and it was blind, because in the breaking band '
+        'the bed term underflows and a ratio of two near-zeros reported 1.6e-4 '
+        'for a run with the plume switched off. Over %d pixels at %s depth the '
+        'bed\'s radiance out of the water is %.3e with the plume and %.3e '
+        'without, a factor of %.3g, and the plume\'s own transmittance factor '
+        'T^2/(1 - R R_sub) is %.3e. THE PLUME IS NOT A LERP TOWARD WHITE: it is '
+        'a slab of reflectance R = %.3f and diffuse transmittance over the '
+        'column and the bed, coupled by the adding series, with a scattering '
+        'coefficient b = %.4g m^-1 and a similarity-scaled optical depth of '
+        '%.4g median in the breaking band -- 2 x 3 alpha/(4 r_32), the '
+        'geometric-optics extinction of the bubble population, with alpha from '
+        'the wave\'s own dissipation and NOT from a density slider. AND IT '
+        'SEPARATES TWO THINGS THAT BOTH HIDE A BED: bar section D\'s suspended '
+        'sediment leaves a column transmittance of %.3e here and bar section '
+        'C\'s entrained air multiplies that again -- a render that credits one '
+        'for the other has not distinguished them. The sphere formula for b is '
+        'CLIPPED AT ITS OWN VALIDITY LIMIT alpha = 0.30, which bites on %.2f%% '
+        'of the wet bay and is reported rather than applied silently. Airborne '
+        'spray is DEFERRED and neither panel contains any.'
+        % (n, k, lbed, lbed0, (lbed / lbed0) if lbed0 > 0 else float('nan'),
+           bfac, Rp, b_med, tau_med, tcol, 100.0 * w.air['clipped_fraction']))
+    return (head, body)
+
+
+def _cap_wind6(w, ck):
+    g = ck.get('glitter', {})
+    gm, gc = g.get('measured'), g.get('closed')
+    uw = ck.get('u_whitecap', (float('nan'),) * 3)
+    ug = ck.get('u_glitter', float('nan'))
+    sens = ck.get('sens', (float('nan'), float('nan')))
+    nan = float('nan')
+    head = (
+        's6  ONE WIND, TWO READOUTS, ONE FRAME -- bar section K\'s glitter path '
+        'and bar section C\'s open-water white, both driven by the SAME '
+        'U10 = %.1f m/s and both measured back off the scene-linear buffer.'
+        % BO.U10)
+    body = (
+        'THE GLITTER WIDTH IS A PERCENT-LEVEL INSTRUMENT AND THE WHITECAP '
+        'COVERAGE IS NOT, AND THAT IS THE FINDING. Measured off this buffer and '
+        'never off the PNG (bar K3): the path is %.3f deg wide at view elevation '
+        '%.0f deg against %.3f deg from the closed form, %+.1f%%, and the '
+        'difference is the RESOLVED swell, which the closed form does not carry '
+        'and this surface does. Inverting through wave 4\'s width/sqrt(mss) '
+        'invariant gives U10 = %.2f m/s. The whitecap coverage on the open sea, '
+        'plan-area-weighted because a coverage is per unit HORIZONTAL area, is '
+        '%.6f, and Monahan & O\'Muircheartaigh (1980) inverts it to U10 = %.2f '
+        'm/s. THE TWO AGREE TO %.1f%%. But the EXPONENT ALONE -- 3.41 as '
+        'universally quoted, 3.52 in the same paper\'s own optimal fit, an '
+        'offset cubic in Callaghan et al. (2008) -- spreads the coverage\'s '
+        'answer to %.2f-%.2f m/s, and the coefficient\'s spread is worse. THE '
+        'NUMBERS: d(ln width)/dU = %.4f per m/s against d(ln W)/dU = %.4f per '
+        'm/s, so a 1%% width measurement fixes the wind to %.3f m/s while a '
+        'FACTOR OF THREE in coverage leaves %.2f m/s -- the width is %.0fx the '
+        'instrument the coverage is. They agree here because one U10 drives '
+        'both; what this frame establishes is that they could not have '
+        'DISAGREED informatively. AND AT THIS WIND THE WHITECAPS ARE %.3f%% OF '
+        'THE SEA SURFACE: a render with conspicuous open-water foam has a '
+        'different wind from the one its glitter path reports. The sea is '
+        'flat-Earth here and the path clips, as in s4 and s5.'
+        % (gm['width'] if gm else nan, gm['el'] if gm else nan,
+           gc['dphi'] if gc else nan,
+           100 * (gm['width'] / gc['dphi'] - 1.0) if (gm and gc) else nan,
+           ug, ck.get('W', nan), uw[0],
+           100 * abs(ug / uw[0] - 1.0) if uw[0] else nan,
+           uw[1], uw[2], sens[0], sens[1],
+           0.01 / sens[0] if sens[0] else nan,
+           math.log(3.0) / sens[1] if sens[1] else nan,
+           (math.log(3.0) / sens[1]) / (0.01 / sens[0])
+           if (sens[0] and sens[1]) else nan,
+           100.0 * ck.get('W', nan)))
+    return (head, body)
+
+
+def clocks_figure(w, f, path):
+    """Section E, drawn: three mechanisms, three decay curves, one axis.
+
+    The bar says they "overlap in space and are separated by their DECAY, not
+    their appearance", and this is that sentence as a figure. Nothing is read
+    back out of it."""
+    import beach_plot as P
+    ct = f['clocks']
+    img = P.canvas(980, 560)
+    ax = P.Axes(img, (86, 56, 560, 300), (0.0, 90.0), (0.0, 1.02),
+                title='Section E: three mechanisms, three clocks',
+                xlabel='seconds since the break', ylabel='fraction remaining')
+    ax.frame(xticks=[0, 15, 30, 45, 60, 75, 90], yticks=[0, 0.25, 0.5, 0.75, 1.0])
+    tt = np.linspace(0.0, 90.0, 600)
+    cols = ((196, 60, 60), (40, 110, 190), (150, 110, 40))
+    for (nm, tau), col in zip((('surface raft %.2f s' % ct['tau_foam'],
+                                ct['tau_foam']),
+                               ('entrained air %.1f s' % ct['tau_air'],
+                                ct['tau_air']),
+                               ('suspension %.0f s' % ct['tau_sed'],
+                                ct['tau_sed'])), cols):
+        ax.line(tt, np.exp(-tt / tau), col, 2)
+        ax.vline(tau, col, 1, (4, 4))
+    P.legend(ax, list(zip(cols, ('surface raft, Monahan & Zietlow 1969 (P)',
+                                 'entrained air, d_p/w_rise (derived)',
+                                 'suspension, d/w_s (derived)'))), 34.0, 0.95)
+    ax2 = P.Axes(img, (660, 56, 930, 300), (2.0, 20.0), (1e-5, 2e-1),
+                 title='Whitecap coverage', xlabel='U10, m/s')
+    ax2.ylim = (math.log10(1e-5), math.log10(2e-1))
+    ax2.frame(xticks=[3, 6, 10, 14, 18],
+              yticks=[math.log10(v) for v in (1e-5, 1e-4, 1e-3, 1e-2, 1e-1)],
+              yfmt='%.0f')
+    uu = np.linspace(2.0, 20.0, 300)
+    ax2.line(uu, np.log10(np.maximum(FM.whitecap_coverage(uu), 1e-9)),
+             (40, 110, 190), 2)
+    ax2.line(uu, np.log10(np.maximum(
+        FM.whitecap_coverage(uu, FM.MOM80_OPT_A, FM.MOM80_OPT_N), 1e-9)),
+        (196, 60, 60), 2, (6, 5))
+    ax2.vline(BO.U10, (28, 30, 34), 1, (3, 4))
+    ax2.marker(BO.U10, math.log10(max(w.W_wind, 1e-9)), (28, 30, 34))
+    P.caption(img, [
+        'SECTION E ASKED FOR TWO TIMESCALES AND THE FILE PRODUCES THREE, and '
+        'the order is not the one the bar implies. Left: e-folding decay of each '
+        'mechanism, all three from this',
+        'scene\'s own fields. The surface raft is Monahan & Zietlow (1969), '
+        'salt water, PUBLISHED. The plume is d_p/w_rise with w_rise from '
+        'Schiller & Naumann drag on the Deane &',
+        'Stokes population -- DERIVED, and it OUTLIVES the surface white by '
+        '%.1fx, so what is left four seconds after a break is a SUBMERGED cloud '
+        'and not a deck. The suspension is'
+        % (ct['tau_air'] / ct['tau_foam']),
+        'd/w_s with Soulsby\'s law -- a THIRD published law, so no two of these '
+        'three share a source. The bar says the sediment lasts MINUTES; at '
+        'd = %.2f m this file\'s bed D50 of %.0f um'
+        % (ct['depth'], 1e6 * B.D50),
+        'clears in %.0f s, and minutes would need %.0f um -- the fine tail, '
+        'which this file does not carry. Right: Monahan & O\'Muircheartaigh '
+        '(1980), the quoted fit (solid) and the same'
+        % (ct['tau_sed'], 1e6 * FM.d50_for_settling_time(120.0, ct['depth'])),
+        'paper\'s optimal fit (dashed); log10 of the fraction. The dot is this '
+        'render\'s wind, U10 = %.1f m/s, W = %.5f. `?` on the wind.'
+        % (BO.U10, w.W_wind)], x=36, y=336)
+    P.save(img, path)
+    return path
+
+
 def _caption(img, lines, pad=12):
     """Burn the figure's own caption into the figure.
 
@@ -891,6 +1218,270 @@ def cuvette(ex, name, io=None):
     return dict(c_hat=c_hat, c_true=c_true, L1=L1, L2=L2)
 
 
+# ======================================== WAVE 6 · THE WHITE, MEASURED
+def foam_report(w):
+    """The three mechanisms and their three clocks, printed from the scene.
+
+    Everything here is a field of `Water`, computed in its constructor from the
+    transform, and nothing in it is read off an image."""
+    print('THE WHITE -- bar section C, three mechanisms')
+    oc = FM.check_one_constant()
+    print('  ONE CONSTANT: 1 - 1/n^2 = %.6f (green), per channel %s'
+          % (oc['tir_frac'], np.round(oc['foam_white'], 5)))
+    b = w.bub
+    print('  the bubble, ray-traced (NOT written from that constant):')
+    print('     TIR share of the disc %s  -- and it MATCHES'
+          % np.round(b['tir_fraction'], 6))
+    print('     reflected in total    %s  (TIR + partial Fresnel below it)'
+          % np.round(b['reflected'], 6))
+    print('     asymmetry g %s   backscatter b_b/b %s'
+          % (np.round(b['g'], 4), np.round(b['bb_over_b'], 5)))
+    print('     energy sum  %s' % np.round(b['total'], 9))
+    a = w.air
+    wet = w.d > B.D_MIN * 1.5
+    brk = w.q_b > 0.5
+
+    sp = a['pop']['spectrum']
+    print('  the entrained air, from D_w and Lamarre & Melville:')
+    print('     standing r_32 %.4g m; the SOURCE spectrum runs %.3g - %.3g m '
+          'and each size leaves on its own clock, tau(r) = (d_p/2)/w(r), '
+          'spanning %.2f s to %.0f s'
+          % (a['r_32'], FM.R_MIN, a['r_max'], sp['tau_at_rmax'],
+             sp['tau_at_rmin']))
+    print('     <tau>_vol = %.3f s, so the AIR clears in under a second while '
+          'the projected area that scatters does not -- the plume has no single '
+          'decay time' % a['tau_vol'])
+    print('     entrainment rate Q: median %.4g m/s in the breaking band'
+          % (np.median(a['Q'][brk]) if brk.any() else float('nan')))
+    print('     alpha: median %.4g in the breaking band, %.4g over the wet bay; '
+          'clipped at 0.30 on %.2f%%'
+          % (np.median(a['alpha'][brk]) if brk.any() else float('nan'),
+             np.median(a['alpha'][wet]), 100 * a['clipped_fraction']))
+    print('     b = %.4g m^-1 median in the breaking band'
+          % (np.median(w.plume['b'][brk]) if brk.any() else float('nan')))
+    print('     raft thickness %.4g m median in the breaking band (DERIVED: '
+          'Q tau_foam / alpha_raft)'
+          % (np.median(w.raft['h_raft'][brk]) if brk.any() else float('nan')))
+    ct = FM.decay_times(np.median(w.H[wet]), np.median(w.d[wet]), w.T_wave)
+    print('  THE THREE CLOCKS (bar section E asked for two):')
+    print('     tau_foam %6.2f s  surface raft   PUBLISHED  Monahan & Zietlow '
+          '1969 (salt)' % ct['tau_foam'])
+    print('     tau_air  %6.2f s  the plume\'s AIR  DERIVED  <tau>_vol over the '
+          'Deane & Stokes spectrum; the spectrum spans %.2f - %.0f s'
+          % (ct['tau_air'], ct['tau_lo'], ct['tau_hi']))
+    print('     tau_sed  %6.2f s  the suspension DERIVED    d/w_s, Soulsby'
+          % ct['tau_sed'])
+    print('     ordering air/foam = %.2f, sed/air = %.1f -- the bar\'s ordering '
+          'holds for the AIR VOLUME and fails for the optical residue, which '
+          'outlives the surface raft by orders of magnitude'
+          % (ct['tau_air'] / ct['tau_foam'], ct['tau_sed'] / ct['tau_air']))
+    print('     the bar says the sediment lasts MINUTES; at d = %.2f m that '
+          'needs D50 = %.0f um against this file\'s bed D50 of %.0f um'
+          % (ct['depth'], 1e6 * FM.d50_for_settling_time(120.0, ct['depth']),
+             1e6 * B.D50))
+    print('  the deck FLOATS: tail length c*tau = %.1f m median in the '
+          'breaking band, against a local wavelength of %.1f m'
+          % (np.median(w.foam_tail[brk]) if brk.any() else float('nan'),
+             np.median(w.c_phase[brk] * w.T_wave) if brk.any() else float('nan')))
+    # the coverage, phase-averaged, so the number is the SURFACE's and not a
+    # pixel's -- a coverage read at one phase is a slice of a sawtooth
+    aa = np.linspace(0.0, w.T_wave, 256)
+    cov_bar = np.array([
+        np.mean(FM.coverage(FM.covering_measure_break(qq, w.T_wave, aa,
+                                                      w.tau_foam)
+                            + w.m_wind))
+        for qq in (1.0, 0.5, 0.1, 0.0)])
+    print('  phase-averaged coverage at Q_b = 1.0 / 0.5 / 0.1 / 0.0 : %s'
+          % np.round(cov_bar, 5))
+    return dict(clocks=ct, cov_bar=cov_bar, bub=b)
+
+
+def bed_visibility(w, ex, name):
+    """DOES THE BED STOP BEING VISIBLE THROUGH THE ENTRAINED AIR? Measured, and
+    in ABSOLUTE terms because the ratio alone is blind.
+
+    THE FIRST WRITING OF THIS FUNCTION REPORTED ONLY R_bed_seen/R_bed AND IT WAS
+    BLIND, in exactly the way this project has now been caught three times. In
+    the breaking band the bed term underflows -- the SUSPENSION has already
+    hidden it -- so the ratio divided one number near zero by another and
+    reported 1.6e-4 for a run with the plume switched OFF, where the answer is 1
+    by construction. Every row here is therefore an absolute quantity and the
+    ratio is only ever `bed_factor`, which is computed forward from T and R and
+    never by dividing two measurements.
+
+    AND IT SEPARATES THE TWO THINGS THAT HIDE A BED. Bar section D's suspended
+    sediment and bar section C's entrained air both do it, and a render that
+    credits one for the other has not distinguished them:
+
+        t_col       the suspension's own transmittance      (section D)
+        bed_factor  the plume's, T^2/(1 - R R_sub)          (section C)
+
+    Both are printed, per depth band, with the bed's own reflectance beside
+    them so a band where there was never any bed light cannot masquerade as a
+    band where the plume removed it.
+    """
+    sh = ex['water']
+    q = sh['q_b'][0]
+    dep = sh['dep'][0]
+    bf = sh['bed_factor'][0][..., 1]
+    tcol = sh['t_col'][0][..., 1]
+    tau_p = sh['R_p'][0][..., 1]
+    rb = sh['R_bed'][0][..., 1]
+    rbs = sh['R_bed_seen'][0][..., 1]
+    rt = np.maximum(sh['R_tot'][0][..., 1], 1e-30)
+    # THE ABSOLUTE ROW. What the bed actually puts into the frame, in the same
+    # scene-linear units as everything else this file prints.
+    E = float(sh['E_dn_w'][0][..., 1]) if np.ndim(sh['E_dn_w']) else float(
+        sh['E_dn_w'][1])
+    L_bed = OPT.out_of_water(np.stack([rbs] * 3, -1) * E / np.pi)[..., 1]
+    out = {}
+    print('  -- %s : does the bed stop being visible?' % name)
+    print('     %-16s %7s %10s %10s %10s %10s %10s'
+          % ('depth band', 'n px', 'R_plume', 't_col(D)', 'bed_fac(C)',
+             'R_bed_seen', 'L_bed'))
+    for lab, sel in (('d < 1.5 m', dep < 1.5),
+                     ('1.5 - 3 m', (dep >= 1.5) & (dep < 3.0)),
+                     ('3 - 6 m', (dep >= 3.0) & (dep < 6.0)),
+                     ('d > 6 m', dep >= 6.0),
+                     ('Q_b > 0.9', q > 0.9)):
+        if sel.sum() < 20:
+            continue
+        row = (int(sel.sum()), float(np.median(tau_p[sel])),
+               float(np.median(tcol[sel])), float(np.median(bf[sel])),
+               float(np.median(rbs[sel])), float(np.median(L_bed[sel])),
+               float(np.median(rb[sel])), float(np.median(rbs[sel] / rt[sel])))
+        out[lab] = row
+        print('     %-16s %7d %10.4f %10.3e %10.3e %10.3e %10.3e'
+              % (lab, row[0], row[1], row[2], row[3], row[4], row[5]))
+    print('     R_plume is the plume\'s own reflectance (green); t_col is the '
+          'SUSPENSION\'s')
+    print('     transmittance and bed_fac the PLUME\'s, so section D and '
+          'section C are')
+    print('     separated; L_bed is absolute scene-linear radiance out of the '
+          'water.')
+    return out
+
+
+def glitter_width_measured(L, cam, el_lo, el_hi, mask=None, n_bin=181,
+                           span=45.0):
+    """The path's width MEASURED OFF THE SCENE-LINEAR BUFFER, in angle.
+
+    Not off the PNG -- bar K3 and the project's standing ruling both forbid it,
+    and this reads `L` before `_save` is ever called. The profile is binned by
+    the view azimuth's offset from the anti-solar bearing at a fixed band of
+    view elevation, which is the same coordinate `beach_optics.
+    glitter_azimuth_profile` uses, so the closed form and the render are being
+    asked the same question.
+
+    WHY THE TWO WILL NOT AGREE EXACTLY, and it is a result rather than an error:
+    the closed form carries ONLY the unresolved slope statistics, while the
+    render's surface is also tilted by the resolved swell. The render's path is
+    therefore broader, by the swell's own mean square slope added in quadrature,
+    and the difference is a measurement of how much slope the grid resolves.
+    """
+    D = cam.rays()
+    r = -D
+    ev = np.degrees(np.arcsin(np.clip(r[..., 2], -1.0, 1.0)))
+    az = np.degrees(np.arctan2(r[..., 0], r[..., 1])) % 360.0
+    dphi = (az - (SUN_AZ + 180.0) + 180.0) % 360.0 - 180.0
+    sel = (ev >= el_lo) & (ev <= el_hi) & (np.abs(dphi) <= span)
+    if mask is not None:
+        sel = sel & mask
+    if sel.sum() < 200:
+        return None
+    edges = np.linspace(-span, span, n_bin + 1)
+    idx = np.clip(np.digitize(dphi[sel], edges) - 1, 0, n_bin - 1)
+    g = L[..., 1][sel]
+    prof = np.zeros(n_bin)
+    cnt = np.zeros(n_bin)
+    np.add.at(prof, idx, g)
+    np.add.at(cnt, idx, 1.0)
+    ok = cnt > 4
+    if ok.sum() < 20:
+        return None
+    xc = 0.5 * (edges[:-1] + edges[1:])
+    wdt, pk = BO.fwhm(xc[ok], prof[ok] / cnt[ok])
+    return dict(width=wdt, peak=pk, n=int(sel.sum()),
+                el=0.5 * (el_lo + el_hi))
+
+
+def wind_check(w, L, cam, ex, el_band=(6.0, 14.0)):
+    """ONE WIND, TWO READOUTS, ONE FRAME -- and whether they agree.
+
+    Bar section K makes the glitter path's width a readout of the mean square
+    slope and therefore of the wind. Section C's open-water white is
+    WHITECAPPING, whose coverage is a published function of the same wind. This
+    render drives both from one `beach_optics.U10`, so the question is not
+    whether the inputs match -- it is whether the two OUTPUTS, measured back off
+    the frame, return the same wind.
+
+    THE COVERAGE IS AREA-WEIGHTED IN THE PLAN, because a coverage fraction is
+    defined per unit HORIZONTAL area and a pixel near the horizon sees hundreds
+    of times more of it than a pixel in the near field. The weight is the
+    horizontal area a pixel's solid angle subtends, r^2/|D_z|, and reporting the
+    unweighted mean instead would be a measurement of the camera.
+    """
+    sh, mw = ex['water'], ex['water_mask']
+    tr = ex['trace']
+    out = {}
+    # --- the glitter, off the buffer
+    gm = glitter_width_measured(L, cam, el_band[0], el_band[1], mask=mw)
+    gc = BO.glitter_width_deg(SUN_EL, 0.5 * (el_band[0] + el_band[1]),
+                              u10=BO.U10)
+    out['glitter'] = dict(measured=gm, closed=gc)
+    # --- the whitecaps, off the same buffer's coverage field
+    q = sh['q_b'][0]
+    cov = sh['cov'][0]
+    rng = tr['t_water'][mw]
+    dz = np.abs(tr['D'][..., 2][mw])
+    wgt = rng ** 2 / np.maximum(dz, 1e-6)
+    open_sea = (q < 1e-3) & (rng > 200.0)
+    print('  -- ONE WIND, TWO READOUTS (bar C x bar K)')
+    print('     put in:  U10 = %.2f m/s (beach_optics.U10, `?`)' % BO.U10)
+    if gm is not None:
+        mss_c = sum(BO.cox_munk_mss(BO.U10))
+        # width/sqrt(mss) is the invariant wave 4 established; invert through it
+        kk = gc['dphi'] / math.sqrt(mss_c)
+        mss_m = (gm['width'] / kk) ** 2
+        u_g = float(BO.wind_from_mss(mss_m))
+        out['u_glitter'] = u_g
+        print('     glitter: width %.3f deg measured over view elev %.0f-%.0f, '
+              '%.3f deg from the closed form (%+.1f%%)'
+              % (gm['width'], el_band[0], el_band[1], gc['dphi'],
+                 100 * (gm['width'] / gc['dphi'] - 1.0)))
+        print('              -> mss %.5f -> U10 = %.2f m/s' % (mss_m, u_g))
+    if open_sea.sum() > 500:
+        W = float((cov[open_sea] * wgt[open_sea]).sum() / wgt[open_sea].sum())
+        W_raw = float(np.mean(cov[open_sea]))
+        u_w, u_lo, u_hi = FM.wind_from_whitecap(W)
+        out['W'] = W
+        out['u_whitecap'] = (float(u_w), float(u_lo), float(u_hi))
+        print('     whitecap: coverage %.6f plan-weighted (%.6f unweighted, '
+              '%d px), law says %.6f' % (W, W_raw, open_sea.sum(), w.W_wind))
+        print('              -> U10 = %.2f m/s, and the EXPONENT ALONE puts it '
+              'in %.2f - %.2f' % (u_w, u_lo, u_hi))
+        if 'u_glitter' in out:
+            print('     THE TWO READOUTS: glitter %.2f m/s, whitecaps %.2f m/s, '
+                  'apart by %.1f%%'
+                  % (out['u_glitter'], u_w,
+                     100 * abs(out['u_glitter'] / u_w - 1.0)))
+            # the SENSITIVITIES, which are the real finding
+            su2, sc2 = BO.cox_munk_mss(BO.U10)
+            dmss_du = BO.CM_A_U + BO.CM_A_C
+            dwid_du = 0.5 * dmss_du / (su2 + sc2)       # d(ln width)/dU
+            dW_du = FM.MOM80_N / BO.U10                 # d(ln W)/dU
+            out['sens'] = (dwid_du, dW_du)
+            print('     SENSITIVITY at this wind: d(ln width)/dU = %.4f per '
+                  'm/s, d(ln W)/dU = %.4f per m/s' % (dwid_du, dW_du))
+            print('              a 1%% width measurement gives dU = %.3f m/s; '
+                  'a FACTOR OF 3 in coverage gives dU = %.2f m/s'
+                  % (0.01 / dwid_du, math.log(3.0) / dW_du))
+    else:
+        print('     whitecap: too few open-sea pixels (%d) in this frame'
+              % open_sea.sum())
+    return out
+
+
 def glitter_table(sun_el=None, u10=None):
     sun_el = SUN_EL if sun_el is None else sun_el
     u10 = BO.U10 if u10 is None else u10
@@ -958,6 +1549,8 @@ def main():
     print()
 
     srep = surface_report(w)
+    print()
+    frep = foam_report(w)
     print()
 
     sc = 0.5 if FAST else 1.0
@@ -1083,25 +1676,44 @@ def main():
     horizon_check(LK, camK)
     print()
     bay_ladder(LJ, exJ, w)
+    print()
+
+    # ---- WAVE 6: the three whites, measured
+    bvis = bed_visibility(w, exF, 'F, the surf zone close up')
+    print()
+    wchk = wind_check(w, LK, camK, exK)
+    print()
+    # THE CONTROL FRAME. One field zeroed -- the plume's R and T -- and nothing
+    # else in the shader touched, so the pair is a measurement of what the
+    # entrained air does and not two pictures of two scenes.
+    w.plume_on = False
+    LF_noair, exF_noair = render(camF, w)
+    w.plume_on = True
+    bvis0 = bed_visibility(w, exF_noair, 'F, with the entrained air REMOVED')
+    print()
 
     # ---- write the frames
-    # THE s4 FRAMES ARE NOT OVERWRITTEN. `s4-bay-render.png` is the LINEAR
-    # surface and it stays on disk as it was, because the pair -- s4 beside s5
-    # at identical framing, identical camera, identical optics, one field
-    # changed -- is the evidence. Re-running this file writes s5 only.
-    kJ = _save(downsample(LJ, SS), '%s/s5-bay-render.png' % OUT,
-               caption=_cap_bay5(srep))
+    # THE s4 AND s5 FRAMES ARE NOT OVERWRITTEN, and that is now a two-wave rule.
+    # s4 is the LINEAR surface, s5 is the nonlinear one with the foam
+    # PLACEHOLDER, and s6 is the same camera again with section C's three
+    # mechanisms. Three frames, one camera, one bed, one sun, one field changed
+    # each time -- overwriting either of the earlier two would destroy the only
+    # thing that makes them evidence.
+    kJ = _save(downsample(LJ, SS), '%s/s6-bay-render.png' % OUT,
+               caption=_cap_bay6(w, srep, frep))
     gapF = np.zeros((LF.shape[0], 8 * SS, 3))
-    kF = _save(downsample(np.concatenate([LF0, gapF, LF], axis=1), SS),
-               '%s/s5-face-render.png' % OUT,
-               caption=_cap_face5(srep, crep, mF))
-    kK = _save(downsample(LK, SS), '%s/s5-glitter-render.png' % OUT,
-               caption=CAP_GLIT)
+    kF = _save(downsample(np.concatenate([LF_noair, gapF, LF], axis=1), SS),
+               '%s/s6-entrained-air.png' % OUT,
+               caption=_cap_air6(w, frep, bvis, bvis0))
+    kK = _save(downsample(LK, SS), '%s/s6-glitter-whitecap.png' % OUT,
+               caption=_cap_wind6(w, wchk))
+    clocks_figure(w, frep, '%s/s6-clocks.png' % OUT)
     print('exposure keys (99th pct of scene-linear): J %.4g  F %.4g  K %.4g'
           % (kJ, kF, kK))
     print('%.1f s' % (time.time() - t0))
     return dict(A=mA, glitter=grows, w=w, frames=frames, cvA=cvA, cvB=cvB,
-                surface=srep, chord=crep, faceF=mF)
+                surface=srep, chord=crep, faceF=mF, foam=frep, bed=bvis,
+                bed0=bvis0, wind=wchk)
 
 
 # ======================================== the face slope, and why A needs more
