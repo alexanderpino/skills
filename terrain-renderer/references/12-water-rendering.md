@@ -631,7 +631,11 @@ zone**, cross-faded with the ambient sea over a blend band offshore. Its compone
   say which one shipped. Animate `phase = τ/T − t/T` and the crests march shoreward forever.
 - **Profile, not sine.** Displace a crest profile (authored 1D shape or steepened Gerstner)
   along the phase; steepen it as `a/h` rises; asymmetrize it (steep front face, long back)
-  approaching the break. Where the `H ≈ 0.78·h` mask trips, hand over to the breaker
+  approaching the break. ⚠️ Those are **two** operations on one harmonic and only the second reaches
+  the face — steepening at zero phase buys a *peaked crest* and 1.299× of face slope at its own
+  validity limit, against 2.000× for the rotation
+  ([A peaked crest is not a steep face](#a-peaked-crest-is-not-a-steep-face-one-harmonic-two-moments)).
+  Where the `H ≈ 0.78·h` mask trips, hand over to the breaker
   treatment: spilling = foam front crawling down the face (profile + animated foam, cheap,
   right answer for most beaches); plunging = an authored curl — flipbook, skinned mesh, or
   particle sheet — placed along the break line (hero-tier, budget it); surging = no break,
@@ -929,6 +933,73 @@ floor is the width of the gap. A renderer that wants the green face must **autho
 term keyed to the breaking mask, a bespoke lip mesh, a particle sheet — and say so, because it is
 not going to emerge from a taller wave. The honest budget line is *"needs the overturn
 representation"*, not *"needs more steepness"*.
+
+### A peaked crest is not a steep face: one harmonic, two moments
+
+The ceiling above says how far a steady wave can go. This says which lever moves it, and the obvious
+lever is the wrong one — which matters because the wrong one is what a shoaling model already has
+lying around, and reaching for it feels like reuse rather than like a guess.
+
+**The setup, which is standard and is the whole apparatus.** A shoaling wave is a primary plus a
+**bound second harmonic**, and one shape parameter and one phase describe it:
+
+```
+eta = a [ cos(phi)  +  r cos(2 phi + psi) ],     a = H/2,   r = b/a
+```
+
+In shallow water `r → 2·Ur` exactly with `Ur = (3/16)·H·k/(kd)³` — so **any model already carrying
+an Ursell number is already carrying `r`**, and the only free thing is `ψ`.
+
+**Both third moments are closed forms of the same two numbers, and that is the finding.** With
+`H(cos nφ) = sin nφ`:
+
+```
+Sk = <eta^3>/sigma^3   = +(3/4) r cos(psi) / ((1 + r^2)/2)^(3/2)
+As = <H(eta)^3>/sigma^3 = -(3/4) r sin(psi) / ((1 + r^2)/2)^(3/2)
+
+    =>   Sk^2 + As^2 = (9/16) r^2 / ((1 + r^2)/2)^3       -- a function of r ALONE
+```
+
+(`D`, verified here against a direct numerical quadrature of both moments at four `(r, ψ)` pairs.)
+So `r` sets **how much** third moment the shape has and `ψ` only says **which of the two it is
+in**. `ψ = 0` is the peaked, fore–aft symmetric crest of a shoaling wave; `ψ = −π/2` is the
+pitched-forward sawtooth of a bore. Nothing in between creates or destroys the moment; it rotates.
+
+**Now the slope, which is the quantity a backlit face is about, and the two limits are exact.**
+Write the face-slope gain as `max|dη/dφ| / a`, which is 1 for a sinusoid by construction. Each shape
+has its own **validity limit**, the `r` at which the surface grows a false crest inside its own
+trough (still single-valued, and still wrong) — derived, not chosen:
+
+| shape | why the limit is there | its `r` | slope gain at it |
+|---|---|---|---|
+| pure **skewness**, `ψ = 0` | `dη/dφ = −sin φ (1 + 4r cos φ)` factorises; the extra root arrives at `cos φ = −1/(4r)` | **1/4** | **3√3/4 = 1.29904** |
+| pure **asymmetry**, `ψ = −π/2` | the derivative is a quadratic in `sin φ` whose second root leaves `[−1, 1]` | **1/2** | **2** exactly (`1 + 2r`) |
+
+⚠️ **The same harmonic buys 30% of face slope in one moment and 100% in the other, and the reason is
+one line.** At `ψ = 0` the harmonic's slope contribution is `2r sin 2φ`, which **vanishes at the
+primary's own steepest point** (`sin φ = ±1 ⇒ sin 2φ = 0`) — so it only reaches the face at *second*
+order in `r`, and meanwhile it is spending its whole budget sharpening the crest, where the slope is
+zero and nobody is looking through it. At `ψ = −π/2` the two terms add directly at `φ = π/2`, giving
+`1 + 2r` at *first* order.
+
+**So "use the skewness" is the right quantity at the wrong moment.** A wave that is merely *skewed*
+is **peaked**, not steep. What steepens a face is the rotation, and the rotation is free — it is a
+phase, not an amplitude, and it costs nothing in validity: the pitched shape tolerates **twice** the
+harmonic the peaked one does, so rotating buys headroom rather than spending it.
+
+This is what [Tier 2](#tier-2--the-shore-wave-band-production-default)'s *"steepen it as `a/h` rises;
+asymmetrize it approaching the break"* is two separate instructions **about**, and the table is which
+is which: the first is `r`, the second is `ψ`, and only the second reaches the face.
+
+**And the family's own ceiling, swept rather than assumed.** Along the validity boundary the gain is
+monotone in `ψ` — 1.299 at 0°, 1.480 at −10°, 1.710 at −30°, 1.927 at −60°, **1.99999 at −90°**
+(`D`, `stokes2_crest_limit` bisected at each `ψ`). **×2.000 is the ceiling of the entire
+second-order family**, at any `r`, any `ψ`, any depth. Measured against the reference bay, whose
+linear steepest face is 8.23°: `×2` on that slope is **16.13°**, and the bay's second-order surface
+reached **15.78°** — **97.7% of the ceiling of the whole family**. Second order was not
+under-exploited there; it was spent. Combined with [the 30° ceiling](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise)
+above, the ordering of the two limits is the useful part: **the shape family runs out first, the
+representation runs out second, and neither runs out because of the implementation.**
 
 ## Aerated water: foam, spray and whitewater
 

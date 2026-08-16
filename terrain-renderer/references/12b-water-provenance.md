@@ -1062,3 +1062,23 @@ least-confident-claims ledger in `00-index.md`.
   (`surface_report`, `chord_report`/`through_face`) at half the shipped frame resolution. It is
   consistent with the theorem and does **not** test it: 15.78 + 15.78 = 31.6° is nowhere near the
   floor, so the frame confirms the scene, not the bound. The bound is carried by the geometry.
+- **P/D** — [A peaked crest is not a steep face](12-water-rendering.md#a-peaked-crest-is-not-a-steep-face-one-harmonic-two-moments).
+  Second-order Stokes' bound harmonic `η = a[cos φ + r cos(2φ+ψ)]` and its depth function
+  `C(kd) = cosh(kd)(2 + cosh 2kd)/sinh³(kd)` are **`P`** (Dean & Dalrymple, *Water Wave Mechanics for
+  Engineers and Scientists*, the second-order surface profile) — structure cited, and this appendix
+  did not open it; the shallow limit `r → 2·Ur` follows from substituting `C → 3/(kd)³` and is `D`.
+  Everything else in the section is **`D`, this chapter's own**:
+  the closed-form moments and the invariant `Sk² + As² = (9/16) r²/((1+r²)/2)³`, checked here against
+  a direct 2²⁰-sample quadrature of `⟨η³⟩` and `⟨H(η)³⟩` at four `(r, ψ)` pairs and agreeing to all
+  printed digits; the two secondary-crest limits `r = 1/4` and `r = 1/2`, each verified by counting
+  sign changes of `dη/dφ` across the limit (2 → 3 → 4 roots at `r` = 0.24 / 0.25 / 0.26); the exact
+  slope gains **3√3/4** and **1 + 2r**, against `beach.slope_gain`'s numerical maximum
+  (1.2990380 vs 1.2990381); and the monotone sweep along the validity boundary establishing **2.000
+  as the family ceiling**. The 97.7% figure is the reference bay's 15.78° against `×2` on its own
+  8.23° linear face — one scene, quoted as a scene.
+  ⚠️ **`?` on `ψ` itself.** Nothing above fixes what `ψ` *is* for a real shoaling wave; the section
+  is deliberately written so that no claim depends on it — the two endpoints are derived (a bound
+  harmonic is phase-locked at `ψ = 0`; a fully broken bore is a sawtooth at `ψ = −π/2`) and every
+  number quoted sits at one endpoint or is a bound over the whole range. Ruessink et al. (2012)
+  publish a `ψ(Ur)` that goes the same way; it could not be verified from a source here and is
+  **not** claimed or used.
