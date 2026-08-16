@@ -1,0 +1,89 @@
+{
+  "stops": {
+    "bar_met_n": 2,
+    "clean_streak_n": 2,
+    "no_progress_n": 3,
+    "budget_waves": 15,
+    "budget_tokens": null,
+    "hard_cap_waves": null,
+    "target_score": 7
+  },
+  "wip_limit": 3,
+  "dimensions": [
+    "physics",
+    "visual",
+    "prose"
+  ],
+  "lanes": [
+    "bathymetry",
+    "wave-field",
+    "optics",
+    "chapter"
+  ],
+  "bar_kind": "reference",
+  "extensions": [],
+  "parked": [
+    {
+      "ts": "2026-08-16T16:14:51+00:00",
+      "lane": "wave-field",
+      "dimension": "physics",
+      "at_wave": 0,
+      "reason": "Section B, the second breaking line. THREE hand-rolled waves, mechanism NAMED and out of scope: Gamma_eq sits above gamma_s on a shoaling bed, the trough is one dissipation e-folding wide and the reform needs two, so the missing mechanism is the 2DH rip-feeder circulation -- which terrain-architect ch.12 declares out of scope. Wave 3: zero of 89 rows reform on a computed 2-D bay, so it is not geometry. Wave 5 fired one more thing at it and it survived: the derived UR_HALF makes the bar 33% higher and 15 m further seaward, and min H/d in the trough moves 0.4556 -> 0.4571 against the 0.40 needed. A bigger bar is not the missing mechanism. The naming is the deliverable.",
+      "open_gap": "",
+      "bar_rounds": 0,
+      "forced": true
+    },
+    {
+      "ts": "2026-08-16T16:16:57+00:00",
+      "lane": "bathymetry",
+      "dimension": "physics",
+      "at_wave": 0,
+      "reason": "Hsu & Evans' parabolic bay-shape equation, parked on PROVENANCE and not on difficulty (wave 9). Fifteen fitted quartic coefficients, no internal check that would catch a wrong digit, and no paper in this container. The circular arc and the logarithmic spiral ARE derivable and were built and measured instead. Unpark only when someone can put the paper in front of it; never by reconstruction -- ruling 9, consult the source or do not invent it.",
+      "open_gap": "",
+      "bar_rounds": 0,
+      "forced": true
+    }
+  ],
+  "gates": [
+    {
+      "name": "pool-suite",
+      "cmd": "sh gauntlet/sea/gates/suite.sh validate.py",
+      "paths": [
+        "terrain-renderer/reference-impl/atmosphere.py",
+        "terrain-renderer/reference-impl/field.py",
+        "terrain-renderer/reference-impl/fix_lobe_evidence.py",
+        "terrain-renderer/reference-impl/fix_lobe_render.py",
+        "terrain-renderer/reference-impl/lobe_albedo_measure.py",
+        "terrain-renderer/reference-impl/optics.py",
+        "terrain-renderer/reference-impl/pool_figures.py",
+        "terrain-renderer/reference-impl/render.py",
+        "terrain-renderer/reference-impl/validate.py",
+        "terrain-renderer/reference-impl/wake.py"
+      ]
+    },
+    {
+      "name": "sea-suite",
+      "cmd": "sh gauntlet/sea/gates/suite.sh validate_beach.py",
+      "paths": [
+        "terrain-renderer/reference-impl/atmosphere.py",
+        "terrain-renderer/reference-impl/beach.py",
+        "terrain-renderer/reference-impl/beach_camera.py",
+        "terrain-renderer/reference-impl/beach_evidence.py",
+        "terrain-renderer/reference-impl/beach_foam.py",
+        "terrain-renderer/reference-impl/beach_optics.py",
+        "terrain-renderer/reference-impl/beach_plot.py",
+        "terrain-renderer/reference-impl/beach_render.py",
+        "terrain-renderer/reference-impl/field.py",
+        "terrain-renderer/reference-impl/fix_lobe_evidence.py",
+        "terrain-renderer/reference-impl/fix_lobe_render.py",
+        "terrain-renderer/reference-impl/lobe_albedo_measure.py",
+        "terrain-renderer/reference-impl/optics.py",
+        "terrain-renderer/reference-impl/pool_figures.py",
+        "terrain-renderer/reference-impl/render.py",
+        "terrain-renderer/reference-impl/validate.py",
+        "terrain-renderer/reference-impl/validate_beach.py",
+        "terrain-renderer/reference-impl/wake.py"
+      ]
+    }
+  ]
+}
