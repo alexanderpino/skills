@@ -1041,7 +1041,9 @@ i.e. liquid water is only ~1–40% of the volume — with **mean bubble diameter
 Whiteness comes from **multiple scattering across thousands of air–water interfaces**, not from
 pigment, which is why foam is broadband white in the visible where water barely absorbs.
 
-**One constant runs the mirror under the surface and the whiteness of foam.** An air bubble seen
+**One constant runs the mirror under the surface and every bubble wall in a foam** (~~and the
+whiteness of foam~~ — struck; the whiteness is multiple scattering, and the correction is two
+paragraphs down). An air bubble seen
 from the water side presents the same water→air interface as the surface seen from below, so it has
 the same critical angle, and the cosine-weighted flux beyond it is `1 − 1/n²` = **43.72%** at
 `n = 1.333` and **43.874%** at this chapter's own green IOR of 1.3348 (`D`, recomputed; it runs
