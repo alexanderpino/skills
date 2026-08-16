@@ -3777,8 +3777,309 @@ def main_wave8():
     return w8
 
 
+
+
+# ============================================================ WAVE 9 -- the
+# static-equilibrium bay: the plan-form, the transport, and the frame
+def bay_plan_figure(bay_flat, bay_bayed, path):
+    """THE BAY IN PLAN, twice: the same code, the same offshore spectrum, the
+    same coastal loop, and ONE array different -- the shoreline.
+
+    Left is waves 1-8's bed, whose shoreline is the regional trend with the
+    hardness field's 380 m roughness on it. Right is the static-equilibrium
+    bay. Both carry their own depth contours, their own refracted crests (the
+    contours of the marched phase, so what is drawn IS the wave field) and
+    their own breaking mask.
+    """
+    import beach_plot as P
+    import beach_evidence as EV
+    ep = bay_bayed['plan']
+    x, y = bay_bayed['x'], bay_bayed['y']
+    x0 = 150.0
+    x1 = float(max(np.nanmax(bay_bayed['x_s']),
+                   np.nanmax(bay_flat['x_s']))) + 110.0
+    i0 = int(np.searchsorted(x, x0))
+    i1 = int(np.searchsorted(x, x1))
+    img = P.canvas(1660, 1270)
+    for k, (bb, ttl) in enumerate((
+            (bay_flat, 'WAVES 1-8: the coastal loop\'s own shoreline. '
+                       '%.1f m of range, and it is ROUGHNESS'
+             % float(bay_flat['x_s'].max() - bay_flat['x_s'].min())),
+            (bay_bayed, 'WAVE 9: the static-equilibrium bay. %.1f m of '
+                        'indentation, from a closed form'
+             % ep['sagitta']))):
+        pix = EV._bay_pixels(bb, bb['tr'])
+        ax = P.Axes(img, (70 + k * 800, 70, 760 + k * 800, 700),
+                    (y[0], y[-1]), (x0, x1), title=ttl,
+                    xlabel='alongshore, m',
+                    ylabel=('cross-shore, m (sea at the top)' if k == 0
+                            else ''), y_up=False)
+        ax.image(pix[i0:i1])
+        ax.frame(EV._ticks(y[0], y[-1], 5), EV._ticks(x0, x1, 6))
+        ax.line(y, bb['x_s'], (255, 96, 64), 2)
+        if k == 1:
+            ax.line(ep['pts'][:, 1], ep['pts'][:, 0], (255, 235, 60), 2,
+                    dash=(9, 7))
+            ax.marker(ep['A1'][1], ep['A1'][0], (255, 235, 60), r=6)
+            ax.marker(ep['A2'][1], ep['A2'][0], (255, 235, 60), r=6)
+            P.legend(ax, [
+                ((255, 96, 64), 'the composed bed\'s waterline'),
+                ((255, 235, 60), 'the closed form R = R_a exp((phi-phi_a) '
+                                 'cot alpha), alpha = %.3f deg'
+                 % math.degrees(ep['alpha'])),
+                ((160, 190, 210), 'depth contours 2 / 4 / 6 m'),
+                ((250, 250, 255), 'breaking mask; crests = phase contours'),
+            ], y[0] + 30, x1 - 60)
+
+    # the alongshore breaking-crest azimuth, the thing bar J reads by eye
+    ax3 = P.Axes(img, (70, 800, 1560, 1010), (y[0], y[-1]), (-26.0, 26.0),
+                 title='WHAT BAR J CHECKS BY EYE: the breaking crest\'s '
+                       'azimuth, and the shore normal it has to follow',
+                 xlabel='alongshore, m', ylabel='degrees')
+    ax3.frame(EV._ticks(y[0], y[-1], 9), EV._ticks(-26.0, 26.0, 7))
+    for bb, col, lab in ((bay_flat, (150, 150, 155), 'flat'),
+                         (bay_bayed, (192, 57, 43), 'bay')):
+        br = B.breaker_row(bb['tr'])
+        ax3.line(y, np.degrees(br['theta']), col, 2)
+    ax3.line(y, -np.degrees(B.shore_normal_angle(y, bay_bayed['x_s'])),
+             (41, 128, 185), 2, dash=(8, 6))
+    ax3.hline(math.degrees(B.THETA0_SWELL), (120, 122, 128), width=1)
+    P.legend(ax3, [
+        ((192, 57, 43), 'breaking crest azimuth, EMBAYED bed -- an output of '
+                        'the 2-D energy-flux march'),
+        ((150, 150, 155), 'the same, flat bed'),
+        ((41, 128, 185), 'the shore normal the bay presents (equilibrium '
+                         'wants these two on top of each other)'),
+        ((120, 122, 128), 'the deep-water direction, %.0f deg'
+         % math.degrees(B.THETA0_SWELL)),
+    ], y[0] + 30, -12.0)
+
+    ec = B.equilibrium_plan(delta=0.0)
+    P.caption(img, [
+        's9  THE EMBAYMENT. DERIVED: the plan-form is a logarithmic spiral, '
+        'R = R_a exp((phi-phi_a) cot alpha), alpha = 90 - theta_b = %.4f deg, '
+        'and theta_b = %.4f deg is the residual breaking obliquity'
+        % (math.degrees(ep['alpha']), math.degrees(ep['theta_b'])),
+        'the 1-D transform OUTPUTS for the stated offshore spectrum. The pole '
+        '(%.1f, %.1f) m solves TWO conditions and has no freedom left: the '
+        'spiral passes through both rock anchors (yellow dots -- the'
+        % (ep['D'][0], ep['D'][1]),
+        'seaward-most shoreline in the outer quarter of each end of the '
+        'coastal loop\'s own plan-form), and its tangent at the downcoast '
+        'control point is perpendicular to the deep-water wave',
+        'vector, which is Hsu & Evans\' definition of that point. The '
+        'indentation, %.2f m over %.0f m, is therefore an OUTPUT.'
+        % (ep['sagitta'], ep['chord']),
+        'CITED: the logarithmic-spiral bay (Krumbein 1944; Yasso 1965; '
+        'Silvester 1970) -- and it is NOT in terrain-architect chapter 12, '
+        'which is a gap reported to the sibling skill.',
+        'MEASURED: bar section J gives roughly 50 m of plan curvature over '
+        '1408 m; this is %.2fx that, reported and NOT fitted -- the standing '
+        'ruling forbids calibrating against the photograph.'
+        % (ep['sagitta'] / 50.0),
+        'DECLARED `?`: the residual obliquity delta. Only delta = 0 is derived '
+        '(shore normal to a radial orthogonal is a CIRCLE, exactly); the '
+        'circle\'s indentation is %.2f m, %.1f%% from the spiral\'s.'
+        % (ec['sagitta'], 100 * abs(ec['sagitta'] / ep['sagitta'] - 1)),
+        'Scene-linear throughout; nothing was read back off this PNG.',
+    ], x=40, y=1070)
+    return P.save(img, path)
+
+
+def transport_figure(path):
+    """THE MEASUREMENT: alongshore breaker height, obliquity and longshore
+    transport for four shorelines under ONE offshore spectrum.
+
+    The straight coast is the control the bar asks for; the ROTATED straight
+    coast is the meter's own calibration, because a near-zero reading means
+    nothing until zero has been demonstrated to be reachable.
+    """
+    import beach_plot as P
+    import beach_evidence as EV
+    ep = B.equilibrium_plan()
+    y = ep['y']
+    x = np.arange(0.0, 1000.0 + 4.0, 4.0)
+    x_ref = float(np.mean(ep['x_s']))
+    cases = [
+        ('straight shore, plane crest', np.full(y.size, x_ref),
+         B.THETA0_SWELL, (44, 62, 80)),
+        ('the closed-form ZERO-transport shore (rotated %.1f deg)'
+         % math.degrees(B.THETA0_SWELL),
+         B.zero_transport_plan(y, x_ref, B.THETA0_SWELL), B.THETA0_SWELL,
+         (39, 174, 96)),
+        ('the BAY, plane crest -- worse, and it must be',
+         ep['x_s'], B.THETA0_SWELL, (211, 84, 0)),
+        ('the BAY, under the fan its own pole implies',
+         ep['x_s'], B.fan_theta0(y, ep['x_s'], ep['D']), (192, 57, 43)),
+    ]
+    out = []
+    for lab, xs, th0, col in cases:
+        _, tr = B.plan_field(x, y, xs, theta0=th0)
+        out.append((lab, col, B.plan_transport(y, xs, tr)))
+
+    img = P.canvas(1560, 1300)
+    ax1 = P.Axes(img, (80, 66, 1520, 340), (y[0], y[-1]), (1.2, 2.6),
+                 title='BREAKER HEIGHT along the shore -- H_b is an OUTPUT '
+                       'of the transform, never an input',
+                 xlabel='', ylabel='H_b, m')
+    ax1.frame(EV._ticks(y[0], y[-1], 9), EV._ticks(1.2, 2.6, 8))
+    for lab, col, pt in out:
+        ax1.line(y, pt['H_b'], col, 2)
+
+    ax2 = P.Axes(img, (80, 410, 1520, 680), (y[0], y[-1]), (-16.0, 16.0),
+                 title='THE ANGLE THAT DOES IT: theta_loc, the breaking '
+                       'orthogonal against the LOCAL shore normal',
+                 xlabel='', ylabel='theta_loc, degrees')
+    ax2.frame(EV._ticks(y[0], y[-1], 9), EV._ticks(-16.0, 16.0, 9))
+    ax2.hline(0.0, (120, 122, 128), width=1)
+    for lab, col, pt in out:
+        ax2.line(y, np.degrees(pt['theta_loc']), col, 2)
+
+    ax3 = P.Axes(img, (80, 750, 1520, 1010), (y[0], y[-1]), (-0.25, 0.25),
+                 title='LONGSHORE TRANSPORT, CERC: Q = C H_b^(5/2) '
+                       'sin(2 theta_loc). Static equilibrium is Q = 0 '
+                       'everywhere',
+                 xlabel='alongshore, m', ylabel='Q, m3/s (positive downdrift)')
+    ax3.frame(EV._ticks(y[0], y[-1], 9), EV._ticks(-0.25, 0.25, 11))
+    ax3.hline(0.0, (120, 122, 128), width=1)
+    for lab, col, pt in out:
+        ax3.line(y, pt['Q'], col, 2)
+    P.legend(ax3, [(c, '%s -- |theta| mean %.3f deg, Q rms %.3e m3/s'
+                    % (l, math.degrees(p['th_mean']), p['Q_rms']))
+                   for l, c, p in out], y[0] + 30, 0.225)
+
+    msp = np.zeros(y.size, bool)
+    msp[ep['j1'] + 2:ep['j2'] - 1] = True
+    q = [float(np.sqrt(np.mean(p['Q'][msp & p['mask']] ** 2)))
+         for _, _, p in out]
+    P.caption(img, [
+        's9  THE PROPERTY THAT MAKES THIS PROVABLE: at static equilibrium the '
+        'wave orthogonal is normal to the shoreline everywhere, so sin(2 '
+        'theta_loc) = 0 and the longshore transport is zero',
+        'all along the bay. Four shorelines, ONE offshore spectrum (H_0 = '
+        '%.1f m, T = %.0f s, theta_0 = %.0f deg), one ramp, one transform, '
+        'one CERC closure -- the only thing that differs'
+        % (B.H0_SWELL, B.T_SWELL, math.degrees(B.THETA0_SWELL)),
+        'between the curves is the array x_s(y). MEASURED, over the spiral '
+        'span, Q rms in m3/s: straight %.4e, the closed-form zero-transport '
+        'shore %.4e, the bay under a plane' % (q[0], q[1]),
+        'crest %.4e, the bay under its own fan %.4e. SO: the straight coast '
+        'is NOT near zero, which is the control the bar asks for; the meter '
+        'CAN read zero (%.0fx down, and without'
+        % (q[2], q[3], q[0] / max(q[1], 1e-12)),
+        'that row a near-zero reading on the bay would be a statement about '
+        'the meter); and the bay under a plane crest is WORSE than straight, '
+        'and it MUST be -- theta_loc = 0 forces',
+        'phi_s = -theta_0 at every station, which is ONE STRAIGHT LINE, so '
+        'any curvature raises the transport. That is terrain-architect '
+        'chapter 12\'s "headlands retreat faster than bays ...',
+        'until the coast STRAIGHTENS", and it is right. A static-equilibrium '
+        'BAY is not a property of a shoreline; it is a property of a '
+        'shoreline AND the headland that shelters it.',
+        'Under the fan its own pole implies the bay falls to %.4e, a factor '
+        'of %.2f below straight -- SMALL, and %.1fx the meter\'s floor, so '
+        'NOT zero to within numerics.'
+        % (q[3], q[0] / q[3], q[3] / max(q[1], 1e-12)),
+        'DERIVED: the closed-form zero-transport shore, and the CERC '
+        'closure\'s sin(2 theta). CITED: Komar & Inman 1970 for the closure '
+        '(via terrain-architect 12); Krumbein/Yasso/Silvester',
+        'for the spiral. MEASURED: everything plotted. Scene-linear '
+        'throughout; no pixel was read.',
+    ], x=40, y=1090)
+    return P.save(img, path)
+
+
+def wave9(w, bay, camJ, infJ, out=print):
+    """The frame at bar J's own camera, on a bed that finally has bar J's own
+    subject in it."""
+    out()
+    ep = bay['plan']
+    out('THE STATIC-EQUILIBRIUM BAY')
+    out('  alpha = 90 - theta_b = %.4f deg (theta_b = %.4f deg, an OUTPUT of '
+        'the 1-D transform)' % (math.degrees(ep['alpha']),
+                                math.degrees(ep['theta_b'])))
+    out('  pole (%.2f, %.2f) m, |D - A1| = %.1f m, closure residual %.2e'
+        % (ep['D'][0], ep['D'][1], ep['r_pole'], float(np.max(np.abs(
+            ep['res'])))))
+    out('  indentation %.2f m over %.0f m of coast; bar J gives ~50 m over '
+        '1408 m, so %.2fx' % (ep['sagitta'], ep['chord'], ep['sagitta'] / 50.))
+    out('  the fan the bay requires: %.2f deg of alongshore swing in the '
+        'orthogonal' % math.degrees(ep['fan']['swing']))
+    L, ex = render(camJ, w)
+    m = frame_report('J (wave 9, embayed)', w, camJ, infJ, L, ex)
+    return dict(L=L, ex=ex, m=m, ep=ep)
+
+
+def _cap_J9(w, cam, inf, m, ep, sw):
+    sh = m.get('shares', {})
+    return [
+        's9-frame-J  BAR SECTION J\'S FRAMING ON A BED THAT HAS BAR SECTION '
+        'J\'S SUBJECT IN IT. The pair to s7-frame-J.png and s8-frame-J.png: '
+        'same inferred viewpoint, same 0.5x ultrawide upright, same sun, same '
+        'optics, same beach and air. ONE FIELD CHANGED -- the plan-form.',
+        'DERIVED: the shoreline is a logarithmic spiral whose pole solves two '
+        'conditions and has no freedom left (through both rock anchors; '
+        'tangent perpendicular to the deep-water wave vector at the downcoast '
+        'control point). alpha = 90 - theta_b = %.3f deg, theta_b = %.3f deg '
+        'from the 1-D transform.'
+        % (math.degrees(ep['alpha']), math.degrees(ep['theta_b'])),
+        'MEASURED off the scene-linear buffer, never off this PNG: '
+        'indentation %.2f m over %.0f m (bar J: ~50 m over 1408, so %.2fx, '
+        'reported and NOT fitted -- the standing ruling forbids calibrating '
+        'on the photographs). Bay-scale swing of the breaking crest azimuth '
+        '%.2f deg against %.2f deg on the un-embayed bed.'
+        % (ep['sagitta'], ep['chord'], ep['sagitta'] / 50.0, sw[1], sw[0]),
+        'STILL OPEN in this frame, unchanged by this wave: ONE surf zone '
+        'where bar J shows three to four separated lines (section B, parked, '
+        'mechanism named); the illuminant is in the wrong half of the sky; '
+        'no airborne spray; the bed under the water reads 1.24-1.40x too '
+        'bright. By "no placeholder in a hero frame" this is a diagnostic.',
+        'Colour ladder, share of frame: %s. Camera: %.2f +/- %.2f deg '
+        'depression, %.1f x %.1f deg upright, brow at z = %.2f m. '
+        'Scene-linear measured before the tone map; the tone map is display '
+        'only, and no physics was read off this PNG.'
+        % (', '.join('%s %.2f%%' % (k, 100 * v) for k, v in sh.items()),
+           math.degrees(inf['dep']['mid']),
+           math.degrees(inf['dep']['half_width']),
+           math.degrees(inf['fov_h']), math.degrees(inf['fov_v']),
+           inf['z_ground']),
+    ]
+
+
+def main_wave9():
+    """WAVE 9 ONLY, and for the same reason waves 7 and 8 have their own
+    entry points: this wave changes the PLAN-FORM, which moves every frame in
+    the s4/s5/s6 one-field-at-a-time series and both of wave 7's."""
+    t0 = time.time()
+    _set_runup()
+    print('sun: elevation %.2f deg, azimuth %.2f deg' % (SUN_EL, SUN_AZ))
+    bay0 = B.run_bay()
+    bay1 = B.run_bay(embay=True)
+    bay_plan_figure(bay0, bay1, '%s/s9-bay-plan.png' % OUT)
+    transport_figure('%s/s9-transport.png' % OUT)
+    sw = []
+    for bb in (bay0, bay1):
+        br = B.breaker_row(bb['tr'])
+        th = np.degrees(br['theta'])
+        ww = max(int(round(0.2 * th.size)) | 1, 3)
+        sm = np.convolve(np.pad(th, ww // 2, mode='edge'),
+                         np.ones(ww) / ww, mode='valid')
+        sw.append(float(sm.max() - sm.min()))
+    w = Water(bay1)
+    SS = SS_HERO
+    (_, _, _, camJ, infJ, _, _, _, _) = hero_cameras(w, W_HERO * SS,
+                                                     H_HERO * SS)
+    w9 = wave9(w, bay1, camJ, infJ)
+    _save(downsample(w9['L'], SS), '%s/s9-frame-J.png' % OUT,
+          caption=_cap_J9(w, camJ, infJ, w9['m'], w9['ep'], sw))
+    print('%.1f s' % (time.time() - t0))
+    return w9
+
+
 if __name__ == '__main__':
-    if '--wave8' in sys.argv:
+    if '--wave9' in sys.argv:
+        main_wave9()
+    elif '--wave8' in sys.argv:
         main_wave8()
     else:
         main()
