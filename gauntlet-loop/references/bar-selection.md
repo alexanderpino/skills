@@ -84,14 +84,15 @@ retirement, and never turns a lane that reached its target into a lane that keep
 spending.
 
 It has one more job, which is why it should be written as a real bar rather than
-a mood: **the stretch is what a surplus buys.** When every lane retires with
-waves unspent, `status` prints the stretch-dividend offer — re-arm the surplus
-with the stretch as the announced target, same guards, judged rounds, or stop
-and return it. The user chooses. A stretch written as "make it amazing" prices
-that offer at nothing; a stretch written as an inspectable bar makes the
-surplus spendable. This is the deliberate version of what the original loop
-does by accident when it overshoots: excellence as a budgeted decision, not a
-lucky residue of grinding.
+a mood: **the stretch is what the user may buy with a surplus.** When every lane
+retires with waves unspent, the surplus is the run's deliverable — the same
+result, cheaper — and it returns to the user by default; `status` says so. The
+offer of a stretch block (the stretch re-armed as an announced target, same
+guards, judged rounds) is one line in the report, priced in the returned waves.
+A stretch written as "make it amazing" prices that offer at nothing; a stretch
+written as an inspectable bar makes it a real purchase. Never spend the surplus
+unasked — that converts the savings the run exists to produce into gold
+plating.
 
 ```
 TARGET   hero reads as professionally art-directed — the three frozen references

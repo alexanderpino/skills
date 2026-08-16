@@ -1025,12 +1025,12 @@ def cmd_status(args):
 
     if all_lanes and all_lanes == retired and max_wave < budget:
         surplus = budget - max_wave
-        print(f"\nSTRETCH SURPLUS: every lane retired with {surplus} wave(s) of agreed budget")
-        print("unspent — the efficiency bought headroom. Do not bank it, and do not spend it")
-        print("silently. Offer the user the choice: re-arm the surplus waves with the")
-        print("contract's stretch as an announced target (same guards, judged rounds), or")
-        print("stop here and return it. Unjudged polish past a retired bar is gold plating;")
-        print("a stretch block is a new announced bar. (bar-selection.md)")
+        print(f"\nSURPLUS: every lane retired with {surplus} wave(s) of agreed budget unspent.")
+        print("That surplus IS the deliverable — the same result, cheaper — and it returns")
+        print("to the user by default. Stop, report, and state the savings. Mention that a")
+        print("stretch block exists (contract's stretch as an announced target, same guards)")
+        print("only as an option the user may buy; never spend the surplus unasked —")
+        print("polishing past the bar converts the savings into gold plating. (bar-selection.md)")
 
     if max_wave >= budget:
         _print_extension_offer(rounds, cfg, per, retired, max_wave)
@@ -1144,13 +1144,38 @@ def cmd_report(args):
     spent = sum(lane_calls.values())
     closed_gaps = sum(s["gaps_closed"] for s in per.values())
     lines = ["# Gauntlet report (draft — lead agent completes the judgement fields)", ""]
-    lines += [f"Waves run: {max(r['wave'] for r in rounds)} of {cfg['stops']['budget_waves']} budgeted", ""]
+    max_wave = max(r["wave"] for r in rounds)
+    budget = cfg["stops"]["budget_waves"]
+    lines += [f"Waves run: {max_wave} of {budget} budgeted", ""]
     lines += [
         f"Cost: ~{spent} subagent calls for {closed_gaps} closed gap(s)"
         + (f" (~{spent / closed_gaps:.0f} calls per gap)" if closed_gaps else "")
         + f"; target score {cfg['stops']['target_score']}/10",
         "",
     ]
+    # The parity claim, made checkable: this run promises the same result at
+    # lower cost, so the report states cost against the intake projection
+    # rather than leaving "efficient" as an adjective.
+    lanes_n = len(cfg.get("lanes") or []) or 1
+    per_wave = min(lanes_n, cfg.get("wip_limit") or 3) * CALLS_PER_LANE_ROUND + CALLS_PER_WAVE_OVERHEAD
+    projected = per_wave * budget
+    verdict = "under" if spent < projected else "at or over"
+    lines += [
+        f"Against projection: ~{projected} calls projected at intake for {budget} wave(s); "
+        f"~{spent} spent — {verdict} projection"
+        + (f", {budget - max_wave} wave(s) returned unspent" if max_wave < budget else "")
+        + ".",
+        "",
+    ]
+    tok = sum(r.get("tokens", 0) for r in rounds)
+    if tok:
+        tb = cfg["stops"].get("budget_tokens")
+        lines += [
+            f"Tokens: {tok:,} measured"
+            + (f" of {tb:,} agreed ({100 * tok // tb}%)" if tb else "")
+            + ".",
+            "",
+        ]
     ext = cfg.get("extensions") or []
     if ext:
         lines += [

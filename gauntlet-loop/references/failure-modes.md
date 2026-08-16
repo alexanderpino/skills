@@ -27,7 +27,8 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | Token burn | cost per closed gap climbing | machine gates, one critic call, WIP, LOD ladder, degradation order |
 | Critic softens; reads as progress | severity easing over near-empty diffs | softening tripwire (`--diff-lines`) in `status` |
 | Blind quietly never happens | every round logged rubric, promotions unblinded | blind promotions by default, `--blind` share in `status` |
-| Guardrails cap the ceiling | target met, budget unspent, run just stops | stretch dividend, tournament round at a ceiling |
+| Savings spent instead of returned | target met, run keeps polishing | surplus returns by default; stretch only on a user grant |
+| Parked short of the target after repetition failed | same builder, same gap, park looming | one tournament round: two framings, blind, before the park |
 | Cost invisible until the bill | budget in waves, burn in tokens | `--budget-tokens`, `--tokens`, cost per gap in `status` |
 | Inspection rot | stale or repeated evidence | re-verify the path at every wave boundary |
 | Nobody sees progress without interrupting | user asks "where are we?" | generated board |

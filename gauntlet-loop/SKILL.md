@@ -15,13 +15,15 @@ and when you are tempted to add a step, ask the test every rule in this file has
 to pass: **does it make the loop smarter, or only busier?**
 
 This is the **smart gauntlet loop**: Shumer's engine run the way a real-time
-engine runs a frame. A game engine ships a frame every 16ms not by rendering
-less scene but by never spending where the eye is not looking — detail scaled to
-distance, unchanged regions reused, the cheapest test rejecting first, static
-light baked once. Every cost rule below is one of those moves with the names
-changed (`references/authorities.md`), and the saved tokens are not savings —
-they are rounds the budget can now afford, which is how the original's grind
-comes back without its bill.
+engine runs a frame. A game engine does not render a *better* scene than the
+naive renderer — it renders the **same scene**, indistinguishable to the
+player, at a fraction of the cost, by never spending where the eye is not
+looking: detail scaled to distance, unchanged regions reused, the cheapest test
+rejecting first, static light baked once. Every cost rule below is one of those
+moves with the names changed (`references/authorities.md`). The promise is the
+same: **the result the full-grind loop would have reached — the same bar met,
+deciding-grade rigour at every decision — faster and cheaper**, and the report
+proves it against the intake projection rather than asserting it.
 
 The method is Matt Shumer's, published 27 July 2026 as the technique behind the
 "Claude of Duty" run (`https://somethingbig.ai/gauntlet-loop`, prompt at
@@ -381,14 +383,15 @@ promote the best champion — not necessarily the latest challenger — then `bo
 and `report`. `report` drafts every section from the log; you add the one thing
 it cannot know, whether the bar was raised mid-run, and your honest read.
 
-**The stretch dividend.** When every lane retires with budget unspent, the
-surplus is not change to return quietly — it is what the efficiency was *for*.
-`status` prints the offer: re-arm the unspent waves with the contract's stretch
-as an announced target, same guards, judged rounds — or stop and hand the
-surplus back. The user chooses; you never roll into the stretch silently. This
-is how the smart variant beats the original's ceiling instead of merely
-undercutting its bill: the original stumbles into extraordinary through
-unbounded grind, this run budgets for it and arrives with the guards still on.
+**The surplus is the deliverable.** The promise of this variant is the same
+result at lower cost, so when every lane retires with budget unspent, the
+surplus **returns to the user by default** — stop, report, and state the
+savings against the intake projection (`report` prints both numbers). A stretch
+block — the contract's stretch re-armed as an announced target, same guards,
+judged rounds — exists as an option the user may *buy* with the surplus; offer
+it in one line, never roll into it, and never polish past a retired bar
+unasked. Spending the savings without a grant is how "cheaper" quietly becomes
+"the same price with extra steps".
 
 Do not soften the open-gaps section. A report that reads as a victory lap is
 worth less than one that says exactly where the artifact is still weak.
