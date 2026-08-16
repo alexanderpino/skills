@@ -3588,64 +3588,100 @@ def _cap_air8(w8):
 
 
 def beach_figure(w, bay, w8, path):
-    """The subaerial profile, drawn against its own closed form."""
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
+    """The subaerial profile drawn against its own closed form, and the
+    wet/dry exceedance against its `?` bracket.
+
+    Drawn with `beach_plot`, which is this project's own PIL axes, and NOT with
+    matplotlib -- which is not installed in this environment and took wave 8's
+    first attempt at this figure down after four renders had already been
+    spent. Every other figure in this project is a `beach_plot` figure; this
+    one now is too.
+    """
+    import beach_plot as P
+    wd = (w8 or {}).get('wd') or {}
     j = int(w.y.size // 2)
     row = w.h[j]
     i0 = int(np.argmax(row > 0.0))
-    sel = slice(max(i0 - 40, 0), min(i0 + 30, row.size))
-    x = w.x[sel] - w.x[i0]
-    fig, ax = plt.subplots(2, 1, figsize=(9.0, 7.4))
-    a = ax[0]
-    a.plot(x, row[sel], 'k-', lw=1.8, label='the bed, row %d' % j)
-    a.plot(x, np.clip(B.TAN_FACE * x, None, B.BACKSHORE_Z), '--',
-           color='#c0392b', lw=1.3,
-           label='closed form: tan(beta) = (2/3)A^1.5/sqrt(d) = %.4f, '
-                 'capped at the storm run-up %.3f m'
-                 % (B.TAN_FACE, B.BACKSHORE_Z))
-    for z, nm, c in ((0.0, 'datum', '#2980b9'),
-                     (B.BERM_Z, 'swell run-up %.3f m (berm level)' % B.BERM_Z,
-                      '#16a085'),
-                     (B.BACKSHORE_Z, 'storm run-up %.3f m (backshore)'
-                      % B.BACKSHORE_Z, '#8e44ad')):
-        a.axhline(z, color=c, lw=0.8, ls=':', label=nm)
-    a.axvline(B.SWASH_W, color='#16a085', lw=0.8, ls='-.')
-    a.axvline(B.BACKSHORE_W, color='#8e44ad', lw=0.8, ls='-.')
-    a.set_ylim(-1.6, 2.6)
-    a.set_xlim(x[0], x[-1])
-    a.set_xlabel('metres landward of the waterline')
-    a.set_ylabel('elevation, m')
-    a.set_title('THE SUBAERIAL BEACH -- nothing placed. Face slope from the '
-                'equilibrium profile, width sqrt(H0 L0) = %.2f m, elevations '
-                'from Hunt.' % B.SWASH_W, fontsize=9)
-    a.legend(fontsize=7, loc='upper left')
-    a.grid(alpha=0.25)
-    b = ax[1]
-    z = np.linspace(0.0, 2.2, 400)
-    b.plot(z, B.swash_wetness(z), '-', color='#c0392b', lw=1.8,
-           label='wetness = exp(-(z/R)^2), R = %.3f m  (Rayleigh exceedance '
-                 'of the run-up)' % B.BERM_Z)
-    b.plot(z, B.swash_wetness(z, R=B.BERM_Z / math.sqrt(math.log(50.0))), '--',
-           color='#7f8c8d', lw=1.1,
-           label='`?` bracket: Hunt\'s R read as R_2%% instead of the rms')
-    b.axvline(B.BERM_Z * math.sqrt(math.log(2.0)), color='#2980b9', lw=0.9,
-              ls=':', label='the median, z = R sqrt(ln 2) = %.3f m'
-              % (B.BERM_Z * math.sqrt(math.log(2.0))))
-    b.set_xlabel('elevation above the datum, m')
-    b.set_ylabel('share of swash cycles reaching it')
-    b.set_title('THE WET/DRY BOUNDARY IS A DISTRIBUTION. Wet sand reads %s '
-                'and dry %s in frame J -- darker in every channel, which is '
-                'bar H3\'s direction.'
-                % (np.round(w8['wd']['wet'], 3) if w8['wd'] else '-',
-                   np.round(w8['wd']['dry'], 3) if w8['wd'] else '-'),
-                fontsize=9)
-    b.legend(fontsize=7)
-    b.grid(alpha=0.25)
-    fig.tight_layout()
-    fig.savefig(path, dpi=118)
-    plt.close(fig)
+    sel = slice(max(i0 - 30, 0), min(i0 + 20, row.size))
+    xs = np.asarray(w.x[sel]) - float(w.x[i0])
+    zs = np.asarray(row[sel])
+    img = P.canvas(1120, 860)
+    ax = P.Axes(img, (90, 60, 1080, 420), (float(xs[0]), float(xs[-1])),
+                (-1.6, 2.6), title='THE SUBAERIAL BEACH -- nothing placed. '
+                'Face slope from the equilibrium profile, excursion '
+                'sqrt(H0 L0) = %.2f m, elevations from Hunt.' % B.SWASH_W,
+                xlabel='metres landward of the waterline',
+                ylabel='elevation, m')
+    ax.frame()
+    ax.line(xs, np.clip(B.TAN_FACE * xs, None, B.BACKSHORE_Z), (192, 57, 43),
+            width=2, dash=(7, 6))
+    ax.line(xs, zs, (20, 20, 20), width=3)
+    for z, col in ((0.0, (41, 128, 185)), (B.BERM_Z, (22, 160, 133)),
+                   (B.BACKSHORE_Z, (142, 68, 173))):
+        ax.hline(z, col, width=1)
+    ax.vline(B.SWASH_W, (22, 160, 133), width=1)
+    ax.vline(B.BACKSHORE_W, (142, 68, 173), width=1)
+    P.legend(ax, [
+        ((20, 20, 20), 'the bed, row %d -- measured face slope %.4f'
+         % (j, w8['bp']['width']['slope'] if w8 else B.TAN_FACE)),
+        ((192, 57, 43), 'closed form tan(beta) = (2/3)A^1.5/sqrt(d) = %.5f, '
+         'capped at the storm run-up' % B.TAN_FACE),
+        ((41, 128, 185), 'the datum'),
+        ((22, 160, 133), 'swell run-up %.3f m at %.2f m -- the berm LEVEL'
+         % (B.BERM_Z, B.SWASH_W)),
+        ((142, 68, 173), 'storm run-up %.3f m at %.2f m -- the backshore'
+         % (B.BACKSHORE_Z, B.BACKSHORE_W)),
+    ], float(xs[0]) + 2.0, 2.35)
+    zq = np.linspace(0.0, 2.2, 400)
+    ax2 = P.Axes(img, (90, 500, 1080, 740), (0.0, 2.2), (0.0, 1.05),
+                 title='THE WET/DRY BOUNDARY IS A DISTRIBUTION, not a line',
+                 xlabel='elevation above the datum, m',
+                 ylabel='share of swash cycles reaching it')
+    ax2.frame()
+    ax2.line(zq, B.swash_wetness(zq), (192, 57, 43), width=3)
+    ax2.line(zq, B.swash_wetness(zq, R=B.BERM_Z / math.sqrt(math.log(50.0))),
+             (127, 140, 141), width=2, dash=(7, 6))
+    ax2.vline(B.BERM_Z * math.sqrt(math.log(2.0)), (41, 128, 185), width=1)
+    P.legend(ax2, [
+        ((192, 57, 43), 'exp(-(z/R)^2), R = %.4f m -- the Rayleigh exceedance '
+         'of the run-up' % B.BERM_Z),
+        ((127, 140, 141), '`?` bracket: Hunt\'s R read as R_2%% instead of the '
+         'rms (R = %.4f m)' % (B.BERM_Z / math.sqrt(math.log(50.0)))),
+        ((41, 128, 185), 'the median, z = R sqrt(ln 2) = %.4f m -- where the '
+         'ladder splits wet from dry'
+         % (B.BERM_Z * math.sqrt(math.log(2.0)))),
+    ], 0.9, 1.0)
+    lines = [
+        's8  THE SUBAERIAL BEACH AND ITS WET/DRY BOUNDARY, against their own '
+        'closed forms. Nothing here is placed and nothing is authored.',
+        'THE FACE SLOPE is the Dean equilibrium profile\'s own where the '
+        'surf-zone model hands over to the swash, (2/3)A^1.5/sqrt(D_MORPH_MIN) '
+        '= %.5f (1:%.1f) -- and the EVOLVED 1-D bed reads %.6f at that depth, '
+        '%.2f%% away, which is a second instrument that could have disagreed.'
+        % (B.TAN_FACE, 1.0 / B.TAN_FACE,
+           (w8 or {}).get('bp', {}).get('face_measured', float('nan')),
+           100 * abs((w8 or {}).get('bp', {}).get('face_measured', B.TAN_FACE)
+                     / B.TAN_FACE - 1)),
+        'THE EXCURSION has the slope divided out of it: R = tan(beta) '
+        'sqrt(H L0), so R/tan(beta) = sqrt(H L0) = %.4f m and the width of a '
+        'dry beach needs no constant. The wedge is TRUNCATED at %.1f m and '
+        '%.3f m because the cliff\'s own talus rises into the swash plane -- '
+        'complete to the swell\'s berm level, cut before the storm\'s '
+        'backshore, which is what a cliffed coast looks like.'
+        % (B.SWASH_W, (w8 or {}).get('bp', {}).get('width', {}).get(
+            'median', float('nan')),
+           (w8 or {}).get('bp', {}).get('width', {}).get('top', float('nan'))),
+        'THE BOUNDARY is the Rayleigh exceedance of the run-up and not a '
+        'ramp. In frame J the DIFFUSE halves read wet %s against dry %s -- '
+        'darker in every channel, which is bar H3\'s direction; the TOTAL is '
+        'the other way round because a 21 deg sun straight out to sea '
+        'backlights the wet band and its specular lobe glints. That is gap 5, '
+        'not gap 2.'
+        % (np.round(wd.get('wet_diff', np.zeros(3)), 3),
+           np.round(wd.get('dry_diff', np.zeros(3)), 3)),
+    ]
+    P.caption(img, lines, x=40, y=760)
+    P.save(img, path)
     print('  wrote %s' % path)
 
 
