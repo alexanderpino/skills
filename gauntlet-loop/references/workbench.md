@@ -4,31 +4,44 @@ A long unattended run needs a surface the user can glance at without interruptin
 it. Interrupting to ask for status costs a context switch on both sides and is the
 main reason people stop letting loops run long enough to work.
 
-## The Live Kanban Workbench
+## The board is generated, not written
 
-The workbench is an HTML file (`gauntlet/workbench.html`) that serves as a live Progress Board (Kanban).
-During Phase 0, the lead agent copies a provided HTML template to this location and opens it in the user's browser.
+```bash
+python3 scripts/gauntlet.py board     # writes gauntlet/workbench.md from the log
+```
 
-**CRITICAL RULE:** You and all sub-agents MUST ONLY edit the `#gauntlet-state` JSON block inside this HTML file. You must NEVER generate, modify, or rewrite the HTML structure itself.
+`board` renders `gauntlet/workbench.md` from `rounds.jsonl` and `config.json`:
+wave and budget, cost so far, target score, the WIP limit, which lanes the next
+wave funds, then three columns — **Active** (with a park flag where `status`
+recommends one), **Parked** with each open gap and the reason it stopped, and
+**Retired** — plus the last twelve rounds.
 
-## Language Rules (ASD-STE100)
+Regenerate it at every wave boundary and after every park or extension. It is
+deterministic, so keeping the user's progress surface current costs zero model
+tokens — which is the point. **Never hand-write or hand-edit the workbench**: a
+board written from memory drifts from the log, and the log is what the report and
+the stop conditions are computed from.
 
-All visible text on the Kanban board (goals, gaps, next fixes) must be written in Simplified Technical English:
-1. Maximum sentence length: 20-25 words.
-2. Use active voice always.
-3. One instruction or statement per sentence.
-4. ZERO AI marketing language (no "amazing", "leverage", "streamline", "delve").
-5. Be direct and objective.
+If the user wants it in a browser, `workbench.md` renders anywhere markdown does
+and can be opened directly. Do not build a bespoke HTML surface for a run — that
+is a whole artifact's worth of tokens spent on a status page.
 
-## What it needs
+## Language rules (ASD-STE100)
 
-- Current wave, active lanes, elapsed time and budget consumed — including any
-  granted extensions (`wave 9 of 11: initial 8, extended +3`), so the user can
-  see at a glance what the run has cost against what they agreed to
-- Per lane: rounds run, current verdict, current named gap, clean-streak counter
+All visible text you add around the board — gap wording, park reasons, report
+prose — is Simplified Technical English: active voice, one statement per
+sentence, 20–25 words maximum, and no marketing language ("amazing", "leverage",
+"streamline", "delve"). Short and literal also happens to be cheap.
+
+## What the user reads it for
+
+- What the run has cost against what they agreed to — including any granted
+  extensions (`wave 9 of 11: initial 8, extended +3`)
+- Which lanes are still being funded, and which stopped and why
 - **Evidence over time** — the artifact evolving, in whatever form it takes:
-  screenshots, rendered pages, drafts, benchmark numbers, test output
-- Champion history, so a user can see whether it is still climbing
+  screenshots, rendered pages, drafts, benchmark numbers, test output. The board
+  links the latest evidence path per lane; keep those paths stable so a user can
+  flip through them.
 - Reverts, visibly — a run that reverts often looks different from one that does not
 
 ## Round log schema
@@ -74,11 +87,15 @@ past state recoverable and the "best champion" findable at stop time. Blind and
 rubric records are not equivalent evidence; `status` reports the rubric share so
 the report can say so.
 
+Records may also carry `"calls": N` when `log-round --calls` was used, so cost
+accounting reports what the round really spent instead of the estimate.
+
 ## Reading the log
 
-`gauntlet.py status` computes streaks, retirement, revert rates and fired stop
-conditions from the log — run it at every wave boundary instead of counting in
-your head. Beyond what it prints, three patterns to watch:
+`gauntlet.py status` computes streaks, retirement, stalls, revert rates, cost per
+closed gap, the next-wave plan and fired stop conditions from the log — run it at
+every wave boundary instead of counting in your head. Beyond what it prints,
+three patterns to watch:
 
 **Margins narrowing** across rounds in a lane — approaching the ceiling. Expected
 and healthy.
@@ -88,17 +105,20 @@ out of closeable gaps, or the lane is cut wrong.
 
 **The same gap recurring** across rounds after being marked closed — either the
 builder is not actually closing it, or it is structural and no amount of lane-level
-work will fix it. Escalate to a re-cut rather than running the same round again.
+work will fix it. Re-cut or park rather than running the same round again;
+`status` parks it for you after three identical gaps.
 
 ## Reporting at the end
 
 `gauntlet.py report` drafts the report from the log; you complete the judgement
 fields. It must cover:
 
-- Bar used, and whether it was raised mid-run
-- Lanes, rounds each, and how each retired
-- The gaps that closed
+- Target bar used, whether it was raised mid-run, and the distance to any stretch
+- Lanes, rounds each, and how each ended — retired, parked, or still open
+- The gaps that closed, and what they cost (calls per closed gap)
 - **The gaps still open** — the section the user actually needs
+- For each parked lane, what would have to change for it to be worth restarting.
+  "More waves" is not an answer.
 - Blind versus rubric round counts
 - Any budget extensions, with the reason each was granted and whether it paid off
 - Whether the loop was still improving at the stop

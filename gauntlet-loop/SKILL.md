@@ -1,338 +1,455 @@
 ---
 name: gauntlet-loop
-description: Run an adversarial build-and-judge quality loop (Gauntlet Loop) to push inspectable artifacts toward a reference-class standard via autonomous rounds. Trigger on "gauntlet", "blind critic", "beat the reference", "keep iterating until it wins", "make it as good as X". Do not trigger for ordinary code review or bug fixing.
+description: Run an adversarial build-and-judge quality loop (Smart Gauntlet Loop) to push inspectable artifacts to a reachable target bar via autonomous rounds, spending judgement only where a decision lands and parking lanes that stop paying for themselves. Trigger on "gauntlet", "smart gauntlet loop", "blind critic", "beat the reference", "keep iterating until it wins", "make it as good as X". Do not trigger for ordinary code review or bug fixing.
 ---
 
 # Gauntlet Loop
 
-> **Set the bar. Cut the lanes. Build. Judge blind. Run it again.**
+> **Work smarter, not harder.**
 
-## Provenance
+That is the whole skill, and it is a decision rule rather than a slogan. A
+gauntlet loop's natural drift is to work *harder* — more rounds, more re-checking,
+more coverage — all of which feel like rigour and are only cost. So when you are
+choosing between two moves here, take the one that closes the gap with less work,
+and when you are tempted to add a step, ask the test every rule in this file has
+to pass: **does it make the loop smarter, or only busier?**
+
+This is the **smart gauntlet loop**: Shumer's engine run the way a real-time
+engine runs a frame. A game engine does not render a *better* scene than the
+naive renderer — it renders the **same scene**, indistinguishable to the
+player, at a fraction of the cost, by never spending where the eye is not
+looking: detail scaled to distance, unchanged regions reused, the cheapest test
+rejecting first, static light baked once. Every cost rule below is one of those
+moves with the names changed (`references/authorities.md`). The promise is the
+same: **the result the full-grind loop would have reached — the same bar met,
+deciding-grade rigour at every decision — faster and cheaper**, and the report
+proves it against the intake projection rather than asserting it.
 
 The method is Matt Shumer's, published 27 July 2026 as the technique behind the
 "Claude of Duty" run (`https://somethingbig.ai/gauntlet-loop`, prompt at
-`https://github.com/mshumer/Claude-of-Duty`). This skill is an operational
-expansion: it adds an intake contract, a champion/challenger regression guard,
-deterministic state tooling, per-dimension bars, and named failure modes. When
-citing the method, credit Shumer for the pattern and be honest about which parts
-are this skill's additions.
+`https://github.com/mshumer/Claude-of-Duty`). This skill adds an intake contract,
+a champion/challenger regression guard, deterministic state tooling,
+per-dimension bars, a WIP limit, a park rule for stalled lanes, and named failure
+modes. Credit Shumer for the pattern; be honest about which parts are additions.
 
-## What a Gauntlet Loop actually is
+## The loop, and the guardrails around it
 
-A quality-*maximising* loop, not a correctness loop.
+**The engine is Shumer's and stays recognisable.** Cut the goal into
+independently judgeable lanes. Per lane: a builder closes one named gap, then a
+*different* critic in fresh context judges the real artifact against a real
+external bar, blind where the artifact allows. Bar wins → the critic names the
+single largest remaining gap and it goes back. Repeat.
 
-The lead agent decomposes a goal into the smallest parts that can be improved and
-judged **separately**. Each part gets a builder and a *different* critic running
-in fresh context. The critic inspects the real artifact — rendered pixels, running
-binary, actual prose, actual measurements — and compares it against a concrete
-external bar, blind wherever the artifact allows. If the bar wins, the critic
-names the single largest remaining gap and the work goes back. Then another round.
+Everything else in this file is one of two things: a **guardrail** against a
+known weakness of that loop, or the **project management** deciding what gets
+funded. Both serve the loop. A rule that stops the loop from running is a wrong
+rule, and a guardrail that adds work without removing more work elsewhere fails
+the mantra even when the weakness it names is real.
 
-Three properties make it a gauntlet rather than a review:
-
-1. **The bar is external and inspectable.** Not "make it production-ready". A real
-   reference the agent cannot argue its way around.
-2. **The builder never grades itself.** A builder has seen every decision it made
-   and is therefore excellent at justifying them. Justification is the enemy here.
-3. **The round count is not scheduled.** Rounds are earned by gaps, not planned.
+The weaknesses, their signals, and the guardrail each one buys, in one table:
+→ `references/failure-modes.md`
+Provenance for each rule: → `references/authorities.md`
 
 ## When not to use this
 
-- **Correctness work with a pass/fail oracle** (failing test, crash, wrong output).
-  That is a debug loop; a gauntlet wastes compute on it. Fix it first, then
-  gauntlet the quality.
-- **Artifacts nobody can inspect.** No inspection path means no loop — only
-  opinion exchange. Fix the path first (screenshot harness, benchmark, render).
+- **Correctness work with a pass/fail oracle** — that is a debug loop. Fix it
+  first, then gauntlet the quality.
+- **Artifacts nobody can inspect.** Fix the inspection path first, or you have
+  only an opinion exchange.
 - **Small bounded edits.** A gauntlet on a 20-line change is theatre.
-- **Genuinely subjective taste with no comparator** — unless the user supplies
-  the comparator, in which case it works fine.
+- **Subjective taste with no comparator**, unless the user supplies one.
 
-If the work is mostly correctness-and-coordination rather than quality-ceiling,
-say so and suggest a plan/execute orchestrator instead. The two compose:
-orchestrate to *done*, gauntlet to *good*.
+If the work is mostly correctness-and-coordination, suggest a plan/execute
+orchestrator instead. The two compose: orchestrate to *done*, gauntlet to *good*.
 
 ## Requirements and blast radius
 
-Settle these before anything else:
+- **Version control is required** — the champion/challenger guard is built on it.
+  Refuse to start **wave 1** on a dirty tree, so the first champion is a known
+  state and a full abort is one command. No VCS? `git init` with consent, also
+  before wave 1. Phase 0 is exempt: it runs on any tree.
+- **Writes are confined** to the workspace and `gauntlet/`; builders write only
+  files they own this wave. **Under Mission Control**, initialise inside the
+  assigned worktree (`mc/<id>`), never the repo root, and cut lanes that respect
+  the Implementer's semantic leases.
+- **The budget stop is always armed.** Never offer an unattended loop without a
+  ceiling; when it depletes the run *stops*.
+- **Subagents make critics honest.** Without them the method degrades — see
+  "Degraded mode".
 
-- **Version control is required.** The champion/challenger guard is built on it.
-  Refuse to start on a dirty working tree — have the user commit or stash first,
-  so the run's first champion is a known state and a full abort is one command.
-  If the project has no VCS, `git init` it (with the user's consent) before wave 1.
-- **Writes are confined** to the project workspace and the `gauntlet/` state
-  directory. Builders write only files they own this wave (`references/decomposition.md`). **Mission Control Integration:** If running under Mission Control, the Gauntlet Loop MUST initialize inside the assigned private worktree (`mc/<id>`), never at the repository root. All lanes cut must strictly respect the Implementer's Mission Control semantic leases.
-- **The budget stop is always armed.** An unattended loop without a ceiling is not
-  safe to agree to, so never offer one. When the budget depletes the run *stops* —
-  then you may **offer an extension in waves**. You may never take one.
-- **Subagents are what make critics honest.** Each critic needs its own clean
-  context. Without subagents the method degrades — see "Degraded mode" below.
+## Cost discipline
+
+A wave spends real money, and most of it is spendable on things that buy nothing.
+Rationale and exceptions: → `references/cost-discipline.md`
+
+1. **Machine gates before critics.** A dimension a command can decide is decided
+   by that command, logged `--mode rubric` with the number as evidence.
+2. **One critic call per round — or fewer.** One inspection answers both
+   comparisons and writes two records. When the named gap splits into
+   gate-checkable pieces, batch up to three gate-verified micro-builds into one
+   judgement. Split into two calls only when the round could retire a dimension.
+3. **Paths, not payloads — and scoped paths after round one.** Subagents get
+   paths, owned files and one gap line; a repeat critic gets the bar, the diff
+   and the judged region, with a full re-read at decision rounds.
+4. **Cap the handoffs.** Critic: the verdict block. Builder: five lines.
+5. **No gap, no builder.** Nothing to close means retire, raise the bar, or park.
+6. **Respect the WIP limit** (default 3). Depth closes gaps; breadth half-closes.
+7. **Let the script count and publish.** `status` and `board` are free — never
+   narrate state into chat or hand-write the workbench.
+8. **Route the model to the decision, not just the role.** Screening-tier
+   verdicts steer routine rounds; a deciding-tier verdict is bought where a
+   lifecycle turns — retire, park, promote into a shared surface. Logged
+   `--tier`; the script refuses to retire on screening evidence.
+   → `references/model-routing.md`
+9. **Never pay twice for the same verdict.** Settled work is not re-judged, a
+   check whose inputs have not changed is not re-run (`gate` caches on a content
+   hash), and the frozen bar is measured **once** — bake its machine numbers at
+   the freeze, never re-derive them per round.
+10. **Read each reference once, at its phase.**
 
 ## State: one directory, one script
 
-All run state lives under `gauntlet/` in the project root, managed by
-`scripts/gauntlet.py` (stdlib-only Python). The model judges; the script counts.
-Streaks, stop conditions, revert rates and budget consumption are computed
-deterministically so they cannot drift over a long context.
+`scripts/gauntlet.py` (stdlib-only) owns all run state under `gauntlet/`. The
+model judges; the script counts.
 
-```
-gauntlet/
-├── config.json      # lanes, dimensions, armed stop thresholds
-├── contract.md      # the confirmed intake contract
-├── bar/             # frozen bar artifacts — never edited after intake
-├── ownership.md     # file-ownership ledger, refreshed each wave
-├── rounds.jsonl     # one validated record per comparison (script-written)
-├── workbench.html   # live Kanban board (updated via #gauntlet-state JSON)
-└── report.md        # drafted by the script at the end, completed by you
-```
-
-```bash
-python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf --bar-kind reference --budget-waves 12
-python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --round 3 \
-    --mode blind --winner other --margin clear --score 7 --severity major --gap "..." \
-    --evidence shots/w2r3.png
-python3 scripts/gauntlet.py status    # streaks, revert rate, fired stop conditions
-python3 scripts/gauntlet.py extend --waves 3 --reason "..."   # only after the user grants it
-python3 scripts/gauntlet.py report    # draft the end-of-run report from the log
-```
-
-Log every comparison through the script, never by hand-editing the file — the
-validation is the point. Full layout, git conventions and the resume protocol:
+`gauntlet/` holds `config.json` (lanes, dimensions, stops, WIP, parks,
+extensions, **gates**), `contract.md`, the frozen `bar/`, `ownership.md`,
+`backlog.md`, `rounds.jsonl` (the log — script-written only), and the generated
+`workbench.md` and `report.md`. Layout and git conventions:
 `references/state-and-resume.md`.
 
-## Phase 0 — The contract
+**Declare gates before wave 1**, one `config.json` entry per mechanical check:
+`{"name": ..., "cmd": "<shell; fails on non-zero exit or any stdout>", "paths":
+["<every file the check reads>"]}`. `paths` is what the cache hashes, so an
+undeclared input makes the gate skip when it should run (`cost-discipline.md`).
 
-Never start looping without this settled. Read `references/intake.md`, then put a
-compact contract in front of the user and get confirmation. 
-First, you must set up the **Live Kanban Workbench** by copying the HTML template to `gauntlet/workbench.html` and opening it in the user's browser.
-Infer or propose everything you can; only **stop conditions** and **budget** genuinely require the
-user, because they encode how much time and money the run may spend.
+```bash
+python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf \
+    --bar-kind reference --budget-waves 8 --target-score 7 --wip-limit 3 \
+    --budget-tokens 1500000
+python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --round 3 \
+    --mode blind --winner other --margin clear --score 7 --severity major \
+    --gap "..." --evidence shots/w2r3.png --tokens 74000 --critic-model sonnet
+python3 scripts/gauntlet.py gate     # mechanical checks; skips those whose inputs are unchanged
+python3 scripts/gauntlet.py status   # state, next-wave plan, park list, fired stops
+python3 scripts/gauntlet.py park --lane a --dimension visual --reason "..."
+python3 scripts/gauntlet.py board    # regenerate workbench.md from the log
+python3 scripts/gauntlet.py extend --waves 3 --reason "..."   # only on a user grant
+python3 scripts/gauntlet.py report   # draft the end-of-run report
+```
 
-| Field | What it fixes |
-|---|---|
-| **Goal** | The destination, not the route. Do not accept an implementation plan as a goal. |
-| **Bar** | The concrete external comparator, per dimension. |
-| **Inspection** | How a critic will actually reach the output each round. |
-| **Stop** | Which conditions are armed, with thresholds → `config.json`. |
-| **Budget** | Ceiling on waves / wall clock / tokens. Always armed. Say that it is a checkpoint: when it runs out the run stops and you come back with an extension offer. Optionally agree a **hard cap** no extension may cross. |
-| **Autonomy** | Unattended until a stop fires, or check in at wave boundaries. |
-| **Workbench** | Where progress is visible without interrupting the run. |
+Log every comparison through the script — the validation is the point. Waves are
+the unit the user agreed to; **tokens are the unit that actually burns**, so pass
+`--tokens` on each round and `status` will print cost per closed gap in the unit
+the bill arrives in. Without it, `status` says `tokens: not measured`, which is
+the honest reading and a poor one.
 
-Stop conditions (`references/stop-conditions.md`): `bar-met`, `clean-streak`,
-`budget`, `judgment` — armed in combination, first to fire wins.
+## Phase 0 — First light
 
-A bar that is not realistically reachable is fine and often correct — it supplies
-direction and prevents stopping at "pretty good for an AI". Say this out loud when
-proposing an ambitious bar so the user reads it as a heading, not a promise.
+**Before the contract, not after it.** Get one real artifact and one working
+inspection path in front of the user in a single step. It needs no permission:
+one reversible build in the workspace.
 
-**Cold start is normal.** When the artifact does not exist yet, wave 1 is a
-bootstrap wave: builders produce first versions, no champion comparison exists,
-and the first bar comparison runs as soon as there is output to inspect. Do not
-invent a fake baseline.
+1. **Build the thinnest end-to-end thing** — a walking skeleton, not one polished
+   part. If the artifact already exists, skip the build and capture it.
+2. **Verify inspection on it**: take the screenshot, run the benchmark, render
+   the page. The failure that otherwise wastes hours, caught in minutes.
+3. **Judge it once** — one critic, one verdict, in the block `references/critic.md`
+   defines. Read that brief now; this is the one place the loop needs it before
+   Phase 4. Put the candidate bar in `gauntlet/bar-candidate/` and give the critic
+   *that* path — `gauntlet/bar/` does not exist yet. A candidate bar is the user's
+   named comparator, or one you propose in a line: an external artifact you can
+   open, not a checklist you wrote. Score against a **provisional target of 7**;
+   Phase 2 sets the real one.
+4. **Show the user** the artifact and the verdict.
 
-## Phase 1 — Set the bar
+Then the arithmetic, out loud, on **provisional** numbers: the *lanes* you expect
+to cut (independently judgeable parts of the artifact — Phase 3) and the default
+*WIP limit* of 3 (lanes funded per wave), both re-checked at Phase 3:
 
-The highest-leverage decision in the run. Read `references/bar-selection.md` for
-taxonomies per artifact class and for finding a bar when the user has none.
+> rounds you estimate per gap × lanes ÷ WIP limit ≈ waves needed
 
-Freeze bar artifacts under `gauntlet/bar/` at intake. Most real artifacts need
-more than one **dimension** (visual + frame time; clarity + completeness); declare
-them in `config.json` and judge each in its own comparison — collapsing them into
-one score is how a loop trades away the dimension nobody is watching.
+Estimate the numerator from first light's own `GAP SEVERITY`, and say which
+reading you took so it can be argued with: a `minor` gap with a named fix is
+usually one round, a `major` gap two or three, and a gap the critic calls
+structural is not closeable at lane level at all — a rescope, not a number.
 
-## Phase 2 — Cut the lanes
+Act on what the step returns, and say which branch you took.
+
+- A **vague verdict** means fix the bar, not run the wave.
+- A **verdict already at or above the provisional 7** — common when the artifact
+  already existed — means there is no gap to fund, so do not open wave 1. Raise
+  the bar to something the artifact demonstrably misses and re-judge, or tell the
+  user it is already there and stop. A run opened against no named gap buys
+  nothing.
+- A **projection that misses the budget** means rescope before wave 1 — drop the
+  lowest-ranked lane, lower the target (the old one becomes the stretch), or ask
+  for more budget.
+
+Two exemptions, because first light runs before `init` exists: its verdict is the
+one comparison not logged — record it in `contract.md` instead — and it runs
+**regardless of tree state**. **Commit its output before the clean-tree check**:
+that commit is the wave-1 baseline the champion guard arms against, and it is
+what makes the tree clean. With no repo the order is: consent → `git init` →
+commit first light → clean-tree check.
+
+## Phase 1 — The contract
+
+Never loop unattended without this settled. Read `references/intake.md`, put a
+compact contract in front of the user, get confirmation. Infer or propose
+everything you can; only **stops**, **kill criteria** and **budget** genuinely
+require the user, because they encode how much time and money the run may spend.
+
+**Size the contract to the run.** Under ~3 waves or 2 lanes, four lines is the
+whole contract — goal, target bar, budget, stops — confirmed in one exchange.
+The full table below is for long unattended runs, where the fields you skip are
+the ones nobody can add later.
+
+Fields, each explained in `intake.md`: **goal** (destination, not route) ·
+**target bar** per dimension · optional **stretch** · **inspection** (and which
+dimensions have machine gates) · ranked **lanes** + WIP limit · armed **stops** ·
+**kill** criteria · **budget** with projected call count and optional hard cap ·
+**autonomy**.
+
+Stops (`references/stop-conditions.md`): `bar-met`, `clean-streak`,
+`no-progress` (parks a lane), `budget`, `judgment` — armed in combination, first
+to fire wins.
+
+**Cold start is normal.** With no artifact yet, wave 1 is a bootstrap wave: first
+versions, no champion comparison, first bar comparison as soon as there is output
+to inspect. Do not invent a fake baseline.
+
+## Phase 2 — Set a reachable bar
+
+The highest-leverage decision in the run. → `references/bar-selection.md`
+
+- **External and inspectable**, and **reachable inside the budget**. A target
+  nobody can hit is not ambition: every round fails, every lane looks stalled,
+  and the log stops carrying information.
+- **Set `--target-score` where the target sits** (default 7). A target of 10
+  means no lane can ever retire; the script warns you.
+- **Ambition above it is a *stretch***, recorded in `contract.md` as a heading
+  rather than a promise. Retirement is judged against the target only; the report
+  states the distance to the stretch — and the stretch is what a surplus buys
+  (Phase 7), so write it as a real bar, not a mood.
+- **Freeze the bar** under `gauntlet/bar/`, and **declare each dimension**
+  (visual + frame time; clarity + completeness) in `config.json`, judged
+  separately. One collapsed score is how a loop trades away the dimension nobody
+  is watching.
+- **Bake the bar's numbers at the freeze.** Run every machine measurement the
+  bar allows — frame times, sizes, counts, scores — once, into
+  `gauntlet/bar/measurements.md`. Critics get the numbers; nobody re-derives a
+  frozen artifact's metrics per round. Judgement is never baked, only
+  measurement — paraphrasing the bar is erosion (`failure-modes.md`).
+- **Place it on the ladder:** *testable* is the precondition Phase 0 produces,
+  *usable* is where the target belongs, *lovable* is where a stretch belongs. A
+  gauntlet does not generate POC → MVP → MLP; it moves one artifact up. If the
+  user actually needs to decide **whether to build at all**, that is discovery
+  work — say so rather than polish an unvalidated idea.
+
+## Phase 3 — Cut and rank the lanes
 
 Split the goal into **lanes**: the smallest units that can be improved and judged
-independently. You cut them, not the user — you can see the artifact and they
-cannot see it the way you do.
+independently. You cut them, not the user. → `references/decomposition.md`
 
-The lane test: *can a fresh critic look at this one thing and say which of two
-versions is better, without needing the rest?*
+- **The lane test:** can a fresh critic look at this one thing and say which of
+  two versions is better, without needing the rest?
+- **Rank them**, because a wave funds `wip_limit` lanes and not all of them:
+  value to the goal × how closeable the gap looks at lane level ÷ cost per round.
+  Starving every lane equally is the commonest way a budget produces nothing
+  finishable.
+- **One file, one owner, per wave**, in `gauntlet/ownership.md`. This is also
+  what lets the wave run concurrently.
+- **The lane set is frozen at the contract.** Between waves it can be merged,
+  split, re-ranked or replaced; it does not *grow* because the run noticed more
+  work — a new lane needs a slot freed by a retirement or a park. Everything else
+  anyone notices goes to `gauntlet/backlog.md`, one line, and returns in the
+  report as work the user can choose to buy. Never as scope this run added.
 
-Assign file ownership per lane in `gauntlet/ownership.md`. One file, one owner,
-per wave. Sizing, parallel-vs-serial, and re-cutting: `references/decomposition.md`.
+## Phase 4 — Run the waves
 
-## Round zero — before any wave
+A wave is one pass over the **funded** lanes — the top `wip_limit` of the ranked
+list, as printed by `status` — at **one round per lane per wave**. Phases 4–6
+cycle until a stop fires.
 
-Run one build and one critic verdict on a single lane before scaling up. It costs
-almost nothing and surfaces the two failures that would otherwise waste hours: a
-broken inspection path, and a bar too soft for the critic to compare against. A
-vague round-zero verdict means fix the bar, not run the wave.
+**Wave setup, once, before any lane starts:** take the champion commit. That one
+ref is every lane's `--champion-ref` for the wave. Concurrent per-round commits
+contend on the git index and capture each other's half-built trees — disjoint
+*file* ownership does not make the index disjoint (`state-and-resume.md`).
 
-## Phase 3 — Run the waves
+Then, per lane, per round:
 
-A wave is one pass over the active lanes. Phases 3 and 4 cycle until a stop
-condition fires — this is the loop, not a sequence.
-
-Per lane, per round:
-
-1. **Build.** Spawn a builder with the lane goal, the bar path, the current
-   artifact, and the last named gap. Not the previous builder's reasoning.
+1. **Build.** Builder gets the lane goal, the bar path, the current artifact and
+   the last named gap — not the previous builder's reasoning.
    → `references/builder.md`
-2. **Snapshot.** Commit the pre-round champion (git; conventions in
-   `references/state-and-resume.md`). Nothing is merged yet.
-3. **Judge — two comparisons, both blind where possible** (→ `references/critic.md`,
-   `references/blind-protocol.md`):
-   - **Promotion:** challenger vs champion. Challenger wins → promote. Loses →
-     revert. This is the regression guard; skip it only on the very first round
-     of a lane, when no champion exists.
-   - **Bar:** (if promoted) ours vs the bar, per dimension. Produces the winner,
-     the margin, the gap and its severity. This drives the streaks.
-4. **Log both** through `gauntlet.py log-round` (`--mode champion` and
-   `--mode blind`/`--mode rubric` respectively). Every record names the
-   `--dimension` it was judged on, and the script rejects any dimension not
-   declared in `config.json` — a lane cannot retire on dimensions nobody judged.
-5. A bar verdict with severity `major`/`minor` and no named gap is invalid — the
-   script rejects it. A verdict of severity `none` must still cite what it
-   inspected, or it is a lazy critic, not a clean round.
+   When the gap splits into gate-checkable pieces, the builder may take up to
+   three **micro-rounds** — build, run `gate`, build again — before one critic
+   judges the accumulated result. The champion guard still arms at that
+   judgement; log `--diff-lines` so the tripwire can read the round.
+2. **Gate, then judge.** Run `gate` first — a dimension failing its own benchmark
+   needs no critic — and hand its output to the critic. `gate` is lane-agnostic
+   and safe to run concurrently: its cache is locked, and a suite whose inputs
+   another lane just moved simply re-runs. Machine checks cost seconds; making
+   them a wave barrier to save those seconds would cost a wave. Then one critic
+   call covering both comparisons
+   (→ `references/critic.md`, `references/blind-protocol.md`):
+   - **Promotion:** challenger vs champion, **blind by default** — both sides
+     are ours, so this comparison is always blindable even when the bar is not:
+     export both under randomised labels, no history, and log `--blind`
+     (`references/blind-protocol.md`). Wins → promote; loses → revert. The
+     regression guard; skipped only on a lane's first round.
+   - **Bar:** ours vs the target bar, per dimension — produced on every round,
+     including a reverted one, where it judges the surviving champion. Gives the
+     winner, margin, gap and severity that drive the streaks. Routine rounds may
+     run at `--tier screening`; a deciding-tier verdict is required wherever a
+     lifecycle turns, and the script enforces it.
+3. **Log both** through `log-round` (`--mode champion`, then `--mode
+   blind`/`rubric`). Every record names its `--dimension`; the script rejects
+   undeclared ones, because a lane cannot retire on dimensions nobody judged.
+   Under a blind protocol the critic returns `WINNER: A | B` — you hold the label
+   mapping and log `ours`/`other`; never ask the critic which side was ours.
+4. A bar verdict with severity `major`/`minor` and no specific gap is invalid and
+   rejected. A `none` verdict must still cite what it inspected.
 
-Two critic calls per round is the default. On cheap, fast-moving lanes you may
-collapse them into one call that answers both questions — but log two records,
-and prefer the full split whenever a round's outcome will trigger retirement.
+**Run independent lanes concurrently.** Spawn the wave's builders in a *single
+message*, and spawn each lane's critic the moment **that lane's** builder returns
+— not when the slowest one does. A critic reads paths and owned files, never
+another lane's output, so waiting buys nothing: identical cost, roughly a third
+of the wall-clock at WIP 3.
 
-## Phase 4 — Smooth
+**Promotion and revert commits are yours, issued serially as verdicts land** —
+never by a builder, never in parallel. Path-scoped to that lane's owned files,
+which is what keeps one wave snapshot sufficient. They serialise against each
+other and block no lane.
 
-At the end of each wave, spawn one fresh agent over the *whole* artifact to
-resolve seams between independently-improved parts. Mandate: coherence, not
-redesign. → `references/smoother.md`
+**Serialise a pair instead when one lane's result changes what "good" means for
+the other** — lighting before materials, structure before paragraph polish
+(`references/decomposition.md`). The mechanics, so two agents resolve it the same
+way: the pair occupies both its slots in the same wave, the dependent builder
+spawns when the upstream *verdict* lands, and the other lanes are unaffected.
 
-Skip it when lanes are genuinely independent. Never skip it on a shared visual
-surface, a single document, or a single rendering pipeline. Then check
-`gauntlet.py status` and start the next wave, re-cut lanes, or stop.
+**Exactly two in-wave barriers:** the smoother, and the wave-boundary review.
+Gates, logging and the champion snapshot are not barriers. Never block on the
+user mid-wave; check-ins belong at boundaries, if autonomy asked for them.
 
-## Phase 5 — Stop and hand off
+## Phase 5 — Smooth
+
+At each wave's end, one fresh agent over the parts that changed, resolving seams
+between independently-improved lanes. Mandate: coherence, not redesign.
+→ `references/smoother.md`
+
+Skip only when the funded lanes touched genuinely disjoint files — check the
+diff, do not assume. Never skip on a shared visual surface, a single document, or
+one rendering pipeline.
+
+## Phase 6 — The wave-boundary review
+
+The cheapest phase in the loop and the one that decides whether the budget buys
+anything. Run `status`, then act:
+
+- **Retire** what met the target or ran out of closeable gaps; its budget returns
+  to the pool.
+- **Park** what `status` flags as stalled: `park --lane <l> --dimension <d>
+  --reason "<log read>"`. It is not a verdict on the artifact — it is the decision
+  to stop paying for rounds that stopped buying anything, and the open gap goes to
+  the user in the report. Resume only on *new evidence*: a re-cut, a fixed
+  inspection path, a new source asset, a revised bar. "It might work this time" is
+  sunk cost with extra steps.
+  **One tournament round before the park** when the stall is a ceiling within
+  reach of the target: two builders, *differently framed* approaches to the same
+  gap, judged blind three-way against the champion. The log has proven repetition
+  dead on this lane; diversity is the one move not yet tried, it costs one extra
+  builder call, and either it breaks the ceiling or it hardens the park report.
+  Once per lane per run — a second tournament is grinding with extra steps.
+- **Re-cut** when the smoother reports the same seam twice, or two lanes' critics
+  keep citing each other's territory. Between waves, never mid-wave; the protocol
+  is in `references/decomposition.md`.
+- **Reallocate** — a retired or parked lane promotes the next one in. Re-check
+  the feasibility arithmetic if the budget now looks tight.
+- **Harvest gates.** Any gap a critic named this wave that a command could check
+  becomes a gate in `config.json`. Gates accumulate; each one moves work
+  permanently from a critic call to a free check, so late waves are cheaper
+  *because* early waves happened. The run is meant to learn.
+- **Re-verify inspection** — open one evidence artifact this wave cited and
+  confirm it is real and current. A harness that broke silently makes every later
+  critic call worthless.
+- **Check the kill criteria** from intake. They fire early on purpose.
+- **Publish** with `board`. Free, and it keeps the user out of your context.
+
+## Phase 7 — Stop and hand off
 
 When a stop fires, finish the wave and the smoother (unless it is a safety stop),
-promote the best champion — not necessarily the latest challenger — then run
-`gauntlet.py report` and complete it:
+promote the best champion — not necessarily the latest challenger — then `board`
+and `report`. `report` drafts every section from the log; you add the one thing
+it cannot know, whether the bar was raised mid-run, and your honest read.
 
-- Bar used, and whether it was raised mid-run
-- Lanes, rounds each, how each retired
-- Gaps closed, and — the part the user actually needs — **gaps still open**
-- Blind vs rubric round counts (not equivalent evidence)
-- Your honest read on whether the loop was still improving at the stop
+**The surplus is the deliverable.** The promise of this variant is the same
+result at lower cost, so when every lane retires with budget unspent, the
+surplus **returns to the user by default** — stop, report, and state the
+savings against the intake projection (`report` prints both numbers). A stretch
+block — the contract's stretch re-armed as an announced target, same guards,
+judged rounds — exists as an option the user may *buy* with the surplus; offer
+it in one line, never roll into it, and never polish past a retired bar
+unasked. Spending the savings without a grant is how "cheaper" quietly becomes
+"the same price with extra steps".
 
 Do not soften the open-gaps section. A report that reads as a victory lap is
 worth less than one that says exactly where the artifact is still weak.
 
-## Phase 5b — when the budget depletes, offer an extension
-
-A budget stop means the money ran out, not that the artifact is done. Those are
-different facts and the user is owed both. So: stop the run, report, and then put
-one extension offer in front of them — **a next block of waves**, priced.
-
-`gauntlet.py status` prints the offer material as soon as the budget fires: the
-open dimensions, whether each is still moving (score trend, severity easing,
-margin narrowing), the recent revert rate, and its read of the log. Present that,
-not a vibe:
-
-```
-Budget depleted at wave 8. Stopped, smoothed, report written.
-  imagery/visual   still moving — score 5→7, severity major→minor; open gap: <gap>
-  imagery/perf     flat for 3 rounds; revert rate 60%
-Extension of 3 waves ≈ 30 subagent calls. My read: worth it for visual, not perf.
-Extend 3 waves on imagery/visual only, re-cut, or stop here?
-```
-
-Rules for the offer:
-
-- **The user grants it. You never self-extend**, and you never keep the loop
-  running while you ask. A budget that extends itself is not a budget.
-- **Offer a block, not an open tap.** Two to four waves, sized so the next
-  decision is made on fresh evidence. If it looks like it needs another twelve,
-  that is a re-cut or a new run, not an extension.
-- **Price it in the same units as intake** — waves and projected subagent calls
-  for the lanes still open, not the retired ones.
-- **Lead with the honest read.** Say "still improving", "flat", or "too few
-  rounds to tell" and back it from the log. Selling an extension you do not
-  believe in is the most expensive thing you can do in this skill.
-- **Recommend stopping when the evidence says stop.** At a ceiling, with every
-  dimension retired, with a broken inspection path, or on downhill drift, the
-  correct offer is "stop" or "re-cut" — `extend` refuses that log read without
-  `--force`, and a bar the artifact has passed calls for raising the bar instead.
-- **Record it.** `gauntlet.py extend --waves N --reason "<evidence>"` writes the
-  grant into `config.json` and the report; then note it in `contract.md` and on
-  the workbench. Extensions are run history, and an unrecorded one is how a
-  4-wave run quietly becomes a 30-wave one.
-
-If the user pre-agreed a hard cap at intake, it is the real ceiling — extensions
-stop there and the script refuses to cross it. Full protocol:
-`references/stop-conditions.md`.
+**Budget stop:** a budget stop means the money ran out, not that the artifact is
+done. Run `status` — it prints the offer material, the honest read and the priced
+block — and put that in front of the user. `extend` enforces the rest.
+→ `references/stop-conditions.md`
 
 ## Non-negotiables
 
-- **No builder grades its own homework.** Separate agent, fresh context, always.
-  (Builders *inspect* their output before handoff — checking it runs and renders
-  is not grading; it prevents burning a round on a broken artifact.)
-- **Critics inspect the artifact, never a summary of it.**
-- **Blind where blindable; label the mode honestly where not.**
-- **Name the gap or the round didn't happen.** Enforced by the script.
-- **The bar never moves down.** Frozen at intake; raising it mid-run is allowed
-  and announced.
-- **Losers get reverted.** Champion/challenger is what stops a long run from
-  wandering downhill one plausible-sounding round at a time.
-- **Every comparison goes through the log.** State the model remembers is state
-  the run will lose.
-- **The budget is extended by the user or not at all.** Stop first, offer second,
-  resume only on a grant — and log the grant with its reason.
-- **Language Rules (ASD-STE100).** All visible text on the Kanban board (goals, gaps, next fixes) and reports must use Simplified Technical English: max 20-25 words per sentence, active voice, one instruction per sentence, no AI marketing language.
+Four the script cannot check, so they are on you:
 
-## Failure modes
+- **No builder grades its own homework.** Separate agent, fresh context. (They do
+  *inspect* their output before handoff — a smoke test, not grading.)
+- **Critics inspect the artifact, never a summary of it** — and blind where
+  blindable, with the mode labelled honestly where not.
+- **Losers get reverted.** What stops a long run wandering downhill one
+  plausible-sounding round at a time. `log-round` checks the *record* says so;
+  only you can make the working tree match it.
+- **The target bar never moves down.** Raising it mid-run is allowed, announced.
 
-Read `references/failure-modes.md` before long unattended runs. The short list:
+The rest are enforced in `gauntlet.py` and it will say so at the point of use: a
+round with no named gap is rejected, a record on a retired dimension warns, a
+stalled lane must be parked before an extension can be priced, and an extension
+needs a reason drawn from the log. Restating them here would be a second copy to
+keep in sync — read the error message instead.
 
-| Mode | Signal | Response |
-|---|---|---|
-| Critic sycophancy | Everything passes, gaps get vaguer | Force a choice; severity field; require evidence |
-| Rubric gaming | Builder optimises the critic's wording, not the bar | Rotate critic framing; re-randomise labels |
-| Bar erosion | Comparisons quietly get easier | Re-read frozen bar files each wave |
-| Progress theatre | Rounds logged, artifact unchanged | Per-round artifact evidence; diff champions |
-| Lane collision | Two lanes fight over one file | One file, one owner per wave |
-| Downhill drift | Late output worse than mid-run | Champion commits; revert losers; per-dimension bars |
-| Context bleed | Critic echoes builder's justifications | Critic gets artifact + bar only |
-| Ceiling denial | Same gap recurs; reverts climb | Re-cut or stop; `status` surfaces the signal |
-| Budget creep | Extensions granted repeatedly, each "nearly there" | Block-sized extensions, evidence per grant, hard cap |
-| Inspection rot | Stale or missing evidence | Re-verify the path at every wave boundary |
+**Visible text is Simplified Technical English (ASD-STE100):** active voice, one
+statement per sentence, 20–25 words, no marketing language. It binds what the run
+*produces* — goals, gaps, verdicts, reports, the board — because that text is read
+by agents and users who did not write it. This file is method prose, not run
+output, and is not bound by the sentence ceiling.
 
 ## Degraded mode (no subagents)
 
-Without subagents the isolation weakens but the method survives: run critics as
-separate explicit passes that receive only the artifact and the bar, never carry
-builder rationale across, and keep logging through the script. Tell the user
-plainly that critic independence is weaker than a real context boundary — do not
-pretend otherwise. In a plain chat with no file access at all, offer the method
+Isolation weakens but the method survives: run critics as separate explicit
+passes receiving only the artifact and the bar, never carry builder rationale
+across, keep logging through the script. Say plainly that critic independence is
+weaker than a real context boundary. With no file access at all, offer the method
 as a manual protocol rather than claiming to run it.
 
 ## Scale expectations
 
-Set these at intake so the budget means something: each round is one builder call
-plus up to two critic calls; a wave multiplies that by active lanes; smoothing
-adds one call per wave. A 3-lane, 10-wave run is therefore roughly 100 subagent
-invocations. Parallel lanes raise the burn *rate*, not the total. When the
-projected total looks disproportionate to the artifact, say so before starting.
-
-Price an extension the same way, over the lanes still open — a 3-wave extension
-on one surviving lane is ~12 calls, not another hundred. That arithmetic is what
-makes "3 more waves?" a question the user can actually answer.
-
-## Worked example
-
-`references/example-run.md` walks one compact run end to end — contract, round
-zero, a revert, a re-cut, a judgment stop — with real log lines. Read it once
-before your first run; point users at it when they ask what they are agreeing to.
+A round is a builder call plus a critic call; a wave is that times the funded
+lanes, plus a smoother. `init` prints the projection (3 lanes × 8 waves ≈ 56
+calls); concurrency cuts a wave's wall-clock, not its cost. Say so before
+starting when the projection looks disproportionate to the artifact.
 
 ## Reference files
 
-Read at the relevant phase, not upfront:
+Each phase above cites the reference it needs — read it there, not upfront.
+Three are not cited inline:
 
-- `references/intake.md` — the contract; cold start; cost expectations
-- `references/bar-selection.md` — bar taxonomies; dimensions; finding a bar
-- `references/decomposition.md` — lane sizing, ownership, parallel vs serial
-- `references/blind-protocol.md` — honest blind comparison; champion mode; rubric fallback
-- `references/stop-conditions.md` — the four conditions, their mechanics, and the budget-extension protocol
-- `references/state-and-resume.md` — directory layout, git conventions, resuming a run
-- `references/workbench.md` — live progress surface; log schema
-- `references/failure-modes.md` — full diagnosis and repair
-- `references/example-run.md` — one annotated run
+- `references/example-run.md` — one annotated run end to end. Read once before
+  your first gauntlet; point users at it when they ask what they are agreeing to.
+- `references/workbench.md` — the generated progress surface and the log schema.
+- `references/authorities.md` — where these rules come from and what each forces.
 
-Subagents: `references/builder.md`, `references/critic.md`, `references/smoother.md`.
-Tooling: `scripts/gauntlet.py` (init / log-round / status / report).
+Subagent briefs: `builder.md`, `critic.md`, `smoother.md`.
+Tooling: `scripts/gauntlet.py` (init / log-round / gate / status / park / board / extend / report).

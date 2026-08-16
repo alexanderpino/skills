@@ -34,14 +34,52 @@ the critic recognises, one side being conspicuously shorter.
 
 The promotion comparison — this round's output against the current champion — is
 the *most* blindable comparison in the whole method: both sides are ours, so no
-branding, style, or provenance separates them. Run it under the same protocol:
-randomised labels, normalised presentation, no history.
+branding, style, or provenance separates them. **It runs blind by default, even
+in runs whose bar comparison cannot be blinded.** The mechanics cost one copy:
+
+```bash
+d=$(mktemp -d) && flip=$((RANDOM % 2))
+git show <champion-ref>:path/to/artifact > "$d/$([ $flip -eq 0 ] && echo A || echo B)"
+cp path/to/artifact "$d/$([ $flip -eq 0 ] && echo B || echo A)"
+# critic sees only $d — no repo, no history, no mtimes; you hold the flip
+```
+
+You hold the label mapping, log the verdict as `ours`/`other`, and add `--blind`
+to the champion record so `status` can report the share honestly. A run whose
+promotions all ran unblinded gets a nudge from `status` — that was this skill's
+own first failure: its reference run logged six bar rounds and zero blind
+anything, which made "blind where blindable" aspirational. The rest of the
+protocol is unchanged: randomised labels, normalised presentation, no history.
+
+By default it happens in the same critic call as the bar comparison — one
+inspection, two verdict blocks, two log records (`critic.md`). Blinding survives
+that perfectly well: the labels are randomised per comparison, and the critic
+never learns which side is ours in either. Split into two calls only when the
+round could retire a dimension, when the two verdicts point opposite ways, or
+when a wrong promotion is expensive to undo.
 
 It is also the comparison to fall back on when no external artifact can be
 compared at all (a bar that is purely numerical, or a category with no usable
 reference): a run judged only champion-vs-challenger still catches regressions
 and still climbs, it just loses the external ceiling. Log it as `--mode champion`;
 it feeds promotion decisions, never bar-met or clean-streak counters.
+
+## When the bar is a number
+
+A dimension whose bar is a measurement does not need a critic at all. Run the
+command, compare the number to the target, and log the result with the
+measurement as evidence:
+
+```bash
+python3 scripts/gauntlet.py log-round --wave 3 --lane imagery --dimension perf \
+  --round 5 --mode rubric --winner other --margin clear --score 6 \
+  --severity minor --gap "LCP 1.9s against a 1.5s budget" \
+  --evidence gauntlet/bench/w3r5.json
+```
+
+Machine gates are the cheapest rounds in the method and the only ones immune to
+sycophancy. Use one wherever the dimension allows it, and save the critic calls
+for the dimensions that genuinely need judgement.
 
 ## When blinding is impossible
 

@@ -12,151 +12,187 @@ waves; the shape is identical.
 "Keep going" with a supplied comparator: a gauntlet. Correctness is not the
 problem (the page renders); the ceiling is.
 
+## First light — before any of the paperwork
+
+No contract yet, no `gauntlet/` directory, no permission asked. One build of the
+thinnest hero that renders end to end — headline, image, CTA, all crude — then
+the Playwright harness pointed at it and a screenshot taken, then one critic
+against a *candidate* bar (the three reference heroes, not yet frozen).
+
+The first verdict came back *"B's type hierarchy is stronger"* with no measurable
+specifics — too soft to build against. Diagnosis: the candidate bar shots were
+whole pages, so the critic judged everything at once. Cropped them to the hero
+region and re-ran: *"A (ref): headline tracking is optically compensated at
+display size; B renders default tracking — visibly looser at 96px."* Actionable.
+
+That screenshot and that sentence went to the user **before** the contract
+below — about four minutes in. Two failures were already dead (a whole-page bar
+that could not discriminate; an unverified screenshot harness), and the
+conversation that follows is about something visible rather than an adjective.
+
+The verdict is not logged — `init` does not exist yet — so it goes into
+`contract.md` as the run's starting evidence.
+
+Then the arithmetic:
+
+> `major` gap with a named fix ≈ 2 rounds per lane × 3 lanes ÷ WIP 2 ≈ 3 waves
+> for one pass, ~6 for two. Fits inside 8. No rescope needed.
+
+Had it come to 14 waves, the honest move was to drop `layout` or lower the target
+*then* — not to start and discover it at wave 8.
+
 ## Contract (proposed in one block, confirmed by the user)
 
 ```
 GOAL     Hero section holds up in a blind comparison against the three references
-BAR      visual: screenshots of the three references at 1440×900 → gauntlet/bar/
-         perf: LCP < 1.5s, CLS < 0.1 (Lighthouse, throttled) → gauntlet/bar/perf.md
-INSPECT  Playwright screenshot harness at 1440×900 + Lighthouse CI, both verified
-LANES    typography, layout-and-spacing, imagery  (proposed; may re-cut)
-STOP     bar-met N=2, clean-streak N=2, budget 8 waves, judgment armed
-BUDGET   8 waves ≈ 3 lanes × ~2 rounds × 3 calls ≈ 40–60 subagent invocations
-AUTONOMY Unattended; workbench.html updated per round
-BENCH    gauntlet/workbench.html
+BAR KIND hybrid
+TARGET   visual: the three reference heroes at 1440×900 → gauntlet/bar/, score 7/10
+         perf:   LCP < 1.5s, CLS < 0.1 (Lighthouse, throttled) → gauntlet/bar/perf.md
+STRETCH  visual indistinguishable from reference 2 at full resolution — direction
+         only; not what retirement is judged against
+INSPECT  Playwright screenshots at 1440×900 (verified) + Lighthouse CI.
+         perf is a machine gate: no critic call, the number decides
+LANES    1 imagery  2 typography  3 layout-and-spacing   WIP limit 2
+STOP     bar-met 2, clean-streak 2, no-progress 3, budget 8 waves, judgment armed
+KILL     visual not at target by wave 5 → stop; the references are a different craft
+BUDGET   8 waves × (2 lanes × 2 calls + 1 smoother) ≈ 40 subagent invocations
+AUTONOMY Unattended; workbench regenerated each wave boundary
+BENCH    gauntlet/workbench.md
 ```
 
 ```bash
-python3 scripts/gauntlet.py init --lanes typography,layout,imagery \
-    --dimensions visual,perf --budget-waves 8
+python3 scripts/gauntlet.py init --lanes imagery,typography,layout \
+    --dimensions visual,perf --bar-kind hybrid \
+    --target-score 7 --wip-limit 2 --no-progress-n 3 --budget-waves 8
 ```
 
-Working tree was dirty → asked the user to commit first. Bar screenshots frozen
-into `gauntlet/bar/`.
-
-## Round zero
-
-One build round on `typography` only, then one critic. The critic verdict came
-back *"B's type hierarchy is stronger"* with no measurable specifics — too soft.
-Diagnosis: the bar screenshots included whole pages, so the critic judged
-everything at once. Fix: cropped bar shots to the hero region only. Second
-round-zero verdict: *"A (ref): headline tracking is optically compensated at
-display size; B renders default tracking — visibly looser at 96px."* Actionable.
-Wave 1 may start.
+The tree was dirty — first light did not care, but wave 1 does, so the user
+committed here. The cropped candidate shots were frozen into `gauntlet/bar/`,
+which is where they stop being candidates. Three lanes cut, two funded per wave:
+`layout` waits.
 
 ## Wave 1 (bootstrap — no champions exist yet)
 
-Three builders in parallel, disjoint file ownership. No promotion comparisons
-(first round of each lane); one bar comparison per lane per dimension.
+Two builders in parallel (`imagery`, `typography`), disjoint file ownership. No
+promotion comparisons (first round of each lane); one critic call per lane
+covering the visual dimension. `perf` needs no critic — Lighthouse decides it.
 
 ```bash
 python3 scripts/gauntlet.py log-round --wave 1 --lane typography --dimension visual \
-  --round 1 --mode blind --winner other --margin decisive --severity major \
+  --round 1 --mode blind --winner other --margin decisive --score 4 --severity major \
   --gap "no optical tracking compensation at display sizes" \
   --evidence gauntlet/shots/w1-typo-ab.png --critic-framing default
-```
 
-Similar records for `layout` (major: "reference uses a 12-col grid with content
-capped at 7 cols; ours spans full width") and `imagery`. Perf dimension logged
-via rubric mode (a Lighthouse number cannot be blinded):
-
-```bash
 python3 scripts/gauntlet.py log-round --wave 1 --lane imagery --dimension perf \
-  --round 1 --mode rubric --winner other --margin clear --severity major \
-  --gap "hero image 1.8MB uncompressed; LCP 3.4s vs 1.5s budget" \
+  --round 1 --mode rubric --winner other --margin clear --score 4 --severity major \
+  --gap "hero image 1.8MB uncompressed; LCP 3.4s against a 1.5s budget" \
   --evidence gauntlet/bench/w1.json
 ```
 
-Smoother pass: found one seam (typography's new type scale collided with
-layout's spacing tokens), fixed, logged.
+That second record cost a Lighthouse run and no subagent at all. Smoother pass:
+one seam (typography's new type scale collided with imagery's caption spacing),
+fixed. `board` regenerated.
 
 ## Wave 2 — a revert
 
-`layout`'s builder closed the grid gap but the challenger *lost* the promotion
-comparison: the critic (blind, challenger vs champion) found the new grid
-introduced horizontal overflow at 1280px. Reverted to the champion ref; the
-critic's reasoning — not the builder's — went into round 3.
+`typography`'s builder closed the tracking gap but the challenger *lost* the
+promotion comparison: the same critic call found the new type scale introduced
+horizontal overflow at 1280px. Reverted to the champion ref; the critic's
+reasoning — not the builder's — went into round 3.
 
 ```bash
-python3 scripts/gauntlet.py log-round --wave 2 --lane layout --dimension visual \
+python3 scripts/gauntlet.py log-round --wave 2 --lane typography --dimension visual \
   --round 2 --mode champion --winner other --margin clear --action reverted \
-  --champion-ref 4f2a91c --evidence gauntlet/shots/w2-layout-champ.png
+  --champion-ref 4f2a91c --evidence gauntlet/shots/w2-typo-champ.png
 ```
 
-A losing round is data: the next builder got "close the grid gap *without*
+A losing round is data: the next builder got "close the tracking gap *without*
 breaking 1280px" and succeeded in round 3.
 
-## Wave 3 — a re-cut
+## Wave 4 — a park
 
-The smoother reported the same seam twice running: typography and layout kept
-fighting over vertical rhythm. Per `decomposition.md`, a recurring seam means the
-cut is wrong. Merged the two lanes into `type-and-layout` between waves; noted in
-the workbench that streak counters for both reset deliberately.
+`imagery/visual` had run four rounds. `status` at the boundary:
 
-## Waves 4–6
+```
+[imagery / visual] STALLED
+  bar 4  promoted 1  reverted 2  streaks bar-met 0 clean 0  rubric 0.0
+  score 5/7 target  margins clear → clear → clear  trend: score 5→5, flat
+  PARK RECOMMENDED: no movement in 3 rounds (score 5→5, flat)
+  open gap: grain texture in the reference reads as intentional; ours reads as compression
+```
 
-`type-and-layout` visual: won blind rounds in waves 5 and 6 → bar-met streak 2 →
-dimension retired. Perf: LCP down to 1.4s → severity `none` twice → clean-streak
-retired. Lane retired. `imagery` visual kept losing on margin `thin` with gaps
-getting cosmetic ("grain texture in ref reads intentional; ours reads like
-compression").
+The builder's last handoff had already said it: the gap needs different source
+imagery, not different code. Parked, with the reason, and `layout` took the freed
+slot from the queue:
+
+```bash
+python3 scripts/gauntlet.py park --lane imagery --dimension visual \
+  --reason "flat 3 rounds at score 5, 2 reverts; grain gap is a source-asset problem"
+```
+
+The lane's open gap goes to the user in the report, where they can act on it —
+commission or generate better source images — in a way no further round could.
+`imagery/perf` kept running: it was still moving, and dimensions park separately.
+
+## Waves 5–7
+
+`typography/visual` won blind rounds in waves 6 and 7 → bar-met streak 2 →
+dimension retired at score 8 against a target of 7. `imagery/perf`: LCP down to
+1.4s → severity `none` twice → clean-streak retired. `layout/visual` closed two
+gaps and was still moving at wave 7.
 
 ## The stop
 
-`status` at the wave-6 boundary: one lane fully retired; `imagery` showing
-margins thin for three rounds and one revert — the judgment signal. Stopped on
-judgment with evidence, two waves under budget, rather than spending them on a
-lane at its ceiling.
+`status` at the wave-7 boundary: two dimensions retired, one parked, `layout`
+still climbing, one wave of budget left. The kill criterion did not fire — visual
+reached target at wave 6. Ran wave 8, smoothed, and stopped on budget.
 
 ```
+wave 8 of 8 budgeted | ~38 calls spent | 6 gap(s) closed (~6 calls each) | WIP limit 2
+
 STOP CONDITIONS FIRED / SIGNALLED:
-  - judgment signal: revert rate over 50% in recent rounds — likely at the ceiling
-```
-
-## Variant: the same run stopping on budget
-
-Had `imagery` still been closing gaps at wave 8, the budget would have fired
-first. Then the run stops, smooths, reports — and comes back with an offer rather
-than a farewell. `status` at the boundary:
-
-```
-wave 8 of 8 budgeted
+  - budget (wave 8 >= 8)
 
 BUDGET DEPLETED — stop cleanly, report, then OFFER AN EXTENSION.
 
 Evidence for the offer:
-  [imagery / visual] still moving (score 5→7, severity easing) — open gap: grain
-                     texture reads as compression, not intent
+  [layout / visual] still moving (score 5→7, severity easing) — open gap: vertical
+                    rhythm breaks below the fold
+  [imagery / visual] parked — not priced into an extension
   recent revert rate: 17%
 
   read: every open dimension is still moving — an extension is likely to buy real gains
 
-Suggested next wave block: 2–4 waves (~8–16 subagent calls over 1 open lane(s)).
+Suggested next wave block: 2–4 waves (~6–12 subagent calls over 1 open lane(s), WIP limit 2).
 ```
 
 Put to the user in four lines — what stopped, what is open, whether it is still
-moving, what more costs — and answered with "yes, three":
+moving, what more costs — and answered with "yes, two":
 
 ```bash
-python3 scripts/gauntlet.py extend --waves 3 \
-    --reason "imagery/visual score 5→7, severity major→minor, 1 revert in 6; grain gap still closeable"
+python3 scripts/gauntlet.py extend --waves 2 \
+    --reason "layout/visual score 5→7, severity major→minor, 1 revert in 6; rhythm gap still closeable"
 ```
 
-Waves 9–11 then run on `imagery` alone; the report shows `initial 8, extended 1×:
-+3` and says whether those three waves earned their keep. Had the read come back
-`at-ceiling` instead, the offer would have been "stop, or re-cut `imagery` around
-the source assets" — and `extend` would have refused the grant without `--force`.
+Note the price: ~6–12 calls, not another forty. The parked lane is not in that
+number, and `extend` would have refused the grant if it had still been unparked.
 
 ## The report (abridged)
 
-- Bar: three reference heroes (visual) + LCP/CLS budgets (perf); never moved
-- `type-and-layout`: retired, 9 bar rounds, 1 revert, 1 re-cut
-- `imagery`: open — largest remaining gap: image texture quality vs references
-- Evidence: 14 blind rounds, 6 rubric rounds
-- **Still improving at stop?** Visual: no — margins thin and flat for three
-  rounds. Perf: retired. Recommendation: the imagery gap is an asset problem,
-  not an iteration problem; commission or generate better source imagery, then
-  a 2-wave follow-up gauntlet on `imagery` alone would likely retire it.
+- Target: three reference heroes at 7/10 (visual) + LCP/CLS budgets (perf); never
+  moved. Stretch (indistinguishable at full resolution): not reached, and not
+  reachable by iteration — it is a photography problem.
+- Cost: ~38 calls, 6 gaps closed, ~6 calls per gap
+- `typography`: retired at wave 7, 7 bar rounds, 1 revert
+- `imagery/perf`: retired. `imagery/visual`: **parked** at wave 4 — open gap:
+  source image grain. Worth restarting only with new source assets; more waves
+  would not have moved it.
+- `layout`: open, still moving at the stop, extended 2 waves
+- Evidence: 11 blind rounds, 5 rubric rounds (perf was machine-gated throughout)
+- **Still improving at stop?** Yes on layout; no on the rest. Recommendation:
+  commission the hero imagery, then a 2-wave follow-up gauntlet on `imagery`
+  alone would likely retire it.
 
 That recommendation is the report doing its job: telling the user where more
-compute would and would not help.
+compute would and would not help — and the park is what made the answer honest
+instead of a guess.

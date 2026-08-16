@@ -1,0 +1,55 @@
+{
+  "stops": {
+    "bar_met_n": 2,
+    "clean_streak_n": 2,
+    "no_progress_n": 2,
+    "budget_waves": 3,
+    "hard_cap_waves": null,
+    "target_score": 9
+  },
+  "wip_limit": 3,
+  "dimensions": [
+    "quality"
+  ],
+  "lanes": [
+    "tokens",
+    "first-show",
+    "speed"
+  ],
+  "bar_kind": "acceptance criteria",
+  "extensions": [],
+  "parked": [],
+  "gates": [
+    {
+      "name": "no-orphan-references",
+      "cmd": "cd gauntlet-loop && for f in references/*.md; do grep -q \"$(basename $f)\" SKILL.md || echo \"ORPHAN $f\"; done",
+      "paths": [
+        "gauntlet-loop/SKILL.md",
+        "gauntlet-loop/references"
+      ]
+    },
+    {
+      "name": "no-dangling-paths",
+      "cmd": "cd gauntlet-loop && grep -oE 'references/[a-z-]+\\.md' SKILL.md | sort -u | while read q; do [ -f \"$q\" ] || echo \"DANGLING $q\"; done",
+      "paths": [
+        "gauntlet-loop/SKILL.md",
+        "gauntlet-loop/references"
+      ]
+    },
+    {
+      "name": "no-unknown-flags",
+      "cmd": "cd gauntlet-loop && grep -oE '\\-\\-[a-z-]{3,}' SKILL.md | sort -u | while read q; do grep -q -- \"\\\"$q\\\"\" scripts/gauntlet.py || echo \"UNKNOWN $q\"; done",
+      "paths": [
+        "gauntlet-loop/SKILL.md",
+        "gauntlet-loop/scripts/gauntlet.py"
+      ]
+    },
+    {
+      "name": "script-compiles",
+      "cmd": "python3 -m py_compile gauntlet-loop/scripts/gauntlet.py",
+      "paths": [
+        "gauntlet-loop/scripts/gauntlet.py"
+      ]
+    }
+  ]
+}

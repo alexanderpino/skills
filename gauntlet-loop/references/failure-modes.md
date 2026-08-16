@@ -6,6 +6,33 @@ improving, and nobody notices until the budget is gone.
 
 Read this before a long unattended run.
 
+Each guardrail in `SKILL.md` exists to buy off one of these, and this table is
+the mapping. A guardrail with no row here is ceremony and belongs deleted.
+
+| Known weakness | Signal it is happening | Guardrail |
+|---|---|---|
+| Runs forever; no natural stop | wave 26 of an agreed 8 | budget stop, kill criteria, hard cap |
+| Critic turns agreeable | everything passes; gaps get vaguer | forced winner, severity + named evidence |
+| Builder learns the critic, not the bar | output matches the critic's phrasing | frozen bar, rotated framing, randomised labels |
+| Bar erosion | comparisons quietly get easier | bar files re-read from disk each wave |
+| Unreachable bar | every round loses; scores never move | target vs stretch, `--target-score` |
+| Every round wins, the whole gets worse | wave 10 worse than wave 6 | champion/challenger revert, per-dimension bars |
+| A lane grinds against a ceiling | same gap round after round, still funded | `no-progress` park, re-cut |
+| Progress theatre | rounds logged, artifact unchanged | per-round evidence, diff champions |
+| Lane collision | reverts undo another lane's work | one file, one owner, per wave |
+| Context bleed | critic echoes builder justifications | critic gets artifact + bar only |
+| Gold plating | rounds spent past a retired dimension | retirement is a stop, not a suggestion |
+| Settled work re-judged, checks re-derived | the log grows, the artifact does not | settled-work rule, hash-cached `gate` |
+| Scope snowball | more lanes at wave 6 than wave 1 | frozen lane set, backlog |
+| Token burn | cost per closed gap climbing | machine gates, one critic call, WIP, LOD ladder, degradation order |
+| Critic softens; reads as progress | severity easing over near-empty diffs | softening tripwire (`--diff-lines`) in `status` |
+| Blind quietly never happens | every round logged rubric, promotions unblinded | blind promotions by default, `--blind` share in `status` |
+| Savings spent instead of returned | target met, run keeps polishing | surplus returns by default; stretch only on a user grant |
+| Parked short of the target after repetition failed | same builder, same gap, park looming | one tournament round: two framings, blind, before the park |
+| Cost invisible until the bill | budget in waves, burn in tokens | `--budget-tokens`, `--tokens`, cost per gap in `status` |
+| Inspection rot | stale or repeated evidence | re-verify the path at every wave boundary |
+| Nobody sees progress without interrupting | user asks "where are we?" | generated board |
+
 ## Critic sycophancy
 
 **Signal.** Everything passes. Gaps get vaguer round over round: "lighting could be
@@ -19,6 +46,12 @@ or the bar is too soft to discriminate.
 counter-pressure: `none` is a strong, evidence-backed claim, not a shrug — and
 `log-round` rejects a major/minor verdict with no named gap outright. If gaps
 stay vague after that, the bar is the problem, not the critic.
+
+The mechanical tripwire: log `--diff-lines` each round, and `status` flags any
+lane whose severity eases while the diffs stay near-empty. An artifact that
+barely changed did not genuinely get better — that signature is a critic
+drifting agreeable, and the flagged verdict is re-run with rotated framing
+before anything trusts it.
 
 ## Rubric gaming
 
@@ -43,6 +76,100 @@ each time it was restated.
 
 **Repair.** Bar files frozen at `gauntlet/bar/` and re-read from disk each wave.
 Never restate the bar from memory into a subagent prompt — point at the path.
+
+## Unreachable bar
+
+**Signal.** Every round loses. Scores sit at 4 and never move. Every dimension
+looks stalled at the same time, and the loop reads as failing when it is actually
+working.
+
+**Cause.** The target was set at an ideal rather than at "done", or
+`target_score` was set to 10 so nothing can ever pass. A bar nobody can reach
+stops discriminating: a near miss and a disaster both log as a loss.
+
+**Repair.** Put the ambition in the stretch line, and set the target where the
+run can plausibly land inside the budget (`bar-selection.md`). Do it before wave
+1 — the feasibility check after first light exists for exactly this. Mid-run, a
+target that is provably out of reach is a rescope conversation with the user, not
+something to grind against.
+
+## Zombie lane
+
+**Signal.** The same lane keeps getting funded, round after round, with the same
+gap named each time. Its score has not moved in four rounds. Everyone can see it
+is stuck; nobody stops it, because stopping feels like giving up.
+
+**Cause.** No prune rule, or a lead agent treating parking as failure. Sunk cost
+does the rest: the more rounds a lane has consumed, the more it seems to deserve
+one more.
+
+**Repair.** The `no-progress` condition is mechanical for this reason —
+`status` flags it, `extend` refuses to price an extension until it is parked, and
+`park` records the reason. Park it, name which of the three causes it was
+(structural, not-a-code-problem, cut wrong — `decomposition.md`), and give the
+slot to the next lane. The open gap goes to the user, who can act on it in ways
+the loop cannot.
+
+## Gold plating
+
+**Signal.** Rounds still running on a dimension that already retired. Builders
+polishing past the target because the artifact "could be better".
+
+**Cause.** Retirement treated as a suggestion, or a target bar nobody believes in
+so the run keeps going by feel.
+
+**Repair.** Retirement is a stop. If the artifact genuinely passed the bar with
+budget left, that is a bar problem: raise it, announced and recorded, and let the
+run continue against something real. Do not fund unjudged polish — no gap, no
+builder.
+
+## Re-litigation
+
+**Signal.** Rounds spent on ground the run already covered: a retired dimension
+judged again, a closed gap re-argued by a new critic, a whole-artifact review
+"just to check" every few waves. The log grows; the artifact does not.
+
+**Cause.** No notion of settled work. Each critic starts cold by design, so
+without an explicit rule nothing stops one from re-opening a question the log
+answered three waves ago — and a lead agent nervous about quality will invite it.
+
+**Repair.** Settled is settled: a closed gap and a retired dimension are not
+re-judged (`critic.md`), and `log-round` warns when a record lands on a retired
+dimension. Regressions are caught *mechanically* rather than by re-review — the
+champion/challenger comparison catches them within a dimension, and machine gates
+re-run every wave catch them across dimensions. A critic that believes something
+previously closed has broken reports it as a regression in NOTES, with evidence.
+
+## Scope snowball
+
+**Signal.** More lanes at wave 6 than at wave 1. Builders fixing adjacent things
+they noticed. A projected call count that has quietly doubled since intake, with
+no extension granted.
+
+**Cause.** Every agent in the loop can see improvements outside its lane, and
+each individual addition looks small and obviously worthwhile. Nothing in the
+method stops the sum.
+
+**Repair.** The scope is frozen at the contract (`decomposition.md`): re-cuts
+redistribute, they never expand, and a new lane needs a slot freed by a
+retirement or a park. Noticed work goes to `gauntlet/backlog.md` and into the
+report, where the user can buy it deliberately in a future run. Compare the
+current projection against the intake projection at each wave boundary — a rise
+with no granted extension is the snowball, measured.
+
+## Token burn
+
+**Signal.** Cost per closed gap climbing wave over wave in `status`. Waves that
+cost as much as the first ones and close nothing.
+
+**Cause.** Critic calls doing work a command could do, two critic calls where one
+inspection would answer both questions, artifacts pasted into prompts, six lanes
+funded for one round each.
+
+**Repair.** `cost-discipline.md`, in full. The two that matter most: machine
+gates for anything measurable, and the WIP limit for everything else. And when
+cost per gap keeps climbing while the open gaps get cosmetic, the honest response
+is a stop, not a cheaper loop.
 
 ## Progress theatre
 
@@ -100,10 +227,17 @@ Revert rate climbs past wins.
 that lane-level work cannot reach.
 
 **Repair.** Recognise it rather than grinding — `status` flags a revert rate
-over 50% in the recent window as exactly this signal. Either re-cut the lanes to
-include the structural element, or stop and report it as an open gap with a
-recommendation. Burning budget on a ceiling is the most common way a long run
-wastes money while looking busy.
+over 50% in the recent window as exactly this signal, and the same signal parks
+the dimension. Before the park, when the stall sits within reach of the target,
+spend **one tournament round**: two builders on the same gap under deliberately
+different framings, judged blind three-way against the champion. The log has
+already proven repetition dead here; diversity is the one move not yet tried,
+and it costs one extra builder call. It either breaks the ceiling or turns "we
+stalled" into "two independent approaches both hit this wall" — which is a far
+stronger park report. Once per lane per run. Then: re-cut the lanes to include
+the structural element, or park and report the open gap with a recommendation.
+Burning budget on a ceiling is the most common way a long run wastes money
+while looking busy.
 
 ## Budget creep
 
