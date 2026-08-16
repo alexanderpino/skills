@@ -1775,6 +1775,230 @@ def runup_hunt(H, xi):
     return H * xi
 
 
+# ==================================================== THE SUBAERIAL BEACH
+#
+# WAVE 8. Waves 1-3 built the whole nearshore and stopped at the datum: the
+# Dean ramp is submarine, the coastal loop's deposition capacity ran from
+# `sea_level - 3.0` up to `sea_level` and not one centimetre above it, and the
+# comment beside it said so outright -- "a beach does not build above the water
+# line here, and the excess LEAVES THE DOMAIN". It leaves at 90.0% of the sand
+# eroded. So the beach scene had a 6 m strip of land between the water and a
+# cliff face of slope 1.0, and `shade_land` classified it as ROCK. Bar J's
+# five-rung colour ladder had three rungs.
+#
+# THREE NUMBERS MAKE A SUBAERIAL BEACH AND EACH ONE IS DERIVED FROM SOMETHING
+# THIS FILE ALREADY OWNS. None of them is chosen and none of them is new.
+#
+#   1  the FACE SLOPE      the equilibrium profile's own slope where it stops
+#                          being solvable                    `beach_face_slope`
+#   2  the SWASH EXCURSION the horizontal reach of the run-up, and it does not
+#                          depend on the slope                `swash_excursion`
+#   3  the RUN-UP LIMIT    the elevation the swash builds to      `berm_crest`
+#
+# and 2 = 3/1 identically, which is the check that the three are one statement
+# rather than three declarations. Written out: Hunt's R = xi*H with
+# xi = tan(beta)/sqrt(H/L_0) is R = tan(beta)*sqrt(H*L_0), so the horizontal
+# excursion R/tan(beta) is sqrt(H*L_0) and the slope cancels. THE WIDTH OF THE
+# DRY BEACH IS THE GEOMETRIC MEAN OF THE DEEP-WATER HEIGHT AND WAVELENGTH,
+# closed form, no constant, and it is 13.77 m at this scene's swell against the
+# 6.0 m of leftover the bed had before.
+
+def beach_face_slope(A=DEAN_A, d_hand=D_MORPH_MIN):
+    """tan(beta) of the beach face: the equilibrium profile's slope where the
+    surf-zone model hands over to the swash.
+
+    THE DEAN PROFILE HAS NO SHORELINE SLOPE, and that is why a beach face is a
+    separate landform rather than the last few metres of the same curve.
+    d = A*y^(2/3) has dd/dy = (2/3)*A*y^(-1/3), which DIVERGES at y = 0; the
+    profile is derived from uniform energy dissipation per unit water volume
+    and there is no water volume at the shoreline for the dissipation to be
+    uniform in. So the face is a straight ramp and what fixes its angle is
+    WHERE the equilibrium profile stops answering.
+
+    This file already states where that is. `D_MORPH_MIN` gates the Exner step
+    to water deeper than 0.35 m, with the reason written beside it: "the bed
+    inside the swash is shaped by swash, which is not modelled here, so the
+    loop is not allowed to invent an answer for it". That is a statement about
+    the physics and not only about the numerics, and it is the handover depth.
+    The face is the tangent to the equilibrium profile there:
+
+        y_0 = (d/A)^(3/2)          tan(beta) = (2/3) A^(3/2) / sqrt(d)
+
+    = 0.05282 at this scene, 1:18.9, which is an ordinary intermediate sandy
+    beach face.
+
+    AND IT IS NOT ONLY A CLOSED FORM -- THE EVOLVED BED AGREES. The 1-D
+    morphodynamic loop is run to quasi-steady from a Dean ramp and reshaped by
+    the transport all the way in; its own slope at the innermost cell it
+    resolves is 0.0529 against the 0.0528 above, 0.2% apart. Two instruments,
+    one derived and one run, and the second could have disagreed: the bar the
+    loop builds is a 0.4 m departure from the ramp 100 m offshore.
+
+    THE HANDOVER DEPTH IS THE ONE SOFT PLACE AND IT IS BRACKETED RATHER THAN
+    ASSERTED. tan(beta) goes as 1/sqrt(d): 0.0988 (1:10) at the transform's own
+    depth floor D_MIN = 0.10 m, 0.0528 (1:19) at D_MORPH_MIN, 0.0312 (1:32) at
+    1 m. That factor of three IS the observed range of sandy beach faces, so
+    the bracket is honest and the mid value is not a coincidence -- but a
+    reader should know that this quantity is the softest of the three.
+
+    THE ROUTE THIS FILE ALREADY HAD DOES NOT WORK, and saying so matters.
+    `EPS_SLOPE`'s own comment gives the Bailard equilibrium slope as Sk/eps --
+    "the slope at which gravity balances the skewness drive". Evaluated in the
+    swash it is ZERO: the skewness carries a (1 - f_brk) factor, the inner surf
+    is fully broken, and the model's equilibrium there is a flat terrace.
+    Measured at the six innermost resolved cells: 0.148, 0.128, 0.067, 0, 0, 0.
+    That is the transport model saying it has no swash, which is exactly what
+    `D_MORPH_MIN` says, and it is why the slope is taken from the profile
+    rather than from the flux.
+    """
+    y0 = (d_hand / A) ** 1.5
+    return (2.0 / 3.0) * A / y0 ** (1.0 / 3.0)
+
+
+def swash_excursion(H=H0_SWELL, T=T_SWELL):
+    """sqrt(H*L_0) -- the horizontal reach of the run-up, INDEPENDENT of the
+    beach slope.
+
+    Hunt's R = xi*H with xi = tan(beta)/sqrt(H/L_0) is linear in tan(beta), so
+    the horizontal distance R/tan(beta) has the slope divided out of it. It is
+    the width of the dry beach a given swell builds, and it needs nothing but
+    the deep-water sea state. 13.77 m at H_0 = 1.5 m, T = 9 s; 19.47 m at the
+    file's own storm, H_0 = 3.0 m.
+
+    `?` INHERITED, NOT NEW: it carries `runup_hunt`'s unstated coefficient, so
+    it is the SCALE of the excursion. Nothing here adds an unknown.
+    """
+    return math.sqrt(H * deep_wavelength(T))
+
+
+def berm_crest(H=H0_SWELL, T=T_SWELL, tan_beta=None):
+    """The elevation the swash builds to: R = tan(beta)*sqrt(H*L_0).
+
+    Hunt's run-up is measured from the STILL-WATER line and already contains
+    the set-up, so no set-up term is added here -- adding one would count the
+    same rise twice. 0.727 m for the swell, 1.029 m for the storm.
+    """
+    tb = beach_face_slope() if tan_beta is None else tan_beta
+    return tb * swash_excursion(H, T)
+
+
+TAN_FACE = beach_face_slope()           # 0.052823, 1:18.9
+BERM_Z = berm_crest()                   # 0.7274 m -- the SWELL run-up limit
+BACKSHORE_Z = berm_crest(H0_STORM)      # 1.0286 m -- the STORM run-up limit
+SWASH_W = swash_excursion()             # 13.771 m -- the dry beach's width
+BACKSHORE_W = swash_excursion(H0_STORM)  # 19.474 m
+
+
+def swash_wetness(z, R=None):
+    """The share of swash cycles that reach elevation `z`: exp(-(z/R)^2).
+
+    THE WET/DRY BOUNDARY IS NOT A LINE AND THE FILE ALREADY OWNS THE
+    DISTRIBUTION. Run-up heights inherit the incident wave heights' statistics,
+    which this file has taken as Rayleigh since wave 1 (`rayleigh_quantiles`,
+    used for the storm forcing). The exceedance of a Rayleigh variate of rms
+    scale R is exp(-(z/R)^2), so the fraction of time a level is swept -- and
+    therefore the fraction of the surface carrying a film -- falls smoothly
+    from 1 at the waterline to 0.368 at the run-up limit and 0.018 at twice it.
+    No boundary is placed and no width is chosen.
+
+    `?` ON WHICH RUN-UP LEVEL HUNT'S R IS, inherited from `runup_hunt` and not
+    added here. Read as the RMS run-up it gives the band above; read as R_2%
+    the Rayleigh scale is R/sqrt(ln 50) = R/1.977 and the band is half as tall.
+    Both are reported; the first is shipped and the second is the bracket.
+    """
+    R = BERM_Z if R is None else R
+    return np.exp(-(np.maximum(np.asarray(z, float), 0.0) / R) ** 2)
+
+
+def subaerial_beach(x, h2, h_rock=None, sea_level=None, tan_face=None,
+                    berm=None, backshore=None, sand_row=None, dy=None):
+    """Lay the beach the coastal loop's own erosion paid for, per row.
+
+    THE PROFILE IS THREE SEGMENTS AND TWO OF THE JOINS ARE DERIVED:
+
+        the FACE        a straight ramp at tan(beta) from the waterline
+                        landward, `swash_excursion` metres of it
+        the BERM LEVEL  z = BERM_Z, the swell's run-up limit. It is a level on
+                        the face and NOT a break in slope -- see below
+        the BACKSHORE   flat at the STORM run-up limit, from the storm swash's
+                        landward limit to the cliff foot
+
+    WHY THE BERM CREST IS NOT A BREAK IN SLOPE, AND THIS CONTRADICTS THE
+    ORDINARY PICTURE OF A BEACH. Hunt's run-up with one face slope puts EVERY
+    run-up limit on the SAME PLANE -- R = tan(beta)*sqrt(H*L_0), so the swell's
+    limit and the storm's limit differ only in how far up that one plane they
+    reach. A berm crest is a break in slope, and a break in slope needs the
+    swell to CUT the storm-built profile, which needs swash transport this
+    model does not have. So what this bed carries is a face, a marked berm
+    LEVEL at 0.727 m where the wet/dry boundary sits, and a flat backshore at
+    1.029 m. THE BERM SCARP IS `?` and it is absent, not approximated.
+
+    THE ANCHOR IS THE CLIFF FOOT AND THE BEACH PROGRADES SEAWARD FROM IT. On
+    this coast the cliff comes down to the water at a slope of 1.2, so a wedge
+    built landward of the present waterline has nowhere to go -- the basement
+    crosses the run-up limit within 60 cm of the shoreline and the capacity is
+    zero. A beach on a cliffed coast is a body of sand standing SEAWARD of the
+    cliff, and its landward limit is where the rock reaches the backshore
+    elevation. That is what is built here.
+
+    THE VOLUME IS CHECKED AND IT IS NOT WHAT LIMITS THE WIDTH. Each row is
+    given `sand_row` cubic metres (the loop's own eroded volume times
+    `SAND_FRACTION`, the part it currently exports) and the wedge needs about
+    35 m^3 per metre of coast; the loop delivers about 1900. So the width is
+    set by the PROFILE GEOMETRY -- where the face meets the equilibrium ramp --
+    and the budget is a check that passes with two orders to spare rather than
+    a knob. Which of the two binds is returned as `supply_limited`.
+
+    WHAT IS PLACED, MARKED: this is applied at COMPOSITION time, in `bay_bed`,
+    and not inside `coastal_step`'s iteration. Inside the iteration the beach
+    moves the waterline the notch attacks and the cliff stops retreating -- a
+    real feedback (a beach protects a cliff) and a wave of its own, because it
+    changes the plan-form every suite row in `_sec_coast` is measured on. The
+    budget is the loop's, the slope is the profile's, the elevations are the
+    run-up's; the ITERATION is not closed and this note is the mark.
+    """
+    x = np.asarray(x, float)
+    h = np.asarray(h2, float).copy()
+    rock = h.copy() if h_rock is None else np.asarray(h_rock, float)
+    # SEA_LEVEL is declared with the coastal loop's own constants, further down
+    # the file than this function is defined, so it is resolved at CALL time.
+    sea_level = SEA_LEVEL if sea_level is None else sea_level
+    tb = TAN_FACE if tan_face is None else tan_face
+    zb = BERM_Z if berm is None else berm
+    zs = BACKSHORE_Z if backshore is None else backshore
+    dx = float(x[1] - x[0])
+    ny, nx = h.shape
+    # THE CLIFF FOOT: walking SEAWARD from the landward edge, the last cell
+    # whose rock is still above the backshore elevation. Same walk as
+    # `shoreline_x` and for the same reason -- a bench poking above the datum
+    # offshore must not be mistaken for the coast.
+    above = rock > (sea_level + zs)
+    run = np.cumprod(above[:, ::-1], axis=1)[:, ::-1].astype(bool)
+    i_foot = np.argmax(run, axis=1)
+    i_foot = np.where(run.any(axis=1), i_foot, nx - 1)
+    # the storm-swash plane, descending seaward from the cliff foot
+    dist = (x[i_foot][:, None] - x[None, :])            # >0 seaward
+    plane = (sea_level + zs) - tb * np.maximum(dist, 0.0)
+    plane = np.where(dist >= 0.0, plane, sea_level + zs)  # flat landward: none
+    fill = np.maximum(plane - rock, 0.0) * (dist >= 0.0)
+    need_row = fill.sum(axis=1) * dx                    # m^3 per metre of coast
+    if sand_row is not None and dy:
+        have = np.asarray(sand_row, float) / float(dy)  # m^3 per metre
+        frac = np.clip(np.where(need_row > 1e-12, have / np.maximum(need_row,
+                                                                    1e-12),
+                                0.0), 0.0, 1.0)
+    else:
+        frac = np.ones(ny)
+    h = rock + frac[:, None] * fill
+    z = h - sea_level
+    on = (fill > 1e-6) & (frac[:, None] > 0.0)
+    wid = ((z > 0.0) & on).sum(axis=1) * dx
+    return dict(h=h, sand=frac[:, None] * fill, i_foot=i_foot,
+                need_row=need_row, frac=frac, width=wid,
+                supply_limited=bool((frac < 0.999).any()),
+                tan_face=tb, berm=zb, backshore=zs)
+
+
 # --------------------------------------------------------------- the 2-D bed
 def bed_2d(x, y, h1d, h_ref, lam_rip=120.0, gap_frac=0.75, gap_width=25.0,
            jitter=0.25, seed=20260813):
@@ -2184,6 +2408,14 @@ def coastal_step(h2, hard, expo, dx, dy, sea_level=SEA_LEVEL,
     vol = float(ero.sum()) * dx * dy
     h = thermal_relax(h, dx, dy, math.tan(math.radians(repose)))
     export = 0.0
+    # WAVE 8. THE SAND THE STEP PRODUCED, PER ROW. `vol` is the whole rock
+    # wedge removed and `export` is the scalar remainder; neither of them is
+    # the quantity a beach is made of, which is the beach-GRADE fraction and
+    # which row of the coast it came off. It is read out here and spent by
+    # `bay_bed` on `subaerial_beach`. NOTHING BELOW IS CHANGED BY THIS LINE --
+    # it is the same `ero` the deposition already uses, summed on a different
+    # axis -- so every measurement in `_sec_coast` is bit-identical to wave 7's.
+    sand_row = ero.sum(axis=1) * dx * dy * sand_fraction
     if deposit and vol > 0.0:
         # `nearShore` is WATER, and it has to be said: the exposure sweep
         # returns zero on land (no fetch reaches a cell behind the cliff), so
@@ -2218,7 +2450,7 @@ def coastal_step(h2, hard, expo, dx, dy, sea_level=SEA_LEVEL,
         f = np.where(cap_row > 1e-12, give / np.maximum(cap_row, 1e-12), 0.0)
         h = h + f[:, None] * cap
         export = float(vol - give.sum())
-    return h, vol, export
+    return h, vol, export, sand_row
 
 
 def _dilate4(m):
@@ -2253,24 +2485,27 @@ def evolve_coast(x, y, h0, hard, n_steps=400, expo_every=25, **kw):
     it is the slow field (it changes only as the coast changes shape) and the
     fast one is the bed.
 
-    Returns (h, exposure, volume eroded, volume exported, history)."""
+    Returns (h, exposure, volume eroded, volume exported, per-row sand,
+    history)."""
     h = np.asarray(h0, float).copy()
     dx = float(x[1] - x[0])
     dy = float(y[1] - y[0])
     expo = None
     v_tot = 0.0
     v_exp = 0.0
+    s_row = np.zeros(np.asarray(h0).shape[0])
     hist = []
     for s in range(int(n_steps)):
         if s % expo_every == 0:
             expo = fetch_exposure(x, y, h)
-        h, v, ex = coastal_step(h, hard, expo, dx, dy, **kw)
+        h, v, ex, sr = coastal_step(h, hard, expo, dx, dy, **kw)
         v_tot += v
         v_exp += ex
+        s_row = s_row + sr
         if s % max(1, n_steps // 6) == 0 or s == n_steps - 1:
             hist.append((s, h.copy()))
     expo = fetch_exposure(x, y, h)
-    return h, expo, v_tot, v_exp, hist
+    return h, expo, v_tot, v_exp, s_row, hist
 
 
 def shoreline_x(x, h2, sea_level=SEA_LEVEL):
@@ -2313,7 +2548,7 @@ def platform_width(x, h2, sea_level=SEA_LEVEL, band=0.75):
 
 
 def bay_bed(x, y, h_coast, h_init, A=DEAN_A, d_shelf=D_SHELF,
-            sea_level=SEA_LEVEL, smooth=True):
+            sea_level=SEA_LEVEL, smooth=True, sand_row=None, beach=True):
     """Compose the coastal loop's plan-form into a submarine bed.
 
     Chapter 12 draws the line itself and this function is on both sides of it:
@@ -2375,7 +2610,19 @@ def bay_bed(x, y, h_coast, h_init, A=DEAN_A, d_shelf=D_SHELF,
         # a one-cell step in the bed is an infinite convergence to Exner. NOT a
         # wavelength-scale filter -- see `smooth_depth`'s note on chapter 27.
         h = _smooth2(h, 1.0, 1.0)
-    return h, x_s, h_dean
+    bch = None
+    if beach:
+        # WAVE 8: THE SUBAERIAL BEACH, LAID AFTER THE SMOOTH AND NOT BEFORE.
+        # The face slope is the whole point of the landform and a 2 m Gaussian
+        # across a 13.8 m ramp rounds 30% of it into the toe and the crest. The
+        # wedge is laid on the composed rock and its own joins are exact by
+        # construction, so it needs no filter of its own.
+        bch = subaerial_beach(x, h, h_rock=h, sea_level=sea_level,
+                              sand_row=sand_row,
+                              dy=float(y[1] - y[0]) if y.size > 1 else None)
+        h = bch['h']
+        x_s = shoreline_x(x, h, sea_level)
+    return h, x_s, h_dean, bch
 
 
 def _gauss1(a, sigma_cells, axis):
@@ -2834,12 +3081,12 @@ def run_coast(dx=DX_COAST, dy=DY_BAY, x_len=X_LEN_BAY, y_half=Y_HALF_BAY,
     y = np.arange(-y_half, y_half + dy, dy)
     h0 = initial_coast(x, y)
     hard = hardness_field(x, y, uniform=uniform_hardness)
-    h, expo, vol, exported, hist = evolve_coast(x, y, h0, hard,
-                                                n_steps=n_steps,
-                                                expo_every=max(n_steps // 16, 1),
-                                                **kw)
+    h, expo, vol, exported, s_row, hist = evolve_coast(
+        x, y, h0, hard, n_steps=n_steps, expo_every=max(n_steps // 16, 1),
+        **kw)
     out = dict(x=x, y=y, h0=h0, h=h, hard=hard, expo=expo, vol=vol,
-               exported=exported, hist=hist, x_s=shoreline_x(x, h),
+               exported=exported, sand_row=s_row,
+               hist=hist, x_s=shoreline_x(x, h),
                x_s0=shoreline_x(x, h0), dx=dx, dy=dy)
     _BAY_CACHE[key] = out
     return out
@@ -2863,11 +3110,13 @@ def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
     x = np.arange(0.0, xc[-1] + dx, dx)
     hc = np.stack([np.interp(x, xc, cs['h'][j]) for j in range(y.size)])
     h0c = np.stack([np.interp(x, xc, cs['h0'][j]) for j in range(y.size)])
-    h_init, x_s, h_dean = bay_bed(x, y, hc, h0c)
+    h_init, x_s, h_dean, bch = bay_bed(x, y, hc, h0c,
+                                       sand_row=cs.get('sand_row'))
     h, tr2, hist, edge = evolve_2d(x, y, h_init, T, H0, theta0,
                                    n_steps=n_steps, dt=dt, k_every=k_every,
                                    **flux_kw)
     out = dict(x=x, y=y, h_init=h_init, h=h, tr=tr2, x_s=x_s, h_dean=h_dean,
+               beach=bch,
                hist=hist, coast=cs, dx=dx, dy=float(y[1] - y[0]), edge=edge,
                tr_init=transform_2d(x, y, h_init, T, H0, theta0))
     if coast is None:
