@@ -52,7 +52,16 @@ H_WATER = 0.0        # the datum. One number, because the chapter's pass is a
 D_MAX = 3.00         # m. Chosen so that tau_red = ABS[0]*D_MAX = 0.785 lands at
                      # the top of the LUT domain and inside the chapter's own
                      # scaling table; 3 m is also a plausible shelf edge.
-SLOPE = 0.18         # bed gradient; reaches D_MAX at x = D_MAX/SLOPE = 16.67 m.
+SLOPE = 0.55         # bed gradient; reaches D_MAX at x = D_MAX/SLOPE = 5.45 m.
+                     # SIZED, not picked: the frame has to carry the whole tau
+                     # range and a downward-looking camera only reaches so far
+                     # before the view goes grazing and the pixel becomes all
+                     # surface reflection. At 0.55 the ramp closes inside 5.5 m
+                     # and the camera below spans tau_red 0 -> 0.785 between
+                     # cos(theta_a) 0.80 and 0.34, which is water read as water.
+                     # A gentler slope pushes the deep end to the horizon and
+                     # the measurement into the Fresnel-dominated band, which is
+                     # what the first writing of this file did.
 DECK_Z = 0.22        # freeboard, m. `render.py`'s liner freeboard is 0.10 m of
                      # blue wall plus the coping course; 0.22 is that order and
                      # its only job here is to make the near band of the frame an
@@ -72,8 +81,8 @@ RHO_POST = np.array([0.38, 0.33, 0.29])
 # ^ MINE. A weathered timber pile; its only job is to be an above-water occluder
 #   with a colour that is not the deck's, so a reject is visible as a reject.
 
-POST = np.array([[5.60, 0.90, -D_MAX], [5.92, 1.22, 1.10]])   # aabb, m
-# ^ a 0.32 m square pile standing 1.10 m proud of the datum at (5.76, 1.06).
+POST = np.array([[2.30, 0.62, -D_MAX], [2.62, 0.94, 0.62]])   # aabb, m
+# ^ a 0.32 m square pile standing 0.62 m proud of the datum at (2.46, 0.78).
 #   Placed so its silhouette falls on water in the hero frame and its shadow
 #   does not touch the waterline, where the shallow-tau measurement lives.
 
@@ -98,11 +107,14 @@ def water_depth(x):
 # frame the water spans 44-73 deg from vertical and the shape factor alone varies
 # by 17.6%. A drone camera would hide that; this one does not, and the pass-vs-
 # offline comparison in `validate_raster.py` is where it shows up.
-EYE = np.array([-2.60, 0.00, 1.62])
-CAM_AZ = np.deg2rad(4.0)        # look nearly down +x, 4 deg off so the post is
+EYE = np.array([-2.00, 0.00, 3.00])
+CAM_AZ = np.deg2rad(6.0)        # look nearly down +x, 6 deg off so the post is
                                 # not dead centre and the sun's road is oblique
-CAM_EL = np.deg2rad(-9.0)       # horizon in the upper third at this FOV
-FOV = np.deg2rad(50.0)
+CAM_EL = np.deg2rad(-26.0)      # horizon just inside the top edge at this FOV,
+                                # so the pass's pixel-exact horizon is in shot
+                                # and the rest of the frame is water that is
+                                # steep enough to see the bed through
+FOV = np.deg2rad(58.0)
 NEAR = 0.05                     # m. Reversed-Z with an INFINITE far plane, so
                                 # `near` is the only depth parameter there is.
 RES = (560, 315)                # w, h. 16:9. See README, `Why 560x315`.
