@@ -4642,3 +4642,18 @@ size, not chased (ruling 11).
 6. **The measurement region is still the largest lever.** The region this wave
    was told to use is empty, and finding that out was worth more than the
    factor it was meant to measure.
+
+## W13 · The suite
+
+**One run, foreground: `386 pass / 0 FAIL / 0 ERROR / 24 open / 82 info`,
+302.3 s** — the whole beach suite, this lane's 28 new rows among the optics and
+bathymetry lanes' of the same wave. `_sec_diffract` alone is 8.3 s and reads
+`28 pass / 0 FAIL / 2 open / 5 info`.
+
+**The pool did not disappear: `306 pass, 0 FAIL, 64 info`** on `validate.py`,
+foreground, after this lane's changes. Nothing in `beach_diffract.py` is
+imported by the pool and `beach.py` is untouched by this lane, which is why.
+
+`python3 validate_beach.py --bugs-diffract` prints the seven-defect table; the
+empty and near-empty columns in it are W8 and they are the deliverable, not the
+full ones.
