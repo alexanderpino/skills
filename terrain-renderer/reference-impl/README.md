@@ -364,11 +364,11 @@ which is bit-identical over the whole frame — and the transmitted column is wh
 the measurement is *of*. The block takes it deliberately, on its own written
 ground that a mean over the whole pixel is hostage to a factor-577 glitter tail.
 **The same choice that makes the row robust to sun glitter is exactly what makes
-it blind to the lobe.** The direction the brief anticipated — the reflected sky
-sitting on top of the transmitted column, so that removing it lowers the reading
-and moves the agreement further from the closed form — is real, and every
-whole-pixel reading below does fall by it. The headline row is not a whole-pixel
-reading, and that is the whole of the answer.
+it blind to the lobe.** The mechanism one would expect to see — the reflected sky
+sitting *on top of* the transmitted column, so that taking the excess away lowers
+the reading and moves the agreement further from the closed form — is real, and
+every whole-pixel reading in the table below does fall by exactly it. The
+headline row is not a whole-pixel reading, and that is the whole of the answer.
 
 **The sweep, print for print.** Both runs' stdout differ on **69 lines** — one of
 them the monkeypatch banner and two of them wall-clock timings, which leaves 66
@@ -407,9 +407,11 @@ output pixels blown by the reflection alone go 4.63% → 3.00% and 14.99% → 9.
 and the far window's radial power falls 11.25 → 9.87 with its mean encoded
 luminance 134.62 → 130.32. **Nothing on the transmitted side moves at all**: the
 bed's own terms — `cau` over the sunlit deep floor, the beam at the bed, the sky
-at the bed, the return leg, the convergence table, the wall/band ratios, the
-riser, tread, coping, freeboard and both wall strips — are identical between the
-two passes, line for line. `terrain-renderer/references/12-water-rendering.md`
+at the bed, the return leg, the convergence table, the riser, tread, coping,
+freeboard and both wall strips — are identical between the two passes, line for
+line. **The submerged wall against the dry band above it reads `0.513` on both**,
+so the ordering finding two sections down is untouched, and so is the
+`0.518 → 0.513` step it is quoted in. `terrain-renderer/references/12-water-rendering.md`
 and `12a-water-derivations.md` were swept for the same class of number and carry
 none: `12a`'s one radiance-buffer measurement is the **coastal** reference's hero
 frame, not the pool's.
@@ -424,6 +426,31 @@ because its rows were isotropic, and the render's own photometry could not see i
 because its rows are transmitted-only. **There is no regression anywhere in this
 file on the reflected column's LEVEL, against anything.** That is the gap this
 re-take names, and it is the next thing to build here.
+
+**And the wide camera says the same thing, which is the check that this is a
+property of the measurement and not of one framing.** `POOL_WIDE=1`, same code,
+same constants, only the camera, two more full passes either side of the
+exponent: `rho_water` measured **0.265408 both, bit for bit** (against the same
+derived 0.225917, +17.5% on that geometry); water / stone transmitted mean over
+mean **0.863012 both**, which is the `0.863` this file quotes two sections down,
+and the closed form beside it **0.734603 both**, which is its `0.735`. The
+transmitted column is bit-identical there too. Everything whole-pixel falls
+further than on the hero, because more of that frame is grazing water: median
+over median scene-linear **0.829 → 0.803** (−3.14%), display-linear off the PNG
+**0.821 → 0.792** (−3.58%), the reflected column's mean over the sunlit floor
+**7.987 → 4.285** (−46.3%, its factor over its own median 183 → 99), and the
+frame's total luminance ×0.715. Its `sail shadow / sunlit floor` goes 0.489 →
+0.479 and five of its colour-regression rows move by 0.7 to 7.2 levels. **The two
+cameras agree on which kind of reading moves and which does not**, and neither
+disturbs a row that is compared with a closed form.
+
+*(The `0.796 → 0.863` and `0.677 → 0.735` pair the wide paragraph below quotes is
+therefore intact. So is the encoded-luminance step beside it: both its ends are
+pre-fix, so the fix cancels out of the difference. For the record the wide
+frame's own encoded mean luminance moves **165.27 → 164.38** under the fix, and
+the hero's **138.58 → 137.93** — the latter reproducing this section's own
+display statement to the pixel, 10 299 pixels at 10 sRGB levels or more and
+4 745 at 100 or more.)*
 
 Nothing in `atmosphere.py`, `render.py`, `optics.py` or `field.py` was touched to
 take this measurement, and the suite says so: `python3 validate.py` runs **306
