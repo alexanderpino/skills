@@ -3923,3 +3923,313 @@ beach's feedback on the cliff.** *(was 12)* **14 · No airborne spray.**
    plan-form and a calibration refused.
 7. **A guard that measures a rough quantity can be green on the broken bed.**
    The raw crest swing preferred the coast with no bay in it.
+
+# WAVE 10 · THE WAVE-FIELD LANE — DIFFRACTION
+
+Gap 3, and it was the largest single unbuilt piece of water physics in the
+project. **The theory is in the skill**
+(`references/12-water-rendering.md`, "K_d is half the solution…", "A
+shore-attached headland does not shelter its own bay", "The fan is an OUTPUT";
+`12a-water-derivations.md` §12; `12b-water-provenance.md`). What is here is the
+implementation's own account and the two things it overturned.
+
+## W1 · What was built, in one paragraph
+
+`beach_diffract.py` — Sommerfeld's exact half-plane solution (1896) in the form
+Penney & Price (1952) applied to water waves, with a rigid (Neumann) screen.
+Fresnel integrals from **three** routes, because there is no scipy in this
+container and a single route would be a single point of failure under
+everything else: a power series, 96-point Gauss–Legendre on the defining
+integral, and an asymptotic series from repeated integration by parts, which is
+the only one that works where the physics is (`kr ~ 10³`, so the Fresnel
+argument reaches 30). One `Edge` class; two places this scene stands it.
+
+**And the part chapter 12 did not carry: the direction.** `K_d` is an amplitude,
+and a bay is held by an angle. `k_vec = grad(arg u) = Im(∇u/u)` is the local
+wave orthogonal, computed on the complex field rather than on the wrapped phase.
+
+## W2 · The bug that a picture could not have found
+
+The reflected term's argument is `2π − φ − φ₀`, **not** `φ + φ₀`. Both give the
+same reflected plane wave; they switch it on in **complementary** regions.
+`φ + φ₀` stands the reflected wave at full strength *inside* the geometric
+shadow — and the lee it draws is completely convincing. What caught it was
+`K_d` on the geometric shadow boundary reading **1.106 / 0.615 / 1.323 / 1.411**
+where the answer is a half.
+
+`U` is 4π-periodic, so `2π − ψ` is the *other sheet* of the same function. With
+the sheet right, the boundary condition holds identically rather than
+approximately: the two arguments coincide at `φ = ±π` while their derivatives
+are equal and opposite, so `∂u/∂φ = 0` exactly for the rigid screen and `u = 0`
+exactly for the pressure-release one.
+
+## W3 · Gap 3's own prescription fails, and it fails before any wave theory
+
+Gap 3 said: *a Sommerfeld / Penney–Price edge stamped at the **headland tip**
+would make the fan an output.* Stamped there, it does not.
+
+An edge modifies the field where it **blocks** something. Cast the straight ray
+from each shoreline station back along the incident direction and ask whether it
+meets land:
+
+| edge at | shoreline stations in its geometric shadow | of the bay's 66 |
+|---|---|---|
+| the true headland tip `A1` | **5 of 89** | **1** |
+| the plan-form's own pole `D` | 68 of 89 | 55 |
+
+The five are all on the **headland's own updrift face**. The reach of a
+shore-attached headland's shadow is `protrusion / tan θ₀`, and here that is
+`91 m / tan 20° = 250 m` against 1409 m of coast — **18 %**. At this coast's
+obliquity the headland shelters essentially none of its own bay.
+
+**And that is the 2.46× indentation over-prediction seen from the other end.**
+The closed form builds a bay that needs a shelter this coast does not have. Wave
+9 reported the over-prediction and inverted it into an offshore obliquity; this
+wave says *why* — not that the spiral is wrong, but that the frame is not one
+whole bay between one diffraction point and one control point.
+
+## W4 · So the edge goes where the construction already says it is
+
+`12a` §11 defines the pole as *"the diffraction point, or more generally the
+virtual source the fan converges on"*, and `spiral_pole`'s selection rule is
+that *"a pole 79 km offshore is not a headland"*. The construction therefore
+already **asserts** an edge at `D`. Standing a real Sommerfeld edge there turns
+the assertion into a measurement, and the measurement has three parts wave 9's
+hand-stated fan did not: an amplitude field, a finite transition across the
+shadow boundary, and a lit region where the field is the *incident* direction
+and knows nothing about the tip.
+
+`D` is 773 m seaward of the domain's offshore boundary, so the edge is applied
+at the boundary and the transform refracts it in. **The standing ruling holds**:
+one stated offshore spectrum, and everything shoreward of the boundary is an
+output.
+
+## W5 · THE TABLE
+
+Six fields, one offshore spectrum (`H₀ = 1.5 m, T = 9 s, θ₀ = 20°`), one ramp,
+one transform, one CERC closure. The first four rows are wave 9's, **recomputed
+here rather than quoted**, and they reproduce to four decimals.
+
+| shoreline and field | mean \|θ_loc\| | `Q` rms over the spiral span | rms `sin(2θ_loc)` |
+|---|---|---|---|
+| straight, plane crest | 6.469° | 9.233×10⁻² | 2.239×10⁻¹ |
+| **the closed-form zero-transport coast — THE FLOOR** | **0.202°** | **1.780×10⁻³** | **4.101×10⁻³** |
+| the bay, plane crest | 5.595° | 1.333×10⁻¹ | 2.311×10⁻¹ |
+| the bay, wave 9's hand-stated fan | 2.801° | 2.650×10⁻² | 8.907×10⁻² |
+| the bay, **diffracted direction only**, `H₀` uniform | 3.081° | 2.104×10⁻² | 7.941×10⁻² |
+| **the bay, DIFFRACTED direction AND `K_d`** | **1.875°** | **3.935×10⁻³** | **5.549×10⁻²** |
+
+**Read the third column, and read it before the second.** `Q ∝ H_b^{5/2}`, so a
+shadow that halves the height cuts the transport by 5.7× whether or not the
+shoreline is an equilibrium; `sin(2θ_loc)` is the same closure with its height
+and its coefficient divided out.
+
+**The two meters disagree by an order, and that is the honest answer.** `Q`
+reaches **2.2×** the floor. `sin(2θ)` is still **13.5×** it. `K_d` falls to
+**0.073** at the sheltered end, so the updrift limb carries an 0.11 m wave and
+its transport is near zero for a reason that has nothing to do with the
+shoreline. **The bay is smaller, not zero, and part of the fall in `Q` is bought
+by the shelter rather than by the plan-form.**
+
+On the bathymetry lane's normal-keyed ramp (`plan_ramp_normal`, this same wave)
+the diffracted row reads **1.767°** and `Q` = **1.809×10⁻³** against a floor of
+1.675×10⁻³ — **1.08× the floor**, and the height-free meter still 13×. The two
+lanes compose; the caveat does not go away.
+
+## W6 · THE OVERTURN — wave 9's residual decomposition is not a floor
+
+Wave 9 attributed its 2.801° to **0.71°** of "the ramp is not concentric with
+the curve it is keyed to" and **1.46°** of "the march meeting curvature", and
+the brief for this wave said diffraction should not touch either, so the honest
+target was the unattributed remainder. **It went under both.**
+
+Those two were measured with **exactly radial** incidence on the circular bay,
+which puts the attributed floor at **2.371°**. One shoreline, one bed, one
+transform, and only the incidence changes:
+
+| incidence on the circular bay | cartesian ramp | concentric ramp |
+|---|---|---|
+| exactly radial from the pole | 2.371° | 1.661° |
+| **Sommerfeld's diffracted field from the same pole** | **1.278°** | **0.998°** |
+
+It survives grid refinement — at `dx` = 8 / 4 / 2 / 1 m the first pair reads
+2.475/1.403, 2.371/1.278, 2.320/1.219, **2.295/1.190**, both converging and the
+gap not closing — so it is not the column march's discretisation. And the
+diffracted field's mean offshore |θ₀| is **19.25°** against radial's 13.59°, so
+it is not "less oblique and therefore easier on the march" either.
+
+**The mechanism.** A stated radial fan is radial *at the shoreline station of
+the row*; the physical field is radial *at the point it is evaluated at*. On
+concentric contours the second is normal to every contour it crosses and the
+first is not. Wave 9's `fan_theta0` docstring insists the radius must be taken
+to the shoreline point — *"the difference is the whole thing"* — and cites 4.9°
+of residual on a straight coast as the evidence. **4.89° is also exactly the
+number wave 9 reports for the `grid-snell` contour defect**, and a radial fan on
+a straight coast is not a test of the convention at all. The two contributions
+are not independent of the incidence and must not be quoted as an additive
+floor.
+
+## W7 · The independent checks, and which ones can fail
+
+A transport residual is one instrument. Diffraction has textbook signatures and
+they are cheap:
+
+| check | reads | verdict |
+|---|---|---|
+| **Cornu spiral limits** `C(±∞) = S(±∞) = ±½` | 0.4999999974 at `x = 10⁶`, and `\|F − (1+i)/2\|·πx → 1.000` | the residual is the `1/(πx)` tail, not error |
+| **`K_d = ½` on the geometric shadow boundary** | 0.529 / 0.514 / 0.507 / 0.504 at `kr` = 25 / 99 / 398 / 1591 | and `(K_d−½)√(kr)` is **constant to 0.005** — the departure is the *reflected* term |
+| the incident term alone, on the boundary | **0.5000000000000000** at every `kr` | `X = 0` and `F(0) = 0`, exactly |
+| **Helmholtz** `(∇²+k²)u = 0`, 4th-order stencil | 1.4×10⁻⁶, falling **5.056 / 5.060** against the stencil's 5.0625 | pure truncation |
+| **Neumann** `∂u/∂n = 0` on both screen faces | 3.8×10⁻⁴ at `ε = 10⁻⁵`, → 0 with `ε` | and Dirichlet gives `u = 0` to 8×10⁻⁸ |
+| **energy** across two downwave lines | equal to 3×10⁻⁴ | and the **gain** in the geometric shadow is **0.98** of the **deficit** on the lit side |
+| chapter 12's `K_d(v)` | 0.50000 / 0.30783 / 0.20267 / 0.11103 | against its 0.5000 / 0.31 / 0.20 / 0.11 |
+| chapter 12's lee centre-line table | 0.1995 0.3053 0.4053 0.5126 0.6157 0.7061 0.8008 | against 0.20 0.31 0.41 0.51 0.62 0.71 0.80, **all seven** |
+| deep-shadow direction | radial from the tip to **0.10°**, `\|k_vec\|/k = 1.0007` | the fan is a *result* |
+
+**Reproducing the lee table established a convention the chapter had not
+stated.** An obstacle has two edges; on the centre line they are equidistant, so
+the two half-plane fields arrive in phase and add — `2·K_d(v)` with
+`v = (W/2)√(2/(λr))`. A Fresnel–Kirchhoff integral over the *aperture* on the
+same geometry gives **0.431** where the table gives 0.51, so a reader
+reconstructing the table from the words alone would have got it wrong. Written
+into `12` and marked `D`.
+
+## W8 · What did NOT reproduce — three blind guards and one survived claim
+
+Seven deliberate defects, all seven fire. What matters is the columns that
+stayed empty:
+
+- **The Helmholtz row is blind to five of the seven.** It is the row written as
+  "checks everything at once", and the reason it is not is one sentence: **a sum
+  of solutions is a solution.** Reading the Cornu limit as `(1+i)` instead of
+  `(1+i)/2` adds a constant multiple of a plane wave and the result still solves
+  the PDE exactly; so do dropping the reflected term, putting it on the wrong
+  sheet, and both scene-level defects. The PDE constrains nothing about the
+  boundary conditions. It caught only `diff-series-everywhere`, which broke the
+  arithmetic.
+- **Chapter 12's own imported numbers are blind to every half-plane defect.**
+  `K_d(v)` and the lee table exercise the Fresnel layer and nothing above it.
+  Importing a chapter's numbers checks the import, not the model.
+- **The transport rows cannot separate the exact diffracted direction from a
+  pure radial fan stamped at the same point.** Reinstalling wave 9's ansatz as
+  `diff-direction-is-radial` fails no transport row — in the shadow the two
+  agree to **1.07° rms**, and the shadow is most of the bay. They guard the
+  *presence* of a fan, not its exactness; what guards exactness is the lit-region
+  row, where the diffracted field is the incident direction and a radial fan is
+  50° away.
+- **A survived claim.** Neumann against Dirichlet moves the Neumann row, the
+  lit-region row and the screen-bearing sensitivity — and **nothing** in the
+  deep-shadow direction field or in any transport row. The module claimed that
+  in a comment; it survived a serious attempt to break it.
+
+**And one defect was a no-op before it was a defect.** The first
+`diff-dirichlet-screen` set `mod.NEUMANN = mod.DIRICHLET`, but `Edge.__init__`'s
+`screen=NEUMANN` default is bound at class-definition time, so the flip reached
+nothing and the table printed an empty column **indistinguishable from a blind
+guard**. A defect that does not reach the code it names is worse than no defect.
+Recorded in its own docstring.
+
+## W9 · What the answer does not depend on
+
+The one free parameter in the construction is the **screen bearing at the pole**,
+and it is free because `D` is a *virtual* source with no barrier at it. It is
+priced rather than hidden:
+
+- **80° of rotation moves the measurement by 0.051°** out of 1.90°. Beyond about
+  +60° the screen turns to face the swell and reflects into the domain, which is
+  a different problem and is excluded rather than tolerated.
+- **The wavenumber the edge diffracts at moves it by 0.034°** across 4 m, 8 m and
+  deep water — because the deep-shadow direction is radial whatever `k` is. `k`
+  sets the width of the transition and the spacing of the Fresnel ripples, not
+  the fan.
+
+A constant chosen to make the picture right does not behave like that.
+
+## W10 · Frames
+
+- `s10-wavefield-diffraction.png` — `K_d` and the direction field in plan for
+  both edges, the geometric shadow boundary drawn, the ½ annotated where the
+  field crosses it and plotted against range, and `K_d(v)` against chapter 12's
+  own four numbers.
+- `s10-wavefield-transport.png` — the six rows on three meters, the four fans
+  per alongshore row, and the `K_d` the boundary is handed.
+- `s10-wavefield-frame-J.png` — bar section J's framing, the pair to
+  `s9-frame-J.png`: same viewpoint, optics, beach, air, sun and plan-form, and
+  one input changed. Bay-scale swing of the breaking crest azimuth **25.89°**
+  against wave 9's 13.57°. A diagnostic, and labelled one.
+
+## W11 · THE RE-ORDERED GAP LIST
+
+### Closed or substantially closed by wave 10
+
+| wave 9 | item | what closed it |
+|---|---|---|
+| **3** | the wave field has no diffraction | an exact half-plane solution; the fan is `grad(arg u)`; residual obliquity 2.801° → **1.875°**, `Q` 2.650×10⁻² → **3.935×10⁻³**, 2.2× the meter's floor |
+
+**Closed with a correction to its own statement:** the edge does *not* go at the
+headland tip on this coast, and the criterion that says so —
+`protrusion / tan θ₀` against the bay's length — is now in the chapter.
+
+### The list now
+
+**1 · The illuminant is in the wrong half of the sky.** Unchanged, and now top
+for a third wave. A wave of its own.
+
+**2 · One surf zone where bar J shows three to four separated lines.** Section
+B, parked, mechanism named (2DH rip-feeder circulation).
+
+**3 · The frame is asserted to be ONE WHOLE BAY, and the geometry says it is
+not.** *(NEW — W3)* The closed form puts the whole 1409 m frame between one
+diffraction point and one control point, which is what makes the indentation
+2.46× the photograph's; and the coast's own headland shadows 250 m of it. The
+honest fix is a scene with **two** control points inside the frame, or an
+offshore obstacle of the kind bar section J actually photographs — not a
+recalibrated `θ₀`. Named and priced, not taken.
+
+**4 · The screen bearing at the pole is `?`.** *(NEW — W9)* Worth 0.051° over
+80° of rotation, so it is reported rather than chased. It becomes real the day
+the scene grows an obstacle a Sommerfeld edge can sit on for a physical reason.
+
+**5 · Combined refraction–diffraction inside the domain.** *(NEW)* The edge is
+applied at the offshore boundary and refracted in, which is defensible for a tip
+773 m seaward of it. An obstacle **inside** the domain — bar section L's
+isolated rock, at `W/λ ≈ 1`, the worst case — needs a mild-slope or
+parabolic-equation solve, and this file does not have one. Chapter 12's
+isolated-rock test is therefore still unmet by the implementation even though
+its term is now built.
+
+**6 · The eye is 17.31 m where the frame demands 25–102 m.** Unchanged.
+
+**7 · The sea at grazing reads as hard shore-parallel bands.** Unchanged.
+
+**8 · Forty-six per cent of the frame is one declared albedo.** Unchanged.
+
+**9 · No swash. 10 · The berm scarp. 11 · The shadow ray costs 0.0 %.
+12 · No shore platform. 13 · The beach's feedback on the cliff. 14 · No
+airborne spray. 15 · The flat Earth at the seam.** Unchanged.
+
+## W12 · The seven things worth carrying out of this wave
+
+1. **`K_d` is half the solution, and it is the half a renderer least needs.**
+   Every chart, every table and this project's own chapter priced diffraction as
+   an amplitude. The same solution carries a **direction**, it is `grad(arg u)`,
+   and it is what turns crests.
+2. **"The orthogonals radiate from the diffraction point" is a theorem, not an
+   ansatz** — but only *inside the geometric shadow*, and the shadow boundary is
+   exactly what an assumed radial fan cannot have.
+3. **Ask whether the obstacle blocks anything before computing what it
+   diffracts.** `protrusion / tan θ₀` against the feature's length. It is one
+   line, it needs no wave model, and on this coast it invalidated the
+   prescription this wave was given.
+4. **A sum of solutions is a solution**, so satisfying the governing equation
+   proves almost nothing about a boundary-value problem. The Helmholtz residual
+   is the most impressive-looking row in the section and the least
+   discriminating.
+5. **A decomposition measured under one boundary condition is not a floor under
+   another.** Wave 9's 0.71° and 1.46° were real measurements and they do not
+   add to a limit; changing the incidence alone got 1.09° under their sum.
+6. **When a shadow makes the waves smaller, the transport meter flatters you.**
+   `Q ∝ H_b^{5/2}`. Divide the height out — `rms sin(2θ_loc)` — and the same
+   result reads 13.5× the floor where `Q` reads 2.2×.
+7. **A deliberate defect that does not reach its target prints the same empty
+   column as a blind guard.** Read the defect, not just the table.
