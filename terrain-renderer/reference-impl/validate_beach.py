@@ -806,6 +806,48 @@ def _bug_wet_albedo_all_diffuse(mod):
     mod.ROCK_WET_DIFF = mod.ROCK_WET
 
 
+def _bug_bed_albedo_air_side(mod):
+    """WAVE 10's own defect, put back: `optics.rho_water` handed an AIR-SIDE
+    apparent albedo where it wants a WATER-SIDE reflectance. This is the code
+    waves 4-9 shipped, and it is the sixth instance of "a shared closed form
+    used one interface off"."""
+    orig = mod.BO.submerged_bed_rho
+
+    def bad(bed_rho_in_water, cos_sun, deps, absorb=None):
+        return orig(OPT.wet_albedo(np.asarray(bed_rho_in_water,
+                                              float)[None])[0],
+                    cos_sun, deps, absorb)
+    mod.BO.submerged_bed_rho = bad
+
+
+def _bug_bed_albedo_diffuse_half(mod):
+    """`README-beach.md` L9's PROPOSED fix, put in: the diffuse half of the
+    air-side albedo. It removes the film's specular term and leaves the doubled
+    trapped series and two of the four interface crossings -- the same error
+    one notch smaller, which is why the suite has to be able to tell the two
+    apart rather than merely notice that something moved."""
+    orig = mod.BO.submerged_bed_rho
+
+    def bad(bed_rho_in_water, cos_sun, deps, absorb=None):
+        a = np.asarray(bed_rho_in_water, float)
+        return orig(OPT.wet_albedo(a[None])[0] - OPT.R_EXT, cos_sun, deps,
+                    absorb)
+    mod.BO.submerged_bed_rho = bad
+
+
+def _bug_bed_no_double_series(mod):
+    """A THIRD candidate, and the one that is hardest to see: the interface
+    counted correctly on the way in and out but the trapped series applied
+    twice on its own. It is here because a guard that only knows "wet_albedo
+    was passed" would miss it, and the identity row does not."""
+    orig = mod.BO.submerged_bed_rho
+
+    def bad(bed_rho_in_water, cos_sun, deps, absorb=None):
+        a = np.asarray(bed_rho_in_water, float)
+        return orig(a / (1.0 - a * OPT.R_INT), cos_sun, deps, absorb)
+    mod.BO.submerged_bed_rho = bad
+
+
 def _bug_airlight_view_direction(mod):
     """The airlight taken in the VIEW direction instead of the ray flattened to
     the horizontal. It looks more physical -- the light does come from where
@@ -947,6 +989,92 @@ def _bug_bay_bed_ignores_plan(mod):
     mod.bay_bed = lambda *a, **kw: orig(*a, **dict(kw, plan=None))
 
 
+# ------------------------------------------ wave 10: the ramp keying's defects
+def _bug_keying_axis(mod):
+    """`bay_bed` back on the cross-shore keying with a plan-form stated. The
+    wave-9 bed exactly -- so this bug is the state of the file before this
+    wave, and any row it does NOT move is a row that could not have found the
+    gap in the first place."""
+    orig = mod.bay_bed
+    mod.bay_bed = lambda *a, **kw: orig(*a, **dict(kw, keying='axis'))
+
+
+def _bug_offset_unsigned(mod):
+    """The distance to the shoreline taken WITHOUT its sign, so the coastal
+    plain is built as a Dean ramp mirrored about the waterline. The bed is
+    still smooth, still monotone offshore, and still has the right contours in
+    the sea -- the whole defect is on the land, which is where a bathymetry
+    section is least likely to look."""
+    orig = mod.shoreline_offset
+    mod.shoreline_offset = lambda x, y, x_s, **kw: -np.abs(orig(x, y, x_s,
+                                                                **kw))
+
+
+def _bug_offset_no_subdivide(mod):
+    """The shoreline polyline used at the grid's own 16 m alongshore spacing
+    with no refinement and no tangential continuation. The distance to a chord
+    is short of the distance to the curve by the chord's sagitta, and the
+    offshore corners find their nearest point at the polyline's END."""
+    orig = mod.shoreline_offset
+
+    def bad(x, y, x_s, n_sub=8, chunk=16):
+        x = np.asarray(x, float)
+        y = np.asarray(y, float)
+        x_s = np.asarray(x_s, float)
+        ax, ay = x_s[:-1], y[:-1]
+        ex, ey = x_s[1:] - ax, y[1:] - ay
+        L2 = np.maximum(ex * ex + ey * ey, 1e-30)
+        XX = x[None, :, None]
+        YY = y[:, None, None]
+        u = np.clip(((XX - ax) * ex + (YY - ay) * ey) / L2, 0.0, 1.0)
+        dq = np.sqrt(np.min((XX - (ax + u * ex)) ** 2
+                            + (YY - (ay + u * ey)) ** 2, axis=2))
+        return np.where(x[None, :] >= x_s[:, None], dq, -dq)
+    mod.shoreline_offset = bad
+    mod._OFFSET_ORIG = orig
+
+
+def _bug_keying_polar_everywhere(mod):
+    """The normal-offset keying replaced by the CONCENTRIC one wave 9 named,
+    applied to the whole composite coast. It is right on the spiral arc and
+    wrong on the rock headland and the tangential beach, because those are not
+    circular arcs about the pole -- which is the distinction this section
+    exists to make."""
+    def bad(x, y, x_s, A=mod.DEAN_A, d_shelf=mod.D_SHELF, s_plain=mod.S_PLAIN,
+            n_sub=8):
+        D = mod.equilibrium_plan()['D']
+        ph = np.arctan2(np.asarray(y, float) - D[1],
+                        np.asarray(x_s, float) - D[0])
+        R = np.hypot(np.asarray(x_s, float) - D[0],
+                     np.asarray(y, float) - D[1])
+        return mod.plan_ramp_polar(x, y, D, (ph, R), A=A, d_shelf=d_shelf,
+                                   s_plain=s_plain)
+    mod.plan_ramp_normal = bad
+
+
+def _bug_fold_unsigned_gradient(mod):
+    """The medial-axis detector run on the UNSIGNED distance. |s| has a V at
+    the waterline, so its gradient collapses there and every shoreline cell is
+    counted as a fold -- a detector that reports 1.05% where the truth is
+    0.25%, and reports it on the straight coast too. This file wrote that
+    version first."""
+    orig = mod.shoreline_offset
+    mod.offset_fold_fraction = lambda x, y, x_s, s_max=None, n_sub=8, \
+        tol=0.9: float(np.mean(
+            np.hypot(np.gradient(np.abs(orig(x, y, x_s, n_sub=n_sub)),
+                                 np.asarray(x, float), axis=1),
+                     np.gradient(np.abs(orig(x, y, x_s, n_sub=n_sub)),
+                                 np.asarray(y, float), axis=0))
+            [(orig(x, y, x_s, n_sub=n_sub) < 0.0)
+             & (-orig(x, y, x_s, n_sub=n_sub)
+                < ((mod.D_SHELF / mod.DEAN_A) ** 1.5 if s_max is None
+                   else s_max))] < float(tol)))
+
+
+BATHY_BUGS = ('keying-axis', 'offset-unsigned', 'offset-no-subdivide',
+              'keying-polar-everywhere', 'fold-unsigned-gradient')
+
+
 EMBAY_BUGS = ('grid-snell', 'spiral-no-tangency', 'alpha-declared',
               'theta-loc-no-shore', 'zero-transport-breaking-angle',
               'cerc-sin-not-double', 'plan-ramp-flat-contours',
@@ -970,6 +1098,9 @@ BUGS = {
     'beta-no-scale-height': _bug_beta_no_scale_height,
     'specular-no-jacobian': _bug_specular_no_jacobian,
     'shadow-reach-one-cell': _bug_shadow_reach_one_cell,
+    'bed-albedo-air-side': _bug_bed_albedo_air_side,
+    'bed-albedo-diffuse-half': _bug_bed_albedo_diffuse_half,
+    'bed-no-double-series': _bug_bed_no_double_series,
     'dw-for-ew': _bug_dw_for_ew,
     'quarter-at-break': _bug_quarter_at_break,
     'cap-not-dissipation': _bug_cap_not_dissipation,
@@ -1025,6 +1156,11 @@ BUGS = {
     'cerc-sin-not-double': _bug_cerc_sin_not_double,
     'plan-ramp-flat-contours': _bug_plan_ramp_flat_contours,
     'bay-bed-ignores-plan': _bug_bay_bed_ignores_plan,
+    'keying-axis': _bug_keying_axis,
+    'offset-unsigned': _bug_offset_unsigned,
+    'offset-no-subdivide': _bug_offset_no_subdivide,
+    'keying-polar-everywhere': _bug_keying_polar_everywhere,
+    'fold-unsigned-gradient': _bug_fold_unsigned_gradient,
 }
 FOAM_BUGS = ('foam-no-transmittance', 'foam-backscatter-is-tir',
              'foam-on-the-crest', 'foam-declared-k',
@@ -1034,6 +1170,8 @@ FOAM_BUGS = ('foam-no-transmittance', 'foam-backscatter-is-tir',
 CAMERA_BUGS = ('fov-on-the-long-side', 'dip-unrefracted',
                'landscape-not-upright', 'hfov-scaled-linearly',
                'separation-small-angle', 'flat-sea-no-horizon')
+BED_BUGS = ('bed-albedo-air-side', 'bed-albedo-diffuse-half',
+            'bed-no-double-series')
 OPTICS_BUGS = {'one-turbidity-slider', 'cdom-scatters', 'depth-averaged-spm',
                'dw-for-bed-power', 'isotropic-phase', 'glitter-fixed-width',
                'glitter-no-jacobian', 'ambient-in-the-tube'}
@@ -2777,6 +2915,314 @@ def _sec_embay(ctx):
           'tolerance the size of the thing it covers.'
           % (_crest_swing(b1), _crest_swing(b0),
              _crest_swing(b1) / max(_crest_swing(b0), 1e-9)), '-')
+
+
+def _sec_bathy(ctx):
+    """WAVE 10. WHAT "CROSS-SHORE DISTANCE" MEANS ON A CURVED COAST.
+
+    Wave 9 priced gap 5 at 0.71 deg of residual obliquity and did not take it.
+    This section takes it, and the first thing it does is fire the prediction
+    at the object it was written against rather than at the object it was
+    measured on. Those are not the same: 0.71 deg was measured on an idealised
+    CIRCLE at exactly radial incidence, and the gap is written against
+    `bay_bed`'s bay, which is a rock headland, a logarithmic spiral and a
+    straight tangential beach under a fan.
+
+    THE STATISTIC IS THE FINDING. Every number wave 9 attributed is a mean of
+    |theta_loc|, and mean|.| is not additive: a term with zero alongshore mean
+    disappears inside it as soon as another term gives theta a bias larger than
+    the first term's own scatter. The ramp-keying error is antisymmetric about
+    the bay's apex -- sin(phi_s) changes sign there -- so it is 0.71 deg of
+    SCATTER and 0.046 deg of DRIFT, and only the second one adds to anything.
+
+    RULING 14 IS IN FORCE THROUGHOUT: the meter's floor is measured in
+    `_sec_embay` and restated in every row here that reports a small number.
+    """
+    B = ctx['B']
+    ep = B.equilibrium_plan()
+    ec = B.equilibrium_plan(delta=0.0)
+    y = ep['y']
+    x = np.arange(0.0, 1000.0 + 4.0, 4.0)
+
+    # ---- 1. the two closed forms the general keying must reproduce ----------
+    xs_flat = np.full(y.size, float(np.mean(ep['x_s'])))
+    check(1, 'normal keying IS the cross-shore keying on a shore along the grid',
+          float(np.max(np.abs(B.plan_ramp_normal(x, y, xs_flat)
+                              - B.plan_ramp(x, y, xs_flat)))), 0.0, 0.0,
+          'THE FIRST OF THE TWO CLOSED FORMS, and it is an EXACT identity '
+          'rather than a tolerance. The family of x-translates and the family '
+          'of normal offsets are the same family if and only if phi_s = '
+          'atan(dx_s/dy) is identically zero. That is every scene waves 1-8 '
+          'rendered, which is exactly why eight waves of surf work could not '
+          'see the difference.', 'm')
+    Dc = ec['D']
+    v = ec['pts'] - Dc
+    Rc = float(np.mean(np.hypot(v[:, 0], v[:, 1])))
+    xs_c = Dc[0] + np.sqrt(np.maximum(Rc ** 2 - (y - Dc[1]) ** 2, 0.0))
+    n0c = np.arctan2(y - Dc[1], xs_c - Dc[0])
+    h_pol = B.plan_ramp_polar(x, y, Dc, (np.array([-1.5, 1.5]),
+                                         np.array([Rc, Rc])))
+    h_nrm = B.plan_ramp_normal(x, y, xs_c)
+    sea_c = x[None, :] < xs_c[:, None]
+    d_pn = float(np.sqrt(np.mean((h_pol - h_nrm)[sea_c] ** 2)))
+    check(2, 'normal keying IS the concentric ramp on a circle about the pole',
+          d_pn / B.D_SHELF, 0.0, 0.01,
+          'THE SECOND CLOSED FORM. `plan_ramp_polar` builds concentric arcs '
+          'about the pole by construction; the normal offsets of a circular '
+          'arc ARE those arcs. %.4f m rms over the sea against a %.1f m shelf '
+          'cap -- and the residual is the 16 m shoreline sampling and the '
+          'tangential continuation past the frame edge, not the geometry. So '
+          'the concentric ramp is a SPECIAL CASE and not a rival: it is right '
+          'for a circular shore about a pole, and the normal offsets are right '
+          'for a shore of any shape with no pole in the statement at all.'
+          % (d_pn, B.D_SHELF), '-')
+    # the derived first-order mismatch, against the two families themselves
+    phi = np.arctan(np.gradient(ep['x_s'], y))
+    s_b = (2.0 / B.DEAN_A) ** 1.5
+    dth = -np.gradient(phi, y) * s_b * np.sin(phi)
+    info(2, 'derived contour-normal mismatch at the breaking offset',
+         math.degrees(float(np.mean(np.abs(dth)))),
+         'Degrees. d(theta) = -(d phi_s/dy) * s * sin(phi_s) to first order: '
+         'the angle by which the TRANSLATE family\'s contour normal has turned '
+         'after a shore-normal ray has travelled s = %.1f m, the offset of the '
+         '2 m breaking contour on this Dean ramp. It is first order in the '
+         'shoreline curvature TIMES the offset TIMES the sine of the shore\'s '
+         'own obliquity to the grid, so it vanishes on a straight coast and on '
+         'a coast parallel to the grid, and on nothing else.' % s_b)
+
+    # ---- 2. the prediction under test --------------------------------------
+    xs = ep['x_s']
+    D = ep['D']
+    n0 = -B.shore_normal_angle(y, xs)
+    fan = B.fan_theta0(y, xs, D)
+    ph_s = np.arctan2(y - D[1], xs - D[0])
+    R_s = np.hypot(xs - D[0], y - D[1])
+    msp = np.zeros(y.size, bool)
+    msp[ep['j1'] + 2:ep['j2'] - 1] = True
+
+    def _run(h2, xs_, th0, c0):
+        tr = B.transform_2d(x, y, h2, B.T_SWELL, B.H0_SWELL, th0, contour0=c0)
+        p = B.plan_transport(y, xs_, tr)
+        m = p['mask']
+        ms = msp & m
+        return dict(abs=math.degrees(float(np.mean(np.abs(p['theta_loc'][m])))),
+                    sgn=math.degrees(float(np.mean(p['theta_loc'][m]))),
+                    Q=p['Q_rms'],
+                    abs_sp=math.degrees(float(np.mean(np.abs(
+                        p['theta_loc'][ms])))),
+                    sgn_sp=math.degrees(float(np.mean(p['theta_loc'][ms]))),
+                    Q_sp=float(np.sqrt(np.mean(p['Q'][ms] ** 2))))
+
+    bay_ax = _run(B.plan_ramp(x, y, xs), xs, fan, n0)
+    bay_po = _run(B.plan_ramp_polar(x, y, D, (ph_s, R_s)), xs, fan, n0)
+    bay_nm = _run(B.plan_ramp_normal(x, y, xs), xs, fan, n0)
+    ctx['bathy'] = dict(ax=bay_ax, po=bay_po, nm=bay_nm)
+    got = bay_ax['abs'] - bay_po['abs']
+    check(1, 'wave 9\'s 0.71 deg does NOT transfer to the bay it was written '
+             'against',
+          got < 0.25, True, 0,
+          'THE FALSIFIABLE PREDICTION, AND IT UNDER-DELIVERS. Wave 9 priced '
+          'the concentric ramp at 0.71 deg of the bay\'s 2.801 deg residual. '
+          'Applied to `bay_bed`\'s own bay -- rock headland, spiral, '
+          'tangential beach, under the fan its pole implies -- it removes '
+          '%.4f deg of the whole-domain mean (%.3f -> %.3f) and %.4f deg over '
+          'the spiral span (%.3f -> %.3f). Six per cent of the price on the '
+          'whole domain, thirty-five over the span. The row asserts the '
+          'SHORTFALL, so it fails if the prediction is ever met -- which is '
+          'the only way to carry a refuted prediction as a live test.'
+          % (got, bay_ax['abs'], bay_po['abs'],
+             bay_ax['abs_sp'] - bay_po['abs_sp'], bay_ax['abs_sp'],
+             bay_po['abs_sp']), 'deg')
+    check(1, 'and it under-delivers because the term has almost no MEAN',
+          abs(bay_ax['sgn'] - bay_po['sgn']) < 0.35, True, 0,
+          'WHY. On the circle where 0.71 deg was measured, the signed mean of '
+          'theta_loc moves by only 0.046 deg between the two keyings while the '
+          'mean of |theta_loc| moves by 0.710 -- the keying error is '
+          'antisymmetric about the bay\'s apex, because sin(phi_s) changes '
+          'sign there, so it is SCATTER and not DRIFT. mean|.| of a zero-mean '
+          'term does not add to mean|.| of a biased one: as soon as the bay '
+          'carries the +1.42 deg drift its own delta implies, the scatter '
+          'stops showing up. Here the signed means differ by %.4f deg.'
+          % abs(bay_ax['sgn'] - bay_po['sgn']), 'deg')
+    check(1, 'normal keying DOES pay on the built bay, and by more than '
+             'concentric',
+          (bay_ax['abs'] - bay_nm['abs']) > 3.0 * got, True, 0,
+          'THE FIX THAT DELIVERS. The concentric family is right only where '
+          'the shore is a circular arc about the pole, and two thirds of this '
+          'coast is not -- it makes the headland and tangent rows WORSE. The '
+          'normal-offset family is right for all of it. Whole-domain mean '
+          '|theta_loc|: axis %.4f, concentric %.4f, normal %.4f deg. Q rms '
+          'over the spiral span: %.4e, %.4e, %.4e m3/s -- note that the '
+          'concentric ramp lowers the angle and RAISES the transport, because '
+          'Q goes as H_b^(5/2) and the bed it builds moves H_b too.'
+          % (bay_ax['abs'], bay_po['abs'], bay_nm['abs'],
+             bay_ax['Q_sp'], bay_po['Q_sp'], bay_nm['Q_sp']), '-')
+    # THE FLOOR, MEASURED IN THIS SECTION AND NOT BORROWED. Ruling 14 is wave
+    # 9's own and it says a near-zero reading is worthless until zero has been
+    # shown to be reachable; a floor imported from another section is a floor
+    # nobody re-derived under this section's beds.
+    xr = B.zero_transport_plan(y, float(np.mean(xs)), B.THETA0_SWELL)
+    n0r = -B.shore_normal_angle(y, xr)
+    flr_ax = _run(B.plan_ramp(x, y, xr), xr, B.THETA0_SWELL, n0r)
+    flr_nm = _run(B.plan_ramp_normal(x, y, xr), xr, B.THETA0_SWELL, n0r)
+    check(1, 'the meter\'s floor does not move under the new keying',
+          flr_nm['abs'] - flr_ax['abs'], 0.0, 0.02,
+          'RULING 14, AND THE ROW THAT HAD TO COME FIRST. The closed-form '
+          'zero-transport coast is STRAIGHT, so the two keyings put its '
+          'contours in the same direction and differ only in the DEPTH they '
+          'assign (%.2f m at the widest, because the axis offset is the normal '
+          'offset divided by cos phi_s). The floor reads %.4f deg / %.4e m3/s '
+          'under the axis keying and %.4f deg / %.4e under the normal one. If '
+          'this row ever moved, every small number below would be measuring '
+          'the meter.'
+          % (float(np.max(np.abs(B.plan_ramp_normal(x, y, xr)
+                                 - B.plan_ramp(x, y, xr)))),
+             flr_ax['abs'], flr_ax['Q_sp'], flr_nm['abs'], flr_nm['Q_sp']),
+          'deg')
+    floor = flr_nm['Q_sp']
+    openq(1, 'the bay is STILL not zero, and the floor is restated beside it',
+          '%.4e m3/s' % bay_nm['Q_sp'], '%.4e (the floor)' % floor,
+          'RULING 14. %.1fx the meter\'s own floor after the fix against '
+          '%.1fx before it. Small, not zero, and the residue is now almost '
+          'entirely the declared delta = theta_b: the spiral is BUILT to hold '
+          'a constant residual obliquity at every station, so a spiral bay '
+          'cannot read zero and only the circle can.'
+          % (bay_nm['Q_sp'] / max(floor, 1e-12),
+             bay_ax['Q_sp'] / max(floor, 1e-12)))
+
+    # ---- 3. are the two attributed terms independent? ----------------------
+    h_car = B.plan_ramp(x, y, xs_c)
+    sweep = []
+    for bdeg in (0.0, 6.5585, 20.0):
+        b = math.radians(bdeg)
+        a = _run(h_car, xs_c, n0c + b, n0c)
+        p = _run(h_pol, xs_c, n0c + b, n0c)
+        sweep.append((bdeg, a['abs'], p['abs'], a['abs'] - p['abs'],
+                      a['sgn'], p['sgn']))
+    ctx['bathy']['sweep'] = sweep
+    check(1, 'wave 9\'s 0.71 deg reproduces EXACTLY on the circle it was '
+             'measured on',
+          sweep[0][3], 0.7103, 5e-3,
+          'The control for everything above. Same circular shoreline, same '
+          'radial incidence, two beds, one of which is `plan_ramp_polar` -- '
+          'wave 9\'s own row, re-run. %.4f deg. So the number is right and the '
+          'ATTRIBUTION is what fails: it was measured on a geometry that the '
+          'bay is not, with a statistic that does not carry.'
+          % sweep[0][3], 'deg')
+    check(1, 'THE TWO ATTRIBUTED TERMS ARE NOT INDEPENDENT',
+          sweep[2][3] < 0.25 * sweep[0][3], True, 0,
+          'THE TEST WAVE 9 DID NOT RUN. Hold the geometry EXACTLY fixed -- the '
+          'same circle, the same two beds -- and change only the incidence '
+          'obliquity, which is the other term\'s own variable. The ramp term '
+          'is %.4f deg at normal incidence, %.4f at delta = 6.56 deg and %.4f '
+          'at 20 deg: it falls by a factor of %.1f across the range. A term '
+          'whose value is a function of the other term\'s variable is not '
+          'independent of it, and wave 9 added them.'
+          % (sweep[0][3], sweep[1][3], sweep[2][3],
+             sweep[0][3] / max(sweep[2][3], 1e-9)), '-')
+    r_abs = sweep[0][3] / max(sweep[2][3], 1e-9)
+    r_sgn = max(abs(sweep[2][4] - sweep[2][5]), 1e-9) / max(
+        abs(sweep[0][4] - sweep[0][5]), 1e-9)
+    check(2, 'and the SIGNED term is nearly flat across the same sweep',
+          r_abs / max(r_sgn, 1e-9) > 2.0, True, 0,
+          'THE SAME SWEEP READ IN THE SIGNED MEAN. The keying moves the '
+          'alongshore DRIFT by %.4f deg at normal incidence and %.4f deg at 20 '
+          'deg -- a factor of %.2f -- where it moves mean|theta| by a factor '
+          'of %.2f in the other direction. And at 20 deg the circle\'s '
+          'mean|theta| and |mean theta| agree to %.4f deg: the distribution '
+          'has stopped straddling zero, so mean|.| has gone blind to any '
+          'zero-mean term inside it. That is the whole mechanism.'
+          % (sweep[0][4] - sweep[0][5], sweep[2][4] - sweep[2][5], r_sgn,
+             r_abs, abs(sweep[2][1] - sweep[2][4])), '-')
+    # ---- and the signed terms DO add, which is the resolution --------------
+    t_flr = flr_ax['sgn']
+    t_march = c_rad_sgn = _run(h_pol, xs_c, n0c, n0c)['sgn']
+    t_delta = _run(h_pol, xs_c, n0c + (math.pi / 2.0 - ep['alpha']),
+                   n0c)['sgn'] - c_rad_sgn
+    t_ramp = _run(h_car, xs_c, n0c, n0c)['sgn'] - c_rad_sgn
+    pred = t_flr + (c_rad_sgn - t_flr) + t_delta + t_ramp
+    check(2, 'the signed terms ADD: floor + march + delta + keying = the bay',
+          pred - bay_ax['sgn_sp'], 0.0, 0.20,
+          'THE RESOLUTION, AS AN EQUATION. Four terms measured one at a time '
+          'on the circle -- floor %+.4f, march-meets-curvature %+.4f, the '
+          'declared delta %+.4f, the keying %+.4f -- sum to %+.4f deg against '
+          '%+.4f measured on the built bay under its own fan over the spiral '
+          'span. Eight per cent. So the physics IS decomposable and wave 9\'s '
+          'two mechanisms are both real; what does not decompose is mean|.|, '
+          'and mean|.| is what every number in M4 was quoted in.'
+          % (t_flr, c_rad_sgn - t_flr, t_delta, t_ramp, pred,
+             bay_ax['sgn_sp']), 'deg')
+
+    # ---- 4. the limit of the normal-offset family --------------------------
+    cs = B.run_coast()
+    f_bay = B.offset_fold_fraction(x, y, xs)
+    f_rock = B.offset_fold_fraction(x, y, cs['x_s'])
+    check(2, 'the stated plan-form has NO fold inside its ramp',
+          f_bay, 0.0, 1e-9,
+          'Normal offsets of a concave curve fold at its centres of '
+          'curvature, and past that medial axis the nearest-point map is '
+          'many-to-one and min() puts a crease in the bed. The analytic bay '
+          'has none inside the ramp: %.4f%% of seaward ramp cells. This is the '
+          'row that says the fix is safe on the surface it is applied to.'
+          % (100 * f_bay), '-')
+    openq(2, 'the coastal loop\'s own rock line DOES fold, and that is why '
+             'the un-embayed bed keeps the axis keying',
+          '%.3f%% of ramp cells' % (100 * f_rock), '0%',
+          'The hardness field\'s roughness gives the rock shoreline a %.0f m '
+          'minimum radius of curvature, well inside the %.0f m ramp, so its '
+          'normal offsets fold and the crease would be a larger defect than '
+          'the obliquity it removes. Named, measured, and NOT taken -- and it '
+          'is also why the un-embayed bed stays bit-identical to waves 1-9 '
+          'rather than being re-based under 300 rows.'
+          % (1.0 / max(float(np.max(np.abs(np.gradient(
+              np.arctan(np.gradient(cs['x_s'], y)), y)
+              * np.cos(np.arctan(np.gradient(cs['x_s'], y)))))), 1e-12),
+             (B.D_SHELF / B.DEAN_A) ** 1.5))
+
+    # ---- 5. the composed bed actually carries it ---------------------------
+    b1 = B.run_bay(dx=4.0, n_steps=75, dt=6000.0, embay=True)
+    h_ax, _, _, _ = B.bay_bed(b1['x'], y,
+                              np.stack([np.interp(b1['x'], cs['x'], cs['h'][j])
+                                        for j in range(y.size)]),
+                              np.stack([np.interp(b1['x'], cs['x'],
+                                                  cs['h0'][j])
+                                        for j in range(y.size)]),
+                              sand_row=cs.get('sand_row'), plan=ep['x_s'],
+                              keying='axis')
+    dmax = float(np.max(np.abs(b1['h_init'] - h_ax)))
+    check(2, 'the keying reaches the COMPOSED bed, not just the isolated ramp',
+          dmax > 0.25, True, 0,
+          '`bay_bed` is the composition -- coastal loop above wave base, Dean '
+          'ramp below it, the bench join and the sand wedge between. The two '
+          'keyings differ by %.2f m of bed at the widest, so a change that '
+          'stopped at `plan_ramp` and never reached the render would be '
+          'caught here. Wave 9 lost a row to exactly that shape of defect '
+          '(`bay-bed-ignores-plan`).' % dmax, '-')
+    fanc = B.fan_theta0(y, ep['x_s'], ep['D'])
+    n0c2 = -B.shore_normal_angle(y, ep['x_s'])
+    cmp_ = {}
+    for kk, hh in (('axis', h_ax), ('normal', b1['h_init'])):
+        tr = B.transform_2d(b1['x'], y, hh, B.T_SWELL, B.H0_SWELL, fanc,
+                            contour0=n0c2)
+        p = B.plan_transport(y, ep['x_s'], tr)
+        ms = msp & p['mask']
+        cmp_[kk] = (math.degrees(float(np.mean(np.abs(p['theta_loc']
+                                                      [p['mask']])))),
+                    math.degrees(float(np.mean(np.abs(p['theta_loc'][ms])))),
+                    float(np.sqrt(np.mean(p['Q'][ms] ** 2))))
+    check(1, 'and it pays THROUGH the whole composition, not only on the ramp',
+          cmp_['normal'][0] < cmp_['axis'][0] - 0.1, True, 0,
+          'THE ROW THAT MAKES THIS WAVE MORE THAN AN ISOLATED RAMP. Same '
+          'coastal loop, same bench join, same sand wedge, same 75 '
+          'morphodynamic steps, same fan -- the keying is the one field that '
+          'changes. Whole-domain mean |theta_loc| %.4f -> %.4f deg, over the '
+          'spiral span %.4f -> %.4f, Q rms %.4e -> %.4e m3/s. The composed '
+          'bed sits about a degree above the isolated ramp because the '
+          'hardness field\'s roughness is still in the shoreline, and that '
+          'gap is a MEASUREMENT of what the roughness costs rather than a '
+          'defect in the keying.'
+          % (cmp_['axis'][0], cmp_['normal'][0], cmp_['axis'][1],
+             cmp_['normal'][1], cmp_['axis'][2], cmp_['normal'][2]), '-')
 
 
 def _theta0_for_sagitta(B, ep, target):
@@ -5027,6 +5473,288 @@ def _sec_foam(ctx):
           'bound.')
 
 
+
+# ============================================================================
+def _sec_bed(ctx):
+    """WAVE 10 -- WHICH SIDE OF THE AIR/WATER INTERFACE EACH QUANTITY LIVES ON.
+
+    THIS SECTION IS NOT ABOUT THE BED. It is about an ERROR CLASS this project
+    has now committed six times: A SHARED CLOSED FORM USED ONE INTERFACE OFF.
+    The bed under the water is the sixth instance and the rows below are
+    written so the seventh cannot pass.
+
+    WHY SIX INSTANCES GOT THROUGH, AND IT IS ONE SENTENCE. Every guard this
+    project owns on the interface is evaluated at an argument where an extra
+    interface crossing is INERT. `wet_albedo` is a Mobius map of the bed
+    albedo, and a Mobius map's structure survives being composed with itself:
+    monotone stays monotone, [0,1] stays [0,1], energy conservation stays
+    energy conservation. Worse, and this is the whole finding --
+
+        wet_albedo(1) == 1 exactly,   and   wet_albedo(0) - R_EXT == 0 exactly
+
+    -- so 0 and 1 are FIXED POINTS of the spurious map, and 0 and 1 are where
+    every energy guard in this project is evaluated. `validate.py`'s strongest
+    interface row, the LOSSLESS WHITE POOL that reads 1.73 when the 1/n^2
+    divisor is dropped, is IDENTICALLY blind to an extra `wet_albedo` in the
+    chain: rho_water(wet_albedo(1)) IS rho_water(1). Not approximately -- the
+    bug is invisible there as a matter of algebra.
+
+    That is chapter 11's tenth way, a fourth shape: A GUARD EVALUATED AT THE
+    FIXED POINTS OF THE OPERATOR THAT WAS WRONGLY INSERTED. The cure is not a
+    tighter tolerance, it is an argument STRICTLY INSIDE (0, 1), and every
+    absolute row below is at 0.45/0.39/0.30 or at the ladder of interior
+    albedos for exactly that reason.
+    """
+    import beach_render as RND
+    O, BO = OPT, BOP
+    a = np.asarray(RND.SAND_DRY, float)
+
+    # ------------------------------- 10.1 THE IDENTITY THAT NAMES THE SIDE
+    # `wet_albedo` IS `rho_water` with the water column set to zero. Two
+    # different code paths reach it: the left-hand side is Mobius algebra on
+    # two hemispherical constants built from a 512-point midpoint rule; the
+    # right-hand side is two 2000-node Gauss-Legendre quadratures with the
+    # exact per-direction internal Fresnel inside them. They share the IOR
+    # triple and nothing else.
+    #
+    # AND IT IS EVALUATED AWAY FROM 0 AND 1 ON PURPOSE. At a = 1 both sides are
+    # 1 - R_EXT identically and the row is worthless; at a = 0 both are 0.
+    for rho in (0.15, 0.45, 0.681, 0.90):
+        r3 = np.full(3, rho)
+        check(1, 'wet_albedo - R_EXT == (1-R_EXT) a slab_esc(0) trap_gain(a,0)'
+              ' at a=%.3f' % rho,
+              O.wet_albedo(r3[None])[0] - O.R_EXT,
+              (1.0 - O.R_EXT) * r3 * O.slab_esc(0.0) * O.trap_gain(r3, 0.0),
+              1e-4,
+              'THE ROW THAT SAYS WHICH SIDE THE ARGUMENT IS ON. `wet_albedo` '
+              'and `rho_water` are ONE transport: an interface crossed in, a '
+              'substrate, a trapped series, an interface crossed out. Set the '
+              'column to zero and they are the same number. So the thing '
+              '`wet_albedo` RETURNS is not the thing `wet_albedo` TAKES, and '
+              'it is not what `rho_water` takes either. 1e-4 is the two '
+              'quadratures\' own spread (512-point midpoint against '
+              '2000-node Gauss-Legendre); the defect this row exists for is '
+              '30%.', rel=True)
+    # the same statement said backwards, so a reader cannot mistake which is
+    # the air-side quantity
+    check(1, 'the diffuse escape IS the same number both ways, ABSOLUTE',
+          O.slab_esc(0.0), 1.0 - O.R_INT, 5e-5,
+          'slab_esc at zero depth integrates 2 mu (1 - R_int(mu)) dmu over the '
+          'water-side cosine; 1 - R_INT is (1 - R_EXT)/n^2 by Walsh\'s '
+          'reciprocity. Two derivations, one number, and it is the hinge of '
+          'the identity above.')
+    check(1, 'Walsh: n^2 (1 - R_INT) == 1 - R_EXT, ABSOLUTE',
+          O.IOR ** 2 * (1.0 - O.R_INT), 1.0 - O.R_EXT, 1e-15,
+          'The relation that makes the two sides of the interface ONE model. '
+          'R_EXT = 6.669%% out of the air and R_INT = 47.617%% out of the '
+          'water -- a ratio of 7.14 -- so an extra crossing is never a '
+          'rounding error, and the row is here to keep that asymmetry visible '
+          'beside the rows that depend on it.')
+
+    # --------------------- 10.2 THE FIXED POINTS, AND WHY THEY WERE THE TRAP
+    # These two rows do not guard the bed. They guard the GUARDS: they state,
+    # as rows, exactly where the existing energy rows are blind, so a later
+    # wave cannot re-derive the blindness by accident.
+    check(1, 'a = 1 is a FIXED POINT of wet_albedo -- the lossless white row '
+          'is blind by algebra', O.wet_albedo(np.ones((1, 3)))[0], np.ones(3),
+          1e-12,
+          'This is normally quoted as "no light is lost on a perfect '
+          'reflector" and it is that. It is ALSO the reason six waves of '
+          'interface guards could not see an extra wet_albedo in the chain: '
+          'validate.py\'s LOSSLESS WHITE POOL row evaluates rho_water at '
+          'rho_bed = 1, and wet_albedo(1) = 1, so the composed and the correct '
+          'chains are the SAME EXPRESSION there. A guard evaluated at the '
+          'fixed point of the operator that was wrongly inserted is not a '
+          'guard.')
+    comp = O.rho_water(O.wet_albedo(np.ones((1, 3)))[0], 0.358, 1.40,
+                       absorb=0.0)
+    corr = O.rho_water(np.ones(3), 0.358, 1.40, absorb=0.0)
+    check(1, 'and the blindness, demonstrated: the WRONG chain and the RIGHT '
+          'chain agree to 1e-15 at rho_bed = 1', comp, corr, 1e-15,
+          'The defect this wave fixed, evaluated at the pool\'s own energy '
+          'row. It is not small there, it is ABSENT there. The same two '
+          'expressions at rho_bed = 0.45 differ by 30%%, which is the next '
+          'row.')
+    for rho, want in ((0.30, 1.29006), (0.45, 1.34952), (0.681, 1.27981)):
+        r3 = np.full(3, rho)
+        got = float(O.rho_water(r3, 0.358, 1.40)[1]
+                    / O.rho_water(O.wet_albedo(r3[None])[0], 0.358, 1.40)[1])
+        check(1, 'the SAME pair off the fixed point: green factor at '
+              'rho_bed=%.3f' % rho, got, want, 1e-4,
+              'ABSOLUTE, and the whole content of the fix, at the POOL\'s own '
+              'depth and absorption so that the pool suite\'s own blind row '
+              'is the one being answered. Off the fixed point the composed '
+              'chain is 28-35%% dark. The factor is NOT monotone in the bed '
+              'albedo -- it is 1 at a = 1 (the fixed point), peaks near a = '
+              '0.45 and falls again toward a = 0, where the composed chain is '
+              'BRIGHTER because wet_albedo(0) = R_EXT is not 0. Any ONE '
+              'interior albedo would have caught this; nine waves wrote none.')
+
+    # ---------------------------- 10.3 THE CALL SITE, AS AN ABSOLUTE ROW
+    # The render's own ladder, not a copy of it.
+    _io = BO.iops()
+    w_absorb = _io['a'] + _io['b_b']
+    lad = BO.submerged_bed_rho(a, 0.358, [3.0], absorb=w_absorb)[0]
+    check(1, 'the shipped bed ladder at 3 m, ABSOLUTE',
+          lad, [0.0233864, 0.0995822, 0.0410648], 2e-6,
+          'THE NUMBER THE RENDER USES, per band, at three metres of this '
+          'coast\'s own water. ABSOLUTE because every ratio row in this '
+          'section would pass with a ladder that was uniformly wrong, and '
+          'because the wave-9 gap list quoted a factor without ever quoting a '
+          'value.')
+    # AND THE REFERENCE IS COMPOSED HERE, FROM `optics.rho_water` DIRECTLY.
+    # THE FIRST WRITING OF THIS ROW COMPARED `submerged_bed_rho` WITH
+    # `submerged_bed_rho` and it was green on all three deliberate defects,
+    # because both sides went through the patched function. That is the fourth
+    # time this project has caught a row that rebuilds the thing it is testing,
+    # and it is recorded rather than quietly corrected: the ONE row that must
+    # not share a line with the code under test is the row that says which
+    # argument it was given.
+    ref = OPT.rho_water(a, 0.358, 3.0, absorb=w_absorb)
+    check(1, 'the ladder IS optics.rho_water at the SUBSTRATE albedo',
+          lad, ref, 1e-12,
+          'The right-hand side is written here out of `optics.rho_water` with '
+          '`SAND_DRY` handed to it and nothing else. It fires if the call '
+          'site, the wrapper or the argument moves -- which the ABSOLUTE row '
+          'above cannot distinguish from a change in the water.')
+    for nm, bad in (('wet_albedo(SAND_DRY) -- what waves 4-9 shipped',
+                     RND.SAND_WET),
+                    ('its diffuse half -- what L9 proposed instead',
+                     RND.SAND_WET_DIFF)):
+        bad_lad = OPT.rho_water(bad, 0.358, 3.0, absorb=w_absorb)
+        check(1, 'and it is NOT %s' % nm,
+              float(np.max(np.abs(bad_lad / lad - 1.0))) > 0.15, True, 0,
+              'Both candidates have ALREADY crossed the interface '
+              '`rho_water` is about to cross for them. This row states the '
+              'two wrong answers by name so that a reader who reaches for '
+              'either finds them refused rather than absent.')
+    # the per-band ORDER separates the hypotheses, and no coefficient enters
+    f_fix = lad / OPT.rho_water(RND.SAND_WET, 0.358, 3.0, absorb=w_absorb)
+    f_l9 = (OPT.rho_water(RND.SAND_WET, 0.358, 3.0, absorb=w_absorb)
+            / OPT.rho_water(RND.SAND_WET_DIFF, 0.358, 3.0, absorb=w_absorb))
+    check(1, 'THE SEPARATING ROW: the correction peaks in GREEN, L9\'s ratio '
+          'peaks in BLUE', (int(np.argmax(f_fix)), int(np.argmax(f_l9))),
+          (1, 2), 0,
+          'A ROW WHOSE RESULT DIFFERS BETWEEN THE HYPOTHESES AND CONTAINS NO '
+          'COEFFICIENT. Both corrections are ~1.3x in magnitude, so a '
+          'magnitude row cannot tell them apart. Their SPECTRA can: L9\'s '
+          'ratio is wet_albedo/(wet_albedo - R_EXT), which is largest where '
+          'R_EXT is largest a share of the whole -- the darkest band, blue. '
+          'The real correction is the doubled trapped series 1/(1 - a R_INT) '
+          'carried through the column, which is largest where the bed is '
+          'brightest AND the water most transparent -- green. Two hypotheses '
+          'of the same size, opposite spectral order.')
+    info(1, 'the factors themselves, per band at 3 m',
+         (np.round(f_fix, 4).tolist(), np.round(f_l9, 4).tolist()),
+         'first: what this wave corrects (fixed/shipped, and it makes the bed '
+         'BRIGHTER). second: the 1.236/1.285/1.398 wave 8 reported, '
+         'reproduced exactly -- the arithmetic was right and its REFERENCE '
+         'was one interface off.')
+
+    # ------------- 10.4 WHAT THE FIX IS WORTH IN THE FRAME, AND IT IS NEARLY
+    #                    NOTHING -- WHICH IS THE OTHER HALF OF THE VERDICT
+    # A near-zero measurement is worthless until zero has been shown to be
+    # reachable (standing ruling 14). So the floor is stated first: the bed's
+    # share of the SUBSURFACE reflectance, by depth band, on this bay's own
+    # suspension field.
+    # The bay this section reads is `_sec_land`'s own, if that section has
+    # already run; otherwise one is built here. `Water` is 2 s on a bay that
+    # exists and 70 s on one that does not, and building a SECOND bay would
+    # also be a second premise.
+    if '_bed_water' not in ctx:
+        bay = ctx.get('_bay')
+        if bay is None:
+            bay = BCH.run_bay()
+            ctx['_bay'] = bay
+        ctx['_bed_water'] = RND.Water(bay)
+    w = ctx['_bed_water']
+    # THE OBJECT THE RENDER ACTUALLY CARRIES, read rather than rebuilt. Every
+    # row above tests a function; this one tests the FIELD `shade_water`
+    # interpolates, which is the only thing a frame ever sees.
+    check(1, 'the render\'s own Water.rho_lut is built on the substrate '
+          'albedo',
+          np.stack([np.interp(3.0, w.dep_lut, w.rho_lut[:, c])
+                    for c in range(3)]),
+          OPT.rho_water(a, math.sin(math.radians(RND.SUN_EL)), 3.0,
+                        absorb=w.io_clear['a'] + w.io_clear['b_b']),
+          6e-3,
+          'Interpolated off the shipped ladder at three metres, against '
+          '`optics.rho_water` composed here at the same sun and the same '
+          'water. The tolerance is the ladder\'s OWN interpolation error and '
+          'nothing else -- 0.41%% in red, 0.05%% in green -- which the row '
+          'below measures rather than assumes.', rel=True)
+    # THE INTERPOLATION ERROR, WHICH `Water.__init__` HAS PROMISED SINCE WAVE 4
+    # WOULD BE "A ROW IN THE SUITE RATHER THAN A CLAIM HERE" AND WAS NOT.
+    _lut_d = np.geomspace(0.05, 20.0, 48)
+    _lut = BO.submerged_bed_rho(a, math.sin(math.radians(RND.SUN_EL)), _lut_d,
+                                absorb=w.io_clear['a'] + w.io_clear['b_b'])
+    _dd = np.geomspace(0.06, 19.0, 1500)
+    _ex = BO.submerged_bed_rho(a, math.sin(math.radians(RND.SUN_EL)), _dd,
+                               absorb=w.io_clear['a'] + w.io_clear['b_b'])
+    _it = np.stack([np.interp(_dd, _lut_d, _lut[:, c]) for c in range(3)], -1)
+    check(1, 'the 48-node depth ladder, worst ABSOLUTE interpolation error',
+          float(np.abs(_it - _ex).max()), 0.0, 2.5e-4,
+          'MEASURED ABSOLUTELY AND NOT RELATIVELY, and the difference between '
+          'the two is the whole reason this row was written this way. In '
+          'RELATIVE terms the ladder is 41%% wrong in red at nineteen metres '
+          '-- linear interpolation of an exponential decay on a geometric '
+          'grid -- and that reads like a defect. In ABSOLUTE terms the worst '
+          'miss anywhere in the ladder is 2.4e-4 of apparent albedo, because '
+          'where the relative error is large the quantity is 1e-9. A relative '
+          'row here would have failed on correct code and a later wave would '
+          'have refined a ladder that costs nothing.')
+    info(1, 'the same ladder, worst RELATIVE error where rho_bed > 1e-4',
+         [round(float(np.abs(_it[:, c] / _ex[:, c] - 1)[_ex[:, c] > 1e-4]
+                      .max()), 4) for c in range(3)],
+         'per band, over the depths where the bed term can still be seen. The '
+         'red channel is the one the ladder resolves worst and it is also the '
+         'one the water removes first.')
+    d = w.d
+    rho = np.stack([np.interp(d, w.dep_lut, w.rho_lut[:, c])
+                    for c in range(3)], -1)
+    R_bed = rho * w.t_col
+    frac = R_bed[..., 1] / np.maximum((w.R_col + R_bed)[..., 1], 1e-15)
+    wet = d > 0.05
+    check(1, 'the bed is the MINORITY of the subsurface below 0.5 m',
+          float(np.median(frac[wet & (d > 0.5)])) < 0.05, True, 0,
+          'THE VERDICT ON WHAT GAP 8 WAS WORTH. The wave-8 gap list priced it '
+          'at "the teal rung and the surf, 12.3%% and 2.3%% of frame J" -- but '
+          'that is the AREA of those rungs, not the BED\'s share of them. '
+          'Below half a metre the suspension\'s own volume reflectance is '
+          'over 95%% of what leaves the column, so a 1.3x error on the bed '
+          'moves the rung by under a part in twenty of a part in twenty. The '
+          'correction is right and its cost was mis-priced by a factor of a '
+          'hundred.')
+    info(1, 'bed share of the subsurface reflectance, by depth band',
+         [(lo, round(float(np.median(frac[wet & (d >= lo) & (d < hi)])), 4))
+          for lo, hi in ((0.05, 0.5), (0.5, 1.0), (1.0, 3.0), (3.0, 8.0))
+          if (wet & (d >= lo) & (d < hi)).sum() > 10],
+         'green band. The bed is the majority term ONLY in the shallowest '
+         'bin, and that bin is the depth CLAMP -- d is floored at 0.10 m by '
+         'the transform, so a quarter of the wet cells sit at exactly 0.1000. '
+         'No camera this project owns resolves water that shallow: bar J\'s '
+         'nearest water pixel is at 0.28 m and the close surf frame F starts '
+         'at 2.07 m.')
+    openq(2, 'the clear water\'s round trip is counted TWICE in the bed term',
+          'rho_lut * t_col', 'rho_lut * (t_col / t_clear)',
+          'FOUND WHILE MEASURING GAP 8 AND NOT FIXED, because it is a second '
+          'defect in the same expression and PRUNE says name it rather than '
+          'chase it. `shade_water` forms R_bed = rho_lut * t_col. `rho_lut` '
+          'is `rho_water(..., absorb = the CLEAR water\'s a + b_b)`, which '
+          'already attenuates the beam down the slant and the diffuse return '
+          'up the column; `column_reflectance`\'s `t_col` is the WHOLE '
+          'column\'s round trip, clear water included. The intent, stated in '
+          '`Water.__init__`, was that t_col carry only the suspension '
+          'layer\'s EXTRA opacity. So the clear column is attenuated twice: '
+          'exp(-c_clear (1/mu_d + 1/mu_u) d), which is 0.65 in green at 1.6 m. '
+          'It makes the bed DARKER, i.e. the same direction as the defect this '
+          'wave fixed, and it is invisible in the frame for the same reason '
+          'that one is -- where the term is big the suspension has already '
+          'hidden the bed. It is the SAME ERROR CLASS in the composition '
+          'rather than the argument: a closed form that already carries a leg '
+          'multiplied by that leg again.')
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -5040,13 +5768,17 @@ def run_suite():
                       (_sec_transform2d, 'the wave transform in 2-D'),
                       (_sec_bay, 'the bar in plan'),
                       (_sec_embay, 'the static-equilibrium bay'),
+                      (_sec_bathy, 'the ramp keying: cross-shore vs '
+                                   'concentric vs normal'),
                       (_sec_optics, 'the coastal IOPs, the path and the '
                                     'glitter'),
                       (_sec_surface, 'the nonlinear free surface'),
                       (_sec_foam, 'the white: foam, entrained air, whitecaps'),
                       (_sec_camera, 'the camera at the owner\'s viewpoints'),
                       (_sec_land, 'the land and the air: beach, wet/dry, '
-                                  'shadow, aerial perspective')):
+                                  'shadow, aerial perspective'),
+                      (_sec_bed, 'the submerged bed, and which side of the '
+                                 'interface an albedo lives on')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -5122,6 +5854,46 @@ def _run_section(fn, label):
 
 if __name__ == '__main__':
     t0 = time.time()
+    if '--bugs-bed' in sys.argv:
+        # WAVE 10. Its own driver for the same reason wave 5's had one: the
+        # section needs a bay, a bay is seventy seconds, and the full `--bugs`
+        # table would build one per defect. Here it is built ONCE and handed to
+        # every run through ctx, so the four runs differ by the defect and by
+        # nothing else -- which is also what makes the comparison a measurement.
+        import importlib
+        import beach_render as RND
+        _bay = BCH.run_bay()
+
+        def _run_bed():
+            del ROWS[:]
+            c = dict(B=BCH, T=BCH.T_SWELL, omega=2.0 * math.pi / BCH.T_SWELL,
+                     x=BCH.make_grid(), _bay=_bay)
+            guard(_sec_bed, 'the submerged bed', c)
+            return c
+        _run_bed()
+        base = set(_fail_names())
+        print('clean bed section: %d pass / %d FAIL / %d open'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base),
+                 sum(r.status == 'OPEN' for r in ROWS)))
+        print()
+        print('%-26s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 118)
+        for name in BED_BUGS:
+            importlib.reload(BOP)
+            importlib.reload(RND)
+            BUGS[name](RND)
+            try:
+                _run_bed()
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-26s %d' % (name, len(caught)))
+            for c in caught:
+                print('%-26s   %s' % ('', c[:88]))
+        importlib.reload(BOP)
+        importlib.reload(RND)
+        sys.exit(0)
     if '--bugs-land' in sys.argv:
         import importlib
         import beach_render as RND
@@ -5191,6 +5963,30 @@ if __name__ == '__main__':
                                     '; '.join(c[:64] for c in caught[:5])))
         importlib.reload(FOAM)
         sys.exit(0)
+    if '--bugs-bathy' in sys.argv:
+        import importlib
+        _run_section(_sec_bathy, 'the ramp keying')
+        base = set(_fail_names())
+        print('clean bathymetry section: %d pass / %d FAIL'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base)))
+        print()
+        print('%-32s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 110)
+        for name in BATHY_BUGS:
+            importlib.reload(BCH)
+            BCH._BAY_CACHE.clear()
+            BUGS[name](BCH)
+            try:
+                _run_section(_sec_bathy, 'the ramp keying')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-32s %d  %s' % (name, len(caught),
+                                    '; '.join(c[:62] for c in caught[:5])))
+        importlib.reload(BCH)
+        BCH._BAY_CACHE.clear()
+        sys.exit(0)
     if '--bugs-embay' in sys.argv:
         import importlib
         _run_section(_sec_embay, 'the static-equilibrium bay')
@@ -5250,8 +6046,9 @@ if __name__ == '__main__':
             importlib.reload(BCH)
             importlib.reload(BOP)
             importlib.reload(CMR)
-            if name in EMBAY_BUGS:
-                # the embayment section is exercised by `--bugs-embay`, which
+            if name in EMBAY_BUGS or name in BATHY_BUGS:
+                # the embayment and bathymetry sections are exercised by
+                # `--bugs-embay` and `--bugs-bathy`, which
                 # clears `beach._BAY_CACHE` between runs. The whole-suite
                 # driver reuses the cache across bugs, so a patched plan-form
                 # would be invisible to every section after the first.
