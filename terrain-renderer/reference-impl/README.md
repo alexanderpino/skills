@@ -300,12 +300,143 @@ because the glitter road is one per cent of the frame and the other ninety-nine
 are unchanged. The blown-white streak down the near-left edge of the hero is
 half of what it was.
 
-Both figures are in `gauntlet/evidence/`, drawn by `fix_lobe_evidence.py` from
-the `HDRP` buffers themselves: `fig-pool-lobe-before-after.png` (before, after,
-and the **signed** difference with a colour bar labelled in absolute radiance —
-signed, because an absolute map cannot show that nothing rose) and
-`fig-pool-lobe-energy-vs-ratio.png` (the flux of both forms against the ellipse
-ratio, in steradians, with this scene's band on it).
+Two of the three figures are in `gauntlet/evidence/`, drawn by
+`fix_lobe_evidence.py` from the `HDRP` buffers themselves:
+`fig-pool-lobe-before-after.png` (before, after, and the **signed** difference
+with a colour bar labelled in absolute radiance — signed, because an absolute map
+cannot show that nothing rose) and `fig-pool-lobe-energy-vs-ratio.png` (the flux
+of both forms against the ellipse ratio, in steradians, with this scene's band on
+it). The third is the re-take below.
+
+### And the photometric ledger, re-taken either side of the exponent — **it did not move, and that is the finding**
+
+Every photometric comparison this file carries against a closed form is taken
+**off a render**, and all of them predate this fix, including the headline pair
+in *the pool's apparent albedo* — the closed form's `rho_water` against *the
+render, measured*. All eight above-water frames changed hash, so each of those
+rows was a candidate for being a measurement of a frame that no longer exists.
+They were re-taken. **Not one of the rows that is compared with a closed form
+moved at all**, and the reason is worth more than the re-measurement was.
+
+**The instrument, and why it is not `fix_lobe_render.py`.** That runner slices
+`render.py` at the line that forms `HDRP`, which is everything a *picture* needs
+and 700 lines above the block that writes the photometric rows.
+`lobe_albedo_measure.py` cuts lower — at the line that names the hero PNG, i.e.
+after **every** above-water analysis block the file carries and before the first
+byte reaches disk — so the two runs' stdout can be diffed print for print, and
+that diff **is** the sweep. It does not redefine the defect: it imports
+`fix_lobe_render._lobe_projection` and monkeypatches it for one run, and
+`atmosphere.py` on disk is never touched. One source line is inserted into
+`water_shade` and it only *records*: the file carries its two columns out as
+luminances alone, and a per-band reading needs the triples. The captured call is
+identified by reproducing `_plw` — the frozen disp-pass pair — through the file's
+own box average, an equality on 960 000 output pixels, so the second (`mono`)
+pass cannot be mistaken for the first.
+
+**The recipe was recovered exactly rather than reconstructed**, which matters
+because the *previous* attempt at this same measurement was wrong three times
+over and *a region that did not contain the phenomenon* was the largest of the
+three. It is not reconstructed here at all: it is `render.py`'s own block, run
+twice, so the only thing that differs between the two runs is the exponent.
+Numerator, the **mean** and not the median of the **transmitted** column over
+`REG == 3` — the sunlit floor at 1.40 m seen through the water, 133 889 output
+pixels. Denominator, `(Y·E_beam·SHAPE)`. Colour space, **scene-linear**, off
+`HDRP` and off `water_shade`'s two columns, **never off a PNG**.
+
+| `rho_water`, hero frame | red | green | blue | **luminance** |
+|---|---|---|---|---|
+| measured, **pre**-fix projection lobe | 0.043691 | 0.292624 | 0.489590 | **0.244431** |
+| measured, **post**-fix lobe | 0.043691 | 0.292624 | 0.489590 | **0.244431** |
+| the closed form beside it (derived, `optics.rho_water`) | 0.040365 | 0.272567 | 0.424998 | **0.225917** |
+| measured against derived | +8.2% | +7.4% | +15.2% | **+8.2%** |
+
+**The two measured rows are equal to the last bit** — in luminance and in all
+three bands. The agreement neither improved nor worsened: **+8.2% before, +8.2%
+after.** It is not that the movement was small; it is that there was none.
+
+**And the reason is the column, not the region.** The obvious hypothesis is the
+one the previous correction of this measurement would predict — that the region
+sits where the lobe never reached. **It is wrong, and the figure exists to show
+it is wrong.** The lobe reached the numerator: **18.2% of region 3's own pixels
+have a moved reflected column**, and that column's mean over the region fell
+**18.120 → 10.499**, ×0.579. What did not move is the **transmitted** column,
+which is bit-identical over the whole frame — and the transmitted column is what
+the measurement is *of*. The block takes it deliberately, on its own written
+ground that a mean over the whole pixel is hostage to a factor-577 glitter tail.
+**The same choice that makes the row robust to sun glitter is exactly what makes
+it blind to the lobe.** The direction the brief anticipated — the reflected sky
+sitting on top of the transmitted column, so that removing it lowers the reading
+and moves the agreement further from the closed form — is real, and every
+whole-pixel reading below does fall by it. The headline row is not a whole-pixel
+reading, and that is the whole of the answer.
+
+**The sweep, print for print.** Both runs' stdout differ on **69 lines** — one of
+them the monkeypatch banner and two of them wall-clock timings, which leaves 66
+that are readings. Every photometric one is here, measured, in the run's own
+precision:
+
+| reading of the hero frame, all of them `render.py`'s own | pre-fix | post-fix | moved by |
+|---|---|---|---|
+| **`rho_water` measured, luminance — the headline row** | 0.244431 | 0.244431 | **zero, to the last bit** |
+| `rho_water` measured, each of the three bands | — | — | **zero, to the last bit** |
+| water / stone, transmitted mean over mean | 0.90770 | 0.90770 | **zero, to the last bit** |
+| transmitted column, mean over region 3 | 0.69811 | 0.69811 | **zero, to the last bit** |
+| sunlit stone, mean · effective albedo | 0.7691 · 0.2112 | 0.7691 · 0.2112 | **zero, to the last bit** |
+| water / stone, + reflected **median** (glitter held out) | 0.948524 | 0.948524 | −2.2e−10% |
+| reflected column, **median** over region 3 | 0.031394 | 0.031394 | −5.1e−9% |
+| sunlit floor, median sRGB luminance *(display-referred)* | 139.7 | **138.7** | **−0.72%** |
+| water / stone, median over median, **display-linear off the PNG** | 0.849 | **0.837** | **−1.40%** |
+| water / stone, median over median, scene-linear | 0.862 | **0.848** | **−1.65%** |
+| the frame's **total** radiance, luminance | 4.564e6 | **2.995e6** | **−34.4%** |
+| reflected column, **mean** over region 3 | 18.120 | **10.499** | **−42.1%** |
+
+Everything above the display-referred rows is scene-linear and is compared
+somewhere with a closed form; **every one of those is bit-identical.** Everything
+below is a whole-pixel or whole-frame statistic and **every one of those fell**,
+by the amount the reflected sky was worth in it. The two are the same fact read
+twice.
+
+**The rest of the diff, which is glitter and nothing else.** The remaining moved
+lines are all statistics *of* the reflected column, and they move the way a
+narrowed glitter road has to: the sunlit-floor and shadowed-floor sRGB medians
+each fall one level, the paired open-water median goes
+`(58,163,182) → (55,161,180)`, the sail-shadow-over-sunlit-floor ratio moves
+0.482 → 0.481, the share of the specular-window rays on which the reflection beats
+the transmission goes 6.1% → 4.0% (and 21.2% → 14.3% on the broad road), the
+output pixels blown by the reflection alone go 4.63% → 3.00% and 14.99% → 9.50%,
+and the far window's radial power falls 11.25 → 9.87 with its mean encoded
+luminance 134.62 → 130.32. **Nothing on the transmitted side moves at all**: the
+bed's own terms — `cau` over the sunlit deep floor, the beam at the bed, the sky
+at the bed, the return leg, the convergence table, the wall/band ratios, the
+riser, tread, coping, freeboard and both wall strips — are identical between the
+two passes, line for line. `terrain-renderer/references/12-water-rendering.md`
+and `12a-water-derivations.md` were swept for the same class of number and carry
+none: `12a`'s one radiance-buffer measurement is the **coastal** reference's hero
+frame, not the pool's.
+
+**What this implicates, and it is an instrument and not a physics.** A **34.4%**
+fall in the frame's total radiance passed through the whole of the pool's
+photometric ledger and moved **three** rows by one part in a hundred, none of
+which is compared with anything. The ledger was never exposed to this defect and
+could not have caught it — which is the *same* finding as the eleven suite rows
+that never left the degeneracy, one level up: the suite could not see the lobe
+because its rows were isotropic, and the render's own photometry could not see it
+because its rows are transmitted-only. **There is no regression anywhere in this
+file on the reflected column's LEVEL, against anything.** That is the gap this
+re-take names, and it is the next thing to build here.
+
+Nothing in `atmosphere.py`, `render.py`, `optics.py` or `field.py` was touched to
+take this measurement, and the suite says so: `python3 validate.py` runs **306
+pass / 0 FAIL / 64 info in 119.4 s** (up from the 298 this section recorded, by
+the eight rows `016d480` added on the other side of the tree, not by anything
+here).
+
+`fig-pool-albedo-retake.png`, drawn by `lobe_albedo_evidence.py` from the two
+`albedo-*-hero.npz` buffers, carries all four of these: the two regions outlined
+on the frame they were measured on — at panel resolution, so a reader can audit
+the region that was the last correction's largest error — the per-band ladder of
+pre-fix, post-fix and closed form, the two columns of the same region, and the
+sweep table above as one bar each.
 
 ### Which frames moved, and which did not
 
@@ -1305,6 +1436,17 @@ and the display-linear median-over-median off the sRGB frame — the number a
 reader with the PNG would get — **0.779 → 0.849**. From a denominator that was
 derived rather than dialled, with the water untouched.
 
+> **Both of those are pre-`7fe9538` readings, and only one of them is still
+> current.** The lobe re-take at the head of this file measured every row of this
+> ledger either side of the fixed exponent. The scene-linear **0.908 does not
+> move at all** — it is the transmitted column, which is bit-identical — but the
+> display-linear median-over-median beside it goes **0.849 → 0.837** (−1.40%),
+> because a median over the *whole* pixel carries the reflected sky and the
+> transmitted column does not. The scene-linear median-over-median, which this
+> section does not quote, moves the same way, 0.862 → 0.848. The wave-15 → 16
+> *step* is unaffected: both its ends are pre-fix, so the fix cancels out of the
+> difference and only the levels move.
+
 **The wide frame moves the same way, and by the same mechanism.** `POOL_WIDE=1`,
 same code, same constants, only the camera: water / sunlit stone goes **0.796 →
 0.863** against a closed form that moves **0.677 → 0.735** on that geometry —
@@ -1428,6 +1570,22 @@ saturated and slightly darker** (0.74 → 0.79), which is the derived illuminant
 doing what a derived illuminant does: the old constant's fake warmth was
 desaturating a blue liner.
 
+> **The wave-16 column above is a pre-`7fe9538` reading of the frame, and two of
+> its rows move under the fixed lobe.** Re-measured on the same segmentation, in
+> the same encode: **floor, sunlit `(53, 161, 184) · 139.7 → (52, 160, 183) ·
+> 138.7`** and **floor, in shadow `· 99.9 → · 98.9`**, both −1.0 level, because
+> a *median sRGB triple* is a whole-pixel reading and therefore carries the
+> reflected sky. The other seven rows — riser, tread, coping, band, both wall
+> strips, water in front — do not move at all, which is the same statement the
+> table already makes about the deck, now made about the fix as well. This is
+> also the two-part reading the lobe section's own sweep table carries: the row
+> is display-referred, and every scene-linear row of this ledger that is
+> compared with a closed form is bit-identical either side of the exponent.
+> *(Two of the rows above — riser face and floor-in-shadow — no longer reproduce
+> at HEAD even pre-fix, `(15, 121, 161) · 101.4` and `(43, 111, 157) · 99.9`.
+> That drift is not the lobe's: it is bit-identical between the two passes and
+> is left for whichever round owns it.)*
+
 ### Suite
 
 **268 rows, 0 FAIL, up from 240.** The 28 new ones are the two illuminants and
@@ -1501,6 +1659,15 @@ albedo*, so neither can be re-derived by hand again.
 > same measurement now reads **0.836 against the form's 0.772, +8.3%**. Every
 > number below still holds for the frame it was taken on; the section further up
 > carries the new pair.
+>
+> **And read the `0.2151` row below with the lobe re-take beside it, which is a
+> different correction and lands the other way.** That row was measured before
+> `7fe9538`, so it was a candidate for being a measurement of a frame that no
+> longer exists. It was re-taken either side of the fixed exponent and **it does
+> not move: 0.244431 both, bit for bit, against the same closed form's
+> 0.225917.** The `0.2151 → 0.2444` step is entirely waves 15 and 16 — the trap
+> and the deck illuminant — and none of it is the lobe. The lobe re-take, and
+> what its *not* moving implicates, is at the head of this file.
 
 ### The prediction, corrected twice
 
@@ -1596,6 +1763,16 @@ A note on the reflected column, because it makes any whole-pixel mean useless: i
 mean over the sunlit floor is **18.12** against a median of **0.031**, a factor of
 **577**, and all of it is sun glitter at `L_SUN = 3.6e5`. A mean taken over the
 whole pixel is that factor's hostage.
+
+> **`18.12` and `577` are pre-`7fe9538`, and this is the one row in the pool's
+> whole photometric ledger that the lobe fix moves by more than two per cent.**
+> Re-measured either side of the exponent on the same region: the reflected
+> column's mean over the sunlit floor is **18.120 → 10.499, ×0.579**, and the
+> factor over its own median **577 → 334**. The **median is unmoved** (0.031394,
+> to 5e-11), which localises the whole of the fall to the glitter tail. The
+> argument this paragraph makes survives intact and is if anything understated
+> by the new number — a factor of 334 between a mean and a median is still a
+> mean nobody may use.
 
 ### What *is* wrong, and it is two ~25% errors of opposite sign
 
