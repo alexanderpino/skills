@@ -556,3 +556,154 @@ def lee_centreline(w_over_lam, n_dist=7, lam=1.0):
     r = frac * W ** 2 / float(lam)
     v = fresnel_parameter(0.5 * W, r, lam)
     return dict(frac=frac, r=r, v=v, amp=2.0 * knife_edge_kd(v))
+
+
+# ============================================================ the scene, in one
+# `beach` is imported LAZILY inside these functions and nowhere at module
+# scope. Three builders are editing this tree at once this wave, and a module
+# that can be imported, checked and fired without pulling in the whole scene is
+# a module two of them can ignore. Nothing above this line knows what a beach
+# is; everything below is the Aljezur bay's own numbers.
+def scene_wavenumber(depth=None):
+    """The wavenumber the edge diffracts at.
+
+    Penney & Price's solution is a CONSTANT-DEPTH solution, and the water
+    between the diffraction point and this domain's offshore boundary is not in
+    the bed at all -- so there is a choice here and it must be stated. The
+    default is the linear-theory k at the shelf depth the ramp caps at, because
+    that is the water the boundary row actually sits in. The suite reports the
+    answer at the deep-water k and at 4 m as well: THE DEEP-SHADOW DIRECTION
+    FIELD IS RADIAL FROM THE TIP WHATEVER k IS -- k sets the width of the
+    transition and the spacing of the Fresnel ripples, not the fan -- so the
+    measurement moves by less than the choice looks like it should.
+    """
+    import beach as B
+    if depth is None:
+        depth = B.D_SHELF
+    return float(B.wavenumber(2.0 * math.pi / B.T_SWELL,
+                              np.asarray([float(depth)]))[0])
+
+
+def scene_edge(ep=None, where='pole', k=None, screen_dir=None, depth=None):
+    """The scene's diffracting edge. `where` is 'pole' or 'headland'.
+
+    ONE CODE PATH, TWO PLACES TO STAND IT. 'headland' is the edge gap 3's own
+    text prescribes -- stamped at the true headland tip. 'pole' is the edge the
+    plan-form construction already asserts, at the virtual source its own
+    closure solve found. They are the same `Edge` class with different
+    arguments, and the difference between what they deliver is this wave's
+    central measurement.
+    """
+    import beach as B
+    if ep is None:
+        ep = B.equilibrium_plan()
+    if k is None:
+        k = scene_wavenumber(depth)
+    if where == 'headland':
+        return headland_edge(ep, k)
+    if where == 'pole':
+        return pole_edge(ep, k, screen_dir=screen_dir)
+    raise ValueError('where must be pole or headland')
+
+
+def scene_fan(ep=None, where='pole', k=None, screen_dir=None, x_off=0.0,
+              H0=None, depth=None):
+    """The diffracted offshore boundary for the bay, as (theta_0, H_0) per row.
+
+    THE DELIVERABLE. `theta_0` here is an OUTPUT of Sommerfeld's solution --
+    grad(arg u) of an exact wave field, not a stated per-row direction -- and
+    so is the amplitude. Everything shoreward of it stays `transform_2d`'s.
+    """
+    import beach as B
+    if ep is None:
+        ep = B.equilibrium_plan()
+    if H0 is None:
+        H0 = B.H0_SWELL
+    edge = scene_edge(ep, where=where, k=k, screen_dir=screen_dir, depth=depth)
+    out = diffracted_boundary(edge, x_off, ep['y'], H0)
+    out['edge'] = edge
+    out['ep'] = ep
+    return out
+
+
+def geometric_shelter(ep, edge, x_s=None):
+    """How much of the coast an edge's GEOMETRIC shadow actually covers.
+
+    The question that has to be asked before any wave theory, and it is the one
+    gap 3 did not ask. A Sommerfeld edge modifies the field where the edge
+    BLOCKS something; if the ray from a shoreline station back out to sea never
+    meets the screen, the diffracted field there is the incident field and the
+    edge has supplied nothing.
+    """
+    y = np.asarray(ep['y'], float)
+    xs = np.asarray(ep['x_s'] if x_s is None else x_s, float)
+    sh = edge.in_shadow(xs, y)
+    bay = (y >= ep['A1'][1]) & (y <= ep['A2'][1])
+    return dict(shadow=sh, n=int(sh.sum()), n_rows=int(y.size),
+                n_bay=int((sh & bay).sum()), n_bay_rows=int(bay.sum()),
+                frac=float(sh.mean()))
+
+
+def transport_table(ep=None, x=None, ramp=None, where='pole', k=None,
+                    screen_dir=None, rows=None):
+    """WAVE 9'S TRANSPORT TABLE WITH THE DIFFRACTED ROWS IN IT.
+
+    Six shorelines-and-fields, ONE offshore spectrum, one ramp, one transform,
+    one CERC closure. The first four are wave 9's, recomputed here rather than
+    quoted, so that a change anywhere in the transform moves the control and the
+    measurement together:
+
+      straight        the control the bar asks for
+      rotated         THE METER'S FLOOR -- the closed-form zero-transport coast
+      bay_plane       the bay under plane crests, which MUST be worse
+      bay_fan9        the bay under wave 9's hand-stated radial fan
+      bay_diff_dir    the bay under the DIFFRACTED direction field, H_0 uniform
+      bay_diff        the bay under the diffracted direction AND amplitude
+
+    THE LAST TWO ARE SPLIT ON PURPOSE. Q goes as H_b^(5/2), so a shadow that
+    halves the height cuts the transport 5.7x whether or not the shoreline is an
+    equilibrium. `bay_diff_dir` is the row that cannot be bought that way, and
+    `sin2_rms` -- the rms of sin(2 theta_loc), which is the CERC closure with
+    its height and its coefficient divided out -- is the column that cannot be
+    bought that way at all. Read that column first.
+    """
+    import beach as B
+    if ep is None:
+        ep = B.equilibrium_plan()
+    y = ep['y']
+    if x is None:
+        x = np.arange(0.0, 1000.0 + 4.0, 4.0)
+    x_ref = float(np.mean(ep['x_s']))
+    fan = scene_fan(ep, where=where, k=k, screen_dir=screen_dir)
+    spec = [('straight', np.full(y.size, x_ref), B.THETA0_SWELL, B.H0_SWELL),
+            ('rotated', B.zero_transport_plan(y, x_ref, B.THETA0_SWELL),
+             B.THETA0_SWELL, B.H0_SWELL),
+            ('bay_plane', ep['x_s'], B.THETA0_SWELL, B.H0_SWELL),
+            ('bay_fan9', ep['x_s'], B.fan_theta0(y, ep['x_s'], ep['D']),
+             B.H0_SWELL),
+            ('bay_diff_dir', ep['x_s'], fan['theta0'], B.H0_SWELL),
+            ('bay_diff', ep['x_s'], fan['theta0'], fan['H0'])]
+    if rows is not None:
+        spec = [s for s in spec if s[0] in rows]
+    # the spiral span: the frame's outer sixth is the rock headland the coastal
+    # loop built and the tangential beach downdrift, neither of which is the
+    # closed form under test.
+    msp = np.zeros(y.size, bool)
+    msp[int(ep['j1']) + 2:int(ep['j2']) - 1] = True
+    out = {}
+    for nm, xs, th0, H0 in spec:
+        _, tr = B.plan_field(x, y, xs, theta0=th0, H0=H0,
+                             **({} if ramp is None else dict(ramp=ramp)))
+        p = B.plan_transport(y, xs, tr)
+        m = msp & p['mask']
+        p['Q_rms_span'] = float(np.sqrt(np.mean(p['Q'][m] ** 2)))
+        p['sin2_rms'] = float(np.sqrt(np.mean(
+            np.sin(2.0 * p['theta_loc'][m]) ** 2)))
+        p['sin2_rms_all'] = float(np.sqrt(np.mean(
+            np.sin(2.0 * p['theta_loc'][p['mask']]) ** 2)))
+        p['th_mean_span'] = float(np.mean(np.abs(p['theta_loc'][m])))
+        out[nm] = p
+    out['_span'] = msp
+    out['_fan'] = fan
+    out['_ep'] = ep
+    return out
