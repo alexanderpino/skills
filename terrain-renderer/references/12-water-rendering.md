@@ -631,6 +631,80 @@ handling emergent cells as boundaries, and the hard shadow needs an actual diffr
 directional spreading) rather than a wider filter on the depth field. **Blurring the shadow is not
 modelling the diffraction**; it happens to look better and it gets `W/λ` wrong in both directions.
 
+#### K_d is half the solution. The other half is a DIRECTION, and it is what a bay is held by
+
+Everything above prices diffraction as an **amplitude** — `K_d`, a number between 0 and 1 that says
+how much wave is in the lee. That is the half a coastal-engineering chart gives you and it is the
+half a renderer least needs, because a wave field is a direction as well as a height and the
+direction is what turns crests. **The same solution carries both**, and taking only the amplitude
+from it is the reason the term keeps getting described as "a soft edge on the shadow".
+
+**The solution, in the form Penney & Price (1952) applied to water waves.** Sommerfeld (1896) solved
+the half-plane exactly — the first exact solution of any diffraction problem. With `e^{−iωt}`, a
+screen along `φ = ±π` from the edge, and a unit plane wave arriving **from** direction `φ₀`:
+
+```
+u(r, φ) = U(r, φ − φ₀)  +  s · U(r, 2π − φ − φ₀)
+
+U(r, ψ) = (1/√2)·e^{−iπ/4}·[ (1+i)/2 + C(X) + i·S(X) ]·e^{−i k r cos ψ},
+X(r, ψ) = 2·√(kr/π)·cos(ψ/2)
+```
+
+`C`, `S` are the Fresnel integrals; `s = +1` for a **rigid (Neumann)** screen, which is the
+water-wave case — no flow through a breakwater or a headland — and `−1` for pressure release. The
+first term is the incident wave switched off across the **geometric shadow** boundary; the second is
+the reflected wave switched off across the **reflection** boundary. Each switches through exactly
+`1/2` at its own boundary because `X = 0` there and `F(0) = 0` exactly — *that* is where this
+section's `K_d(0) = 0.5000` comes from, and it holds at every range rather than asymptotically.
+**`P` for the two papers; `D` for the form as written, which was verified here rather than
+transcribed.**
+
+> **The second term's argument is `2π − φ − φ₀`, not `φ + φ₀`.** Both give the same plane wave —
+> `cos(2π − φ − φ₀) = cos(φ + φ₀)` — but they switch it on in **complementary** regions, and
+> `φ + φ₀` stands the reflected wave at full strength *inside* the geometric shadow. `U` is
+> **4π-periodic**, so `2π − ψ` is the other sheet of the same function, which is the whole content
+> of "the half-plane lives on a two-sheeted Riemann surface". The reference implementation shipped
+> `φ + φ₀` first and it drew a completely convincing lee; what caught it was the `1/2` on the shadow
+> boundary reading **1.106 / 0.615 / 1.323** instead. **`D`, and recorded because the picture cannot
+> find it.**
+
+**The direction is `grad(arg u)`.** `u` is complex, so `k_vec = ∇(arg u) = Im(∇u / u)` is the local
+wavenumber vector, and it is an **output** of the wave solution with nothing per-station stated
+anywhere in it. Measured on the reference implementation (`D`):
+
+- **Deep in the geometric shadow the orthogonal is RADIAL from the tip**, to **0.10°** at ranges of
+  0.6–2 km on a 126 m swell, with `|k_vec|/k = 1.000` to 7×10⁻⁴. Nothing radial is put in: the field
+  is two Fresnel integrals of a plane wave. So "the fan converges on the diffraction point" is a
+  **result**, not the ansatz a plan-form construction has to assume it is.
+- **Far in the lit region it is the incident direction**, to 0.02° at 12 km.
+- **Near the shadow boundary it is neither, and it rings** — `K_d = 0.980` and the orthogonal
+  **0.89°** off the incident direction at Fresnel parameter `v = −5.4`. The lit side of an edge
+  overshoots; a model that returns a clean 1.0 and 0.0 there has smoothed the physics away, which is
+  the same failure as blurring the shadow seen from the other side.
+
+**What this section's own numbers survived.** An independent implementation (no scipy in the
+container; Fresnel integrals built from a power series, Gauss–Legendre quadrature and an asymptotic
+series, cross-checked against each other) reproduces `K_d(0) = 0.50000` and `0.30783 / 0.20267 /
+0.11103` against the `0.31 / 0.20 / 0.11` above, and **all seven columns** of the lee centre-line
+table to ≤ 0.005. **`D`, and the table's convention is now stated because it was not obvious:** the
+centre-line values are the **coherent sum of two half-plane edge fields**, `2·K_d(v)` with
+`v = (W/2)·√(2/(λr))`, the two edges being equidistant on the centre line and therefore in phase. A
+Fresnel–Kirchhoff integral over the *aperture* on the same geometry gives 0.431 at `r = W²/λ`, not
+0.51, so a reader reconstructing the table from the words alone would have missed it.
+
+**Three checks that can actually fail, and what each one cannot see.**
+
+| check | what it says | what it is blind to |
+|---|---|---|
+| `(∇² + k²)u = 0` on a 4th-order stencil | residual 1.4×10⁻⁶, and it falls as `h⁴` (5.056 / 5.060 against the stencil's 5.0625), so it is truncation | **almost everything.** A *sum* of solutions is a solution, so the PDE constrains nothing about the boundary conditions: of seven deliberate defects it caught only the one that broke the arithmetic |
+| `K_d = 1/2` on the geometric shadow boundary | 0.529 / 0.514 / 0.507 / 0.504 at `kr` = 25 / 99 / 398 / 1591, and `(K_d − ½)·√(kr)` is **constant to 0.005** — the departure is the reflected term, not an error | nothing much: it caught 3 of the 7 |
+| energy across two downwave lines | equal to 3×10⁻⁴; and split at the shadow boundary, the **gain** in the geometric shadow is **0.98** of the **deficit** on the lit side | a scale error common to both sides |
+
+**The energy statement is the one worth quoting to a reviewer**, because it is the answer to "where
+did the wave in the lee come from": exactly as much flux appears where a ray model puts none as goes
+missing from the side that was lit. A model that fills the lee by widening a filter cannot make that
+statement, and a model that masks the obstacle and stops propagation fails it outright.
+
 ### The shoreline is part of the wave field, and a straight one is a test that cannot fail
 
 Everything above turns *crests* onto contours. Nothing above asks where the **contours** came from,
@@ -708,6 +782,8 @@ CERC closure — the only thing that differs between rows is the array `x_s(y)`;
 | the log-spiral bay, under the fan its own pole implies | 2.801° | 7.921 × 10⁻² | 1.2× down (3.5× over the spiral span) |
 | the same bay, ramp keyed **concentrically** about the pole | 2.759° | 6.437 × 10⁻² | the two-line change, and it buys 0.04° |
 | **the same bay, ramp keyed to the NORMAL distance to the shore** | **2.448°** | **7.176 × 10⁻²** | 12 % of the residual, and it is the general form |
+| the bay, under a **DIFFRACTED** fan — direction only, `H₀` uniform | 3.081° | 6.256 × 10⁻² | `2.10 × 10⁻²` over the spiral span |
+| **the bay, under a DIFFRACTED fan — direction AND `K_d`** | **1.875°** | **7.629 × 10⁻³** | **`3.94 × 10⁻³` over the spiral span, 2.2× the floor** |
 
 Read the second row first. **A near-zero reading is worthless until zero has been shown to be
 reachable** — that is the fourteenth way a measurement lies (`11`) with the sign flipped, two
@@ -723,6 +799,90 @@ boundary left **4.89°** of residual obliquity and 76 % of the straight coast's 
 the local contour it leaves **0.20°**. **If your transform takes a scalar offshore direction and
 applies Snell against the grid, it is exact only for a straight coast, and it will be silently wrong
 on any bay you give it.** `D`
+
+#### A shore-attached headland does not shelter its own bay, and the geometry says so first
+
+The obvious place to stand the edge is the **updrift headland tip**, and on this coast it delivers
+nothing — for a reason that needs no wave theory at all. An edge modifies the field where it
+**blocks** something, so before computing a diffracted field, cast the straight ray from each
+shoreline station back along the incident direction and ask whether it meets land. On the reference
+scene, whose headland protrudes **91 m** seaward at a deep-water obliquity of **20°**, the geometric
+shadow is **250 m** of coast — `5` of `89` shoreline stations, and **1** of the bay's `66`, all of
+them on the **headland's own updrift face**. `D`
+
+```
+alongshore reach of a shore-attached headland's shadow  ≈  protrusion / tan(θ₀)
+```
+
+**That is a criterion, and it is cheap.** A headland shelters a bay only if `protrusion / tan θ₀` is
+comparable with the bay's own length. Here it is 250 m against 1409 m, i.e. **18 %**, and the bay
+the closed form builds is **2.46× more indented than the photograph** — which is the same fact seen
+from the other end. **The closed form is building a bay that needs a shelter this coast does not
+have**, and the honest reading of the over-prediction is not that the spiral is wrong but that the
+frame is not one whole bay between one diffraction point and one control point. `D`
+
+The pole the two-condition solve returns sits **1441 m** from the updrift anchor and **773 m
+seaward of the domain**, and it *does* shelter the bay — 55 of its 66 stations. But there is no
+barrier there: `D` is a **virtual** source, so the direction its screen extends in has no geometry
+behind it. That is the one free parameter in this construction and it is priced rather than hidden:
+**rotating the screen through 80° moves the measurement by 0.051° out of 1.90°**, and changing the
+wavenumber the edge diffracts at across 4 m, 8 m and deep water moves it by **0.034°** — because the
+deep-shadow direction is radial whatever `k` is, so `k` sets the width of the transition and the
+spacing of the Fresnel ripples, not the fan. **A constant chosen to make a picture right does not
+behave like that.** `?` on the bearing; `D` on both sensitivities.
+
+#### The fan is an OUTPUT, and making it one overturns the attribution above
+
+The last two rows of that table replace the *stated* per-row offshore direction with `grad(arg u)`
+of a Sommerfeld edge stamped at the plan-form's own pole — the point `12a` §11 already calls "the
+diffraction point, or more generally the virtual source the fan converges on", so standing a real
+edge there turns an assertion into a measurement. Nothing per-station is stated: the field still
+arrives from outside with one spectrum (`H₀ = 1.5 m, T = 9 s, θ₀ = 20°`) and everything shoreward of
+the boundary stays the transform's output. **`D`**
+
+**Read the direction-only row and the full row as two different claims.** `Q ∝ H_b^{5/2}`, so a
+shadow that halves the height cuts the transport by 5.7× whether or not the shoreline is an
+equilibrium — which is a way a measurement lies, and it is why the third meter below exists:
+
+| meter | straight | the floor | bay, plane crest | bay, stated fan | bay, DIFFRACTED |
+|---|---|---|---|---|---|
+| mean \|θ_loc\| | 6.469° | **0.202°** | 5.595° | 2.801° | **1.875°** |
+| `Q` rms over the spiral span | 9.233×10⁻² | **1.780×10⁻³** | 1.333×10⁻¹ | 2.650×10⁻² | **3.935×10⁻³** |
+| rms `sin(2θ_loc)` — the closure with its height and its coefficient divided out | 2.239×10⁻¹ | **4.101×10⁻³** | 2.311×10⁻¹ | 8.907×10⁻² | **5.549×10⁻²** |
+
+**The two meters disagree by an order and the height-free one is the honest one.** `Q` reaches
+**2.2×** the floor; `sin(2θ)` is still **13.5×** it. `K_d` falls to **0.073** at the sheltered end,
+so the updrift limb of this bay carries an 0.11 m wave and its transport is near zero for a reason
+that has nothing to do with the shoreline. **The bay is smaller, not zero, and part of the fall in
+`Q` is bought by the shelter rather than by the plan-form.** `D`
+
+**And the fan is not what a stated radial fan is.** In the geometric shadow the diffracted direction
+and the radius from the tip agree to **1.07° rms**; over the whole boundary they differ by **11.4°**,
+because outside the shadow the field is the incident wave and knows nothing about the tip. A stated
+radial fan applies the fan everywhere. **A diffracted field applies it only where the edge blocks
+something, and the shadow boundary is where it stops** — that boundary is the thing an assumed fan
+cannot have.
+
+**This overturns the residual decomposition below, and the overturn is a measurement.** That
+decomposition attributes 0.71° to the ramp's keying and 1.46° to the march meeting curvature, both
+measured with **exactly radial** incidence on the circular bay, which puts the "attributed floor" at
+**2.371°**. Take one shoreline, one bed, one transform and change only the incidence:
+
+| incidence on the circular bay, cartesian ramp | mean \|θ_loc\| |
+|---|---|
+| exactly radial from the pole | 2.371° |
+| **Sommerfeld's diffracted field from the same pole** | **1.278°** |
+| exactly radial, concentric ramp | 1.661° |
+| Sommerfeld, concentric ramp | 0.998° |
+
+The diffracted field gets under the attributed floor **with the ramp and the march untouched**, and
+it survives grid refinement — at `dx` = 8 / 4 / 2 / 1 m the first pair reads 2.475/1.403,
+2.371/1.278, 2.320/1.219, 2.295/1.190, both converging and the gap not closing — so it is not the
+column march's discretisation. **The two contributions are therefore not independent of the
+incidence and must not be quoted as an additive floor.** The mechanism is that a stated radial fan
+is radial *at the shoreline station*, while the physical field is radial *at the point it is
+evaluated at*; on concentric contours the second is normal to every contour it crosses and the first
+is not. `D`
 
 #### Where the residual goes, and the honest answer
 
@@ -798,6 +958,18 @@ decomposes fine. **Attribute in a statistic that adds; report in whichever one t
   as an output.
 - **If the shore is straight, the refraction check is void** and a different one is owed — a rotated
   test bed, or the isolated-obstacle test above.
+- **If a bay is claimed to be sheltered, ask which object shelters it and how long its shadow is.**
+  `protrusion / tan θ₀` against the bay's length, before any wave model. A shore-attached headland
+  at a small obliquity shelters almost nothing, and a "diffraction point" that turns out to be a
+  virtual source a kilometre offshore is a fitted parameter wearing a physical name.
+- **If a diffraction term is claimed, ask for the direction field and not only for `K_d`.** An
+  amplitude chart is half the solution and it is the half that does not turn crests. Ask also what
+  the model does on the *lit* side of the shadow boundary: the real field overshoots and rings
+  there, and a clean 1.0 is the same defect as a blurred shadow.
+- **If a transport residual is decomposed, ask whether the pieces were measured at the same
+  incidence.** Two contributions measured under one boundary condition do not add to a floor under a
+  different one; on this scene a decomposition that looked additive was got under by 0.5° once the
+  incidence became an output.
 - **If the plan-form is claimed as an equilibrium, ask for the transport profile and for the
   meter's floor.** Two numbers, and the second is the one that gets left out.
 - **The bay's indentation is the one number to compare against a photograph, and it must not be

@@ -2356,10 +2356,103 @@ read zero and only the circle can.
   them. Writing them from memory would manufacture a citation, so the form is named and **not**
   implemented. Anyone with the paper should add it: its advantage over the spiral is precisely that
   it produces the straight downcoast tangent as part of one formula instead of as a join.
-- The **fan itself**. The implementation supplies it as a stated per-row offshore direction radiating
-  from the bay's own pole, which is a boundary condition and not a diffraction solve. A Sommerfeld /
-  Penney–Price edge stamped at the headland tip would make the fan an output; that is the next wave's
-  work and it is the same term `12`'s diffraction section prices.
+- ~~The **fan itself**.~~ **Closed, and the closing corrected the prescription** — see §12 below.
+  The fan is now `grad(arg u)` of a Sommerfeld field and an output; but "stamped at the headland
+  tip", which this section wrote as the route, does not work on this coast and the reason is
+  geometry rather than wave theory.
+- **The screen bearing at the pole**, which is `?` and stays `?`, because the pole is a virtual
+  source with no barrier at it. Priced rather than chased: 80° of rotation moves the measurement by
+  0.051°.
+
+---
+
+## 12 · The fan as an output: Sommerfeld's half-plane, and what it costs to assume one instead
+
+§11 proved that a curved static-equilibrium bay needs the orthogonal to **fan**, computed the fan a
+stated shoreline requires (`ψ(y) = −φ_s(y)`, a 39.6° swing on the reference scene) and then supplied
+it by hand as a radial fan from the bay's own pole. This section replaces the assumption with a wave
+solution and reports what changed.
+
+### The form, and the sheet the reflected term lives on
+
+Sommerfeld (1896), in Penney & Price's (1952) water-wave application, with `exp(−iωt)` and a screen
+along `φ = ±π`:
+
+```
+u(r, φ) = U(r, φ − φ_0)  +  s · U(r, 2π − φ − φ_0)
+U(r, ψ) = (1/sqrt 2) exp(−i pi/4) [ (1+i)/2 + C(X) + i S(X) ] exp(−i k r cos ψ)
+X(r, ψ) = 2 sqrt(k r / pi) cos(ψ/2)
+```
+
+`s = +1` is the rigid (Neumann) screen and it is the water-wave case. The three limits `U` has to
+have are the whole content of the construction and each is one line of Fresnel algebra:
+
+```
+cos(ψ/2) -> +inf :  bracket -> (1+i) = sqrt 2 exp(i pi/4),  U -> exp(−i k r cos ψ)   the plane wave
+cos(ψ/2) =  0    :  bracket  = (1+i)/2,                     U  = exp(−i k r cos ψ)/2  EXACTLY a half
+cos(ψ/2) -> −inf :  bracket -> 0,                           U -> 0                    switched off
+```
+
+The middle line is where `12`'s `K_d(0) = 0.5000` comes from, and it is **exact at every `kr`** — no
+asymptotics enter, because `X = 0` there and `F(0) = 0`. The two outer lines are the **Cornu
+spiral's limits**, `C(±inf) = S(±inf) = ±1/2`, which is why the half is a half and not something
+else.
+
+**Why `2π − φ − φ_0` and not `φ + φ_0`.** Both produce the same reflected plane wave, since
+`cos(2π − φ − φ_0) = cos(φ + φ_0)`. They differ in *where they switch it on*. With `φ ∈ (−π, π]` and
+the incident arriving from `φ_0`, the physical regions are
+
+```
+geometric shadow      φ − φ_0 < −π            (for φ_0 > 0)
+reflected wave        |φ + φ_0| > π,  i.e.  φ > π − φ_0, between the reflection boundary and the screen
+```
+
+and `cos((φ + φ_0)/2) > 0` is the **complement** of that second region. `U` is 4π-periodic in `ψ`
+(`cos(ψ/2)` has period 4π and `cos ψ` has period 2π), so `2π − ψ` is the same function on the other
+sheet and it switches on the correct side. The boundary condition then holds identically rather than
+approximately: at `φ = ±π` the two arguments **coincide** while their `φ`-derivatives are equal and
+opposite, so `∂u/∂φ = 0` for `s = +1` and `u = 0` for `s = −1`, exactly. **`D`.** The reference
+implementation shipped `φ + φ_0` first; it drew a convincing lee and read `K_d = 1.106` on the shadow
+boundary.
+
+### The Fresnel parameter of the charts is this `X`, and the identity is worth writing once
+
+Coastal-engineering charts use `v = b·sqrt(2/(λ r))`, `b` the perpendicular offset beyond the shadow
+boundary at range `r`. Expanding `X` about the boundary with `ψ = π + ε` and `b = r·ε`:
+
+```
+cos(ψ/2) = cos(pi/2 + ε/2) = −sin(ε/2) ≈ −ε/2
+X ≈ −2 sqrt(k r / pi) (ε/2) = −ε sqrt(k r / pi) = −b sqrt(k/(pi r)) = −b sqrt(2/(λ r)) = −v
+```
+
+so **`v = −X`**, and `12`'s tabulated `K_d(v)` is `|U|` with a single term. `D`.
+
+### The direction, which is the part §11 had to assume
+
+`u` is complex, so `k_vec = grad(arg u) = Im(grad u / u)`. Written on the complex field rather than
+on `arg u`, because `arg` wraps by 2π and the difference of two complex numbers does not. Measured
+(`D`): radial from the tip to **0.10°** deep in the shadow with `|k_vec|/k = 1.0007`; the incident
+direction to 0.02° far in the lit region; and neither near the boundary, where it rings.
+
+**So §11's pole is vindicated as a description and demoted as a mechanism.** "The orthogonals
+radiate from a pole" is exactly what a diffracted field does *in the geometric shadow* — that is a
+theorem about `grad(arg u)`, not an ansatz. But a stated radial fan has no shadow boundary, applies
+the fan in the lit region too, and is radial at the *shoreline station* rather than at the *point*;
+the three differences are worth 11.4° rms across the offshore boundary and are what separates the
+last two rows of `12`'s transport table from the fourth.
+
+### What could not be closed here
+
+- **The screen bearing at the pole.** `?`. There is no barrier at `D`. Priced: 80° of rotation moves
+  the transport measurement by 0.051°, and beyond about +60° the screen turns to face the swell and
+  reflects into the domain, which is a different problem and is excluded rather than tolerated.
+- **`k` for the edge.** Penney & Price is a constant-depth solution and the water between `D` and the
+  domain's offshore boundary is not in the bed. Stated as the shelf-depth `k`; the answer moves
+  0.034° across 4 m, 8 m and deep water, because the deep-shadow direction is radial whatever `k` is.
+- **Combined refraction–diffraction.** The edge is applied at the offshore boundary and the transform
+  refracts it in. That is defensible for a tip 773 m seaward of the boundary and it is **not** a
+  mild-slope solve; a scene with an obstacle *inside* the domain needs one, and this file does not
+  have it.
 
 ---
 

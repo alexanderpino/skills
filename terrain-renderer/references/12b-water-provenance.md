@@ -634,6 +634,33 @@ least-confident-claims ledger in `00-index.md`.
   near-constant answer is the coefficient and the glow's share moving in opposite directions
   (0.012, 0.026, 0.038 inferred), not the bias being insensitive to geometry. Quote the formula,
   not the percentage.
+- **P/D** — [K_d is half the solution](12-water-rendering.md#k_d-is-half-the-solution-the-other-half-is-a-direction-and-it-is-what-a-bay-is-held-by),
+  wave 10. **Sommerfeld 1896** (the exact half-plane solution) and **Penney & Price 1952** (its
+  water-wave application, rigid screen) are `P` — cited for the *structure* and **not** re-verified
+  against those papers, which this container does not hold. The **form as written** — including the
+  reflected term's argument `2π − φ − φ₀` rather than `φ + φ₀` — is `D`: it was fixed by requiring
+  the physical switch-on regions and then verified, not transcribed. The Fresnel integrals are `D`,
+  built here from three routes (power series, Gauss–Legendre, asymptotic) because there is no scipy
+  in this container, and cross-checked against each other to 1e-12 and 1e-9 in their overlaps.
+  Everything numerical beside them is `D`, measured on `reference-impl/beach_diffract.py`:
+  `K_d(0) = 0.50000`; `0.30783 / 0.20267 / 0.11103` at `v` = 0.5 / 1 / 2 against this chapter's own
+  `0.31 / 0.20 / 0.11`; all seven lee centre-line columns to ≤ 0.005; the Helmholtz residual
+  `1.4×10⁻⁶` falling as `h⁴`; `(K_d − ½)·√(kr)` constant to 0.005; the energy gain in the shadow at
+  0.98 of the lit side's deficit; the deep-shadow direction radial to 0.10°. **The lee table's
+  convention — a coherent sum of two half-plane edge fields, `2·K_d((W/2)√(2/(λr)))` — is `D` and is
+  newly stated**: it was not in the chapter's words and a Fresnel–Kirchhoff aperture integral on the
+  same geometry gives 0.431 where the table gives 0.51.
+- **D** — [A shore-attached headland does not shelter its own bay](12-water-rendering.md#a-shore-attached-headland-does-not-shelter-its-own-bay-and-the-geometry-says-so-first).
+  `protrusion / tan θ₀` and the 5-of-89 / 1-of-66 shadow count are measured on the coastal loop's own
+  plan-form; the criterion is derived from the geometry and has no citation behind it. The screen
+  bearing at the pole is `?` and both sensitivities quoted beside it (0.051° over 80° of rotation,
+  0.034° over 4 m → deep water) are `D`.
+- **D/M** — [The fan is an OUTPUT](12-water-rendering.md#the-fan-is-an-output-and-making-it-one-overturns-the-attribution-above).
+  The six-row transport table is `D` on `beach.py` + `beach_diffract.py`, one offshore spectrum, one
+  ramp, one transform, one CERC closure. The overturn of wave 9's residual decomposition is `M` — a
+  claim this project made and this project withdrew: the 0.71° and 1.46° were measured at exactly
+  radial incidence and are not an additive floor under a different one, demonstrated by a pair that
+  differs in the incidence alone (2.371° → 1.278°) and confirmed by grid refinement to `dx = 1 m`.
 - **P/D** — [Diffraction is not refraction](12-water-rendering.md#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it).
   The Sommerfeld half-plane solution and its coastal-engineering use for breakwaters
   (Penney & Price 1952) are `P` — cited for the *structure*, and **not** re-verified against those
