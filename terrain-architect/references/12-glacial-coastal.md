@@ -790,6 +790,49 @@ practical consequences:
   then let deposition (deltas, longshore) modify it. This reads correctly and costs nothing;
   trying to *erode* a seabed into shape does not.
 
+> **"Distance" in `depth ∝ distance^⅔` is the distance to the shoreline CURVE, and the obvious
+> implementation is not that.** Found by implementing this bullet against a curved coast
+> (`terrain-renderer/reference-impl/beach.py`). The natural code is
+> `d = A·(x_s(y) − x)^(2/3)` — one array subtract per row — and on a curved shore it is a
+> *different surface* from the one this bullet asks for. `x_s(y) − x` is an offset along the grid's
+> cross-shore **axis**, and the family of curves it generates is the family of **translates** of the
+> shoreline; the distance to the shoreline generates the family of **normal offsets**. The two
+> coincide if and only if the shore runs parallel to the grid's alongshore axis. **D**
+>
+> Two things go wrong, and the first is a terrain problem before it is ever a water one.
+>
+> 1. **The bathymetry acquires a grid dependence.** Two translates separated by `Δs` along the axis
+>    are separated by `Δs·cos φ_s` *perpendicular*, `φ_s = atan(dx_s/dy)`, so the contour spacing —
+>    and therefore the nearshore slope — varies alongshore purely with how the coast happens to lie
+>    on the grid. Measured on a 1409 m embayment: the perpendicular gap between the 2 m and 6 m
+>    contours runs 239.5–253.2 m, **5.4 %** of crowding, where the Dean offset itself is a constant
+>    253.2 m. **Rotate the grid and the seabed changes.** **M**
+> 2. **Refraction reads the difference.** A normal offset shares its normal lines with the curve it
+>    offsets, so a wave orthogonal that arrives normal to the shore stays normal to every contour it
+>    crosses. On the translate family it does not, and the mismatch after travelling `s` is
+>    `Δθ = −(dφ_s/dy)·s·sin φ_s` to first order — curvature × offset × the sine of the shore's
+>    obliquity to the grid. Measured at the 2 m contour of that embayment: **0.397°** axis-keyed,
+>    **0.0008°** keyed to the curve, against **0.397°** from the formula. On the longshore transport
+>    the fix is worth 12 % of the residual obliquity that a static-equilibrium bay is supposed not
+>    to have. **D**, checked **M**
+>
+> **The rule:** key the ramp to `dist(P, shoreline)`, not to `x_s(y) − x`. It costs a
+> point-to-polyline distance, it is exactly the axis version on a shore parallel to the grid, and it
+> is exactly a concentric ramp about a pole when the shore is a circular arc about that pole — so
+> nothing that was right before becomes wrong.
+>
+> **The one limit, and it is a property of the shoreline rather than of the method.** Normal offsets
+> of a concave curve fold at its centres of curvature; past that **medial axis** the nearest-point
+> map is many-to-one and the ramp gets a crease (a slope discontinuity, not a step). Measure it as
+> the share of ramp cells with `|∇dist| < 1`: **0 %** on an analytic bay plan-form, **0.25 %** on the
+> same scene's rock shoreline, whose hardness-field roughness gives it a 90 m minimum radius of
+> curvature inside a 483 m ramp. A coast too wiggly to have a single-valued offset field inside its
+> own shoreface is telling you the equilibrium ramp is not a description of it at that scale —
+> smooth the plan-form you key to, or accept the crease knowingly. **M**
+>
+> Derivation and the transport measurements:
+> `terrain-renderer/references/12a-water-derivations.md` §11.
+
 **One bounded exception, below.** The rule above governs the seabed *below wave base*. Inside the
 surf zone the bed genuinely is reworked every day, and that band gets a real morphodynamic step —
 see [Surf-zone morphodynamics](#surf-zone-morphodynamics--bars-rips--the-nearshore-circulation).

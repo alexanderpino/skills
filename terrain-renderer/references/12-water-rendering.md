@@ -706,6 +706,8 @@ CERC closure — the only thing that differs between rows is the array `x_s(y)`;
 | **the closed-form zero-transport coast** (rotated 20°) | **0.202°** | **5.127 × 10⁻³** | **18× down** |
 | the log-spiral bay, plane crest | 5.595° | 1.875 × 10⁻¹ | **2× UP** |
 | the log-spiral bay, under the fan its own pole implies | 2.801° | 7.921 × 10⁻² | 1.2× down (3.5× over the spiral span) |
+| the same bay, ramp keyed **concentrically** about the pole | 2.759° | 6.437 × 10⁻² | the two-line change, and it buys 0.04° |
+| **the same bay, ramp keyed to the NORMAL distance to the shore** | **2.448°** | **7.176 × 10⁻²** | 12 % of the residual, and it is the general form |
 
 Read the second row first. **A near-zero reading is worthless until zero has been shown to be
 reachable** — that is the fourteenth way a measurement lies (`11`) with the sign flipped, two
@@ -728,21 +730,66 @@ The bay under its own fan is **small and not zero**: `2.65 × 10⁻²` m³/s ove
 a meter floor of `1.78 × 10⁻³` — about **15× the floor**. It decomposes, and the decomposition is
 the useful part:
 
-- **0.71° — the ramp is not concentric with the curve it is keyed to.** `d = A·(x_s(y) − x)^(2/3)`
-  makes contours that are *x-translates* of the shoreline, and translates of a concave curve
-  **converge**. A ray that arrives normal to the shoreline does not stay normal to the contours on
-  the way in, and refraction hands some obliquity back. Rebuilding the same bay with the depth a
-  function of **distance from the pole** — concentric arcs, on which a radial ray is normal to every
-  contour it crosses — removes exactly this much. `D`
+- **The ramp is keyed along the grid's axis rather than to the shoreline curve** — worth **0.71°**
+  on a circular bay at radial incidence and **0.25°** on the bay actually built. `D`, and the gap
+  between those two numbers is a finding in its own right; see below.
 - **1.46° — the solver, on a curved bed.** A column-marched transform carries the ray's alongshore
   drift only through its `∂k/∂y` terms. At 20° the drift is 0.36 of a cell per step, not the 0.015
   the near-normal case gives, and on straight contours at the same obliquity the same march leaves
   only 0.20°. So the extra is the march meeting curvature, not physics. `D`
+- **The declared residual obliquity `δ`**, which neither of the two above named and which turns out
+  to dominate the built bay: **+1.40°** of the +1.42° the bay actually carries. `M`
 
-Neither is a tolerance and neither was widened. **The claim that survives is the mechanism** — that
-a bay's equilibrium is a statement about the shoreline *and* its sheltering headland together — and
-the claim that does not is "the built bay carries zero transport", which it does not, by a factor
-that is now attributable rather than absorbed.
+Neither of the first two is a tolerance and neither was widened. **The claim that survives is the
+mechanism** — that a bay's equilibrium is a statement about the shoreline *and* its sheltering
+headland together — and the claim that does not is "the built bay carries zero transport", which it
+does not, by a factor that is now attributable rather than absorbed.
+
+#### The cross-shore distance is a distance to a CURVE, and this is where a renderer gets it wrong
+
+`d = A·(x_s(y) − x)^(2/3)` is not the Dean profile on a curved coast. It is the Dean profile
+*composed with an offset along the grid's x axis*, and that generates the family of **translates**
+of the shoreline; the profile's own sentence — "depth ∝ distance from the shoreline" — generates the
+family of **normal offsets**. The two agree if and only if the shore runs parallel to the grid's
+alongshore axis, which is every straight-coast scene ever shipped. Three things follow, and the
+algebra is in [`12a` §11](12a-water-derivations.md#what-cross-shore-distance-means-on-a-curved-coast--and-why-an-axis-offset-is-not-a-normal-offset). **`D`**
+
+- **A normal offset shares its normal lines with the shoreline**, so a ray launched normal to the
+  shore is normal to every contour it crosses and Snell is the identity along it. A translate does
+  not: after travelling `s` the ray meets the contour belonging to station `y + s·sin φ_s`, whose
+  normal has turned by `Δθ = −(dφ_s/dy)·s·sin φ_s` to first order — curvature × offset × the sine of
+  the shore's obliquity **to the grid**. Measured off the bed at the 2 m contour: 0.397° axis-keyed,
+  0.0008° normal-keyed, 0.397° from the formula.
+- **The translate family's perpendicular contour spacing varies as `cos φ_s`** — 5.4 % of crowding
+  across this bay — so *rotating the grid changes the bathymetry*. That is disqualifying for a
+  landform claim on its own, before any wave touches it.
+- **"Key the ramp concentrically about the pole" is the special case for a circular shore.** Keying
+  it to the distance to the curve needs no pole and is right for a composite coast — headland,
+  spiral, tangential beach — of which only the middle third is an arc about anything. Its one limit
+  is the shoreline's **medial axis**, where normal offsets fold and `min` creases the bed: 0 % of the
+  ramp on the analytic bay, 0.25 % on the same scene's rough rock shoreline, which is the signal
+  that a 90 m-radius wiggle is too sharp for a 483 m ramp to be keyed to.
+
+**Measured on the built bay under the same fan, the same transform and the same CERC closure — one
+field changed:** mean `|θ_loc|` **2.801° → 2.448°** and `Q` rms over the spiral span
+**2.650 × 10⁻² → 2.454 × 10⁻²** m³/s, against a floor of `1.780 × 10⁻³` that the keying does not
+move (the zero-transport coast is straight, so both keyings give it the same contour *directions*
+and differ only in the depth they assign). The concentric ramp instead gives 2.759° and
+**3.189 × 10⁻²** — lower angle, *higher* transport, because `Q ∝ H_b^(5/2)` and a different bed
+shoals differently. **`M`**
+
+#### The attribution failed, and it failed in the statistic
+
+The 0.71° above was measured on a circle and quoted against a bay. It reproduces exactly on the
+circle and removes 0.041° of the bay's whole-domain mean. The reason is worth more than the fix:
+**every number in that attribution is a mean of `|θ_loc|`, and `mean|·|` is not additive.** The
+keying error is antisymmetric about the bay's apex (`sin φ_s` changes sign there), so it is
+**scatter, not drift** — 0.710° in `mean|θ|` and 0.05° in the signed mean. Hold the geometry exactly
+fixed and sweep only the incidence obliquity and the ramp term falls 0.710° → 0.111° while the
+signed term does not move: the two "independent" terms are not independent **in that statistic**.
+In the signed mean the four terms sum to +1.375° against +1.420° measured, and the physics
+decomposes fine. **Attribute in a statistic that adds; report in whichever one the reader needs.**
+`M`
 
 #### For the reviewer
 

@@ -435,6 +435,33 @@ least-confident-claims ledger in `00-index.md`.
   what transfers is the mechanism and the calibration discipline, never the figures.
   **`?`** — `δ`, the residual obliquity that fixes `α`. Bracketed by the circle (0.9 % in
   indentation on this scene), not closed.
+- **D** — **The "cross-shore distance" in the Dean profile is a distance to the shoreline CURVE, and
+  an offset along a grid axis is not one.**
+  ([`12`](12-water-rendering.md#the-cross-shore-distance-is-a-distance-to-a-curve-and-this-is-where-a-renderer-gets-it-wrong),
+  [`12a` §11](12a-water-derivations.md#what-cross-shore-distance-means-on-a-curved-coast--and-why-an-axis-offset-is-not-a-normal-offset),
+  and the authoring rule routed to `terrain-architect/references/12-glacial-coastal.md`.)
+  **`D`** — that `d = A(x_s(y) − x)^(2/3)` generates the family of *translates* of the shoreline
+  while `d = A·dist(P, shore)^(2/3)` generates its *normal offsets*; that the two coincide iff
+  `φ_s ≡ 0`; that a normal offset shares its normal lines with the curve it offsets (a classical
+  property of parallel curves, re-derived rather than cited), so a shore-normal ray is normal to
+  every contour it crosses; and the first-order mismatch `Δθ = −(dφ_s/dy)·s·sin φ_s` on the
+  translate family. The concentric ramp about a pole is the circular special case, `D`.
+  **`M`** — every figure: 0.397° axis-keyed against 0.0008° normal-keyed at the 2 m contour of the
+  reference embayment, against 0.397° from the formula; 5.4 % of contour crowding; the built bay's
+  2.801° → 2.448° and `2.650 × 10⁻² → 2.454 × 10⁻²` m³/s over the spiral span against an unmoved
+  floor of `1.780 × 10⁻³`; the medial-axis fold at 0 % / 0.25 % of ramp cells. Properties of *that*
+  scene; what transfers is the mechanism.
+  ⚠️ **A correction carried by this entry.** The previous round priced the concentric ramp at
+  **0.71°** of the bay's residual obliquity. That number reproduces exactly (0.7103°) **on the δ = 0
+  circle it was measured on** and is worth **0.041°** on the bay it was written against. The number
+  was right and the attribution was not, for a reason that generalises past this chapter: the
+  attribution was made in `mean|θ|`, the keying error is antisymmetric about the bay's apex and so
+  carries almost no mean, and `mean|·|` of a zero-mean term does not add to `mean|·|` of a biased
+  one. The same two terms **do** add in the signed mean (four terms, +1.375° against +1.420°
+  measured, 3 %). **Attribute in a statistic that adds.** `M`
+  **`?`** — whether the medial-axis crease matters visually. It is measured as a share of cells and
+  has not been fired at a render; the un-embayed bed is left on the axis keying for that reason and
+  the reason is recorded rather than the row being widened.
 - **D** — **The offshore Snell invariant is the wavenumber component along the CONTOUR, not along
   the grid.** Found by calibrating the transport meter: on the closed-form zero-transport coast,
   which must break at exactly `θ = 0`, a 2-D march that conserved `k_y` on the grid axis left 4.89°
