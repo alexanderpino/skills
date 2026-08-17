@@ -2,3 +2,4 @@ terrain-architect-workspace/
 __pycache__/
 *.py[cod]
 gauntlet/.gates.lock
+gauntlet-loop-workspace/
