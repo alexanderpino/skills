@@ -4233,3 +4233,203 @@ airborne spray. 15 · The flat Earth at the seam.** Unchanged.
    result reads 13.5× the floor where `Q` reads 2.2×.
 7. **A deliberate defect that does not reach its target prints the same empty
    column as a blind guard.** Read the defect, not just the table.
+
+---
+
+# WAVE 10 · THE RAMP KEYING
+
+Gap 5 of the re-ordered list, named and priced by wave 9 and not taken.
+**The theory is in the skills** — the authoring rule in
+`terrain-architect/references/12-glacial-coastal.md` (next to the Dean-profile
+bullet whose own sentence is the underspecified one), the derivation in
+`terrain-renderer/references/12a-water-derivations.md` §11, the reviewer-facing
+statement and the transport table in `12-water-rendering.md`, and the
+correction in `12b-water-provenance.md`. What is here is the implementation's
+own account.
+
+## K1 · The verdict first: the prediction UNDER-DELIVERS, by 16×
+
+Wave 9 priced the concentric ramp at **0.71°** of the bay's 2.801° residual
+obliquity. It reproduces **exactly** — 0.7103° — on the δ = 0 circle at radial
+incidence where it was measured. Applied to the bay it was written against
+(rock headland, log spiral, straight tangential beach, under the fan its pole
+implies) it removes **0.041°** of the whole-domain mean and **0.252°** over the
+spiral span. Six per cent of the price on the whole domain.
+
+The number was right. The **attribution** was wrong, and that is the finding.
+
+## K2 · The table, wave 9's rows re-run and wave 10's added
+
+One offshore spectrum (`H₀ = 1.5 m, T = 9 s, θ₀ = 20°`), one Dean coefficient,
+one 2-D march, one CERC closure. `mean|θ|` over the whole domain, `Q` rms over
+the spiral span, exactly as wave 9 quoted them.
+
+| shoreline | mean \|θ_loc\| | `Q` rms, m³/s (spiral span) |
+|---|---|---|
+| straight, plane crest | 6.469° | 9.233×10⁻² |
+| **the closed-form zero-transport coast — THE FLOOR** | **0.202°** | **1.780×10⁻³** |
+| the bay, plane crest | 5.595° | 1.333×10⁻¹ |
+| the bay, hand-stated fan (wave 9's bed) | 2.801° | 2.650×10⁻² |
+| **the bay, CONCENTRIC ramp (the gap as written)** | **2.759°** | **3.189×10⁻²** |
+| **the bay, NORMAL-OFFSET ramp (what shipped)** | **2.448°** | **2.454×10⁻²** |
+| the floor again, under the new keying | 0.203° | 1.675×10⁻³ |
+
+The floor is in the table twice on purpose: ruling 14 is wave 9's own, and a
+keying change that moved the meter would have made every row above it a
+statement about the meter. It does not move — the zero-transport coast is
+*straight*, so both keyings give it the same contour **directions** and differ
+only in the depth they assign (3.17 m at the widest).
+
+**Note the concentric ramp lowers the angle and RAISES the transport.**
+`Q ∝ H_b^{5/2}`, and a differently-shaped bed shoals differently. One statistic
+was never going to be enough.
+
+## K3 · What "cross-shore distance" means, and terrain-architect's silence
+
+Chapter 12 says *"depth ∝ distance^⅔ … a graded ramp from shoreline to shelf
+break"*. **It does not say what the distance is measured along**, and asking it
+was the whole of this wave. `x_s(y) − x` is an offset along the grid's axis and
+generates the family of **translates** of the shoreline; the distance to the
+shoreline generates the family of **normal offsets**. They coincide iff
+`φ_s ≡ atan(dx_s/dy) ≡ 0` — every scene waves 1–8 rendered.
+
+Wave 9's word for the mechanism was "translates of a concave curve converge",
+and that is not quite it: translates are *congruent*, and nothing about them
+converges. The exact statement is that **a normal offset shares its normal
+lines with the curve it offsets** and a translate does not. So a ray launched
+normal to the shore stays normal to every normal-offset contour it crosses —
+Snell is the identity along it — while on the translate family, after
+travelling `s`, it meets the contour belonging to station `y + s·sin φ_s`,
+whose normal has turned by
+
+    Δθ(s) = −(dφ_s/dy)·s·sin(φ_s) + O(s²)
+
+Measured off the bed's own gradient at the 2 m contour, on a refined grid over
+the analytic spiral: **0.397°** axis-keyed, **0.0008°** normal-keyed, against
+**0.397°** from the formula. Derived and measured to three figures.
+
+And the translate family's *perpendicular* contour spacing goes as `cos φ_s`,
+so it crowds by **5.4 %** across this bay where the Dean offset is a constant
+253.2 m. **Rotate the grid and the bathymetry changes.** That is a terrain
+defect before it is a water one, which is why the authoring rule was routed to
+terrain-architect rather than kept here.
+
+## K4 · The concentric ramp is a special case, and the general one is what shipped
+
+Concentric arcs about a pole *are* the normal offsets of a circular shore. The
+normal offset is the same statement with no pole in it, and that matters here
+because only the middle third of this coast is an arc about anything: the
+concentric ramp makes the headland and tangent rows **worse** (4.895° → 5.475°)
+while the normal offset improves them (→ 4.564°). `plan_ramp_normal` is exactly
+`plan_ramp` on a shore parallel to the grid (0.000e+00 m) and the concentric
+ramp on a circle about the pole (0.037 m rms over the sea, 0.44 % of the shelf
+cap).
+
+**The one limit is the medial axis**, where normal offsets fold and `min` puts
+a crease in the bed: **0 %** of ramp cells on the analytic plan-form, **0.25 %**
+on the coastal loop's own rock line, whose 380 m-correlation roughness gives it
+a 90 m minimum radius of curvature inside a 483 m ramp. So `bay_bed` keys
+normally wherever a plan-form is **stated** and the un-embayed bed keeps the
+axis keying. That is a prune with a measured reason, and it also keeps waves
+1–9 bit-identical instead of re-basing 300 rows under them.
+
+## K5 · Are the two attributed terms independent? NO — and the statistic is why
+
+Wave 9 attributed 0.71° to the keying and 1.46° to the march meeting curvature,
+and assumed they add. **Both mechanisms are real and they do add — in the
+signed mean. They do not add in `mean|θ|`, which is what every M4 number is
+quoted in.**
+
+The keying error is **antisymmetric about the bay's apex**, because `sin φ_s`
+changes sign there. It is 0.710° of alongshore **scatter** and 0.05° of
+**drift**. `mean|·|` of a zero-mean term does not add to `mean|·|` of a biased
+one, and the moment the bay carries the +1.40° drift its own declared δ implies,
+the scatter stops showing up.
+
+The clean demonstration holds the geometry EXACTLY fixed — the same circle, the
+same two beds — and sweeps only the incidence obliquity, which is the *other*
+term's variable:
+
+| incidence off the shore normal | 0° | 6.56° | 20° |
+|---|---|---|---|
+| the ramp term in `mean\|θ\|` | 0.710° | 0.641° | 0.111° |
+| the same term, **signed** | −0.007° | −0.010° | +0.050° |
+
+A factor of 6.4 in one statistic and flat in the other. At 20° the circle's
+`mean|θ|` and `|mean θ|` agree to 0.004° — the distribution has stopped
+straddling zero and `mean|·|` has gone blind.
+
+And the four signed terms, each measured one at a time on the circle:
+
+| term | signed mean `θ_loc` |
+|---|---|
+| the meter's floor | −0.117° |
+| the march meets curvature | +0.100° |
+| **the declared δ = θ_b** | **+1.400°** |
+| the ramp keying | −0.007° |
+| sum | **+1.375°** |
+| measured on the built bay, spiral span | **+1.420°** |
+
+3 %. **The term that dominates the built bay is the declared δ, and neither of
+wave 9's two mechanisms named it.** The spiral is *built* to hold a constant
+residual obliquity at every station; a spiral bay therefore cannot read zero and
+only the circle can. Wave 9 marked δ `?` and did not connect it to the residual
+it was measuring.
+
+## K6 · What did NOT reproduce
+
+Five deliberate defects, all caught. What they did **not** move is the report.
+
+- **`keying-axis` — this entire wave reverted — moves only 2 of 14 rows**, and
+  both are the two taken on the COMPOSED bed. The twelve rows that carry the
+  wave's actual finding build their beds from `plan_ramp*` directly and are
+  green on a `bay_bed` that ignores the fix completely. That is wave 9's
+  `bay-bed-ignores-plan` shape repeating one wave later: **a section that
+  measures a mechanism on an isolated instrument cannot tell you whether the
+  mechanism reached the scene.** The composed-bed rows were added because of
+  this, not before it.
+- **`offset-unsigned` moves no transport row at all.** A bed whose whole coastal
+  plain is a mirrored Dean ramp passes every wave-field row in the section,
+  because the wave field never touches land. Caught only by the straight-coast
+  identity and by the fold detector.
+- **`offset-no-subdivide` is caught by exactly one row**, and it is the one that
+  compares against the *other* closed form. Without the circle row a 0.36 m
+  bathymetry error from chord sagitta would have been invisible.
+- **The two `openq` rows cannot fail under any defect.** That is the harness's
+  design and not a surprise, but it means the fold measurement and the
+  ruling-14 restatement are reported quantities and not guards.
+
+## K7 · The gap list
+
+**5 · The ramp is keyed cross-shore, not concentrically** — CLOSED, and the
+price was wrong. Everything else on wave 9's list is unchanged. One item is
+sharpened:
+
+**`δ` is no longer a cosmetic `?`.** It is the largest single term in the built
+bay's residual obliquity (+1.40° of +1.42°). Wave 9 bracketed it by the circle
+in *indentation* (0.9 %) and that bracket says nothing about the transport,
+where δ = 0 and δ = θ_b are a factor of fourteen apart. Either the spiral is
+adopted knowing it is a constant-non-zero-transport form, or the circle is —
+and that is a decision, not a `?`.
+
+## The suite
+
+`386 pass / 0 FAIL / 0 ERROR / 24 open / 82 info`, 626.4 s, one run, on the
+tree as it stood with two sibling lanes' sections in it. `_sec_bathy` is 14
+rows. `validate.py` (the pool) is `306 pass / 0 FAIL / 64 info` — the pool did
+not disappear. Wave 9's own eight defects all still fire under the changed bed
+(`--bugs-embay`).
+
+## Frames
+
+- `s10-bathy-contours.png` — the two contour families in plan, the convergence
+  as the perpendicular gap between the 2 m and 6 m contours, and the cost as
+  the contour normal a shore-normal ray actually meets, measured against the
+  derived first-order line.
+- `s10-bathy-residual.png` — the residual decomposed in both statistics, the
+  obliquity sweep that shows the terms are not independent in `mean|·|`, and
+  the table.
+- `s10-bathy-frame.png` — bar J's framing, one field changed from
+  `s9-frame-J.png`. On the composed bed at the render's own resolution,
+  `mean|θ_loc|` 2.7704° → 2.4562° and `Q` rms 2.6229×10⁻² → 2.4919×10⁻² m³/s
+  against a floor of 5.6910×10⁻⁴ that did not move.
