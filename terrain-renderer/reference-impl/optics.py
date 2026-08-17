@@ -159,6 +159,33 @@ T_OUT_DIFFUSE = 1. - R_INT       # = (1 - R_EXT)/n^2 = 0.526/0.524/0.519
 
 
 def wet_albedo(a):
+    """AIR-SIDE apparent albedo of [water film + substrate], given the
+    substrate's WATER-SIDE reflectance `a`. The two sides are not the same
+    number and the whole point of this function is the map between them.
+
+    IN  `a`     what the substrate returns to the water touching it. No air in
+                it, no interface in it.
+    OUT         what an eye in the AIR sees looking at the wet substrate: `a`
+                with the film's own surface reflection added at the front and
+                two interface crossings and a trapped series wrapped round it.
+
+    THE RETURN VALUE IS NOT AN ADMISSIBLE ARGUMENT TO THIS FUNCTION, NOR TO
+    `rho_water`, and this project has spent six waves learning that one
+    sentence. `wet_albedo(wet_albedo(a))` and `rho_water(wet_albedo(a), ...)`
+    are both syntactically fine, both monotone, both energy-conserving and both
+    wrong: they cross the interface twice more than the physics does. The
+    identity that pins which side is which, and it is a suite row in both
+    `validate.py` and `validate_beach.py`:
+
+        wet_albedo(a) - R_EXT == (1 - R_EXT) * a * slab_esc(0) * trap_gain(a, 0)
+
+    -- i.e. this function IS `rho_water` with the water column set to zero and
+    the sun's directional Fresnel replaced by its hemispherical average. Same
+    transport, same interface, two names, one argument convention.
+
+    (The two sides differ by 7.14x diffusely -- R_EXT = 6.669% out of the air
+    against R_INT = 47.617% out of the water -- which is why an extra crossing
+    is never a rounding error.)"""
     return R_EXT[None] + (1. - R_EXT[None]) * (1. - R_INT[None]) * a / (
         1. - a * R_INT[None])
 
@@ -282,6 +309,17 @@ def trap_gain(rho, dep, bounces=None, absorb=None, cone_only=False):
 def rho_water(rho_bed, cos_sun, dep, bounces=None, absorb=None):
     """Apparent albedo of the water column: the share of the beam falling on the
     surface that comes back out of it, EXCLUDING the surface's own reflection.
+
+    `rho_bed` IS A WATER-SIDE REFLECTANCE. The interface is crossed twice
+    inside this function -- `(1 - fresnel(cos_sun))` going in and `slab_esc`
+    coming out -- and `rho_bed` sits between the two crossings, so it must be
+    what the bed returns TO THE WATER standing on it. A dry-substrate albedo is
+    the right kind of thing (that is the identification `wet_albedo` already
+    makes); `wet_albedo(a)` is NOT, and neither is `wet_albedo(a) - R_EXT`.
+    Both of those have already crossed the interface and carry the trapped
+    series, so passing either applies the whole of this file's interface model
+    twice. See `wet_albedo`'s docstring for the identity that separates them,
+    and `beach_optics.submerged_bed_rho` for the wave-10 write-up.
     Add `fresnel(cos_sun)` to it and a LOSSLESS WHITE-BEDDED pool comes to
     exactly 1 -- energy conservation, with no constant of this file in the
     right-hand side. That limit pins the SHAPE of the series but it cannot see

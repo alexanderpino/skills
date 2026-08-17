@@ -287,11 +287,17 @@ class Water:
         self.r2_clamped = ss['clamped_fraction']
         self.Ur = ss['ursell']
 
+        # --- WAVE 10: THE BED ARGUMENT IS A WATER-SIDE REFLECTANCE, and waves
+        # 4-9 handed it an air-side one. `SAND_WET` is `wet_albedo(SAND_DRY)`,
+        # which is the apparent albedo of a wet film SEEN FROM THE AIR --
+        # `rho_water` then crossed the interface twice more around it and
+        # applied the same trapped series a second time. The derivation, the
+        # identity that settles which side is which, and the `?` that survives
+        # it are in `beach_optics.submerged_bed_rho`.
         self.dep_lut = np.geomspace(0.05, 20.0, 48)
-        self.rho_lut = np.stack([
-            OPT.rho_water(SAND_WET, math.sin(math.radians(SUN_EL)), float(dd),
-                          absorb=self.io_clear['a'] + self.io_clear['b_b'])
-            for dd in self.dep_lut])
+        self.rho_lut = BO.submerged_bed_rho(
+            SAND_DRY, math.sin(math.radians(SUN_EL)), self.dep_lut,
+            absorb=self.io_clear['a'] + self.io_clear['b_b'])
         self.t_col = col['t_col']
 
         # --- WAVE 6: THE WHITE, and it is three fields because bar section C

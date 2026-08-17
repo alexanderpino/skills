@@ -704,6 +704,77 @@ def secchi(a, b_b, mu_d=MU_D):
     return 1.0 / float(np.min(k_d(a, b_b, mu_d)))
 
 
+# ===================== WHICH SIDE OF THE INTERFACE THE BED'S ALBEDO LIVES ON
+# WAVE 10. This is the sixth instance of one error class in this project -- a
+# shared closed form used ONE INTERFACE OFF -- and it is the instance that gets
+# the interface named in an argument, because the previous five were fixed one
+# call site at a time and a sixth arrived anyway.
+#
+# `optics.rho_water(rho_bed, cos_sun, dep, absorb)` composes, in order:
+#
+#     (1 - fresnel(cos_sun))   the beam crossing air -> water, ONCE
+#     exp(-a dep / cos t)      down the refracted slant to the bed
+#     rho_bed                  <-- THE ARGUMENT
+#     slab_esc(dep)            up, and out through water -> air, ONCE
+#     trap_gain(rho_bed, dep)  the series between the bed and the underside
+#
+# so the interface is crossed exactly twice INSIDE the function and `rho_bed`
+# sits BETWEEN the two crossings. It is therefore a WATER-SIDE reflectance:
+# what the bed returns to the water standing on it, with no air anywhere in it.
+#
+# `optics.wet_albedo(a)` is the SAME transport with the column set to zero:
+#
+#     wet_albedo(a) = R_EXT + (1 - R_EXT)(1 - R_INT) a / (1 - a R_INT)
+#
+# -- a specular reflection off the top of a film, plus a beam that crosses in,
+# meets a substrate of reflectance `a` and crosses back out. It is an AIR-SIDE
+# apparent albedo, and its own argument `a` is the water-side one. The identity
+# that says so exactly, and it is checked in both suites:
+#
+#     wet_albedo(a) - R_EXT  ==  (1 - R_EXT) * a * slab_esc(0) * trap_gain(a, 0)
+#
+# Waves 4-9 handed `wet_albedo(SAND_DRY)` to `rho_water` as its bed. That is the
+# air-side answer plugged into the water-side slot: the trapped series applied
+# TWICE, the interface crossed FOUR times, and a specular reflection off the top
+# of a film that does not exist under three metres of water. `README-beach.md`
+# L9 reported it and proposed the DIFFUSE HALF instead -- which removes the
+# specular term and leaves the double series and two of the four crossings, so
+# it is the same error one notch smaller.
+#
+# The bed of a bay is wet, and L9 is right about that; what it costs is not a
+# second interface. A submerged grain pack sits in bulk water with no
+# refractive-index step between its pore water and the column above it, so
+# there is no film, no critical angle, and no trapped series down there. The
+# trapping happens at the SURFACE, three metres up, and `slab_esc`/`trap_gain`
+# are already carrying it. The argument is the substrate's own reflectance.
+#
+# `?` AND IT IS A REAL ONE, LEFT OPEN RATHER THAN PATCHED. The substrate's
+# reflectance IN WATER is not identical to its reflectance in air: a quartz
+# grain in water has an index contrast of 1.55/1.334 rather than 1.55/1.00, so
+# it scatters less per grain, the mean path inside the grain is longer and the
+# pack absorbs more. That is a grain-scale model (Angstrom 1925; Lekner & Dorf
+# 1988) with constants this project does not hold, and using SAND_DRY for both
+# is the SAME identification `wet_albedo(SAND_DRY)` already makes -- so the
+# choice here is consistency, not a new approximation. The direction of its
+# error is known: the true submerged bed is slightly DARKER than this.
+def submerged_bed_rho(bed_rho_in_water, cos_sun, deps, absorb=None):
+    """`optics.rho_water` on a depth ladder, with the bed argument taken on the
+    WATER side of the interface -- which is the side `rho_water` wants.
+
+    The interface side is in the parameter's NAME because that is the only
+    guard this project has found that travels with the call. Pass a dry (or
+    equivalently, an in-medium) substrate albedo; do NOT pass `wet_albedo` of
+    one, and do not pass its diffuse half either -- both have already crossed
+    the interface `rho_water` is about to cross for them.
+
+    Returns (len(deps), 3). A ladder rather than a field because `rho_water`
+    takes a scalar depth; the interpolation error is a row in the suite.
+    """
+    a = np.asarray(bed_rho_in_water, float)
+    return np.stack([OPT.rho_water(a, float(cos_sun), float(dd), absorb=absorb)
+                     for dd in np.asarray(deps, float).ravel()])
+
+
 # ================================================ the glitter path, Cox & Munk
 # BAR SECTION K: the path's angular width is a READOUT OF THE MEAN SQUARE SLOPE,
 # and it must come from the slope distribution rather than from a spread
