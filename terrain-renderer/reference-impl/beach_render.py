@@ -4082,8 +4082,514 @@ def main_wave9():
     return w9
 
 
+# =========================================================== WAVE 10 -- what
+# "cross-shore distance" means on a curved coast
+#
+# THE HOUSE PALETTE IS REUSED UNCHANGED and that is a decision, not laziness:
+# these three figures join a series of thirty-six, and the categorical order
+# (44,62,80 slate / 39,174,96 green / 211,84,0 orange / 192,57,43 red /
+# 41,128,185 blue) is the one every earlier evidence figure assigns in. A
+# figure that renamed the colours would break the only cross-figure identity
+# the series has. Every panel below carries a legend, no panel carries two y
+# scales, and nothing is labelled by colour alone.
+_C_AXIS = (211, 84, 0)          # the cross-shore (translate) keying
+_C_NORM = (39, 174, 96)         # the normal-offset keying
+_C_POLE = (41, 128, 185)        # the concentric keying, wave 9's proposal
+_C_INK = (44, 62, 80)
+_C_RED = (192, 57, 43)
+
+
+def _contour_polyline(x, y, h2, level):
+    """The depth contour at `level` metres, as (y, x) per alongshore row.
+
+    Read off the bed by linear interpolation in x along each row -- the bed is
+    monotone offshore over the ramp, so the contour is a single-valued graph
+    x(y) and no marching-squares is needed. Nothing is read off a PNG.
+    """
+    out = np.full(y.size, np.nan)
+    for j in range(y.size):
+        d = -h2[j]
+        i = np.nonzero((d[:-1] - level) * (d[1:] - level) <= 0.0)[0]
+        if i.size:
+            i = int(i[-1])
+            a, b = d[i], d[i + 1]
+            t = 0.0 if b == a else (level - a) / (b - a)
+            out[j] = x[i] + t * (x[i + 1] - x[i])
+    return out
+
+
+def _curve_len(y, xs):
+    m = np.isfinite(xs)
+    return float(np.sum(np.hypot(np.diff(xs[m]), np.diff(y[m]))))
+
+
+def bathy_contour_figure(path):
+    """THE TWO CONTOUR FAMILIES IN PLAN, and the convergence quantified.
+
+    ONE shoreline, ONE Dean coefficient, ONE shelf cap. The only thing that
+    differs between the panels is what "distance from the shoreline" is taken
+    to mean -- along the grid's x axis, or to the curve.
+    """
+    import beach_plot as P
+    import beach_evidence as EV
+    ep = B.equilibrium_plan()
+    y = ep['y']
+    x = np.arange(0.0, 1000.0 + 4.0, 4.0)
+    xs = ep['x_s']
+    h_ax = B.plan_ramp(x, y, xs)
+    h_nm = B.plan_ramp_normal(x, y, xs)
+    lv = (1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0)
+    x0, x1 = 120.0, float(np.nanmax(xs)) + 60.0
+    img = P.canvas(1660, 1330)
+    L0 = _curve_len(y, xs)
+    lens = {}
+    for k, (h2, ttl, col) in enumerate((
+            (h_ax, 'KEYED CROSS-SHORE: d = A (x_s(y) - x)^(2/3). The contours '
+                   'are TRANSLATES of the shoreline', _C_AXIS),
+            (h_nm, 'KEYED TO THE CURVE: d = A dist(P, shore)^(2/3). The '
+                   'contours are its NORMAL OFFSETS', _C_NORM))):
+        ax = P.Axes(img, (70 + k * 800, 70, 760 + k * 800, 690),
+                    (y[0], y[-1]), (x0, x1), title=ttl,
+                    xlabel='alongshore, m',
+                    ylabel=('cross-shore, m (sea at the top)' if k == 0
+                            else ''), y_up=False)
+        ax.frame(EV._ticks(y[0], y[-1], 5), EV._ticks(x0, x1, 6))
+        ll = []
+        for lvl in lv:
+            c = _contour_polyline(x, y, h2, lvl)
+            ax.line(y, c, col, 2 if lvl in (2.0, 6.0) else 1,
+                    dash=None if lvl in (2.0, 6.0) else (5, 5))
+            ll.append(_curve_len(y, c))
+        lens[k] = ll
+        ax.line(y, xs, _C_INK, 3)
+        # the shore-normal rays: launched normal to the shoreline, drawn
+        # straight, so the eye can see which family they stay normal to
+        phi = B.shore_normal_angle(y, xs)
+        for j in range(4, y.size - 4, 9):
+            t = np.linspace(0.0, 330.0, 2)
+            ax.line(y[j] + t * np.sin(phi[j]), xs[j] - t * np.cos(phi[j]),
+                    (110, 112, 120), 1, dash=(4, 6))
+        # the OTHER family's 6 m contour, so the difference is visible and not
+        # only tabulated
+        oth = _contour_polyline(x, y, h_nm if k == 0 else h_ax, 6.0)
+        ax.line(y, oth, (150, 152, 158), 2, dash=(3, 7))
+        P.legend(ax, [
+            (_C_INK, 'the shoreline, %.0f m of curve' % L0),
+            (col, 'depth contours 1-7 m; 2 m and 6 m solid'),
+            ((150, 152, 158), 'the OTHER keying\'s 6 m contour: they part by '
+                              '%.1f m'
+             % float(np.nanmax(np.abs(_contour_polyline(x, y, h_ax, 6.0)
+                                      - _contour_polyline(x, y, h_nm, 6.0))))),
+            ((110, 112, 120), 'rays launched NORMAL to the shoreline'),
+        ], y[0] + 30, x1 - 108)
+
+    # ---- the convergence, as a number -------------------------------------
+    # PERPENDICULAR spacing between the 2 m and the 6 m contour, per
+    # alongshore station. That IS the convergence: the translate family lays
+    # its contours down along the grid, so their perpendicular spacing is the
+    # axis spacing times cos(phi_s) and CROWDS wherever the shore turns away
+    # from the grid; the normal family holds it constant by construction.
+    phi = B.shore_normal_angle(y, xs)
+    msp = np.zeros(y.size, bool)
+    msp[ep['j1'] + 2:ep['j2'] - 1] = True
+    ds_ax = (_contour_polyline(x, y, h_ax, 2.0)
+             - _contour_polyline(x, y, h_ax, 6.0)) * np.cos(phi)
+    ds_nm = np.hypot(_contour_polyline(x, y, h_nm, 2.0)
+                     - _contour_polyline(x, y, h_nm, 6.0), 0.0) * np.cos(phi)
+    s26 = (6.0 / B.DEAN_A) ** 1.5 - (2.0 / B.DEAN_A) ** 1.5
+    ax3 = P.Axes(img, (70, 790, 810, 1030), (y[0], y[-1]), (225.0, 262.0),
+                 title='THE CONVERGENCE: PERPENDICULAR gap between the 2 m '
+                       'and 6 m contours',
+                 xlabel='alongshore, m', ylabel='gap, m')
+    ax3.frame(EV._ticks(y[0], y[-1], 5), EV._ticks(225.0, 262.0, 6))
+    ax3.hline(s26, (150, 152, 158), width=1)
+    ax3.line(y, ds_ax, _C_AXIS, 2)
+    ax3.line(y, ds_nm, _C_NORM, 2)
+    P.legend(ax3, [
+        (_C_AXIS, 'cross-shore keying: %.1f - %.1f m, a %.1f%% crowding, and '
+                  'it tracks cos(phi_s) exactly'
+         % (float(np.nanmin(ds_ax[msp])), float(np.nanmax(ds_ax[msp])),
+            100 * (1.0 - float(np.nanmin(ds_ax[msp]))
+                   / float(np.nanmax(ds_ax[msp]))))),
+        (_C_NORM, 'normal keying: constant at %.1f m by construction'
+         % float(np.nanmean(ds_nm[msp]))),
+        ((150, 152, 158), 'the Dean offset itself, s(6 m) - s(2 m) = %.1f m'
+         % s26),
+    ], y[0] + 30, 259.5)
+
+    # ---- and what it costs the ray ----------------------------------------
+    # ON A REFINED GRID AND ON THE ANALYTIC SPIRAL ALONE, and both halves of
+    # that are the measurement's honesty rather than its convenience. The
+    # render grid is 16 m alongshore against 4 m cross-shore, and a contour
+    # DIRECTION taken by finite difference on a 4:1 anisotropic grid carries
+    # about a degree of its own error -- the size of the thing being measured.
+    # And the rock headland's roughness turns the local shore normal by several
+    # degrees cell to cell, which is a different question from this one.
+    yf = np.arange(y[ep['j1']], y[ep['j2']] + 2.0, 2.0)
+    xf = np.arange(0.0, 1000.0 + 2.0, 2.0)
+    xsf = np.interp(yf, ep['pts'][:, 1], ep['pts'][:, 0])
+    hf_ax = B.plan_ramp(xf, yf, xsf)
+    hf_nm = B.plan_ramp_normal(xf, yf, xsf)
+    phf = B.shore_normal_angle(yf, xsf)
+
+    def _cnorm(h2, s):
+        gx = np.gradient(-h2, xf, axis=1)
+        gy = np.gradient(-h2, yf, axis=0)
+        px = xsf - s * np.cos(phf)
+        py = yf + s * np.sin(phf)
+        fi = np.clip((px - xf[0]) / (xf[1] - xf[0]), 0, xf.size - 1.001)
+        fj = np.clip((py - yf[0]) / (yf[1] - yf[0]), 0, yf.size - 1.001)
+        i0, j0 = fi.astype(int), fj.astype(int)
+        a, b = fi - i0, fj - j0
+
+        def smp(g):
+            return ((1 - a) * (1 - b) * g[j0, i0] + a * (1 - b) * g[j0, i0 + 1]
+                    + (1 - a) * b * g[j0 + 1, i0] + a * b * g[j0 + 1, i0 + 1])
+        return np.arctan2(-smp(gy), -smp(gx))
+    s_b = (2.0 / B.DEAN_A) ** 1.5
+    dth = -np.gradient(phf, yf) * s_b * np.sin(phf)
+    m_ax = _cnorm(hf_ax, s_b) + phf
+    m_nm = _cnorm(hf_nm, s_b) + phf
+    ke = slice(6, yf.size - 6)
+    ax4 = P.Axes(img, (890, 790, 1590, 1030), (yf[0], yf[-1]), (-1.6, 1.6),
+                 title='THE COST, on the analytic spiral: the contour normal '
+                       'a shore-normal ray meets at 2 m',
+                 xlabel='alongshore, m', ylabel='mismatch, degrees')
+    ax4.frame(EV._ticks(yf[0], yf[-1], 5), EV._ticks(-1.6, 1.6, 9))
+    ax4.hline(0.0, (150, 152, 158), width=1)
+    ax4.line(yf[ke], np.degrees(m_ax[ke]), _C_AXIS, 2)
+    ax4.line(yf[ke], np.degrees(m_nm[ke]), _C_NORM, 2)
+    ax4.line(yf[ke], np.degrees(dth[ke]), _C_RED, 2, dash=(5, 11))
+    P.legend(ax4, [
+        (_C_AXIS, 'cross-shore keying, MEASURED off the bed\'s own gradient: '
+                  'mean |.| %.3f deg'
+         % math.degrees(float(np.mean(np.abs(m_ax[ke]))))),
+        (_C_NORM, 'normal keying, MEASURED the same way: mean |.| %.4f deg -- '
+                  'zero to the grid\'s own accuracy'
+         % math.degrees(float(np.mean(np.abs(m_nm[ke]))))),
+        (_C_RED, 'DERIVED first order, -(d phi_s/dy) s sin(phi_s): mean |.| '
+                 '%.3f deg' % math.degrees(float(np.mean(np.abs(dth[ke]))))),
+    ], yf[0] + 20, 1.45)
+
+    P.caption(img, [
+        's10-bathy-contours  WHAT "CROSS-SHORE DISTANCE" MEANS ON A CURVED '
+        'COAST. DERIVED: `d = A (x_s(y) - x)^(2/3)` and `d = A dist(P, '
+        'shore)^(2/3)` generate DIFFERENT families. The first is generated by '
+        'translation along the grid\'s',
+        'x axis, so the PERPENDICULAR spacing of its contours is the axis '
+        'spacing times cos(phi_s) and crowds by %.1f%% across this bay; the '
+        'second is generated by the normal flow and holds that spacing '
+        'constant, which is what an equilibrium profile asserts.'
+        % (100 * (1.0 - float(np.nanmin(ds_ax[msp]))
+                  / float(np.nanmax(ds_ax[msp])))),
+        'The two families coincide if and only if phi_s = atan(dx_s/dy) is '
+        'identically zero, which is every scene waves 1-8 rendered. DERIVED: a '
+        'normal offset shares its NORMAL LINES with the curve it offsets, so a '
+        'ray launched normal to the shoreline is normal to',
+        'every contour it crosses and Snell is the identity along it; on the '
+        'translate family the contour it meets after travelling s belongs to '
+        'station y + s sin(phi_s), where the normal has turned by -(d '
+        'phi_s/dy) s sin(phi_s) to first order.',
+        'MEASURED, off the scene-linear bed arrays and never off a PNG: that '
+        'mismatch at the 2 m contour, both families, against the derived line. '
+        'The concentric ramp wave 9 named is the special case of the normal '
+        'family for a circular shore about a pole.',
+        'CITED: the Dean (1991) equilibrium profile h ~ x^(2/3), via '
+        'terrain-architect chapter 12 -- which states the exponent and does '
+        'NOT state what the distance is measured along, and that silence is '
+        'this wave\'s finding.',
+    ], x=40, y=1110)
+    return P.save(img, path)
+
+
+def bathy_residual_figure(path):
+    """THE RESIDUAL OBLIQUITY DECOMPOSED, in both statistics, because the
+    statistic is the finding."""
+    import beach_plot as P
+    import beach_evidence as EV
+    ep = B.equilibrium_plan()
+    ec = B.equilibrium_plan(delta=0.0)
+    y = ep['y']
+    x = np.arange(0.0, 1000.0 + 4.0, 4.0)
+    xs, D = ep['x_s'], ep['D']
+    n0 = -B.shore_normal_angle(y, xs)
+    fan = B.fan_theta0(y, xs, D)
+    ph_s = np.arctan2(y - D[1], xs - D[0])
+    R_s = np.hypot(xs - D[0], y - D[1])
+    msp = np.zeros(y.size, bool)
+    msp[ep['j1'] + 2:ep['j2'] - 1] = True
+
+    def run(h2, xs_, th0, c0):
+        tr = B.transform_2d(x, y, h2, B.T_SWELL, B.H0_SWELL, th0, contour0=c0)
+        p = B.plan_transport(y, xs_, tr)
+        m, ms = p['mask'], msp & p['mask']
+        return (math.degrees(float(np.mean(np.abs(p['theta_loc'][m])))),
+                math.degrees(float(np.mean(p['theta_loc'][ms]))),
+                math.degrees(float(np.mean(np.abs(p['theta_loc'][ms])))),
+                float(np.sqrt(np.mean(p['Q'][ms] ** 2))))
+
+    Dc = ec['D']
+    v = ec['pts'] - Dc
+    Rc = float(np.mean(np.hypot(v[:, 0], v[:, 1])))
+    xs_c = Dc[0] + np.sqrt(np.maximum(Rc ** 2 - (y - Dc[1]) ** 2, 0.0))
+    n0c = np.arctan2(y - Dc[1], xs_c - Dc[0])
+    h_pol_c = B.plan_ramp_polar(x, y, Dc, (np.array([-1.5, 1.5]),
+                                           np.array([Rc, Rc])))
+    h_car_c = B.plan_ramp(x, y, xs_c)
+    xr = B.zero_transport_plan(y, float(np.mean(xs)), B.THETA0_SWELL)
+    flr = run(B.plan_ramp(x, y, xr), xr, B.THETA0_SWELL,
+              -B.shore_normal_angle(y, xr))
+    c_rad = run(h_pol_c, xs_c, n0c, n0c)
+    dlt = math.pi / 2.0 - ep['alpha']
+    c_dlt = run(h_pol_c, xs_c, n0c + dlt, n0c)
+    c_ax = run(h_car_c, xs_c, n0c, n0c)
+    bay = {k: run(h, xs, fan, n0) for k, h in
+           (('axis', B.plan_ramp(x, y, xs)),
+            ('pole', B.plan_ramp_polar(x, y, D, (ph_s, R_s))),
+            ('norm', B.plan_ramp_normal(x, y, xs)))}
+
+    terms = [('the meter\'s floor', flr[1], _C_INK),
+             ('the march meets curvature', c_rad[1] - flr[1], _C_POLE),
+             ('the declared delta = theta_b', c_dlt[1] - c_rad[1], _C_RED),
+             ('the ramp keying', c_ax[1] - c_rad[1], _C_AXIS)]
+    tot = sum(t[1] for t in terms)
+
+    img = P.canvas(1660, 1190)
+    ax1 = P.Axes(img, (80, 70, 810, 470), (-0.5, 5.5), (-0.4, 2.3),
+                 title='SIGNED mean theta_loc: the four terms ADD to the bay',
+                 xlabel='', ylabel='degrees, signed')
+    ax1.frame(None, EV._ticks(-0.4, 2.0, 7))
+    
+    ax1.hline(0.0, (150, 152, 158), width=1)
+    base = 0.0
+    for i, (lab, v_, col) in enumerate(terms):
+        ax1.fill_between(np.array([i - 0.34, i + 0.34]),
+                         np.array([min(base, base + v_)] * 2),
+                         np.array([max(base, base + v_)] * 2), col)
+        ax1.text(i, max(base, base + v_) + 0.05, '%+.3f' % v_, _C_INK,
+                 anchor='ms')
+        base += v_
+    for i, (v_, lab, col) in enumerate(((tot, 'sum of the four', (120, 122, 128)),
+                                        (bay['axis'][1], 'MEASURED on the bay',
+                                         _C_AXIS))):
+        ax1.fill_between(np.array([4 + i - 0.34, 4 + i + 0.34]),
+                         np.zeros(2), np.array([v_] * 2), col)
+        ax1.text(4 + i, v_ + 0.05, '%+.3f' % v_, _C_INK, anchor='ms')
+    P.legend(ax1, [
+        (_C_INK, '1 floor  2 march x curvature  3 declared delta  4 ramp '
+                 'keying  5 their sum  6 the bay, measured'),
+        ((120, 122, 128), 'sum %+.4f deg against %+.4f measured -- %.0f%%, '
+                          'so the PHYSICS decomposes'
+         % (tot, bay['axis'][1], 100 * abs(tot / bay['axis'][1] - 1.0))),
+    ], -0.35, 2.25)
+
+    ax2 = P.Axes(img, (890, 70, 1590, 470), (-0.5, 3.5), (0.0, 4.5),
+                 title='mean |theta_loc| on the BUILT bay: what each keying '
+                       'actually buys',
+                 xlabel='', ylabel='degrees, mean of |.|')
+    ax2.frame(None, EV._ticks(0.0, 3.0, 7))
+    for i, (k, lab, col) in enumerate((('axis', 'cross-shore', _C_AXIS),
+                                       ('pole', 'concentric', _C_POLE),
+                                       ('norm', 'normal-offset', _C_NORM))):
+        ax2.fill_between(np.array([i - 0.3, i + 0.3]), np.zeros(2),
+                         np.array([bay[k][0]] * 2), col)
+        ax2.text(i, bay[k][0] + 0.06, '%.3f' % bay[k][0], _C_INK, anchor='ms')
+    ax2.fill_between(np.array([2.7, 3.3]), np.zeros(2),
+                     np.array([bay['axis'][0] - 0.71] * 2), (150, 152, 158))
+    ax2.text(3.0, bay['axis'][0] - 0.71 + 0.06, '%.3f' % (bay['axis'][0]
+                                                          - 0.71),
+             _C_INK, anchor='ms')
+    P.legend(ax2, [
+        (_C_AXIS, '1 the bay as wave 9 built it: %.4f deg' % bay['axis'][0]),
+        (_C_POLE, '2 the concentric ramp wave 9 priced: %.4f -- it removes '
+                  '%.3f, not 0.71' % (bay['pole'][0],
+                                      bay['axis'][0] - bay['pole'][0])),
+        (_C_NORM, '3 the normal-offset ramp: %.4f, removes %.3f'
+         % (bay['norm'][0], bay['axis'][0] - bay['norm'][0])),
+        ((150, 152, 158), '4 where wave 9\'s prediction said it would land'),
+    ], -0.35, 4.35)
+
+    # the sweep that shows the two terms are not independent
+    ax3 = P.Axes(img, (80, 560, 810, 900), (0.0, 20.0), (0.0, 5.0),
+                 title='WHY THE PRICE DOES NOT TRANSFER: hold the geometry '
+                       'fixed, sweep the obliquity',
+                 xlabel='incidence obliquity off the shore normal, degrees',
+                 ylabel='degrees')
+    ax3.frame(EV._ticks(0.0, 20.0, 6), EV._ticks(0.0, 5.0, 6))
+    bs = np.array([0.0, 2.0, 4.0, 6.5585, 9.0, 13.0, 20.0])
+    ra, rp, sa, sp = [], [], [], []
+    for bd in bs:
+        a = run(h_car_c, xs_c, n0c + math.radians(bd), n0c)
+        p = run(h_pol_c, xs_c, n0c + math.radians(bd), n0c)
+        ra.append(a[0])
+        rp.append(p[0])
+        sa.append(a[1])
+        sp.append(p[1])
+    ra, rp = np.array(ra), np.array(rp)
+    sa, sp = np.array(sa), np.array(sp)
+    ax3.line(bs, ra, _C_AXIS, 2)
+    ax3.line(bs, rp, _C_POLE, 2)
+    ax3.line(bs, ra - rp, _C_RED, 3)
+    ax3.line(bs, sa - sp, _C_INK, 3, dash=(8, 6))
+    ax3.vline(6.5585, (150, 152, 158), width=1)
+    P.legend(ax3, [
+        (_C_AXIS, 'mean|theta|, cross-shore keying'),
+        (_C_POLE, 'mean|theta|, concentric keying'),
+        (_C_RED, 'THE RAMP TERM in mean|.|: %.3f -> %.3f deg, a factor of %.1f'
+         % (ra[0] - rp[0], ra[-1] - rp[-1],
+            (ra[0] - rp[0]) / max(ra[-1] - rp[-1], 1e-9))),
+        (_C_INK, 'the same term in the SIGNED mean: %.3f -> %.3f -- flat'
+         % (sa[0] - sp[0], sa[-1] - sp[-1])),
+    ], 0.4, 4.85)
+
+    ax4 = P.Axes(img, (890, 560, 1590, 900), (0.0, 1.0), (0.0, 1.0),
+                 title='', xlabel='', ylabel='')
+    ax4.text(0.0, 1.06, 'THE TABLE: one offshore spectrum, one ramp exponent, '
+                        'one transform, one CERC closure', _C_INK, anchor='ls',
+             font=P.FONT_B)
+    rows = [
+        ('shoreline', 'mean |theta|', 'Q rms, m3/s', (120, 122, 128)),
+        ('straight, plane crest', '6.469 deg', '9.233e-02', _C_INK),
+        ('closed-form ZERO-transport (THE FLOOR)', '%.3f deg' % flr[0],
+         '%.4e' % flr[3], _C_NORM),
+        ('the bay, plane crest', '5.595 deg', '1.333e-01', _C_RED),
+        ('the bay, hand-stated fan (wave 9)', '%.3f deg' % bay['axis'][0],
+         '%.4e' % bay['axis'][3], _C_AXIS),
+        ('the bay, CONCENTRIC ramp', '%.3f deg' % bay['pole'][0],
+         '%.4e' % bay['pole'][3], _C_POLE),
+        ('the bay, NORMAL-OFFSET ramp', '%.3f deg' % bay['norm'][0],
+         '%.4e' % bay['norm'][3], _C_NORM),
+    ]
+    for i, (a, b, c, col) in enumerate(rows):
+        yy = 0.93 - 0.13 * i
+        ax4.text(0.02, yy, a, col, anchor='ls')
+        ax4.text(0.66, yy, b, col, anchor='ls')
+        ax4.text(0.84, yy, c, col, anchor='ls')
+
+    P.caption(img, [
+        's10-bathy-residual  THE RESIDUAL OBLIQUITY, DECOMPOSED, AND THE '
+        'STATISTIC IS THE FINDING. MEASURED, scene-linear, off the transform\'s '
+        'own arrays: wave 9 priced the concentric ramp at 0.71 deg of the '
+        'bay\'s 2.801 deg residual.',
+        'It reproduces EXACTLY on the circle it was measured on (%.4f deg) and '
+        'removes %.3f deg on the bay it was written against -- because the '
+        'keying error is ANTISYMMETRIC about the bay\'s apex (sin phi_s changes '
+        'sign there), so it is'
+        % (ra[0] - rp[0], bay['axis'][0] - bay['pole'][0]),
+        'scatter and not drift, and mean|.| of a zero-mean term does not add '
+        'to mean|.| of a biased one. The lower-left panel is the proof: hold '
+        'the geometry EXACTLY fixed and change only the incidence obliquity, '
+        'and the ramp term in mean|.|',
+        'falls by a factor of %.1f while the same term in the signed mean does '
+        'not move. DERIVED: the four signed terms, each measured one at a time '
+        'on the circle, sum to %+.4f deg against %+.4f measured on the bay -- '
+        'the physics IS decomposable.'
+        % ((ra[0] - rp[0]) / max(ra[-1] - rp[-1], 1e-9), tot, bay['axis'][1]),
+        'RULING 14 (wave 9\'s own): the floor is measured and printed beside '
+        'every small number -- %.3f deg / %.4e m3/s on the closed-form '
+        'zero-transport coast. The bay is %.1fx the floor after the fix and '
+        '%.1fx before it: SMALL, and not zero.'
+        % (flr[0], flr[3], bay['norm'][3] / flr[3], bay['axis'][3] / flr[3]),
+        'Q rms is quoted over the spiral span in every row, mean|theta| over '
+        'the whole domain, exactly as wave 9 quoted them. Nothing was read off '
+        'a PNG.',
+    ], x=40, y=960)
+    return P.save(img, path)
+
+
+def _cap_J10(w, cam, inf, m, ep, res):
+    sh = m.get('shares', {})
+    return [
+        's10-bathy-frame  BAR SECTION J\'S FRAMING, ONE FIELD CHANGED FROM '
+        's9-frame-J.png: the Dean ramp is keyed to the distance to the '
+        'shoreline CURVE instead of along the grid\'s cross-shore axis. Same '
+        'inferred viewpoint, same 0.5x ultrawide upright, same sun, same '
+        'optics, same beach, same air, same plan-form.',
+        'DERIVED: `d = A dist(P, shore)^(2/3)`. The two keyings are the same '
+        'surface only where the shore runs parallel to the grid; here they '
+        'differ by %.2f m of bed at the widest, and the contours they build '
+        'differ in DIRECTION, which is what refraction reads.' % res['dmax'],
+        'MEASURED off the scene-linear buffer, never off this PNG: on the '
+        'composed bed under the fan its own pole implies, mean |theta_loc| '
+        'falls %.4f -> %.4f deg and Q rms over the spiral span %.4e -> %.4e '
+        'm3/s. The meter\'s floor, measured on the closed-form zero-transport '
+        'coast, is %.4e m3/s and did not move.'
+        % (res['ax'][0], res['nm'][0], res['ax'][2], res['nm'][2],
+           res['floor']),
+        'STILL OPEN in this frame, unchanged by this wave: the illuminant is '
+        'in the wrong half of the sky; ONE surf zone where bar J shows three '
+        'to four separated lines; no airborne spray; the bed under the water '
+        'reads 1.24-1.40x too bright. By "no placeholder in a hero frame" this '
+        'is a diagnostic.',
+        'Colour ladder, share of frame: %s. Camera: %.2f +/- %.2f deg '
+        'depression, %.1f x %.1f deg upright, brow at z = %.2f m. '
+        'Scene-linear measured before the tone map; the tone map is display '
+        'only.'
+        % (', '.join('%s %.2f%%' % (k, 100 * v) for k, v in sh.items()),
+           math.degrees(inf['dep']['mid']),
+           math.degrees(inf['dep']['half_width']),
+           math.degrees(inf['fov_h']), math.degrees(inf['fov_v']),
+           inf['z_ground']),
+    ]
+
+
+def main_wave10():
+    """WAVE 10 ONLY. The bed under the bay changes, so the frame changes and
+    the two diagnostics are rebuilt from the same call."""
+    t0 = time.time()
+    _set_runup()
+    print('sun: elevation %.2f deg, azimuth %.2f deg' % (SUN_EL, SUN_AZ))
+    bathy_contour_figure('%s/s10-bathy-contours.png' % OUT)
+    print('contours %.1f s' % (time.time() - t0))
+    bathy_residual_figure('%s/s10-bathy-residual.png' % OUT)
+    print('residual %.1f s' % (time.time() - t0))
+
+    cs = B.run_coast()
+    ep = B.equilibrium_plan(coast=cs)
+    bay1 = B.run_bay(embay=True)
+    y, xg = bay1['y'], bay1['x']
+    hc = np.stack([np.interp(xg, cs['x'], cs['h'][j]) for j in range(y.size)])
+    h0 = np.stack([np.interp(xg, cs['x'], cs['h0'][j]) for j in range(y.size)])
+    h_ax, _, _, _ = B.bay_bed(xg, y, hc, h0, sand_row=cs.get('sand_row'),
+                              plan=ep['x_s'], keying='axis')
+    fan = B.fan_theta0(y, ep['x_s'], ep['D'])
+    n0 = -B.shore_normal_angle(y, ep['x_s'])
+    msp = np.zeros(y.size, bool)
+    msp[ep['j1'] + 2:ep['j2'] - 1] = True
+
+    def rd(h2, xs_, th0, c0):
+        tr = B.transform_2d(xg, y, h2, B.T_SWELL, B.H0_SWELL, th0, contour0=c0)
+        p = B.plan_transport(y, xs_, tr)
+        ms = msp & p['mask']
+        return (math.degrees(float(np.mean(np.abs(p['theta_loc']
+                                                  [p['mask']])))),
+                math.degrees(float(np.mean(np.abs(p['theta_loc'][ms])))),
+                float(np.sqrt(np.mean(p['Q'][ms] ** 2))))
+    xr = B.zero_transport_plan(y, float(np.mean(ep['x_s'])), B.THETA0_SWELL)
+    res = dict(ax=rd(h_ax, ep['x_s'], fan, n0),
+               nm=rd(bay1['h_init'], ep['x_s'], fan, n0),
+               floor=rd(B.plan_ramp_normal(xg, y, xr), xr, B.THETA0_SWELL,
+                        -B.shore_normal_angle(y, xr))[2],
+               dmax=float(np.max(np.abs(bay1['h_init'] - h_ax))))
+    print('composed bed: axis %.4f deg / %.4e -> normal %.4f deg / %.4e; '
+          'floor %.4e' % (res['ax'][0], res['ax'][2], res['nm'][0],
+                          res['nm'][2], res['floor']))
+    w = Water(bay1)
+    SS = SS_HERO
+    (_, _, _, camJ, infJ, _, _, _, _) = hero_cameras(w, W_HERO * SS,
+                                                     H_HERO * SS)
+    L, ex = render(camJ, w)
+    m = frame_report('J (wave 10, normal-keyed ramp)', w, camJ, infJ, L, ex)
+    _save(downsample(L, SS), '%s/s10-bathy-frame.png' % OUT,
+          caption=_cap_J10(w, camJ, infJ, m, ep, res))
+    print('%.1f s' % (time.time() - t0))
+    return res
+
+
 if __name__ == '__main__':
-    if '--wave9' in sys.argv:
+    if '--wave10' in sys.argv:
+        main_wave10()
+    elif '--wave9' in sys.argv:
         main_wave9()
     elif '--wave8' in sys.argv:
         main_wave8()

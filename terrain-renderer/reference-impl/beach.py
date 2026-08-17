@@ -3494,14 +3494,17 @@ def shoreline_offset(x, y, x_s, n_sub=8, chunk=16):
     # radial fan there -- 0.91 m of spurious depth on this scene, measured. The
     # coast does not stop at the frame edge, and the only continuation that
     # introduces no second form is the curve's own tangent.
+    # ONE long segment at each end and not a thousand short ones: a straight
+    # continuation is exactly represented by a single chord, and replicating
+    # the refined end segment out to the shelf cap makes the cost of this
+    # function quadratic in the refinement for no accuracy at all.
     ext = 1.5 * (D_SHELF / DEAN_A) ** 1.5
-    n_e = max(int(ext / max(float(np.hypot(Px[1] - Px[0], Py[1] - Py[0])),
-                            1e-9)), 1)
-    k_e = np.arange(1, n_e + 1, dtype=float)
-    Px = np.concatenate([Px[0] - k_e[::-1] * (Px[1] - Px[0]), Px,
-                         Px[-1] + k_e * (Px[-1] - Px[-2])])
-    Py = np.concatenate([Py[0] - k_e[::-1] * (Py[1] - Py[0]), Py,
-                         Py[-1] + k_e * (Py[-1] - Py[-2])])
+    e0 = np.array([Px[1] - Px[0], Py[1] - Py[0]])
+    e1 = np.array([Px[-1] - Px[-2], Py[-1] - Py[-2]])
+    e0 = e0 / max(float(np.hypot(*e0)), 1e-12)
+    e1 = e1 / max(float(np.hypot(*e1)), 1e-12)
+    Px = np.concatenate([[Px[0] - ext * e0[0]], Px, [Px[-1] + ext * e1[0]]])
+    Py = np.concatenate([[Py[0] - ext * e0[1]], Py, [Py[-1] + ext * e1[1]]])
     ax, ay = Px[:-1], Py[:-1]
     ex, ey = Px[1:] - ax, Py[1:] - ay
     L2 = np.maximum(ex * ex + ey * ey, 1e-30)
