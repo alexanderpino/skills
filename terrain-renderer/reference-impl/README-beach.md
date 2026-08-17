@@ -4433,3 +4433,212 @@ not disappear. Wave 9's own eight defects all still fire under the changed bed
   `s9-frame-J.png`. On the composed bed at the render's own resolution,
   `mean|θ_loc|` 2.7704° → 2.4562° and `Q` rms 2.6229×10⁻² → 2.4919×10⁻² m³/s
   against a floor of 5.6910×10⁻⁴ that did not move.
+
+---
+
+# WAVE 10 · THE OPTICS LANE — WHICH SIDE OF THE INTERFACE AN ALBEDO LIVES ON
+
+Gap 8 of the wave-9 list: *"the bed under the water is 1.24–1.40× too bright.
+Reported, not patched."* It was recorded there as the **sixth** instance of one
+error class — *a shared closed form used one interface off*. This section is the
+implementation's account. The theory is in
+`references/12a-water-derivations.md` §10 ("Which side of the interface the
+argument lives on") and the error class is in `references/11-verification-
+failures.md`, the tenth way, fourth shape.
+
+## O1 · The factor is confirmed as arithmetic and refuted as a finding
+
+`L9` compared `wet_albedo(SAND_DRY)` with its own diffuse half and got
+1.236 / 1.285 / 1.398. Measured here in **scene-linear off the radiance buffer**
+of bar J, on the bed term alone, the same ratio comes back as
+**1.250 / 1.317 / 1.424** — reproduced to three digits through the whole
+transport rather than as an albedo triple.
+
+**And it is the ratio between two AIR-SIDE quantities.** Both of `L9`'s
+candidates have already crossed the air/water interface; neither is what
+`rho_water` wants. Against the substrate's own reflectance the shipped bed is
+**too DARK by 1.320 / 1.341 / 1.287**, which is the same size and the opposite
+direction.
+
+| bed argument handed to `optics.rho_water` | R | G | B | what it is |
+|---|---|---|---|---|
+| `SAND_DRY` = (0.45, 0.39, 0.30) | **0.02339** | **0.09958** | **0.04106** | correct — one crossing in, one out |
+| `SAND_WET` = `wet_albedo(SAND_DRY)` — waves 4–9 | 0.01802 | 0.07572 | 0.03234 | four crossings, series twice |
+| `SAND_WET_DIFF` — what `L9` proposed | 0.01456 | 0.05831 | 0.02303 | three crossings, series twice |
+
+(apparent albedo of the column at 3 m of this coast's own water, sun at 21°.)
+
+## O2 · The defect, and the identity that proves it is the defect
+
+`rho_water` crosses the interface **twice inside itself** — `(1 − fresnel)`
+going in and `slab_esc` coming out — and `rho_bed` sits **between** the
+crossings. So `rho_bed` is a **water-side** reflectance. `wet_albedo(a)` is the
+**air-side** apparent albedo of the same substrate, and its own argument `a` is
+the water-side one. Set the column to zero and the two are literally the same
+expression:
+
+```
+wet_albedo(a) - R_EXT  ==  (1 - R_EXT) * a * slab_esc(0) * trap_gain(a, 0)
+```
+
+exact, checked in both suites at four interior albedos, agreeing to `3×10⁻⁵` —
+which is the spread between a 512-point midpoint rule and two 2000-node
+Gauss–Legendre quadratures, the only two things the two sides share.
+
+**`wet_albedo` IS `rho_water` with the water taken out of it.** Passing one to
+the other composes the closed form with itself.
+
+`L9`'s argument that the bed of a bay is *wet* is right and does not cost a
+second interface: a submerged grain pack sits in bulk water with **no
+refractive-index step** between its pore water and the column above it. No
+film, no critical angle, no trapped series down there. The trapping happens at
+the surface, and `slab_esc`/`trap_gain` are already carrying it.
+
+**The fix is one line and one code path.** `beach_optics.submerged_bed_rho`
+holds the derivation and puts the interface side in the parameter's **name**
+(`bed_rho_in_water`), which is the only guard found so far that travels to the
+call site. `optics.py` is untouched except for docstrings — its AST is identical
+modulo docstrings, so **the pool's frames are bit-identical by construction**,
+and `render.py` was never wrong here: it passes the liner's bare albedo.
+
+## O3 · The separating measurement, and it is spectral rather than metric
+
+Both candidate corrections are ≈1.3×. **A magnitude row cannot tell them
+apart.** Their **per-band order** can, and it contains no coefficient:
+
+- `L9`'s ratio is `wet_albedo/(wet_albedo − R_EXT)`, largest where `R_EXT` is
+  the largest *share* of a dark band → peaks in **BLUE** (1.424).
+- The real correction is the doubled trapped series `1/(1 − a·R_INT)` carried
+  through the column, largest where the bed is brightest *and* the water most
+  transparent → peaks in **GREEN** (1.341).
+
+`_sec_bed` carries that as a row on `argmax`, with no number in the comparison.
+
+## O4 · THE OTHER HALF OF THE VERDICT: the bed is not in the frame
+
+The region this measurement was supposed to use — *"water pixels where the bed
+is at least half of what you are looking at"* — **is empty**. In bar J the
+bed's own light never exceeds **0.77%** of a water pixel; in the close surf
+frame F it never exceeds **0.02%**. Below half a metre the **suspension's**
+volume reflectance is over 95% of what leaves the column.
+
+So the region actually used is **derived from the bathymetry and identical
+under both hypotheses**: water shallower than 1 m, 4.6% of frame J, drawn on
+the evidence figure. There the bed term moves by the tabulated factors and
+**the frame moves by 0.014–0.026%** — 0.0017 W m⁻² sr⁻¹ against water at 4.24.
+
+**Wave 8 priced this gap at "the teal rung and the surf, 12.3% and 2.3% of
+frame J". That is the AREA of those rungs, not the bed's SHARE of them. The
+teal rung is the suspension.** The correction is right, derivable and worth
+nothing in this frame, and those are three separate findings.
+
+**The control makes the near-zero meaningful** (standing ruling 14). Sediment,
+entrained air and foam switched off — three fields zeroed, nothing else touched
+— and the bed reaches **71%** of a pixel; the same correction is then worth
+**0.69 / 1.47 / 0.85%** of the pixel. Zero is reachable, and the fix does move
+a frame when there is a bed in it.
+
+## O5 · The degeneracy every existing interface row was sitting inside
+
+Six repeats meant the guards could not see this shape, and the reason is exact
+rather than cultural.
+
+`wet_albedo` is a **Möbius map** of the bed albedo, and every structural
+property the suites check is **closed under composition**: monotone stays
+monotone, `[0,1]` stays `[0,1]`, energy conservation stays energy conservation.
+That alone would make it hard. What makes it invisible is sharper:
+
+```
+wet_albedo(1) = 1        and        wet_albedo(0) - R_EXT = 0
+```
+
+**0 and 1 are the FIXED POINTS of the spuriously inserted map — and 0 and 1 are
+where every energy guard in this project is written.** `validate.py`'s
+strongest interface row, the LOSSLESS WHITE POOL (`R(sun) + rho_water(1, …) =
+1`, which reads **1.73** with the `1/n²` divisor removed), is blind **by
+algebra**: `rho_water(wet_albedo(1))` *is* `rho_water(1)`.
+
+| `rho_bed` | correct chain | with the spurious `wet_albedo` | ratio |
+|---|---|---|---|
+| **1.000** — where every energy row sits | 0.563872 | **0.563872** | **1.000000000000** |
+| 0.681 | 0.332328 | 0.259670 | 1.280 |
+| 0.450 | 0.200103 | 0.148277 | **1.350** |
+| 0.300 | 0.126130 | 0.097771 | 1.290 |
+
+Twelve significant figures at the chosen point, 35% one step off it. **Any one
+row at any interior albedo, in any of nine waves, would have caught it.** None
+was written, because 0 and 1 are the two arguments where a closed form is
+*self-checking* — and a self-checking argument is exactly the one an inserted
+operator fixes.
+
+Both suites now carry rows strictly inside `(0, 1)`, plus a row that states the
+blindness itself so it cannot be re-derived by accident.
+
+## O6 · The suite, and what did NOT reproduce
+
+`_sec_bed` is **19 pass / 0 FAIL / 1 open**. The beach suite goes to
+**386 pass / 0 FAIL / 0 ERROR / 24 open / 82 info** and the pool to
+**306 pass / 0 FAIL / 64 info** (was 298/0/64; +8 rows, no frame moves).
+
+Three deliberate defects in `--bugs-bed`, each fired at every new row:
+
+| bug | rows caught |
+|---|---|
+| `bed-albedo-air-side` — what waves 4–9 shipped | 5 |
+| `bed-albedo-diffuse-half` — what `L9` proposed | 5 |
+| `bed-no-double-series` — the series twice with the interface right | 5 |
+
+**And three of those rows were GREEN on all three defects in their first
+writing**, which is recorded rather than quietly fixed. They compared
+`submerged_bed_rho` with `submerged_bed_rho`, so both sides went through the
+patched function. That is the **fourth** time this project has caught a row
+that rebuilds the thing it is testing. The reference is now composed from
+`optics.rho_water` directly, and a fifth row reads the render's own
+`Water.rho_lut` object rather than any function.
+
+**A promise four waves old, kept and immediately interesting.** `Water.__init__`
+has said since wave 4 that the depth ladder's interpolation error "is a row in
+the suite rather than a claim here", and no such row existed. Written: in
+**relative** terms the 48-node ladder is **41% wrong in red at 19 m** — linear
+interpolation of an exponential on a geometric grid — which reads like a defect.
+In **absolute** terms its worst miss anywhere is **2.4×10⁻⁴** of apparent
+albedo, because where the relative error is large the quantity is `1e-9`. The
+row is therefore absolute; a relative one would have failed on correct code and
+sent a later wave to refine a ladder that costs nothing.
+
+## O7 · A second defect in the same expression, named and parked
+
+`shade_water` forms `R_bed = rho_lut * t_col`. `rho_lut` is
+`rho_water(…, absorb = the CLEAR water's a + b_b)`, which already attenuates
+the beam down the slant and the diffuse return up the column;
+`column_reflectance`'s `t_col` is the **whole** column's round trip, clear water
+included. The stated intent was that `t_col` carry only the suspension layer's
+**extra** opacity. So the clear column is attenuated **twice** —
+`exp(−c_clear(1/μ_d + 1/μ_u)d)`, which is 0.65 in green at 1.6 m.
+
+It is the **same error class in the composition rather than the argument**: a
+closed form that already carries a leg, multiplied by that leg again. It makes
+the bed darker — the same direction as the defect this wave fixed — and it is
+invisible in the frame for the same reason. Carried as an `openq` row with its
+size, not chased (ruling 11).
+
+## O8 · The six things worth carrying out of this wave
+
+1. **A reported factor can be arithmetically right and have the wrong
+   reference.** `L9`'s 1.24–1.40× reproduces exactly and compares two air-side
+   quantities to each other. The sign of the correction is the opposite of the
+   one reported.
+2. **`wet_albedo` IS `rho_water` with the water taken out of it**, and nobody
+   had written that identity down in ten waves of using both.
+3. **The fixed points of an operator are where a suite is blind to that
+   operator.** A boundary condition is where a formula proves itself and
+   therefore where a second copy of it is invisible.
+4. **Put the interface side in the parameter's name.** It is the only guard so
+   far that travels to the call site, which is where the mistake is made.
+5. **A correction can be right, derivable, and worth nothing in the frame.**
+   The bed is at most 0.77% of a water pixel here; the gap list priced the
+   AREA of the rungs it touches instead of its SHARE of them, and was out by
+   about a hundred.
+6. **The measurement region is still the largest lever.** The region this wave
+   was told to use is empty, and finding that out was worth more than the
+   factor it was meant to measure.
