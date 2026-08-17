@@ -333,6 +333,18 @@ identified by reproducing `_plw` — the frozen disp-pass pair — through the f
 own box average, an equality on 960 000 output pixels, so the second (`mono`)
 pass cannot be mistaken for the first.
 
+**The two hero passes straddle a commit to `optics.py`, and that is checked
+rather than waved through.** `d91de1f` landed between them, from the other side
+of the tree. Its effect on this file is nil and it is provable rather than
+argued: the module's **executable AST is identical either side of it** once
+docstrings are stripped — the commit adds documentation and nothing else — and
+the two passes independently agree on `optics.rho_water` to the last bit
+(0.22591706300377828). Both passes also reproduce this section's own frame
+statistics exactly: total luminance 4.564e6 → 2.995e6, peak per-channel |Δ|
+1378.1 at row 497 col 0, and, through the encode, 10 299 output pixels at 10
+sRGB levels or more and 4 745 at 100 or more. The frame under this instrument is
+the frame this section measured.
+
 **The recipe was recovered exactly rather than reconstructed**, which matters
 because the *previous* attempt at this same measurement was wrong three times
 over and *a region that did not contain the phenomenon* was the largest of the
