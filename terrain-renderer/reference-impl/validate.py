@@ -405,6 +405,66 @@ def tier1_fresnel(R):
           'a = 1 must give a_wet = 1 identically; anything else leaks energy')
     check(1, 'wet_albedo(0) == R_EXT (bare interface over a black substrate)',
           OPT.wet_albedo(np.zeros((1, 3)))[0], OPT.R_EXT, 1e-15, 'algebraic limit')
+    # === THE TWO ROWS ABOVE ARE THE PROJECT'S SIXTH BLIND SPOT, AND THESE ARE
+    # === THE ROWS THAT ARE NOT.  (sea wave 10)
+    #
+    # `wet_albedo` maps the substrate's WATER-SIDE reflectance to the film's
+    # AIR-SIDE apparent albedo. Its RETURN VALUE is therefore not an admissible
+    # ARGUMENT to itself, nor to `rho_water`, whose `rho_bed` sits between that
+    # function's own two interface crossings. Six times in this project a
+    # closed form has been used one interface off, and the reason no guard saw
+    # the sixth is written in the two rows above:
+    #
+    #       wet_albedo(1) = 1   and   wet_albedo(0) - R_EXT = 0
+    #
+    # -- 0 and 1 are FIXED POINTS of the map, and 0 and 1 are where every
+    # energy guard in this file is evaluated. The LOSSLESS WHITE POOL row 1300
+    # lines below -- the strongest interface guard this project owns, the one
+    # that reads 1.73 with the 1/n^2 divisor removed -- cannot see an extra
+    # `wet_albedo` in the chain, because `rho_water(wet_albedo(1))` IS
+    # `rho_water(1)` as an expression. Not nearly: identically.
+    #
+    # A guard evaluated at the fixed point of the operator that was wrongly
+    # inserted is not a guard. The cure is an argument STRICTLY INSIDE (0, 1).
+    _wa_i = np.array([0.15, 0.45, 0.681, 0.90])
+    for _a in _wa_i:
+        _a3 = np.full(3, _a)
+        check(1, 'wet_albedo - R_EXT == (1-R_EXT) a slab_esc(0) trap_gain(a,0)'
+              ' at a=%.3f' % _a,
+              OPT.wet_albedo(_a3[None])[0] - OPT.R_EXT,
+              (1. - OPT.R_EXT) * _a3 * OPT.slab_esc(0.) * OPT.trap_gain(_a3, 0.),
+              1e-4,
+              'THE ROW THAT NAMES WHICH SIDE OF THE INTERFACE THE ARGUMENT IS '
+              'ON. Left: Mobius algebra on two hemispherical constants from a '
+              '512-point midpoint rule. Right: two 2000-node Gauss-Legendre '
+              'quadratures with the exact per-direction internal Fresnel in '
+              'them. They share the IOR triple and nothing else -- and they '
+              'agree, because `wet_albedo` IS `rho_water` with the water '
+              'column set to zero. 1e-4 relative is the two quadratures; the '
+              'defect the row exists for is 30%.', rel=True)
+    # and the blindness itself, stated as a row so it cannot be re-derived by
+    # accident: the wrong chain and the right chain, at the fixed point.
+    check(1, 'THE BLIND SPOT: at rho_bed = 1 the composed and the correct '
+             'chains are the SAME NUMBER',
+          OPT.rho_water(OPT.wet_albedo(np.ones((1, 3)))[0], 0.358, 1.40,
+                        absorb=0.),
+          OPT.rho_water(np.ones(3), 0.358, 1.40, absorb=0.), 1e-15,
+          'This is not a physics row. It is a row ABOUT THE SUITE: it '
+          'measures, and fixes in place, the exact degeneracy that let six '
+          'instances of one error class through. The lossless white pool is '
+          'evaluated here, and here the defect is not small -- it is absent.')
+    for _a, _w in ((0.30, 1.29006), (0.45, 1.34952), (0.681, 1.27981)):
+        _a3 = np.full(3, _a)
+        check(1, '...and one step off it, at rho_bed = %.3f, it is %.0f%% '
+                 'dark' % (_a, 100 * (_w - 1)),
+              float(OPT.rho_water(_a3, 0.358, 1.40)[1]
+                    / OPT.rho_water(OPT.wet_albedo(_a3[None])[0], 0.358,
+                                    1.40)[1]), _w, 1e-4,
+              'ABSOLUTE, green band, at THIS POOL\'s depth and absorption. '
+              'Any one of these three rows, written at any point in nine '
+              'waves, would have caught the beach\'s bed argument. None was '
+              'written, because every row anybody thought to write was written '
+              'at a = 1 or a = 0.')
 
 
 # ====================================================== TIER 1: SNELL AND TIR
