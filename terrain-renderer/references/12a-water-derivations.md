@@ -1991,6 +1991,88 @@ over a per-point irradiance and the other a median *picture* pixel over a median
 which a skewed caustic net does not let commute. The row is a consistency check with a known sign.
 What actually measures the absorption is the map row above it, which is exact.
 
+### Which side of the interface the argument lives on — and the map between them
+
+*(sea wave 10. This is the sixth time this project has used a shared closed form one interface off,
+and the first time the map itself has been written down.)*
+
+The two closed forms above are **one transport**, and reading them as two is what produced the
+error. Set the water column of `rho_water` to zero and evaluate its in-coupling diffusely rather
+than at the sun's cosine:
+
+```
+T_esc(0) = 1 - R_int,      G_rt(0) = R_int
+=>  rho_water(a, ., 0) = (1 - R_ext) * a * (1 - R_int) / (1 - a R_int)
+                       = a_wet(a) - R_ext                                  EXACTLY
+```
+
+**`a_wet` is `rho_water` with the water taken out of it.** The identity is exact and checked in both
+suites at four interior albedos; the two sides share the refractive-index triple and nothing else —
+the left is Möbius algebra on two hemispherical constants from a 512-point midpoint rule, the right
+is two 2000-node Gauss–Legendre quadratures with the exact per-direction internal Fresnel inside
+them, and they agree to `3×10⁻⁵`.
+
+**So `a` is a WATER-SIDE reflectance in both.** It is what the substrate returns to the water in
+contact with it, with no air in it and no interface in it. `a_wet(a)` is the **AIR-SIDE** apparent
+albedo of the pair — what an eye outside the film sees. ⚠️ **`a_wet`'s return value is not an
+admissible argument to `a_wet`, and it is not an admissible argument to `rho_water` either.** Both
+compositions are syntactically fine, monotone, energy-conserving, and wrong by the whole of the
+interface model applied twice.
+
+**Priced, at a bed of `a = (0.45, 0.39, 0.30)` under 3 m of coastal water**
+(`D`, recomputed here; the water is `a + b_b = (0.2824, 0.0836, 0.1577)` m⁻¹, sun at 21°):
+
+| `rho_bed` handed to `rho_water` | R | G | B | what it actually is |
+|---|---|---|---|---|
+| `a` — **the substrate's own reflectance** | **0.02339** | **0.09958** | **0.04106** | correct: one crossing in, one out |
+| `a_wet(a)` = (0.3473, 0.3008, 0.2373) | 0.01802 | 0.07572 | 0.03234 | **four crossings, series twice** |
+| `a_wet(a) − R_ext` = (0.2811, 0.2342, 0.1698) | 0.01456 | 0.05831 | 0.02303 | three crossings, series twice |
+| ⇒ correct / shipped | **1.298** | **1.315** | **1.270** | the bed was too **dark** |
+| ⇒ shipped / diffuse-half | 1.237 | 1.299 | 1.404 | *the ratio between two air-side quantities* |
+
+**The last two rows are the same size and opposite in spectral order, and that is what separates
+them with no coefficient in the comparison.** `a_wet/(a_wet − R_ext)` is largest where `R_ext` is
+the largest *share* of a dark band — **blue**. The real correction is the doubled trapped series
+`1/(1 − a R_int)` carried through the column, largest where the bed is brightest *and* the water
+most transparent — **green**. A magnitude row cannot tell 1.30 from 1.32; a per-band **order** row
+can, and it contains no constant.
+
+**Why "the bed is wet, so use the wet albedo" is wrong, and it is worth stating because it is the
+intuitive answer.** A submerged grain pack does have pore water — and there is no refractive-index
+step between its pore water and the metre of water above it. No film, no critical angle, no trapped
+series *down there*. The trapping happens at the **surface**, and `T_esc`/`G_rt` are already
+carrying it. Putting `a_wet` in the bed slot moves the interface from the top of the water column to
+the top of the sand.
+
+**`?` — what this identification does cost, left open.** The substrate's reflectance *in water* is
+not its reflectance *in air*: a quartz grain in water has an index contrast of 1.55/1.334 rather
+than 1.55/1.00, so it scatters less per grain, the mean path inside the grain lengthens and the pack
+absorbs more (Ångström 1925; Lekner & Dorf 1988 for the two-mechanism decomposition). That is a
+grain-scale model with constants this project does not hold. Using the dry albedo for both is the
+*same* identification `a_wet(a_dry)` already makes, so it is consistency rather than a new
+approximation — and **the direction of its error is known**: the true submerged bed is slightly
+darker than the closed form above.
+
+**And what the correction was worth, which is the other half of the verdict.** Measured in
+scene-linear off the radiance buffer of the coastal reference's own hero frame, over the water
+shallower than 1 m: the bed term moves by exactly the factors tabulated, and **the frame moves by
+0.014–0.026%**, because the bed's own light never exceeds **0.77% of a water pixel**. Below half a
+metre the suspension's volume reflectance is over 95% of what leaves the column. With the suspended
+sediment, the entrained air and the foam deck switched off — three fields zeroed and nothing else
+touched — the bed reaches **71%** of a pixel and the same correction is worth 0.7–1.5% of it. ⚠️
+**A correction can be right, derivable, and worth nothing in the frame, and those are three
+separate findings.** The gap list that carried this defect priced it at "the teal rung and the surf,
+12.3% and 2.3% of frame J" — that is the **area** of those rungs, not the bed's **share** of them.
+The teal rung is the suspension.
+
+**A second defect in the same expression, named and not taken.** The coastal reference forms the
+bed's contribution as `rho_water(…, absorb = clear water) × t_col`, where `t_col` is the two-layer
+column's *whole* round-trip transmittance. The clear column is therefore attenuated twice —
+`exp(−c_clear(1/μ_d + 1/μ_u)d)`, which is 0.65 in green at 1.6 m. It is the same error class in the
+**composition** rather than the argument: a closed form that already carries a leg, multiplied by
+that leg again. It makes the bed darker, i.e. the same direction as the one fixed above, and it is
+invisible in the frame for the same reason. Recorded, priced, parked.
+
 ---
 
 ## 11. The static-equilibrium bay

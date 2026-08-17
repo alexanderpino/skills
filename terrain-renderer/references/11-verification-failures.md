@@ -846,6 +846,65 @@ input domain they occupy, and whether the shipped callers occupy the same one.**
 not, and the answer was a sun glint carrying up to **1378 in scene-linear radiance too much** —
 77% of its own pixel — down one edge of the shipped hero frame.
 
+**A fourth shape, and it is the one a reviewer is least likely to look for, because the row that is
+blind is the suite's *strongest* row.** The first three shapes are a defect that cancels, a defect
+that is zero, and two expressions that coincide over a sub-manifold. This one is: **the guard is
+evaluated at a FIXED POINT of the operator that was wrongly inserted.**
+
+**The case, from the same project's coastal scene, and it had survived six waves.** Two closed forms
+describe one transport across an air/water interface. `a_wet(a) = R_ext + (1−R_ext)(1−R_int)a/(1−a
+R_int)` maps a substrate's **water-side** reflectance to the **air-side** apparent albedo of
+[water film + substrate]; `rho_water(rho_bed, …)` crosses the interface twice inside itself, so its
+`rho_bed` is also water-side. A renderer passed `a_wet(a)` where `a` belonged — the interface model
+applied twice, worth up to 35%.
+
+**Why no guard saw it.** `a_wet` is a Möbius map of `a`, and every structural property the suite
+checks is **closed under composition**: monotone stays monotone, `[0,1]` stays `[0,1]`, energy
+conservation stays energy conservation. That alone would make a composition hard to see. What made
+it *impossible* is sharper:
+
+```
+a_wet(1) = 1     exactly       and       a_wet(0) - R_ext = 0     exactly
+```
+
+**0 and 1 are the fixed points of the map — and 0 and 1 are where every energy guard in the project
+was written.** The suite's strongest interface row is a *lossless white pool*: a perfect-white bed,
+no absorption, and the assertion `R(sun) + rho_water(1, …) = 1`, whose right-hand side is the number
+1 and which reads **1.73** if the `L/n²` divisor is dropped. Against this defect it is not merely
+weak. Re-fired here (`terrain-renderer/reference-impl/`, `optics.py` and `validate.py`; both columns
+recomputed at the pool's own 1.40 m depth, its own sun, green band, `rho_water` excluding the surface reflection):
+
+| `rho_bed` | correct chain | with the spurious `a_wet` composed in | ratio |
+|---|---|---|---|
+| **1.000** — the lossless-white row, and both `a_wet` boundary rows | 0.563872 | **0.563872** | **1.000000000000** |
+| 0.681 | 0.332328 | 0.259670 | 1.280 |
+| 0.450 | 0.200103 | 0.148277 | **1.350** |
+| 0.300 | 0.126130 | 0.097771 | 1.290 |
+
+**Twelve significant figures at the point the suite chose, and 35% one step off it.** No tolerance
+reaches that, because at `rho_bed = 1` the two chains are not close — they are the **same
+expression**. `a_wet(0) = R_ext` closes the other end the same way. Every guard anybody thought to
+write was written at one of those two arguments, because they are the two arguments where a closed
+form is *self-checking*, and self-checking arguments are exactly the ones an inserted operator
+fixes.
+
+⚠️ **A boundary condition is where a formula proves itself, and therefore where an extra copy of the
+formula is invisible.** The rule that follows is mechanical and costs one line: **for every map the
+codebase can accidentally apply twice, find its fixed points, and require at least one guard
+strictly away from them.** In this case any single row at any interior albedo — 0.15, 0.45, 0.9 —
+would have caught it, in any of nine waves. None was written. The row that finally settled it is not
+a numerical comparison at all but the **identity between the two forms**, evaluated on the interior:
+`a_wet(a) − R_ext == (1−R_ext)·a·T_esc(0)·1/(1−a·G_rt(0))`, which states in code *which side of the
+interface each function's argument lives on* — the thing the six defects all got wrong and no row
+had ever said.
+
+**And the interface-side question generalises past water.** Any pair (in-medium quantity, apparent
+quantity) invites it: radiance and basic radiance `L/n²`; reflectance measured inside a dielectric
+and the Saunderson-corrected one measured outside; linear and display-referred colour; energy
+density and the flux crossing a boundary. The defect always looks like a plausible value of the
+right type, and the type system cannot see it. ⚠️ **Put the side in the parameter's name.** It is
+the only guard found so far that travels to the call site, where the mistake is actually made.
+
 **The mechanical check, and it is cheaper than any of the above.** For every guard, ask what the
 defect it is aimed at would multiply, and where the row evaluates. Three questions — the first two
 answerable by reading one row, the third only by reading all of them together:
@@ -856,7 +915,11 @@ answerable by reading one row, the third only by reading all of them together:
 2. **Is the row's argument at a value where the defect vanishes?** Zero load, zero absorption,
    unit albedo, normal incidence: sweep the argument, or state in the row's own reason why the
    chosen value is where the defect is *largest* rather than where it is convenient.
-3. **Taking the rows on one function together, what region of its input domain do they cover, and
+3. **Is the row's argument a FIXED POINT of the operator the defect inserts or removes?** Unit
+   albedo, zero load, a perfect reflector, an identity transform: these are where a formula proves
+   itself, and therefore where a second copy of the formula is invisible. Find the fixed points of
+   anything the code can apply twice, and put a guard strictly between them.
+4. **Taking the rows on one function together, what region of its input domain do they cover, and
    do the shipped callers stay inside it?** This one is not answerable row by row and that is why
    it is separate: eleven individually reasonable rows can all sit on the same isotropic default,
    an identity can hold there that holds nowhere else, and a row count says nothing about it. The
