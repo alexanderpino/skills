@@ -262,7 +262,7 @@ expensive.
 ## Agents, prompting, and LLM judges
 
 This section carries more weight than the rest, because a gauntlet's critic *is*
-an LLM judge and the known failure modes of LLM judges are the method's `lasten`.
+an LLM judge, so the measured failure modes of LLM judges are the method's own.
 Every guardrail below buys off a measured effect, not a worry.
 
 **Huang et al., "Large Language Models Cannot Self-Correct Reasoning Yet"

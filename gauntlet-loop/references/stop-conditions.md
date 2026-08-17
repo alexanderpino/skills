@@ -13,10 +13,14 @@ agreed at intake, end the run early on evidence the user named in advance.
 ## The lane-level conditions
 
 ### `bar-met`
-Our output wins the bar comparison in **N consecutive rounds** on a dimension
-(config `bar_met_n`, default 2 — a single win is noise). A *lane* retires only
-when **every one of its dimensions** has retired via `bar-met` or `clean-streak`;
-this is what stops visual wins from retiring a lane whose frame time still loses.
+Our output wins the bar comparison in **N consecutive deciding-tier rounds** on a
+dimension (config `bar_met_n`, default 2 — a single win is noise). A round
+advances the streak only when it also **scores at or above the target with no
+`major` gap named**: winning the comparison while a major gap stays open, or
+while the score sits below the bar, is not the bar being met, and the script
+does not count it. A *lane* retires only when **every one of its dimensions**
+has retired via `bar-met` or `clean-streak`; this is what stops visual wins from
+retiring a lane whose frame time still loses.
 
 A retired lane can still carry a recorded open gap (a `minor` that never
 mattered); the report keeps it. Retirement is a resource decision, not a claim of
@@ -73,9 +77,12 @@ with extra steps. The resume reason lands in the run history either way.
 ## The run-level conditions
 
 ### `budget`
-Ceiling on waves (config `budget_waves`), optionally also wall clock or tokens
-tracked outside the script. **Always armed**, even alongside the others — it is
-what makes an unattended run safe to agree to.
+Ceiling on waves (config `budget_waves`), optionally also tokens
+(`budget_tokens` — `status` fires it from the `--tokens` you log, so log them;
+an unmeasured round is invisible to this stop) and wall clock tracked outside
+the script. First to deplete fires; waves left never override tokens spent.
+**Always armed**, even alongside the others — it is what makes an unattended
+run safe to agree to.
 
 When it fires, stop cleanly at a wave boundary after smoothing rather than
 mid-lane. A coherent artifact one wave early beats an incoherent one at the
@@ -157,6 +164,10 @@ Recommend against extending — and say why in one line — when:
 python3 scripts/gauntlet.py extend --waves 3 \
     --reason "imagery/visual score 5→7, severity major→minor; grain gap still closeable"
 ```
+
+When the *token* budget is what fired, the same grant must raise that ceiling
+too — `extend --waves 2 --budget-tokens 2000000` — or the token stop stays
+fired whatever the wave count says; the script warns if you forget.
 
 The script raises `budget_waves`, appends the grant to `config.json` with the
 wave it was granted at and the log read at the time, and refuses:

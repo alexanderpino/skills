@@ -122,6 +122,10 @@ extensions, **gates**), `contract.md`, the frozen `bar/`, `ownership.md`,
 `{"name": ..., "cmd": "<shell; fails on non-zero exit or any stdout>", "paths":
 ["<every file the check reads>"]}`. `paths` is what the cache hashes, so an
 undeclared input makes the gate skip when it should run (`cost-discipline.md`).
+Both `cmd` and `paths` resolve from the directory the script is invoked in —
+always run it from the workspace root (under Mission Control, the worktree
+root), or every path silently resolves to nothing; `gate` warns when a gate's
+paths match no file, and never caches such a gate.
 
 ```bash
 python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf \
@@ -226,8 +230,9 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
 - **External and inspectable**, and **reachable inside the budget**. A target
   nobody can hit is not ambition: every round fails, every lane looks stalled,
   and the log stops carrying information.
-- **Set `--target-score` where the target sits** (default 7). A target of 10
-  means no lane can ever retire; the script warns you.
+- **Set `--target-score` where the target sits** (default 7). The script counts
+  a bar-met round only at or above it, so a target of 10 means bar-met never
+  fires; the script warns you.
 - **Ambition above it is a *stretch***, recorded in `contract.md` as a heading
   rather than a promise. Retirement is judged against the target only; the report
   states the distance to the stretch — and the stretch is what a surplus buys

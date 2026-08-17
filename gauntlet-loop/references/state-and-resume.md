@@ -22,8 +22,10 @@ gauntlet/
 Two decision records live in `config.json` rather than in the round log, because
 they are choices the run made rather than verdicts it received: `extensions`
 (budget the user granted) and `parked` (lanes the run stopped funding, each with
-its wave, reason and open gap). Both survive a re-cut — `init --force` carries
-them across — and both appear in the report.
+its wave, reason and open gap). Both appear in the report, and both survive a
+re-cut: `init --force` carries the whole prior config across — budget, hard cap,
+stops, WIP limit, gates, parks, extensions — and overrides only the flags you
+explicitly re-state, so a re-cut can never quietly reset the agreement.
 
 Add `gauntlet/` to the project's VCS. The state is small, and a resumed run
 without its log is not a resumed run.

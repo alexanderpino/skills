@@ -156,8 +156,12 @@ Initialise the state directory as part of confirming the contract:
 python3 scripts/gauntlet.py init --lanes <a,b,c> --dimensions <d1,d2> \
     --bar-kind <kind> --target-score 7 --wip-limit 3 \
     --bar-met-n 2 --clean-streak-n 2 --no-progress-n 3 \
-    --budget-waves <N> [--hard-cap-waves <M>]
+    --budget-waves <N> --budget-tokens <T> [--hard-cap-waves <M>]
 ```
+
+Set `--budget-tokens` from the first light round's measured cost rather than
+omitting it — waves are the unit the user agrees to, tokens are the unit that
+burns, and the token stop can only fire on a ceiling that exists.
 
 `init` prints the projected call count per wave and for the whole budget — put
 that number in front of the user with the contract, not after it.
