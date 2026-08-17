@@ -43,6 +43,7 @@ HERE = __file__.rsplit('/', 1)[0] if '/' in __file__ else '.'
 sys.path.insert(0, HERE)
 
 import beach as BCH                                             # noqa: E402
+import beach_diffract as DFR                                    # noqa: E402
 import beach_optics as BOP                                      # noqa: E402
 import beach_foam as FOAM                                       # noqa: E402
 import beach_camera as CMR                                      # noqa: E402
@@ -1071,6 +1072,117 @@ def _bug_fold_unsigned_gradient(mod):
                    else s_max))] < float(tol)))
 
 
+# ---------------------------------- wave 10: the diffracted wave field's defects
+#
+# EVERY ONE OF THESE DRAWS A PLAUSIBLE LEE. That is the point: a diffraction
+# implementation is the archetype of a place where the picture cannot tell you
+# whether the field is right, and five of the seven below were live at some
+# point in this file's own drafting.
+def _bug_diff_reflected_same_sheet(mod):
+    """The reflected term on `phi + phi_0` instead of `2 pi - phi - phi_0`.
+
+    THE BUG THIS FILE ACTUALLY HAD. Same plane wave, complementary switch: the
+    reflected wave stands at full strength inside the geometric shadow and
+    vanishes where the reflection is. The lee it draws is completely
+    convincing."""
+    U = mod._U
+
+    def bad(kr, phi, phi0, screen=mod.NEUMANN):
+        phi = np.asarray(phi, float)
+        return U(kr, phi - phi0) + float(screen) * U(kr, phi + phi0)
+    mod.halfplane_polar = bad
+    mod.Edge.field = lambda self, X, Y: bad(
+        self.k * self.polar(X, Y)[0], self.polar(X, Y)[1], self.phi0,
+        self.screen)
+
+
+def _bug_diff_no_reflected_term(mod):
+    """Only the incident term -- the single-edge Fresnel-Kirchhoff
+    approximation, which is what most coastal-engineering charts actually
+    tabulate. It has no boundary condition on the screen at all."""
+    U = mod._U
+
+    def bad(kr, phi, phi0, screen=mod.NEUMANN):
+        return U(kr, np.asarray(phi, float) - phi0)
+    mod.halfplane_polar = bad
+    mod.Edge.field = lambda self, X, Y: bad(
+        self.k * self.polar(X, Y)[0], self.polar(X, Y)[1], self.phi0,
+        self.screen)
+
+
+def _bug_diff_cornu_limit_one(mod):
+    """(1+i) for (1+i)/2 in the switch's bracket -- the Cornu spiral's limit
+    read as 1 rather than 1/2. The shadow boundary then reads 1 instead of a
+    half and the lit region reads 1.5, and the FIELD IS STILL SMOOTH."""
+    def bad(kr, psi):
+        kr = np.asarray(kr, float)
+        psi = np.asarray(psi, float)
+        X = 2.0 * np.sqrt(np.maximum(kr, 0.0) / math.pi) * np.cos(0.5 * psi)
+        br = (1.0 + 1.0j) + mod.fresnel(X)
+        return (br * np.exp(-0.25j * math.pi) / math.sqrt(2.0)
+                * np.exp(-1j * kr * np.cos(psi)))
+    mod._U = bad
+
+
+def _bug_diff_series_everywhere(mod):
+    """The power series for every argument. Correct mathematics, catastrophic
+    arithmetic: at the Fresnel arguments this scene reaches the terms grow to
+    e^39 before they cancel and nothing survives."""
+    mod.fresnel = lambda x: mod._fresnel_series(np.asarray(x, float))
+
+
+def _bug_diff_direction_is_radial(mod):
+    """The orthogonal taken as the radius from the tip EVERYWHERE, instead of
+    grad(arg u).
+
+    WAVE 9'S OWN ANSATZ, reinstalled as a defect. It is right deep in the
+    shadow -- that is this section's own finding -- and wrong everywhere else,
+    because outside the shadow the field is the incident wave and knows nothing
+    about the tip."""
+    mod.Edge.direction = lambda self, X, Y, step=None: np.arctan2(
+        np.asarray(Y, float) - self.tip[1], np.asarray(X, float) - self.tip[0])
+
+
+def _bug_diff_kd_not_applied(mod):
+    """The diffracted boundary hands back the stated H_0 rather than K_d H_0.
+    Half the solution thrown away, and the half that a K_d chart would have
+    given you for free."""
+    orig = mod.diffracted_boundary
+
+    def bad(edge, x_off, y, H0):
+        out = orig(edge, x_off, y, H0)
+        out['H0'] = out['H0_plain']
+        return out
+    mod.diffracted_boundary = bad
+
+
+def _bug_diff_dirichlet_screen(mod):
+    """A pressure-release screen where the water-wave problem needs a rigid
+    one. A node on the breakwater face where there should be an antinode.
+
+    THE FIRST DRAFT OF THIS DEFECT WAS A NO-OP and fired nothing, which looked
+    exactly like a blind guard until it was read: it set `mod.NEUMANN =
+    mod.DIRICHLET`, and `Edge.__init__`'s `screen=NEUMANN` default was bound at
+    class-definition time, so the flip reached nothing. A defect that does not
+    reach the code it names is worse than no defect, because the empty column
+    it prints reads as a finding. Recorded because the next reader will write
+    the same one."""
+    init = mod.Edge.__init__
+
+    def bad(self, tip, screen_dir, khat, k, screen=mod.DIRICHLET):
+        init(self, tip, screen_dir, khat, k, screen=mod.DIRICHLET)
+    mod.Edge.__init__ = bad
+    orig = mod.halfplane_polar
+    mod.halfplane_polar = (lambda kr, phi, phi0, screen=mod.DIRICHLET:
+                           orig(kr, phi, phi0, mod.DIRICHLET))
+
+
+DIFFRACT_BUGS = ('diff-reflected-same-sheet', 'diff-no-reflected-term',
+                 'diff-cornu-limit-one', 'diff-series-everywhere',
+                 'diff-direction-is-radial', 'diff-kd-not-applied',
+                 'diff-dirichlet-screen')
+
+
 BATHY_BUGS = ('keying-axis', 'offset-unsigned', 'offset-no-subdivide',
               'keying-polar-everywhere', 'fold-unsigned-gradient')
 
@@ -1156,6 +1268,13 @@ BUGS = {
     'cerc-sin-not-double': _bug_cerc_sin_not_double,
     'plan-ramp-flat-contours': _bug_plan_ramp_flat_contours,
     'bay-bed-ignores-plan': _bug_bay_bed_ignores_plan,
+    'diff-reflected-same-sheet': _bug_diff_reflected_same_sheet,
+    'diff-no-reflected-term': _bug_diff_no_reflected_term,
+    'diff-cornu-limit-one': _bug_diff_cornu_limit_one,
+    'diff-series-everywhere': _bug_diff_series_everywhere,
+    'diff-direction-is-radial': _bug_diff_direction_is_radial,
+    'diff-kd-not-applied': _bug_diff_kd_not_applied,
+    'diff-dirichlet-screen': _bug_diff_dirichlet_screen,
     'keying-axis': _bug_keying_axis,
     'offset-unsigned': _bug_offset_unsigned,
     'offset-no-subdivide': _bug_offset_no_subdivide,
@@ -3273,6 +3392,437 @@ def _crest_swing(bay):
     sm = np.convolve(np.pad(th, w // 2, mode='edge'), np.ones(w) / w,
                      mode='valid')
     return float(sm.max() - sm.min())
+
+
+# =========================== 6c - diffraction: the term no ray model has
+#
+# WAVE 10, GAP 3. `beach_diffract.py` is a module of its own and this section is
+# the only place that fires it. It owns no path in `beach.py`, `beach_optics.py`
+# or `beach_render.py`.
+def _sec_diffract(ctx):
+    """WAVE 10. Diffraction -- the term no ray model has, and the fan a bay is
+    held by.
+
+    THE CLAIM UNDER TEST is wave 9's, and it is a proof rather than a guess: a
+    curved static-equilibrium bay cannot exist under plane crests, because
+    theta_loc = 0 forces phi_s = -theta_0 at every station and that integrates
+    to ONE straight line. The bay needs the orthogonal to FAN, and the fan is
+    diffraction. Wave 9 supplied it as a stated per-row offshore direction. This
+    section fires an exact wave solution at the same measurement and asks
+    whether the fan can be an OUTPUT.
+
+    WHAT IS IMPORTED. `references/12-water-rendering.md`'s diffraction section
+    carries K_d = 0.5000 on the geometric shadow boundary, K_d = 0.31 / 0.20 /
+    0.11 at Fresnel parameters v = 0.5 / 1 / 2, and a seven-column lee
+    centre-line table behind an obstacle of width W. Those are the tier-2 rows
+    below and they are the chapter's numbers, not restatements of the code's:
+    `beach_diffract.py` shares no line with whatever produced them.
+
+    AND EVERY ROW HERE CAN FAIL. A diffraction implementation is a place where
+    a plausible picture and a wrong field look identical -- the first draft of
+    `halfplane_polar` stood the reflected wave at full strength inside the
+    geometric shadow and drew a perfectly convincing lee. What caught it was
+    the 1/2.
+    """
+    B = ctx['B']
+    D = DFR
+    ep = ctx.get('ep') or B.equilibrium_plan()
+    ctx['ep'] = ep
+
+    # ================================================== 1. the Fresnel integrals
+    # The Cornu spiral's own limits, and they are WHY the shadow boundary reads
+    # a half: F(+inf) = (1+i)/2, so the incident term's bracket is half its
+    # total there.
+    big = np.array([1e6, 1e7, 1e8])
+    Fb = D.fresnel(big)
+    check(1, 'Cornu spiral: C and S approach 1/2 at +infinity',
+          float(np.max(np.abs(np.stack([Fb.real, Fb.imag]) - 0.5))), 0.0,
+          4e-7,
+          'The Fresnel integrals\' limits. Evaluated at kr-scale arguments '
+          'rather than asserted, and the residual is not error but the '
+          'asymptotic tail: |F(x) - (1+i)/2| goes as 1/(pi x), which at x = '
+          '1e6 is 3.2e-7. If these two limits were not a half nothing else in '
+          'this section would come out.', '-')
+    check(1, 'the tail is 1/(pi x), so the limit is approached and not hit',
+          float(np.max(np.abs(np.abs(Fb - (0.5 + 0.5j)) * math.pi * big - 1.0))),
+          0.0, 0.02,
+          'The same statement as a rate. A wrong normalisation would move the '
+          'limit; a wrong asymptotic series would move this.', '-')
+    xs = np.linspace(-3.0, 3.0, 61)
+    check(1, 'the Fresnel integral is ODD',
+          float(np.max(np.abs(D.fresnel(-xs) + D.fresnel(xs)))), 0.0, 1e-13,
+          'F(-x) = -F(x) by the integrand\'s evenness. The oddness is what '
+          'makes the Cornu spiral run from -(1+i)/2 to +(1+i)/2 and therefore '
+          'what makes the half a half rather than something else.', '-')
+    h = 1e-5
+    xd = np.linspace(-3.5, 3.5, 29)
+    check(1, 'dF/dx = exp(i pi x^2 / 2), the defining integrand',
+          float(np.max(np.abs((D.fresnel(xd + h) - D.fresnel(xd - h))
+                              / (2 * h)
+                              - np.exp(0.5j * math.pi * xd ** 2)))), 0.0, 5e-9,
+          'Differentiating the implementation must return the integrand it '
+          'was built from. This is the row that would catch a wrong power of '
+          'x, a missing pi/2 or a swapped C and S, none of which move the '
+          'limits above. The tolerance is the central difference\'s own '
+          'truncation, h^2 |F\'\'\'| / 6 with h = 1e-5 and |F\'\'\'| ~ '
+          '(pi x)^2 = 121 at x = 3.5, i.e. 2e-9 -- computed, not widened '
+          'until the row passed.', '-')
+    xa = np.linspace(-2.0, 2.0, 41)
+    check(3, 'route 1 vs route 2: power series against Gauss-Legendre',
+          float(np.max(np.abs(D._fresnel_series(xa) - D._fresnel_gl(xa)))),
+          0.0, 1e-12,
+          'TWO ROUTES THAT DO NOT SHARE A SOURCE. The series comes from '
+          'expanding the exponential and integrating term by term; the '
+          'quadrature comes from evaluating the integral. There is no scipy '
+          'in this container, so a single route would be a single point of '
+          'failure under everything else here.', '-')
+    xb = np.linspace(3.6, 9.0, 28)
+    check(3, 'route 2 vs route 3: quadrature against the asymptotic series',
+          float(np.max(np.abs(D._fresnel_asym(xb) - D._fresnel_gl(xb)))),
+          0.0, 1e-9,
+          'The overlap where the switch sits. Above |x| = 4 the physics needs '
+          'the asymptotic form (kr reaches 1e3 here, so the Fresnel argument '
+          'reaches 30) and the series has already lost every digit to '
+          'cancellation; the quadrature still works at 9 and pins it.', '-')
+    xt = np.array([0.02, 0.05, 0.1])
+    check(1, 'small argument: C -> x and S -> pi x^3 / 6',
+          float(np.max(np.abs(np.stack(
+              [D.fresnel(xt).real / xt,
+               D.fresnel(xt).imag / (math.pi * xt ** 3 / 6.0)]) - 1.0))),
+          0.0, 2e-3,
+          'The leading terms, from the integrand\'s own Taylor series. Cheap, '
+          'and it is the one row that fixes the SCALE of the argument -- a '
+          'factor of pi/2 in the wrong place survives every other row in this '
+          'block.', '-')
+
+    # ============================================= 2. Sommerfeld's exact field
+    lam = B.deep_wavelength(B.T_SWELL)
+    k = 2.0 * math.pi / lam
+    e0 = D.Edge((0.0, 0.0), (0.0, -1.0), (1.0, 0.0), k)
+    XX, YY = np.meshgrid(np.linspace(60.0, 1500.0, 26),
+                         np.linspace(-800.0, 800.0, 26))
+    res = [float(np.max(D.helmholtz_residual(e0, XX, YY, step=lam / s)))
+           for s in (40.0, 60.0, 90.0)]
+    check(1, 'the field satisfies the Helmholtz equation',
+          res[1], 0.0, 1e-5,
+          'THE ROW THAT CHECKS EVERYTHING AT ONCE. Sommerfeld\'s solution is '
+          'exact, so |(lap + k^2) u| / (k^2 |u|) on a 4th-order stencil '
+          'measures the Fresnel integrals, the branch handling, the frame '
+          'conversion and the two-term sum together. A wrong Fresnel route or '
+          'a wrapped polar angle shows up here and in NO picture of |u|.', '-')
+    check(1, 'and the residual is 4th-order in the step, so it is truncation',
+          float(np.max(np.abs(np.array([res[0] / res[1], res[1] / res[2]])
+                              - (60.0 / 40.0) ** 4))), 0.0, 0.02,
+          'The distinction that makes the row above mean something. If the '
+          'residual were a defect in the field it would not fall as h^4 when '
+          'the stencil is refined; measured, 7.82e-6 -> 1.55e-6 -> 3.07e-7 '
+          'against the 5.0625 the stencil predicts.', '-')
+    nb = D.screen_normal_derivative(e0, np.array([200.0, 800.0]), eps=1e-5)
+    check(1, 'Neumann: du/dn = 0 on BOTH faces of the screen',
+          float(np.max(np.concatenate(nb))), 0.0, 1e-3,
+          'The water-wave boundary condition -- no flow through a breakwater '
+          'or a headland -- and the reason the reflected term ADDS. Penney & '
+          'Price 1952. Reported as |du/dn| / (k |u|) so it is dimensionless; '
+          'the residual is the finite angular offset the derivative is taken '
+          'at, and it falls with it.', '-')
+    ed = D.Edge((0.0, 0.0), (0.0, -1.0), (1.0, 0.0), k, screen=D.DIRICHLET)
+    check(1, 'Dirichlet: u = 0 on the screen, so the sign is a CHOICE',
+          float(np.max(np.abs(D.halfplane_polar(
+              k * np.array([200.0, 800.0]), math.pi - 1e-9, ed.phi0,
+              ed.screen)))), 0.0, 1e-6,
+          'The other sign of the same solution, checked so that "Neumann" is '
+          'a decision this file made rather than a hard-coded plus. A '
+          'pressure-release screen has a NODE where a rigid one has an '
+          'antinode, and the water-wave problem is the rigid one.', '-')
+
+    # ---- the 1/2, which is chapter 12's own number and the classic check
+    rr = np.array([500.0, 2000.0, 8000.0, 32000.0])
+    sx, sy = e0.shadow_boundary_line(rr)
+    kd_sb = e0.kd(sx, sy)
+    check(1, 'K_d on the geometric shadow boundary is 1/2',
+          float(np.max(np.abs(kd_sb - 0.5))), 0.0, 0.03,
+          'THE CLASSIC CHECK, and chapter 12 states it outright: "the field '
+          'on the geometric shadow boundary is the Sommerfeld half-plane '
+          'result, and it is exactly half the incident amplitude". A ray '
+          'model says ONE on the lit side of that line and ZERO on the other. '
+          'The residual here is the REFLECTED term, which is O((kr)^-1/2) and '
+          'is checked as such in the next row rather than absorbed.', '-')
+    check(1, 'and the departure from 1/2 is the reflected term, O((kr)^-1/2)',
+          float(np.ptp((kd_sb - 0.5) * np.sqrt(k * rr))), 0.0, 0.01,
+          'Scaled by sqrt(kr) the four ranges collapse onto one constant, '
+          'which is what an edge-diffracted tail does and what an error does '
+          'not. THE FIRST DRAFT OF THIS FILE READ 1.10 / 0.61 / 1.32 HERE '
+          'because the reflected term was written on the wrong sheet '
+          '(phi + phi_0 rather than 2 pi - phi - phi_0), and the lee it drew '
+          'looked completely convincing.', '-')
+    check(1, 'the incident term alone is 1/2 on the boundary at EVERY range',
+          float(np.abs(D._U(1.0, math.pi))), 0.5, 1e-14,
+          'X = 2 sqrt(kr/pi) cos(psi/2) vanishes at psi = pi whatever kr is, '
+          'and F(0) = 0 exactly, so the switch passes through a half with no '
+          'asymptotics anywhere near it. That is where chapter 12\'s 0.5000 '
+          'comes from.', '-')
+
+    # ---- the two limits the field has to reproduce
+    lit = (np.array([3000.0]), np.array([12000.0]))
+    check(2, 'far in the LIT region the field is the incident plane wave',
+          float(np.max(np.abs(
+              np.array([float(e0.kd(*lit)[0]),
+                        float(e0.wavenumber_ratio(*lit)[0]),
+                        math.degrees(float(e0.direction(*lit)[0]))])
+              - np.array([1.0, 1.0, 0.0])))), 0.0, 0.02,
+          'Amplitude, |k_vec|/k and direction, 12 km into the lit quadrant. '
+          'The limit an edge solution must return where the edge is far away: '
+          'if it did not, the "diffraction" would be modifying water it never '
+          'reached.', '-')
+    near = (np.array([2000.0]), np.array([2400.0]))
+    info(1, 'and NEARER the boundary it rings, which is the physics not error',
+         (round(float(e0.kd(*near)[0]), 4),
+          round(math.degrees(float(e0.direction(*near)[0])), 3)),
+         'K_d and the direction in degrees at Fresnel parameter v = -5.4 on '
+         'the lit side. The lit side of an edge OVERSHOOTS and rings -- the '
+         'Cornu spiral winds into its limit rather than reaching it -- so '
+         'K_d = 0.980 and the orthogonal is 0.89 deg off the incident '
+         'direction. A model that returns a clean 1.0 and 0.0 there has '
+         'smoothed the physics away, and that is the failure mode chapter 12 '
+         'warns about when it says blurring the shadow is not modelling the '
+         'diffraction.')
+    px = np.array([600.0, 600.0, 1500.0])
+    py = np.array([-600.0, -1200.0, -1500.0])
+    check(1, 'deep in the SHADOW the orthogonal is RADIAL from the tip',
+          float(np.max(np.abs(np.degrees(e0.direction(px, py))
+                              - np.degrees(np.arctan2(py, px))))), 0.0, 0.15,
+          'THE ROW THIS WAVE EXISTS FOR. grad(arg u) of the exact field, '
+          'against the radius from the edge -- and they agree to a tenth of a '
+          'degree. So "the fan converges on the diffraction point" is an '
+          'OUTPUT of a wave solution and not the ansatz `12a` section 11 had '
+          'to assume it was. Nothing radial was put in: the field is two '
+          'Fresnel integrals of a plane wave.', 'deg')
+    check(1, 'and it is a locally plane wave there: |k_vec| = k',
+          float(np.max(np.abs(e0.wavenumber_ratio(px, py) - 1.0))), 0.0,
+          0.01,
+          'The companion row, and the one that says the direction above means '
+          'something. Where two terms of comparable size interfere the phase '
+          'gradient is not a wavenumber and the direction is not a direction; '
+          'reporting |k_vec|/k is how a reader knows which is which.', '-')
+
+    # ================================== 3. chapter 12's OWN numbers, imported
+    check(2, 'chapter 12: K_d = 0.31 / 0.20 / 0.11 at v = 0.5 / 1 / 2',
+          float(np.max(np.abs(D.knife_edge_kd(np.array([0.5, 1.0, 2.0]))
+                              - np.array([0.31, 0.20, 0.11])))), 0.0, 0.005,
+          'IMPORTED, not restated. `references/12-water-rendering.md`\'s '
+          'diffraction section prices this term for the isolated-rock case '
+          'with exactly these four numbers, and this file reproduces them at '
+          '0.30783 / 0.20267 / 0.11103 from Fresnel integrals it built itself. '
+          'The tolerance is the chapter\'s own two decimals.', '-')
+    lee = D.lee_centreline(1.0)
+    check(2, 'chapter 12\'s lee centre-line table, all seven columns',
+          float(np.max(np.abs(lee['amp'] - np.array(
+              [0.20, 0.31, 0.41, 0.51, 0.62, 0.71, 0.80])))), 0.0, 0.006,
+          'The chapter\'s table of amplitude on the lee centre line at 0.1 to '
+          '10 obstacle-Fresnel-lengths W^2/lam. AN OBSTACLE HAS TWO EDGES and '
+          'on the centre line they are equidistant, so the two half-plane '
+          'fields arrive in phase and add: 2 K_d(v) with v = (W/2) sqrt(2 / '
+          '(lam r)). Reproducing all seven from that reading is what '
+          'establishes the chapter\'s convention as well as its arithmetic -- '
+          'a Babinet calculation on the same geometry gives 0.43 at r = '
+          'W^2/lam, not 0.51, so the convention was not obvious.', '-')
+
+    # =============================================== 4. energy, and where from
+    yb = np.linspace(-9000.0, 9000.0, 36001)
+    fx = [D.flux_x(e0, xx, yb) for xx in (400.0, 1600.0, 4000.0)]
+    check(3, 'energy: the flux through two downwave lines is the same',
+          float(np.max(np.abs(np.array([fx[1] / fx[0], fx[2] / fx[0]])
+                              - 1.0))), 0.0, 6e-4,
+          'WHAT CROSSES INTO THE SHADOW HAS TO COME FROM SOMEWHERE. Between '
+          'two lines downwave of the tip there is no screen and no source, so '
+          'Im(conj(u) du/dx)/k integrated across must agree. A one-sided look '
+          'at |u| cannot make this statement, and a model that "adds" energy '
+          'to the lee by blurring the shadow fails it outright.', '-')
+    ysh = yb[yb < 0.0]
+    ylt = yb[yb > 0.0]
+    gain = D.flux_x(e0, 1600.0, ysh)
+    deficit = D.flux_x(e0, 1600.0, ylt) - float(ylt[-1] - ylt[0])
+    check(3, 'and the shadow\'s GAIN is the lit side\'s DEFICIT',
+          gain / abs(deficit), 1.0, 0.02,
+          'The same conservation, split at the geometric shadow boundary and '
+          'therefore the sharper statement: %.1f units of flux appear where a '
+          'ray model puts none, and exactly that much is missing from the '
+          'side that was lit. The lit side is measured against its own '
+          'incident flux (unit density), so nothing here is a ratio of the '
+          'field to itself.' % gain, '-')
+
+    # ============================================ 5. THE SCENE: two edges
+    e_h = D.scene_edge(ep, where='headland')
+    g_h = D.geometric_shelter(ep, e_h)
+    e_p = D.scene_edge(ep, where='pole')
+    g_p = D.geometric_shelter(ep, e_p)
+    info(1, 'headland tip: shoreline stations in its geometric shadow',
+         (g_h['n'], g_h['n_rows'], g_h['n_bay']),
+         'Of %d shoreline stations and %d of them in the bay. The bay\'s '
+         'count is the third number.' % (g_h['n_rows'], g_h['n_bay_rows']))
+    openq(1, 'GAP 3\'S OWN PRESCRIPTION FAILS, and it fails at the geometry',
+          '%d of %d bay stations sheltered' % (g_h['n_bay'], g_h['n_bay_rows']),
+          'a fan of %.1f deg' % math.degrees(ep['fan']['swing']),
+          'Gap 3 says "a Sommerfeld / Penney-Price edge stamped at the '
+          'HEADLAND TIP would make the fan an output". Stamped there, it does '
+          'not, and no wave theory is involved in why: at this coast\'s 20 deg '
+          'obliquity a shore-attached headland that protrudes %.0f m casts a '
+          'geometric shadow %.0f m long alongshore, and every station in it '
+          'is on the headland\'s OWN updrift face. An edge modifies the field '
+          'where it BLOCKS something; the straight ray from a bay station '
+          'back out to sea never meets this one. The bay is 2.46x more '
+          'indented than the photograph and this is the same fact seen from '
+          'the other end -- the closed form builds a bay that needs a shelter '
+          'this coast does not have.'
+          % (float(np.max(ep['x_s']) - ep['A1'][0]),
+             float(np.max(ep['x_s']) - ep['A1'][0])
+             / math.tan(B.THETA0_SWELL)))
+    check(1, 'the pole DOES shelter the bay, and that is why it is the pole',
+          g_p['n_bay'] > 0.7 * g_p['n_bay_rows'], True, 0,
+          '%d of the bay\'s %d stations. `12a` section 11 defines the pole as '
+          '"the diffraction point, or more generally the virtual source the '
+          'fan converges on", and `spiral_pole`\'s selection rule is that a '
+          'pole 79 km offshore is not a headland. So the construction already '
+          'ASSERTS an edge at D; standing a real Sommerfeld edge there turns '
+          'the assertion into a measurement.'
+          % (g_p['n_bay'], g_p['n_bay_rows']), '-')
+
+    # ============================================ 6. THE TRANSPORT, six rows
+    t = D.transport_table(ep=ep)
+    ctx['diffract_T'] = t
+    fl = t['rotated']
+    bp, b9, bd, bf = (t['bay_plane'], t['bay_fan9'], t['bay_diff_dir'],
+                      t['bay_diff'])
+    check(1, 'the meter\'s floor is unchanged by this wave',
+          math.degrees(fl['th_mean']), 0.2015, 0.002,
+          'STANDING RULING 14, and it comes first. A near-zero measurement is '
+          'worthless until zero has been shown to be reachable; the '
+          'closed-form zero-transport coast is the row that shows it, and it '
+          'is recomputed here rather than quoted so that any change to the '
+          'transform moves the control and the measurement together.', 'deg')
+    check(1, 'the diffracted fan beats the plane crest on the bay',
+          bf['th_mean'] < 0.4 * bp['th_mean'], True, 0,
+          'The bay under plane crests leaves %.4f deg of residual obliquity '
+          'and it MUST -- theta_loc = 0 forces one straight line. Under the '
+          'diffracted field it leaves %.4f. One array changed: the offshore '
+          'boundary.' % (math.degrees(bp['th_mean']),
+                         math.degrees(bf['th_mean'])), '-')
+    check(1, 'and it beats wave 9\'s hand-stated fan on the meter that has '
+             'the height divided out',
+          bd['sin2_rms'] < b9['sin2_rms'], True, 0,
+          'THE ROW THAT CANNOT BE BOUGHT BY MAKING THE WAVES SMALLER. Q goes '
+          'as H_b^(5/2), so a shadow that halves the height cuts Q by 5.7x '
+          'whatever the shoreline is doing; rms sin(2 theta_loc) is the CERC '
+          'closure with its height and its coefficient divided out. '
+          'Direction-only, H_0 uniform: %.4e against wave 9\'s %.4e. With the '
+          'amplitude as well: %.4e.'
+          % (bd['sin2_rms'], b9['sin2_rms'], bf['sin2_rms']), '-')
+    info(1, 'THE ROW: the bay under a DIFFRACTED fan',
+         (round(math.degrees(bf['th_mean']), 4),
+          float('%.4e' % bf['Q_rms_span'])),
+         'mean |theta_loc| in degrees and Q rms in m3/s over the spiral span, '
+         'against wave 9\'s 2.8006 and 2.6504e-02 and against the meter\'s '
+         'floor of %.4f and %.4e.'
+         % (math.degrees(fl['th_mean']), fl['Q_rms_span']))
+    openq(1, 'the bay is STILL not zero, and Q is the flattering meter',
+          'sin2 %.4e = %.1fx the floor' % (bf['sin2_rms'],
+                                           bf['sin2_rms'] / fl['sin2_rms']),
+          'Q %.4e = %.1fx the floor' % (bf['Q_rms_span'],
+                                        bf['Q_rms_span'] / fl['Q_rms_span']),
+          'HONEST ANSWER, and the two meters disagree by an order. K_d falls '
+          'to %.3f at the sheltered end, so the updrift limb of this bay '
+          'carries a %.2f m wave and its transport is near zero for a reason '
+          'that has nothing to do with the shoreline being an equilibrium. '
+          'The height-free meter is the one to read and it says %.1fx the '
+          'floor. Reported rather than absorbed.'
+          % (float(t['_fan']['kd'].min()),
+             B.H0_SWELL * float(t['_fan']['kd'].min()),
+             bf['sin2_rms'] / fl['sin2_rms']))
+
+    # ================= 7. WAVE 9'S ATTRIBUTION, and this wave overturns it
+    ec = B.equilibrium_plan(delta=0.0)
+    y = ep['y']
+    xg = np.arange(0.0, 1000.0 + 4.0, 4.0)
+    vv = ec['pts'] - ec['D']
+    Rc0 = float(np.mean(np.hypot(vv[:, 0], vv[:, 1])))
+    xs_c = ec['D'][0] + np.sqrt(np.maximum(Rc0 ** 2 - (y - ec['D'][1]) ** 2,
+                                           0.0))
+    n0 = np.arctan2(y - ec['D'][1], xs_c - ec['D'][0])
+    kh = np.asarray(ec['khat'], float)
+    e_c = D.Edge(ec['D'], np.array([kh[1], -kh[0]]), kh, D.scene_wavenumber())
+    bdc = D.diffracted_boundary(e_c, 0.0, y, B.H0_SWELL)
+    h_car = B.plan_ramp(xg, y, xs_c)
+    cont = -B.shore_normal_angle(y, xs_c)
+
+    def _res(th0):
+        tr = B.transform_2d(xg, y, h_car, B.T_SWELL, B.H0_SWELL, th0,
+                            contour0=cont)
+        return math.degrees(B.plan_transport(y, xs_c, tr)['th_mean'])
+
+    rad, som = _res(n0), _res(bdc['theta0'])
+    check(3, 'wave 9\'s attributed floor is NOT a floor: the diffracted field '
+             'gets under it',
+          som < 0.7 * rad, True, 0,
+          'THE DECISIVE PAIR, and it overturns something. Wave 9 decomposed '
+          'the bay\'s residual into 0.71 deg of "the ramp is not concentric '
+          'with the curve it is keyed to" and 1.46 deg of "the march meeting '
+          'curvature", and both were measured with EXACTLY RADIAL incidence '
+          'on the circular bay, which puts the attributed floor at 2.3710 '
+          'deg. Here: one shoreline, one bed, one transform, and only the '
+          'incidence changes -- exact radial %.4f deg against Sommerfeld '
+          '%.4f. The two contributions are therefore NOT independent of the '
+          'incidence, and quoting them as an additive floor is wrong. The '
+          'mechanism is that the diffracted field is radial only where the '
+          'edge shadows; across the lit part it is the incident direction, '
+          'and that departure has the opposite sign to the obliquity a '
+          'converging ramp hands back.' % (rad, som), '-')
+    info(3, 'and it survives grid refinement, so it is not the march',
+         (round(rad, 4), round(som, 4)),
+         'Measured at dx = 8 / 4 / 2 / 1 m the pair reads 2.475/1.403, '
+         '2.371/1.278, 2.320/1.219, 2.295/1.190 -- both converging, and the '
+         'gap between them is not closing. If the improvement were the column '
+         'march\'s discretisation it would shrink with dx.')
+    info(3, 'the diffracted field is 7.7 deg rms away from radial',
+         round(math.degrees(float(np.sqrt(np.mean(
+             (bdc['theta0'] - n0) ** 2)))), 3),
+         'Degrees. So the improvement above is not "the same fan computed '
+         'more carefully": it is a different field, and the difference lives '
+         'where the edge does not shadow.')
+
+    # ================================= 8. what the answer does NOT depend on
+    outs = []
+    for dg in (-40.0, -20.0, 0.0, 20.0, 40.0):
+        a = math.radians(dg)
+        base = np.array([ep['khat'][1], -ep['khat'][0]])
+        sd = np.array([base[0] * math.cos(a) - base[1] * math.sin(a),
+                       base[0] * math.sin(a) + base[1] * math.cos(a)])
+        tt = D.transport_table(ep=ep, screen_dir=sd,
+                               rows=('bay_diff',))['bay_diff']
+        outs.append(math.degrees(tt['th_mean']))
+    check(2, 'the screen bearing at the pole does not buy the answer',
+          float(np.max(outs) - np.min(outs)), 0.0, 0.08,
+          'THE ONE FREE PARAMETER IN THIS SECTION, and it is free because '
+          'there is no barrier at D -- D is a virtual source, so the '
+          'direction its screen extends in has no geometry behind it. Rotate '
+          'it through 80 degrees and the measurement moves by %.3f deg out of '
+          '%.3f. The physics comes from the edge being THERE, not from how it '
+          'is turned; a constant chosen to make the picture right would not '
+          'behave like this. Beyond about +60 deg the screen turns to face '
+          'the swell and reflects into the domain, which is a different '
+          'problem and is excluded rather than tolerated.'
+          % (float(np.max(outs) - np.min(outs)), float(np.mean(outs))), 'deg')
+    kk = [math.degrees(D.transport_table(
+        ep=ep, k=D.scene_wavenumber(dd), rows=('bay_diff',)
+    )['bay_diff']['th_mean']) for dd in (4.0, 8.0, 400.0)]
+    check(2, 'nor does the wavenumber the edge diffracts at',
+          float(np.max(kk) - np.min(kk)), 0.0, 0.05,
+          'Penney & Price is a constant-depth solution and the water between '
+          'the diffraction point and this domain is not in the bed, so k is a '
+          'stated choice. It moves the answer by %.3f deg across 4 m, 8 m and '
+          'deep water, because the DEEP-SHADOW DIRECTION IS RADIAL WHATEVER k '
+          'IS -- k sets the width of the transition and the spacing of the '
+          'Fresnel ripples, not the fan.' % (float(np.max(kk) - np.min(kk))),
+          'deg')
 
 
 # ================================ 7 - the coastal IOPs, the path and the glitter
@@ -5770,6 +6320,9 @@ def run_suite():
                       (_sec_embay, 'the static-equilibrium bay'),
                       (_sec_bathy, 'the ramp keying: cross-shore vs '
                                    'concentric vs normal'),
+                      (_sec_diffract, 'diffraction: Sommerfeld, '
+                                      'Penney-Price, and the fan a bay '
+                                      'needs'),
                       (_sec_optics, 'the coastal IOPs, the path and the '
                                     'glitter'),
                       (_sec_surface, 'the nonlinear free surface'),
@@ -5963,6 +6516,32 @@ if __name__ == '__main__':
                                     '; '.join(c[:64] for c in caught[:5])))
         importlib.reload(FOAM)
         sys.exit(0)
+    if '--bugs-diffract' in sys.argv:
+        import importlib
+        _run_section(_sec_diffract, 'diffraction')
+        base = set(_fail_names())
+        print('clean diffraction section: %d pass / %d FAIL'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base)))
+        print()
+        print('%-30s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 118)
+        for name in DIFFRACT_BUGS:
+            importlib.reload(DFR)
+            importlib.reload(BCH)
+            BCH._BAY_CACHE.clear()
+            BUGS[name](DFR)
+            try:
+                _run_section(_sec_diffract, 'diffraction')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-30s %d  %s' % (name, len(caught),
+                                    '; '.join(c[:64] for c in caught[:5])))
+        importlib.reload(DFR)
+        importlib.reload(BCH)
+        BCH._BAY_CACHE.clear()
+        sys.exit(0)
     if '--bugs-bathy' in sys.argv:
         import importlib
         _run_section(_sec_bathy, 'the ramp keying')
@@ -6046,6 +6625,10 @@ if __name__ == '__main__':
             importlib.reload(BCH)
             importlib.reload(BOP)
             importlib.reload(CMR)
+            if name in DIFFRACT_BUGS:
+                # `--bugs-diffract` fires these; it reloads `beach_diffract`
+                # between runs, which the whole-suite driver does not.
+                continue
             if name in EMBAY_BUGS or name in BATHY_BUGS:
                 # the embayment and bathymetry sections are exercised by
                 # `--bugs-embay` and `--bugs-bathy`, which
