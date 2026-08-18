@@ -30,6 +30,40 @@ Common leaks: consistent file naming, one side always rendered at a different
 resolution, our side having debug UI, the reference having compression artifacts
 the critic recognises, one side being conspicuously shorter.
 
+### The artifact can carry the history, and the two rules above do not meet
+
+Rule 2 strips **provenance** — which side is ours. Rule 4 withholds **history** —
+the builder's changelog and rationale. Both are about what you *hand* the critic.
+Neither notices that the history can be **inside the thing being judged**, and
+when it is, stripping provenance does not help: the leak is not "this is ours",
+it is "here is the builder's own account of what is wrong with it".
+
+Observed, and it is not a corner case. On a rendering run every evidence frame
+carried a caption burned into the pixels — the wave number, what the builder held
+open, and why each choice was made. Three critics in separate contexts, judging
+three different lanes, each flagged it unprompted and each quoted the same kind of
+line back: *"THE FOAM IS A PLACEHOLDER"*, *"STILL OPEN in this frame"*, *"WAVE 7
+MEASURED 0.0% AND GAVE A REASON THAT IS NOW WRONG"*. All three reported grading
+pixels only. That is three critics' discipline substituting for a protocol, which
+is exactly the trade the blind exists to remove.
+
+Captioning a figure is good practice everywhere else in a run — a diagnostic
+without its provenance mark is worse than useless. So the rule is not "stop
+captioning". It is:
+
+- **Render the caption to a sidecar** (`frame.png` + `frame.caption.md`) and hand
+  the critic the image alone. The caption keeps its audience; the critic keeps its
+  independence.
+- **A frame with text baked in is not a candidate for the artifact itself.** One
+  critic had to crop before it could judge a hero frame at all. If the run's bar
+  is "would a viewer wonder whether this is a photograph", a caption in the corner
+  answers that question before the viewer reaches the image.
+
+The general form, worth carrying past this instance: **ask what the critic must
+open in order to judge, and assume everything inside it has been read.** A blind
+that depends on a critic choosing not to look at something it is holding is not a
+blind.
+
 ## Champion versus challenger
 
 The promotion comparison — this round's output against the current champion — is
