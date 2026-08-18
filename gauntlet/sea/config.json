@@ -3,10 +3,10 @@
     "bar_met_n": 2,
     "clean_streak_n": 2,
     "no_progress_n": 3,
-    "budget_waves": 15,
-    "budget_tokens": null,
+    "budget_waves": 26,
+    "budget_tokens": 8000000,
     "hard_cap_waves": null,
-    "target_score": 7
+    "target_score": 9
   },
   "wip_limit": 3,
   "dimensions": [
@@ -14,6 +14,11 @@
     "visual",
     "prose"
   ],
+  "dimension_targets": {
+    "physics": 9,
+    "visual": 9,
+    "prose": 8
+  },
   "lanes": [
     "bathymetry",
     "wave-field",
