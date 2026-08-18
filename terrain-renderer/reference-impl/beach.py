@@ -3025,18 +3025,35 @@ EUSTATIC_HIGHSTANDS = (8.0, 2.0, -5.0, 6.0, 0.0)
                             # progression) and against this one (where it must
                             # be that progression plus the stated offsets).
 
-UPLIFT_RATE = 3.0e-4        # m/yr = 0.30 mm/yr. `?` AND IT IS A FORCING, not a
-                            # fitted constant. Uplifting coasts run 0.1-3 mm/yr
-                            # (the Californian and New Zealand staircases
-                            # chapter 12 names as the textbook cases). What
-                            # bounds it HERE is the domain rather than the
-                            # photograph: the initial plain tops out at 44.0 m,
-                            # so a ladder whose first rung is above that has no
-                            # terrace in the frame at all, i.e. U <= 44.0/P =
-                            # 4.4e-4 m/yr at this period. 3.0e-4 sits inside
-                            # both brackets and the suite SWEEPS it, because the
-                            # claim is the closed form E_i = e_i + U*i*P - Z_p
-                            # and not this value of U.
+UPLIFT_RATE = 1.0e-4        # m/yr = 0.10 mm/yr. `?` AND IT IS A FORCING, not a
+                            # fitted constant -- the tectonic boundary condition
+                            # the coastal loop runs under, exactly as
+                            # THETA0_SWELL is the wave field's.
+                            #
+                            # THREE INDEPENDENT BOUNDS, and the value is where
+                            # they overlap rather than where the picture wanted
+                            # it:
+                            #  1. PUBLISHED RANGE. Uplifting coasts run 0.1-3
+                            #     mm/yr. The TOP of that range is active margin
+                            #     -- the Californian and New Zealand staircases
+                            #     chapter 12 names as the textbook cases -- and
+                            #     the BOTTOM is passive margin. This coast is
+                            #     passive Atlantic margin, so the bottom is the
+                            #     setting's own answer and not a fit.
+                            #  2. THE LADDER MUST BE IN THE FRAME.
+                            #     `uplift_ceiling`: the initial plain tops out
+                            #     at 44.0 m, so U <= 4.4e-4 m/yr at this period
+                            #     for a two-stand history to have any terrace at
+                            #     all.
+                            #  3. THE TREAD MUST REACH THE PRESENT BROW.
+                            #     `terrace_brow_ceiling`: 9.2e-5 m/yr on this
+                            #     scene, and 1.0e-4 lands just above it, which
+                            #     the seaward planation covers -- the measured
+                            #     tread starts at x = 640 m against a present
+                            #     shoreline at 640.7 m.
+                            # The claim is the closed form E_i = e_i + U*i*P -
+                            # Z_p, not this number, and the suite sweeps U and
+                            # requires the ladder to track it linearly.
 
 CLIFF_RETREAT_RATE = 0.10   # m/yr. Chapter 12's own bracket for cliff retreat is
                             # 0.05-0.5 m/yr (it is quoted there against the
@@ -3220,6 +3237,31 @@ def overprint_threshold(retreat, s_sea, notch_depth=None):
     return float(notch_depth) + float(s_sea) * float(retreat)
 
 
+def terrace_brow_ceiling(retreat, eustatic=0.0, s_plain=S_PLAIN,
+                         period=EUSTATIC_PERIOD):
+    """The largest uplift rate whose tread still reaches the PRESENT cliff brow.
+
+    THE THIRD DOMAIN CONSTRAINT, and the one that decides whether the terrace is
+    the ground the camera stands on or a step 200 m behind it.
+
+    The older stand's shoreline sits where the initial plain reaches that
+    stand's level: `x_0 = X_SHORE0 + (e + U*P)/s_plain`. The present stand's
+    cliff brow sits at `X_SHORE0 + R`, `R` its own retreat. The old tread runs
+    from `x_0` landward, so it covers the present brow only if `x_0 <= X_SHORE0
+    + R`:
+
+        e + U*P  <=  s_plain * R        <=>       U  <=  (s_plain*R - e)/P
+
+    On this scene R = 189.5 m and s_plain = 0.08, so `s_plain*R` = 15.2 m; with
+    MIS 5e's e = 6.0 m that leaves 9.2 m for the uplift, i.e. 9.2e-5 m/yr.
+    THE INEQUALITY IS SLIGHTLY CONSERVATIVE because it ignores how far the old
+    stand planed SEAWARD of its own shoreline, which is why UPLIFT_RATE = 1.0e-4
+    still lands the tread's seaward lip at x = 640 m against a shoreline at
+    640.7 m rather than 10 m short of it.
+    """
+    return (float(s_plain) * float(retreat) - float(eustatic)) / float(period)
+
+
 def soil_mantle(age, rate=DENUDATION_RATE):
     """The regolith a terrace tread has acquired since it emerged, metres.
 
@@ -3241,8 +3283,57 @@ def bare_rock_age_limit(rough=None, rate=DENUDATION_RATE):
     return (ROCK_ROUGH if rough is None else float(rough)) / float(rate)
 
 
+def stand_levels(eustatic=EUSTATIC_HIGHSTANDS, uplift=UPLIFT_RATE,
+                 period=EUSTATIC_PERIOD, frame='sea'):
+    """The sea level each stand is run at, OLDEST FIRST, in the chosen frame.
+
+    CHAPTER 12 WRITES THE UPLIFT AS `h += upliftField * dt` AND ON A CAPPED
+    HEIGHTFIELD THAT LIFTS THE BASIN OUT OF THE WATER. This scene's Dean ramp
+    is capped at D_SHELF = 8 m (the cap is the 2-D transform's offshore
+    boundary condition and is not cosmetic), so a single 30 m lift puts the
+    ENTIRE domain above the datum: the sea disappears, the notch has nothing to
+    cut, and the loop returns one flat surface. That is not a subtlety, it is
+    what the first run of `run_terrace` did.
+
+    The equivalent statement costs nothing and needs no basin. Only RELATIVE
+    sea level does any work -- `coastal_step` is a function of `h - sea_level`
+    in every term it has, and so is `fetch_exposure` -- so lifting the land by
+    `U*P` between stands and holding the sea at `e_i` is the same history as
+    holding the land still and running stand `i` at
+
+        L_i = e_i + U*(n-1-i)*P
+
+    with the present stand at `L_{n-1} = e_{n-1}`. The RELIEF the flight needs
+    is then ABOVE the present shoreline, which is exactly where this domain has
+    it: the coastal plain is what the older stands cut into.
+
+    THE EQUIVALENCE HAS A CONDITION ON THE INITIAL SURFACE AND GETTING IT WRONG
+    COSTS THE WHOLE FLIGHT. The two frames agree only if the sea frame's
+    starting ground is the uplift frame's raised by the TOTAL lift,
+    `(n-1)*U*P` -- the uplift frame ends `(n-1)*U*P` higher than it started, and
+    both runs are read in the frame where the present stand is the datum. Start
+    the sea frame from the unshifted surface and the oldest stand is `(n-1)*U*P`
+    too low relative to its own sea, which is a completely different history:
+    measured here it cuts one bench and leaves ONE rung of four. The suite
+    carries the shifted pair and it agrees to machine precision.
+
+    `frame='uplift'` returns the chapter's literal constant levels; the loop
+    then does the lifting. `frame='sea'` returns the falling ladder and the
+    loop does not lift. One loop, one flag, and the flag is a symmetry test.
+    """
+    eus = tuple(float(v) for v in eustatic)
+    n = len(eus)
+    if frame == 'uplift':
+        return list(eus)
+    if frame != 'sea':
+        raise ValueError('frame must be "sea" or "uplift"')
+    return [eus[i] + float(uplift) * (n - 1 - i) * float(period)
+            for i in range(n)]
+
+
 def evolve_coast_stands(x, y, h0, hard, stands, uplift=UPLIFT_RATE,
-                        period=EUSTATIC_PERIOD, expo_every=250, **kw):
+                        period=EUSTATIC_PERIOD, expo_every=250, frame='sea',
+                        **kw):
     """CHAPTER 12'S SEA-LEVEL-HISTORY LOOP, with its structure kept verbatim:
 
         for stand in seaLevelHistory:            # each (level, duration)
@@ -3251,8 +3342,13 @@ def evolve_coast_stands(x, y, h0, hard, stands, uplift=UPLIFT_RATE,
 
     `stands` is a sequence of `(level_m, n_steps)`, OLDEST FIRST, and the last
     one is the present stand -- its level is the datum the whole scene is
-    referred to. Between stands the land is lifted by `uplift * period`, which
-    is the "h += upliftField * dt" line and the only place tectonics enters.
+    referred to.
+
+    `frame` decides WHERE THE UPLIFT GOES and the two are the same history --
+    see `stand_levels`. `'uplift'` is the chapter's line, `h += uplift*period`
+    between stands, and it needs a basin deeper than the ladder is tall.
+    `'sea'` puts the same relative motion into the stand levels and needs no
+    basin at all, which is the only one of the two this domain can run.
 
     TWO-LAYER BOOKKEEPING, and it costs one array. `h` is the surface and
     `h_rock` is the rock beneath it: erosion lowers both (the notch cuts rock),
@@ -3297,7 +3393,7 @@ def evolve_coast_stands(x, y, h0, hard, stands, uplift=UPLIFT_RATE,
         rec.append(dict(level=float(level), n_steps=n_steps,
                         age=(n - 1 - i) * float(period),
                         mantle=float(soil_mantle((n - 1 - i) * float(period)))))
-        if i < n - 1:
+        if i < n - 1 and frame == 'uplift':
             lift = float(uplift) * float(period)
             h = h + lift
             h_rock = h_rock + lift
@@ -3416,7 +3512,7 @@ def platform_width(x, h2, sea_level=SEA_LEVEL, band=0.75):
 
 def bay_bed(x, y, h_coast, h_init, A=DEAN_A, d_shelf=D_SHELF,
             sea_level=SEA_LEVEL, smooth=True, sand_row=None, beach=True,
-            plan=None, keying=None):
+            plan=None, keying=None, stand_age=0.0):
     """Compose the coastal loop's plan-form into a submarine bed.
 
     Chapter 12 draws the line itself and this function is on both sides of it:
@@ -3546,6 +3642,32 @@ def bay_bed(x, y, h_coast, h_init, A=DEAN_A, d_shelf=D_SHELF,
         h = bch['h']
         x_s = shoreline_x(x, h, sea_level)
     reg = np.maximum(h - h_rock, 0.0)
+    # WAVE 13: THE EMERGED TREAD'S MANTLE, AND IT IS AN AGE AND NOT A CHOICE.
+    #
+    # With a sea-level history the plateau stops being an untouched ramp and
+    # becomes a bench the sea planed at an older stand -- so `touched` is TRUE
+    # over it and, with no sediment on it, `sand_cover_fraction(0) = 0` would
+    # paint 45% of the frame as BARE ROCK. That is worse than the flat albedo
+    # it replaces and it is also wrong: a bench that emerged one glacial cycle
+    # ago has been weathering ever since, and chapter 12's own denudation
+    # bracket (0.01-0.1 mm/yr) turns 100 kyr into 1-10 m of mantle. Against
+    # ROCK_ROUGH = 0.25 m that is `sand_cover_fraction` = 1.000 and the tread
+    # reads as ground. `soil_mantle` is the whole model and it adds no constant
+    # this chapter does not already state.
+    #
+    # WHICH GROUND IS OLD IS AN OUTPUT, not an elevation somebody picked.
+    # Planed ground standing above BACKSHORE_Z -- the STORM run-up limit, which
+    # wave 8 derived rather than declared -- cannot have been cut by the
+    # present stand, because the present stand cannot plane above its own
+    # highest swash. So it was cut by an earlier one and is at least one cycle
+    # old. Read the other way this is the useful half: bare rock shows on a
+    # tread only while its mantle is thinner than one roughness, i.e. for the
+    # first ROCK_ROUGH/rate = 2.5-25 kyr after it emerges, so THE LADDER'S
+    # RUNGS ARE DISTINGUISHABLE BY THEIR BARE-ROCK SHARE. The present bench,
+    # below BACKSHORE_Z, keeps its zero mantle and stays bare.
+    if stand_age:
+        emerged = touched & (h > BACKSHORE_Z)
+        reg = reg + emerged * float(soil_mantle(stand_age))
     cover = sand_cover_fraction(reg)
     # NOT `h_rock`: `subaerial_beach` already returns that name for the
     # PRE-BEACH COMPOSED bed, which `_sec_beach` measures the wedge's width
@@ -5539,11 +5661,37 @@ N_COAST = 4000          # coastal-loop iterations. K_COAST*N_COAST is the clock
 _BAY_CACHE = {}
 
 
+SCENE_STANDS = 2            # rungs the SCENE's history runs. Two, and the
+                            # number is the domain's rather than a choice:
+                            # `terraces_in_domain` on the 316 m plateau is
+                            # 0.06-0.63 of ONE Quaternary tread, so a flight is
+                            # a landform this window on the coast cannot hold.
+                            # What it can hold is one emerged tread and the
+                            # present bench below it, which is the pair the
+                            # camera is standing on and looking down.
+
+
 def run_coast(dx=DX_COAST, dy=DY_BAY, x_len=X_LEN_BAY, y_half=Y_HALF_BAY,
-              n_steps=N_COAST, uniform_hardness=False, **kw):
+              n_steps=N_COAST, uniform_hardness=False, stands=None,
+              uplift=UPLIFT_RATE, period=EUSTATIC_PERIOD, **kw):
     """Chapter 12's coastal loop on the plan grid. Cached, because every row of
-    the suite that asks about the bay wants the same coast."""
+    the suite that asks about the bay wants the same coast.
+
+    `stands` IS OFF BY DEFAULT AND THAT IS DELIBERATE, exactly as wave 9's
+    `embay` was: every measurement waves 1-12 published was taken on the
+    single-stand coast, and a wave that changes the plan-form under them makes
+    413 rows incomparable in one move. With `stands=None` this is byte-for-byte
+    wave 12's function.
+
+    `stands=n` runs the SEA-LEVEL HISTORY instead -- `n` stands, oldest first,
+    in the falling-sea frame (`stand_levels`), the last of them at the present
+    datum. The plateau then stops being `initial_coast`'s declared ramp and
+    becomes an EMERGED TERRACE TREAD: an output of the same notch/collapse/
+    deposit loop that cuts the present bench, planed at its own stand's level
+    and left standing when the sea fell away from it.
+    """
     key = ('coast', dx, dy, x_len, y_half, n_steps, uniform_hardness,
+           stands, uplift, period,
            tuple(sorted((k, v) for k, v in kw.items()
                         if isinstance(v, (int, float, bool, str)))))
     if key in _BAY_CACHE:
@@ -5552,13 +5700,26 @@ def run_coast(dx=DX_COAST, dy=DY_BAY, x_len=X_LEN_BAY, y_half=Y_HALF_BAY,
     y = np.arange(-y_half, y_half + dy, dy)
     h0 = initial_coast(x, y)
     hard = hardness_field(x, y, uniform=uniform_hardness)
-    h, expo, vol, exported, s_row, hist = evolve_coast(
-        x, y, h0, hard, n_steps=n_steps, expo_every=max(n_steps // 16, 1),
-        **kw)
+    rec = None
+    h_rock = None
+    if stands is None:
+        h, expo, vol, exported, s_row, hist = evolve_coast(
+            x, y, h0, hard, n_steps=n_steps, expo_every=max(n_steps // 16, 1),
+            **kw)
+    else:
+        n = int(stands)
+        eus = tuple(EUSTATIC_HIGHSTANDS)[-n:]
+        lv = stand_levels(eus, uplift=uplift, period=period, frame='sea')
+        seq = [(lv[i], n_steps) for i in range(n)]
+        h, h_rock, expo, vol, exported, s_row, rec = evolve_coast_stands(
+            x, y, h0, hard, seq, uplift=uplift, period=period, frame='sea',
+            expo_every=max(n_steps // 16, 1), **kw)
+        hist = [(0, h0.copy()), (n * n_steps - 1, h.copy())]
     out = dict(x=x, y=y, h0=h0, h=h, hard=hard, expo=expo, vol=vol,
                exported=exported, sand_row=s_row,
                hist=hist, x_s=shoreline_x(x, h),
-               x_s0=shoreline_x(x, h0), dx=dx, dy=dy)
+               x_s0=shoreline_x(x, h0), dx=dx, dy=dy,
+               stands=stands, record=rec, h_rock_loop=h_rock)
     _BAY_CACHE[key] = out
     return out
 
@@ -5608,7 +5769,7 @@ def run_terrace(n_stands=TERRACE_STANDS, n_steps=TERRACE_STEPS,
                 uplift=TERRACE_UPLIFT, period=EUSTATIC_PERIOD,
                 eustatic=EUSTATIC_HIGHSTANDS, x_len=2400.0, dx=8.0,
                 y_half=96.0, dy=32.0, x_shore=1600.0, s_sea=0.05,
-                s_plain=S_PLAIN, uniform=False):
+                s_plain=S_PLAIN, uniform=False, frame='uplift'):
     """THE INSTRUMENT: a domain wide and deep enough to hold a flight, so that
     the closed form can be checked against a realisation.
 
@@ -5634,7 +5795,8 @@ def run_terrace(n_stands=TERRACE_STANDS, n_steps=TERRACE_STEPS,
     offset is the only thing `planation_depth` can be wrong about.
     """
     key = ('terrace', n_stands, n_steps, uplift, period, x_len, dx, y_half, dy,
-           x_shore, s_sea, s_plain, bool(uniform), tuple(eustatic or ()))
+           x_shore, s_sea, s_plain, bool(uniform), frame,
+           tuple(eustatic or ()))
     if key in _BAY_CACHE:
         return _BAY_CACHE[key]
     x = np.arange(0.0, x_len + dx, dx)
@@ -5642,16 +5804,21 @@ def run_terrace(n_stands=TERRACE_STANDS, n_steps=TERRACE_STEPS,
     h1 = np.where(x >= x_shore, s_plain * (x - x_shore),
                   s_sea * (x - x_shore))
     h0 = np.repeat(h1[None, :], y.size, axis=0)
+    if frame == 'sea':
+        # see `stand_levels`: the sea frame starts from the ground the uplift
+        # frame ENDS on, so both are read with the present stand as the datum.
+        h0 = h0 + float(uplift) * (int(n_stands) - 1) * float(period)
     hard = hardness_field(x, y, uniform=True)
     eus = ((0.0,) * n_stands if uniform
            else tuple(eustatic)[-n_stands:])
-    stands = [(eus[i], n_steps) for i in range(n_stands)]
+    lv = stand_levels(eus, uplift=uplift, period=period, frame=frame)
+    stands = [(lv[i], n_steps) for i in range(n_stands)]
     h, h_rock, expo, vol, exp_, s_row, rec = evolve_coast_stands(
-        x, y, h0, hard, stands, uplift=uplift, period=period)
+        x, y, h0, hard, stands, uplift=uplift, period=period, frame=frame)
     out = dict(x=x, y=y, h0=h0, h=h, h_rock=h_rock, hard=hard, expo=expo,
                vol=vol, exported=exp_, sand_row=s_row, record=rec,
                stands=stands, eustatic=eus, uplift=uplift, period=period,
-               dx=dx, dy=dy, x_shore=x_shore, s_sea=s_sea,
+               frame=frame, dx=dx, dy=dy, x_shore=x_shore, s_sea=s_sea,
                relief=float(s_sea * x_shore),
                ladder=terrace_ladder(eustatic=eus, uplift=uplift,
                                      period=period,
@@ -5663,7 +5830,7 @@ def run_terrace(n_stands=TERRACE_STANDS, n_steps=TERRACE_STEPS,
 
 def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
             theta0=THETA0_SWELL, coast=None, k_every=4, embay=False,
-            **flux_kw):
+            stands=None, **flux_kw):
     """The whole scene: coastal loop -> plan bed -> 2-D transform -> Exner.
 
     `dt` is set from the same diffusion bound the 1-D loop uses,
@@ -5672,10 +5839,10 @@ def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
     duration waves 1 and 2 ran, so the bar is comparable across the three.
     """
     key = ('bay', dx, n_steps, dt, T, H0, theta0, k_every, bool(embay),
-           tuple(sorted((k, v) for k, v in flux_kw.items())))
+           stands, tuple(sorted((k, v) for k, v in flux_kw.items())))
     if coast is None and key in _BAY_CACHE:
         return _BAY_CACHE[key]
-    cs = run_coast() if coast is None else coast
+    cs = run_coast(stands=stands) if coast is None else coast
     xc, y = cs['x'], cs['y']
     x = np.arange(0.0, xc[-1] + dx, dx)
     hc = np.stack([np.interp(x, xc, cs['h'][j]) for j in range(y.size)])
@@ -5687,15 +5854,20 @@ def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
     # four fields were, and the flag IS the curved/straight control the
     # transport measurement needs.
     ep = equilibrium_plan(coast=cs) if embay else None
+    stand_age = 0.0
+    if cs.get('record'):
+        stand_age = float(cs['record'][0].get('age', 0.0))
     h_init, x_s, h_dean, bch = bay_bed(x, y, hc, h0c,
                                        sand_row=cs.get('sand_row'),
-                                       plan=None if ep is None else ep['x_s'])
+                                       plan=None if ep is None else ep['x_s'],
+                                       stand_age=stand_age)
     h, tr2, hist, edge = evolve_2d(x, y, h_init, T, H0, theta0,
                                    n_steps=n_steps, dt=dt, k_every=k_every,
                                    **flux_kw)
     out = dict(x=x, y=y, h_init=h_init, h=h, tr=tr2, x_s=x_s, h_dean=h_dean,
                beach=bch, embay=bool(embay), plan=ep,
-               hist=hist, coast=cs, dx=dx, dy=float(y[1] - y[0]), edge=edge,
+               hist=hist, coast=cs, stands=stands, stand_age=stand_age,
+               dx=dx, dy=float(y[1] - y[0]), edge=edge,
                tr_init=transform_2d(x, y, h_init, T, H0, theta0))
     if coast is None:
         _BAY_CACHE[key] = out
