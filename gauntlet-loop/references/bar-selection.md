@@ -119,6 +119,20 @@ usable costing roughly double the one before — and that 10 is not a rung at
 all (`cost-discipline.md`). Ambition is welcome; unpriced ambition is how a
 budget disappoints someone.
 
+The ladder is also the **build order**, and the script enforces it: the
+next-wave ranking funds dimensions below their usable line before any
+dimension buys a rung above it, and `plan` renders the stages — bootstrap
+until everything is judged, everything to usable, then the ambitious rungs,
+then stretch on a grant. The skateboard rule at run level: a whole artifact
+at 6 beats one dimension at 9 next to one at 2, because critics, smoothers
+and users all judge the whole.
+
+Each rung the menu offers carries an **anchor**: one agreed sentence of what
+n/10 concretely is for this artifact (`intake.md`), recorded in `contract.md`
+and copied into the plan. Anchors exist for choosing rungs; judging stays
+with the frozen bar — an anchor handed to a critic is a rubric a builder can
+learn to game.
+
 Two consequences worth stating at intake:
 
 - **The bootstrap wave builds a thin end-to-end slice, not one perfect part.**

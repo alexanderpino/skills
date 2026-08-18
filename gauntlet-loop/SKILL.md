@@ -94,8 +94,8 @@ Rationale and exceptions: → `references/cost-discipline.md`
 4. **Cap the handoffs.** Critic: the verdict block. Builder: five lines.
 5. **No gap, no builder.** Nothing to close means retire, raise the bar, or park.
 6. **Respect the WIP limit** (default 3). Depth closes gaps; breadth half-closes.
-7. **Let the script count and publish.** `status` and `board` are free — never
-   narrate state into chat or hand-write the workbench.
+7. **Let the script count and publish.** `status`, `board`, `quote` and `plan`
+   are free — never narrate state into chat or hand-write the workbench.
 8. **Route the model to the decision, not just the role.** Screening-tier
    verdicts steer routine rounds; a deciding-tier verdict is bought where a
    lifecycle turns — retire, park, promote into a shared surface. Logged
@@ -137,6 +137,7 @@ python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --rou
 python3 scripts/gauntlet.py gate     # mechanical checks; skips those whose inputs are unchanged
 python3 scripts/gauntlet.py status   # state, next-wave plan, park list, fired stops
 python3 scripts/gauntlet.py quote --current-score 4   # the quality-price menu: what 7, 8, 9 cost; 10 is not a price
+python3 scripts/gauntlet.py plan --current-score 4    # draft plan.md: build stages in order, priced — the forward scaffold
 python3 scripts/gauntlet.py park --lane a --dimension visual --reason "..."
 python3 scripts/gauntlet.py board    # regenerate workbench.md from the log
 python3 scripts/gauntlet.py extend --waves 3 --reason "..."   # only on a user grant
@@ -225,6 +226,22 @@ together: a user who sees 9 cost three times 7 picks a rung on purpose, in
 either direction. Fully autonomous with no rung named? Default to 7 and record
 the menu in `contract.md`, so the choice they did not make stays visible.
 
+**Anchor the rungs before selling them.** A rung on the menu means nothing
+until the user knows what an 8 *is* for their artifact. Two or three questions
+per ambitious dimension — what must 7 concretely do; what does "I would ship
+this" look like; what is explicitly *not* needed — become one anchor line per
+menu rung in `contract.md`, so the offer reads "8/10 = 'kits react to stadium
+lighting at replay distance' — ~10 waves", not a bare number. Anchors are for
+*choosing* rungs, never for judging: the critic still scores against the
+frozen bar (`references/bar-selection.md`).
+
+**Then hang the run on the scaffold.** `plan` drafts `gauntlet/plan.md`: the
+build stages in order — bootstrap until every dimension is judged, everything
+to its usable line, only then the ambitious rungs, stretch on a grant only —
+each stage priced. You add the anchors and the serialised pairs; regenerate it
+at wave boundaries, where the prices move from the intake guess to measured
+actuals. The workbench looks backward; the plan looks forward.
+
 Fields, each explained in `intake.md`: **goal** (destination, not route) ·
 **target bar** per dimension · optional **stretch** · **inspection** (and which
 dimensions have machine gates) · ranked **lanes** + WIP limit · armed **stops** ·
@@ -300,7 +317,9 @@ independently. You cut them, not the user. → `references/decomposition.md`
 
 A wave is one pass over the **funded** lanes — the top `wip_limit` of the ranked
 list, as printed by `status` — at **one round per lane per wave**. Phases 4–6
-cycle until a stop fires.
+cycle until a stop fires. `status` also names the **build stage**: dimensions
+below their usable line are funded before any dimension buys a rung above it —
+whole-and-crude beats one-part-excellent, enforced in the ranking.
 
 **Wave setup, once, before any lane starts:** take the champion commit. That one
 ref is every lane's `--champion-ref` for the wave. Concurrent per-round commits
@@ -482,4 +501,4 @@ Three are not cited inline:
 - `references/authorities.md` — where these rules come from and what each forces.
 
 Subagent briefs: `builder.md`, `critic.md`, `smoother.md`.
-Tooling: `scripts/gauntlet.py` (init / log-round / gate / status / quote / park / board / extend / report).
+Tooling: `scripts/gauntlet.py` (init / log-round / gate / status / quote / plan / park / board / extend / report).

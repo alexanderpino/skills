@@ -128,6 +128,14 @@ def target_for(cfg, dimension):
     return (cfg.get("dimension_targets") or {}).get(dimension, cfg["stops"]["target_score"])
 
 
+def usable_line(target):
+    """The 'usable' rung for a dimension: 7 on the method's scale, or the
+    dimension's own target when that is lower. The build order climbs every
+    dimension here before any dimension buys a rung above it — Kniberg's
+    skateboard at run level: whole and crude beats one part excellent."""
+    return min(7, target)
+
+
 def load_rounds(root):
     p = root / "rounds.jsonl"
     if not p.exists():
@@ -724,11 +732,13 @@ def _next_wave_plan(per, cfg):
     """Which lanes the next wave should fund, ranked by evidence.
 
     Moving dimensions first, then unread ones, then stalled — and inside each
-    band, the Phase 3 ranking (the order of `lanes` in config.json) breaks the
-    tie. Without that tiebreaker the plan funded whichever lane happened to be
-    judged first, and the ranked list the contract agreed was never consulted.
-    The WIP limit cuts the tail: funding every lane a little is how a budget
-    dies without a result.
+    band, dimensions still below their usable line come before dimensions
+    polishing above it (the build order: usable everywhere before lovable
+    anywhere), then the Phase 3 ranking (the order of `lanes` in config.json)
+    breaks the tie. Without that tiebreaker the plan funded whichever lane
+    happened to be judged first, and the ranked list the contract agreed was
+    never consulted. The WIP limit cuts the tail: funding every lane a little
+    is how a budget dies without a result.
     """
     active = _active_keys(per)
     if not active:
@@ -739,8 +749,10 @@ def _next_wave_plan(per, cfg):
     def sort_key(k):
         s = per[k]
         sev_rank = 0 if s["open_gap"] and s["trend"]["improving"] is not False else 1
+        below_usable = s["last_score"] is None or s["last_score"] < usable_line(s["target"])
         return (
             2 if s["stalled"] else rank[s["trend"]["improving"]],
+            0 if below_usable else 1,
             sev_rank,
             lane_rank.get(k[0], len(lane_rank)),
             s["bar_rounds"],
@@ -1266,6 +1278,138 @@ def cmd_quote(args):
         )
 
 
+def cmd_plan(args):
+    """Draft gauntlet/plan.md — the run's forward-looking scaffold.
+
+    The workbench looks backward (what happened); the plan looks forward:
+    the build stages in order, which dimensions each stage climbs, and what
+    each stage costs at current prices. Stage order is Kniberg's ladder run
+    at run level — bootstrap to testable, climb everything to usable, only
+    then climb the ambitious dimensions to their higher targets, and stretch
+    only on a user grant. Regenerate at wave boundaries: prices swap from
+    the intake guess to measured actuals as the log fills.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    stops = cfg["stops"]
+    rounds = load_rounds(root)
+    wip = cfg.get("wip_limit") or DEFAULT_CONFIG["wip_limit"]
+    per, _r, _c = _lane_dim_status(rounds, cfg)
+
+    rpg, rpg_src = args.rounds_per_gap, "assumed — pass --rounds-per-gap or let the log measure it"
+    tpr = args.tokens_per_round
+    if rounds:
+        closed = sum(s["gaps_closed"] for s in per.values())
+        bar_rounds_n = sum(s["bar_rounds"] for s in per.values())
+        if args.rounds_per_gap is None and closed:
+            rpg, rpg_src = bar_rounds_n / closed, f"measured: {bar_rounds_n} bar rounds / {closed} closed gap(s)"
+        if tpr is None:
+            tok = sum({l: s["lane_tokens"] for (l, _d), s in per.items()}.values())
+            meas = sum({l: s["token_coverage"][0] for (l, _d), s in per.items()}.values())
+            if meas:
+                tpr = tok // meas
+    if rpg is None:
+        rpg = 2.0
+
+    done, bootstrap, to_usable, to_target = [], [], [], []
+    for key in sorted(per):
+        s = per[key]
+        if s["retired"] or s["parked"]:
+            done.append(key)
+        elif s["last_score"] is None:
+            score = args.current_score
+            (bootstrap if score is None else
+             to_usable if score < usable_line(s["target"]) else to_target).append(key)
+        elif s["last_score"] < usable_line(s["target"]):
+            to_usable.append(key)
+        else:
+            to_target.append(key)
+    # Everything active at/above its usable line is stage-3 work by definition:
+    # still open (no retirement streak yet), climbing toward its own target.
+
+    def stage_price(keys, to_line):
+        per_lane = {}
+        for lane, dim in keys:
+            score = per[(lane, dim)]["last_score"]
+            score = args.current_score if score is None else score
+            tgt = to_line(per[(lane, dim)]["target"])
+            per_lane[lane] = per_lane.get(lane, 0.0) + _climb_rounds(score, tgt, rpg)
+        tot = sum(per_lane.values())
+        if tot <= 0:
+            return 0, 0, 0
+        # Makespan bound: no shorter than the longest lane, no shorter than the
+        # total spread over the WIP slots.
+        waves = max(max(per_lane.values()), tot / wip)
+        waves = int(waves) + (waves % 1 > 0)
+        calls = _projected_calls(waves, sorted(per_lane), wip)
+        return waves, calls, int(tot * tpr) if tpr else 0
+
+    def fmt(keys, to_line=None):
+        out = []
+        for l, d in keys:
+            s = per[(l, d)]["last_score"]
+            s = args.current_score if s is None else s
+            goal = per[(l, d)]["target"] if to_line is None else to_line(per[(l, d)]["target"])
+            out.append(f"{l}/{d} ({'?' if s is None else s}→{goal})")
+        return ", ".join(out) or "—"
+
+    L = [
+        "# Gauntlet plan (drafted by `gauntlet.py plan` — lead agent completes the anchor and order fields)",
+        "",
+        f"Contract: gauntlet/contract.md | bar: gauntlet/bar/ | WIP {wip} | "
+        f"budget {stops['budget_waves']} wave(s)"
+        + (f", {stops['budget_tokens']:,} tokens" if stops.get("budget_tokens") else ""),
+        f"Prices: {rpg:.1f} round(s) per gap ({rpg_src})"
+        + (f", ~{tpr:,} tokens per lane-round" if tpr else ", tokens unmeasured"),
+        "",
+        "Build order — a stage starts when the one before it has nothing left in it.",
+        "Rungs above usable wait: whole-and-crude beats one-part-excellent (bar-selection.md).",
+        "",
+        "## Stage 0 — First light (testable)",
+        "One thin end-to-end build, one verified inspection path, one verdict.",
+        "Recorded in contract.md, not the log. Done before this plan means anything.",
+        "",
+        "## Stage 1 — Bootstrap: every dimension judged once",
+        f"Dimensions never judged: {fmt(bootstrap)}",
+        "(unpriced until judged — first light or the bootstrap wave sets the number)"
+        if bootstrap else "(empty — every declared dimension has a verdict)",
+        "",
+    ]
+    w2, c2, t2 = stage_price(to_usable, lambda tgt: usable_line(tgt))
+    L += [
+        "## Stage 2 — Climb to usable (everything to its usable line)",
+        f"Dimensions below usable: {fmt(to_usable, usable_line)}",
+        (f"Price: ~{w2} wave(s), ~{c2} calls" + (f", ~{t2:,} tokens" if t2 else "")) if to_usable else "(empty)",
+        "",
+    ]
+    w3, c3, t3 = stage_price(to_target, lambda tgt: tgt)
+    L += [
+        "## Stage 3 — Climb to target (the ambitious dimensions)",
+        f"Dimensions above usable, below their target: {fmt(to_target)}",
+        (f"Price: ~{w3} wave(s), ~{c3} calls" + (f", ~{t3:,} tokens" if t3 else "")) if to_target else "(empty)",
+        "",
+        "## Stage 4 — Stretch (user-bought only)",
+        "The contract's stretch, re-armed as an announced target with the same guards.",
+        "Never entered on the run's own authority; priced with `quote` when offered.",
+        "",
+        "## What each rung buys (lead agent: copy the anchors from contract.md)",
+        "Per dimension, one line per rung on the menu: what n/10 concretely IS for",
+        "this artifact — the anchor the user agreed to, not an adjective.",
+        "",
+        "## Order constraints (lead agent: record the serialised pairs)",
+        "Lanes where one result changes what 'good' means for another",
+        "(lighting before materials — decomposition.md), and why.",
+        "",
+        f"Retired/parked already: {fmt(done) if done else '—'}",
+    ]
+    out = root / "plan.md"
+    out.write_text("\n".join(L) + "\n")
+    print(f"wrote {out}")
+    stage = ("1 (bootstrap)" if bootstrap else "2 (climb to usable)" if to_usable
+             else "3 (climb to target)" if to_target else "done — every dimension retired or parked")
+    print(f"current stage: {stage}")
+
+
 def cmd_status(args):
     root = Path(args.root)
     cfg = load_config(root)
@@ -1363,6 +1507,15 @@ def cmd_status(args):
     funded, deferred = _next_wave_plan(per, cfg)
     stalled = _park_candidates(per)
     if funded:
+        below = [
+            k for k in _active_keys(per)
+            if per[k]["last_score"] is None or per[k]["last_score"] < usable_line(per[k]["target"])
+        ]
+        stage = ("climb-to-usable — below the line: "
+                 + ", ".join(f"{l}/{d}" for l, d in sorted(below))
+                 if below else
+                 "climb-to-target — every open dimension is usable; what remains is the rungs above")
+        print(f"BUILD STAGE: {stage}")
         cost = _projected_calls(1, funded, wip)
         print(f"NEXT WAVE (WIP {wip}): {', '.join(funded)}  → ~{cost} subagent calls")
         if deferred:
@@ -1769,6 +1922,15 @@ def main():
     p.add_argument("--targets", help="comma-separated rungs to price (default: 7,8,9,10 plus the configured targets)")
     p.add_argument("--dimension", help="price one dimension's ladder from its own scores (mid-run)")
     p.set_defaults(fn=cmd_quote)
+
+    p = sub.add_parser("plan", help="draft gauntlet/plan.md — build stages in order, priced; the forward-looking scaffold")
+    p.add_argument("--current-score", type=int,
+                   help="score for dimensions not yet judged (first light's verdict), so their stages price")
+    p.add_argument("--rounds-per-gap", type=float,
+                   help="estimated rounds to close one gap (default 2.0; measured cost per closed gap mid-run)")
+    p.add_argument("--tokens-per-round", type=int,
+                   help="tokens one lane-round costs (default: measured average from the log, when logged)")
+    p.set_defaults(fn=cmd_plan)
 
     p = sub.add_parser("park", help="stop funding a lane/dimension that stopped moving")
     p.add_argument("--lane", required=True)

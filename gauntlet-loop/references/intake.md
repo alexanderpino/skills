@@ -103,6 +103,22 @@ and let the user pick the rung; TARGET and BUDGET are one decision wearing two
 names. If the run is fully autonomous and no rung was named, default to 7 and
 record the menu in `contract.md` so the unmade choice stays visible.
 
+**Anchor each rung before offering it.** A price next to a bare number is
+still not an informed choice — the user must know what an 8 *is* for their
+artifact. Ask, per dimension whose ambition is above the default (three
+questions, not an interrogation):
+
+1. What must n/10 concretely do? ("kits react to stadium lighting at replay
+   distance")
+2. Where is "I would ship this" on that scale?
+3. What is explicitly *not* needed? (the cheapest line in the contract —
+   it deletes rungs nobody wants)
+
+One anchor line per menu rung goes into `contract.md`, and the menu is
+presented as anchor + price. Anchors are for choosing, never for judging:
+the critic still scores against the frozen bar, or the anchors become a
+rubric the builder can game (`bar-selection.md`).
+
 Say **which model tier each role runs on** in the same breath, because it changes
 what those calls cost by up to 5× (`model-routing.md`). The default worth stating
 plainly: judgement roles inherit the session model, mechanical builders drop a
@@ -182,7 +198,12 @@ omitting it — waves are the unit the user agrees to, tokens are the unit that
 burns, and the token stop can only fire on a ceiling that exists.
 
 `init` prints the projected call count per wave and for the whole budget — put
-that number in front of the user with the contract, not after it.
+that number in front of the user with the contract, not after it. Then `plan`
+drafts `gauntlet/plan.md` — the build stages in order (bootstrap → everything
+to usable → the ambitious rungs → stretch on a grant), each priced — and you
+complete its anchor and serialised-pair fields. Contract, menu and plan
+together are the offer the user confirms: what, to which rung, in what order,
+for what money.
 
 Write the confirmed contract to `gauntlet/contract.md`, including the stretch and
 the kill criteria. Every subagent that needs the goal, bar or rules reads it from
