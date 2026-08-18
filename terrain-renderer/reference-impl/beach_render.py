@@ -341,6 +341,27 @@ class Water:
         self.tau_foam = FM.foam_residence(salt=True)
         self.foam_tail = FM.foam_tail_length(self.c_phase, self.tau_foam)
 
+        # --- WAVE 12: THE SURFACE COVER, AND IT IS A LANDFORM FACT THIS FILE
+        # HAD NO WAY TO ASK FOR. `shade_land` decided rock-versus-sand by SLOPE
+        # alone through wave 11, which chapter 11 says outright is one clause of
+        # three ("Outcrop = rockMask from (slope > tan 40 deg) u (regolithDepth
+        # ~ 0) u (convex curvature)"), and it is the clause that CANNOT fire on
+        # the landform bar section H1 is about: a wave-cut bench is FLAT, so a
+        # slope test calls the whole of it sand. `bay_bed` now returns the
+        # loop's own bedrock and the sediment lying on it, so the missing
+        # clause is available and costs one array.
+        self.plan = bay.get('plan')             # the static-equilibrium bay,
+                                                # when this bed has one
+        bch = bay.get('beach')
+        if bch is not None and 'cover' in bch:
+            self.regolith = bch['regolith']
+            self.cover = bch['cover']
+            self.planed = bch['planed']
+        else:                                   # a bed built without the beach
+            z = np.zeros_like(self.h)
+            self.regolith, self.cover = z, z
+            self.planed = np.zeros_like(self.h, bool)
+
     def sample(self, xw, yw, field):
         """Bilinear sample of a cell field at world (x, y), edges clamped."""
         fx = np.clip((xw - self.x[0]) / (self.x[1] - self.x[0]), 0,
@@ -791,7 +812,35 @@ def shade_land(w, P, D, parts=None):
     hy = (w.sample(xw, yw + e, w.h) - w.sample(xw, yw - e, w.h)) / (2 * e)
     N = np.stack([-hx, -hy, np.ones_like(hx)], -1)
     N /= np.linalg.norm(N, axis=-1, keepdims=True)
+    # WAVE 12: CHAPTER 11'S rockMask HAS THREE CLAUSES AND THIS FILE HAD ONE.
+    #
+    #   Outcrop = rockMask from (slope > tan 40 deg) u (regolithDepth ~ 0)
+    #             u (convex curvature).  "Emerges automatically if you run
+    #             layered K -- you don't author it."
+    #
+    # The slope clause is below and is unchanged. The REGOLITH clause is the
+    # one that decides bar section H1's landform, and it is the one that was
+    # missing: a wave-cut bench is FLAT, so the slope clause calls the whole of
+    # it sand and the bench -- the surface two of the bar's frames are OF --
+    # can never appear in this render at all. That is what wave 11's critic
+    # measured as "no cliff, no headland, no wave-cut bench, no exposed rock,
+    # no offshore reef" and diagnosed as the bed never crossing the slope
+    # threshold; the bed does cross it (15.9% of the visible land, measured),
+    # but the landform in question is not a slope.
+    #
+    # `w.cover` is `beach.sand_cover_fraction` of the sediment the bed
+    # generator actually laid, so "sand infilling the hollows" is an area
+    # fraction taken over the rock's own sub-grid roughness rather than a
+    # threshold: a veneer one roughness deep covers 76% and leaves a quarter of
+    # the bench standing through it. `w.planed` gates it to ground the SEA has
+    # stripped -- the coastal plateau also carries none of this loop's sediment
+    # and is a soil-mantled land surface that has never been in the surf, so
+    # zero regolith there is not bare rock and must not be painted as it.
+    cover = w.sample(xw, yw, w.cover)
+    planed = w.sample(xw, yw, w.planed.astype(float))
+    bare = np.clip(planed * (1.0 - cover), 0.0, 1.0)[..., None]
     rock = np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0.0, 1.0)[..., None]
+    rock = np.maximum(rock, bare)               # the union chapter 11 writes
     plain = np.clip((hz - PLAIN_Z) / 4.0, 0.0, 1.0)[..., None] * (1 - rock)
     # WAVE 8: THE WET/DRY BOUNDARY IS A DISTRIBUTION AND NOT A LINE. Waves 4-7
     # ramped it over a declared 0.35 m either side of a single run-up height.
@@ -2606,11 +2655,20 @@ def surf_line_scale(w):
 
 
 def build_frame(w, y_cam, content, name, az_deg, W, H, D_lines, s_lines,
-                h_eye=None):
+                h_eye=None, x_cam=None):
     """Infer the camera, then stand it on the bed. Returns (Camera, record)."""
     if h_eye is None:
         h_eye = CAM._mid(content['eye_above_ground'])
-    x_c, z_g, x_near = viewpoint(w, y_cam, h_eye)
+    if x_cam is not None:
+        # WAVE 12: an EXPLICIT standing point, so `viewpoint`'s brow search is
+        # not run. Nothing in the shipped frames passes this -- it is what the
+        # four-placement comparison in `frame_standoff_report` was measured
+        # with, and it is kept so that measurement can be repeated.
+        j = int(np.argmin(np.abs(w.y - y_cam)))
+        i = int(np.argmin(np.abs(w.x - x_cam)))
+        x_c, z_g, x_near = float(w.x[i]), float(w.h[j, i]), float('nan')
+    else:
+        x_c, z_g, x_near = viewpoint(w, y_cam, h_eye)
     z_eye = z_g + h_eye
     inf = CAM.infer_frame(name, content, z_eye, D_lines, s_lines)
     inf['x_cam'], inf['y_cam'], inf['z_ground'] = x_c, float(y_cam), z_g
@@ -2635,6 +2693,12 @@ def frame_azimuth_J(w, y_cam, fov_h):
     bearing of the far shoreline minus half the horizontal field, and both
     terms are measured: the shoreline comes out of the bed, the half-field out
     of the lens.
+
+    WAVE 12 TRIED TO REPLACE THIS AND PUT IT BACK. The alternative -- stand at
+    the bay's own chord midpoint, at the standoff the lens was inferred from,
+    and aim at the chord -- was built, rendered at four placements and measured
+    against this one. It is worse, for a projective reason that no placement
+    can move. `frame_standoff_report` carries the four rows and the arithmetic.
     """
     j_far = int(np.argmax(w.y))
     i_far = int(np.argmax(w.h[j_far] > 0.0))
@@ -2644,6 +2708,68 @@ def frame_azimuth_J(w, y_cam, fov_h):
     dy = float(w.y[j_far] - y_cam)
     bearing = math.degrees(math.atan2(dx, dy)) % 360.0
     return (bearing - math.degrees(fov_h) / 2.0) % 360.0, bearing
+
+
+def frame_standoff_report(w, cam):
+    """WHAT THE FRAME'S NEAR HALF IS, AND WHY MOVING THE CAMERA DOES NOT FIX IT.
+
+    Wave 11's critic measured wave 10's hero frame and found "no cliff, no
+    headland, no wave-cut bench, no exposed rock, no offshore reef", with
+    51.10% of the frame on a flat plane carrying a high-frequency standard
+    deviation of 0.006/255 -- and read that as the BED never crossing the
+    renderer's rock threshold. Wave 12 measured the bed instead and the reading
+    does not hold: the slope clause fires over 15.9% of the visible land. What
+    the frame is short of is not relief; it is RANGE. 95% of the land pixels in
+    that frame are within 34 m of the lens and 44.6% of the whole frame is the
+    coastal plateau the photographer is standing on.
+
+    THE ROUND TRIP, because a negative result taken seriously is worth more
+    than the change it rejects. `J_CONTENT` declares
+    `standoff_over_chord = (0.35, 0.65)` and `beach_camera.infer_lens` spends
+    that ratio on the LENS -- the 13 mm ultrawide, 89.9 x 106.2 deg -- and
+    never on the PLACEMENT. Wave 12 applied it to the placement as well: the
+    camera was stood 0.35 chords back from the midpoint of the bay's own
+    A1->A2 chord, on the highest ground the domain carries, aimed at the chord
+    midpoint. FOUR PLACEMENTS WERE RENDERED AND MEASURED (360 x 480, same bed,
+    same sun, same materials, one field changed each time):
+
+        the domain corner at the brow  (wave 7-11)  sky .321 water .168 land .511
+        the bay centre at the brow, aimed at A2      sky .321 water .174 land .505
+        the updrift anchor at the brow, aimed at A2  sky .321 water .181 land .498
+        the updrift anchor, 0.36 chords back, 45 m   sky .321 water .035 land .644
+
+    Standing higher and further back makes it WORSE, and the reason is
+    projective and cannot be placed away. A bay of chord C seen from p chords
+    back on a cliff of height z subtends atan(z/(pC)) BELOW the horizon --
+    5.8 deg for this bed at its best -- while the frame carries 106.2 deg of
+    vertical field with the horizon in its upper third. So the bay occupies
+    ~5% of the frame's height whatever the camera does, and the remaining ~60%
+    below it is near ground by arithmetic. THE PLACEMENT IS THEREFORE LEFT AT
+    WAVE 7'S, and the finding is redirected: the near-field plateau is not an
+    error to be framed out, it is what an ultrawide clifftop frame contains,
+    and bar section K's own inventory says so ("dune vegetation in the
+    foreground"). The defect is that it is a FLAT PLACEHOLDER, which is this
+    lane's to fix and which the rest of wave 12 spends itself on.
+
+    Reported here so the ranking is a number: the standoff the bar's interval
+    asks for, the standoff the domain can supply, and the bay's angular extent
+    below the horizon.
+    """
+    ep = getattr(w, 'plan', None)
+    if ep is None:
+        return None
+    A1, A2 = np.asarray(ep['A1'], float), np.asarray(ep['A2'], float)
+    chord = float(np.hypot(A2[0] - A1[0], A2[1] - A1[1]))
+    x_mid = 0.5 * (A1[0] + A2[0])
+    lo, hi = CAM.J_CONTENT['standoff_over_chord']
+    have = float(w.x[-1]) - x_mid
+    z_cam = float(cam.pos[2])
+    p_now = (float(cam.pos[0]) - x_mid) / chord
+    sub = math.degrees(math.atan2(z_cam, max(abs(float(cam.pos[0]) - x_mid),
+                                             1.0)))
+    return dict(chord=chord, want=(lo * chord, hi * chord), have=have,
+                p_now=p_now, p_max=have / chord, z_cam=z_cam,
+                bay_below_horizon_deg=sub)
 
 
 SS_HERO = 2
@@ -2661,10 +2787,15 @@ def hero_cameras(w, W, H, out=print):
     out()
     CAM.report([], out)
     fov_h_probe = CAM.portrait_fov(13.0)[1]
-    az_j, bear_j = frame_azimuth_J(w, float(w.y[2]), fov_h_probe)
-    camJ, infJ = build_frame(w, float(w.y[2]), CAM.J_CONTENT,
+    # WAVE 12 MOVED THIS CAMERA AND MOVED IT BACK, and the round trip is the
+    # measurement -- see `frame_standoff_report`. The placement is wave 7's and
+    # is unchanged.
+    y_j = float(w.y[2])
+    az_j, bear_j = frame_azimuth_J(w, y_j, fov_h_probe)
+    camJ, infJ = build_frame(w, y_j, CAM.J_CONTENT,
                              'J -- the embayment overview, upright',
                              az_j, W, H, D_lines, s_lines)
+    infJ['standoff'] = frame_standoff_report(w, camJ)
     camK, infK = build_frame(w, 0.0, CAM.K_CONTENT,
                              'K -- open water and the glitter path, upright',
                              SUN_AZ, W, H, D_lines, s_lines)

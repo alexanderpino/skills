@@ -2000,6 +2000,85 @@ def subaerial_beach(x, h2, h_rock=None, sea_level=None, tan_face=None,
                 tan_face=tb, berm=zb, backshore=zs)
 
 
+def sand_cover_fraction(reg, sigma_r=None, n_iter=48):
+    """What share of a rough rock surface a sand veneer of MEAN depth `reg`
+    actually covers.
+
+    BAR SECTION H1 IS A CLOSED FORM AND WAVE 12 IS WHERE IT GETS ONE. The bar
+    photographs the bench as "deeply pocketed, with sand infilling the hollows
+    and dark weed on the wet rock", and calls that "a landform with a formation
+    mechanism, not scenery". A renderer that decides rock-versus-sand by SLOPE
+    -- which is what `beach_render.shade_land` did through wave 11 -- cannot
+    produce it: the bench is FLAT, so a slope test calls the whole of it sand
+    and the photograph's defining surface never appears. Chapter 11 gives the
+    right test outright and this file was not using it:
+
+        Outcrop = rockMask from (slope > tan 40 deg) u (regolithDepth ~ 0)
+                  u (convex curvature).  "Emerges automatically if you run
+                  layered K -- you don't author it."
+
+    The regolith clause is the one that fires on a bench, and the loop already
+    computes the regolith: it is the sand wedge `bay_bed` lays over the planed
+    rock. What is missing is the MAP from a mean depth to a covered AREA, and
+    the two are not the same number on a rough surface -- which is the whole of
+    "sand INFILLING THE HOLLOWS".
+
+    THE FORM. Let the rock surface inside one cell have elevation z ~ N(0,
+    sigma_r) about its own mean, and let sand pond to a level l. Then
+
+        covered area fraction    f = Phi(u),        u = l / sigma_r
+        mean sand depth          reg = sigma_r * (phi(u) + u * Phi(u))
+
+    -- the second is E[(l - z)+] for a Gaussian, and it is the volume book,
+    not a fit. So `reg` fixes `u` and `u` fixes `f`, with nothing left over.
+    d/du (phi + u Phi) = Phi(u), so Newton on it converges from any start and
+    the routine is exact to round-off rather than tabulated.
+
+    WHAT IT PREDICTS, AND IT IS FALSIFIABLE: a veneer whose mean depth EQUALS
+    the rock's own roughness covers 81.6% of the area, not 100%; a fifth of the
+    surface is still bare rock standing through it. Half a roughness covers
+    57.5% and a quarter covers 36.5%. That non-linearity IS the pocketed bench,
+    and a linear "sand if reg > 0" test produces a clean edge where the
+    photograph has an interfinger. Measured on this scene's own bench (planed
+    rock within 2.5 m of the datum): median regolith 0.167 m against
+    ROCK_ROUGH = 0.25 m, so 48% of the bench reads bare rock and 52% sand --
+    two surfaces on one landform, out of the volume book and nothing else.
+
+    `sigma_r` IS SUB-GRID AND SAYS SO. The loop's cells are 4 x 16 m and bar
+    H1's pockets are metres across, so the roughness this integral is taken
+    over is BELOW the representation -- the same statement chapter 12 makes
+    about arches and this file makes about the plunging lip, and it is why the
+    quantity enters as a distribution rather than as geometry. `ROCK_ROUGH` is
+    its scale, declared `?`, and swept in the suite.
+    """
+    sigma_r = ROCK_ROUGH if sigma_r is None else float(sigma_r)
+    r = np.maximum(np.asarray(reg, float), 0.0) / max(sigma_r, 1e-9)
+    # bisection: g(u) = phi(u) + u Phi(u) is strictly increasing, g(-8) ~ 1e-16
+    lo = np.full(r.shape, -8.0)
+    hi = np.maximum(r + 1.0, 1.0)
+    for _ in range(int(n_iter)):
+        mid = 0.5 * (lo + hi)
+        P = 0.5 * (1.0 + _erf(mid / math.sqrt(2.0)))
+        g = np.exp(-0.5 * mid * mid) / math.sqrt(2.0 * math.pi) + mid * P
+        lo = np.where(g < r, mid, lo)
+        hi = np.where(g < r, hi, mid)
+    u = 0.5 * (lo + hi)
+    return 0.5 * (1.0 + _erf(u / math.sqrt(2.0)))
+
+
+def _erf(z):
+    """Vectorised erf. `math.erf` is scalar and `scipy` is not a dependency of
+    this file; Abramowitz & Stegun 7.1.26 is 1.5e-7 absolute, which is four
+    orders below anything `sand_cover_fraction` is asked for."""
+    z = np.asarray(z, float)
+    s = np.sign(z)
+    a = np.abs(z)
+    t = 1.0 / (1.0 + 0.3275911 * a)
+    y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t
+                - 0.284496736) * t + 0.254829592) * t * np.exp(-a * a)
+    return s * y
+
+
 # --------------------------------------------------------------- the 2-D bed
 def bed_2d(x, y, h1d, h_ref, lam_rip=120.0, gap_frac=0.75, gap_width=25.0,
            jitter=0.25, seed=20260813):
@@ -2192,6 +2271,20 @@ HARD_SEED = 20260814    # the geology is a DECLARED random field with a stated
                         # particular coast but that a coast with SOME hardness
                         # variation produces headlands, a bay and a pocketed
                         # bench, and that a uniform one produces none of it.
+
+ROCK_ROUGH = 0.25       # m, the rms relief of the planed rock surface WITHIN
+                        # one cell. `?` AND IT IS THE ONE NEW UNKNOWN WAVE 12
+                        # ADDS. Bar section H1 photographs the bench as "deeply
+                        # pocketed, with sand infilling the hollows"; it gives
+                        # no depth and the standing ruling forbids reading one
+                        # off the frame. What the number is FOR is stated
+                        # exactly: `sand_cover_fraction` below needs the scale
+                        # of the roughness a sand veneer has to bury before the
+                        # surface stops reading as rock, and that is a sub-grid
+                        # quantity this loop's 4 x 16 m cells cannot resolve --
+                        # see the note on `sand_cover_fraction`. The suite
+                        # sweeps 0.10/0.25/0.60 and reports what the bench's
+                        # bare-rock share does across it.
 
 D_SHELF = 8.0           # m, the depth the Dean ramp is capped at, so the
                         # offshore boundary sits on a flat shelf. Not cosmetic:
@@ -2676,6 +2769,21 @@ def bay_bed(x, y, h_coast, h_init, A=DEAN_A, d_shelf=D_SHELF,
         # a one-cell step in the bed is an infinite convergence to Exner. NOT a
         # wavelength-scale filter -- see `smooth_depth`'s note on chapter 27.
         h = _smooth2(h, 1.0, 1.0)
+    # WAVE 12: THE ROCK SURFACE, KEPT. Everything above this line composes a
+    # bed; what it does NOT do is record which of the surface is ROCK and which
+    # is SEDIMENT LYING ON IT, and that distinction is a landform fact the
+    # renderer needs and had no way to ask for. It costs one array: the coastal
+    # loop's own surface, plan-shifted with everything else, is the rock; what
+    # the composition put ON TOP of it is the regolith.
+    #
+    # `planed` is the second half of the same statement and it is NOT the same
+    # mask. A cell with no sediment on it is bare rock only if the sea has
+    # actually stripped it -- the coastal PLATEAU also has zero of this loop's
+    # sediment on it and is a soil-mantled land surface that has never been in
+    # the surf. `touched` is already computed above (the loop cut this cell by
+    # more than 0.25 m), so the discriminator is free and it is an OUTPUT of
+    # the loop rather than an elevation band somebody chose.
+    h_rock = h_coast.copy()
     bch = None
     if beach:
         # WAVE 8: THE SUBAERIAL BEACH, LAID AFTER THE SMOOTH AND NOT BEFORE.
@@ -2688,6 +2796,19 @@ def bay_bed(x, y, h_coast, h_init, A=DEAN_A, d_shelf=D_SHELF,
                               dy=float(y[1] - y[0]) if y.size > 1 else None)
         h = bch['h']
         x_s = shoreline_x(x, h, sea_level)
+    reg = np.maximum(h - h_rock, 0.0)
+    cover = sand_cover_fraction(reg)
+    # NOT `h_rock`: `subaerial_beach` already returns that name for the
+    # PRE-BEACH COMPOSED bed, which `_sec_beach` measures the wedge's width
+    # against. This one is the coastal loop's own bedrock, which is a different
+    # surface wherever the Dean ramp took over, and renaming the old key would
+    # have moved a suite row for no reason.
+    surf = dict(h_bedrock=h_rock, regolith=reg, cover=cover, planed=touched)
+    if bch is not None:
+        bch = dict(bch)
+        bch.update(surf)
+    else:
+        bch = surf
     return h, x_s, h_dean, bch
 
 

@@ -709,6 +709,66 @@ def breaking_fraction_2d(d, H, gamma_b=B.GAMMA_B):
     return q.reshape(d.shape)
 
 
+# ------------------------- WAVE 12: WHICH BREAKING STATEMENT LAYS THE FOAM,
+# and the file was carrying two that disagree by an order of magnitude
+#
+# THE DEFECT. Wave 6 fed `covering_measure_break` with Battjes & Janssen's Q_b.
+# Q_b is a RAYLEIGH EXCEEDANCE PROBABILITY: given a random sea of root-mean-
+# square height H_rms, it is the share of individual waves whose height passes
+# gamma_b d. The field this renderer draws is not a random sea. `transform_2d`
+# marches ONE monochromatic wave train -- one period, one direction, one
+# height -- so there is no height distribution for the closure to operate on,
+# and handing its deterministic H to a random-sea closure as if it were H_rms
+# is a category error. Measured on this scene's centre row:
+#
+#     x     H/d    transform says    Q_b (BJ)   f_roller (D_w/D_sat, lagged)
+#    580   0.598   NOT breaking        0.309          0.015
+#    600   0.455   BREAKING            0.064          0.511
+#    660   0.484   BREAKING            0.095          0.826
+#    700   0.633   BREAKING            0.405          0.987
+#
+# TWO THINGS ARE WRONG AND THE SECOND IS WORSE THAN THE FIRST. The magnitude is
+# eight to ten times low through the saturated surf zone -- and the PLACEMENT
+# is inverted. Q_b peaks at x = 580, which is the one column in that list where
+# the transform says the wave is NOT breaking, because Q_b keys on H/d
+# APPROACHING gamma while the dissipation keys on the wave ACTUALLY breaking.
+# So waves 6-11 drew their brightest foam band seaward of their own break
+# point. Bar section B is explicit that this is the distinction that matters:
+# "a monotone profile cannot distinguish a renderer that COMPUTES breaking from
+# one that DRAWS FOAM NEAR THE SHORE".
+#
+# THE FIX ADDS NOTHING. `beach.roller_fraction` is the transform's own
+# dissipation D_w over the saturated-bore scale, lagged shoreward by half a
+# local wavelength because the roller rides the front -- and the sediment
+# transport has trusted it since wave 1. Using it here means the foam, the
+# undertow and the bar are all reading ONE statement about whether this wave is
+# breaking, which is the same argument `broken_fraction`'s own docstring makes
+# about keying to the dissipation rather than to H/d.
+#
+# Q_b IS NOT DELETED AND IS NOT WRONG. It is the right closure for a random sea
+# and the file keeps it: when this lane gives the offshore boundary a
+# directional and frequency spectrum, H becomes an H_rms and Q_b becomes
+# applicable. What is recorded is that it was applicable to NEITHER field it
+# was used on.
+#
+# AND A THIRD ROUTE, WHICH IS OPEN. The same file computes h_air = Q tau_foam,
+# the standing depth of air per unit surface area, and gets 6.6 cm through the
+# inner surf zone. If a real surf raft is h_0 thick then the covered fraction
+# is h_air/(alpha h_0), which for h_0 between one bubble layer (0.5 mm) and
+# 10 cm spans 0.7 to 137. The deposit of covering measure 1 per fully broken
+# sweep -- which is what this file has always assumed and never said -- sits
+# inside that bracket at its thick end. THE BRACKET IS TOO WIDE TO SETTLE
+# ANYTHING, so nothing here is changed by it and it is recorded as open rather
+# than used as a multiplier. Closing it needs a measured raft thickness.
+def deck_source(tr, n_lag=None):
+    """The field that lays the surface deck: the roller, not the exceedance.
+
+    One line, so that the choice above is in ONE place and a future wave that
+    disagrees with it has one call to change."""
+    return (B.roller_fraction(tr) if n_lag is None
+            else B.roller_fraction(tr, n_lag=n_lag))
+
+
 def surface_foam(q_b, T, age, u10, tau=TAU_FOAM_SALT, deep_mask=None):
     """The coverage mask, from the breaking statistics and the wind. One field,
     two sources, and it reduces to Monahan exactly where nothing breaks."""
@@ -716,6 +776,256 @@ def surface_foam(q_b, T, age, u10, tau=TAU_FOAM_SALT, deep_mask=None):
     if deep_mask is not None:
         m = np.where(deep_mask, covering_measure_wind(u10) * np.ones_like(m), m)
     return coverage(m), m
+
+
+# ==================================================== 7 · THE REALISATION, and
+# the difference between it and the mean is the whole of wave 12
+#
+# THE DEFECT, NAMED FIRST. Waves 6-11 computed the covering measure `m` above,
+# mapped it through `coverage()` to a FRACTION, and the renderer then wrote
+#
+#       L = L_water (1 - cov) + L_foam cov
+#
+# which is an alpha blend by the EXPECTED coverage. That draws E[chi], the
+# ensemble mean of the indicator, and never chi itself. A field whose mean is a
+# smooth function of x is a smooth ramp when you draw its mean -- so the surf
+# zone came out as one continuous soft grey band with a single smooth
+# cross-shore hump, no bubble texture, no bright breaking line, no alongshore
+# break-up, and both of its edges continuous smooth curves. Every one of those
+# is a property of the MEAN and not of the field. The physics was already right
+# and the picture was an airbrush gradient, because the last step threw the
+# realisation away.
+#
+# IT IS THE SAME DEFECT THE OPTICS LANE IS FIXING FOR THE GLITTER IN THIS SAME
+# WAVE -- the render drawing the ensemble mean of a stochastic field and never
+# its samples -- and finding it in a second place is worth more than either fix.
+#
+# WHAT THE MODEL ALREADY WAS. `coverage(m) = 1 - exp(-m)` is not a saturating
+# curve someone liked the shape of. It is the VOID PROBABILITY of a Boolean
+# (germ-grain) model: drop grains of mean area <A> at germs of a Poisson
+# process of intensity lambda, and the probability that a given point is
+# covered by none of them is exp(-lambda <A>) = exp(-m). So the file has been
+# carrying a Boolean model since wave 6 and drawing only its first moment. The
+# realisation needs exactly ONE quantity the file did not have -- the GRAIN
+# SIZE -- because m alone fixes lambda<A> and says nothing about how that
+# product splits.
+#
+# THE GRAIN SIZE, AND WHERE IT COMES FROM. Foam is a passive tracer on the
+# surface (bar section H5: "visible eddies with foam as the tracer"), so its
+# patch scale is the scale of the surface flow structures that gather and tear
+# it. In the surf zone that flow is DEPTH-LIMITED: the vertical extent of any
+# eddy is capped by the local water depth d, and a horizontal structure much
+# smaller than its own vertical scale is not a coherent eddy, so d is the
+# smallest coherent horizontal scale a depth-limited turbulent surface flow
+# carries. Hence
+#
+#       grain diameter = d,      radius r_g = d/2
+#
+# and the coefficient is DECLARED AT UNITY on the diameter rather than fitted.
+# `grain_sensitivity()` reports what 0.5x and 2x do to the coverage statistics,
+# and the coefficient is an OPEN row rather than a claim. What is NOT declared
+# is the scaling: grains shrink toward the waterline and coarsen seaward
+# because the depth does, which is why the lace at the swash edge is finer than
+# the patches over the bar -- and that is a prediction, not a texture.
+#
+# WHAT IS RANDOM AND WHAT IS NOT. The germ positions and their marks are the
+# only random numbers in this file, and they are the SAMPLER of a stated point
+# process -- the same standing as a Monte Carlo direction drawn from a BRDF.
+# They are not a noise function chosen because the picture came out right:
+# `boolean_mean()` below measures the realisation's own coverage against
+# `coverage(m)` and the suite fails if they disagree, so the random field is
+# pinned to the physics at every point rather than layered on top of it.
+R_G_MIN = 0.25                    # m, the finest grain octave. `D`
+R_G_OCTAVES = 4                   # 0.25, 0.5, 1.0, 2.0 m
+R_G_MAX = R_G_MIN * 2 ** R_G_OCTAVES     # the OUTER scale, not a grain radius
+GRAIN_PER_DEPTH = 0.5             # r_g = 0.5 d, i.e. diameter = depth. `D`
+MU_REF = 0.5                      # germs per cell of the DOMINATING process
+GERM_SLOTS = 4                    # truncation; P(N>4 | mu=0.5) = 1.7e-4
+_M32 = np.uint64(0xFFFFFFFF)
+
+
+def _mix(h):
+    """A 32-bit integer avalanche (Murmur-class), evaluated in uint64 so the
+    products cannot overflow. Deterministic, so a frame is reproducible and two
+    rays that hit the same square metre agree about what is on it."""
+    h = np.asarray(h, np.uint64) & _M32
+    h = ((h ^ (h >> np.uint64(16))) * np.uint64(0x7FEB352D)) & _M32
+    h = ((h ^ (h >> np.uint64(15))) * np.uint64(0x846CA68B)) & _M32
+    return (h ^ (h >> np.uint64(16))) & _M32
+
+
+def _hash_u(*keys):
+    """Uniform on [0, 1) from a tuple of integer keys."""
+    h = np.uint64(0x2545F491)
+    for i, k in enumerate(keys):
+        h = _mix(h ^ (np.asarray(k, np.int64).astype(np.uint64)
+                      + np.uint64(0x9E3779B9) * np.uint64(i + 1)))
+    return h.astype(np.float64) * (1.0 / 4294967296.0)
+
+
+def _poisson_thresholds(mu, n):
+    """CDF cut points of Poisson(mu) at 0, 1, ... n-1, as plain floats.
+
+    The dominating process is HOMOGENEOUS -- mu is a module constant -- so this
+    is exact rather than an approximation, and the per-cell count is drawn from
+    one uniform by inverse CDF."""
+    p, c, out = math.exp(-mu), 0.0, []
+    for k in range(n):
+        c += p
+        out.append(c)
+        p *= mu / (k + 1.0)
+    return out
+
+
+_POIS = _poisson_thresholds(MU_REF, GERM_SLOTS)
+
+
+def grain_radius(d, k=GRAIN_PER_DEPTH, r_min=R_G_MIN, r_max=R_G_MAX):
+    """The foam patch radius: half the local depth, clamped to the octave
+    ladder. The clamp's cost is a reported row, not a hidden one."""
+    return np.clip(k * np.asarray(d, float), r_min, r_max)
+
+
+def octave_weights(r_g, r_min=R_G_MIN, n=R_G_OCTAVES):
+    """Split the covering measure over the octaves BELOW the outer scale, with
+    equal measure in each -- a self-similar grain field.
+
+    A SUPERPOSITION OF BOOLEAN MODELS IS A BOOLEAN MODEL: the void probability
+    of independent germ fields multiplies, so prod_j exp(-m_j) = exp(-m)
+    whenever the weights sum to one. The ladder therefore changes the coverage
+    law by exactly nothing, and every choice made here is a choice about
+    TEXTURE at fixed coverage.
+
+    WHY EQUAL MEASURE PER OCTAVE AND NOT ALL OF IT AT ONE SCALE. Foam is a
+    passive tracer on a surface flow that is turbulent between two scales: the
+    depth-limited outer scale r_g = d/2 above, and the scales at which the raft
+    stops being a sheet below. A tracer stirred by a flow with no preferred
+    scale acquires structure at every scale in that range, so the scale-free
+    split is the one that ADDS no scale -- it is the null choice, not a tuned
+    spectrum. Wave 12's first draft put all the measure at r_g and the render
+    came out as confetti: identical discs, one size, visibly a stamp. Recorded
+    because the coverage statistics were identical in both, so no row in this
+    file could have told them apart and only the frame could.
+
+    The outer scale is the DEPTH's, so the ladder is short in the swash and
+    long over the bar -- fine lace at the waterline, coarse patches offshore --
+    and that is a prediction of the depth-limited argument rather than a
+    texture setting.
+    """
+    v = np.clip(np.log2(np.maximum(np.asarray(r_g, float), 1e-9) / r_min),
+                0.0, float(n))
+    j0 = np.floor(v).astype(np.int64)
+    f = v - j0                              # the top octave's partial weight
+    idx = np.arange(n).reshape((1,) * np.ndim(v) + (n,))
+    w = np.where(idx < j0[..., None], 1.0, 0.0)
+    w = np.where(idx == j0[..., None], np.maximum(f, 1e-12)[..., None], w)
+    return w / np.maximum(w.sum(-1, keepdims=True), 1e-12)
+
+
+def boolean_indicator(xw, yw, m, r_g, seed=0, mu=MU_REF, slots=GERM_SLOTS,
+                      r_min=R_G_MIN, n_oct=R_G_OCTAVES, return_p=False):
+    """chi(x, y) in {0, 1}: ONE REALISATION whose mean is exactly 1 - exp(-m).
+
+    THE CONSTRUCTION, and it is exact rather than approximately Poisson.
+
+      * The DOMINATING germ field is homogeneous with intensity
+        lambda_ref = mu / r_j^2 in octave j, so the count in a cell of side r_j
+        is Poisson(mu) with mu a CONSTANT -- one uniform per cell, inverse CDF,
+        no field evaluation at the germ.
+      * Each germ carries an independent uniform mark u.
+      * A germ is RETAINED at the query point q if u < p_j(q), with
+            p_j(q) = m_j(q) / (lambda_ref pi r_j^2) = m_j(q) / (mu pi).
+        Independent marking of a Poisson process gives a Poisson process of
+        intensity lambda_ref p, so
+            P(q uncovered) = prod_j exp(-lambda_ref p_j pi r_j^2) = exp(-m)
+        exactly, for every m and every grain ladder.
+      * Cell side = grain radius, so any germ whose disc reaches q lies in the
+        3x3 block of cells around q. The search is exhaustive, not a cutoff.
+
+    p is clamped at 1, which happens where m_j > mu pi = 1.571. The clamped
+    fraction is returned so the suite can state it instead of a comment
+    claiming it never bites.
+    """
+    xw = np.asarray(xw, float)
+    yw = np.asarray(yw, float)
+    m = np.broadcast_to(np.asarray(m, float), xw.shape)
+    r_g = np.broadcast_to(np.asarray(r_g, float), xw.shape)
+    w = octave_weights(r_g, r_min, n_oct)
+    covered = np.zeros(xw.shape, bool)
+    p_max = 0.0
+    for j in range(n_oct):
+        s = r_min * 2.0 ** j
+        p = np.maximum(m, 0.0) * w[..., j] / (mu * math.pi)
+        p_max = max(p_max, float(p.max()) if p.size else 0.0)
+        p = np.minimum(p, 1.0)
+        live = p > 0.0
+        if not live.any():
+            continue
+        ci = np.floor(xw / s).astype(np.int64)
+        cj = np.floor(yw / s).astype(np.int64)
+        for oi in (-1, 0, 1):
+            for oj in (-1, 0, 1):
+                a, b = ci + oi, cj + oj
+                nsel = _hash_u(a, b, np.int64(j), np.int64(seed))
+                for t in range(slots):
+                    # the cell drew N ~ Poisson(mu) from `nsel`; slot t is
+                    # occupied iff N > t, i.e. the uniform is above the CDF at t
+                    have = (nsel >= _POIS[t]) & live
+                    if not have.any():
+                        continue
+                    gx = (a + _hash_u(a, b, np.int64(100 + t),
+                                      np.int64(j), np.int64(seed))) * s
+                    gy = (b + _hash_u(a, b, np.int64(200 + t),
+                                      np.int64(j), np.int64(seed))) * s
+                    u = _hash_u(a, b, np.int64(300 + t), np.int64(j),
+                                np.int64(seed))
+                    hit = (have & (u < p)
+                           & ((xw - gx) ** 2 + (yw - gy) ** 2 < s * s))
+                    covered |= hit
+    chi = covered.astype(float)
+    return (chi, p_max) if return_p else chi
+
+
+def boolean_mean(n=400, m_val=0.6, r_val=1.0, span=200.0, seed=0):
+    """THE GUARD'S INSTRUMENT, and it is a control with a known answer.
+
+    Realise a homogeneous field on a square and measure the covered fraction
+    against 1 - exp(-m). Standing ruling 14: a near-agreement is worthless
+    unless the meter can also read a DISagreement, so the caller is expected to
+    push m and r around and watch the answer track."""
+    g = (np.arange(n) + 0.5) / n * span
+    X, Y = np.meshgrid(g, g)
+    chi = boolean_indicator(X, Y, np.full(X.shape, m_val),
+                            np.full(X.shape, r_val), seed=seed)
+    return dict(measured=float(chi.mean()), analytic=float(coverage(m_val)),
+                m=m_val, r_g=r_val)
+
+
+def grain_sensitivity(m_val=0.6, coeffs=(0.25, 0.5, 1.0), **kw):
+    """What the declared coefficient buys and what it does not.
+
+    The COVERAGE must not move with the grain size -- that is the Boolean
+    model's own theorem -- while the PATCH SCALE must move with it exactly.
+    Reporting both is what separates a declared constant from a fitted one."""
+    out = []
+    for k in coeffs:
+        r = grain_radius(2.0, k=k)
+        out.append((k, float(r), boolean_mean(m_val=m_val, r_val=float(r),
+                                              **kw)['measured']))
+    return out
+
+
+def filtered_indicator(chi, cov, footprint, r_g):
+    """Fade the realisation to its own mean where the pixel outruns the grain.
+
+    A pixel whose footprint is many grains wide should read the MEAN, because
+    that is what the integral of the indicator over the footprint converges to;
+    a pixel smaller than a grain should read the SAMPLE. This is a filter, not
+    a fudge, and it is exact in both limits -- what is approximate is the
+    crossover, which is taken linearly in 2 r_g / footprint."""
+    g = np.clip(2.0 * np.asarray(r_g, float)
+                / np.maximum(np.asarray(footprint, float), 1e-6), 0.0, 1.0)
+    return cov + (chi - cov) * g
 
 
 # ========================================================= the module's own run
