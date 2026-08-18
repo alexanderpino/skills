@@ -23,6 +23,8 @@ one with a one-line justification and let them override it.
 GOAL     <destination, one sentence — not an implementation plan>
 BAR KIND <reference | acceptance criteria | hybrid>
 TARGET   <the concrete comparator, where its files live, and the score it sits at>
+RUNGS    <per ambitious dimension: what n/10 concretely is (anchor) and what it
+         costs (from `quote`) — the chosen rung becomes that dimension's target>
 STRETCH  <optional ambition — direction only, never a stop condition>
 INSPECT  <how a critic reaches the real output each round; which dimensions have
          machine gates that need no critic at all>
@@ -52,7 +54,18 @@ judgement about approach, which is where a lot of the method's value sits.
 judged against and it must be reachable inside the budget; ambition above it goes
 in the stretch line, which never arms a stop condition. Freeze the artifacts
 under `gauntlet/bar/` now, before any lane runs. Set `--target-score` where the
-target actually sits — a target of 10 means no lane can ever retire.
+target actually sits — at 10, bar-met can never fire.
+
+When the user names one blanket number — "10/10, like EA FC26" — do not write
+it into the contract as-is. **Ask per dimension what n/10 must be**, or propose
+the split yourself with a one-line reason each, priced with `quote`: the same
+request decomposes into rungs that are buyable (gameplay rules, systems, UX
+flows) and rungs no iteration count reaches against a production team's years
+(animation, shader craft). Record the split as
+`--dimension-targets "gameplay=8,graphics=6"`; the dimensions that fail
+reachability outright get the evidenced refusal from `bar-selection.md`, not a
+silent write-down — and the 10 the user wanted goes in the stretch line, where
+the distance to it is reported honestly at the end.
 
 **Inspection.** This is the field that silently kills runs. Before wave one,
 verify a critic can actually reach the output: the screenshot harness works, the
@@ -84,6 +97,29 @@ funded lanes, add one smoother call per wave. State the projected total in the
 contract block ("8 waves × 3 lanes ≈ 56 subagent invocations") so "budget: 8
 waves" is a number they can actually evaluate. Parallel lanes raise the burn
 rate, not the total; `init` prints the projection for you.
+
+Then price the *target* the same way: `quote --current-score <first light>`
+prints the quality-price menu — 7 costs this, 8 costs that, 9 roughly double
+again, 10 is not a price (`cost-discipline.md`). Present it with the contract
+and let the user pick the rung; TARGET and BUDGET are one decision wearing two
+names. If the run is fully autonomous and no rung was named, default to 7 and
+record the menu in `contract.md` so the unmade choice stays visible.
+
+**Anchor each rung before offering it.** A price next to a bare number is
+still not an informed choice — the user must know what an 8 *is* for their
+artifact. Ask, per dimension whose ambition is above the default (three
+questions, not an interrogation):
+
+1. What must n/10 concretely do? ("kits react to stadium lighting at replay
+   distance")
+2. Where is "I would ship this" on that scale?
+3. What is explicitly *not* needed? (the cheapest line in the contract —
+   it deletes rungs nobody wants)
+
+One anchor line per menu rung goes into `contract.md`, and the menu is
+presented as anchor + price. Anchors are for choosing, never for judging:
+the critic still scores against the frozen bar, or the anchors become a
+rubric the builder can game (`bar-selection.md`).
 
 Say **which model tier each role runs on** in the same breath, because it changes
 what those calls cost by up to 5× (`model-routing.md`). The default worth stating
@@ -156,11 +192,20 @@ Initialise the state directory as part of confirming the contract:
 python3 scripts/gauntlet.py init --lanes <a,b,c> --dimensions <d1,d2> \
     --bar-kind <kind> --target-score 7 --wip-limit 3 \
     --bar-met-n 2 --clean-streak-n 2 --no-progress-n 3 \
-    --budget-waves <N> [--hard-cap-waves <M>]
+    --budget-waves <N> --budget-tokens <T> [--hard-cap-waves <M>]
 ```
 
+Set `--budget-tokens` from the first light round's measured cost rather than
+omitting it — waves are the unit the user agrees to, tokens are the unit that
+burns, and the token stop can only fire on a ceiling that exists.
+
 `init` prints the projected call count per wave and for the whole budget — put
-that number in front of the user with the contract, not after it.
+that number in front of the user with the contract, not after it. Then `plan`
+drafts `gauntlet/plan.md` — the build stages in order (bootstrap → everything
+to usable → the ambitious rungs → stretch on a grant), each priced — and you
+complete its anchor and serialised-pair fields. Contract, menu and plan
+together are the offer the user confirms: what, to which rung, in what order,
+for what money.
 
 Write the confirmed contract to `gauntlet/contract.md`, including the stretch and
 the kill criteria. Every subagent that needs the goal, bar or rules reads it from

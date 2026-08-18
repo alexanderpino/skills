@@ -113,6 +113,26 @@ Kniberg's **earliest testable → usable → lovable** (`authorities.md`):
 | **Usable / viable** | Where the **target bar** normally sits. Good enough to hand over; retirement is judged against it. |
 | **Lovable** | Where a **stretch** normally sits. Direction, reported as distance, never a stop condition. |
 
+The rungs have prices, and the user should see them before picking one:
+`quote` prints what 7, 8 and 9 cost from the current score — each point above
+usable costing roughly double the one before — and that 10 is not a rung at
+all (`cost-discipline.md`). Ambition is welcome; unpriced ambition is how a
+budget disappoints someone.
+
+The ladder is also the **build order**, and the script enforces it: the
+next-wave ranking funds dimensions below their usable line before any
+dimension buys a rung above it, and `plan` renders the stages — bootstrap
+until everything is judged, everything to usable, then the ambitious rungs,
+then stretch on a grant. The skateboard rule at run level: a whole artifact
+at 6 beats one dimension at 9 next to one at 2, because critics, smoothers
+and users all judge the whole.
+
+Each rung the menu offers carries an **anchor**: one agreed sentence of what
+n/10 concretely is for this artifact (`intake.md`), recorded in `contract.md`
+and copied into the plan. Anchors exist for choosing rungs; judging stays
+with the frozen bar — an anchor handed to a critic is a rubric a builder can
+learn to game.
+
 Two consequences worth stating at intake:
 
 - **The bootstrap wave builds a thin end-to-end slice, not one perfect part.**
@@ -144,6 +164,39 @@ If that exceeds the budget, fix it now, and say which fix you chose:
 A run that starts knowing it cannot reach its target has already decided to
 disappoint someone. The only cheap moment to fix that is before wave 1.
 
+## When the target is impossible — say so, with the number
+
+Some targets fail the reachability property against physics, not against the
+budget: a 2× speedup asked of an inner loop the profile already shows at the
+memory-bandwidth floor, lossless compression below the measured entropy, a
+latency target under one network round-trip. No wave count reaches those.
+Taking the contract anyway converts an honest "no" at minute five into a
+budget stop at wave 8 that breaks the same news for more money — and quietly
+lowering the target instead delivers something the user did not ask for under
+the name of what they did.
+
+The refusal has to earn itself, in both directions:
+
+- **Substantiate it.** "That is impossible" carries weight only with the
+  measurement or the floor argument attached — the profile, the bandwidth
+  arithmetic, the bound it hits. First light is where this evidence comes
+  from: measure before arguing. An unsubstantiated "impossible" is the same
+  failure as an unsubstantiated "amazing", pointed the other way.
+- **Bound it.** Almost nothing is impossible outright; it is impossible
+  *under stated constraints*. Say which: within this algorithm, this data
+  layout, this hardware, this scope. The bounds tell the user which door is
+  still open — and whether opening it is a re-cut, a new contract, or not
+  worth it at all.
+- **Offer the reachable target.** State the nearest target the measurement
+  does support, and price it. "2× is not reachable inside this loop — it is
+  bandwidth-bound at 94% of peak; 1.3× is, from the two measured stalls" is a
+  contract. "Sorry, impossible" is a door closed on someone who still has a
+  problem.
+
+Then the user chooses: the reachable target, the structural change, or no run
+at all. What is never on offer is accepting the impossible target and letting
+the budget stop deliver the verdict later.
+
 ## Raising the bar mid-run
 
 If the artifact passes the target with rounds left, the bar was set too low. That
@@ -166,6 +219,17 @@ own critic comparison and its own `log-round` record (`--dimension`), its own
 streaks, and its own retirement. A lane retires only when every one of its
 dimensions has — so a decisive visual win cannot retire a lane whose frame time
 still loses.
+
+**Targets split the same way the bars do.** `--dimension-targets
+"gameplay=8,graphics=6"` gives each dimension its own rung, and the script
+judges each dimension's bar-met against its own number. This is the honest
+answer to the blanket "10/10 like <AAA title>" request: decomposed with the
+user, the 10 splits into rungs that are buyable (rules, systems, flows) and
+rungs that iteration cannot reach against a production team's years of craft
+(animation, shaders) — ask what n/10 each dimension must be, price the first
+kind (`quote`), refuse the second with the measurement, and put the 10 in the
+stretch line. Averaging the wish into one number prices nothing and
+disappoints everyone.
 
 ## Freezing
 
