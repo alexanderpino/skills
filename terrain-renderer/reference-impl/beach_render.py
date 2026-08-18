@@ -795,7 +795,7 @@ def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0):
     return L * np.where(exited, 1.0, 0.0)[..., None], chord, lit
 
 
-def shade_land(w, P, D, parts=None):
+def shade_land(w, P, D, parts=None, foot=None):
     """Sand and rock, and the wet band that comes for free.
 
     Bar section H3: wet sand darkens because a thin film traps light between the
@@ -838,7 +838,18 @@ def shade_land(w, P, D, parts=None):
     # zero regolith there is not bare rock and must not be painted as it.
     cover = w.sample(xw, yw, w.cover)
     planed = w.sample(xw, yw, w.planed.astype(float))
-    bare = np.clip(planed * (1.0 - cover), 0.0, 1.0)[..., None]
+    # WAVE 12, SECOND PASS: AND THE COVER FRACTION IS NOT A SURFACE EITHER.
+    # `planed * (1 - cover)` paints the EXPECTATION of a binary mask -- a wash
+    # of one-quarter rock over every square metre, where bar H1's word is
+    # POCKETED and means a quarter of the AREA. `beach.rock_bare_mask` draws
+    # the same closed form as a realisation: sand fills each pocket from the
+    # bottom up, so the bare share is the top (1 - cover) of the rock's own
+    # height ordering. Its expectation is `sand_cover_fraction` exactly, at
+    # every pocket scale, so nothing about the volume book moves -- only its
+    # placement. `foot` is the pixel footprint: once a pocket is sub-pixel the
+    # correct answer for that pixel IS the mean, and the mask returns to it.
+    bare = np.clip(planed * B.rock_bare_mask(xw, yw, cover, foot=foot),
+                   0.0, 1.0)[..., None]
     rock = np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0.0, 1.0)[..., None]
     rock = np.maximum(rock, bare)               # the union chapter 11 writes
     plain = np.clip((hz - PLAIN_Z) / 4.0, 0.0, 1.0)[..., None] * (1 - rock)
@@ -1508,7 +1519,17 @@ def render(cam, w, t=0.0, label='', air=True, vis=None):
     if ml.any():
         Pl = cam.pos[None] + tr['t_land'][ml][..., None] * D[ml]
         lp = {}
-        Ll = shade_land(w, Pl[None], D[ml][None], parts=lp)[0]
+        # THE PIXEL'S FOOTPRINT ON THE GROUND, and it is geometry rather than a
+        # filter width: a pixel subtends 2 tan(fov/2)/h radians, so at range t
+        # it covers t times that on a surface square to the ray, and 1/cos of
+        # it on one that is not. The obliquity factor is capped at 20 because a
+        # ray grazing the plateau has an unbounded footprint and the cap is
+        # where the mask has already gone to its mean anyway.
+        px = 2.0 * cam.tan / cam.h
+        nz = np.clip(np.abs(D[ml][..., 2]), 1.0 / 20.0, 1.0)
+        foot = tr['t_land'][ml] * px / nz
+        Ll = shade_land(w, Pl[None], D[ml][None], parts=lp,
+                        foot=foot[None])[0]
         ex['land_parts'] = {k: (v[0] if hasattr(v, 'ndim') and v.ndim >= 1
                                 else v) for k, v in lp.items()}
         if air:

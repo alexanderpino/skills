@@ -2287,6 +2287,125 @@ def sand_cover_fraction(reg, sigma_r=None, n_iter=48):
     return 0.5 * (1.0 + _erf(u / math.sqrt(2.0)))
 
 
+# ------------------------------------------------- the pockets, as a SURFACE
+#
+# WAVE 12, AND IT IS THE SAME SENTENCE AS THE WET/DRY BOUNDARY ABOVE.
+# `sand_cover_fraction` is the right closed form and the wrong object to paint.
+# `beach_render.shade_land` took its answer -- an AREA FRACTION -- and used it
+# as a blending coefficient: `bare = planed * (1 - cover)`. That draws the
+# expectation of a binary spatial mask, which is a wash of intermediate rock,
+# and bar H1's word for what it should be is POCKETED. A quarter of a bench
+# standing through a veneer is a quarter of its AREA in pockets, not every
+# square metre being one-quarter rock.
+#
+# The realisation needs one thing the closed form does not: the SCALE of the
+# pockets. `sand_cover_fraction`'s own note says the roughness is sub-grid --
+# "the loop's cells are 4 x 16 m and bar H1's pockets are metres across" -- so
+# the scale is metres, and that sentence is the bar's own reading of the frame
+# rather than a measurement off it. It is declared, marked and bracketed, the
+# same standing as `ROCK_ROUGH` which it sits beside.
+ROCK_POCKET = 2.0        # m, the alongshore/cross-shore correlation length of
+                         # the planed rock's sub-grid relief. `?` -- the second
+                         # unknown this lane adds and it is the SAME unknown as
+                         # ROCK_ROUGH seen sideways: that one is the relief's
+                         # amplitude, this one its wavelength, and together
+                         # they are an rms SLOPE of sqrt(2)*0.25/2.0 = 0.177.
+                         # Bracket (0.7, 6.0) m; the suite reports what the
+                         # bench's bare share does across it, and the answer is
+                         # NOTHING, because the mean of the mask is
+                         # `sand_cover_fraction` at any scale. What the scale
+                         # moves is the SIZE of the pockets and not how much
+                         # rock shows, which is the honest way to hold a `?`
+                         # that the volume book cannot decide.
+ROCK_POCKET_BRACKET = (0.7, 6.0)
+
+
+def _lattice_noise(x, y, lam, seed):
+    """Bilinearly interpolated hash noise on a lattice of spacing `lam`.
+
+    Hashed by CELL INDEX, like `_splitmix01` above and for the same reason: the
+    surface must not depend on which pixels a camera happened to ask about.
+    Smoothstep rather than linear interpolation, so the field is C1 and the
+    pockets have no lattice creases in them.
+    """
+    fx = np.asarray(x, float) / lam
+    fy = np.asarray(y, float) / lam
+    i0 = np.floor(fx).astype(np.int64)
+    j0 = np.floor(fy).astype(np.int64)
+    tx, ty = fx - i0, fy - j0
+    tx = tx * tx * (3.0 - 2.0 * tx)
+    ty = ty * ty * (3.0 - 2.0 * ty)
+
+    def h(i, j):
+        return _splitmix01(i * np.int64(73856093) ^ (j * np.int64(19349663)),
+                           seed)
+    a = h(i0, j0) * (1 - tx) + h(i0 + 1, j0) * tx
+    b = h(i0, j0 + 1) * (1 - tx) + h(i0 + 1, j0 + 1) * tx
+    return a * (1 - ty) + b * ty
+
+
+def _uniform_lut(n_bin=512, n_samp=400000, lam=1.0, seed=1):
+    """The cdf of `_lattice_noise`, so its output can be mapped to a marginal
+    that is EXACTLY uniform.
+
+    WHY IT HAS TO BE UNIFORM, and this is the whole reason the function exists.
+    The mask is `bare = (rank > cover)`, where `rank` is where a point stands in
+    the height ordering of the rock inside its cell. A rank field is uniform by
+    definition, and only if it is uniform does E[bare] equal 1 - cover -- which
+    is the identity that ties this realisation to `sand_cover_fraction`'s
+    closed form and lets the suite check one against the other. Interpolated
+    hash noise is NOT uniform (the interpolant pulls mass toward the middle:
+    its sd is 0.187 against a uniform's 0.289), so it is remapped through its
+    own measured cdf, once, at import.
+    """
+    rng = np.random.default_rng(12345)
+    p = rng.uniform(0.0, 1000.0, (n_samp, 2))
+    v = _lattice_noise(p[:, 0], p[:, 1], lam, seed)
+    q = np.linspace(0.0, 1.0, n_bin + 1)
+    return np.quantile(v, q), q
+
+
+_ROCK_RANK_LUT = None
+
+
+def rock_rank(x, y, lam=None, seed=20260820):
+    """The sub-grid rock surface's RANK field: uniform on [0, 1], smooth,
+    correlation length `lam`. 0 is the bottom of a pocket, 1 the top of a rib.
+    """
+    global _ROCK_RANK_LUT
+    lam = ROCK_POCKET if lam is None else lam
+    if _ROCK_RANK_LUT is None:
+        _ROCK_RANK_LUT = _uniform_lut()
+    xs, q = _ROCK_RANK_LUT
+    return np.interp(_lattice_noise(x, y, lam, seed), xs, q)
+
+
+def rock_bare_mask(x, y, cover, foot=None, lam=None, seed=20260820):
+    """WHERE the rock stands through the sand, not HOW MUCH of it does.
+
+        bare = (rank > cover)
+
+    -- sand fills from the bottom of the pocket up, so the covered share is the
+    LOWEST `cover` of the surface by rank, exactly as `sand_cover_fraction`'s
+    Gaussian integral says. E[bare] = 1 - cover identically, for any pocket
+    scale, which is the row the suite fires.
+
+    AND IT FALLS BACK TO THE MEAN WHEN THE PIXEL IS BIGGER THAN A POCKET, which
+    is not a cosmetic anti-aliasing choice but the same statement one level up:
+    once a pocket is sub-pixel the correct answer for that pixel IS the area
+    mean, and `sand_cover_fraction` is what the mean is. `foot` is the pixel's
+    footprint in metres; the blend is linear in lam/foot, so the expectation is
+    1 - cover at every range and only the VARIANCE goes away with distance.
+    """
+    lam = ROCK_POCKET if lam is None else lam
+    cover = np.clip(np.asarray(cover, float), 0.0, 1.0)
+    m = (rock_rank(x, y, lam, seed) > cover).astype(float)
+    if foot is None:
+        return m
+    s = np.clip(lam / np.maximum(np.asarray(foot, float), 1e-6), 0.0, 1.0)
+    return s * m + (1.0 - s) * (1.0 - cover)
+
+
 def _erf(z):
     """Vectorised erf. `math.erf` is scalar and `scipy` is not a dependency of
     this file; Abramowitz & Stegun 7.1.26 is 1.5e-7 absolute, which is four

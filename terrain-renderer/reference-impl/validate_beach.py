@@ -849,6 +849,37 @@ def _bug_sheet_independent_draw(mod):
     mod.sheet_front = _sheet
 
 
+def _bug_pockets_as_blend(mod):
+    """Waves 4-11's own line: the cover FRACTION used as a blending
+    coefficient, so every square metre of bench reads one-quarter rock instead
+    of a quarter of the area being a pocket."""
+    def _blend(x, y, cover, foot=None, lam=None, seed=None):
+        return 1.0 - np.clip(np.asarray(cover, float), 0.0, 1.0)
+    mod.rock_bare_mask = _blend
+
+
+def _bug_pocket_rank_not_uniform(mod):
+    """The rank field taken straight off the interpolated hash noise, without
+    the remap through its own cdf. The marginal is then bell-shaped, so
+    E[bare] no longer equals 1 - cover and the tie to `sand_cover_fraction`
+    quietly breaks while the picture still looks pocketed."""
+    def _raw(x, y, lam=None, seed=20260820):
+        return mod._lattice_noise(x, y, mod.ROCK_POCKET if lam is None
+                                  else lam, seed)
+    mod.rock_rank = _raw
+
+
+def _bug_pocket_no_footprint(mod):
+    """The footprint fallback dropped, so a pocket smaller than a pixel is
+    still drawn as a hard mask -- which is the mean drawn wrong rather than
+    not drawn at all, and it aliases."""
+    orig = mod.rock_bare_mask
+
+    def _nofoot(x, y, cover, foot=None, lam=None, seed=20260820):
+        return orig(x, y, cover, foot=None, lam=lam, seed=seed)
+    mod.rock_bare_mask = _nofoot
+
+
 def _bug_wet_albedo_all_diffuse(mod):
     """`optics.wet_albedo` shipped whole into the Lambertian lobe -- waves
     4-7's own code. Wet sand then reads BRIGHTER than dry and never glossy,
@@ -1236,7 +1267,9 @@ DIFFRACT_BUGS = ('diff-reflected-same-sheet', 'diff-no-reflected-term',
 BATHY_BUGS = ('keying-axis', 'offset-unsigned', 'offset-no-subdivide',
               'keying-polar-everywhere', 'fold-unsigned-gradient',
               'runup-scale-as-rms', 'swash-mean-not-sample',
-              'swash-lattice-from-caller', 'sheet-independent-draw')
+              'swash-lattice-from-caller', 'sheet-independent-draw',
+              'pockets-as-blend', 'pocket-rank-not-uniform',
+              'pocket-no-footprint')
 
 
 EMBAY_BUGS = ('grid-snell', 'spiral-no-tangency', 'alpha-declared',
@@ -1261,6 +1294,9 @@ BUGS = {
     'swash-mean-not-sample': _bug_swash_mean_not_sample,
     'swash-lattice-from-caller': _bug_swash_lattice_from_caller,
     'sheet-independent-draw': _bug_sheet_independent_draw,
+    'pockets-as-blend': _bug_pockets_as_blend,
+    'pocket-rank-not-uniform': _bug_pocket_rank_not_uniform,
+    'pocket-no-footprint': _bug_pocket_no_footprint,
     'wet-albedo-all-diffuse': _bug_wet_albedo_all_diffuse,
     'airlight-view-direction': _bug_airlight_view_direction,
     'beta-no-scale-height': _bug_beta_no_scale_height,
@@ -3541,6 +3577,72 @@ def _sec_bathy(ctx):
           'this file already owns as sqrt(H_0 L_0) with the slope divided out. '
           'No constant is added and the row says so by computing the '
           'excursion a second way.', 'm')
+    # ================== WAVE 12 · THE POCKETS: THE SAME SENTENCE, ONE LEVEL UP
+    #
+    # `sand_cover_fraction` is a closed form and `shade_land` was using it as a
+    # blending coefficient -- `bare = planed * (1 - cover)` -- which paints the
+    # EXPECTATION of a binary spatial mask. Bar H1's word is POCKETED and it
+    # means a quarter of the AREA, not every square metre being a quarter rock.
+    rng_p = np.random.default_rng(20260821)
+    pp = rng_p.uniform(0.0, 4000.0, (400000, 2))
+    rk = B.rock_rank(pp[:, 0], pp[:, 1])
+    check(1, 'the sub-grid rock surface\'s RANK field is uniform, ABSOLUTE',
+          [float(rk.mean()), float(rk.std())],
+          [0.5, 1.0 / math.sqrt(12.0)], 3e-3,
+          'IT HAS TO BE UNIFORM OR THE TIE TO THE CLOSED FORM BREAKS. The mask '
+          'is (rank > cover), so E[bare] = 1 - cover only if rank is uniform. '
+          'Interpolated hash noise is NOT -- the interpolant pulls mass to the '
+          'middle and its sd is 0.187 against 0.289 -- so it is remapped '
+          'through its own measured cdf. This row is what says the remap is '
+          'there and working; `--bug pocket-rank-not-uniform` removes it.')
+    for c in (0.10, 0.30, 0.50, 0.75, 0.90):
+        m = B.rock_bare_mask(pp[:, 0], pp[:, 1], np.full(pp.shape[0], c))
+        check(1, 'realised bare share at cover = %.2f is the closed form' % c,
+              float(m.mean()), 1.0 - c, 4e-3,
+              'THE IDENTITY THAT MAKES THE REALISATION FREE. Nothing about the '
+              'volume book moves -- `sand_cover_fraction` is still what decides '
+              'HOW MUCH rock shows, out of the Gaussian ponding integral -- and '
+              'the realisation decides only WHERE. The two are checked against '
+              'each other here and neither is built from the other.')
+    mb = B.rock_bare_mask(pp[:, 0], pp[:, 1], np.full(pp.shape[0], 0.5))
+    check(1, 'the mask the shader multiplies is BINARY at pocket scale, '
+          'ABSOLUTE',
+          float(np.mean((mb > 1e-9) & (mb < 1.0 - 1e-9))), 0.0, 0.0,
+          'Zero samples strictly between rock and sand, over 400000 of them. '
+          'The field waves 4-11 used put ALL of them in between, which is a '
+          'wash and not a pocket -- `--bug pockets-as-blend`. Reachable-zero, '
+          'ruling 14.')
+    for f, want_sd in ((B.ROCK_POCKET, 0.5), (10.0 * B.ROCK_POCKET, 0.05),
+                       (100.0 * B.ROCK_POCKET, 0.005)):
+        mf = B.rock_bare_mask(pp[:, 0], pp[:, 1], np.full(pp.shape[0], 0.5),
+                              foot=np.full(pp.shape[0], f))
+        check(1, 'the mask returns to its own mean at a %.0f m footprint' % f,
+              [float(mf.mean()), float(mf.std())], [0.5, want_sd], 5e-3,
+              'NOT ANTI-ALIASING, THE SAME STATEMENT ONE LEVEL UP: once a '
+              'pocket is sub-pixel the correct answer for that pixel IS the '
+              'area mean, and the area mean is `sand_cover_fraction`. The '
+              'expectation is held at every range and only the variance goes '
+              'away, which is the property a filter chosen for looks would not '
+              'have.')
+    # ---- the pocket SCALE moves the size and not the share -----------------
+    for lam in B.ROCK_POCKET_BRACKET:
+        ml = B.rock_bare_mask(pp[:, 0], pp[:, 1], np.full(pp.shape[0], 0.5),
+                              lam=lam)
+        check(1, 'the `?` in ROCK_POCKET does not move the bare share '
+              '(lam = %.1f m)' % lam, float(ml.mean()), 0.5, 5e-3,
+              'HOW A `?` THIS LANE CANNOT CLOSE IS HELD. The pocket scale is '
+              'declared and bracketed 0.7-6.0 m; what it changes is the SIZE '
+              'of a pocket and not how much rock shows, because the mean of '
+              'the mask is the closed form at any scale. So the unknown is '
+              'confined to a length the frame reports and cannot leak into the '
+              'volume book.')
+    # ---- and it is a property of the coast, not of the caller --------------
+    sub = pp[100:5000]
+    check(1, 'the pockets do not move when the camera does, ABSOLUTE',
+          float(np.abs(B.rock_rank(sub[:, 0], sub[:, 1]) - rk[100:5000]).max()),
+          0.0, 0.0,
+          'Hashed by lattice cell index, like the swash lattice above and for '
+          'the same reason. Reachable-zero.')
     check(1, 'tau_dry enters only as sqrt(ln N): the bracket, ABSOLUTE',
           [B.damp_limit_median(tau=B.SWASH_TAU_BRACKET[0]),
            B.damp_limit_median(),
