@@ -6,6 +6,11 @@ loop is running.
 
 ## How to run intake without interrogating anyone
 
+The user's one-line wish is a complete input. Composing the gauntlet — bar,
+lanes, dimensions, budget proposal, the contract itself — is *this* phase's
+job, never homework returned to the user; asking them to "write a proper
+gauntlet prompt" is the intake refusing to do its work.
+
 Most of the contract you can propose. Three things genuinely require the user:
 **the stop conditions**, **the kill criteria** and **the budget** — they encode
 how much of the user's time and money this run may spend, and you cannot infer

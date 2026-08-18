@@ -1,6 +1,6 @@
 ---
 name: gauntlet-loop
-description: Run an adversarial build-and-judge quality loop (Smart Gauntlet Loop) to push inspectable artifacts to a reachable target bar via autonomous rounds, spending judgement only where a decision lands and parking lanes that stop paying for themselves. Trigger on "gauntlet", "smart gauntlet loop", "blind critic", "beat the reference", "keep iterating until it wins", "make it as good as X". Do not trigger for ordinary code review or bug fixing.
+description: Run an adversarial build-and-judge quality loop (Smart Gauntlet Loop) to push inspectable artifacts to a reachable target bar via autonomous rounds, spending judgement only where a decision lands and parking lanes that stop paying for themselves. The user needs no method vocabulary and no prepared prompt — a one-line wish plus an artifact is complete input; the skill composes the contract, bar, lanes and budget itself. Trigger on any ask to iterate an inspectable artifact (page, docs, README, copy, design, render, code quality) toward high or comparable quality, "gauntlet", "make it as good as X / like [product]", "keep iterating / keep going until it's genuinely great", "don't stop after one pass", "professional / production / best-in-class quality", "10/10", "hold up against this reference or example", or when the user supplies reference material to match. Do not trigger for ordinary code review, bug fixing against failing tests, or small bounded edits.
 ---
 
 # Gauntlet Loop
@@ -49,6 +49,20 @@ the mantra even when the weakness it names is real.
 The weaknesses, their signals, and the guardrail each one buys, in one table:
 → `references/failure-modes.md`
 Provenance for each rule: → `references/authorities.md`
+
+## What the user must supply: almost nothing
+
+There is no "gauntlet prompt" to write, and never send a user away to write
+one. A one-line wish plus an artifact — "make this landing page genuinely
+good", "get these docs to the level of X" — is complete input. Composing the
+gauntlet is this skill's own Phase 0–2 work: first light produces something
+to look at, the bar is found and proposed (`references/bar-selection.md`:
+never ask the user to define "good"), the lanes are cut, the menu is priced,
+and the whole thing comes back as **one contract block to confirm, not a
+form to fill in**. The only three things genuinely theirs to decide — stops,
+kill criteria, budget — arrive as proposals with numbers attached. A user
+who does know the method can pre-specify any of it; a user who has never
+heard of it gives up nothing.
 
 ## When not to use this
 
