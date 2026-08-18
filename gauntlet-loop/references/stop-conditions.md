@@ -271,11 +271,15 @@ Never halt silently. On any stop:
 
 1. Finish the wave and run the smoother, unless the stop is a safety stop
 2. Promote the best champion, not necessarily the latest challenger
-3. `gauntlet.py board`, then `gauntlet.py report`, then complete the judgement
-   fields yourself — including what each parked lane would need to be worth
-   restarting
-4. State whether the loop was still improving when it stopped
-5. On a budget stop, make the extension offer — a priced block of waves, or an
+3. **Smoke test the final state**: open, run or render the promoted artifact
+   once, end to end, after the smoother's edits — the promoted-and-smoothed
+   state is the one state no critic ever judged as a whole. If it does not
+   open, that is a safety stop, not a shippable result.
+4. `gauntlet.py board`, then `gauntlet.py report`, then complete the judgement
+   fields yourself — the smoke test (what you opened, what you saw), and what
+   each parked lane would need to be worth restarting
+5. State whether the loop was still improving when it stopped
+6. On a budget stop, make the extension offer — a priced block of waves, or an
    honest recommendation to stop
 
 That last sentence is what tells the user whether to spend more. It is the most

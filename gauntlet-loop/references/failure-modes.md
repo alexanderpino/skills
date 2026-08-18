@@ -34,6 +34,7 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | Parked short of the target after repetition failed | same builder, same gap, park looming | one tournament round: two framings, blind, before the park |
 | Cost invisible until the bill | budget in waves, burn in tokens | `--budget-tokens`, `--tokens`, cost per gap in `status` |
 | Inspection rot | stale or repeated evidence | re-verify the path at every wave boundary |
+| Shipped unopened | the promoted-and-smoothed final state was never inspected as a whole | handoff smoke test at Phase 7, written into the report |
 | Nobody sees progress without interrupting | user asks "where are we?" | generated board |
 
 ## Critic sycophancy

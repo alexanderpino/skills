@@ -421,9 +421,15 @@ anything. Run `status`, then act:
 ## Phase 7 — Stop and hand off
 
 When a stop fires, finish the wave and the smoother (unless it is a safety stop),
-promote the best champion — not necessarily the latest challenger — then `board`
-and `report`. `report` drafts every section from the log; you add the one thing
-it cannot know, whether the bar was raised mid-run, and your honest read.
+promote the best champion — not necessarily the latest challenger — then **smoke
+test the deliverable in its final state**: open, run or render the promoted
+artifact once, end to end, *after* the smoother's edits. The promoted-and-
+smoothed state is otherwise the one state of the artifact nobody ever inspected
+as a whole — the smoother was the last writer and no critic judged its output.
+Handing that over unopened is the failure every tester recognises. Then `board`
+and `report`. `report` drafts every section from the log; you fill in the smoke
+test (what you opened, what you saw), the one thing it cannot know — whether the
+bar was raised mid-run — and your honest read.
 
 **The surplus is the deliverable.** The promise of this variant is the same
 result at lower cost, so when every lane retires with budget unspent, the

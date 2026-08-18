@@ -1853,6 +1853,14 @@ def cmd_report(args):
             lines += items
     lines += [
         "",
+        "## Handoff smoke test",
+        "",
+        "(lead agent: after promoting the best champion and running the smoother, open,"
+        " run or render the final artifact once, end to end. State what you opened and"
+        " what you saw — the promoted-and-smoothed state is otherwise the one state of"
+        " the artifact nobody ever inspected as a whole. 'Not run' is an answer the"
+        " reader deserves to see written down.)",
+        "",
         "## Distance to the stretch bar, if one was set",
         "",
         "(lead agent: the target bar is what retirement was judged against. If contract.md"
