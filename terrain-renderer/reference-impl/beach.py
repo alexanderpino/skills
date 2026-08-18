@@ -2966,6 +2966,415 @@ def evolve_coast(x, y, h0, hard, n_steps=400, expo_every=25, **kw):
     return h, expo, v_tot, v_exp, s_row, hist
 
 
+# =============================================================================
+# WAVE 13 -- THE SEA-LEVEL HISTORY, AND THE LADDER IT WRITES
+# =============================================================================
+# Wave 12 measured the coastal plateau at 45.4% of the hero frame, one declared
+# albedo, high-frequency sd 0.0009 of 255, and diagnosed it as an emerged MARINE
+# TERRACE -- chapter 12's own sea-level-history loop, named and not built. Wave
+# 13's first job was to TEST that diagnosis rather than build on it, and the
+# test is exact rather than plausible:
+#
+#   THE PLATEAU IS NEITHER A TERRACE NOR A RELAXATION ARTEFACT. IT IS THE
+#   INITIAL CONDITION, UNTOUCHED.
+#
+# `initial_coast` returns `S_PLAIN * (x - X_SHORE0)` repeated over y, and on the
+# 4000-step run 14 423 of 22 339 cells satisfy |h - h0| < 1e-9 -- every one of
+# them landward of x = 688 m. Its per-column alongshore standard deviation is
+# 1.4e-14 m, i.e. machine precision on a field the loop is supposed to have
+# worked. A far-field RELAXATION artefact (the other candidate) would show the
+# opposite signature on both counts: it is the Dean ramp's asymptote reached
+# from a disturbed state, so it carries a nonzero residual and inherits the
+# alongshore structure of whatever disturbed it. Neither is present. The
+# plateau is a declared ramp that no process in this file has ever run on.
+#
+# So the diagnosis SURVIVES as the identification -- a flat surface behind an
+# actively retreating cliff on an uplifting coast is an emerged terrace, and
+# nothing else in chapter 12 makes one -- and its PRESCRIPTION does not survive
+# intact. What the loop below shows is that this domain holds ONE TREAD and not
+# a flight, and the arithmetic is the chapter's own (see `terraces_in_domain`).
+#
+# ---------------------------------------------------------------- the forcing
+# The sea-level history is to the coastal loop what the offshore spectrum is to
+# the wave transform: standing ruling 5 says the wave field "arrives from
+# OUTSIDE with a stated offshore spectrum, so shoaling and refraction are
+# OUTPUTS and not inputs", and the same discipline applies here. The eustatic
+# curve and the uplift rate are STATED; every elevation, width and slope below
+# is an output of running them.
+
+EUSTATIC_PERIOD = 1.0e5     # yr, the late-Quaternary glacial cycle. The 100-kyr
+                            # world since the mid-Pleistocene transition. `?` in
+                            # the sense that nothing in this project measured
+                            # it, but it is not a free parameter of the model --
+                            # it is the forcing's period and the ladder's rung
+                            # spacing is LINEAR in it, which the suite sweeps.
+
+HIGHSTAND_DURATION = 1.0e4  # yr, how long an interglacial highstand holds still
+                            # enough to plane a bench. `?`. It sets the TREAD
+                            # WIDTH and nothing else, through `tread_width`.
+
+EUSTATIC_HIGHSTANDS = (8.0, 2.0, -5.0, 6.0, 0.0)
+                            # m, the eustatic level of each successive highstand,
+                            # OLDEST FIRST -- MIS 11, 9, 7, 5e, 1. `?` and quoted
+                            # from model knowledge, not verified against a
+                            # published curve, so it is marked and the suite is
+                            # written so that NOTHING depends on the particular
+                            # numbers: the ladder's closed form takes the tuple
+                            # as an argument and is checked against a uniform
+                            # tuple (where it must be an exact arithmetic
+                            # progression) and against this one (where it must
+                            # be that progression plus the stated offsets).
+
+UPLIFT_RATE = 3.0e-4        # m/yr = 0.30 mm/yr. `?` AND IT IS A FORCING, not a
+                            # fitted constant. Uplifting coasts run 0.1-3 mm/yr
+                            # (the Californian and New Zealand staircases
+                            # chapter 12 names as the textbook cases). What
+                            # bounds it HERE is the domain rather than the
+                            # photograph: the initial plain tops out at 44.0 m,
+                            # so a ladder whose first rung is above that has no
+                            # terrace in the frame at all, i.e. U <= 44.0/P =
+                            # 4.4e-4 m/yr at this period. 3.0e-4 sits inside
+                            # both brackets and the suite SWEEPS it, because the
+                            # claim is the closed form E_i = e_i + U*i*P - Z_p
+                            # and not this value of U.
+
+CLIFF_RETREAT_RATE = 0.10   # m/yr. Chapter 12's own bracket for cliff retreat is
+                            # 0.05-0.5 m/yr (it is quoted there against the
+                            # denudation rate). THIS IS THE LOOP'S CLOCK and it
+                            # is the only thing that converts `coastal_step`
+                            # iterations into years -- K_COAST is a rate per
+                            # STEP with no time in it, so the step is worth
+                            # `retreat per step / retreat per year` years and
+                            # `step_years` says so.
+
+DENUDATION_RATE = 3.0e-5    # m/yr = 0.03 mm/yr, subaerial lowering of a land
+                            # surface. Chapter 12's own bracket, 0.01-0.1 mm/yr,
+                            # quoted there. Used ONLY to convert a terrace's AGE
+                            # into the thickness of the mantle weathering has put
+                            # on it (`soil_mantle`) -- which is what decides
+                            # whether a tread reads as rock or as ground.
+
+
+def step_years(retreat_per_step, retreat_rate=CLIFF_RETREAT_RATE):
+    """How many years one `coastal_step` iteration is worth.
+
+    K_COAST is m per STEP per unit exposure and carries no time at all, so the
+    loop's clock is arbitrary until something outside it is fixed. The thing
+    outside it is chapter 12's cliff-retreat bracket, 0.05-0.5 m/yr. Measure the
+    loop's own retreat per step and the step is worth their quotient.
+
+    Measured on this scene: 189.46 m in 4000 steps = 0.047 m/step, so one step
+    is 0.09-0.95 yr and the whole 4000-step run is 379-3789 yr. THAT IS SHORTER
+    THAN AN INTERGLACIAL, which is the first half of the domain arithmetic.
+    """
+    return float(retreat_per_step) / float(retreat_rate)
+
+
+def tread_width(duration=HIGHSTAND_DURATION, retreat_rate=CLIFF_RETREAT_RATE):
+    """The cross-shore width a stand of `duration` years planes, KINEMATICALLY.
+
+    A shore platform is cut at the same rate the cliff retreats, because it IS
+    the ground the cliff has retreated across:  W = R * D.
+
+    At chapter 12's bracket and a 10-kyr highstand that is 500-5000 m, against
+    a 1000 m domain -- which is the finding, not a nuisance. See
+    `terraces_in_domain`.
+
+    THIS IS AN UPPER BOUND AND THE LOOP DOES NOT REACH IT, because the loop
+    carries a depth-limited attenuation the kinematic form does not: measured
+    here the bench runs 100 / 148 / 216 / 280 m at 1000 / 2000 / 4000 / 6400
+    steps, i.e. W ~ N^0.55 rather than N^1. Chapter 12 already records that the
+    attenuation does not produce a saturating width and marks the equilibrium
+    claim `?`; nothing here closes that, and the sublinearity is reported by
+    `platform_growth_exponent` rather than modelled.
+    """
+    return float(retreat_rate) * float(duration)
+
+
+def planation_depth(notch=NOTCH_HEIGHT, k_coast=K_COAST, n_steps=None,
+                    drive=1.0, hard=1.0, n_iter=200):
+    """The depth below the stand's own level that the notch planes its bench to.
+
+    THE ONE ELEVATION IN THE LADDER THAT IS NOT DECLARED. `coastal_step` cuts at
+    `k_coast * drive * exp(-(h - level)^2 / 2 notch^2) / hard` per step, so a
+    cell `z` below the level is being cut exponentially slowly. After N steps it
+    has been lowered by roughly `N * k_coast * drive * exp(-z^2/2 notch^2)/hard`,
+    and the bench sits where that equals `z`:
+
+        z = (K*N*drive/hard) * exp(-z^2 / (2*notch^2))
+
+    which is transcendental and is solved here by fixed-point iteration on
+    z = notch*sqrt(2*ln(K*N*drive/(hard*z))).
+
+    THE POINT OF THE FORM IS THE LOGARITHM. The bench level depends on the
+    clock only as sqrt(ln N), so it is set by NOTCH_HEIGHT and essentially not
+    by how long the stand lasted -- measured on this scene the bench sits at
+    -1.832 / -1.866 / -1.895 / -1.906 m at 1000 / 2000 / 4000 / 6400 steps, a
+    4% move for a 6.4x change in the clock. THAT is what lets a flight of
+    terraces read its own eustatic history back: every rung is cut to the same
+    depth below its own stand, so the DIFFERENCES between rungs are the sea
+    level's and the uplift's, with Z_p cancelling out of them exactly.
+    """
+    if n_steps is None:
+        n_steps = N_COAST                       # defined with the scene sizes
+    a = float(k_coast) * float(n_steps) * float(drive) / max(float(hard), 1e-12)
+    z = float(notch)
+    for _ in range(int(n_iter)):
+        arg = a / max(z, 1e-12)
+        if arg <= 1.0:
+            return 0.0
+        z_new = float(notch) * math.sqrt(2.0 * math.log(arg))
+        if abs(z_new - z) < 1e-13:
+            z = z_new
+            break
+        z = 0.5 * (z + z_new)
+    return z
+
+
+def terrace_ladder(n_stands=None, uplift=UPLIFT_RATE, period=EUSTATIC_PERIOD,
+                   eustatic=EUSTATIC_HIGHSTANDS, planation=None):
+    """THE ELEVATION LADDER. Chapter 12's marine-terrace section in closed form.
+
+    A bench cut at stand `i` (oldest first, `n-1` = the present one) was planed
+    to `e_i - Z_p` at the time, and has been lifted at `U` for the `(n-1-i)`
+    cycles since:
+
+        E_i = e_i + U * (n-1-i) * P  -  Z_p
+
+    Two consequences, and they are what the suite checks separately:
+
+      * the SPACING between successive rungs is `U*P + (e_i - e_{i+1})`, and Z_p
+        is not in it. With a uniform eustatic tuple the ladder is an EXACT
+        arithmetic progression of common difference `U*P` -- a control whose
+        answer is known before the loop is run (standing ruling 14).
+      * the OFFSET of the whole ladder is `-Z_p`, which is the loop's own
+        output and the only quantity here that is not declared.
+
+    Returns the elevations OLDEST FIRST, i.e. descending, so `out[0]` is the
+    highest and oldest rung and `out[-1]` is the present bench.
+    """
+    if planation is None:
+        planation = planation_depth()
+    if eustatic is None:
+        n = int(n_stands or 1)
+        eustatic = (0.0,) * n
+    eustatic = tuple(float(v) for v in eustatic)
+    if n_stands is not None and int(n_stands) != len(eustatic):
+        n = int(n_stands)
+        eustatic = (eustatic * (n // len(eustatic) + 1))[:n]
+    n = len(eustatic)
+    return np.array([eustatic[i] + uplift * (n - 1 - i) * period - planation
+                     for i in range(n)])
+
+
+def terraces_in_domain(plateau_width, duration=HIGHSTAND_DURATION,
+                       retreat_rate=CLIFF_RETREAT_RATE):
+    """How many rungs of the ladder the domain can hold. Arithmetic, no model.
+
+    A flight of `n` terraces needs `n` treads side by side, so it needs
+    `n * W` of cross-shore ground. The measured plateau here is 316 m (x = 688
+    to 1000, the untouched region) and one Quaternary highstand's tread is
+    500-5000 m, so the answer is BELOW ONE at every rate in chapter 12's
+    bracket. That is why this file builds a single emerged tread in the scene
+    and proves the ladder on a wider instrument domain instead.
+    """
+    return float(plateau_width) / max(tread_width(duration, retreat_rate), 1e-9)
+
+
+def overprint_threshold(retreat, s_sea, notch_depth=None):
+    """The smallest rung spacing `U*P` that leaves a LEGIBLE flight, metres.
+
+    NOT IN CHAPTER 12, and it is the reason a real uplifting coast either has a
+    staircase or has nothing. The competition is between the vertical offset
+    the uplift buys and the horizontal ground the next stand eats:
+
+      * after `h += uplift*period` the old tread stands `U*P - Z_p` above the
+        new sea level, so the new shoreline lands `(U*P - Z_p)/s_sea` SEAWARD
+        of the old tread's outer lip, on the shoreface of slope `s_sea`;
+      * the new stand then retreats `R` landward while it cuts its own bench.
+
+    The old tread survives as a separate rung iff the new stand does not reach
+    it:
+
+        (U*P - Z_p)/s_sea  >  R      <=>      U*P  >  Z_p + s_sea*R
+
+    BELOW THE THRESHOLD THE RUNGS DO NOT GET CLOSER TOGETHER -- THEY MERGE.
+    Each stand re-planes its predecessor and the flight collapses to ONE
+    surface at the youngest level, which is a qualitatively different landform
+    and not a staircase with fine treads. Measured on the instrument at
+    900 steps a rung and s_sea = 0.05: 4 rungs at U*P >= 4.6 m, 2 at 4.4 m and
+    1 at 4.2 m and below, against Z_p = 1.61 m -- so the transition is sharp
+    and it is at 2.7-2.9 Z_p.
+
+    `retreat` IS AN INPUT AND MUST BE MEASURED, and that is the one soft place
+    here. The first stand cuts from a wedge apex and retreats 101.6 m; the
+    stands after it start on a shoreface and the threshold above implies an
+    effective 58 m. Feeding the FIRST stand's retreat in over-predicts the
+    threshold by 45%. The FORM is derived; the retreat to put in it is the
+    loop's own output and is marked `?` until a stand-by-stand retreat law
+    exists -- which is chapter 12's unbounded-platform open problem seen from
+    a second side.
+    """
+    if notch_depth is None:
+        notch_depth = planation_depth()
+    return float(notch_depth) + float(s_sea) * float(retreat)
+
+
+def soil_mantle(age, rate=DENUDATION_RATE):
+    """The regolith a terrace tread has acquired since it emerged, metres.
+
+    Weathering lowers a land surface at chapter 12's own 0.01-0.1 mm/yr, and
+    what it lowers it INTO is a mantle. Over one 100-kyr cycle that is 1-10 m,
+    against a rock roughness (ROCK_ROUGH) of 0.25 m -- so `sand_cover_fraction`
+    of it is 1.000 and an old tread reads as ground rather than as rock. The
+    same arithmetic run backwards is the useful half: bare rock shows on a
+    tread only while the mantle is thinner than a roughness, i.e. for the first
+    `ROCK_ROUGH/rate` = 2.5-25 kyr after it emerges. THE LADDER'S RUNGS ARE
+    THEREFORE DISTINGUISHABLE BY THEIR BARE-ROCK SHARE, and that is a derived
+    signature of terrace AGE rather than a painted one.
+    """
+    return float(rate) * np.asarray(age, float)
+
+
+def bare_rock_age_limit(rough=None, rate=DENUDATION_RATE):
+    """The age at which a tread's mantle reaches one rock roughness, years."""
+    return (ROCK_ROUGH if rough is None else float(rough)) / float(rate)
+
+
+def evolve_coast_stands(x, y, h0, hard, stands, uplift=UPLIFT_RATE,
+                        period=EUSTATIC_PERIOD, expo_every=250, **kw):
+    """CHAPTER 12'S SEA-LEVEL-HISTORY LOOP, with its structure kept verbatim:
+
+        for stand in seaLevelHistory:            # each (level, duration)
+            repeat prop. duration:  coastalStep(h, stand.level, exposure)
+            h += upliftField * dt                # tectonics between stands
+
+    `stands` is a sequence of `(level_m, n_steps)`, OLDEST FIRST, and the last
+    one is the present stand -- its level is the datum the whole scene is
+    referred to. Between stands the land is lifted by `uplift * period`, which
+    is the "h += upliftField * dt" line and the only place tectonics enters.
+
+    TWO-LAYER BOOKKEEPING, and it costs one array. `h` is the surface and
+    `h_rock` is the rock beneath it: erosion lowers both (the notch cuts rock),
+    deposition raises only `h` (the deposit is sediment). `h - h_rock` is then
+    the regolith the loop actually put there, and it is carried up with the
+    tread when the land is lifted -- which is what makes an emerged tread's
+    cover fraction an OUTPUT of the history rather than a mask somebody drew.
+    Nothing about the single-stand result changes: with one stand and no uplift
+    this reproduces `evolve_coast` to the bit, and the suite carries that row.
+
+    Returns (h, h_rock, exposure, volume, exported, sand_row, record) where
+    `record` has one entry per stand with its level, step count, and the age of
+    its bench at the end of the run.
+    """
+    h = np.asarray(h0, float).copy()
+    h_rock = h.copy()
+    dx = float(x[1] - x[0])
+    dy = float(y[1] - y[0])
+    v_tot = 0.0
+    v_exp = 0.0
+    s_row = np.zeros(h.shape[0])
+    rec = []
+    n = len(stands)
+    for i, (level, n_steps) in enumerate(stands):
+        n_steps = int(n_steps)
+        expo = None
+        for s in range(n_steps):
+            if s % expo_every == 0:
+                expo = fetch_exposure(x, y, h, sea_level=level)
+            h_before = h
+            h, v, ex, sr = coastal_step(h, hard, expo, dx, dy,
+                                        sea_level=level, **kw)
+            # THE ROCK SURFACE FOLLOWS THE CUT AND NOT THE FILL. Wherever the
+            # step lowered the surface, rock was removed and the rock surface
+            # goes with it; wherever it raised the surface, sediment was added
+            # and the rock stays where it was. One min(), no coefficient.
+            h_rock = np.minimum(h_rock, h)
+            v_tot += v
+            v_exp += ex
+            s_row = s_row + sr
+            del h_before
+        rec.append(dict(level=float(level), n_steps=n_steps,
+                        age=(n - 1 - i) * float(period),
+                        mantle=float(soil_mantle((n - 1 - i) * float(period)))))
+        if i < n - 1:
+            lift = float(uplift) * float(period)
+            h = h + lift
+            h_rock = h_rock + lift
+    expo = fetch_exposure(x, y, h, sea_level=stands[-1][0])
+    return h, h_rock, expo, v_tot, v_exp, s_row, rec
+
+
+def terrace_levels(x, h2, slope_max=0.02, min_width=40.0, tol=1.5,
+                   z_min=None):
+    """MEASURE THE LADDER BACK OFF A BUILT SURFACE. The other half of the proof.
+
+    A terrace tread is a run of ground flatter than anything else on the
+    profile: the planation slopes this loop produces are 1:476 to 1:2403
+    (measured), the initial plain is 1:12.5 and the cliff is 1:0.71, so a
+    threshold at 1:50 separates them by more than an order of magnitude on both
+    sides and nothing here is tuned between them.
+
+    Per row: find contiguous runs with |dh/dx| < slope_max wider than
+    `min_width`, take each run's MEDIAN elevation, then cluster the levels
+    across all rows with `tol` metres of tolerance. Returns a list of dicts,
+    highest first, with the level, the total width and the number of rows.
+
+    THE MEDIAN AND NOT THE MEAN, and the reason is this project's own repeated
+    error class: a tread with a riser accidentally caught at one end has a mean
+    pulled off the tread and a median that is still on it.
+    """
+    x = np.asarray(x, float)
+    h2 = np.atleast_2d(np.asarray(h2, float))
+    dx = float(x[1] - x[0])
+    n_min = max(int(round(min_width / dx)), 2)
+    found = []
+    for j in range(h2.shape[0]):
+        g = np.abs(np.gradient(h2[j], dx))
+        flat = g < slope_max
+        if z_min is not None:
+            flat &= h2[j] > z_min
+        i = 0
+        while i < flat.size:
+            if not flat[i]:
+                i += 1
+                continue
+            k = i
+            while k < flat.size and flat[k]:
+                k += 1
+            if k - i >= n_min:
+                found.append((float(np.median(h2[j][i:k])), (k - i) * dx))
+            i = k
+    if not found:
+        return []
+    found.sort(key=lambda t: -t[0])
+    out = []
+    cur = [found[0]]
+    for lv, w in found[1:]:
+        if abs(lv - np.median([c[0] for c in cur])) <= tol:
+            cur.append((lv, w))
+        else:
+            out.append(cur)
+            cur = [(lv, w)]
+    out.append(cur)
+    return [dict(level=float(np.median([c[0] for c in g])),
+                 width=float(np.mean([c[1] for c in g])),
+                 n_rows=len(g)) for g in out]
+
+
+def platform_growth_exponent(widths, steps):
+    """The power the bench's width grows with the clock at, log-log.
+
+    Chapter 12 records that the depth-limited attenuation "does not bound the
+    platform" and marks the equilibrium-width claim `?`. This returns the
+    number that says how far from bounded it is: 1.0 is unattenuated (the
+    kinematic W = R*D), 0.0 is saturated. Measured here: 0.55.
+    """
+    w = np.log(np.asarray(widths, float))
+    s = np.log(np.asarray(steps, float))
+    return float(np.polyfit(s, w, 1)[0])
+
+
 def shoreline_x(x, h2, sea_level=SEA_LEVEL):
     """The seaward edge of continuous land, per alongshore row, interpolated.
 
@@ -4384,6 +4793,104 @@ def run_coast(dx=DX_COAST, dy=DY_BAY, x_len=X_LEN_BAY, y_half=Y_HALF_BAY,
                exported=exported, sand_row=s_row,
                hist=hist, x_s=shoreline_x(x, h),
                x_s0=shoreline_x(x, h0), dx=dx, dy=dy)
+    _BAY_CACHE[key] = out
+    return out
+
+
+TERRACE_STANDS = 4          # rungs the instrument builds. Four is the fewest
+                            # that makes the arithmetic-progression test
+                            # non-trivial: three points fit a line through two
+                            # of them, four do not.
+TERRACE_STEPS = 900         # coastal-loop iterations per stand on the
+                            # instrument. NOT a physical duration -- it is the
+                            # clock set so that each tread is wide enough to be
+                            # separated by `terrace_levels` and narrow enough
+                            # that four of them fit the instrument's domain.
+                            # `tread_width` says what a real highstand would
+                            # cut and `terraces_in_domain` says how many of
+                            # those fit the SCENE, which is the finding.
+
+
+TERRACE_UPLIFT = 5.0e-5     # m/yr on the INSTRUMENT ONLY, so that U*P = 5.0 m
+                            # per rung. It is not the scene's uplift and is not
+                            # meant to be: what bounds it is the instrument's
+                            # own relief, by the same arithmetic
+                            # `uplift_ceiling` states -- a flight of n rungs
+                            # needs (n-1)*U*P of relief BELOW the first stand's
+                            # shoreline for the sea to still have somewhere to
+                            # be after the land has been lifted n-1 times. The
+                            # suite sweeps this and the ladder must track it
+                            # linearly; that is the claim, not the number.
+
+
+def uplift_ceiling(relief, n_stands, period=EUSTATIC_PERIOD):
+    """The largest uplift rate a domain with `relief` metres of it can hold a
+    flight of `n_stands` in.
+
+    THE VERTICAL TWIN OF `terraces_in_domain`, and a flight is bounded by both.
+    Each `h += uplift*dt` between stands lifts the whole grid, so the sea must
+    still find ground at its own level afterwards: after `n-1` lifts that is
+    ground which started `(n-1)*U*P` below the first stand's shoreline. Run a
+    history past this ceiling and the domain emerges completely -- the loop
+    then runs on dry land, erodes nothing, and returns a single flat surface,
+    which is exactly what the first run of the instrument here did.
+    """
+    return float(relief) / max((int(n_stands) - 1) * float(period), 1e-9)
+
+
+def run_terrace(n_stands=TERRACE_STANDS, n_steps=TERRACE_STEPS,
+                uplift=TERRACE_UPLIFT, period=EUSTATIC_PERIOD,
+                eustatic=EUSTATIC_HIGHSTANDS, x_len=2400.0, dx=8.0,
+                y_half=96.0, dy=32.0, x_shore=1600.0, s_sea=0.05,
+                s_plain=S_PLAIN, uniform=False):
+    """THE INSTRUMENT: a domain wide and deep enough to hold a flight, so that
+    the closed form can be checked against a realisation.
+
+    Standing ruling 14 -- a measurement is worthless until the control whose
+    answer is known in advance has been built. Here the control is the ladder
+    itself: `terrace_ladder` says where the rungs must land before the loop is
+    run, and `terrace_levels` reads them off the surface afterwards without
+    ever seeing the closed form. Two routes, no shared source.
+
+    THE INITIAL CONDITION IS A PLAIN WEDGE AND NOT `initial_coast`, deliberately.
+    A control's starting surface should have no feature that could be mistaken
+    for the answer, and the Dean ramp has one: its slope at the offshore end of
+    a 2 km domain is 0.007, which is inside the same order as the planation
+    slopes the loop produces (0.0004-0.0021), so a flat-run detector would have
+    to be tuned to separate them. A straight 1:20 seabed is 25x the planation
+    slope and needs no tuning. The scene's bed keeps the Dean ramp; chapter 12
+    requires it there and this is not there.
+
+    `uniform=True` flattens the eustatic tuple to all-zero, which is the
+    STRONGER control: the ladder is then an exact arithmetic progression of
+    common difference `uplift*period`, so an error in the uplift bookkeeping
+    shows up as a non-constant difference rather than as an offset -- and the
+    offset is the only thing `planation_depth` can be wrong about.
+    """
+    key = ('terrace', n_stands, n_steps, uplift, period, x_len, dx, y_half, dy,
+           x_shore, s_sea, s_plain, bool(uniform), tuple(eustatic or ()))
+    if key in _BAY_CACHE:
+        return _BAY_CACHE[key]
+    x = np.arange(0.0, x_len + dx, dx)
+    y = np.arange(-y_half, y_half + dy, dy)
+    h1 = np.where(x >= x_shore, s_plain * (x - x_shore),
+                  s_sea * (x - x_shore))
+    h0 = np.repeat(h1[None, :], y.size, axis=0)
+    hard = hardness_field(x, y, uniform=True)
+    eus = ((0.0,) * n_stands if uniform
+           else tuple(eustatic)[-n_stands:])
+    stands = [(eus[i], n_steps) for i in range(n_stands)]
+    h, h_rock, expo, vol, exp_, s_row, rec = evolve_coast_stands(
+        x, y, h0, hard, stands, uplift=uplift, period=period)
+    out = dict(x=x, y=y, h0=h0, h=h, h_rock=h_rock, hard=hard, expo=expo,
+               vol=vol, exported=exp_, sand_row=s_row, record=rec,
+               stands=stands, eustatic=eus, uplift=uplift, period=period,
+               dx=dx, dy=dy, x_shore=x_shore, s_sea=s_sea,
+               relief=float(s_sea * x_shore),
+               ladder=terrace_ladder(eustatic=eus, uplift=uplift,
+                                     period=period,
+                                     planation=planation_depth(
+                                         n_steps=n_steps)))
     _BAY_CACHE[key] = out
     return out
 
