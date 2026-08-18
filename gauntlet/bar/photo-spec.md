@@ -930,3 +930,71 @@ qualitatively, so implementation is now licensed. The discipline that remains:
 **Open question for the owner, not blocking:** how deep does the falloff run —
 centimetres, or tens of centimetres? It is the one number that would turn a fitted
 parameter into a measured one.
+
+## L · The pool at night, lit from inside — added mid-run by owner ruling
+
+A ninth photograph, and **not** of the reference pool: a different pool at Lagos
+(Portugal), 37.10 N 8.67 W, 2026-08-18, evening. Exact clock time **`?`** —
+supplied as "in the evening", never as a timestamp, and it must not be assumed.
+Camera **`?`**: the earlier frames are an iPhone 16 Pro, this one is not stated,
+and a night frame is very likely multi-frame stacked, so **its radiometry is
+evidence for ORDERING and MECHANISM only, never for absolute level.** Read
+section J2c before quoting any number off it.
+
+### Why this frame is worth more than a ninth daytime frame
+
+**It inverts the illuminant.** Every other photograph in this bar has the source
+*outside* the water: sun and sky refract in, the bed reflects, the light escapes.
+This one has submerged luminaires — **the source is inside the water** — and the
+sky term is gone entirely, because it is night.
+
+That inversion is the sharpest test this bar can offer, because it puts the
+chapter's central asymmetry on the outside of the picture instead of inside a
+correction term. The two sides of one interface are `R_ext = 6.669%` diffuse from
+outside against `R_int = 47.617%` diffuse from inside, a ratio of **7.14×**, and
+`R_int` decomposes as `1 − 1/n² = 43.874%` past the critical angle plus `3.743%`
+of partial Fresnel inside the cone. In daylight that asymmetry is a term. Here it
+**is the composition**.
+
+### What the frame shows, and what each observation tests
+
+1. **The deck is nearly black and the water is bright.** In every daytime frame
+   the deck is the brighter of the two. The inversion is not a lighting choice —
+   it is the escape cone. A submerged source can only leave through the Snell
+   cone, a disc of half-angle `θ_c = asin(1/n) = 48.6°` about the vertical;
+   everything outside it is totally internally reflected. **A renderer that treats
+   the surface as a partial reflector from below will spill light onto the deck
+   and fail this frame at a glance.**
+2. **The bed is lit far more evenly than a single lamp explains.** The light TIR'd
+   back down is the reason: past the critical angle the surface is a *perfect*
+   mirror, so the water body acts as a light box with a near-lossless ceiling.
+   The bed's evenness is a consequence of `1 − 1/n²`, and it is measurable.
+3. **The mosaic tile grid is resolved across most of the bed.** This is a texture
+   and geometry criterion, not an optical one — and it is the kind of thing the
+   overriding rule says the tell will be.
+4. **The water body's own glow separates cleanly.** With no sun and no sky, the
+   in-scattering along the view ray and the bed's reflected light are the *only*
+   two terms. In daylight they cannot be separated; here they can. This is the
+   frame that can falsify a renderer which has tuned one to cover for the other.
+5. **The steps and the ladder are lit from below** and read pale against the
+   water — a geometry check on the near field.
+6. **Small floating debris sits on the surface**, a few specks. Not a criterion;
+   recorded so nobody models it as a defect.
+
+### What this frame must NOT be used for
+
+- **Absolute radiometry.** Night mode stacks frames and lifts shadows non-linearly;
+  the black surround is almost certainly crushed. Ordering and mechanism only.
+- **Water colour against section A.** The lamp's own spectrum is unknown, and a
+  white-balance solve on a scene lit by one unknown source is under-determined.
+  Section A stands on the daylight frames.
+- **Anything about the reference pool.** This is a different pool, a different
+  liner, a different depth. It tests the *physics*, not the *scene*.
+
+### The criterion
+
+A render of this configuration is at the bar when the deck is dark **because the
+escape cone made it dark**, the bed is even **because the ceiling is a mirror past
+48.6°**, and both fall out of the same interface code that the daylight frames
+already use — with **no night-specific constant anywhere**. Owner ruling, standing:
+*het moet komen door natuurkundige effecten.*
