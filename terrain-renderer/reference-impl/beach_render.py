@@ -757,6 +757,50 @@ def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0):
     interior is lit THROUGH ITS OWN WALL and that lighting it with ambient sky
     misses the whole mechanism. The same is true of a wave face two orders
     smaller.
+
+    WAVE 13 -- THE TWO INVARIANTS THE MARCH CLAIMED AND DID NOT CARRY, and
+    together they were the whole of the sea-sky seam.
+
+    The paragraph above ends "The chord is where it exits", and `shade_water`'s
+    own docstring says of this term "It is zero when the chord is zero". THE
+    CODE DID THE OPPOSITE. `g_prev` was initialised to ZERO -- an assumption
+    that the traced entry point lies exactly ON the free surface -- so on the
+    FIRST step the crossing refinement evaluated
+
+        frac = g_prev / (g_prev - g) = 0 / (0 - g) = 0
+
+    and a ray that was reported as having exited immediately accumulated a
+    chord of EXACTLY zero. `exp(-(a + b_b) * 0)` is 1, so the term returned
+    `L_in` undiminished: THE FULL SOLAR BEAM THROUGH ZERO METRES OF WATER,
+    added on top of terms 1-3.
+
+    IT FIRED WHERE THE TRACE IS ILL-CONDITIONED, WHICH IS THE HORIZON. The
+    water intersection is four Newton steps on `z(t) = eta`, and its update
+    `dt = (eta - z)/d_z` divides by a ray z-component that goes to zero at
+    grazing: at 0.06 deg below the horizontal `d_z` is 6e-4 and the step is
+    kilometres. The traced point then sits metres ABOVE the free surface, the
+    first march step is still in air, `g < 0` fires, and the pixel collects an
+    undimmed sun. Measured on frame K at 30 km: chord exactly 0.0 for every
+    pixel of the first ten water rows, and 26% of them lit -- 0.588 of green
+    radiance added to a sky of 1.273. That IS the seam.
+
+    So the two invariants are asserted rather than assumed:
+
+      (1) THE MARCH STARTS FROM THE GAP IT ACTUALLY HAS. `g_prev` is the real
+          `eta - z` at the entry point. If the tracer is exact it is zero and
+          nothing changes; if it is not, the refinement sees the truth. A ray
+          whose entry point is ABOVE the surface never entered the water and
+          has no chord to report.
+      (2) A PATH OF NO LENGTH CARRIES NO TRANSPORT. This term is, by its own
+          definition, the sun's radiance ATTENUATED BY THE WATER IT CROSSED;
+          with no water crossed there is nothing to see through and what the
+          eye receives along that ray is the surface, which terms 1-3 already
+          carry in full. Including it double-counts the sun. `chord > 0` is not
+          a threshold and not a tuned epsilon -- it is the exact statement that
+          the ray was inside the medium for a finite length.
+
+    Neither is a constant and neither was chosen to make the picture right:
+    both are restatements of what the two docstrings already promised.
     """
     eta_r = 1.0 / OPT.IOR[1]                 # green's; the chord is geometric
     T = np.stack(OPT.refract(D[..., 0], D[..., 1], D[..., 2],
@@ -767,7 +811,11 @@ def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0):
     chord = np.zeros(P.shape[:-1])
     exited = np.zeros(P.shape[:-1], bool)
     Q = P.copy()
-    g_prev = np.zeros(P.shape[:-1])                 # eta - z, positive in water
+    # (1) THE GAP AT THE ENTRY POINT, MEASURED. Positive in water. Zero for an
+    # exact tracer hit, which is what the old `np.zeros` asserted without ever
+    # checking it.
+    g_prev = free_surface(w, P[..., 0], P[..., 1], t_now) - P[..., 2]
+    entered = g_prev >= 0.0
     for m in range(n_step):
         Qn = Q + T * step
         e = free_surface(w, Qn[..., 0], Qn[..., 1], t_now)
@@ -781,7 +829,11 @@ def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0):
         chord = np.where(exited, chord, chord + step * np.clip(frac, 0.0, 1.0))
         exited = exited | out
         Q, g_prev = Qn, g
-    chord = np.where(exited, chord, 0.0)
+    # (2) A FACE IS A CROSSING OF FINITE LENGTH, and the three clauses are the
+    # three ways there is no face: the ray never entered the water, it never
+    # found a far side, or it found one at zero range.
+    face = entered & exited & (chord > 0.0)
+    chord = np.where(face, chord, 0.0)
     # the far side's own normal, where the beam gets in
     zx, zy = surface_slope(w, Q[..., 0], Q[..., 1], t_now)
     Nf = np.stack([-zx, -zy, np.ones_like(zx)], -1)
@@ -792,7 +844,7 @@ def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0):
     a = BO.iops()['a'][None, None] * np.ones_like(L_in)
     bb = BO.iops()['b_b'][None, None] * np.ones_like(L_in)
     L = L_in * np.exp(-(a + bb) * chord[..., None])
-    return L * np.where(exited, 1.0, 0.0)[..., None], chord, lit
+    return L * face[..., None], chord, lit
 
 
 def shade_land(w, P, D, parts=None, foot=None):
