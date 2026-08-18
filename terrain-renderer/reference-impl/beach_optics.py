@@ -820,7 +820,19 @@ WIND_AZ = 315.0         # deg, the direction the wind blows TOWARD, in the same
                         # path's width changes by at most 28% with it.
 
 
-def slope_pdf(zx, zy, u10=U10, wind_az=WIND_AZ):
+def wind_axes(wind_az=WIND_AZ):
+    """The unit vectors of the wind's own frame in world axes (+x E, +y N).
+
+    `u` along the wind, `c` across it, matching `slope_pdf`'s own rotation --
+    written once so the realisation below and the density here cannot drift
+    apart, which is the failure mode a second copy of two lines of trigonometry
+    has in every file this project has written."""
+    ph = math.radians(wind_az)
+    return (np.array([math.sin(ph), math.cos(ph)]),
+            np.array([-math.cos(ph), math.sin(ph)]))
+
+
+def slope_pdf(zx, zy, u10=U10, wind_az=WIND_AZ, var=None):
     """The Cox-Munk slope probability density, anisotropic, per unit slope^2.
 
     Gaussian, NOT the Gram-Charlier series. Cox & Munk's own paper adds skewness
@@ -828,14 +840,360 @@ def slope_pdf(zx, zy, u10=U10, wind_az=WIND_AZ):
     peak and more in the far wings, and they are `?` here because this file
     reports a WIDTH -- a half-maximum -- which the corrections move far less
     than they move the wings. Recorded as a known omission and NOT as a
-    negligible one: the wings are where a glitter path's faint outer edge is."""
-    su2, sc2 = cox_munk_mss(u10)
+    negligible one: the wings are where a glitter path's faint outer edge is.
+
+    `var` OVERRIDES the two variances with (sigma_u^2, sigma_c^2), and it is the
+    hook the realisation needs: once part of the slope is DRAWN, the density
+    left to describe the rest carries only the variance that was not drawn.
+    Arrays are allowed and broadcast, because the split is per pixel."""
+    su2, sc2 = cox_munk_mss(u10) if var is None else var
+    su2 = np.maximum(np.asarray(su2, float), 1e-12)
+    sc2 = np.maximum(np.asarray(sc2, float), 1e-12)
     ph = math.radians(wind_az)
     # the wind's own axes: `u` along the wind, `c` across it
     zu = np.asarray(zx, float) * math.sin(ph) + np.asarray(zy, float) * math.cos(ph)
     zc = -np.asarray(zx, float) * math.cos(ph) + np.asarray(zy, float) * math.sin(ph)
-    return (1.0 / (2.0 * np.pi * math.sqrt(su2 * sc2))
+    return (1.0 / (2.0 * np.pi * np.sqrt(su2 * sc2))
             * np.exp(-0.5 * (zu * zu / su2 + zc * zc / sc2)))
+
+
+# ===================== THE REALISATION, AND WHY THE DISTRIBUTION IS NOT ONE
+# WAVE 12, AND IT IS THE LARGEST SINGLE DEFECT THIS PROJECT HAS SHIPPED IN THE
+# WATER. Waves 4-11 shaded every pixel of the sea with `slope_pdf` itself --
+# the ENSEMBLE MEAN of the glint distribution -- and never with a sample of it.
+# The consequence is two symptoms that look unrelated and are one defect:
+#
+#   * the glitter path is a smooth slab. Its interior standard deviation in the
+#     shipped frame is 1.0-2.6 grey levels over 144 pixels, and its right edge
+#     falls 255 -> 118 over 45 pixels with NOT ONE non-monotone step. A
+#     photograph of a glitter path is granular at every scale: single facets
+#     clip and dark water stays between them.
+#   * the water body is flat. The alongshore high-frequency standard deviation
+#     of the open sea is 0.2-0.8 grey levels, which is a painted vertical
+#     gradient rather than a surface.
+#
+# BOTH ARE THE SAME MISSING OBJECT: a realisation of the small-scale slope
+# field. The first is the glint term evaluated at the mean; the second is the
+# SKY-REFLECTION term evaluated on a normal that carries only the swell.
+#
+# THE STATEMENT THAT MAKES IT A RENDERER CLAIM AND NOT A SCENE FIX. Let the
+# facet slope at a point be the sum of what the pixel RESOLVES and what it does
+# not:
+#
+#       z  =  z_res  +  z_sub                                          (R1)
+#
+# The two are independent -- they are disjoint bands of the same wavenumber
+# spectrum -- so the density of the total is the CONVOLUTION
+#
+#       p_tot(z)  =  INT p_res(z_r) p_sub(z - z_r) dz_r                (R2)
+#
+# and the correct shading of one pixel is `p_sub` evaluated at `z* - z_res`,
+# where z* is the slope that mirrors the sun into the eye and z_res is DRAWN.
+# Shading with `p_tot(z*)` instead is exactly (R2) with p_res = delta: it
+# declares the whole surface unresolved, at every scale, including a near-field
+# pixel 20 cm across on a sea whose roughness is centimetres. THE ENSEMBLE MEAN
+# IS THE CORRECT ANSWER FOR A PIXEL THE SIZE OF THE ENSEMBLE AND FOR NO OTHER.
+#
+# So the fix is not "add noise": it is to MOVE variance from `p_sub` to `p_res`
+# by the amount the pixel can carry, and the total is conserved identically.
+# That is why the width law survives -- the path's width is a readout of the
+# TOTAL mean square slope and the total does not move -- and it is the
+# verification this file is built around rather than a hope.
+#
+# ---- WHERE THE SPLIT IS, AND IT IS LOGARITHMIC -----------------------------
+# The partition needs the slope spectrum, and the saturation range supplies it
+# with nothing left to choose. Phillips (1958): in the equilibrium range the
+# omnidirectional elevation spectrum is
+#
+#       Psi(k) = B k^-4
+#
+# so the slope spectrum is k^2 Psi(k) and the mean square slope below a cutoff
+# is
+#
+#       mss(<k_c) = INT_{k_0}^{k_c} k^2 Psi(k) 2 pi k dk
+#                 = 2 pi B ln(k_c / k_0)                               (R3)
+#
+# -- LOGARITHMIC in the cutoff. Two consequences follow and both are used:
+#
+#   (1) EQUAL VARIANCE PER LOGARITHMIC BAND. Octaves of wavenumber carry equal
+#       slope variance, which is what makes a sum over geometric bands the
+#       natural synthesis and what makes the amplitude of each band a
+#       CONSEQUENCE rather than a setting.
+#   (2) THE AMPLITUDE B IS NOT FREE. Requiring (R3) over the whole range to
+#       return Cox & Munk's measured mss fixes 2 pi B = mss / ln(k_cap/k_0).
+#       The SHAPE is Phillips, the AMPLITUDE is Cox & Munk, and the anisotropy
+#       is Cox & Munk's two variances. There is no constant here chosen to make
+#       the picture right, which is this project's standing ruling 3.
+#
+# THE UPPER LIMIT IS THE GRAVITY-CAPILLARY CUTOFF and it is derived, not
+# declared: the wavenumber of MINIMUM phase speed, where surface tension takes
+# over from gravity,
+#
+#       k_cap = sqrt(rho g / sigma)
+#
+# which for clean sea water is 372 rad/m, a 1.69 cm wave. Above it the surface
+# is stiffened by tension and the saturation range ends; Cox & Munk's clean-sea
+# mss is the integral up to about there. sigma is the one number imported for
+# this and it is `P`.
+#
+# THE LOWER LIMIT IS THE WIND SEA'S OWN PEAK AND IT COMES FROM THE SAME WIND.
+# The saturation range begins at the spectral peak, and for a fully developed
+# sea Pierson & Moskowitz (1964) put that peak at omega_p = 0.877 g / U10, so
+#
+#       k_p = omega_p^2 / g = 0.769 g / U10^2
+#
+# -- 0.21 rad/m at U10 = 6 m/s, a 30 m wave. Nothing new is declared: the same
+# U10 that sets the mss sets the range the mss is spread over, which is what
+# makes the whole construction a one-parameter object.
+#
+# AND THE SWELL IS A DIFFERENT SEA. This scene's offshore boundary condition is
+# a 10 s swell at k_0 = 0.040 rad/m -- a factor of five BELOW the wind-sea peak
+# and outside this range entirely -- and the render already draws it as
+# geometry. Its resolved slope variance is measured and SUBTRACTED from the
+# budget, so the surface is not rough twice and the total returns Cox & Munk's
+# mss exactly. `shade_water`'s comment has claimed that subtraction since wave
+# 4 and the code never did it; it does now.
+SIGMA_AW = 0.0728       # N/m, clean water/air surface tension near 20 C. `P`
+RHO_SW = 1025.0         # kg/m^3, the same sea water the sediment balance uses
+PM_OMEGA_P = 0.877      # Pierson & Moskowitz (1964), omega_p = a g / U10. `P`
+
+
+def pm_peak_wavenumber(u10=U10, g=9.80665):
+    """The fully-developed wind-sea peak, rad/m: k_p = (a g/U)^2/g."""
+    return (PM_OMEGA_P * g / np.asarray(u10, float)) ** 2 / g
+
+
+def capillary_cutoff(sigma=SIGMA_AW, rho=RHO_SW, g=9.80665):
+    """The gravity-capillary wavenumber of minimum phase speed, rad/m.
+
+    c^2 = g/k + sigma k/rho is minimised at k = sqrt(rho g / sigma); it is the
+    shortest wave the gravity saturation range reaches and the natural upper
+    limit of the slope integral. 372 rad/m, a 1.69 cm wave, for clean sea
+    water -- and a slick raises sigma's effective value, which is precisely the
+    mechanism Cox & Munk's own slick measurements isolated."""
+    return math.sqrt(rho * g / sigma)
+
+
+K_CAP = capillary_cutoff()
+
+
+def mss_fraction_below(k_c, k_lo, k_hi=None):
+    """(R3): the share of the mean square slope carried below a cutoff.
+
+    ln(k_c/k_lo) / ln(k_hi/k_lo), clipped to [0, 1]. A pure consequence of the
+    k^-4 saturation range and the reason a pixel's footprint decides how much
+    of the sea it can draw and how much it must still integrate over."""
+    k_hi = K_CAP if k_hi is None else k_hi
+    r = np.log(np.maximum(np.asarray(k_c, float), 1e-30) / k_lo)
+    return np.clip(r / math.log(k_hi / k_lo), 0.0, 1.0)
+
+
+def spread_weights(su2, sc2):
+    """The directional spreading that returns Cox & Munk's TWO variances.
+
+    A component travelling at angle theta to the wind, with slope amplitude A,
+    contributes A^2 cos^2(theta)/2 to sigma_u^2 and A^2 sin^2(theta)/2 to
+    sigma_c^2. Put M >= 5 components on a fan equally spaced over [0, pi) with
+
+        A_j^2 = C (alpha cos^2 th_j + beta sin^2 th_j)
+
+    and every trigonometric sum closes exactly, because sums of exp(i m th_j)
+    vanish for m = 2 and m = 4 as soon as M >= 5:
+
+        SUM cos^4 = 3M/8,  SUM cos^2 sin^2 = M/8,  SUM cos^3 sin = 0
+
+    so  sigma_u^2 = (CM/16)(3 alpha + beta),  sigma_c^2 = (CM/16)(alpha + 3
+    beta), and the CROSS-covariance is zero identically rather than to within
+    sampling. Inverting with CM/16 = 1:
+
+        alpha = (3 sigma_u^2 - sigma_c^2)/8,  beta = (3 sigma_c^2 - sigma_u^2)/8
+
+    Both are positive whenever the two variances are within a factor of three,
+    and Cox & Munk's ratio runs 0.64 (U = 1 m/s) to 1.65 (U -> inf) -- inside
+    that window at every wind, which is a property of the published relation
+    and is checked as a row rather than assumed here.
+
+    THE FAN SPANS [0, pi) AND NOT [0, 2 pi), AND THAT IS A CORRECTION THIS WAVE
+    MADE TO ITSELF. A fan of M equally spaced directions over the full circle
+    with M EVEN contains M/2 ANTIPARALLEL PAIRS, and a plane wave at theta and
+    one at theta + pi are the same wave: their phases sum to a constant, the
+    cross term <sin psi_j sin psi_{j+M/2}> is -cos(phi_j + phi_{j+M/2})/2 and
+    does NOT vanish. The design moments -- which assume independence -- were
+    then right and the field's actual variance was 7% and 26% low in the two
+    axes with a 5% spurious cross-correlation. The moment sums are algebra and
+    could not see it; only sampling the field and measuring it could, which is
+    why that measurement is a row and not a comment. Over [0, pi) every
+    direction is a distinct wave line and the same identities still close."""
+    a = (3.0 * su2 - sc2) / 8.0
+    b = (3.0 * sc2 - su2) / 8.0
+    if a <= 0.0 or b <= 0.0:
+        raise ValueError('the two slope variances differ by more than 3x; a '
+                         'cos^2 fan cannot represent that spreading')
+    return a, b
+
+
+def _sinc(u):
+    """sin(u)/u, unnormalised, with the removable singularity handled.
+
+    This is the exact transfer function of a BOX average -- which is what a
+    pixel does to the surface under it, and what `downsample` then does again
+    to the samples. Using it rather than a smooth roll-off matters: the whole
+    partition below is an energy budget, and only the true filter makes the
+    resolved and unresolved shares add to the total."""
+    u = np.asarray(u, float)
+    return np.where(np.abs(u) < 1e-8, 1.0 - u * u / 6.0,
+                    np.sin(u) / np.where(np.abs(u) < 1e-8, 1.0, u))
+
+
+class SlopeRealisation:
+    """ONE SAMPLE of the Cox-Munk slope field, band by band.
+
+    A sum of `n_band` geometric wavenumber bands, each carrying an equal share
+    of the variance (which is (R3)'s equal-variance-per-octave), each drawn as
+    `n_dir` plane waves on the fan `spread_weights` fixes, each with a random
+    phase from a seeded generator. The result is a Gaussian slope field whose
+    two second moments are Cox & Munk's by construction and whose spectrum is
+    Phillips' by construction, evaluated at ARBITRARY world points -- which is
+    what a ray tracer needs and what a texture cannot give.
+
+    NOT AN ELEVATION FIELD, AND THAT IS A STATED APPROXIMATION. The realisation
+    perturbs the surface NORMAL and not the ray intersection. Its own
+    amplitudes are a = A/k, which for the band that carries most of the slope
+    (k ~ 100 rad/m) is under a millimetre; displacing the intersection by that
+    changes the range by nothing and the normal by everything, so the normal is
+    where it is spent. It is the one place this file trades geometry for
+    statistics and it is marked here rather than buried.
+    """
+
+    def __init__(self, u10=U10, wind_az=WIND_AZ, k_lo=None, k_hi=None,
+                 carried=None, n_band=16, n_dir=7, seed=1954):
+        if n_dir < 5:
+            raise ValueError('the fan needs at least five directions or the '
+                             'fourth-order sums do not close')
+        su2, sc2 = cox_munk_mss(u10) if carried is None else carried
+        if su2 <= 0.0 or sc2 <= 0.0:
+            raise ValueError('nothing left to carry')
+        self.u10, self.wind_az = u10, wind_az
+        self.su2, self.sc2 = float(su2), float(sc2)
+        self.k_lo = float(pm_peak_wavenumber(u10) if k_lo is None else k_lo)
+        self.k_hi = float(K_CAP if k_hi is None else k_hi)
+        self.n_band, self.n_dir = int(n_band), int(n_dir)
+        # --- the bands: geometric, so each carries 1/n_band of the variance
+        edges = np.geomspace(self.k_lo, self.k_hi, self.n_band + 1)
+        self.k_edges = edges
+        self.k = np.sqrt(edges[:-1] * edges[1:])        # the log-band centre
+        al, be = spread_weights(self.su2, self.sc2)
+        rng = np.random.default_rng(seed)
+        # a per-band offset so the fans of different bands do not line up and
+        # draw a lattice; it is a rotation of an isotropic construction and
+        # moves no moment.
+        off = rng.uniform(0.0, math.pi, self.n_band)
+        th = (math.pi * np.arange(self.n_dir)[None] / self.n_dir
+              + off[:, None])                            # (n_band, n_dir)
+        self.theta = th
+        c2, s2 = np.cos(th) ** 2, np.sin(th) ** 2
+        # A_j^2 with C = 16/M, then the per-band share 1/n_band
+        a2 = (16.0 / self.n_dir) * (al * c2 + be * s2) / self.n_band
+        self.A = np.sqrt(a2)                             # slope amplitudes
+        self.phase = rng.uniform(0.0, 2.0 * math.pi, th.shape)
+        # world-frame propagation direction of each component. In the wind
+        # frame it is (cos th, sin th); `wind_axes` rotates it.
+        u_hat, c_hat = wind_axes(wind_az)
+        self.dx = np.cos(th) * u_hat[0] + np.sin(th) * c_hat[0]
+        self.dy = np.cos(th) * u_hat[1] + np.sin(th) * c_hat[1]
+        self.cu = np.cos(th)                             # projection onto u
+        self.cc = np.sin(th)                             # projection onto c
+
+    # ------------------------------------------------------------------ moments
+    def design_variance(self):
+        """(sigma_u^2, sigma_c^2) the construction is supposed to carry.
+
+        Returned from the amplitudes and the fan, NOT from the inputs -- so a
+        row that compares this against `cox_munk_mss` is comparing the built
+        object with the published relation and not a number with itself."""
+        return (float((self.A ** 2 * self.cu ** 2).sum() / 2.0),
+                float((self.A ** 2 * self.cc ** 2).sum() / 2.0))
+
+    def design_covariance(self):
+        return float((self.A ** 2 * self.cu * self.cc).sum() / 2.0)
+
+    def band_variance(self):
+        """The slope variance in each band. Equal by construction, and that
+        equality IS the k^-4 saturation range."""
+        return (self.A ** 2).sum(1) / 2.0
+
+    def elevation_spectrum(self):
+        """Psi(k) recovered from the band amplitudes, m^4/rad^2.
+
+        Band b holds slope variance V_b spread over an annulus of width dk, so
+        k^2 Psi 2 pi k dk = V_b and Psi = V_b / (2 pi k^3 dk). A log-log fit of
+        this against k must return the exponent -4 -- which is the row that
+        catches a synthesis with the right total and the wrong spectrum."""
+        dk = np.diff(self.k_edges)
+        return self.band_variance() / (2.0 * np.pi * self.k ** 3 * dk)
+
+    # ------------------------------------------------------------------- sampling
+    def slope(self, x, y, foot_c=None, foot_a=None, ea=None, trunc=30.0):
+        """The realised slope at world points, and the variance it leaves.
+
+        `foot_c`, `foot_a`  the pixel's footprint on the water, metres, across
+                            and along the view. A component is averaged over
+                            that rectangle, which multiplies its amplitude by
+                            sinc(k.e_a L_a/2) sinc(k.e_c L_c/2) -- the exact
+                            box transfer function. Pass None for "resolve
+                            everything", which is the k_cap limit and is the
+                            control ruling 14 asks for.
+        `ea`                the horizontal view direction, (..., 2), unit. The
+                            footprint's long axis. Only used when a footprint
+                            is given.
+
+        Returns dict(zx, zy, su2_res, sc2_res). The two variances are what the
+        realisation ACTUALLY carried at this footprint; the caller subtracts
+        them from the budget and gives the remainder to `slope_pdf`. That
+        subtraction is what makes (R2) hold pixel by pixel instead of on
+        average, and it is the difference between this and a normal map."""
+        x = np.asarray(x, float)
+        y = np.asarray(y, float)
+        zx = np.zeros(x.shape)
+        zy = np.zeros(x.shape)
+        vu = np.zeros(x.shape)
+        vc = np.zeros(x.shape)
+        filt = foot_c is not None
+        if filt:
+            La = np.asarray(foot_c if foot_a is None else foot_a, float)
+            Lc = np.asarray(foot_c, float)
+            ea = np.asarray(ea, float)
+            eax, eay = ea[..., 0], ea[..., 1]
+            ecx, ecy = eay, -eax
+        for b in range(self.n_band):
+            kb = self.k[b]
+            for j in range(self.n_dir):
+                dx, dy = self.dx[b, j], self.dy[b, j]
+                amp = self.A[b, j]
+                if filt:
+                    ua = 0.5 * kb * (dx * eax + dy * eay) * La
+                    uc = 0.5 * kb * (dx * ecx + dy * ecy) * Lc
+                    live = (np.abs(ua) < trunc) & (np.abs(uc) < trunc)
+                    if not live.any():
+                        continue
+                    f = np.where(live, _sinc(ua) * _sinc(uc), 0.0)
+                else:
+                    f = 1.0
+                s = np.sin(kb * (dx * x + dy * y) + self.phase[b, j])
+                g = -amp * f * s
+                zx += g * dx
+                zy += g * dy
+                a2 = (amp * f) ** 2 / 2.0
+                vu += a2 * self.cu[b, j] ** 2
+                vc += a2 * self.cc[b, j] ** 2
+        return dict(zx=zx, zy=zy, su2_res=vu, sc2_res=vc)
+
+    def residual(self, su2_res, sc2_res, floor=1e-9):
+        """What is LEFT for the density, per pixel. The complement, and the
+        floor is there only so a fully resolved pixel does not divide by zero
+        -- it is 1e-9 of slope variance, five orders below anything drawn."""
+        return (np.maximum(self.su2 - np.asarray(su2_res, float), floor),
+                np.maximum(self.sc2 - np.asarray(sc2_res, float), floor))
 
 
 # --- THE RADIANCE, DERIVED, BECAUSE THE JACOBIAN IS THE WHOLE PHYSICS ---------
@@ -867,18 +1225,31 @@ def slope_pdf(zx, zy, u10=U10, wind_az=WIND_AZ):
 # tilt gain, and it is the term a renderer that normalises glitter to a flat
 # surface silently throws away.
 def glitter_radiance(sun_dir, view_dir, e_sun=None, u10=U10, wind_az=WIND_AZ,
-                     shadow=True):
+                     shadow=True, slope0=None, var=None):
     """Specular sea-surface radiance toward the observer.
 
     `sun_dir`   unit vector TOWARD the sun, world axes (+x E, +y N, +z up)
     `view_dir`  unit vector of PROPAGATION from the eye into the scene, so its
                 z is negative when looking down at the sea
+    `slope0`    (..., 2) the slope the pixel has already RESOLVED -- the swell
+                plus whatever `SlopeRealisation` drew. The density is then
+                evaluated at z* - slope0, which is (R2) done pixel by pixel.
+    `var`       (sigma_u^2, sigma_c^2) left UNRESOLVED, the complement of what
+                `slope0` carries. Arrays allowed; they are per pixel.
     returns     (..., 3) radiance
+
+    WITH BOTH OMITTED THIS IS EXACTLY WAVES 4-11: slope0 = 0 and var = the full
+    Cox & Munk pair, which is (R2) with p_res = delta -- the ensemble mean. The
+    closed-form width functions below call it that way deliberately, because a
+    WIDTH is a statement about the ensemble and must not be measured on one
+    sample of it.
 
     `shadow` applies the Smith/Bourlier-style bistatic shadowing factor for a
     Gaussian surface, which is what keeps the horizon from going infinite: at
     theta_v -> 90 the 1/cos(theta_v) in the Jacobian diverges and the real
-    surface hides its own far slopes. It is derived beside its own function."""
+    surface hides its own far slopes. It is derived beside its own function. It
+    uses the TOTAL mss and not the residual, because shadowing is a property of
+    the whole run of the surface toward the horizon and not of one band of it."""
     s = np.asarray(sun_dir, float)
     v = np.asarray(view_dir, float)
     v = v / np.linalg.norm(v, axis=-1, keepdims=True)
@@ -891,7 +1262,11 @@ def glitter_radiance(sun_dir, view_dir, e_sun=None, u10=U10, wind_az=WIND_AZ,
     cos_om = np.clip((s * n).sum(-1), 0.0, 1.0)
     cos_tv = np.maximum(r[..., 2], 1e-6)     # view zenith cosine, upward leg
     e = ATM.E_SUN if e_sun is None else np.asarray(e_sun, float)
-    p = slope_pdf(zx, zy, u10, wind_az)
+    if slope0 is not None:
+        s0 = np.asarray(slope0, float)
+        zx = zx - s0[..., 0]
+        zy = zy - s0[..., 1]
+    p = slope_pdf(zx, zy, u10, wind_az, var=var)
     out = (OPT.fresnel(cos_om) * e
            * (p / (4.0 * cos_beta ** 4 * cos_tv))[..., None])
     if shadow:
