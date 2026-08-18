@@ -934,19 +934,53 @@ parameter into a measured one.
 ## L · The pool at night, lit from inside — added mid-run by owner ruling
 
 A ninth photograph, and **not** of the reference pool: a different pool at Lagos
-(Portugal), 37.10 N 8.67 W, 2026-08-18, evening. Exact clock time **`?`** —
-supplied as "in the evening", never as a timestamp, and it must not be assumed.
-Camera **`?`**: the earlier frames are an iPhone 16 Pro, this one is not stated,
-and a night frame is very likely multi-frame stacked, so **its radiometry is
-evidence for ORDERING and MECHANISM only, never for absolute level.** Read
-section J2c before quoting any number off it.
+(Portugal), 37.1028 N 8.6741 W, **2026-08-18 21:27 WEST**. Camera **`?`**: the
+earlier frames are an iPhone 16 Pro, this one is not stated, and a night frame is
+very likely multi-frame stacked, so **its radiometry is evidence for ORDERING and
+MECHANISM only, never for absolute level.** Read section J2c before quoting any
+number off it.
+
+### The illuminant, computed rather than assumed
+
+`atmosphere.solar_position(37.1028, -8.6741, 2026, 8, 18, 21, 27, tz=1.0)`:
+
+| | |
+|---|---|
+| geometric elevation | **−12.712°** |
+| apparent elevation | **−12.781°** |
+| azimuth (compass) | **297.20°** — WNW |
+| air mass | **undefined** |
+| declination | 12.881° |
+| equation of time | −3.787 min |
+
+The evening's boundaries at this place, from the same routine: apparent sunset
+**20:28**, civil twilight ends **20:50**, nautical twilight ends **21:23**,
+astronomical twilight ends **21:58**. The frame was taken **four minutes after
+the end of nautical twilight** and half an hour before full astronomical dark.
+
+**So the sky term is not literally zero, and an earlier draft of this section
+overstated it.** The sun is 12.78° below the horizon; there is a residual
+astronomical-twilight sky, and if any of it is visible in the frame it is a faint
+gradient toward **WNW**, not a uniform black. What is true — and it is the useful
+statement — is that the residual is orders below the submerged lamps, so the
+frame is *effectively* lamp-only. That is now a **derived** claim rather than an
+assumed one, which is the whole difference.
+
+**The undefined air mass is a finding, not a nuisance.** Kasten–Young is only
+defined above the horizon and returns `nan` here, with a `RuntimeWarning` from a
+negative base raised to a fractional power. Any code path that feeds a
+below-horizon illuminant into an air-mass extinction produces `nan` or garbage
+**silently**, because a `nan` multiplied into a radiance field propagates without
+raising. A guard belongs on that boundary, and section L is the frame that would
+have exposed it.
+
 
 ### Why this frame is worth more than a ninth daytime frame
 
 **It inverts the illuminant.** Every other photograph in this bar has the source
 *outside* the water: sun and sky refract in, the bed reflects, the light escapes.
 This one has submerged luminaires — **the source is inside the water** — and the
-sky term is gone entirely, because it is night.
+sky term is four minutes past the end of nautical twilight and orders below them.
 
 That inversion is the sharpest test this bar can offer, because it puts the
 chapter's central asymmetry on the outside of the picture instead of inside a
