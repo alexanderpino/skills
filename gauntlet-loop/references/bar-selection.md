@@ -144,6 +144,39 @@ If that exceeds the budget, fix it now, and say which fix you chose:
 A run that starts knowing it cannot reach its target has already decided to
 disappoint someone. The only cheap moment to fix that is before wave 1.
 
+## When the target is impossible — say so, with the number
+
+Some targets fail the reachability property against physics, not against the
+budget: a 2× speedup asked of an inner loop the profile already shows at the
+memory-bandwidth floor, lossless compression below the measured entropy, a
+latency target under one network round-trip. No wave count reaches those.
+Taking the contract anyway converts an honest "no" at minute five into a
+budget stop at wave 8 that breaks the same news for more money — and quietly
+lowering the target instead delivers something the user did not ask for under
+the name of what they did.
+
+The refusal has to earn itself, in both directions:
+
+- **Substantiate it.** "That is impossible" carries weight only with the
+  measurement or the floor argument attached — the profile, the bandwidth
+  arithmetic, the bound it hits. First light is where this evidence comes
+  from: measure before arguing. An unsubstantiated "impossible" is the same
+  failure as an unsubstantiated "amazing", pointed the other way.
+- **Bound it.** Almost nothing is impossible outright; it is impossible
+  *under stated constraints*. Say which: within this algorithm, this data
+  layout, this hardware, this scope. The bounds tell the user which door is
+  still open — and whether opening it is a re-cut, a new contract, or not
+  worth it at all.
+- **Offer the reachable target.** State the nearest target the measurement
+  does support, and price it. "2× is not reachable inside this loop — it is
+  bandwidth-bound at 94% of peak; 1.3× is, from the two measured stalls" is a
+  contract. "Sorry, impossible" is a door closed on someone who still has a
+  problem.
+
+Then the user chooses: the reachable target, the structural change, or no run
+at all. What is never on offer is accepting the impossible target and letting
+the budget stop deliver the verdict later.
+
 ## Raising the bar mid-run
 
 If the artifact passes the target with rounds left, the bar was set too low. That

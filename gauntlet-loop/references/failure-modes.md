@@ -93,6 +93,13 @@ run can plausibly land inside the budget (`bar-selection.md`). Do it before wave
 target that is provably out of reach is a rescope conversation with the user, not
 something to grind against.
 
+When the target is not merely ambitious but *disproved* — first light's
+measurement already sits at a floor the target lies below — do not rescope
+silently. Refuse it with the measurement, the bounds it holds under ("within
+this algorithm, on this hardware"), and the nearest reachable number
+(`bar-selection.md`). An honest "no" before wave 1 is the cheapest verdict
+this method can produce.
+
 ## Zombie lane
 
 **Signal.** The same lane keeps getting funded, round after round, with the same

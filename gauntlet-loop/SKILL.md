@@ -189,6 +189,13 @@ Act on what the step returns, and say which branch you took.
 - A **projection that misses the budget** means rescope before wave 1 — drop the
   lowest-ranked lane, lower the target (the old one becomes the stretch), or ask
   for more budget.
+- A **target the first measurement already disproves** — a 2× speedup asked of a
+  loop the profile shows at its hardware floor — is refused before wave 1, with
+  the number. Say what the measured ceiling is, under which constraints it holds,
+  what would have to change to move it (a different algorithm, a different
+  scope: a different contract), and the nearest target that *is* reachable.
+  Running waves toward a proven impossibility spends the budget re-proving the
+  first measurement. → `references/bar-selection.md`
 
 Two exemptions, because first light runs before `init` exists: its verdict is the
 one comparison not logged — record it in `contract.md` instead — and it runs
