@@ -1167,6 +1167,10 @@ def cmd_extend(args):
     print("Record the extension in contract.md, run `board`, then resume at the wave boundary.")
 
 
+def _ceil(x):
+    return int(x) + (x % 1 > 0)
+
+
 def _climb_rounds(score, target, rpg):
     """Estimated rounds for one lane to climb from `score` to `target`.
 
@@ -1258,8 +1262,7 @@ def cmd_quote(args):
             print(f"  {t:<8}{'0':<8}{'0':<8}{'0':<14}already there — raise the bar or stop")
             continue
         total = sum(per_lane.values())
-        waves = max(max(per_lane.values()), total / wip)
-        waves = int(waves) + (waves % 1 > 0)
+        waves = _ceil(max(max(per_lane.values()), total / wip))
         calls = _projected_calls(waves, list(lane_scores), wip)
         tok_s = f"~{int(total * tpr):,}" if tpr else "not measured"
         fit = ("fits" if waves <= budget_left
@@ -1339,8 +1342,7 @@ def cmd_plan(args):
             return 0, 0, 0
         # Makespan bound: no shorter than the longest lane, no shorter than the
         # total spread over the WIP slots.
-        waves = max(max(per_lane.values()), tot / wip)
-        waves = int(waves) + (waves % 1 > 0)
+        waves = _ceil(max(max(per_lane.values()), tot / wip))
         calls = _projected_calls(waves, sorted(per_lane), wip)
         return waves, calls, int(tot * tpr) if tpr else 0
 
@@ -1372,7 +1374,11 @@ def cmd_plan(args):
         "## Stage 1 — Bootstrap: every dimension judged once",
         f"Dimensions never judged: {fmt(bootstrap)}",
         "(unpriced until judged — first light or the bootstrap wave sets the number)"
-        if bootstrap else "(empty — every declared dimension has a verdict)",
+        if bootstrap else (
+            "(empty — every declared dimension has a logged verdict)" if rounds else
+            f"(priced from --current-score {args.current_score} — first light's verdict; "
+            "each dimension still logs its own first verdict in wave 1)"
+        ),
         "",
     ]
     w2, c2, t2 = stage_price(to_usable, lambda tgt: usable_line(tgt))

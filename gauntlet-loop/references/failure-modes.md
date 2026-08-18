@@ -15,7 +15,10 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | Critic turns agreeable | everything passes; gaps get vaguer | forced winner, severity + named evidence |
 | Builder learns the critic, not the bar | output matches the critic's phrasing | frozen bar, rotated framing, randomised labels |
 | Bar erosion | comparisons quietly get easier | bar files re-read from disk each wave |
-| Unreachable bar | every round loses; scores never move | target vs stretch, `--target-score` |
+| Unreachable bar | every round loses; scores never move | target vs stretch, `--target-score`; a disproved target gets an evidenced refusal at intake |
+| Target chosen blind to its price | "aim for a 9" agreed with no cost attached | the quality-price menu (`quote`): rungs priced at intake, 10 shown as a wall |
+| A rung nobody defined | scores argued mid-run because "8" means nothing | rung anchors in the contract — anchors choose, the frozen bar judges |
+| Budget spent in the wrong order | one dimension at 9 while another sits at 2 | usable-line ranking + staged `plan`: usable everywhere before lovable anywhere |
 | Every round wins, the whole gets worse | wave 10 worse than wave 6 | champion/challenger revert, per-dimension bars |
 | A lane grinds against a ceiling | same gap round after round, still funded | `no-progress` park, re-cut |
 | Progress theatre | rounds logged, artifact unchanged | per-round evidence, diff champions |

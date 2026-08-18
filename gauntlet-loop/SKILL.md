@@ -218,29 +218,22 @@ whole contract — goal, target bar, budget, stops — confirmed in one exchange
 The full table below is for long unattended runs, where the fields you skip are
 the ones nobody can add later.
 
-**Price the target as a menu, before asking for the budget.** `quote` turns
-first light's score into the quality-price menu — what 7, 8 and 9 cost in
-waves, calls and tokens, and that 10 is not a price (bar-met cannot fire
-there). Put that table in the contract so TARGET and BUDGET are chosen
-together: a user who sees 9 cost three times 7 picks a rung on purpose, in
-either direction. Fully autonomous with no rung named? Default to 7 and record
-the menu in `contract.md`, so the choice they did not make stays visible.
+**Price the target as a menu, and anchor its rungs.** `quote` turns first
+light's score into the quality-price menu — what 7, 8 and 9 cost, and that 10
+is not a price (bar-met cannot fire there). A rung must also *mean* something:
+three questions per ambitious dimension — what must n/10 concretely do; where
+is "I would ship this"; what is explicitly *not* needed — become one anchor
+line per rung in `contract.md`, so the offer reads anchor + price and TARGET
+and BUDGET are chosen together (`references/intake.md`). Anchors are for
+choosing, never for judging — the critic still scores against the frozen bar.
+Autonomous with no rung named? Default to 7 and record the menu, so the
+unmade choice stays visible.
 
-**Anchor the rungs before selling them.** A rung on the menu means nothing
-until the user knows what an 8 *is* for their artifact. Two or three questions
-per ambitious dimension — what must 7 concretely do; what does "I would ship
-this" look like; what is explicitly *not* needed — become one anchor line per
-menu rung in `contract.md`, so the offer reads "8/10 = 'kits react to stadium
-lighting at replay distance' — ~10 waves", not a bare number. Anchors are for
-*choosing* rungs, never for judging: the critic still scores against the
-frozen bar (`references/bar-selection.md`).
-
-**Then hang the run on the scaffold.** `plan` drafts `gauntlet/plan.md`: the
-build stages in order — bootstrap until every dimension is judged, everything
-to its usable line, only then the ambitious rungs, stretch on a grant only —
-each stage priced. You add the anchors and the serialised pairs; regenerate it
-at wave boundaries, where the prices move from the intake guess to measured
-actuals. The workbench looks backward; the plan looks forward.
+**Then hang the run on the scaffold.** `plan` drafts `gauntlet/plan.md` — the
+build stages in order (bootstrap → everything to usable → the ambitious rungs
+→ stretch on a grant), each priced; you add the anchors and the serialised
+pairs. Regenerate at wave boundaries, where prices move from the intake guess
+to measured actuals. The workbench looks backward; the plan looks forward.
 
 Fields, each explained in `intake.md`: **goal** (destination, not route) ·
 **target bar** per dimension · optional **stretch** · **inspection** (and which

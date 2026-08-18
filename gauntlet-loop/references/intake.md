@@ -23,6 +23,8 @@ one with a one-line justification and let them override it.
 GOAL     <destination, one sentence — not an implementation plan>
 BAR KIND <reference | acceptance criteria | hybrid>
 TARGET   <the concrete comparator, where its files live, and the score it sits at>
+RUNGS    <per ambitious dimension: what n/10 concretely is (anchor) and what it
+         costs (from `quote`) — the chosen rung becomes that dimension's target>
 STRETCH  <optional ambition — direction only, never a stop condition>
 INSPECT  <how a critic reaches the real output each round; which dimensions have
          machine gates that need no critic at all>

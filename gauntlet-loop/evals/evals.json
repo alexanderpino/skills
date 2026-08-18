@@ -53,6 +53,24 @@
         "A report was produced: gauntlet/report.md exists and lists the open gaps from the log (the passive call-to-action gap and the closing/objection gap)",
         "The run ends with a decision for the user: a priced extension offer (waves and approximate call cost) presented as the user's choice, or an explicit recommendation to stop \u2014 not silent continuation and not an unpriced 'shall I keep going?'"
       ]
+    },
+    {
+      "id": 3,
+      "eval_name": "build-order-first",
+      "prompt": "My API docs are in docs.md, and reference-docs.md is the docs of an API I think is documented brilliantly. Make mine hold up against it. What I care about most is the writing \u2014 the polish and clarity \u2014 honestly I'd love that at a 9. Keep the whole thing to about 3 waves, work autonomously, don't ask me questions.",
+      "expected_output": "Decomposes the clarity-9 wish into per-dimension targets with anchors, drafts the staged plan, funds the weak completeness dimension to usable before buying clarity polish above 7, shows the priced rung choice, and reports honestly.",
+      "files": [
+        "docs.md",
+        "reference-docs.md"
+      ],
+      "assertions": [
+        "A forward plan exists: gauntlet/plan.md is present and carries the staged build order (a 'Climb to usable' stage before higher rungs)",
+        "The blanket ambition was decomposed: clarity and completeness are separate declared dimensions with differentiated targets (config dimension_targets or an explicit per-dimension split in the contract), the clarity-9 wish recorded rather than silently adopted or silently dropped",
+        "Build order respected: the weak dimension (completeness) was funded from the first wave, and no round bought clarity polish above the usable line while completeness was still below its own usable line",
+        "The price was shown: the contract or final answer presents the rung choice with its cost (quality-price menu or equivalent priced statement), not an unpriced 'aiming for 9'",
+        "The completeness holes were actually closed: final docs.md covers authentication, errors, and pagination (the reference's core sections a client developer needs)",
+        "Budget respected and reported honestly: no wave logged past the agreed budget, and the report/final answer names what is still open rather than declaring victory"
+      ]
     }
   ]
 }
