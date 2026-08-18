@@ -55,6 +55,11 @@ DEFAULT_CONFIG = {
     # crawling: it is both the Kanban WIP limit and the main token control.
     "wip_limit": 3,
     "dimensions": ["overall"],
+    # Per-dimension target overrides ({dim: 1-10}); stops.target_score is the
+    # default for dimensions not named here. A blanket "10/10" request is
+    # decomposed into these at intake — the same 10 that is merely expensive
+    # on one dimension is unreachable by iteration on another.
+    "dimension_targets": {},
     "lanes": [],
     "bar_kind": "reference",
     # Granted budget extensions, appended by `extend`. The run's history of
@@ -115,6 +120,12 @@ def initial_budget(cfg):
 
 def parked_keys(cfg):
     return {(p["lane"], p["dimension"]) for p in cfg.get("parked") or []}
+
+
+def target_for(cfg, dimension):
+    """The target score this dimension retires against: its own entry in
+    dimension_targets, or the run default in stops."""
+    return (cfg.get("dimension_targets") or {}).get(dimension, cfg["stops"]["target_score"])
 
 
 def load_rounds(root):
@@ -178,6 +189,34 @@ def cmd_init(args):
             "ambition as a stretch in contract.md",
             file=sys.stderr,
         )
+    if args.dimension_targets:
+        dt = {}
+        for part in args.dimension_targets.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if "=" not in part:
+                die(f"--dimension-targets entries are dim=score, got {part!r}")
+            d, _, v = part.partition("=")
+            d = d.strip()
+            try:
+                v = int(v.strip())
+            except ValueError:
+                die(f"dimension target for {d!r} must be an integer 1-10, got {v.strip()!r}")
+            if not (1 <= v <= 10):
+                die(f"dimension target for {d!r} must be between 1 and 10")
+            if d not in cfg["dimensions"]:
+                die(f"dimension {d!r} in --dimension-targets is not declared "
+                    f"({', '.join(cfg['dimensions'])})")
+            if v == 10:
+                print(
+                    f"warning: target 10 on {d!r} means bar-met can never fire on that "
+                    "dimension — it could only retire on clean-streak evidence. Put the 10 "
+                    "in the stretch line and set the target where the bar actually is",
+                    file=sys.stderr,
+                )
+            dt[d] = v
+        cfg["dimension_targets"] = dt
     if old and args.budget_waves is not None and \
             args.budget_waves != (old.get("stops") or {}).get("budget_waves"):
         print(
@@ -216,6 +255,10 @@ def cmd_init(args):
     lanes = len(cfg["lanes"]) or 1
     per_wave = min(lanes, cfg["wip_limit"]) * CALLS_PER_LANE_ROUND + CALLS_PER_WAVE_OVERHEAD
     print(f"initialised {root}/ — freeze bar artifacts into {root}/bar/ before wave 1")
+    if cfg.get("dimension_targets"):
+        print("per-dimension targets: "
+              + ", ".join(f"{d}={v}" for d, v in sorted(cfg["dimension_targets"].items()))
+              + f" (default {cfg['stops']['target_score']} for the rest)")
     if old:
         print(
             "re-cut: budget, stops, WIP limit, gates, parks and extensions carried across. "
@@ -367,7 +410,7 @@ def cmd_log_round(args):
             die("the named gap is too thin to build against — say what differs and where")
         rec["severity"] = args.severity
         rec["gap"] = args.gap or "none"
-        target = cfg["stops"]["target_score"]
+        target = target_for(cfg, args.dimension)
         if args.severity == "major" and args.score >= target:
             print(
                 f"warning: score {args.score} is at or above the target of {target} but severity is "
@@ -404,7 +447,7 @@ def cmd_log_round(args):
     print(f"logged: wave {rec['wave']} lane {rec['lane']} [{rec['dimension']}] {rec['mode']} → {rec['winner']} ({rec['margin']})")
 
 
-def _streaks(records, stops):
+def _streaks(records, target):
     """Compute trailing streaks over bar-mode records, ordered as logged.
 
     Lifecycle streaks count deciding verdicts only. A screening-tier win can
@@ -415,9 +458,10 @@ def _streaks(records, stops):
     A bar-met round must also sit at or above the target with no major gap.
     Winning the comparison while scoring below the bar, or while a major gap
     stays open, is not the bar being met — counting it was how a lane could
-    retire at 3/10 with an open major gap and read as a success.
+    retire at 3/10 with an open major gap and read as a success. The target
+    is per dimension (target_for): a run can hold gameplay to 8 and graphics
+    to 6 without one number lying about both.
     """
-    target = stops["target_score"]
     bar_met = clean = 0
     for r in reversed(records):
         if r["winner"] == "ours" and r.get("severity") != "major" and r["score"] >= target:
@@ -486,7 +530,7 @@ def _dimension_trend(bar_recs, window=4):
     return {"improving": improving, "note": ", ".join(bits)}
 
 
-def _stall_read(bar_recs, champ_recs, stops):
+def _stall_read(bar_recs, champ_recs, stops, target):
     """Has this dimension stopped paying for its rounds?
 
     Returns (stalled, note). Stalling is the prune signal: it is not a verdict
@@ -502,7 +546,7 @@ def _stall_read(bar_recs, champ_recs, stops):
     # lanes and `extend` then demands they be parked.
     window = bar_recs[-n:]
     if all(r.get("severity") == "none" for r in window) and \
-            window[-1]["score"] >= stops["target_score"]:
+            window[-1]["score"] >= target:
         return False, (
             f"flat at {window[-1]['score']} with no gap named — at the target, awaiting "
             "a deciding-tier verdict to retire, not stalled"
@@ -586,10 +630,11 @@ def _lane_dim_status(rounds, cfg):
         lane_cost[lane] = (calls, tokens, measured, len(groups))
     out = {}
     for key, recs in keys.items():
-        lane, _dim = key
+        lane, dim = key
+        tgt = target_for(cfg, dim)
         bar_recs = [r for r in recs if r["mode"] in BAR_MODES]
         champ_recs = [r for r in recs if r["mode"] == "champion"]
-        bar_met, clean = _streaks(bar_recs, stops)
+        bar_met, clean = _streaks(bar_recs, tgt)
         margins = [r["margin"] for r in bar_recs][-5:]
         # Trends and stalls read one tier track at a time. Screening and
         # deciding verdicts come from different critics; pooling them makes a
@@ -621,7 +666,7 @@ def _lane_dim_status(rounds, cfg):
             and any(p.get("severity") in ("major", "minor") for p in bar_recs[:i])
         )
         retired = bar_met >= stops["bar_met_n"] or clean >= stops["clean_streak_n"]
-        stalled, stall_note = _stall_read(track_recs, champ_recs, stops)
+        stalled, stall_note = _stall_read(track_recs, champ_recs, stops, tgt)
         is_parked = key in parked
         trend = _dimension_trend(track_recs, window=stops["no_progress_n"])
         if track_note:
@@ -647,6 +692,7 @@ def _lane_dim_status(rounds, cfg):
             "stalled": stalled and not retired and not is_parked,
             "stall_note": stall_note,
             "trend": trend,
+            "target": tgt,
             "lane_calls": lane_cost.get(lane, (0, 0, 0, 0))[0],
             "lane_tokens": lane_cost.get(lane, (0, 0, 0, 0))[1],
             "token_coverage": lane_cost.get(lane, (0, 0, 0, 0))[2:4],
@@ -1146,6 +1192,10 @@ def cmd_quote(args):
     if rounds:
         per, _r, _c = _lane_dim_status(rounds, cfg)
         open_keys = _active_keys(per)
+        if args.dimension:
+            open_keys = [k for k in open_keys if k[1] == args.dimension]
+            if not open_keys:
+                die(f"no open lane carries dimension {args.dimension!r}")
         unjudged = [k for k in open_keys if per[k]["last_score"] is None]
         if unjudged and args.current_score is None:
             die(
@@ -1176,11 +1226,13 @@ def cmd_quote(args):
     if not (0 <= min(lane_scores.values()) <= 10):
         die("scores must be between 0 and 10")
 
+    dt = cfg.get("dimension_targets") or {}
     targets = sorted({int(t) for t in (args.targets or "").split(",") if t.strip()}
-                     or ({7, 8, 9, 10} | {stops["target_score"]}))
+                     or ({7, 8, 9, 10} | {stops["target_score"]} | set(dt.values())))
     n_lanes = len(lane_scores)
     print(
-        f"quality-price menu — from {'scores ' + ', '.join(f'{l}:{s}' for l, s in sorted(lane_scores.items()))}"
+        f"quality-price menu{' — dimension ' + args.dimension if args.dimension else ''}"
+        f" — from {'scores ' + ', '.join(f'{l}:{s}' for l, s in sorted(lane_scores.items()))}"
         f" | {rpg:.1f} round(s) per gap ({rpg_src}) | {n_lanes} lane(s), WIP {wip}"
     )
     print(f"  {'target':<8}{'waves':<8}{'calls':<8}{'tokens(est)':<14}vs budget ({max(budget_left, 0)} wave(s) left)")
@@ -1206,6 +1258,12 @@ def cmd_quote(args):
         "one before (diminishing returns — cost-discipline.md). An estimate to choose a rung "
         "by, not a promise; re-quote at wave boundaries, where the measured cost replaces it."
     )
+    if dt and not args.dimension:
+        print(
+            "note: dimensions carry their own targets ("
+            + ", ".join(f"{d}={v}" for d, v in sorted(dt.items()))
+            + f", default {stops['target_score']}) — price one dimension's ladder with --dimension <d>"
+        )
 
 
 def cmd_status(args):
@@ -1282,9 +1340,9 @@ def cmd_status(args):
               f"  streaks bar-met {s['bar_met_streak']} clean {s['clean_streak']}"
               f"  rubric {s['rubric_share']}")
         score = (
-            f"score {s['last_score']}/{cfg['stops']['target_score']} target"
+            f"score {s['last_score']}/{s['target']} target"
             if s["last_score"] is not None
-            else f"never judged (target {cfg['stops']['target_score']})"
+            else f"never judged (target {s['target']})"
         )
         print(f"  {score}"
               f"  margins {' → '.join(s['recent_margins']) or '—'}  trend: {s['trend']['note']}")
@@ -1387,7 +1445,11 @@ def cmd_board(args):
         f"- Wave **{max_wave} of {budget}**"
         + (f" (initial {initial_budget(cfg)}, extended {len(ext)}×)" if ext else ""),
         f"- Cost so far: ~{spent} subagent calls",
-        f"- Target score: {cfg['stops']['target_score']}/10 | WIP limit: {cfg.get('wip_limit')} lane(s)",
+        f"- Target score: {cfg['stops']['target_score']}/10"
+        + (" (per-dimension: "
+           + ", ".join(f"{d}={v}" for d, v in sorted(cfg["dimension_targets"].items())) + ")"
+           if cfg.get("dimension_targets") else "")
+        + f" | WIP limit: {cfg.get('wip_limit')} lane(s)",
         f"- Next wave funds: {', '.join(funded) or 'nothing — all lanes retired or parked'}"
         + (f" (waiting: {', '.join(deferred)})" if deferred else ""),
         "",
@@ -1408,7 +1470,7 @@ def cmd_board(args):
         lambda k: [
             f"{k[0]} / {k[1]}" + (" ⚠ park?" if per[k]["stalled"] else ""),
             str(per[k]["bar_rounds"]),
-            f"{per[k]['last_score']}/{cfg['stops']['target_score']}"
+            f"{per[k]['last_score']}/{per[k]['target']}"
             if per[k]["last_score"] is not None else "—",
             per[k]["trend"]["note"],
             (per[k]["open_gap"] or "—").replace("|", "/"),
@@ -1441,7 +1503,8 @@ def cmd_board(args):
         lambda k: [
             f"{k[0]} / {k[1]}",
             str(per[k]["bar_rounds"]),
-            "bar-met" if per[k]["bar_met_streak"] >= cfg["stops"]["bar_met_n"] else "clean-streak",
+            ("bar-met" if per[k]["bar_met_streak"] >= cfg["stops"]["bar_met_n"] else "clean-streak")
+            + f" at {per[k]['target']}",
             str(per[k]["gaps_closed"]),
         ],
     )
@@ -1476,7 +1539,10 @@ def cmd_report(args):
     lines += [
         f"Cost: ~{spent} subagent calls for {closed_gaps} closed gap(s)"
         + (f" (~{spent / closed_gaps:.0f} calls per gap)" if closed_gaps else "")
-        + f"; target score {cfg['stops']['target_score']}/10",
+        + f"; target score {cfg['stops']['target_score']}/10"
+        + (" (per-dimension: "
+           + ", ".join(f"{d}={v}" for d, v in sorted(cfg["dimension_targets"].items())) + ")"
+           if cfg.get("dimension_targets") else ""),
         "",
     ]
     # The parity claim, made checkable: this run promises the same result at
@@ -1574,7 +1640,7 @@ def cmd_report(args):
     for (lane, dim), s in sorted(per.items()):
         detail = (
             f"{s['bar_rounds']} bar rounds, {s['reverts']} reverts,"
-            f" last score {s['last_score']}/{cfg['stops']['target_score']}"
+            f" last score {s['last_score']}/{s['target']}"
             if s["bar_rounds"]
             else "never judged — no verdict was logged against this dimension"
         )
@@ -1645,6 +1711,10 @@ def main():
                    help="rounds of no movement before a dimension is flagged for parking (default 3)")
     p.add_argument("--target-score", type=int,
                    help="score the target bar sits at, 1-10 (default 7); record higher ambition as a stretch")
+    p.add_argument("--dimension-targets",
+                   help='per-dimension target overrides, e.g. "gameplay=8,graphics=6" — a blanket '
+                        "10/10 request is decomposed into these at intake; unnamed dimensions use "
+                        "--target-score")
     p.add_argument("--wip-limit", type=int, help="max lanes funded per wave (default 3)")
     p.add_argument("--budget-waves", type=int)
     p.add_argument("--budget-tokens", type=int,
@@ -1696,7 +1766,8 @@ def main():
                    help="estimated rounds to close one gap (default 2.0 pre-run; measured cost per closed gap mid-run)")
     p.add_argument("--tokens-per-round", type=int,
                    help="tokens one lane-round costs (default: measured average from the log, when logged)")
-    p.add_argument("--targets", help="comma-separated rungs to price (default: 7,8,9,10 plus the configured target)")
+    p.add_argument("--targets", help="comma-separated rungs to price (default: 7,8,9,10 plus the configured targets)")
+    p.add_argument("--dimension", help="price one dimension's ladder from its own scores (mid-run)")
     p.set_defaults(fn=cmd_quote)
 
     p = sub.add_parser("park", help="stop funding a lane/dimension that stopped moving")

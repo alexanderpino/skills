@@ -249,6 +249,15 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
 - **Set `--target-score` where the target sits** (default 7). The script counts
   a bar-met round only at or above it, so a target of 10 means bar-met never
   fires; the script warns you.
+- **Targets are per dimension when the ambitions differ** —
+  `--dimension-targets "gameplay=8,graphics=6"`, and retirement on each
+  dimension is judged against its own number. A blanket "10/10 like the
+  reference" is not a target, it is an unpriced wish: decompose it with the
+  user — ask what n/10 each dimension must reach — because the same 10 that is
+  merely expensive on gameplay rules is unreachable-by-iteration on animation
+  and shader craft against a AAA bar. Price the reachable rungs (`quote`),
+  refuse the disproved ones with evidence, and never let one dimension's wall
+  sink the rungs the others can reach.
 - **Ambition above it is a *stretch***, recorded in `contract.md` as a heading
   rather than a promise. Retirement is judged against the target only; the report
   states the distance to the stretch — and the stretch is what a surplus buys

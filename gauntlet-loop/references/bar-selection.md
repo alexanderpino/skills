@@ -206,6 +206,17 @@ streaks, and its own retirement. A lane retires only when every one of its
 dimensions has — so a decisive visual win cannot retire a lane whose frame time
 still loses.
 
+**Targets split the same way the bars do.** `--dimension-targets
+"gameplay=8,graphics=6"` gives each dimension its own rung, and the script
+judges each dimension's bar-met against its own number. This is the honest
+answer to the blanket "10/10 like <AAA title>" request: decomposed with the
+user, the 10 splits into rungs that are buyable (rules, systems, flows) and
+rungs that iteration cannot reach against a production team's years of craft
+(animation, shaders) — ask what n/10 each dimension must be, price the first
+kind (`quote`), refuse the second with the measurement, and put the 10 in the
+stretch line. Averaging the wish into one number prices nothing and
+disappoints everyone.
+
 ## Freezing
 
 Copy bar artifacts into `gauntlet/bar/` at intake and reference them by path

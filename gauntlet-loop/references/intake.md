@@ -52,7 +52,18 @@ judgement about approach, which is where a lot of the method's value sits.
 judged against and it must be reachable inside the budget; ambition above it goes
 in the stretch line, which never arms a stop condition. Freeze the artifacts
 under `gauntlet/bar/` now, before any lane runs. Set `--target-score` where the
-target actually sits — a target of 10 means no lane can ever retire.
+target actually sits — at 10, bar-met can never fire.
+
+When the user names one blanket number — "10/10, like EA FC26" — do not write
+it into the contract as-is. **Ask per dimension what n/10 must be**, or propose
+the split yourself with a one-line reason each, priced with `quote`: the same
+request decomposes into rungs that are buyable (gameplay rules, systems, UX
+flows) and rungs no iteration count reaches against a production team's years
+(animation, shader craft). Record the split as
+`--dimension-targets "gameplay=8,graphics=6"`; the dimensions that fail
+reachability outright get the evidenced refusal from `bar-selection.md`, not a
+silent write-down — and the 10 the user wanted goes in the stretch line, where
+the distance to it is reported honestly at the end.
 
 **Inspection.** This is the field that silently kills runs. Before wave one,
 verify a critic can actually reach the output: the screenshot harness works, the
