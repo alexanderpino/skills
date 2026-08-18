@@ -415,15 +415,26 @@ anything. Run `status`, then act:
 - **Re-verify inspection** — open one evidence artifact this wave cited and
   confirm it is real and current. A harness that broke silently makes every later
   critic call worthless.
+- **Review the gates' blind spot** — once per run per machine-decided dimension
+  (at a re-cut, or before that dimension retires): one deciding-tier verdict on
+  "what about this dimension do these gates not see?", judged against the
+  artifact. Gates are declared inside the run and nothing else ever reviews the
+  suite (`references/cost-discipline.md`).
 - **Check the kill criteria** from intake. They fire early on purpose.
 - **Publish** with `board`. Free, and it keeps the user out of your context.
 
 ## Phase 7 — Stop and hand off
 
 When a stop fires, finish the wave and the smoother (unless it is a safety stop),
-promote the best champion — not necessarily the latest challenger — then `board`
-and `report`. `report` drafts every section from the log; you add the one thing
-it cannot know, whether the bar was raised mid-run, and your honest read.
+promote the best champion — not necessarily the latest challenger — then **smoke
+test the deliverable in its final state**: open, run or render the promoted
+artifact once, end to end, *after* the smoother's edits. The promoted-and-
+smoothed state is otherwise the one state of the artifact nobody ever inspected
+as a whole — the smoother was the last writer and no critic judged its output.
+Handing that over unopened is the failure every tester recognises. Then `board`
+and `report`. `report` drafts every section from the log; you fill in the smoke
+test (what you opened, what you saw), the one thing it cannot know — whether the
+bar was raised mid-run — and your honest read.
 
 **The surplus is the deliverable.** The promise of this variant is the same
 result at lower cost, so when every lane retires with budget unspent, the

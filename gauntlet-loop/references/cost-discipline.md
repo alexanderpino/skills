@@ -195,6 +195,19 @@ Two failure modes to avoid while doing this:
   the mechanical work *off* the critic so its whole budget goes to judgement; they
   do not replace it. (Baking obeys the same line: bake the bar's *measurements*,
   never a paraphrase of its qualities — that is bar erosion.)
+
+  And its blind spot has an owner: **the gates judge what they measure, and
+  nothing in fresh context ever reviews the suite itself** — gates are declared
+  by whoever runs the loop, often about work that same context produced, and the
+  independence machinery (fresh context, blind labels, a separate judge) is
+  deliberately not applied to them. So once per run per machine-decided
+  dimension — at a re-cut, or before that dimension retires — spend one
+  deciding-tier verdict on the question *"what about this dimension do these
+  gates not see?"*, judged against the artifact, not against the suite. Field
+  evidence for why: a physics suite read 8/7/8 on the same tree that three
+  critics in separate contexts independently scored 3/10 visually — the gates
+  were right about everything they measured and blind to everything they did
+  not. Log the answer as a round; harvest any new check it names.
 - **Do not let a gate go stale silently.** A gate must declare every path it
   reads. One that reads a file it did not declare will skip when it should run,
   which is worse than not having the gate — you would at least have known you
