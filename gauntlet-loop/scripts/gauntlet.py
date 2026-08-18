@@ -1043,7 +1043,7 @@ def cmd_park(args):
               "Restarting a lane on hope is sunk cost with extra steps.")
         return
 
-    per, _retired, _closed = _lane_dim_status(rounds, cfg) if rounds else ({}, set(), set())
+    per, _retired, _closed = _lane_dim_status(rounds, cfg)
     stats = per.get(key)
     unjudged = stats is not None and not stats["bar_rounds"] and not stats["champ_rounds"]
     if (stats is None or unjudged) and not args.force:
@@ -1070,9 +1070,15 @@ def cmd_park(args):
         "forced": bool(args.force),
     })
     save_config(root, cfg)
-    per, _retired, _closed = _lane_dim_status(rounds, cfg) if rounds else ({}, set(), set())
+    per, _retired, _closed = _lane_dim_status(rounds, cfg)
     funded, deferred = _next_wave_plan(per, cfg)
     print(f"parked [{args.lane} / {args.dimension}] at wave {max_wave} — {reason}")
+    print(
+        "  A park defunds EVERY remaining gap in this dimension. If the blocker is one\n"
+        "  structural gap while the rest still moves, the cheaper move is smaller: that\n"
+        "  gap goes to backlog.md as deliberately-not-funded and the dimension keeps its\n"
+        "  funding for the gaps that remain (stop-conditions.md)."
+    )
     if (stats or {}).get("open_gap"):
         print(f"  open gap carried into the report: {stats['open_gap']}")
     print(f"  next wave now funds: {', '.join(funded) or 'nothing — every lane is retired or parked'}")
@@ -1124,7 +1130,7 @@ def cmd_extend(args):
             file=sys.stderr,
         )
 
-    per, retired, _closed = _lane_dim_status(rounds, cfg) if rounds else ({}, set(), set())
+    per, retired, _closed = _lane_dim_status(rounds, cfg)
     _, verdict, open_lanes = _extension_evidence(rounds, cfg, per, retired)
     if verdict == "at-ceiling" and not args.force:
         die(
@@ -1434,6 +1440,18 @@ def cmd_status(args):
     root = Path(args.root)
     cfg = load_config(root)
     rounds = load_rounds(root)
+    # The same rule as gates: a bar that resolves to no file cannot invalidate
+    # anything, and it erodes silently — every verdict is then judged against a
+    # paraphrase carried in context. bar_kind names what the bar is; this checks
+    # that it exists at all.
+    bar_dir = root / "bar"
+    bar_frozen = bar_dir.exists() and any(f.is_file() for f in bar_dir.rglob("*"))
+    if not bar_frozen:
+        print(
+            "WARNING: gauntlet/bar/ contains no files — bar verdicts are being judged "
+            "against nothing frozen. Freeze the comparator files before the next round "
+            "(bar-selection.md: bars described from memory drift; bars stored as files do not).\n"
+        )
     if not rounds:
         # Wave 1 is exactly when the funded plan is needed — the declared lanes
         # are seeded even with an empty log, so print the plan instead of nothing.

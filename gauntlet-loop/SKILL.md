@@ -415,6 +415,11 @@ anything. Run `status`, then act:
 - **Re-verify inspection** — open one evidence artifact this wave cited and
   confirm it is real and current. A harness that broke silently makes every later
   critic call worthless.
+- **Review the gates' blind spot** — once per run per machine-decided dimension
+  (at a re-cut, or before that dimension retires): one deciding-tier verdict on
+  "what about this dimension do these gates not see?", judged against the
+  artifact. Gates are declared inside the run and nothing else ever reviews the
+  suite (`references/cost-discipline.md`).
 - **Check the kill criteria** from intake. They fire early on purpose.
 - **Publish** with `board`. Free, and it keeps the user out of your context.
 

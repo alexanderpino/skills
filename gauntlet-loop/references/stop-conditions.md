@@ -65,6 +65,16 @@ for rounds that stopped buying anything, and it is the single most valuable thin
 a long run does with its budget. The freed slots go to the next lanes on the
 ranked list; the open gap goes into the report where the user can act on it.
 
+**Mind the grain: a park defunds a whole lane × dimension, but blockers often
+arrive one item at a time.** When a single structural gap keeps being named
+while the dimension's other gaps still close, parking throws away the funded
+work that was still paying. The smaller move is the right one: move that one
+gap to `backlog.md` as deliberately-not-funded (it reaches the report the same
+way a park's open gap does), tell the next critic it is settled-as-open so it
+stops being re-named, and keep the dimension funded for what remains. Park when
+the *dimension* stopped paying; backlog when an *item* did. `park` prints this
+reminder because the two are easy to conflate at wave 9.
+
 The script defends the decision in both directions: it refuses to park a
 dimension the log still reads as moving (use `--force` for a scope or priority
 call from outside the log), and it warns if you log a round against a parked one.
