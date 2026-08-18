@@ -4166,25 +4166,51 @@ def spectral_components(T=T_SWELL, H0=H0_SWELL, theta0=THETA0_SWELL,
     smax = spread_smax(u10, T) if smax is None else float(smax)
     rng = np.random.default_rng(seed)
 
-    # stratified cells in f (log-spaced edges) and in theta (uniform edges over
-    # the full circle -- the spreading function itself decides how much energy
-    # a direction gets, and truncating the fan would be a second, hidden knob)
+    # ---- frequency: log-stratified cells with a jitter inside each. Log and
+    # not linear because the k^2 moments this field is tested against live in
+    # the TAIL, and log spacing puts equal numbers of components per octave.
     fe = np.geomspace(band[0] * fp, band[1] * fp, n_f + 1)
-    te = np.linspace(-math.pi, math.pi, n_th + 1)
     uf = rng.random(n_f)
-    ut = rng.random((n_f, n_th))
-    f = fe[:-1] * (fe[1:] / fe[:-1]) ** uf                  # log-uniform jitter
+    f = fe[:-1] * (fe[1:] / fe[:-1]) ** uf
     df = fe[1:] - fe[:-1]
-    th = te[:-1][None, :] + ut * (te[1] - te[0])
-    dth = te[1] - te[0]
-
     s = spread_s(f, fp, smax)
     S = jonswap(f, hs, fp, gamma)
-    D = spread_pdf(th, s[:, None])
-    E = S[:, None] * D * df[:, None] * dth                  # m^2 per component
-    # renormalise to the band's own energy, so the drawn field carries exactly
-    # the variance the band is entitled to and the quadrature error of a coarse
-    # lattice does not leak into H0.
+
+    # ---- direction: EQUAL-ENERGY cells, by inverting the directional CDF.
+    #
+    # THIS WAS A UNIFORM FAN OVER THE CIRCLE AND THAT WAS THE ROUND'S SECOND
+    # REAL DEFECT. At this scene's own spread the peak's lobe is 9.7 deg wide
+    # at half maximum, so a uniform fan of 20 directions -- 18 deg a cell --
+    # put TWO components inside the lobe at the peak frequency out of forty at
+    # that frequency. The drawn field was therefore very nearly two plane waves
+    # where it matters most, and it still looked like corrugated roofing.
+    #
+    # AND THE SECOND-MOMENT ROUND TRIP PASSED ANYWAY, recovering smax to 3.5
+    # per cent. It passed because <k^2 cos^2> and <k^2 sin^2> are dominated by
+    # the broad, well-sampled high-frequency tail, while what an eye reads is
+    # the narrow peak. That is wave 12's lesson in a new place -- a statistic
+    # that stays right under a defect because the quantity it averages is
+    # always right -- and it is why the suite now carries a lobe-occupancy row
+    # beside the moment row. The moment row alone would have shipped this.
+    #
+    # Inverting the CDF puts n_th components at each frequency spaced by EQUAL
+    # ENERGY, so a lobe of any width gets its proportionate share of them, and
+    # every component carries the same amplitude. No cell width is chosen.
+    n_grid = 8192
+    tg = np.linspace(-math.pi, math.pi, n_grid)
+    Dg = spread_pdf(tg[None, :], s[:, None])
+    cdf = np.cumsum(0.5 * (Dg[:, 1:] + Dg[:, :-1]) * np.diff(tg), axis=1)
+    cdf = np.concatenate([np.zeros((n_f, 1)), cdf], axis=1)
+    cdf = cdf / cdf[:, -1:]
+    ut = (np.arange(n_th)[None, :] + rng.random((n_f, n_th))) / n_th
+    th = np.empty((n_f, n_th))
+    for i in range(n_f):
+        th[i] = np.interp(ut[i], cdf[i], tg)
+
+    # equal energy inside a frequency; the frequency cell's own share across
+    # them. Renormalised to the band's energy so a coarse lattice's quadrature
+    # error cannot leak into H0.
+    E = np.broadcast_to((S * df)[:, None], (n_f, n_th)) / float(n_th)
     frac = spectral_band_energy(T, band, gamma, hs)
     E = E * (frac * (hs / 4.0) ** 2) / E.sum()
 
@@ -4210,17 +4236,55 @@ def spectral_components(T=T_SWELL, H0=H0_SWELL, theta0=THETA0_SWELL,
                 band_fraction=frac, n=a.size, rayleigh=bool(rayleigh))
 
 
-def spectral_eta(comp, xw, yw, t=0.0):
-    """The free surface of a component list at (x, y, t). Linear, and that is
-    stated: the second-order bound harmonic is `nonlinear_eta`'s job and it is
-    applied to the carrier, not to each component of a bundle."""
+FOOT_SIGMA = 1.0 / math.sqrt(12.0)      # a square footprint of side a has the
+                                        # second moment of a Gaussian of this
+                                        # sigma; Var(U(-a/2, a/2)) = a^2/12.
+
+
+def spectral_eta(comp, xw, yw, t=0.0, foot=None):
+    """The free surface of a component list at (x, y, t).
+
+    LINEAR, AND THAT IS STATED. The second-order bound harmonic is
+    `nonlinear_eta`'s job and it is applied to a carrier, not to each component
+    of a bundle -- a second-order sum over a spectrum needs the full quadratic
+    interaction kernel, which is a different piece of physics and is not in
+    this file. In deep water the correction is a k0/2 = 1.9 per cent of
+    amplitude at this swell, so the leading order is the whole of it out there.
+
+    `foot` IS THE BAND LIMIT AND IT IS NOT A BLUR. A short-crested realisation
+    drawn per pixel and sampled once per pixel ALIASES, and trading banding for
+    sparkle noise would not be an improvement -- it would be the same class of
+    error in a different octave. What a pixel sees is the surface averaged over
+    its own footprint, and averaging over a footprint is a CONVOLUTION, so in
+    the spectrum it is a multiplication:
+
+        eta * g   ==>   a_j -> a_j * exp( -k_j^2 sigma^2 / 2 )
+
+    for a Gaussian kernel of standard deviation sigma, exactly, with no
+    approximation and no filter width chosen by eye. A square footprint of side
+    `foot` has variance foot^2/12, so sigma = foot/sqrt(12) matches its second
+    moment -- the only property of the kernel this expression uses.
+
+    Nothing is lost by this: what the footprint removes is exactly the variance
+    the glitter's slope distribution is already carrying statistically, which
+    is the argument `beach_optics.mss_fraction_below` already makes for the
+    same cutoff from the other side. `foot` broadcasts against xw/yw, so every
+    pixel gets its own band.
+    """
     xw = np.asarray(xw, float)
     yw = np.asarray(yw, float)
     out = np.zeros(np.broadcast(xw, yw).shape, float)
     kx, ky, a, ph, om = (comp['kx'], comp['ky'], comp['a'], comp['phase'],
                          comp['omega'])
+    if foot is None:
+        for j in range(a.size):
+            out += a[j] * np.cos(kx[j] * xw + ky[j] * yw - om[j] * t + ph[j])
+        return out
+    s2 = (np.asarray(foot, float) * FOOT_SIGMA) ** 2
+    k2 = comp['k'] ** 2
     for j in range(a.size):
-        out += a[j] * np.cos(kx[j] * xw + ky[j] * yw - om[j] * t + ph[j])
+        out += (a[j] * np.exp(-0.5 * k2[j] * s2)
+                * np.cos(kx[j] * xw + ky[j] * yw - om[j] * t + ph[j]))
     return out
 
 
@@ -4608,6 +4672,44 @@ def transform_2d(x, y, h2, T, H0, theta0, breaking=True, gamma_b=GAMMA_B,
     sin0 = np.clip(c[:, 0] / c0 * np.sin(th0 - n0), -1.0, 1.0)
     theta[:, 0] = np.arcsin(sin0) + n0
     ky = k[:, 0] * np.sin(theta[:, 0])
+
+    # ---- WAVE 13: THE PHASE'S ALONGSHORE HALF, WHICH WAS MISSING ENTIRELY.
+    # This function's own docstring says contours of S mod 2 pi are the crests,
+    # and waves 1-12 set S[:, 0] = 0 and then accumulated ONLY the x-integral
+    # of k cos(theta). k = grad(S) has two components and only one of them was
+    # ever integrated, so the drawn phase satisfied dS/dx = k_x exactly and
+    # dS/dy = 0 exactly -- at a sea state whose orthogonal is 20 deg off
+    # shore-normal.
+    #
+    # MEASURED ON A CONTROL WHOSE ANSWER IS KNOWN IN ADVANCE (ruling 14): a
+    # FLAT bed in 20 m of water, where refraction has nothing to bend and the
+    # answer is a plane wave. dS/dx came back 0.057264 against k_x = 0.057264;
+    # dS/dy came back 0.000000 against k_y = 0.016998, and the alongshore phase
+    # run across 1408 m of coast -- 23.9 radians, nearly four whole
+    # wavelengths -- was absent. The obliquity is present in `theta`, in the
+    # radiation stress, in the longshore transport and in every row that reads
+    # them. It was absent from the ONE field the renderer draws crests with, so
+    # every crest in every frame ran exactly shore-parallel whatever the sea
+    # state said, edge to edge, at constant orientation. That is half of what
+    # the critic called corrugated roofing and it is not a spreading problem.
+    #
+    # The fix is the boundary condition the potential needs and nothing more:
+    # S(y, 0) = INT_0^y k_y(y', 0) dy', so that the march's x-integration
+    # carries a phase whose y-derivative is already right. It stays right
+    # downstream because the march ENFORCES curl(k) = 0 -- that is its
+    # equation (1) -- so a potential exists and integrating it along x from a
+    # correct boundary is path-independent. Testing dS/dy = k sin(theta) at
+    # mid-domain therefore tests the boundary AND the irrotationality in one
+    # row, and the suite carries it on the flat-bed control where the answer
+    # is a closed form.
+    S[:, 0] = np.concatenate(
+        [[0.0], np.cumsum(0.5 * (ky[1:] + ky[:-1]) * dy)]) if ny > 1 else 0.0
+    if ny > 1:
+        j0 = int(np.argmin(np.abs(y)))          # phase zero at y = 0, so that
+        S[:, 0] -= S[j0, 0]                     # the scalar case matches the
+                                                # deep-water plane wave the
+                                                # renderer draws beyond the
+                                                # domain, k0(x cos th + y sin th)
     if not refraction:
         ky = None                      # the deliberate defect uses this
     Phi[:, 0] = (E0 * cg0 * np.cos(th0 - n0)

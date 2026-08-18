@@ -421,9 +421,31 @@ _TH0 = B.THETA0_SWELL
 # offshore boundary is the same physics as the inshore one and the seam has
 # nothing to hide.
 _R0 = 0.5 * B.H0_SWELL * _K0 / 2.0
+# --- WAVE 13: THE OPEN SEA IS A REALISATION AND WAS A PLANE WAVE.
+# `far` above was one deep-water component -- an infinite crest at a single
+# frequency and a single direction -- and it drew the open water as a stack of
+# straight parallel full-width bands. The critic's word was "corrugated
+# roofing" and the critic's number, off `s7-frame-K.png`, was an along-crest
+# residual of 0.16 of the cross-crest one.
+#
+# It is now a realisation of the offshore directional spectrum `beach.py`
+# states: JONSWAP in frequency scaled to the SAME H0, times the cos-2s
+# spreading whose peak parameter comes from the SAME wind the glitter already
+# uses, through Mitsuyasu's wave age. NOTHING NEW IS DECLARED and nothing is
+# dialled -- standing ruling 5 makes short-crestedness an output, and this is
+# the line where it becomes one.
+#
+# THE COMPONENT COUNT IS A COST, NOT A PHYSICS, AND THE DIRECTIONAL COUNT IS
+# NOT FREE. With equal-energy directional cells, 8 x 32 = 256 components puts
+# 41 of them inside the peak's own 9.7 deg half-width lobe and recovers the
+# smax they were drawn from to 0.6 per cent. The suite measures both numbers
+# at five lattice sizes, so this is a measured plateau rather than a guess --
+# and the lobe count is measured because the moment alone did not catch the
+# uniform fan that preceded it.
+_FAR = B.spectral_components(n_f=8, n_th=32)
 
 
-def free_surface(w, xw, yw, t=0.0):
+def free_surface(w, xw, yw, t=0.0, foot=None):
     H = w.sample(xw, yw, w.H)
     S = w.sample(xw, yw, w.S)
     r = w.sample(xw, yw, w.r2)
@@ -435,13 +457,14 @@ def free_surface(w, xw, yw, t=0.0):
     # about -- one file down from where it usually bites.
     ph = S - om * t
     eta = B.nonlinear_eta(0.5 * H, r, psi, ph)
-    ph0 = _K0 * (xw * math.cos(_TH0) + yw * math.sin(_TH0)) - om * t
-    far = B.nonlinear_eta(0.5 * B.H0_SWELL, _R0, 0.0, ph0)
     f = np.clip((w.x[0] + 60.0 - xw) / 60.0, 0.0, 1.0)
+    if not np.any(f > 0.0):
+        return eta
+    far = B.spectral_eta(_FAR, xw, yw, t, foot=foot)
     return eta * (1.0 - f) + far * f
 
 
-def surface_slope(w, xw, yw, t=0.0, eps=0.5):
+def surface_slope(w, xw, yw, t=0.0, eps=0.5, foot=None):
     """The RESOLVED slope of the free surface, by central difference.
 
     `eps` WAS ONE METRE AND WAVE 5 HALVED IT, for a reason that is arithmetic
@@ -455,8 +478,10 @@ def surface_slope(w, xw, yw, t=0.0, eps=0.5):
     gain factor as a row rather than this comment carrying it as a claim.
     """
     e = eps
-    zx = (free_surface(w, xw + e, yw, t) - free_surface(w, xw - e, yw, t)) / (2 * e)
-    zy = (free_surface(w, xw, yw + e, t) - free_surface(w, xw, yw - e, t)) / (2 * e)
+    zx = (free_surface(w, xw + e, yw, t, foot)
+          - free_surface(w, xw - e, yw, t, foot)) / (2 * e)
+    zy = (free_surface(w, xw, yw + e, t, foot)
+          - free_surface(w, xw, yw - e, t, foot)) / (2 * e)
     return zx, zy
 
 
@@ -588,7 +613,7 @@ COS_SUN = math.sin(math.radians(SUN_EL))
 E_DOWN_AIR = E_SUN * COS_SUN + np.pi * ATM.SKY_DECK     # on the horizontal
 
 
-def shade_water(w, P, D, t_now):
+def shade_water(w, P, D, t_now, foot=None):
     """The water, in four terms and not one of them is a colour.
 
         1  the sky, reflected            Fresnel(theta_v) x env_diffuse(mirror)
@@ -606,7 +631,7 @@ def shade_water(w, P, D, t_now):
     not in the water, it is in the length.
     """
     xw, yw = P[..., 0], P[..., 1]
-    zx, zy = surface_slope(w, xw, yw, t_now)
+    zx, zy = surface_slope(w, xw, yw, t_now, foot=foot)
     Nn = np.stack([-zx, -zy, np.ones_like(zx)], -1)
     Nn /= np.linalg.norm(Nn, axis=-1, keepdims=True)
     V = -D                                          # toward the eye
@@ -692,7 +717,8 @@ def shade_water(w, P, D, t_now):
     # that march. Where the sun is not behind the face the term is zeroed by its
     # own geometry: the source of term 4 is the SUN SEEN THROUGH the water, and
     # a face turned away from the sun has none.
-    L_path, chord, lit = through_face(w, P, D, t_now, Nn, dep, c_bar)
+    L_path, chord, lit = through_face(w, P, D, t_now, Nn, dep, c_bar,
+                                      foot=foot)
 
     # ---- THE SURFACE DECK. Bar section C's first mechanism, and it is a
     # COVERAGE MASK -- not a particle system, not a texture, not a crest tint.
@@ -741,7 +767,8 @@ def shade_water(w, P, D, t_now):
                 E_dn_w=E_dn_w)
 
 
-def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0):
+def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0,
+                 foot=None):
     """Section A's transport: what the sun leaves behind after crossing a wave.
 
     The ray refracts at the surface (`optics.refract`, the shared module's own
@@ -818,7 +845,7 @@ def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0):
     entered = g_prev >= 0.0
     for m in range(n_step):
         Qn = Q + T * step
-        e = free_surface(w, Qn[..., 0], Qn[..., 1], t_now)
+        e = free_surface(w, Qn[..., 0], Qn[..., 1], t_now, foot)
         g = e - Qn[..., 2]
         out = (g < 0.0) & (~exited)
         # LINEAR REFINE, and it is not cosmetic. The cuvette inversion below
@@ -835,7 +862,7 @@ def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0):
     face = entered & exited & (chord > 0.0)
     chord = np.where(face, chord, 0.0)
     # the far side's own normal, where the beam gets in
-    zx, zy = surface_slope(w, Q[..., 0], Q[..., 1], t_now)
+    zx, zy = surface_slope(w, Q[..., 0], Q[..., 1], t_now, foot=foot)
     Nf = np.stack([-zx, -zy, np.ones_like(zx)], -1)
     Nf /= np.linalg.norm(Nf, axis=-1, keepdims=True)
     lit = np.clip((Nf * SUN[None, None]).sum(-1), 0.0, 1.0)
@@ -1557,7 +1584,18 @@ def render(cam, w, t=0.0, label='', air=True, vis=None):
     mw = tr['water'] & ~up
     if mw.any():
         Pw = cam.pos[None] + tr['t_water'][mw][..., None] * D[mw]
-        sh = shade_water(w, Pw[None], D[mw][None], t)
+        # THE WATER GETS THE SAME PIXEL FOOTPRINT THE LAND ALREADY HAD, and
+        # wave 13 is the first frame that needs it: a resolved sea with
+        # structure down to 19 m, sampled once per pixel out to a 40 km sea
+        # plane, aliases. `free_surface` band-limits each component by
+        # exp(-k^2 sigma^2/2) rather than blurring the result, which is the
+        # same cutoff `beach_optics.mss_fraction_below` argues from the other
+        # side: what the footprint removes, the glitter's slope distribution
+        # is already carrying.
+        pxw = 2.0 * cam.tan / cam.h
+        nzw = np.clip(np.abs(D[mw][..., 2]), 1.0 / 20.0, 1.0)
+        footw = tr['t_water'][mw] * pxw / nzw
+        sh = shade_water(w, Pw[None], D[mw][None], t, foot=footw[None])
         Lw = sh['L'][0]
         if air:
             Lw = aerial(Lw, D[mw], np.linalg.norm(Pw - cam.pos[None], axis=-1),
