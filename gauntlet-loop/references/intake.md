@@ -85,6 +85,13 @@ contract block ("8 waves × 3 lanes ≈ 56 subagent invocations") so "budget: 8
 waves" is a number they can actually evaluate. Parallel lanes raise the burn
 rate, not the total; `init` prints the projection for you.
 
+Then price the *target* the same way: `quote --current-score <first light>`
+prints the quality-price menu — 7 costs this, 8 costs that, 9 roughly double
+again, 10 is not a price (`cost-discipline.md`). Present it with the contract
+and let the user pick the rung; TARGET and BUDGET are one decision wearing two
+names. If the run is fully autonomous and no rung was named, default to 7 and
+record the menu in `contract.md` so the unmade choice stays visible.
+
 Say **which model tier each role runs on** in the same breath, because it changes
 what those calls cost by up to 5× (`model-routing.md`). The default worth stating
 plainly: judgement roles inherit the session model, mechanical builders drop a

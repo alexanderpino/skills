@@ -138,7 +138,10 @@ My read: worth it on visual. Extend 3, re-cut, or stop here?
 ```
 
 Sizing: **2–4 waves**. Enough to close a named gap, short enough that the next
-decision is made on fresh evidence. Wanting another twelve is a signal for a
+decision is made on fresh evidence. Size it against a rung, not a feeling:
+`quote` re-prices the remaining distance from the log's last scores and the
+measured cost per closed gap, so the offer reads "target 7 is ~2 more waves;
+8 would be ~6" rather than "a few more waves should do it". Wanting another twelve is a signal for a
 re-cut or a new run with a new contract, not an extension — and the script warns
 when a single grant exceeds the whole original budget.
 

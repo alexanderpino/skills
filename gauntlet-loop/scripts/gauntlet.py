@@ -1109,6 +1109,105 @@ def cmd_extend(args):
     print("Record the extension in contract.md, run `board`, then resume at the wave boundary.")
 
 
+def _climb_rounds(score, target, rpg):
+    """Estimated rounds for one lane to climb from `score` to `target`.
+
+    One gap is roughly one score point up to 7 (the usable rung); above 7 each
+    point costs about double the one before — the tapering the method's own
+    literature measures (Madaan et al., cost-discipline.md). 9→10 is priced
+    nowhere: bar-met cannot fire at 10, so a 10 is a stretch, not a target.
+    """
+    total = 0.0
+    for p in range(int(score), int(target)):
+        total += rpg * (2 ** max(0, (p + 1) - 7))
+    return total
+
+
+def cmd_quote(args):
+    """Print the quality-price menu: what each target rung costs from here.
+
+    Pre-run it prices from first light's single score; at a wave boundary it
+    prices each open lane from its last score, and swaps the rounds-per-gap
+    guess for the measured cost per closed gap where the log has one. The
+    menu exists so TARGET and BUDGET are chosen together, informed — a user
+    who sees 9 cost three times 7 picks on purpose, in either direction.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    stops = cfg["stops"]
+    rounds = load_rounds(root)
+    wip = cfg.get("wip_limit") or DEFAULT_CONFIG["wip_limit"]
+
+    rpg, rpg_src = args.rounds_per_gap, "assumed (minor gap ≈ 1 round, major ≈ 2-3; pass --rounds-per-gap)"
+    tpr, tpr_src = args.tokens_per_round, "from --tokens-per-round"
+    lane_scores = {}
+    budget_left = stops["budget_waves"]
+
+    if rounds:
+        per, _r, _c = _lane_dim_status(rounds, cfg)
+        open_keys = _active_keys(per)
+        unjudged = [k for k in open_keys if per[k]["last_score"] is None]
+        if unjudged and args.current_score is None:
+            die(
+                "these open dimensions were never judged: "
+                + ", ".join(f"{l}/{d}" for l, d in unjudged)
+                + " — pass --current-score to price them, or judge them first"
+            )
+        for (lane, _dim), s in ((k, per[k]) for k in open_keys):
+            sc = s["last_score"] if s["last_score"] is not None else args.current_score
+            lane_scores[lane] = min(lane_scores.get(lane, 10), sc)
+        closed = sum(s["gaps_closed"] for s in per.values())
+        bar_rounds = sum(s["bar_rounds"] for (l, d), s in per.items())
+        if args.rounds_per_gap is None and closed:
+            rpg, rpg_src = bar_rounds / closed, f"measured: {bar_rounds} bar rounds / {closed} closed gap(s)"
+        if tpr is None:
+            tok = sum({l: s["lane_tokens"] for (l, _d), s in per.items()}.values())
+            meas = sum({l: s["token_coverage"][0] for (l, _d), s in per.items()}.values())
+            if meas:
+                tpr, tpr_src = tok // meas, f"measured average over {meas} lane-round(s)"
+        budget_left = stops["budget_waves"] - max(r["wave"] for r in rounds)
+    else:
+        if args.current_score is None:
+            die("no rounds logged — pass --current-score with first light's verdict score")
+        lanes = cfg.get("lanes") or ["artifact"]
+        lane_scores = {lane: args.current_score for lane in lanes}
+    if rpg is None:
+        rpg = 2.0
+    if not (0 <= min(lane_scores.values()) <= 10):
+        die("scores must be between 0 and 10")
+
+    targets = sorted({int(t) for t in (args.targets or "").split(",") if t.strip()}
+                     or ({7, 8, 9, 10} | {stops["target_score"]}))
+    n_lanes = len(lane_scores)
+    print(
+        f"quality-price menu — from {'scores ' + ', '.join(f'{l}:{s}' for l, s in sorted(lane_scores.items()))}"
+        f" | {rpg:.1f} round(s) per gap ({rpg_src}) | {n_lanes} lane(s), WIP {wip}"
+    )
+    print(f"  {'target':<8}{'waves':<8}{'calls':<8}{'tokens(est)':<14}vs budget ({max(budget_left, 0)} wave(s) left)")
+    for t in targets:
+        if t >= 10:
+            print(f"  {t:<8}{'—':<8}{'—':<8}{'—':<14}not priceable: bar-met cannot fire at 10 — "
+                  "write a 10 as the stretch, not the target")
+            continue
+        per_lane = {l: _climb_rounds(s, t, rpg) for l, s in lane_scores.items()}
+        if all(v <= 0 for v in per_lane.values()):
+            print(f"  {t:<8}{'0':<8}{'0':<8}{'0':<14}already there — raise the bar or stop")
+            continue
+        total = sum(per_lane.values())
+        waves = max(max(per_lane.values()), total / wip)
+        waves = int(waves) + (waves % 1 > 0)
+        calls = _projected_calls(waves, list(lane_scores), wip)
+        tok_s = f"~{int(total * tpr):,}" if tpr else "not measured"
+        fit = ("fits" if waves <= budget_left
+               else f"needs +{waves - max(budget_left, 0)} wave(s)" + (" (extension)" if rounds else ""))
+        print(f"  {t:<8}{waves:<8}{'~' + str(calls):<7}{tok_s:<14}{fit}")
+    print(
+        "assumptions: one gap ≈ one score point up to 7; each point above 7 costs ~2× the "
+        "one before (diminishing returns — cost-discipline.md). An estimate to choose a rung "
+        "by, not a promise; re-quote at wave boundaries, where the measured cost replaces it."
+    )
+
+
 def cmd_status(args):
     root = Path(args.root)
     cfg = load_config(root)
@@ -1589,6 +1688,16 @@ def main():
 
     p = sub.add_parser("status")
     p.set_defaults(fn=cmd_status)
+
+    p = sub.add_parser("quote", help="price the target rungs: what 7, 8, 9 cost from here; 10 is not a price")
+    p.add_argument("--current-score", type=int,
+                   help="first light's verdict score (pre-run); mid-run the log's last scores are used")
+    p.add_argument("--rounds-per-gap", type=float,
+                   help="estimated rounds to close one gap (default 2.0 pre-run; measured cost per closed gap mid-run)")
+    p.add_argument("--tokens-per-round", type=int,
+                   help="tokens one lane-round costs (default: measured average from the log, when logged)")
+    p.add_argument("--targets", help="comma-separated rungs to price (default: 7,8,9,10 plus the configured target)")
+    p.set_defaults(fn=cmd_quote)
 
     p = sub.add_parser("park", help="stop funding a lane/dimension that stopped moving")
     p.add_argument("--lane", required=True)

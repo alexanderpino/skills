@@ -136,6 +136,7 @@ python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --rou
     --gap "..." --evidence shots/w2r3.png --tokens 74000 --critic-model sonnet
 python3 scripts/gauntlet.py gate     # mechanical checks; skips those whose inputs are unchanged
 python3 scripts/gauntlet.py status   # state, next-wave plan, park list, fired stops
+python3 scripts/gauntlet.py quote --current-score 4   # the quality-price menu: what 7, 8, 9 cost; 10 is not a price
 python3 scripts/gauntlet.py park --lane a --dimension visual --reason "..."
 python3 scripts/gauntlet.py board    # regenerate workbench.md from the log
 python3 scripts/gauntlet.py extend --waves 3 --reason "..."   # only on a user grant
@@ -215,6 +216,14 @@ require the user, because they encode how much time and money the run may spend.
 whole contract — goal, target bar, budget, stops — confirmed in one exchange.
 The full table below is for long unattended runs, where the fields you skip are
 the ones nobody can add later.
+
+**Price the target as a menu, before asking for the budget.** `quote` turns
+first light's score into the quality-price menu — what 7, 8 and 9 cost in
+waves, calls and tokens, and that 10 is not a price (bar-met cannot fire
+there). Put that table in the contract so TARGET and BUDGET are chosen
+together: a user who sees 9 cost three times 7 picks a rung on purpose, in
+either direction. Fully autonomous with no rung named? Default to 7 and record
+the menu in `contract.md`, so the choice they did not make stays visible.
 
 Fields, each explained in `intake.md`: **goal** (destination, not route) ·
 **target bar** per dimension · optional **stretch** · **inspection** (and which
@@ -464,4 +473,4 @@ Three are not cited inline:
 - `references/authorities.md` — where these rules come from and what each forces.
 
 Subagent briefs: `builder.md`, `critic.md`, `smoother.md`.
-Tooling: `scripts/gauntlet.py` (init / log-round / gate / status / park / board / extend / report).
+Tooling: `scripts/gauntlet.py` (init / log-round / gate / status / quote / park / board / extend / report).

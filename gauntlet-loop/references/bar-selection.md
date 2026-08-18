@@ -113,6 +113,12 @@ Kniberg's **earliest testable → usable → lovable** (`authorities.md`):
 | **Usable / viable** | Where the **target bar** normally sits. Good enough to hand over; retirement is judged against it. |
 | **Lovable** | Where a **stretch** normally sits. Direction, reported as distance, never a stop condition. |
 
+The rungs have prices, and the user should see them before picking one:
+`quote` prints what 7, 8 and 9 cost from the current score — each point above
+usable costing roughly double the one before — and that 10 is not a rung at
+all (`cost-discipline.md`). Ambition is welcome; unpriced ambition is how a
+budget disappoints someone.
+
 Two consequences worth stating at intake:
 
 - **The bootstrap wave builds a thin end-to-end slice, not one perfect part.**
