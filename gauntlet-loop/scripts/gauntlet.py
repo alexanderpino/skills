@@ -21,6 +21,7 @@ import datetime
 import json
 import hashlib
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -350,6 +351,19 @@ def cmd_log_round(args):
         die("score must be an integer between 0 and 10")
     if not args.evidence:
         die("evidence is required — a verdict with nothing inspected is not a round")
+    # Evidence is free text (a measurement, a comparison note) — but when it
+    # looks like a file path, it should open. A verdict citing a screenshot
+    # nobody can open is progress theatre with a citation.
+    ev = args.evidence.strip()
+    if " " not in ev and ("/" in ev or Path(ev).suffix):
+        bare = re.sub(r":[0-9][0-9,-]*$", "", ev)
+        if not Path(bare).exists():
+            print(
+                f"warning: evidence {ev!r} looks like a path but does not exist from here — "
+                "a verdict citing evidence nobody can open is progress theatre "
+                "(failure-modes.md). Check the path, or make the evidence a measurement.",
+                file=sys.stderr,
+            )
 
     rec = {
         "ts": now(),
