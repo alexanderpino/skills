@@ -4787,8 +4787,123 @@ def main_wave10():
     return res
 
 
+# ======================================================= WAVE 12: THE BEACH FACE
+#
+# EVERY FIGURE THIS WAVE WRITES CARRIES ITS CAPTION IN A SIDECAR and the hero
+# frames carry no text at all. Wave 11's three critics each reported, without
+# being asked, that the blind was defeated because every evidence frame had the
+# builder's changelog burned into its pixels, and one had to crop a hero frame
+# before it could judge it. `gauntlet-loop/references/blind-protocol.md`.
+def _sidecar(path, text):
+    with open(path.replace('.png', '.caption.md'), 'w') as f:
+        f.write(text.rstrip() + '\n')
+
+
+def waterline_crop(L, cam, w, ex, path, cols=(560, 720), rows=(300, 480)):
+    """THE MEASUREMENT THAT JUDGES THIS LANE, at 1:1.
+
+    Bar H3 calls the waterline "one of the strongest tonal edges in these
+    frames" and wave 11's critic measured 48 px of beach face with no step
+    anywhere in it. This is that face at ONE RENDER PIXEL PER IMAGE PIXEL --
+    no downsample, no resize -- so an edge that is there is visible and an edge
+    that is not cannot be hidden by a filter.
+
+    Returns the numbers as well as the crop, because a crop is an assertion and
+    a step in the green channel is a measurement.
+    """
+    c0, c1 = cols
+    r0, r1 = rows
+    sub = L[r0:r1, c0:c1]
+    _save(sub, path)
+    g = np.clip(sub / WHITE, 0, 1) ** (1 / 2.2) * 255.0
+    prof = g[:, (c1 - c0) // 2, 1]
+    d = np.abs(np.diff(prof))
+    return dict(rows=(r0, r1), cols=(c0, c1),
+                step=float(d.max()), step_row=r0 + int(np.argmax(d)) + 1,
+                prof=prof)
+
+
+def pockets_figure(w, path, j=None):
+    """THE CLOSED FORM AND ITS REALISATION, side by side on the same cells.
+
+    Left: `1 - sand_cover_fraction(regolith)`, which is what waves 4-11 painted
+    -- an area fraction used as a coefficient. Right: `rock_bare_mask` on the
+    same cells, whose MEAN is the left panel exactly. Nothing about how much
+    rock shows changes between them; only where it is.
+    """
+    import beach_plot as P
+    from PIL import Image
+    reg = w.regolith
+    cov = w.cover
+    # the band where the answer is neither 0 nor 1 -- the bench's interfinger
+    band = w.planed & (cov > 0.02) & (cov < 0.98)
+    if not band.any():
+        band = w.planed
+    jj = np.where(band.any(axis=1))[0]
+    j = int(jj[len(jj) // 2]) if j is None else j
+    ii = np.where(band[j])[0]
+    if ii.size < 4:
+        ii = np.where(w.planed[j])[0]
+    x0, x1 = float(w.x[ii.min()]), float(w.x[ii.max()])
+    n = 480
+    xs = np.linspace(x0, x1, n)
+    ys = np.linspace(w.y[j] - 0.5 * (x1 - x0), w.y[j] + 0.5 * (x1 - x0), n)
+    X, Y = np.meshgrid(xs, ys)
+    cv = w.sample(X, Y, cov)
+    mean = 1.0 - cv
+    real = B.rock_bare_mask(X, Y, cv)
+    img = Image.new('RGB', (2 * n + 60, n + 40), (250, 249, 246))
+    for k, a in enumerate((mean, real)):
+        px = (np.clip(a, 0, 1)[..., None] * np.array([[[70., 66., 60.]]])
+              + (1 - np.clip(a, 0, 1))[..., None]
+              * np.array([[[214., 194., 160.]]]))
+        img.paste(Image.fromarray(px.astype(np.uint8)), (20 + k * (n + 20), 20))
+    img.save(path)
+    return dict(j=j, x0=x0, x1=x1, span=float(x1 - x0),
+                mean_left=float(mean.mean()), mean_right=float(real.mean()),
+                cover_med=float(np.median(cv)),
+                reg_med=float(np.median(w.sample(X, Y, reg))))
+
+
+def main_wave12():
+    """WAVE 12, THE BATHYMETRY LANE. One bed, one camera, three figures."""
+    t0 = time.time()
+    _set_runup()
+    bay = B.run_bay(embay=True)
+    w = Water(bay)
+    SS = SS_HERO
+    (_, _, _, camJ, infJ, _, _, _, _) = hero_cameras(w, W_HERO * SS,
+                                                     H_HERO * SS)
+    L, ex = render(camJ, w)
+    print('rendered %.1f s' % (time.time() - t0))
+    m = frame_report('J (wave 12, the beach face)', w, camJ, infJ, L, ex)
+    wd = wet_dry_report(w, ex, L)
+    bp = beach_report(w, bay)
+    pr = plain_relief(w, ex)
+
+    _save(downsample(L, SS), '%s/s12-bathy-frame.png' % OUT)
+    # the crop is taken from the FULL-RESOLUTION buffer, so 1:1 means one
+    # render sample per image pixel and the downsample cannot smooth an edge
+    # into existence or out of it.
+    cr = waterline_crop(L, camJ, w, ex,
+                        '%s/s12-bathy-waterline.png' % OUT,
+                        cols=(2 * 560, 2 * 720), rows=(2 * 330, 2 * 430))
+    pk = pockets_figure(w, '%s/s12-bathy-pockets.png' % OUT)
+    print('waterline crop: largest one-row step in green %.2f of 255 at row %d'
+          % (cr['step'], cr['step_row']))
+    print('pockets: row j=%d, %.0f m span, cover median %.3f, regolith median '
+          '%.3f m; bare share mean-panel %.4f realisation-panel %.4f'
+          % (pk['j'], pk['span'], pk['cover_med'], pk['reg_med'],
+             pk['mean_left'], pk['mean_right']))
+    print('%.1f s' % (time.time() - t0))
+    return dict(m=m, wd=wd, bp=bp, pr=pr, cr=cr, pk=pk, w=w, L=L, ex=ex,
+                cam=camJ, inf=infJ)
+
+
 if __name__ == '__main__':
-    if '--wave10' in sys.argv:
+    if '--wave12' in sys.argv:
+        main_wave12()
+    elif '--wave10' in sys.argv:
         main_wave10()
     elif '--wave9' in sys.argv:
         main_wave9()
