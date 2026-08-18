@@ -57,6 +57,20 @@ No git available and the user declines `git init`? Fall back to snapshot copies
 under `gauntlet/champions/<lane>/w<W>r<R>/` for owned paths only, and say
 plainly that this is weaker (no atomic revert, no history diffing).
 
+### Truly concurrent lanes: worktrees, with or without Mission Control
+
+The rules above deliver *write* concurrency: builders edit disjoint files at
+once, and all commits happen serially outside the concurrent region. When lanes
+need more than that — each builder running its own build, tests, or renders
+against its own consistent tree — one shared working tree is not enough, and
+one-file-one-owner does not make the index disjoint. The answer is per-lane
+`git worktree add` (the same isolation Mission Control provides, usable without
+it): each lane gets its own index and working tree, merges back serially at the
+wave boundary in ranked order, and the wave's champion snapshot is taken on the
+merged state. Ownership still applies — worktrees remove index contention, not
+ownership conflicts — and every worktree is removed after the merge: a leftover
+worktree is a fork of the run that no log describes.
+
 ## Resuming a run
 
 On being asked to continue a gauntlet — or on discovering a `gauntlet/` directory

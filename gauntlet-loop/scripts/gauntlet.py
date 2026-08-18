@@ -1070,17 +1070,15 @@ def cmd_park(args):
         "forced": bool(args.force),
     })
     save_config(root, cfg)
-    # No short circuit on an empty log. `_lane_dim_status` is what seeds the
-    # declared pairs, so skipping it because nothing has been judged yet is the
-    # one case where the seed is needed most: it left `per` empty, the plan
-    # named nobody, and this line printed "every lane is retired or parked" over
-    # a run that had not judged a single round. `status` on the same state said
-    # "no rounds logged yet" -- two commands, one log, opposite readings, and
-    # the wrong one is the one a cold start meets first, because carrying parks
-    # across from an archived run happens before the first round is logged.
     per, _retired, _closed = _lane_dim_status(rounds, cfg)
     funded, deferred = _next_wave_plan(per, cfg)
     print(f"parked [{args.lane} / {args.dimension}] at wave {max_wave} — {reason}")
+    print(
+        "  A park defunds EVERY remaining gap in this dimension. If the blocker is one\n"
+        "  structural gap while the rest still moves, the cheaper move is smaller: that\n"
+        "  gap goes to backlog.md as deliberately-not-funded and the dimension keeps its\n"
+        "  funding for the gaps that remain (stop-conditions.md)."
+    )
     if (stats or {}).get("open_gap"):
         print(f"  open gap carried into the report: {stats['open_gap']}")
     print(f"  next wave now funds: {', '.join(funded) or 'nothing — every lane is retired or parked'}")
@@ -1442,6 +1440,18 @@ def cmd_status(args):
     root = Path(args.root)
     cfg = load_config(root)
     rounds = load_rounds(root)
+    # The same rule as gates: a bar that resolves to no file cannot invalidate
+    # anything, and it erodes silently — every verdict is then judged against a
+    # paraphrase carried in context. bar_kind names what the bar is; this checks
+    # that it exists at all.
+    bar_dir = root / "bar"
+    bar_frozen = bar_dir.exists() and any(f.is_file() for f in bar_dir.rglob("*"))
+    if not bar_frozen:
+        print(
+            "WARNING: gauntlet/bar/ contains no files — bar verdicts are being judged "
+            "against nothing frozen. Freeze the comparator files before the next round "
+            "(bar-selection.md: bars described from memory drift; bars stored as files do not).\n"
+        )
     if not rounds:
         # Wave 1 is exactly when the funded plan is needed — the declared lanes
         # are seeded even with an empty log, so print the plan instead of nothing.
@@ -1860,6 +1870,14 @@ def cmd_report(args):
             ]
             lines += items
     lines += [
+        "",
+        "## Handoff smoke test",
+        "",
+        "(lead agent: after promoting the best champion and running the smoother, open,"
+        " run or render the final artifact once, end to end. State what you opened and"
+        " what you saw — the promoted-and-smoothed state is otherwise the one state of"
+        " the artifact nobody ever inspected as a whole. 'Not run' is an answer the"
+        " reader deserves to see written down.)",
         "",
         "## Distance to the stretch bar, if one was set",
         "",

@@ -65,6 +65,16 @@ for rounds that stopped buying anything, and it is the single most valuable thin
 a long run does with its budget. The freed slots go to the next lanes on the
 ranked list; the open gap goes into the report where the user can act on it.
 
+**Mind the grain: a park defunds a whole lane × dimension, but blockers often
+arrive one item at a time.** When a single structural gap keeps being named
+while the dimension's other gaps still close, parking throws away the funded
+work that was still paying. The smaller move is the right one: move that one
+gap to `backlog.md` as deliberately-not-funded (it reaches the report the same
+way a park's open gap does), tell the next critic it is settled-as-open so it
+stops being re-named, and keep the dimension funded for what remains. Park when
+the *dimension* stopped paying; backlog when an *item* did. `park` prints this
+reminder because the two are easy to conflate at wave 9.
+
 The script defends the decision in both directions: it refuses to park a
 dimension the log still reads as moving (use `--force` for a scope or priority
 call from outside the log), and it warns if you log a round against a parked one.
@@ -271,11 +281,15 @@ Never halt silently. On any stop:
 
 1. Finish the wave and run the smoother, unless the stop is a safety stop
 2. Promote the best champion, not necessarily the latest challenger
-3. `gauntlet.py board`, then `gauntlet.py report`, then complete the judgement
-   fields yourself — including what each parked lane would need to be worth
-   restarting
-4. State whether the loop was still improving when it stopped
-5. On a budget stop, make the extension offer — a priced block of waves, or an
+3. **Smoke test the final state**: open, run or render the promoted artifact
+   once, end to end, after the smoother's edits — the promoted-and-smoothed
+   state is the one state no critic ever judged as a whole. If it does not
+   open, that is a safety stop, not a shippable result.
+4. `gauntlet.py board`, then `gauntlet.py report`, then complete the judgement
+   fields yourself — the smoke test (what you opened, what you saw), and what
+   each parked lane would need to be worth restarting
+5. State whether the loop was still improving when it stopped
+6. On a budget stop, make the extension offer — a priced block of waves, or an
    honest recommendation to stop
 
 That last sentence is what tells the user whether to spend more. It is the most
