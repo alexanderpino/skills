@@ -609,11 +609,87 @@ the retreat loop are in conflict as written. See below.**
 > "attack the first land cell above the waterline" is **N** — a statement about what a heightfield
 > can represent, and it belongs beside the arch warning rather than beside the erosion law.
 
+> **A fourth finding in the same block, and it is about the bench rather than the cliff.** Same
+> implementation, measured at the settings above. The wave-cut platform this section promises does
+> appear — 14–16 m of it in every row of 1408 m of coast, planed to within 0.75 m of the datum —
+> and **none of it is visible, because step 3 buries the part of it that is above water.** The
+> deposition band lays the eroded sand over every cell below the swash plane, and a bench at sea
+> level is below the swash plane by definition. Measured on the subaerial bench: **median regolith
+> 2.27 m against a rock roughness of 0.25 m**, so the sand is nine times the relief it would have
+> to *infill* to leave anything showing, and the surface reads as beach with cover = 1.000
+> everywhere. The bare platform is all below the waterline.
+>
+> **It is one declared number away, and the number is the sand fraction.** The wedge needs
+> 34.3 m³ per metre of coast and the loop delivers 206.1 at a 10% sand yield, so the bench emerges
+> subaerially only below about **1.7%**. That is the whole distance between "this coast has a sand
+> beach" and "this coast has a rock platform", and both are photographed at the same coast a
+> hundred metres apart — so a scene wanting both needs the yield to be a **field** (it is a
+> function of what the cliff is made of, which is the hardness field this block already carries)
+> rather than one constant. **`?` and unbuilt**; recorded so the next reader does not conclude the
+> platform is missing from the loop when what is missing is its exposure.
+
+**Sand infilling the hollows is an AREA fraction, and it is not a blending coefficient.** The
+bench in a photograph is *pocketed* — bare rock standing through sand that has filled the hollows —
+and that is a statement about area, not about depth. It has a closed form and needs no texture. Let
+the rock inside one cell have elevation `z ~ N(0, σ_r)` about its own mean and let sand pond to a
+level `l`:
+
+```
+covered area fraction   f   = Φ(u),                    u = l/σ_r
+mean sand depth         reg = σ_r·(φ(u) + u·Φ(u))      # = E[(l − z)+], the volume book
+```
+
+so a mean depth fixes `u` and `u` fixes `f`, with nothing left over. **It is strongly non-linear
+and that non-linearity IS the pocketing**: a veneer whose mean depth *equals* the rock's roughness
+covers **81.6%** of the area, not 100% — a fifth of the surface still stands through it. Half a
+roughness covers 57.5%, a quarter 36.5%. A linear "sand if `reg > 0`" test gives a clean edge where
+the photograph has an interfinger.
+
+> **And then it must be drawn as a MASK, not multiplied in as a coefficient.** Found by
+> implementing exactly the paragraph above and shipping it for a wave: an area fraction used as a
+> blend paints the *expectation* of a binary spatial field — every square metre reading a quarter
+> rock, where "pocketed" means a quarter of the **area**. The fix costs one field and no new
+> physics: sand fills each pocket from the bottom up, so the bare share is the top `1 − f` of the
+> rock's own **height ordering**, and a rank field is uniform on [0,1] by definition, which is the
+> only marginal for which `E[bare] = 1 − f` identically. The realisation and the closed form then
+> check each other, and neither is built from the other.
+>
+> **Why this survived a whole wave: the mean was always right.** Reintroducing the blend as a
+> deliberate defect moves **not one** of the five suite rows that check the bare share against
+> `Φ(u)`. What it moves are the rows that ask whether the shader's field is *binary*. A
+> quantity that is correct in expectation and wrong as a surface is invisible to every test written
+> about its expectation — which is the general lesson, and this chapter's `glacierStep` volume rule
+> is the same shape one level down.
+>
+> The pocket **scale** is a second `?` and it is the first one seen sideways: `σ_r` is the relief's
+> amplitude, the correlation length is its wavelength, and together they are an rms slope. Declared
+> at 2 m, bracketed 0.7–6 m, and the bracket moves the *size* of a pocket and **not** how much rock
+> shows — because the mask's mean is the closed form at any scale. That is how to hold an unknown
+> the volume book cannot decide.
+
 **Sea stacks and arches** are `L`-tier and **need `11`'s representation warning**: an arch
 cannot exist in a heightfield. A sea *stack* can (it's just an isolated column), and it emerges
 naturally where a hard bed survives while the softer rock around it retreats — so it requires
 spatially varying hardness. With uniform rock you get a straight cliff and nothing else, which
 is the usual reason a coastal graph looks boring.
+
+> **"Spatially varying" is not enough — the hardness field needs a SPECTRUM, and a single
+> correlation length silently forbids the stack.** Measured on the same implementation, which uses
+> a band-limited field of seven modes spread one octave around an alongshore correlation length of
+> 380 m. That field produces the headlands and the bay it was built for: 150 m of shoreline
+> amplitude over 1408 m of coast, with hardness varying by ±0.29 along the shoreline. It produces
+> **zero** isolated highs standing seaward of the shoreline, in the whole domain, at any step count
+> — and the reason is arithmetic rather than dynamics. **The shortest mode present is 190 m; the
+> grid's alongshore Nyquist is 32 m; a sea stack is 10–30 m across.** There is no power at the
+> landform's own scale, so no run of the loop can produce one.
+>
+> The consequence for a reader is a ranking, not a patch: **a hardness field with one scale is a
+> headland-and-bay generator, and a stack, a skerry or an offshore reef needs power two orders
+> below it** — which is what rock-mass strength actually looks like, since it is set by joint and
+> bedding spacing and fracture networks are scale-free over orders of magnitude. Whether a
+> power-law hardness field produces stacks **is not verified here** and is `?`: it was diagnosed
+> and left, because changing the field's spectrum changes the plan-form every other measurement in
+> this block was made on. The *diagnosis* is `D` — three numbers and a comparison.
 
 ## Lacustrine (lake) shores
 
@@ -758,6 +834,30 @@ for stand in seaLevelHistory:            # each (level, duration)
 The single-stand case is the wave-cut platform above; the *sequence* is how you author an
 uplifted coast — one stand for one clean terrace, several for the staircase. Do **not** fill the
 flat benches in `03`; like glacial overdeepenings they are real, deliberate flats.
+
+> **The single-stand loop leaves the ground BEHIND the cliff undefined, and on a clifftop camera
+> that ground is most of the frame.** Found by rendering the coastal loop's own output from the
+> viewpoint one of the reference photographs was taken from: the plateau the photographer is
+> standing on is **45.4% of the pixels**, and the loop never touched it — it is still the initial
+> condition's ramp, one albedo, with a normal whose tilt varies by 3.7° across the whole frame and
+> a high-frequency standard deviation of **0.0009 of 255**. Zero texture, and the largest single
+> object in the picture.
+>
+> **It is not a missing constant and no weathering coefficient reaches it.** Differential subaerial
+> weathering keyed to the same hardness field lowers the plateau by 2–18 cm over the 182 m this
+> coast retreated (denudation 0.01–0.1 mm/yr against cliff retreat 0.05–0.5 m/yr, a ratio of 10⁻³
+> to 10⁻⁴), so its relief has slopes of order 10⁻⁴ — invisible at any coefficient in that bracket.
+>
+> **What the plateau IS, is this section's own landform.** A flat surface at 36–44 m behind an
+> actively retreating cliff on an Atlantic coast is an **emerged marine terrace** — the same bench
+> the single stand cuts, lifted clear. So the structure it is missing (an old cliff line at its
+> inner edge, a bench at a former stand's level, the same planed roughness under a soil mantle) is
+> what the loop above already produces, run at a sea-level history instead of at one stand. The
+> alternative explanation — that a real coastal plain's relief is *drainage* — is fluvial and out
+> of this chapter, and the two are distinguishable by whether the relief is shore-parallel or
+> dendritic. **Recorded as a gap with its mechanism named and not closed**: running a stand history
+> changes the plan-form every measurement in [Cliff retreat & beaches](#cliff-retreat--beaches) was
+> made on.
 
 ## Deltas, estuaries, rias
 

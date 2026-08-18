@@ -5223,7 +5223,7 @@ def _sec_land(ctx):
               'A linear ramp -- which is what waves 4-7 used -- misses by 0.13 '
               'at this level, fifty times the tolerance.')
     check(1, 'the median of the DISTRIBUTION, ABSOLUTE',
-          sg * math.sqrt(math.log(2.0)), 0.3062051, 1e-6,
+          sg * math.sqrt(math.log(2.0)), 0.30616837, 1e-6,
           'Where the exceedance crosses 0.5. It is NO LONGER where the ladder '
           'splits wet from dry -- wave 12 splits on the realisation\'s own '
           'damp limit, which is a different and higher level -- and the row is '

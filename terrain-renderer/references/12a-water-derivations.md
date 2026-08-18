@@ -1991,6 +1991,93 @@ over a per-point irradiance and the other a median *picture* pixel over a median
 which a skewed caustic net does not let commute. The row is a consistency check with a known sign.
 What actually measures the absorption is the map row above it, which is exact.
 
+### Where the band ENDS — a distribution is not a surface, and it is two masks, not one
+
+*(sea wave 12. The closed form above says how much darker wet is; this says **where** wet stops, and
+it is the third place in this project where a renderer was drawing an ensemble mean.)*
+
+The section above is about a *film on a substrate*. On a beach the same trapped series applies
+unchanged — the reference photographs make the waterline one of the strongest tonal edges in the
+set — and it then needs one thing a pool does not: **the boundary**. Getting the boundary wrong
+costs more than getting the albedo wrong, because an albedo error is a level and a boundary error
+is the whole feature.
+
+**Run-up heights are Rayleigh, and the share of swash cycles reaching a level `z` is the
+exceedance**
+
+```
+p(z) = exp(-(z/sigma)^2)
+```
+
+which is correct, checkable against a generator that has never heard of beaches, and **the wrong
+object to paint.** A shader that blends wet albedo into dry by `p(z)` draws the *time-average of
+the beach*, and an average has no edge — measured on this project's own wave-10 hero frame, the
+largest one-row step in green across 48 px of beach face was **4/255**, on a monotone ramp.
+
+**What the surface is** is a realisation. Sand darkened by pore water stays dark until the pores
+drain — minutes, against a 9 s period — so at any instant the face is damp up to the **highest
+run-up of the last `N = tau_dry/T` cycles**, and the maximum of `N` iid Rayleigh variates has
+
+```
+F_N(z) = [1 - exp(-(z/sigma)^2)]^N        cdf
+z(u)   = sigma * sqrt(-ln(1 - u^(1/N)))   its inverse, for u ~ U(0,1)
+median = sigma * sqrt(-ln(1 - 2^(-1/N)))
+```
+
+Draw `z(u)` per alongshore position and the boundary is a **step in elevation** that **varies
+alongshore**, which is what a beach has. Its correlation length is not a new number: beach cusps
+self-organise at the horizontal swash excursion (Werner & Fink 1993), and the excursion is already
+`sqrt(H_0 L_0)` with the slope divided out of Hunt's run-up.
+
+**Two consequences worth having.**
+
+**1 · It closes an open `?` by consequence rather than by citation.** Hunt (1959) `R = xi*H` is a
+*scaling*; the coefficient depends on which run-up level is meant, and this project had that marked
+`?` since wave 1. The realisation decides it, because the two readings are not both survivable:
+
+| Hunt's `R` read as | `sigma` | damp limit, median | the beach's own top (`BACKSHORE_Z`) |
+|---|---|---|---|
+| the rms | 0.7274 m | **1.433 m** | 1.029 m — **no dry sand, ever** |
+| `R_2%` | 0.3677 m | **0.725 m** | 1.029 m — wet face, dry backshore |
+
+The rms reading makes the same closed forms that *build* the beach unable to leave any of it dry.
+So `R` is `R_2%`, `sigma = R/sqrt(ln 50) = R/1.9781`, and the band waves 4–11 drew was **1.978×
+too tall**.
+
+**2 · The specular and the diffuse are not one mask.** The trapped series is light re-emerging from
+a wetted **grain pack** — pore water, minutes. A specular lobe needs **free water standing on the
+surface**, which is the swash *sheet*, and the sheet is on a level only while the front is above
+it. Driving both from one field puts a mirror on damp sand, and on the wave-10 frame that mirror
+was worth **1.28 against a 1.39 diffuse term over 3.19% of the whole frame** — enough to invert the
+wet/dry pair entirely. Split them and the pair reads in the trapped series' direction again:
+
+| | wet/dry, scene-linear, TOTAL |
+|---|---|
+| one mask (waves 4–11) | 1.558 / 1.604 / 1.628 — **wet brighter** |
+| two masks (this) | **0.584 / 0.565 / 0.541** |
+
+The sheet is drawn from the same run-up distribution *conditioned on the cycle maximum*, so
+`z_sheet <= z_damp` holds identically at every phase rather than by clipping.
+
+**Measured after, on the same 48 px:** largest one-row green step **36/255**, damp `153,138,116`
+against dry `189,174,150`.
+
+> **The failure-mode table in `12` already prescribed this and the implementation did not follow
+> it.** The row reads *"Wet dark sand band that follows the surf | Run-up / swash envelope |
+> **Max-recent-run-up envelope** feeds the wetness overlay"*. A max-recent envelope is exactly the
+> realisation above; what shipped was the exceedance, which is the envelope's *distribution*. The
+> chapter was right and un-followed, which is a different and more useful finding than the chapter
+> being wrong.
+
+**Tier.** The Rayleigh exceedance and the `N`-maximum inversion are `D` — one line of order
+statistics each, and the suite checks the realisation's counted share against the closed-form cdf
+over 28001 cusp cells at four levels, with neither side built from the other. The two-substance
+split is `P` in mechanism (pore water versus a free surface) and the *sheet's* residence is `?`:
+the swash phase a frame is taken at is the bore's travel time across the surf zone, which no model
+here carries, so the guarded statement is the bound `z_sheet <= z_damp`, fired at every phase.
+`tau_dry = 300 s` is `?`, bracketed 60–1800 s; it enters only as `sqrt(ln N)`, so a factor of 30
+moves the damp limit by **1.56×** against the **1.98×** error it removes.
+
 ### Which side of the interface the argument lives on — and the map between them
 
 *(sea wave 10. This is the sixth time this project has used a shared closed form one interface off,
