@@ -848,7 +848,27 @@ def shade_land(w, P, D, parts=None):
     # this project has carried since wave 1, so the share of swash cycles that
     # reach a level -- and therefore the share of the surface still carrying a
     # film -- is exp(-(z/R)^2). Nothing is placed: `beach.swash_wetness`.
-    wet = B.swash_wetness(hz)[..., None]
+    #
+    # WAVE 12: ...AND A DISTRIBUTION IS NOT A SURFACE. Wave 8 got the statistic
+    # right and then PAINTED it, which draws the time-average of the beach.
+    # An average has no edge, and bar H3 calls this boundary "one of the
+    # strongest tonal edges in these frames"; wave 11's critic measured the
+    # consequence as a smooth ramp with no boundary anywhere across 48 px of
+    # beach face. The shader now draws a REALISATION -- `beach.damp_limit`, the
+    # maximum of the last tau_dry/T run-ups, sharp in z and cusped alongshore
+    # at the swash excursion -- which is the same correction the optics lane
+    # made to the glitter and the wave-field lane made to the foam, in the
+    # third and last place this project was drawing an ensemble mean.
+    #
+    # AND IT IS TWO MASKS, BECAUSE THEY ARE TWO SUBSTANCES. Pore water in the
+    # grain pack darkens (the trapped series) and lasts minutes; free water
+    # standing on the surface reflects, and is only there while the swash sheet
+    # is. Waves 4-11 drove both from one field, which puts a mirror on damp
+    # sand -- and that, not the albedo, is what inverts bar J's wet/dry rung.
+    z_damp = B.damp_limit(yw)
+    z_sheet = B.sheet_front(yw)
+    wet = (hz <= z_damp).astype(float)[..., None]       # pore water: DIFFUSE
+    film = (hz <= z_sheet).astype(float)[..., None]     # free water: SPECULAR
     sand = 1.0 - rock - plain
     # the DIFFUSE albedo. The wet forms are the trapped series with the film's
     # own surface reflection taken OUT of them (see SAND_WET_DIFF): wet sand is
@@ -868,14 +888,16 @@ def shade_land(w, P, D, parts=None):
     sh = land_shadow(w, P, N)
     L = alb * (E_SUN[None, None] * (ndl * sh)[..., None] / np.pi + env_irr(N))
     # ...AND THE SPECULAR HALF, which is where the rest of `wet_albedo` went.
-    # It is multiplied by `wet` and by nothing else: dry sand is matte, wet
-    # sand is glossy, and they are one field apart. `sand + rock` and not the
-    # plain, because a wetted plain is a surface this scene never has.
-    spec = wet * (sand + rock) * wet_specular(D, N)
+    # WAVE 12 MOVED IT OFF `wet` AND ONTO `film`. It is a lobe off a water
+    # surface, so it needs a water surface: `film` is the swash sheet, not the
+    # damp band. `sand + rock` and not the plain, because a wetted plain is a
+    # surface this scene never has.
+    spec = film * (sand + rock) * wet_specular(D, N)
     if parts is not None:
         parts['diffuse'] = L
         parts['specular'] = spec
         parts['wet'] = wet[..., 0]
+        parts['film'] = film[..., 0]
         parts['sand'] = sand[..., 0]
         parts['N'] = N
         parts['shadow'] = sh
@@ -2916,13 +2938,13 @@ def bar_J_ladder(w, ex, L):
         sand = np.clip(sand, 0.0, 1.0)
         # WAVE 8: the wet share is `beach.swash_wetness`, the same field
         # `shade_land` shades with, so the ladder and the shader cannot drift.
-        # A RUNG IS COUNTED WHERE THE SURFACE READS AS THAT SURFACE, and the
-        # split is the median of the distribution -- wetness > 0.5, i.e. below
-        # z = R sqrt(ln 2) = 0.605 m -- not an extra threshold: it is where
-        # more than half the swash cycles reach, which is what "wet sand" is.
-        wet = B.swash_wetness(hz)
-        out['wet sand'] = float((sand * (wet > 0.5)).sum()) / n
-        out['dry sand'] = float((sand * (wet <= 0.5)).sum()) / n
+        # WAVE 12: the shader draws a REALISATION, so the ladder counts the
+        # same realisation -- `beach.damp_limit` -- and no threshold is
+        # introduced at all. A pixel is wet sand if it is below this beach's
+        # own damp limit, which is the same test the shader makes.
+        wet = hz <= B.damp_limit(P[..., 1])
+        out['wet sand'] = float((sand * wet).sum()) / n
+        out['dry sand'] = float((sand * (~wet)).sum()) / n
     else:
         out['wet sand'] = out['dry sand'] = 0.0
     out['rungs_present'] = sum(1 for k, v in out.items()
@@ -3111,11 +3133,12 @@ def land_breakdown(w, ex, L):
     rock = np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0.0, 1.0)
     plain = np.clip((hz - PLAIN_Z) / 4.0, 0.0, 1.0) * (1 - rock)
     sand = 1.0 - rock - plain
-    wet = (B.swash_wetness(hz) > 0.5) * sand
+    wet = (hz <= B.damp_limit(P[..., 1])) * sand
+    film = (hz <= B.sheet_front(P[..., 1])) * sand
     n = float(L.shape[0] * L.shape[1])
     return dict(rock=float(rock.sum()) / n, plain=float(plain.sum()) / n,
                 sand=float(sand.sum()) / n, wet_sand=float(wet.sum()) / n,
-                runup=B.BERM_Z)
+                film_sand=float(film.sum()) / n, runup=B.BERM_Z)
 
 
 def sun_for_the_coast_frames():
@@ -3304,16 +3327,28 @@ def beach_report(w, bay, out=print):
                / float(w.y[1] - w.y[0]) / max(np.median(bch['need_row']), 1e-9),
                bch['supply_limited']))
     out('  the wet/dry boundary is a Rayleigh exceedance and not a line: '
-        'wetness = exp(-(z/R)^2) with R = %.4f m, so the median (w = 0.5) '
-        'sits at z = %.4f m and the surface is %.3f wet at the berm level '
-        'and %.3f at the backshore.'
-        % (B.BERM_Z, B.BERM_Z * math.sqrt(math.log(2.0)),
-           float(B.swash_wetness(B.BERM_Z)),
-           float(B.swash_wetness(B.BACKSHORE_Z))))
-    out('  `?` INHERITED: read as R_2%% instead of the rms, Hunt\'s R gives a '
-        'Rayleigh scale of %.4f m and the band is half as tall. Both are '
-        'reported; the first is shipped.'
-        % (B.BERM_Z / math.sqrt(math.log(50.0))))
+        'wetness = exp(-(z/sigma)^2) with sigma = %.4f m (Hunt\'s R = %.4f m '
+        'read as R_2%%), so the median of the distribution sits at z = %.4f m.'
+        % (B.swash_scale(), B.BERM_Z,
+           B.swash_scale() * math.sqrt(math.log(2.0))))
+    out('  ...AND THE SURFACE IS A REALISATION OF IT, NOT THE DISTRIBUTION. '
+        'The damp limit is the maximum of the last N = tau/T = %.0f run-ups: '
+        'median %.4f m over the bed, drawn %.4f-%.4f m across the domain, '
+        'against a berm at %.4f m and a backshore at %.4f m. Across the '
+        'tau_dry bracket %s s the median limit runs %.4f-%.4f m.'
+        % (B.swash_cycles(), B.damp_limit_median(),
+           float(np.min(B.damp_limit(bch_y := np.linspace(-704.0, 704.0,
+                                                          178)))),
+           float(np.max(B.damp_limit(bch_y))), B.BERM_Z, B.BACKSHORE_Z,
+           B.SWASH_TAU_BRACKET,
+           B.damp_limit_median(tau=B.SWASH_TAU_BRACKET[0]),
+           B.damp_limit_median(tau=B.SWASH_TAU_BRACKET[1])))
+    out('  `?` CLOSED BY CONSEQUENCE: read as the rms instead of R_2%%, the '
+        'damp limit is %.4f m and this beach -- which its own closed forms '
+        'top out at %.4f m -- has NO dry sand at any instant. That is what '
+        'decides the reading, not a citation.'
+        % (B.damp_limit_median(R=B.BERM_Z * math.sqrt(math.log(50.0))),
+           B.BACKSHORE_Z))
     return dict(width=bw, beach=bch)
 
 
@@ -3338,9 +3373,13 @@ def wet_dry_report(w, ex, L, out=print):
     rock = np.clip((np.abs(hx) + np.abs(hy) - 0.35) / 0.5, 0.0, 1.0)
     plain = np.clip((hz - PLAIN_Z) / 4.0, 0.0, 1.0) * (1 - rock)
     sand = np.clip(1.0 - rock - plain, 0.0, 1.0) > 0.5
-    wetf = B.swash_wetness(hz)
+    # WAVE 12: the realisation the shader drew, not the distribution it came
+    # from -- and the DAMP band, not the sheet, because bar H3's pair is the
+    # trapped series in the pore water and the sheet is a third surface.
+    wetf = (hz <= B.damp_limit(P[..., 1])).astype(float)
+    film = (hz <= B.sheet_front(P[..., 1]))
     Lp = L[ex['land_mask']]
-    mw = sand & (wetf > 0.5)
+    mw = sand & (wetf > 0.5) & (~film)
     md = sand & (wetf <= 0.5)
     if not (mw.any() and md.any()):
         return None
@@ -3362,17 +3401,25 @@ def wet_dry_report(w, ex, L, out=print):
             'channel, which is bar H3\'s direction and the direction waves '
             '4-7 had backwards'
             % (np.round(dd, 4), np.round(dw, 4), np.round(rd, 4)))
-        out('       SPECULAR dry %s   wet %s   -- the lobe is ON the wet band '
-            'and OFF the dry one by construction, and it is what inverts the '
-            'total'
-            % (np.round(spc[md].mean(0), 4), np.round(spc[mw].mean(0), 4)))
-        out('       THE INVERSION IS GAP 5, NOT GAP 2. This frame is drawn '
-            'under a 21.0 deg sun at azimuth 273.8 -- straight out to sea on '
-            'a west-facing coast -- so the wet band is BACKLIT and glints. '
-            'Bar J\'s own class of frame is front-lit (56.22 / 123.13), where '
-            'the specular goes away from the camera and the pair reads in the '
-            'diffuse order. The albedos are right; the illuminant is in the '
-            'wrong half of the sky.')
+        out('       SPECULAR dry %s   wet(damp, no sheet) %s   sheet %s'
+            % (np.round(spc[md].mean(0), 4), np.round(spc[mw].mean(0), 4),
+               np.round(spc[sand & film].mean(0), 4)
+               if (sand & film).any() else 'absent'))
+        out('       WAVE 12: THE LOBE IS OFF THE DAMP BAND. Waves 4-11 drove '
+            'the specular from the same field as the diffuse, which puts a '
+            'mirror on damp sand -- and the mirror, not the albedo, is what '
+            'inverted this rung. Free water is on the surface only where the '
+            'swash SHEET is, so the damp band is now matte and reads in bar '
+            'H3\'s order; the sheet is a THIRD surface and is counted apart. '
+            'What survives of the illuminant gap: this frame is drawn under a '
+            '21.0 deg sun at azimuth 273.8 -- out to sea on a west-facing '
+            'coast -- against bar J\'s own class at 56.22 / 123.13, so the '
+            'sheet is backlit here and would not be there.')
+        out('       the sheet covers %.3f%% of the land in frame against the '
+            'damp band\'s %.3f%%; before wave 12 the lobe was on all of the '
+            'second.'
+            % (100 * float((sand & film).sum()) / max(sand.size, 1),
+               100 * float((sand & (wetf > 0.5)).sum()) / max(sand.size, 1)))
     out('     the albedos it rests on: dry %s, wet DIFFUSE %s '
         '(= wet_albedo - R_EXT), and the R_EXT %s that used to be inside the '
         'diffuse term is now the specular lobe.'
@@ -3776,17 +3823,19 @@ def beach_figure(w, bay, w8, path):
                  ylabel='share of swash cycles reaching it')
     ax2.frame()
     ax2.line(zq, B.swash_wetness(zq), (192, 57, 43), width=3)
-    ax2.line(zq, B.swash_wetness(zq, R=B.BERM_Z / math.sqrt(math.log(50.0))),
+    ax2.line(zq, B.swash_wetness(zq, R=B.BERM_Z * math.sqrt(math.log(50.0))),
              (127, 140, 141), width=2, dash=(7, 6))
-    ax2.vline(B.BERM_Z * math.sqrt(math.log(2.0)), (41, 128, 185), width=1)
+    ax2.line(zq, B.damp_exceedance(zq), (39, 60, 117), width=3)
+    ax2.vline(B.damp_limit_median(), (41, 128, 185), width=1)
     P.legend(ax2, [
-        ((192, 57, 43), 'exp(-(z/R)^2), R = %.4f m -- the Rayleigh exceedance '
-         'of the run-up' % B.BERM_Z),
-        ((127, 140, 141), '`?` bracket: Hunt\'s R read as R_2%% instead of the '
-         'rms (R = %.4f m)' % (B.BERM_Z / math.sqrt(math.log(50.0)))),
-        ((41, 128, 185), 'the median, z = R sqrt(ln 2) = %.4f m -- where the '
-         'ladder splits wet from dry'
-         % (B.BERM_Z * math.sqrt(math.log(2.0)))),
+        ((192, 57, 43), 'exp(-(z/sigma)^2), sigma = %.4f m -- the Rayleigh '
+         'exceedance of ONE run-up' % B.swash_scale()),
+        ((127, 140, 141), 'waves 4-11: Hunt\'s R read as the rms rather than '
+         'R_2%% (sigma = %.4f m), a band 1.978x too tall' % B.BERM_Z),
+        ((39, 60, 117), 'P(damp) = 1-(1-p)^N, N = %.0f cycles -- and the '
+         'SHADER DRAWS A SAMPLE OF THIS, not the curve' % B.swash_cycles()),
+        ((41, 128, 185), 'the damp limit\'s median, z = %.4f m'
+         % B.damp_limit_median()),
     ], 0.9, 1.0)
     lines = [
         's8  THE SUBAERIAL BEACH AND ITS WET/DRY BOUNDARY, against their own '

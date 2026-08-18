@@ -799,6 +799,56 @@ def _bug_swash_linear_band(mod):
         / (mod.BERM_Z if R is None else R), 0.0, 1.0)
 
 
+def _bug_runup_scale_as_rms(mod):
+    """Waves 4-11's reading of Hunt's R: the run-up limit used as the Rayleigh
+    SCALE rather than as the 2% quantile of it. The band is 1.978x too tall and
+    the instantaneous damp limit runs off the top of the beach."""
+    mod.RUNUP_QUANTILE = math.exp(-1.0)          # sigma == BERM_Z
+
+
+def _bug_swash_mean_not_sample(mod):
+    """THE DEFECT WAVE 11'S CRITIC MEASURED: the shader hands the wetted
+    DISTRIBUTION where a realisation belongs, so the wet/dry boundary is the
+    time-average of the swash and has no edge. Put back as a `damp_limit` that
+    returns the level of the mean rather than a draw -- one number for the
+    whole coast, which is what a blend by exp(-(z/sigma)^2) is worth once the
+    shader thresholds it."""
+    def _flat(y, R=None, T=None, tau=None, seed=None, lam=None):
+        return np.full(np.shape(np.asarray(y, float)),
+                       mod.swash_scale(R) * math.sqrt(math.log(2.0)))
+    mod.damp_limit = _flat
+
+
+def _bug_swash_lattice_from_caller(mod):
+    """The lattice built from the CALLER'S span and filled from a sequential
+    generator, which is how this was first written. Every camera then sees its
+    own waterline, and nothing in a single-camera suite can tell."""
+    def _nodes(y, R=None, T=None, tau=None, seed=20260818, lam=None):
+        lam = mod.SWASH_W if lam is None else lam
+        y = np.asarray(y, float)
+        y0 = float(np.min(y)) - lam
+        n = int(math.ceil((float(np.max(y)) + 2.0 * lam - y0) / lam)) + 1
+        ys = y0 + lam * np.arange(n)
+        n_c = mod.swash_cycles(mod.T_SWELL if T is None else T, tau)
+        u = np.random.default_rng(seed).uniform(1e-9, 1.0 - 1e-12, ys.size)
+        return ys, mod.swash_scale(R) * np.sqrt(-np.log1p(-u ** (1.0 / n_c)))
+    mod._damp_nodes = _nodes
+
+
+def _bug_sheet_independent_draw(mod):
+    """The swash sheet drawn as its own Rayleigh instead of conditioned on the
+    cycle maximum -- the first writing of `sheet_front`. The sheet then pokes
+    through the damp band wherever its draw beats the maximum's."""
+    def _sheet(y, R=None, phase=0.5, seed=20260819, lam=None):
+        s = mod.swash_scale(R)
+        k, ys = mod._swash_lattice(y, lam)
+        u = np.clip(mod._splitmix01(k, seed), 1e-12, 1.0 - 1e-12)
+        z_r = s * np.sqrt(-np.log(u))
+        f = max(0.0, 1.0 - (1.0 - 2.0 * float(phase)) ** 2)
+        return np.interp(np.asarray(y, float), ys, z_r) * f
+    mod.sheet_front = _sheet
+
+
 def _bug_wet_albedo_all_diffuse(mod):
     """`optics.wet_albedo` shipped whole into the Lambertian lobe -- waves
     4-7's own code. Wet sand then reads BRIGHTER than dry and never glossy,
@@ -1184,7 +1234,9 @@ DIFFRACT_BUGS = ('diff-reflected-same-sheet', 'diff-no-reflected-term',
 
 
 BATHY_BUGS = ('keying-axis', 'offset-unsigned', 'offset-no-subdivide',
-              'keying-polar-everywhere', 'fold-unsigned-gradient')
+              'keying-polar-everywhere', 'fold-unsigned-gradient',
+              'runup-scale-as-rms', 'swash-mean-not-sample',
+              'swash-lattice-from-caller', 'sheet-independent-draw')
 
 
 EMBAY_BUGS = ('grid-snell', 'spiral-no-tangency', 'alpha-declared',
@@ -1205,6 +1257,10 @@ LAND_RENDER_BUGS = {'wet-albedo-all-diffuse', 'airlight-view-direction',
 BUGS = {
     'face-slope-at-break': _bug_face_slope_at_break,
     'swash-linear-band': _bug_swash_linear_band,
+    'runup-scale-as-rms': _bug_runup_scale_as_rms,
+    'swash-mean-not-sample': _bug_swash_mean_not_sample,
+    'swash-lattice-from-caller': _bug_swash_lattice_from_caller,
+    'sheet-independent-draw': _bug_sheet_independent_draw,
     'wet-albedo-all-diffuse': _bug_wet_albedo_all_diffuse,
     'airlight-view-direction': _bug_airlight_view_direction,
     'beta-no-scale-height': _bug_beta_no_scale_height,
@@ -3343,6 +3399,159 @@ def _sec_bathy(ctx):
           % (cmp_['axis'][0], cmp_['normal'][0], cmp_['axis'][1],
              cmp_['normal'][1], cmp_['axis'][2], cmp_['normal'][2]), '-')
 
+    # ============ WAVE 12 · THE BEACH FACE: A REALISATION, NOT A DISTRIBUTION
+    #
+    # Bar H3 calls the waterline "one of the strongest tonal edges in these
+    # frames". Waves 4-11 shaded it with `swash_wetness`, which is the SHARE OF
+    # SWASH CYCLES that reach a level -- correct as a statistic and wrong as a
+    # surface, because it paints the time-average of the beach and an average
+    # has no edge. Measured on the wave-10 hero frame: 48 px of beach face with
+    # no step anywhere in it.
+    #
+    # These rows guard the replacement, and every one of them is an ABSOLUTE
+    # metre or an exact identity rather than a ratio.
+    sg = B.swash_scale()
+    check(1, 'the Rayleigh scale IS Hunt\'s R at the 2%% level, ABSOLUTE',
+          [float(sg), float(B.swash_wetness(B.BERM_Z))],
+          [B.BERM_Z / math.sqrt(-math.log(0.02)), 0.02], 1e-12,
+          'THE `?` IN `runup_hunt` CLOSED BY CONSEQUENCE. Hunt (1959) gives a '
+          'SCALING and the file says outright that the coefficient depends on '
+          'which run-up level is meant. Read as the rms, the damp limit -- the '
+          'maximum of the last tau/T run-ups -- lands at %.4f m on a beach '
+          'whose own closed forms top out at BACKSHORE_Z = %.4f m, so this '
+          'coast could have no dry sand at any instant. Read as R_2%% it lands '
+          'at %.4f m, just under the berm, which is where '
+          '`subaerial_beach`\'s own docstring already put it. The identity is '
+          'exact and it is the only place the reading enters.'
+          % (B.damp_limit_median(R=B.BERM_Z * math.sqrt(math.log(50.0))),
+             B.BACKSHORE_Z, B.damp_limit_median()), 'm')
+    check(1, 'the rms reading gives a beach with NO dry sand, ABSOLUTE',
+          float(B.damp_limit_median(R=B.BERM_Z * math.sqrt(math.log(50.0)))
+                > B.BACKSHORE_Z), 1.0, 0.0,
+          'The falsification the row above rests on, as its own row so it can '
+          'fail on its own. If a later wave moves BACKSHORE_Z or the drying '
+          'time far enough that the rms reading stops being absurd, the '
+          'argument above stops holding and this says so.')
+    # ---- the realisation against the distribution it is drawn from ---------
+    # COUNTED AT THE LATTICE NODES AND OVER 386 km OF COAST, and both of those
+    # are the row rather than convenience. At the nodes because the field
+    # BETWEEN nodes is a linear interpolant, whose marginal is a mixture along
+    # the segment and not the node distribution -- counting the interpolant
+    # against the node cdf would be comparing two different quantities and
+    # would need a tolerance to hide it. Over 386 km because the scene's own
+    # 1408 m carries 102 independent cusp cells and a binomial sd of 0.027,
+    # which is larger than any tolerance worth writing; 28000 cells put it at
+    # 0.0016 and the claim is about the CONSTRUCTION, not about this bay.
+    yn = B.SWASH_W * np.arange(-14000, 14001, dtype=float)
+    zn = B.damp_limit(yn)
+    for z in (0.45, 0.60, 0.75, 0.90):
+        check(1, 'realised damp share at z = %.2f m against its own cdf' % z,
+              float((zn > z).mean()), float(B.damp_exceedance(z)), 0.008,
+              'THE SAMPLE MUST COME FROM THE DISTRIBUTION and this is the '
+              'only honest way to say so: count the realisation and compare '
+              'with 1-(1-p)^N computed from the closed form. Neither side is '
+              'built from the other -- `damp_exceedance` never calls '
+              '`damp_limit` -- so a wrong inverse cdf, a wrong N or a wrong '
+              'scale moves one and not the other. The tolerance is five '
+              'binomial sd at 28001 cells, not a tuning.')
+    yq = np.linspace(-704.0, 704.0, 40001)
+    zd = B.damp_limit(yq)
+    # THE ROW THAT IS ABOUT THE EDGE, and it is fired at the field the shader
+    # actually multiplies rather than at a summary of it. `shade_land` forms
+    # `wet = (hz <= damp_limit(y))`, so the wetted field takes ONLY 0 and 1 and
+    # the transition occupies zero height. Waves 4-11 formed
+    # `wet = swash_wetness(hz)`, which takes every value in between: over a
+    # beach face sampled at a centimetre, 96% of the samples were strictly
+    # interior. That difference is the edge, and this counts it.
+    zface = np.linspace(0.0, B.BACKSHORE_Z, 2000)
+    yface = np.full_like(zface, 37.0)
+    wet_shader = (zface <= B.damp_limit(yface)).astype(float)
+    interior = float(np.mean((wet_shader > 1e-9) & (wet_shader < 1 - 1e-9)))
+    check(1, 'the wetted field the shader multiplies is BINARY, ABSOLUTE',
+          interior, 0.0, 0.0,
+          'Zero samples strictly between dry and wet, over 2000 samples of one '
+          'beach face at half a centimetre. The field waves 4-11 shaded with '
+          'puts %.1f%% of the same samples in between, which is a ramp and not '
+          'a boundary -- and it is exactly what wave 11\'s critic measured as '
+          '"a smooth ramp with no edge anywhere across 48 px of beach". '
+          'Reachable-zero, ruling 14: the value IS zero and the row asks for '
+          'zero.'
+          % (100 * float(np.mean((B.swash_wetness(zface) > 1e-9)
+                                 & (B.swash_wetness(zface) < 1 - 1e-9)))))
+    check(1, 'and it still spans levels ALONGSHORE, ABSOLUTE',
+          [float(zd.min()), float(zd.max())], [0.5346, 1.0339], 2e-3,
+          'A step in z that is the SAME step everywhere alongshore is a ruled '
+          'line, which is the other way to draw a waterline wrong. The '
+          'realisation is cusped at the swash excursion and these are the two '
+          'ends of it over 1408 m of coast.', 'm')
+    # ---- the two masks, and the bound between them -------------------------
+    # COUNTED AS VIOLATIONS AND NOT AS A MARGIN. The quantity is one-sided:
+    # max(sheet - damp) is NEGATIVE when the bound holds, so asserting it
+    # equals zero fails on a correct field. What the bound says is that the
+    # count of exceedances is zero, and zero is reachable -- ruling 14.
+    n_bad = 0
+    n_draw = 0
+    for sd_ in range(8):
+        for ph in (0.0, 0.25, 0.5, 0.75, 1.0):
+            zs_ = B.sheet_front(yn, phase=ph, seed=20260819 + 101 * sd_)
+            n_bad += int(np.count_nonzero(zs_ > B.damp_limit(yn) + 1e-12))
+            n_draw += zs_.size
+    check(1, 'the swash SHEET never outruns the damp band, ABSOLUTE',
+          float(n_bad), 0.0, 0.0,
+          'TWO MASKS BECAUSE THEY ARE TWO SUBSTANCES: pore water in the grain '
+          'pack darkens for minutes (the trapped series bar H3 invokes), free '
+          'water on the surface reflects and is gone with the sheet. Waves '
+          '4-11 drove both from one field, which puts a mirror on damp sand '
+          'and is what inverted bar J\'s wet/dry rung. The sheet is drawn from '
+          'the run-up distribution CONDITIONED on the same cycle maximum, so '
+          'the bound holds IDENTICALLY rather than by clipping: %d draws over '
+          'eight seeds and five swash phases -- the phase is `?`, being the '
+          'bore\'s travel time across the surf zone, so the statement that '
+          'does not depend on it is fired at all of it -- and not one '
+          'exceedance. Drawing the sheet independently instead puts 2.0%% of '
+          'them through, which is `--bug sheet-independent-draw`.' % n_draw)
+    check(1, 'the sheet is BELOW the damp band, not equal to it',
+          float(np.mean(B.sheet_front(yn) < B.damp_limit(yn) - 1e-9)), 1.0,
+          1e-12,
+          'The other half of the same statement, because a sheet clipped TO '
+          'the damp limit would satisfy the row above and be one surface '
+          'again. Every node strictly below.')
+    # ---- the realisation is a property of the COAST, not of the caller -----
+    ysub = yq[9000:15000]
+    check(1, 'the waterline does not move when the camera does, ABSOLUTE',
+          [float(np.abs(B.damp_limit(ysub) - zd[9000:15000]).max()),
+           float(np.abs(B.damp_limit(yq[::-1])[::-1] - zd).max())], [0.0, 0.0],
+          0.0,
+          'RULING 14 IN ITS OWN SHAPE: zero is reachable here and it is what '
+          'the row asks for. `shade_land` is handed only the LAND pixels of '
+          'one camera, so a lattice built from the caller\'s own span would '
+          'give every camera a different waterline and a suite that never '
+          'looks at two cameras would not see it. The lattice is anchored at '
+          'y = 0 and indexed by a HASH of the node, not by a stream, which is '
+          'what makes both of these exactly zero.', 'm')
+    check(1, 'the cusp spacing is the swash excursion and nothing new, '
+          'ABSOLUTE',
+          [float(B._swash_lattice(np.array([0.0, 100.0]))[1][1]
+                 - B._swash_lattice(np.array([0.0, 100.0]))[1][0]),
+           float(B.SWASH_W)],
+          [B.SWASH_W, math.sqrt(B.H0_SWELL * B.deep_wavelength(B.T_SWELL))],
+          1e-12,
+          'The alongshore correlation length of the edge is the horizontal '
+          'swash excursion -- beach-cusp spacing, Werner & Fink 1993 -- which '
+          'this file already owns as sqrt(H_0 L_0) with the slope divided out. '
+          'No constant is added and the row says so by computing the '
+          'excursion a second way.', 'm')
+    check(1, 'tau_dry enters only as sqrt(ln N): the bracket, ABSOLUTE',
+          [B.damp_limit_median(tau=B.SWASH_TAU_BRACKET[0]),
+           B.damp_limit_median(),
+           B.damp_limit_median(tau=B.SWASH_TAU_BRACKET[1])],
+          [0.5595, 0.7247, 0.8754], 5e-4,
+          'THE ONE NEW UNKNOWN THIS LANE ADDS, bracketed rather than asserted. '
+          'A factor of 30 in the drying time moves the damp limit by 1.56x, '
+          'because it enters as sqrt(ln(tau/T)). The defect it replaces was '
+          'wrong by 1.98x on its own, so the bracket is smaller than the error '
+          'it removes -- which is the honest way to rank a `?`.', 'm')
+
 
 def _theta0_for_sagitta(B, ep, target):
     """Invert the closed form: the deep-water obliquity a stated indentation
@@ -4878,31 +5087,46 @@ def _sec_land(ctx):
           'write.')
 
     # ============================================= 11.3 THE WET/DRY BOUNDARY
-    check(1, 'swash_wetness at 0, R, 2R, ABSOLUTE',
-          [float(B.swash_wetness(0.0)), float(B.swash_wetness(B.BERM_Z)),
-           float(B.swash_wetness(2.0 * B.BERM_Z))],
+    # WAVE 12 MOVED THESE THREE ROWS, AND THEY HAD TO MOVE: they asserted the
+    # Rayleigh SCALE was `BERM_Z` itself, which is Hunt's R read as the rms
+    # run-up. `beach.swash_scale` reads it as R_2% instead -- the reading the
+    # file's own beach geometry forces, see `_sec_bathy` -- so the scale is
+    # 1.978x smaller and every level in this block moves with it. A guard that
+    # encodes a defect moves when the defect is fixed; what would be wrong is
+    # to widen it.
+    sg = B.swash_scale()
+    check(1, 'swash_wetness at 0, sigma, 2 sigma, ABSOLUTE',
+          [float(B.swash_wetness(0.0)), float(B.swash_wetness(sg)),
+           float(B.swash_wetness(2.0 * sg))],
           [1.0, math.exp(-1.0), math.exp(-4.0)], 1e-12,
           'The boundary is a distribution and these are three points of it. '
           'Absolute, because a wet band that is too tall and one that is too '
           'short both look like a wet band and only the numbers separate '
           'them.')
+    check(1, 'Hunt\'s R is the 2%% level of THIS distribution, ABSOLUTE',
+          float(B.swash_wetness(B.BERM_Z)), B.RUNUP_QUANTILE, 1e-12,
+          'The identity that ties the scale to the reading: if sigma is '
+          'R_2%/sqrt(-ln 0.02) then the exceedance AT R must be 0.02 exactly. '
+          'One line, and it is the whole content of `swash_scale`.')
     # ...AND AGAINST A GENERATOR THAT HAS NEVER SEEN THE FUNCTION.
     rg = np.random.default_rng(20260816)
-    sig = B.BERM_Z / math.sqrt(2.0)
+    sig = sg / math.sqrt(2.0)
     smp = rg.rayleigh(sig, 400000)
-    for z in (0.3, 0.727394, 1.2):
-        check(1, 'Monte-Carlo Rayleigh exceedance at z = %.3f m' % z,
+    for z in (0.3, 0.3677, 0.727394):
+        check(1, 'Monte-Carlo Rayleigh exceedance at z = %.4f m' % z,
               float((smp > z).mean()), float(B.swash_wetness(z)), 0.0025,
               'The claim is that the wetted share IS the exceedance of a '
-              'Rayleigh run-up of rms scale R, and this draws 400000 of them '
+              'Rayleigh run-up of scale sigma, and this draws 400000 of them '
               'and counts. Nothing in numpy\'s generator knows about beaches. '
               'A linear ramp -- which is what waves 4-7 used -- misses by 0.13 '
               'at this level, fifty times the tolerance.')
-    check(1, 'the median of the band, ABSOLUTE',
-          B.BERM_Z * math.sqrt(math.log(2.0)), 0.6055646, 1e-6,
-          'Where wetness crosses 0.5, which is the level the ladder counts '
-          'wet sand below. In metres, so the rung and the shader cannot drift '
-          'apart in opposite directions and both stay green.', unit='m')
+    check(1, 'the median of the DISTRIBUTION, ABSOLUTE',
+          sg * math.sqrt(math.log(2.0)), 0.3062051, 1e-6,
+          'Where the exceedance crosses 0.5. It is NO LONGER where the ladder '
+          'splits wet from dry -- wave 12 splits on the realisation\'s own '
+          'damp limit, which is a different and higher level -- and the row is '
+          'kept because the distribution is still what the realisation is '
+          'drawn from.', unit='m')
 
     # ================================== 11.4 THE BEACH IN THE BED, IN METRES
     bw = ctx['_beach_width']

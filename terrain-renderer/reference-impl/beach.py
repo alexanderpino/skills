@@ -1889,25 +1889,246 @@ SWASH_W = swash_excursion()             # 13.771 m -- the dry beach's width
 BACKSHORE_W = swash_excursion(H0_STORM)  # 19.474 m
 
 
+# ---------------------------------------------------------------------------
+# WAVE 12: THE `?` IN `runup_hunt` IS CLOSED, BY CONSEQUENCE RATHER THAN BY A
+# CITATION -- and closing it moves the wet band by a factor of two.
+#
+# `runup_hunt` says outright that Hunt's R is a SCALING and that "the
+# coefficient depends on which run-up level (mean, 2%, maximum)". Waves 4-11
+# then read `BERM_Z` as the RAYLEIGH SCALE of the run-up distribution:
+# `swash_wetness` was exp(-(z/BERM_Z)^2), which says 36.8% of swash cycles
+# exceed 0.727 m. If 0.727 m is instead the 2% level -- which is what modern
+# run-up practice means by Hunt's R -- then the Rayleigh scale is
+#
+#       sigma = R_2% / sqrt(ln 50) = R_2% / 1.9781 = 0.3677 m
+#
+# and the band is 1.978x shorter. The two readings are not both available,
+# because the file's OWN three-number identity decides between them, and the
+# argument needs no photograph:
+#
+#   THE INSTANTANEOUS DAMP LIMIT IS A MAXIMUM, NOT A MEAN. Sand darkened by
+#   pore water stays dark until the pores drain, which is minutes against a
+#   9 s period. So at any instant the beach is damp up to the HIGHEST run-up of
+#   the last N = tau_dry/T cycles, and the maximum of N Rayleigh variates sits
+#   at sigma*sqrt(ln N).
+#
+#   Read sigma = BERM_Z: with N = 33 the damp limit is 1.36 m. The beach these
+#   same closed forms build tops out at BACKSHORE_Z = 1.029 m. The whole beach
+#   is damp at every instant and this coast can have NO DRY SAND AT ALL -- and
+#   the bed's own dry beach, which `beach_width` measures at 12 m, would be a
+#   surface the shader can never paint dry.
+#
+#   Read sigma = BERM_Z/1.978: the damp limit is 0.688 m against a berm at
+#   0.727 m and a backshore at 1.029 m. Wet face, dry backshore, boundary just
+#   below the berm -- which is what `subaerial_beach`'s own docstring already
+#   asserts ("a marked berm LEVEL at 0.727 m where the wet/dry boundary sits")
+#   and what waves 4-11 could not produce.
+#
+# So the `?` is resolved by SELF-CONSISTENCY inside the file's own identity,
+# and the resolution is reported as such: it is not a citation and it is not a
+# fit to a frame. The suite fires `--bug runup-scale-as-rms` at it.
+RUNUP_QUANTILE = 0.02        # Hunt's R read as the 2% run-up. See above.
+SWASH_TAU_DRY = 300.0        # s, how long sand stays visibly damp after the
+                             # swash leaves it. `?` -- no measurement of the
+                             # drainage/evaporation time of a medium-sand beach
+                             # face was available and the standing ruling
+                             # forbids fitting one to a photograph. It enters
+                             # ONLY as sqrt(ln(tau/T)), so the bracket below is
+                             # a factor of 30 and moves the damp limit by 1.38
+                             # to 2.30 sigma -- a factor of 1.7 on a quantity
+                             # the mean-wetness model got wrong by 2.0. The
+                             # suite reports the bracket rather than hiding it.
+SWASH_TAU_BRACKET = (60.0, 1800.0)
+
+
+def swash_scale(R=None, quantile=None):
+    """The RAYLEIGH SCALE sigma of the run-up, from Hunt's R read as R_q.
+
+    P(run-up > R_q) = q = exp(-(R_q/sigma)^2)  ->  sigma = R_q/sqrt(-ln q).
+    One line, and it is the only place the reading of Hunt's R enters.
+
+    `quantile` is resolved from the module at CALL time and not bound as a
+    default, so the suite's `--bug runup-scale-as-rms` can put waves 4-11's
+    reading back by setting the constant. A default argument would have frozen
+    it at import and the bug would have caught nothing -- which is how the
+    first writing of this function shipped, and the `--bugs-bathy` table is
+    what said so.
+    """
+    R = BERM_Z if R is None else R
+    q = RUNUP_QUANTILE if quantile is None else quantile
+    return R / math.sqrt(-math.log(q))
+
+
 def swash_wetness(z, R=None):
-    """The share of swash cycles that reach elevation `z`: exp(-(z/R)^2).
+    """The share of swash cycles that reach elevation `z`: exp(-(z/sigma)^2).
 
     THE WET/DRY BOUNDARY IS NOT A LINE AND THE FILE ALREADY OWNS THE
     DISTRIBUTION. Run-up heights inherit the incident wave heights' statistics,
     which this file has taken as Rayleigh since wave 1 (`rayleigh_quantiles`,
-    used for the storm forcing). The exceedance of a Rayleigh variate of rms
-    scale R is exp(-(z/R)^2), so the fraction of time a level is swept -- and
-    therefore the fraction of the surface carrying a film -- falls smoothly
-    from 1 at the waterline to 0.368 at the run-up limit and 0.018 at twice it.
-    No boundary is placed and no width is chosen.
+    used for the storm forcing). The exceedance of a Rayleigh variate of scale
+    sigma is exp(-(z/sigma)^2).
 
-    `?` ON WHICH RUN-UP LEVEL HUNT'S R IS, inherited from `runup_hunt` and not
-    added here. Read as the RMS run-up it gives the band above; read as R_2%
-    the Rayleigh scale is R/sqrt(ln 50) = R/1.977 and the band is half as tall.
-    Both are reported; the first is shipped and the second is the bracket.
+    THIS IS A DISTRIBUTION AND NOT A SURFACE, AND THAT DISTINCTION IS THE WHOLE
+    OF WAVE 12'S SECOND FINDING. It is the right answer to "what share of the
+    time is this level swept"; it is the WRONG object to paint, because a
+    renderer that blends wet albedo into dry by this fraction draws the
+    TIME-AVERAGE of the beach and not the beach. The average has no edge. Bar
+    H3 calls the waterline "one of the strongest tonal edges in these frames",
+    and an average cannot have one however correct its statistics are. What the
+    shader wants is `damp_limit` below -- a REALISATION -- and this function is
+    what that realisation is drawn from.
+
+    `sigma` is `swash_scale`, i.e. Hunt's R read as R_2%; see the block above.
     """
-    R = BERM_Z if R is None else R
-    return np.exp(-(np.maximum(np.asarray(z, float), 0.0) / R) ** 2)
+    s = swash_scale(R)
+    return np.exp(-(np.maximum(np.asarray(z, float), 0.0) / s) ** 2)
+
+
+def swash_cycles(T=T_SWELL, tau=None):
+    """How many swash cycles the sand remembers: N = tau_dry/T."""
+    tau = SWASH_TAU_DRY if tau is None else tau
+    return max(float(tau) / float(T), 1.0)
+
+
+def damp_exceedance(z, R=None, T=T_SWELL, tau=None):
+    """P(the surface at `z` is damp) = 1 - (1 - exp(-(z/sigma)^2))^N.
+
+    The probability that AT LEAST ONE of the last N run-ups reached `z`. Still
+    a distribution -- it is the cdf of the realisation `damp_limit` draws --
+    and it is here so the suite can check the realisation against it without
+    rebuilding either from the other.
+    """
+    p = swash_wetness(z, R)
+    return 1.0 - (1.0 - p) ** swash_cycles(T, tau)
+
+
+def damp_limit_median(R=None, T=T_SWELL, tau=None):
+    """The median of the N-cycle run-up maximum, in metres: the level the
+    wet/dry edge sits at. sigma*sqrt(-ln(1 - 2^(-1/N)))."""
+    n = swash_cycles(T, tau)
+    return swash_scale(R) * math.sqrt(-math.log1p(-0.5 ** (1.0 / n)))
+
+
+def _splitmix01(k, seed):
+    """A uniform in (0, 1) from an INTEGER LATTICE INDEX. SplitMix64's
+    finaliser, which is a hash and not a stream.
+
+    THE POINT IS THAT IT IS INDEXED AND NOT SEQUENTIAL. `default_rng(seed)`
+    gives the n-th node the n-th draw, so the value at a node depends on where
+    the caller started counting -- and `shade_land` is handed only the LAND
+    pixels of one camera, so its span is not the bed's and not the next
+    camera's. The waterline would then move when the camera did. A hash of the
+    node's own index cannot: node k is the same draw for every caller.
+    """
+    with np.errstate(over='ignore'):        # wraparound IS the arithmetic here
+        k = np.asarray(k, np.int64).astype(np.uint64)
+        z = (k + np.uint64(seed) * np.uint64(0x9E3779B97F4A7C15)
+             ).astype(np.uint64)
+        z = (z ^ (z >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
+        z = (z ^ (z >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
+        z = z ^ (z >> np.uint64(31))
+        return (z >> np.uint64(11)).astype(np.float64) / float(1 << 53)
+
+
+def _swash_lattice(y, lam=None):
+    """The alongshore lattice the run-up realisation is drawn on: node indices
+    and their positions, ANCHORED AT y = 0 so the lattice is a property of the
+    coast rather than of the caller's slice.
+
+    THE SPACING IS NOT DECLARED. A swash edge is not straight, and what makes
+    it not straight is beach cusps, whose spacing is set by the swash excursion
+    itself (Werner & Fink 1993's self-organisation argument; the relation
+    quoted everywhere is spacing ~ the horizontal swash excursion). This file
+    already owns that excursion as `SWASH_W` = R/tan(beta), so the alongshore
+    correlation length of the run-up realisation is that and nothing new.
+    `?` on the constant of proportionality, which is taken as 1.
+    """
+    lam = SWASH_W if lam is None else lam
+    y = np.asarray(y, float)
+    k0 = int(math.floor(float(np.min(y)) / lam)) - 1
+    k1 = int(math.ceil(float(np.max(y)) / lam)) + 1
+    k = np.arange(k0, k1 + 1)
+    return k, k * lam
+
+
+def damp_limit(y, R=None, T=T_SWELL, tau=None, seed=20260818, lam=None):
+    """ONE REALISATION of the damp limit, in metres, per alongshore position.
+
+    THE SHADER MUST DRAW A SAMPLE AND NOT A MEAN, and this is the third place
+    in this project where that same sentence turned out to be the defect: the
+    optics lane found the render drawing the ensemble mean of the glint
+    distribution instead of its samples, the wave-field lane found the foam
+    drawn as its own mean, and here the wet/dry boundary was drawn as the
+    time-average of the swash. All three are the same mistake and all three
+    read as "smooth where the photograph is sharp".
+
+    The maximum of N iid Rayleigh(sigma) variates has cdf F(z)^N with
+    F(z) = 1 - exp(-(z/sigma)^2), so a uniform u inverts to
+
+        z = sigma * sqrt(-ln(1 - u^(1/N)))
+
+    drawn on the cusp lattice above and linearly interpolated between nodes, so
+    the edge has the alongshore correlation the swash gives it and no power
+    below it. Deterministic in `seed`: this is a property of the SURFACE, so
+    two cameras looking at the same beach must see the same waterline.
+    """
+    ys, z = _damp_nodes(y, R=R, T=T, tau=tau, seed=seed, lam=lam)
+    return np.interp(np.asarray(y, float), ys, z)
+
+
+def _damp_nodes(y, R=None, T=T_SWELL, tau=None, seed=20260818, lam=None):
+    """The damp limit AT THE LATTICE NODES. Its own function so `sheet_front`
+    can condition on exactly the nodes `damp_limit` interpolates between --
+    rebuilding the lattice from a different span offsets it by one cell and the
+    sheet then pokes through the damp band by a few centimetres, which is the
+    kind of near-miss a `<=` row catches and a picture does not."""
+    n = swash_cycles(T, tau)
+    s = swash_scale(R)
+    k, ys = _swash_lattice(y, lam)
+    u = np.clip(_splitmix01(k, seed), 1e-12, 1.0 - 1e-12)
+    return ys, s * np.sqrt(-np.log1p(-u ** (1.0 / n)))
+
+
+def sheet_front(y, R=None, phase=0.5, seed=20260819, lam=None):
+    """The free-water SHEET's front, in metres, at one instant of one cycle.
+
+    TWO MASKS AND NOT ONE, because they are two different substances. The
+    trapped series bar H3 invokes is light re-emerging from a wetted GRAIN
+    PACK -- pore water, which stays for `SWASH_TAU_DRY` -- and it darkens.
+    A specular lobe needs FREE WATER standing on the surface, which is the
+    swash sheet, and the sheet is on a level only while the front is above it.
+    Waves 4-11 drove both from one field, which puts a mirror on damp sand:
+    measured on the wave-10 hero frame, the specular term was 1.28 against a
+    diffuse term of 1.39 over 3.19% of the whole frame, and it is what inverts
+    bar J's wet/dry rung.
+
+    The front's own trajectory is ballistic -- the uprush decelerates under
+    gravity along the face -- so a cycle whose run-up is z_r puts the front at
+
+        z_s = z_r * (1 - (1 - 2 phi)^2),    phi in [0, 1]
+
+    which is 0 at both ends and z_r at mid-cycle. `phase` is the instant the
+    frame is taken at and it is `?`: the offset between the wave field's phase
+    and the swash's is the bore's travel time across the surf zone, which this
+    model does not carry. 0.5 -- maximum uprush -- is shipped and the suite
+    checks the sheet is bounded by the damp limit at EVERY phase, which is the
+    statement that does not depend on the choice.
+
+    THE SHEET CANNOT OUTRUN THE DAMP BAND, and it is drawn so that it cannot
+    rather than clipped so that it does not. This cycle is ONE OF THE N whose
+    maximum is `damp_limit`, so its run-up is Rayleigh CONDITIONED on being at
+    most that maximum: u_cycle = v * F(z_damp) with v uniform. The bound
+    z_sheet <= z_damp then holds identically, at every phase and every seed,
+    which is what makes it a row the suite can assert exactly.
+    """
+    s = swash_scale(R)
+    ys, z_d = _damp_nodes(y, R=R, lam=lam)
+    F = 1.0 - np.exp(-(z_d / s) ** 2)                   # the truncation point
+    k, _ = _swash_lattice(y, lam)
+    v = _splitmix01(k, seed)
+    z_r = s * np.sqrt(-np.log1p(-np.clip(v * F, 0.0, 1.0 - 1e-15)))
+    f = max(0.0, 1.0 - (1.0 - 2.0 * float(phase)) ** 2)
+    return np.interp(np.asarray(y, float), ys, z_r) * f
 
 
 def subaerial_beach(x, h2, h_rock=None, sea_level=None, tan_face=None,
