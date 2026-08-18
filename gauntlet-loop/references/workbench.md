@@ -87,8 +87,13 @@ past state recoverable and the "best champion" findable at stop time. Blind and
 rubric records are not equivalent evidence; `status` reports the rubric share so
 the report can say so.
 
-Records may also carry `"calls": N` when `log-round --calls` was used, so cost
-accounting reports what the round really spent instead of the estimate.
+Records may also carry these optional fields, each set by its `log-round` flag:
+`"calls": N` and `"tokens": N` (real cost — unmeasured rounds fall back to the
+estimate, and `status` reports partial measurement as a floor), `"tier":
+"screening"` (steers rounds, never advances retirement), `"blind": true`
+(champion mode: the promotion ran under the blind protocol), `"diff_lines": N`
+(feeds the softening tripwire), and `"critic_model": "<id>"` (the report prints
+the distribution).
 
 ## Reading the log
 

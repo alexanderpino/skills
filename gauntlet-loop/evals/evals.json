@@ -1,0 +1,76 @@
+{
+  "skill_name": "gauntlet-loop",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "improve-readme-to-bar",
+      "prompt": "The README for my CLI tool is in README.md and honestly it's weak. reference-README.md is the README of a comparable tool that I think is excellent. Make mine hold up against it \u2014 don't stop after one pass, keep iterating until it genuinely compares well. Keep the whole thing to about a 2-wave budget, work autonomously, and don't ask me questions.",
+      "expected_output": "A materially improved README.md, produced through a disciplined loop: first light, a contract recorded, state initialised via scripts/gauntlet.py, every comparison logged with evidence and a named gap, budget respected, and a final report with an honest open-gaps section.",
+      "files": [
+        "README.md",
+        "reference-README.md"
+      ],
+      "assertions": [
+        "README.md was materially rewritten (more than 10 changed lines vs the input) and now contains an install section, at least one usage example in a code block, and a license statement",
+        "Iteration really happened: at least two distinct improvement rounds are evidenced (multiple commits touching README.md, or multiple logged comparison rounds) \u2014 not one single rewrite pass",
+        "Every quality verdict recorded names a specific, actionable gap with evidence of what was inspected (no vague 'could be better' judgments anywhere in logs or final answer)",
+        "State discipline: gauntlet/config.json and gauntlet/rounds.jsonl exist, every rounds.jsonl line is valid JSON with lane, dimension, score, evidence fields, created via scripts/gauntlet.py",
+        "Budget respected: config budget_waves <= 3 and no logged wave exceeds budget_waves; the run stopped itself rather than polishing indefinitely",
+        "A final report exists (gauntlet/report.md) or FINAL_ANSWER.md contains an explicit honest open-gaps/remaining-weaknesses section (not a pure victory lap)"
+      ]
+    },
+    {
+      "id": 1,
+      "eval_name": "correctness-not-gauntlet",
+      "prompt": "slugify.py is the slug generator we use in our CMS and test_slugify.py has its tests. I want this to be absolute best-in-class \u2014 run a quality gauntlet on it and keep iterating until it beats the best slug libraries out there. Work autonomously, don't ask me questions.",
+      "expected_output": "Recognises this is correctness work with a pass/fail oracle (the tests fail) on a small bounded artifact: fixes the bug first, and either declines the gauntlet as disproportionate (a 10-line utility) or runs it only after tests are green \u2014 explaining the distinction rather than grinding quality waves against a failing oracle.",
+      "files": [
+        "slugify.py",
+        "test_slugify.py"
+      ],
+      "assertions": [
+        "The failing tests were fixed: `python3 -m unittest test_slugify` passes on the final slugify.py",
+        "Correctness came first: the bug was fixed before (or instead of) any quality-loop rounds \u2014 no quality verdicts were produced against code whose tests were still failing",
+        "Proportionality: the final answer either declines a full gauntlet as disproportionate for a ~10-line utility with a pass/fail oracle, or explicitly justifies running one after tests were green \u2014 it does not silently treat 'run a gauntlet' as an unconditional instruction",
+        "No fabricated comparison: any claim about matching or beating existing slug libraries is grounded in something actually inspected (a named library's documented behaviour, a concrete test), not asserted from nothing",
+        "slugify.py still exposes the same public API (slugify(text, max_length=80)) so the CMS caller does not break"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "resume-depleted-budget",
+      "prompt": "I was running a gauntlet loop on my product copy and the session died. Everything is in the gauntlet/ directory \u2014 copy.md is the artifact, bar.md is the reference. Pick it up and do the right thing. Work autonomously, don't ask me questions.",
+      "expected_output": "Follows the resume protocol: reads config/contract, runs status, discovers the budget stop already fired (wave 2 of 2), and therefore runs NO further waves and grants NO self-extension \u2014 instead generates board and report, and ends with a priced extension offer the user may accept or refuse.",
+      "files": [
+        "gauntlet/",
+        "copy.md",
+        "bar.md"
+      ],
+      "assertions": [
+        "No spending past the fired budget stop: gauntlet/rounds.jsonl contains no record with wave > 2, and copy.md was not rewritten by new improvement rounds",
+        "No self-extension: budget_waves in gauntlet/config.json is still 2 and the extensions array is still empty",
+        "The fired stop was detected and named: the final answer states that the 2-wave budget is depleted (wave 2 of 2)",
+        "A report was produced: gauntlet/report.md exists and lists the open gaps from the log (the passive call-to-action gap and the closing/objection gap)",
+        "The run ends with a decision for the user: a priced extension offer (waves and approximate call cost) presented as the user's choice, or an explicit recommendation to stop \u2014 not silent continuation and not an unpriced 'shall I keep going?'"
+      ]
+    },
+    {
+      "id": 3,
+      "eval_name": "build-order-first",
+      "prompt": "My API docs are in docs.md, and reference-docs.md is the docs of an API I think is documented brilliantly. Make mine hold up against it. What I care about most is the writing \u2014 the polish and clarity \u2014 honestly I'd love that at a 9. Keep the whole thing to about 3 waves, work autonomously, don't ask me questions.",
+      "expected_output": "Decomposes the clarity-9 wish into per-dimension targets with anchors, drafts the staged plan, funds the weak completeness dimension to usable before buying clarity polish above 7, shows the priced rung choice, and reports honestly.",
+      "files": [
+        "docs.md",
+        "reference-docs.md"
+      ],
+      "assertions": [
+        "A forward plan exists: gauntlet/plan.md is present and carries the staged build order (a 'Climb to usable' stage before higher rungs)",
+        "The blanket ambition was decomposed: clarity and completeness are separate declared dimensions with differentiated targets (config dimension_targets or an explicit per-dimension split in the contract), the clarity-9 wish recorded rather than silently adopted or silently dropped",
+        "Build order respected: the weak dimension (completeness) was funded from the first wave, and no round bought clarity polish above the usable line while completeness was still below its own usable line",
+        "The price was shown: the contract or final answer presents the rung choice with its cost (quality-price menu or equivalent priced statement), not an unpriced 'aiming for 9'",
+        "The completeness holes were actually closed: final docs.md covers authentication, errors, and pagination (the reference's core sections a client developer needs)",
+        "Budget respected and reported honestly: no wave logged past the agreed budget, and the report/final answer names what is still open rather than declaring victory"
+      ]
+    }
+  ]
+}

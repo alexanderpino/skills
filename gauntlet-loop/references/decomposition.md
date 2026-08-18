@@ -113,10 +113,13 @@ The decomposition is a hypothesis. Evidence that it is wrong:
 - Every round in a lane requires files owned by another lane
 - More than one lane parks for the same underlying reason
 
-Re-cut between waves, never mid-wave. Re-run `init --force` with the new lane set
-(parks and extensions are carried across as run history) and note the change in
-`contract.md` — a re-cut resets the streak counters for the affected lanes, and a
-reader of the log needs to know that the reset was deliberate.
+Re-cut between waves, never mid-wave. Re-run `init --force` with the new lane
+set — the budget, stops, WIP limit, gates, parks and extensions all carry
+across, so a re-cut can never quietly change the agreement — and note the
+change in `contract.md`. Streaks follow the lane *name*: a lane that keeps its
+name keeps its counters, so **rename any lane whose scope materially changed**
+and the new name starts fresh. Keeping the old name on a new scope inherits a
+streak the new scope never earned.
 
 A re-cut is also the honest answer when a park was really a cutting mistake: park
 the old lane, cut a new one that contains the structural element, and let the log

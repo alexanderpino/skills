@@ -102,7 +102,7 @@ reasoning — not the builder's — went into round 3.
 
 ```bash
 python3 scripts/gauntlet.py log-round --wave 2 --lane typography --dimension visual \
-  --round 2 --mode champion --winner other --margin clear --action reverted \
+  --round 2 --mode champion --winner other --margin clear --score 5 --action reverted \
   --champion-ref 4f2a91c --evidence gauntlet/shots/w2-typo-champ.png
 ```
 

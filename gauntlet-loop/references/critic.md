@@ -74,7 +74,8 @@ paragraph is carried by every agent downstream of you.
 COMPARISON: promotion | bar
 DIMENSION: <the one dimension you judged>
 SCORE: <0-10 integer, calibrated to the target>
-WINNER: A | B
+WINNER: A | B          (blind — you were not told the sides)
+        ours | ref     (rubric — you were told, so label honestly)
 MARGIN: decisive | clear | thin
 GAP SEVERITY: major | minor | none        (bar comparisons only)
 LARGEST GAP: <one specific, actionable difference — or "none">

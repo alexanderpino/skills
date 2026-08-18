@@ -206,6 +206,40 @@ The reference files are indexed by phase at the bottom of `SKILL.md`. Reading al
 of them at intake costs the whole set before the run has decided anything, and
 most runs never need `blind-protocol.md`'s rubric section or the resume protocol.
 
+## The quality-price menu
+
+Quality has a price curve, and hiding it is how runs end up buying a 9 on a
+7 budget or a 7 on a 9 ambition. `quote` prints the curve so the rung is
+chosen, not drifted into:
+
+```
+$ python3 scripts/gauntlet.py quote --current-score 4
+  target  waves  calls  ...
+  7       6      ~42    fits
+  8       10     ~70    needs +2 wave(s)
+  9       18     ~126   needs +10 wave(s)
+  10      —      —      not priceable: bar-met cannot fire at 10
+```
+
+The model behind the numbers, so it can be argued with: one gap is roughly one
+score point up to 7 (the usable rung), and each point above 7 costs about
+double the one before. That doubling is not styling — refinement gains taper
+across iterations (Madaan et al.) and cost efficiency settles early and rarely
+recovers (the CPI finding), both in `authorities.md`. The 10 row is a wall,
+not a rung: the script cannot count a bar-met round at 10, so a 10 belongs in
+the stretch line as prose.
+
+Two uses, one command. **At intake**, quote from first light's score and put
+the menu in the contract next to TARGET and BUDGET (`intake.md`). **At wave
+boundaries**, quote again with no flags: it re-prices each open lane from its
+last score, and swaps the rounds-per-gap guess for the measured cost per
+closed gap once the log has one — the estimate you started with is dead the
+moment there are actuals. That re-quote is also what prices an extension
+offer in rungs instead of vibes (`stop-conditions.md`).
+
+It is an estimate to choose by, never a promise — the stop conditions, not
+the quote, decide when the run ends.
+
 ## Cheap moves that are worth their cost
 
 Do not save money on these — each one prevents a much larger loss:

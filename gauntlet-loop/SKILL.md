@@ -94,8 +94,8 @@ Rationale and exceptions: → `references/cost-discipline.md`
 4. **Cap the handoffs.** Critic: the verdict block. Builder: five lines.
 5. **No gap, no builder.** Nothing to close means retire, raise the bar, or park.
 6. **Respect the WIP limit** (default 3). Depth closes gaps; breadth half-closes.
-7. **Let the script count and publish.** `status` and `board` are free — never
-   narrate state into chat or hand-write the workbench.
+7. **Let the script count and publish.** `status`, `board`, `quote` and `plan`
+   are free — never narrate state into chat or hand-write the workbench.
 8. **Route the model to the decision, not just the role.** Screening-tier
    verdicts steer routine rounds; a deciding-tier verdict is bought where a
    lifecycle turns — retire, park, promote into a shared surface. Logged
@@ -122,6 +122,10 @@ extensions, **gates**), `contract.md`, the frozen `bar/`, `ownership.md`,
 `{"name": ..., "cmd": "<shell; fails on non-zero exit or any stdout>", "paths":
 ["<every file the check reads>"]}`. `paths` is what the cache hashes, so an
 undeclared input makes the gate skip when it should run (`cost-discipline.md`).
+Both `cmd` and `paths` resolve from the directory the script is invoked in —
+always run it from the workspace root (under Mission Control, the worktree
+root), or every path silently resolves to nothing; `gate` warns when a gate's
+paths match no file, and never caches such a gate.
 
 ```bash
 python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf \
@@ -132,6 +136,8 @@ python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --rou
     --gap "..." --evidence shots/w2r3.png --tokens 74000 --critic-model sonnet
 python3 scripts/gauntlet.py gate     # mechanical checks; skips those whose inputs are unchanged
 python3 scripts/gauntlet.py status   # state, next-wave plan, park list, fired stops
+python3 scripts/gauntlet.py quote --current-score 4   # the quality-price menu: what 7, 8, 9 cost; 10 is not a price
+python3 scripts/gauntlet.py plan --current-score 4    # draft plan.md: build stages in order, priced — the forward scaffold
 python3 scripts/gauntlet.py park --lane a --dimension visual --reason "..."
 python3 scripts/gauntlet.py board    # regenerate workbench.md from the log
 python3 scripts/gauntlet.py extend --waves 3 --reason "..."   # only on a user grant
@@ -185,6 +191,13 @@ Act on what the step returns, and say which branch you took.
 - A **projection that misses the budget** means rescope before wave 1 — drop the
   lowest-ranked lane, lower the target (the old one becomes the stretch), or ask
   for more budget.
+- A **target the first measurement already disproves** — a 2× speedup asked of a
+  loop the profile shows at its hardware floor — is refused before wave 1, with
+  the number. Say what the measured ceiling is, under which constraints it holds,
+  what would have to change to move it (a different algorithm, a different
+  scope: a different contract), and the nearest target that *is* reachable.
+  Running waves toward a proven impossibility spends the budget re-proving the
+  first measurement. → `references/bar-selection.md`
 
 Two exemptions, because first light runs before `init` exists: its verdict is the
 one comparison not logged — record it in `contract.md` instead — and it runs
@@ -204,6 +217,23 @@ require the user, because they encode how much time and money the run may spend.
 whole contract — goal, target bar, budget, stops — confirmed in one exchange.
 The full table below is for long unattended runs, where the fields you skip are
 the ones nobody can add later.
+
+**Price the target as a menu, and anchor its rungs.** `quote` turns first
+light's score into the quality-price menu — what 7, 8 and 9 cost, and that 10
+is not a price (bar-met cannot fire there). A rung must also *mean* something:
+three questions per ambitious dimension — what must n/10 concretely do; where
+is "I would ship this"; what is explicitly *not* needed — become one anchor
+line per rung in `contract.md`, so the offer reads anchor + price and TARGET
+and BUDGET are chosen together (`references/intake.md`). Anchors are for
+choosing, never for judging — the critic still scores against the frozen bar.
+Autonomous with no rung named? Default to 7 and record the menu, so the
+unmade choice stays visible.
+
+**Then hang the run on the scaffold.** `plan` drafts `gauntlet/plan.md` — the
+build stages in order (bootstrap → everything to usable → the ambitious rungs
+→ stretch on a grant), each priced; you add the anchors and the serialised
+pairs. Regenerate at wave boundaries, where prices move from the intake guess
+to measured actuals. The workbench looks backward; the plan looks forward.
 
 Fields, each explained in `intake.md`: **goal** (destination, not route) ·
 **target bar** per dimension · optional **stretch** · **inspection** (and which
@@ -226,8 +256,18 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
 - **External and inspectable**, and **reachable inside the budget**. A target
   nobody can hit is not ambition: every round fails, every lane looks stalled,
   and the log stops carrying information.
-- **Set `--target-score` where the target sits** (default 7). A target of 10
-  means no lane can ever retire; the script warns you.
+- **Set `--target-score` where the target sits** (default 7). The script counts
+  a bar-met round only at or above it, so a target of 10 means bar-met never
+  fires; the script warns you.
+- **Targets are per dimension when the ambitions differ** —
+  `--dimension-targets "gameplay=8,graphics=6"`, and retirement on each
+  dimension is judged against its own number. A blanket "10/10 like the
+  reference" is not a target, it is an unpriced wish: decompose it with the
+  user — ask what n/10 each dimension must reach — because the same 10 that is
+  merely expensive on gameplay rules is unreachable-by-iteration on animation
+  and shader craft against a AAA bar. Price the reachable rungs (`quote`),
+  refuse the disproved ones with evidence, and never let one dimension's wall
+  sink the rungs the others can reach.
 - **Ambition above it is a *stretch***, recorded in `contract.md` as a heading
   rather than a promise. Retirement is judged against the target only; the report
   states the distance to the stretch — and the stretch is what a surplus buys
@@ -270,7 +310,9 @@ independently. You cut them, not the user. → `references/decomposition.md`
 
 A wave is one pass over the **funded** lanes — the top `wip_limit` of the ranked
 list, as printed by `status` — at **one round per lane per wave**. Phases 4–6
-cycle until a stop fires.
+cycle until a stop fires. `status` also names the **build stage**: dimensions
+below their usable line are funded before any dimension buys a rung above it —
+whole-and-crude beats one-part-excellent, enforced in the ranking.
 
 **Wave setup, once, before any lane starts:** take the champion commit. That one
 ref is every lane's `--champion-ref` for the wave. Concurrent per-round commits
@@ -452,4 +494,4 @@ Three are not cited inline:
 - `references/authorities.md` — where these rules come from and what each forces.
 
 Subagent briefs: `builder.md`, `critic.md`, `smoother.md`.
-Tooling: `scripts/gauntlet.py` (init / log-round / gate / status / park / board / extend / report).
+Tooling: `scripts/gauntlet.py` (init / log-round / gate / status / quote / plan / park / board / extend / report).
