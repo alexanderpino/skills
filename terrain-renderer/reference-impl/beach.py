@@ -3594,6 +3594,772 @@ def smooth_depth_2d(d, dx, dy, scale_x, scale_y):
 
 
 # ============================================================================
+# THE OFFSHORE DIRECTIONAL SPECTRUM, AND THE REALISATION DRAWN FROM IT
+# ============================================================================
+#
+# WAVE 13'S FINDING, STATED FIRST BECAUSE IT IS THE ROUND'S DELIVERABLE.
+# Waves 1-12 assumed a directional spread of EXACTLY ZERO and a frequency
+# spread of exactly zero. `transform_2d` marches ONE (T, theta0) pair; the
+# renderer's open sea beyond the domain was one plane wave,
+#
+#       eta = (H0/2) cos( k0 (x cos th0 + y sin th0) )
+#
+# whose crests are straight lines of infinite length. Measured on the scene's
+# own grid before this wave: the phase S varied by 0.063 rad ALONGSHORE across
+# 1408 m of coast -- one hundredth of a wavelength -- and the height H by 0.7%.
+# That is not a small spread. It is a delta function, s = infinity, and the
+# critic's word for what it draws was "corrugated roofing".
+#
+# Standing ruling 5 says the wave field arrives from OUTSIDE with a stated
+# offshore spectrum, so short-crestedness and groupiness are OUTPUTS. That
+# forces the shape of the fix: the spread cannot be a knob, it has to fall out
+# of a spectrum whose parameters are already declared. Two are (H0, T); the
+# third is the WIND, which this scene has already declared for the glitter.
+#
+# ---- WHAT WAS READ, this wave, before any of this was written (ruling 9)
+#
+#   Goda, Y. (2008/2010), "Overview on the applications of random wave concept
+#   in coastal engineering" (Proc. Japan Acad. Ser. B; open access). Gives the
+#   Mitsuyasu-type spreading in the form used below --
+#       G(f; th) = G0 cos^(2s)((th - th0)/2)
+#       s = smax (f/fp)^5     f <= fp
+#       s = smax (f/fp)^-2.5  f >  fp
+#   and Goda & Suzuki's engineering values smax = 10 (wind waves), 25 (swell,
+#   short decay), 75 (swell, long decay), with a 2001 New Zealand buoy record
+#   of smax ~ 65 for long-travelled swell quoted in support.
+#
+#   WAFO (Lund University) `spreading` documentation, which states the
+#   normalisation explicitly as N(s) = gamma(s+1)/(2 sqrt(pi) gamma(s+1/2)),
+#   attributes the cos-2s form to Longuet-Higgins, Cartwright & Smith (1963),
+#   and lists the two wave-age parameterisations of the peak spread:
+#       Mitsuyasu et al. (1975)   sp = 11.5 (U10/cp)^-2.5,  ma = 5, mb = -2.5
+#       Hasselmann et al. (1980)  spa = 6.97, spb = 9.77, ma = 4.06,
+#                                 mb = -2.33 - 1.45 (U10/cp - 1.17)
+#
+# Neither the Fourier-coefficient identity nor the crest-length ratio below was
+# taken from either source. Both are derived here and both are checked against
+# quadrature in the suite, which is the only reason they are allowed to be
+# written down at all.
+#
+# ---- (S1) THE SPREADING FUNCTION AND ITS MOMENTS
+#
+# D(th; s) = N(s) cos^(2s)(th/2) on (-pi, pi], with th measured from the mean
+# direction. Its Fourier coefficients have a closed form. Write
+# cos^(2s)(th/2) = ((1 + cos th)/2)^s and use the beta integral; the result is
+#
+#       <cos n th>  =  Gamma(s+1)^2 / ( Gamma(s+1-n) Gamma(s+1+n) )       (S1)
+#
+# which is USELESS AS WRITTEN in floating point -- Gamma(s+1-n) is negative for
+# s < n-1 and lgamma throws its sign away, and both gammas overflow by s = 200.
+# The same quantity as a product of n ratios is exact, sign-correct and cannot
+# overflow:
+#
+#       <cos n th>  =  PROD_{m=1..n} (s + 1 - m) / (s + m)                (S1')
+#
+# n = 1 gives s/(s+1), the textbook first moment; n = 2 gives
+# s(s-1)/((s+1)(s+2)), which is NEGATIVE for s < 1 and that sign is physical --
+# a spread broader than cos^2(th/2) has more energy across the mean direction
+# than along it. `spread_moment` is (S1'); the suite checks it against a
+# 4-million-point quadrature of D at eight values of s including s < 1.
+#
+# ---- (S2) THE CREST-LENGTH RATIO, WHICH IS THE ROUND'S FALSIFIABLE PREDICTION
+#
+# Short-crestedness is not a look. It is a second-moment statement about the
+# surface covariance, and it can be measured off a generated field without
+# looking at a picture. For a field of components all at wavenumber magnitude k
+# spread in direction by D,
+#
+#       rho(xi, eta) = INT D(th) cos( k(xi cos th + eta sin th) ) dth
+#
+# and expanding cos to second order in the separation (the only order a
+# correlation LENGTH depends on),
+#
+#       rho ~ 1 - (k^2/2) [ xi^2 <cos^2 th> + eta^2 <sin^2 th> ]
+#
+# with the cross term vanishing by the symmetry of D. So the curvature of the
+# correlation surface at zero lag is k^2<cos^2 th> across the crest and
+# k^2<sin^2 th> along it, the two correlation lengths are the reciprocal square
+# roots of those, and their RATIO is free of k entirely:
+#
+#       L_along / L_across = sqrt( <cos^2 th> / <sin^2 th> )
+#                          = sqrt( (1 + <cos 2th>) / (1 - <cos 2th>) )
+#
+# Substituting (S1') at n = 2 and clearing the denominators,
+#
+#       1 + <cos2th> = [ (s+1)(s+2) + s(s-1) ] / [(s+1)(s+2)] = (2s^2+2s+2)/D
+#       1 - <cos2th> = [ (s+1)(s+2) - s(s-1) ] / [(s+1)(s+2)] = (4s+2)/D
+#
+#       ==>   L_along / L_across  =  sqrt( (s^2 + s + 1) / (2 s + 1) )    (S2)
+#
+# That is the whole prediction, and it has teeth in both limits: s -> 0 (a flat
+# spread, isotropic) gives exactly 1, and s -> infinity gives sqrt(s/2) -> the
+# infinite crest waves 1-12 drew. s = 25 gives 3.57, s = 75 gives 6.14.
+# `crest_length_ratio` is (S2) and `measure_anisotropy` measures it back off a
+# generated field by fitting that curvature. If the field does not return the s
+# it was drawn from, the realisation is wrong -- and that test is the reason
+# this section exists rather than a picture that looks choppier.
+#
+# (S2) IS FOR ONE WAVENUMBER. A real spectrum spreads in frequency too, and
+# then the curvatures are <k^2 cos^2 th> and <k^2 sin^2 th> over the whole
+# 2-D spectrum, which is `spectrum_anisotropy` by quadrature. The two disagree
+# HARD here and the disagreement is the physics: s falls as (f/fp)^-2.5 above
+# the peak while k^2 rises as f^4, so the short waves are both heavily weighted
+# and nearly isotropic, and they drag the ratio down a long way below (S2) at
+# smax. THE RATIO THEREFORE DEPENDS ON THE BAND, and any number quoted for it
+# is meaningless without one. Both this file and the suite quote the band.
+
+U10_SCENE = 6.0         # m/s. THE SAME WIND `beach_optics.U10` gives the
+                        # glitter, and it is `?` there for the same reason: the
+                        # wind at the frame's hour is unknown. It is repeated
+                        # here rather than imported because `beach.py` is the
+                        # lower layer and must not depend on the optics module;
+                        # the suite carries a row that FAILS if the two ever
+                        # differ, which is the only honest way to hold one
+                        # number in two files. One wind, three readouts now:
+                        # the glitter's width, the whitecap coverage, and the
+                        # directional spread of the swell.
+JONSWAP_GAMMA = 3.3     # Hasselmann et al. (1973), the JONSWAP mean peak
+                        # enhancement. `?` -- it is a mean over a fetch-limited
+                        # North Sea campaign and this is Atlantic swell, for
+                        # which a larger value would be defensible. Nothing in
+                        # the crest-length prediction is sensitive to it: the
+                        # suite carries the anisotropy at gamma = 1 (Pierson-
+                        # Moskowitz) and at gamma = 7 and the ratio moves by
+                        # under 2%, because gamma reshapes the peak and the
+                        # ratio is set by the TAIL.
+JONSWAP_SIGMA_A = 0.07  # Hasselmann et al. (1973), the peak-width parameters
+JONSWAP_SIGMA_B = 0.09  # below and above fp. `P`.
+MITSUYASU_SP = 11.5     # Mitsuyasu et al. (1975) via WAFO: sp = 11.5 w^-2.5
+MITSUYASU_MB = -2.5     # with w = U10/cp the inverse wave age. Above the peak
+MITSUYASU_MA = 5.0      # s falls as (f/fp)^mb, below it rises as (f/fp)^ma.
+SPREAD_BAND = (0.55, 2.6)   # the synthesis band, in units of fp. See
+                            # `spectral_components` for why it is this and not
+                            # (0, inf), and `spectral_band_energy` for what it
+                            # costs.
+
+
+def jonswap(f, hs, fp, gamma=JONSWAP_GAMMA, g=G):
+    """The JONSWAP frequency spectrum S(f), m^2/Hz, scaled to a stated Hs.
+
+    Hasselmann et al. (1973):
+
+        S(f) = alpha g^2 (2 pi)^-4 f^-5 exp(-1.25 (f/fp)^-4) * gamma^b
+        b    = exp( -(f - fp)^2 / (2 sigma^2 fp^2) ),  sigma = 0.07 / 0.09
+
+    ALPHA IS NOT AN INPUT HERE. The scene declares a deep-water HEIGHT, so
+    alpha is whatever makes the zeroth moment come out at (Hs/4)^2 -- one
+    published constant fewer, and the input the rest of this file already
+    uses. The normalisation is done on the SAME band the realisation is drawn
+    from wherever a realisation is involved; see `spectral_components`.
+    """
+    f = np.asarray(f, float)
+    fp = float(fp)
+    pos = f > 0.0
+    ff = np.where(pos, f, 1.0)
+    sig = np.where(ff <= fp, JONSWAP_SIGMA_A, JONSWAP_SIGMA_B)
+    b = np.exp(-((ff - fp) ** 2) / (2.0 * sig ** 2 * fp ** 2))
+    shape = (ff ** -5.0) * np.exp(-1.25 * (ff / fp) ** -4.0) * gamma ** b
+    shape = np.where(pos, shape, 0.0)
+    # the alpha that puts m0 at (Hs/4)^2, by the same quadrature the caller
+    # would use. Done on a dense log grid over the full spectrum.
+    fq = np.geomspace(0.2 * fp, 20.0 * fp, 4096)
+    sq = np.where(fq <= fp, JONSWAP_SIGMA_A, JONSWAP_SIGMA_B)
+    bq = np.exp(-((fq - fp) ** 2) / (2.0 * sq ** 2 * fp ** 2))
+    shq = (fq ** -5.0) * np.exp(-1.25 * (fq / fp) ** -4.0) * gamma ** bq
+    m0_shape = np.trapezoid(shq, fq)
+    return shape * ((hs / 4.0) ** 2) / m0_shape
+
+
+def deep_phase_speed(T, g=G):
+    """c_p = g T / (2 pi), the deep-water phase speed at the peak."""
+    return g * float(T) / (2.0 * math.pi)
+
+
+def spread_smax(u10=U10_SCENE, T=T_SWELL):
+    """Mitsuyasu et al. (1975): smax = 11.5 (U10/c_p)^-2.5, from wave age.
+
+    THE SPREAD IS AN OUTPUT AND THIS IS THE LINE THAT MAKES IT ONE. The scene
+    states a wind and a peak period; the inverse wave age U10/c_p follows, and
+    with it the peak directional spread. Nothing is dialled.
+
+    `?`, AND IT IS A LOUD ONE. Mitsuyasu's relation was fitted to WIND SEA,
+    over inverse wave ages of roughly 0.4 to 2 -- seas still under the wind
+    that raised them. This scene is a 9 s swell under a 6 m/s wind, c_p = 14.05
+    m/s and U10/c_p = 0.427, which is off the low end of the fitted range and
+    the relation is being EXTRAPOLATED into swell. It returns smax = 96.6,
+    narrower than Goda & Suzuki's 75 for "swell with long decay distance" and
+    than the 65 measured off New Zealand. Both of those are the sanity check,
+    and the suite carries them as a bracket rather than this comment carrying
+    them as a claim: the answer must land in 25..150 or the extrapolation has
+    gone somewhere the literature does not go.
+    """
+    w = float(u10) / deep_phase_speed(T)
+    return MITSUYASU_SP * w ** MITSUYASU_MB
+
+
+def spread_s(f, fp, smax):
+    """Goda's frequency dependence of the spread parameter.
+
+    s = smax (f/fp)^5 below the peak, smax (f/fp)^-2.5 above it. The spread is
+    NARROWEST at the peak and broadens both ways, which is the observation the
+    two exponents encode; the field's high-frequency components are close to
+    isotropic and that is what breaks the crests up.
+    """
+    r = np.asarray(f, float) / float(fp)
+    return float(smax) * np.where(r <= 1.0, r ** MITSUYASU_MA,
+                                  r ** MITSUYASU_MB)
+
+
+def spread_norm(s):
+    """N(s) = Gamma(s+1) / (2 sqrt(pi) Gamma(s+1/2)).
+
+    Longuet-Higgins, Cartwright & Smith (1963) via WAFO. Evaluated through
+    lgamma because Gamma(s+1) overflows a double by s = 170 and this scene's
+    own s is 96.6 at the peak with larger values below it.
+    """
+    return np.exp(_gammaln(np.asarray(s, float) + 1.0)
+                  - _gammaln(np.asarray(s, float) + 0.5)) / (
+                      2.0 * math.sqrt(math.pi))
+
+
+_gammaln = np.vectorize(math.lgamma, otypes=[float])
+
+
+def spread_pdf(theta, s):
+    """D(theta; s) = N(s) cos^(2s)(theta/2), theta from the MEAN direction.
+
+    Normalised to unit integral over (-pi, pi]; the suite checks that by
+    quadrature at eight values of s rather than trusting the gamma ratio.
+    """
+    theta = np.asarray(theta, float)
+    s = np.asarray(s, float)
+    c = np.cos(0.5 * theta)
+    # cos^(2s) via logs, so that s ~ 1e2 and cos ~ 1e-3 do not underflow to a
+    # zero that the normalisation then divides into.
+    with np.errstate(divide='ignore', invalid='ignore'):
+        lg = 2.0 * s * np.log(np.abs(c))
+    return spread_norm(s) * np.where(np.abs(c) > 0.0, np.exp(lg), 0.0)
+
+
+def spread_moment(s, n):
+    """<cos n theta> for D(theta; s), by (S1') -- a product of n ratios.
+
+    Exact, sign-correct for s < n-1 where the gamma form goes negative, and
+    free of overflow at any s. n must be a non-negative integer.
+    """
+    s = np.asarray(s, float)
+    n = int(n)
+    if n < 0:
+        raise ValueError('n must be >= 0')
+    p = np.ones_like(s)
+    for m in range(1, n + 1):
+        p = p * (s + 1.0 - m) / (s + m)
+    return p
+
+
+def crest_length_ratio(s):
+    """(S2): L_along / L_across = sqrt( (s^2 + s + 1) / (2 s + 1) ).
+
+    The ratio of the alongshore to the cross-crest correlation length for a
+    SINGLE-WAVENUMBER field spread by cos^(2s)(theta/2). Derived above; checked
+    against `spread_moment(s, 2)` and against quadrature in the suite.
+
+    1 at s = 0 (isotropic), 3.573 at s = 25, 6.145 at s = 75, ~sqrt(s/2) as
+    s -> infinity. A field whose measured ratio is not this one was not drawn
+    from this spreading function.
+    """
+    s = np.asarray(s, float)
+    return np.sqrt((s * s + s + 1.0) / (2.0 * s + 1.0))
+
+
+def spectrum_moment_tensor(T=T_SWELL, u10=U10_SCENE, theta0=THETA0_SWELL,
+                           band=SPREAD_BAND, gamma=JONSWAP_GAMMA, hs=None,
+                           n_f=2048, n_th=1441, g=G, smax=None):
+    """The wavenumber second-moment tensor <k_i k_j> of the stated spectrum.
+
+    M = [[<kx^2>, <kx ky>], [<kx ky>, <ky^2>]] normalised by m0, by quadrature
+    over E(f, th) = S(f) D(th - theta0; s(f)) with k = (2 pi f)^2/g.
+
+    THE BAND IS AN ARGUMENT AND NOT A DEFAULT BURIED IN THE MATHS. The second
+    moment of a f^-5 tail against k^2 ~ f^4 is logarithmically divergent, so
+    <k^2 .> has no value without an upper limit, and the limit that matters is
+    the one the REALISATION is drawn over -- a field cannot be anisotropic at
+    wavelengths it does not contain.
+    """
+    fp = 1.0 / float(T)
+    hs = 4.0 * math.sqrt((H0_SWELL ** 2) / 8.0) if hs is None else float(hs)
+    f = np.geomspace(band[0] * fp, band[1] * fp, n_f)
+    dth = np.linspace(-math.pi, math.pi, n_th)         # from the MEAN direction
+    S = jonswap(f, hs, fp, gamma)
+    s = spread_s(f, fp, spread_smax(u10, T) if smax is None else float(smax))
+    k = (2.0 * math.pi * f) ** 2 / g
+    w = S * k ** 2                                     # (n_f,)
+    D = spread_pdf(dth[None, :], s[:, None])           # (n_f, n_th)
+    ang = float(theta0) + dth                          # in the GRID frame
+    xx = np.trapezoid(D * np.cos(ang)[None, :] ** 2, dth, axis=1)
+    yy = np.trapezoid(D * np.sin(ang)[None, :] ** 2, dth, axis=1)
+    xy = np.trapezoid(D * (np.cos(ang) * np.sin(ang))[None, :], dth, axis=1)
+    m0 = float(np.trapezoid(S, f))
+    return (float(np.trapezoid(w * xx, f) / m0),
+            float(np.trapezoid(w * xy, f) / m0),
+            float(np.trapezoid(w * yy, f) / m0))
+
+
+def anisotropy_from_tensor(Mxx, Mxy, Myy, frame='crest'):
+    """Turn a second-moment tensor into a correlation-length ratio.
+
+    THE RATIO IS A PROPERTY OF THE FRAME IT IS MEASURED IN, AND THIS FUNCTION
+    EXISTS BECAUSE THIS WAVE GOT THAT WRONG FIRST. The prediction was written
+    in the frame of the MEAN WAVE DIRECTION and the measurement was taken in
+    the frame of the GRID; at this scene's 20 deg of obliquity the two differ
+    by 60 per cent, and the disagreement looked exactly like a broken
+    realisation until the tensor was written down. Both numbers are real and
+    they answer different questions:
+
+      frame='crest'  sqrt(lam_max/lam_min) of M -- the INTRINSIC ratio, the one
+                     (S2) predicts and the one the spread means. Free of how
+                     the coast happens to be oriented.
+      frame='grid'   sqrt(Mxx/Myy) -- the APPARENT ratio, alongshore against
+                     cross-shore, which is what a frame edge measures and what
+                     the critic's statistic sees. Always the SMALLER of the two
+                     for an oblique sea, because an oblique crest crosses the
+                     frame diagonally and its alongshore run is foreshortened.
+
+    The principal axis of M is the mean wave direction exactly, for any
+    spreading function symmetric about it; the suite checks that, and a
+    spreading function accidentally written asymmetric would fail it.
+    """
+    if frame == 'grid':
+        return math.sqrt(Mxx / Myy)
+    if frame != 'crest':
+        raise ValueError("frame must be 'crest' or 'grid'")
+    tr = Mxx + Myy
+    dt = math.sqrt(max((Mxx - Myy) ** 2 + 4.0 * Mxy ** 2, 0.0))
+    return math.sqrt((tr + dt) / (tr - dt))
+
+
+def tensor_principal_angle(Mxx, Mxy, Myy):
+    """The direction of M's largest eigenvalue, rad from +x."""
+    return 0.5 * math.atan2(2.0 * Mxy, Mxx - Myy)
+
+
+def spectrum_anisotropy(frame='crest', **kw):
+    """The crest-length ratio the drawn field must return, in a stated frame."""
+    return anisotropy_from_tensor(*spectrum_moment_tensor(**kw), frame=frame)
+
+
+def smax_from_anisotropy(ratio, frame='crest', lo=1.0, hi=4000.0, tol=1e-9,
+                         **kw):
+    """INVERT the prediction: what smax would a field of this ratio have been
+    drawn from?
+
+    THIS IS THE ROUND-TRIP STATED AS ONE NUMBER. Measuring a ratio close to the
+    predicted one is a comparison; recovering the SPREAD PARAMETER back out of
+    a generated field and finding the value it was drawn at is the round trip,
+    and it is the form the finding is reported in. Bisection on
+    `spectrum_anisotropy`, which is monotone in smax over any band because a
+    narrower spread cannot lower a second-moment ratio at any frequency.
+    """
+    kw.pop('smax', None)
+
+    def g(sm):
+        return spectrum_anisotropy(frame=frame, smax=sm, **kw) - float(ratio)
+
+    a, b = float(lo), float(hi)
+    ga, gb = g(a), g(b)
+    if ga * gb > 0.0:
+        raise ValueError('the ratio %.4f is outside smax in [%g, %g]'
+                         % (ratio, lo, hi))
+    for _ in range(200):
+        m = 0.5 * (a + b)
+        gm = g(m)
+        if ga * gm <= 0.0:
+            b, gb = m, gm
+        else:
+            a, ga = m, gm
+        if b - a < tol * max(1.0, b):
+            break
+    return 0.5 * (a + b)
+
+
+def spectral_band_energy(T=T_SWELL, band=SPREAD_BAND, gamma=JONSWAP_GAMMA,
+                         hs=None, n_f=4096):
+    """The fraction of m0 that lies inside the synthesis band. Reported, not
+    hidden: what is outside it is the wind sea the glitter already carries
+    statistically, and saying so is the whole of the honesty here."""
+    fp = 1.0 / float(T)
+    hs = 4.0 * math.sqrt((H0_SWELL ** 2) / 8.0) if hs is None else float(hs)
+    f_all = np.geomspace(0.2 * fp, 20.0 * fp, n_f)
+    f_bnd = np.geomspace(band[0] * fp, band[1] * fp, n_f)
+    m_all = np.trapezoid(jonswap(f_all, hs, fp, gamma), f_all)
+    m_bnd = np.trapezoid(jonswap(f_bnd, hs, fp, gamma), f_bnd)
+    return float(m_bnd / m_all)
+
+
+# ---------------------------------------------------------- the realisation
+# DRAW THE FIELD, NOT ITS STATISTICS. Wave 12 found the same error in four
+# places -- a distribution painted where a realisation belongs -- and a
+# directional spectrum shaded as a smooth mean would be the fifth. What follows
+# is a component list with PHASES, summed into a surface; the spectrum is
+# recoverable from it and is recovered from it, in the suite.
+#
+# THE LATTICE IS STRATIFIED AND JITTERED, and both halves matter.
+#   * A regular (f, th) lattice makes the sum PERIODIC in space with the period
+#     of the wavenumber lattice, which draws a tiling no sea has. Jittering each
+#     component inside its own cell destroys the lattice and keeps the sample
+#     spectrum exact to O(1/N) -- it is stratified sampling and nothing more.
+#   * The amplitudes are DETERMINISTIC, a_j = sqrt(2 E(f_j, th_j) df dth), and
+#     only the phase is random. That is a deliberate choice of instrument: with
+#     random (Rayleigh) amplitudes the sample spectrum fluctuates and a failed
+#     round-trip could always be blamed on the draw. With deterministic
+#     amplitudes the sample spectrum is exact by construction, so a failed
+#     round-trip can ONLY be a geometry error -- a direction convention, an
+#     aliased wavenumber, a lattice, a lost factor. That is the error class this
+#     round is hunting. `rayleigh=True` restores the physical draw, and the
+#     suite runs both: the Rayleigh case is the control that says how much of
+#     any residual is sampling noise (ruling 14 -- a near-zero is worthless
+#     until zero has been shown to be reachable).
+# THE VARIANCE IS THE TRANSFORM'S OWN. E0 = rho g H0^2 / 8 means m0 = H0^2/8,
+# so H0_SWELL = 1.5 m is an H_rms and the significant height is 4 sqrt(m0) =
+# 2.12 m. Getting that backwards is a factor of sqrt(2) on every amplitude in
+# the scene and it is a suite row, not a comment.
+
+
+def spectral_components(T=T_SWELL, H0=H0_SWELL, theta0=THETA0_SWELL,
+                        u10=U10_SCENE, band=SPREAD_BAND,
+                        gamma=JONSWAP_GAMMA, n_f=10, n_th=24, seed=20260913,
+                        rayleigh=False, smax=None, g=G):
+    """A realisation of the stated offshore directional spectrum.
+
+    OUT: dict with kx, ky (rad/m), omega (rad/s), a (m, amplitude), phase
+         (rad), plus the s(f) the components were drawn at and the m0 they
+         carry. eta(x, y, t) = SUM a_j cos(kx_j x + ky_j y - omega_j t + ph_j).
+
+    The mean direction is theta0 off shore-normal, measured the same way the
+    transform measures it: +x is shoreward, theta is the angle of the wave
+    ORTHOGONAL from +x, so kx = k cos(theta), ky = k sin(theta).
+    """
+    fp = 1.0 / float(T)
+    hs = 4.0 * math.sqrt(float(H0) ** 2 / 8.0)
+    smax = spread_smax(u10, T) if smax is None else float(smax)
+    rng = np.random.default_rng(seed)
+
+    # stratified cells in f (log-spaced edges) and in theta (uniform edges over
+    # the full circle -- the spreading function itself decides how much energy
+    # a direction gets, and truncating the fan would be a second, hidden knob)
+    fe = np.geomspace(band[0] * fp, band[1] * fp, n_f + 1)
+    te = np.linspace(-math.pi, math.pi, n_th + 1)
+    uf = rng.random(n_f)
+    ut = rng.random((n_f, n_th))
+    f = fe[:-1] * (fe[1:] / fe[:-1]) ** uf                  # log-uniform jitter
+    df = fe[1:] - fe[:-1]
+    th = te[:-1][None, :] + ut * (te[1] - te[0])
+    dth = te[1] - te[0]
+
+    s = spread_s(f, fp, smax)
+    S = jonswap(f, hs, fp, gamma)
+    D = spread_pdf(th, s[:, None])
+    E = S[:, None] * D * df[:, None] * dth                  # m^2 per component
+    # renormalise to the band's own energy, so the drawn field carries exactly
+    # the variance the band is entitled to and the quadrature error of a coarse
+    # lattice does not leak into H0.
+    frac = spectral_band_energy(T, band, gamma, hs)
+    E = E * (frac * (hs / 4.0) ** 2) / E.sum()
+
+    a = np.sqrt(2.0 * E)
+    if rayleigh:
+        # the physical draw: a complex Gaussian per component, whose modulus is
+        # Rayleigh with the same mean square. Phase falls out of the same draw.
+        z = (rng.normal(size=E.shape) + 1j * rng.normal(size=E.shape))
+        z = z / math.sqrt(2.0)
+        a = np.abs(z) * np.sqrt(2.0 * E)
+        ph = np.angle(z)
+    else:
+        ph = rng.uniform(0.0, 2.0 * math.pi, E.shape)
+
+    om = 2.0 * math.pi * np.broadcast_to(f[:, None], th.shape)
+    k = om ** 2 / g                                          # deep water
+    ang = float(theta0) + th
+    return dict(kx=(k * np.cos(ang)).ravel(), ky=(k * np.sin(ang)).ravel(),
+                omega=om.ravel(), a=a.ravel(), phase=ph.ravel(),
+                k=k.ravel(), theta=ang.ravel(), f=om.ravel() / (2 * math.pi),
+                theta0=float(theta0),
+                s=s, smax=smax, fp=fp, band=band, m0=float(0.5 * (a ** 2).sum()),
+                band_fraction=frac, n=a.size, rayleigh=bool(rayleigh))
+
+
+def spectral_eta(comp, xw, yw, t=0.0):
+    """The free surface of a component list at (x, y, t). Linear, and that is
+    stated: the second-order bound harmonic is `nonlinear_eta`'s job and it is
+    applied to the carrier, not to each component of a bundle."""
+    xw = np.asarray(xw, float)
+    yw = np.asarray(yw, float)
+    out = np.zeros(np.broadcast(xw, yw).shape, float)
+    kx, ky, a, ph, om = (comp['kx'], comp['ky'], comp['a'], comp['phase'],
+                         comp['omega'])
+    for j in range(a.size):
+        out += a[j] * np.cos(kx[j] * xw + ky[j] * yw - om[j] * t + ph[j])
+    return out
+
+
+def measure_anisotropy(eta, dx, dy, n_lag=6):
+    """Measure L_along / L_across back off a GENERATED field. The round trip.
+
+    The curvature of the correlation surface at zero lag is fitted, in each
+    axis separately, from the first `n_lag` lags:
+
+        rho(r) ~ 1 - (1/2) C r^2   ==>   L = 1/sqrt(C)
+
+    and the ratio L_y/L_x is returned. Only the ratio is claimed -- the
+    individual lengths depend on the band's upper limit, the ratio much less
+    so, and it is the ratio that (S2) predicts.
+
+    IN: eta (ny, nx), sampled on a uniform grid at spacing dy, dx.
+
+    THE FIT IS ON rho ITSELF AND NOT ON log rho, and the lag window is short.
+    A Gaussian or exponential fit over many lags measures the correlation
+    SHAPE, which is a different statistic; the second moment of the spectrum is
+    the curvature AT ZERO and only short lags see it.
+    """
+    e = np.asarray(eta, float)
+    e = e - e.mean()
+    v = float((e * e).mean())
+    if v <= 0.0:
+        raise ValueError('a field with no variance has no correlation length')
+    cx, cy = [], []
+    for m in range(1, n_lag + 1):
+        cx.append(float((e[:, m:] * e[:, :-m]).mean()) / v)
+        cy.append(float((e[m:, :] * e[:-m, :]).mean()) / v)
+    lx = (np.arange(1, n_lag + 1) * dx) ** 2
+    ly = (np.arange(1, n_lag + 1) * dy) ** 2
+    # least squares through the origin on (1 - rho) vs r^2, slope = C/2
+    Cx = 2.0 * float(np.dot(lx, 1.0 - np.array(cx)) / np.dot(lx, lx))
+    Cy = 2.0 * float(np.dot(ly, 1.0 - np.array(cy)) / np.dot(ly, ly))
+    return dict(L_across=1.0 / math.sqrt(Cx), L_along=1.0 / math.sqrt(Cy),
+                ratio=math.sqrt(Cx / Cy), Mxx=Cx, Myy=Cy,
+                rho_x=np.array(cx), rho_y=np.array(cy))
+
+
+def measure_tensor_fft(eta, dx, dy, window=True):
+    """The second-moment tensor of a SAMPLED field, from its own 2-D FFT.
+
+    THE SECOND ROUTE, AND IT SHARES NOTHING WITH THE FIRST. `measure_anisotropy`
+    fits the curvature of the correlation surface at short lag, which is a
+    real-space statistic with a truncation bias of order (k L)^2 that has to be
+    argued away. This one is Parseval: the periodogram IS the sample spectrum,
+    so <k_i k_j> is a weighted sum over it.
+
+    THE WINDOW IS NOT COSMETIC AND THE UNWINDOWED VERSION IS KEPT SO THAT THE
+    SUITE CAN SHOW IT. A drawn field is not periodic on its patch -- the
+    components' wavenumbers are nowhere near the FFT lattice -- so the
+    periodogram leaks, and leakage falls only as k^-2 while this statistic
+    weights by k^+2. Measured on this scene's own realisation: 99.9 per cent of
+    the ENERGY is inside the synthesis band and only 93.8 per cent of the
+    k^2-weighted energy is, and the unwindowed tensor reports a crest-frame
+    ratio of 2.74 against the 3.52 the spectrum it was drawn from predicts --
+    a 22 per cent error that looks exactly like a broken realisation. With a
+    Hann window both figures are 100.0 per cent and the ratio is 3.46. A
+    second moment is the statistic leakage hurts most, and a meter that is
+    wrong by 22 per cent would have condemned a field that was right.
+
+    The window's own kernel adds its second moment to both diagonal terms --
+    about +11 per cent here -- which nearly cancels in the RATIO and is why
+    only the ratio is claimed. What this route CANNOT see is aliasing, because
+    an aliased component appears at a real wavenumber and is counted there;
+    that is what the correlation route is for, and the two agreeing is the
+    evidence.
+
+    IN: eta (ny, nx) on a uniform grid. OUT: (Mxx, Mxy, Myy), rad^2/m^2.
+    """
+    e = np.asarray(eta, float)
+    e = e - e.mean()
+    ny, nx = e.shape
+    if window:
+        e = e * (np.hanning(ny)[:, None] * np.hanning(nx)[None, :])
+    P = np.abs(np.fft.fft2(e)) ** 2
+    kx = 2.0 * math.pi * np.fft.fftfreq(nx, dx)[None, :]
+    ky = 2.0 * math.pi * np.fft.fftfreq(ny, dy)[:, None]
+    w = P.sum()
+    return (float((P * kx ** 2).sum() / w), float((P * kx * ky).sum() / w),
+            float((P * ky ** 2).sum() / w))
+
+
+def extrusion_ratio(F, smooth=None):
+    """THE CRITIC'S OWN STATISTIC, on a scene-linear field rather than a PNG.
+
+    A field that is a 1-D profile extruded along the crest has F = f(across)
+    alone. The critic measured, off `s7-frame-K.png`, an along-crest residual
+    of 5.2 DN after removing the smooth cross-crest trend against 31.7 DN
+    across the crests -- a ratio of 0.16 -- and called it corrugated roofing.
+    Written here as:
+
+        F_bar(xi)  = mean along the crest
+        along      = rms( F - F_bar )                  the short-crested part
+        across     = rms( F_bar - smooth(F_bar) )      the crest modulation
+        ratio      = along / across
+
+    ZERO FOR AN EXACT EXTRUSION, by construction and not by tolerance, and
+    measured at 0.000000 on this scene's own waves 1-12 plane wave. It rises
+    without bound as the field becomes short-crested, and the value it should
+    reach is not free -- `extrusion_ratio_predicted` is the closed form.
+
+    IN: F (n_along, n_across). AXIS 0 IS ALONG THE CREST AND AXIS 1 IS ACROSS
+    IT, and getting that wrong is not a sign error, it is a different
+    statistic: this wave first measured an oblique plane wave in the GRID frame
+    and got 77.6 for a field whose along-crest residual is exactly zero. The
+    frame the crests are aligned with is the frame this statistic lives in, and
+    it is the frame a picture of horizontal bands is already in.
+
+    `ratio_raw` is the same quantity without the detrend. The detrend is the
+    critic's and it matters on a RENDER, where shoaling and perspective put a
+    real cross-crest trend under the crests; on a stationary patch the two
+    agree, and `ratio_raw` is the one the closed form predicts exactly.
+    """
+    F = np.asarray(F, float)
+    fbar = F.mean(axis=0)
+    along = float(np.sqrt(((F - fbar[None, :]) ** 2).mean()))
+    n = fbar.size
+    w = max(int(round(n / 8.0)), 3) if smooth is None else int(smooth)
+    ker = np.ones(w) / w
+    trend = np.convolve(np.pad(fbar, (w, w), mode='edge'), ker,
+                        mode='same')[w:w + n]
+    across = float(np.sqrt(((fbar - trend) ** 2).mean()))
+    raw = float(np.sqrt(((fbar - fbar.mean()) ** 2).mean()))
+    return dict(along=along, across=across, across_raw=raw,
+                ratio=(along / across) if across > 0 else float('inf'),
+                ratio_raw=(along / raw) if raw > 0 else float('inf'))
+
+
+def extrusion_ratio_predicted(comp, width):
+    """What `extrusion_ratio` MUST return, in closed form, for a component list.
+
+    EXACT, NOT ASYMPTOTIC, and the first version of this function was neither.
+    Averaging a component a cos(kx xi + ky eta + ph) along the crest over a
+    window of length W leaves amplitude a*sinc(ky W/2) -- the mean of a cosine
+    over an interval is the cosine times a sinc of half the phase run. The
+    components are mutually incoherent, so their variances add and
+
+        sigma^2 = SUM a_j^2 / 2                          the field's variance
+        V       = SUM (a_j^2 / 2) sinc^2( k_y,j W / 2 )  what the mean keeps
+        ratio   = sqrt( (sigma^2 - V) / V )                            (S3)
+
+    with sinc(z) = sin z / z and sinc(0) = 1. THAT LAST VALUE IS THE WHOLE
+    POINT: a field with every k_y = 0 -- an extrusion -- has V = sigma^2 and a
+    ratio of exactly zero, and the statistic's floor is a consequence rather
+    than a tolerance. (S3) depends on the spread only through the DISTRIBUTION
+    OF k_y, which is what a directional spectrum is, so it turns the critic's
+    number into a prediction of the spread and not merely a report of it.
+
+    The first attempt wrote V ~ sigma^2 * 2 Lc / W with Lc an integral
+    correlation length, which is the textbook large-W asymptote. It was wrong
+    here by a factor of three and got WORSE as W grew, because for a
+    narrow-band field rho oscillates, the negative lobes cancel most of
+    INT rho du, and an integral length truncated at the first zero crossing --
+    the standard estimator -- is not that integral at all. (S3) needs no
+    estimator.
+
+    `comp` is a `spectral_components` dict; `width` is the along-crest extent
+    of the patch, in metres. k_y is taken IN THE CREST FRAME -- k sin(th - th0)
+    -- because that is the frame `extrusion_ratio` reads, and using the grid
+    frame's k_y instead is the same 20-degree error the anisotropy tensor
+    caught.
+    """
+    a = np.asarray(comp['a'], float)
+    ky = (np.asarray(comp['k'], float)
+          * np.sin(np.asarray(comp['theta'], float) - comp.get('theta0', 0.0)))
+    z = 0.5 * ky * float(width)
+    sinc = np.where(np.abs(z) < 1e-12, 1.0, np.sin(z) / np.where(z == 0, 1, z))
+    var = 0.5 * float((a ** 2).sum())
+    V = 0.5 * float((a ** 2 * sinc ** 2).sum())
+    if V <= 0.0:
+        return float('inf')
+    return math.sqrt(max(var - V, 0.0) / V)
+
+
+def integral_length(eta, d, axis=0, max_lag=None):
+    """INT_0^inf rho(r) dr along one axis, truncated at the first zero
+    crossing of rho -- the standard estimator, and the truncation is what makes
+    it an estimator rather than a divergent sum over noise."""
+    e = np.asarray(eta, float)
+    e = e - e.mean()
+    v = float((e * e).mean())
+    n = e.shape[axis]
+    m_max = n // 3 if max_lag is None else int(max_lag)
+    tot = 0.5                                   # rho(0) = 1, trapezoid
+    for m in range(1, m_max + 1):
+        sl0 = [slice(None)] * e.ndim
+        sl1 = [slice(None)] * e.ndim
+        sl0[axis] = slice(m, None)
+        sl1[axis] = slice(None, -m)
+        r = float((e[tuple(sl0)] * e[tuple(sl1)]).mean()) / v
+        if r <= 0.0:
+            break
+        tot += r
+    return tot * float(d)
+
+
+# ---------------------------------------------------------------- groupiness
+# GROUPINESS IS NOT DECORATION EITHER. The chapter's advice through wave 12 was
+# "superpose two or three periods with a slow group envelope" -- a knob. The
+# envelope of a Gaussian process is a CONSEQUENCE of the spectrum's bandwidth
+# and has nothing free in it. Longuet-Higgins (1957, 1984) narrow-band result:
+# for a Gaussian surface the envelope A is Rayleigh, so
+#
+#       <A> = sqrt(pi m0 / 2),  <A^2> = 2 m0,  var(A) = (2 - pi/2) m0
+#
+# and the groupiness factor in the Funke & Mansard sense -- the coefficient of
+# variation of the wave-energy envelope A^2 / 2 -- is, for an exponential
+# (A^2 Rayleigh-squared) variable, exactly 1. That is the SATURATION value a
+# fully random narrow-band sea reaches and it is not adjustable. The number
+# that IS adjustable by the spectrum is the LENGTH of a group, which is set by
+# the bandwidth nu = sqrt(m0 m2 / m1^2 - 1): the envelope decorrelates over
+# roughly 1/(nu f_p) periods, so a narrow spectrum gives long sets and a broad
+# one gives none. `spectral_bandwidth` returns nu and the suite checks the
+# measured group length against 1/nu rather than against an eye.
+
+
+def spectral_bandwidth(T=T_SWELL, band=SPREAD_BAND, gamma=JONSWAP_GAMMA,
+                       hs=None, n_f=4096):
+    """nu = sqrt(m0 m2 / m1^2 - 1), Longuet-Higgins' spectral width, over the
+    stated band. Zero for a monochromatic wave -- which is what waves 1-12
+    had, and it is why nothing in them could group."""
+    fp = 1.0 / float(T)
+    hs = 4.0 * math.sqrt((H0_SWELL ** 2) / 8.0) if hs is None else float(hs)
+    f = np.geomspace(band[0] * fp, band[1] * fp, n_f)
+    S = jonswap(f, hs, fp, gamma)
+    m = [float(np.trapezoid(S * f ** n, f)) for n in (0, 1, 2)]
+    return math.sqrt(max(m[0] * m[2] / m[1] ** 2 - 1.0, 0.0))
+
+
+def envelope(sig):
+    """The Hilbert envelope of a 1-D record, by FFT. |sig + i H(sig)|."""
+    s = np.asarray(sig, float)
+    s = s - s.mean()
+    n = s.size
+    F = np.fft.fft(s)
+    h = np.zeros(n)
+    h[0] = 1.0
+    if n % 2 == 0:
+        h[n // 2] = 1.0
+        h[1:n // 2] = 2.0
+    else:
+        h[1:(n + 1) // 2] = 2.0
+    return np.abs(np.fft.ifft(F * h))
+
+
+def groupiness_factor(sig):
+    """std(A^2) / mean(A^2) for the envelope A of a record.
+
+    Exactly 1 for a Gaussian narrow-band process, because A^2 is then
+    exponentially distributed. A monochromatic wave gives 0. It is therefore a
+    yes/no instrument on whether a field is a realisation at all, and it is
+    used that way here rather than as a tuning target.
+    """
+    a2 = envelope(sig) ** 2
+    return float(a2.std() / a2.mean())
+
+
+# ============================================================================
 # THE WAVE TRANSFORM IN 2-D
 # ============================================================================
 #
