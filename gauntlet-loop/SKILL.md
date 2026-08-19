@@ -258,9 +258,10 @@ unmade choice stays visible.
 
 **Then hang the run on the scaffold.** `plan` drafts `gauntlet/plan.md` — the
 build stages in order (bootstrap → everything to usable → the ambitious rungs
-→ stretch on a grant), each priced; you add the anchors and the serialised
-pairs. Regenerate at wave boundaries, where prices move from the intake guess
-to measured actuals. The workbench looks backward; the plan looks forward.
+→ stretch on a grant), each priced; you add the anchors and the serialised-
+pair order (which lanes must run after which — Phase 4, `decomposition.md`).
+Regenerate at wave boundaries, where prices move from the intake guess to
+measured actuals. The workbench looks backward; the plan looks forward.
 
 Fields, each explained in `intake.md`: **goal** (destination, not route) ·
 **target bar** per dimension · optional **stretch** · **inspection** (and which
@@ -316,7 +317,9 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
 - **Freeze the bar** under `gauntlet/bar/`, and **declare each dimension**
   (visual + frame time; clarity + completeness) in `config.json`, judged
   separately. One collapsed score is how a loop trades away the dimension nobody
-  is watching.
+  is watching. This is the moment `init` runs — it creates `gauntlet/` and the
+  config that every command after it reads — and the moment to declare the
+  gates: `init` first, freeze into the directory it made, gates into its config.
 - **Bake the bar's numbers at the freeze.** Run every machine measurement the
   bar allows — frame times, sizes, counts, scores — once, into
   `gauntlet/bar/measurements.md`. Critics get the numbers; nobody re-derives a
