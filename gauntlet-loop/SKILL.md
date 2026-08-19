@@ -40,6 +40,15 @@ independently judgeable lanes. Per lane: a builder closes one named gap, then a
 external bar, blind where the artifact allows. Bar wins → the critic names the
 single largest remaining gap and it goes back. Repeat.
 
+The vocabulary, once, so nothing below is read cold: a **round** is one
+builder-then-critic pass on one lane; a **wave** is one round across the
+**funded** lanes — at most the **WIP limit** of them, the rest wait; each lane
+is judged per **dimension** (visual, perf, …) against that dimension's own
+target. A dimension **retires** when a verdict streak says the bar is met —
+done, stop spending — and is **parked** when it stops moving — not done, stop
+spending anyway. Verdicts carry a **tier**: *screening* (cheap, steers the
+next build) or *deciding* (expensive, the only tier that can retire or park).
+
 Everything else in this file is one of two things: a **guardrail** against a
 known weakness of that loop, or the **project management** deciding what gets
 funded. Both serve the loop. A rule that stops the loop from running is a wrong
