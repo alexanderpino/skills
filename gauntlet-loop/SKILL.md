@@ -139,7 +139,10 @@ undeclared input makes the gate skip when it should run (`cost-discipline.md`).
 Both `cmd` and `paths` resolve from the directory the script is invoked in —
 always run it from the workspace root (under Mission Control, the worktree
 root), or every path silently resolves to nothing; `gate` warns when a gate's
-paths match no file, and never caches such a gate.
+paths match no file, and never caches such a gate. An answer key is a gate
+farm: every mechanically checkable item in it becomes a gate here at init,
+checked free every wave, leaving the critics only the judgement items
+(`references/bar-selection.md`).
 
 ```bash
 python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf \
@@ -284,7 +287,9 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
   modification: *one map and one answer key, not a ticket each* (the answer
   key is the bar, and a bar is one frozen file, not fourteen tickets). An
   answer key bars function well and taste badly, so aesthetic dimensions still
-  need a reference artifact of their own. → `references/bar-selection.md`
+  need a reference artifact of their own. And mid-run, a question whose answer
+  is a *choice* is escaped fog: back to the map or the user, never decided ad
+  hoc by a builder. → `references/bar-selection.md`
 - **Targets are per dimension when the ambitions differ** —
   `--dimension-targets "gameplay=8,graphics=6"`, and retirement on each
   dimension is judged against its own number. A blanket "10/10 like the

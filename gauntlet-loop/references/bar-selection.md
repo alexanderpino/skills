@@ -103,6 +103,33 @@ the **answer key** (the checkable statements — bar material, frozen at
 1h33 with every answer-key check passing. And its honest footnote — "the
 design only came out okay" — is the second rule below, observed in the wild.
 
+### Running the combination: wayfinder decides, the gauntlet builds
+
+The two loops meet at a clean seam — one resolves decisions, the other closes
+gaps — and the handoff is mechanical once the map is done:
+
+| Wayfinder produces | The gauntlet consumes it as |
+|---|---|
+| Destination | GOAL in the contract |
+| Notes (domain, standing preferences) | the contract's rules and constraints |
+| Decisions so far (the resolved map) | intake context; what the lanes are cut around |
+| **The answer key** | the bar — frozen at `gauntlet/bar/answer-key.md` |
+| Not yet specified (the fog) | **must be empty first** — open fog is an unsettled bar |
+| Out of scope | the contract's scope line and `backlog.md` |
+
+Two operational rules make the seam pay:
+
+- **The answer key is a gate farm.** Every mechanically checkable item in it
+  ("every list endpoint pages with an opaque cursor") becomes a gate in
+  `config.json` at init — checked free every wave from day one, instead of
+  costing a critic. The judgement-only items are what the critics keep.
+- **A decision surfacing mid-run is escaped fog, and it goes back to the
+  map.** When a builder or critic hits a question whose answer is a *choice*
+  ("should sessions expire?"), that is not a gap to close — it is a decision
+  nobody made. It goes back to the wayfinder map as a new ticket (or to the
+  user, if no map exists), and the lane waits or parks. A builder resolving
+  it ad hoc is the self-invented bar returning one fragment at a time.
+
 Two rules keep an answer key honest:
 
 - **It is authored before the loop and frozen.** An answer key the builder
