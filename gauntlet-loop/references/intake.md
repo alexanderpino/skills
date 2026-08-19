@@ -58,8 +58,10 @@ judgement about approach, which is where a lot of the method's value sits.
 **Target and stretch.** See `bar-selection.md`. The target is what retirement is
 judged against and it must be reachable inside the budget; ambition above it goes
 in the stretch line, which never arms a stop condition. Freeze the artifacts
-under `gauntlet/bar/` now, before any lane runs. Set `--target-score` where the
-target actually sits — at 10, bar-met can never fire.
+under `gauntlet/bar/` now, before any lane runs — and if there is nothing to
+freeze, `bar-request` writes what each dimension needs, for the user or a scout
+agent to fetch; the run waits (`bar-selection.md`: no bar, no run). Set
+`--target-score` where the target actually sits — at 10, bar-met can never fire.
 
 When the user names one blanket number — "10/10, like EA FC26" — do not write
 it into the contract as-is. **Ask per dimension what n/10 must be**, or propose

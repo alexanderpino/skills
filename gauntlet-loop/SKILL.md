@@ -153,6 +153,7 @@ python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --rou
     --gap "..." --evidence shots/w2r3.png --tokens 74000 --critic-model sonnet
 python3 scripts/gauntlet.py gate     # mechanical checks; skips those whose inputs are unchanged
 python3 scripts/gauntlet.py status   # state, next-wave plan, park list, fired stops
+python3 scripts/gauntlet.py bar-request               # what comparison material is still missing, per dimension — for a user or scout
 python3 scripts/gauntlet.py quote --current-score 4   # the quality-price menu: what 7, 8, 9 cost; 10 is not a price
 python3 scripts/gauntlet.py plan --current-score 4    # draft plan.md: build stages in order, priced — the forward scaffold
 python3 scripts/gauntlet.py park --lane a --dimension visual --reason "..."
@@ -536,4 +537,4 @@ Three are not cited inline:
 - `references/authorities.md` — where these rules come from and what each forces.
 
 Subagent briefs: `builder.md`, `critic.md`, `smoother.md`.
-Tooling: `scripts/gauntlet.py` (init / log-round / gate / status / quote / plan / park / board / extend / report).
+Tooling: `scripts/gauntlet.py` (init / bar-request / quote / plan / log-round / gate / status / park / board / extend / report).

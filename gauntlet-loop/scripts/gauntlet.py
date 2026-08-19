@@ -7,13 +7,17 @@ cannot drift in a long context — and so the lead agent never spends tokens
 recomputing them.
 
 Commands:
-  init        Create the gauntlet/ state directory and config
-  log-round   Append one validated comparison record to rounds.jsonl
-  status      State per lane/dimension, the next-wave plan, fired stop conditions
-  park        Stop spending on a lane/dimension that stopped moving (or resume it)
-  board       Regenerate gauntlet/workbench.md from the log (no model tokens)
-  extend      Raise the wave budget after the user grants an extension
-  report      Draft the end-of-run gauntlet report from the log
+  init         Create the gauntlet/ state directory and config
+  bar-request  Write bar-request.md — the comparison material this run still needs
+  quote        The quality-price menu: what each target rung costs from here
+  plan         Draft plan.md — build stages in order, priced; the forward scaffold
+  log-round    Append one validated comparison record to rounds.jsonl
+  gate         Run the mechanical checks; skip those whose inputs are unchanged
+  status       State per lane/dimension, the next-wave plan, fired stop conditions
+  park         Stop spending on a lane/dimension that stopped moving (or resume it)
+  board        Regenerate gauntlet/workbench.md from the log (no model tokens)
+  extend       Raise the wave budget after the user grants an extension
+  report       Draft the end-of-run gauntlet report from the log
 """
 
 import argparse
