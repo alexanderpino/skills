@@ -132,7 +132,7 @@ Do not recompute state in prose, do not keep a running summary in context, and
 never hand-write the workbench. If you find yourself explaining the run's state
 to yourself in the transcript, run `status` instead.
 
-### 8. Route the model to the role
+### 8. Route the model to the decision, not just the role
 
 A mechanical builder does not need the tier a deciding critic needs, and a
 machine-checkable dimension needs no model at all. Routing by role is the largest
