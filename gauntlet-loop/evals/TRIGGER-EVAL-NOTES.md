@@ -60,6 +60,33 @@ per-query trigger rate.
 python3 measure_trigger.py eval_set.json description.txt claude-fable-5 3 /tmp/scratch
 ```
 
+## Variance makes description A/B testing expensive — budget it first
+
+A candidate description written specifically against the observed misses
+(naming page/docs artifact classes outright, plus "use this BEFORE editing
+anything yourself") measured *worse*: 30% recall against the baseline's 40%,
+precision 100% in both. But the interesting part is not the number — it is
+that the hit set almost completely swapped. Baseline hit emails, CLI text,
+deck narrative, game replays; the candidate hit pricing page, emails,
+portfolio, and missed the four the baseline caught. Only one query was stable
+across both.
+
+That is variance, not a description effect: at three runs per query the noise
+is larger than any difference these candidates produce. Distinguishing two
+descriptions reliably would need roughly 10+ runs per query — 200+ `claude -p`
+invocations per candidate. **That is a real budget item; agree it before
+starting.** This exploration consumed a significant share of a session's
+tokens and returned a methodological finding rather than a better description.
+
+Practical guidance:
+
+- Do not change a working description on a difference of one or two queries.
+- Measure the *current* description first and keep the number; only chase a
+  candidate if you have budget for enough runs to beat the noise.
+- Precision is the property worth protecting. Across every configuration
+  measured here it stayed at 100% — including all ten hard negatives, four of
+  them Dutch. Recall around 40% is the honest current figure.
+
 ## What the eval set should contain
 
 - **Positives** across artifact classes (page, docs, copy, emails, deck, CLI
