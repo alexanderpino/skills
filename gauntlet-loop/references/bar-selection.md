@@ -59,10 +59,47 @@ Search for the strongest real artifact in the category, or construct a measureme
 that plays the same role. Then state, in one sentence, *why* it is the right bar —
 that sentence is what the user is actually approving.
 
-If nothing external exists, build one: generate three deliberately different
-candidate versions first, have the user pick the best, and use it as the champion
-the loop must beat. A self-generated bar is weaker than an external one and you
-should say so, but it beats no bar at all.
+## No bar, no run — and never a bar you invented mid-loop
+
+The loop's entire output is "A or B is better". If B is a standard the agent
+made up while building A, the comparison measures nothing: the builder is
+grading itself with extra steps, and every round confirms a taste it already
+held. **A run does not start without comparison material that exists outside
+this run.** That is not a preference; it is what separates a gauntlet from an
+elaborate self-review.
+
+So when there is nothing to compare against, do not improvise one. **Say what
+you need and stop** — `gauntlet.py bar-request` writes
+`gauntlet/bar-request.md`: per dimension, what comparator would settle it,
+which of the four properties it must satisfy, acceptable formats, and where
+the files go. Hand that to the user, or to a scout agent whose only job is to
+fetch it. Requesting the bar costs one message; discovering at wave 6 that the
+bar was self-authored costs the run.
+
+### When the artifact is genuinely new: a spec and an answer key
+
+Some artifacts have no comparator because nothing like them exists — an
+internal tool, a bespoke workflow. That is not permission to invent a
+standard; it is a different *source* for one. Resolve the open questions into
+research-backed decisions **before wave 1**, and write the result as a spec
+plus an **answer key**: concrete, checkable statements the artifact must
+satisfy, authored outside the loop and frozen into `gauntlet/bar/` like any
+other bar. The answer key plays the part the reference product plays
+elsewhere. Matt Pocock's `wayfinder` skill exists to produce exactly this —
+it turns each undecided question into research rather than a default
+(`https://github.com/mattpocock/skills`).
+
+Two rules keep an answer key honest:
+
+- **It is authored before the loop and frozen.** An answer key the builder
+  extends mid-run is a self-invented standard wearing a checklist.
+- **It bars what it can check, and says what it cannot.** Answer keys are
+  strong on function ("every list endpoint pages with an opaque cursor") and
+  weak on taste. A run reported as fully passing its answer key while the
+  design "came out okay" is the predictable result. So: answer key for the
+  functional dimensions, external reference artifacts for the aesthetic ones,
+  declared as separate dimensions with their own targets. Do not let a passing
+  answer key stand in for a visual bar nobody set.
 
 ## Target and stretch
 

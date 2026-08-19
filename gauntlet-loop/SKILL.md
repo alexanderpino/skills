@@ -273,6 +273,16 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
 - **Set `--target-score` where the target sits** (default 7). The script counts
   a bar-met round only at or above it, so a target of 10 means bar-met never
   fires; the script warns you.
+- **No bar, no run.** The loop's output is "A or B is better"; a B the agent
+  invented while building A measures nothing. If there is no comparison
+  material, run `bar-request` — it writes `gauntlet/bar-request.md` naming what
+  would settle each dimension, for the user or a scout agent to fetch — and
+  stop until it arrives. `log-round` refuses bar-mode records while
+  `gauntlet/bar/` is empty. For genuinely novel artifacts the bar is a
+  research-backed **spec and answer key**, authored before wave 1 and frozen
+  like any bar (Matt Pocock's `wayfinder` produces exactly this); an answer key
+  bars function well and taste badly, so aesthetic dimensions still need a
+  reference artifact of their own. → `references/bar-selection.md`
 - **Targets are per dimension when the ambitions differ** —
   `--dimension-targets "gameplay=8,graphics=6"`, and retirement on each
   dimension is judged against its own number. A blanket "10/10 like the

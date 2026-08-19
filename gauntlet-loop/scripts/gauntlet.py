@@ -351,6 +351,21 @@ def cmd_log_round(args):
         die("score must be an integer between 0 and 10")
     if not args.evidence:
         die("evidence is required — a verdict with nothing inspected is not a round")
+    # A bar comparison needs something to compare against. Champion mode does
+    # not (both sides are ours), so it stays available — but then nothing can
+    # retire on bar-met, and the run should say so rather than drift into
+    # grading its own taste.
+    if args.mode in BAR_MODES:
+        bar_dir = root / "bar"
+        if not (bar_dir.exists() and any(f.is_file() for f in bar_dir.rglob("*"))):
+            die(
+                f"no comparison material in {bar_dir}/ — a bar verdict needs a bar that "
+                "exists outside this run, or the round measures the builder's own taste.\n"
+                "  python3 scripts/gauntlet.py bar-request   # writes what this run needs\n"
+                "Freeze the comparator (or a research-backed answer key) into that directory "
+                "first. Champion-mode rounds still work without it, but nothing retires on "
+                "bar-met (bar-selection.md)."
+            )
     # Evidence is free text (a measurement, a comparison note) — but when it
     # looks like a file path, it should open. A verdict citing a screenshot
     # nobody can open is progress theatre with a citation.
@@ -1301,6 +1316,74 @@ def cmd_quote(args):
         )
 
 
+def cmd_bar_request(args):
+    """Write gauntlet/bar-request.md — what comparison material this run needs.
+
+    The loop compares A against B. When B does not exist yet, the honest move
+    is to name what would settle each dimension and stop, so a user or a scout
+    agent can fetch it — never to invent a standard and grade against it.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    dims = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
+    have = sorted(f.name for f in (root / "bar").rglob("*") if f.is_file()) if (root / "bar").exists() else []
+    L = [
+        "# Bar request — comparison material this run needs before wave 1",
+        "",
+        f"Bar kind agreed at intake: **{cfg.get('bar_kind', 'reference')}**",
+        f"Already frozen in `{root}/bar/`: " + (", ".join(f"`{n}`" for n in have) if have else "_nothing yet_"),
+        "",
+        "A gauntlet's output is \"A or B is better\". Without a B that exists outside",
+        "this run, every verdict measures the builder's own taste. So this run does not",
+        "start until the material below is in place — or until the user decides the run",
+        "is not worth it, which is also a valid answer.",
+        "",
+        "## What a usable bar must satisfy",
+        "",
+        "1. **External** — it exists independently of this run and of the agent's opinion.",
+        "2. **Inspectable** — a critic can open, run or measure it, not just read about it.",
+        "3. **Unarguable** — the artifact cannot talk its way past it.",
+        "4. **Reachable** — the distance from today's artifact is closeable inside the budget.",
+        "",
+        "## Per dimension",
+        "",
+    ]
+    for d in dims:
+        L += [
+            f"### {d}  (target {target_for(cfg, d)}/10)",
+            "",
+            "- **What would settle it** (lead agent: name the comparator concretely — the",
+            "  product, document, implementation, measurement or corpus a critic would hold",
+            f"  up next to ours to judge *{d}*):",
+            "- **Acceptable forms**: reference artifact (files, screenshots at a stated",
+            "  viewport, recordings), a measurement plus threshold, a competing",
+            "  implementation, or — where nothing comparable exists — a research-backed",
+            "  spec and answer key authored before wave 1 (`bar-selection.md`).",
+            "- **Where it goes**: `" + f"{root}/bar/{d}/" + "` (frozen; read-only once wave 1 starts).",
+            "- **Done when**: a critic given only that path can score our artifact against it",
+            "  without asking anyone what \"good\" means.",
+            "",
+        ]
+    L += [
+        "## For whoever fetches this",
+        "",
+        "Bring the real thing, not a description of it: a paraphrased bar drifts every",
+        "time it is restated, and drift always makes the bar easier. Capture references",
+        "at comparable framing and resolution to our own output. If the best available",
+        "comparator is weaker than the ambition, say so — a run against a soft bar that",
+        "everyone believes is hard is worse than no run.",
+        "",
+        "Answer-key route only: state each item as something checkable, and mark which",
+        "dimensions it cannot cover (taste, feel, visual craft) so those get a reference",
+        "artifact of their own instead of passing by default.",
+    ]
+    out = root / "bar-request.md"
+    out.write_text("\n".join(L) + "\n")
+    print(f"wrote {out}")
+    print("Hand it to the user or to a scout agent. Do not start wave 1 until "
+          f"{root}/bar/ holds something a critic can open.")
+
+
 def cmd_plan(args):
     """Draft gauntlet/plan.md — the run's forward-looking scaffold.
 
@@ -1968,6 +2051,10 @@ def main():
     p.add_argument("--targets", help="comma-separated rungs to price (default: 7,8,9,10 plus the configured targets)")
     p.add_argument("--dimension", help="price one dimension's ladder from its own scores (mid-run)")
     p.set_defaults(fn=cmd_quote)
+
+    p = sub.add_parser("bar-request",
+                       help="write gauntlet/bar-request.md — the comparison material this run needs, for a user or scout agent")
+    p.set_defaults(fn=cmd_bar_request)
 
     p = sub.add_parser("plan", help="draft gauntlet/plan.md — build stages in order, priced; the forward-looking scaffold")
     p.add_argument("--current-score", type=int,
