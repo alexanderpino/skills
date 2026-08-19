@@ -1327,12 +1327,30 @@ def cmd_bar_request(args):
     cfg = load_config(root)
     dims = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
     have = sorted(f.name for f in (root / "bar").rglob("*") if f.is_file()) if (root / "bar").exists() else []
+    # The wayfinder skill's local output lands in .wayfinder/ — if it is here,
+    # the answer key likely already exists and the request is mostly moot.
+    wf = Path(".wayfinder")
+    wf_files = sorted(f.name for f in wf.rglob("*") if f.is_file()) if wf.exists() else []
     L = [
         "# Bar request — comparison material this run needs before wave 1",
         "",
         f"Bar kind agreed at intake: **{cfg.get('bar_kind', 'reference')}**",
         f"Already frozen in `{root}/bar/`: " + (", ".join(f"`{n}`" for n in have) if have else "_nothing yet_"),
         "",
+    ]
+    if wf_files:
+        L += [
+            "**A `.wayfinder/` folder exists in this repo** ("
+            + ", ".join(f"`{n}`" for n in wf_files[:6])
+            + (", …" if len(wf_files) > 6 else "") + ") — the wayfinder skill's output.",
+            "If it holds the map and answer key, most of this request is already met:",
+            f"freeze a COPY of the answer key to `{root}/bar/answer-key.md` (note source",
+            "and date in contract.md — `.wayfinder/` keeps evolving, a bar must not),",
+            "check the map's 'Not yet specified' section is empty, and only fetch below",
+            "what the answer key cannot cover (bar-selection.md).",
+            "",
+        ]
+    L += [
         "A gauntlet's output is \"A or B is better\". Without a B that exists outside",
         "this run, every verdict measures the builder's own taste. So this run does not",
         "start until the material below is in place — or until the user decides the run",

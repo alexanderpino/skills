@@ -117,6 +117,18 @@ gaps — and the handoff is mechanical once the map is done:
 | Not yet specified (the fog) | **must be empty first** — open fog is an unsettled bar |
 | Out of scope | the contract's scope line and `backlog.md` |
 
+**The `.wayfinder/` folder convention.** Run locally, wayfinder leaves its
+output as files in a `.wayfinder/` directory in the repo — that is where the
+map and answer key land, and the AI Labs prompt extension points the critic
+at exactly those files. This skill consumes them by **freezing a copy**:
+`.wayfinder/` is a living planning surface, and the bar must not move while
+the run judges against it — so the answer key is copied to
+`gauntlet/bar/answer-key.md` at intake (note the source and date in
+`contract.md`), never referenced in place. If planning later changes the map
+materially, that is an announced bar-raise or re-cut conversation, not a bar
+that drifted because its source kept evolving. `bar-request` detects the
+folder and says so.
+
 Two operational rules make the seam pay:
 
 - **The answer key is a gate farm.** Every mechanically checkable item in it
