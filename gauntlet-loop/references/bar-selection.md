@@ -89,6 +89,20 @@ elsewhere. Matt Pocock's `wayfinder` skill exists to produce exactly this —
 it turns each undecided question into research rather than a default
 (`https://github.com/mattpocock/skills`).
 
+**The shape matters: one map and one answer key, not a ticket each.** Stock
+wayfinder writes a ticket file per decision — fourteen decisions, fourteen
+files. As a plan that is workable; as a *bar* it is fourteen mini-standards
+nobody can hand a critic in one path, each one a separate cold read every
+round pays for, and each one a separate surface for drift. The AI Labs
+community runs wayfinder with one modification — literally the prompt
+`change wayfinder: one map and one answer key, not a ticket each` — and that
+is the shape this skill requires of the route: the **map** (the resolved
+decisions and why — intake material, it feeds the contract and the plan) and
+the **answer key** (the checkable statements — bar material, frozen at
+`gauntlet/bar/answer-key.md`). Their proof run: a real HR system, built in
+1h33 with every answer-key check passing. And its honest footnote — "the
+design only came out okay" — is the second rule below, observed in the wild.
+
 Two rules keep an answer key honest:
 
 - **It is authored before the loop and frozen.** An answer key the builder

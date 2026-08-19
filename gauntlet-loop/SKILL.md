@@ -280,9 +280,11 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
   stop until it arrives. `log-round` refuses bar-mode records while
   `gauntlet/bar/` is empty. For genuinely novel artifacts the bar is a
   research-backed **spec and answer key**, authored before wave 1 and frozen
-  like any bar (Matt Pocock's `wayfinder` produces exactly this); an answer key
-  bars function well and taste badly, so aesthetic dimensions still need a
-  reference artifact of their own. → `references/bar-selection.md`
+  like any bar. Matt Pocock's `wayfinder` produces exactly this — run with one
+  modification: *one map and one answer key, not a ticket each* (the answer
+  key is the bar, and a bar is one frozen file, not fourteen tickets). An
+  answer key bars function well and taste badly, so aesthetic dimensions still
+  need a reference artifact of their own. → `references/bar-selection.md`
 - **Targets are per dimension when the ambitions differ** —
   `--dimension-targets "gameplay=8,graphics=6"`, and retirement on each
   dimension is judged against its own number. A blanket "10/10 like the

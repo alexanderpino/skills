@@ -1373,9 +1373,12 @@ def cmd_bar_request(args):
         "comparator is weaker than the ambition, say so — a run against a soft bar that",
         "everyone believes is hard is worse than no run.",
         "",
-        "Answer-key route only: state each item as something checkable, and mark which",
-        "dimensions it cannot cover (taste, feel, visual craft) so those get a reference",
-        "artifact of their own instead of passing by default.",
+        "Answer-key route only: deliver ONE map (the resolved decisions and why) and ONE",
+        "answer key (the checkable statements), never a ticket file per decision — the",
+        "answer key is the bar, and a bar is one frozen file a critic opens, not fourteen.",
+        "State each item as something checkable, and mark which dimensions it cannot",
+        "cover (taste, feel, visual craft) so those get a reference artifact of their",
+        "own instead of passing by default (bar-selection.md).",
     ]
     out = root / "bar-request.md"
     out.write_text("\n".join(L) + "\n")
