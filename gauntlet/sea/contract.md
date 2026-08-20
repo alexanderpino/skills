@@ -244,3 +244,45 @@ builder that dies should lose the paragraph, not the proof.
 a suite total is not evidence that a wave landed. `git log -- validate_beach.py`
 must show the wave's own entry. Running the right command is not the same as
 running a command that could have failed.
+
+## The generic reference set — `gauntlet/sea/bar/generic/`
+
+Added at wave 16 on the owner's ruling that *"als je ergens een referentiefoto
+van nodig hebt staat het internet vol"*. Nine openly-licensed photographs with
+full provenance, plus `measure.py`, which recomputes every number in that
+directory's README from the JPEGs beside it.
+
+**It is not the bar and must never be filed as one.** `bar/bar.md` describes the
+owner's five Aljezur frames; these are strangers' photographs of other
+coastlines. The hyper-realism criterion — *shot from a viewpoint one of the
+owner's photographs was taken from, so the two can sit side by side* — is
+**still blocked** and nothing here bears on it.
+
+What it does is convert four verbal criteria into **falsifiable numbers**, so a
+critic can say *how far* rather than only *not yet*:
+
+- **glitter interior sd 41–60 grey levels** (and 36–70 in a second frame), 8-bit
+  luma in a ±10 px core strip, against the render's **1.0–2.6** — a factor of
+  16 to 60, and the strongest result in the set because two independent frames
+  agree
+- **glitter taper ×2.0 widening toward the observer**, 38 → 75 px over 279 rows
+- **foam correlation length 0.3–0.8% of the foam patch's own width**, against
+  ~100% for a soft gradient
+- **foam clot size q90, 10 cm to 70 cm alongshore** — a 7:1 range *within one
+  wave*, scaled from a person's height
+- **wet/dry sand luminance ratio bracketed 1.7× ≤ r ≤ 3.0×** by two frames
+  sitting on opposite ends of the transfer curve
+
+Every one of those is dimensionless or bracketed on purpose: **absolute
+radiometry is refused throughout**, because the illuminant, exposure, white
+balance and grade of a stranger's photograph are all unknown.
+
+**Ocean colour at depth was refused outright**, with the measurement that
+justifies it: one candidate's offshore water has a red-channel mean of 8.7/255,
+a grade on the floor, and another is a stitched panorama whose flare makes open
+sea read *brighter* than the surf. The reason is structural rather than bad
+luck — every well-composed coastal photograph is graded and the grade is never
+recorded. Colour stays on the daylight Aljezur frames.
+
+**Six of the nine are share-alike.** A figure that pastes one beside a render
+output is a derivative and inherits CC BY-SA. Read §9 before publishing one.
