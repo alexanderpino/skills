@@ -7181,6 +7181,706 @@ def _sec_spread(ctx):
          'future change to S which DOES touch them cannot be silent.')
 
 
+
+# ============================================================== WAVE 16, (1/2)
+# THE TERRACE. Wave 13 landed the sea-level history -- `stand_levels`,
+# `evolve_coast_stands`, `terrace_levels`, `run_coast(stands=...)` and the
+# instrument `run_terrace` -- and shipped ZERO suite rows for any of it. Two
+# waves then read this file as green on a body of physics it had never heard
+# of. This section and `_sec_seam` are that debt, and they were written before
+# anything else in this wave.
+#
+# WHAT IS CHECKED AGAINST WHAT. The closed form (`terrace_ladder`) says where
+# the rungs must land BEFORE the loop runs; `terrace_levels` reads them off the
+# built surface afterwards and has never seen the closed form. Two routes, no
+# shared source -- the rule this project broke once by transcribing one comment
+# twice, and the rule standing ruling 14 restates.
+#
+# WHERE. Almost all of it on the INSTRUMENT (`run_terrace`), because that is
+# where the answer is known in advance: a straight 1:20 seabed with no feature
+# that could be mistaken for a tread, and `uniform=True` flattens the eustatic
+# tuple so the ladder must be an exact arithmetic progression. The SCENE
+# (`run_coast(stands=4)`) gets its own block at the end, because the scene is
+# what ships and because it does something the instrument does not -- two of
+# its four rungs are 1.0 m apart and MERGE.
+#
+# SEVEN DOCSTRING PROMISES ARE MADE TRUE HERE, every one of them false when
+# this wave opened: `EUSTATIC_PERIOD` ("the ladder's rung spacing is LINEAR in
+# it, which the suite sweeps"), `EUSTATIC_HIGHSTANDS` ("checked against a
+# uniform tuple ... and against this one"), `UPLIFT_RATE` ("the suite sweeps U
+# and requires the ladder to track it linearly"), `terrace_ladder` ("what the
+# suite checks separately"), `stand_levels` ("the suite carries the shifted
+# pair"), `evolve_coast_stands` ("the suite carries that row") and
+# `TERRACE_UPLIFT` ("the suite sweeps this").
+def _terrace_wedge(B, x_len=2400.0, dx=8.0, y_half=96.0, dy=32.0,
+                   x_shore=1600.0, s_sea=0.05):
+    """The instrument's own initial condition, built HERE so that the shifted
+    and unshifted sea frames can be run from ONE surface.
+
+    `run_terrace` does not return `h0`, and the control this section needs is
+    the SAME wedge run twice, with and without the `(n-1)*U*P` shift that
+    `stand_levels` says the sea frame requires. Rebuilding the wedge in the
+    suite would normally be the exact error this file warns about -- two routes
+    that share a source -- so it is checked rather than trusted: the row 'the
+    control shares the instrument's initial condition' runs the SHIFTED history
+    from this wedge and requires it to reproduce `run_terrace(frame='sea')` to
+    the bit. If the module's wedge ever changes, that row fails and the control
+    is retired, instead of quietly measuring a different landform.
+    """
+    x = np.arange(0.0, x_len + dx, dx)
+    y = np.arange(-y_half, y_half + dy, dy)
+    h1 = np.where(x >= x_shore, B.S_PLAIN * (x - x_shore),
+                  s_sea * (x - x_shore))
+    return x, y, np.repeat(h1[None, :], y.size, axis=0)
+
+
+def _rungs(B, x, h, **kw):
+    """Measured levels, HIGHEST FIRST, as a plain descending list.
+
+    `terrace_levels` returns highest-first already but `terrace_ladder` returns
+    OLDEST-first, and on the scene's eustatic tuple those two orders DIFFER --
+    rung 2 is younger than rung 3 and stands one metre higher. Sorting both
+    before they are compared is not cosmetic: comparing them in their native
+    orders is a row that fails on a correct ladder.
+    """
+    return sorted([d['level'] for d in B.terrace_levels(x, h, **kw)],
+                  reverse=True)
+
+
+def _sec_terrace(ctx):
+    B = ctx['B']
+    P = B.EUSTATIC_PERIOD
+    n = B.TERRACE_STANDS
+    U = B.TERRACE_UPLIFT
+
+    # ----------------------------------- T.1 the closed form and its offsets
+    lad_u = B.terrace_ladder(eustatic=(0.0,) * n, uplift=U, period=P,
+                             planation=0.0)
+    check(1, 'uniform ladder is an EXACT arithmetic progression, step U*P',
+          np.diff(lad_u), -U * P * np.ones(n - 1), 1e-12,
+          'The control whose answer is known before the loop is run. With a '
+          'flat eustatic tuple E_i = U*(n-1-i)*P - Z_p, so the differences are '
+          '-U*P exactly and Z_p has cancelled out of them. A ladder whose '
+          'spacing is not constant here has an error in the UPLIFT '
+          'bookkeeping and not in the planation depth -- the two are '
+          'separable, and this is the row that separates them.', unit='m')
+    eus = tuple(B.EUSTATIC_HIGHSTANDS)[-n:]
+    lad_e = B.terrace_ladder(eustatic=eus, uplift=U, period=P, planation=0.0)
+    check(1, 'scene tuple = the uniform progression PLUS the stated offsets',
+          lad_e - lad_u, np.array(eus), 1e-12,
+          'PROMISED BY `EUSTATIC_HIGHSTANDS`\' OWN COMMENT AND NEVER WRITTEN. '
+          'The eustatic numbers are marked `?` -- quoted from model knowledge '
+          'rather than from a published curve -- so the file\'s whole defence '
+          'is that NOTHING depends on their particular values. This row is '
+          'that defence: the tuple enters the ladder additively and in no '
+          'other way, so a different curve moves each rung by exactly itself.',
+          unit='m')
+    check(1, 'the ladder\'s OFFSET is -Z_p and its SPACING never sees Z_p',
+          [float(B.terrace_ladder(eustatic=eus, uplift=U, period=P,
+                                  planation=z)[-1] + z)
+           for z in (0.0, 1.0, 5.0)], [float(lad_e[-1])] * 3, 1e-12,
+          '`terrace_ladder`\'s docstring names two consequences and says they '
+          'are "what the suite checks separately". This is the second: the '
+          'whole ladder translates by -Z_p and nothing else moves. With the '
+          'row above it means a wrong planation depth can only ever be an '
+          'OFFSET error -- which is why `terrace-planation-zero` fires the '
+          'absolute rows and leaves every spacing row green.', unit='m')
+
+    # ---------------------------- T.2 the closed form against a REALISATION
+    r = B.run_terrace(uniform=True)
+    meas = _rungs(B, r['x'], r['h'])
+    lad = np.sort(r['ladder'])[::-1]
+    # THE TOLERANCE IS THE TREAD'S OWN RELIEF AND IS NOT FITTED. A tread here
+    # is flat to 1:280..1:524 (measured) over 48..168 m, so it carries
+    # 0.12..0.32 m of relief and its median can lie up to half of that --
+    # 0.16 m -- from any single reference elevation. 0.25 m is that with
+    # margin, and it is a twentieth of the 5 m rung spacing: an error of one
+    # whole rung is twenty times this row's width.
+    check(1, 'ladder vs `terrace_levels` on the uniform instrument, 4 rungs',
+          meas, lad, 0.25,
+          'TIER 1 AND TIER 3 AT ONCE, which is what the instrument is for. '
+          '`terrace_ladder` is arithmetic evaluated before the loop; '
+          '`terrace_levels` is a flat-run finder run on the surface the loop '
+          'built, with no access to the closed form. Measured '
+          '13.331/8.314/3.299/-1.753 against 13.390/8.390/3.390/-1.610. '
+          'A DEGENERACY THIS ROW CANNOT SEE, named because `--bugs-terrace` '
+          'found it: both lists are SORTED before comparison (they have to '
+          'be -- see `_rungs`), so on a UNIFORM tuple an index reversal '
+          'i <-> n-1-i permutes the ladder into itself and this row stays '
+          'green under `terrace-ladder-index`. The rows that do catch it are '
+          'the signed progression above, where the differences change sign, '
+          'and the scene block below, whose eustatic tuple is not monotonic.',
+          unit='m')
+    check(1, 'the instrument resolves ALL FOUR rungs, not three of them',
+          len(meas), 4, 0,
+          'A ladder row compared on a truncated list is the empty-selection '
+          'disease with a different vector: if `terrace_levels` found three '
+          'rungs the row above would compare three numbers and pass. Four is '
+          'also the fewest that makes the progression test non-trivial -- '
+          'three points fit a line through two of them.')
+
+    # -------------------------------- T.3 the sweeps the docstrings promise
+    # U and P enter ONLY as the product U*P, so a defect in either alone would
+    # be invisible to a sweep of the other. Both are swept.
+    sw_got, sw_exp, sw_n = [], [], []
+    for Uv, Pv in ((5.0e-5, P), (8.0e-5, P), (U, 1.4e5)):
+        rr = B.run_terrace(uniform=True, uplift=Uv, period=Pv)
+        m = _rungs(B, rr['x'], rr['h'])
+        sw_got.extend(np.diff(m))
+        sw_exp.extend([-Uv * Pv] * (len(m) - 1))
+        sw_n.append(len(m))
+    check(1, 'MEASURED rung spacing tracks U*P over a 2.7x sweep of U and P',
+          sw_got, sw_exp, 0.10,
+          'The strongest terrace row in this file, and the one Z_p cannot '
+          'reach. Nine spacings from three histories at U*P = 5, 8 and 7 m, '
+          'read off three built surfaces by the flat-run finder, against the '
+          'product the forcing states. Worst departure 0.052 m on a 5 m rung, '
+          'one per cent. `terrace-planation-zero` moves every ABSOLUTE level '
+          'by 1.61 m and leaves this row untouched, which is the separation '
+          '`terrace_ladder` claims and this is where it is demonstrated.',
+          unit='m')
+    check(1, 'CONTROL: each swept history really did build four rungs',
+          sw_n, [4, 4, 4], 0,
+          'RULING 14. The sweep above is a statement about spacings and is '
+          'worth nothing if one history collapsed to two rungs and '
+          'contributed a single spacing that happened to be right. It also '
+          'guards the sweep against the MERGE below: at U*P = 3 m this '
+          'instrument builds three rungs and not four, so a sweep that '
+          'wandered under the overprint threshold would be quietly measuring '
+          'a different landform.')
+
+    # ------------------------------------ T.4 the two frames are one history
+    a = B.run_terrace(frame='uplift')
+    b = B.run_terrace(frame='sea')
+    check(1, 'frame=\'uplift\' and frame=\'sea\' are the SAME history, max|dh|',
+          float(np.abs(a['h'] - b['h']).max()), 0.0, 1e-9,
+          'PROMISED BY `stand_levels` ("the suite carries the shifted pair '
+          'and it agrees to machine precision") AND NEVER WRITTEN. Only '
+          'RELATIVE sea level does any work, so lifting the land by U*P '
+          'between stands and holding the sea at e_i is the same history as '
+          'holding the land still and running stand i at e_i + U*(n-1-i)*P. '
+          'Measured 1.3e-13 m over 4 x 900 coastal steps on 7 x 301 cells.',
+          unit='m')
+    check(1, 'the ROCK surface transforms with the frame too, max|dh_rock|',
+          float(np.abs(a['h_rock'] - b['h_rock']).max()), 0.0, 1e-9,
+          '`evolve_coast_stands` carries two layers so that an emerged '
+          'tread\'s cover fraction is an OUTPUT of the history rather than a '
+          'mask somebody drew. The lift in the uplift frame must move BOTH '
+          'layers or the regolith h - h_rock is destroyed by a change of '
+          'formulation, which would make the sediment on the tread an '
+          'artefact of which frame was run.', unit='m')
+    check(1, 'and so do the eroded and the exported volumes',
+          [a['vol'], a['exported']], [b['vol'], b['exported']], 1e-6,
+          'The surfaces agreeing is necessary and not sufficient: two '
+          'histories can end on the same ground having moved different '
+          'amounts of rock to get there. The volume integrals are the loop\'s '
+          'own bookkeeping and they agree exactly.', unit='m^3')
+
+    x_w, y_w, h_w = _terrace_wedge(B)
+    hard_w = B.hardness_field(x_w, y_w, uniform=True)
+    lv_sea = B.stand_levels((0.0,) * n, uplift=U, period=P, frame='sea')
+    seq = [(lv_sea[i], B.TERRACE_STEPS) for i in range(n)]
+    shifted = B.evolve_coast_stands(x_w, y_w, h_w + U * (n - 1) * P, hard_w,
+                                    seq, uplift=U, period=P, frame='sea')[0]
+    unshift = B.evolve_coast_stands(x_w, y_w, h_w, hard_w, seq, uplift=U,
+                                    period=P, frame='sea')[0]
+    r_sea = B.run_terrace(uniform=True, frame='sea')
+    check(1, 'the control shares the instrument\'s initial condition, bitwise',
+          bool(np.array_equal(shifted, r_sea['h'])), True, 0,
+          'THE ROW THAT LICENSES THE ROW BELOW. The unshifted control has to '
+          'be built here, because `run_terrace` does not return its own h0 '
+          'and a control rebuilt from a docstring is exactly how this project '
+          'installed a wrong constant twice. So the rebuilt wedge is REQUIRED '
+          'to reproduce `run_terrace(frame=\'sea\')` to the bit. If the '
+          'module\'s wedge ever changes, this fails and the control is '
+          'retired rather than silently measuring something else.')
+    check(1, 'starting the SEA frame unshifted costs the flight',
+          [len(_rungs(B, x_w, shifted)), len(_rungs(B, x_w, unshift))],
+          [4, 2], 0,
+          '`stand_levels`: "THE EQUIVALENCE HAS A CONDITION ON THE INITIAL '
+          'SURFACE AND GETTING IT WRONG COSTS THE WHOLE FLIGHT." The uplift '
+          'frame ENDS (n-1)*U*P higher than it started, so the sea frame must '
+          'BEGIN there; begin it on the unshifted ground and the oldest stand '
+          'sits 15 m too low against its own sea. Measured: 4 levels shifted, '
+          '2 unshifted -- one emerged tread of three, plus the present bench. '
+          'One line of `run_terrace`, worth three quarters of the landform.')
+
+    # ------------------ T.5 why the chapter's own line cannot run this domain
+    check(1, 'chapter 12\'s `h += upliftField*dt` needs 30 m of basin; the '
+             'Dean ramp caps at 8',
+          float(B.D_SHELF) < (n - 1) * B.UPLIFT_RATE * P, True, 0,
+          'NOT A STYLE CHOICE AND NOT AN OPTIMISATION. The scene\'s offshore '
+          'boundary condition caps the ramp at D_SHELF = 8 m, and a '
+          'four-stand history at the scene\'s own uplift needs (n-1)*U*P = 30 '
+          'm of water for the sea to still have somewhere to be after the '
+          'last lift. 30 > 8, so the chapter\'s literal loop puts the ENTIRE '
+          'domain above the datum, the notch has nothing to cut, and the run '
+          'returns one flat surface. That is what the first run of '
+          '`run_terrace` did.')
+    check(1, '`uplift_ceiling` says the same thing in the forcing\'s units',
+          float(B.uplift_ceiling(B.D_SHELF, n)) < float(B.UPLIFT_RATE),
+          True, 0,
+          'The same inequality divided by (n-1)*P: the ceiling on this basin '
+          'is 2.67e-5 m/yr and the coast runs at 1.0e-4, 3.7 times over. Both '
+          'forms are here because the FIRST is the one a reader checks by eye '
+          'and the SECOND is the one that scales with the ladder\'s height.',
+          unit='m/yr')
+    h0s = B.initial_coast(np.arange(0.0, 1000.0 + 4.0, 4.0),
+                          np.arange(-704.0, 704.0 + 16.0, 16.0))
+    check(1, 'DEMONSTRATED: lift the scene\'s own bed and the sea is gone',
+          float((h0s + (n - 1) * B.UPLIFT_RATE * P).min()) > B.SEA_LEVEL,
+          True, 0,
+          'The arithmetic above run on the ACTUAL initial surface rather than '
+          'on its stated cap, because a cap is a promise and a grid is a '
+          'fact. `initial_coast` bottoms out at -7.63 m, so after 30 m of '
+          'lift the MINIMUM of the grid is +22.4 m and there is no cell left '
+          'at or below the datum: `fetch_exposure` returns nothing, '
+          '`coastal_step` cuts nothing, and every stand after the first is a '
+          'no-op.')
+
+    # ---------------------------------- T.6 one stand is still the old loop
+    x1 = np.arange(0.0, 400.0 + 8.0, 8.0)
+    y1 = np.arange(-96.0, 96.0 + 32.0, 32.0)
+    h1 = B.initial_coast(x1, y1)
+    hd1 = B.hardness_field(x1, y1)
+    o_a = B.evolve_coast(x1, y1, h1, hd1, n_steps=200, expo_every=50)
+    o_b = B.evolve_coast_stands(x1, y1, h1, hd1, [(B.SEA_LEVEL, 200)],
+                                uplift=0.0, expo_every=50)
+    check(1, 'one stand, no uplift: `evolve_coast_stands` == `evolve_coast`, '
+             'bitwise',
+          [bool(np.array_equal(o_a[0], o_b[0])),
+           bool(np.array_equal(o_a[4], o_b[5])),
+           bool(o_a[2] == o_b[3]), bool(o_a[3] == o_b[4])],
+          [True] * 4, 0,
+          'PROMISED BY `evolve_coast_stands` ("this reproduces `evolve_coast` '
+          'to the bit, and the suite carries that row") AND NEVER WRITTEN. It '
+          'is the row that makes `stands` safe to leave off by default: every '
+          'measurement waves 1-12 published was taken on the single-stand '
+          'coast, and this says the new loop has not moved it by a bit. '
+          'Surface, sand row, eroded volume and exported volume -- all four, '
+          'and array_equal rather than a tolerance.')
+
+    # ----------------------------------------- T.7 the planation depth Z_p
+    Zp = B.planation_depth(n_steps=900)
+    res = Zp - B.K_COAST * 900.0 * math.exp(
+        -Zp ** 2 / (2.0 * B.NOTCH_HEIGHT ** 2))
+    check(1, 'Z_p is a ROOT of z = (K N/hard) exp(-z^2/2 notch^2), residual',
+          res, 0.0, 1e-9,
+          'The one elevation in the ladder that is not declared, returned by '
+          'a damped fixed-point iteration -- so the row that means anything '
+          'is the RESIDUAL of the equation being solved, formed here from the '
+          'notch constants and not from the iterate. A root-finder that '
+          'stopped early passes its own convergence test and fails this one. '
+          'Measured 8.6e-14 m.', unit='m')
+    zs = [B.planation_depth(n_steps=N) for N in (1000, 6400)]
+    # A ROW THAT EXPLODES IS WORTH LESS THAN A ROW THAT FAILS -- `error_row`
+    # says so and wave 2 learned it the expensive way. `terrace-planation-zero`
+    # sends both of these to 0.0, which is a ZeroDivisionError inside the ratio
+    # and a log of infinity inside the prediction; degenerate inputs are turned
+    # into an infinite ratio here so the row FAILS and the eleven rows after it
+    # still run.
+    _r_got = zs[1] / zs[0] if zs[0] > 0 else float('inf')
+    _r_exp = (math.sqrt(math.log(B.K_COAST * 6400.0 / zs[1])
+                        / math.log(B.K_COAST * 1000.0 / zs[0]))
+              if min(zs) > 0 else 0.0)
+    check(1, 'Z_p follows the clock only as sqrt(ln N): 6.4x N buys 15%',
+          _r_got, _r_exp, 1e-12,
+          'THE POINT OF THE TRANSCENDENTAL FORM, and the reason a flight can '
+          'read its own eustatic history back at all: every rung is cut to '
+          'the same depth below its OWN stand, so the differences between '
+          'rungs are the sea level\'s and the uplift\'s with Z_p cancelling '
+          'exactly. A Z_p linear in N would read 6.4 here instead of 1.151.',
+          rel=True)
+    dz = [meas[i] - r_sea['stands'][i][0] for i in range(n)]
+    check(3, 'MEASURED bench depth below its own stand level vs Z_p',
+          dz, [-Zp] * n, 0.25,
+          'TIER 3, and the only row that closes the loop on the planation '
+          'depth. `planation_depth` is a transcendental solved from the notch '
+          'constants; this is the depth the notch ACTUALLY planed to, read '
+          'off four independently cut benches by the flat-run finder. '
+          'Measured -1.669/-1.686/-1.701/-1.753 against -1.610. The SIGN is '
+          'half the row: a bench above its own stand level is not a bench.',
+          unit='m')
+
+    # ----------------------- T.8 the reader takes the MEDIAN, not the mean
+    xs = np.arange(0.0, 400.0 + 4.0, 4.0)
+    prof = np.full(xs.size, 10.0)
+    rmp = (xs > 240.0) & (xs <= 320.0)
+    prof[rmp] = 10.0 + 0.019 * (xs[rmp] - 240.0)        # under `slope_max`
+    prof[xs > 320.0] = 11.52 + 0.9 * (xs[xs > 320.0] - 320.0)
+    seg = prof[:80]
+    check(1, 'a tread with a riser caught inside the flat run still reads ON '
+             'the tread',
+          float(B.terrace_levels(xs, prof[None, :], min_width=40.0)[0]
+                ['level']), 10.0, 0.01,
+          '`terrace_levels`\' own docstring: "THE MEDIAN AND NOT THE MEAN, '
+          'and the reason is this project\'s own repeated error class." The '
+          'synthetic here is a 240 m tread at exactly 10.000 m with an 80 m '
+          'riser at 1:53 on its landward end -- gentle enough to pass the '
+          '1:50 flat test, so the detected run really does contain it. '
+          '`--bug terrace-levels-mean` puts the mean back and this row reads '
+          '10.181.', unit='m')
+    check(1, 'CONTROL: the mean of that same run is NOT on the tread',
+          abs(float(seg.mean()) - 10.0) > 0.1, True, 0,
+          'RULING 14, and it is one line. The row above is worth nothing if '
+          'the two statistics coincide on this synthetic -- which they do on '
+          'a symmetric tread, and that is exactly the profile a careless '
+          'control would have drawn. Measured mean 10.1805 against a median '
+          'of 10.0000, an 18 cm displacement on a tread the ladder resolves '
+          'to 25 cm.')
+
+    # ------------------------------------- T.9 the overprint, and the merge
+    r_lo = B.run_terrace(n_stands=2, uniform=True, uplift=4.0e-5)
+    r_hi = B.run_terrace(n_stands=2, uniform=True, uplift=5.0e-5)
+    m_lo = _rungs(B, r_lo['x'], r_lo['h'])
+    m_hi = _rungs(B, r_hi['x'], r_hi['h'])
+    check(1, 'below the overprint threshold rungs MERGE, they do not crowd',
+          [len(m_lo), len(m_hi)], [1, 2], 0,
+          'The qualitative claim `overprint_threshold` exists to make, and it '
+          'is qualitative on purpose: "BELOW THE THRESHOLD THE RUNGS DO NOT '
+          'GET CLOSER TOGETHER -- THEY MERGE". Two stands, so the answer is a '
+          'clean one-or-two. At U*P = 4 m this instrument returns ONE surface '
+          'and at 5 m it returns two, so the transition is sharp and lies '
+          'between them. A model in which close rungs merely crowd would '
+          'return two levels 4 m apart at U*P = 4.')
+    between(3, 'the measured merge threshold brackets `overprint_threshold`',
+            float(B.overprint_threshold(58.0, 0.05)), 4.0, 5.0,
+            'TIER 3. The form U*P > Z_p + s_sea*R is derived; the retreat to '
+            'put into it is the loop\'s own output and `overprint_threshold` '
+            'marks it `?`. At the docstring\'s own effective 58 m the form '
+            'gives 4.71 m and the realisation puts the transition between 4 '
+            'and 5 m -- the form and the realisation agreeing without the '
+            'retreat having been fitted to make them. Z_p = 0 would put the '
+            'form at 2.90 m, outside the bracket, which is what '
+            '`terrace-planation-zero` demonstrates.', unit='m')
+    check(1, 'the MERGED surface sits at the YOUNGER rung, not the older and '
+             'not their mean', float(m_lo[0]),
+          float(np.sort(r_lo['ladder'])[0]), 0.25,
+          'WHICH surface survives is the physics, and it is a much stronger '
+          'statement than the count. The younger stand re-planes its '
+          'predecessor, so the survivor is the YOUNGER rung: at U*P = 4 m the '
+          'ladder is [2.39, -1.61] and the single measured level is -1.775, '
+          '0.17 m from the younger rung and 4.17 m from the older. A merge '
+          'that averaged the two would read +0.39 and a merge that kept the '
+          'older would read +2.39; both are ten tolerances away.', unit='m')
+
+    # --------------------------------------------- T.10 the scene that ships
+    cs = B.run_coast(stands=4)
+    xs2, hs2 = cs['x'], cs['h']
+    lad_s = np.sort(B.terrace_ladder(eustatic=tuple(B.EUSTATIC_HIGHSTANDS)[-4:],
+                                     uplift=B.UPLIFT_RATE, period=P))[::-1]
+    sc = _rungs(B, xs2, hs2)
+    emerged = [v for v in sc if v > -3.0]
+    check(1, 'the scene builds THREE emerged surfaces from a FOUR-rung ladder',
+          len(emerged), 3, 0,
+          'The scene\'s own eustatic tuple puts rungs 2 and 3 at 14.189 and '
+          '13.189 m -- ONE METRE apart, against a merge threshold the '
+          'instrument measures at 4-5 m. So the scene must show three '
+          'surfaces and not four, and it does. The fourth level '
+          '`terrace_levels` returns, -5.617 m, is the offshore ramp and not a '
+          'tread, which is why the count is taken above the datum-minus-3 m '
+          'line rather than off the raw list.')
+    check(1, 'CONTROL: the merge survives a reader tolerance a fifth of the '
+             'pair\'s spacing',
+          len([v for v in _rungs(B, xs2, hs2, tol=0.2) if v > -3.0]), 3, 0,
+          'RULING 14, AND THE DEGENERACY THIS BLOCK HAD TO DESIGN AROUND. '
+          '`terrace_levels` clusters levels within `tol` = 1.5 m by default, '
+          'and the two rungs that merge are 1.0 m apart -- so the DEFAULT '
+          'reader would have merged them whatever the surface did, and the '
+          'row above would have been a statement about the reader. Re-read at '
+          'tol = 0.2 m the answer is still three, and one row\'s profile runs '
+          'continuously from x = 632 to 964 m with no riser in it at all.')
+    # NaN RATHER THAN AN INDEX ERROR, for `error_row`'s reason: three of this
+    # wave's five terrace defects destroy the flight outright, and a section
+    # that raises on the first of them takes every row after it down and
+    # reports one catch where there were four. A NaN compares False against
+    # everything, so a scene with no emerged tread FAILS these rows instead of
+    # ending the section.
+    _nan = float('nan')
+    check(1, 'the two UNMERGED rungs land on the closed form',
+          [emerged[0] if emerged else _nan,
+           sc[-2] if len(sc) > 1 else _nan], [lad_s[0], lad_s[-1]], 0.25,
+          'The oldest tread and the present bench: the two rungs with no '
+          'neighbour inside the merge threshold. Measured 30.063 and -1.904 '
+          'against 30.189 and -1.811, inside the tread\'s own relief, on a '
+          'ladder 32 m tall, with the closed form written before the loop was '
+          'run.', unit='m')
+    mid = []
+    for j in range(hs2.shape[0]):
+        v = [q for q in _rungs(B, xs2, hs2[j:j + 1]) if 10.0 < q < 20.0]
+        if v:
+            mid.append(v[0])
+    mid = np.array(mid) if mid else np.array([_nan])
+    check(1, 'the MERGED tread is bracketed by the two rungs it merged',
+          [float(mid.min()) > lad_s[2], float(mid.max()) < lad_s[1]],
+          [True, True], 0,
+          'A CLOSED-FORM BRACKET AND NOT A TOLERANCE, and it is the row that '
+          'says what a merge actually does. The younger stand can only CUT, '
+          'so it planes the old tread down to its own rung at 14.189 m and '
+          'cannot lift the ground already below that off the older rung at '
+          '13.189 m; the merged surface must therefore lie between them '
+          'everywhere. Measured 13.859..14.047 over all 89 rows -- 77 per '
+          'cent of the way from the old rung to the new, so the overprint is '
+          'most of the tread and not all of it.', unit='m')
+    check(3, 'the treads are alongshore-uniform to a twentieth of that '
+             'spacing', float(mid.std()), 0.0, 0.05,
+          'The merged tread is the hardest case in the scene: if the loop '
+          'wandered alongshore by anything approaching the 1.0 m that '
+          'separates the two rungs it merged, the bracket row above would be '
+          'measuring noise instead of a landform. Measured sd 0.0401 m over '
+          '89 rows -- a twenty-fifth of the pair spacing and a sixth of the '
+          'tread\'s own cross-shore relief.', unit='m')
+    info(1, 'the scene holds ONE Quaternary tread, not a flight',
+         round(float(B.terraces_in_domain(316.0)), 3),
+         '`terraces_in_domain`: a real 10-kyr highstand at chapter 12\'s own '
+         'retreat bracket planes 500-5000 m and the untouched plateau is 316 '
+         'm, so the answer is below one at every rate in the bracket. The '
+         'four rungs above exist because TERRACE_STEPS is a CLOCK and not a '
+         'duration. What the SCENE can hold is one emerged tread and the '
+         'present bench, which is the pair the camera stands on and looks '
+         'down.')
+    info(3, 'measured tread widths on the scene, landward to seaward, m',
+         [round(d['width'], 1) for d in B.terrace_levels(xs2, hs2)],
+         'Recorded rather than checked. `platform_growth_exponent` puts the '
+         'bench width at N^0.55 and chapter 12 marks the equilibrium-width '
+         'claim `?`; nothing in this wave closes it, so the widths are a '
+         'checksum against a future change that moves them silently.')
+
+
+# ============================================================== WAVE 16, (2/2)
+# THE SEAM. The other half of wave 13's unguarded landing, and the same story:
+# `through_face`'s two invariants and `horizon_seam` shipped with no row behind
+# them, so the fix that closed the sea-sky seam was held in place by a
+# docstring.
+#
+# WHAT THE DEFECT WAS. `g_prev` was initialised to ZERO -- an assertion that
+# the traced entry point lies exactly ON the free surface. On the first march
+# step the crossing refinement then evaluated frac = 0/(0 - g) = 0, so a ray
+# reported as having EXITED carried a chord of exactly zero, and exp(-c*0) = 1
+# returned the full solar beam through no water at all. It fired at the horizon
+# because the surface intersection is Newton on z(t) = eta and its update
+# divides by the ray's z-component, which goes to zero at grazing.
+#
+# THE ROWS ARE STATEMENTS, NOT EPSILONS, and that is deliberate. Both
+# invariants are exact: a ray whose entry point is ABOVE the surface never
+# entered the water, and a path of no length carries no transport. Neither
+# needs a tolerance, so neither has one -- `tol = 0` throughout the first
+# block, and the only bracketed row in the section is the published criterion
+# from bar K2.
+#
+# TWO FRAMES, BECAUSE ONE OF THEM CANNOT SEE THE OTHER'S HAZARD. Frame K is
+# aimed down the sun's azimuth and frame J across it, and `horizon_seam`'s
+# column selection is right on one and catastrophically wrong on the other --
+# which is the second thing this section guards.
+def _seam_probe(RND, B, w, cam, tf=None):
+    """One render, and everything the section reads off it.
+
+    `through_face` is swapped by NAME rather than by editing, because
+    `shade_water` resolves it at call time -- which is also how
+    `beach_render.seam_figure` draws the BEFORE half of `s13-sea-sky-seam`. So
+    the shipping path and the wave-12 path here are the SAME code path with two
+    functions in one slot, not two checkouts compared from memory.
+    """
+    orig = RND.through_face
+    if tf is not None:
+        RND.through_face = tf
+    try:
+        L, ex = RND.render(cam, w)
+    finally:
+        RND.through_face = orig
+    sh, mw = ex['water'], ex['water_mask']
+    D = cam.rays()
+    j = int(np.where((D[..., 2] >= 0.0).all(1))[0][-1])
+    P = ex['water_P']
+    # THE ENTRY GAP, RECOMPUTED OUTSIDE `through_face`. Positive in water.
+    g0 = RND.free_surface(w, P[..., 0], P[..., 1], 0.0) - P[..., 2]
+    ch, Lp = sh['chord'][0], sh['L_path'][0]
+    # the seam band: two rows of sea, two rows of sky, off the glitter path
+    az = np.degrees(np.arctan2(D[j, :, 0], D[j, :, 1])) % 360.0
+    off = np.abs((az - RND.SUN_AZ + 180.0) % 360.0 - 180.0)
+    k = max(int(0.12 * L.shape[1]), 2)
+    sel = np.argsort(off)[-2 * k:]
+    full_c = np.zeros(L.shape[:2])
+    full_c[mw] = ch
+    full_p = np.zeros(L.shape[:2] + (3,))
+    full_p[mw] = Lp
+    idx = np.ix_(np.arange(j + 1, j + 3), sel)
+    return dict(L=L, ex=ex, j=j, chord=ch, L_path=Lp, gap=g0,
+                seam=RND.horizon_seam(L, cam),
+                band_chord=full_c[idx], band_path=full_p[idx],
+                band_total=L[idx].reshape(-1, 3).mean(0),
+                sel=sel, off=off)
+
+
+def _sec_seam(ctx):
+    B = ctx['B']
+    import beach_render as RND
+    bay = ctx.get('_bay')
+    if bay is None:
+        bay = B.run_bay()
+        ctx['_bay'] = bay
+    w = RND.Water(bay)
+    # 240 x 320 rather than the hero 720 x 960, because the section needs FOUR
+    # renders and the defect is a property of the grazing geometry rather than
+    # of the sampling: it is present at every resolution and measures 0.359
+    # here against 0.148 at hero size. A row that only fires on the hero frame
+    # would be a row nobody runs.
+    cams = RND.hero_cameras(w, 240, 320, out=lambda *a, **kw: None)
+    camJ, camK = cams[3], cams[5]
+    pk = _seam_probe(RND, B, w, camK)
+    pj = _seam_probe(RND, B, w, camJ)
+
+    # ------------------------ K.1 the two invariants, on the frames that ship
+    for nm, p in (('K', pk), ('J', pj)):
+        ch, Lp = p['chord'], p['L_path']
+        check(1, 'frame %s: a path of no length carries no transport' % nm,
+              int((Lp[ch == 0.0] > 0.0).sum()), 0, 0,
+              'INVARIANT (2), AS AN EXACT STATEMENT AND NOT A THRESHOLD. '
+              '`shade_water` calls this term "the sun seen THROUGH the '
+              'water"; with no water crossed there is nothing to see through, '
+              'and what the eye receives is the surface, which terms 1-3 '
+              'already carry in full. So `chord > 0` is not a tuned epsilon, '
+              'it is the statement that the ray was inside the medium for a '
+              'finite length. Measured 0 of %d water pixels here; the wave-12 '
+              'path leaves 717 on frame K and 224 on frame J.' % ch.size)
+        check(1, 'frame %s: a ray entering ABOVE the surface never entered'
+              % nm, int((Lp[p['gap'] < 0.0] > 0.0).sum()), 0, 0,
+              'INVARIANT (1). The gap is recomputed here from the render\'s '
+              'own `water_P` and `free_surface`, OUTSIDE `through_face`, and '
+              'compared against what `through_face` returned -- so this is '
+              'the mask being audited and not the march being re-derived. '
+              'More than half the water pixels of both frames have a traced '
+              'entry point above the free surface (52.9%% on K, 54.3%% on J), '
+              'which is how large the tracer\'s error is and why asserting it '
+              'away cost the whole horizon.')
+
+    # ----------------- K.2 the controlled experiment: rays that cannot have
+    # entered, with a known answer, on a grid the defect cannot dodge
+    ex = pk['ex']
+    tr = ex['trace']
+    D = camK.rays()
+    mw = tr['water'] & ~(D[..., 2] >= 0.0)
+    Pw = camK.pos[None] + tr['t_water'][mw][..., None] * D[mw]
+    s = np.arange(0, Pw.shape[0], 7)
+    Ps, Ds = Pw[s], D[mw][s]
+    zx, zy = RND.surface_slope(w, Ps[..., 0], Ps[..., 1], 0.0)
+    Nn = np.stack([-zx, -zy, np.ones_like(zx)], -1)
+    Nn /= np.linalg.norm(Nn, axis=-1, keepdims=True)
+    dep = w.sample(Ps[..., 0], Ps[..., 1], w.d)
+    eta = RND.free_surface(w, Ps[..., 0], Ps[..., 1], 0.0)
+    got, exp_ = [], []
+    for dz in (2.0, 10.0):
+        Pu = Ps.copy()
+        Pu[..., 2] = eta + dz
+        Lv = RND.through_face(w, Pu[None], Ds[None], 0.0, Nn[None], dep[None],
+                              np.zeros_like(dep)[None])[0]
+        got.append(float(np.abs(Lv).max()))
+        exp_.append(0.0)
+    check(1, 'rays launched 2 m and 10 m ABOVE the sea return exactly zero',
+          got, exp_, 0.0,
+          'THE DESIGNED EXPERIMENT, and the reason the section does not stop '
+          'at the two observational rows above. Those rows report what the '
+          'shipping frames happen to contain; this one MANUFACTURES the '
+          'condition the defect needs, on %d rays whose entry points are '
+          'unambiguously in the air, and asks for the answer that is known in '
+          'advance. It cannot be inert and it cannot be satisfied by a bed '
+          'that happens not to have the geometry. The wave-12 path returns a '
+          'nonzero radiance on ALL %d of them, up to 3.911 W/m2/sr -- the '
+          'full solar beam delivered through ten metres of air.'
+          % (Ps.shape[0], Ps.shape[0]))
+
+    # ------------------------------- K.3 the seam band itself, where it fired
+    for nm, p in (('K', pk), ('J', pj)):
+        check(1, 'frame %s: every ray in the seam band is grazing, chord == 0'
+              % nm, int((p['band_chord'] != 0.0).sum()), 0, 0,
+              'THE LOCATION ROW, and the section would be worth much less '
+              'without it: a guard evaluated where the defect is inert is not '
+              'a guard. This is evaluated in the two rows of sea the seam '
+              'metric itself samples, 112 pixels, at a range of 30 km and a '
+              'depression under 0.7 deg. NOT ONE of them crosses a wave face '
+              '-- the refracted ray never finds a far side inside `reach` -- '
+              'so the path term\'s contribution to the band is exactly zero '
+              'by geometry, and any of it that appears there is the defect.')
+        check(1, 'frame %s: and so the path term contributes NOTHING to the '
+                 'band' % nm, float(np.abs(p['band_path']).max()), 0.0, 0.0,
+              'The consequence of the row above, stated on radiance instead '
+              'of on geometry, because that is the quantity the seam is made '
+              'of. Measured 0.0000 in all three channels. Under the wave-12 '
+              'path the same band carries 0.484/0.431/0.325 on frame K -- '
+              'THIRTY-THREE PER CENT of the red channel of a band that is '
+              'otherwise 98.6 per cent mirrored sky. That is the seam, in the '
+              'units it is made of and before any tone map.', unit='W/m2/sr')
+
+    # --------------------------------------------- K.4 bar K2's own criterion
+    for nm, p in (('K', pk), ('J', pj)):
+        between(2, 'frame %s: sea/sky ratio at the horizon, worst channel'
+                % nm, float(np.max(p['seam']['ratio'])), 0.90, 1.05,
+                'BAR K2 MAKES THIS A CRITERION: "the sea\'s radiance at '
+                'grazing must approach the sky\'s reflected value '
+                'CONTINUOUSLY, and any seam there is a tell visible at a '
+                'glance." UNITY IS NOT THE TARGET AND THAT MATTERS. The two '
+                'bands sit 2 and 4 rows either side of the horizon rather '
+                'than at it, so the sea band\'s Fresnel reflectance is '
+                '`optics.fresnel` at its own depression -- 0.970 and 0.935, '
+                'an independent route -- and a perfect mirror already reads '
+                'below one. Aerial perspective over 30 km adds airlight back. '
+                'Measured 0.988/0.981/0.962 on K and 1.005/0.998/0.970 on J. '
+                'The bracket is not fitted between the two populations: the '
+                'wave-12 path reads 1.359 and 1.259, five times outside it.')
+    info(3, 'the seam band is 98.6 per cent mirrored sky',
+         [round(float(v), 4) for v in pk['band_total']],
+         'The composition of the band on frame K, scene-linear: L_sky '
+         '1.044/1.170/1.397, L_up 0.000/0.003/0.001, L_glit 0, L_path 0. A '
+         'mirror plus a trace of upwelling is what a sea just below the '
+         'horizon IS, and recording it is what makes the ratio row above a '
+         'statement about the mirror rather than about an unexamined sum.')
+
+    # ----------------------- K.5 `horizon_seam` must not be measuring glitter
+    check(1, 'the seam columns are chosen by AZIMUTH FROM THE SUN, both frames',
+          [float(pk['seam']['off_axis_deg']) > 15.0,
+           float(pj['seam']['off_axis_deg']) > 15.0], [True, True], 0,
+          'Down the sun\'s azimuth the sea just below the horizon carries the '
+          'sun\'s own image and is two orders above the sky; comparing those '
+          'is measuring the GLITTER, not the seam. Measured 34.2 deg off on '
+          'frame K and 67.6 deg on frame J.', unit='deg')
+    n_col = pj['L'].shape[1]
+    k = max(int(0.12 * n_col), 2)
+    edge = np.r_[0:k, n_col - k:n_col]
+    j = pj['j']
+    Lj = pj['L']
+    sky_e = Lj[j - 3:j - 1, edge].reshape(-1, 3).mean(0)
+    sea_e = Lj[j + 1:j + 3, edge].reshape(-1, 3).mean(0)
+    check(3, 'CONTROL: on frame J the FRAME EDGES are the glitter path',
+          [float(pj['off'][edge].min()) < 1.0,
+           float(np.max(sea_e / np.maximum(sky_e, 1e-9))) > 10.0],
+          [True, True], 0,
+          'RULING 14: the row above is worth nothing unless the selection it '
+          'rejects is genuinely wrong on some frame this project renders. It '
+          'is. Frame J\'s left edge lands 0.06 deg from the sun, and the '
+          'edge-column ratio there is 50.2/39.6/24.5 -- a seam reported as '
+          '4916 per cent off when the frame\'s actual seam is 3.0 per cent. '
+          'On frame K the two selections coincide exactly, which is why the '
+          'defect survived a wave: it is invisible on the frame the seam '
+          'figure is drawn from.')
+
+    # ------------------------------- K.6 what the bug table found out, kept
+    info(1, 'of `through_face`\'s three mask clauses, ONE carries the seam',
+         'entered', 'MEASURED BY `--bugs-seam` AND WORTH MORE THAN A PASS. '
+         'The march\'s two invariants were reintroduced separately as well as '
+         'together. `seam-mask-exited-only` -- the real entry gap kept, the '
+         'mask reduced to `exited` alone -- fires ALL NINE rows the verbatim '
+         'wave-12 function fires, so the whole of the seam is the `entered` '
+         'clause. `seam-gprev-zero` -- the zero gap put back but the mask left '
+         'intact -- fires NOTHING: used only in the crossing refinement, the '
+         'initialisation is inert on both hero frames, and it mattered '
+         'historically because `entered` was computed FROM it. And '
+         '`seam-no-chord-clause` fires nothing either: no ray on either frame '
+         'is entered-and-exited with a zero chord, so `chord > 0` is a true '
+         'statement that this bed never exercises. It is kept because it is '
+         'an invariant and not a filter, but it is NOT a guard here and this '
+         'row is the file saying so out loud.')
+
+
 # --------------------------------------------------- the spectral-block bugs
 def _bug_phase_no_alongshore(mod):
     """WAVES 1-12: S(y, 0) = 0, and only k_x ever integrated.
@@ -7285,6 +7985,316 @@ BUGS.update({
 })
 
 
+
+# ------------------------------------------------------- the wave-16 bugs
+# Five for the terrace and five for the seam. Every one of them is either a
+# LINE THAT ONCE SHIPPED or the single clause a guard rests on, put back so
+# that the guard can be seen to fail. Two are here specifically to say what
+# does NOT fire: `terrace-planation-zero` moves every absolute elevation and
+# must leave every spacing row green, and `seam-no-chord-clause` removes an
+# invariant that turns out to be inert on both hero frames.
+def _bug_terrace_sea_unshifted(mod):
+    """WAVE 13'S FIRST RUN OF THE SEA FRAME: `run_terrace` forgets the line
+
+        h0 = h0 + uplift * (n_stands - 1) * period
+
+    and starts the falling-sea history on the ground the uplift frame BEGINS
+    on instead of the ground it ENDS on.
+
+    REINTRODUCED WHERE IT IS EXACT RATHER THAN WHERE IT WAS WRITTEN. Deleting
+    the line from `run_terrace` would mean copying `run_terrace` into this
+    file, and a control rebuilt from a docstring is how this project installed
+    a wrong constant twice. `coastal_step` and `fetch_exposure` are functions
+    of `h - sea_level` in every term they have, so lowering the initial surface
+    by the total lift is the same operation wherever it is applied: the wrapper
+    below takes it off `h0` at the entry to `evolve_coast_stands`, which is the
+    same array `run_terrace` would have handed over unshifted. The suite's own
+    `_terrace_wedge` control is hit too, and that is correct -- under this
+    defect there is no shifted run left to compare against.
+    """
+    orig = mod.evolve_coast_stands
+
+    def ev(x, y, h0, hard, stands, uplift=mod.UPLIFT_RATE,
+           period=mod.EUSTATIC_PERIOD, frame='sea', **kw):
+        if frame == 'sea':
+            h0 = np.asarray(h0, float) - float(uplift) * (len(stands) - 1) \
+                * float(period)
+        return orig(x, y, h0, hard, stands, uplift=uplift, period=period,
+                    frame=frame, **kw)
+    mod.evolve_coast_stands = ev
+
+
+def _bug_terrace_ladder_index(mod):
+    """The ladder written `E_i = e_i + U*i*P - Z_p` instead of
+    `e_i + U*(n-1-i)*P - Z_p`: the OLDEST stand lifted least instead of most.
+
+    The commonest off-by-orientation in a sequence indexed oldest-first, and it
+    is invisible to a two-stand history -- which is why the instrument builds
+    four."""
+    orig = mod.terrace_ladder
+
+    def lad(n_stands=None, uplift=mod.UPLIFT_RATE,
+            period=mod.EUSTATIC_PERIOD, eustatic=mod.EUSTATIC_HIGHSTANDS,
+            planation=None):
+        if planation is None:
+            planation = mod.planation_depth()
+        if eustatic is None:
+            eustatic = (0.0,) * int(n_stands or 1)
+        eustatic = tuple(float(v) for v in eustatic)
+        if n_stands is not None and int(n_stands) != len(eustatic):
+            nn = int(n_stands)
+            eustatic = (eustatic * (nn // len(eustatic) + 1))[:nn]
+        nn = len(eustatic)
+        return np.array([eustatic[i] + uplift * i * period - planation
+                         for i in range(nn)])
+    mod.terrace_ladder = lad
+
+
+def _bug_terrace_planation_zero(mod):
+    """Z_p = 0: the bench assumed to be planed at exactly its own stand level.
+
+    THE DISCRIMINATING BUG OF THE TERRACE BLOCK, and it is here to be reported
+    on rather than merely caught. `terrace_ladder`'s docstring claims the
+    spacing between rungs does not see Z_p and only the OFFSET does. If that is
+    true then this defect -- which is a pure 1.61 m translation of the whole
+    ladder -- must fire every absolute row and NOT ONE spacing row. If a
+    spacing row fires anyway, the claim is wrong and the docstring, not the
+    tolerance, is what needs correcting.
+    """
+    mod.planation_depth = lambda *a, **kw: 0.0
+
+
+def _bug_terrace_levels_mean(mod):
+    """`terrace_levels` reducing each flat run by its MEAN instead of its
+    MEDIAN -- the one line its docstring singles out.
+
+    The body is `terrace_levels`' own, copied once with `np.median` -> `np.mean`
+    in the PER-RUN reduction only. The cluster reduction keeps its median,
+    because the docstring's claim is specifically about a riser caught at the
+    end of one run and not about clustering across rows.
+    """
+    def tl(x, h2, slope_max=0.02, min_width=40.0, tol=1.5, z_min=None):
+        x = np.asarray(x, float)
+        h2 = np.atleast_2d(np.asarray(h2, float))
+        dx = float(x[1] - x[0])
+        n_min = max(int(round(min_width / dx)), 2)
+        found = []
+        for j in range(h2.shape[0]):
+            g = np.abs(np.gradient(h2[j], dx))
+            flat = g < slope_max
+            if z_min is not None:
+                flat &= h2[j] > z_min
+            i = 0
+            while i < flat.size:
+                if not flat[i]:
+                    i += 1
+                    continue
+                k = i
+                while k < flat.size and flat[k]:
+                    k += 1
+                if k - i >= n_min:
+                    found.append((float(np.mean(h2[j][i:k])),   # ---- THE BUG
+                                  (k - i) * dx))
+                i = k
+        if not found:
+            return []
+        found.sort(key=lambda t: -t[0])
+        out, cur = [], [found[0]]
+        for lv, wd in found[1:]:
+            if abs(lv - np.median([c[0] for c in cur])) <= tol:
+                cur.append((lv, wd))
+            else:
+                out.append(cur)
+                cur = [(lv, wd)]
+        out.append(cur)
+        return [dict(level=float(np.median([c[0] for c in g])),
+                     width=float(np.mean([c[1] for c in g])),
+                     n_rows=len(g)) for g in out]
+    mod.terrace_levels = tl
+
+
+def _bug_terrace_stand_levels_reversed(mod):
+    """`stand_levels` running the OLDEST stand at the LOWEST sea:
+    `e_i + U*i*P` where the ladder wants `e_i + U*(n-1-i)*P`.
+
+    The falling-sea frame read as a rising one. It leaves the uplift frame
+    untouched -- that branch returns the eustatic tuple verbatim -- so it is
+    also the cleanest possible test of whether the frame-equivalence row is
+    doing any work: if it is, this fires it and nothing in the uplift frame
+    moves at all.
+    """
+    def sl(eustatic=mod.EUSTATIC_HIGHSTANDS, uplift=mod.UPLIFT_RATE,
+           period=mod.EUSTATIC_PERIOD, frame='sea'):
+        eus = tuple(float(v) for v in eustatic)
+        if frame == 'uplift':
+            return list(eus)
+        if frame != 'sea':
+            raise ValueError('frame must be "sea" or "uplift"')
+        return [eus[i] + float(uplift) * i * float(period)
+                for i in range(len(eus))]
+    mod.stand_levels = sl
+
+
+TERRACE_BUGS = ('terrace-sea-unshifted', 'terrace-ladder-index',
+                'terrace-planation-zero', 'terrace-levels-mean',
+                'terrace-stand-levels-reversed')
+
+
+# ------------------------------------------------------------- the seam bugs
+def _seam_variant(RND, gprev_zero=False, use_entered=True, use_chord=True):
+    """`through_face`'s march with three switches on the two lines wave 13
+    changed. ONE copy of the body, not four.
+
+    Four near-copies of a thirty-line march is four chances for a
+    reintroduction to drift from the thing it claims to reintroduce, so the
+    body is written once and the defects are booleans on it. The copy itself is
+    then audited: `--bugs-seam` runs `seam-none-of-them` first, which builds
+    this variant with the SHIPPING settings and requires it to reproduce
+    `through_face` bit for bit on the frame-K rays. If that ever drifts, the
+    whole table is void and says so.
+
+    `gprev_zero=True, use_entered=False, use_chord=False` is waves 1-12's
+    function exactly, and the module's own `_through_face_wave12` -- which
+    draws the BEFORE half of `s13-sea-sky-seam` -- is run as a separate entry
+    so that the two agree.
+    """
+    def tf(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0, foot=None):
+        eta_r = 1.0 / RND.OPT.IOR[1]
+        T = np.stack(RND.OPT.refract(D[..., 0], D[..., 1], D[..., 2],
+                                     Nn[..., 0], Nn[..., 1], Nn[..., 2],
+                                     eta_r), -1)
+        Tn = np.linalg.norm(T, axis=-1, keepdims=True)
+        T = T / np.where(Tn > 1e-9, Tn, 1.0)
+        step = reach / n_step
+        chord = np.zeros(P.shape[:-1])
+        exited = np.zeros(P.shape[:-1], bool)
+        Q = P.copy()
+        if gprev_zero:
+            g_prev = np.zeros(P.shape[:-1])
+        else:
+            g_prev = RND.free_surface(w, P[..., 0], P[..., 1],
+                                      t_now) - P[..., 2]
+        entered = (RND.free_surface(w, P[..., 0], P[..., 1], t_now)
+                   - P[..., 2]) >= 0.0
+        for _ in range(n_step):
+            Qn = Q + T * step
+            e = RND.free_surface(w, Qn[..., 0], Qn[..., 1], t_now, foot)
+            g = e - Qn[..., 2]
+            out = (g < 0.0) & (~exited)
+            frac = np.where(out, g_prev / np.maximum(g_prev - g, 1e-9), 1.0)
+            chord = np.where(exited, chord,
+                             chord + step * np.clip(frac, 0.0, 1.0))
+            exited = exited | out
+            Q, g_prev = Qn, g
+        face = exited
+        if use_entered:
+            face = face & entered
+        if use_chord:
+            face = face & (chord > 0.0)
+        chord = np.where(face, chord, 0.0)
+        zx, zy = RND.surface_slope(w, Q[..., 0], Q[..., 1], t_now, foot=foot)
+        Nf = np.stack([-zx, -zy, np.ones_like(zx)], -1)
+        Nf /= np.linalg.norm(Nf, axis=-1, keepdims=True)
+        lit = np.clip((Nf * RND.SUN[None, None]).sum(-1), 0.0, 1.0)
+        L_in = (RND.E_SUN[None, None] * lit[..., None]
+                * (1.0 - RND.OPT.fresnel(np.clip(lit, 1e-4, 1.0))) / math.pi)
+        a = RND.BO.iops()['a'][None, None] * np.ones_like(L_in)
+        bb = RND.BO.iops()['b_b'][None, None] * np.ones_like(L_in)
+        L = L_in * np.exp(-(a + bb) * chord[..., None])
+        return L * face[..., None], chord, lit
+    return tf
+
+
+SEAM_BUGS = ('seam-none-of-them', 'seam-wave12-verbatim', 'seam-gprev-zero',
+             'seam-mask-exited-only', 'seam-no-chord-clause',
+             'seam-edge-columns')
+
+SEAM_VARIANTS = {
+    # the audit entry: the shipping settings, which must catch nothing
+    'seam-none-of-them': dict(),
+    # waves 1-12 exactly: zero gap asserted AND the two-clause mask gone
+    'seam-gprev-zero': dict(gprev_zero=True),
+    'seam-mask-exited-only': dict(use_entered=False, use_chord=False),
+    'seam-no-chord-clause': dict(use_chord=False),
+}
+
+
+def _seam_edge_columns(RND):
+    """`horizon_seam` sampling THE FRAME'S OUTER COLUMNS instead of the columns
+    furthest in azimuth from the sun -- which is what it did before the
+    selection was rewritten, and what reported frame J's seam as 6188 per cent.
+
+    The only line that differs is `sel`. Everything else, including the two
+    two-row bands and the ratio, is `horizon_seam`'s own.
+    """
+    def hs(L, cam, edge_frac=0.12):
+        D = cam.rays()
+        up = D[..., 2] >= 0.0
+        rows = np.where(up.all(1))[0]
+        if rows.size == 0 or rows[-1] + 4 >= L.shape[0] or rows[-1] < 3:
+            return None
+        j = int(rows[-1])
+        n = L.shape[1]
+        k = max(int(edge_frac * n), 2)
+        sel = np.r_[0:k, n - k:n]                        # ---- THE DEFECT
+        az_col = np.degrees(np.arctan2(D[j, :, 0], D[j, :, 1])) % 360.0
+        off = np.abs((az_col - RND.SUN_AZ + 180.0) % 360.0 - 180.0)
+        sky = L[j - 3:j - 1, sel].reshape(-1, 3).mean(0)
+        sea = L[j + 1:j + 3, sel].reshape(-1, 3).mean(0)
+        r = sea / np.maximum(sky, 1e-9)
+        return dict(sky=sky, sea=sea, ratio=r,
+                    off_axis_deg=float(off[sel].min()),
+                    worst=float(np.max(np.abs(r - 1.0))))
+    return hs
+
+
+def _bug_seam_wave12(mod):
+    """WAVES 1-12'S `through_face`, taken from `beach_render` itself.
+
+    Not a reimplementation: `_through_face_wave12` already lives in the
+    renderer because it draws the BEFORE half of `s13-sea-sky-seam`, so this
+    table and the published figure fire the SAME function. The parametrised
+    variant `seam-mask-exited-only` plus `seam-gprev-zero` is the same defect
+    written the other way, and the two are run side by side so that they can
+    be seen to agree."""
+    mod.through_face = mod._through_face_wave12
+
+
+def _bug_seam_none(mod):
+    mod.through_face = _seam_variant(mod)
+
+
+def _bug_seam_gprev_zero(mod):
+    mod.through_face = _seam_variant(mod, gprev_zero=True)
+
+
+def _bug_seam_mask_exited(mod):
+    mod.through_face = _seam_variant(mod, use_entered=False, use_chord=False)
+
+
+def _bug_seam_no_chord(mod):
+    mod.through_face = _seam_variant(mod, use_chord=False)
+
+
+def _bug_seam_edges(mod):
+    mod.horizon_seam = _seam_edge_columns(mod)
+
+
+BUGS.update({
+    'terrace-sea-unshifted': _bug_terrace_sea_unshifted,
+    'terrace-ladder-index': _bug_terrace_ladder_index,
+    'terrace-planation-zero': _bug_terrace_planation_zero,
+    'terrace-levels-mean': _bug_terrace_levels_mean,
+    'terrace-stand-levels-reversed': _bug_terrace_stand_levels_reversed,
+    'seam-none-of-them': _bug_seam_none,
+    'seam-wave12-verbatim': _bug_seam_wave12,
+    'seam-gprev-zero': _bug_seam_gprev_zero,
+    'seam-mask-exited-only': _bug_seam_mask_exited,
+    'seam-no-chord-clause': _bug_seam_no_chord,
+    'seam-edge-columns': _bug_seam_edges,
+})
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -7313,7 +8323,19 @@ def run_suite():
                       (_sec_land, 'the land and the air: beach, wet/dry, '
                                   'shadow, aerial perspective'),
                       (_sec_bed, 'the submerged bed, and which side of the '
-                                 'interface an albedo lives on')):
+                                 'interface an albedo lives on'),
+                      # WAVE 16. `_sec_terrace` is here rather than beside
+                      # `_sec_coast` because it builds `run_coast(stands=4)`,
+                      # which is 23 s of coastal loop nothing else in the file
+                      # wants; putting it last keeps the cheap sections'
+                      # failures at the top of a run. `_sec_seam` MUST come
+                      # after `_sec_land`, which is what puts the full-scale
+                      # bay in `ctx['_bay']` -- built once and rendered from,
+                      # rather than built twice.
+                      (_sec_terrace, 'the sea-level history: the ladder, the '
+                                     'two frames, and the merge'),
+                      (_sec_seam, 'the sea-sky seam and the transport '
+                                  'through a wave face')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -7623,6 +8645,114 @@ if __name__ == '__main__':
                 print('%-24s   %s' % ('', c[:84]))
         importlib.reload(BCH)
         sys.exit(0)
+    if '--bugs-terrace' in sys.argv:
+        # WAVE 16. Its own driver, and the bay cache is CLEARED between runs
+        # for the same reason `--bugs-bathy` clears it: three of the five
+        # defects are inside functions `run_terrace` and `run_coast` call, so
+        # a surface built once and reused would have been built from the clean
+        # module and not one realisation row could fire. That costs the scene's
+        # 23 s per defect and buys guards that are known to fail rather than
+        # assumed to.
+        import importlib
+
+        def _run_terr():
+            del ROWS[:]
+            c = dict(B=BCH, T=BCH.T_SWELL,
+                     omega=2.0 * math.pi / BCH.T_SWELL, x=BCH.make_grid())
+            guard(_sec_terrace, 'the sea-level history', c)
+            return c
+        BCH._BAY_CACHE.clear()
+        _run_terr()
+        base = set(_fail_names())
+        print('clean terrace section: %d pass / %d FAIL / %d info'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base),
+                 sum(r.status == 'INFO' for r in ROWS)))
+        print()
+        print('%-32s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 118)
+        for name in TERRACE_BUGS:
+            importlib.reload(BCH)
+            BCH._BAY_CACHE.clear()
+            BUGS[name](BCH)
+            try:
+                _run_terr()
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-32s %d' % (name, len(caught)))
+            for c in caught:
+                print('%-32s   %s' % ('', c[:80]))
+        importlib.reload(BCH)
+        BCH._BAY_CACHE.clear()
+        sys.exit(0)
+    if '--bugs-seam' in sys.argv:
+        # WAVE 16. The module is NOT reloaded between runs and the bay is NOT
+        # rebuilt, which is the opposite of the terrace driver and is right for
+        # the opposite reason: every seam defect is one function in one slot
+        # that `shade_water` resolves at call time, so swapping the slot is the
+        # whole of the reintroduction and the bed underneath must be identical
+        # or the comparison is two beds and not two functions.
+        import beach_render as RND
+        _ctx = dict(B=BCH, T=BCH.T_SWELL, omega=2.0 * math.pi / BCH.T_SWELL,
+                    x=BCH.make_grid())
+
+        def _run_seam():
+            del ROWS[:]
+            guard(_sec_seam, 'the sea-sky seam', _ctx)
+        _run_seam()
+        base = set(_fail_names())
+        print('clean seam section: %d pass / %d FAIL / %d info'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base),
+                 sum(r.status == 'INFO' for r in ROWS)))
+        # THE AUDIT OF THE REINTRODUCTION ITSELF. `_seam_variant` is one copy
+        # of `through_face`'s march with three booleans on it; before any
+        # defect is trusted, the copy with the SHIPPING settings is required to
+        # reproduce the shipping function bit for bit on the frame-K rays. A
+        # table built on a variant that had drifted would be measuring the
+        # drift.
+        _w = RND.Water(_ctx['_bay'])
+        _cam = RND.hero_cameras(_w, 240, 320, out=lambda *a, **kw: None)[5]
+        _D = _cam.rays()
+        _tr = RND.trace(_cam, _w, 0.0)
+        _m = _tr['water'] & ~(_D[..., 2] >= 0.0)
+        _P = _cam.pos[None] + _tr['t_water'][_m][..., None] * _D[_m]
+        _zx, _zy = RND.surface_slope(_w, _P[..., 0], _P[..., 1], 0.0)
+        _N = np.stack([-_zx, -_zy, np.ones_like(_zx)], -1)
+        _N /= np.linalg.norm(_N, axis=-1, keepdims=True)
+        _dep = _w.sample(_P[..., 0], _P[..., 1], _w.d)
+        _args = (_w, _P[None], _D[_m][None], 0.0, _N[None], _dep[None],
+                 np.zeros_like(_dep)[None])
+        _a = RND.through_face(*_args)
+        _b = _seam_variant(RND)(*_args)
+        _c = RND._through_face_wave12(*_args)
+        print('audit: variant(shipping) vs `through_face`  max|dL| %.3e  '
+              'max|dchord| %.3e' % (float(np.abs(_a[0] - _b[0]).max()),
+                                    float(np.abs(_a[1] - _b[1]).max())))
+        _d = _seam_variant(RND, gprev_zero=True, use_entered=False,
+                           use_chord=False)(*_args)
+        print('audit: variant(wave-12 switches) vs `_through_face_wave12`  '
+              'max|dL| %.3e  max|dchord| %.3e'
+              % (float(np.abs(_c[0] - _d[0]).max()),
+                 float(np.abs(_c[1] - _d[1]).max())))
+        print()
+        print('%-26s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 118)
+        _o_tf, _o_hs = RND.through_face, RND.horizon_seam
+        for name in SEAM_BUGS:
+            RND.through_face, RND.horizon_seam = _o_tf, _o_hs
+            BUGS[name](RND)
+            try:
+                _run_seam()
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-26s %d' % (name, len(caught)))
+            for c in caught:
+                print('%-26s   %s' % ('', c[:86]))
+        RND.through_face, RND.horizon_seam = _o_tf, _o_hs
+        sys.exit(0)
     if '--bugs' in sys.argv:
         run_suite()
         base = set(_fail_names())
@@ -7646,6 +8776,15 @@ if __name__ == '__main__':
                 # clears `beach._BAY_CACHE` between runs. The whole-suite
                 # driver reuses the cache across bugs, so a patched plan-form
                 # would be invisible to every section after the first.
+                continue
+            if name in TERRACE_BUGS or name in SEAM_BUGS:
+                # WAVE 16. The terrace defects live inside functions whose
+                # output `beach._BAY_CACHE` holds, so the whole-suite driver
+                # -- which does not clear it -- would run every one of them
+                # against a surface built by the CLEAN module. The seam
+                # defects patch `beach_render`, which this driver does not
+                # import at all. Both families have their own flag, and the
+                # tables that fire them are the ones those flags print.
                 continue
             if name in LAND_BUGS:
                 # the land section is exercised by `--bugs-land`, which
