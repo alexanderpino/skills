@@ -66,6 +66,17 @@ python3 scripts/gauntlet.py init --lanes imagery,typography,layout \
     --target-score 7 --wip-limit 2 --no-progress-n 3 --budget-waves 8
 ```
 
+With state initialised, two free prints joined the contract in front of the
+user. `quote --current-score 4` priced the rungs — 7 ≈ 5 waves (~25 calls,
+fits inside 8), 8 ≈ the whole budget, 9 ≈ double again, 10 printed as a wall —
+which is how the TARGET line's "score 7/10" became a chosen rung with a
+visible price rather than a default. And `plan` drafted `gauntlet/plan.md`:
+bootstrap until every dimension is judged, everything to its usable line,
+then the ambitious rungs — with the rung anchors copied in from the contract.
+Had the bar shots not existed, `bar-request` would have written the shopping
+list instead and the run would have waited (no bar, no run). From here every
+`status` prints the build stage next to the funded set.
+
 The tree was dirty — first light did not care, but wave 1 does, so the user
 committed here. The cropped candidate shots were frozen into `gauntlet/bar/`,
 which is where they stop being candidates. Three lanes cut, two funded per wave:

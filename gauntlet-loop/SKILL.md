@@ -1,6 +1,6 @@
 ---
 name: gauntlet-loop
-description: Run an adversarial build-and-judge quality loop (Smart Gauntlet Loop) to push inspectable artifacts to a reachable target bar via autonomous rounds, spending judgement only where a decision lands and parking lanes that stop paying for themselves. Trigger on "gauntlet", "smart gauntlet loop", "blind critic", "beat the reference", "keep iterating until it wins", "make it as good as X". Do not trigger for ordinary code review or bug fixing.
+description: Run an adversarial build-and-judge quality loop (Smart Gauntlet Loop) to push inspectable artifacts to a reachable target bar via autonomous rounds, spending judgement only where a decision lands and parking lanes that stop paying for themselves. The user needs no method vocabulary and no prepared prompt — a one-line wish plus an artifact is complete input; the skill composes the contract, bar, lanes and budget itself. Trigger on the INTENT — iterate an inspectable artifact (page, docs, README, copy, design, render, code quality) toward high or comparable quality — in any language and any wording; the following are examples of that intent, not required phrases: "gauntlet", "make it as good as X / like [product]", "keep iterating / keep going until it's genuinely great", "don't stop after one pass", "professional / production / best-in-class quality", "10/10", "hold up against this reference or example", Dutch "maak dit zo goed als X / blijf verbeteren tot het echt goed is", or when the user supplies reference material to match. Do not trigger for ordinary code review, bug fixing against failing tests, or small bounded edits.
 ---
 
 # Gauntlet Loop
@@ -40,6 +40,15 @@ independently judgeable lanes. Per lane: a builder closes one named gap, then a
 external bar, blind where the artifact allows. Bar wins → the critic names the
 single largest remaining gap and it goes back. Repeat.
 
+The vocabulary, once, so nothing below is read cold: a **round** is one
+builder-then-critic pass on one lane; a **wave** is one round across the
+**funded** lanes — at most the **WIP limit** of them, the rest wait; each lane
+is judged per **dimension** (visual, perf, …) against that dimension's own
+target. A dimension **retires** when a verdict streak says the bar is met —
+done, stop spending — and is **parked** when it stops moving — not done, stop
+spending anyway. Verdicts carry a **tier**: *screening* (cheap, steers the
+next build) or *deciding* (expensive, the only tier that can retire or park).
+
 Everything else in this file is one of two things: a **guardrail** against a
 known weakness of that loop, or the **project management** deciding what gets
 funded. Both serve the loop. A rule that stops the loop from running is a wrong
@@ -49,6 +58,41 @@ the mantra even when the weakness it names is real.
 The weaknesses, their signals, and the guardrail each one buys, in one table:
 → `references/failure-modes.md`
 Provenance for each rule: → `references/authorities.md`
+
+## What the user must supply: almost nothing
+
+There is no "gauntlet prompt" to write, and never send a user away to write
+one. A one-line wish plus an artifact — "make this landing page genuinely
+good", "get these docs to the level of X" — is complete input. Composing the
+gauntlet is this skill's own Phase 0–2 work: first light produces something
+to look at, the bar is found and proposed (`references/bar-selection.md`:
+never ask the user to define "good"), the lanes are cut, the menu is priced,
+and the whole thing comes back as **one contract block to confirm, not a
+form to fill in**. The only three things genuinely theirs to decide — stops,
+kill criteria, budget — arrive as proposals with numbers attached. A user
+who does know the method can pre-specify any of it; a user who has never
+heard of it gives up nothing.
+
+## This skill drives the loop; it is not a step inside someone else's
+
+Whoever owns the budget is the driver, and this skill owns it: the contract,
+the state, the subagents, the stops. That is why the guardrails bind at all —
+an advisory version, consulted mid-loop by an agent free to ignore the budget
+stop, would be the original loop with extra reading. (Its *components* are
+components: `builder.md`, `critic.md` and `smoother.md` are role briefs for
+subagents, and they hold no budget. Wayfinder is likewise a driver of its own
+process, not a step in this one — it runs before, and hands over an answer
+key.)
+
+A larger orchestrator can still hire this loop as a **subcontractor**: pass
+the budget at `init` (`--budget-waves`, `--budget-tokens`, `--hard-cap-waves`)
+and let it run its own contract inside those limits. Record it with
+`init --invoked-by agent`, because it changes who "the user" is at Phase 7 —
+and one rule survives the nesting: **budget authority always escalates to a
+human.** A caller may set the budget; it may never grant more. A fleet topping
+up its own subcontractor is the self-extension ban defeated by laundering the
+accountability, so `extend` refuses on an agent-invoked run and the report
+says the run was agent-started.
 
 ## When not to use this
 
@@ -125,7 +169,10 @@ undeclared input makes the gate skip when it should run (`cost-discipline.md`).
 Both `cmd` and `paths` resolve from the directory the script is invoked in —
 always run it from the workspace root (under Mission Control, the worktree
 root), or every path silently resolves to nothing; `gate` warns when a gate's
-paths match no file, and never caches such a gate.
+paths match no file, and never caches such a gate. An answer key is a gate
+farm: every mechanically checkable item in it becomes a gate here at init,
+checked free every wave, leaving the critics only the judgement items
+(`references/bar-selection.md`).
 
 ```bash
 python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf \
@@ -136,6 +183,7 @@ python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --rou
     --gap "..." --evidence shots/w2r3.png --tokens 74000 --critic-model sonnet
 python3 scripts/gauntlet.py gate     # mechanical checks; skips those whose inputs are unchanged
 python3 scripts/gauntlet.py status   # state, next-wave plan, park list, fired stops
+python3 scripts/gauntlet.py bar-request               # what this run still needs before wave 1: comparison material, and direction where the artifact has layers
 python3 scripts/gauntlet.py quote --current-score 4   # the quality-price menu: what 7, 8, 9 cost; 10 is not a price
 python3 scripts/gauntlet.py plan --current-score 4    # draft plan.md: build stages in order, priced — the forward scaffold
 python3 scripts/gauntlet.py park --lane a --dimension visual --reason "..."
@@ -231,9 +279,10 @@ unmade choice stays visible.
 
 **Then hang the run on the scaffold.** `plan` drafts `gauntlet/plan.md` — the
 build stages in order (bootstrap → everything to usable → the ambitious rungs
-→ stretch on a grant), each priced; you add the anchors and the serialised
-pairs. Regenerate at wave boundaries, where prices move from the intake guess
-to measured actuals. The workbench looks backward; the plan looks forward.
+→ stretch on a grant), each priced; you add the anchors and the serialised-
+pair order (which lanes must run after which — Phase 4, `decomposition.md`).
+Regenerate at wave boundaries, where prices move from the intake guess to
+measured actuals. The workbench looks backward; the plan looks forward.
 
 Fields, each explained in `intake.md`: **goal** (destination, not route) ·
 **target bar** per dimension · optional **stretch** · **inspection** (and which
@@ -259,6 +308,20 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
 - **Set `--target-score` where the target sits** (default 7). The script counts
   a bar-met round only at or above it, so a target of 10 means bar-met never
   fires; the script warns you.
+- **No bar, no run.** The loop's output is "A or B is better"; a B the agent
+  invented while building A measures nothing. If there is no comparison
+  material, run `bar-request` — it writes `gauntlet/bar-request.md` naming what
+  would settle each dimension, for the user or a scout agent to fetch — and
+  stop until it arrives. `log-round` refuses bar-mode records while
+  `gauntlet/bar/` is empty. For genuinely novel artifacts the bar is a
+  research-backed **spec and answer key**, authored before wave 1 and frozen
+  like any bar. Matt Pocock's `wayfinder` produces exactly this — run with one
+  modification: *one map and one answer key, not a ticket each* (the answer
+  key is the bar, and a bar is one frozen file, not fourteen tickets). An
+  answer key bars function well and taste badly, so aesthetic dimensions still
+  need a reference artifact of their own. And mid-run, a question whose answer
+  is a *choice* is escaped fog: back to the map or the user, never decided ad
+  hoc by a builder. → `references/bar-selection.md`
 - **Targets are per dimension when the ambitions differ** —
   `--dimension-targets "gameplay=8,graphics=6"`, and retirement on each
   dimension is judged against its own number. A blanket "10/10 like the
@@ -275,7 +338,9 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
 - **Freeze the bar** under `gauntlet/bar/`, and **declare each dimension**
   (visual + frame time; clarity + completeness) in `config.json`, judged
   separately. One collapsed score is how a loop trades away the dimension nobody
-  is watching.
+  is watching. This is the moment `init` runs — it creates `gauntlet/` and the
+  config that every command after it reads — and the moment to declare the
+  gates: `init` first, freeze into the directory it made, gates into its config.
 - **Bake the bar's numbers at the freeze.** Run every machine measurement the
   bar allows — frame times, sizes, counts, scores — once, into
   `gauntlet/bar/measurements.md`. Critics get the numbers; nobody re-derives a
@@ -292,6 +357,26 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
 Split the goal into **lanes**: the smallest units that can be improved and judged
 independently. You cut them, not the user. → `references/decomposition.md`
 
+- **On a layered artifact, settle the minimum architecture first — and ask for
+  it out loud.** `bar-request` writes the intake request in two parts: the bar,
+  and the direction. Ask for a wayfinder map, an architecture record (SAD,
+  ADRs), a spec, or the existing codebase's conventions by path — whichever the
+  user has. Requesting it costs one message; inventing it costs the run. Not a
+  design document — only the load-bearing decisions, and the test for which
+  those are is exact: *a decision no lane-level round could reach.* Those are the
+  structural gaps of wave 6, bought cheap at wave 0. Freeze them as constraints
+  in the contract, and harvest every one a command can check into a gate, so the
+  layering is enforced free every wave instead of trusted. A README needs none
+  of this; a renderer needs it before the lanes are cut, because the cut follows
+  the layers.
+- **Anchor what the lanes would otherwise each invent.** Every builder is a
+  fresh context, so every unanswered question gets five defensible answers and
+  one incoherent artifact. Ask of each lane: *what will this agent have to make
+  up, and would the others make up the same thing?* Each "no" needs an anchor,
+  strongest first: a gate (divergence goes red), a worked example in the tree
+  (pattern-matched for free), a decision cited by path. Prose is the weakest and
+  drifts. The smoother repairs seams every wave; an anchor retires one.
+  → `references/decomposition.md`
 - **The lane test:** can a fresh critic look at this one thing and say which of
   two versions is better, without needing the rest?
 - **Rank them**, because a wave funds `wip_limit` lanes and not all of them:
@@ -312,7 +397,12 @@ A wave is one pass over the **funded** lanes — the top `wip_limit` of the rank
 list, as printed by `status` — at **one round per lane per wave**. Phases 4–6
 cycle until a stop fires. `status` also names the **build stage**: dimensions
 below their usable line are funded before any dimension buys a rung above it —
-whole-and-crude beats one-part-excellent, enforced in the ranking.
+whole-and-crude beats one-part-excellent, enforced in the ranking. That is
+*quality* order, not *technical* order: the loop knows what is behind, never
+what is underneath. Foundations-before-facade (an abstraction layer before the
+features on it) comes from the plan, a domain skill, or grounding — and if it
+comes from none of those, the loop discovers it the expensive way, as a
+structural gap that forces a re-cut (`references/decomposition.md`).
 
 **Wave setup, once, before any lane starts:** take the champion commit. That one
 ref is every lane's `--champion-ref` for the wave. Concurrent per-round commits
@@ -456,10 +546,19 @@ block — and put that in front of the user. `extend` enforces the rest.
 
 ## Non-negotiables
 
-Four the script cannot check, so they are on you:
+Five the script cannot check, so they are on you:
 
 - **No builder grades its own homework.** Separate agent, fresh context. (They do
   *inspect* their output before handoff — a smoke test, not grading.)
+- **No builder invents what a source has settled.** Anything canonical,
+  version-dependent, or long-since-solved gets grounded in a real source before
+  it is written — normative first (spec, official docs for the version in use,
+  the dependency's source), then named authority (maintainers, recognised
+  experts, peer-reviewed work). Community aggregates like Stack Overflow are a
+  pointer, never a citation: authority attaches to the author, not the venue, so
+  an answer *by* a domain authority counts and the thread around it does not.
+  Cite what you opened; never fabricate a citation.
+  → `references/grounding.md`
 - **Critics inspect the artifact, never a summary of it** — and blind where
   blindable, with the mode labelled honestly where not.
 - **Losers get reverted.** What stops a long run wandering downhill one
@@ -504,5 +603,7 @@ Three are not cited inline:
 - `references/workbench.md` — the generated progress surface and the log schema.
 - `references/authorities.md` — where these rules come from and what each forces.
 
-Subagent briefs: `builder.md`, `critic.md`, `smoother.md`.
-Tooling: `scripts/gauntlet.py` (init / log-round / gate / status / quote / plan / park / board / extend / report).
+Subagent briefs: `builder.md`, `critic.md`, `smoother.md` — and
+`grounding.md`, which binds builders and critics alike: what to look up rather
+than recall, which sources carry authority, and how to cite them.
+Tooling: `scripts/gauntlet.py` (init / bar-request / quote / plan / log-round / gate / status / park / board / extend / report).

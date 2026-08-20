@@ -88,6 +88,119 @@ When unsure, serialise the pair for one wave and watch whether the second lane's
 critic keeps citing the first lane's territory. That is the dependency showing
 itself.
 
+### The order the loop enforces is not the order the artifact needs
+
+Two different orderings run through a gauntlet, and only one of them is
+mechanical:
+
+- **Quality altitude — enforced.** Usable everywhere before lovable anywhere:
+  `status` ranks dimensions below their usable line ahead of any dimension
+  buying a rung above it, and `plan` stages it. This is what stops a run
+  polishing shaders while gameplay sits at 2.
+- **Technical dependency — not enforced, and the loop cannot infer it.** A
+  graphics abstraction layer before renderer features; a fixed-timestep loop
+  before netcode; a schema before the systems that walk it. The loop knows what
+  is *behind* (evidence, trends, budget); it does not know what is *underneath*.
+  It has no domain knowledge and will not acquire any by iterating.
+
+Where the second ordering has to come from, most reliable first:
+
+1. **Upstream planning.** The map and answer key settle the architecture
+   decisions before wave 1 (`bar-selection.md`); the lane cut then inherits the
+   order as serialised pairs. This is the cheapest place to get it right.
+2. **A domain skill.** Where one exists for the artifact's field, consult it
+   while cutting — it holds the layering this skill deliberately does not — and
+   name it in the contract's Notes so every wave's agents load it.
+3. **Grounding.** The layering of a long-solved domain is a settled question,
+   not an invention (`grounding.md`). A renderer's architecture is not something
+   to reconstruct from memory in the middle of a wave.
+4. **Reactively, at full price.** Absent all three, the loop still finds out: a
+   lane whose critic keeps naming a gap that "sits below the lane" is the
+   missing foundation announcing itself, and the answer is a re-cut, not another
+   round. It works — and it costs the rounds a plan would have saved.
+
+The bootstrap wave forces a minimum of this on its own: you cannot screenshot a
+frame without something that draws one, so a thin end-to-end slice drags the
+load-bearing path into existence early. But a walking skeleton is not an
+architecture. It proves the path exists; it says nothing about whether the layer
+beneath it is the right one.
+
+### The minimum architecture, before wave 1
+
+So on a layered artifact, something *does* have to be written before the loop
+runs — and the discipline is in how little.
+
+**The test for what belongs in it: a decision no lane-level round could reach.**
+Those are exactly the structural gaps the run would otherwise discover at wave 6
+and answer with a re-cut. Buy them at wave 0, where they cost a paragraph.
+Everything else — anything a builder can change inside its own files, judged by
+a critic against the bar — stays out, because deciding it early is guessing with
+extra confidence.
+
+For a renderer that is a short list: where the abstraction boundary sits, what
+owns the frame, how resources are addressed, what the update order is. It is not
+a design document, and a full one at this point is the planning-fallacy version
+of the same mistake — precise about what nobody has learned yet.
+
+Three things make it worth the paragraph:
+
+- **It decides the cut.** Lanes follow layers; a lane that straddles a boundary
+  produces critics that keep citing each other's territory, which is the re-cut
+  signal arriving the expensive way.
+- **It becomes constraints, not suggestions.** Frozen in the contract's rules,
+  it reaches every builder by path, like the bar.
+- **Harvest it into gates.** This is the move that pays: layering is unusually
+  machine-checkable — dependency direction, forbidden imports, where a file may
+  live, what a module may reach. An architecture written as prose is advisory
+  and drifts; the same architecture expressed as gates is enforced free every
+  wave, and the run cannot violate it without the check going red
+  (`cost-discipline.md`).
+
+Where it comes from is the same list as the ordering above: the wayfinder map
+and answer key, an architecture skill, a domain skill for the field, or
+grounding for a solved domain. What it must never be is a builder's improvised
+choice at wave 3, defended afterwards because the code already assumes it.
+
+### Its real job: making independent agents converge
+
+Dependency order is the obvious reason to settle architecture early. The one
+that actually bites in a fan-out loop is different: **every builder is a fresh
+context, so every unanswered question gets answered independently.** Five lanes
+meeting the same silent question — how is an error shaped, where does state
+live, how is a resource addressed, what is a name — produce five defensible
+answers and one incoherent artifact. Nobody made a mistake; nobody was told.
+
+The smoother exists for this and is the *repair*: one agent over the changed
+surface each wave, reconciling seams (`smoother.md`). Repair recurs; the anchor
+is bought once. So the question worth asking while cutting lanes is not only
+"what is underneath" but **"what will each of these agents have to invent, and
+would they invent the same thing?"** Every "no" is an anchor you owe them.
+
+What actually converges agents, strongest first — and note that prose is last:
+
+1. **A gate.** Mechanical and unignorable: a divergent choice turns a check red
+   in the same wave. Dependency direction, forbidden imports, a required
+   header, a naming pattern. Convergence you do not have to trust.
+2. **A worked example in the tree.** Builders pattern-match on what is already
+   there, for free, without being told. So the first lane through a layer should
+   produce the canonical one deliberately, and later lanes are pointed at it by
+   path. One real example out-converges three pages of description.
+3. **A named decision, cited by path.** In the contract's rules or the frozen
+   architecture — read from disk each wave, never paraphrased into a prompt.
+4. **Prose describing the intent.** Weakest. It survives one wave and drifts,
+   because each agent restates it slightly differently to itself.
+
+The champion works the same way and is easy to overlook: every lane builds
+against the same committed state, so the artifact itself carries the
+convention forward. That is another reason promotions are sequenced by the lead
+agent rather than left to builders — a serialised promotion keeps one shared
+reality; concurrent ones create several.
+
+And the signal that an anchor is missing is already in the loop: when the
+smoother reports the same seam a second wave running, that is not a smoothing
+problem. Stop paying for the repair and create the anchor — a gate if the rule
+is checkable, an example if it is a pattern.
+
 ## File ownership
 
 **One file, one owner, per wave.** Not per run — ownership can move between waves,

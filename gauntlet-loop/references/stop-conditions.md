@@ -178,6 +178,10 @@ python3 scripts/gauntlet.py extend --waves 3 \
     --reason "imagery/visual score 5→7, severity major→minor; grain gap still closeable"
 ```
 
+A run started by an agent (`init --invoked-by agent`) cannot be extended by its
+caller at all: the priced offer escalates up the chain until a human decides.
+A caller sets the budget; only a human raises it.
+
 When the *token* budget is what fired, the same grant must raise that ceiling
 too — `extend --waves 2 --budget-tokens 2000000` — or the token stop stays
 fired whatever the wave count says; the script warns if you forget.

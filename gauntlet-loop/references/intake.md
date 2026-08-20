@@ -6,6 +6,11 @@ loop is running.
 
 ## How to run intake without interrogating anyone
 
+The user's one-line wish is a complete input. Composing the gauntlet — bar,
+lanes, dimensions, budget proposal, the contract itself — is *this* phase's
+job, never homework returned to the user; asking them to "write a proper
+gauntlet prompt" is the intake refusing to do its work.
+
 Most of the contract you can propose. Three things genuinely require the user:
 **the stop conditions**, **the kill criteria** and **the budget** — they encode
 how much of the user's time and money this run may spend, and you cannot infer
@@ -53,8 +58,24 @@ judgement about approach, which is where a lot of the method's value sits.
 **Target and stretch.** See `bar-selection.md`. The target is what retirement is
 judged against and it must be reachable inside the budget; ambition above it goes
 in the stretch line, which never arms a stop condition. Freeze the artifacts
-under `gauntlet/bar/` now, before any lane runs. Set `--target-score` where the
-target actually sits — at 10, bar-met can never fire.
+under `gauntlet/bar/` now, before any lane runs — and if there is nothing to
+freeze, `bar-request` writes what each dimension needs, for the user or a scout
+agent to fetch; the run waits (`bar-selection.md`: no bar, no run). Set
+`--target-score` where the target actually sits — at 10, bar-met can never fire.
+
+**Direction, where the artifact has layers.** `bar-request` asks for this in the
+same document, and it is the half people forget: the load-bearing decisions a
+lane-level round could never reach. **Ask whether they exist before asking
+anyone to write them — and look before you ask.** The command scans the usual
+homes (ARCHITECTURE.md, an `adr/` or `docs/decisions/` directory, `.wayfinder/`,
+CONTRIBUTING, the agent-facing convention files) and lists what it found, so the
+question becomes "are these current and load-bearing, and what do they not
+answer?" instead of "please write me an architecture". Nothing found is not
+proof nothing exists — it may live in a wiki, a ticket, or one colleague's head,
+all cheaper to retrieve than to re-derive. An existing convention beats a fresh
+document anyway, because the codebase already agrees with it. The alternative to
+asking is every builder deciding it privately, which is what the smoother then
+pays for each wave (`decomposition.md`).
 
 When the user names one blanket number — "10/10, like EA FC26" — do not write
 it into the contract as-is. **Ask per dimension what n/10 must be**, or propose
