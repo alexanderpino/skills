@@ -539,3 +539,97 @@ with the bed visible through it — and the surf breaks on the platform's seawar
 edge as section H5's *reflective* case while breaking on sand a hundred metres
 away as the *intermediate* one. **Both breaker classes in one exposure**, which H5
 had to infer across two frames.
+
+## M · A boat's wake on open water — two frames, and the first closed form the sea has
+
+Two photographs, owner-supplied, from a cliff top: a RIB under way on open water,
+and a second frame with **two** boats and their wakes at different ages. Place and
+clock **`?`** — not stated, and not to be assumed. The Algarve limestone and
+vegetation in the second frame place it on the same coast as the rest of the set,
+but that is an inference and it is written as one.
+
+**These are the most useful sea frames in the bar so far, for three separate
+reasons, and none of them is the boat.**
+
+### M1 · The sea's texture, with a metre stick in the picture
+
+Section K's judged verdict was that the open sea reads as **corrugated roofing**:
+a 1-D profile extruded alongshore, alongshore residual **5.2 DN** against **31.7
+DN** across the crests, a ratio of **0.16**. And the optics verdict was that the
+water body is flat — alongshore high-frequency sd **0.20–0.30 grey levels** — a
+painted gradient rather than a sea.
+
+These frames are what the alternative looks like, at a **known scale**: a RIB of
+this class is **`?` but bracketable at 7–9 m**, and it sits in the same frame as
+the texture. That converts every texture judgement from "looks about right" into
+a length. The surface here is short-crested, multi-scale and granular at every
+range in frame, with no direction running unbroken across the picture.
+
+**Judge the render's texture against this with the scale bar in hand.** A
+correlation length measured off these frames, in metres via the hull, is a real
+number the render must return.
+
+### M2 · The Kelvin wake — a constant the sea can be held to
+
+This is the part worth the most. A displacement hull in **deep** water leaves a
+wake whose envelope has a half-angle
+
+```
+θ_K = asin(1/3) = 19.4712°
+```
+
+— Kelvin (1887), from stationary phase on the deep-water dispersion relation, and
+**independent of speed**. Inside it sit two systems, both visible in the first
+frame: **transverse** waves normal to the track with wavelength `λ = 2πU²/g`, and
+**divergent** waves fanning back as the feathered arms. That is a *falsifiable
+geometric prediction with no free parameter*, which is exactly what this run has
+been short of on the wave-field lane — every other wave-field criterion so far has
+been a statistic.
+
+**The caveat is not small and it must be settled before the constant is used.**
+19.47° is the deep-water limit. In finite depth the wake is governed by the depth
+Froude number `Fr_h = U/√(gh)`, and as `Fr_h → 1` the wedge **widens toward 90°**
+and the transverse system disappears; above 1 it narrows again. For a RIB at
+10–15 m/s over Algarve inshore depths of order 10–30 m, `√(gh)` is 10–17 m/s, so
+**`Fr_h` is plausibly near 1 and this may not be a deep-water wake at all.** Depth
+and speed are both `?`. So:
+
+- The **19.47°** figure is a *derivation to test against*, never a target to tune
+  to. If the measured wedge is wider, the finding is the depth, not an error.
+- A render that produces 19.47° **by construction** has proved nothing. It must
+  come out of the dispersion relation the file already solves, and it must widen
+  correctly when the same code is run in shallow water.
+
+### M3 · Two wakes at two ages, in one frame
+
+The second photograph carries two boats and their trails, and the trails are
+**different ages in the same lighting and the same sea state**. That is a decay
+measurement with the confounds removed — the thing section E's two clouds never
+had.
+
+The white behind a hull is not the Kelvin wave field. It is **entrained air and
+turbulence** from propeller and hull, and it decays on its own clock. Wave 6
+already derived three timescales for the surf zone — Monahan & Zietlow's **3.85 s**
+raft, the plume's air at **0.81 s**, and the suspension at **143 s** — from three
+unrelated sources. **This frame is an independent test of that machinery on a
+completely different generator.** Length of trail ÷ boat speed is a residence
+time, and if the surf-zone constants predict this wake's persistence, they have
+survived a transfer no surf frame could have offered.
+
+### M4 · The glitter, resolved
+
+The optics verdict said the render draws the **ensemble mean** of the glint
+distribution and never the samples: a path clipping at 255 across 144 px with an
+interior sd of **1.0–2.6 grey levels**, its edge falling 255 → 118 over 45 px
+without one non-monotone step. These frames show the real thing at this range —
+separated glints with dark water between them, and a granularity that persists as
+the surface foreshortens away.
+
+### What these frames must NOT be used for
+
+- **Absolute radiometry.** No time, no camera, no exposure stated.
+- **Water colour.** Same reason, and the second frame carries a strong haze or
+  flare wash across its lower third that will corrupt any level read there.
+- **The boat.** Nobody is modelling a RIB. It is a **scale reference and a wake
+  generator**, and section E's ruling on stand-ins applies: the object is a
+  stand-in, the physics it excites is the subject.
