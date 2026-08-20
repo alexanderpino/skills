@@ -200,3 +200,47 @@ This is the **`chapter` lane's** work. That lane has sat behind the WIP limit fo
 the whole run and has never been funded once — which is defensible while its job
 was prose nobody had scored, and is not defensible now that it owns a named,
 measured gap of this size.
+
+## Two process rulings, added at wave 16 after diagnosing why the run never converged
+
+Both came from one reading of `status`, which after fifteen waves said:
+
+```
+wave 15 of 26 budgeted | ~37 calls spent | 0 gap(s) closed | WIP limit 3
+no stop condition fired
+```
+
+**Zero gaps closed in fifteen waves — and it was the bookkeeping, not the work.**
+Real things had closed: the lobe exponent, the sea/sky seam, the missing
+alongshore phase, the inverted wet/dry ladder, the plateau as an output. But
+every round record stapled the *next* gap onto the round that closed the last
+one, so `severity` was never once logged as `none`. The script counts a closure
+as a clean round following a gap; it had recorded none, because none was ever
+written.
+
+That is not cosmetic. **`bar-met` and `clean-streak` are the two stops that end
+a run, and both count clean rounds.** A round that fixes something and names the
+next thing was being logged identically to a round that fixed nothing. The run
+could not converge by construction — not because the work was not converging,
+but because the record admitted no arrival.
+
+**Ruling 15 — a round that closes its gap is logged `--severity none`.** The
+next gap gets its own record, or goes to `backlog.md`. Never stapled to the
+round that closed the previous one. A clean round is a fact about the artifact
+and the log has to be able to state it.
+
+**Ruling 16 — brief the guards and the evidence FIRST, the chapter last.**
+Six builders across waves 12 and 13 died on session limits, and they all died at
+the *end* of their round, because the briefs said build → guard → draw → write.
+So the guards and the figures were what got lost, every time. Wave 13 landed
+three lanes of real physics with **zero suite rows and zero figures**, and it
+went unnoticed for two waves because the suite stayed green on code it had never
+heard of.
+
+The order is now: **guard rows → evidence → chapter**, pushed after each. A
+builder that dies should lose the paragraph, not the proof.
+
+**And the check that would have caught wave 13 in ten seconds**, now standing:
+a suite total is not evidence that a wave landed. `git log -- validate_beach.py`
+must show the wave's own entry. Running the right command is not the same as
+running a command that could have failed.
