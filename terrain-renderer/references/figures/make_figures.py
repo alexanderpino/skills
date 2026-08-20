@@ -94,6 +94,7 @@ import beach_optics as BO              # noqa: E402  read-only
 import beach_plot as P                 # noqa: E402  read-only (the toolkit)
 import optics as O                     # noqa: E402  read-only
 import wake as W                       # noqa: E402  read-only
+import wind_spectrum as WS             # noqa: E402  read-only
 
 # --- palette -----------------------------------------------------------------
 # A light page, and no distinction is carried by colour alone: every pair that
@@ -113,6 +114,8 @@ FILL_B = (168, 190, 210)          # the Fresnel remnant
 FILL_C = (232, 224, 208)
 
 DEG = '°'
+SUP3 = '³'
+SUP_M1 = '⁻¹'
 
 
 def _lin(a, b, n=601):
@@ -201,6 +204,39 @@ def preflight():
         B.swash_scale(), B.BERM_Z / np.sqrt(np.log(50.0)), 1e-12)
     # 6. Cox & Munk's two components against the separately fitted total.
     chk('mss components at 6 m/s', sum(BO.cox_munk_mss(6.0)), 0.03348, 1e-9)
+    # 6a. `12a` §7a's slope integral, by TWO ROUTES THAT SHARE NO LINE. The
+    #     figure draws `mss = INT B(k) d ln k` on a log-uniform grid; this
+    #     re-derives it as `INT k^2 S(k) dk` on a LINEAR grid -- a different
+    #     variable of integration, a different node distribution and a
+    #     different integrand, agreeing to 4e-11. A change-of-variable that was
+    #     wrong by a factor of k would be invisible to a finer version of
+    #     either rule and is caught instantly by the other one.
+    _u10 = 6.0 / WS.u125_over_u10()
+    for _kc in (20.0, 370.0, 3700.0):
+        _lin = np.linspace(1e-6, _kc, 600001)
+        chk('mss two routes, k_c = %g' % _kc,
+            WS.mss(_u10, 1e12, _kc),
+            float(np.trapezoid(_lin ** 2
+                               * WS.omni_spectrum(_lin, _u10, 1e12), _lin)),
+            1e-8)
+    #     ⚠️ THE TWO ROUTES ABOVE SHARE THEIR INTEGRAND, and `--selftest`
+    #     proved it: deleting the capillary branch outright left them agreeing
+    #     to 1e-17 and the guard blind, because both quadratures then integrate
+    #     the same wrong `curvature`. Two instruments that differ only in their
+    #     RULE establish the change of variable and nothing about the content.
+    #     So the content gets an ABSOLUTE row against a number the spectrum
+    #     never touches -- the 1954 fit -- at the tolerance that paper itself
+    #     quotes, plus the share of the total the slicked cut-off carries.
+    chk('spectral mss returns the 1954 fit at 6 m/s',
+        WS.mss(_u10, 1e12, 10.0 * WS.K_M), WS.cox_munk_total(6.0), 0.004)
+    chk('slicked cut-off carries 0.591 of the total',
+        WS.mss(_u10, 1e12, 20.0) / WS.mss(_u10, 1e12, 10.0 * WS.K_M),
+        0.591, 0.03)
+    #     The fully-developed limit, which is what decided a transcription
+    #     ambiguity in the fetch law (see `12b`), and the capillary scale's own
+    #     two closed forms.
+    chk('inverse wave age -> 0.84', WS.omega_c(_u10, 1e12), 0.84, 1e-9)
+    chk('c_min = sqrt(2 g / k_m)', WS.min_phase_speed(), WS.C_M, 3e-4)
 
     # ---- `09`, `10` and `19`. Same rule: a second route, no shared line. ----
     # 7. The spacing staircase. IEEE-754's own answer against the closed form
@@ -739,6 +775,60 @@ def fig_glitter_path(out):
         if e in (25.0, 0.2):
             cx.marker(e, p_, ACCENT, r=5)
     return P.save(img, os.path.join(out, 'glitter-path-narrowing.png'))
+
+
+def fig_mss_cutoff(out):
+    """Where the slope variance lives, and what you get if you stop early.
+
+    The claim, from `12`'s "Cox & Munk is a LIMIT, not an input": **the upper
+    cut-off of the slope integral is a property of the instrument, not of the
+    water**, so one sea has as many mean square slopes as it has instruments.
+    The chapter states it as a table of five percentages, and a table is the
+    wrong shape for it -- what makes it land is seeing that the CURVE is still
+    climbing steeply at the wavenumber each instrument stops at.
+
+    Left is `B(k)`, the slope variance per unit ln k, so area under it IS slope
+    variance and the flat line is what Phillips' equal-variance-per-octave
+    asserts instead. Right is the running integral of the left panel. Nothing
+    is drawn that is not `wind_spectrum`'s own output."""
+    img = P.canvas(1180, 620)
+    u10 = 6.0 / WS.u125_over_u10()
+    cuts = (11.0, 20.0, 95.0, 250.0, 370.0)
+    names = ('L band', 'C&M slick', 'Ku band', 'Ka band', 'capillary')
+    kk = np.geomspace(0.02, 10.0 * WS.K_M, 500)
+    lk = np.log10(kk)
+
+    ax = P.Axes(img, (86, 54, 590, 500), (-1.7, 3.7), (0.0, 0.0062),
+                xlabel='log10 wavenumber k, rad m%s' % SUP_M1,
+                ylabel='B(k) = k%s S(k), slope variance per unit ln k' % SUP3)
+    ax.frame(xticks=[-1, 0, 1, 2, 3],
+             yticks=[0.0, 0.002, 0.004, 0.006], yfmt='%.3f')
+    kcap, kp = float(BO.K_CAP), float(BO.pm_peak_wavenumber(6.0))
+    b_flat = float(WS.cox_munk_total(6.0)) / np.log(kcap / kp)
+    ax.line(np.array([np.log10(kp), np.log10(kcap)]),
+            np.array([b_flat, b_flat]), ACCENT, width=3, dash=(9, 5))
+    ax.line(lk, WS.curvature(kk, u10, 1e12), INK, width=3)
+    for c in cuts:
+        ax.vline(np.log10(c), MUTED, width=1, dash=(2, 6))
+    _legend(ax, [(INK, None, 'derived from the wind'),
+                 (ACCENT, (9, 5), 'flat B, back-solved from the fit')],
+            -1.6, 0.0059)
+
+    bx = P.Axes(img, (700, 54, 1140, 500), (-1.7, 3.7), (0.0, 0.040),
+                xlabel='log10 upper cut-off k_c, rad m%s' % SUP_M1,
+                ylabel='mean square slope below k_c')
+    bx.frame(xticks=[-1, 0, 1, 2, 3],
+             yticks=[0.0, 0.01, 0.02, 0.03, 0.04], yfmt='%.2f')
+    kc = np.geomspace(0.05, 10.0 * WS.K_M, 140)
+    bx.hline(float(WS.cox_munk_total(6.0)), MUTED, width=1, dash=(2, 6))
+    bx.line(np.log10(kc),
+            [WS.mss(u10, 1e12, float(v), n=4001) for v in kc], INK, width=3)
+    for c, nm in zip(cuts, names):
+        bx.marker(np.log10(c), WS.mss(u10, 1e12, c, n=4001), ACCENT, r=5)
+        bx.text(np.log10(c) + 0.10,
+                WS.mss(u10, 1e12, c, n=4001) - 0.0014, nm,
+                colour=MUTED, font=P.FONT_S)
+    return P.save(img, os.path.join(out, 'mss-cutoff-family.png'))
 
 
 # =============================================================================
@@ -1496,7 +1586,7 @@ def fig_kelvin_wake(out):
 
 
 FIGURES = (fig_two_sides, fig_factorisation, fig_trapped_series,
-           fig_runup, fig_sommerfeld, fig_glitter_path,
+           fig_runup, fig_sommerfeld, fig_glitter_path, fig_mss_cutoff,
            fig_float_binades, fig_depth_precision, fig_cube_sphere,
            fig_aureole_ceiling, fig_receiver_weights, fig_azimuth_fold,
            fig_kelvin_wake)
@@ -1551,6 +1641,29 @@ def selftest():
     case("Hunt's R read as the rms (the waves 4-11 bug)",
          lambda: setattr(B, 'RUNUP_QUANTILE', float(np.exp(-1.0))),
          lambda: setattr(B, 'RUNUP_QUANTILE', 0.02))
+
+    # ---- `12a` §7a's slope integral, perturbed the three ways it would break -
+    saved['curv'] = WS.curvature
+    case('the capillary branch B_h dropped',
+         lambda: setattr(WS, 'curvature',
+                         lambda k, u, f, split=False: (
+                             (saved['curv'](k, u, f, split=True)[0],
+                              np.zeros_like(np.asarray(k, float)))
+                             if split
+                             else saved['curv'](k, u, f, split=True)[0])),
+         lambda: setattr(WS, 'curvature', saved['curv']))
+    saved['om'] = WS.omega_c
+    case('the fetch law read as a subtraction, not an exponent',
+         lambda: setattr(WS, 'omega_c',
+                         lambda u, f: 0.84 * np.tanh(
+                             (9.80665 * np.asarray(f, float)
+                              / np.asarray(u, float) ** 2 / 2.2e4) ** 0.4)
+                         - 0.75),
+         lambda: setattr(WS, 'omega_c', saved['om'])),
+    saved['km'] = WS.K_M
+    case('k_m declared at 200 rad/m instead of 370',
+         lambda: setattr(WS, 'K_M', 200.0),
+         lambda: setattr(WS, 'K_M', saved['km']))
 
     # ---- the `09`, `10` and `19` guards, perturbed the way they would break --
     _g = globals()

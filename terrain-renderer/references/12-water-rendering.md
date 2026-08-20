@@ -81,6 +81,7 @@ This chapter's six figures, and the claim each one exists to make:
 | `trapped-series` | [12·3](#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point) | truncation and the wrong constant are additive; and `1/(1 − ρR_int)` is a **bound**, not a gain |
 | `sommerfeld-half-plane` | [12·4](#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it) | `K_d = ½` on the boundary exactly, the lit side rings, and the Cornu chord is why |
 | `glitter-path-narrowing` | [12·5](#sun-glitter-the-sparkle-path) | the path's width is a *function* of view elevation, so no spread parameter can be it |
+| `mss-cutoff-family` | [12·6](#cox--munk-is-a-limit-not-an-input--and-that-changes-what-you-may-do-with-it) | the slope integral is still climbing where every instrument stops, so "the" mss is set by the cut-off |
 | `runup-distribution-vs-realisation` | [`12a` 12a·1](12a-water-derivations.md#where-the-band-ends--a-distribution-is-not-a-surface-and-it-is-two-masks-not-one) | a distribution has no edge and a realisation does; the same defect as glitter drawn as its pdf |
 
 `validate.py` is what makes the reference implementation evidence rather than an illustration — it
@@ -3767,6 +3768,25 @@ ocean. For a renderer the consequence is direct: **your cut-off is your pixel fo
 of side `L` resolves up to `k = π/L`; everything above that must be carried statistically in the
 BRDF, and everything below it should be drawn. Splitting the budget anywhere else double-counts or
 loses variance.
+
+![The curvature spectrum against wavenumber, and the running slope-variance integral with five instrument cut-offs marked](figures/mss-cutoff-family.png)
+
+> **Figure 12·6 — one sea, five mean square slopes.** `D` for the integrals, **`P (attribution)`**
+> for the spectrum (ECKV 1997 — see [`12b`](12b-water-provenance.md); the paper is not held here).
+> Drawn by [`figures/make_figures.py`](figures/make_figures.py) (`fig_mss_cutoff`) from
+> `reference-impl/wind_spectrum.py`. Scene-linear and dimensionless throughout; `U₁₂.₅ = 6 m/s`,
+> large fetch.
+> **Left:** `B(k) = k³S(k)` is the slope variance per unit `ln k`, so **the area under this curve is
+> a mean square slope** and the dotted verticals are where five instruments stop integrating. The
+> dashed line is what Phillips' equal-variance-per-octave asserts instead — a *constant* `B`. It is
+> right on the mean to 7.1% and wrong in shape by a factor of **3.44**, and the twin-peaked
+> structure is why: a gravity peak near the wind sea, a trough near `k ≈ 30–100 rad m⁻¹`, and a
+> capillary peak that the flat model cannot represent at all.
+> **Right:** the running integral of the left panel. **Read the slope at each marker, not the
+> height** — the curve is still climbing steeply where every one of the five instruments stops,
+> which is the whole claim: none of them has measured "the" mean square slope, and the differences
+> between them are not disagreements. The dotted horizontal is the 1954 fit, which the derivation
+> returns to within that paper's own ±0.004 at this wind.
 
 **2 · Basin size reaches almost none of it — the optics really is scale-free.** Fetch enters the
 whole derivation in exactly **one** place, the peak wavenumber `k_p = g Ω_c²/U₁₀²`. The short-wave

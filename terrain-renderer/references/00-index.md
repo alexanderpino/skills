@@ -60,7 +60,7 @@ and writes no physics of its own, so a figure cannot drift from the code that sh
 in the markdown beside the image, never in the pixels, where they can be read, diffed and corrected.
 
 ```
-python3 terrain-renderer/references/figures/make_figures.py             # redraw all thirteen
+python3 terrain-renderer/references/figures/make_figures.py             # redraw all fourteen
 python3 terrain-renderer/references/figures/make_figures.py --selftest  # prove the guard can fail
 ```
 
@@ -68,7 +68,7 @@ python3 terrain-renderer/references/figures/make_figures.py --selftest  # prove 
 |---|---|---|
 | `09` | 3 | The float32 spacing **staircase** against the smooth law that bounds it; reversed-Z **flat over seven decades** while three other curves climb as one; the cube-sphere's two mappings, and the direction each is worst in |
 | `10` | 3 | The Rayleigh aureole's **ceiling of ½** with the shipped constant above it; the two receiver weights, **equal in area and nothing else**; an `acos` **folding** about solar noon |
-| `12`, `12a` | 6 | Two Fresnel constants from one surface; a product that is not a mean; a series and its bound; a distribution painted where its realisation belongs; Sommerfeld's exact half; a width that is a function |
+| `12`, `12a` | 7 | Two Fresnel constants from one surface; a product that is not a mean; a series and its bound; a distribution painted where its realisation belongs; Sommerfeld's exact half; a width that is a function; **an integral still climbing where every instrument stops** |
 | `19` | 1 | The Kelvin wedge as a **ratio**, self-similar in `V·t`, and the capillary band where the ratio leaves ½ |
 
 **The twenty-chapter gap is deliberate elsewhere, and the reasons are the useful part.** A figure
