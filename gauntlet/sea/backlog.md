@@ -45,3 +45,26 @@ this run added.
   tolerates 1e-4, which is *exactly the size of what it covers*. Found
   independently by two builders. A tolerance the size of the defect is the
   twelfth way in chapter 11.
+
+- **The hero camera follows the terrace onto the terrace.** Found at wave 16
+  while re-measuring the plateau. `beach_camera` stands the eye on the highest
+  ground the bed supplies, which is bar J's own constraint and not a
+  composition; the sea-level history raises the highest ground from a 17.31 m
+  cliff brow at x = 648 m to the 30.19 m oldest tread, which reaches the
+  landward boundary. So the inference walks the camera onto the flattest surface
+  in the domain: **water falls from 16.8 % to 1.6 % of the frame and 66.4 % of
+  it is one tread.** Not this round's to fix and not the terrace's fault — the
+  terrace is correct. Closing it means the camera inference needs a term the
+  landform cannot supply on its own (a standoff, or a rule that the eye wants
+  the *cliff brow* rather than the *highest point*), and that is a camera-lane
+  decision with 413 published measurements standing behind the current
+  placement. Evidence: `s16-terrace-frame` against `s16-terrace-fixedcam`.
+
+- **`through_face`'s `chord > 0` clause is an invariant with no exercise.**
+  Wave 16's `--bugs-seam` removed it alone (`seam-no-chord-clause`) and **not
+  one row fired**: no ray on either hero frame is entered-and-exited with a zero
+  chord, so the clause is true and inert on this bed. It is kept because it is a
+  statement about the medium rather than a filter, but the suite cannot tell
+  whether it is right. Closing it means a bed or a camera where a ray crosses a
+  face at exactly zero range — a tangency — which nothing in this scene
+  produces.

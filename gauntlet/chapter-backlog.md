@@ -1292,3 +1292,129 @@ four faults were 5–25% and every one of them looked fine.
 **Recorded as the project's next structural step**, alongside the sea loop rather
 than after it: the sea loop proves the physics of open water; a rasterizer
 reference proves the half of the chapter that no amount of offline work can reach.
+
+## The uplift line in chapter 12 needs a basin, and on a capped shelf it cannot run
+
+Found at wave 16 by writing guard rows for wave 13's marine terrace
+(`validate_beach.py::_sec_terrace`, 29 rows). `terrain-architect`'s
+[12-glacial-coastal](../terrain-architect/references/12-glacial-coastal.md)
+gives the flight of marine terraces as:
+
+```
+for stand in seaLevelHistory:            # each (level, duration)
+    repeat prop. duration:  coastalStep(h, stand.level, exposure)
+    h += upliftField * dt                # tectonics between stands
+```
+
+**That line lifts the whole grid, so the sea has to still find ground at its own
+level after every lift.** After `n-1` lifts that is ground which started
+`(n-1)·U·P` below the first stand's shoreline — a VERTICAL constraint on the
+domain that sits beside the horizontal one (`n` treads need `n·W` of
+cross-shore ground) and that the chapter does not state. Call it the uplift
+ceiling: `U <= relief / ((n-1)·P)`.
+
+**On this project's own bed the constraint is violated by 3.7x and the loop
+returns a single flat surface.** The nearshore is chapter 12's own Dean
+equilibrium profile *capped at a shelf depth* — `D_SHELF = 8 m` here, and the
+cap is the 2-D transform's offshore boundary condition rather than cosmetics.
+A four-stand history at 1.0e-4 m/yr and a 100-kyr cycle needs 30 m of water.
+30 > 8: after one lift the **minimum** of the grid is +22.4 m, the exposure
+fetch returns nothing, `coastalStep` cuts nothing, and every stand after the
+first is a no-op. That is not a subtlety — it is what the first run of the
+instrument did, and a reader implementing the pseudocode literally on any
+shelf-capped bed will get one flat plane and no error message.
+
+**The equivalent statement costs nothing and needs no basin.** Only RELATIVE
+sea level does any work: `coastalStep` and the exposure fetch are functions of
+`h - seaLevel` in every term they have. So lifting the land by `U·P` between
+stands and holding the sea at `e_i` is the same history as holding the land
+still and running stand `i` at
+
+```
+    L_i = e_i + U·(n-1-i)·P            # oldest first; the present stand at e_{n-1}
+```
+
+The relief the flight needs is then ABOVE the present shoreline, which is where
+a coastal plain already has it — the plain is what the older stands cut into.
+One loop, one flag, and the flag is a symmetry test: the two frames agree to
+**max|dh| = 1.3e-13 m** over 4 × 900 coastal steps, on the surface, on the rock
+layer beneath it and on both volume integrals.
+
+**The equivalence has a condition on the initial surface and it is worth three
+quarters of the landform.** The uplift frame *ends* `(n-1)·U·P` higher than it
+starts, so the sea frame must *begin* there. Start it on the unshifted ground
+and the oldest stand is 15 m too low against its own sea: measured on a
+four-rung instrument, **4 levels shifted against 2 unshifted** — one emerged
+tread of three, plus the present bench. It is one line and it is silent.
+
+## A flight of terraces has a THRESHOLD, and below it the rungs merge
+
+Not in chapter 12, and it is the reason a real uplifting coast either has a
+staircase or has nothing. The competition is vertical against horizontal:
+
+- after a lift the old tread stands `U·P - Z_p` above the new sea, so the new
+  shoreline lands `(U·P - Z_p)/s_sea` seaward of the old tread's lip, on a
+  shoreface of slope `s_sea`;
+- the new stand then retreats `R` landward while it cuts its own bench.
+
+The old tread survives as a separate rung iff the new stand does not reach it:
+
+```
+    U·P  >  Z_p + s_sea·R
+```
+
+`Z_p` is the **planation depth** — how far below its own stand level the notch
+planes its bench, which is the only elevation in the ladder that is not
+declared. It solves `z = (K·N/hard)·exp(-z²/2·notch²)`, and the point of the
+transcendental form is the logarithm: `Z_p` follows the clock only as
+`sqrt(ln N)`, so a 6.4x change in stand duration moves it **15 %**. That is what
+lets a flight read its own eustatic history back — every rung is cut to the same
+depth below its own stand, so the DIFFERENCES between rungs are the sea level's
+and the uplift's, with `Z_p` cancelling out exactly.
+
+**Below the threshold the rungs do not get closer together — they MERGE**, and
+the survivor is the YOUNGER one, because the younger stand can only cut.
+Measured on a controlled two-stand instrument at 900 steps a rung and
+`s_sea = 0.05`: **one surface at `U·P = 4 m`, two at 5 m**, against a form that
+gives 4.71 m at the loop's own effective retreat. A merge that averaged the two
+rungs would have read +0.39 m; the measured single level is -1.775 m, 0.17 m
+from the younger rung and 4.17 m from the older.
+
+It happens on the shipped scene: two of its four rungs are **1.0 m apart** and
+the frame shows three surfaces, not four, with the merged tread lying inside the
+closed-form bracket `[13.189, 14.189]` at 13.859–14.047 m — 77 % of the way from
+the old rung to the new. So a chapter that offers `seaLevelHistory` without the
+threshold offers a staircase the reader may not get.
+
+## The terrace closed the physics and made the picture flatter — a camera result
+
+The plateau callout in `12-glacial-coastal` says the flat ground behind the
+cliff is an emerged marine terrace and records the fix as *"a gap with its
+mechanism named and not closed"*. It was closed at wave 13 and re-measured at
+wave 16, three waves late, and the re-measurement is the part a chapter would
+want:
+
+- **held at the same camera the terrace works** — the plateau patch's
+  high-frequency standard deviation goes from `2.75e-04 / 3.29e-04 / 1.40e-04`
+  to `1.59e-03 / 1.60e-03 / 1.22e-03` scene-linear, a factor of 5–9, and the
+  8-bit frame goes from 8–9 distinct levels to 30–34;
+- **at the camera the landform implies, it does the opposite.** A hero camera
+  inferred from the bed stands the eye on the *highest ground*, and the flight's
+  oldest tread is now the highest ground and reaches the landward boundary. The
+  camera walks onto it, and from a plane at 1:1274 the near field is **one RGB
+  triple across 30 000 pixels** — 161–194x flatter than the bed the critic
+  scored 3/10, with water down from 16.8 % to 1.6 % of the frame.
+
+**The lesson is not about terraces.** A landform generator that raises the
+highest point in the domain moves any camera whose placement is inferred from
+the terrain, and the improvement can land entirely outside the frame it was
+built for. Anything a chapter says about authoring relief for a *known
+viewpoint* has to say which of the two is being held.
+
+**And one measurement lesson, dearly bought.** The `0.0009 of 255` the chapter
+quotes for the plateau is **mostly the quantiser**: the same estimator run on
+the un-quantised display image reads `7.1e-05 / 8.3e-05 / 4.8e-05`, twelve times
+smaller. It is a patch spanning eight grey levels scored on its own 8-bit
+display. The conclusion happens to survive — the surface really is flat — but
+the statistic that carried it was measuring the file format.
+
