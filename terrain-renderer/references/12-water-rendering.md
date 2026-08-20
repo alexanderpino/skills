@@ -448,8 +448,32 @@ dispersion relation is
 omega^2 = ( g*k + (sigma/rho)*k^3 ) * tanh(k*h)      # sigma = surface tension, rho = density
 ```
 
-The `k³` term means phase speed *rises* again for very short waves, so it has a **minimum: about
-23.1 cm/s, at a wavelength of about 1.73 cm.** Below that wavelength you are in the capillary
+The `k³` term means phase speed *rises* again for very short waves, so it has a **minimum**, and
+both halves of that minimum come from **one** surface tension:
+
+```
+sigma = 0.0728 N/m, rho = 1000 kg/m^3, g = 9.81 m/s^2      # reference-impl/wake.py: SIG, RHO, G
+c_min    = (4 g sigma / rho)^(1/4)  = 0.23119 m/s = 23.12 cm/s
+k_min    = sqrt(rho g / sigma)                              # the same k minimises c and c_g
+lam_min  = 2 pi sqrt(sigma / (rho g)) = 0.017116 m = 1.712 cm
+```
+
+⚠️ **Quote the pair from one `σ` or do not quote it as a pair.** This chapter carried
+**23.1 cm/s at 1.73 cm** for its whole run and [`00`](00-index.md#sources--provenance) recorded the
+two as *verified together*. They are not consistent: 23.1 cm/s inverts to `σ = 0.07256 N/m` and
+1.73 cm to `σ = 0.07437 N/m` — **2.5% apart in `σ`**, 1.1% in `λ`. Both are inside the ordinary
+spread of published clean-water values, which is exactly why the mismatch survived being checked:
+each number is defensible alone and the *pair* is not. Nothing downstream moves at this precision,
+so it is a **provenance defect rather than a numerical one** — and this project treats that as the
+worse kind, because a pair marked verified that cannot both be right is a claim whose check has
+been spent without being made. The rule that prevents the recurrence is the one used for `c` versus
+`K_d` and for per-axis versus total slope: **declare the constant once, upstream, and derive every
+consequence from it at the point of use.** `σ` is the declaration above; `c_min` and `λ_min` are
+two lines of it. (`D` for both closed forms from `σ`; `P/?` for `σ` itself, whose published
+clean-water values at 20 °C span roughly 0.0724–0.0729 N/m and which
+[the meniscus](#the-meniscus-line-where-reachability-cannot-fail) reads at `ρ = 998`.)
+
+Below that wavelength you are in the capillary
 regime (surface tension restoring), above it the gravity regime. Two consequences: a spectrum has
 a natural high-frequency cutoff around a couple of centimetres — ripples finer than the minimum
 are *damped out rather than supported*, so a renderer that keeps adding finer normal-map octaves
@@ -3724,7 +3748,8 @@ at independent random points. Four things follow, and each is a review test:
    is temporal, not spatial**; judge it on a pan, never on a still.
 2. **It is dispersive, and that is the cheapest tell in the frame.** The field carries many scales
    at once and each moves at its own speed: `c = ω/k` from `ω² = (gk + (σ/ρ)k³)·tanh(kh)`, with the
-   minimum at 23.1 cm/s / 1.73 cm ([Calm water](#calm-water-the-low-energy-regime)) and rising in
+   minimum at 23.12 cm/s / 1.712 cm — both derived from one `σ`, see
+   [Calm water](#calm-water-the-low-energy-regime) — and rising in
    *both* directions from there. Across a pool-sized band — say 3 cm to 55 cm, entirely on the
    gravity side of that minimum — the long components outrun the short ones by roughly **4:1**
    (~0.25 m/s against ~0.93 m/s), so the eye sees fine ripples crawling while a longer swell

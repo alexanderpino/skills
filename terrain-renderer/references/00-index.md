@@ -287,8 +287,16 @@ verification effort first.
   group speed in that chapter's snippet was corrected 2026-08 (`c_g = √(g·d)`; the earlier
   `½√(g·d)` was the deep-water relation). Energy-spectrum sections (sea states / calm / aerated,
   2026-08): Beaufort descriptors are verbatim from NOAA SPC (D-tier, fetched); Douglas/WMO
-  adoption dates conflict across secondary sources and are deliberately not asserted; the capillary
-  minimum (23.1 cm/s @ 1.73 cm) and Kelvin angle were verified against standard references; foam
+  adoption dates conflict across secondary sources and are deliberately not asserted; the Kelvin
+  angle was verified against standard references. **The capillary minimum was recorded here as
+  "verified as a pair" and the pair was not consistent** (corrected 2026-08): 23.1 cm/s implies
+  `σ = 0.07256 N/m` and 1.73 cm implies `σ = 0.07437 N/m`, 2.5% apart. Each half is inside the
+  published spread for clean water, so each survived being checked alone — which is what a
+  pair-check is *for*, and this entry claimed one that had not been made. `12` now **declares one
+  `σ` (0.0728 N/m, `reference-impl/wake.py::SIG`) and derives both halves from it** — 23.12 cm/s at
+  1.712 cm — so the two cannot drift apart again; the constant is `P/?` and the two closed forms
+  are `D`. Nothing downstream moved at the quoted precision: this was a provenance defect, not a
+  numerical one. Foam
   optics are from Dierssen 2019 (fetched; sole author verified); the waterfall
   sheet→ligament→droplet cascade is classical instability theory with no waterfall-specific
   canonical citation; the pure-water RGB absorption triple was corrected 2026-08 to match its
