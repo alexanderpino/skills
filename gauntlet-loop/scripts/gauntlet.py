@@ -7,13 +7,17 @@ cannot drift in a long context — and so the lead agent never spends tokens
 recomputing them.
 
 Commands:
-  init        Create the gauntlet/ state directory and config
-  log-round   Append one validated comparison record to rounds.jsonl
-  status      State per lane/dimension, the next-wave plan, fired stop conditions
-  park        Stop spending on a lane/dimension that stopped moving (or resume it)
-  board       Regenerate gauntlet/workbench.md from the log (no model tokens)
-  extend      Raise the wave budget after the user grants an extension
-  report      Draft the end-of-run gauntlet report from the log
+  init         Create the gauntlet/ state directory and config
+  bar-request  Write bar-request.md — the comparison material this run still needs
+  quote        The quality-price menu: what each target rung costs from here
+  plan         Draft plan.md — build stages in order, priced; the forward scaffold
+  log-round    Append one validated comparison record to rounds.jsonl
+  gate         Run the mechanical checks; skip those whose inputs are unchanged
+  status       State per lane/dimension, the next-wave plan, fired stop conditions
+  park         Stop spending on a lane/dimension that stopped moving (or resume it)
+  board        Regenerate gauntlet/workbench.md from the log (no model tokens)
+  extend       Raise the wave budget after the user grants an extension
+  report       Draft the end-of-run gauntlet report from the log
 """
 
 import argparse
@@ -63,6 +67,11 @@ DEFAULT_CONFIG = {
     "dimension_targets": {},
     "lanes": [],
     "bar_kind": "reference",
+    # Who started this run: "human" or "agent" (an orchestrator hiring the loop
+    # as a subcontractor). It changes who "the user" is at a budget stop — an
+    # agent may hand the loop a budget, but may never grant it more, or the
+    # no-self-extension rule is defeated by a fleet wearing two hats.
+    "invoked_by": "human",
     # Granted budget extensions, appended by `extend`. The run's history of
     # "the budget ran out and the user chose to keep going".
     "extensions": [],
@@ -242,6 +251,10 @@ def cmd_init(args):
         if args.hard_cap_waves < cfg["stops"]["budget_waves"]:
             die("hard-cap-waves is below budget-waves — the cap is the ceiling extensions may not cross")
         cfg["stops"]["hard_cap_waves"] = args.hard_cap_waves
+    if args.invoked_by:
+        if args.invoked_by not in ("human", "agent"):
+            die("invoked-by must be human or agent")
+        cfg["invoked_by"] = args.invoked_by
     if args.bar_kind:
         if args.bar_kind not in ("reference", "acceptance criteria", "hybrid"):
             die("bar-kind must be one of: reference, acceptance criteria, hybrid")
@@ -351,6 +364,21 @@ def cmd_log_round(args):
         die("score must be an integer between 0 and 10")
     if not args.evidence:
         die("evidence is required — a verdict with nothing inspected is not a round")
+    # A bar comparison needs something to compare against. Champion mode does
+    # not (both sides are ours), so it stays available — but then nothing can
+    # retire on bar-met, and the run should say so rather than drift into
+    # grading its own taste.
+    if args.mode in BAR_MODES:
+        bar_dir = root / "bar"
+        if not (bar_dir.exists() and any(f.is_file() for f in bar_dir.rglob("*"))):
+            die(
+                f"no comparison material in {bar_dir}/ — a bar verdict needs a bar that "
+                "exists outside this run, or the round measures the builder's own taste.\n"
+                "  python3 scripts/gauntlet.py bar-request   # writes what this run needs\n"
+                "Freeze the comparator (or a research-backed answer key) into that directory "
+                "first. Champion-mode rounds still work without it, but nothing retires on "
+                "bar-met (bar-selection.md)."
+            )
     # Evidence is free text (a measurement, a comparison note) — but when it
     # looks like a file path, it should open. A verdict citing a screenshot
     # nobody can open is progress theatre with a citation.
@@ -1103,6 +1131,17 @@ def cmd_extend(args):
             "budget creep. Say what is still moving and what it will close."
         )
 
+    # Budget authority escalates to a human, whoever started the run. An
+    # orchestrator may hand this loop a budget at init; it may not top it up,
+    # because a fleet granting its own subcontractor more waves is exactly the
+    # self-extension the method forbids, with the accountability laundered.
+    if cfg.get("invoked_by") == "agent" and not args.force:
+        die(
+            "this run was started by an agent, so the grant for more budget cannot come "
+            "from the calling agent — stop, report, and escalate the priced offer up the "
+            "chain until a human decides. Use --force ONLY to record a grant a human "
+            "actually made (say so in --reason)."
+        )
     max_wave = max((r["wave"] for r in rounds), default=0)
     if not rounds and not args.force:
         die("no rounds logged — raise --budget-waves at init instead of extending a run that has not started")
@@ -1299,6 +1338,202 @@ def cmd_quote(args):
             + ", ".join(f"{d}={v}" for d, v in sorted(dt.items()))
             + f", default {stops['target_score']}) — price one dimension's ladder with --dimension <d>"
         )
+
+
+def _direction_candidates():
+    """Direction material that may already be in the repo.
+
+    Ask what exists before asking anyone to write it: a round trip to a human
+    is expensive, a glob is free, and most teams have more written down than
+    they volunteer. Targeted lookups, not a tree walk.
+    """
+    hits = []
+    for name in ("ARCHITECTURE.md", "DESIGN.md", "SPEC.md", "CONTRIBUTING.md",
+                 "AGENTS.md", "CLAUDE.md", "README.md"):
+        if Path(name).is_file():
+            hits.append(name)
+    for d in (".wayfinder", "adr", "adrs", "decisions", "docs/adr", "docs/decisions",
+              "docs/architecture", "docs/design", "design", "spec", "specs", "rfcs", "docs"):
+        p = Path(d)
+        if not p.is_dir():
+            continue
+        md = sorted(f.name for f in p.glob("*.md"))[:3]
+        if md:
+            hits.append(f"{d}/ ({', '.join(md)}{', …' if len(md) == 3 else ''})")
+    return hits
+
+
+def cmd_bar_request(args):
+    """Write gauntlet/bar-request.md — what comparison material this run needs.
+
+    The loop compares A against B. When B does not exist yet, the honest move
+    is to name what would settle each dimension and stop, so a user or a scout
+    agent can fetch it — never to invent a standard and grade against it.
+    """
+    root = Path(args.root)
+    cfg = load_config(root)
+    dims = cfg.get("dimensions") or DEFAULT_CONFIG["dimensions"]
+    have = sorted(f.name for f in (root / "bar").rglob("*") if f.is_file()) if (root / "bar").exists() else []
+    # The wayfinder skill's local output lands in .wayfinder/ — if it is here,
+    # the answer key likely already exists and the request is mostly moot.
+    wf = Path(".wayfinder")
+    wf_files = sorted(f.name for f in wf.rglob("*") if f.is_file()) if wf.exists() else []
+    L = [
+        "# Intake request — what this run needs before wave 1",
+        "",
+        "Two kinds of input, and the loop must invent neither: **comparison material**",
+        "(the bar, always required) and **direction** (the decisions, required when the",
+        "artifact has structure beneath its surface).",
+        "",
+        "## 1. Comparison material — the bar",
+        "",
+        f"Bar kind agreed at intake: **{cfg.get('bar_kind', 'reference')}**",
+        f"Already frozen in `{root}/bar/`: " + (", ".join(f"`{n}`" for n in have) if have else "_nothing yet_"),
+        "",
+    ]
+    if wf_files:
+        tickets = [n for n in wf_files if "ticket" in n.lower()]
+        has_key = any("answer" in n.lower() and "key" in n.lower() for n in wf_files)
+        L += [
+            "**A `.wayfinder/` folder exists in this repo** ("
+            + ", ".join(f"`{n}`" for n in wf_files[:6])
+            + (", …" if len(wf_files) > 6 else "") + ") — the wayfinder skill's output.",
+            "",
+        ]
+        if has_key:
+            L += [
+                "It already carries an answer key, so most of this request is met: freeze a",
+                f"COPY of it to `{root}/bar/answer-key.md` (note source and date in",
+                "contract.md — `.wayfinder/` keeps evolving, a bar must not), check the map's",
+                "'Not yet specified' section is empty, and fetch below only what the key",
+                "cannot cover (bar-selection.md).",
+                "",
+            ]
+        elif tickets:
+            L += [
+                f"**Stock shape: {len(tickets)} ticket file(s), no answer key.** Usable, but not",
+                "as a bar — a bar is one frozen file a critic opens, not a folder it must",
+                "assemble. Collapse it yourself before wave 1; it is a sort, not a rewrite,",
+                "and every resolved ticket lands in exactly one place:",
+                "",
+                f"- **checkable statement** → `{root}/bar/answer-key.md`, citing the ticket it",
+                "  came from, so the collapse can be audited",
+                "- **constraint or layering decision** → the contract's rules (architecture,",
+                "  not bar: it binds builders, critics do not score against it)",
+                "- **out of scope** → `backlog.md`, where the report will carry it",
+                "- **still open** → it is fog, and fog is an unsettled bar: resolve it or rule",
+                "  it out of scope. An open ticket silently becomes an assumption otherwise.",
+                "",
+                "Refuse the shortcut of pointing critics at the folder: fourteen mini-bars is",
+                "fourteen cold reads per round and fourteen surfaces for drift.",
+                "",
+            ]
+        else:
+            L += [
+                "No answer key and no tickets found in it — check whether the map lives on an",
+                "issue tracker instead; the same collapse applies to its closed children.",
+                "",
+            ]
+    L += [
+        "A gauntlet's output is \"A or B is better\". Without a B that exists outside",
+        "this run, every verdict measures the builder's own taste. So this run does not",
+        "start until the material below is in place — or until the user decides the run",
+        "is not worth it, which is also a valid answer.",
+        "",
+        "### What a usable bar must satisfy",
+        "",
+        "1. **External** — it exists independently of this run and of the agent's opinion.",
+        "2. **Inspectable** — a critic can open, run or measure it, not just read about it.",
+        "3. **Unarguable** — the artifact cannot talk its way past it.",
+        "4. **Reachable** — the distance from today's artifact is closeable inside the budget.",
+        "",
+        "### Per dimension",
+        "",
+    ]
+    for d in dims:
+        L += [
+            f"### {d}  (target {target_for(cfg, d)}/10)",
+            "",
+            "- **What would settle it** (lead agent: name the comparator concretely — the",
+            "  product, document, implementation, measurement or corpus a critic would hold",
+            f"  up next to ours to judge *{d}*):",
+            "- **Acceptable forms**: reference artifact (files, screenshots at a stated",
+            "  viewport, recordings), a measurement plus threshold, a competing",
+            "  implementation, or — where nothing comparable exists — a research-backed",
+            "  spec and answer key authored before wave 1 (`bar-selection.md`).",
+            "- **Where it goes**: `" + f"{root}/bar/{d}/" + "` (frozen; read-only once wave 1 starts).",
+            "- **Done when**: a critic given only that path can score our artifact against it",
+            "  without asking anyone what \"good\" means.",
+            "",
+        ]
+    L += [
+        "Bring the real thing, not a description of it: a paraphrased bar drifts every",
+        "time it is restated, and drift always makes the bar easier. Capture references",
+        "at comparable framing and resolution to our own output. If the best available",
+        "comparator is weaker than the ambition, say so — a run against a soft bar that",
+        "everyone believes is hard is worse than no run.",
+        "",
+        "",
+        "## 2. Direction — the decisions (skip for a flat artifact: a README needs none)",
+        "",
+        "A gauntlet improves; it does not decide. Where the artifact has layers, the",
+        "decisions beneath it must exist before the lanes are cut, or each fresh builder",
+        "answers the same silent question differently and the smoother pays for it every",
+        "wave (`decomposition.md`).",
+        "",
+        "**First: ask whether it already exists — do not assume it must be written.**",
+    ]
+    found = _direction_candidates()
+    if found:
+        L += [
+            "Found in this repo already, before anyone writes anything new:",
+            "",
+        ] + [f"- `{h}`" for h in found] + [
+            "",
+            "Read those first. Say which are load-bearing and current, and ask only for",
+            "what they do not answer — an existing convention beats a fresh document,",
+            "because the codebase already agrees with it.",
+            "",
+        ]
+    else:
+        L += [
+            "Nothing found under the usual names in this directory. That is not proof it",
+            "does not exist: ask. It may live in a wiki, a ticket, a design channel, or",
+            "one colleague's head — all cheaper to retrieve than to re-derive.",
+            "",
+        ]
+    L += [
+        "- **What is needed**: the load-bearing decisions only — the ones no lane-level",
+        "  round could reach. Where a boundary sits, what owns what, how things are named",
+        "  and addressed, dependency or update order. Not a full design document.",
+        "- **Acceptable forms**: a wayfinder map, an architecture record (SAD, ADRs), a",
+        "  spec, a design doc, or the conventions of an existing codebase cited by path.",
+        "- **Open decisions must be listed as open.** An unresolved question is not a",
+        "  default; name it so it is resolved or ruled out of scope before wave 1.",
+        "- **Where it goes**: the contract's rules — it binds builders. It is *not* the",
+        "  bar: critics do not score against it. Anything in it a command can check",
+        "  (dependency direction, forbidden imports, file placement) becomes a gate, so",
+        "  the structure is enforced free every wave instead of trusted.",
+        "- **Done when**: a builder handed only that path knows which layer its change",
+        "  belongs in and which conventions it must follow, without asking anyone.",
+        "",
+        "Who can produce it: the `wayfinder` skill (map and answer key), an architecture",
+        "skill, a domain skill for this field, or grounding where the domain is solved.",
+        "",
+        "## Notes for whoever fetches this",
+        "",
+        "Answer-key route only: deliver ONE map (the resolved decisions and why) and ONE",
+        "answer key (the checkable statements), never a ticket file per decision — the",
+        "answer key is the bar, and a bar is one frozen file a critic opens, not fourteen.",
+        "State each item as something checkable, and mark which dimensions it cannot",
+        "cover (taste, feel, visual craft) so those get a reference artifact of their",
+        "own instead of passing by default (bar-selection.md).",
+    ]
+    out = root / "bar-request.md"
+    out.write_text("\n".join(L) + "\n")
+    print(f"wrote {out}")
+    print("Hand it to the user or to a scout agent. Do not start wave 1 until "
+          f"{root}/bar/ holds something a critic can open.")
 
 
 def cmd_plan(args):
@@ -1727,6 +1962,13 @@ def cmd_report(args):
     max_wave = max(r["wave"] for r in rounds)
     budget = cfg["stops"]["budget_waves"]
     lines += [f"Waves run: {max_wave} of {budget} budgeted", ""]
+    if cfg.get("invoked_by") == "agent":
+        lines += [
+            "Started by an agent, not a human: the budget was handed to this run by a"
+            " caller. Any extension recorded below required a human grant escalated up"
+            " the chain — a calling agent cannot fund its own subcontractor.",
+            "",
+        ]
     lines += [
         f"Cost: ~{spent} subagent calls for {closed_gaps} closed gap(s)"
         + (f" (~{spent / closed_gaps:.0f} calls per gap)" if closed_gaps else "")
@@ -1904,6 +2146,10 @@ def main():
     p.add_argument("--lanes", help="comma-separated initial lane names")
     p.add_argument("--dimensions", help="comma-separated bar dimensions (default: overall)")
     p.add_argument("--bar-kind", help="reference|acceptance criteria|hybrid")
+    p.add_argument("--invoked-by", choices=("human", "agent"),
+                   help="who started this run (default human). 'agent' means an orchestrator "
+                        "hired the loop: it may set the budget, never grant more — extensions "
+                        "escalate to a human")
     p.add_argument("--bar-met-n", type=int)
     p.add_argument("--clean-streak-n", type=int)
     p.add_argument("--no-progress-n", type=int,
@@ -1968,6 +2214,10 @@ def main():
     p.add_argument("--targets", help="comma-separated rungs to price (default: 7,8,9,10 plus the configured targets)")
     p.add_argument("--dimension", help="price one dimension's ladder from its own scores (mid-run)")
     p.set_defaults(fn=cmd_quote)
+
+    p = sub.add_parser("bar-request",
+                       help="write gauntlet/bar-request.md — the comparison material this run needs, for a user or scout agent")
+    p.set_defaults(fn=cmd_bar_request)
 
     p = sub.add_parser("plan", help="draft gauntlet/plan.md — build stages in order, priced; the forward-looking scaffold")
     p.add_argument("--current-score", type=int,

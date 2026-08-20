@@ -12,9 +12,13 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | Known weakness | Signal it is happening | Guardrail |
 |---|---|---|
 | Runs forever; no natural stop | wave 26 of an agreed 8 | budget stop, kill criteria, hard cap |
+| Self-extension laundered through a caller | an orchestrator tops up the loop it hired | budget authority escalates to a human: `extend` refuses on an `--invoked-by agent` run |
 | Critic turns agreeable | everything passes; gaps get vaguer | forced winner, severity + named evidence |
 | Builder learns the critic, not the bar | output matches the critic's phrasing | frozen bar, rotated framing, randomised labels |
 | Bar erosion | comparisons quietly get easier | bar files re-read from disk each wave |
+| Self-invented bar | the agent grades against a standard it made up while building | no bar, no run: `bar-request`, and `log-round` refuses bar modes with an empty `bar/` |
+| Answer key mistaken for a full bar | every check passes, the design is still mediocre | answer key bars function; aesthetic dimensions get their own reference artifact |
+| Bar assembled from an unfinished map | open tickets quietly become whatever the first builder assumed | collapsing stock wayfinder output is a sort: resolved decisions become the key, constraints the rules, out-of-scope the backlog, and OPEN tickets block the start |
 | Unreachable bar | every round loses; scores never move | target vs stretch, `--target-score`; a disproved target gets an evidenced refusal at intake |
 | Target chosen blind to its price | "aim for a 9" agreed with no cost attached | the quality-price menu (`quote`): rungs priced at intake, 10 shown as a wall |
 | A rung nobody defined | scores argued mid-run because "8" means nothing | rung anchors in the contract — anchors choose, the frozen bar judges |
@@ -23,7 +27,10 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | A lane grinds against a ceiling | same gap round after round, still funded | `no-progress` park, re-cut |
 | Progress theatre | rounds logged, artifact unchanged | per-round evidence, diff champions |
 | Lane collision | reverts undo another lane's work | one file, one owner, per wave |
+| Parallel invention | disjoint lanes each answer the same unasked question differently; every part defensible, the whole incoherent | anchors before the wave — a gate, a worked example, a decision by path; a seam the smoother repairs twice means an anchor is missing |
+| Facade before foundation | rounds polish what sits on a layer that is still wrong | the minimum architecture settled before wave 1 (decisions no lane-level round could reach) and harvested into gates; dependency order from the plan, a domain skill or grounding — the loop enforces quality order only |
 | Context bleed | critic echoes builder justifications | critic gets artifact + bar only |
+| Built from memory what a source had settled | confident detail that is a version behind, or a fabricated citation | grounding rule: normative source first, authority by author not venue, cite only what was opened |
 | Gold plating | rounds spent past a retired dimension | retirement is a stop, not a suggestion |
 | Settled work re-judged, checks re-derived | the log grows, the artifact does not | settled-work rule, hash-cached `gate` |
 | Scope snowball | more lanes at wave 6 than wave 1 | frozen lane set, backlog |

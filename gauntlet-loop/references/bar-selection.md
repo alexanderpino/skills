@@ -59,10 +59,129 @@ Search for the strongest real artifact in the category, or construct a measureme
 that plays the same role. Then state, in one sentence, *why* it is the right bar —
 that sentence is what the user is actually approving.
 
-If nothing external exists, build one: generate three deliberately different
-candidate versions first, have the user pick the best, and use it as the champion
-the loop must beat. A self-generated bar is weaker than an external one and you
-should say so, but it beats no bar at all.
+## No bar, no run — and never a bar you invented mid-loop
+
+The loop's entire output is "A or B is better". If B is a standard the agent
+made up while building A, the comparison measures nothing: the builder is
+grading itself with extra steps, and every round confirms a taste it already
+held. **A run does not start without comparison material that exists outside
+this run.** That is not a preference; it is what separates a gauntlet from an
+elaborate self-review.
+
+So when there is nothing to compare against, do not improvise one. **Say what
+you need and stop** — `gauntlet.py bar-request` writes
+`gauntlet/bar-request.md`: per dimension, what comparator would settle it,
+which of the four properties it must satisfy, acceptable formats, and where
+the files go. Hand that to the user, or to a scout agent whose only job is to
+fetch it. Requesting the bar costs one message; discovering at wave 6 that the
+bar was self-authored costs the run.
+
+### When the artifact is genuinely new: a spec and an answer key
+
+Some artifacts have no comparator because nothing like them exists — an
+internal tool, a bespoke workflow. That is not permission to invent a
+standard; it is a different *source* for one. Resolve the open questions into
+research-backed decisions **before wave 1**, and write the result as a spec
+plus an **answer key**: concrete, checkable statements the artifact must
+satisfy, authored outside the loop and frozen into `gauntlet/bar/` like any
+other bar. The answer key plays the part the reference product plays
+elsewhere. Matt Pocock's `wayfinder` skill exists to produce exactly this —
+it turns each undecided question into research rather than a default
+(`https://github.com/mattpocock/skills`).
+
+**The shape matters: one map and one answer key, not a ticket each.** Stock
+wayfinder writes a ticket file per decision — fourteen decisions, fourteen
+files. As a plan that is workable; as a *bar* it is fourteen mini-standards
+nobody can hand a critic in one path, each one a separate cold read every
+round pays for, and each one a separate surface for drift. The AI Labs
+community runs wayfinder with one modification — literally the prompt
+`change wayfinder: one map and one answer key, not a ticket each` — and that
+is the shape this skill requires of the route: the **map** (the resolved
+decisions and why — intake material, it feeds the contract and the plan) and
+the **answer key** (the checkable statements — bar material, frozen at
+`gauntlet/bar/answer-key.md`). Their proof run: a real HR system, built in
+1h33 with every answer-key check passing. And its honest footnote — "the
+design only came out okay" — is the second rule below, observed in the wild.
+
+### Running the combination: wayfinder decides, the gauntlet builds
+
+The two loops meet at a clean seam — one resolves decisions, the other closes
+gaps — and the handoff is mechanical once the map is done:
+
+| Wayfinder produces | The gauntlet consumes it as |
+|---|---|
+| Destination | GOAL in the contract |
+| Notes (domain, standing preferences) | the contract's rules and constraints |
+| Decisions so far (the resolved map) | intake context; what the lanes are cut around |
+| **The answer key** | the bar — frozen at `gauntlet/bar/answer-key.md` |
+| Not yet specified (the fog) | **must be empty first** — open fog is an unsettled bar |
+| Out of scope | the contract's scope line and `backlog.md` |
+
+### Handed stock wayfinder output? Collapse it, do not demand a re-run
+
+The modification above is how to *run* wayfinder for this purpose. It is not a
+precondition: plenty of maps were charted before anyone thought about a
+gauntlet, and stock wayfinder writes a ticket per decision. That output is
+perfectly usable — it is simply not a bar yet, because a bar is one frozen file
+a critic opens, not a folder it must assemble.
+
+Collapsing it is a **sort, not a rewrite**, and it is cheap: the judgement was
+already spent in the tickets. Every *resolved* ticket lands in exactly one
+destination:
+
+| The resolution is… | It belongs in |
+|---|---|
+| a checkable statement about the artifact | `gauntlet/bar/answer-key.md` — cite the ticket it came from, so the collapse is auditable |
+| a constraint or layering decision | the contract's rules — it binds builders; critics do not score against it (`decomposition.md`) |
+| work ruled beyond the destination | `backlog.md`, and from there the report |
+| still open | nothing yet: fog is an unsettled bar |
+
+That last row is the one to be strict about. An open ticket at wave 1 does not
+stay open — it quietly becomes whatever the first builder who trips over it
+assumed. Resolve it, or rule it out of scope and say so. The same applies when
+the map lives on an issue tracker rather than in a folder: collapse the closed
+children, and treat the open ones as the fog they are.
+
+What never happens: pointing critics at the ticket folder to "use it as the
+bar". Fourteen mini-bars is fourteen cold reads per round, fourteen surfaces
+for drift, and no single artifact anyone can freeze.
+
+**The `.wayfinder/` folder convention.** Run locally, wayfinder leaves its
+output as files in a `.wayfinder/` directory in the repo — that is where the
+map and answer key land, and the AI Labs prompt extension points the critic
+at exactly those files. This skill consumes them by **freezing a copy**:
+`.wayfinder/` is a living planning surface, and the bar must not move while
+the run judges against it — so the answer key is copied to
+`gauntlet/bar/answer-key.md` at intake (note the source and date in
+`contract.md`), never referenced in place. If planning later changes the map
+materially, that is an announced bar-raise or re-cut conversation, not a bar
+that drifted because its source kept evolving. `bar-request` detects the
+folder and says so.
+
+Two operational rules make the seam pay:
+
+- **The answer key is a gate farm.** Every mechanically checkable item in it
+  ("every list endpoint pages with an opaque cursor") becomes a gate in
+  `config.json` at init — checked free every wave from day one, instead of
+  costing a critic. The judgement-only items are what the critics keep.
+- **A decision surfacing mid-run is escaped fog, and it goes back to the
+  map.** When a builder or critic hits a question whose answer is a *choice*
+  ("should sessions expire?"), that is not a gap to close — it is a decision
+  nobody made. It goes back to the wayfinder map as a new ticket (or to the
+  user, if no map exists), and the lane waits or parks. A builder resolving
+  it ad hoc is the self-invented bar returning one fragment at a time.
+
+Two rules keep an answer key honest:
+
+- **It is authored before the loop and frozen.** An answer key the builder
+  extends mid-run is a self-invented standard wearing a checklist.
+- **It bars what it can check, and says what it cannot.** Answer keys are
+  strong on function ("every list endpoint pages with an opaque cursor") and
+  weak on taste. A run reported as fully passing its answer key while the
+  design "came out okay" is the predictable result. So: answer key for the
+  functional dimensions, external reference artifacts for the aesthetic ones,
+  declared as separate dimensions with their own targets. Do not let a passing
+  answer key stand in for a visual bar nobody set.
 
 ## Target and stretch
 

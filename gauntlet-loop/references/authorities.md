@@ -318,6 +318,26 @@ the "Claude of Duty" run: decompose, build, judge blind against a real bar,
 repeat on the named gap.
 → Everything above is scaffolding around that core. Credit it accordingly.
 
+The original prompt, line by line, and where each line landed here — the
+skill's lineage in one table:
+
+| Shumer's prompt says | This skill made it |
+|---|---|
+| "at the level of the most recent Call of Duty games" | the external bar — the one line that made the method work; frozen at `gauntlet/bar/`, and when no such product exists, the wayfinder answer key plays its part (`bar-selection.md`) |
+| "utterly perfect … every single thing at AAA quality" | an unpriced blanket 10 — decomposed into per-dimension targets with anchors, priced on the menu, 10 shown as a wall |
+| "fan out sub-agents … tackle each one individually" | lanes with file ownership — plus the WIP limit the original lacked (every lane a little is how a budget dies) |
+| "/loop on each item … a separate sub-agent check it" | the round: builder, then a fresh-context critic; "separate" grew into non-negotiable #1 |
+| "a really harsh critic" | harsh in substance, not tone: forced winner, severity plus named evidence (`critic.md`) |
+| "if it doesn't look triple A, keep going … don't stop until utterly wowed" | the missing stop — the runs-forever failure mode; here the budget is always armed, retirement is streak-based, the surplus returns |
+| "compare them side by side blind" | the blind protocol, formalised: randomised labels, leak checks, margins, the caption rule |
+| "ultracode" (the fleet) | WIP-limited waves — concurrency cuts wall-clock, never cost |
+
+The AI Labs combination (the video) is the same recipe with the bar made
+manufacturable: wayfinder, modified to emit one map and one answer key,
+upstream; the prompt's "compared with the actual Call of Duty game" becomes
+"compared with the answer key". In this skill both halves are structural —
+the answer-key route, and a bar that is always a frozen file.
+
 ## How to argue with this file
 
 Two tests before adopting a rule from any of these sources:
