@@ -161,6 +161,74 @@ def surfaces(name, regions, note=''):
                 f"{R/B:8.3f}{G/B:8.3f}")
 
 
+# ------------------------------------------- matched-luminance chromaticity -
+
+def matched_luminance(name, box_a, box_b, lab_a, lab_b, windows):
+    """Compare the chromaticity of two regions RESTRICTED TO PIXELS OF THE SAME
+    display-referred luminance.
+
+    Why this and not a plain box mean. In these frames G/B rises with brightness
+    everywhere, including inside a single water region with no foam in it — the
+    tone curve and the sun/sky mix couple level to chromaticity. So a difference
+    in mean G/B between a bright region and a dark one proves nothing. Matching
+    luminance first removes the coupling and leaves the bar's own surviving
+    instrument: a within-frame ratio between surfaces close in level.
+    """
+    a = np.asarray(img(name)).astype(np.float64)
+
+    def stats(box, lo, hi):
+        x0, y0, x1, y1 = box
+        s = a[y0:y1, x0:x1].reshape(-1, 3)
+        L = srgb_to_linear(s)
+        Y = 0.2126 * L[:, 0] + 0.7152 * L[:, 1] + 0.0722 * L[:, 2]
+        m = (Y >= lo) & (Y < hi)
+        if m.sum() < 200:
+            return None
+        return m.sum(), Y[m].mean(), (L[m, 1] / L[m, 2]).mean(), (L[m, 0] / L[m, 2]).mean()
+
+    print(f"\n=== {name} — chromaticity at matched luminance")
+    print(f"    A = {lab_a}\n    B = {lab_b}")
+    print(f"{'linY window':>16}{'nA':>8}{'G/B A':>8}{'nB':>9}{'G/B B':>8}{'A/B':>8}")
+    for lo, hi in windows:
+        ra, rb = stats(box_a, lo, hi), stats(box_b, lo, hi)
+        if not ra or not rb:
+            print(f"{lo:.2f}-{hi:.2f}".rjust(16) + "   too few pixels")
+            continue
+        print(f"{lo:.2f}-{hi:.2f}".rjust(16)
+              + f"{ra[0]:8d}{ra[2]:8.3f}{rb[0]:9d}{rb[2]:8.3f}{ra[2]/rb[2]:8.3f}")
+
+
+# ------------------------------------------------------- angular scale -----
+
+def angular_scale(name, focal35_mm, stored_w, path_offset_px, widths_px, note):
+    """Degrees per stored pixel at a given offset from the frame centre, from
+    the EXIF focal length. A width in pixels is meaningless across two frames
+    shot at 105 mm and at 27 mm equivalent; this is what makes them comparable.
+
+    Assumes the published file is the full frame. Both g1 and g2 are within 3%
+    of their sensors' native pixel dimensions, so the crop is negligible here.
+    A rectilinear lens is assumed; barrel distortion at 27 mm eq. is a further
+    unquantified error on g2, in the direction of understating the wide end.
+    """
+    f_px = (stored_w / 2) / math.tan(math.radians(
+        math.degrees(2 * math.atan(18.0 / focal35_mm)) / 2))
+    dtheta = math.degrees(f_px / (f_px ** 2 + path_offset_px ** 2))
+    print(f"\n{name}: focal {focal35_mm:.0f} mm eq, stored width {stored_w} px "
+          f"-> f = {f_px:.0f} px; at {path_offset_px:+d} px from centre, "
+          f"{dtheta:.5f} deg/px")
+    print(f"  {note}")
+    for w in widths_px:
+        print(f"    path width {w:4d} px  ->  {w * dtheta:6.3f} deg")
+
+
+def angular_table():
+    print("\n=== glitter path width in ANGLE, not pixels")
+    angular_scale('g1', 105.0, 1280, -70, [38, 75],
+                  'Canon 5D IV, full frame, 105 mm; path near frame centre')
+    angular_scale('g2', 27.0, 1280, 350, [77, 138],
+                  'Nikon D300 DX, 18 mm = 27 mm eq; path right of centre')
+
+
 # ---------------------------------------------------------- solar position ---
 
 def julian_day(y, m, d, h, mi, s):
@@ -308,4 +376,11 @@ if __name__ == '__main__':
         'dry sand (upper beach)':     (1150, 780, 1350, 880)},
         'STITCHED PANORAMA with flare across the left third; see README')
 
+    matched_luminance('f1-breaker-three-whites.jpg',
+                      (800, 505, 960, 570), (250, 80, 750, 240),
+                      'thin backlit crest window',
+                      'deep unbroken water, same exposure',
+                      [(0.24, 0.30), (0.26, 0.32), (0.28, 0.34)])
+
+    angular_table()
     solar_table()

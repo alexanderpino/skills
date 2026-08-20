@@ -94,8 +94,8 @@ Sun-glitter path over open water, sun on the horizon, from a pier.
   altitude; **not** a surveyed camera height). Kühlungsborn, Baltic Sea.
   **Graded: Adobe Lightroom Classic 13.4.**
 - **Evidence FOR** the glitter path's **shape and granularity**: the taper
-  direction, the width ratio between horizon and near field, the duty cycle of
-  bright facets against dark water. See §2.
+  direction, the width ratio between horizon and near field, and the size of
+  the dark gaps between bright facets. See §2.
 - **NOT evidence for** any level or colour on the path (a sunset frame,
   graded, and the path spans the brightest and darkest parts of the frame — the
   exact case the bar's K3 forbids reading a level from). Not evidence for
@@ -165,9 +165,11 @@ A spilling/plunging breaker from a cliff top, with a bather in frame for scale.
   that.
 - **Evidence FOR** the **three whites of section C** as visibly different
   surfaces in one exposure; the **spread of level inside a single nominal
-  "white"**; the green translucent window in the crest; **whitewater reading
-  strongly blue against sand metered in the same exposure**; and a metric scale
-  via the bather. See §3 and §4.
+  "white"**; **the section-A green direction, at matched luminance** — the thin
+  backlit crest is 1.13–1.15× greener in `G/B` than deep water of the same
+  brightness in the same frame (§5); **whitewater reading strongly blue against
+  sand metered in the same exposure**; and a metric scale via the bather.
+  See §3, §4 and §5.
 - **NOT evidence for** absolute foam reflectance, water colour, or the Aljezur
   wave field. Not evidence for the plunging lip's interior — the lip here is
   spilling forward, not enclosing air.
@@ -323,6 +325,11 @@ above the local background. "core" is a ±10 px strip on the path centre.
    75 px in the near field, over 279 rows of an 853-row frame. One band
    (519–565) is non-monotone; it is reported rather than dropped, and it is
    where a long swell crest crosses the path.
+   *The ratio is taken inside one frame at one focal length, so the pixel is a
+   fair unit here.* Checked rather than assumed: at 105 mm the degrees-per-pixel
+   at the top band's radius and at the bottom band's differ by **0.2 %**, which
+   is nothing against ×2.0. That check does **not** carry between g1 and g2 —
+   see §2.3.
 2. **Interior sd: 41–60 grey levels.** The render reports **1.0–2.6**. That is a
    factor of **16 to 60**. This is the single strongest number in this directory,
    because it is a *within-frame spread* — the one instrument that survives white
@@ -347,8 +354,17 @@ above the local background. "core" is a ±10 px strip on the path centre.
   Two independent frames agreeing that the interior sd is tens of levels is
   worth more than either alone.
 - **Clipping 5.9–18.7 %** — higher than g1, still nowhere near solid.
-- **Width 77–138 px against g1's 38–75 px.** The path at high sun is roughly
-  twice as wide as at sunset in the same fraction of frame.
+- **Width 77–138 px against g1's 38–75 px — and a pixel width does not travel
+  between these two frames.** g1 was shot at 105 mm and g2 at 27 mm equivalent,
+  so a pixel subtends 0.0153° in one and 0.0527° in the other. Converted
+  (`angular_scale` in `measure.py`, from the EXIF focal lengths):
+  **g1's path is 0.58°–1.15° wide; g2's is 4.06°–7.27°.** The high-sun path is
+  about **six times wider in angle**, not twice.
+  **What that six does *not* mean.** The path's angular width reads mean square
+  slope, i.e. the wind (Cox & Munk). The wind is `?` for both frames, the seas
+  are different (Baltic swell against a sheltered bay), and the camera heights
+  differ. **The factor of six cannot be attributed to sun elevation**, and is
+  recorded as a spread between two unrelated conditions rather than as a trend.
 
 **A discrepancy, recorded and not explained away.** g2's banded width runs
 138 → 89 px, i.e. it *narrows* toward the observer, the opposite of g1. I do not
@@ -473,8 +489,11 @@ obliquity together. Cross-shore sizes are not quoted.
    number. The stranded lace (q90 52 px ≈ 73 cm) is the coarsest structure and
    the sunlit bore (q90 8 px ≈ 10 cm) the finest — **the same wave carries foam
    structure over a 7:1 range of clot size at one instant.**
-4. **Coverage inside a "white" is 18–57 %, not 100 %.** Even inside the thickest
-   bore, fewer than half the pixels are above the half-max level of that patch.
+4. **There are dark gaps inside every "white".** The gap median is **2–7 px**
+   everywhere, including inside the thickest bore. The same caution as §2.4
+   applies to the `coverage` column and for the same reason: the threshold is
+   per box, so it reports histogram shape and is not a comparison against a
+   render. The **gap median** and **`l/W`** are the columns that are.
 
 ---
 
@@ -534,8 +553,12 @@ a number the render must land inside, with the sign the right way round.**
 **The hue moves too, and in two different ways that must not be confused.**
 
 - **Wet sand not covered by standing water** goes darker *and more saturated in
-  its own hue*: f2's `linR/B` climbs monotonically **1.706 → 2.347 → 2.531 →
-  2.763** as the sand gets wetter. Brown gets browner.
+  its own hue*: in f2 the dry upper beach reads `linR/B` **1.706** and all three
+  wetter samples read **2.35 to 2.76**. Brown gets browner, by a factor of
+  **1.4–1.6**. *The ordering among the three wet samples is not monotone in
+  darkness* (2.763 at `linY` 0.290, 2.531 at 0.179) and is not claimed — the
+  darkest sample is partly under a thin water film, which is the next bullet's
+  mechanism, not this one.
 - **Sand under a water film or a foam sheet** goes darker *and bluer*, because
   the film reflects sky: f1's dry sand `linR/B` 2.291 against sand under a swash
   film at **1.153**.
@@ -565,7 +588,7 @@ f1, one exposure, five regions:
 
 1. **The spread inside one "white" is 28–45 grey levels of standard deviation.**
    The three whitewater regions have means within 11 levels of each other and
-   standard deviations three to four times that separation. **The classes are not
+   standard deviations two and a half to four times that separation. **The classes are not
    separated by their means; they are separated by their texture and by what is
    visible through them** — which is exactly what the bar's section C says
    (*"if a renderer whitens without hiding what is behind, it has modelled the
@@ -610,7 +633,9 @@ confirmed it, twice, with measurements:
   physically impossible and it disqualifies the frame for level as well as
   colour. **Colour refused.**
 
-The three things that *were* salvaged, and their limits:
+**Three things about colour that this set *can* say, and their limits.** The
+second is the strongest colour result in the directory and it is not about the
+ladder at all — it fell out of asking the refusal question properly.
 
 1. **s1** gives a genuine within-frame shallow-water pair: the same column over
    sand (`linY` 0.4588, `linR/B` 0.731) and over dark rock (0.4194, 0.721). Two
@@ -618,10 +643,34 @@ The three things that *were* salvaged, and their limits:
    survives. It shows the bed *revealing* structure through the column, which is
    the shallow-bottom half of section D's confusable pair. **It does not give a
    deep-to-shallow ladder** because there is no deep water in the frame.
-2. **f2** gives a green wave face (`linY` 0.1066, `linR/B` 0.663, `linG/B` 0.927)
-   against sand at `linR/B` 1.7–2.8 in the same exposure. That the face is green
-   and the sand is not is a within-frame *ordering* and it stands. The *hue* does
-   not.
+2. **f1 gives the section-A direction, at matched luminance, and it is the
+   soundest colour result in this directory.** Section A says a thin backlit
+   wave face reads green while the same water metres away reads grey-blue.
+   The absolute triples cannot test that — under an unknown white balance a
+   channel triple is not evidence, and in fact **neither f1 nor f2 reaches
+   `G > B` anywhere in the water**, so a naive reading would call the claim
+   refused.
+   It is not, because the plain box mean is the wrong instrument here. `G/B`
+   rises with brightness *everywhere* in this frame, including inside a single
+   deep-water box with no foam in it — level and chromaticity are coupled by the
+   tone curve and by the sun/sky mix. **Compare at matched luminance and the
+   coupling drops out:**
+
+   | display-referred `linY` window | crest `G/B` | water `G/B` | ratio |
+   |---|---|---|---|
+   | 0.24–0.30 | 0.811 (n = 1 992) | 0.721 (n = 12 713) | **1.125** |
+   | 0.26–0.32 | 0.829 (n = 1 831) | 0.727 (n = 7 599) | **1.141** |
+   | 0.28–0.34 | 0.841 (n = 1 470) | 0.731 (n = 4 127) | **1.150** |
+
+   **The thin backlit crest is 1.13–1.15× greener in `G/B` than deep water of
+   the same brightness in the same exposure**, stable across three windows and
+   thousands of pixels each. That is a within-frame ratio between surfaces close
+   in level — the one instrument the bar says survives all three camera
+   failures — and it is a *direction*, not a hue.
+   **f2 does not reproduce it**: its thin face reads `G/B` 0.927 against deeper
+   water at 0.870–0.930, i.e. a ratio of **1.00–1.07**, which is not a result.
+   Both are recorded. One frame showing the effect and one not showing it is
+   what this set has, and the reader is entitled to know which is which.
 3. **g3** gives the ocean-basin colour ordering — deep Atlantic, green shelf,
    turquoise bank — but it is a corrected-reflectance product, so it is a
    **map of where the ladder is**, not a measurement of the ladder.
@@ -686,10 +735,12 @@ questions**, each of which was previously a verbal claim with nothing behind it:
 | target | served by | the number a critic can hold the render against |
 |---|---|---|
 | glitter granularity | g1, g2, g3 | interior sd **41–60** and **36–70** levels; dark-gap median **2–6 px**; `l/W` **0.7–5 %** |
-| glitter taper | g1 | **×2.0**, widening toward the observer, over 279 rows of an 853-row frame |
+| glitter taper | g1 **only** | **×2.0**, widening toward the observer, within one frame over 279 of 853 rows |
+| glitter angular width | g1, g2 | **0.58–1.15°** and **4.06–7.27°** — a spread between two unknown winds, **not** a trend in sun elevation |
 | foam structure | f1, f2 | `l/W` **0.3–0.8 %**; clot q90 **10–70 cm** alongshore, a **7:1** range within one wave |
 | wet/dry sand edge | s1, f2, f1 | scene ratio bracketed **1.7×–3.0×**, and three distinct hue behaviours |
 | ocean colour at depth | **nothing** | **refused** — see §5 |
+| *(unasked, and it turned up)* section A's green direction | f1; **not** f2 | thin backlit crest **1.13–1.15×** greener in `G/B` than deep water **at matched luminance**, one exposure |
 
 **What it still cannot judge.** Everything in the bar that is about *this* place:
 the Aljezur bar-and-trough, the reform, the eclipse-affected illuminant of the
