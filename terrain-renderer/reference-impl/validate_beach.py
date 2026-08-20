@@ -6631,6 +6631,660 @@ def _sec_bed(ctx):
           'multiplied by that leg again.')
 
 
+# ==========================================================================
+# WAVE 15 -- THE DIRECTIONAL SPECTRUM, THE REALISATION, AND THE PHASE FIELD
+# ==========================================================================
+#
+# WHY THIS SECTION IS BEING WRITTEN TWO WAVES LATE, because that is the finding.
+#
+# Wave 13's wave-field builder wrote `beach.py`'s spectral block -- 766 lines of
+# spreading function, moment tensor, realisation and measurement -- pushed it in
+# `d3cabb9` and `a5db020`, reported "THREE REAL FAILURES IN MY OWN NEW ROWS" and
+# died on a session limit mid-diagnosis. The wave record carried that forward as
+# an open gap on the grounds that an unexplained failure which stopped failing is
+# the worst kind of green.
+#
+# IT STOPPED FAILING BECAUSE THE ROWS WERE NEVER COMMITTED. Neither wave-13
+# commit touches this file; `git log -- validate_beach.py` runs from wave 12 to
+# wave 14 without a wave-13 entry, and before this section the string "smax" did
+# not appear in it. The suite was green on wave 13's spectral block the way a
+# suite is green on code it has never heard of. Every "the suite checks that"
+# in `beach.py`'s spectral docstrings -- there are nine of them -- was a promise
+# against a section that did not exist.
+#
+# THE THREE FAILURES ARE REAL, THEY ARE STILL THERE, AND THEY ARE ONE ERROR
+# CLASS. Reconstructed from the claims the module's own prose makes, each one is
+# A NUMBER MEASURED ON ONE DRAW AND WRITTEN DOWN AS A PROPERTY -- which is wave
+# 12's lesson, and wave 13 named it itself two paragraphs before committing three
+# more instances of it:
+#
+#   (i)   `beach_render.py` says 8 x 32 "recovers the smax they were drawn from
+#         to 0.6 per cent". On the SHIPPED SEED it recovers it to -16.6 per cent.
+#         Over 40 seeds the lattice is very nearly unbiased (-0.68% on the ratio)
+#         with a 3.9% seed-to-seed SCATTER, and seed 20260913 sits 1.5 sigma low.
+#         The claim was one draw. Rows S.5 measure the ensemble and the scatter.
+#   (ii)  `spectral_components`' own comment says the suite "measures both
+#         numbers at five lattice sizes". It measured neither, at none.
+#   (iii) `beach.py` says the anisotropy "moves by under 2%" between gamma = 1
+#         and gamma = 7. Measured: -5.07% and +5.81%. Row S.3.4, and the comment
+#         is corrected in `beach.py` rather than the row widened to meet it.
+#   (iv)  (S3), the extrusion prediction, is compared against a statistic whose
+#         PER-DRAW SCATTER IS 47 PER CENT -- because V is dominated by the few
+#         components nearest k_y = 0. A single realisation is 26% off (S3) and
+#         that is not a defect, it is the estimator. Rows S.6 test the ensemble
+#         and record the scatter, which is the only form in which (S3) is a
+#         guard at all.
+#
+# AND THE HEADLINE FINDING HAD NO GUARD EITHER. `transform_2d`'s missing
+# alongshore phase -- the defect that made every crest in every frame run exactly
+# shore-parallel -- was fixed in `a5db020` with its control described in a
+# comment and nowhere else. Rows S.8 put it in the suite, and `--bug
+# phase-no-alongshore` puts waves 1-12's `S[:, 0] = 0` back and fails them.
+#
+# ONE DEGENERACY WORTH NAMING, because the obvious row has it. On a STRAIGHT
+# coast k_y is independent of y, so S(y, 0) is linear in y and the march adds the
+# same increment to every row: dS/dy = k sin(theta) holds for a reason that has
+# nothing to do with the irrotationality the comment claims it tests. The
+# straight-bed rows are kept because they are the closed form, and row S.8.5 is
+# run ON THE BAY, where k_y varies alongshore by sd 5.7e-3 rad/m -- with S.8.6 as
+# the control that says so, per ruling 14.
+
+
+def _sec_spread(ctx):
+    B = ctx['B']
+    S_VALUES = (0.0, 0.3, 0.7, 1.0, 2.0, 10.0, 25.0, 96.44461994852664)
+
+    # -------------------------------------------- S.1 the spreading function
+    # A million-point trapezoid of a smooth periodic function is accurate to
+    # 2.4e-10 here, measured against a four-million-point one; 1e-8 is two and
+    # a half orders of margin and is not fitted to the answer.
+    thq = np.linspace(-math.pi, math.pi, 1_000_001)
+    norms, mom_got, mom_exp = [], [], []
+    for s in S_VALUES:
+        D = B.spread_pdf(thq, s)
+        norms.append(float(np.trapezoid(D, thq)))
+        for n in (1, 2, 3):
+            mom_exp.append(float(np.trapezoid(D * np.cos(n * thq), thq)))
+            mom_got.append(float(B.spread_moment(s, n)))
+    check(1, 'D(th; s) integrates to 1 at eight s, quadrature', norms,
+          np.ones(len(S_VALUES)), 1e-8,
+          'LCS-1963 cos-2s with N(s) = Gamma(s+1)/(2 sqrt(pi) Gamma(s+1/2)), '
+          'evaluated through lgamma. If the normalisation is wrong every '
+          'moment below is wrong by the same factor and the ratios would hide '
+          'it -- so the normalisation is checked first and separately.')
+    check(1, '(S1\') <cos n th> vs quadrature, n = 1..3 at eight s', mom_got,
+          mom_exp, 1e-8,
+          'The gamma-ratio identity <cos n th> = PROD (s+1-m)/(s+m), derived '
+          'in `beach.py` and NOT taken from Goda or WAFO. The quadrature is '
+          'the independent route and it shares nothing with the product form '
+          'but the pdf. Includes s = 96.44, where the Gamma(s+1)^2 form '
+          'overflows a double.')
+    m2_small = [float(B.spread_moment(s, 2)) for s in (0.3, 0.7)]
+    check(1, '<cos 2th> is NEGATIVE for s < 1 -- the sign lgamma throws away',
+          [v < 0.0 for v in m2_small], [True, True], 0,
+          'Gamma(s+1-n) is negative for s < n-1 and `lgamma` returns the log '
+          'of its MODULUS, so the textbook gamma form silently returns +0.0702 '
+          'where the answer is -0.0702. The sign is physical: a spread broader '
+          'than cos^2(th/2) carries more energy ACROSS the mean direction than '
+          'along it. `--bug moment-gamma-form` puts the lgamma form back.')
+
+    # ------------------------------------------------- S.2 (S2), the ratio
+    s_arr = np.array([0.0, 0.5, 1.0, 5.0, 25.0, 75.0, 96.4446])
+    m2 = B.spread_moment(s_arr, 2)
+    check(1, '(S2) L_along/L_across vs sqrt((1+<cos2th>)/(1-<cos2th>))',
+          B.crest_length_ratio(s_arr), np.sqrt((1.0 + m2) / (1.0 - m2)),
+          1e-12, 'The closed form (S2) = sqrt((s^2+s+1)/(2s+1)) is the '
+          'algebraic reduction of the moment expression. Two routes to one '
+          'number that must agree to machine precision, because one is the '
+          'other cleared of denominators.', rel=True)
+    check(1, '(S2) is exactly 1 at s = 0 -- an isotropic spread has no crests',
+          float(B.crest_length_ratio(0.0)), 1.0, 1e-15,
+          'The limit that fixes the constant. A ratio that is not 1 for a flat '
+          'directional distribution is measuring something other than '
+          'short-crestedness.')
+    check(2, '(S2) at Goda & Suzuki\'s smax = 25 and 75',
+          [float(B.crest_length_ratio(25.0)), float(B.crest_length_ratio(75.0))],
+          [3.573, 6.145], 1e-3,
+          'The two engineering values Goda & Suzuki give for swell. Quoted in '
+          '`beach.py`\'s derivation to three decimals; this row is what stops '
+          'the quotation drifting from the function.')
+
+    # -------------------------------- S.3 the scene\'s own spread, and its wind
+    check(1, 'U10 is ONE wind: beach.U10_SCENE == beach_optics.U10',
+          float(B.U10_SCENE), float(BOP.U10), 0.0,
+          'PROMISED BY `spread_smax`\'S OWN DOCSTRING AND NEVER WRITTEN. The '
+          'constant is repeated in two files because `beach.py` is the lower '
+          'layer and must not import the optics module. One wind now has three '
+          'readouts -- the glitter\'s width, the whitecap coverage and the '
+          'directional spread -- and this row is the only thing holding them '
+          'to the same number.', unit='m/s')
+    cp = B.deep_phase_speed(B.T_SWELL)
+    check(1, 'inverse wave age U10/c_p at the scene\'s own T and wind',
+          float(B.U10_SCENE) / cp,
+          6.0 / (B.G * 9.0 / (2.0 * math.pi)), 1e-12,
+          'c_p = gT/2pi, the deep-water phase speed. The spread is an OUTPUT '
+          '(ruling 5) and this is the quantity it is an output OF, so it is '
+          'pinned rather than left implicit in a docstring.')
+    between(2, 'smax lands inside the published swell bracket',
+            float(B.spread_smax()), 25.0, 150.0,
+            'Mitsuyasu\'s 11.5 w^-2.5 is being EXTRAPOLATED below its fitted '
+            'range of w ~ 0.4..2 into swell, and `spread_smax` says so. The '
+            'bracket is Goda & Suzuki\'s 25 and 75 for swell and the 2001 New '
+            'Zealand buoy\'s 65, widened to 150 for the extrapolation. A value '
+            'outside it means the extrapolation has gone somewhere the '
+            'literature does not.')
+    check(1, 'H0_SWELL is an H_rms: Hs = 4 sqrt(m0) = 4 sqrt(H0^2/8)',
+          4.0 * math.sqrt(B.H0_SWELL ** 2 / 8.0), 2.1213203435596424, 1e-12,
+          'E0 = rho g H0^2/8 makes m0 = H0^2/8, so the 1.5 m the scene states '
+          'is an H_rms and the significant height is 2.12 m. Getting this '
+          'backwards is a factor of sqrt(2) on every amplitude in the scene; '
+          '`spectral_components`\' own comment calls it a suite row rather '
+          'than a comment, and until now it was a comment.', unit='m')
+
+    # ------------------------------------- S.4 the moment tensor and its frame
+    Mxx, Mxy, Myy = B.spectrum_moment_tensor()
+    check(1, 'the tensor\'s principal axis IS the mean wave direction',
+          math.degrees(B.tensor_principal_angle(Mxx, Mxy, Myy)),
+          math.degrees(B.THETA0_SWELL), 1e-4,
+          'True for ANY spreading function symmetric about theta0, so a '
+          'spreading function accidentally written asymmetric fails here and '
+          'nowhere else. It is also the row that settles the frame confusion '
+          'that cost wave 13 its first draft.', unit='deg')
+    r_crest = B.anisotropy_from_tensor(Mxx, Mxy, Myy, 'crest')
+    r_grid = B.anisotropy_from_tensor(Mxx, Mxy, Myy, 'grid')
+    check(1, 'oblique sea: the GRID ratio is smaller than the CREST ratio',
+          r_grid < r_crest, True, 0,
+          'An oblique crest crosses the frame diagonally, so its alongshore '
+          'run is foreshortened and a frame-edge statistic reads LOW. At this '
+          'scene\'s 20 deg the two differ by 62 per cent -- 3.522 against '
+          '2.178 -- and wave 13 spent a draft treating that gap as a broken '
+          'realisation. The inequality is the invariant; the gap is the scene.')
+    M0 = B.spectrum_moment_tensor(theta0=0.0)
+    check(1, 'at normal incidence the two frames are the SAME number',
+          B.anisotropy_from_tensor(*M0, frame='grid'),
+          B.anisotropy_from_tensor(*M0, frame='crest'), 1e-9,
+          'THE CONTROL FOR THE ROW ABOVE, per ruling 14: an inequality between '
+          'two frames is worth nothing until the case where they must coincide '
+          'has been shown to coincide. theta0 = 0 puts the crest frame on the '
+          'grid frame and the two expressions must return one value.')
+    r_g1 = B.spectrum_anisotropy(frame='crest', gamma=1.0)
+    r_g7 = B.spectrum_anisotropy(frame='crest', gamma=7.0)
+    check(3, 'peak-enhancement sensitivity: gamma 1 and 7 vs 3.3',
+          [100 * (r_g1 - r_crest) / r_crest, 100 * (r_g7 - r_crest) / r_crest],
+          [-5.07, 5.81], 0.15,
+          'FAILURE (iii). `beach.py` claimed this moves "by under 2%" and it '
+          'moves by 5.1 and 5.8 -- a number quoted from memory of an argument '
+          'rather than from a measurement. The ARGUMENT is still right (gamma '
+          'reshapes the peak, the k^2 moment lives in the tail) and the '
+          'conclusion is unchanged; the figure was wrong and the comment is '
+          'now corrected in `beach.py` rather than this tolerance widened to '
+          'cover it.', unit='%')
+
+    # ----------------- S.5 the realisation, its own list, and the lattice cost
+    comp = B.spectral_components(n_f=8, n_th=32)
+    hs = 4.0 * math.sqrt(B.H0_SWELL ** 2 / 8.0)
+    check(1, 'the drawn m0 is the band\'s share of the stated m0, exactly',
+          comp['m0'], comp['band_fraction'] * (hs / 4.0) ** 2, 1e-12,
+          'The amplitudes are renormalised to the band energy so a coarse '
+          'lattice\'s quadrature error cannot leak into H0. This row is what '
+          'makes that statement true rather than intended: the realisation '
+          'carries the height the scene declared, whatever the lattice.',
+          rel=True, unit='m^2')
+
+    def _list_tensor(c):
+        w = 0.5 * np.asarray(c['a'], float) ** 2
+        W = float(w.sum())
+        return (float((w * c['kx'] ** 2).sum() / W),
+                float((w * c['kx'] * c['ky']).sum() / W),
+                float((w * c['ky'] ** 2).sum() / W))
+
+    L_pat, n_pat = 1408.0, 320
+    th0 = comp['theta0']
+    uu = (np.arange(n_pat) - n_pat / 2) * (L_pat / n_pat)
+    UU, VV = np.meshgrid(uu, uu)              # axis 0 ALONG crest, axis 1 across
+    xw = UU * math.cos(th0) - VV * math.sin(th0)
+    yw = UU * math.sin(th0) + VV * math.cos(th0)
+    eta = B.spectral_eta(comp, xw, yw, 0.0)
+    dpat = L_pat / n_pat
+    r_list = B.anisotropy_from_tensor(*_list_tensor(comp), frame='crest')
+    r_hann = B.anisotropy_from_tensor(
+        *B.measure_tensor_fft(eta, dpat, dpat, window=True), frame='crest')
+    r_none = B.anisotropy_from_tensor(
+        *B.measure_tensor_fft(eta, dpat, dpat, window=False), frame='crest')
+    r_corr = B.measure_anisotropy(eta, dpat, dpat)['ratio']
+    check(3, 'the FIELD returns the tensor of the LIST it was summed from',
+          100 * (r_hann - r_list) / r_list, 0.0, 6.0,
+          'THE GEOMETRY ROW. The amplitudes are deterministic, so the sample '
+          'spectrum is exact by construction and a failed round trip here can '
+          'only be a direction convention, an aliased wavenumber or a lost '
+          'factor -- which is the error class wave 13 was hunting. Measured '
+          '-2.6%%; the residual is the Hann kernel\'s own second moment, which '
+          'nearly but not exactly cancels in a ratio.', unit='%')
+    check(3, 'the correlation route agrees with the periodogram route',
+          100 * (r_corr - r_hann) / r_hann, 0.0, 8.0,
+          'TWO ROUTES THAT SHARE NOTHING BUT THE FIELD. One fits the curvature '
+          'of the correlation surface at short lag in real space; the other is '
+          'Parseval on the periodogram. The correlation route cannot see '
+          'leakage and the FFT route cannot see aliasing, so agreement rules '
+          'out both.', unit='%')
+    check(3, 'WITHOUT a window the periodogram tensor is biased LOW by >10%',
+          100 * (r_none - r_list) / r_list < -10.0, True, 0,
+          'A drawn field is not periodic on its patch, so the periodogram '
+          'leaks; leakage falls as k^-2 while this statistic weights by k^+2. '
+          'Measured -16.7 per cent, which looks exactly like a broken '
+          'realisation and is a broken METER. The row asserts the bias is '
+          'there, so that a future "improvement" which silently drops the '
+          'window is caught by the suite instead of by a critic.')
+
+    ens = []
+    for sd in range(20260913, 20260913 + 24):
+        ens.append(B.anisotropy_from_tensor(
+            *_list_tensor(B.spectral_components(n_f=8, n_th=32, seed=sd)),
+            frame='crest'))
+    ens = np.array(ens)
+    check(3, 'ENSEMBLE: 8x32 is unbiased against the continuous spectrum',
+          100 * (ens.mean() - r_crest) / r_crest, 0.0, 2.0,
+          'FAILURE (i), AND ITS RESOLUTION. The lattice is a stratified Monte '
+          'Carlo estimator of the spectrum, so the honest statement about it '
+          'is an expectation over the jitter and not one draw. Over 24 seeds '
+          'it is within a per cent. The shipped lattice is therefore RIGHT and '
+          'the number written down about it was not.', unit='%')
+    between(3, 'ENSEMBLE: the 8x32 seed-to-seed scatter, which is the real cost',
+            100 * ens.std() / ens.mean(), 2.5, 6.0,
+            'THE NUMBER THAT SHOULD HAVE BEEN QUOTED. 3.9 per cent, and it is '
+            'the whole of why one draw said -5.7. Bracketed rather than pinned '
+            'because it is itself estimated from 24 samples; the bracket '
+            'excludes both zero and the 0.6 per cent that was claimed.',
+            unit='%')
+    r_ship = B.anisotropy_from_tensor(*_list_tensor(comp), frame='crest')
+    openq(3, 'the SHIPPED seed draws a field 5.7% less anisotropic than stated',
+          '%.4f (spectrum)' % r_crest, '%.4f (seed 20260913)' % r_ship,
+          'MEASURED, UNDERSTOOD, NOT FIXED, and deliberately not fixed. Seed '
+          '20260913 sits 1.5 sigma low on a 3.9 per cent scatter, which '
+          'propagates to -16.6 per cent on the recovered smax because the '
+          'ratio goes as sqrt(s/2) and halves every relative error on the way '
+          'in. Searching seeds for a better draw is fitting a constant to make '
+          'the picture right, which ruling 3 forbids; raising n_f to 64 would '
+          'cut the scatter to 0.5 per cent at 8x the far-field component sum. '
+          'The cost is now measured instead of being asserted as 0.6 per cent.')
+
+    # the lobe, which is the row the moment could not replace
+    s_pk = float(B.spread_s(comp['fp'], comp['fp'], comp['smax']))
+    hwhm = math.acos(0.5 ** (1.0 / (2.0 * s_pk)))
+    occ = (np.abs(comp['theta'] - comp['theta0']).reshape(8, 32)
+           <= hwhm).sum(axis=1)
+    check(1, 'equal-energy cells put >= 4 components inside the peak lobe',
+          int(occ.min()) >= 4, True, 0,
+          'THE ROW THE SECOND MOMENT COULD NOT REPLACE, and wave 13 said so '
+          'itself. The peak lobe is 9.7 deg wide at half maximum. A UNIFORM '
+          'fan of 32 directions over the circle is 11.25 deg a cell and lands '
+          'ZERO components in it, so the drawn field was nearly two plane '
+          'waves exactly where an eye looks -- AND THE MOMENT ROUND TRIP '
+          'PASSED ANYWAY, because <k^2 cos^2> is dominated by the broad, '
+          'well-sampled tail. Inverting the directional CDF gives every '
+          'frequency cell its proportionate share; measured 4..14 per cell.')
+    thu = -math.pi + (np.arange(32) + 0.5) * (2.0 * math.pi / 32)
+    check(1, 'CONTROL: a uniform fan of the same size lands ZERO in the lobe',
+          int((np.abs(thu) <= hwhm).sum()), 0, 0,
+          'RULING 14. The occupancy row above is worth nothing until the '
+          'lattice it was written to reject has been shown to fail it. This is '
+          'wave 13\'s own first draft, and it is the control that says the row '
+          'can read zero.')
+
+    # ------------------------------------------- S.6 (S3), the critic\'s number
+    plane = dict(kx=np.array([0.0497]), ky=np.array([0.0]),
+                 a=np.array([0.75]), phase=np.array([0.3]),
+                 omega=np.array([0.698]), k=np.array([0.0497]),
+                 theta=np.array([0.0]), theta0=0.0)
+    pw = B.spectral_eta(plane, UU, VV, 0.0)
+    check(1, 'an extrusion has an extrusion ratio of EXACTLY zero',
+          B.extrusion_ratio(pw)['ratio_raw'], 0.0, 1e-10,
+          'The statistic\'s floor is a consequence and not a tolerance: a '
+          'field with every k_y = 0 loses nothing to the along-crest mean. '
+          'This is waves 1-12\'s entire sea, and it is what the critic was '
+          'looking at when the word was corrugated roofing.')
+    check(1, '(S3) predicts exactly zero for the same field',
+          B.extrusion_ratio_predicted(plane, L_pat), 0.0, 0.0,
+          'sinc(0) = 1 makes V = sigma^2 identically. The closed form and the '
+          'measurement must reach the floor by different arguments.')
+    KY2 = 0.01
+    th2 = math.asin(KY2 / 0.0507)             # so that k sin(theta) is exact
+    two = dict(kx=np.array([0.0497, 0.0507 * math.cos(th2)]),
+               ky=np.array([0.0, KY2]),
+               a=np.array([0.75, 0.75]), phase=np.array([0.3, 1.1]),
+               omega=np.array([0.698, 0.698]),
+               k=np.array([0.0497, 0.0507]),
+               theta=np.array([0.0, th2]), theta0=0.0)
+    zz = 0.5 * KY2 * L_pat
+    sinc2 = (math.sin(zz) / zz) ** 2
+    check(1, '(S3) on a two-component list, against the sinc written out',
+          B.extrusion_ratio_predicted(two, L_pat),
+          math.sqrt((1.0 - sinc2) / (1.0 + sinc2)), 1e-12,
+          'sigma^2 = a^2, V = (a^2/2)(1 + sinc^2(k_y W/2)) for equal '
+          'amplitudes, so the ratio reduces to a one-line expression with the '
+          'sinc evaluated by hand. Independent of `extrusion_ratio_predicted`\'s '
+          'own loop, which is the point.', rel=True)
+
+    # (S3)'s V written out HERE rather than called out of `beach.py`, so that
+    # the ensemble row has a second route to the quantity it is testing.
+    def _V_crest(c, width):
+        z = 0.5 * width * (np.asarray(c['k'], float)
+                           * np.sin(np.asarray(c['theta'], float)
+                                    - c.get('theta0', 0.0)))
+        sc = np.where(np.abs(z) < 1e-12, 1.0,
+                      np.sin(z) / np.where(z == 0.0, 1.0, z))
+        return 0.5 * float((np.asarray(c['a'], float) ** 2 * sc ** 2).sum())
+
+    v_ship = _V_crest(comp, L_pat)
+    sig_ship = 0.5 * float((comp['a'] ** 2).sum())
+    check(1, '(S3) reads k_y in the CREST frame, not the grid frame',
+          B.extrusion_ratio_predicted(comp, L_pat),
+          math.sqrt((sig_ship - v_ship) / v_ship), 1e-12,
+          'THE TWENTY-DEGREE ERROR AGAIN, in the other statistic. '
+          '`extrusion_ratio` reads the frame the crests are aligned with, so '
+          '(S3) must take k_y there too -- k sin(th - th0), not the grid\'s '
+          'k sin(th). Using the grid frame changes the answer by 27 per cent '
+          'at this scene\'s obliquity and is the same class of mistake the '
+          'anisotropy tensor caught in wave 13\'s first draft. Second route '
+          'written out in this file, so the two do not share a loop. '
+          '`--bug extrusion-grid-frame` puts it back.', rel=True)
+
+    small = B.spectral_components(n_f=4, n_th=8, seed=20260913)
+    V = _V_crest(small, L_pat)
+    rng = np.random.default_rng(20260915)
+    raws = []
+    for _ in range(48):
+        cc = dict(small)
+        cc['phase'] = rng.uniform(0.0, 2.0 * math.pi, small['phase'].shape)
+        raws.append(B.extrusion_ratio(
+            B.spectral_eta(cc, xw, yw, 0.0))['across_raw'] ** 2)
+    raws = np.array(raws)
+    check(3, 'ENSEMBLE: <var of the along-crest mean> is (S3)\'s V',
+          100 * (raws.mean() - V) / V, 0.0, 15.0,
+          'FAILURE (iv), AND ITS RESOLUTION. (S3) predicts the EXPECTATION of '
+          'the along-crest mean\'s variance over the phase draw. That is what '
+          'is testable and this row tests it, over 48 draws at a fixed '
+          'direction lattice so that only the phase moves.', unit='%')
+    between(3, 'the per-draw scatter of that variance, which is why (S3) is '
+               'not a per-frame row', 100 * raws.std() / raws.mean(),
+            15.0, 90.0,
+            'V is a sum dominated by the handful of components nearest '
+            'k_y = 0, so its single-realisation estimator has an O(1) relative '
+            'variance -- measured 47 per cent on the shipped 8x32 lattice and '
+            'of that order here. A row comparing ONE realisation to (S3) at '
+            'any tolerance a guard would be worth having is a row that fails '
+            'about a third of the time, which is what wave 13 hit. The '
+            'bracket is wide because it is a scatter of a scatter.', unit='%')
+    er_one = B.extrusion_ratio(eta)
+    info(3, '(S3) on ONE shipped realisation: measured vs predicted',
+         [round(er_one['ratio_raw'], 4),
+          round(B.extrusion_ratio_predicted(comp, L_pat), 4)],
+         'The two numbers wave 13 died between: 1.79 measured against 2.42 '
+         'predicted, -26 per cent, and NEITHER IS WRONG. Carried as info '
+         'rather than as a row because the quantity has 47 per cent scatter '
+         'and a row on it would be a coin toss. What both numbers say together '
+         'is the finding that matters: the field is short-crested, at an '
+         'order the spectrum predicts, where waves 1-12 measured 0.000000.')
+
+    # ---------------------------------------------------- S.7 the groups
+    xs = np.arange(4096) * 2.0
+    check(1, 'a monochromatic wave has no groups',
+          B.groupiness_factor(np.cos(0.0497 * xs)), 0.0, 0.05,
+          'GF = std(A^2)/mean(A^2) for the Hilbert envelope. Exactly zero for '
+          'a single sinusoid, whose envelope is constant. This is waves 1-12 '
+          'again, and it is the floor the realisation has to leave.')
+    between(2, 'the realisation\'s groupiness reaches the Rayleigh saturation',
+            B.groupiness_factor(B.spectral_eta(comp, xs, np.zeros_like(xs), 0.0)),
+            0.7, 1.3,
+            'Longuet-Higgins: a Gaussian narrow-band surface has a Rayleigh '
+            'envelope, so A^2 is exponential and its coefficient of variation '
+            'is EXACTLY 1. Not a tuning target -- a saturation value the '
+            'physics reaches on its own. The bracket is the finite-record '
+            'scatter of a 4096-sample estimate.')
+    check(1, 'the spectral bandwidth is nonzero, which is what lets it group',
+          B.spectral_bandwidth() > 0.2, True, 0,
+          'nu = sqrt(m0 m2/m1^2 - 1), zero for a monochromatic wave. Measured '
+          '0.273 over the synthesis band. The group LENGTH is 1/nu periods and '
+          'nothing in it is free; waves 1-12 had nu = 0 and could not group at '
+          'any setting.')
+    grp = B.spectral_components(n_f=64, n_th=8, seed=20260913)
+    nper = 1 << 15
+    tt = np.arange(nper) * (B.T_SWELL / 32.0)
+    rec = np.zeros(nper)
+    for j in range(grp['a'].size):
+        rec += grp['a'][j] * np.cos(grp['phase'][j] - grp['omega'][j] * tt)
+    Aenv = B.envelope(rec)
+    Aenv = Aenv - Aenv.mean()
+    vA = float((Aenv * Aenv).mean())
+    zc = 0
+    for m in range(1, nper // 4):
+        if float((Aenv[m:] * Aenv[:-m]).mean()) / vA <= 0.0:
+            zc = m
+            break
+    check(3, 'the group LENGTH is 1/nu periods, measured off the envelope',
+          zc * (B.T_SWELL / 32.0) / B.T_SWELL, 1.0 / B.spectral_bandwidth(),
+          0.12,
+          'PROMISED BY `spectral_bandwidth`\'S OWN COMMENT AND NEVER WRITTEN. '
+          'The envelope of a Gaussian sea decorrelates over roughly 1/nu '
+          'periods, so a narrow spectrum gives long sets and a broad one gives '
+          'none -- the sets are an OUTPUT of the bandwidth, not the "slow '
+          'group envelope" knob the chapter advised through wave 12. Measured '
+          '3.50 periods against 3.66. The estimator is the FIRST ZERO CROSSING '
+          'of the envelope\'s autocorrelation, not its integral: the integral '
+          'returns 0.67 periods here, because for a narrow-band field rho '
+          'oscillates and the negative lobes eat it. That is the same '
+          'estimator trap (S3) fell into, one statistic over.', rel=True,
+          unit='periods')
+
+    # ------------------- S.7b the Rayleigh control (ruling 14, from the other
+    # side): how much of any residual above is the DRAW rather than the code?
+    det, ray = [], []
+    for sd in range(20260913, 20260913 + 24):
+        cd = B.spectral_components(n_f=8, n_th=32, seed=sd)
+        cr = B.spectral_components(n_f=8, n_th=32, seed=sd, rayleigh=True)
+        det.append(cd['m0'])
+        ray.append(B.anisotropy_from_tensor(*_list_tensor(cr), frame='crest'))
+    det, ray = np.array(det), np.array(ray)
+    check(1, 'deterministic amplitudes: the sample m0 has ZERO scatter',
+          float(det.std() / det.mean()), 0.0, 1e-12,
+          'THE INSTRUMENT CHOICE, MADE EXPLICIT. `spectral_components` draws '
+          'only the phase, so the sample spectrum is exact by construction and '
+          'a failed round trip can ONLY be a geometry error rather than the '
+          'draw. This row is what makes that argument checkable instead of '
+          'asserted -- and it is the reason the 3.9 per cent ratio scatter '
+          'above is attributable to the frequency JITTER and to nothing else.')
+    between(3, 'the Rayleigh control: the physical draw costs a wider scatter',
+            100 * ray.std() / ray.mean(), 6.0, 14.0,
+            'RULING 14 FROM THE OTHER SIDE -- a near-zero is worthless until '
+            'the reachable floor is known, and a small scatter is worthless '
+            'until the scatter of the PHYSICAL draw is known. `rayleigh=True` '
+            'restores complex-Gaussian amplitudes: m0 then scatters by 10.3 '
+            'per cent and the crest ratio by 9.4, against 0.0 and 3.9 for the '
+            'deterministic draw. A real sea state is that uncertain; the '
+            'renderer uses the deterministic draw because it is an instrument '
+            'and not a forecast.', unit='%')
+
+    # ------------------------------- S.8 THE PHASE FIELD, which had no guard
+    Ly, ny, nx = 1408.0, 129, 65
+    yv = np.linspace(-Ly / 2, Ly / 2, ny)
+    xv = np.linspace(0.0, 640.0, nx)
+    flat = B.transform_2d(xv, yv, np.full((ny, nx), -20.0), B.T_SWELL,
+                          B.H0_SWELL, B.THETA0_SWELL, breaking=False)
+    Sf, thf, kf = flat['S'], flat['theta'], flat['k']
+    gy, gx = np.gradient(Sf, yv[1] - yv[0], xv[1] - xv[0])
+    KX, KY = kf * np.cos(thf), kf * np.sin(thf)
+    sl = (slice(1, -1), slice(1, -1))
+    check(1, 'flat bed: dS/dx = k_x everywhere', float(np.abs(gx - KX)[sl].max()),
+          0.0, 1e-12,
+          'THE CONTROL WHOSE ANSWER IS KNOWN IN ADVANCE (ruling 14): 20 m of '
+          'flat water, where refraction has nothing to bend and the answer is '
+          'a plane wave. This half was always right, and it is here so that '
+          'the row below is known to be measuring the phase field and not the '
+          'gradient operator.', unit='rad/m')
+    check(1, 'flat bed: dS/dy = k_y -- THE HALF THAT WAS EXACTLY ZERO',
+          float(np.abs(gy - KY)[sl].max()), 0.0, 1e-12,
+          'WAVE 13\'S HEADLINE DEFECT, WHICH HAD NO ROW UNTIL NOW. Waves 1-12 '
+          'set S[:, 0] = 0 and integrated only k_x, so the ONE field the '
+          'renderer draws crests with returned dS/dy = 0.000000 against '
+          'k_y = 0.016998. The obliquity was present in theta, in the '
+          'radiation stress and in the longshore transport, and absent from '
+          'the picture. `--bug phase-no-alongshore` puts it back.', unit='rad/m')
+    check(1, 'flat bed: the alongshore phase run across 1408 m of coast',
+          float(Sf[-1, 0] - Sf[0, 0]), 23.9336, 1e-3,
+          'k_y * Ly = 0.016998 * 1408 -- 23.93 radians, nearly four whole '
+          'wavelengths of crest displacement from one edge of frame to the '
+          'other. That is the quantity that was missing, in the units the '
+          'picture is drawn in.', unit='rad')
+    check(1, 'flat bed: the crest azimuth read off S IS the wave direction',
+          math.degrees(math.atan2(gy[ny // 2, nx // 2], gx[ny // 2, nx // 2])),
+          math.degrees(thf[ny // 2, nx // 2]), 1e-6,
+          'The renderer reads crests off contours of S, so the azimuth of '
+          'grad(S) is what the frame shows. It read 0.000 deg for a wave whose '
+          'orthogonal is 16.533 deg off shore-normal; every crest in every '
+          'frame ran exactly shore-parallel whatever the sea state said.',
+          unit='deg')
+
+    bay = ctx.get('_bay_coarse')
+    if bay is None:
+        bay = B.run_bay(dx=4.0, n_steps=75, dt=6000.0)
+        ctx['_bay_coarse'] = bay
+    tb = bay['tr']
+    bx, by = bay['x'], bay['y']
+    dbx, dby = float(bx[1] - bx[0]), float(by[1] - by[0])
+    gby = np.gradient(tb['S'], dby, axis=0)
+    KYb = tb['k'] * np.sin(tb['theta'])
+    msk = np.zeros(tb['S'].shape, bool)
+    msk[2:-2, 2:-2] = True
+    msk &= tb['d'] > 3.0
+    check(3, 'CURVED bay: dS/dy = k sin(theta) where k_y varies alongshore',
+          math.sqrt(float(((gby - KYb)[msk] ** 2).mean())), 0.0, 1.5e-3,
+          'THE NON-DEGENERATE VERSION, and the reason the flat rows are not '
+          'enough. On a straight coast k_y does not depend on y, so S(y,0) is '
+          'linear and the march adds the same increment to every row -- '
+          'dS/dy = k_y holds for a reason that has nothing to do with the '
+          'irrotationality the fix relies on. On the bay the march must '
+          'ENFORCE curl(k) = 0 for the potential to be path-independent, and '
+          'this row is the only place that is tested. Measured rms 2.4e-4 '
+          'against 1.7e-2 with the defect back -- a factor of seventy.',
+          unit='rad/m')
+    check(1, 'CONTROL: k_y on the bay really does vary alongshore',
+          float(KYb[msk].std()) > 1e-3, True, 0,
+          'RULING 14 AGAIN. The row above is a statement about a varying k_y '
+          'and is worth nothing if k_y happens to be constant on this bed. '
+          'Measured sd 2.7e-3 rad/m over the mask and 5.7e-3 down the '
+          'mid-domain column, against a k_x scale of 0.13.')
+    info(1, 'blast radius of the phase fix: the fields S does NOT feed',
+         [round(float(np.abs(tb[nm]).sum()), 6) for nm in ('d', 'H', 'theta')],
+         'S is a diagnostic of the march, not an input to it: no flux term '
+         'reads it, so the bed, the height and the angle are bit-identical '
+         'either side of the fix. Recorded as a checksum triple so that a '
+         'future change to S which DOES touch them cannot be silent.')
+
+
+# --------------------------------------------------- the spectral-block bugs
+def _bug_phase_no_alongshore(mod):
+    """WAVES 1-12: S(y, 0) = 0, and only k_x ever integrated.
+
+    Reintroduced exactly rather than approximately. The march's increment does
+    not depend on S, so the old field is the new one with its own boundary
+    column subtracted off every row -- which is what waves 1-12 computed, to
+    the last bit, and not an imitation of it.
+    """
+    orig = mod.transform_2d
+
+    def tr(*a, **kw):
+        out = orig(*a, **kw)
+        out['S'] = out['S'] - out['S'][:, :1]
+        return out
+    mod.transform_2d = tr
+
+
+def _bug_moment_gamma_form(mod):
+    """(S1) as the textbook gamma ratio through lgamma, which throws the sign
+    away for s < n - 1 and returns +0.0702 where the answer is -0.0702.
+
+    The pole at s + 1 - n = 0 is handled rather than allowed to raise, because
+    a section that explodes is worth less than a section that fails -- it takes
+    every row after it with it, and this file's own `error_row` says so. 1/Gamma
+    is zero at the pole, which is also the right answer there.
+    """
+    def _lg(v):
+        try:
+            return math.lgamma(v)
+        except ValueError:                       # a pole of Gamma: 1/Gamma = 0
+            return float('inf')
+    lg = np.vectorize(_lg, otypes=[float])
+
+    def sm(s, n):
+        s = np.asarray(s, float)
+        n = int(n)
+        with np.errstate(over='ignore', invalid='ignore'):
+            return np.exp(2.0 * lg(s + 1.0) - lg(s + 1.0 - n)
+                          - lg(s + 1.0 + n))
+    mod.spread_moment = sm
+
+
+def _bug_spread_uniform_fan(mod):
+    """WAVE 13'S OWN FIRST DRAFT: a uniform fan of directions over the full
+    circle instead of equal-energy cells from the spreading function's CDF.
+
+    FAITHFUL, AND THE FIDELITY IS THE POINT. The amplitudes are re-drawn from
+    the spreading function AT the fan's directions -- a_j = sqrt(2 S df D dth) --
+    so the fan carries the correct directional ENERGY and only mis-samples the
+    directional SHAPE. That is the defect as it actually shipped in the draft,
+    and it is why the second-moment round trip passed under it: <k^2 cos^2> is
+    dominated by the broad, well-sampled tail. A cruder reintroduction that left
+    the equal-energy amplitudes in place would break the moment too, and would
+    then "prove" the moment row catches a defect that it demonstrably did not.
+    """
+    orig = mod.spectral_components
+
+    def sc(**kw):
+        c = orig(**kw)
+        n_f, n_th = kw.get('n_f', 10), kw.get('n_th', 24)
+        dth = 2.0 * math.pi / n_th
+        th = -math.pi + (np.arange(n_th) + 0.5) * dth
+        E_row = 0.5 * (c['a'] ** 2).reshape(n_f, n_th).sum(axis=1)
+        D = mod.spread_pdf(th[None, :], np.asarray(c['s'], float)[:, None])
+        E = D * dth
+        E = E * (E_row / E.sum(axis=1))[:, None]
+        a = np.sqrt(2.0 * E).ravel()
+        ang = c['theta0'] + np.broadcast_to(th[None, :], (n_f, n_th)).ravel()
+        c = dict(c)
+        c['a'] = a
+        c['theta'] = ang
+        c['kx'] = c['k'] * np.cos(ang)
+        c['ky'] = c['k'] * np.sin(ang)
+        c['m0'] = float(0.5 * (a ** 2).sum())
+        return c
+    mod.spectral_components = sc
+
+
+def _bug_extrusion_grid_frame(mod):
+    """(S3) with the GRID frame's k_y instead of the crest frame's -- the same
+    twenty-degree error the anisotropy tensor caught, in the other statistic."""
+    def pred(comp, width):
+        a = np.asarray(comp['a'], float)
+        z = 0.5 * np.asarray(comp['ky'], float) * float(width)
+        sinc = np.where(np.abs(z) < 1e-12, 1.0,
+                        np.sin(z) / np.where(z == 0, 1.0, z))
+        var = 0.5 * float((a ** 2).sum())
+        V = 0.5 * float((a ** 2 * sinc ** 2).sum())
+        return math.sqrt(max(var - V, 0.0) / V) if V > 0 else float('inf')
+    mod.extrusion_ratio_predicted = pred
+
+
+SPREAD_BUGS = ('phase-no-alongshore', 'moment-gamma-form',
+               'spread-uniform-fan', 'extrusion-grid-frame')
+
+BUGS.update({
+    'phase-no-alongshore': _bug_phase_no_alongshore,
+    'moment-gamma-form': _bug_moment_gamma_form,
+    'spread-uniform-fan': _bug_spread_uniform_fan,
+    'extrusion-grid-frame': _bug_extrusion_grid_frame,
+})
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -6642,6 +7296,8 @@ def run_suite():
                       (_sec_states, 'beach state, Iribarren, the sun'),
                       (_sec_coast, 'the coast in plan'),
                       (_sec_transform2d, 'the wave transform in 2-D'),
+                      (_sec_spread, 'the directional spectrum, the '
+                                    'realisation, and the phase field'),
                       (_sec_bay, 'the bar in plan'),
                       (_sec_embay, 'the static-equilibrium bay'),
                       (_sec_bathy, 'the ramp keying: cross-shore vs '
@@ -6936,6 +7592,35 @@ if __name__ == '__main__':
                                                str(exc)[:60])]
             print('%-30s %d  %s' % (name, len(caught),
                                     '; '.join(c[:66] for c in caught[:5])))
+        importlib.reload(BCH)
+        sys.exit(0)
+    if '--bugs-spread' in sys.argv:
+        # WAVE 15. Its own driver, and the bay is deliberately NOT cached
+        # across the runs: `phase-no-alongshore` is a defect IN the transform,
+        # so a bay built once and reused would be built from the clean module
+        # and the curved-bay row could not fire. Eight seconds a run buys a
+        # guard that is known to fail rather than assumed to.
+        import importlib
+        _run_section(_sec_spread, 'the directional spectrum')
+        base = set(_fail_names())
+        print('clean spread section: %d pass / %d FAIL / %d open'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base),
+                 sum(r.status == 'OPEN' for r in ROWS)))
+        print()
+        print('%-24s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 110)
+        for name in SPREAD_BUGS:
+            importlib.reload(BCH)
+            BUGS[name](BCH)
+            try:
+                _run_section(_sec_spread, 'the directional spectrum')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-24s %d' % (name, len(caught)))
+            for c in caught:
+                print('%-24s   %s' % ('', c[:84]))
         importlib.reload(BCH)
         sys.exit(0)
     if '--bugs' in sys.argv:

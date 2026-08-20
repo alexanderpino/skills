@@ -3843,12 +3843,18 @@ U10_SCENE = 6.0         # m/s. THE SAME WIND `beach_optics.U10` gives the
 JONSWAP_GAMMA = 3.3     # Hasselmann et al. (1973), the JONSWAP mean peak
                         # enhancement. `?` -- it is a mean over a fetch-limited
                         # North Sea campaign and this is Atlantic swell, for
-                        # which a larger value would be defensible. Nothing in
-                        # the crest-length prediction is sensitive to it: the
-                        # suite carries the anisotropy at gamma = 1 (Pierson-
-                        # Moskowitz) and at gamma = 7 and the ratio moves by
-                        # under 2%, because gamma reshapes the peak and the
-                        # ratio is set by the TAIL.
+                        # which a larger value would be defensible. The
+                        # crest-length prediction is WEAKLY sensitive to it and
+                        # the suite now says how weakly, at gamma = 1
+                        # (Pierson-Moskowitz) and at gamma = 7: -5.07% and
+                        # +5.81% on the crest-frame ratio, because gamma
+                        # reshapes the peak and the ratio is set by the TAIL.
+                        # WAVE 13 WROTE "UNDER 2%" HERE AND NEVER MEASURED IT.
+                        # The argument was right and the figure was invented to
+                        # go with it; wave 15 measured it, corrected the number
+                        # rather than widening the row, and the conclusion --
+                        # that gamma is not what sets short-crestedness -- is
+                        # unchanged.
 JONSWAP_SIGMA_A = 0.07  # Hasselmann et al. (1973), the peak-width parameters
 JONSWAP_SIGMA_B = 0.09  # below and above fp. `P`.
 MITSUYASU_SP = 11.5     # Mitsuyasu et al. (1975) via WAFO: sp = 11.5 w^-2.5

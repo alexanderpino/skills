@@ -437,11 +437,31 @@ _R0 = 0.5 * B.H0_SWELL * _K0 / 2.0
 #
 # THE COMPONENT COUNT IS A COST, NOT A PHYSICS, AND THE DIRECTIONAL COUNT IS
 # NOT FREE. With equal-energy directional cells, 8 x 32 = 256 components puts
-# 41 of them inside the peak's own 9.7 deg half-width lobe and recovers the
-# smax they were drawn from to 0.6 per cent. The suite measures both numbers
-# at five lattice sizes, so this is a measured plateau rather than a guess --
-# and the lobe count is measured because the moment alone did not catch the
-# uniform fan that preceded it.
+# 4 to 14 of them per frequency cell inside the peak's own 9.7 deg lobe -- 65
+# in all -- against ZERO for the uniform fan that preceded it.
+#
+# THE SECOND HALF OF THIS COMMENT USED TO READ "recovers the smax they were
+# drawn from to 0.6 per cent. The suite measures both numbers at five lattice
+# sizes." NEITHER SENTENCE WAS TRUE. The suite measured neither number at any
+# lattice size -- wave 13 died before its rows were committed and no row for
+# any of this existed until wave 15 -- and 0.6 per cent was one draw. Measured
+# properly, over 24 seeds:
+#
+#   the 8 x 32 lattice is UNBIASED against the continuous spectrum, -0.3 per
+#   cent on the crest-frame ratio, with a 3.9 PER CENT SEED-TO-SEED SCATTER.
+#   Seed 20260913 -- the one shipped here -- draws 1.5 sigma low, at -5.7 per
+#   cent on the ratio and -16.6 per cent on the smax recovered back out of it,
+#   because the ratio goes as sqrt(s/2) and doubles every relative error on the
+#   way in.
+#
+# The lattice is therefore right and the sentence about it was not. The seed is
+# NOT searched for a better draw -- that is fitting a constant to make the
+# picture right, which standing ruling 3 forbids -- and the scatter is carried
+# as an OPEN row in `_sec_spread` with its price named: n_f = 64 would cut it
+# to 0.5 per cent at eight times this sum. The lobe count is a separate row
+# from the moment because the moment alone did not catch the uniform fan, and
+# `--bugs-spread` demonstrates exactly that: with the fan put back faithfully,
+# the ensemble moment rows still PASS and only the lobe row fires.
 _FAR = B.spectral_components(n_f=8, n_th=32)
 
 
