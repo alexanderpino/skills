@@ -1340,6 +1340,29 @@ def cmd_quote(args):
         )
 
 
+def _direction_candidates():
+    """Direction material that may already be in the repo.
+
+    Ask what exists before asking anyone to write it: a round trip to a human
+    is expensive, a glob is free, and most teams have more written down than
+    they volunteer. Targeted lookups, not a tree walk.
+    """
+    hits = []
+    for name in ("ARCHITECTURE.md", "DESIGN.md", "SPEC.md", "CONTRIBUTING.md",
+                 "AGENTS.md", "CLAUDE.md", "README.md"):
+        if Path(name).is_file():
+            hits.append(name)
+    for d in (".wayfinder", "adr", "adrs", "decisions", "docs/adr", "docs/decisions",
+              "docs/architecture", "docs/design", "design", "spec", "specs", "rfcs", "docs"):
+        p = Path(d)
+        if not p.is_dir():
+            continue
+        md = sorted(f.name for f in p.glob("*.md"))[:3]
+        if md:
+            hits.append(f"{d}/ ({', '.join(md)}{', …' if len(md) == 3 else ''})")
+    return hits
+
+
 def cmd_bar_request(args):
     """Write gauntlet/bar-request.md — what comparison material this run needs.
 
@@ -1458,6 +1481,28 @@ def cmd_bar_request(args):
         "answers the same silent question differently and the smoother pays for it every",
         "wave (`decomposition.md`).",
         "",
+        "**First: ask whether it already exists — do not assume it must be written.**",
+    ]
+    found = _direction_candidates()
+    if found:
+        L += [
+            "Found in this repo already, before anyone writes anything new:",
+            "",
+        ] + [f"- `{h}`" for h in found] + [
+            "",
+            "Read those first. Say which are load-bearing and current, and ask only for",
+            "what they do not answer — an existing convention beats a fresh document,",
+            "because the codebase already agrees with it.",
+            "",
+        ]
+    else:
+        L += [
+            "Nothing found under the usual names in this directory. That is not proof it",
+            "does not exist: ask. It may live in a wiki, a ticket, a design channel, or",
+            "one colleague's head — all cheaper to retrieve than to re-derive.",
+            "",
+        ]
+    L += [
         "- **What is needed**: the load-bearing decisions only — the ones no lane-level",
         "  round could reach. Where a boundary sits, what owns what, how things are named",
         "  and addressed, dependency or update order. Not a full design document.",

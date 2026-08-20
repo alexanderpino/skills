@@ -64,9 +64,16 @@ agent to fetch; the run waits (`bar-selection.md`: no bar, no run). That same
 request has a second half worth asking for explicitly whenever the artifact has
 structure beneath its surface: **the direction** — a wayfinder map, an
 architecture record (SAD, ADRs), a spec, or the conventions of the existing
-codebase cited by path. Ask what exists rather than assuming nothing does;
-most teams have more written down than they volunteer, and the alternative is
-each builder deciding it privately (`decomposition.md`). Set
+codebase cited by path. **Ask whether it exists before asking anyone to write it** — and look first:
+`bar-request` scans for the usual homes (ARCHITECTURE.md, an `adr/` or
+`docs/decisions/` directory, `.wayfinder/`, CONTRIBUTING, the agent-facing
+convention files) and lists what it found, so the question becomes "are these
+current and load-bearing?" rather than "please write me an architecture".
+Nothing found is not proof nothing exists: it may live in a wiki, a ticket, or
+one colleague's head, all cheaper to retrieve than to re-derive. An existing
+convention also beats a fresh document, because the codebase already agrees
+with it. The alternative to asking is each builder deciding it privately
+(`decomposition.md`). Set
 `--target-score` where the target actually sits — at 10, bar-met can never fire.
 
 When the user names one blanket number — "10/10, like EA FC26" — do not write
