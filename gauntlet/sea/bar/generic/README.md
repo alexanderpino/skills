@@ -63,8 +63,11 @@ example of a grade destroying a channel outright.
 ### The one thing this set has that the bar's own frames do not
 
 The bar's sections H, I, J, K, L and M all record *"no time was given; illuminant
-`?`; time requested."* **Every image here carries an EXIF timestamp, and seven of
-the nine carry EXIF GPS.** So the illuminant *geometry* is computable, by the same
+`?`; time requested."* **Eight of the nine here carry an EXIF timestamp to the
+second, and six of those carry EXIF GPS.** (g3 carries no EXIF at all; f1 and f2
+carry a time but no position, so their coordinates below are *inferred from the
+place name* and every derived number inherits that.) So for eight frames the
+illuminant *geometry* is computable, by the same
 NOAA/Meeus + Bennett recipe the bar used on its own two dated frames. Run
 `measure.py` for the table; it is reproduced in **§6** below.
 
