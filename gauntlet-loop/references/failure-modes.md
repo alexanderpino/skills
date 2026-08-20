@@ -18,6 +18,7 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | Bar erosion | comparisons quietly get easier | bar files re-read from disk each wave |
 | Self-invented bar | the agent grades against a standard it made up while building | no bar, no run: `bar-request`, and `log-round` refuses bar modes with an empty `bar/` |
 | Answer key mistaken for a full bar | every check passes, the design is still mediocre | answer key bars function; aesthetic dimensions get their own reference artifact |
+| Bar assembled from an unfinished map | open tickets quietly become whatever the first builder assumed | collapsing stock wayfinder output is a sort: resolved decisions become the key, constraints the rules, out-of-scope the backlog, and OPEN tickets block the start |
 | Unreachable bar | every round loses; scores never move | target vs stretch, `--target-score`; a disproved target gets an evidenced refusal at intake |
 | Target chosen blind to its price | "aim for a 9" agreed with no cost attached | the quality-price menu (`quote`): rungs priced at intake, 10 shown as a wall |
 | A rung nobody defined | scores argued mid-run because "8" means nothing | rung anchors in the contract — anchors choose, the frozen bar judges |

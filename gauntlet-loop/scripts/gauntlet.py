@@ -1363,17 +1363,48 @@ def cmd_bar_request(args):
         "",
     ]
     if wf_files:
+        tickets = [n for n in wf_files if "ticket" in n.lower()]
+        has_key = any("answer" in n.lower() and "key" in n.lower() for n in wf_files)
         L += [
             "**A `.wayfinder/` folder exists in this repo** ("
             + ", ".join(f"`{n}`" for n in wf_files[:6])
             + (", …" if len(wf_files) > 6 else "") + ") — the wayfinder skill's output.",
-            "If it holds the map and answer key, most of this request is already met:",
-            f"freeze a COPY of the answer key to `{root}/bar/answer-key.md` (note source",
-            "and date in contract.md — `.wayfinder/` keeps evolving, a bar must not),",
-            "check the map's 'Not yet specified' section is empty, and only fetch below",
-            "what the answer key cannot cover (bar-selection.md).",
             "",
         ]
+        if has_key:
+            L += [
+                "It already carries an answer key, so most of this request is met: freeze a",
+                f"COPY of it to `{root}/bar/answer-key.md` (note source and date in",
+                "contract.md — `.wayfinder/` keeps evolving, a bar must not), check the map's",
+                "'Not yet specified' section is empty, and fetch below only what the key",
+                "cannot cover (bar-selection.md).",
+                "",
+            ]
+        elif tickets:
+            L += [
+                f"**Stock shape: {len(tickets)} ticket file(s), no answer key.** Usable, but not",
+                "as a bar — a bar is one frozen file a critic opens, not a folder it must",
+                "assemble. Collapse it yourself before wave 1; it is a sort, not a rewrite,",
+                "and every resolved ticket lands in exactly one place:",
+                "",
+                f"- **checkable statement** → `{root}/bar/answer-key.md`, citing the ticket it",
+                "  came from, so the collapse can be audited",
+                "- **constraint or layering decision** → the contract's rules (architecture,",
+                "  not bar: it binds builders, critics do not score against it)",
+                "- **out of scope** → `backlog.md`, where the report will carry it",
+                "- **still open** → it is fog, and fog is an unsettled bar: resolve it or rule",
+                "  it out of scope. An open ticket silently becomes an assumption otherwise.",
+                "",
+                "Refuse the shortcut of pointing critics at the folder: fourteen mini-bars is",
+                "fourteen cold reads per round and fourteen surfaces for drift.",
+                "",
+            ]
+        else:
+            L += [
+                "No answer key and no tickets found in it — check whether the map lives on an",
+                "issue tracker instead; the same collapse applies to its closed children.",
+                "",
+            ]
     L += [
         "A gauntlet's output is \"A or B is better\". Without a B that exists outside",
         "this run, every verdict measures the builder's own taste. So this run does not",

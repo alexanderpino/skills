@@ -117,6 +117,35 @@ gaps — and the handoff is mechanical once the map is done:
 | Not yet specified (the fog) | **must be empty first** — open fog is an unsettled bar |
 | Out of scope | the contract's scope line and `backlog.md` |
 
+### Handed stock wayfinder output? Collapse it, do not demand a re-run
+
+The modification above is how to *run* wayfinder for this purpose. It is not a
+precondition: plenty of maps were charted before anyone thought about a
+gauntlet, and stock wayfinder writes a ticket per decision. That output is
+perfectly usable — it is simply not a bar yet, because a bar is one frozen file
+a critic opens, not a folder it must assemble.
+
+Collapsing it is a **sort, not a rewrite**, and it is cheap: the judgement was
+already spent in the tickets. Every *resolved* ticket lands in exactly one
+destination:
+
+| The resolution is… | It belongs in |
+|---|---|
+| a checkable statement about the artifact | `gauntlet/bar/answer-key.md` — cite the ticket it came from, so the collapse is auditable |
+| a constraint or layering decision | the contract's rules — it binds builders; critics do not score against it (`decomposition.md`) |
+| work ruled beyond the destination | `backlog.md`, and from there the report |
+| still open | nothing yet: fog is an unsettled bar |
+
+That last row is the one to be strict about. An open ticket at wave 1 does not
+stay open — it quietly becomes whatever the first builder who trips over it
+assumed. Resolve it, or rule it out of scope and say so. The same applies when
+the map lives on an issue tracker rather than in a folder: collapse the closed
+children, and treat the open ones as the fog they are.
+
+What never happens: pointing critics at the ticket folder to "use it as the
+bar". Fourteen mini-bars is fourteen cold reads per round, fourteen surfaces
+for drift, and no single artifact anyone can freeze.
+
 **The `.wayfinder/` folder convention.** Run locally, wayfinder leaves its
 output as files in a `.wayfinder/` directory in the repo — that is where the
 map and answer key land, and the AI Labs prompt extension points the critic
