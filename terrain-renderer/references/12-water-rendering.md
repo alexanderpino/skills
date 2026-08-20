@@ -44,9 +44,32 @@ question this chapter answers in a sentence is usually answered in full by one o
 | [`12a-water-derivations.md`](12a-water-derivations.md) | The **mathematics and the pseudocode** — the derivations behind results this chapter quotes as one line, worked rather than asserted | A number here has to be re-derived, re-checked, or carried to different constants |
 | [`12b-water-provenance.md`](12b-water-provenance.md) | **Sources & provenance** for all of `12`: every tier, every citation, every `?`, and the `P/T/D/F/N/?` convention itself | Anything here is about to be cited, or a figure is about to be quoted outside this skill |
 | `reference-impl/` | The **executable form**: `field.py` (the surface), `wake.py` (the jet's eikonal wake), `render.py` (the light), and `validate.py` as the arbiter | A claim here is disputed, or a new one needs somewhere to be falsified |
+| [`figures/`](figures/) | The **pictures**, and [`figures/make_figures.py`](figures/make_figures.py), the one script that draws every one of them | A claim here is about a *shape* and the words are not carrying it |
 
 The provenance appendix moved out of this file rather than shrinking: nothing was removed, and the
 tier markers scattered through the prose (`P`, `D`, `?` …) all resolve against `12b`.
+
+**The figures are generated, never pasted.** Every image in `12` and `12a` comes from
+`figures/make_figures.py`, which imports the reference implementation **read-only** and writes no
+physics of its own, so a figure cannot drift from the code that ships. Each carries its provenance
+mark and the function that drew it in the caption *beside* the image — never inside the pixels,
+where it cannot be diffed and cannot be corrected. Regenerate the set with:
+
+```
+python3 terrain-renderer/references/figures/make_figures.py
+```
+
+It re-derives every headline number by a second, non-shared route before drawing a pixel and exits
+non-zero if any of them has moved. The six figures, and the claim each one exists to make:
+
+| Figure | Where | The claim it carries, which is a shape |
+|---|---|---|
+| `fresnel-two-sides` | [12·1](#surface-reflection-names-two-opposite-things-a-loss-and-a-trap) | one interface has two reflectances; the internal one is pinned to 1 past `θ_c`, and 92% of it is geometry |
+| `lut-factorisation` | [12·2](#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them) | the two factors of the exit transport rise together, so their product is not their joint |
+| `trapped-series` | [12·3](#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point) | truncation and the wrong constant are additive; and `1/(1 − ρR_int)` is a **bound**, not a gain |
+| `sommerfeld-half-plane` | [12·4](#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it) | `K_d = ½` on the boundary exactly, the lit side rings, and the Cornu chord is why |
+| `glitter-path-narrowing` | [12·5](#sun-glitter-the-sparkle-path) | the path's width is a *function* of view elevation, so no spread parameter can be it |
+| `runup-distribution-vs-realisation` | [`12a` 12a·1](12a-water-derivations.md#where-the-band-ends--a-distribution-is-not-a-surface-and-it-is-two-masks-not-one) | a distribution has no edge and a realisation does; the same defect as glitter drawn as its pdf |
 
 `validate.py` is what makes the reference implementation evidence rather than an illustration — it
 checks the renderer against things it did not write (closed forms, published measurements,
@@ -459,7 +482,8 @@ lam_min  = 2 pi sqrt(sigma / (rho g)) = 0.017116 m = 1.712 cm
 ```
 
 ⚠️ **Quote the pair from one `σ` or do not quote it as a pair.** This chapter carried
-**23.1 cm/s at 1.73 cm** for its whole run and [`00`](00-index.md#sources--provenance) recorded the
+**23.1 cm/s at 1.73 cm** for its whole run and
+[`00`'s ledger](00-index.md#least-confident-claims-ledger) recorded the
 two as *verified together*. They are not consistent: 23.1 cm/s inverts to `σ = 0.07256 N/m` and
 1.73 cm to `σ = 0.07437 N/m` — **2.5% apart in `σ`**, 1.1% in `λ`. Both are inside the ordinary
 spread of published clean-water values, which is exactly why the mismatch survived being checked:
@@ -717,6 +741,25 @@ centre-line values are the **coherent sum of two half-plane edge fields**, `2·K
 `v = (W/2)·√(2/(λr))`, the two edges being equidistant on the centre line and therefore in phase. A
 Fresnel–Kirchhoff integral over the *aperture* on the same geometry gives 0.431 at `r = W²/λ`, not
 0.51, so a reader reconstructing the table from the words alone would have missed it.
+
+![The knife-edge diffraction coefficient across the shadow boundary, and the Cornu spiral beside it](figures/sommerfeld-half-plane.png)
+
+> **Figure 12·4 — the half on the shadow boundary, and why it is a half.** `D`. Drawn by
+> [`figures/make_figures.py`](figures/make_figures.py) (`fig_sommerfeld`) from
+> `reference-impl/beach_diffract.py`'s own `knife_edge_kd`, `fresnel` and `cornu_limit` — the
+> same Fresnel integrals the suite checks, not a second implementation. Scene-linear; `K_d` is an
+> amplitude ratio. **Left:** `K_d(v)` with `v > 0` into the geometric shadow. Three things a ray
+> model gets wrong are all in the shape. `K_d(0) = 0.5000` **exactly**, at every `kr`, with no
+> asymptotics in it. The **lit side overshoots and rings** — 1.122 at `v = −1`, still 1.052 at
+> `v = −3`, decaying as the Cornu spiral winds in — so a model that returns a clean 1.0 outside the
+> shadow has smoothed the physics away in the same way, and for the same reason, as one that
+> returns a clean 0.0 inside it. And the shadow side has **no edge at all**: it decays smoothly
+> through the chapter's own 0.30783 / 0.20267 / 0.11103 at `v = 0.5 / 1 / 2` (marked). **Right,
+> the Cornu spiral, which is the argument rather than an illustration:** `K_d` is `1/√2` times the
+> **chord** from the current point `(C(v), S(v))` to the upper eye. The three marked points are
+> **collinear** — `(−½, −½)`, the origin, `(+½, +½)` — so the chord from the origin is exactly half
+> the chord from the far eye, and `K_d(0) = ½` follows from `C(±∞) = S(±∞) = ±½` and nothing else.
+> That is the whole of "the half is a half and not something else", and it is one look.
 
 **Three checks that can actually fail, and what each one cannot see.**
 
@@ -1954,7 +1997,15 @@ ordinary geometric interreflection sum, under a name that is this chapter's own 
 `1/(1 − ρ·R_int)`, so its *gain* rises with the albedo — and a dark liner therefore loses twice,
 once on each return and again on the bounces it never gets:
 
-| Liner | ρ (green) | Trapped gain | Apparent | Against white |
+⚠️ **The gain column below is `1/(1 − ρ·R_int)`, which is the trap with the column's absorption
+removed — an upper bound and not the gain of any particular pool.** It is the right object for the
+argument being made here (a dark liner loses twice, and the mechanism is depth-free); it is the
+wrong object for pricing a basin, because the returned light crosses the water twice and
+`G_rt(a·d) ≤ R_int` with equality only at `τ = 0`. On this chapter's own 1.40 m the bound overstates
+by 24.7% in red at ρ = 0.50. Priced, drawn and cross-checked in [figure
+12·3](#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point).
+
+| Liner | ρ (green) | Trapped gain, `τ = 0` | Apparent | Against white |
 |---|---|---|---|---|
 | White | 0.80 | **1.61×** | 1.21 | 1.00 |
 | Light blue | 0.65 | 1.45× | 0.88 | 0.73 |
@@ -2701,6 +2752,24 @@ too dark. Fix the vocabulary before quoting any transport figure below.
 triple; the derivation, the per-channel spread and the discontinuity that has to be split out of the
 internal integral are [`12a` §7](12a-water-derivations.md#one-interface-two-diffuse-reflectances).)
 
+![The two directional Fresnel curves of one water surface, and the exact decomposition of the internal one](figures/fresnel-two-sides.png)
+
+> **Figure 12·1 — one interface, two reflectances, and where the larger one comes from.** `D`.
+> Drawn by [`figures/make_figures.py`](figures/make_figures.py) (`fig_two_sides`), green band,
+> `n = 1.3348`, from `reference-impl/optics.py`'s own `fresnel` and `r_int_at` — no constant is
+> retyped. Scene-linear (both axes are dimensionless ratios; no transfer curve anywhere).
+> **Left:** the same boundary read from its two sides. The air→water curve has **no critical
+> angle** and climbs smoothly to 1 only at grazing; the water→air curve is **pinned to exactly 1**
+> past `θ_c = 48.52°` and is flat there for 41.5° of the hemisphere. That single discontinuity is
+> the whole reason the two hemispherical means differ by 7.14×, and the symmetric-looking formula
+> `R = ½(r_s + r_p)` does not show it. **Right:** the cosine-weighted integrand `2μ R(μ)`, whose
+> **areas are the three constants**. The pale block left of `μ_c` is `∫₀^{μ_c} 2μ dμ = cos²θ_c =
+> 1 − 1/n² = 0.43874`, which contains **no Fresnel evaluation at all** — it is geometry. The narrow
+> block right of it is the partial Fresnel remnant, 0.03743, and the two sum to `R_int = 0.47617`.
+> The third, flattest area is `R_ext = 0.06669` on the same scale: the entire external loss is the
+> sliver. Read the picture and the reason `1 − 1/n²` gets used *as* `R_int` is immediate — they are
+> the same region minus a shape that is hard to see and worth 3.74 points.
+
 **The two are tied, so getting one right does not license guessing the other.** Walsh's relation
 
 ```
@@ -2972,6 +3041,32 @@ The closed geometric series and its truncations, at the diffuse constant and at 
 | 0.400 (luminance) | 1.2353 | 1.1905 (−3.6%) | 1.2267 (−0.7%) | 1.1755 (−4.8%) |
 | 0.585 (this liner, green) | 1.3861 | 1.2786 (**−7.8%**) | 1.3562 (−2.2%) | 1.2567 (−9.3%) |
 | 0.681 (this liner, blue) | 1.4799 | 1.3243 (**−10.5%**) | 1.4294 (−3.4%) | 1.2988 (−12.2%) |
+
+![The trapped series, its truncations, and the lossless bound against the real absorbing column](figures/trapped-series.png)
+
+> **Figure 12·3 — the trapped gain: three errors in one quantity, and one of them is the chapter's
+> own.** `D`. Drawn by [`figures/make_figures.py`](figures/make_figures.py)
+> (`fig_trapped_series`) from `reference-impl/optics.py`'s `R_INT`, `slab_trap` and `IOR`.
+> Scene-linear; a gain is dimensionless. **Left:** the closed series against its truncations, with
+> this liner's three albedos marked. The error grows *superlinearly* in `ρ`, which is why one
+> curve read at three albedos produces a **chromatic** error — the truncation is a function of `ρ`
+> alone and the chromaticity is entirely the liner's. The wrong-constant curve
+> `1/(1 − ρ(1 − 1/n²))` sits just below one bounce for every `ρ`, so the two mistakes are
+> **additive and easy to make together**. **Right, and this is the finding the picture forced:**
+> the gain the table above quotes is `1/(1 − ρ·R_int)`, which assumes the returned light **crosses
+> the column twice for free**. It does not. The real round trip is `G_rt(τ)`, the same integral the
+> LUT section [refuses to factorise](#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them),
+> and at this pool's own 1.40 m it is `0.0965 / 0.3277 / 0.4445` against `R_int = 0.476` flat. So
+> at ρ = 0.50 the quoted **1.31× gain is really 1.05× in red** — the lossless form overstates by
+> **24.7 / 9.7 / 2.4 %** — and on this liner's own triple by **9.4 / 12.0 / 3.7 %** (`D`,
+> recomputed here). **`1/(1 − ρ·R_int)` is an upper bound, not the gain**, and it is tight only as
+> `τ → 0`. The trapped-gain table in [The two materials a pool actually
+> has](#the-two-materials-a-pool-actually-has-and-neither-is-water) is therefore a **depth-free**
+> statement and now says so; use it to reason about *why a dark liner loses twice*, and use
+> `1/(1 − ρ·G_rt(a·d))` to price a specific pool. The two errors on this page run opposite ways —
+> truncation makes the trap too weak, the lossless constant makes it too strong — which is one
+> more instance of the rule the LUT section states: **compose the error, do not reason term by
+> term.**
 
 (`D`, recomputed here at `R_int = 0.47617`, `1 − 1/n² = 0.43874`.) **The error is chromatic**,
 because ρ is, so a one-bounce truncation does not darken a pool — it *desaturates* it, by 7–10% in
@@ -3840,6 +3935,24 @@ term — worth saying, because the tempting single explanation is off by an orde
 measured on the full profile (the residual is the peak not sitting exactly at `Δφ = 0`). Quote the
 `1/cos θ_v` on its own and the path comes out **8.5× too bright** at the horizon.
 
+![Five peak-normalised azimuth profiles of the glitter path, and its FWHM and peak against view elevation](figures/glitter-path-narrowing.png)
+
+> **Figure 12·5 — the path's width is a function, and one number cannot be it.** `D`, and the
+> underlying slope statistics are `P` (Cox & Munk 1954). Drawn by
+> [`figures/make_figures.py`](figures/make_figures.py) (`fig_glitter_path`) by calling
+> `reference-impl/beach_optics.py`'s `glitter_radiance` directly — the shipped Cox–Munk BRDF with
+> its Smith shadowing, not a re-derivation. **Scene-linear radiance throughout**; the right panel's
+> axis is the radiance itself, with no exposure and no tone curve, which is the only way the 14×
+> is readable as a number rather than as a look. Green band, `U₁₂.₅ = 6 m/s`, sun at 21.02°.
+> **Left:** five azimuth cuts, each normalised to **its own** peak, so the only thing the panel
+> shows is *shape*. The path narrows monotonically as the eye drops, and it does so with **one
+> slope distribution and one wind** — nothing in the model changes between the curves except where
+> the camera is. **Middle and right:** the two columns of the table above, as two curves that go
+> **opposite ways** — FWHM 14.90° → 6.60° (**2.258×** narrower) while the peak runs 13.6 → 193.4
+> (**14.18×** brighter), reproducing the printed 2.26 and 14.2 from the implementation itself. A
+> spread parameter is a single number and can be neither of these curves; that is the argument,
+> and the two panels together are it.
+
 ⚠️ **So a glitter path of uniform width is wrong, and it is the default.** Anything that draws the
 path as a stretched blob, a scrolled mask, or a lobe with one width applied along its length is
 making a claim about the surface statistics that the surface statistics contradict — and it is
@@ -4701,6 +4814,29 @@ chapter's pool (`τ = a·d = 0.3664 / 0.0742 / 0.0143` at 1.40 m, `D`, recompute
 |---|---|---|---|---|
 | Escape, `T_esc` | **0.3403 / 0.4795 / 0.5106** | 0.2850 / 0.4563 / 0.5050 | **16.2 / 4.8 / 1.1 % low** (the truth is 19.4 / 5.1 / 1.1 % above it) | **+0.76** in red |
 | Round trip, `G_rt` | **0.0965 / 0.3277 / 0.4445** | 0.1389 / 0.3614 / 0.4546 | **43.9 / 10.3 / 2.3 % high** (the truth is 30.5 / 9.3 / 2.2 % below it) | **−0.85** in red |
+
+![The two integrands of the escape leg over their shared cosine, and the factorisation error against optical depth](figures/lut-factorisation.png)
+
+> **Figure 12·2 — why the product of the means is not the mean of the product.** `D`. Drawn by
+> [`figures/make_figures.py`](figures/make_figures.py) (`fig_factorisation`) from
+> `reference-impl/optics.py`'s `slab_esc`, `slab_trap`, `r_int_at` and `_e3`. Scene-linear;
+> dimensionless throughout. **Left, the mechanism**, on this pool's own red column
+> (`τ = 0.36638`): the two thin curves are the factors, and they **rise together** — a steep ray
+> attenuates less *and* escapes, a grazing one attenuates more *and* is totally reflected. The
+> thick solid curve is the joint integrand `2μ f g`, whose area is `T_esc = 0.3403`; the dashed
+> straight line is the separated integrand `2μ ⟨f⟩⟨g⟩`, whose area is `0.2850`. **The two curves
+> cross**, and the two tinted regions are the two halves of `Cov(f, g)`: the separated form
+> over-counts below `μ_c` (where the true escape is *identically zero* and it still credits some)
+> and under-counts above it by more. The net is the printed +19.4%. **Right, the size of it**:
+> `joint/separated − 1` against `τ` for both legs, per band, with each band's own pool `τ` marked.
+> Two things are visible that the tables below cannot show. The escape leg and the round trip have
+> **opposite signs** at every `τ`, which is the cancellation that lets a chain-level check pass at
+> 2.8% while a term inside is wrong by 19.4%. And the three bands **very nearly coincide** — the
+> spread the correction below names is real but small, so the per-channel spread in the printed
+> numbers comes almost entirely from the three bands sitting at *different `τ`*, not from
+> `R_int(μ)` differing between them. That is a sharper statement than "the table needs a band
+> label", and it is the one to carry: **re-run the row at your own `τ`, and do not expect the band
+> label to be what moves it.**
 
 ⚠️ **And the round-trip row hides a second choice, where the *more* physical option is the *further*
 off.** `(2E₃(τ))²` in the table is **two one-way diffuse legs**, which re-randomises the ray's

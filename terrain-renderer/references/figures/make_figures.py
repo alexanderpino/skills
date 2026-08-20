@@ -25,10 +25,13 @@ WHAT IT MAY AND MAY NOT DO.
      mark and every sentence of interpretation live in the markdown beside the
      image, where they can be read, diffed and corrected. Wave 11's three
      critics each reported that text inside the pixels defeated the blind.
-  3. SCENE-LINEAR for anything physical. The one display-referred panel
-     (`fig_runup`, panel A, which is a picture of an image) says so in its own
-     chapter caption and encodes through `beach_render`'s own transfer curve
-     rather than a private gamma.
+  3. SCENE-LINEAR throughout, and NOTHING here is display-referred. The two
+     panels that are images rather than plots (`fig_runup`) map grey level
+     LINEARLY to scene-linear albedo: no exposure, no tone curve, no gamma.
+     They are maps of a field, not renders of it, and the chapter caption says
+     so. If a future figure ever needs a display transform, take it from
+     `render.encode` rather than writing a private gamma, and say so in the
+     caption.
   4. IT FAILS RATHER THAN DRAWS A STALE VALUE. `preflight()` re-derives each
      figure's headline number by a route that does not share code with the one
      being drawn, and raises SystemExit on the first disagreement. A plotting

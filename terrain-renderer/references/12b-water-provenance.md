@@ -634,7 +634,10 @@ least-confident-claims ledger in `00-index.md`.
   near-constant answer is the coefficient and the glow's share moving in opposite directions
   (0.012, 0.026, 0.038 inferred), not the bias being insensitive to geometry. Quote the formula,
   not the percentage.
-- **P/D** — [K_d is half the solution](12-water-rendering.md#k_d-is-half-the-solution-the-other-half-is-a-direction-and-it-is-what-a-bay-is-held-by),
+- **P/D** — [K_d is half the solution; the other half is a
+  direction](12-water-rendering.md#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it)
+  (the section was renamed and this link had rotted; **figure 12·4** there now draws the
+  coefficient and the Cornu spiral),
   wave 10. **Sommerfeld 1896** (the exact half-plane solution) and **Penney & Price 1952** (its
   water-wave application, rigid screen) are `P` — cited for the *structure* and **not** re-verified
   against those papers, which this container does not hold. The **form as written** — including the

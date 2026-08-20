@@ -1418,7 +1418,11 @@ quadrature is split there or it is wrong at the third digit:
 | 1.3400 | 48.268° | 6.7511% | 48.0681% | 7.120 | 44.3083% | 3.7598% |
 
 (`D`, 2000-node Gauss–Legendre here, split at `μ_c`.) Three things follow, and each is load-bearing
-somewhere in `12`.
+somewhere in `12`. All three are visible at once in
+[`12`'s figure 12·1](12-water-rendering.md#surface-reflection-names-two-opposite-things-a-loss-and-a-trap),
+which draws the two directional curves and then the decomposition **as areas** under the
+cosine-weighted integrand — the geometric block, the Fresnel remnant, and `R_ext` on the same
+scale. `figures/fresnel-two-sides.png`, from `figures/make_figures.py`.
 
 **The two are tied, so neither is free.** Walsh's relation `n²(1 − R_int) = 1 − R_ext` holds on
 these quadratures to **6×10⁻¹¹** — float64 noise, not agreement to a tolerance — which is what makes
@@ -2029,6 +2033,29 @@ alongshore**, which is what a beach has. Its correlation length is not a new num
 self-organise at the horizontal swash excursion (Werner & Fink 1993), and the excursion is already
 `sqrt(H_0 L_0)` with the slope divided out of Hunt's run-up.
 
+![The beach face painted by the swash exceedance beside one realisation of the same field](figures/runup-distribution-vs-realisation.png)
+
+> **Figure 12a·1 — a distribution is not a surface, and this is what that costs.** `D`. Drawn by
+> [`figures/make_figures.py`](figures/make_figures.py) (`fig_runup`) from `reference-impl`'s own
+> `beach.swash_wetness`, `beach.damp_limit` and the shipped `beach_render` sand pair —
+> deterministic in `damp_limit`'s explicit seed, which is a counter hash with no RNG state, so the
+> figure redraws identically forever. **Both fields are scene-linear ALBEDO with grey level linear
+> in albedo — no exposure, no tone curve, no gamma. They are maps of the field, not renders of
+> it.** **Upper left:** the face painted by the exceedance `p(z) = exp(−(z/σ)²)`. It is the correct
+> answer to *what share of cycles reach this level* and it is a **monotone ramp with no boundary
+> anywhere**, at any contrast, at any exposure — because it is the beach's time-average and an
+> average has no edge. **Lower left:** one draw of the `N`-cycle run-up maximum on the cusp
+> lattice, same albedos, same blend, same code. The boundary is a **step**, and it **varies
+> alongshore** by the swash's own correlation length, which is what the reference photographs show.
+> The dashed line on both is the median damp limit, 0.725 m — note that the realisation crosses it
+> from both sides and the distribution merely passes through it. **Right:** the vertical cut. The
+> exceedance is one smooth curve; the realisation is four hard steps at four alongshore stations
+> (0.736 / 0.948 / 0.696 / 0.603 m). **No amount of correctness in the smooth curve produces the
+> step.** This is the figure to hold beside glitter drawn as its slope pdf and foam drawn as its
+> own mean: same defect, same symptom — *smooth where the photograph is sharp* — and the
+> transferable statement is that **an ensemble mean is the right object for a budget and the wrong
+> object for a surface.**
+
 **Two consequences worth having.**
 
 **1 · It closes an open `?` by consequence rather than by citation.** Hunt (1959) `R = xi*H` is a
@@ -2483,7 +2510,10 @@ cos(ψ/2) -> −inf :  bracket -> 0,                           U -> 0           
 The middle line is where `12`'s `K_d(0) = 0.5000` comes from, and it is **exact at every `kr`** — no
 asymptotics enter, because `X = 0` there and `F(0) = 0`. The two outer lines are the **Cornu
 spiral's limits**, `C(±inf) = S(±inf) = ±1/2`, which is why the half is a half and not something
-else.
+else. Drawn — the coefficient across the boundary and the spiral beside it, with the three
+collinear points that make the chord from the origin exactly half the chord from the far eye — in
+[`12`'s figure 12·4](12-water-rendering.md#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it)
+(`figures/sommerfeld-half-plane.png`, from `figures/make_figures.py`).
 
 **Why `2π − φ − φ_0` and not `φ + φ_0`.** Both produce the same reflected plane wave, since
 `cos(2π − φ − φ_0) = cos(φ + φ_0)`. They differ in *where they switch it on*. With `φ ∈ (−π, π]` and
