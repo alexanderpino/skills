@@ -49,6 +49,7 @@ import beach_foam as FOAM                                       # noqa: E402
 import beach_camera as CMR                                      # noqa: E402
 import optics as OPT                                            # noqa: E402,F401
 import atmosphere as ATM                                        # noqa: E402
+import wind_spectrum as WSP                                     # noqa: E402
 
 VERBOSE = '-v' in sys.argv or '--verbose' in sys.argv
 BUG = None
@@ -8295,6 +8296,460 @@ BUGS.update({
 })
 
 
+# ==========================================================================
+# WAVE 17 -- THE SLOPE STATISTICS, DERIVED FROM THE FORCING
+#
+# The question this section answers is not "is the mss right". It is "where
+# does the mss COME FROM". Thirteen waves took it from Cox & Munk's 1954 fit,
+# which is a measurement made off Maui and asserted here. `wind_spectrum.py`
+# computes it instead from a wind-wave spectrum (ECKV 1997) integrated to slope
+# variance, and the rows below ask whether that derivation RETURNS the fit in
+# the limit the fit was measured in.
+#
+# THE HEADLINE ROW IS `spectral mss returns Cox & Munk`, and it is written so
+# it can fail: it compares an integral over seven decades of wavenumber against
+# a published straight line, absolutely, with the PAPER's own quoted
+# uncertainty as the tolerance rather than one sized from the disagreement.
+#
+# THE TRAP THIS SECTION IS BUILT AROUND. A suite that checks only the TOTAL is
+# blind to the thing that matters, because a flat spectrum scaled to the right
+# total passes every total row. That is this project's own recorded failure --
+# "a row green on a broken thing because the mean was always right". So every
+# total row here is paired with a SHAPE row, and `spec-flat-b` reintroduces
+# exactly that defect to prove the pairing works.
+# ==========================================================================
+def _sec_spectrum(ctx):
+    """WAVE 17 -- the wind-wave spectrum, and Cox & Munk as its large-fetch
+    limit."""
+    W = WSP
+    # The scene's wind. `beach_optics.U10 = 6.0` is the number the whole run
+    # uses; the conversion below is what makes it a 12.5 m wind for Cox & Munk
+    # and a 10 m wind for ECKV, which are not the same number.
+    u125 = 6.0
+    ratio = W.u125_over_u10()
+    u10 = u125 / ratio
+    big = 1e12                       # "large fetch" -- see the limit row below
+    k_top = 10.0 * W.K_M             # integrate a decade past the capillary
+                                     # scale, where B has collapsed to nothing
+
+    # --------------------------------------------- 17.1 the two upper scales
+    # ECKV declares k_m = 370 rad/m and c_m = 0.23 m/s as if they were two
+    # constants. They are one constant and a consequence, and these two rows
+    # are what turn the top of the spectrum from a declaration into physics.
+    check(1, 'c_m is the MINIMUM of c(k), not a second constant',
+          W.min_phase_speed(), W.C_M, 3.0e-4,
+          'c^2 = (g/k)(1 + k^2/k_m^2) is stationary at k = k_m exactly, so '
+          'c_min = sqrt(2g/k_m) = 0.23024 m/s. ECKV quotes c_m = 0.23. The '
+          'row exists because a file that carried both as independent inputs '
+          'could drift them apart and nothing would notice; here one is '
+          'derived from the other and the agreement is the check.')
+    check(1, 'k_m equals the surface-tension wavenumber sqrt(rho g/sigma)',
+          W.capillary_wavenumber(), W.K_M, 0.03,
+          'sqrt(rho g / sigma) = 367.0 rad/m for clean fresh water at 20 C '
+          'against ECKV\'s 370 -- 0.8% apart, from surface tension on one '
+          'side and a fit to tank spectra on the other. THIS IS THE ROW THAT '
+          'SAYS THE UPPER END OF THE SPECTRUM IS DERIVED. The 3% tolerance is '
+          'the spread of published sigma for natural water (0.072-0.075 N/m), '
+          'which is 2.0% on the wavenumber, not the observed 0.8%.',
+          rel=True)
+
+    # --------------------------------------------- 17.2 the sea's age vs fetch
+    # ⚠️ NOT ONLY AT THE FIXED POINT. The fully-developed limit is a fixed
+    # point of the fetch law and a second copy of the law is invisible there,
+    # so the monotone row below is evaluated at four INTERMEDIATE fetches.
+    check(1, 'inverse wave age -> 0.84 at large fetch',
+          float(W.omega_c(u10, big)), W.OMEGA_FD, 1e-6,
+          'tanh -> 1 so Omega_c -> 0.84, the fully developed sea. ⚠️ THIS ROW '
+          'IS WHAT DECIDES A TRANSCRIPTION AMBIGUITY: the fetch law extracts '
+          'from an HTML source as "0.84 tanh(...) - 0.75", which at infinite '
+          'fetch would give 0.09 and contradict every source\'s stated value. '
+          'Read as an exponent it gives 0.84 exactly. The limit picks the '
+          'reading, and `spec-fetch-subtract` fires the other one.')
+    om_f = [float(W.omega_c(u10, f)) for f in (1e3, 1e4, 1e5, 1e6)]
+    check(1, 'inverse wave age falls monotonically as fetch grows',
+          float(np.min(np.diff(om_f))) < 0.0, True, 0,
+          'Omega_c at fetch 1e3/1e4/1e5/1e6 m = %.3f/%.3f/%.3f/%.3f. A '
+          'younger sea is a steeper sea; a law that rose with fetch would be '
+          'the eleventh way. Four samples, all strictly between the two fixed '
+          'points of the law.' % tuple(om_f))
+    rt = [W.fetch_for_omega(u10, o) for o in (1.2, 2.0, 4.0)]
+    check(1, 'fetch_for_omega inverts omega_c (round trip, 3 points)',
+          [float(W.omega_c(u10, f)) for f in rt], [1.2, 2.0, 4.0], 1e-9,
+          'The closed-form inverse is used to locate the edge of ECKV\'s '
+          'fitted domain for a scene, so it has to be the actual inverse and '
+          'not an approximation to it. Three points, none of them a limit.')
+
+    # --------------------------- 17.2b the exponent nothing at large fetch sees
+    # ⚠️ THIS ROW EXISTS BECAUSE A DEFECT ESCAPED. `spec-alpha-p-half` -- the
+    # equilibrium exponent rounded from 0.55 to 0.50 -- was caught by ZERO rows
+    # on this section's first firing. The cause is a degeneracy, not a gap in
+    # coverage: every other row here sits at a fully developed sea, where
+    # Omega_c = 0.84, and 0.84^0.55 = 0.9107 against 0.84^0.50 = 0.9165. Six
+    # tenths of a per cent on the long-wave branch, 0.00013 of mss, against a
+    # tolerance of 0.004. THE ROW HAD TO MOVE, NOT WIDEN. Evaluated at the
+    # young end of ECKV's own domain the two exponents part by 8%.
+    f_young = W.fetch_for_omega(u10, W.OMEGA_MAX)
+    check(1, 'alpha_p at a YOUNG sea (Omega_c = 5), where the exponent shows',
+          float(W.alpha_p(u10, f_young)), 0.006 * 5.0 ** 0.55, 1e-9,
+          'alpha_p = 0.006 Omega_c^0.55 = %.6f at Omega_c = 5, against '
+          '%.6f if the exponent were 0.50 -- 8.2%% apart, where at Omega_c = '
+          '0.84 they are 0.6%% apart and invisible. The expected value is '
+          'written out in this row rather than read from the function, so '
+          'this compares the code with the source and not with itself. '
+          '⚠️ IT IS AN ARITHMETIC ROW, NOT A PHYSICS ROW: the 0.55 rests on '
+          'one restatement ([M]) and nothing in this container measures a '
+          'young sea\'s mss, so what is guarded is the transcription.'
+          % (0.006 * 5.0 ** 0.55, 0.006 * 5.0 ** 0.5))
+    check(1, 'alpha_m contains the friction velocity and no fetch at all',
+          [W.alpha_m(u10), W.alpha_m(u10)],
+          [float(np.asarray(W.alpha_m(u10))), 0.01 * (1.0 + math.log(
+              math.sqrt(W.CD_10N) * u10 / W.C_M))], 1e-12,
+          'ECKV Eq. 44 evaluated against its own closed form written out '
+          'here. The row looks tautological and is not: what it pins is the '
+          'SIGNATURE -- alpha_m takes one argument, the wind, and there is no '
+          'fetch to pass it. A later wave that adds a basin-size term to the '
+          'capillary branch breaks this row, which is the point.')
+
+    # ------------------------------------ 17.3 THE HEADLINE: does it return CM
+    # Absolute rows against the published fit, at both ends of Cox & Munk's own
+    # 1-14 m/s domain, with the paper's +-0.004 as the tolerance.
+    for uu in (6.0, 14.0):
+        m_spec = W.mss(uu / ratio, big, k_top)
+        m_cm = float(W.cox_munk_total(uu))
+        check(1, 'spectral mss returns Cox & Munk at U12.5 = %g' % uu,
+              m_spec, m_cm, W.CM_SIGMA,
+              'THE ROW THIS WAVE EXISTS FOR. mss = INT k^2 S(k) dk over seven '
+              'decades of an ECKV spectrum at large fetch, against '
+              '0.003 + 5.12e-3 U. Got %.5f against %.5f, a gap of %+.5f. The '
+              'tolerance is Cox & Munk\'s OWN quoted uncertainty on the '
+              'clean-sea mss (+-0.004), which is a property of the 1954 '
+              'photographs and not of this disagreement. If this row passes, '
+              'the fit is a CONSEQUENCE of the wind and not an input, and the '
+              'sea and the pool are one calculation.'
+              % (m_spec, m_cm, m_spec - m_cm))
+    m3 = W.mss(3.0 / ratio, big, k_top)
+    openq(1, 'the derivation runs HIGH at low wind (U12.5 = 3)',
+          '%.5f vs %.5f' % (m3, float(W.cox_munk_total(3.0))),
+          'within +-0.004',
+          'Measured, understood, not achieved. At 3 m/s the spectral mss is '
+          '%+.5f above Cox & Munk -- 36%%, and outside the paper\'s band, '
+          'while 6 and 14 m/s are inside it. THE TERM IS NAMED: it is the '
+          'short-wave branch B_h, whose alpha_m = 0.01[1 + ln(u*/c_m)] goes '
+          'to zero only when u* reaches c_m/e and stays finite below it, so '
+          'the capillary tail does not switch off as the wind drops the way '
+          'the measurements say it does. This is not this run\'s discovery: '
+          'Guerin et al. (Archimer/Ifremer 28378, read here) report the same '
+          'sign -- "the slick and clean mss predicted by Elfouhaily spectrum '
+          'are larger than those experimentally observed by Phillips and CM" '
+          '-- and propose an excavation of the decimetre range to fix it. '
+          'Parked with the mechanism named, per ruling 11.'
+          % (m3 - float(W.cox_munk_total(3.0))))
+
+    # --------------------------------- 17.4 the second integral of one spectrum
+    # ⚠️ Two instruments agreeing establishes nothing until their sensitivities
+    # are compared. `mss` weights k^2 and is decided by the SHORT waves; the
+    # elevation variance weights k^0 and is decided by the PEAK. They test
+    # different halves of the same spectrum, which is why both are here.
+    hs = W.significant_height(u10, big)
+    between(1, 'fully-developed H_s against the 0.22 U10^2/g rule', hs / (0.22 * u10 * u10 / 9.80665),
+            1.0, 1.3,
+            'H_s = 4 sqrt(INT S dk) = %.3f m at U10 = %.3f, against the '
+            'textbook fully-developed 0.22 U^2/g = %.3f m. BRACKETED, NOT '
+            'CHECKED TIGHT, and the reason is a real one: ECKV\'s '
+            'fully-developed sea is Omega_c = 0.84 while Pierson-Moskowitz\'s '
+            'peak sits at Omega = 0.877, so the two define "fully developed" '
+            'differently and a tight row here would be comparing two '
+            'conventions. What the bracket does catch is a spectrum whose '
+            'PEAK is in the wrong place by a factor, which no mss row can '
+            'see.' % (hs, u10, 0.22 * u10 * u10 / 9.80665))
+
+    # --------------------------------------- 17.5 the cut-off IS the instrument
+    # The sharpest form of the owner's question. mss is dominated by its
+    # high-k end, so "the" mss does not exist until a cut-off is named.
+    cuts = (11.0, 20.0, 95.0, 250.0, 370.0)
+    fam = W.mss_cutoff_family(u10, big, cuts)
+    check(1, 'mss rises monotonically with the upper cut-off',
+          float(np.min(np.diff(fam))) > 0.0, True, 0,
+          'mss(<k) at k = 11/20/95/250/370 rad/m = %s. A cut-off family, not '
+          'a line. These five are not arbitrary: 11, 95 and 250 rad/m are the '
+          'L-, Ku- and Ka-band retrievals in Hwang & Fois (arXiv:2204.11591, '
+          'read here), 20 rad/m is the cut-off that paper assigns to Cox & '
+          'Munk\'s own artificial-slick runs (which suppressed waves shorter '
+          'than ~0.3 m), and 370 is the capillary scale.'
+          % ' '.join('%.4f' % v for v in fam))
+    check(1, 'the slick cut-off (20 rad/m) carries a MINORITY of the total',
+          W.mss(u10, big, 20.0) / W.mss(u10, big, k_top), 0.591, 0.03,
+          'ABSOLUTE row on the thing the chapter has to stop getting wrong. '
+          'Integrating only to Cox & Munk\'s slick cut-off returns 59%% of '
+          'the total mss; the other 41%% is in waves shorter than 31 cm. So '
+          'the SAME sea has two different published mean square slopes and '
+          'neither is wrong -- "which mss" is set by the resolution of the '
+          'instrument, not by the basin. The tolerance is 5%% relative on a '
+          'ratio of two quadratures of one function.')
+
+    # ------------------------------- 17.6 the fit becomes a consequence, twice
+    # This project's shipped model is Phillips k^-4: EQUAL slope variance per
+    # octave, with the amplitude back-solved so the whole range returns Cox &
+    # Munk. That makes B a constant. ECKV derives B(k) from the wind instead.
+    # ROW ONE asks whether the constant was right ON AVERAGE. ROW TWO asks
+    # whether B is actually constant -- and it is row two that has teeth,
+    # because row one passes for any spectrum with the right total.
+    kcap = float(BOP.K_CAP)
+    kp_pm = float(BOP.pm_peak_wavenumber(6.0))
+    mss_cm6 = float(W.cox_munk_total(6.0))
+    b_code = mss_cm6 / math.log(kcap / kp_pm)
+    lk = np.linspace(math.log(kp_pm), math.log(kcap), 4001)
+    b_eckv = WSP.curvature(np.exp(lk), u10, big)
+    b_bar = float(np.trapezoid(b_eckv, lk) / (lk[-1] - lk[0]))
+    check(1, 'the back-solved Phillips constant equals the DERIVED mean B',
+          b_bar / b_code, 1.0, 0.10,
+          'The shipped model had to choose one number: 2 pi B = mss/ln(k_cap/'
+          'k_p) = %.6f, chosen so the picture returns Cox & Munk. ECKV '
+          'derives B(k) from the wind; its mean over the SAME band range is '
+          '%.6f. They agree to %.1f%%. THAT IS THE FIT BECOMING A '
+          'CONSEQUENCE. ⚠️ This row alone proves almost nothing -- see the '
+          'next one -- and it is here as the absolute anchor, not as the '
+          'result.' % (b_code, b_bar, 100.0 * abs(b_bar / b_code - 1.0)))
+    check(1, 'B(k) is NOT flat -- the derived spectrum has shape',
+          float(b_eckv.max() / b_eckv.min()), 3.44, 0.35,
+          'THE ROW WITH TEETH, and the reason it exists is written in this '
+          'project\'s own history: a guard green on a broken thing because '
+          'the mean was always right. B ranges %.6f..%.6f over the shipped '
+          'band range, a factor of %.2f -- it dips near k ~ 30-100 rad/m and '
+          'rises again toward the capillary peak. Phillips\' equal-variance-'
+          'per-octave asserts this factor is 1.000. So the amplitude was '
+          'right on average and the SHAPE was never tested by anything. '
+          '`spec-flat-b` reintroduces the flat spectrum with the correct '
+          'total and this is the only row in the section that catches it.'
+          % (b_eckv.min(), b_eckv.max(), b_eckv.max() / b_eckv.min()))
+
+    # -------------------------- 17.7 THE SEPARATING MEASUREMENT (one or two?)
+    # The wave's own hypothesis was that the render's low resolved mss (26x)
+    # and its smooth glitter path (16-60x) are ONE defect: a realisation of the
+    # wrong spectrum. This row is the control that decides it, and it decides
+    # it against the hypothesis.
+    foots = (0.05, 0.1, 0.2, 0.5, 1.0, 2.0)
+    dev = []
+    for fo in foots:
+        kr = W.resolvable_wavenumber(fo)
+        dev.append(W.mss(u10, big, kr)
+                   / W.phillips_mss_below(kr, kp_pm, kcap, mss_cm6))
+    worst = float(np.max(np.abs(np.asarray(dev) - 1.0)))
+    check(1, 'ECKV and Phillips agree on RESOLVED mss at every footprint',
+          worst, 0.0, 0.10,
+          'The two spectra, integrated to the wavenumber a pixel of side '
+          '0.05/0.1/0.2/0.5/1/2 m can resolve (k = pi/L), give resolved mean '
+          'square slopes within %.1f%% of each other -- ratios %s. THIS IS '
+          'THE MEASUREMENT THAT SEPARATES TWO CANDIDATE DEFECTS. If the '
+          'render\'s glitter path were smooth because it drew a realisation '
+          'of the WRONG SPECTRUM, replacing Phillips with ECKV would move the '
+          'resolved variance; it moves it by less than 5%% at every scale a '
+          'pixel of this render subtends. So the spectrum is not the cause, '
+          'and the missing per-pixel structure has to come from the '
+          'realisation not reaching the surface geometry at all.'
+          % (100.0 * worst, ' '.join('%.3f' % d for d in dev)))
+    kres_swell = 0.0
+    for kc in np.geomspace(0.05, 5.0, 4000):
+        if W.mss(u10, big, float(kc), n=2001) >= 0.0013:
+            kres_swell = float(kc)
+            break
+    info(1, 'the render\'s resolved mss 0.0013 as an ECKV cut-off',
+         '%.3f rad/m (lambda %.1f m)' % (kres_swell, 2 * math.pi / kres_swell),
+         'README-beach records the resolved field\'s mss as 0.0013 against '
+         'Cox & Munk\'s 0.0335 -- the 26x this wave was sent to explain. '
+         'Under ECKV, 0.0013 is the slope variance carried by everything '
+         'longer than %.0f m. The render draws one 90 m swell and its second '
+         'harmonic, so its resolved geometry is consistent with a cut-off two '
+         'decades below what its own pixels could carry: at a 0.2 m footprint '
+         'the spectrum offers %.4f, which is %.0fx more resolved variance '
+         'than the swell alone provides. INFO rather than a check, because '
+         '0.0013 is a number read from a report and not recomputed here.'
+         % (2 * math.pi / kres_swell, W.mss(u10, big, W.resolvable_wavenumber(0.2)),
+            W.mss(u10, big, W.resolvable_wavenumber(0.2)) / 0.0013))
+
+    # ------------------------------------------- 17.8 THE POOL, answered honestly
+    om_pool, ok_pool, msg_pool = W.domain_note(u10, 10.0)
+    check(1, 'a 10 m basin is OUTSIDE ECKV\'s fitted domain',
+          ok_pool, False, 0,
+          'THE POOL\'S ANSWER, AND IT IS A REFUSAL. %s ECKV\'s peak-'
+          'enhancement branch is defined for 0.84 < Omega_c < 5; a 10 m fetch '
+          'under this wind gives 12.33. The suite ASSERTS the refusal so that '
+          'no later wave can quote the extrapolated number as a prediction. '
+          'A row that returned a pool mss here would be the worst kind of '
+          'green.' % msg_pool)
+    f_edge = W.fetch_for_omega(u10, W.OMEGA_MAX)
+    check(1, 'the shortest fetch ECKV is fitted for, at this wind',
+          f_edge, 204.1, 2.0,
+          'Omega_c = 5 at a fetch of %.1f m for a %.2f m/s wind. ABSOLUTE row '
+          'and the number a reader needs: the model\'s domain bottoms out at '
+          'roughly 200 m of open water, so a 10 m pool is 20x below it and a '
+          '25 m competition pool is still 8x below it. The tolerance is 1%% '
+          'of the value, which is far finer than the domain edge itself is '
+          'known to -- it guards the arithmetic, not the oceanography.'
+          % (f_edge, u10))
+    # AND THE PART THAT DOES TRANSFER, WHICH IS THE OWNER'S POINT
+    bh_sea = float(WSP.curvature(np.array([W.K_M]), u10, big, split=True)[1][0])
+    bh_pool = float(WSP.curvature(np.array([W.K_M]), u10, 10.0,
+                                  split=True)[1][0])
+    check(1, 'the capillary branch is fetch-INDEPENDENT at the capillary scale',
+          bh_pool / bh_sea, 1.0, 0.03,
+          'THE OWNER\'S "WATER IS WATER", DERIVED RATHER THAN ASSERTED. B_h = '
+          '0.5 alpha_m (c_m/c) F_m, and alpha_m = 0.01[1 + ln(u*/c_m)] '
+          'contains the friction velocity and NOTHING ELSE -- no fetch, no '
+          'basin, no length scale of any kind. At k = k_m the sea and the 10 '
+          'm basin differ by %.1f%%, and that residue is only L_PM J_p, which '
+          'tend to 1 far above the peak. So the short-wave half of the slope '
+          'budget is scale-free BY CONSTRUCTION: fetch enters the whole '
+          'derivation in exactly one place, the peak wavenumber, and the '
+          'capillary tail does not see it.'
+          % (100.0 * abs(bh_pool / bh_sea - 1.0)))
+
+    # ------------------------------------------------- 17.9 the two wind traps
+    check(1, 'the 12.5 m / 10 m wind conversion is applied',
+          ratio, 1.02117, 1e-5,
+          'ANSWER KEY G2, AND IT IS LIVE IN THIS PROJECT. ECKV is '
+          'parameterised on U10; Cox & Munk\'s fit is at a 12.5 m mast. '
+          '`beach_optics.U10 = 6.0` is fed straight to the 12.5 m fit. The '
+          'conversion is a neutral log profile with z0 taken from ECKV\'s own '
+          'drag coefficient, so it costs no new constant, and it is 2.1%% -- '
+          'too small to see in a picture and 0.0007 of mss, which is a fifth '
+          'of the tolerance the headline row runs at.')
+    ustar6 = float(W.friction_velocity(u10))
+    info(1, 'the scene sits 3% below a KINK in alpha_m',
+         'u* = %.4f, c_m = %.2f' % (ustar6, W.C_M),
+         'alpha_m switches from 0.01[1 + ln(u*/c_m)] to 0.01[1 + 3 ln(u*/c_m)]'
+         ' at u* = c_m, which is U10 = %.3f m/s (U12.5 = %.3f). This scene\'s '
+         '6 m/s gives u* = %.4f, just under. A wind sweep that steps across '
+         '6.06 m/s crosses a derivative discontinuity in the MODEL, not in '
+         'the sea, and the slope of alpha_m triples there. Recorded so that a '
+         'later wave reading a kink off a plot does not go looking for it in '
+         'the water.'
+         % (W.C_M / math.sqrt(W.CD_10N), W.C_M / math.sqrt(W.CD_10N) * ratio,
+            ustar6))
+    check(1, 'Cox & Munk\'s TOTAL fit is not the sum of her components',
+          W.CM_TOTAL_A, 5.12e-3, 1e-12,
+          'ANSWER KEY G4. The components sum to 0.003 + 5.08e-3 U; the '
+          'separately fitted total is 0.003 + 5.12e-3 U. 0.8%% apart at any '
+          'wind, and a file that checks one against the other has misread the '
+          'source. This row pins which of the two the comparison above uses, '
+          'because substituting the other one would shift the headline row by '
+          '0.00024 -- inside its tolerance, and therefore exactly the kind of '
+          'silent substitution nothing else would catch.')
+
+
+# ------------------------------------------------------------ the wave-17 bugs
+# Eight defects. Six are transcription errors a reader of ONE source would
+# actually have shipped -- the two square roots and the fetch exponent are the
+# three the header of `wind_spectrum.py` records as live traps -- and two are
+# the structural ones this project has been caught by before.
+def _bug_spec_no_sqrt(mod):
+    """The radicals dropped from F_p and Gamma, which is how [M]'s HTML
+    renders them. THE DEFECT IS REAL AND WAS NEARLY SHIPPED HERE."""
+    src = mod.curvature
+
+    def cur(k, u10, fetch, split=False):
+        k = np.asarray(k, float)
+        om = float(mod.omega_c(u10, fetch))
+        kp = float(mod.peak_wavenumber(u10, fetch))
+        cp = math.sqrt(mod.G / kp)
+        c = mod.phase_speed(k)
+        l_pm = np.exp(-1.25 * (kp / k) ** 2)
+        gam = 1.7 if om <= 1.0 else 1.7 + 6.0 * math.log10(om)
+        sig = 0.08 * (1.0 + 4.0 * om ** -3)
+        gb = np.exp(-((k / kp - 1.0) ** 2) / (2.0 * sig * sig))   # -- DEFECT
+        j_p = gam ** gb
+        f_p = l_pm * j_p * np.exp(-(om / math.sqrt(10.0))
+                                  * (k / kp - 1.0))               # -- DEFECT
+        b_l = 0.5 * (0.006 * om ** 0.55) * (cp / c) * f_p
+        us = float(mod.friction_velocity(u10))
+        am = (0.01 * (1.0 + math.log(us / mod.C_M)) if us <= mod.C_M
+              else 0.01 * (1.0 + 3.0 * math.log(us / mod.C_M)))
+        f_m = l_pm * j_p * np.exp(-0.25 * (k / mod.K_M - 1.0) ** 2)
+        b_h = 0.5 * am * (mod.C_M / c) * f_m
+        return (b_l, b_h) if split else b_l + b_h
+    mod.curvature = cur
+    mod._src = src
+
+
+def _bug_spec_fetch_subtract(mod):
+    """`0.84 tanh(...) - 0.75` instead of `0.84 tanh(...)^(-0.75)`."""
+    def om(u10, fetch):
+        u10 = np.asarray(u10, float)
+        X = mod.G * np.asarray(fetch, float) / (u10 * u10)
+        return mod.OMEGA_FD * np.tanh((X / mod.X_0) ** 0.4) - 0.75
+    mod.omega_c = om
+
+
+def _bug_spec_alpha_p_half(mod):
+    """alpha_p = 0.006 Omega^0.5, the exponent rounded from 0.55.
+
+    ⚠️ THE DEFECT THAT ESCAPED THIS SECTION'S FIRST FIRING, and it is left in
+    the table with that fact recorded rather than quietly fixed. It patches
+    `alpha_p` itself, which is why `alpha_p` is a named function at all: while
+    the exponent lived inside `curvature` the only way to fire it was to
+    rescale the result, and the only rows that could have seen it were mss
+    rows at a fully developed sea, where the two exponents differ by 0.6%."""
+    mod.alpha_p = lambda u10, fetch: 0.006 * np.asarray(
+        mod.omega_c(u10, fetch), float) ** 0.50
+
+
+def _bug_spec_no_capillary(mod):
+    """B_h dropped: the gravity waves only. THE WAVE'S OWN HYPOTHESIS, fired
+    as a defect so that the rows which would have caught it are on record."""
+    src = mod.curvature
+
+    def cur(k, u10, fetch, split=False):
+        b_l, b_h = src(k, u10, fetch, split=True)
+        z = np.zeros_like(np.asarray(b_h, float))
+        return (b_l, z) if split else b_l
+    mod.curvature = cur
+
+
+def _bug_spec_u12_as_u10(mod):
+    """The 12.5 m wind used as a 10 m wind. Answer key G2."""
+    mod.u125_over_u10 = lambda: 1.0
+
+
+def _bug_spec_components_sum(mod):
+    """Cox & Munk's component sum 5.08e-3 quoted as the total fit. Key G4."""
+    mod.CM_TOTAL_A = 5.08e-3
+
+
+def _bug_spec_flat_b(mod):
+    """B(k) FLAT, scaled to the correct total -- this project's shipped
+    Phillips model, and the defect that passes every row about a mean."""
+    def cur(k, u10, fetch, split=False):
+        k = np.asarray(k, float)
+        kp = float(mod.peak_wavenumber(u10, fetch))
+        tot = float(mod.cox_munk_total(6.0))
+        b = np.full(k.shape, tot / math.log(mod.K_M * 10.0 / kp))
+        b = np.where((k >= kp) & (k <= mod.K_M * 10.0), b, 0.0)
+        return (b, np.zeros_like(b)) if split else b
+    mod.curvature = cur
+
+
+def _bug_spec_km_declared(mod):
+    """k_m set to 200 rad/m, breaking its agreement with surface tension and
+    with the minimum of the dispersion relation at once."""
+    mod.K_M = 200.0
+
+
+SPECTRUM_BUGS = ('spec-no-sqrt', 'spec-fetch-subtract', 'spec-alpha-p-half',
+                 'spec-no-capillary', 'spec-u12-as-u10',
+                 'spec-components-sum', 'spec-flat-b', 'spec-km-declared')
+
+BUGS.update({
+    'spec-no-sqrt': _bug_spec_no_sqrt,
+    'spec-fetch-subtract': _bug_spec_fetch_subtract,
+    'spec-alpha-p-half': _bug_spec_alpha_p_half,
+    'spec-no-capillary': _bug_spec_no_capillary,
+    'spec-u12-as-u10': _bug_spec_u12_as_u10,
+    'spec-components-sum': _bug_spec_components_sum,
+    'spec-flat-b': _bug_spec_flat_b,
+    'spec-km-declared': _bug_spec_km_declared,
+})
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -8335,7 +8790,13 @@ def run_suite():
                       (_sec_terrace, 'the sea-level history: the ladder, the '
                                      'two frames, and the merge'),
                       (_sec_seam, 'the sea-sky seam and the transport '
-                                  'through a wave face')):
+                                  'through a wave face'),
+                      # WAVE 17. Pure quadrature on closed forms -- no grid, no
+                      # bay, no render -- so it costs about a second and its
+                      # position in the list is free. It is last because it is
+                      # newest, not because it is expensive.
+                      (_sec_spectrum, 'the slope statistics derived from the '
+                                      'forcing, and Cox & Munk as its limit')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -8594,6 +9055,32 @@ if __name__ == '__main__':
         importlib.reload(BCH)
         BCH._BAY_CACHE.clear()
         sys.exit(0)
+    if '--bugs-spectrum' in sys.argv:
+        # WAVE 17. Its own driver because the defects patch `wind_spectrum`,
+        # which the whole-suite driver does not reload -- a patched `curvature`
+        # would leak into every later run and the table would be measuring the
+        # order of the loop instead of the defects. Reloaded between every one.
+        import importlib
+        _run_section(_sec_spectrum, 'the derived slope statistics')
+        base = set(_fail_names())
+        print('clean spectrum section: %d pass / %d FAIL'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base)))
+        print()
+        print('%-24s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 110)
+        for name in SPECTRUM_BUGS:
+            importlib.reload(WSP)
+            BUGS[name](WSP)
+            try:
+                _run_section(_sec_spectrum, 'the derived slope statistics')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-24s %d  %s' % (name, len(caught),
+                                    '; '.join(c[:70] for c in caught[:5])))
+        importlib.reload(WSP)
+        sys.exit(0)
     if '--bugs-surface' in sys.argv:
         import importlib
         _run_section(_sec_surface, 'the nonlinear free surface')
@@ -8776,6 +9263,12 @@ if __name__ == '__main__':
                 # clears `beach._BAY_CACHE` between runs. The whole-suite
                 # driver reuses the cache across bugs, so a patched plan-form
                 # would be invisible to every section after the first.
+                continue
+            if name in SPECTRUM_BUGS:
+                # WAVE 17. These patch `wind_spectrum`, which this driver does
+                # not reload between defects, so a patched `curvature` would
+                # survive into every later row. `--bugs-spectrum` reloads it
+                # and is the table that fires them.
                 continue
             if name in TERRACE_BUGS or name in SEAM_BUGS:
                 # WAVE 16. The terrace defects live inside functions whose
