@@ -965,6 +965,192 @@ def fig_bar_alongshore(bay, path):
     return P.save(img, path)
 
 
+# ============================================================ wave 13 / 15
+# WAVE 13 PRODUCED NO FIGURE AT ALL -- all three of its builders died at or
+# before the evidence step, and the standing ruling is that every wave produces
+# visual evidence. These are wave 13's findings, drawn two waves late.
+
+
+def fig_phase_alongshore(bay, path):
+    """WAVE 13's LARGEST FINDING FOR THE PICTURE: the phase field had no
+    alongshore half, so every crest in every frame ran exactly shore-parallel.
+
+    Left is waves 1-12, right is the fix, and the left panel is generated from
+    the right one rather than from an old checkout: the march's increment does
+    not depend on S, so waves 1-12's field is exactly this one with its own
+    boundary column subtracted off every row. Nothing is redrawn by hand.
+    """
+    x, y, tr = bay['x'], bay['y'], bay['tr']
+    tr12 = dict(tr)
+    tr12['S'] = tr['S'] - tr['S'][:, :1]         # S(y, 0) = 0, waves 1-12
+    pix12 = _bay_pixels(bay, tr12)
+    pix13 = _bay_pixels(bay, tr)
+
+    x0 = 150.0
+    x1 = float(np.nanmax(bay['x_s'])) + 90.0
+    i0 = int(np.searchsorted(x, x0))
+    i1 = int(np.searchsorted(x, x1))
+
+    img = P.canvas(1500, 1080)
+    for k, (pix, ttl) in enumerate((
+            (pix12, 'waves 1-12:  S(y, 0) = 0, only k_x integrated'),
+            (pix13, 'wave 13:  S(y, 0) = INT k_y dy, both components'))):
+        ax = P.Axes(img, (78 + k * 730, 66, 700 + k * 730, 640),
+                    (y[0], y[-1]), (x0, x1), title=ttl,
+                    xlabel='alongshore, m',
+                    ylabel=('cross-shore, m (sea at the top)' if k == 0 else ''),
+                    y_up=False)
+        ax.image(pix[i0:i1])
+        ax.frame(_ticks(y[0], y[-1], 5), _ticks(x0, x1, 6))
+        ax.line(y, bay['x_s'], (255, 96, 64), 2)
+
+    # ---- the gradient of the drawn phase, on the flat-bed control where the
+    # answer is a plane wave and known in advance (ruling 14).
+    ny, nx, Ly = 129, 65, 1408.0
+    yv = np.linspace(-Ly / 2, Ly / 2, ny)
+    xv = np.linspace(0.0, 640.0, nx)
+    fl = B.transform_2d(xv, yv, np.full((ny, nx), -20.0), B.T_SWELL,
+                        B.H0_SWELL, B.THETA0_SWELL, breaking=False)
+    S13 = fl['S']
+    S12 = S13 - S13[:, :1]
+    ky = float(fl['k'][ny // 2, nx // 2] * math.sin(fl['theta'][ny // 2, nx // 2]))
+    run = float(S13[-1, 0] - S13[0, 0])
+
+    ax = P.Axes(img, (78, 730, 700, 1010), (yv[0], yv[-1]),
+                (-0.5 * run, 0.5 * run + 1.0),
+                title='the drawn phase along the coast, flat bed in 20 m',
+                xlabel='alongshore, m', ylabel='S, radians')
+    ax.frame(_ticks(yv[0], yv[-1], 5), _ticks(-0.5 * run, 0.5 * run, 5))
+    ax.line(yv, S12[:, 0], BAR, 3)
+    ax.line(yv, S13[:, 0], WAVE, 3)
+    P.legend(ax, [(BAR, 'waves 1-12: 0.000 rad, flat'),
+                  (WAVE, 'wave 13: %.2f rad = %.2f wavelengths'
+                   % (run, run / (2 * math.pi)))],
+             yv[0] + 60, 0.42 * run)
+
+    ax = P.Axes(img, (808, 730, 1430, 1010), (yv[0], yv[-1]),
+                (-0.004, 0.022),
+                title='dS/dy against k sin(theta), the closed form',
+                xlabel='alongshore, m', ylabel='dS/dy, rad/m')
+    ax.frame(_ticks(yv[0], yv[-1], 5), [0.0, 0.005, 0.01, 0.015, 0.02])
+    g12 = np.gradient(S12, yv[1] - yv[0], axis=0)[:, nx // 2]
+    g13 = np.gradient(S13, yv[1] - yv[0], axis=0)[:, nx // 2]
+    ax.hline(ky, GREY, 2, (7, 5))
+    ax.line(yv, g12, BAR, 3)
+    ax.line(yv, g13, WAVE, 3)
+    P.legend(ax, [(GREY, 'k sin(theta) = %.6f rad/m' % ky),
+                  (BAR, 'waves 1-12: 0.000000, EXACTLY'),
+                  (WAVE, 'wave 13: %.6f' % float(g13[ny // 2]))],
+             yv[0] + 60, 0.0095)
+    return P.save(img, path)
+
+
+def fig_terrace_ladder(path, n_stands=5):
+    """THE PLATEAU AS AN OUTPUT OF A SEA-LEVEL HISTORY, not a declared ramp.
+
+    THE ELEVATION DISTRIBUTION IS THE FIGURE, and that is a choice rather than
+    a convenience: the ladder is a statement about where land elevation PILES
+    UP, and a shaded relief of a 1:1274 tread shows nothing at all. Treads are
+    spikes in the histogram and risers are the empty ground between them.
+
+    The control is the same coast run WITHOUT the sea-level history -- the
+    declared ramp waves 1-12 carried -- whose distribution is featureless by
+    construction. One field changed, and the comparison is the evidence.
+    """
+    cs_flat = B.run_coast()
+    cs = B.run_coast(stands=int(n_stands))
+    x = cs['x']
+    h, hf = cs['h'], cs_flat['h']
+    lv = B.terrace_levels(x, h, z_min=-4.0)
+    closed = B.terrace_ladder()
+    dx = float(x[1] - x[0])
+
+    img = P.canvas(1500, 980)
+    lo = -8.0
+    hi = float(max(h.max(), max(closed))) + 2.0
+    edges = np.arange(lo, hi + 0.25, 0.25)
+    c_t, _ = np.histogram(h.ravel(), bins=edges)
+    c_f, _ = np.histogram(hf.ravel(), bins=edges)
+    top = float(max(c_t.max(), c_f.max()))
+
+    ax = P.Axes(img, (92, 66, 900, 470), (lo, hi), (0.0, 1.02),
+                title='where the land\'s elevation piles up -- the ladder, '
+                      'against the same coast with no sea-level history',
+                xlabel='elevation above present datum, m',
+                ylabel='cells per 0.25 m bin, of the fullest bin')
+    ax.frame(_ticks(lo, hi, 7), [0.0, 0.25, 0.5, 0.75, 1.0])
+    for i in range(c_t.size):
+        if c_t[i]:
+            ax.fill_between([edges[i], edges[i + 1]], [0.0, 0.0],
+                            [c_t[i] / top, c_t[i] / top], (108, 142, 184))
+    ax.line(0.5 * (edges[:-1] + edges[1:]), c_f / top, GREY, 2)
+    ax.vline(0.0, (120, 160, 200), 2, (5, 4))
+    for i_t, t in enumerate(sorted(lv, key=lambda d: d['level'])):
+        ax.text(t['level'], 0.99 - 0.055 * (i_t % 2),
+                ' %.3f m' % t['level'], BAR, 'lm')
+        ax.vline(t['level'], BAR, 1, (4, 4))
+    P.legend(ax, [((108, 142, 184), 'the sea-level history, %d stands' % n_stands),
+                  (GREY, 'the declared ramp, waves 1-12'),
+                  (BAR, 'treads found by `terrace_levels`')],
+             0.30 * hi, 0.72)
+
+    # ---- the profile the ladder is cut into
+    j = h.shape[0] // 2
+    ax2 = P.Axes(img, (985, 66, 1440, 470), (float(x[0]), float(x[-1])),
+                 (lo, hi), title='the mid-domain profile',
+                 xlabel='cross-shore, m', ylabel='elevation, m')
+    ax2.frame(_ticks(float(x[0]), float(x[-1]), 4), _ticks(lo, hi, 7))
+    ax2.hline(0.0, (120, 160, 200), 2, (6, 5))
+    ax2.line(x, hf[j], GREY, 2)
+    ax2.line(x, h[j], INKY, 3)
+    for t in lv:
+        ax2.hline(t['level'], BAR, 1, (4, 4))
+
+    # ---- measured levels against the closed form, which is the round trip
+    ax3 = P.Axes(img, (92, 570, 760, 900), (-0.5, float(len(closed)) - 0.5),
+                 (lo, hi),
+                 title='the measured treads against `terrace_ladder`, the '
+                       'closed form -- the round trip',
+                 xlabel='rung, oldest and highest first',
+                 ylabel='elevation, m')
+    ax3.frame(list(range(len(closed))), _ticks(lo, hi, 7))
+    ax3.line(np.arange(len(closed)), np.asarray(closed, float), GREEN, 3)
+    for i, s in enumerate(closed):
+        ax3.marker(i, float(s), GREEN, 5)
+    for t in lv:
+        ax3.hline(t['level'], BAR, 1, (4, 4))
+    P.legend(ax3, [(GREEN, 'closed form: uplift x age + the stand\'s eustatic level'),
+                   (BAR, 'measured back off the built surface')], -0.35, hi - 6.0)
+
+    # ---- the tread's own flatness, alongshore
+    main = [t for t in lv if t['level'] > 5.0][-1]
+    rows, spans = [], []
+    for jj in range(h.shape[0]):
+        m = ((np.abs(np.gradient(h[jj], dx)) < 0.02)
+             & (np.abs(h[jj] - main['level']) < 0.6))
+        if m.sum() > 10:
+            rows.append(float(np.median(h[jj][m])))
+            idx = np.where(m)[0]
+            spans.append((float(x[idx[0]]), float(x[idx[-1]])))
+    rows = np.asarray(rows)
+    y = cs['y']
+    ax4 = P.Axes(img, (890, 570, 1440, 900),
+                 (float(y[0]), float(y[-1])),
+                 (main['level'] - 0.5, main['level'] + 0.5),
+                 title='the main tread\'s level, alongshore -- sd %.4f m'
+                       % float(rows.std()),
+                 xlabel='alongshore, m', ylabel='tread level, m')
+    ax4.frame(_ticks(float(y[0]), float(y[-1]), 5),
+              [main['level'] + d for d in (-0.4, -0.2, 0.0, 0.2, 0.4)],
+              yfmt='%.2f')
+    ax4.hline(main['level'], BAR, 2, (5, 4))
+    ax4.line(y[:rows.size], rows, INKY, 3)
+    return P.save(img, path)
+
+
+INKY = (44, 48, 56)
+
+
 # ------------------------------------------------------------------ wave 5
 def fig_surface_shape(sc, path):
     """The surface stops being a sinusoid -- and the ceiling that stops it.
@@ -1090,8 +1276,9 @@ def main():
                                     's5-surface-shape.png'))
     sc = B.run_scene() if need_1d else None
     sc_storm = B.run_scene(H0=B.H0_STORM) if want('s1-profile-bar.png') else None
-    bay = B.run_bay() if any(want(n) for n in ('s3-bay-plan.png',
-                                               's3-bar-alongshore.png')) else None
+    bay = B.run_bay() if any(want(n) for n in (
+        's3-bay-plan.png', 's3-bar-alongshore.png',
+        's13-phase-alongshore.png')) else None
     for fn, args in ((fig_profile, (sc, sc_storm, 's1-profile-bar.png')),
                      (fig_transform, (sc, 's1-wave-transform.png')),
                      (fig_flux, (sc, 's1-flux-convergence.png')),
@@ -1109,7 +1296,9 @@ def main():
                      (fig_oblique_snell, ('s3-refraction-oblique.png',)),
                      (fig_bay_plan, (bay, 's3-bay-plan.png')),
                      (fig_bar_alongshore, (bay, 's3-bar-alongshore.png')),
-                     (fig_surface_shape, (sc, 's5-surface-shape.png'))):
+                     (fig_surface_shape, (sc, 's5-surface-shape.png')),
+                     (fig_phase_alongshore, (bay, 's13-phase-alongshore.png')),
+                     (fig_terrace_ladder, ('s13-terrace-ladder.png',))):
         if not want(args[-1]):
             continue
         a = list(args)
