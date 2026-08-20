@@ -73,6 +73,40 @@ least-confident-claims ledger in `00-index.md`.
   statistical glitter model. Wind speed is referenced at **12.5 m**, and the fit is calibrated
   only over 1–14 m/s — do not extrapolate to storm winds. Verified 2026-08 against the paper.
   [DOI 10.1364/JOSA.44.000838](https://doi.org/10.1364/JOSA.44.000838).
+  ⚠️ **It is a fitted boundary condition, and since
+  [`12a` §7a](12a-water-derivations.md#7a-the-slope-statistics-from-the-forcing--and-cox--munk-as-the-limit)
+  the chapter presents it as a *limit* rather than an input** — a spectrum integrated to slope
+  variance returns it to within the paper's own ±0.004 at 6 and 14 m/s. Its component fits were
+  re-verified 2026-08 against an independent restatement (Wang et al. 2025, AMT 18, 6329, Eq. 12:
+  `m_u = 3.16×10⁻³U`, `m_c = 3.0×10⁻³ + 1.92×10⁻³U` at 12.5 m over 1–14 m/s).
+  ⚠️ **Its clean and slicked numbers are two different integrals of one sea**, not two oceans: the
+  artificial slick suppressed waves shorter than ~0.3 m, an upper cut-off near 20 rad/m, which is
+  59% of the total slope variance at 6 m/s.
+- **P (attribution)** — Elfouhaily, Chapron, Katsaros & Vandemark, "A unified directional spectrum
+  for long and short wind-driven waves" (Journal of Geophysical Research 102(C7), 15781–15796,
+  1997): the wind- **and fetch**-parameterised spectrum spanning gravity and capillary wavenumbers
+  continuously, from which
+  [`12a` §7a](12a-water-derivations.md#7a-the-slope-statistics-from-the-forcing--and-cox--munk-as-the-limit)
+  derives the slope statistics instead of asserting them.
+  [DOI 10.1029/97JC00467](https://doi.org/10.1029/97JC00467).
+  ⚠️ **The paper is NOT held in this repository and was not read.** It is paywalled and no copy was
+  reachable. The equations used are the agreed **intersection of four independent restatements**,
+  all read 2026-08: Mobley's *Ocean Optics Web Book* ("Wave Variance Spectra: Examples", which
+  carries ECKV's own equation numbers); Wang et al. 2025 (AMT 18, 6329, open access — `B_l`, `α_p`,
+  `Ω`, `L_PM`, `J_p`, `γ`, `σ`, `c_p/c` and the cut-off term); Zhang et al. (PMC6111991, open
+  access — the fetch law and `k_p`); and Hwang & Fois (arXiv:2204.11591 — the instrument cut-offs).
+  **Cite the structure; do not claim the 1997 numbers were re-verified.** Two transcription traps
+  found while cross-checking are fired as suite defects rather than left in prose: HTML rendering
+  silently drops the square roots from `F_p` and `Γ` (demonstrable, because the same conversion
+  turns a phase speed into a speed squared), and the fetch law's exponent extracts as a subtraction,
+  which the fully-developed limit rules out. The **domain** is `0.84 < Ω_c < 5`, i.e. fetches above
+  roughly 200 m at 6 m/s; below that the model is being extrapolated and
+  `validate_beach.py::_sec_spectrum` asserts the refusal rather than returning a number.
+  ⚠️ **Known bias:** its mss runs *high* against Cox & Munk at low wind (+36% at 3 m/s).
+  Independently
+  reported — Guérin et al., Archimer/Ifremer 28378, read here: *"the slick and clean mss
+  predicted by Elfouhaily spectrum are larger than those experimentally observed by Phillips and
+  CM"*.
 - **P** — Ross, Dion & Potvin, "Detailed analytical approach to the Gaussian surface
   bidirectional reflectance distribution function specular component applied to the sea surface"
   (JOSA A 22(11), 2442–2453, 2005): the Gaussian-slope microfacet BRDF with Smith masking that

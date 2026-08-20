@@ -1555,6 +1555,133 @@ which is not a discrepancy to reconcile. Quote route 1 for a cost or a visibilit
 
 ---
 
+## 7a. The slope statistics, from the forcing — and Cox & Munk as the limit
+
+**Derived from:** a wind-wave spectrum, integrated. **Replaces:** a fitted line, quoted.
+
+Every mean square slope in [`12`](12-water-rendering.md) had, until this derivation, one source:
+`mss = 0.003 + 5.12×10⁻³ U`. It is cited, so it is honest; it is **not derived**, and that matters
+because the standing discipline of this skill is that a number comes from a physical effect and not
+from a constant chosen to make a picture right. Cox & Munk (1954) is a *fitted boundary condition* —
+a summary of what wind does to open water with long fetch. Handing it to a scene asserts a
+measurement made elsewhere.
+
+The objection that forced this section was put in its sharpest form as: *water is water; the size of
+the surface should make little or no difference if the formulas are right.* That is correct, and it
+is worth being precise about **why**. The optics is scale-free: Fresnel, the specular condition and
+the slope-to-radiance Jacobian ([§5](#5-the-reflected-slope-ellipse)) contain no length. Exactly one
+input to the whole chain knows how big the water is, and it is the slope statistics. So the way to
+answer the objection is to derive *those* and see what size actually does to them.
+
+### The integral, and why the curvature spectrum is the natural variable
+
+Let `S(k)` be the omnidirectional elevation spectrum, so that `∫S dk` is the elevation variance.
+Slope is the gradient of elevation, so each component's slope amplitude is `k` times its elevation
+amplitude and
+
+```
+mss(<k_c) = ∫₀^{k_c} k² S(k) dk
+```
+
+Substituting the dimensionless **curvature spectrum** `B(k) ≡ k³S(k)` and `dk = k d ln k`:
+
+```
+mss(<k_c) = ∫ k² · B(k)/k³ · k d ln k = ∫ B(k) d ln k                    (7a.1)
+```
+
+**`B(k)` is the slope variance per unit ln k.** That single change of variable is what makes the
+rest legible: the slope budget is an area under `B` on a log axis, octaves of wavenumber are equal
+widths, and "which waves carry the roughness" becomes a question you can answer by looking.
+
+It also exposes what this skill's earlier model was. Phillips' `k⁻⁴` saturation range is
+`Ψ = B₀k⁻⁴`, i.e. **`B = constant`** — equal slope variance per octave — with the amplitude
+back-solved to make the whole range return Cox & Munk. That is a defensible interpolation and it is
+not a derivation, because the one free number in it was set by the answer.
+
+### The spectrum, and the limit that recovers the fit
+
+Using ECKV (1997), `S(k) = k⁻³[B_l + B_h]`, with a long-wave branch peaked at `k_p` and a short-wave
+branch peaked at the gravity–capillary scale `k_m`. Fetch enters through the inverse wave age
+
+```
+Ω_c = 0.84 · tanh[(X/X₀)^0.4]^(−0.75) ,   X = gF/U₁₀² ,  X₀ = 2.2×10⁴      (7a.2)
+k_p = g Ω_c² / U₁₀²
+```
+
+Evaluating (7a.1) at large fetch (`Ω_c → 0.84`) and integrating past the capillary scale returns
+**0.03597 at `U₁₂.₅ = 6`** against Cox & Munk's **0.03372**, and **0.07511 at 14 m/s** against
+**0.07468** — both inside the 1954 paper's own quoted ±0.004. At 3 m/s it runs 36% high, and the
+term responsible is named rather than absorbed: `α_m = 0.01[1 + ln(u*/c_m)]` keeps the capillary
+branch alive as the wind drops instead of switching it off.
+
+**The fit is therefore a consequence, not an input** — over the range that matters — and two
+independent checks agree with that verdict from different directions:
+
+- the back-solved Phillips constant `2πB = 0.004508` against ECKV's *derived* mean `B` over the same
+  band range, **0.004188** — 7.1% apart;
+- the elevation integral `∫S dk`, which weights the **peak** where `mss` weights the **tail**,
+  giving `H_s` within 16% of the textbook fully-developed `0.22U²/g` (a bracket, not a match: ECKV
+  and Pierson–Moskowitz define "fully developed" at slightly different wave ages).
+
+⚠️ **But the mean being right proves less than it looks.** `B` is *not* constant: over the shipped
+band range it runs `0.001568 … 0.005395`, a factor of **3.44**, dipping near `k ≈ 30–100 rad/m` and
+rising toward the capillary peak. Phillips asserts that factor is 1.000. A guard suite that checks
+only totals cannot tell the two apart — which is why `_sec_spectrum` pairs a shape row with every
+total row, and why the deliberate defect `spec-flat-b` (flat `B`, correct total) is caught by the
+shape row **and by nothing else**.
+
+### Three consequences, and one of them is a refusal
+
+**(i) The cut-off is the instrument.** (7a.1) is tail-dominated, so `mss` has no value until `k_c`
+is named. Integrating only to `20 rad/m` — the cut-off Cox & Munk's own artificial slick imposed by
+suppressing waves shorter than ~0.3 m — returns **59%** of the total; L, Ku and Ka band return 52,
+73 and 83%. **One sea, five published mean square slopes, none of them wrong.** For a renderer the
+cut-off is the pixel footprint, `k = π/L`, which is the same box filter [§4](#4-footprint-filtering)
+already derives; below it, draw; above it, integrate into the BRDF.
+
+**(ii) Fetch touches the peak and nothing else.** `α_m` is a function of `u*` alone — no fetch, no
+basin, no length. At `k = k_m` a 10 m basin and an open ocean under one wind differ by **1.7%**.
+This is the owner's *water is water*, as algebra: **the half of the slope budget that makes the
+glitter is scale-free by construction.**
+
+**(iii) Below ~200 m of fetch, the derivation has nothing to say.** ECKV is fitted for
+`0.84 < Ω_c < 5`, which at 6 m/s stops at a fetch of **204 m**. A 10 m basin gives `Ω_c = 12.3`. The
+suite **asserts** that this is out of domain rather than returning the extrapolated number, so no
+later reader can pick it up as a result. A pool's surface is not fetch-limited wind sea; naming that
+is the honest deliverable, not producing a figure for it.
+
+### What this did *not* explain, which is the more useful half
+
+The derivation was expected to close a second gap: the reference render's resolved slope variance is
+**0.0013** against 0.0335, and its glitter path's interior standard deviation is 16–60× flatter than
+a photographed one. The hypothesis was that both were one defect — a realisation of the *wrong
+spectrum*, missing the capillary tail.
+
+**The control refutes it.** Integrate ECKV and flat-Phillips to the same footprint-limited cut-off,
+and they agree to within **4.4% at every footprint from 5 cm to 2 m**. Swapping the spectrum moves
+the resolvable variance by almost nothing. What is missing is not spectral content but
+**placement**:
+at a 0.2 m footprint the spectrum offers 0.0203 of resolvable slope variance and the render carries
+0.0013 — a factor of 15 — because the realisation reaches the shading normals and never reaches the
+surface geometry. Both symptoms follow from that one fact, and neither follows from the choice of
+spectrum.
+
+> Recorded because a negative result that redirects a wave is worth more than a positive one that
+> confirms it: **do not spend the next round on a better spectrum.**
+
+*Implemented in `reference-impl/wind_spectrum.py`; guarded by `_sec_spectrum` in `validate_beach.py`
+— 20 rows, 8 deliberate defects, all caught, one of them only after the row was **moved** (see
+[What did not reproduce](#what-did-not-reproduce)). Figures: `gauntlet/sea/evidence/s17-*.png`.
+⚠️ **Provenance: `P (attribution)` for ECKV — the 1997 paper is not held in this repository.** The
+equations are the intersection of four independent restatements (Mobley's *Ocean Optics Web Book*;
+Wang et al. 2025, AMT 18, 6329; Zhang et al., PMC6111991; Hwang & Fois, arXiv:2204.11591), all read
+in 2026-08; the arithmetic is `D`. Two transcription traps found while cross-checking are fired as
+suite defects: HTML rendering silently drops the square roots from `F_p` and `Γ` (provably — the
+same conversion turns a phase speed into a speed squared), and the fetch law's exponent extracts as
+a subtraction, which the fully-developed limit rules out.*
+
+---
+
 ## 8. The gathers
 
 **Derived from:** the definition of irradiance, and a change of variables. Three estimators, one
@@ -2824,6 +2951,36 @@ arithmetic slip in a write-up rather than a defect in the code.
    inflatable is a surface-tension measurement wearing a buoyancy label. *(`D`, all four numbers
    recomputed here; the method rule this belongs to is
    [`11`](11-verification-failures.md#pick-instruments-whose-parameters-someone-else-has-fixed).)*
+
+9. **A guard that could not see the exponent it was guarding.** *Found and closed while building
+   [§7a](#7a-the-slope-statistics-from-the-forcing--and-cox--munk-as-the-limit); recorded because
+   the
+   mechanism is general and cheap to repeat.* The new spectrum section shipped with eight deliberate
+   defects and, on its first firing, **one of them was caught by nothing at all**: `alpha_p`'s
+   equilibrium exponent rounded from `Ω_c^0.55` to `Ω_c^0.50`.
+
+   The cause was not missing coverage — the section had twenty rows, several of them absolute, on
+   quantities the exponent feeds. It was a **degeneracy in the argument**. Every row sat at a fully
+   developed sea, where `Ω_c = 0.84`, and `0.84^0.55 = 0.9107` against `0.84^0.50 = 0.9165`: six
+   tenths of a per cent on the long-wave branch, `0.00013` of `mss`, against a tolerance of `0.004`.
+   **Any exponent of a number that close to 1 is that close to 1.** The rows were not too loose;
+   they
+   were all standing on the one point where the defect cannot exist.
+
+   The fix is the one this file keeps arriving at from different directions and it is worth stating
+   as a rule: **when a defect escapes, move the row before you tighten it.** `alpha_p` became a
+   named
+   function so a guard could evaluate it at the *young* end of the model's own domain (`Ω_c = 5`),
+   where the two exponents part by **8.2%** and a `1e-9` row separates them without any tolerance
+   argument at all. Widening nothing, moving one argument, turned an invisible defect into an
+   unmissable one.
+
+   This is [`11`](11-verification-failures.md)'s "no row at a degenerate argument" arriving in a
+   disguise worth naming: the degenerate argument was not a fixed point of the *map* (zero load,
+   unit albedo, normal incidence) but a fixed point of the **parameterisation** — a base near 1,
+   where every exponent agrees. *(`D`, `validate_beach.py --bugs-spectrum`; the escape is recorded
+   in
+   the defect's own docstring rather than quietly repaired.)*
 
 ## Three more, closed in the same round, that this file did not carry
 

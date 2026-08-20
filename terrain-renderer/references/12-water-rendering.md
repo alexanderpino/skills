@@ -3718,6 +3718,88 @@ The distribution is *anisotropic* — `sigma_u^2/sigma_c^2` averages about 1.34,
 with steadier wind giving stronger anisotropy — so the glitter pattern is an ellipse elongated
 along the wind, not a disc.
 
+#### Cox & Munk is a LIMIT, not an input — and that changes what you may do with it
+
+Read the block above again and notice what it is: **a fitted boundary condition**. It is a 1954
+empirical summary of what wind does to open water with long fetch, and every number in it was
+measured somewhere else. Nothing is wrong with citing it. But a renderer that *takes* `mss` from
+that line has asserted a measurement rather than computed one, and it inherits three limits it
+usually does not know it has — the wind must be at 12.5 m, between 1 and 14 m/s, over **open sea**.
+Point it at a lake, a harbour, or a swimming pool and it is being extrapolated silently.
+
+The fix is not a second fit. It is to compute the slope statistics from the forcing, using a
+wind-wave **spectrum**, and to recover Cox & Munk as the large-fetch limit:
+
+```
+mss(<k_c) = ∫₀^{k_c} k² S(k) dk = ∫ B(k) d ln k          # B(k) = k³S(k), dimensionless
+```
+
+`B(k)` is the **slope variance per unit ln k** — the whole slope budget, decade by decade. Using
+the ECKV (1997) unified spectrum, which spans gravity and capillary wavenumbers continuously and is
+parameterised by wind *and fetch*, the integral returns
+
+| `U₁₂.₅` | Cox & Munk | derived from the wind | gap |
+|---|---|---|---|
+| 3 m/s | 0.01836 | 0.02491 | +36% — outside the 1954 band |
+| **6 m/s** | **0.03372** | **0.03597** | **+6.7% — inside it** |
+| 10 m/s | 0.05420 | 0.05914 | +9.1% |
+| **14 m/s** | **0.07468** | **0.07511** | **+0.6% — inside it** |
+
+**So the fit is a consequence of the wind, not an input to the picture** — to within its own
+published uncertainty over most of its range, with a known low-wind excess that the literature
+also reports. Three things follow that a renderer can act on.
+
+**1 · "The" mean square slope does not exist until you name a cut-off.** The integral is dominated
+by its high-wavenumber tail, so `mss` is meaningless without an upper limit — and **the upper limit
+is a property of the instrument, not of the water**:
+
+| upper cut-off `k_c` | what sets it | share of total mss at 6 m/s |
+|---|---|---|
+| 11 rad/m | L-band radar | 52% |
+| **20 rad/m** | **Cox & Munk's own slicked runs** (suppressed waves < 0.3 m) | **59%** |
+| 95 rad/m | Ku band | 73% |
+| 250 rad/m | Ka band | 83% |
+| 370 rad/m | the gravity–capillary scale | 88% |
+
+Cox & Munk's clean and slicked numbers are **two different integrals of one sea**, which is why the
+chapter's own "slicks are 2–3× lower mss" (above) is a *filtering* statement and not a different
+ocean. For a renderer the consequence is direct: **your cut-off is your pixel footprint.** A pixel
+of side `L` resolves up to `k = π/L`; everything above that must be carried statistically in the
+BRDF, and everything below it should be drawn. Splitting the budget anywhere else double-counts or
+loses variance.
+
+**2 · Basin size reaches almost none of it — the optics really is scale-free.** Fetch enters the
+whole derivation in exactly **one** place, the peak wavenumber `k_p = g Ω_c²/U₁₀²`. The short-wave
+branch that carries most of `k²S(k)` is
+
+```
+B_h = ½ α_m (c_m/c) F_m ,     α_m = 0.01[1 + ln(u*/c_m)]
+```
+
+and `α_m` contains the friction velocity **and no length scale of any kind**. Measured at the
+capillary scale, a 10 m basin and an open ocean under the same wind differ by **1.7%**. Shrink the
+water and the gravity waves have nowhere to grow; the centimetre waves that make the glitter never
+notice. **A renderer therefore needs one slope model for the sea and the pool, differing in one
+argument** — which is the opposite of the usual instinct to write two.
+
+**3 · Below about 200 m of fetch, say you do not know.** ECKV's own fitted domain is
+`0.84 < Ω_c < 5`; for a 6 m/s wind that bottoms out at a fetch of **204 m**. A 10 m pool gives
+`Ω_c = 12.3`, two and a half times outside it, and a 25 m competition pool is still eight times
+below the domain edge. **There is no wind-wave spectrum here to integrate**, and a number produced
+by extrapolating one is not a prediction. For a small basin the surface disturbance is not
+fetch-limited wind sea at all — it is swimmers, inflow jets and the basin's own reflections — and
+that is a different model, honestly named rather than faked with an out-of-range fit.
+
+> **The rule this replaces.** Old: *look up `mss` from the wind.* New: *integrate the spectrum to
+> your pixel footprint, and if the fetch is too short to have a spectrum, say so.* The old rule is
+> still the right shortcut for open sea at 1–14 m/s, and now it is a shortcut with a derivation
+> behind it instead of a citation standing in for one.
+
+*Derived in `12a-water-derivations.md` §7a; implemented in `reference-impl/wind_spectrum.py`;
+guarded by `_sec_spectrum` in `validate_beach.py` (20 rows, 8 deliberate defects). ⚠️ The ECKV 1997
+paper is **not held in this repository** — the equations are the agreed intersection of four
+independent restatements and the structure is `P (attribution)`; the arithmetic is `D`.*
+
 **Why the naive version inverts the physics.** A sharp specular lobe (high Blinn-Phong exponent,
 low GGX alpha) on a normal-mapped surface produces one small blown-out highlight where the mirror
 direction lands. Reality is the opposite: a *glitter path* stretching tens of degrees toward the
