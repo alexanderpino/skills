@@ -10,8 +10,8 @@ description: >-
   agent acts as a master architect and business analyst: it picks the altitude, derives content
   from evidence, writes user stories/acceptance criteria in the company's house format, and
   triages so only needed artifacts are produced. Captures software with C4, records decisions via
-  RFC→ADR, and requires a STRIDE/OWASP threat model and FinOps cost estimate in every HLD/SAD. Conforms to
-  ISO/IEC/IEEE 42010, ISO/IEC 25010, ISO/IEC/IEEE 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42.
+  RFC→ADR, and requires a STRIDE/OWASP threat model and FinOps cost estimate in every HLD/SAD.
+  Conforms to ISO 42010, 25010, 29148; uses TOGAF 10, ArchiMate 3.2, C4, arc42.
 ---
 
 # Architecture Docs
@@ -37,7 +37,11 @@ preserves what's worth preserving. Crucially, you **derive content from evidence
 (code, configs, tests, git history, manifests) before asking the human, ask only
 precise questions for what can't be derived (usually business drivers, priorities,
 target SLAs), and record anything unresolved as a *visible* assumption or gap — never
-fabricate a stakeholder, driver, or number to make a template look complete.
+fabricate a stakeholder, driver, or number to make a template look complete. When the
+user asks for **advice** ("should we…?") rather than a change, the deliverable is a
+recommendation, not a document: genuine options, a committed verdict with its costs,
+and what evidence would change it (`methods.md` §8); it becomes a `proposed` ADR only
+once accepted.
 
 **How to actually arrive at the content** — stakeholders, concerns, drivers, quality
 scenarios, the architecture itself (by reverse-engineering an existing codebase), and
@@ -153,7 +157,8 @@ decision is rediscovered the expensive way; (2) in greenfield, document the **sl
 you are touching**, not the whole repo. Scope the bootstrap to the change.
 
 Two things are **never optional** when an HLD or SAD is produced or materially changed: the
-**threat model** (STRIDE → OWASP Top 10:2025) and the **FinOps cost estimate**. And wherever
+**threat model** (STRIDE → the OWASP lens matching the surface: web, API, or LLM Top 10)
+and the **FinOps cost estimate**. And wherever
 possible the whole set is enforced as **Architecture-as-Code in CI** — front-matter/ADR
 linting, conformance-checklist validation, diagram rendering, architecture fitness functions,
 and an Infracost cost gate (`references/automation.md`).
@@ -212,7 +217,10 @@ slice you touched.
 Use the templates in `assets/templates/`. Fill them; don't paste them empty.
 Naming, IDs, and front-matter conventions that keep everything greppable are in
 `references/conventions.md` — **follow them exactly**, because the searchability
-the user wants depends on consistent IDs and front-matter, not prose.
+the user wants depends on consistent IDs and front-matter, not prose. The prose
+itself must read like a senior architect wrote it, not a generator — plain,
+specific, committed; neutral context, decided decisions; no sentence that would
+be true of any system. Voice rules and the tells to avoid: `references/writing-style.md`.
 
 ### Enterprise & solution documents (when at those altitudes)
 - **`enterprise-architecture.md`** *(enterprise)* — TOGAF-structured Architecture
@@ -290,7 +298,9 @@ indexes them. Full guidance, status transitions, and supersession rules are in
 `references/conventions.md`; standards background in `references/standards.md`.
 
 ### Security, privacy & cost are mandatory in HLD and SAD
-Every HLD and SAD carries a **threat model** (STRIDE mapped to OWASP Top 10:2025) and a
+Every HLD and SAD carries a **threat model** (STRIDE mapped to the OWASP lens that matches
+the surface — web Top 10:2025, API Security Top 10:2023, or LLM Applications Top 10:2025 —
+with the target ASVS 5.0 level as a `C.xx`) and a
 **FinOps cost-estimate matrix** (provider calculators + Infracost). These are not optional
 sections — set `security-reviewed`/`cost-reviewed: true` when signed off. Where the system
 processes **personal or regulated data**, §8 also carries a **DPIA** (`references/privacy.md`)
@@ -368,8 +378,10 @@ manifest in the index README). Condensed:
   README manifest. Read before initialising docs.
 - `references/methods.md` — **how a master architect derives the content**: mindset,
   picking the altitude, reverse-engineering a codebase, eliciting stakeholders/drivers,
-  quality scenarios, recovering/making decisions, derive-then-ask-then-assume, and
-  gap analysis (current→target→delta→closure) as one discipline across all altitudes.
+  quality scenarios, recovering/making decisions (incl. **advisory mode**),
+  derive-then-ask-then-assume, gap analysis (current→target→delta→closure) as one
+  discipline across all altitudes, and **designing forward with attribute-driven
+  iterations (ADD)** when the structure doesn't exist yet.
 - `references/structure.md` — **how to choose the shape**: finding boundaries (strategic
   DDD — subdomains, bounded contexts, context maps), selecting a structuring style
   (layered/hexagonal/clean/vertical-slice/modular-monolith/microservices) with the
@@ -421,6 +433,10 @@ manifest in the index README). Condensed:
 - `references/significance.md` — is this change architecturally significant / ADR-worthy?
 - `references/conventions.md` — IDs, the machine-readable front-matter schema, naming,
   status lifecycle, the `ARCH-REF:` marker, grep patterns. Read before editing any doc.
+- `references/writing-style.md` — **prose, tone & voice**: the SEI seven rules,
+  value-neutral context vs committed decisions (Nygård), altitude of language
+  (Hohpe's elevator), precision habits (Brown/Fowler), and the tells of generated
+  text with the any-system test that kills them. Read before writing any substantial prose.
 - `references/standards.md` — the full standards mapping and ISO required-content lists
   (42010:2022, 25010:2023, 29148, TOGAF/ArchiMate, C4, STRIDE/OWASP, FinOps, SAR).
 - `references/mermaid-guide.md` — C4 L1–L4 copy-paste snippets, the mandate table,
