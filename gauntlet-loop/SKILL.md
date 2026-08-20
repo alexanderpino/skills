@@ -357,6 +357,14 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
 Split the goal into **lanes**: the smallest units that can be improved and judged
 independently. You cut them, not the user. → `references/decomposition.md`
 
+- **On a layered artifact, settle the minimum architecture first.** Not a design
+  document — only the load-bearing decisions, and the test for which those are
+  is exact: *a decision no lane-level round could reach.* Those are the
+  structural gaps of wave 6, bought cheap at wave 0. Freeze them as constraints
+  in the contract, and harvest every one a command can check into a gate, so the
+  layering is enforced free every wave instead of trusted. A README needs none
+  of this; a renderer needs it before the lanes are cut, because the cut follows
+  the layers. → `references/decomposition.md`
 - **The lane test:** can a fresh critic look at this one thing and say which of
   two versions is better, without needing the rest?
 - **Rank them**, because a wave funds `wip_limit` lanes and not all of them:

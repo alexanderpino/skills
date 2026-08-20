@@ -125,6 +125,42 @@ load-bearing path into existence early. But a walking skeleton is not an
 architecture. It proves the path exists; it says nothing about whether the layer
 beneath it is the right one.
 
+### The minimum architecture, before wave 1
+
+So on a layered artifact, something *does* have to be written before the loop
+runs — and the discipline is in how little.
+
+**The test for what belongs in it: a decision no lane-level round could reach.**
+Those are exactly the structural gaps the run would otherwise discover at wave 6
+and answer with a re-cut. Buy them at wave 0, where they cost a paragraph.
+Everything else — anything a builder can change inside its own files, judged by
+a critic against the bar — stays out, because deciding it early is guessing with
+extra confidence.
+
+For a renderer that is a short list: where the abstraction boundary sits, what
+owns the frame, how resources are addressed, what the update order is. It is not
+a design document, and a full one at this point is the planning-fallacy version
+of the same mistake — precise about what nobody has learned yet.
+
+Three things make it worth the paragraph:
+
+- **It decides the cut.** Lanes follow layers; a lane that straddles a boundary
+  produces critics that keep citing each other's territory, which is the re-cut
+  signal arriving the expensive way.
+- **It becomes constraints, not suggestions.** Frozen in the contract's rules,
+  it reaches every builder by path, like the bar.
+- **Harvest it into gates.** This is the move that pays: layering is unusually
+  machine-checkable — dependency direction, forbidden imports, where a file may
+  live, what a module may reach. An architecture written as prose is advisory
+  and drifts; the same architecture expressed as gates is enforced free every
+  wave, and the run cannot violate it without the check going red
+  (`cost-discipline.md`).
+
+Where it comes from is the same list as the ordering above: the wayfinder map
+and answer key, an architecture skill, a domain skill for the field, or
+grounding for a solved domain. What it must never be is a builder's improvised
+choice at wave 3, defended afterwards because the code already assumes it.
+
 ## File ownership
 
 **One file, one owner, per wave.** Not per run — ownership can move between waves,
