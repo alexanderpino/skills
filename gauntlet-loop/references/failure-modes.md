@@ -12,6 +12,7 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | Known weakness | Signal it is happening | Guardrail |
 |---|---|---|
 | Runs forever; no natural stop | wave 26 of an agreed 8 | budget stop, kill criteria, hard cap |
+| Self-extension laundered through a caller | an orchestrator tops up the loop it hired | budget authority escalates to a human: `extend` refuses on an `--invoked-by agent` run |
 | Critic turns agreeable | everything passes; gaps get vaguer | forced winner, severity + named evidence |
 | Builder learns the critic, not the bar | output matches the critic's phrasing | frozen bar, rotated framing, randomised labels |
 | Bar erosion | comparisons quietly get easier | bar files re-read from disk each wave |

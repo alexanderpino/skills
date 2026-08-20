@@ -67,6 +67,11 @@ DEFAULT_CONFIG = {
     "dimension_targets": {},
     "lanes": [],
     "bar_kind": "reference",
+    # Who started this run: "human" or "agent" (an orchestrator hiring the loop
+    # as a subcontractor). It changes who "the user" is at a budget stop — an
+    # agent may hand the loop a budget, but may never grant it more, or the
+    # no-self-extension rule is defeated by a fleet wearing two hats.
+    "invoked_by": "human",
     # Granted budget extensions, appended by `extend`. The run's history of
     # "the budget ran out and the user chose to keep going".
     "extensions": [],
@@ -246,6 +251,10 @@ def cmd_init(args):
         if args.hard_cap_waves < cfg["stops"]["budget_waves"]:
             die("hard-cap-waves is below budget-waves — the cap is the ceiling extensions may not cross")
         cfg["stops"]["hard_cap_waves"] = args.hard_cap_waves
+    if args.invoked_by:
+        if args.invoked_by not in ("human", "agent"):
+            die("invoked-by must be human or agent")
+        cfg["invoked_by"] = args.invoked_by
     if args.bar_kind:
         if args.bar_kind not in ("reference", "acceptance criteria", "hybrid"):
             die("bar-kind must be one of: reference, acceptance criteria, hybrid")
@@ -1122,6 +1131,17 @@ def cmd_extend(args):
             "budget creep. Say what is still moving and what it will close."
         )
 
+    # Budget authority escalates to a human, whoever started the run. An
+    # orchestrator may hand this loop a budget at init; it may not top it up,
+    # because a fleet granting its own subcontractor more waves is exactly the
+    # self-extension the method forbids, with the accountability laundered.
+    if cfg.get("invoked_by") == "agent" and not args.force:
+        die(
+            "this run was started by an agent, so the grant for more budget cannot come "
+            "from the calling agent — stop, report, and escalate the priced offer up the "
+            "chain until a human decides. Use --force ONLY to record a grant a human "
+            "actually made (say so in --reason)."
+        )
     max_wave = max((r["wave"] for r in rounds), default=0)
     if not rounds and not args.force:
         die("no rounds logged — raise --budget-waves at init instead of extending a run that has not started")
@@ -1835,6 +1855,13 @@ def cmd_report(args):
     max_wave = max(r["wave"] for r in rounds)
     budget = cfg["stops"]["budget_waves"]
     lines += [f"Waves run: {max_wave} of {budget} budgeted", ""]
+    if cfg.get("invoked_by") == "agent":
+        lines += [
+            "Started by an agent, not a human: the budget was handed to this run by a"
+            " caller. Any extension recorded below required a human grant escalated up"
+            " the chain — a calling agent cannot fund its own subcontractor.",
+            "",
+        ]
     lines += [
         f"Cost: ~{spent} subagent calls for {closed_gaps} closed gap(s)"
         + (f" (~{spent / closed_gaps:.0f} calls per gap)" if closed_gaps else "")
@@ -2012,6 +2039,10 @@ def main():
     p.add_argument("--lanes", help="comma-separated initial lane names")
     p.add_argument("--dimensions", help="comma-separated bar dimensions (default: overall)")
     p.add_argument("--bar-kind", help="reference|acceptance criteria|hybrid")
+    p.add_argument("--invoked-by", choices=("human", "agent"),
+                   help="who started this run (default human). 'agent' means an orchestrator "
+                        "hired the loop: it may set the budget, never grant more — extensions "
+                        "escalate to a human")
     p.add_argument("--bar-met-n", type=int)
     p.add_argument("--clean-streak-n", type=int)
     p.add_argument("--no-progress-n", type=int,

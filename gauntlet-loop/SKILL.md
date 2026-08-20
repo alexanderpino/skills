@@ -73,6 +73,27 @@ kill criteria, budget — arrive as proposals with numbers attached. A user
 who does know the method can pre-specify any of it; a user who has never
 heard of it gives up nothing.
 
+## This skill drives the loop; it is not a step inside someone else's
+
+Whoever owns the budget is the driver, and this skill owns it: the contract,
+the state, the subagents, the stops. That is why the guardrails bind at all —
+an advisory version, consulted mid-loop by an agent free to ignore the budget
+stop, would be the original loop with extra reading. (Its *components* are
+components: `builder.md`, `critic.md` and `smoother.md` are role briefs for
+subagents, and they hold no budget. Wayfinder is likewise a driver of its own
+process, not a step in this one — it runs before, and hands over an answer
+key.)
+
+A larger orchestrator can still hire this loop as a **subcontractor**: pass
+the budget at `init` (`--budget-waves`, `--budget-tokens`, `--hard-cap-waves`)
+and let it run its own contract inside those limits. Record it with
+`init --invoked-by agent`, because it changes who "the user" is at Phase 7 —
+and one rule survives the nesting: **budget authority always escalates to a
+human.** A caller may set the budget; it may never grant more. A fleet topping
+up its own subcontractor is the self-extension ban defeated by laundering the
+accountability, so `extend` refuses on an agent-invoked run and the report
+says the run was agent-started.
+
 ## When not to use this
 
 - **Correctness work with a pass/fail oracle** — that is a debug loop. Fix it
