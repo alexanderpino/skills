@@ -85,6 +85,26 @@ def _lin(a, b, n=601):
     return np.linspace(a, b, n)
 
 
+def _legend(ax, entries, x, y, dy=18, w=30):
+    """`beach_plot.legend`, but the sample line carries the curve's DASH.
+
+    The toolkit's own legend draws every sample solid, which silently defeats
+    the rule that no distinction may rest on colour alone: two curves told
+    apart by dash then have identical legend keys. Entries are
+    (colour, dash, label); `dash=None` is solid."""
+    for i, (col, dash, lab) in enumerate(entries):
+        px, py = float(ax.px(x)), float(ax.py(y)) + i * dy
+        if dash is None:
+            ax.d.line([px, py, px + w, py], fill=col, width=3)
+        else:
+            on, off, t = dash[0], dash[1], 0.0
+            while t < w:
+                ax.d.line([px + t, py, px + min(t + on, w), py], fill=col,
+                          width=3)
+                t += on + off
+        ax.d.text((px + w + 7, py), lab, fill=INK, font=P.FONT_S, anchor='lm')
+
+
 def _fill_signed(ax, x, lo, hi, col_hi, col_lo):
     """Fill between two curves, using a different tone on each side of every
     crossing. Two curves whose AREAS are the quantity being compared cross
@@ -189,9 +209,9 @@ def fig_two_sides(out):
             'R_int = %.3f%%' % (100 * O.R_INT[1]), MUTED)
     ax.text(4.0, float(O.R_EXT[1]) + 0.045,
             'R_ext = %.3f%%' % (100 * O.R_EXT[1]), MUTED)
-    P.legend(ax, [(INK, 'R(%s) air %s water' % ('θ', '→')),
-                  (BLU, 'R(%s) water %s air' % ('θ', '→'))],
-             3.0, 0.86)
+    _legend(ax, [(INK, None, 'R(%s) air %s water' % ('θ', '→')),
+                 (BLU, (9, 5), 'R(%s) water %s air' % ('θ', '→'))],
+            3.0, 0.86)
 
     # -- panel B: the cosine-weighted integrand, split at mu_c
     bx = P.Axes(img, (676, 54, 1140, 520), (0.0, 1.0), (0.0, 1.45),
@@ -217,9 +237,9 @@ def fig_two_sides(out):
     bx.text(0.86, 0.13, '%.5f' % float(O.R_INT[1] - (1 - 1 / O.IOR[1] ** 2)),
             INK, anchor='ms')
     bx.text(0.30, 0.045, '%.5f' % float(O.R_EXT[1]), INK, anchor='ms')
-    P.legend(bx, [(INK, '2%s R_ext(%s)' % ('μ', 'μ')),
-                  (BLU, '2%s R_int(%s)' % ('μ', 'μ'))],
-             0.05, 1.30)
+    _legend(bx, [(INK, None, '2%s R_ext(%s)' % ('μ', 'μ')),
+                 (BLU, (9, 5), '2%s R_int(%s)' % ('μ', 'μ'))],
+            0.05, 1.30)
     return P.save(img, os.path.join(out, 'fresnel-two-sides.png'))
 
 
@@ -255,13 +275,13 @@ def fig_factorisation(out):
     ax.line(m, sep, ACCENT, width=3, dash=(7, 5))
     ax.line(m, joint, RED, width=3)
     ax.vline(float(np.cos(O.TC_SNELL[0])), MUTED, width=1, dash=(2, 6))
-    P.legend(ax, [(MUTED, 'f(%s) = exp(-%s/%s)' % ('μ', 'τ', 'μ')),
-                  (MUTED, 'g(%s) = 1 - R_int(%s)' % ('μ', 'μ')),
-                  (RED, '2%s f g   %s  T_esc = %.4f'
-                   % ('μ', '→', O.slab_esc(B_DEPTH)[0])),
-                  (ACCENT, '2%s %s  %s  %.4f'
-                   % ('μ', '⟨f⟩⟨g⟩', '→', sep_val))],
-             0.04, 1.39)
+    _legend(ax, [(MUTED, (3, 4), 'f(%s) = exp(-%s/%s)' % ('μ', 'τ', 'μ')),
+                 (MUTED, (9, 5), 'g(%s) = 1 - R_int(%s)' % ('μ', 'μ')),
+                 (RED, None, '2%s f g   %s  T_esc = %.4f'
+                  % ('μ', '→', O.slab_esc(B_DEPTH)[0])),
+                 (ACCENT, (7, 5), '2%s mean(f) mean(g)  %s  %.4f'
+                  % ('μ', '→', sep_val))],
+            0.04, 1.39)
 
     # -- panel B: the size of it against tau, both legs, per band
     bx = P.Axes(img, (688, 54, 1140, 520), (0.0, 2.0), (-90.0, 70.0),
@@ -291,7 +311,8 @@ def fig_factorisation(out):
         bx.marker(tp, 100.0 * float(O.slab_trap(B_DEPTH)[c]
                                     / (O._e3(np.array([2 * tp]))[0]
                                        * O.R_INT[c]) - 1), BAND[c])
-    P.legend(bx, [(BAND[c], BAND_NAME[c]) for c in (0, 1, 2)], 0.06, 62.0)
+    _legend(bx, [(BAND[c], BAND_DASH[c], BAND_NAME[c]) for c in (0, 1, 2)],
+            0.06, 62.0)
     return P.save(img, os.path.join(out, 'lut-factorisation.png'))
 
 
@@ -327,11 +348,11 @@ def fig_trapped_series(out):
         ax.vline(float(liner[c]), MUTED, width=1, dash=(2, 6))
         ax.marker(float(liner[c]),
                   float(1.0 / (1.0 - liner[c] * O.R_INT[1])), BAND[c])
-    P.legend(ax, [(INK, '1/(1 - %s R_int)' % 'ρ'),
-                  (GRN, 'two bounces'),
-                  (GRN, 'one bounce'),
-                  (ACCENT, '1/(1 - %s (1 - 1/n%s))' % ('ρ', '²'))],
-             0.04, 1.94)
+    _legend(ax, [(INK, None, '1/(1 - %s R_int)' % 'ρ'),
+                 (GRN, (9, 5), 'two bounces'),
+                 (GRN, (3, 4), 'one bounce'),
+                 (ACCENT, (2, 6), '1/(1 - %s (1 - 1/n%s))' % ('ρ', '²'))],
+            0.04, 1.94)
 
     # -- panel B: the lossless series as a BOUND the real column does not reach
     bx = P.Axes(img, (688, 54, 1140, 520), (0.0, 1.0), (1.0, 2.0),
@@ -350,13 +371,209 @@ def fig_trapped_series(out):
         bx.vline(float(liner[c]), MUTED, width=1, dash=(2, 6))
         bx.marker(float(liner[c]), float(1.0 / (1.0 - liner[c] * grt[c])),
                   BAND[c])
-    P.legend(bx, [(INK, '1/(1 - %s R_int),  no absorption' % 'ρ')]
-             + [(BAND[c], '1/(1 - %s G_rt),  %s' % ('ρ', BAND_NAME[c]))
-                for c in (0, 1, 2)], 0.04, 1.94)
+    _legend(bx, [(INK, (3, 4), '1/(1 - %s R_int),  no absorption' % 'ρ')]
+            + [(BAND[c], BAND_DASH[c], '1/(1 - %s G_rt),  %s'
+                % ('ρ', BAND_NAME[c])) for c in (0, 1, 2)], 0.04, 1.94)
     return P.save(img, os.path.join(out, 'trapped-series.png'))
 
 
-FIGURES = (fig_two_sides, fig_factorisation, fig_trapped_series)
+# --- figure 4: a distribution is not a surface -------------------------------
+def fig_runup(out):
+    """The swash exceedance painted where its realisation belongs.
+
+    The claim, and the chapter calls it the same defect class as glitter drawn
+    as its slope pdf and foam drawn as its own mean: `exp(-(z/sigma)^2)` is the
+    share of cycles reaching a level, so blending wet into dry by it draws the
+    beach's TIME-AVERAGE, and an average has no edge. This is the one claim in
+    the water chapters that a paragraph genuinely cannot carry, because the
+    whole of it is that one picture has a boundary and the other does not.
+
+    Both panels are FIELDS OF SCENE-LINEAR ALBEDO, not renders: grey level is
+    linear in albedo with one common scale factor, no exposure, no tone curve
+    and no gamma. Nothing here is display-referred."""
+    import beach_render as BR                    # read-only, for the sand pair
+
+    img = P.canvas(1180, 700)
+    y = _lin(0.0, 120.0, 480)
+    z = _lin(0.0, 1.10, 260)
+    ZZ, YY = np.meshgrid(z, y, indexing='ij')
+
+    # the shipped blend, taken from the renderer rather than retyped
+    def albedo(wet):
+        w = np.asarray(wet, float)[..., None]
+        return BR.SAND_DRY * (1.0 - w) + BR.SAND_WET_DIFF * w
+
+    dist = B.swash_wetness(ZZ)                   # the exceedance: a DISTRIBUTION
+    real = (ZZ <= B.damp_limit(YY)).astype(float)  # one draw: a REALISATION
+    scale = 255.0 / float(BR.SAND_DRY.max())
+
+    def strip(w):
+        a = np.clip(albedo(w) * scale, 0, 255).astype(np.uint8)
+        return a[::-1]                            # elevation up the page
+
+    box_a = (92, 54, 566, 300)
+    box_b = (92, 386, 566, 632)  # xlabel below
+    ax = P.Axes(img, box_a, (0.0, 120.0), (0.0, 1.10),
+                ylabel='elevation z, m')
+    ax.image(strip(dist))
+    ax.frame(yticks=[0.0, 0.5, 1.0], yfmt='%.1f')
+    ax.hline(float(B.damp_limit_median()), ACCENT, width=2, dash=(7, 5))
+    bx = P.Axes(img, box_b, (0.0, 120.0), (0.0, 1.10),
+                xlabel='alongshore position y, m', ylabel='elevation z, m')
+    bx.image(strip(real))
+    bx.frame(xticks=[0, 30, 60, 90, 120], yticks=[0.0, 0.5, 1.0], yfmt='%.1f')
+    bx.hline(float(B.damp_limit_median()), ACCENT, width=2, dash=(7, 5))
+
+    # the vertical cut through both, in scene-linear albedo
+    cx = P.Axes(img, (688, 54, 1140, 632), (0.21, 0.43), (0.0, 1.10),
+                xlabel='scene-linear albedo, green band',
+                ylabel='elevation z, m')
+    cx.frame(xticks=[0.22, 0.26, 0.30, 0.34, 0.38, 0.42],
+             yticks=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0], xfmt='%.2f', yfmt='%.1f')
+    a_dist = albedo(B.swash_wetness(z))[:, 1]
+    cx.line(a_dist, z, ACCENT, width=3, dash=(9, 5))
+    stations = (0.0, 27.5, 55.1, 82.6)
+    for i, y0 in enumerate(stations):
+        zl = float(B.damp_limit(np.array([y0]))[0])
+        w = (z <= zl).astype(float)
+        cx.line(albedo(w)[:, 1], z, INK, width=2 if i else 3)
+    cx.hline(float(B.damp_limit_median()), ACCENT, width=1, dash=(2, 6))
+    _legend(cx, [(ACCENT, (9, 5), 'painted by the exceedance p(z)'),
+                 (INK, None, 'one realisation, four stations')], 0.222, 1.06)
+    return P.save(img, os.path.join(out, 'runup-distribution-vs-realisation.png'))
+
+
+# --- figure 5: Sommerfeld's half-plane ---------------------------------------
+def fig_sommerfeld(out):
+    """K_d across the shadow boundary, and the Cornu spiral that fixes the half.
+
+    The claim: K_d = 1/2 on the geometric shadow boundary EXACTLY, at every kr
+    and with no asymptotics in it; the lit side overshoots and rings; and a
+    model that returns a clean 1 and 0 there has smoothed the physics away.
+    Two of those three are shapes. The spiral is not decoration -- K_d is
+    1/sqrt2 times the chord from the current point to the upper eye, so the
+    half at v = 0 is the chord from the origin, and C(inf) = S(inf) = 1/2 is
+    why it is a half and not something else."""
+    img = P.canvas(1180, 620)
+
+    ax = P.Axes(img, (92, 54, 578, 500), (-6.0, 6.0), (0.0, 1.25),
+                xlabel='Fresnel parameter v  (lit %s 0 %s geometric shadow)'
+                       % ('←', '→'),
+                ylabel='K_d = |U| / |U_incident|')
+    ax.frame(xticks=[-6, -4, -2, 0, 2, 4, 6],
+             yticks=[0.0, 0.25, 0.5, 0.75, 1.0, 1.25], yfmt='%.2f')
+    v = _lin(-6.0, 6.0, 2401)
+    ax.hline(1.0, MUTED, width=1, dash=(2, 6))
+    ax.hline(0.5, ACCENT, width=1, dash=(2, 6))
+    ax.vline(0.0, ACCENT, width=2, dash=(7, 5))
+    ax.line(v, BD.knife_edge_kd(v), INK, width=3)
+    ax.marker(0.0, float(BD.knife_edge_kd(0.0)), ACCENT, r=5)
+    for vv in (0.5, 1.0, 2.0):
+        ax.marker(vv, float(BD.knife_edge_kd(vv)), BLU, r=4)
+    ax.text(0.35, 0.53, 'K_d(0) = %.4f' % BD.knife_edge_kd(0.0), ACCENT)
+
+    bx = P.Axes(img, (700, 54, 1140, 500), (-0.75, 0.75), (-0.75, 0.75),
+                xlabel='C(x)', ylabel='S(x)')
+    bx.frame(xticks=[-0.5, 0.0, 0.5], yticks=[-0.5, 0.0, 0.5],
+             xfmt='%.1f', yfmt='%.1f')
+    x = _lin(-8.0, 8.0, 6001)
+    f = BD.fresnel(x)
+    cl = BD.cornu_limit()
+    bx.line(f.real, f.imag, INK, width=2)
+    bx.line([0.0, cl[0]], [0.0, cl[1]], ACCENT, width=3)
+    bx.line([-cl[0], cl[0]], [-cl[1], cl[1]], BLU, width=2, dash=(7, 5))
+    bx.marker(cl[0], cl[1], ACCENT, r=5)
+    bx.marker(-cl[0], -cl[1], BLU, r=5)
+    bx.marker(0.0, 0.0, ACCENT, r=5)
+    bx.text(0.22, 0.66, 'x %s +%s' % ('→', '∞'), MUTED, anchor='rs')
+    bx.text(-0.22, -0.71, 'x %s -%s' % ('→', '∞'), MUTED)
+    bx.text(0.03, -0.06, 'x = 0', MUTED)
+    return P.save(img, os.path.join(out, 'sommerfeld-half-plane.png'))
+
+
+# --- figure 6: the glitter path's width is a function ------------------------
+def _glit_profile(view_el, sun_el=21.02, dphi=None):
+    """One azimuth cut of the Cox & Munk glitter path, green band, at a stated
+    view elevation. Everything comes from `beach_optics.glitter_radiance`."""
+    if dphi is None:
+        dphi = _lin(-40.0, 40.0, 1601)
+
+    def d(el, az):
+        el, az = np.radians(el), np.radians(az)
+        return np.stack([np.cos(el) * np.cos(az), np.cos(el) * np.sin(az),
+                         np.sin(el) * np.ones_like(az)], -1)
+    s = d(sun_el, 180.0 * np.ones(1))[0]
+    r = d(view_el, dphi)
+    L = BO.glitter_radiance(s, -r)[:, 1]
+    return dphi, L
+
+
+def _fwhm(dphi, L):
+    pk = float(L.max())
+    over = dphi[L >= 0.5 * pk]
+    return float(over.max() - over.min()), pk
+
+
+def fig_glitter_path(out):
+    """The path narrows toward the horizon while it brightens.
+
+    The claim: a glitter path of uniform width is wrong and it is the default,
+    and the error is a SHAPE rather than a level, so no exposure check sees it.
+    A shape claim is the one kind a table cannot make -- the chapter's two
+    monotone columns are here as two curves that go opposite ways, from one
+    slope distribution and one wind."""
+    img = P.canvas(1180, 620)
+    els = (25.0, 15.0, 6.0, 1.5, 0.2)
+    styles = (None, (9, 5), (3, 4), (2, 6), (1, 3))
+
+    ax = P.Axes(img, (86, 54, 470, 500), (-25.0, 25.0), (0.0, 1.06),
+                xlabel='azimuth from the path centre %s%s, %s'
+                       % ('Δ', 'φ', DEG),
+                ylabel='radiance / its own peak')
+    ax.frame(xticks=[-20, -10, 0, 10, 20],
+             yticks=[0.0, 0.25, 0.5, 0.75, 1.0], yfmt='%.2f')
+    ax.hline(0.5, MUTED, width=1, dash=(2, 6))
+    ent = []
+    for i, e in enumerate(els):
+        dphi, L = _glit_profile(e)
+        w, pk = _fwhm(dphi, L)
+        ax.line(dphi, L / pk, INK if i == 0 else BLU, width=3 if i == 0 else 2,
+                dash=styles[i])
+        ent.append((INK if i == 0 else BLU, styles[i], '%.1f%s' % (e, DEG)))
+    _legend(ax, ent, -24.0, 1.02)
+
+    sweep = np.array([25.0, 21.02, 18.0, 15.0, 12.0, 10.0, 8.0, 6.0, 4.5, 3.0,
+                      2.0, 1.5, 1.0, 0.5, 0.2])
+    ws, pks = [], []
+    for e in sweep:
+        dphi, L = _glit_profile(e)
+        w, pk = _fwhm(dphi, L)
+        ws.append(w)
+        pks.append(pk)
+    ws, pks = np.array(ws), np.array(pks)
+
+    bx = P.Axes(img, (566, 54, 830, 500), (0.0, 26.0), (0.0, 17.0),
+                xlabel='view elevation, ' + DEG,
+                ylabel='path FWHM in azimuth, ' + DEG)
+    bx.frame(xticks=[0, 5, 10, 15, 20, 25], yticks=[0, 4, 8, 12, 16])
+    bx.line(sweep, ws, INK, width=3)
+    for e, w in zip(sweep, ws):
+        if e in (25.0, 0.2):
+            bx.marker(e, w, ACCENT, r=5)
+
+    cx = P.Axes(img, (912, 54, 1140, 500), (0.0, 26.0), (0.0, 210.0),
+                xlabel='view elevation, ' + DEG,
+                ylabel='peak radiance, green band, scene-linear')
+    cx.frame(xticks=[0, 5, 10, 15, 20, 25], yticks=[0, 50, 100, 150, 200])
+    cx.line(sweep, pks, INK, width=3)
+    for e, p_ in zip(sweep, pks):
+        if e in (25.0, 0.2):
+            cx.marker(e, p_, ACCENT, r=5)
+    return P.save(img, os.path.join(out, 'glitter-path-narrowing.png'))
+
+
+FIGURES = (fig_two_sides, fig_factorisation, fig_trapped_series,
+           fig_runup, fig_sommerfeld, fig_glitter_path)
 
 
 def main(argv):
