@@ -49,14 +49,16 @@ question this chapter answers in a sentence is usually answered in full by one o
 The provenance appendix moved out of this file rather than shrinking: nothing was removed, and the
 tier markers scattered through the prose (`P`, `D`, `?` …) all resolve against `12b`.
 
-**The figures are generated, never pasted.** Every image in `12` and `12a` comes from
-`figures/make_figures.py`, which imports the reference implementation **read-only** and writes no
-physics of its own, so a figure cannot drift from the code that ships. Each carries its provenance
-mark and the function that drew it in the caption *beside* the image — never inside the pixels,
-where it cannot be diffed and cannot be corrected. Regenerate the set with:
+**The figures are generated, never pasted.** Every image in `12` and `12a` — and every image in the
+rest of `references/`, which the same script now draws — comes from `figures/make_figures.py`, which
+imports the reference implementation **read-only** and writes no physics of its own, so a figure
+cannot drift from the code that ships. Each carries its provenance mark and the function that drew it
+in the caption *beside* the image — never inside the pixels, where it cannot be diffed and cannot be
+corrected. `00`'s figure table lists the whole set, and the chapters that deliberately have none.
+Regenerate with:
 
 ```
-python3 terrain-renderer/references/figures/make_figures.py             # redraw all six
+python3 terrain-renderer/references/figures/make_figures.py             # redraw all thirteen
 python3 terrain-renderer/references/figures/make_figures.py --selftest  # prove the guard can fail
 ```
 
@@ -66,10 +68,11 @@ non-zero if any of them has moved: Walsh's relation on independently quadratured
 limits, Hunt's reading of `R`, and Cox & Munk's two components against the separately fitted total.
 And because **a guard that has never been seen to fail is not known to be a guard** —
 [`11`'s fourteenth way](11-verification-failures.md#the-fourteenth-way-two-instruments-agree-and-could-not-have-disagreed),
-with the sign flipped — `--selftest` fires it at six deliberately broken inputs, including the
-softened total-internal-reflection branch and the run-up misreading waves 4–11 actually shipped.
-All six are caught; a figure whose guard goes blind is caught by the run that says so. The six
-figures, and the claim each one exists to make:
+with the sign flipped — `--selftest` fires it at **fifteen** deliberately broken inputs, six of them
+this chapter's (including the softened total-internal-reflection branch and the run-up misreading
+waves 4–11 actually shipped) and nine belonging to the figures the same script draws for `09`, `10`
+and `19`. All fifteen are caught; a figure whose guard goes blind is caught by the run that says so.
+This chapter's six figures, and the claim each one exists to make:
 
 | Figure | Where | The claim it carries, which is a shape |
 |---|---|---|

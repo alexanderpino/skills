@@ -183,7 +183,7 @@ doubled annulus — the standard clipmap-shaped cut):
 | L3 | 4 | ~50 | ~31 |
 | L2 | 8 | ~50 | ~31 |
 | L0–L1 (pinned) | 16–32 | 5 | ~3 |
-| **Resident set** | | **~255 tiles** | **~127 MiB** |
+| **Resident set** | | **~205 tiles** | **~127 MiB** |
 
 Two lessons generalize: (a) a ring cut costs **levels × ring**, roughly constant bytes per level —
 versus ~845 MiB for the naive "whole pyramid resident" (1365 tiles), and (b) splat weights dominate

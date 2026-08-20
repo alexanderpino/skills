@@ -52,6 +52,46 @@ measurements and independent methods. It **exited non-zero on eight rows** for s
 a recorded finding with its tolerance justified from the estimator's own error, not a broken build —
 and all eight are now closed, with no tolerance widened and four of them tightened.
 
+## Figures, and the chapters that deliberately have none
+
+Every image in `references/` is drawn by the single script
+[`figures/make_figures.py`](figures/make_figures.py), which imports the implementation **read-only**
+and writes no physics of its own, so a figure cannot drift from the code that ships. Captions live
+in the markdown beside the image, never in the pixels, where they can be read, diffed and corrected.
+
+```
+python3 terrain-renderer/references/figures/make_figures.py             # redraw all thirteen
+python3 terrain-renderer/references/figures/make_figures.py --selftest  # prove the guard can fail
+```
+
+| Chapter | Figures | The shape each one carries |
+|---|---|---|
+| `09` | 3 | The float32 spacing **staircase** against the smooth law that bounds it; reversed-Z **flat over seven decades** while three other curves climb as one; the cube-sphere's two mappings, and the direction each is worst in |
+| `10` | 3 | The Rayleigh aureole's **ceiling of ½** with the shipped constant above it; the two receiver weights, **equal in area and nothing else**; an `acos` **folding** about solar noon |
+| `12`, `12a` | 6 | Two Fresnel constants from one surface; a product that is not a mean; a series and its bound; a distribution painted where its realisation belongs; Sommerfeld's exact half; a width that is a function |
+| `19` | 1 | The Kelvin wedge as a **ratio**, self-similar in `V·t`, and the capillary band where the ratio leaves ½ |
+
+**The twenty-chapter gap is deliberate elsewhere, and the reasons are the useful part.** A figure
+earns its place when a claim has a **shape** — a curve that crosses, two factors that diverge, a
+distribution against a realisation, a bound something clears. It does not earn its place when the
+claim is a number, a table or an identity. Recorded so a later round does not re-litigate them:
+
+| Chapter | Considered | Rejected because |
+|---|---|---|
+| `01` | The T-junction sparkle — a vertex exactly on a coarse edge that still leaks | Real, and drawable, but only by putting a **rasterizer inside the generator**. The generator's charter is that it contains no implementation; a figure is not worth breaking it for |
+| `01` | Distance-to-centre vs distance-to-closest-point; the CDLOD morph shortfall | `d_centre/d_nearest` is a ratio of two lengths and the crack from `morphK = 0.98` is `(1 − morphK)·Δh` — both are **identities**, and their pictures are a hyperbola and a straight line |
+| `06` | Ring cut vs whole pyramid resident | A geometric series against a constant one — an identity. Every number in the worked example is a **chosen parameter with no implementation behind it**, so the figure would re-typeset a table. Checking the table instead of drawing it found an arithmetic error the picture would have inherited (the ring column sums to ~205 tiles, not 255) |
+| `07` | The mip halo from independently filtered weights and content | The defect is real and is the same class as `12`'s slope filtering, but showing it needs an **invented weight ramp and two invented layer colours**. "Same mathematics as non-premultiplied alpha halos" already names a known class, which is sharper than a picture of this file's own test case |
+| `08` | The HiZ footprint's mip selection | Suspected the stated rule under-samples straddling rects. **Checked it: the rule is sound** — `ceil(log2 w)` puts the rect at ≤1 texel, so a 2×2 fetch always spans it. No figure, and no correction needed |
+| `08` | LOD/occlusion hysteresis as a loop | "Split at `tau`, merge at `tau·h`" is already the clearest statement; the loop adds a rectangle |
+| `10` | CSM split schemes: uniform vs log vs the `lambda` blend | The **strongest rejection in the set**, and the closest call. It has a genuine shape — texels-per-screen-pixel diverging by orders of magnitude near the camera — but near, far, cascade count and shadow resolution would all be **numbers this file chose**, with nothing shipping behind them. The round's rule is that a figure's numbers come from something that ships |
+| `11` | Anything | Unchanged from the previous round: "a ratio cannot see a common factor" is an algebraic identity, and a picture would illustrate the scene rather than the mechanism |
+| `19` | Particle count scaling with volume | `8×` for a doubled linear size is a cube law stated in four words |
+
+The remaining chapters — `02`–`05`, `13`–`18` — have no implementation behind their quantitative
+claims anywhere in this skill, which is the same reason and the one the project's contract already
+names as its largest unproven region. **An invented number in a figure is worse than no figure.**
+
 ## Master technique index
 
 | Technique / topic | Chapter | Canonical source | Tier | Link |

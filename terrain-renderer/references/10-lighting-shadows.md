@@ -428,6 +428,27 @@ passes. This exact error placed a mid-afternoon August sun in the northwest duri
 own reference work, and it invalidates every shadow in a comparison while looking like a small
 transcription slip.
 
+The mechanism is worth naming, because it is what makes the wrong answer *plausible* rather than
+absurd. Both `acos` forms take the hour angle only through `cos(ha)` — via the elevation, or via the
+zenith — so both are **even functions of it**: each folds about solar noon and neither can, in
+principle, tell morning from afternoon. That is why they need an afternoon rule at all, and why
+crossing the rules returns the mirror of a true azimuth: a real compass bearing, on the wrong side.
+
+![Azimuth across a day by atan2 and by the two acos branches, with the elevation below](figures/azimuth-quadrant-fold.png)
+
+> **Figure 10·3 — an `acos` cannot know the afternoon, and the elevation never tells on it.** `D`.
+> Drawn by [`figures/make_figures.py`](figures/make_figures.py) (`fig_azimuth_fold`) by sweeping
+> `reference-impl/atmosphere.py`'s own `solar_position` across 2026-08-12 at Aljezur and feeding the
+> declination and elevation it returns into the two `acos` forms above — one routine, evaluated the
+> chapter's three ways. **Top:** `atan2` rises monotonically through the day and passes 180° at
+> solar noon. Each `acos` branch lies exactly *on* it in its own half of the day and mirrors it in
+> the other; the fold at `ha = 0` is the whole bug. The shaded band is the rise/set bracket
+> (70.5°, 289.5°) — the crossed value **306.05°** is outside it and the correct **233.95°** is
+> inside, which is the cheap guard the section recommends, working. **Bottom:** the elevation over
+> the same day, with the 15:28 sun and its mirror hour marked at the *same* height. There is no
+> `acos` branch in the elevation, so colour, air mass and slant path are all still right at the
+> wrong sun — and every check a reader is likely to run keeps passing.
+
 Three guards, in the order they are worth running:
 
 - **Ship `atan2`.** The two-argument form has no branch and no origin ambiguity; the `acos` forms
@@ -565,7 +586,27 @@ the physics *only* through the phase function and the phase function's angular m
   effective `⟨cos²Θ⟩_w = 0.145` — an ordinary number for a horizontal face under a 21° sun. The
   hand constant put the aureole at **68%** of its illuminant, which inverts to `⟨cos²Θ⟩_w = 2.125`.
   There is no atmosphere, no sun position and no receiver for which that exists (`D`, all four
-  figures recomputed here).
+  figures recomputed here). And it is not only green: red inverts to **3.846** and blue to
+  **1.021**, so all three shipped bands clear a ceiling that nothing can clear.
+
+![The aureole's share against its own ceiling, and the two hand terms that cancel](figures/aureole-ceiling.png)
+
+> **Figure 10·1 — a ceiling, three points under it, and three points where nothing can be.** `D` on
+> `P` (Rayleigh's phase function and its angular moments). Drawn by
+> [`figures/make_figures.py`](figures/make_figures.py) (`fig_aureole_ceiling`) from
+> `reference-impl/atmosphere.py`'s own environment and its own quadrature — `sky(lobes=())` is the
+> gradient, `SKY_DIFFUSE_LOBES` adds the aureole, and `env_irradiance` integrates both against the
+> same horizontal receiver. Nothing is re-integrated in the figure. **Left:** `share = m/(1+m)`
+> against `m = ⟨cos²Θ⟩_w`. The shaded region is the whole of what can exist, because `cos²Θ ∈ [0,1]`
+> forces `m ∈ [0,1]`; the curve simply stops rising at ½. The three derived shares sit at
+> 12.1 / 12.7 / 11.1 %, on the curve and well inside the domain. The three shipped shares sit at
+> 79.4 / 68.0 / 50.5 % — **above the ceiling in every band**, at abscissae the axis only shows
+> because the figure extends it past the point where the physics ends. This is the one claim in the
+> chapter a picture states better than a number: a level says "too big", a bound says "outside".
+> **Right, on a log axis because the terms span 0.37× to 10.5×:** why it survived. `SKY_AMB × 0.30`
+> is 0.37–0.42× the gradient's own integral, `SUN_COL × 0.075` is 3.1–10.5× the aureole's, and their
+> **sum** crosses 1.0 between green and blue — 1.60× red, 1.16× green, 0.68× blue. Two errors of
+> opposite sign, nearly cancelling in the one band a luminance check looks hardest at.
 
 **That is a falsification from the atmosphere, with no photograph in it** — which is the point
 worth carrying past this project. A constant that has resisted every image comparison for a year
@@ -612,6 +653,21 @@ over `(−π/2, π/2)` is 2, and the remaining `sin θ · sin θ` is the cosine 
 **For a uniform sky the ratio is exactly ½, and for nothing else.** That is why halving a deck
 illuminant for a wall is so durable a habit — it is right in the one case everybody checks. What it
 costs elsewhere is the difference between a `cos θ sin θ` weight and a `sin² θ` one:
+
+![The two receiver-orientation weights, and the same two weights applied to Fresnel](figures/receiver-orientation-weights.png)
+
+> **Figure 10·2 — same area, nothing else the same.** `P/synthesis` for the weights (the cosine law
+> integrated over each receiver's visible azimuth), `D` for the reflectances. Drawn by
+> [`figures/make_figures.py`](figures/make_figures.py) (`fig_receiver_weights`); the exact ½ is
+> checked before any pixel against `atmosphere.env_irradiance`'s own spherical quadrature, which
+> shares no line with the 1-D forms above. **Left:** the two weights normalised to unit area, which
+> is what makes them comparable at all. The horizontal receiver's peaks at 45° and is symmetric
+> about it; the vertical receiver's is **still climbing when it runs out of sky**. They enclose
+> the same area and agree about nothing else — which is exactly why one number can be right for a
+> uniform sky and wrong for every real one. **Right:** the consequence, on the pool's own interface.
+> The vertical weight peaks precisely where Fresnel turns up, so the two integrands' areas are
+> 0.2112 and 0.0667 — **3.17×**, produced entirely by the receiver's orientation, with nothing about
+> the water changed. `R(θ)` is drawn at true scale and leaves the frame on its way to 1.
 
 - **A vertical face weights the horizon and a horizontal face cannot reach it.** Where the sky is
   brighter near the horizon — which is every real atmosphere in red and green — the vertical face

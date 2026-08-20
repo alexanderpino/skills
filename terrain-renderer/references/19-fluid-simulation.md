@@ -244,6 +244,33 @@ simulated, with the sim reserved for the near-hull disturbance. In shallow water
 Froude number 1, the pattern changes and narrows — if the game has shallows, either handle it or
 keep boats in deep water.
 
+The half-angle is a function of the ratio `c_g/c` **and of nothing else**, which is both why it is
+speed-free and where its limits are. Write the steady pattern's locus: a disturbance of age `t`,
+radiating at angle `θ` to the track, sits at `V·t·(−1 + r cos²θ, r cosθ sinθ)` with `r = c_g/c`.
+That is self-similar in `V·t` — the wedge is scale-free, so speed cannot enter — and its half-angle
+is `max_θ atan(r sinθ cosθ / (1 − r cos²θ))`, which at `r = ½` is exactly `arcsin(1/3)`. It follows
+that **there is a third regime the paragraph above does not name**: capillarity. Below about 10 cm
+`r` leaves ½ on deep water alone, and the wedge *widens* rather than narrowing; at the capillary
+minimum (17.1 mm, 0.231 m/s) `c_g = c`, `r = 1`, and there is no wedge at all. Ship wakes never go
+there; a jet in a swimming pool lives entirely inside it, which is why `12`'s wake is not a Kelvin
+wedge and is not drawn as one.
+
+![The Kelvin wedge construction at three speeds, and the group-to-phase ratio behind it](figures/kelvin-wake-angle.png)
+
+> **Figure 19·1 — the angle is a ratio, and the ratio is not always ½.** `P` for the construction
+> (Kelvin 1887), `D` for the capillary band. Drawn by
+> [`figures/make_figures.py`](figures/make_figures.py) (`fig_kelvin_wake`); `r` is never assumed —
+> it is measured from `reference-impl/wake.py`'s `sigma_w` and `c_group`, one capillary-gravity
+> dispersion relation with both halves taken from it. **Left, drawn isometrically so the angle is
+> the angle:** the constant-age loci at three speeds. They are three different sizes and the tangent
+> from the source is **one line** — that is the speed-independence as a picture rather than as an
+> assertion, and it is why the V can be a decal. **Middle:** `c_g/c` against wavelength. It is ½ to
+> four figures across the whole gravity range, turns up through the capillary band, and reaches 1 at
+> the 17.1 mm minimum, where `wake.py`'s own `C_MIN` is the phase speed. **Right:** the half-angle
+> that follows. 19.47° wherever the ratio is ½, climbing steeply once it is not, and **ceasing to
+> exist** past the minimum — beyond it the energy outruns the phase and there is no trailing wedge
+> to have an angle.
+
 ## Domains, budgets and LOD
 
 Fluid does not stream, so the domain is a budget decision made explicitly:
@@ -336,6 +363,13 @@ Tiers per `00`: **P** paper · **T** talk · **D** docs · **F** folklore · **?
   deep-water group velocity is half the phase velocity. William Thomson (Lord Kelvin), "On Ship
   Waves", *Proceedings of the Institution of Mechanical Engineers* 38, 409–434 (1887). Verified
   2026-08.
+- **D** — That the half-angle is `max_θ atan(r sinθ cosθ / (1 − r cos²θ))` for a general
+  group-to-phase ratio `r`, reducing to `arcsin(1/3)` at `r = ½`; that the locus is self-similar in
+  `V·t` and therefore speed-free; and that the wedge widens and then ceases to exist through the
+  capillary band, with `r = 1` at the 17.1 mm minimum. Derived and drawn in
+  `figures/make_figures.py` (`fig_kelvin_wake`), with `r` measured from `reference-impl/wake.py`'s
+  own dispersion relation rather than assumed. The capillary regime is not in Kelvin and is not a
+  correction to him — it is outside the deep-water-gravity limit his result is stated in.
 - **P** — **SPH incompressibility variants** (verified 2026-08): Solenthaler & Pajarola,
   "Predictive-Corrective Incompressible SPH", *ACM TOG* 28(3) (SIGGRAPH 2009), 40:1–40:6;
   Ihmsen, Cornelis, Solenthaler, Horvath & Teschner, "Implicit Incompressible SPH", *IEEE TVCG*
