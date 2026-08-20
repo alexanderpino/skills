@@ -4933,6 +4933,98 @@ def waterline_crop(L, cam, w, ex, path, cols=(560, 720), rows=(300, 480)):
                 prof=prof)
 
 
+def _through_face_wave12(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0,
+                         foot=None):
+    """WAVES 1-12's `through_face`, reintroduced EXACTLY, for the seam figure.
+
+    Two lines differ from the shipping version and they are the two the wave-13
+    optics builder changed: `g_prev` starts at zero -- asserting that the traced
+    entry point lies exactly on the free surface -- and the mask is `exited`
+    alone rather than `entered & exited & (chord > 0)`. Everything else is
+    copied unchanged, so the comparison is those two lines and nothing else.
+
+    It lives here rather than in the suite because it is what draws the BEFORE
+    half of `s13-sea-sky-seam`, and a before/after frame whose two halves came
+    from two checkouts is not a comparison anybody can re-run.
+    """
+    eta_r = 1.0 / OPT.IOR[1]
+    T = np.stack(OPT.refract(D[..., 0], D[..., 1], D[..., 2],
+                             Nn[..., 0], Nn[..., 1], Nn[..., 2], eta_r), -1)
+    Tn = np.linalg.norm(T, axis=-1, keepdims=True)
+    T = T / np.where(Tn > 1e-9, Tn, 1.0)
+    step = reach / n_step
+    chord = np.zeros(P.shape[:-1])
+    exited = np.zeros(P.shape[:-1], bool)
+    Q = P.copy()
+    g_prev = np.zeros(P.shape[:-1])                  # ---- THE DEFECT, (1)
+    for m in range(n_step):
+        Qn = Q + T * step
+        e = free_surface(w, Qn[..., 0], Qn[..., 1], t_now, foot)
+        g = e - Qn[..., 2]
+        out = (g < 0.0) & (~exited)
+        frac = np.where(out, g_prev / np.maximum(g_prev - g, 1e-9), 1.0)
+        chord = np.where(exited, chord, chord + step * np.clip(frac, 0.0, 1.0))
+        exited = exited | out
+        Q, g_prev = Qn, g
+    chord = np.where(exited, chord, 0.0)             # ---- THE DEFECT, (2)
+    zx, zy = surface_slope(w, Q[..., 0], Q[..., 1], t_now, foot=foot)
+    Nf = np.stack([-zx, -zy, np.ones_like(zx)], -1)
+    Nf /= np.linalg.norm(Nf, axis=-1, keepdims=True)
+    lit = np.clip((Nf * SUN[None, None]).sum(-1), 0.0, 1.0)
+    L_in = (E_SUN[None, None] * lit[..., None]
+            * (1.0 - OPT.fresnel(np.clip(lit, 1e-4, 1.0))) / np.pi)
+    a = BO.iops()['a'][None, None] * np.ones_like(L_in)
+    bb = BO.iops()['b_b'][None, None] * np.ones_like(L_in)
+    L = L_in * np.exp(-(a + bb) * chord[..., None])
+    return L * np.where(exited, 1.0, 0.0)[..., None], chord, lit
+
+
+def seam_figure(out_dir, W=720, H=960, rows=None):
+    """`s13-sea-sky-seam`: a 1:1 crop across the horizon, before and after.
+
+    NO TEXT IS BURNED INTO THIS FIGURE. Wave 11's three critics each reported
+    that captions inside the pixels defeated the blind and one had to crop
+    before it could judge a frame; the caption is the sidecar beside the PNG.
+
+    The two halves are ONE CODE PATH and one bed, rendered back to back in one
+    process with `through_face` swapped for `_through_face_wave12` between them.
+    Both are tone-mapped through the SAME exposure, so a difference in the image
+    is a difference in the radiance -- and the radiance itself is measured
+    before the tone map, by `horizon_seam`, which is what the caption quotes.
+    """
+    global through_face
+    import os
+    bay = B.run_bay(embay=True)
+    w = Water(bay)
+    (_, _, _, _, _, camK, infK) = hero_cameras(w, W, H)[:7]
+
+    L_new, _ = render(camK, w)
+    seam_new = horizon_seam(L_new, camK)
+    _orig = through_face
+    through_face = _through_face_wave12
+    try:
+        L_old, _ = render(camK, w)
+    finally:
+        through_face = _orig
+    seam_old = horizon_seam(L_old, camK)
+
+    # the horizon row, found from the camera's own rays rather than from pixels
+    D = camK.rays()
+    up = D[..., 2] >= 0.0
+    j = int(np.where(up.all(1))[0][-1])
+    if rows is None:
+        rows = (max(j - 90, 0), min(j + 90, L_new.shape[0]))
+    r0, r1 = rows
+    gap = 6
+    band = np.zeros((2 * (r1 - r0) + gap, L_new.shape[1], 3))
+    band[:r1 - r0] = L_old[r0:r1]
+    band[r1 - r0 + gap:] = L_new[r0:r1]
+    path = os.path.join(out_dir, 's13-sea-sky-seam.png')
+    _save(band, path)
+    return dict(path=path, seam_old=seam_old, seam_new=seam_new,
+                horizon_row=j, rows=rows, shape=L_new.shape)
+
+
 def pockets_figure(w, path, j=None):
     """THE CLOSED FORM AND ITS REALISATION, side by side on the same cells.
 
