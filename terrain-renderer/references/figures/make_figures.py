@@ -1226,15 +1226,15 @@ def fig_receiver_weights(out):
                  (BLU, (9, 5), 'vertical receiver:  (4/%s) sin%s%s'
                   % ('π', '²', 'θ'))], 2.0, 1.39)
 
-    # The axis belongs to the two INTEGRANDS, whose areas are the two means.
-    # R itself climbs to 1 at grazing and would flatten them against the floor;
-    # it is drawn at true scale and simply leaves the frame, which is a more
-    # honest way to say "it goes to one" than rescaling everything else.
-    bx = P.Axes(img, (688, 54, 1140, 520), (0.0, 90.0), (0.0, 0.50),
+    # The axis holds BOTH integrands whole. The vertical one reaches 1.27 at
+    # grazing -- above R itself, because its weight is a density and exceeds 1
+    # there -- so a range chosen for the horizontal one would clip away exactly
+    # the region the panel exists to show.
+    bx = P.Axes(img, (688, 54, 1140, 520), (0.0, 90.0), (0.0, 1.42),
                 xlabel='polar angle %s from the zenith, %s' % ('θ', DEG),
                 ylabel='reflectance, and each weight\'s integrand')
     bx.frame(xticks=[0, 15, 30, 45, 60, 75, 90],
-             yticks=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5], yfmt='%.1f')
+             yticks=[0.0, 0.25, 0.5, 0.75, 1.0, 1.25], yfmt='%.2f')
     r = O.fresnel(np.cos(th))[:, 1]
     bx.fill_between(deg, np.zeros_like(deg), r * wv, FILL_B)
     bx.fill_between(deg, np.zeros_like(deg), r * wh, FILL_C)
@@ -1244,14 +1244,17 @@ def fig_receiver_weights(out):
     mh = float(np.trapezoid(r * wh, th))
     mv = float(np.trapezoid(r * wv, th))
     bx.marker(0.0, float(O.fresnel(np.array([1.0]))[0, 1]), ACCENT, r=5)
-    bx.text(76.5, 0.455, 'R(%s) %s 1' % ('θ', '→'), INK, anchor='rs')
-    bx.text(88.0, 0.055, 'normal incidence %.4f'
-            % O.fresnel(np.array([1.0]))[0, 1], ACCENT, anchor='rs')
+    bx.text(88.0, 1.05, 'R(%s)' % 'θ', INK, anchor='rs')
+    bx.text(88.0, 1.30, 'the vertical weight is a DENSITY:', BLU, anchor='rs')
+    bx.text(88.0, 1.19, 'it passes 1 before the sky runs out', BLU,
+            anchor='rs')
+    bx.text(30.0, 0.075, 'normal incidence %.4f'
+            % O.fresnel(np.array([1.0]))[0, 1], ACCENT, anchor='ls')
     _legend(bx, [(INK, (2, 5), 'R(%s), green band, n = %.4f' % ('θ', O.IOR[1])),
                  (BLU, (9, 5), 'vertical integrand:  area = %.4f' % mv),
                  (GRN, (3, 4), 'horizontal integrand:  area = %.4f' % mh),
                  (ACCENT, None, 'the ratio is %.2f%s, from the weight alone'
-                  % (mv / mh, '×'))], 2.0, 0.475)
+                  % (mv / mh, '×'))], 2.0, 0.62)
     return P.save(img, os.path.join(out, 'receiver-orientation-weights.png'))
 
 

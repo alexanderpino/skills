@@ -667,7 +667,9 @@ costs elsewhere is the difference between a `cos θ sin θ` weight and a `sin² 
 > uniform sky and wrong for every real one. **Right:** the consequence, on the pool's own interface.
 > The vertical weight peaks precisely where Fresnel turns up, so the two integrands' areas are
 > 0.2112 and 0.0667 — **3.17×**, produced entirely by the receiver's orientation, with nothing about
-> the water changed. `R(θ)` is drawn at true scale and leaves the frame on its way to 1.
+> the water changed. Both integrands are shown whole, on one scale, so the two shaded areas are the
+> two numbers: the vertical one passes 1.0 before the sky runs out, because a weight normalised to
+> unit area over a finite interval is a *density* and is under no obligation to stay below one.
 
 - **A vertical face weights the horizon and a horizontal face cannot reach it.** Where the sky is
   brighter near the horizon — which is every real atmosphere in red and green — the vertical face
