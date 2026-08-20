@@ -60,7 +60,13 @@ judged against and it must be reachable inside the budget; ambition above it goe
 in the stretch line, which never arms a stop condition. Freeze the artifacts
 under `gauntlet/bar/` now, before any lane runs — and if there is nothing to
 freeze, `bar-request` writes what each dimension needs, for the user or a scout
-agent to fetch; the run waits (`bar-selection.md`: no bar, no run). Set
+agent to fetch; the run waits (`bar-selection.md`: no bar, no run). That same
+request has a second half worth asking for explicitly whenever the artifact has
+structure beneath its surface: **the direction** — a wayfinder map, an
+architecture record (SAD, ADRs), a spec, or the conventions of the existing
+codebase cited by path. Ask what exists rather than assuming nothing does;
+most teams have more written down than they volunteer, and the alternative is
+each builder deciding it privately (`decomposition.md`). Set
 `--target-score` where the target actually sits — at 10, bar-met can never fire.
 
 When the user names one blanket number — "10/10, like EA FC26" — do not write

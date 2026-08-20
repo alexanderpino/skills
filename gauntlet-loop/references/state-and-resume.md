@@ -12,7 +12,7 @@ gauntlet/
 ├── config.json      # lanes, dimensions, targets, stops, WIP limit, parks, extensions, gates
 ├── contract.md      # confirmed intake contract — subagents read goal/rules here
 ├── bar/             # frozen bar artifacts (or answer-key.md); read-only after intake
-├── bar-request.md   # what comparison material is still missing — `gauntlet.py bar-request`
+├── bar-request.md   # intake request: the bar, and direction where needed — `gauntlet.py bar-request`
 ├── ownership.md     # file-ownership ledger, rewritten at each wave start
 ├── backlog.md       # noticed but deliberately unfunded; goes into the report
 ├── rounds.jsonl     # append-only, script-validated; the single source of truth

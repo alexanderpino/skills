@@ -183,7 +183,7 @@ python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --rou
     --gap "..." --evidence shots/w2r3.png --tokens 74000 --critic-model sonnet
 python3 scripts/gauntlet.py gate     # mechanical checks; skips those whose inputs are unchanged
 python3 scripts/gauntlet.py status   # state, next-wave plan, park list, fired stops
-python3 scripts/gauntlet.py bar-request               # what comparison material is still missing, per dimension — for a user or scout
+python3 scripts/gauntlet.py bar-request               # what this run still needs before wave 1: comparison material, and direction where the artifact has layers
 python3 scripts/gauntlet.py quote --current-score 4   # the quality-price menu: what 7, 8, 9 cost; 10 is not a price
 python3 scripts/gauntlet.py plan --current-score 4    # draft plan.md: build stages in order, priced — the forward scaffold
 python3 scripts/gauntlet.py park --lane a --dimension visual --reason "..."
@@ -357,9 +357,13 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
 Split the goal into **lanes**: the smallest units that can be improved and judged
 independently. You cut them, not the user. → `references/decomposition.md`
 
-- **On a layered artifact, settle the minimum architecture first.** Not a design
-  document — only the load-bearing decisions, and the test for which those are
-  is exact: *a decision no lane-level round could reach.* Those are the
+- **On a layered artifact, settle the minimum architecture first — and ask for
+  it out loud.** `bar-request` writes the intake request in two parts: the bar,
+  and the direction. Ask for a wayfinder map, an architecture record (SAD,
+  ADRs), a spec, or the existing codebase's conventions by path — whichever the
+  user has. Requesting it costs one message; inventing it costs the run. Not a
+  design document — only the load-bearing decisions, and the test for which
+  those are is exact: *a decision no lane-level round could reach.* Those are the
   structural gaps of wave 6, bought cheap at wave 0. Freeze them as constraints
   in the contract, and harvest every one a command can check into a gate, so the
   layering is enforced free every wave instead of trusted. A README needs none
