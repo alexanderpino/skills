@@ -26,6 +26,7 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | A lane grinds against a ceiling | same gap round after round, still funded | `no-progress` park, re-cut |
 | Progress theatre | rounds logged, artifact unchanged | per-round evidence, diff champions |
 | Lane collision | reverts undo another lane's work | one file, one owner, per wave |
+| Facade before foundation | rounds polish what sits on a layer that is still wrong | dependency order comes from the plan, a domain skill or grounding — the loop enforces quality order only |
 | Context bleed | critic echoes builder justifications | critic gets artifact + bar only |
 | Built from memory what a source had settled | confident detail that is a version behind, or a fabricated citation | grounding rule: normative source first, authority by author not venue, cite only what was opened |
 | Gold plating | rounds spent past a retired dimension | retirement is a stop, not a suggestion |

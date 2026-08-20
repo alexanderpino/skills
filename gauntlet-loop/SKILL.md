@@ -377,7 +377,12 @@ A wave is one pass over the **funded** lanes — the top `wip_limit` of the rank
 list, as printed by `status` — at **one round per lane per wave**. Phases 4–6
 cycle until a stop fires. `status` also names the **build stage**: dimensions
 below their usable line are funded before any dimension buys a rung above it —
-whole-and-crude beats one-part-excellent, enforced in the ranking.
+whole-and-crude beats one-part-excellent, enforced in the ranking. That is
+*quality* order, not *technical* order: the loop knows what is behind, never
+what is underneath. Foundations-before-facade (an abstraction layer before the
+features on it) comes from the plan, a domain skill, or grounding — and if it
+comes from none of those, the loop discovers it the expensive way, as a
+structural gap that forces a re-cut (`references/decomposition.md`).
 
 **Wave setup, once, before any lane starts:** take the champion commit. That one
 ref is every lane's `--champion-ref` for the wave. Concurrent per-round commits

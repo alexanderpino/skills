@@ -88,6 +88,43 @@ When unsure, serialise the pair for one wave and watch whether the second lane's
 critic keeps citing the first lane's territory. That is the dependency showing
 itself.
 
+### The order the loop enforces is not the order the artifact needs
+
+Two different orderings run through a gauntlet, and only one of them is
+mechanical:
+
+- **Quality altitude — enforced.** Usable everywhere before lovable anywhere:
+  `status` ranks dimensions below their usable line ahead of any dimension
+  buying a rung above it, and `plan` stages it. This is what stops a run
+  polishing shaders while gameplay sits at 2.
+- **Technical dependency — not enforced, and the loop cannot infer it.** A
+  graphics abstraction layer before renderer features; a fixed-timestep loop
+  before netcode; a schema before the systems that walk it. The loop knows what
+  is *behind* (evidence, trends, budget); it does not know what is *underneath*.
+  It has no domain knowledge and will not acquire any by iterating.
+
+Where the second ordering has to come from, most reliable first:
+
+1. **Upstream planning.** The map and answer key settle the architecture
+   decisions before wave 1 (`bar-selection.md`); the lane cut then inherits the
+   order as serialised pairs. This is the cheapest place to get it right.
+2. **A domain skill.** Where one exists for the artifact's field, consult it
+   while cutting — it holds the layering this skill deliberately does not — and
+   name it in the contract's Notes so every wave's agents load it.
+3. **Grounding.** The layering of a long-solved domain is a settled question,
+   not an invention (`grounding.md`). A renderer's architecture is not something
+   to reconstruct from memory in the middle of a wave.
+4. **Reactively, at full price.** Absent all three, the loop still finds out: a
+   lane whose critic keeps naming a gap that "sits below the lane" is the
+   missing foundation announcing itself, and the answer is a re-cut, not another
+   round. It works — and it costs the rounds a plan would have saved.
+
+The bootstrap wave forces a minimum of this on its own: you cannot screenshot a
+frame without something that draws one, so a thin end-to-end slice drags the
+load-bearing path into existence early. But a walking skeleton is not an
+architecture. It proves the path exists; it says nothing about whether the layer
+beneath it is the right one.
+
 ## File ownership
 
 **One file, one owner, per wave.** Not per run — ownership can move between waves,
