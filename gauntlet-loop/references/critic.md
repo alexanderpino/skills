@@ -120,6 +120,12 @@ grade on a curve. The failure mode is not being mean, it is being agreeable.
 **"Good for an AI" is not a standard.** The comparison is against the bar, full
 stop. The bar does not care how the artifact was made.
 
+**An ungrounded claim is a gap you may name.** Where a canonical answer exists —
+a spec, the official reference for the version in use, a maintainer's own word —
+and the artifact reproduces it from memory instead, that is specific and
+actionable: say what it asserts, what the source says, and where you looked
+(`grounding.md`).
+
 **Vague gaps are failed criticism.** "Lighting could be better" is worthless.
 "Ours has no contact shadows where the crate meets the floor; the reference has a
 tight dark gradient there" is a round.

@@ -15,16 +15,23 @@ against a bar you can look at yourself.
 
 1. **Look at the bar first.** Not the gap description — the actual reference. The
    gap text is a pointer; the bar is the truth.
-2. **Close the named gap.** That is this round's job. Not a redesign, not the whole
+2. **Ground before you write anything already settled.** If the gap touches a
+   spec, an API, a version-dependent detail, or a problem the world solved long
+   ago, open the source and work from it — normative first, then named
+   authority; community threads are a pointer to those, not a citation. Memory
+   is undated and confident, which is the dangerous combination. Name what you
+   opened in your handoff, and if you could not reach it, say the claim is
+   unverified rather than writing it as fact (`grounding.md`).
+3. **Close the named gap.** That is this round's job. Not a redesign, not the whole
    lane, not adjacent things that also bother you.
-3. **Inspect your own output before handing off.** Render it, run it, read it back.
+4. **Inspect your own output before handing off.** Render it, run it, read it back.
    Handing a critic something you never looked at wastes a full round. This is
    not grading — you are checking the thing exists and runs, not judging whether
    it is good. The judgement stays with the critic; the smoke test stays with you.
-4. **Report what changed, not why it is good.** Files touched, one line each,
+5. **Report what changed, not why it is good.** Files touched, one line each,
    five lines maximum. No rationale, no self-assessment. Your handoff is read by
    every agent after you, so length here is paid for many times over.
-5. **Say if the gap is not closeable from your files.** If closing it needs a
+6. **Say if the gap is not closeable from your files.** If closing it needs a
    different source asset, a structural change below this lane, or a decision
    only the user can make, stop and say so in one line instead of shipping an
    approximation. That sentence is what lets the run park the lane instead of

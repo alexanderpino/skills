@@ -521,10 +521,19 @@ block — and put that in front of the user. `extend` enforces the rest.
 
 ## Non-negotiables
 
-Four the script cannot check, so they are on you:
+Five the script cannot check, so they are on you:
 
 - **No builder grades its own homework.** Separate agent, fresh context. (They do
   *inspect* their output before handoff — a smoke test, not grading.)
+- **No builder invents what a source has settled.** Anything canonical,
+  version-dependent, or long-since-solved gets grounded in a real source before
+  it is written — normative first (spec, official docs for the version in use,
+  the dependency's source), then named authority (maintainers, recognised
+  experts, peer-reviewed work). Community aggregates like Stack Overflow are a
+  pointer, never a citation: authority attaches to the author, not the venue, so
+  an answer *by* a domain authority counts and the thread around it does not.
+  Cite what you opened; never fabricate a citation.
+  → `references/grounding.md`
 - **Critics inspect the artifact, never a summary of it** — and blind where
   blindable, with the mode labelled honestly where not.
 - **Losers get reverted.** What stops a long run wandering downhill one
@@ -569,5 +578,7 @@ Three are not cited inline:
 - `references/workbench.md` — the generated progress surface and the log schema.
 - `references/authorities.md` — where these rules come from and what each forces.
 
-Subagent briefs: `builder.md`, `critic.md`, `smoother.md`.
+Subagent briefs: `builder.md`, `critic.md`, `smoother.md` — and
+`grounding.md`, which binds builders and critics alike: what to look up rather
+than recall, which sources carry authority, and how to cite them.
 Tooling: `scripts/gauntlet.py` (init / bar-request / quote / plan / log-round / gate / status / park / board / extend / report).
