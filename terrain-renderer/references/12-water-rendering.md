@@ -56,11 +56,20 @@ mark and the function that drew it in the caption *beside* the image — never i
 where it cannot be diffed and cannot be corrected. Regenerate the set with:
 
 ```
-python3 terrain-renderer/references/figures/make_figures.py
+python3 terrain-renderer/references/figures/make_figures.py             # redraw all six
+python3 terrain-renderer/references/figures/make_figures.py --selftest  # prove the guard can fail
 ```
 
 It re-derives every headline number by a second, non-shared route before drawing a pixel and exits
-non-zero if any of them has moved. The six figures, and the claim each one exists to make:
+non-zero if any of them has moved: Walsh's relation on independently quadratured index pairs, the
+`μ_c`-split integral against `optics.py`'s own midpoint-plus-Walsh route, `K_d(0)`, the Cornu
+limits, Hunt's reading of `R`, and Cox & Munk's two components against the separately fitted total.
+And because **a guard that has never been seen to fail is not known to be a guard** —
+[`11`'s fourteenth way](11-verification-failures.md#the-fourteenth-way-two-instruments-agree-and-could-not-have-disagreed),
+with the sign flipped — `--selftest` fires it at six deliberately broken inputs, including the
+softened total-internal-reflection branch and the run-up misreading waves 4–11 actually shipped.
+All six are caught; a figure whose guard goes blind is caught by the run that says so. The six
+figures, and the claim each one exists to make:
 
 | Figure | Where | The claim it carries, which is a shape |
 |---|---|---|

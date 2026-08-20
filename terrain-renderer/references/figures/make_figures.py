@@ -579,7 +579,67 @@ FIGURES = (fig_two_sides, fig_factorisation, fig_trapped_series,
            fig_runup, fig_sommerfeld, fig_glitter_path)
 
 
+# --- the guard's own guard ---------------------------------------------------
+def selftest():
+    """`--selftest`: fire `preflight()` at deliberately broken inputs.
+
+    Standing ruling 14 with the sign flipped -- a near-zero measurement is
+    worthless until zero has been shown to be reachable, and a guard that has
+    never been seen to fail is not known to be a guard. Each case below
+    perturbs ONE quantity `preflight` reads, at roughly the size of a real
+    regression, and the run fails if any of them slips through. Every module is
+    restored afterwards; nothing is written to disk."""
+    cases, saved = [], {}
+
+    def case(name, apply, undo):
+        apply()
+        try:
+            preflight()
+            r = 'DID NOT FIRE  <-- blind'
+        except SystemExit:
+            r = 'fired'
+        undo()
+        cases.append((name, r))
+
+    preflight()                                   # must pass clean first
+    saved['R_INT'] = O.R_INT.copy()
+    case('R_INT +0.1%',
+         lambda: setattr(O, 'R_INT', saved['R_INT'] * 1.001),
+         lambda: setattr(O, 'R_INT', saved['R_INT']))
+    saved['R_INT_MU'] = O.R_INT_MU.copy()
+    case('the TIR branch softened to 0.99',
+         lambda: setattr(O, 'R_INT_MU',
+                         np.where(saved['R_INT_MU'] >= 1.0, 0.99,
+                                  saved['R_INT_MU'])),
+         lambda: setattr(O, 'R_INT_MU', saved['R_INT_MU']))
+    saved['ABS'] = O.ABS.copy()
+    case('ABS red +2%',
+         lambda: setattr(O, 'ABS', saved['ABS'] * np.array([1.02, 1.0, 1.0])),
+         lambda: setattr(O, 'ABS', saved['ABS']))
+    saved['IOR'] = O.IOR.copy()
+    case('IOR green 1.3348 -> 1.3330',
+         lambda: setattr(O, 'IOR', np.array([1.3320, 1.3330, 1.3400])),
+         lambda: setattr(O, 'IOR', saved['IOR']))
+    saved['kd'] = BD.knife_edge_kd
+    case('K_d scaled by 1.0002',
+         lambda: setattr(BD, 'knife_edge_kd',
+                         lambda v: saved['kd'](v) * 1.0002),
+         lambda: setattr(BD, 'knife_edge_kd', saved['kd']))
+    case("Hunt's R read as the rms (the waves 4-11 bug)",
+         lambda: setattr(B, 'RUNUP_QUANTILE', float(np.exp(-1.0))),
+         lambda: setattr(B, 'RUNUP_QUANTILE', 0.02))
+
+    for n, r in cases:
+        print('%-46s %s' % (n, r))
+    blind = [n for n, r in cases if 'DID NOT' in r]
+    print('%d/%d perturbations caught' % (len(cases) - len(blind), len(cases)))
+    preflight()                                   # and clean again afterwards
+    return 1 if blind else 0
+
+
 def main(argv):
+    if '--selftest' in argv:
+        return selftest()
     out = argv[1] if len(argv) > 1 else _HERE
     os.makedirs(out, exist_ok=True)
     preflight()
