@@ -50,6 +50,14 @@ That last field matters. If you keep finding the same seam wave after wave, the
 decomposition is cutting through something that should have stayed whole. Say so —
 the lead agent can re-cut the lanes.
 
+**You are the repair, not the cure.** Seams form because independent agents
+answer the same unasked question differently, and reconciling them is a cost
+this pass pays every wave. A seam that recurs is therefore a message to the
+lead agent: an anchor is missing, and buying it once — a gate if the rule is
+checkable, a worked example if it is a pattern — retires this seam permanently
+(`decomposition.md`). Name the missing convention in STRUCTURAL, not just the
+symptom you fixed.
+
 Keep the report to those five lines. You run once a wave; a long report is read
 by everyone in the next one.
 

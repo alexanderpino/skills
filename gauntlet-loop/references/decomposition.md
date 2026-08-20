@@ -161,6 +161,46 @@ and answer key, an architecture skill, a domain skill for the field, or
 grounding for a solved domain. What it must never be is a builder's improvised
 choice at wave 3, defended afterwards because the code already assumes it.
 
+### Its real job: making independent agents converge
+
+Dependency order is the obvious reason to settle architecture early. The one
+that actually bites in a fan-out loop is different: **every builder is a fresh
+context, so every unanswered question gets answered independently.** Five lanes
+meeting the same silent question — how is an error shaped, where does state
+live, how is a resource addressed, what is a name — produce five defensible
+answers and one incoherent artifact. Nobody made a mistake; nobody was told.
+
+The smoother exists for this and is the *repair*: one agent over the changed
+surface each wave, reconciling seams (`smoother.md`). Repair recurs; the anchor
+is bought once. So the question worth asking while cutting lanes is not only
+"what is underneath" but **"what will each of these agents have to invent, and
+would they invent the same thing?"** Every "no" is an anchor you owe them.
+
+What actually converges agents, strongest first — and note that prose is last:
+
+1. **A gate.** Mechanical and unignorable: a divergent choice turns a check red
+   in the same wave. Dependency direction, forbidden imports, a required
+   header, a naming pattern. Convergence you do not have to trust.
+2. **A worked example in the tree.** Builders pattern-match on what is already
+   there, for free, without being told. So the first lane through a layer should
+   produce the canonical one deliberately, and later lanes are pointed at it by
+   path. One real example out-converges three pages of description.
+3. **A named decision, cited by path.** In the contract's rules or the frozen
+   architecture — read from disk each wave, never paraphrased into a prompt.
+4. **Prose describing the intent.** Weakest. It survives one wave and drifts,
+   because each agent restates it slightly differently to itself.
+
+The champion works the same way and is easy to overlook: every lane builds
+against the same committed state, so the artifact itself carries the
+convention forward. That is another reason promotions are sequenced by the lead
+agent rather than left to builders — a serialised promotion keeps one shared
+reality; concurrent ones create several.
+
+And the signal that an anchor is missing is already in the loop: when the
+smoother reports the same seam a second wave running, that is not a smoothing
+problem. Stop paying for the repair and create the anchor — a gate if the rule
+is checkable, an example if it is a pattern.
+
 ## File ownership
 
 **One file, one owner, per wave.** Not per run — ownership can move between waves,

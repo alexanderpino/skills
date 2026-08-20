@@ -364,7 +364,15 @@ independently. You cut them, not the user. → `references/decomposition.md`
   in the contract, and harvest every one a command can check into a gate, so the
   layering is enforced free every wave instead of trusted. A README needs none
   of this; a renderer needs it before the lanes are cut, because the cut follows
-  the layers. → `references/decomposition.md`
+  the layers.
+- **Anchor what the lanes would otherwise each invent.** Every builder is a
+  fresh context, so every unanswered question gets five defensible answers and
+  one incoherent artifact. Ask of each lane: *what will this agent have to make
+  up, and would the others make up the same thing?* Each "no" needs an anchor,
+  strongest first: a gate (divergence goes red), a worked example in the tree
+  (pattern-matched for free), a decision cited by path. Prose is the weakest and
+  drifts. The smoother repairs seams every wave; an anchor retires one.
+  → `references/decomposition.md`
 - **The lane test:** can a fresh critic look at this one thing and say which of
   two versions is better, without needing the rest?
 - **Rank them**, because a wave funds `wip_limit` lanes and not all of them:
