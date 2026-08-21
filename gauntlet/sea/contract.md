@@ -158,18 +158,50 @@ Measure in **scene-linear, before the tone map**. Never read a PNG for physics.
 - **Autonomy: run unattended.** Owner: *"BLijf maar gewoon door gaan met de
   waves, autonoom. Zorg voor visuele tussentijdse evidence."*
 
-## Closed, and not to be re-opened
+## ~~Closed, and not to be re-opened~~ — RE-OPENED AT WAVE 20, and the closure was a category error
 
-- **Section A** — the backlit wave face reading green against grey-blue water.
-  Closed as **unreachable by proof**, not parked as unreached. Stokes' 120°
-  corner (1880) caps a single-valued crest face at **30°** for every wave of
-  permanent form, at any order, at any depth, against the **41.48°** an in-water
-  lengthwise sightline needs. Section A requires the wave to be within ~11° of
-  overturning, which is section F's multivalued instant: **A and F are one
-  criterion at two moments.** Section A's other half — falsifying a renderer
-  that *tints* its water — was discharged by wave 4's cuvette and stays
+The owner: *"Het oppervlak van de zee en ander open water bestaat ook uit golven.
+En soms heb je hogere golven. En golven die omslaan."*
+
+That is a correction and it lands. **Stokes' 120° corner bounds waves of
+PERMANENT FORM — steady waves.** An overturning wave is precisely one for which
+*no* steady solution exists; it overturns **because** the permanent form has
+ceased to be available. The theorem was used here to close a question it does not
+answer, and I wrote that closure.
+
+**What the argument actually establishes is narrower and still true:** a
+**single-valued heightfield** `η(x, y)` cannot carry a multivalued surface,
+because a plunging lip folds over itself and a heightfield admits one height per
+point. That is a statement about **this implementation's representation**, not
+about the physics — and a representation is a choice.
+
+So the two sections are re-scoped rather than closed:
+
+- **Section F — the multivalued surface.** No longer *unreachable*. Now:
+  **requires a representation this implementation does not have.** The route is
+  not exotic and it is what production renderers do: the heightfield carries the
+  wave up to the instant it goes multivalued, and a second representation — a
+  parametric breaker lip, a mesh strip, or particles — carries the plunge. What
+  it costs and what it would break is **unpriced**, and pricing it is the first
+  step, not building it.
+- **Section A — the backlit face.** Its geometric bound stands *for a
+  single-valued surface* (30° against the 41.48° needed) and falls with F, since
+  A is F at an earlier instant. Re-scoped with it. Its other half — falsifying a
+  renderer that *tints* its water — was discharged by wave 4's cuvette and stays
   discharged.
-- **Section F** — the multivalued surface. Out of scope by the same argument.
+
+**And the owner's first clause is the part that matters most.** Overturning is
+not an exotic edge case to be dispatched with a citation. **The sea surface *is*
+waves, sometimes higher ones, and sometimes they overturn.** A model of open
+water that structurally cannot do it is incomplete, and the honest way to record
+that is as an open gap with a named cost — not as a closed one with a proof
+pointing somewhere else.
+
+**Kept as a warning about method**, because it is the more useful lesson: a
+correct theorem, cited accurately, closed a question for six waves by answering a
+neighbouring one. Nothing in the citation was false. The failure was in the
+scope of the claim it was made to support, and no suite, critic or answer key can
+see that — only reading the theorem's own preconditions can.
 
 ## Contract amendment — the goal has a third part, and the skill ships no figures
 
