@@ -386,3 +386,48 @@ So a figure can be numerically correct and *drawn* out of line with the physics
 it claims to depict, and the suite is silent. Under ruling 17 that is a gap in
 the instrument, and it is recorded here rather than in a builder's README
 because it belongs to whoever next touches `references/figures/`.
+
+## Ruling 18 — derived, guarded, and never called
+
+Wave 18 found this three times, in three lanes, by three builders who did not
+speak to each other. It is now this project's dominant error class and it
+outranks every individual defect any of them fixed.
+
+- **Foam.** Wave 12 diagnosed the airbrush correctly, built the entire fix, and
+  wired none of it. `grep` for `boolean_indicator`, `filtered_indicator`,
+  `grain_radius`, `deck_source` returned **nothing outside `beach_foam.py`**.
+  `shade_water` still blended by `coverage(m)` — the mean.
+- **Glitter.** Seventeen waves argued the resolved/unresolved slope split, and
+  `grep -rn SlopeRealisation` returned the class statement and two comments:
+  **nothing had ever instantiated it.** `shade_water` computed the two variances
+  on one line and threw them away on the next.
+- **Diffraction.** The physics critic established it independently: ten Sommerfeld
+  rows verified, and `beach_render.py` **does not import `beach_diffract`**.
+  Zero pixels of either hero frame carry a diffracted edge.
+
+And one more, from the wave before: **wave 13 landed three lanes with no suite
+rows at all**, and the 413-pass total that "confirmed" it was wave 12's suite
+unchanged.
+
+**The suite cannot see any of these, and the reason is structural rather than
+sloppy.** Every row tested a *function* in a module. Not one tested whether the
+**render path reaches it**. A module can be correct, guarded, cited, figured and
+chaptered while contributing nothing to a single pixel, and every instrument the
+run owns will report success.
+
+**So: a row that tests a function must be paired with a row that tests that the
+frame reaches it.** Coverage is a first-class property here, not a nicety —
+integers, off the rendered buffer: how many pixels, what share of frame, and
+where. The physics answer key says in its own words that it *cannot* check this,
+because it checks quantities and not whether any pixel reached the code, and the
+project has a shade sail on record that **0 of 8 640 000 subsamples** ever hit.
+
+**The ten-second version, for a lead agent reading a builder's report:** a suite
+total is not evidence that a wave landed. `git log -- <the suite file>` must show
+the wave's own entry, and a `grep` for the new symbols must find them **outside**
+the module that defines them. Running the right command is not the same as
+running a command that could have failed.
+
+This belongs in `terrain-renderer/references/11-verification-failures.md` as a
+numbered way, with these four as its instances. Recorded here first because the
+chapter is a shared surface and this is the run's own governance.
