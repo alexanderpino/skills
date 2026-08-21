@@ -197,6 +197,20 @@ water that structurally cannot do it is incomplete, and the honest way to record
 that is as an open gap with a named cost — not as a closed one with a proof
 pointing somewhere else.
 
+**PRICED AT WAVE 20 — `overturning-price.md`, and the price changed the
+question.** The scout measured the scene rather than argued about it, and the
+scene answers: the wave breaks on the seaward flank of its own Exner bar, at a
+local slope of **1 : 4.4**, where the local Iribarren number is **ξ = 1.110
+(0.967–1.203 over 89 rows) — plunging on both published threshold sets, on every
+row**. So this model already says the scene overturns. Two further measurements
+narrow the representation question: the shipped surface reaches **43.53°** (46.89°
+in a fine zoom) — *past* Stokes' corner and past 41.48° — and section A is still
+unreachable, because chapter 12's criterion is on the **sum** of two crossings,
+82.96°; and `surface_state`'s validity clamp bites on **74.78 %** of the wet bay
+at up to 154× the shape's own limit. **The boundary is topological, not angular.**
+Exactly one candidate representation survives standing ruling 4, priced at
+2 waves + 2–4, and it is blocked on provenance. Sections A and F stay **open**.
+
 **Kept as a warning about method**, because it is the more useful lesson: a
 correct theorem, cited accurately, closed a question for six waves by answering a
 neighbouring one. Nothing in the citation was false. The failure was in the

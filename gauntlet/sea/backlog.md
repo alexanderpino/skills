@@ -110,3 +110,21 @@ this run added.
   pixels with per-pixel CV of order 1; a richer surface has widened that. Whether
   the answer is a wider window, an ensemble over seeds, or a defect in the new
   surface is the **wave-field lane's** call. Both numbers are on record.
+
+- **The overturning representation — priced at wave 20, not bought.**
+  `overturning-price.md` is the price, and it is a scope decision rather than a
+  build question. The measurement that matters: **the shipped scene's wave
+  breaks on the seaward flank of its own Exner bar at a local slope of 1 : 4.4,
+  where the local Iribarren number is ξ = 1.110 (0.967–1.203 over 89 rows) —
+  plunging on both published threshold sets, on every row.** So the model
+  already says this scene overturns; what refuses it is that `η(x, y)` admits
+  one height per point. Exactly one candidate survives standing ruling 4 — the
+  exact parametric cubic free surface of Longuet-Higgins (1982), which is a
+  solution rather than a sculpt; an authored mesh, a flipbook and a particle
+  sheet all fail ruling 4, and a particle surface fails ruling 3 as well
+  because its smoothing radius is a constant chosen to make the picture right.
+  **2 waves for the geometry-and-measurement half, 2–4 more for the renderer
+  half.** ⚠️ **Blocked on provenance, exactly like Hsu & Evans above:** the 1982
+  paper is not in this container, web search this round did not surface the
+  explicit `z(ω, t)`, and ruling 9 forbids reconstructing it. Sections A and F
+  stay **open**; this entry is the price, not a park on the sections.

@@ -633,7 +633,8 @@ renderer half is never bought, this is still a result rather than a stub.
 Multi-hit `trace`, the seam in `shade_water`, the lip's own foam and chord, the
 reach rows, the byte-identical proof outside the band. Two waves if the tracer
 rewire goes cleanly; four if it goes the way this project's last three rewires
-went. **Ask before starting**: at wave 20 of 26 this is 2–4 of about 7 remaining
+went. **Ask before starting**: at wave 20 of 26 budgeted this is 2–4 of the six
+remaining
 waves, spent on one bar section, while the largest measured tell in every frame
 (the land, 30–400× short) has no owner and the glitter slab is 6.4 % of frame.
 
