@@ -356,8 +356,9 @@ Costs are in **waves**, calibrated on this project's own record: wave 5 (the
 nonlinear surface — shape change, same representation, same tracer) was one lane
 for one wave; wave 19 (the spectral bundle replacing the first-order term, plus a
 suite section and the foam realisation) was one lane for one wave and left one
-`FAIL` and one open residual. **Neither touched the tracer.** In nineteen waves
-nothing has.
+`FAIL` and one open residual. **Neither touched the tracer**, and in nineteen
+waves nothing has touched its single-hit assumption: `trace` has solved
+`z(t) = eta` by Newton from the analytic plane hit since the scene existed.
 
 ### 3.0 The null — do not do it
 
@@ -387,7 +388,7 @@ different places.
 **What it breaks:** nothing. **How it is verified:** it already is — the
 measurements in §1 are the evidence for the null as much as against it.
 
-### 3.1 A parametric breaker lip, stitched to the heightfield — **the only ruling-4 survivor**
+### 3.1 A parametric breaker lip, stitched to the heightfield — **the only affordable ruling-4 survivor**
 
 **The route, and it is not the one the chapters name.** Not an authored curl and
 not a flipbook. **Longuet-Higgins (1982), "Parametric solutions for breaking
@@ -397,8 +398,10 @@ include Stokes' 120° corner flow and the 45° rotating wedge, and whose **cubic
 class has a free surface that *"corresponds with remarkable accuracy to the
 forward face of an overturning, or plunging, breaker."* (Web-verified this round;
 the abstract and the secondary literature agree on the statement, and see the
-provenance gate below.) New (1983) supplies the companion result that the tube's
-inner surface is close to an ellipse of axis ratio √3.
+provenance gate below.) A companion result attributed to New (1983) — that the
+tube's inner surface is close to an ellipse of axis ratio √3 — is **recalled and
+not verified this round**, and is marked `?` until someone reads it; it is a
+nice-to-have and nothing in the price rests on it.
 
 **What it can represent:** the forward face and the throwing jet of a plunging
 breaker, i.e. section F, and with it section A at the earlier instant. The air
