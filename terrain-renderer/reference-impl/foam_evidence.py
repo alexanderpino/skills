@@ -148,6 +148,26 @@ def main():
     _write('%s/s18-foam-frame-after.png' % OUT,
            _u8(BR.downsample(La, BR.SS_HERO)), CAP_FRAME)
 
+    # ------------------------------------------- THE CHAPTER'S OWN FIGURES
+    # A chapter figure and an evidence figure answer different questions --
+    # "what does this claim look like" against "did this round move the
+    # number" -- and the contract is explicit that the evidence set must not be
+    # dumped into the chapters. What travels is the ONE comparison that IS the
+    # claim: the same coverage field as its expectation and as one realisation
+    # of itself, side by side, so a reader can see that "a coverage law is a
+    # random set's first moment" is a statement about pictures.
+    #
+    # It is written by this script rather than pasted, which is the rule for
+    # every figure in the skill, and the panels are the same buffers the
+    # evidence figures are cut from.
+    fig = np.concatenate([_u8(Lb[y0:y1, x0:x1]),
+                          np.full((CROP_H, 8, 3), 255, np.uint8),
+                          _u8(La[y0:y1, x0:x1])], axis=1)
+    _fig = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        '..', 'references', 'figures')
+    Image.fromarray(fig).save(os.path.join(_fig, 'foam-mean-vs-realisation.png'))
+    print('wrote %s/foam-mean-vs-realisation.png' % _fig)
+
     with open('%s/s18-foam-edge-before.caption.md' % OUT) as f:
         pass
     print('\nl/W  before %.3f %%   after %.3f %%   photographs 0.3-0.8 %%'

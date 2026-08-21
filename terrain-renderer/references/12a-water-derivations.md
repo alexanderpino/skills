@@ -31,6 +31,8 @@ Contents: [Conventions](#conventions-that-have-to-be-fixed-first) ·
 [The gathers](#8-the-gathers) · [The caustic pass](#9-the-caustic-pass-as-a-forward-splat) ·
 [Absorption and the dry-band calibration](#10-absorption-and-the-dry-band-calibration) ·
 [The static-equilibrium bay](#11-the-static-equilibrium-bay) ·
+[The fan as an output](#12--the-fan-as-an-output-sommerfelds-half-plane-and-what-it-costs-to-assume-one-instead) ·
+[The foam as a Boolean model](#13--the-foam-is-a-boolean-model-and-a-coverage-is-its-first-moment) ·
 [What checks what](#what-checks-what) · [What did not reproduce](#what-did-not-reproduce)
 
 ## Conventions that have to be fixed first
@@ -2700,6 +2702,250 @@ last two rows of `12`'s transport table from the fourth.
 
 ---
 
+## 13 · The foam is a Boolean model, and a coverage is its first moment
+
+*(sea wave 18. The **fourth** place in this project where a renderer was drawing an ensemble mean —
+after the glitter's slope pdf, the run-up exceedance of §10 and the sand-cover fraction. It is also
+the first where the fix had already been derived, written, committed, and then never called by
+anything.)*
+
+### The coverage law already commits you to a point process
+
+Every foam model in this chapter routes through one line:
+
+```
+coverage = 1 - exp(-m)          m = the covering measure, a rate x a residence time
+```
+
+It looks like a saturating curve someone liked the shape of. It is not. It is the **void probability
+of a Boolean (germ–grain) model**: drop grains of mean area `⟨A⟩` at the points of a Poisson process
+of intensity `λ`, and the chance that a given point is covered by none of them is
+
+```
+P(uncovered) = exp(-lambda <A>) = exp(-m)          m := lambda <A>
+```
+
+So a renderer that computes `m` from breaking statistics and whitecapping **has already declared a
+random set**. `coverage(m)` is that set's expected indicator, `E[χ]`, and
+
+> **an expectation that varies smoothly in `x` IS an airbrush gradient.**
+
+Alpha-blending by it draws the mean of the foam field and never the foam field. The surf zone comes
+out as one continuous soft grey band with a single smooth cross-shore hump, no bubble texture, no
+bright breaking line, no alongshore break-up, and both of its edges continuous smooth curves. Every
+one of those is a property of the mean and not of the set. **The physics can be entirely right and
+the picture still an airbrush, because the last step threw the realisation away.**
+
+The diagnosis needs no render around it: mapped 0–1 to 0–255, the coverage buffer of a hero frame
+is a set of perfectly smooth diagonal ribbons with continuous edges and no break-up at any scale.
+That picture, and the crops below, are in `gauntlet/sea/evidence/s18-foam-*`.
+
+### The realisation needs exactly one quantity the coverage does not carry
+
+`m = λ⟨A⟩` is a **product**. It fixes the coverage and says nothing about how the product splits —
+many small grains or few large ones give the same `m` and the same mean, and completely different
+pictures. The one new quantity is therefore the **grain size**, and it must come from somewhere
+physical or the whole exercise is a noise function with a citation stapled to it.
+
+**It comes from the depth.** Foam is a passive tracer on the surface flow, so its patch scale is the
+scale of the structures that gather and tear it. In the surf zone that flow is **depth-limited**:
+the vertical extent of any eddy is capped by the local water depth `d`, and a horizontal structure
+much smaller than its own vertical scale is not a coherent eddy. So `d` is the smallest coherent
+horizontal scale a depth-limited turbulent surface flow carries, and
+
+```
+grain diameter = d          r_g = d/2          (`D`, coefficient declared at unity on the diameter)
+```
+
+The **scaling** is the part that is not a choice: grains shrink toward the waterline and coarsen
+seaward because the depth does. Fine lace at the swash edge and coarse patches over the bar is then
+a *prediction* of the depth-limited argument rather than a texture setting — and a renderer that
+gets it backwards has said something falsifiable and false.
+
+### The construction is exact, not approximately Poisson
+
+The tempting implementation — evaluate `m` at a germ, decide whether the germ exists — is wrong,
+because `m` is inhomogeneous and the germ's own intensity would then have to be integrated. The
+construction that is exact uses **independent marking of a homogeneous dominating process**:
+
+* the dominating germ field is homogeneous with intensity `λ_ref = μ / r_j²` in octave `j`, so the
+  count in a cell of side `r_j` is `Poisson(μ)` with `μ` a **constant** — one uniform per cell,
+  inverse CDF, no field evaluation at the germ at all;
+* each germ carries an independent uniform mark `u`;
+* a germ is **retained at the query point `q`** if `u < p_j(q)`, with `p_j(q) = m_j(q)/(λ_ref π r_j²)
+  = m_j(q)/(μπ)`.
+
+Independent marking of a Poisson process gives a Poisson process of intensity `λ_ref p`, so
+
+```
+P(q uncovered) = prod_j exp(-lambda_ref p_j pi r_j^2) = exp(-m)
+```
+
+**exactly, for every `m` and every grain ladder** — not in the limit, not on average over the frame,
+but at each point. That identity is the whole difference between a realisation of the physics and a
+texture laid on top of it, and it is what a suite row can hold the random field to. Measured on the
+hero frame: the drawn field's mean is `0.21691` against the coverage's `0.21819`, out by 0.6 % on
+that many germs.
+
+Cell side is set to the grain radius, so any germ whose disc reaches `q` lies in the 3×3 block of
+cells around `q` and the search is **exhaustive rather than a cutoff**.
+
+**The octave ladder changes the coverage by exactly nothing.** A superposition of Boolean models is
+a Boolean model — the void probabilities multiply, `∏_j exp(−m_j) = exp(−m)` whenever the weights
+sum to one — so every choice about the ladder is a choice about **texture at fixed coverage**. Equal
+measure per octave is the null choice: a tracer stirred by a flow with no preferred scale between an
+outer and an inner cut acquires structure at every scale between them, so a scale-free split is the
+one that *adds* no scale. Putting all the measure at `r_g` instead gives identical coverage
+statistics and a render of identical discs — visibly a stamp — which is worth recording precisely
+because **no coverage row can tell the two apart and only the frame can.**
+
+### The pixel decides which of the two to show, and that is a filter rather than a fudge
+
+A pixel whose footprint spans many grains *should* read the mean, because that is what the integral
+of the indicator over the footprint converges to; a pixel smaller than a grain should read the
+sample. So
+
+```
+g = clamp(2 r_g / footprint, 0, 1)          drawn = cov + (chi - cov) * g
+```
+
+exact in both limits, approximate only in the crossover, which is taken linearly. The footprint is
+not a new parameter: it is the same `t · 2tan(fov/2)/h / |cos|` the renderer already computes to
+band-limit the surface slope. Where `g` is small the germ search buys a number that is multiplied by
+zero, so it is skipped — on a frame whose sea plane runs to 40 km that is a real saving.
+
+### What it measures, against photographs, and the instrument had to be controlled first
+
+`gauntlet/sea/bar/generic/` converts section C's verbal criterion into a **dimensionless** one: the
+correlation length inside a foam patch is **0.3–0.8 % of that patch's own width**, across six boxes
+in two photographs, with clot runs at q90 of 8–52 px and dark gaps of 2–7 px *inside every white*.
+Dimensionless is the point — no exposure, white balance, tone curve or grade enters it.
+
+**Two controls came first, and both changed what could honestly be claimed.**
+
+1. **The meter cannot return 100 %.** The reference README says a soft gradient's `l/W` "is of order
+100 %", which is true of the *field* and false of the *instrument*: the statistic is the 1/e lag of
+the autocorrelation of luma **after a 61 px boxcar high-pass**, so the largest lag it can report is
+bounded by the window. A pure ramp comes back at **0.91 %**. Quoting a render's "before" against a
+verbal 100 % would have been a lie in the render's favour, and only running the meter on a ramp
+found it.
+2. **`l/W` alone is blind.** A pure ramp carrying **one display level** of noise scores **0.12 %** —
+*inside* the photographs' bracket — while being exactly the airbrush the bracket exists to reject.
+What separates them is the **run** statistic: a monotone field above a half-max threshold is one
+unbroken run per row. So the criterion is a **pair**, and neither half is quotable alone.
+
+Measured on the hero frame, before and after, through the renderer's own display encode — which is
+the one class of quantity for which a display-referred measurement is the correct one, because the
+reference is display-referred:
+
+| | before | after | photographs |
+|---|---|---|---|
+| `l/W` | 2.25 % | **0.63 %** | 0.3–0.8 % |
+| acf 1/e | 11.26 px | 3.12 px | 1.5–4.0 px |
+| run q90 | **328 px** | 25 px | 8–52 px |
+| gap median | 209 px | 10 px | 2–7 px |
+
+The before's run q90 of 328 px in a 500 px box is the airbrush's signature, exactly as the control
+predicted.
+
+![The same foam edge drawn as the coverage's expectation, left, and as one realisation of the same coverage, right](figures/foam-mean-vs-realisation.png)
+
+> **The whole of this section in one pair.** Left: the surface blended by `coverage(m)`, the
+> Boolean model's *expected* indicator. Right: one *realisation* of that same model, with the same
+> covering measure, the same source, the same camera and the same build — the mean is unchanged at
+> every point by construction, and the suite states that as a number. What changes is that the set
+> is drawn instead of its first moment, so the seaward edge stops being a curve and dark water
+> appears between the clots at the depth-limited grain scale.
+>
+> 1:1 from the full-resolution render buffer, so no resampling can smooth an edge into existence or
+> out of it. Measured on these two panels: `l/W` 2.25 % → 0.63 % against photographs' 0.3–0.8 %,
+> and clot run q90 328 px → 25 px against 8–52 px.
+>
+> `D` — drawn by `reference-impl/foam_evidence.py`. **Display-referred on purpose**: the reference
+> numbers come from 8-bit photographs and a run-length statistic above a half-max threshold does
+> not survive a change of tone curve. Every physical figure in this file is scene-linear; this one
+> is not, and that is the correct choice here rather than an exception to be excused.
+
+### The second maximum is the phase clock, and it is not a surf-line count
+
+The critic who opened this round measured "a single smooth hump, no second maximum". Counted on the
+coverage the renderer composites, that is no longer true — 4 to 8 prominent maxima on five
+cross-shore cuts — and **the mechanism is not a second breakpoint.** The deck is laid by the
+breaking crest, then lies `(c − u)a` behind it and decays on the foam's own residence time, so a
+cross-shore cut walks back through successive crests and reads a maximum behind each one. **The
+second maximum is the previous wave's foam.**
+
+The control that establishes whose it is: strip the phase and count the same cuts on the deck source
+alone, and they read **2, 2, 1, 1, 1** — one band. So the extra maxima are the advection-and-decay
+clock, not the cross-shore shape of the breaking statistic. This matters for what a later wave
+should expect: **adding a bar to the depth field should move the deck-source count, not the drawn
+count.** If the drawn count rises while the source count does not, the change was in the foam clock
+and not in the bed.
+
+**This is not the surf-line criterion and must not be read as one.** Three to four *separated* surf
+lines need a bar system in the depth field, which is a different lane and is untouched here.
+
+### Which breaking statement lays the deck, and the two differ in PLACEMENT
+
+A random-sea closure like Battjes & Janssen's `Q_b` is a **Rayleigh exceedance**: given a sea of
+root-mean-square height `H_rms`, it is the share of individual waves passing `γ_b d`. Handing it the
+deterministic `H` of a monochromatic train is a category error — there is no height distribution for
+the closure to operate on.
+
+The consequence is not only that the magnitude is eight to ten times low through the saturated surf
+zone. It is that the **placement is inverted**, and that is the half worth writing down, because it
+is directly testable and the magnitude is not:
+
+> `Q_b` keys on `H/d` **approaching** `γ`. The dissipation keys on the wave **actually breaking**.
+
+So on a reference bay the exceedance's maximum falls on the **first breaking cell** — lag 0 — at
+every cross-shore cut, while the roller's is **41 to 68 cells shoreward**, because a surface bore
+takes a lag of order a wavelength to build. A statement whose foam peaks at the instant breaking
+begins is describing the approach to breaking. *(A seaward-energy-share statistic was tried first
+and rejected: the two overlap on it, 0.18 against 0.13 at one cut, so it cannot decide.)*
+
+`Q_b` is not wrong and should not be deleted — it is the right closure for a random sea and becomes
+applicable the moment the offshore boundary carries a directional spectrum. What is being fixed is
+*which of the two the deck is laid from*.
+
+### What did NOT close, named rather than drawn
+
+Ruling: if it cannot be derived, it is not drawn — it is named.
+
+* **Lace and cusps are still absent, and the mechanism is identified.** The realisation breaks the
+  foam into grains, which is break-up, and it is *not* lace. Lace is foam that **persists after the
+  water beneath it has gone** — stranded on sand the swash has retreated from — and that needs foam
+  with a **residence time different from the water's**, advected on the swash rather than pinned to
+  the wave phase. This model pins foam age to the wave phase, which for a wave of permanent form is
+  exact and is also precisely the assumption that forbids stranding: a tracer whose age is a function
+  of phase cannot be left behind. Closing it needs foam carried as its own advected field over the
+  swash excursion. That is a term this model does not have, and it is that term.
+* **The grain floor hides the depth-limited prediction where it is most visible.** `r_g` is clamped
+  at a finest octave, and in the swash — where the depth is a tenth of a metre — that clamp binds for
+  the large majority of samples, so the ladder collapses to one octave exactly where the prediction
+  says the lace should be finest. The clamp is a physical claim (below some scale a raft stops being a
+  sheet) that this model cannot currently check. Reported as a row, not moved.
+* **The grain coefficient is unguarded by texture, and the reason is structural.** Equal measure per
+  octave means the finest octave is occupied whatever the coefficient is, and a 1/e correlation length
+  reads the finest scale present. Coarsening the outer scale *adds* coarse structure without removing
+  fine structure, so a texture statistic cannot see a grain coefficient ten times wrong. It has to be
+  guarded where it lives — in the ladder position — and a round that guards it through `l/W` has a
+  green row and no test.
+
+### The transferable lesson, and it is about wiring rather than about foam
+
+The realisation, the grain argument, the exact marking construction and the source correction were
+**all derived, written and committed in an earlier round, and nothing ever called any of them.** Six
+rounds later the render still blended by `coverage(m)` and still sourced the deck from the
+exceedance. Every suite row about foam passed, because every one of them was about the *functions*
+and none was about whether the **render path calls them**.
+
+> A fix that exists only as a function is not a fix, and a green suite is not evidence that one
+> landed. The cheap row that would have caught it asks the shipping code path to report that it
+> drew a realisation — and fails when the call is deleted, rather than becoming vacuous.
+
+---
+
 ## What checks what
 
 `validate.py` runs in three tiers: **1** closed form (a disagreement is a bug in one of the two),
@@ -2758,6 +3004,15 @@ method (a disagreement localises to one of the two methods).
 | `R_ext`, `R_int`, `a_wet` boundary conditions | quadrature; reciprocity; Egan & Hilgeman fit | 1, 3 | pass |
 | `a(λ)` itself | Pope & Fry 1997 point-sampled *and* band-integrated; a Smith & Baker exclusion row | 2 | pass |
 | Dry-band absorption regression | — | — | **no test** |
+| **`coverage(m) = 1 − exp(−m)` is the Boolean model's void probability** | the realisation's own counted covered fraction against the closed form, on a homogeneous patch and on the frame — 0.21691 drawn vs 0.21819 expected | 1, 3 | pass |
+| The exact marking construction (homogeneous dominating field, thinned at the query point) | the identity above holds *for every `m` and every ladder*, which is what the row actually tests: push `m` and `r_g` around and the answer tracks | 1 | pass |
+| Equal measure per octave leaves the coverage invariant | `∏_j exp(−m_j) = exp(−m)`; and the ladder is checked to be *occupied* rather than pinned at either end | 1 | pass |
+| `r_g = d/2` from depth-limited macroturbulence | **the coefficient is `D`, declared, and the texture cannot guard it** — equal measure per octave keeps the finest octave occupied, so a 1/e correlation length is blind to a 10× error. Guarded in the *ladder position* instead, which fires in both directions | — | **partial** — see the §13 residual |
+| Foam correlation length as a fraction of patch width | six boxes in two photographs, 0.3–0.8 %, dimensionless; **paired** with the run q90, because `l/W` alone scores a noisy ramp inside the bracket | 2 | pass (0.63 %) |
+| The meter itself | ramp, white noise, and a Boolean field of *known* grain at *known* sampling; plus five published photograph rows reproduced to the second decimal by the port | 1, 2, 3 | pass |
+| The deck is laid from the roller and not from the exceedance | placement, not magnitude: the maximum must lie shoreward of the first breaking cell, and the exceedance's lies *on* it at every cut | 1 | pass |
+| The second maximum in the cross-shore foam profile | counted on the composited coverage, with the phase-stripped count as the control that says whose it is | 1 | pass |
+| **Lace, cusps, scallops and stranded foam** | — | — | **no test, and nothing to test** — the mechanism is absent from the model, not merely unguarded. See the §13 residual |
 
 Also unguarded, and worth knowing before quoting any level from this material: the five-band
 decomposition itself (`WIND_RMS`, `REVERB_RMS`, `JNEAR_RMS` are chosen, and the chapter's far-field

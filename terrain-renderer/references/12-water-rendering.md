@@ -72,7 +72,7 @@ with the sign flipped — `--selftest` fires it at **fifteen** deliberately brok
 this chapter's (including the softened total-internal-reflection branch and the run-up misreading
 waves 4–11 actually shipped) and nine belonging to the figures the same script draws for `09`, `10`
 and `19`. All fifteen are caught; a figure whose guard goes blind is caught by the run that says so.
-This chapter's six figures, and the claim each one exists to make:
+This chapter's figures, and the claim each one exists to make:
 
 | Figure | Where | The claim it carries, which is a shape |
 |---|---|---|
@@ -82,6 +82,7 @@ This chapter's six figures, and the claim each one exists to make:
 | `sommerfeld-half-plane` | [12·4](#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it) | `K_d = ½` on the boundary exactly, the lit side rings, and the Cornu chord is why |
 | `glitter-path-narrowing` | [12·5](#sun-glitter-the-sparkle-path) | the path's width is a *function* of view elevation, so no spread parameter can be it |
 | `mss-cutoff-family` | [12·6](#cox--munk-is-a-limit-not-an-input--and-that-changes-what-you-may-do-with-it) | the slope integral is still climbing where every instrument stops, so "the" mss is set by the cut-off |
+| `foam-mean-vs-realisation` | [`12a` 12a·13](12a-water-derivations.md#13--the-foam-is-a-boolean-model-and-a-coverage-is-its-first-moment) | a coverage law is a random set's *first moment*; drawing it gives an airbrush and drawing the set gives clots and gaps, at the same coverage everywhere |
 | `runup-distribution-vs-realisation` | [`12a` 12a·1](12a-water-derivations.md#where-the-band-ends--a-distribution-is-not-a-surface-and-it-is-two-masks-not-one) | a distribution has no edge and a realisation does; the same defect as glitter drawn as its pdf |
 
 `validate.py` is what makes the reference implementation evidence rather than an illustration — it
@@ -169,6 +170,8 @@ the reference implementation or read off a photograph, not supposed.
 | An outdoor pool with a geometrically clean waterline and no band at all | The `neglect` control shipped at a **zero default**. Most pools in service carry a band, so a pristine liner is the special case; a renderer defaulting to zero age reads as CG by default, and the same holds for every persistent liquid line — tanks, locks, harbour walls, hulls | [Fouling in the corners](#fouling-in-the-corners-from-an-algorithm-rather-than-from-a-texture) |
 | The sea is green everywhere, or blue everywhere, whatever the wave is doing | A tint on the water **body**. One backlit breaking wave refutes it in a single exposure: the face reads saturated green while the same water two metres away reads grey-blue, so the colour is the **path** and must vanish when the path does | [The surf zone](#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot) |
 | The saturated green backlit face never appears in the surf, however tall or steep the wave field is made | **Not a tuning shortfall — a bar on the representation.** A sightline through a wave crosses the surface twice, so the entry and exit inclinations must sum to `2(90° − θ_c)` = **82.96°**; Stokes' 120° corner caps a wave of permanent form at 30° a face, so its best sum is 60°. No single-valued height field of a steady wave reaches it, at any height, order or grid | [The 30° ceiling](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise) |
+| The whole nearshore is one continuous soft grey band with a smooth cross-shore hump, both of its edges continuous curves, and no bubble texture or alongshore break-up at any scale | The foam **coverage** painted where its **realisation** belongs. `1 − exp(−m)` is the void probability of a Boolean model, so alpha-blending by it draws `E[χ]` and never `χ` — and an expectation that varies smoothly in `x` *is* an airbrush gradient. Measured: correlation length 2.25 % of the patch width against 0.3–0.8 % in photographs, and clot runs of 328 px in a 500 px box against 8–52 px. Fourth instance of this defect class in this chapter | [`12a` 12a·13](12a-water-derivations.md#13--the-foam-is-a-boolean-model-and-a-coverage-is-its-first-moment) |
+| Foam that sits *seaward* of where the wave visibly breaks, and is far too thin through the saturated surf zone | The deck laid from a **random-sea exceedance** (`Q_b`) handed a monochromatic train — a category error, because there is no height distribution for the closure to operate on. The two statements differ in **placement**, not only in level: an exceedance peaks where `H/d` *approaches* `γ`, the dissipation where the wave *is* breaking. Measured: the exceedance's maximum lands on the first breaking cell at every cut, the roller's 41–68 cells shoreward | [`12a` 12a·13](12a-water-derivations.md#which-breaking-statement-lays-the-deck-and-the-two-differ-in-placement) |
 | Surf built as one particle system, and it reads as confetti over glass | **Three whites, three materials**: the blanket behind a break is a *coverage mask*, the opacity inside the wave mouth is a *participating medium*, the spray is *particles* — and the particles are the **smallest** share. All three are built on the same `1 − 1/n²` wall reflectance and share nothing else — and none of them whitens *because* of it: a bubble backscatters `b_b/b = 0.023`, so the white is multiple scattering | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
 | Water is right in the near field and goes black — or absurdly saturated — toward the horizon, and no fog or exposure setting fixes both halves | **The straight ray used as the traversal distance.** `d/cos θ_a` diverges at grazing; the transmitted ray refracts and `d/μ_w` is bounded by `1.33 d`. Median 12.1%, p95 46.5% on a measured frame, fixed by one `sqrt` | [Screen-space water, step 4](#screen-space-water-the-fullscreen-triangle-pass) |
 | Volumetric foam or a bubble plume that goes bright white but you can still see the bed through it | `1 − 1/n²` spent as a **backscatter fraction** instead of a wall reflectance — 19× too much return, and the transmittance that should have fallen with it never does. A conservative slab has `R = τ'/(1 + τ')` and `T = 1 − R`; whitening without hiding means the model has `R` and not `T` | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
@@ -1602,6 +1605,36 @@ is the same machinery as [turbid water](#water-body-optical-identity-where-the-i
 run to its high end. Note also which fittings do this: a pool's filtration return is submerged and
 pumps *water*, so it does not foam; a jacuzzi fitting deliberately aspirates air, which is a
 different fitting rather than a stronger one.
+
+⚠️ **And a coverage mask is a *random set*, so shipping the coverage means shipping its first
+moment.** Every foam model in this chapter routes through `coverage = 1 − exp(−m)`, which is not a
+saturating curve chosen for its shape — it is the **void probability of a Boolean (germ–grain)
+model**: drop grains of mean area `⟨A⟩` at a Poisson process of intensity `λ` and a point escapes
+all of them with probability `exp(−λ⟨A⟩)`. So a renderer that computes `m` **has already declared a
+random set**, and alpha-blending by `coverage(m)` draws `E[χ]` and never `χ`. An expectation that
+varies smoothly in `x` *is* an airbrush gradient: one soft band, one smooth hump, both edges
+continuous curves, no texture at any scale — every one of those a property of the mean and not of
+the set. **The physics can be entirely right and the picture still an airbrush, because the last
+step threw the realisation away.** Drawing the set instead needs exactly one quantity the coverage
+does not carry — the **grain size**, because `m = λ⟨A⟩` is a product and fixes neither factor — and
+in the surf zone that comes from the **depth**, which caps any eddy's vertical extent and so sets
+the smallest coherent horizontal scale the surface flow carries. Full construction, the exactness
+proof, and the dimensionless measurement against photographs: [`12a`
+12a·13](12a-water-derivations.md#13--the-foam-is-a-boolean-model-and-a-coverage-is-its-first-moment).
+This is the same defect as glitter drawn as its slope pdf and a beach face drawn as its run-up
+exceedance; finding it a fourth time is the argument for treating *"is this field a distribution or
+a realisation?"* as a standing question rather than a bug.
+
+⚠️ **Which breaking statement lays the deck is a separate decision, and getting it wrong moves the
+foam rather than only dimming it.** A random-sea closure — Battjes & Janssen's `Q_b` — is a Rayleigh
+exceedance over a height *distribution*; hand it the deterministic `H` of a single train and there
+is no distribution for it to operate on. The failure is not only that the level comes out eight to
+ten times low through the saturated surf zone: an exceedance keys on `H/d` **approaching** `γ` while
+the dissipation keys on the wave **actually breaking**, so the foam is drawn *seaward of the break
+point*. Bar criteria are explicit that this is the distinction that matters, because a monotone
+cross-shore profile cannot distinguish a renderer that computes breaking from one that draws foam
+near the shore. Lay the deck from whatever the dissipation, the undertow and the bar already read —
+one statement about whether this wave is breaking, not two.
 
 **Foam albedo is a decay curve, not a constant** — and this is the most useful single fact here:
 
