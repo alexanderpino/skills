@@ -11387,6 +11387,119 @@ def _sec_population(ctx):
          'the march zeroes rather than this file special-casing.'
          % bd['seaward_fraction'])
 
+    # ==================================================================== P.6
+    # THE CALM SEA, WHICH IS A LIMIT CASE WHOSE ANSWER IS KNOWN IN ADVANCE.
+    #
+    # The owner: "Soms zijn er geen hoge golven, dan lijkt de zee net een meer.
+    # Maar dan zie je zeker niet van die witte 'koppen'." Two whites, two
+    # drivers, and the test is whether this render knows the difference:
+    #
+    #   open water   WIND-driven. Steepness exceeds a limit; coverage rises as
+    #                U^3.41 and must vanish with the wind.
+    #   surf zone    DEPTH-limited. H/d > gamma_b, and it happens at any wind,
+    #                including none.
+    #
+    # If the offshore white were driven by Q_b instead of by wind, a calm sea
+    # would show foam where it should show none. This block is the falsification
+    # and it is also answer-key row G12, whose own prescription -- "count foam
+    # fraction in the open-water region of the scene-linear buffer, excluding
+    # the surf zone" -- had no row until now.
+    check(1, 'CALM: whitecap coverage at zero wind is EXACTLY zero',
+          float(FOAM.whitecap_coverage(0.0)), 0.0, 0.0,
+          'THE LIMIT, AND THE TOLERANCE IS LITERALLY ZERO. Monahan & '
+          'O\'Muircheartaigh is W = a U^n with n = %.2f, so W(0) = 0 exactly '
+          'rather than nearly -- and `covering_measure_wind` carries it '
+          'through -log1p(-W), which is also exactly 0 there. A model with an '
+          'additive floor anywhere in that chain would put a grey film on a '
+          'mirror, forever, and no amount of wave-population work would take '
+          'it off. `_sec_foam` already guards coverage(0) = 0; this guards the '
+          'other end of the same chain, the one the wind enters by.'
+          % FOAM.MOM80_N, '-')
+    q_off = float(np.max(w.q_b[:, 0]))
+    dk_off = float(np.max(np.abs(w.deck[:, 0])))
+    check(1, 'CALM: the DEPTH-limited term does not reach the open sea',
+          float(dk_off), 0.0, 1e-12,
+          'THE OTHER HALF OF THE SEPARATION, AND IT IS THE ONE THAT COULD '
+          'HAVE BEEN WRONG. At the offshore boundary of this bed -- %.1f m of '
+          'water -- Battjes & Janssen\'s Q_b is %.2e and the surface deck is '
+          '%.2e, exactly zero. So the break term of the covering measure '
+          'contributes NOTHING out there at any wind, and the offshore white '
+          'is wind and only wind. The mechanism is B&J\'s own: the bisection '
+          'for (1-Q)/ln Q = -(H_rms/H_m)^2 bottoms out at its 1e-12 floor '
+          'once H_rms/(gamma_b d) drops below about 0.16, so this is a hard '
+          'zero and not an asymptote.'
+          % (float(np.median(w.d[:, 0])), q_off, dk_off), '-')
+
+    # THE REACH, at zero wind, off a THIRD rendered frame -- the shipping path
+    # with one module constant changed, which is the only form of this row
+    # that measures the picture rather than the physics.
+    u10_0 = RND.BO.U10
+    try:
+        RND.BO.U10 = 0.0
+        L_c, ex_c = RND.render(camK, w)
+    finally:
+        RND.BO.U10 = u10_0
+    shc = ex_c['water']
+    qbc = np.asarray(shc['q_b']).reshape(-1)
+    covc = np.asarray(shc['cov']).reshape(-1)
+    offm = qbc <= 0.01
+    surfm = ~offm
+    n_off = int((covc[offm] > 0.0).sum())
+    n_surf = int((covc[surfm] > 0.5).sum())
+    cov_w = np.asarray(on['sh']['cov']).reshape(-1)
+    off_w = np.asarray(on['sh']['q_b']).reshape(-1) <= 0.01
+    check(0, 'CALM REACH: at U = 0 the open sea has ZERO foam pixels',
+          float(n_off), 0.0, 0,
+          'THE OWNER\'S SENTENCE AS AN INTEGER, AND IT IS EXACTLY ZERO RATHER '
+          'THAN SMALL -- a tolerance the size of the thing it covers would be '
+          'the thirteenth way. Frame K at 240 x 320 rendered a THIRD time '
+          'with `beach_optics.U10` set to 0 and nothing else touched: of %d '
+          'water samples, %d are seaward of the surf zone (q_b <= 0.01), and '
+          'the number of those carrying ANY drawn foam -- not "faint", not '
+          '"a few", cov > 0 -- is %d. At the shipping %.1f m/s the same count '
+          'is %d. Meanwhile the SHORE still breaks: %d surf pixels above half '
+          'coverage at zero wind. Two whites, two drivers, and this row is '
+          'what fails if they are ever wired to the same one.'
+          % (qbc.size, int(offm.sum()), n_off, u10_0,
+             int((cov_w[off_w] > 0.0).sum()), n_surf), '-')
+    n_surf_wind = int((cov_w[~off_w] > 0.5).sum())
+    check(0, 'CALM: taking the wind away does NOT take the surf line away',
+          float(abs(n_surf - n_surf_wind)) / max(n_surf_wind, 1), 0.0, 0.02,
+          'THE SEPARATION MEASURED FROM THE OTHER SIDE, and without it the '
+          'row above could pass on a frame that simply had no foam in it. '
+          'Swinging the wind from %.1f m/s to nothing moves the surf zone\'s '
+          'foam pixel count from %d to %d -- %.1f %% -- because depth-limited '
+          'breaking does not care about the wind. The residual is not noise: '
+          '`covering_measure_wind` ADDS to the break term, so removing it '
+          'takes a few marginal surf pixels below the half-coverage threshold '
+          'with it. That is the correct sign and the correct size.'
+          % (u10_0, n_surf_wind, n_surf,
+             100.0 * abs(n_surf - n_surf_wind) / max(n_surf_wind, 1)), '-')
+    w_thr = float(FOAM.whitecap_coverage(FOAM.CALLAGHAN_U0 - 0.01))
+    openq(2, 'the coverage law is a POWER LAW and has no onset',
+          'W(%.2f m/s) = %.2e' % (FOAM.CALLAGHAN_U0 - 0.01, w_thr),
+          'W = 0 below %.2f m/s' % FOAM.CALLAGHAN_U0,
+          'THE HONEST DIFFERENCE BETWEEN THE TWO PUBLISHED FORMS, SIZED '
+          'RATHER THAN ASSUMED. `whitecap_coverage` is a bare power law, so '
+          'it is zero ONLY at U = 0 and is merely small below any finite '
+          'wind. Callaghan et al. (2008, GRL 35, L23609) is piecewise with a '
+          'hard ONSET at U10 = %.2f m/s, below which coverage is identically '
+          'zero -- and this file already carries that number as '
+          '`CALLAGHAN_U0`, marked published, AND NEVER USES IT. On the owner\'s '
+          'lake-like sea the two forms disagree by %.2e in coverage, which '
+          'over the %d open-water samples of this frame is %.2f pixels '
+          'expected -- so the owner\'s observation is satisfied by the '
+          'shipping law and the disagreement is sub-pixel. IT IS NOT TAKEN, '
+          'and the reason is the standing rule rather than the size: '
+          'answer-key G11 marks Callaghan `P` -- an ATTRIBUTION -- and the '
+          'paper is not in this container, so the branch point and the two '
+          'exponents cannot be read. Installing a piecewise law from a cited '
+          'onset alone would be transcribing a shape, which is the failure '
+          'this project has already had twice. Marked attribution-only, the '
+          'way the answer key marks its nine other such items.'
+          % (FOAM.CALLAGHAN_U0, w_thr, int(offm.sum()),
+             w_thr * int(offm.sum())))
+
 
 def _scatter(L, mw, vals):
     """Put a per-water-pixel field back into a full-frame buffer."""
@@ -11503,10 +11616,43 @@ def _bug_pop_envelope_is_abs_eta(mod):
     mod.spectral_surface = bad
 
 
+def _bug_calm_whitecap_floor(mod):
+    """A GREY FILM ON A MIRROR: the coverage law given an additive floor.
+
+    The owner's observation is that a lake-flat sea has no white caps at all.
+    This is the single most likely way to lose that -- a small constant added
+    "so the open sea is not dead", which is exactly the airbrush instinct this
+    project has now un-learned four times. It is invisible at any working wind
+    (1e-4 against 1.7e-3 at 6 m/s) and it makes the calm limit impossible.
+    Patches `beach_foam`."""
+    orig = mod.whitecap_coverage
+
+    def floored(u10, **kw):
+        return orig(u10, **kw) + 1e-4
+    mod.whitecap_coverage = floored
+
+
+def _bug_calm_break_reaches_deep(mod):
+    """THE TWO WHITES WIRED TO ONE DRIVER: the open sea foams from Q_b.
+
+    `covering_measure_break` given a floor on the breaking fraction, so the
+    depth-limited term stops vanishing offshore. The frame then shows foam on
+    a calm open sea driven by the SURF term, which is the defect the owner is
+    describing and which no row in this file could see before. Patches
+    `beach_foam`."""
+    orig = mod.covering_measure_break
+
+    def leaky(q_b, T, age, tau=mod.TAU_FOAM_SALT):
+        return orig(np.maximum(np.asarray(q_b, float), 2e-3), T, age, tau)
+    mod.covering_measure_break = leaky
+
+
 POPULATION_BUGS = ('pop-no-bundle', 'pop-monochromatic-bundle',
                    'pop-expectation-foam', 'pop-carrier-denominator',
-                   'pop-envelope-is-abs-eta')
+                   'pop-envelope-is-abs-eta', 'calm-whitecap-floor',
+                   'calm-break-reaches-deep')
 POP_RENDER_BUGS = ('pop-no-bundle', 'pop-expectation-foam')
+POP_FOAM_BUGS = ('calm-whitecap-floor', 'calm-break-reaches-deep')
 
 BUGS.update({
     'pop-no-bundle': _bug_pop_no_bundle,
@@ -11514,6 +11660,8 @@ BUGS.update({
     'pop-expectation-foam': _bug_pop_expectation_foam,
     'pop-carrier-denominator': _bug_pop_carrier_denominator,
     'pop-envelope-is-abs-eta': _bug_pop_envelope_is_abs_eta,
+    'calm-whitecap-floor': _bug_calm_whitecap_floor,
+    'calm-break-reaches-deep': _bug_calm_break_reaches_deep,
 })
 
 
@@ -12433,11 +12581,17 @@ if __name__ == '__main__':
         print('-' * 118)
         for name in POPULATION_BUGS:
             importlib.reload(BCH)
-            BUGS[name](RND if name in POP_RENDER_BUGS else BCH)
+            importlib.reload(FOAM)
+            BUGS[name](RND if name in POP_RENDER_BUGS
+                       else (FOAM if name in POP_FOAM_BUGS else BCH))
             # `_FAR` and the module-level flags are built at import, so the
             # renderer is reloaded AFTER `beach` is patched -- which is the
             # only order in which `pop-monochromatic-bundle` reaches the
-            # component list the picture actually holds.
+            # component list the picture actually holds. The foam defects need
+            # it too: `beach_render` holds `import beach_foam as FM`, which is
+            # the same module object, but reloading FOAM rebinds the module's
+            # attributes and the patch must be applied AFTER that reload, not
+            # before -- which is the order above.
             if name not in POP_RENDER_BUGS:
                 importlib.reload(RND)
             try:
@@ -12450,6 +12604,7 @@ if __name__ == '__main__':
             for c in caught:
                 print('%-28s   %s' % ('', c[:84]))
             importlib.reload(BCH)
+            importlib.reload(FOAM)
             importlib.reload(RND)
         sys.exit(0)
     if '--bugs-land' in sys.argv:
