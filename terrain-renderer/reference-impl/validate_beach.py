@@ -9810,9 +9810,15 @@ def _sec_view(ctx):
     small = RND.Camera(cam.pos, cam.pos + cam.f, 40.0, 64, 48)
     win = (12, 30, 7, 41)
     crp = RND.CropCamera(small, *win)
+    # REPORTED AS A SCALAR, not as the arrays. The first version handed `check`
+    # two 18 x 34 x 3 ray grids; they are the right comparison and they printed
+    # 34 KB of direction cosines into a report a human is supposed to read.
+    # `check` prints what it is given, so the reduction belongs here.
+    d_ray = float(np.abs(crp.rays()
+                         - small.rays()[win[0]:win[1], win[2]:win[3]]).max())
     check(1, 'CropCamera reproduces the parent raster\'s rays EXACTLY over its '
              'window',
-          crp.rays(), small.rays()[win[0]:win[1], win[2]:win[3]], 0.0,
+          d_ray, 0.0, 0.0,
           'ABSOLUTE ZERO, on direction cosines. The patch is rendered as a '
           'crop because the full frame costs 470 s against this one\'s 10 s, '
           'and that trade is only legitimate if the crop is the SAME PIXELS. '
@@ -9849,9 +9855,11 @@ def _sec_view(ctx):
           'display-referred figure is not the baseline and is not used as '
           'one. The floor is 1.0e-04 scene-linear in EVERY channel. Measured '
           'here: %.3e / %.3e / %.3e. The camera this section repairs reads '
-          '2.0e-07 / 2.3e-07 / 4.4e-07 on the same pixels, which is 400 to '
-          '2000 times under the floor, so the row cannot be passed by a '
-          'camera standing on a plane. It is a FLOOR and not a band on '
+          '1.96e-07 / 2.30e-07 / 4.44e-07 on the same pixels of this same '
+          'bed -- 225 to 510 times UNDER the floor, against a measured value '
+          '4 to 9 times OVER it -- so the row sits in a two-order-of-magnitude '
+          'gap and cannot be passed by a camera standing on a plane. It is a '
+          'FLOOR and not a band on '
           'purpose: a patch with more structure in it than this is not a '
           'regression, and the only failure this project has ever had here is '
           'in one direction.' % (sd[0], sd[1], sd[2]), unit='bool')
