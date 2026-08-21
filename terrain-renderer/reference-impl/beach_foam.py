@@ -1028,6 +1028,69 @@ def filtered_indicator(chi, cov, footprint, r_g):
     return cov + (chi - cov) * g
 
 
+def realise_visible(g_filter, floor=1.0e-2):
+    """Which samples can SEE the realisation, so the rest are not drawn.
+
+    `filtered_indicator` returns `cov + (chi - cov) g`, so a sample whose `g` is
+    zero returns the mean whatever chi says. Evaluating the germ search there
+    buys a number that is multiplied by zero. On the hero frame this is most of
+    the raster -- the sea plane runs to 40 km and a pixel out there covers 54 m
+    against a 0.25 m grain, i.e. g = 0.009 -- so the cull is what makes the
+    realisation affordable rather than an optimisation of it.
+
+    The floor is stated rather than tuned: at g = 0.01 the realisation can move
+    a coverage by at most 0.01, which is a quarter of a display level on the
+    8-bit encode and therefore cannot change a rendered pixel."""
+    return np.asarray(g_filter, float) > floor
+
+
+def coverage_field(xw, yw, m, d, footprint, seed=0, floor=1.0e-2):
+    """THE FOAM THE RENDERER ACTUALLY DRAWS: one realisation, footprint-filtered.
+
+    This is the function wave 12 built the parts of and never assembled, and
+    the frame kept drawing `coverage(m)` -- the MEAN -- for six more waves. It
+    exists so that the render path has exactly ONE call to make and so that a
+    grep for its name answers the question "does the picture use the
+    realisation or its expectation", which is a question no suite row could
+    answer while the answer lived in whether a caller happened to exist.
+
+    Everything in it is already derived elsewhere in this file and nothing is
+    added:
+
+      * `m`     the covering measure -- `deck_source`'s roller fraction through
+                `covering_measure_break`, plus Monahan & O'Muircheartaigh's
+                whitecapping. Wave 6 and wave 12.
+      * `d`     the local depth, which fixes the grain through `grain_radius`
+                on the depth-limited-macroturbulence argument. Wave 12.
+      * `chi`   `boolean_indicator`, whose void probability is exp(-m) EXACTLY,
+                so the realisation's mean is the coverage the physics asked for
+                at every point and not merely on average over the frame.
+      * `g`     `filtered_indicator`'s crossover, from the pixel footprint the
+                renderer already computes for the slope band-limit.
+
+    Returns the drawn coverage, and the diagnostics a guard row needs: the
+    fraction of visible samples, the clamped-p maximum, and the mean of the
+    realisation against the mean of the field it is drawn from."""
+    xw = np.asarray(xw, float)
+    cov = coverage(np.asarray(m, float))
+    r_g = grain_radius(d)
+    fp = np.broadcast_to(np.asarray(footprint, float), xw.shape)
+    g = np.clip(2.0 * r_g / np.maximum(fp, 1e-6), 0.0, 1.0)
+    vis = realise_visible(g, floor) & (np.asarray(m, float) > 0.0)
+    out = np.array(cov, float, copy=True)
+    p_max = 0.0
+    if vis.any():
+        chi, p_max = boolean_indicator(xw[vis], np.asarray(yw, float)[vis],
+                                       np.asarray(m, float)[vis],
+                                       np.broadcast_to(r_g, xw.shape)[vis],
+                                       seed=seed, return_p=True)
+        out[vis] = cov[vis] + (chi - cov[vis]) * g[vis]
+    return out, dict(visible=float(vis.mean()) if vis.size else 0.0,
+                     p_max=float(p_max),
+                     mean_drawn=float(out[vis].mean()) if vis.any() else 0.0,
+                     mean_field=float(cov[vis].mean()) if vis.any() else 0.0)
+
+
 # ========================================================= the module's own run
 def main():
     np.set_printoptions(precision=5, suppress=False)

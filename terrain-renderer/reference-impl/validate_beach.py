@@ -34,6 +34,7 @@ defects back, one at a time, and prints the rows that fail for each. A guard
 that does not fire on its own bug is a comment with a check() around it.
 """
 import math
+import os
 import sys
 import time
 
@@ -8750,6 +8751,785 @@ BUGS.update({
 })
 
 
+
+
+# ------------------------------------------------- WAVE 18: the foam-texture bugs
+# Each of these is a defect that HAS shipped in this project or that the guard
+# above was written to stop shipping. The first is not hypothetical at all: it
+# is the state of the tree at c394669, which every suite run for six waves
+# called green.
+#
+# They patch `beach_render`, not `beach`, because the defect they model lives
+# between the physics and the pixels -- which is the whole point of the section.
+def _bug_foam_draw_the_mean(mod):
+    """THE CHAMPION'S OWN DEFECT: draw E[chi] and never chi.
+
+    `beach_render.Water` gets `foam_realise = False`, which is the control-panel
+    branch `shade_water` already carries -- so this is not a synthetic patch,
+    it is the code path waves 6 to 17 actually shipped."""
+    orig = mod.Water.__init__
+
+    def init(self, bay):
+        orig(self, bay)
+        self.foam_realise = False
+    mod.Water.__init__ = init
+
+
+def _bug_foam_exceedance_source(mod):
+    """THE OTHER HALF of the champion's defect: lay the deck from Battjes &
+    Janssen's Q_b instead of the roller. Wave 12 wrote the fix and nothing
+    called it."""
+    orig = mod.Water.__init__
+
+    def init(self, bay):
+        orig(self, bay)
+        self.foam_roller = False
+        self.deck = self.q_b
+    mod.Water.__init__ = init
+
+
+def _bug_foam_grain_at_one_scale(mod):
+    """All the covering measure at the OUTER scale, no octave ladder.
+
+    Wave 12 recorded that its first draft did this and "the render came out as
+    confetti: identical discs, one size, visibly a stamp", AND that the coverage
+    statistics were identical in both, so no row it had could tell them apart.
+    This is that draft, put back."""
+    import beach_foam as _F
+    orig = _F.octave_weights
+
+    def ow(r_g, r_min=_F.R_G_MIN, n=_F.R_G_OCTAVES):
+        w = orig(r_g, r_min, n)
+        top = np.zeros_like(w)
+        top[..., -1] = 1.0
+        return top
+    _F.octave_weights = ow
+
+
+def _bug_foam_grain_ten_times(mod):
+    """The grain declared ten times too coarse: r_g = 5 d rather than d/2.
+
+    The coverage is untouched -- that is the Boolean model's own theorem -- so
+    this is a defect ONLY the texture rows can see, and it is the reason the
+    section exists as something other than a second coverage check."""
+    import beach_foam as _F
+    _F.grain_radius = lambda d, k=5.0, r_min=_F.R_G_MIN, r_max=_F.R_G_MAX: \
+        np.clip(k * np.asarray(d, float), r_min, r_max * 10.0)
+
+
+def _bug_foam_noise_not_realisation(mod):
+    """THE RULING-3 BUG, and the one worth the most.
+
+    Keep the smooth mean and multiply a NOISE FUNCTION onto it -- a field
+    chosen because it breaks the edge up, with no point process behind it and
+    no theorem tying it to `coverage(m)`. It is built to score well on `l/W`,
+    because that is exactly what a builder reaching for a noise function would
+    get. A guard that cannot separate this from the realisation is a guard that
+    licenses standing ruling 3 being broken."""
+    import beach_foam as _F
+
+    def cf(xw, yw, m, d, footprint, seed=0, floor=1.0e-2):
+        cov = _F.coverage(np.asarray(m, float))
+        x = np.asarray(xw, float)
+        y = np.asarray(yw, float)
+        n = (np.sin(x * 7.3 + 1.7) * np.sin(y * 6.1 - 0.4)
+             + 0.5 * np.sin(x * 19.1 - 2.2) * np.sin(y * 17.7 + 1.1))
+        out = np.clip(cov * (1.0 + 0.9 * n), 0.0, 1.0)
+        return out, dict(visible=1.0, p_max=0.0,
+                         mean_drawn=float(out.mean()),
+                         mean_field=float(cov.mean()))
+    _F.coverage_field = cf
+
+
+def _bug_foam_saturate_the_deck(mod):
+    """The deck laid at coverage 1 wherever anything breaks -- a solid sheet.
+
+    The clot statistic is what notices: a saturated field has no dark gaps
+    inside its white, and the generic set measures a gap median of 2-7 px
+    inside even the thickest bore."""
+    import beach_foam as _F
+    orig = _F.coverage_field
+
+    def cf(xw, yw, m, d, footprint, seed=0, floor=1.0e-2):
+        out, st = orig(xw, yw, m, d, footprint, seed, floor)
+        return np.where(np.asarray(m, float) > 0.15, 1.0, out), st
+    _F.coverage_field = cf
+
+
+def _bug_foam_no_second_band(mod):
+    """The deck sourced from a monotone function of depth alone -- foam near
+    the shore, drawn rather than computed.
+
+    Bar section B is explicit that this is the distinction that matters: "a
+    monotone profile cannot distinguish a renderer that COMPUTES breaking from
+    one that DRAWS FOAM NEAR THE SHORE"."""
+    orig = mod.Water.__init__
+
+    def init(self, bay):
+        orig(self, bay)
+        d = np.maximum(self.d, 1e-3)
+        self.deck = np.clip(np.exp(-d / 1.2), 0.0, 1.0)
+    mod.Water.__init__ = init
+
+
+def _bug_foam_no_phase_lag(mod):
+    """The deck laid with NO age dependence -- foam that never decays behind
+    the crest.
+
+    ADDED AFTER THE FIRST BUG RUN, and it is the row-can-fail control for the
+    second maximum. `foamtex-no-second-band` was written to kill that row and
+    did not touch it: the second maximum comes from the PHASE CLOCK, so a
+    monotone deck source still bands. A guard nothing in the table can fail is
+    not a guard, so the defect that actually removes the banding gets an entry:
+    strip the exponential in age and every cut collapses to the deck source's
+    own cross-shore shape, which is one band."""
+    import beach_foam as _F
+
+    def cmb(q_b, T, age, tau=_F.TAU_FOAM_SALT):
+        q = np.clip(np.asarray(q_b, float), 0.0, 1.0)
+        denom = 1.0 - math.exp(-float(T) / float(tau))
+        return q * np.ones_like(np.asarray(age, float)) / denom
+    _F.covering_measure_break = cmb
+
+
+def _bug_foam_grain_a_twentieth(mod):
+    """The grain declared twenty times too FINE: r_g = d/20.
+
+    The other direction, so the ladder row is shown to fire both ways rather
+    than to have a one-sided bracket that happens to sit above the clean value.
+    Every sample lands on the R_G_MIN floor and the ladder stops varying with
+    depth at all -- which is the depth-limited claim switched off while the
+    coverage, again, does not move."""
+    import beach_foam as _F
+    _F.grain_radius = lambda d, k=0.05, r_min=_F.R_G_MIN, r_max=_F.R_G_MAX: \
+        np.clip(k * np.asarray(d, float), r_min, r_max)
+
+
+FOAMTEX_BUGS = ('foamtex-draw-the-mean', 'foamtex-exceedance-source',
+                'foamtex-grain-at-one-scale', 'foamtex-grain-ten-times',
+                'foamtex-grain-a-twentieth',
+                'foamtex-noise-not-realisation', 'foamtex-saturate-the-deck',
+                'foamtex-no-second-band', 'foamtex-no-phase-lag')
+
+BUGS.update({
+    'foamtex-no-phase-lag': _bug_foam_no_phase_lag,
+    'foamtex-grain-a-twentieth': _bug_foam_grain_a_twentieth,
+    'foamtex-draw-the-mean': _bug_foam_draw_the_mean,
+    'foamtex-exceedance-source': _bug_foam_exceedance_source,
+    'foamtex-grain-at-one-scale': _bug_foam_grain_at_one_scale,
+    'foamtex-grain-ten-times': _bug_foam_grain_ten_times,
+    'foamtex-noise-not-realisation': _bug_foam_noise_not_realisation,
+    'foamtex-saturate-the-deck': _bug_foam_saturate_the_deck,
+    'foamtex-no-second-band': _bug_foam_no_second_band,
+})
+
+
+# ============================================================================
+# WAVE 18 -- THE DRAWN FOAM'S TEXTURE, AND THE INSTRUMENT THAT READS IT
+#
+# WHY THIS SECTION EXISTS, and it is the wave-13 lesson with a new vector.
+#
+# Wave 12 diagnosed the airbrush exactly right: `coverage(m) = 1 - exp(-m)` is
+# the void probability of a Boolean model and the renderer alpha-blended by it,
+# drawing E[chi] and never chi. It then built `boolean_indicator`,
+# `filtered_indicator`, `grain_radius`, `octave_weights` and `boolean_mean`,
+# wrote 310 lines of derivation around them -- AND WIRED NONE OF IT INTO THE
+# PICTURE. At c394669, six waves later,
+#
+#     grep -rn 'boolean_indicator|filtered_indicator|grain_radius' *.py
+#
+# returned nothing outside `beach_foam.py` itself. The suite had no row that
+# could notice, because every row it had was about `beach_foam`'s functions and
+# none was about whether the RENDER PATH CALLS THEM. The frame the owner looked
+# at was still the mean.
+#
+# So the first row here is not about foam at all. It is the row that asks
+# whether the shipping code path uses the realisation, and it is written so
+# that deleting the call makes it FAIL rather than making it vacuous.
+#
+# WHAT THE ROWS ARE MEASURED AGAINST. `gauntlet/sea/bar/generic/` measured nine
+# photographs and converted section C's verbal criteria into two dimensionless
+# brackets that survive a stranger's exposure, white balance and grade:
+#
+#     foam correlation length   0.3 - 0.8 %  of the foam patch's own width
+#     foam clot run q90         8 - 52 px    at 1920 px across (10 - 70 cm)
+#
+# THE ENCODE, STATED OUT LOUD BECAUSE THE STANDING RULING FORBIDS IT ANYWHERE
+# ELSE. Every physical row in this file is scene-linear. These are not. The
+# reference numbers come from 8-bit JPEGs, and the run/gap statistic is taken
+# above a half-max threshold on 8-bit luma, which is not invariant under a tone
+# curve -- so the render must go through the SAME encode before it is compared,
+# and `_foam_encode8` below is `beach_render._save`'s curve and nothing else.
+# A texture ratio is the one class of quantity for which a display-referred
+# measurement is the correct one, because the reference is display-referred.
+def _foam_boxcar(x, k):
+    return np.convolve(x, np.ones(k) / k, mode='same')
+
+
+def _foam_luma8(a):
+    return 0.2126 * a[..., 0] + 0.7152 * a[..., 1] + 0.0722 * a[..., 2]
+
+
+def _foam_encode8(L, white, gamma=2.2):
+    """`beach_render._save`'s curve. Display-referred ON PURPOSE -- see above."""
+    img = np.clip(np.asarray(L, float) / max(white, 1e-9), 0.0, 1.0)
+    return (img ** (1.0 / gamma)) * 255.0
+
+
+def _foam_texture(P, hp=61):
+    """A LINE-FOR-LINE PORT of `gauntlet/sea/bar/generic/measure.py::texture`.
+
+    It is copied rather than imported because the generic set is run state and
+    this file must not depend on it existing -- and it is copied VERBATIM,
+    including the 61 px high-pass and the 80-lag cap, because a comparison
+    against those photographs through a different filter is not a comparison.
+    `_sec_foamtex` reproduces three of the published rows from the JPEGs when
+    they are present, so the port is checked rather than asserted.
+    """
+    P = np.asarray(P, float)
+    bg, pk = np.percentile(P, 10), np.percentile(P, 99)
+    thr = bg + 0.5 * (pk - bg)
+    m = P > thr
+    runs, gaps = [], []
+    for r in range(m.shape[0]):
+        c = g = 0
+        for v in m[r]:
+            if v:
+                if g:
+                    gaps.append(g); g = 0
+                c += 1
+            else:
+                if c:
+                    runs.append(c); c = 0
+                g += 1
+        if c:
+            runs.append(c)
+    runs = np.array(runs) if runs else np.array([0])
+    gaps = np.array(gaps) if gaps else np.array([0])
+    W = P.shape[1]
+    trim = hp // 2
+    maxlag = max(4, min(80, (W - 2 * trim) // 3))
+    acc = np.zeros(maxlag + 1); n = 0
+    for r in range(P.shape[0]):
+        row = P[r] - _foam_boxcar(P[r], hp)
+        row = row[trim:W - trim]
+        if row.size < maxlag + 4:
+            continue
+        row = row - row.mean()
+        v = (row * row).mean()
+        if v <= 0:
+            continue
+        acc += np.array([(row[:row.size - k] * row[k:]).mean() / v
+                         for k in range(maxlag + 1)])
+        n += 1
+    l1 = float('nan')
+    if n:
+        acc /= n
+        for k in range(1, maxlag + 1):
+            if acc[k] <= 1 / math.e:
+                l1 = k - 1 + (acc[k - 1] - 1 / math.e) / max(acc[k - 1] - acc[k],
+                                                            1e-9)
+                break
+    return dict(W=W, thr=float(thr), cov=100.0 * float(m.mean()),
+                run_med=float(np.percentile(runs, 50)),
+                run_q90=float(np.percentile(runs, 90)),
+                gap_med=float(np.percentile(gaps, 50)),
+                acf=float(l1), lW=100.0 * float(l1) / W)
+
+
+def _foam_maxima(p, k=9, rel=0.10):
+    """Interior local maxima of a lightly smoothed profile, keeping only those
+    whose prominence clears `rel` of the profile's own range.
+
+    The prominence test is the whole row: without it a ripple on the flank of
+    one hump counts as a second maximum and the guard says the surf zone has
+    structure it does not have. `rel` is 10 %, and `_sec_foamtex` reports what
+    the count does at 5 % and 20 % so the threshold is a stated choice rather
+    than the one that gave the answer."""
+    p = np.asarray(p, float)
+    if p.size < 3 * k:
+        return []
+    s = np.convolve(p, np.ones(k) / k, mode='valid')
+    rngv = float(s.max() - s.min())
+    if rngv <= 0:
+        return []
+    out = []
+    for i in range(1, s.size - 1):
+        if s[i] >= s[i - 1] and s[i] > s[i + 1]:
+            lo = min(float(s[:i].min()), float(s[i + 1:].min()))
+            if (s[i] - lo) > rel * rngv:
+                out.append((i + k // 2, float(s[i])))
+    return out
+
+
+def _foam_hero_footprint(RND, FOAM, w, sub=4):
+    """The hero frame's ground sample spacing WHERE THE SURF IS, derived from
+    the camera rather than read off a render.
+
+    A pixel subtends 2 tan(fov/2) / h radians; a ray reaching the sea plane at
+    range t covers t times that, and 1/|D_z| of it on a surface it does not meet
+    square. The camera stands at z_c over z = 0, so t = z_c/|D_z| and the
+    footprint is z_c (2 tan / h) / D_z^2. No render, no shading.
+
+    WHERE IT IS EVALUATED IS THE WHOLE ROW, and the first draft of this function
+    got it wrong in a way worth recording. Taking a low percentile down the
+    centre column returns the BOTTOM EDGE of the frame -- dry beach in the
+    foreground, 0.025 m to a pixel -- and sampling the foam patch there made the
+    texture rows fail by a factor of five for a reason that had nothing to do
+    with foam. The footprint has to be taken where the DECK IS LAID, so the rays
+    are pushed to the sea plane, the deck source is sampled at the points they
+    land on, and the median is taken over the breaking set. That ties the
+    guard's sampling to the surf zone by the model's own field.
+
+    Subsampled by `sub` in each axis: the footprint is a smooth function of the
+    ray angle, so a median over every 16th pixel is the same median."""
+    cam = RND.hero_cameras(w, RND.W_HERO * RND.SS_HERO,
+                           RND.H_HERO * RND.SS_HERO,
+                           out=lambda *a, **kw: None)[3]
+    D = cam.rays()[::sub, ::sub]
+    zc = float(cam.pos[2])
+    px = 2.0 * cam.tan / cam.h
+    dz = D[..., 2]
+    sel = dz < -1e-6
+    t = zc / np.maximum(-dz[sel], 1e-9)
+    P = cam.pos[None] + t[..., None] * D[sel]
+    foot = t * px / np.maximum(-dz[sel], 1e-9)
+    inside = ((P[:, 0] >= w.x[0]) & (P[:, 0] <= w.x[-1])
+              & (P[:, 1] >= w.y[0]) & (P[:, 1] <= w.y[-1]))
+    deck = np.where(inside, w.sample(P[:, 0], P[:, 1], w.deck), 0.0)
+    brk = deck > 0.5 * float(deck.max()) if deck.size and deck.max() > 0 \
+        else np.zeros(deck.shape, bool)
+    if not brk.any():
+        raise AssertionError('no breaking samples on the sea plane -- the '
+                             'footprint row would be measured on nothing')
+    return dict(cam=cam, foot=foot[brk], px=px, z_cam=zc,
+                n_brk=int(brk.sum()), foot_all=foot)
+
+
+def _foam_surf_patch(RND, FOAM, w, mpp, nx=500, ny=120):
+    """A rectangle of the REAL bay's inner surf zone, sampled at the hero
+    frame's own ground spacing.
+
+    Everything in it comes from the shipping fields: the covering measure
+    through `surface_foam` off the transform's roller, and the depth off the
+    bed. Nothing is synthesised except the choice of WHERE, which is taken as
+    the alongshore line of highest covering measure inside the surf band -- a
+    deterministic rule, so no box is hand-placed."""
+    # the surf band: where the covering measure is largest, on the bed's own grid
+    xs, ys = w.x, w.y
+    q_b = w.deck
+    # one cross-shore profile per alongshore station, on the stored fields
+    m_field = FOAM.covering_measure_break(q_b, w.T_wave, 0.0, w.tau_foam)
+    j = int(np.unravel_index(int(np.argmax(m_field)), m_field.shape)[0])
+    i = int(np.unravel_index(int(np.argmax(m_field)), m_field.shape)[1])
+    x0, y0 = float(xs[i]), float(ys[j])
+    gx = x0 + (np.arange(nx) - nx / 2.0) * mpp
+    gy = y0 + (np.arange(ny) - ny / 2.0) * mpp
+    X, Y = np.meshgrid(gx, gy)
+    ph = w.sample(X, Y, w.S)
+    age = FOAM.age_from_phase(ph, w.omega)
+    qb = w.sample(X, Y, w.deck)
+    cov, m = FOAM.surface_foam(qb, w.T_wave, age, RND.BO.U10, w.tau_foam)
+    d = np.maximum(w.sample(X, Y, w.d), 0.02)
+    return dict(X=X, Y=Y, m=m, cov=cov, d=d, x0=x0, y0=y0, mpp=mpp)
+
+
+def _sec_foamtex(ctx):
+    """WAVE 18 -- is the foam a REALISATION in the picture, and does its
+    texture have the photographs' scale?
+
+    Four jobs, in this order, because each depends on the one before being
+    true:
+
+      F.0  the instrument reads a known answer          (standing ruling 14)
+      F.1  the RENDER PATH draws the realisation        (the wave-13 lesson)
+      F.2  its texture lands in the photographs' bracket
+      F.3  the cross-shore profile has a second maximum, and where it comes from
+    """
+    B = ctx['B']
+    import beach_render as RND
+    bay = ctx.get('_bay')
+    if bay is None:
+        bay = B.run_bay()
+        ctx['_bay'] = bay
+    w = RND.Water(bay)
+
+    # ==================================================================== F.0
+    # THE INSTRUMENT, AGAINST FIELDS WHOSE ANSWER IS KNOWN IN ADVANCE.
+    #
+    # Standing ruling 14, and it earned its place twice in one afternoon here.
+    # The generic README says a soft gradient's l/W "is of order 100 %". That is
+    # true of the FIELD and false of this METER: the statistic is taken on the
+    # residual after a 61 px boxcar high-pass, so the largest lag it can return
+    # is bounded by the window, and a pure gradient comes back at a few per cent
+    # rather than at 100. Quoting the render's 1.5 % "before" against a 100 %
+    # expectation would therefore have been a lie in the render's favour, and
+    # only running the meter on a ramp found it.
+    rng = np.random.default_rng(20250818)
+    H0, W0 = 120, 500
+    xx = np.arange(W0)[None, :] * np.ones((H0, 1))
+    ramp = 255.0 * xx / W0
+    t_ramp = _foam_texture(ramp)
+    t_noise = _foam_texture(rng.normal(128.0, 40.0, (H0, W0)))
+    t_rampn = _foam_texture(ramp + rng.normal(0.0, 1.0, (H0, W0)))
+
+    between(1, 'meter: a pure ramp cannot reach 100 % l/W (window-bound)',
+            t_ramp['lW'], 0.3, 4.0,
+            'THE CEILING ROW. `l/W` is measured on the residual after a 61 px '
+            'boxcar high-pass, so a field with no structure at all returns the '
+            'WINDOW\'s scale and not the patch\'s. A pure ramp reads %.2f %%, '
+            'not 100 %%. Every "before" number in this wave is quoted against '
+            'this ceiling rather than against the README\'s verbal 100 %%, and '
+            'the README\'s sentence is right about the field and wrong about '
+            'what this instrument would print.' % t_ramp['lW'], '%')
+    between(1, 'meter: white noise reads the sampling scale',
+            t_noise['acf'], 0.0, 1.2,
+            'The other end. A field whose structure is one pixel returns an '
+            'acf below one pixel, so the meter is not floored above the '
+            'sampling scale and a real 1 px texture would not be reported as '
+            '3 px.', 'px')
+    check(1, 'meter is BLIND to a gradient carrying a 1 DN noise floor',
+          float(t_rampn['lW'] < 0.3 and t_rampn['run_q90'] > 100.0), 1.0, 0,
+          'THE ROW THAT SAYS WHY `l/W` IS NOT ENOUGH ON ITS OWN, and it is the '
+          'defect this wave found in its own first draft of the guard. A pure '
+          'ramp with one display level of noise on it scores l/W = %.2f %% -- '
+          'INSIDE the photographs\' 0.3-0.8 %% bracket -- while being exactly '
+          'the airbrush the bracket exists to reject. What separates them is '
+          'the RUN statistic: the noisy ramp\'s run q90 is %.0f px, half the '
+          'box, because a monotone field above a half-max threshold is one '
+          'unbroken run per row, while the photographs are 8-52 px. So the '
+          'texture rows below are a PAIR and neither is quoted alone.'
+          % (t_rampn['lW'], t_rampn['run_q90']), '-')
+
+    # the meter against a Boolean field of KNOWN grain, at a KNOWN sampling
+    mpp_ref = 0.117
+    g1 = np.arange(W0) * mpp_ref
+    g2 = np.arange(H0) * mpp_ref
+    GX, GY = np.meshgrid(g1, g2)
+    chi_ref = FOAM.boolean_indicator(GX, GY, np.full(GX.shape, 0.8),
+                                     np.full(GX.shape, 0.25))
+    t_ref = _foam_texture(chi_ref * 255.0)
+    between(1, 'meter on a Boolean field of known 0.25 m grain at 0.117 m/px',
+            t_ref['lW'], 0.15, 0.9,
+            'The forward control: a realisation whose grain and sampling are '
+            'both stated reads %.2f %% in the same box the render is measured '
+            'in. The meter is therefore able to RETURN a number in the '
+            'photographs\' bracket, which is the thing a near-zero measurement '
+            'is worthless without.' % t_ref['lW'], '%')
+
+    # and against the photographs themselves, when the generic set is present
+    _gen = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        '..', '..', 'gauntlet', 'sea', 'bar', 'generic')
+    _pub = [('f2-swash-foam-lace.jpg', (560, 540, 1060, 640), 0.81),
+            ('f2-swash-foam-lace.jpg', (460, 690, 960, 800), 0.76),
+            ('f1-breaker-three-whites.jpg', (1250, 830, 1750, 960), 0.54)]
+    _got = []
+    try:
+        from PIL import Image as _Im
+        for fn, (a, b, c, d) in _pub:
+            p = os.path.join(_gen, fn)
+            if not os.path.exists(p):
+                raise IOError(fn)
+            A = np.asarray(_Im.open(p).convert('RGB'), float)
+            _got.append(_foam_texture(_foam_luma8(A)[b:d, a:c])['lW'])
+    except Exception:
+        _got = []
+    if _got:
+        check(1, 'the port reproduces the published photograph l/W rows',
+              _got, [p for _, _, p in _pub], 0.01,
+              'THE PORT IS CHECKED, NOT ASSERTED. `_foam_texture` is a copy of '
+              '`measure.py::texture`, and a copy is a place for a transcription '
+              'error to live. Re-measuring three of that file\'s own published '
+              'boxes off the JPEGs beside it closes that: %s against %s. If '
+              'the generic set is absent this row is skipped and the two rows '
+              'above still pin the meter.'
+              % ([round(g, 2) for g in _got], [p for _, _, p in _pub]), '%')
+    else:
+        info(1, 'the port against the published rows', 'generic set absent',
+             'The nine reference photographs are run state and are not '
+             'required for this file to run. When they are present the row '
+             'above re-measures three of their published boxes.')
+
+    # ==================================================================== F.1
+    # DOES THE SHIPPING RENDER PATH DRAW THE REALISATION.
+    #
+    # 240 x 320, the same size `_sec_seam` renders at and for the same reason:
+    # the question is whether a call happens, and that is not a property of the
+    # sampling. The rows are written so that reverting `shade_water` to
+    # `cov = coverage(m)` fails them -- which is exactly what six waves of a
+    # green suite did not do.
+    cam = RND.hero_cameras(w, 240, 320, out=lambda *a, **kw: None)[3]
+    L_r, ex_r = RND.render(cam, w)
+    sh = ex_r['water']
+    st = sh.get('foam_stats')
+    check(0, 'the render path returns foam realisation diagnostics',
+          float(isinstance(st, dict)), 1.0, 0,
+          'THE WAVE-13 ROW. Wave 12 built `boolean_indicator` and nothing '
+          'called it; the suite stayed green for six waves on code the picture '
+          'had never run. This row fails if `shade_water` stops reporting that '
+          'it drew a realisation, which is the cheapest possible proxy for '
+          '"the call is still there" and the one that would have caught it.',
+          '-')
+    vis = float(st['visible']) if isinstance(st, dict) else 0.0
+    between(0, 'share of water samples that can SEE the realisation',
+            vis, 0.02, 1.0,
+            'Below `realise_visible`\'s floor the filter multiplies the sample '
+            'by zero and the mean is drawn, correctly -- the open sea at 40 km '
+            'is 54 m to a pixel against a 0.25 m grain. This row asserts the '
+            'cull has not swallowed the surf zone too: %.1f %% of water '
+            'samples here are inside the crossover.' % (100 * vis), '-')
+
+    # the realisation must DIFFER from the mean pointwise and AGREE in the mean
+    cov_mean_field = FOAM.surface_foam(sh['deck'], w.T_wave, sh['age'],
+                                       RND.BO.U10, w.tau_foam)[0]
+    drawn = sh['cov']
+    dif = np.abs(drawn - cov_mean_field)
+    frac_diff = float((dif > 1e-6).mean())
+    check(0, 'drawn coverage differs from coverage(m) POINTWISE',
+          float(frac_diff > 0.01), 1.0, 0,
+          'A realisation that equals its own expectation everywhere is the '
+          'expectation. %.1f %% of water samples differ, which is the share '
+          'the crossover admits.' % (100 * frac_diff), '-')
+    mm = float(np.abs(np.asarray(st['mean_drawn']) - st['mean_field'])
+               / max(st['mean_field'], 1e-9)) if isinstance(st, dict) else 1.0
+    between(0, 'realisation mean against 1 - exp(-m), over the visible set',
+            mm, 0.0, 0.06,
+            'AND THE OTHER HALF, WHICH IS WHAT MAKES IT PHYSICS RATHER THAN '
+            'TEXTURE. `boolean_indicator`\'s marking construction gives '
+            'P(covered) = 1 - exp(-m) EXACTLY at every point, so the drawn '
+            'field\'s mean must track the coverage the breaking statistics '
+            'asked for. It is out by %.2f %%, which is sampling on this many '
+            'germs and not a bias. A texture laid on top of the coverage would '
+            'pass the row above and fail this one.' % (100 * mm), '-')
+
+    # ==================================================================== F.2
+    # THE TEXTURE, AT THE HERO FRAME'S OWN GROUND SAMPLING.
+    hf = _foam_hero_footprint(RND, FOAM, w)
+    mpp = float(np.median(hf['foot']))
+    info(1, 'hero frame ground sample spacing, in the breaking set', mpp,
+         'DERIVED FROM THE CAMERA, not read off a render: z_c (2 tan/h) / D_z^2 '
+         'on the sea plane, median over the %d subsampled rays that land where '
+         'the deck source is above half its maximum. The texture rows sample '
+         'the world at this spacing so that a per-cent-of-box-width figure '
+         'means the same thing here as it does in a 1920 px photograph. It is '
+         'measured where the foam is because taking it at the frame\'s bottom '
+         'edge returns the dry foreground and is four times finer.'
+         % hf['n_brk'])
+    pat = _foam_surf_patch(RND, FOAM, w, mpp)
+    r_g = FOAM.grain_radius(pat['d'])
+    fp = np.full(pat['m'].shape, mpp)
+    drawn_p, st_p = FOAM.coverage_field(pat['X'], pat['Y'], pat['m'], pat['d'],
+                                        fp)
+    t_before = _foam_texture(np.clip(pat['cov'], 0, 1) * 255.0)
+    t_after = _foam_texture(np.clip(drawn_p, 0, 1) * 255.0)
+
+    info(1, 'foam patch l/W, the MEAN field (what waves 6-17 drew)',
+         round(t_before['lW'], 3),
+         'The airbrush, through this meter and at the ceiling row\'s own '
+         'reading: a smooth field returns the high-pass window\'s scale. It is '
+         'recorded as the before, and the ceiling row above is what stops it '
+         'being quoted against a verbal 100 %.')
+    between(0, 'foam patch l/W, the DRAWN field, vs photographs 0.3-0.8 %',
+            t_after['lW'], 0.25, 0.95,
+            'THE ROW THIS WAVE EXISTS FOR. `gauntlet/sea/bar/generic/` measures '
+            'the correlation length inside a foam patch at 0.3-0.8 %% of that '
+            'patch\'s own width across six boxes in two photographs, and the '
+            'bracket is dimensionless so no exposure, white balance or grade '
+            'enters it. The drawn field reads %.2f %% against the mean field\'s '
+            '%.2f %%. The bracket is widened by one part in six on each side '
+            'because the photographs\' own six boxes span 0.29-0.82 and a guard '
+            'set to the extremes of six samples fails on the seventh.'
+            % (t_after['lW'], t_before['lW']), '%')
+    between(0, 'foam clot run q90, vs photographs 8-52 px',
+            t_after['run_q90'], 5.0, 70.0,
+            'THE PAIRED ROW, and F.0 shows why it cannot be dropped: `l/W` '
+            'alone scores a noisy gradient INSIDE the bracket. The run '
+            'statistic is what a monotone field cannot fake -- above a half-max '
+            'threshold it is one unbroken run per row. The photographs give '
+            '8-52 px, a 7:1 spread within one wave; this reads %.0f px against '
+            'the mean field\'s %.0f px.'
+            % (t_after['run_q90'], t_before['run_q90']), 'px')
+    between(1, 'dark gaps inside the white: gap median, vs photographs 2-7 px',
+            t_after['gap_med'], 1.0, 12.0,
+            'The generic set\'s fourth reading: "there are dark gaps inside '
+            'every white", gap median 2-7 px including inside the thickest '
+            'bore. A coverage that saturates to a solid sheet has no gaps and '
+            'this row is what notices.', 'px')
+    info(1, 'the realisation preserves the mean on the patch',
+         (round(float(drawn_p.mean()), 5), round(float(pat['cov'].mean()), 5)),
+         'Drawn against expected on the same rectangle. These are the same two '
+         'numbers F.1 checks on the render; they are repeated here because the '
+         'texture rows above would otherwise be free to buy their bracket by '
+         'moving the coverage.')
+
+    # WHAT THE GRAIN FLOOR COSTS, reported rather than tuned
+    v = np.clip(np.log2(np.maximum(r_g, 1e-9) / FOAM.R_G_MIN), 0.0,
+                float(FOAM.R_G_OCTAVES))
+    # AND THE ROW THAT GUARDS THE GRAIN FROM ABOVE, added after firing the bugs.
+    #
+    # `foamtex-grain-ten-times` -- r_g = 5 d instead of d/2 -- passed every
+    # texture row in the first draft, and the reason is structural rather than a
+    # loose bracket: `octave_weights` puts EQUAL measure in every octave below
+    # the outer scale, so the finest octave is always occupied and the acf's 1/e
+    # lag is set by the finest scale present. Coarsening the outer scale adds
+    # coarse structure without removing fine structure, and a correlation length
+    # cannot see it. So the declared coefficient has to be guarded where it
+    # actually lives -- in the LADDER POSITION -- and not through the texture.
+    # The bracket is the depth field's: the surf zone this frame draws runs
+    # roughly 0.3-2 m, so r_g = d/2 spans 0.15-1.0 m, i.e. 0 to 2 octaves above
+    # R_G_MIN. A median above that says the grain is coarser than any depth in
+    # the scene permits, whatever the texture reads.
+    # AND IT IS MEASURED OVER THE WHOLE BREAKING ZONE, not over the patch,
+    # which is the second thing the bug run corrected. `_foam_surf_patch` picks
+    # the point of greatest covering measure and that is the SWASH, in 0.10 m of
+    # water, where r_g = d/2 is under R_G_MIN and pinned to the floor for 74 %
+    # of the samples. A grain coefficient is unobservable exactly where it is
+    # clamped, so a row that looks for it there is asking a question the scene
+    # has already answered. Over the breaking zone the depths run 0.10-2.70 m
+    # (p5-p95) and the ladder is genuinely occupied.
+    d_all = np.asarray(w.d, float)
+    deck_all = np.clip(np.asarray(w.deck, float), 0.0, 1.0)
+    brk_sel = deck_all > 0.5 * float(deck_all.max())
+    v_all = np.clip(np.log2(np.maximum(FOAM.grain_radius(d_all[brk_sel]), 1e-9)
+                            / FOAM.R_G_MIN), 0.0, float(FOAM.R_G_OCTAVES))
+    between(1, 'grain ladder position, median octaves above R_G_MIN',
+            float(np.median(v_all)), 0.5, float(FOAM.R_G_OCTAVES) - 0.5,
+            'THE ROW THE TEXTURE CANNOT PROVIDE, and the bug table is what '
+            'showed it was needed. `foamtex-grain-ten-times` -- r_g = 5 d '
+            'instead of d/2 -- passed every texture row, and the reason is '
+            'structural rather than a loose bracket: `octave_weights` puts '
+            'EQUAL measure in every octave below the outer scale, so the finest '
+            'octave is occupied whatever the coefficient is, and the acf\'s 1/e '
+            'lag reads the finest scale present. Coarsening the outer scale '
+            'ADDS coarse structure without removing fine structure and a '
+            'correlation length cannot see it. So the coefficient is guarded '
+            'where it lives. THE BRACKET IS NOT FITTED: it says the ladder must '
+            'be USED -- neither pinned on the R_G_MIN floor nor saturated at '
+            'the top octave -- because a depth-limited grain whose ladder '
+            'position does not move across a surf zone spanning %.2f to %.2f m '
+            'is not depth-limited. r_g = %.1f d reads %.2f of %d octaves; 5 d '
+            'saturates at %d and d/20 collapses to 0, so the row fires in both '
+            'directions. %.0f %% of the breaking zone is on the floor.'
+            % (float(np.percentile(d_all[brk_sel], 5)),
+               float(np.percentile(d_all[brk_sel], 95)),
+               FOAM.GRAIN_PER_DEPTH, float(np.median(v_all)),
+               FOAM.R_G_OCTAVES, FOAM.R_G_OCTAVES,
+               100 * float((FOAM.GRAIN_PER_DEPTH * d_all[brk_sel]
+                            < FOAM.R_G_MIN).mean())),
+            'octaves')
+    clamped = float((FOAM.GRAIN_PER_DEPTH * pat['d'] < FOAM.R_G_MIN).mean())
+    info(2, 'grain ladder: share of the patch on the R_G_MIN floor', clamped,
+         'OPEN, AND NAMED RATHER THAN MOVED. `grain_radius` clamps r_g = d/2 at '
+         'R_G_MIN = 0.25 m, and %.0f %% of this patch sits on that floor, where '
+         '`octave_weights` puts all the measure in one octave -- so the '
+         'depth-limited prediction that the lace FINES toward the waterline is '
+         'switched off exactly where the waterline is. Lowering the floor is '
+         'not free: R_G_MIN is declared as the scale below which a raft stops '
+         'being a sheet, which is a physical claim this file cannot currently '
+         'check. The cost is now a row instead of a comment. Median ladder '
+         'position v = %.2f octaves of %d.'
+         % (100 * clamped, float(np.median(v)), FOAM.R_G_OCTAVES))
+
+    # ==================================================================== F.3
+    # THE SECOND MAXIMUM, AND WHOSE IT IS.
+    #
+    # The critic that opened this round measured "a single smooth hump, no
+    # second maximum" -- on a frame that predates wave 12. It is no longer
+    # true, and the reason is NOT this wave: `deck_source` was changed at
+    # ee3c17b from Battjes & Janssen's Q_b to the transform's own roller
+    # fraction lagged half a local wavelength behind the crest, so the foam is
+    # laid down by each breaking crest and decays behind it -- one band per
+    # crest. The row pins that so it cannot be lost again, and it is explicitly
+    # NOT a claim about the number of surf LINES, which needs a bar system in
+    # the depth field and belongs to the bathymetry lane.
+    # WHICH PROFILE, and the first draft of this row measured the wrong one.
+    #
+    # `covering_measure_break(deck, T, age)` at age = 0 is just `deck` rescaled,
+    # and the roller fraction's own cross-shore shape is ONE band -- it rises at
+    # the break point and stays up to the shore. Counted that way the row came
+    # back [2, 2, 1, 1, 1] and failed, which is the correct answer to the wrong
+    # question: the frame does not draw the deck source, it draws the deck AT
+    # THE PHASE EACH POINT IS AT. Foam of age `a` lies (c - u) a behind the
+    # crest and decays on tau_foam, so a cross-shore cut walks back through
+    # successive crests and reads a maximum behind each one. The second maximum
+    # is the PREVIOUS WAVE'S foam, and the profile that has to be measured is
+    # the one `shade_water` composites.
+    cross = []
+    for frac in (0.2, 0.35, 0.5, 0.65, 0.8):
+        j = int(frac * (len(w.y) - 1))
+        age_j = FOAM.age_from_phase(np.asarray(w.S[j], float), w.omega)
+        prof = FOAM.surface_foam(np.asarray(w.deck[j], float), w.T_wave,
+                                 age_j, RND.BO.U10, w.tau_foam)[0]
+        prof = np.asarray(prof, float)
+        if not np.isfinite(prof).all() or prof.max() <= 0:
+            continue
+        cross.append((j, prof))
+    counts = [len(_foam_maxima(p)) for _, p in cross]
+    check(0, 'cross-shore foam profile has a second maximum',
+          float(len(counts) > 0 and min(counts) >= 2), 1.0, 0,
+          'NOT A SINGLE SMOOTH HUMP, which is what the critic that opened this '
+          'round measured. Counted on the coverage the renderer composites, '
+          'along %d cross-shore cuts, keeping only maxima whose prominence '
+          'clears 10 %% of the profile\'s own range: %s. THE MECHANISM IS THE '
+          'PHASE LAG, not a second breakpoint: the deck is laid by the breaking '
+          'crest and lies (c - u) a behind it, decaying on Monahan & Zietlow\'s '
+          'tau, so a cut walks back through successive crests. THIS IS NOT A '
+          'SURF-LINE COUNT and must not be read as one -- three to four '
+          'SEPARATED lines need a bar system in the depth field, which is the '
+          'bathymetry lane\'s and is not touched here.' % (len(counts), counts),
+          '-')
+    c5 = [len(_foam_maxima(p, rel=0.05)) for _, p in cross]
+    c20 = [len(_foam_maxima(p, rel=0.20)) for _, p in cross]
+    info(1, 'maxima count at prominence 5 % / 10 % / 20 %',
+         (c5, counts, c20),
+         'The threshold is a choice, so its sensitivity is printed. The count '
+         'must not depend on it for the claim to be worth making; where it '
+         'does, the extra maxima are ripples and the row above uses 10 %.')
+    # WHICH BREAKING STATEMENT LAYS THE DECK, and it is measured by WHERE THE
+    # MAXIMUM SITS rather than by how big it is.
+    #
+    # Wave 12's diagnosis was that Q_b keys on H/d APPROACHING gamma while the
+    # dissipation keys on the wave ACTUALLY breaking, so the two differ in
+    # PLACEMENT and not only in magnitude. That is directly testable and it
+    # separates them cleanly, which the magnitude does not: on this bay the
+    # exceedance's maximum falls on the FIRST BREAKING CELL at all five cuts --
+    # exactly at onset, 0 cells shoreward -- while the roller's maximum is 41 to
+    # 68 cells shoreward of it, because a surface bore takes ROLLER_LAG
+    # wavelengths to build. A statement whose foam peaks at the instant breaking
+    # begins is describing the approach to breaking, not the roller that carries
+    # the foam. (A seaward-ENERGY-share statistic was tried first and rejected:
+    # the two overlap on it, 0.18 against 0.13 at one cut, so it cannot decide.)
+    lags = []
+    for j, _ in cross:
+        br = np.asarray(w.brk[j], bool)
+        if not br.any():
+            continue
+        i0 = int(np.argmax(br))
+        lags.append(int(np.argmax(np.clip(np.asarray(w.deck[j], float),
+                                          0.0, 1.0))) - i0)
+    check(0, 'the deck peaks SHOREWARD of the first breaking cell',
+          float(len(lags) > 0 and min(lags) >= 1), 1.0, 0,
+          'The foam\'s source is `deck_source` -- `roller_fraction`, the '
+          'transform\'s own dissipation lagged shoreward by ROLLER_LAG local '
+          'wavelengths -- and its maximum lies %s cells shoreward of onset on '
+          'the five cuts. Battjes & Janssen\'s Q_b, which this file drew the '
+          'foam from for eleven waves, peaks at lag 0 at every cut. Q_b is not '
+          'deleted and is not wrong: it is the right closure for a random sea '
+          'and `brk = w.q_b > 0.5` still reads it. What this row fixes is which '
+          'of the two the DECK is laid from.' % lags, '-')
+    dsrc = [len(_foam_maxima(np.asarray(
+        FOAM.covering_measure_break(w.deck[j], w.T_wave, 0.0, w.tau_foam),
+        float))) for j, _ in cross]
+    info(1, 'maxima in the DECK SOURCE alone, phase removed', dsrc,
+         'THE CONTROL THAT SAYS WHOSE THE SECOND MAXIMUM IS. With the phase '
+         'taken out the same cuts read %s -- so the extra maxima are the '
+         'advection-and-decay clock and not the cross-shore shape of the '
+         'breaking statistic. A wave that later adds a bar to the depth field '
+         'should see THIS number rise; if the row above rises while this one '
+         'does not, the change was in the foam clock and not in the bed.'
+         % dsrc)
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -8796,7 +9576,14 @@ def run_suite():
                       # position in the list is free. It is last because it is
                       # newest, not because it is expensive.
                       (_sec_spectrum, 'the slope statistics derived from the '
-                                      'forcing, and Cox & Munk as its limit')):
+                                      'forcing, and Cox & Munk as its limit'),
+                      # WAVE 18. AFTER `_sec_land`, which is what puts the
+                      # full-scale bay in `ctx['_bay']` -- this section renders
+                      # from it exactly as `_sec_seam` does, and building the
+                      # bay twice would cost more than every row in it.
+                      (_sec_foamtex, 'the foam as a REALISATION: is it drawn, '
+                                     'and does its texture have the '
+                                     'photographs\' scale')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -8980,6 +9767,36 @@ if __name__ == '__main__':
             print('%-30s %d  %s' % (name, len(caught),
                                     '; '.join(c[:64] for c in caught[:5])))
         importlib.reload(FOAM)
+        sys.exit(0)
+    if '--bugs-foamtex' in sys.argv:
+        # WAVE 18. The bugs patch `beach_render` (and, for two of them,
+        # `beach_foam`), so BOTH are reloaded between cases -- a bug that
+        # rebinds `Water.__init__` or `beach_foam.coverage_field` and is not
+        # unwound leaks into every case after it and the table becomes fiction.
+        import importlib
+        import beach_render as RND
+        _run_section(_sec_foamtex, 'the drawn foam')
+        base = set(_fail_names())
+        print('clean foamtex section: %d pass / %d FAIL'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base)))
+        print()
+        print('%-32s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 118)
+        for name in FOAMTEX_BUGS:
+            importlib.reload(FOAM)
+            importlib.reload(RND)
+            BUGS[name](RND)
+            try:
+                _run_section(_sec_foamtex, 'the drawn foam')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-32s %d' % (name, len(caught)))
+            for c in caught:
+                print('%-32s   %s' % ('', c[:80]))
+        importlib.reload(FOAM)
+        importlib.reload(RND)
         sys.exit(0)
     if '--bugs-diffract' in sys.argv:
         import importlib

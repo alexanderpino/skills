@@ -317,6 +317,37 @@ class Water:
         self.c_phase = tr['c']
         self.D_w = tr['D_w']
         self.q_b = FM.breaking_fraction_2d(self.d, self.H)
+        # WAVE 18 -- THE FOAM'S SOURCE, AND IT IS THE SECOND THING WAVE 12
+        # FIXED IN A COMMENT AND NEVER CONNECTED.
+        #
+        # `beach_foam.deck_source` exists so that "which breaking statement
+        # lays the deck" is answered in ONE place; its own docstring says so.
+        # Nothing called it. Six waves after the fix was written the foam was
+        # still sourced from `self.q_b` above -- Battjes & Janssen's Rayleigh
+        # exceedance -- which is the category error the 50-line comment at
+        # `beach_foam.py:712` documents and claims to have removed: this field
+        # marches ONE monochromatic train, so there is no height distribution
+        # for a random-sea closure to operate on. Reproduced on this bay's
+        # centre row, and it is wave 12's own table to the third decimal:
+        #
+        #     x     d     H/d     q_b (BJ)   roller (deck_source)
+        #   572   3.71   0.435      0.047        0.016
+        #   616   2.57   0.464      0.072        0.544
+        #   660   1.74   0.484      0.095        0.826
+        #   704   0.34   1.094      1.000        0.991
+        #
+        # Eight to ten times low through the saturated surf zone, and placed
+        # seaward of the break: Q_b keys on H/d APPROACHING gamma, the roller
+        # on the wave ACTUALLY breaking. So waves 6-17 drew their foam from a
+        # statement about a sea state this scene does not have.
+        #
+        # Q_B IS KEPT AND IS NOT WRONG -- it is the right closure for a random
+        # sea, `brk = w.q_b > 0.5` still reads it, and when the offshore
+        # boundary grows a spectrum it becomes applicable again. What changes
+        # is only which of the two the DECK is laid from, and that is now the
+        # one the dissipation, the undertow and the bar have all used since
+        # wave 1.
+        self.deck = FM.deck_source(tr)
         self.bub = FM.bubble_scatter()
         self.air = FM.entrained_air(self.D_w, self.H, self.T_wave)
         # THE PLUME IS EVALUATED PER PIXEL, NOT PER CELL, because it is
@@ -759,8 +790,43 @@ def shade_water(w, P, D, t_now, foot=None):
     # HOW BRIGHT. A pile of plates: the raft is n_walls bubble walls each
     # reflecting the bar's own 1 - 1/n^2, and the raft's THICKNESS is the air
     # arriving at the surface times the residence time, not a chosen depth.
+    # WAVE 18 -- THE REALISATION IS DRAWN, and until this line it was not.
+    #
+    # Wave 12 diagnosed the airbrush correctly and built every part of the fix:
+    # `boolean_indicator` draws one sample of the same Boolean model whose void
+    # probability IS `coverage(m)`, and `filtered_indicator` fades it to the
+    # mean where the pixel outruns the grain. Then nothing called either one.
+    # `grep -rn boolean_indicator *.py` outside its own module returned NOTHING
+    # at c394669, six waves later, and the line here still read
+    #
+    #       cov = coverage(m)          # E[chi]
+    #
+    # so the frame the owner called "strak witte lijnen" was still the
+    # expectation. Measured on the champion's own coverage buffer: the field is
+    # a set of perfectly smooth diagonal ribbons, and its correlation length is
+    # 1.50-1.98 % of a 500 px box against 0.3-0.8 % in the photographs.
+    #
+    # NOTHING NEW IS INVENTED HERE. The one call below assembles quantities this
+    # file already computes -- the covering measure, the local depth, and the
+    # pixel footprint that band-limits the slope two hundred lines above. The
+    # mean is unchanged at every point by construction, which is the property
+    # that makes this a realisation of the physics rather than a texture laid on
+    # top of it, and `_sec_foamtex` in the suite is what states that as a number.
     q_b = w.sample(xw, yw, w.q_b)
-    cov1, m_cov = FM.surface_foam(q_b, w.T_wave, age, BO.U10, w.tau_foam)
+    deck = (w.sample(xw, yw, w.deck) if getattr(w, 'foam_roller', True)
+            else q_b)
+    cov1, m_cov = FM.surface_foam(deck, w.T_wave, age, BO.U10, w.tau_foam)
+    if getattr(w, 'foam_realise', True):
+        fp = (np.full(xw.shape, 1e9) if foot is None
+              else np.broadcast_to(np.asarray(foot, float), xw.shape))
+        cov1, foam_stats = FM.coverage_field(xw, yw, m_cov, dep, fp,
+                                             seed=getattr(w, 'foam_seed', 0))
+    else:
+        # THE CONTROL PANEL, exactly as `plume_on` is one: this branch draws
+        # E[chi] and is what every wave up to 17 drew. It is kept so the pair
+        # can be rendered and measured, not so the mean can be chosen.
+        foam_stats = dict(visible=0.0, p_max=0.0, mean_drawn=float('nan'),
+                          mean_field=float('nan'))
     if not getattr(w, 'foam_on', True):
         cov1 = np.zeros_like(cov1)
     cov = cov1[..., None]
@@ -781,6 +847,7 @@ def shade_water(w, P, D, t_now, foot=None):
     L = L * (1.0 - cov) + L_foam * cov
     return dict(L=L, L_sky=L_sky, L_glit=L_glit, L_up=L_up, L_path=L_path,
                 chord=chord, cov=cov[..., 0], lit=lit, cos_v=cos_v,
+                foam_stats=foam_stats, foot=foot, xw=xw, yw=yw, deck=deck,
                 age=age, q_b=q_b, m_cov=m_cov, R_p=R_p, T_p=T_p,
                 R_bed_seen=R_bed_seen, R_bed=R_bed, R_sub=R_sub, R_tot=R_tot,
                 R_raft=R_raft, bed_factor=bed_factor, dep=dep, t_col=t_col,
