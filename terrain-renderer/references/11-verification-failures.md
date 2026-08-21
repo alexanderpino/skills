@@ -705,6 +705,49 @@ nothing, and a project that has both believes it has two independent confirmatio
 question to ask of any suite plus any golden set is *which lines does the union of these actually
 execute* — and the answer is a number, not an impression.
 
+#### A second shape: derived, guarded, and never called
+
+The instance above is coverage zero **by scene configuration** — the code is wired in, and this
+frame's geometry happens never to ask for it. There is a harsher shape, and it was found three times
+in one wave, in three separate subsystems, by three builders who never spoke to each other:
+
+- **The foam.** A round diagnosed a smooth foam edge correctly, derived the fix, wrote it, and wired
+  none of it. `grep` for its four new symbols returned **nothing outside the module that defined
+  them**; the shader still blended by the mean.
+- **The glitter.** Six rounds argued the resolved/unresolved slope split. `grep` for the class that
+  implements it returned the class statement and two comments: **nothing had ever instantiated it.**
+  The shader computed the two variances on one line and discarded them on the next.
+- **The diffraction.** Ten Sommerfeld rows verified and green, and the renderer **does not import the
+  module** — zero pixels of any frame carry a diffracted edge.
+
+**The difference from the first shape is the detector, and it is why the first shape's instruments
+all miss this one.** A per-branch subsample counter answers *did this frame reach that branch*. It
+cannot answer *does any path connect that module to any frame*, because the branch it would count is
+in a module nothing calls, so the counter is never compiled into the frame's execution at all. The
+count is not zero; **there is no count.**
+
+So the detector is a different instrument and it costs seconds:
+
+- **`grep` for each new symbol and require a hit OUTSIDE the module that defines it.** A module whose
+  every reference is internal is a library nobody imported, however correct it is.
+- **Pair every row that tests a function with a row that tests that the frame reaches it**, in
+  integers off the rendered buffer: how many pixels, what share, and where. A function row and a
+  reach row are not redundant — this shape passes the first and fails the second by construction.
+- **Distrust a docstring that says the suite checks something.** Seven such promises in one module
+  were false on the tree that shipped them, and nine in another; they had been written when the rows
+  were intended and never revisited when they were not written. A claim about a test is not a test.
+
+**And the same failure has a version one level higher up**, which is how it survived so long here: a
+round can land its *code* and never land its *rows*. The suite then reports a healthy total on the
+next wave, computed over a suite that has never heard of the new code — green for the same reason an
+empty test file is green. The ten-second check is `git log -- <the suite file>`: **a suite total is
+not evidence that a wave landed**, and the wave's own entry either exists or it does not.
+
+The compounding is worth stating plainly, because it is what makes this shape expensive. A module
+that is derived, cited, figured, chaptered and guarded, and that no frame calls, produces a **perfect
+score on every instrument the project owns** while contributing nothing. Nothing in the record is
+false; the record is simply not about the artifact.
+
 ### Pick instruments whose parameters someone else has fixed
 
 A scene object that exists to test physics is an **instrument**, and every free number in it is a

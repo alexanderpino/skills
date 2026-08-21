@@ -428,6 +428,14 @@ the wave's own entry, and a `grep` for the new symbols must find them **outside*
 the module that defines them. Running the right command is not the same as
 running a command that could have failed.
 
-This belongs in `terrain-renderer/references/11-verification-failures.md` as a
-numbered way, with these four as its instances. Recorded here first because the
-chapter is a shared surface and this is the run's own governance.
+**Lifted to the chapter, and it is NOT a fifteenth way.** The ninth way — *the
+code no pixel reached* — was already there, with the shade sail as its instance.
+This is a **second shape of the ninth**, and the distinction is the detector:
+the ninth's instance is coverage zero *by scene configuration*, where the code
+is wired in and this frame's geometry never asks for it. A per-branch subsample
+counter finds that one. It cannot find this one, because the branch it would
+count sits in a module nothing calls, so it is never compiled into the frame's
+execution at all — **the count is not zero; there is no count.** The detector is
+a `grep` that must find each new symbol *outside* the module defining it, and a
+reach row paired with every function row. Written into
+`11-verification-failures.md` under the ninth way, with all four instances.
