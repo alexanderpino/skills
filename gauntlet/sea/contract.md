@@ -286,3 +286,58 @@ recorded. Colour stays on the daylight Aljezur frames.
 
 **Six of the nine are share-alike.** A figure that pastes one beside a render
 output is a derivative and inherits CC BY-SA. Read §9 before publishing one.
+
+## Ruling 17 — the pictures must be in line with the physics
+
+Owner ruling: *"De plaatjes moeten in lijn zijn met de fysica."* It arrived
+while three builders were under a brief demanding a **visible change in a
+rendered frame**, which is exactly the pressure under which someone draws
+something that merely resembles the answer.
+
+It is not a softening of that demand. It sharpens it: **the visible change has
+to BE the physics becoming visible**, not a separate thing that looks like it.
+
+Three consequences bind every round that touches a frame:
+
+1. **Every added structure is traceable to a computed quantity.** For each thing
+   now visible that was not before, the round names the number it came from and
+   where that number is computed. *"Granularity from the resolved slope variance
+   at the pixel footprint, out of `wind_spectrum`"* is a chain. *"A noise field
+   tuned to sd 45"* is not, and it fails standing ruling 3 whatever the frame
+   looks like. The test extends to the camera: a viewpoint must follow from
+   something, and *"it shows more water"* is not something.
+2. **If it cannot be derived, it is not drawn — it is named.** A round reporting
+   *"the structure the photographs show requires a term this model does not
+   have, and it is this term"* is worth more than a frame that looks better for
+   a reason nobody can trace. That naming has been a real deliverable more than
+   once here and is never a failure.
+3. **The residual is stated.** How much of the measured gap closed *by
+   derivation*, and how much remains. A partial close with an honest split is a
+   result; a full close nobody can follow is not.
+
+**Why now, and it is worth keeping.** The owner looked at a hero frame and said
+it does not look like water. The honest answer was that seventeen waves went to
+physics — which is now genuinely good — while nobody worked on the picture since
+it was scored 3/10 at wave 11. The correction is to work on the picture. **The
+failure mode one step past that correction is the opposite one**: a picture that
+looks better while the physics behind it stays unreached. That is worse than the
+current frame, because it would be untrue *and it would look fine* — and this
+project's entire method depends on the render being an instrument rather than an
+illustration.
+
+### The same ruling reaches the skill's own figures, where nothing guards it yet
+
+The figure generator imports the implementation read-only and holds no physical
+constant of its own, which is the right architecture. But wave 15's builder
+reported honestly that `--selftest` **cannot see anything graphical** —
+`preflight` checks numbers, never pixels, so a clipped fill, a wrong axis range
+or a curve plotted against the wrong variable passes every guard, and it bit
+that round four times. It also reported that **nothing compares a figure to its
+caption or to its chapter**, and that the chapter-09 figures have no
+implementation to disagree with, so a closed form and a quadrature sharing one
+misreading would agree and pass.
+
+So a figure can be numerically correct and *drawn* out of line with the physics
+it claims to depict, and the suite is silent. Under ruling 17 that is a gap in
+the instrument, and it is recorded here rather than in a builder's README
+because it belongs to whoever next touches `references/figures/`.
