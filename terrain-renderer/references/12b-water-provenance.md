@@ -643,6 +643,25 @@ least-confident-claims ledger in `00-index.md`.
   path narrows and brightens toward the horizon. Re-measure the constants for another geometry.
   The closed forms beside them — `β₀ = |θ_sun − θ_view|/2`, and the azimuth-to-tilt steepening —
   are half-vector geometry derived here and checked against the model (`D`).
+- **D** — [The pdf is the ensemble mean, and per-pixel use declares the pixel unresolved](12-water-rendering.md#every-equation-above-is-about-the-ensemble-and-a-pixel-is-not-one),
+  with the mathematics at [`12a` §7b](12a-water-derivations.md#7b-shading-with-the-slope-pdf-declares-the-pixel-unresolved).
+  The convolution `p_tot = p_res * p_sub`, its degenerate case `p_res = δ`, and the closed-form
+  coefficient of variation `CV² = (1+ρ_u)(1+ρ_c)/√((1+2ρ_u)(1+2ρ_c)) − 1` are derived here; the
+  closed form was checked against 4×10⁶ Monte Carlo draws and agrees to four decimals, and the
+  check is a suite row rather than a claim. The **band structure** the resolved half is drawn from
+  is `P` twice over — Phillips' `k⁻⁴` saturation range for the shape, Cox & Munk's two variances
+  for the amplitude and anisotropy, Pierson & Moskowitz for the lower limit — and the upper limit
+  `√(ρg/σ)` = 372 rad/m is derived from surface tension, not declared. Everything numeric is `D` on
+  the reference implementation's sea scene: the resolved-share table (0.73 at 5 cm to 0.004 at
+  20 m), the CV table beside it, the frame's own 0.37–0.62 → 0.66–1.36 and 56/9/16/10 → 3/2/2/1 px,
+  the 8% by which a `sinc` box filter falls short of a sharp cut-off, and the 1.0018 a mean-radiance
+  check returns on a surface deliberately made rough twice. Those price *that* wind (6 m/s, itself
+  `?`), that swell and that camera. **What transfers is the structure**: the split is logarithmic in
+  the footprint, `CV → 0` as `ρ → 0`, the total mean square slope is conserved so the width law is
+  untouched, and a mean cannot audit any of it.
+  ⚠️ **The `U₁₂.₅/U₁₀ = 1.02117` conversion is `D` on ECKV's own drag coefficient** and is required
+  wherever a `U₁₀` meets Cox & Munk — including inside a derivative, where omitting it silently
+  compares `d/dU₁₀` against `d/dU₁₂.₅`.
 - **P/D** — [What a single-bounce glitter model loses below the horizon](12-water-rendering.md#sun-glitter-the-sparkle-path).
   The two integrals — the radiance over the upward hemisphere, and `ρ_F(ω) cos ω · p/cos β` over
   slope space — are the Cox–Munk construction (`P`); their agreement to 7×10⁻⁵ relative, and the

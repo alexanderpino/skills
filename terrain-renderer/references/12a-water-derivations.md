@@ -1670,6 +1670,13 @@ spectrum.
 
 > Recorded because a negative result that redirects a wave is worth more than a positive one that
 > confirms it: **do not spend the next round on a better spectrum.**
+>
+> **The next round did not, and [§7b](#7b-shading-with-the-slope-pdf-declares-the-pixel-unresolved)
+> is what it found instead.** The redirection was worth what it cost: with the spectrum ruled out,
+> the remaining candidate was the *placement* named above, and putting the variance where the
+> pixel could carry it moved the reference path's interior coefficient of variation from 0.37–0.62
+> to 0.66–1.36 and its median bright run from 56/9/16/10 px to 3/2/2/1 px, with the total mean
+> square slope untouched.
 
 *Implemented in `reference-impl/wind_spectrum.py`; guarded by `_sec_spectrum` in `validate_beach.py`
 — 20 rows, 8 deliberate defects, all caught, one of them only after the row was **moved** (see
@@ -1681,6 +1688,176 @@ in 2026-08; the arithmetic is `D`. Two transcription traps found while cross-che
 suite defects: HTML rendering silently drops the square roots from `F_p` and `Γ` (provably — the
 same conversion turns a phase speed into a speed squared), and the fetch law's exponent extracts as
 a subtraction, which the fully-developed limit rules out.*
+
+---
+
+## 7b. Shading with the slope pdf declares the pixel unresolved
+
+**Derived from:** the convolution of two independent slope bands. **Replaces:** evaluating the
+ensemble mean once per pixel and calling the result a surface.
+
+[§7a](#7a-the-slope-statistics-from-the-forcing--and-cox--munk-as-the-limit) ended by naming what it
+had *failed* to explain, and told the next round not to spend itself on a better spectrum. This is
+that round. The defect is not in `S(k)`; it is in **where the variance is put**.
+
+### The statement, in two lines
+
+Split the facet slope at a point into what the pixel's footprint resolves and what it does not.
+They are disjoint bands of one spectrum, so they are independent and
+
+```
+z         =  z_res  +  z_sub                                              (7b.1)
+p_tot(z)  =  ∫ p_res(z_r) · p_sub(z − z_r) dz_r                           (7b.2)
+```
+
+The correct radiance for one pixel is the **unresolved** density evaluated at `z* − z_res`, where
+`z*` is the slope that mirrors the sun into the eye and `z_res` is *drawn*. Shading with `p_tot(z*)`
+instead is exactly (7b.2) with `p_res = δ`: **the declaration that this pixel resolves nothing.**
+
+That is the correct answer for a pixel the size of the ensemble and for no other. A 20 cm footprint
+on a sea whose roughness is centimetres is not that pixel, and shading it with the pdf is not a
+simplification — it is a statement about the surface which the surface contradicts.
+
+⚠️ **This is the single most common way a physically-correct glitter model still renders as vinyl.**
+Everything in [§5](#5-the-reflected-slope-ellipse) and in
+[`12`'s glitter section](12-water-rendering.md#sun-glitter-the-sparkle-path) can be right — the
+Jacobian, Cox & Munk's two variances, Smith shadowing, the width as a function of view elevation —
+and the path will still come out as a solid lozenge, because every one of those is a statement about
+the **ensemble** and none of them says anything about what one pixel does.
+
+### Which is which, and it is logarithmic
+
+The partition needs a cut-off, and the pixel supplies it. A box of side `L` averages a component of
+wavenumber `k` to `sinc(k·L/2)`, so the resolvable wavenumber is `k_res = π/L`. With the saturation
+range's equal-variance-per-octave (7a),
+
+```
+resolved share  =  ln(k_res/k_lo) / ln(k_hi/k_lo)                          (7b.3)
+```
+
+— which is why the split moves so slowly with resolution and why it never reaches either end. At
+`U₁₀ = 6 m/s`, `k_lo = 0.21 rad/m` (the Pierson–Moskowitz peak) and `k_hi = 372 rad/m` (the
+gravity–capillary minimum of `c(k)`), a footprint of 5 cm resolves **73%** of the wind sea's slope
+variance, 20 cm resolves **55%**, 1 m resolves **33%**, and 5 m resolves **12%**. Nothing is chosen:
+both limits are the same `U₁₀` that fixes the total.
+
+**The true box filter is 5–15% less efficient than (7b.3) suggests**, measured by sampling: `sinc`
+lets a little through above the cut-off and takes a lot away below it, and on a spectrum with equal
+variance per octave the second wins. Use (7b.3) to reason and the sampled number to budget.
+
+### The footprint is not square, and the axis nobody computes is the one that matters
+
+A pixel subtends a fixed solid angle, but its footprint on a *horizontal* sea is stretched by
+`1/|d_z|` **along** the view direction and not at all across it. At a grazing view the two axes
+differ by an order of magnitude. A renderer that uses one scalar footprint — and the obvious scalar
+is the along-view one, because it is the larger and therefore the safe band limit for geometry —
+throws away everything the pixel could resolve **across** its width.
+
+That is not a small loss: it is the difference between a path that is granular across its width and
+one that is smooth. Filter the two axes separately, `sinc(k·ê_a·L_a/2)·sinc(k·ê_c·L_c/2)`, and the
+near field comes out granular across and streaked along, which is what a photographed path does.
+
+### What the granularity has to be, before anything is drawn
+
+This is the part that makes the result falsifiable rather than a look. At the path's centre the
+radiance goes as `p_sub(z* − z_res)`; write `ρ = r/a` for the ratio of resolved to residual variance
+in each wind axis. With `z_res` zero-mean Gaussian and `E[exp(−t z²)] = (1 + 2tr)^{−1/2}`:
+
+```
+E[L]    = [(1 + ρ_u)(1 + ρ_c)]^{−1/2}
+E[L²]   = [(1 + 2ρ_u)(1 + 2ρ_c)]^{−1/2}
+CV²     = (1 + ρ_u)(1 + ρ_c) / √((1 + 2ρ_u)(1 + 2ρ_c))  −  1              (7b.4)
+```
+
+**(7b.4) is a floor on the interior variation of a glitter path, and it contains no photograph, no
+texture and no free parameter.** `ρ` is the pixel's own footprint read through (7b.3). Verified
+against 4×10⁶ Monte Carlo draws to four decimals. Some values, at this scene's wind:
+
+| footprint | resolved share | ρ | **CV required** |
+|---|---|---|---|
+| 5 cm | 0.73 | 2.74 | **1.08** |
+| 10 cm | 0.64 | 1.78 | **0.83** |
+| 20 cm | 0.55 | 1.21 | **0.65** |
+| 1 m | 0.33 | 0.50 | **0.35** |
+| 5 m | 0.12 | 0.14 | **0.12** |
+| 20 m | 0.004 | 0.004 | **0.004** |
+
+`ρ → 0` gives `CV → 0`, and that is the ensemble-mean renderer sitting at the bottom of its own
+table: not a defect of the shading, the right answer for a footprint that resolves nothing.
+
+**And it converts, which is the only reason it can be held against a photograph at all.** For an
+unclipped `γ = 2.2` encode, `σ₈ ≈ μ₈·CV/γ`. A photographed path reading `μ₈ = 129–215` with
+`σ₈ = 41–70` therefore implies a scene-linear **CV of roughly 0.5–0.8** — and because those frames
+also clip 1–18% of their core, that is a *lower* bound on the real spread. Two frames, two cameras,
+two suns, two grades, and the dimensionless number they agree on lands on the same shelf of the
+table above as a footprint of 10–25 cm. Nothing was fitted to make that happen.
+
+### Conservation is the check, not the granularity
+
+Moving variance from `p_sub` into `p_res` **conserves the total identically** — that is the whole
+content of (7b.2) — so:
+
+- **the path's angular width does not move.** It is a readout of the *total* mean square slope
+  ([`12`](12-water-rendering.md#sun-glitter-the-sparkle-path)), and the total is untouched. A
+  realisation that widens or narrows the path has broken the budget.
+- **the mean radiance does not move.** Measured on a reference frame with one flag switched: 2.1%,
+  which is sampling error plus the mast-height correction below.
+- **a scene already drawing a swell must subtract it.** The swell is resolved geometry with slope of
+  its own; the realisation may carry Cox & Munk *minus* what the swell already spends, or the sea is
+  rough twice.
+
+⚠️ **The conservation checks cannot see whether the realisation happened, and one of them cannot see
+the opposite defect either.** A mean-radiance row was written here to catch a sea drawn rough
+*twice* — variance added on top of the budget rather than carved out of it. Fired at exactly that
+defect it reads **1.0018**: the Jacobian spreads the same reflected flux over a wider path and the
+plan-weighted mean barely moves. What caught it was the exact budget-closure identity. **An
+algebraic invariant saw what four statistics taken off the picture could not.**
+
+### Two costs, both real
+
+**(i) The width becomes hard to measure.** A path's width is an ensemble statement; a realised path
+gives one *sample* of it, and the bin means of an azimuth profile are heavy-tailed. An FWHM found by
+walking out from the peak to the **first** half-crossing is then biased low — a single low bin ends
+the walk. On the reference render the estimate runs **5.7° → 10.5°** as the bins widen from 181 to
+15, against a closed form of **10.56°**, while the same ladder on the ensemble-mean field is flat to
+0.8%. The ensemble width is still there. The cheap single-frame estimator can no longer see it, and
+what it needs is a crossing that must persist over several bins, or an average over seeds.
+
+**(ii) The mast height stops being negligible.** Cox & Munk's fit is stated at a **12.5 m** mast and
+every modern wind is `U₁₀`. A neutral log profile with `z₀` taken from the drag coefficient the
+spectrum already uses gives `U₁₂.₅/U₁₀ = 1.02117` — **1.9% on the mss, 0.95% on the path's width.**
+Too small to see in a picture, which is exactly why it survives; and a sixth of the tolerance a
+Cox & Munk row runs at, so no headline check will ever catch it either.
+
+### What this does *not* fix, named rather than built
+
+- **The swell's budget line is footprint-independent.** It is subtracted once, as a scene constant,
+  while the swell the shader draws is band-limited per pixel like everything else. A pixel too
+  coarse to resolve the swell has the line subtracted anyway and shades with 7.8% less variance than
+  Cox & Munk allows — a factor of **1.03** in radiance at the path centre. On a 90 m swell that
+  begins at a footprint near 45 m, which for a 20 m eye is beyond the horizon. Fixing it properly
+  needs the swell's own per-pixel filtered variance, which is a second spectrum to carry.
+- **The realisation perturbs the normal, not the intersection.** Its own elevation amplitudes are
+  `a = A/k`, under a millimetre for the band that carries most of the slope, so the range is
+  unchanged and the normal is everything. It follows that anything measuring a **length through the
+  water** — a chord, a refracted path — must use the *geometric* normal and not the microfacet one.
+- **Two of the three dimensionless granularity statistics are blind.** The correlation length as a
+  share of the path's width reads 1.6–3.0% before and 2.2–5.3% after, and the published 0.7–5%
+  contains both; the dark-pixel share reads 0.79 before and 0.75 after. The **run-length median** is
+  what separates them: a slab has runs and no gaps.
+
+*Implemented in `reference-impl/beach_optics.py` (`SlopeRealisation`, `subgrid_realisation`) and
+`beach_render.py` (`shade_water`); guarded by `_sec_glitter_field` in `validate_beach.py` — 17 rows,
+4 deliberate defects, all caught. Figures: `gauntlet/sea/evidence/s18-glitter-1to1.png` and
+`s18-cv-floor.png`. Provenance: `D` throughout for (7b.1)–(7b.4); `P` for Cox & Munk's two variances
+and for the Pierson–Moskowitz peak; `P (attribution)` for ECKV as in §7a.*
+
+**The historical note is the useful part.** (7b.1)–(7b.2) were written into this project's reference
+implementation, argued at length in comments, given a class that implements them — and then **never
+instantiated by anything for five rounds.** The suite stayed green throughout, because every glitter
+row it had was a statement about the ensemble and the ensemble was always right. A claim with no
+code path behind it is a claim nobody has tested, and it can survive a long time next to code that
+looks like it is doing the work.
 
 ---
 

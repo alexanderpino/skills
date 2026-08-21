@@ -119,6 +119,7 @@ the reference implementation or read off a photograph, not supposed.
 |---|---|---|
 | Glitter is a broad pale road instead of isolated blinding points | The environment's sun is a **fitted lobe, not a disc**: peak, width and flux were never made to land on the sun together, and the sky lobes carry the direct beam short by a factor of tens. Presents as a tuning problem; is not one | [Sun glitter](#sun-glitter-the-sparkle-path) |
 | One blown-out highlight instead of a glitter path | The opposite error, in the *lobe* rather than the source: a sharp specular NDF where the slope distribution is tens of degrees wide | [Sun glitter](#sun-glitter-the-sparkle-path) |
+| A glitter path with the **right width and the right brightness** that is nonetheless a smooth slab — no isolated facets, no dark water between them, and no exposure makes it granular | The slope **pdf** evaluated once per pixel. It is the *ensemble mean* of the glint, so using it declares every pixel to contain the whole ensemble. The width law, the Jacobian and the shadowing can all be exactly right and this will still happen, which is why it reads as a tuning problem and is not one | [Every equation above is about the ensemble](#every-equation-above-is-about-the-ensemble-and-a-pixel-is-not-one) |
 | Saturated coloured speckle along a refracted silhouette — a step nosing, a ladder rail | Three IORs are **three delta wavelengths**, and a step edge at the dispersion scale resolves as a three-tooth comb. It is aliasing *of* dispersion, not dispersion | [A channel is a band](#a-channel-is-a-band-not-a-wavelength) |
 | Far water reads flat and plastic *after* filtering was added | The slope variance was correctly removed from the field and **never given a receiver** — or handed over as a scalar, when what was removed is a tensor | [Pick the kernel](#pick-the-kernel-on-purpose-and-give-the-variance-a-receiver) |
 | The far surface breaks into a coarse moiré | The other end of the same trade: **no distance-dependent narrowing of the slope distribution**, so a band is still sampled at a footprint wider than itself. The fix narrows the distribution per component; it cannot be applied to the shaded result afterwards, because shading is nonlinear in slope | [Distance and filtering](#distance-and-filtering-why-far-water-turns-to-plastic) |
@@ -4108,6 +4109,57 @@ rather than a level and no exposure check sees it. The rule falls out of the two
 **the path must come from the slope pdf and never from a spread parameter**, because a spread
 parameter is a single number and the path's width is a *function* — of the wind through `√mss`, and
 of the view elevation through the geometry above. One number cannot be both.
+
+#### Every equation above is about the ENSEMBLE, and a pixel is not one
+
+Take everything in this section as given — the Jacobian, the two variances, Smith shadowing, the
+width as a function of view elevation — implement it exactly, and the path will still come out as a
+**solid lozenge with no dark water in it.** That is not a bug in any of the above. It is what those
+equations mean.
+
+`p(z)` is the slope *distribution*: the fraction of facets, over an ensemble, whose slope is `z`.
+Evaluating it once per pixel and shading with the answer says *this pixel contains the whole
+ensemble* — which is true for a pixel a kilometre across and false for one 20 cm across on a sea
+whose roughness is centimetres. Split the slope into the band the footprint resolves and the band it
+does not; they are disjoint bands of one spectrum, so
+
+```
+p_tot(z*)  =  ∫ p_res(z_r)·p_sub(z* − z_r) dz_r
+```
+
+and the correct shading is `p_sub(z* − z_res)` with `z_res` **drawn**. Shading with `p_tot(z*)` is
+that integral with `p_res = δ`. **The pdf is the ensemble mean and using it per pixel is a claim that
+the pixel resolves nothing.**
+
+What this costs to fix is one realisation of the sub-footprint slope field, filtered by the pixel's
+own footprint, added to the shading normal, with the *complement* of its variance left for the pdf.
+The total is conserved identically, so the width law above survives untouched — and the interior of
+the path acquires a coefficient of variation that
+[`12a` §7b](12a-water-derivations.md#7b-shading-with-the-slope-pdf-declares-the-pixel-unresolved)
+derives in closed form from the resolved/unresolved variance ratio alone:
+**≈0.65 at a 20 cm footprint, ≈0.83 at 10 cm, →0 as the footprint grows.** Photographed paths imply
+0.5–0.8. An ensemble-mean renderer sits at the bottom of that curve at every distance.
+
+Three consequences a real-time implementation should carry:
+
+- **The footprint is anisotropic and the axis usually dropped is the one that matters.** A pixel's
+  footprint on horizontal water is stretched `1/|d_z|` along the view and not at all across it. The
+  along-view axis is the safe scalar band limit for *geometry* — and using it for the slope split
+  throws away everything the pixel could have resolved across its width, which is precisely the
+  direction the granularity runs.
+- **Perturb the normal, not the intersection.** The sub-footprint band's elevation amplitudes are
+  `a = A/k`, sub-millimetre where the slope lives. Anything measuring a **length through the water**
+  must keep the geometric normal.
+- **Do not check this with a mean.** The construction conserves the mean exactly, so a mean-radiance
+  comparison reads 1.000 whether the realisation happened or not — and it reads **1.002** on a
+  surface deliberately made rough *twice*, because the Jacobian spreads the same flux over a wider
+  path. Check the slope **budget** as an identity, and check the picture with a run-length median.
+  A soft LOD blend between "realised" near and "pdf" far is the correct structure, but it must blend
+  the **variance split**, not the two shaded results.
+
+⚠️ **`U` in the Cox & Munk block is at 12.5 m.** A neutral log profile puts `U₁₂.₅/U₁₀ = 1.021`, so
+feeding `U₁₀` straight in loses **1.9% of mss**. It is too small to see and too large to leave in a
+model whose whole claim is that the numbers are derived.
 
 **Slicks are a slope-variance effect, not a colour effect.** Cox & Munk also measured oil-slicked
 water: films damp capillary and short gravity waves, cutting total mean-square slope by a factor
