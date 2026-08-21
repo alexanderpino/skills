@@ -98,3 +98,15 @@ this run added.
   that *stops*, which needs the wave to un-break, which needs the trough to be
   two Dally e-foldings wide, which needs the rip-feeder circulation of a 2DH
   solve. Unchanged since wave 2 and still the same exclusion.
+
+- **`_sec_glitter_field`'s conservation row fails on the wave population, and it
+  is a tolerance question rather than a bug.** Wave 19's suite carries one FAIL:
+  *the plan-weighted mean radiance is CONSERVED by the partition*, 0.927941
+  against a 6 % window. Attributed rather than asserted — it reproduces
+  standalone at the identical value, and with `beach_render.SPECTRAL_ON = False`
+  (the waves 5-18 surface, one flag) the same row reads **0.969062 PASS**. So the
+  spectral realisation landed at `4481c11` is what moves it. The row's own text
+  says the window is the sampling error of ONE realisation over 15 703 water
+  pixels with per-pixel CV of order 1; a richer surface has widened that. Whether
+  the answer is a wider window, an ensemble over seeds, or a defect in the new
+  surface is the **wave-field lane's** call. Both numbers are on record.

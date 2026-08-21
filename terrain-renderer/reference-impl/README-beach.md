@@ -4882,3 +4882,96 @@ is a lane of its own.
 single train. The measurement above says the count of breaking lines is a
 property of that boundary condition and not of the bed, which is worth a
 paragraph the chapter does not have.
+
+## M10 · The camera did not move, and it was checked rather than assumed
+
+Wave 18 repaired `beach_render.viewpoint` and the camera now stands on the cliff
+brow with water at 16.2% of frame. A bed change that moves the brow moves the
+camera, so this was measured on both beds rather than argued from where the
+change was supposed to be:
+
+| | brow x | brow height | standoff |
+|---|---|---|---|
+| single-partition bay | 640.0000 m | 14.9352 m | 618.1966 |
+| two-partition bay | **640.0000 m** | **14.9352 m** | **618.1966** |
+
+Identical to every printed digit, and the highest ground in the domain agrees to
+six decimals (43.883729 m both). The reason is structural rather than lucky:
+`exner_step_2d` tapers the flux out below `D_MORPH_MIN = 0.35 m`, so the only
+land the loop can touch is the cell or two immediately above the waterline —
+measured, the three largest above-sea-level differences are **0.214 m at
+h = 0.01 m**, 0.210 m at h = 0.01 m and 0.190 m at h = 0.09 m, all of them
+15 m below and 20 m seaward of the brow.
+
+**And the shipping frames are byte-identical anyway**, because `climate`
+defaults to `None` in `evolve_2d` and `run_bay` — the third time this file has
+taken that decision, after wave 9's `embay` and wave 16's `stands`, and for the
+same reason: a wave that changes the boundary condition under 562 published rows
+makes all of them incomparable in one move.
+
+## M11 · Wave 9's transport control, re-measured
+
+Ruling 14 says a near-zero measurement is worthless until zero has been shown
+reachable, and wave 9's three-number transport table is this project's standing
+instance of it. Re-run this wave on the same `_sec_embay` section:
+
+| | wave 9 | this wave |
+|---|---|---|
+| straight coast under the oblique swell | 6.469° | **6.4694°** |
+| the closed-form zero-transport coast (the meter's floor) | 0.202° | **0.20154°** |
+| the bay under a plane crest, `Q` rms | 1.875e-01 | **1.8746e-01** |
+| the bay under the fan its own pole implies, `Q` rms | — | 2.6504e-02, ×3.48 down |
+| the meter's floor, same units | — | 1.7795e-03, so the bay is 14.9× the floor |
+
+**Every one of them reproduces to the printed digit.** They cannot move, and the
+reason is structural rather than lucky:
+`equilibrium_plan`, `plan_field`, `plan_transport` and `zero_transport_plan` are
+all reached from `run_coast()`/`equilibrium_plan()`, none of which this lane
+touched, and `run_bay`'s default is byte-identical. A difference in any of them would have been a `FAIL`, not a
+note — the first two rows are `check`s with no slack, and ruling 14's control
+(*a straight coast under this swell carries transport, so the zero is reachable*)
+is the row directly above them.
+
+## M12 · The suite, from ONE run, and what else was running
+
+**`599 pass / 1 FAIL / 0 ERROR / 34 open / 108 info`, 1903.1 s**, one run of
+`validate_beach.py -v`, foreground.
+
+**What else was running (ruling 13's surviving half).** `nproc` is 4 and this
+total is not comparable with a quiet-machine one. Live for most of it: a sibling
+builder's full `validate_beach.py` in worktree `agent-ac5ff9345c87cfd1c`, and a
+second sibling's `tsec.py` / `calm2.py`. Three to five Python processes at
+100–120 % CPU each on four cores throughout. The same two sections that took
+**124 s and 173 s alone** took the same work under contention at 219 s and 254 s,
+so the honest reading of the 1903 s is **"about 1.5–1.8× a quiet-machine
+number"** and it should not be diffed against wave 13's 302 s for any purpose
+except noticing that the file has grown.
+
+**The pool did not disappear (ruling 6): `306 pass, 0 FAIL, 64 info`, 132.9 s.**
+Unchanged.
+
+### The one FAIL is not this lane's, and it is attributed rather than asserted
+
+> `2  the plan-weighted mean radiance is CONSERVED by the partition   1   0.927941   FAIL`
+
+in `_sec_glitter_field` — wave 18's glitter lane. Three measurements settle it:
+
+1. **It reproduces standalone**, at the identical 0.927941, so it is not a
+   cross-section interaction with anything this lane added.
+2. **It is a property of the SURFACE, not of the bed.** Re-run with
+   `beach_render.SPECTRAL_ON = False` — the shipping path of waves 5 through 18,
+   one flag, nothing else — and the same row reads **0.969062 PASS**. The wave
+   population that landed at `4481c11` is what moves it, and that commit's own
+   author records that it *"built the wave population and pushed no guard for
+   it"*.
+3. **Neither line this lane wrote is on that path.** `climate` defaults to `None`
+   in `evolve_2d` and `run_bay`, so `bay['tr_parts']` is `None` for every bay the
+   glitter section builds and `Water`'s new branch is skipped; `DECK_UNION` is
+   inert without it; and `evolve_2d`'s `climate is None` arm is the wave-18 code
+   verbatim.
+
+The row's own text says the 6 % window is *"the sampling error of one realisation
+over 15703 water pixels whose per-pixel CV is order 1"* — so the population's
+realisation has widened that sampling error past the window, and whether the
+right answer is a wider window or a defect in the new surface is the
+**wave-field lane's** call, not this one's. Handed over with both numbers.
