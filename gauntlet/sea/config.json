@@ -16,7 +16,7 @@
   ],
   "dimension_targets": {
     "physics": 9,
-    "visual": 9,
+    "visual": 7,
     "prose": 8
   },
   "lanes": [
@@ -26,6 +26,7 @@
     "chapter"
   ],
   "bar_kind": "reference",
+  "invoked_by": "human",
   "extensions": [],
   "parked": [],
   "gates": [

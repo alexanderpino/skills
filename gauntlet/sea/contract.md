@@ -486,3 +486,36 @@ execution at all — **the count is not zero; there is no count.** The detector 
 a `grep` that must find each new symbol *outside* the module defining it, and a
 reach row paired with every function row. Written into
 `11-verification-failures.md` under the ninth way, with all four instances.
+
+## Ruling 19 — the targets are re-cut, and the extension waits for evidence
+
+Owner delegated the target after the re-quote: *"Neem de beste stap en meest
+realistische stap."* Owner also chose **both halves of the overturning wave** and
+**is supplying the five Aljezur photographs**.
+
+**Targets are now `physics=9, visual=7, prose=8`.** Physics sits at 8 with two 9s
+— one honest step. Prose is at 8, judged twice, and that is the target. Visual
+moves to **7, not 9 and not 6**: 9 is not buyable at any budget the arithmetic
+allows, and 6 was only ever justified by the missing photographs, which are now
+coming. 5 → 7 is one honest step on the measured trajectory.
+
+**The extension was NOT taken, and the script is the reason.** `extend` refused:
+
+> budget is not depleted (wave 19 of 26) — **extend when it runs out, so the
+> decision is made on evidence.**
+
+That is better discipline than the plan had. The plan priced the chosen scope at
+**8–11 waves and ~8.4–12.1M tokens** at the measured rate of 7.0 rounds and
+~1.23M tokens per closed gap, against 7 waves and ~1.8M remaining — so an
+extension is very likely, and it will be requested **when the stop fires**, with
+the run's own evidence behind it rather than a projection. Not forced.
+
+**And one correction the run should stop repeating.** The lead agent told the
+owner the figure programme was "under a quarter done" because 5 of 22 chapters
+carry a figure. `00-index.md` says otherwise in its own words: the twenty-chapter
+gap is deliberate, with per-chapter rejection reasons recorded, and *"the
+remaining chapters — `02`–`05`, `13`–`18` — have no implementation behind their
+quantitative claims anywhere in this skill … an invented number in a figure is
+worse than no figure."* **The figures programme is complete for every chapter
+that has an implementation behind it.** The residue is not a figures gap; it is
+the contract's own *nothing proves the approximations*, and it is one item.
