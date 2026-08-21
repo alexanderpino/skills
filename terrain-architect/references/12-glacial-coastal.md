@@ -859,6 +859,63 @@ flat benches in `03`; like glacial overdeepenings they are real, deliberate flat
 > changes the plan-form every measurement in [Cliff retreat & beaches](#cliff-retreat--beaches) was
 > made on.
 
+> **THE PRESCRIPTION ABOVE WAS FOLLOWED, AND THE PICTURE GOT WORSE — because a terrace flight
+> moves the clifftop the note above is standing on.** The stand history was run (four stands,
+> 100 kyr apart) and the plateau did become an emerged tread with real relief. Measured on the
+> radiance buffer over the same rectangle, **holding the camera fixed**, the high-frequency
+> standard deviation rose from `2.75e-04` to `1.59e-03` — a factor of **5–9**, and 8–9 distinct
+> display levels became 30–34. The landform half of the prescription is **correct and is now
+> confirmed by measurement**. But the shipped frame is not taken at a fixed camera: the viewpoint
+> is *derived from the landform*, and re-derived on the new landform it walked to the domain's
+> landward boundary and stood on the oldest tread, 2–3 m from the eye. The same rectangle then
+> read `1.7e-06` — **one RGB triple across 30 000 pixels**, 161–194× flatter than the frame this
+> note was written about, with the sea down from 16.8% of the frame to 1.6%.
+>
+> **The mechanism is general and belongs in this section, because this section is what creates
+> it.** A clifftop viewpoint is normally found as a break in slope, and both of the obvious rules
+> for finding one are broken by a terrace flight — not by a bug in them, but by the landform:
+>
+> - **A threshold expressed as a multiple of the profile's own median slope collapses when you
+>   add a tread.** The tread is flat *and large*; on this coast it became 63% of the land, and the
+>   median land slope fell from `0.0800` to `0.0007`. The threshold falls with it until the
+>   tread's **own microrelief** — the relief the terrace was built to produce — clears it. Anchor
+>   the threshold to the **plain's declared gradient**, which is a generator input and does not
+>   move when the ground does.
+> - **"The first break in slope walking inland-to-seaward" stops being "the seaward-most break"
+>   the moment there is a flight**, because a flight has a **riser per rung** by construction.
+>   Stopping at the first one puts the camera on the upper tread with the lower tread occluding
+>   the sea. Walk to the **last** break before the land ends, and take the **top** of that run and
+>   not its foot.
+>
+> Both corrections restore the original frame **bit-identically** on a single-stand bed, which is
+> the test that says they are repairs and not a new policy.
+>
+> **Two corrections to the figures in the note above, both measured.** First, `0.0009 of 255` is
+> **mostly the quantiser**: the same estimator on the same un-quantised buffer reads `7.1e-05`,
+> **twelve times smaller**. A high-frequency statistic taken from an 8-bit image of an
+> already-flat surface is measuring the display, and the un-quantised figure is the one a later
+> round can compare against. Second, "no weathering coefficient reaches it" is **true for a
+> stronger reason than the one given**. The bracket argument is about amplitude; the binding
+> constraint is **resolution**. At a clifftop camera the near ground is sampled far finer than the
+> heightfield is stored — measured here, a median land pixel covers **~4 mm against a 2 m grid**,
+> with **97–99% of land pixels below half a cell** — so the near field is a bilinear interpolant
+> of four corners and is *a plane by construction*. **No field that lives on the grid can put
+> texture there**, whatever its amplitude: not weathering, not drainage, not a vegetation mask,
+> not an albedo keyed to slope or aspect or wetness. Structure at that scale has to come from a
+> **sub-grid closed form evaluated per sample**, the way sub-pixel rock-pocket coverage already
+> is — and **the one such form that exists is switched off on a tread by this section's own soil
+> model**. Sub-pixel bare-rock coverage is a function of mantle thickness against rock roughness;
+> the mantle this section prescribes is denudation × terrace age, which for one 100 kyr cycle is
+> 1–10 m against a roughness of ~0.25 m, so the coverage fraction **saturates at 1.000 exactly**
+> and the bare-rock realisation returns identically zero. Measured on the tread: `cover` = 1.000000
+> with zero range, `bare` = 0 everywhere. That is not a defect in either model — a 100 kyr tread
+> *is* soil-covered, and the mantle argument is this section's own and is right. It means the two
+> results compose to **"the only sub-grid texture in the pipeline is the one the landform has
+> buried"**. **Named and not closed**: a soil-mantled tread needs its own sub-grid surface process
+> — soil-creep microrelief, desiccation polygons, a vegetation patch statistic, rill spacing from a
+> drainage-density law — and this chapter has none of them. Inventing one to fill a frame would be
+> the failure mode this whole discipline exists to prevent.
+
 ## Deltas, estuaries, rias
 
 Where a river (`03`, `04`) meets the sea it drops its load — fluvial transport capacity collapses
