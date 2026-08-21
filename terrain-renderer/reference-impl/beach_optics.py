@@ -62,6 +62,7 @@ import numpy as np
 
 import optics as OPT
 import atmosphere as ATM                                        # noqa: F401
+import wind_spectrum as WSP
 
 
 # ============================================================ the spectral grid
@@ -797,16 +798,40 @@ CM_A_U = 3.16e-3
 CM_A_C = 1.92e-3
 CM_B_C = 0.003
 
+# ---- WAVE 18: THE MAST HEIGHT, WHICH THIS FILE HAD BEEN IGNORING -----------
+# ANSWER KEY G2, and until this wave it was LIVE HERE. Cox & Munk's fit is
+# stated at a 12.5 m mast; `U10` below is, by its own name and by every other
+# use in this project, the wind at 10 m. Waves 4-17 fed the 10 m wind straight
+# into the 12.5 m fit, which is a systematic underestimate of the slope
+# variance by exactly the log-profile ratio.
+#
+# The conversion costs NO NEW CONSTANT and that is why it is taken rather than
+# declared negligible: `wind_spectrum.roughness_length` inverts ECKV's own
+# neutral drag coefficient for z0, and the neutral log profile then gives
+# U(12.5)/U(10) = ln(12.5/z0)/ln(10/z0) = 1.02117. Wave 17 derived it and wrote
+# the trap up in its own row; this is the line that acts on it.
+#
+# IT IS SMALL AND IT IS NOT NOTHING: +2.1% on the wind is +1.9% on the mss,
+# +0.95% on the path's angular width. Too small to see in a picture -- which is
+# exactly why it survived fourteen waves -- and a fifth of the tolerance the
+# suite's headline Cox & Munk row runs at, which is why it is not allowed to.
+U125_OVER_U10 = WSP.u125_over_u10()
+
 
 def cox_munk_mss(u10):
-    """(sigma_u^2, sigma_c^2), the along- and cross-wind slope variances."""
-    u = np.asarray(u10, float)
+    """(sigma_u^2, sigma_c^2), the along- and cross-wind slope variances.
+
+    `u10` IS THE TEN-METRE WIND and is converted to Cox & Munk's own 12.5 m
+    mast height before the fit is evaluated. See `U125_OVER_U10` above."""
+    u = np.asarray(u10, float) * U125_OVER_U10
     return CM_A_U * u, CM_B_C + CM_A_C * u
 
 
 def wind_from_mss(mss):
-    """The inverse readout: a measured total mean square slope, as a wind."""
-    return (np.asarray(mss, float) - CM_B_C) / (CM_A_U + CM_A_C)
+    """The inverse readout: a measured total mean square slope, as a TEN-METRE
+    wind. The exact inverse of `cox_munk_mss`'s total, mast height included."""
+    return ((np.asarray(mss, float) - CM_B_C) / (CM_A_U + CM_A_C)
+            / U125_OVER_U10)
 
 
 U10 = 6.0               # m/s. `?` -- the wind at the frame's hour is unknown
@@ -1194,6 +1219,46 @@ class SlopeRealisation:
         -- it is 1e-9 of slope variance, five orders below anything drawn."""
         return (np.maximum(self.su2 - np.asarray(su2_res, float), floor),
                 np.maximum(self.sc2 - np.asarray(sc2_res, float), floor))
+
+
+def subgrid_realisation(mss_swell_u=0.0, mss_swell_c=0.0, u10=U10,
+                        wind_az=WIND_AZ, **kw):
+    """The wind-sea realisation a SCENE ALREADY DRAWING A SWELL is allowed.
+
+    WAVE 18, AND IT IS THE LINE THE CLASS ABOVE WAS WRITTEN FOR AND NEVER
+    REACHED. Waves 12-17 defined `SlopeRealisation`, argued (R1)-(R3) for it,
+    and never instantiated it anywhere: `grep -rn SlopeRealisation *.py` at
+    wave 17 returned the class statement and two comments. So the whole
+    partition was theory with no code path, which is precisely the condition
+    this project's contract calls a claim nobody has tested.
+
+    THE BUDGET, AND WHY IT IS A SUBTRACTION AND NOT AN ADDITION. The total
+    slope variance a scene may carry is Cox & Munk's, at this wind. A renderer
+    that already draws a swell as GEOMETRY has spent part of that budget in the
+    surface itself; the remainder -- and only the remainder -- is what the
+    wind-sea realisation is allowed to draw, or the sea is rough twice and the
+    path's width, which is a readout of the TOTAL, comes out wrong. So
+
+        carried  =  Cox & Munk(u10)  -  (what the resolved swell measures)
+
+    and the two swell numbers are arguments rather than constants because they
+    are a MEASUREMENT of the scene's own surface, taken by the caller on the
+    caller's own grid.
+
+    Raises if a scene's swell has eaten the whole budget: that would mean the
+    resolved geometry is already rougher than the published sea, and returning
+    a realisation with a negative variance is not the honest answer to it."""
+    su2, sc2 = cox_munk_mss(u10)
+    left_u = float(su2) - float(mss_swell_u)
+    left_c = float(sc2) - float(mss_swell_c)
+    if left_u <= 0.0 or left_c <= 0.0:
+        raise ValueError(
+            'the resolved swell carries (%.5g, %.5g) of slope variance and '
+            'Cox & Munk at U10 = %.2f allows (%.5g, %.5g); there is nothing '
+            'left for the wind sea and the budget is the thing that is wrong'
+            % (mss_swell_u, mss_swell_c, u10, su2, sc2))
+    return SlopeRealisation(u10=u10, wind_az=wind_az,
+                            carried=(left_u, left_c), **kw)
 
 
 # --- THE RADIANCE, DERIVED, BECAUSE THE JACOBIAN IS THE WHOLE PHYSICS ---------

@@ -69,6 +69,11 @@ import atmosphere as ATM
 
 FAST = '--fast' in sys.argv
 OUT = '../../gauntlet/sea/evidence'
+SUBGRID_SEED = 1954     # the year of Cox & Munk's flight, and it is a SEED and
+                        # not a tuning: no frame in this project is drawn twice
+                        # to pick a better draw of it, which standing ruling 3
+                        # forbids and which wave 13 already had to say once
+                        # about the offshore spectrum's own seed.
 
 
 # ============================================================ scene placement
@@ -393,6 +398,46 @@ class Water:
             self.regolith, self.cover = z, z
             self.planed = np.zeros_like(self.h, bool)
 
+        # --- WAVE 18: THE SLOPE BUDGET, AND THE SUB-FOOTPRINT SEA THAT IS
+        # LEFT OF IT. Built here, once, because it is a property of the SCENE
+        # -- of this wind and this swell -- and not of a camera. A realisation
+        # rebuilt per frame would put a different sea in every picture.
+        self.mss_swell = self._swell_slope_budget()
+        self.subgrid = BO.subgrid_realisation(self.mss_swell['su2'],
+                                              self.mss_swell['sc2'],
+                                              u10=BO.U10, wind_az=BO.WIND_AZ,
+                                              seed=SUBGRID_SEED)
+        self.subgrid_on = True
+
+    def _swell_slope_budget(self):
+        """WHAT THE RESOLVED GEOMETRY ALREADY SPENDS, measured not asserted.
+
+        `free_surface` draws a swell, and a swell has slope. Before wave 18
+        the number lived in a comment in this file -- "its mean square slope is
+        0.0013 against the 0.0335 Cox & Munk put on a 6 m/s sea" -- read off a
+        report and never recomputed. It is now recomputed, on the same sampler
+        and the same difference operator the shader uses, and it is the
+        SUBTRACTION that makes the sub-footprint realisation an accounting
+        move rather than an addition of roughness.
+
+        Measured over the WET bay on a fixed grid, and projected onto the
+        wind's own axes so it subtracts from the two Cox & Munk variances
+        separately rather than from their sum. `foot=None` deliberately: this
+        is the surface as the geometry defines it, not as one camera samples
+        it, so nothing here depends on a raster.
+        """
+        gx, gy = np.meshgrid(np.linspace(self.x[0] + 5, self.x[-1] - 5, 420),
+                             np.linspace(self.y[0] + 20, self.y[-1] - 20, 160))
+        zx, zy = surface_slope(self, gx, gy)
+        wet = self.sample(gx, gy, self.d) > B.D_MIN
+        if not wet.any():
+            wet = np.ones_like(zx, bool)
+        u_hat, c_hat = BO.wind_axes(BO.WIND_AZ)
+        zu = zx[wet] * u_hat[0] + zy[wet] * u_hat[1]
+        zc = zx[wet] * c_hat[0] + zy[wet] * c_hat[1]
+        return dict(su2=float((zu * zu).mean()), sc2=float((zc * zc).mean()),
+                    n=int(wet.sum()))
+
     def sample(self, xw, yw, field):
         """Bilinear sample of a cell field at world (x, y), edges clamped."""
         fx = np.clip((xw - self.x[0]) / (self.x[1] - self.x[0]), 0,
@@ -704,7 +749,7 @@ COS_SUN = math.sin(math.radians(SUN_EL))
 E_DOWN_AIR = E_SUN * COS_SUN + np.pi * ATM.SKY_DECK     # on the horizontal
 
 
-def shade_water(w, P, D, t_now, foot=None):
+def shade_water(w, P, D, t_now, foot=None, foot_c=None):
     """The water, in four terms and not one of them is a colour.
 
         1  the sky, reflected            Fresnel(theta_v) x env_diffuse(mirror)
@@ -723,6 +768,43 @@ def shade_water(w, P, D, t_now, foot=None):
     """
     xw, yw = P[..., 0], P[..., 1]
     zx, zy = surface_slope(w, xw, yw, t_now, foot=foot)
+    # THE GEOMETRIC NORMAL -- the swell and nothing else. Term 4 marches a ray
+    # through the body of a wave and needs the surface's actual shape; the
+    # sub-footprint field below is explicitly NOT geometry (its own amplitudes
+    # are a = A/k, under a millimetre for the band that carries most of the
+    # slope), so it must not enter a path length.
+    Ng = np.stack([-zx, -zy, np.ones_like(zx)], -1)
+    Ng /= np.linalg.norm(Ng, axis=-1, keepdims=True)
+
+    # ---- 0, WAVE 18: THE SUB-FOOTPRINT WIND SEA, DRAWN.
+    # (R1)-(R3) in `beach_optics` have argued since wave 12 that the slope at a
+    # point splits into what the pixel resolves and what it does not, that the
+    # two are disjoint bands of one spectrum, and that the correct shading is
+    # the UNRESOLVED density evaluated at z* - z_res. Waves 12-17 shipped the
+    # argument and none of the code: `SlopeRealisation` was never instantiated,
+    # so z_res stopped at the swell and every pixel was shaded with the
+    # ensemble mean of the whole distribution -- which is (R2) with p_res =
+    # delta, i.e. the declaration that a 20 cm footprint resolves nothing.
+    #
+    # This is the line that draws it. The band amplitudes are Phillips'
+    # k^-4 saturation range, the total is Cox & Munk's minus the swell the
+    # geometry already spends, the directional split is Cox & Munk's own two
+    # variances, and the per-pixel cut is the EXACT box transfer function of
+    # the footprint. Nothing here is chosen to make the picture right; the
+    # picture changes because the variance moved from p_sub into p_res, and
+    # the total is conserved identically, which is the row the suite carries.
+    sub = None
+    if getattr(w, 'subgrid_on', False) and foot is not None:
+        ea = D[..., :2].copy()
+        na = np.linalg.norm(ea, axis=-1, keepdims=True)
+        ea = ea / np.maximum(na, 1e-9)
+        fc = foot if foot_c is None else foot_c
+        sub = w.subgrid.slope(xw, yw, foot_c=fc, foot_a=foot, ea=ea)
+        zx = zx + sub['zx']
+        zy = zy + sub['zy']
+    # THE SHADING NORMAL, which carries the swell AND the drawn wind sea. It is
+    # what terms 1 and 2 see, because a facet reflects the sky and the sun with
+    # the tilt it actually has.
     Nn = np.stack([-zx, -zy, np.ones_like(zx)], -1)
     Nn /= np.linalg.norm(Nn, axis=-1, keepdims=True)
     V = -D                                          # toward the eye
@@ -738,8 +820,26 @@ def shade_water(w, P, D, t_now, foot=None):
     # THE RESOLVED SLOPE IS SUBTRACTED FROM THE VARIANCE AND NOT IGNORED. The
     # swell this file draws already carries mss_resolved; the glitter must carry
     # only what the grid does NOT resolve, or the surface is rough twice.
+    #
+    # WAVE 18 IS WHERE THAT COMMENT BECAME TRUE. It had stood over a call with
+    # neither argument passed since wave 4 -- `su2, sc2` were computed on the
+    # line above and thrown away -- which is the whole of the smooth path.
     su2, sc2 = BO.cox_munk_mss(BO.U10)
-    L_glit = BO.glitter_radiance(SUN, D, u10=BO.U10)
+    if sub is not None:
+        # z* - z_res per pixel, and the density left over per pixel. The two
+        # go together: shifting the evaluation point without shrinking the
+        # variance would double-count, and shrinking it without shifting would
+        # be a narrower ensemble mean rather than a realisation.
+        # `residual` complements the realisation's CARRIED variance, which is
+        # already Cox & Munk MINUS the swell, so the swell must not be
+        # subtracted a second time here. slope0 = swell + drawn; var = Cox &
+        # Munk - swell - drawn; the three add back to the published total at
+        # every pixel and at every footprint, by construction.
+        res = w.subgrid.residual(sub['su2_res'], sub['sc2_res'])
+        L_glit = BO.glitter_radiance(SUN, D, u10=BO.U10,
+                                     slope0=np.stack([zx, zy], -1), var=res)
+    else:
+        L_glit = BO.glitter_radiance(SUN, D, u10=BO.U10)
 
     # ---- 3, out of the column
     R_col = w.sample(xw, yw, w.R_col)
@@ -808,7 +908,13 @@ def shade_water(w, P, D, t_now, foot=None):
     # that march. Where the sun is not behind the face the term is zeroed by its
     # own geometry: the source of term 4 is the SUN SEEN THROUGH the water, and
     # a face turned away from the sun has none.
-    L_path, chord, lit = through_face(w, P, D, t_now, Nn, dep, c_bar,
+    # `Ng` AND NOT `Nn`: the chord is a LENGTH THROUGH THE WATER and the
+    # sub-footprint field is a statistic on the normal, not a displacement of
+    # the surface. Refracting into the body of the wave off a microfacet would
+    # make a path length depend on a normal perturbation whose own amplitude is
+    # sub-millimetre, and `through_face` is bit-for-bit the wave-12 function on
+    # the frame-K rays because of it.
+    L_path, chord, lit = through_face(w, P, D, t_now, Ng, dep, c_bar,
                                       foot=foot)
 
     # ---- THE SURFACE DECK. Bar section C's first mechanism, and it is a
@@ -891,7 +997,7 @@ def shade_water(w, P, D, t_now, foot=None):
                 age=age, q_b=q_b, m_cov=m_cov, R_p=R_p, T_p=T_p,
                 R_bed_seen=R_bed_seen, R_bed=R_bed, R_sub=R_sub, R_tot=R_tot,
                 R_raft=R_raft, bed_factor=bed_factor, dep=dep, t_col=t_col,
-                E_dn_w=E_dn_w)
+                E_dn_w=E_dn_w, zx=zx, zy=zy, sub=sub)
 
 
 def through_face(w, P, D, t_now, Nn, dep, c_bar, n_step=32, reach=24.0,
@@ -1789,7 +1895,19 @@ def render(cam, w, t=0.0, label='', air=True, vis=None):
         pxw = 2.0 * cam.tan / cam.h
         nzw = np.clip(np.abs(D[mw][..., 2]), 1.0 / 20.0, 1.0)
         footw = tr['t_water'][mw] * pxw / nzw
-        sh = shade_water(w, Pw[None], D[mw][None], t, foot=footw[None])
+        # AND THE OTHER AXIS, WHICH WAVE 18 NEEDED AND NOBODY HAD WRITTEN. A
+        # pixel's footprint on a horizontal sea is NOT square: along the view
+        # it is stretched by 1/|D_z| and across it is not stretched at all.
+        # The band limit the surface already used is the along axis (the larger
+        # one, so it is the conservative filter for a scalar); the
+        # sub-footprint realisation filters the two axes separately, because a
+        # grazing pixel resolves centimetre structure ACROSS the view while
+        # averaging metres of it along, and a square footprint would throw the
+        # first away. That anisotropy is why the near-field path is granular
+        # across its width and streaked along it.
+        footcw = tr['t_water'][mw] * pxw
+        sh = shade_water(w, Pw[None], D[mw][None], t, foot=footw[None],
+                         foot_c=footcw[None])
         Lw = sh['L'][0]
         if air:
             Lw = aerial(Lw, D[mw], np.linalg.norm(Pw - cam.pos[None], axis=-1),

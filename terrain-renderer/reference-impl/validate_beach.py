@@ -10041,6 +10041,764 @@ BUGS.update({
 })
 
 
+# ===========================================================================
+# 18 · THE REALISATION REACHING THE SURFACE, AND THE PATH THAT COMES OUT OF IT
+# ===========================================================================
+# WAVE 18. Seventeen waves argued this and none of them ran it. `beach_optics`
+# has carried (R1)-(R3) -- the slope splits into resolved and unresolved, the
+# two are disjoint bands of one spectrum, the correct shading is the
+# UNRESOLVED density at z* - z_res -- since wave 12, together with a class
+# that implements it. At wave 17 `grep -rn SlopeRealisation *.py` returned the
+# class statement and two comments: NOTHING INSTANTIATED IT. The renderer went
+# on shading every pixel with the ensemble mean of the whole distribution,
+# which is (R2) with p_res = delta, and the frame the owner objected to is
+# what that looks like.
+#
+# WHAT THIS SECTION HAS TO BE ABLE TO CATCH, and the list is this run's own
+# history of green rows over broken things:
+#
+#   * A ROW THAT REBUILDS WHAT IT TESTS. `residual` is literally
+#     `carried - resolved`, so "resolved + residual == carried" is an identity
+#     and worth nothing. Every variance row below measures the field by
+#     SAMPLING it and compares that against the algebra, which is a different
+#     route to the same number.
+#   * A ROW GREEN BECAUSE THE MEAN WAS ALWAYS RIGHT. (R2) conserves the mean
+#     EXACTLY -- that is the whole point of it -- so a mean row cannot see
+#     whether the realisation happened. ⚠️ AND IT TURNS OUT IT CANNOT SEE THE
+#     OPPOSITE DEFECT EITHER: fired at `glit-no-budget`, a sea drawn rough
+#     TWICE, the plan-weighted mean moves by 0.18 per cent, because the
+#     Jacobian spreads the same flux over a wider path. It is kept, and it is
+#     labelled with that measurement instead of with the hope that motivated
+#     it. The row that catches the double count is the exact budget-closure
+#     row -- algebra, not a statistic off the picture.
+#   * ELEVEN ROWS INSIDE ONE DEGENERACY. The footprint ladder spans 5 cm to
+#     20 m -- three decades -- because at any single footprint the resolved
+#     share, the residual and the CV are one number wearing three hats.
+#   * A ROW BLIND BECAUSE TWO CASES COINCIDE. Measured and reported below:
+#     `l/W`, the correlation length as a share of the path's own width, does
+#     NOT separate the two frames. It reads 1.6-3.0% on the smooth path and
+#     2.2-5.3% on the realised one, and the generic reference set's 0.7-5%
+#     covers both. The instrument that does separate them is the RUN AND GAP
+#     MEDIAN pair, and the section says so out loud rather than quoting the
+#     dimensionless ratio because it is dimensionless.
+#   * RULING 14: a near-zero measurement is worthless until zero is shown to
+#     be reachable. Both ends of the footprint axis are controls with answers
+#     known in advance, and one of them is asserted BIT FOR BIT.
+def _cv_partition(rho_u, rho_c):
+    """THE COEFFICIENT OF VARIATION A PARTITIONED GLITTER PATH MUST HAVE.
+
+    DERIVED HERE, and it is the row's whole substance, so it is written out.
+    At the centre of the path the specular slope is z* and the radiance is
+    proportional to the UNRESOLVED density evaluated at z* - z_res:
+
+        L  ∝  exp[ -(z_u - z*_u)^2 / 2a_u - (z_c - z*_c)^2 / 2a_c ]
+
+    with a the residual variances. Over the ensemble of drawn fields z_res is
+    zero-mean Gaussian with variances r, so with rho = r/a, and using
+    E[exp(-t z^2)] = (1 + 2 t r)^(-1/2) for z ~ N(0, r):
+
+        E[L]   = [(1 + rho_u)(1 + rho_c)]^(-1/2)
+        E[L^2] = [(1 + 2 rho_u)(1 + 2 rho_c)]^(-1/2)
+        CV^2   = (1 + rho_u)(1 + rho_c) / sqrt((1+2rho_u)(1+2rho_c))  -  1
+
+    NOTHING IN IT IS A PHOTOGRAPH AND NOTHING IN IT IS A TEXTURE. rho is the
+    ratio of what a pixel's own footprint resolves to what it does not, and
+    both come from the spectrum through `SlopeRealisation`. rho -> 0 gives
+    CV -> 0, which is waves 4-17 exactly: a pixel that resolves nothing has no
+    granularity, and that is not a defect of the shading, it is the correct
+    answer for a pixel the size of the ensemble.
+
+    It is a FLOOR for the render rather than a prediction of it, and the two
+    reasons are named: the rendered strip also carries the swell's own slope
+    (which this expression does not include) and a real spread of z* across
+    the strip's width (which it assumes away). Both ADD variance. A render
+    BELOW this floor has lost the realisation; a render far above it has
+    bought granularity somewhere else and the next row asks where."""
+    ru, rc = float(rho_u), float(rho_c)
+    v = ((1.0 + ru) * (1.0 + rc)
+         / math.sqrt((1.0 + 2.0 * ru) * (1.0 + 2.0 * rc)) - 1.0)
+    return math.sqrt(max(v, 0.0))
+
+
+def _runs_and_gaps(blk, msk):
+    """Median run, median gap, and DARK SHARE along image rows.
+
+    The generic reference directory's own instrument (`bar/generic/measure.py`
+    §2.4), threshold `p10 + (p99 - p10)/2` of the box's own histogram, so it
+    describes a SHAPE and not a brightness. Reproduced here rather than
+    imported because that file reads JPEGs and this one must never.
+
+    THE THIRD NUMBER IS THE ONE THAT SURVIVES A SOLID SLAB. Run and gap
+    medians are undefined when a strip never crosses its own threshold, which
+    is exactly what the smooth path does: no transitions, no runs, no gaps,
+    two NaNs and a row that cannot be evaluated. `dark` -- the share of core
+    pixels below the threshold -- is defined for every strip, goes to zero on
+    a slab, and is dimensionless, so it compares a 240-wide raster with a
+    1280-wide photograph without a scale between them."""
+    v = blk[msk]
+    if v.size < 32:
+        return float('nan'), float('nan'), float('nan')
+    thr = np.percentile(v, 10) + 0.5 * (np.percentile(v, 99)
+                                        - np.percentile(v, 10))
+    runs, gaps = [], []
+    for i in range(blk.shape[0]):
+        line = blk[i][msk[i]]
+        if line.size < 8:
+            continue
+        up = line > thr
+        n = 1
+        for t in range(1, up.size):
+            if up[t] == up[t - 1]:
+                n += 1
+            else:
+                (runs if up[t - 1] else gaps).append(n)
+                n = 1
+        (runs if up[-1] else gaps).append(n)
+    return (float(np.median(runs)) if runs else float('nan'),
+            float(np.median(gaps)) if gaps else float('nan'),
+            float((v <= thr).mean()))
+
+
+def _path_strip(L, mw, frac=0.15):
+    """The glitter path's core strip, off the SCENE-LINEAR buffer.
+
+    Never off a PNG: the standing ruling forbids it and this is called on `L`
+    before anything is written.
+
+    THE STRIP IS A FRACTION OF THE PATH'S OWN WIDTH AND NOT A PIXEL COUNT, and
+    that correction was forced by the row failing. `bar/generic/measure.py`
+    takes a +-10 px core on paths 38-75 px wide, i.e. 28-55% of the width; a
+    +-20 px core written literally here spans a 240-wide raster's whole path
+    AND ITS WINGS, so the "interior" sd it returns is dominated by the profile
+    falling off either side. Measured, that put the SMOOTH path's CV at 0.84
+    -- higher than the realised path's floor -- for a reason that has nothing
+    to do with granularity. A fraction of the band's own half-maximum width
+    reads the same quantity on the 240 x 320 suite raster and on the 1440 x
+    1920 hero one, which is what a row run at two resolutions has to do."""
+    g = L[..., 1]
+    rows = np.where(mw.sum(1) > 20)[0]
+    if rows.size < 40:
+        return []
+    a, b = int(rows[0]), int(rows[-1])
+    ed = np.linspace(a, b, 5).astype(int)
+    out = []
+    for i in range(4):
+        s = slice(ed[i], ed[i + 1])
+        v = np.where(mw[s], g[s], np.nan)
+        if not np.isfinite(v).any():
+            out.append(None)
+            continue
+        col = np.nanmean(v, axis=0)
+        j = int(np.nanargmax(col))
+        bg = np.nanpercentile(col, 20)
+        pk = col[j] - bg
+        wl = j
+        while wl > 0 and np.isfinite(col[wl - 1]) and col[wl - 1] - bg > 0.5 * pk:
+            wl -= 1
+        wr = j
+        while (wr < g.shape[1] - 1 and np.isfinite(col[wr + 1])
+               and col[wr + 1] - bg > 0.5 * pk):
+            wr += 1
+        wid = max(wr - wl, 1)
+        half = max(int(round(frac * wid)), 2)
+        c0, c1 = max(j - half, 0), min(j + half + 1, g.shape[1])
+        blk, bm = g[s, c0:c1], mw[s, c0:c1]
+        core = blk[bm]
+        if core.size < 64:
+            out.append(None)
+            continue
+        # THE GRANULARITY BOX IS WIDER THAN THE CV CORE, and the two are
+        # different questions rather than one measured twice. An interior
+        # standard deviation wants pixels that are all inside the path, so it
+        # takes 15% of the width and no wings. A run-and-gap median wants a
+        # LINE long enough to contain several of each, which at +-15% of a
+        # 15 px path is five pixels and yields nothing at all -- the row that
+        # asked for it returned NaN on both frames and could not tell them
+        # apart. `bar/generic` §2.4 has the same split: it reports the sd on a
+        # +-10 px core and the runs on a 150-220 px box.
+        wide = max(int(round(0.6 * wid)), 6)
+        d0_, d1_ = max(j - wide, 0), min(j + wide + 1, g.shape[1])
+        run, gap, dark = _runs_and_gaps(g[s, d0_:d1_], mw[s, d0_:d1_])
+        out.append(dict(rows=(int(ed[i]), int(ed[i + 1])), col=j,
+                        mean=float(core.mean()), sd=float(core.std()),
+                        cv=float(core.std() / max(core.mean(), 1e-12)),
+                        run=run, gap=gap, dark=dark, width=int(wr - wl),
+                        sl=s, c0=c0, c1=c1))
+    return out
+
+
+def _sec_glitter_field(ctx):
+    B = ctx['B']
+    import beach_render as RND
+    O = BOP
+    bay = ctx.get('_bay')
+    if bay is None:
+        bay = B.run_bay()
+        ctx['_bay'] = bay
+    w = RND.Water(bay)
+
+    # -------------------------------- 18.1 THE MAST HEIGHT, answer key G2
+    # FIRST IN THE SECTION BECAUSE IT DEPENDS ON NOTHING. Everything below
+    # needs a bed, a camera and two renders; this needs a constant. A defect
+    # that stops the path being findable should not also cost the two rows
+    # that could have run on a module import.
+    ratio = float(O.U125_OVER_U10)
+    between(2, 'ANSWER KEY G2: the 12.5 m mast conversion is APPLIED here',
+            ratio, 1.018, 1.026,
+            'LIVE IN `beach_optics` UNTIL THIS WAVE. Cox & Munk\'s fit is at '
+            'a 12.5 m mast; `beach_optics.U10` is the ten-metre wind by its '
+            'own name; waves 4-17 fed the second straight into the first. '
+            'The bracket is an INDEPENDENT ROUTE and not a restatement: a '
+            'neutral log profile over open sea has z0 between 1e-4 and 5e-4 '
+            'm at this wind (Charnock with alpha 0.011-0.018 and u* ~ 0.23 '
+            'm/s), which puts ln(12.5/z0)/ln(10/z0) between 1.020 and 1.023; '
+            'the widened 1.018-1.026 covers a decade of z0 either side. '
+            '`beach_optics` gets its own value from ECKV\'s drag coefficient '
+            'instead, 1.02117. DROPPING THE CONVERSION GIVES EXACTLY 1.000 '
+            'AND FAILS THIS ROW, which is the only reason it is a row.')
+    naive = O.CM_B_C + (O.CM_A_U + O.CM_A_C) * O.U10
+    check(1, 'and it moves the mean square slope by 1.9%',
+          float(sum(O.cox_munk_mss(O.U10)) / naive), 1.0192, 5e-4,
+          'THE SIZE OF THE THING, so that no later wave has to guess whether '
+          'it mattered. mss goes %.5f -> %.5f, the path\'s angular width by '
+          'half of that in the log, 0.95%%. Too small to see in a picture -- '
+          'which is precisely why it survived fourteen waves -- and 0.00065 '
+          'of mss against the 0.004 the paper\'s own uncertainty allows, so '
+          'it is a sixth of the tolerance the headline Cox & Munk row runs '
+          'at and would never have shown up there either.'
+          % (naive, sum(O.cox_munk_mss(O.U10))))
+
+    info(3, 'l/W does NOT separate the two frames', 'smooth 1.6-3.0%, '
+         'realised 2.2-5.3%',
+         'THE BLIND INSTRUMENT, REPORTED BECAUSE IT IS BLIND. The generic '
+         'reference set offers the correlation length as a share of the '
+         'path\'s own width -- 0.7-5% on two photographs -- and it is '
+         'dimensionless, which is why it looked like the best of the three. '
+         'Measured on the hero frame it reads 1.6-3.0% BEFORE this wave and '
+         '2.2-5.3% AFTER, and the published range contains both. The reason '
+         'is that the smooth path is not perfectly smooth: the swell tilts '
+         'the specular condition on a scale of a few pixels, so the '
+         'autocorrelation finds a short length in a frame with no facets in '
+         'it, while the numerator and the denominator both grow when the '
+         'facets arrive. This project has just had a row go blind because '
+         'two cases coincided; this is the same shape and it is on the '
+         'record instead of in a table. The pair that DOES separate them is '
+         'the run and gap median, which is why 18.6 is a check and this is '
+         'an info.')
+
+    # ------------------------------------------------- 18.2 the field is DRAWN
+    # The first row of the section is the one wave 17 could not write: that
+    # there is a realisation at all, in the object the renderer holds.
+    check(1, 'the scene HOLDS a slope realisation and the renderer uses it',
+          bool(getattr(w, 'subgrid_on', False)
+               and isinstance(getattr(w, 'subgrid', None), O.SlopeRealisation)),
+          True, 0,
+          'WAVE 18\'S FIRST ROW AND THE ONE THAT WOULD HAVE CAUGHT WAVE 12. '
+          '`SlopeRealisation` was written at wave 12 with (R1)-(R3) argued '
+          'above it in sixty lines of comment, and at wave 17 nothing in the '
+          'project had ever constructed one -- so the whole partition was a '
+          'claim with no code path, which this project\'s contract calls a '
+          'claim nobody has tested. The row asserts the OBJECT, not a number, '
+          'because that is what was missing.')
+
+    su2_cm, sc2_cm = O.cox_munk_mss(O.U10)
+    sw = w.mss_swell
+    check(1, 'the slope budget CLOSES: swell + carried = Cox & Munk',
+          float(w.subgrid.su2 + w.subgrid.sc2 + sw['su2'] + sw['sc2']),
+          float(su2_cm + sc2_cm), 1e-12,
+          'THE ACCOUNTING, AND IT IS A SUBTRACTION. The scene draws a swell '
+          'as geometry, and that swell has slope -- measured on the shader\'s '
+          'own sampler over %d wet points, (%.5g, %.5g) in the wind\'s two '
+          'axes. What the wind-sea realisation is allowed to carry is Cox & '
+          'Munk MINUS that, or the sea is rough twice and the path\'s width, '
+          'which is a readout of the TOTAL, comes out wrong. Exact to '
+          'float64: it is one subtraction and nothing is rounded into it.'
+          % (sw['n'], sw['su2'], sw['sc2']))
+
+    # ------- 18.2 the SAMPLED field against the ALGEBRA, at eight footprints
+    # THE ROW THAT IS NOT AN IDENTITY. `slope()` returns both the field and
+    # the variance it says it carried; the second is a sum over sinc^2 and the
+    # first is a sum of sines. Comparing them is two routes, and it is what
+    # catches a filter applied to the amplitude but not to the accounting, or
+    # to the accounting but not to the amplitude -- which is the shape of
+    # every energy-budget bug this project has shipped.
+    rng = np.random.default_rng(20260821)
+    n = 120000
+    px = rng.uniform(-800.0, 800.0, n)
+    py = rng.uniform(-800.0, 800.0, n)
+    ea = np.stack([np.ones(n), np.zeros(n)], -1)
+    u_hat, c_hat = O.wind_axes(O.WIND_AZ)
+    foots = (0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 20.0)
+    dev, frac, cvs = [], [], []
+    for fo in foots:
+        f = np.full(n, float(fo))
+        d = w.subgrid.slope(px, py, foot_c=f, foot_a=f, ea=ea)
+        zu = d['zx'] * u_hat[0] + d['zy'] * u_hat[1]
+        zc = d['zx'] * c_hat[0] + d['zy'] * c_hat[1]
+        ru, rc = float(d['su2_res'].mean()), float(d['sc2_res'].mean())
+        dev.append(max(abs(float((zu * zu).mean()) / max(ru, 1e-30) - 1.0),
+                       abs(float((zc * zc).mean()) / max(rc, 1e-30) - 1.0)))
+        frac.append((ru + rc) / (w.subgrid.su2 + w.subgrid.sc2))
+        cvs.append(_cv_partition(ru / max(w.subgrid.su2 - ru, 1e-30),
+                                 rc / max(w.subgrid.sc2 - rc, 1e-30)))
+    check(3, 'the SAMPLED variance equals the sinc accounting, 5 cm to 20 m',
+          float(np.max(dev)), 0.0, 0.03,
+          'TIER 3 AND THE TWO ROUTES DO NOT SHARE A SOURCE. `slope` returns '
+          'the field as a sum of %d sines and, separately, the variance it '
+          'claims to have carried as a sum of sinc^2 amplitudes. This row '
+          'measures the first on %d world points and divides by the second, '
+          'at eight footprints spanning three decades; worst disagreement '
+          '%.2f%%. An identity row -- resolved plus residual equals carried '
+          '-- would pass on a realisation that drew nothing, because '
+          '`residual` is defined as the complement. This one cannot.'
+          % (w.subgrid.n_band * w.subgrid.n_dir, n, 100 * float(np.max(dev))))
+
+    check(1, 'the resolved share falls MONOTONICALLY with footprint',
+          bool(np.all(np.diff(frac) < 0.0)), True, 0,
+          'The share of the wind sea a pixel can draw is %s at footprints %s '
+          'metres. Monotone by (R3): a box of side L filters a component of '
+          'wavenumber k by sinc(kL/2), the filter is a decreasing function of '
+          'L at every k, and the variance is a positive sum over k. A '
+          'realisation that ignored the footprint would be FLAT here and '
+          'would still pass every ensemble row in section 7.'
+          % (' '.join('%.3f' % f for f in frac),
+             ' '.join('%g' % f for f in foots)))
+
+    # (R3) says the share is LOGARITHMIC in the cut-off. The sinc is not a
+    # brick wall, so the two cannot agree exactly -- and the comparison is
+    # bracketed rather than pointed, which is the honest shape for it.
+    r3 = [float(O.mss_fraction_below(math.pi / fo, w.subgrid.k_lo,
+                                     w.subgrid.k_hi)) for fo in foots]
+    rat = [a / max(b, 1e-30) for a, b in zip(frac, r3) if 1e-3 < b < 0.999]
+    between(1, 'the sampled share sits just under the sharp-cutoff (R3)',
+            float(np.mean(rat)), 0.85, 1.00,
+            'WHAT (R3) PREDICTS AND WHY IT IS A BRACKET. (R3) integrates the '
+            'k^-4 range to a SHARP cut-off at k = pi/L; the pixel applies a '
+            'sinc, which lets a little through above the cut-off and takes a '
+            'lot away below it, and on a spectrum with equal variance per '
+            'octave the second wins. The measured shares are %s against '
+            '(R3)\'s %s -- mean ratio %.3f, i.e. the true box filter is 5-15%% '
+            'less efficient than the ideal cut-off it is usually written as. '
+            'Above 1.00 would mean the filter is inventing variance; below '
+            '0.85 would mean it is throwing away a band it should keep.'
+            % (' '.join('%.3f' % f for f in frac),
+               ' '.join('%.3f' % f for f in r3), float(np.mean(rat))))
+
+    # ------------------------------- 18.3 RULING 14: both ends of the axis
+    d_all = w.subgrid.slope(px[:4000], py[:4000])
+    check(1, 'CONTROL, resolve-everything: the realisation carries ALL of it',
+          float((d_all['su2_res'] + d_all['sc2_res']).mean()
+                / (w.subgrid.su2 + w.subgrid.sc2)), 1.0, 1e-12,
+          'RULING 14, THE UPPER END. `foot=None` is the unfiltered field: '
+          'every component at full amplitude, so the accounting must return '
+          'the whole carried variance and the residual must be the floor. '
+          'Exact, not approximate -- the filter is the ONLY thing that can '
+          'reduce it, and with no filter there is nothing to reduce it by.')
+    fbig = np.full(4000, 4000.0)
+    d0 = w.subgrid.slope(px[:4000], py[:4000], foot_c=fbig, foot_a=fbig,
+                         ea=ea[:4000])
+    check(1, 'CONTROL, footprint 4 km: the realisation carries NOTHING',
+          float(np.abs(d0['zx']).max() + np.abs(d0['zy']).max()),
+          0.0, 0.0,
+          'RULING 14, THE LOWER END, AND IT IS AN EXACT ZERO RATHER THAN A '
+          'SMALL NUMBER. A near-zero measurement is worthless until zero is '
+          'shown reachable; here it is reachable by construction, because '
+          '`slope` truncates a component whose sinc argument exceeds 30 and '
+          'at a 4 km footprint every one of the %d components is past that. '
+          'So the shading of a horizon pixel falls back to the ensemble mean '
+          'BIT FOR BIT, which is the correct answer for a pixel the size of '
+          'the ensemble and the next row asserts it.'
+          % (w.subgrid.n_band * w.subgrid.n_dir))
+    sun = RND.SUN
+    # THE DIRECTIONS ARE ON THE PATH, and that is not cosmetic: a fan aimed
+    # anywhere else evaluates the Gaussian 130 e-foldings down, where the
+    # radiance is 1e-33 and a ratio between two of them is a comparison
+    # between two underflows. This section's first writing did exactly that
+    # and the row failed at 0.999 on an arithmetic artefact rather than on
+    # anything about the surface -- which is the fifteenth way a measurement
+    # lies and it cost twenty minutes. The fan is the anti-solar azimuth,
+    # swept +-8 deg, at the elevations the frame actually contains.
+    els = np.radians(np.linspace(3.0, 25.0, 50))
+    dphi = np.radians(np.linspace(-8.0, 8.0, 80))
+    E, Ph = np.meshgrid(els, dphi, indexing='ij')
+    az = math.radians(RND.SUN_AZ + 180.0) + Ph
+    look = np.stack([np.sin(az) * np.cos(E), np.cos(az) * np.cos(E),
+                     np.sin(E)], -1).reshape(-1, 3)
+    dirs = -look                             # propagation from the eye
+    nd = dirs.shape[0]
+    d_big = w.subgrid.slope(px[:nd], py[:nd], foot_c=np.full(nd, 4000.0),
+                            foot_a=np.full(nd, 4000.0), ea=ea[:nd])
+    vv = w.subgrid.residual(d_big['su2_res'], d_big['sc2_res'])
+    l_ens = O.glitter_radiance(sun, dirs, u10=O.U10,
+                               var=(w.subgrid.su2, w.subgrid.sc2))
+    l_sub = O.glitter_radiance(sun, dirs, u10=O.U10,
+                               slope0=np.stack([d_big['zx'], d_big['zy']], -1),
+                               var=vv)
+    check(1, 'a fully unresolved pixel shades EXACTLY as an ensemble mean',
+          float(np.abs(l_sub - l_ens).max() / max(float(l_ens.max()), 1e-30)),
+          0.0, 1e-15,
+          'THE COMPOSITION OF THE TWO CONTROLS, and it is the row that says '
+          'the new shading path degenerates correctly. Where nothing is '
+          'resolved, slope0 must be exactly 0 and var must be exactly the '
+          'carried pair, so the call must reduce to a plain Cox & Munk '
+          'ensemble mean -- and it does, EXACTLY, on %d directions across the '
+          'whole path. NOTE WHICH ENSEMBLE MEAN, because the difference is '
+          'this wave\'s one named approximation and the next row measures '
+          'it: the CARRIED variance, which is Cox & Munk minus the swell, '
+          'not Cox & Munk itself.' % nd)
+    l_full = O.glitter_radiance(sun, dirs, u10=O.U10)
+    ipk = int(np.argmax(l_full[..., 1]))
+    info(2, 'the swell\'s budget line is footprint-INDEPENDENT, and the cost',
+         '%.3f at the path centre, %.3f at its half-max' % (
+             float(l_ens[ipk, 1] / max(l_full[ipk, 1], 1e-30)),
+             float(np.median(l_ens[..., 1][l_full[..., 1]
+                                           > 0.5 * l_full[ipk, 1]]
+                             / np.maximum(l_full[..., 1][l_full[..., 1]
+                                                         > 0.5 * l_full[ipk, 1]],
+                                          1e-30)))),
+         'THE APPROXIMATION THIS WAVE MAKES, MEASURED RATHER THAN LEFT '
+         'IMPLICIT. The swell\'s slope variance is subtracted from the budget '
+         'ONCE, as a scene constant, while the swell the shader actually '
+         'draws is band-limited by each pixel\'s own footprint like '
+         'everything else. So a pixel too coarse to resolve the swell has '
+         'that line subtracted anyway and shades with %.5g of variance where '
+         'Cox & Munk allows %.5g -- 7.8%% low, which is this ratio in '
+         'radiance. WHERE IT BITES: the swell is 90 m long, so it stops being '
+         'resolved at a footprint near 45 m, which on this camera is a range '
+         'of about 15 km -- past the horizon at a 20 m eye height. The error '
+         'is therefore confined to sea drawn beyond the horizon line, where '
+         'the glitter term is already the dimmest thing in the frame. Fixing '
+         'it properly needs the swell\'s own per-pixel filtered variance, '
+         'which is a second spectrum to carry, and it is named here instead '
+         'of built.'
+         % (w.subgrid.su2 + w.subgrid.sc2, sum(O.cox_munk_mss(O.U10))))
+
+    # ---------------------------- 18.4 THE HEADLINE, off the radiance buffer
+    # 240 x 320, the same raster `_sec_seam` renders at and for the same
+    # reason: the section needs TWO renders and the quantity is a property of
+    # the footprint, which the row derives its own floor from. At this raster
+    # the footprints along the path run coarser than the hero frame's, so the
+    # floor is LOWER here -- and that is the point of deriving it per frame
+    # rather than quoting the hero frame's number.
+    cams = RND.hero_cameras(w, 240, 320, out=lambda *a, **kw: None)
+    camK = cams[5]
+    L_on, ex_on = RND.render(camK, w)
+    w.subgrid_on = False
+    L_off, ex_off = RND.render(camK, w)
+    w.subgrid_on = True
+    mw = ex_on['water_mask']
+    # THE STRIP IS MEASURED ON `L_glit` AND NOT ON THE TOTAL FRAME, and the
+    # reason is a dilution rather than a preference: the sky, the column and
+    # the path add radiance that the partition does not touch, so a CV taken
+    # on the sum is the glitter's CV divided by (1 + everything else / glit).
+    # That ratio changes down the frame, which would put a camera-dependent
+    # factor inside a row about the surface.
+    st_on = _path_strip(_scatter(L_on, mw, ex_on['water']['L_glit'][0]), mw)
+    st_off = _path_strip(_scatter(L_off, mw, ex_off['water']['L_glit'][0]), mw)
+    pairs = [(a, b) for a, b in zip(st_on, st_off)
+             if a is not None and b is not None]
+    if not check(1, 'the glitter path is FINDABLE in both frames',
+                 len(pairs), 4, 1,
+                 'A ROW ON NOTHING IS A BLIND ROW, and this suite treats an '
+                 'empty comparison as an error rather than a pass. Four '
+                 'row-bands are cut down the path and each needs a locatable '
+                 'peak and 64 core pixels; %d survived. THE REASON IT IS A '
+                 'FAIL AND NOT A RAISE: `error_row` above argues that an '
+                 'exception costs every row after it, and this condition is '
+                 'reachable -- `glit-no-footprint` drops the band limit, the '
+                 'open sea aliases, and the path stops being a peak at all. '
+                 'That defect should cost this row and the strip rows, not '
+                 'the mast-height rows at the end of the section.'
+                 % len(pairs)):
+        return
+    # THE FLOOR IS DERIVED PER BAND FROM THAT BAND'S OWN FOOTPRINTS, and the
+    # 90th percentile is taken rather than the median because the COARSEST
+    # pixels of a strip are the ones with the least to be granular with. A
+    # floor built on the finest pixel would be a floor the strip could not
+    # reach for reasons that have nothing to do with the realisation.
+    foot = ex_on['water']['foot'][0]
+    full_f = np.zeros(L_on.shape[:2])
+    full_f[mw] = foot
+    floors, added, on_cv, off_cv = [], [], [], []
+    for a, b in pairs:
+        m = mw[a['sl'], a['c0']:a['c1']]
+        fr = full_f[a['sl'], a['c0']:a['c1']][m]
+        lo = float(np.percentile(fr, 90))
+        f1 = np.full(3000, lo)
+        dd = w.subgrid.slope(px[:3000], py[:3000], foot_c=f1, foot_a=f1,
+                             ea=ea[:3000])
+        ru = float(dd['su2_res'].mean())
+        rc = float(dd['sc2_res'].mean())
+        floors.append(_cv_partition(ru / max(w.subgrid.su2 - ru, 1e-30),
+                                    rc / max(w.subgrid.sc2 - rc, 1e-30)))
+        on_cv.append(a['cv'])
+        off_cv.append(b['cv'])
+        added.append(math.sqrt(max(a['cv'] ** 2 - b['cv'] ** 2, 0.0)))
+    # WHICH BANDS THE FLOOR EVEN SPEAKS ABOUT, and it is not all of them. The
+    # band nearest the horizon has a footprint of kilometres on this raster,
+    # so the partition guarantees a CV of 0.000 there -- correctly, because a
+    # pixel that resolves nothing has nothing to be granular with. A row that
+    # counted that band as a pass would be passing on a vacuous inequality,
+    # which is this suite's own definition of the worst kind of green.
+    live = [i for i, f in enumerate(floors) if f > 0.02]
+    check(1, 'the derived floor is NON-VACUOUS on at least two row-bands',
+          len(live) >= 2, True, 0,
+          'THE ROW THAT KEEPS THE NEXT ONE FROM PASSING ON NOTHING. Floors '
+          'by band, horizon-most first: %s. The first is 0.000 and it is not '
+          'a defect -- at this raster that band\'s footprint is kilometres '
+          'and (R3) says a pixel that resolves nothing carries no structure, '
+          'which is the ensemble mean being the CORRECT answer there. So the '
+          'headline row is evaluated on the %d band(s) where the partition '
+          'actually promises something, and this row asserts there are at '
+          'least two of them. Without it, a frame in which every footprint '
+          'had gone to infinity would pass the headline row with every '
+          'inequality reading 0 >= 0.'
+          % (' '.join('%.3f' % f for f in floors), len(live)))
+    check(1, 'THE VARIANCE THE REALISATION ADDS CLEARS ITS DERIVED FLOOR',
+          bool(all(added[i] >= floors[i] for i in live)), True, 0,
+          'THE ROW THIS WAVE EXISTS FOR, AND IT IS SCENE-LINEAR OFF THE '
+          'RADIANCE BUFFER -- never a PNG, and never against the '
+          'photographs, which are 8-bit and graded. The floor is derived in '
+          '`_cv_partition` from ONE quantity: rho, the ratio of the slope '
+          'variance a pixel\'s own footprint resolves to the variance it does '
+          'not, and both come from the spectrum. Row-bands down the path: '
+          'realised CV %s, waves 4-17 on the SAME strip of the SAME frame '
+          'with one flag switched %s, so the variance ADDED IN QUADRATURE is '
+          '%s against floors %s. '
+          'WHY IN QUADRATURE AND NOT ABSOLUTELY, and it is a correction this '
+          'row made to itself: the smooth path is not flat either -- the '
+          'swell tilts the specular condition across the strip and gives it '
+          'a CV of %s on its own -- and at the COARSE bands, where the '
+          'footprint resolves little, the swell\'s share alone exceeds the '
+          'floor. Comparing the total against the floor would then pass for '
+          'the wrong reason. The realisation and the swell are independent '
+          'bands of one spectrum, so their variances add; subtracting the '
+          'one that was already there is the only form of this row that '
+          'measures what the wave did.'
+          % (' '.join('%.3f' % v for v in on_cv),
+             ' '.join('%.3f' % v for v in off_cv),
+             ' '.join('%.3f' % v for v in added),
+             ' '.join('%.3f' % f for f in floors),
+             ' '.join('%.3f' % v for v in off_cv)))
+    marg = [added[i] / max(floors[i], 1e-9) for i in live]
+    between(1, 'the margin over the floor is BOUNDED ON BOTH SIDES',
+            float(max(marg)), 1.0, 6.0,
+            'THE ROW ABOVE WITH ITS SLACK MEASURED, AND THE SECOND BOUND IS '
+            'THE POINT. Clearing a floor by 1%% and clearing it by 30x are '
+            'not the same result and an inequality cannot tell them apart. '
+            'On the live bands the added CV is %s against floors %s, margins '
+            '%s. BELOW 1 is the realisation failing to draw what the '
+            'partition promises. ABOVE 6 is the other failure and the one '
+            'this project is one step away from: granularity arriving from '
+            'somewhere the spectrum does not account for -- a noise texture, '
+            'an aliasing artefact, a double-counted band -- which would clear '
+            'the floor magnificently and mean nothing. The excess that IS '
+            'accounted for is bounded and named: the floor uses the band\'s '
+            'COARSEST pixel (90th percentile of its footprints) while the '
+            'strip also contains finer ones, and the specular slope spreads '
+            'across the strip\'s own width. The finest band sits at 1.2, '
+            'which is the floor being nearly tight -- the best outcome '
+            'available and not a weak one.'
+            % (' '.join('%.3f' % added[i] for i in live),
+               ' '.join('%.3f' % floors[i] for i in live),
+               ' '.join('%.2fx' % m for m in marg)))
+
+    # ------------------------ 18.5 the mean, which must NOT have moved
+    tr = ex_on['trace']
+    wgt = np.where(mw, tr['t_water'] ** 2
+                   / np.maximum(np.abs(tr['D'][..., 2]), 1e-6), 0.0)
+    m_on = float((L_on[..., 1] * wgt)[mw].sum() / wgt[mw].sum())
+    m_off = float((L_off[..., 1] * wgt)[mw].sum() / wgt[mw].sum())
+    check(2, 'the plan-weighted mean radiance is CONSERVED by the partition',
+          m_on / m_off, 1.0, 0.06,
+          'AND IT IS STATED AS WHAT IT IS: A ROW THAT CANNOT SEE THE '
+          'REALISATION. (R2) conserves the mean identically -- the '
+          'convolution of the resolved and unresolved densities is the total '
+          'density -- so this number would be 1.000 whether the field were '
+          'drawn or not. It was written for the OTHER failure -- granularity '
+          'bought by adding roughness ON TOP of the budget instead of '
+          'carving it out -- and ⚠️ IT DOES NOT CATCH THAT EITHER, which is '
+          'measured rather than feared: `--bugs-glitter` runs '
+          '`glit-no-budget`, which draws the field at full Cox & Munk '
+          'variance AND keeps the full Cox & Munk variance in the density, '
+          'and this row reads 1.0018. The reason is the Jacobian: a sea that '
+          'is rough twice spreads the same reflected flux over a wider path, '
+          'so the plan-weighted mean over ALL the water is very nearly '
+          'unchanged. The row that does catch it is the exact budget-closure '
+          'row at the top of the section, and the lesson is this project\'s '
+          'own: an algebraic invariant saw what four statistics off the '
+          'picture could not. Measured %.4f. The 6%% window is not a physics '
+          'tolerance; '
+          'it is the sampling error of one realisation over %d water pixels '
+          'whose per-pixel CV is order 1, plus the 1.9%% the mast-height '
+          'correction moves the mss by. This project has had a row stay '
+          'green because the mean was always right; this one says so on its '
+          'face.' % (m_on / m_off, int(mw.sum())))
+
+    # ------------------- 18.6 the run/gap pair, and the instrument that is BLIND
+    ron = [a['run'] for a, _ in pairs]
+    gon = [a['gap'] for a, _ in pairs]
+    roff = [b['run'] for _, b in pairs]
+    goff = [b['gap'] for _, b in pairs]
+    check(1, 'THE BRIGHT RUNS BREAK UP: run median falls by 3x or more',
+          float(np.median(roff) / max(np.median(ron), 1e-9)), 4.3, 1.8,
+          'THE GENERIC SET\'S OWN INSTRUMENT (bar/generic §2.4), on the '
+          'radiance buffer instead of on 8-bit luma. A photographed path has '
+          'bright runs with a median of 2-3 px and dark gaps of 2-6 px '
+          'BETWEEN them: dark water at the same scale as the facets, '
+          'everywhere along the path. Measured on the same box of the same '
+          'frame with one flag switched: runs %s px realised against %s px '
+          'smooth, gaps %s against %s. The RATIO is the row because a pixel '
+          'count on a 240-wide raster is not comparable with a 1280-wide '
+          'photograph and pretending otherwise would be calibrating against '
+          'the photographs, which standing ruling 7 forbids. Tolerance 1.8 '
+          'on 4.3 is wide on purpose -- it is a median of medians over three '
+          'bands of one realisation -- and it still excludes 1.0, which is '
+          'what a frame with no facets in it returns.'
+          % (' '.join('%.0f' % r for r in ron),
+             ' '.join('%.0f' % r for r in roff),
+             ' '.join('%.0f' % g for g in gon),
+             ' '.join('%.0f' % g for g in goff)))
+    don = [a['dark'] for a, _ in pairs]
+    doff = [b['dark'] for _, b in pairs]
+    info(3, 'and the DARK SHARE is the second blind instrument',
+         'realised %s vs smooth %s'
+         % (' '.join('%.2f' % d for d in don),
+            ' '.join('%.2f' % d for d in doff)),
+         'REPORTED BECAUSE IT IS BLIND, and it is the second of two in this '
+         'section. The share of box pixels below the box\'s own '
+         'half-threshold looked like the statistic that survives a slab -- '
+         'runs and gaps go undefined when a strip never crosses its '
+         'threshold, and a share never does. It does not separate the two '
+         'frames: 0.75/0.71/0.56 realised against 0.79/0.74/0.71 smooth. The '
+         'reason is that the box is 0.6 of the path\'s width either side of '
+         'centre, so most of what it counts as "dark" is OFF-PATH WATER, '
+         'which is dark in both frames and dominates the share. Narrowing '
+         'the box until it is all path makes the statistic undefined on the '
+         'slab again. So the run median is what carries this, and it is a '
+         'length rather than a share.')
+
+    # ------------------------------------- 18.7 the width, and what it cost
+    # The path's WIDTH is an ensemble statement, and a realisation makes it a
+    # hard one to estimate off a single frame. This is a cost of the wave and
+    # it is measured rather than hoped away.
+    cf = float(O.glitter_width_deg(RND.SUN_EL, 12.0, u10=O.U10)['dphi'])
+    lad_on, lad_off = [], []
+    for nb in (181, 45, 15):
+        a = RND.glitter_width_measured(L_on, camK, 8.0, 16.0, mask=mw,
+                                       n_bin=nb)
+        b = RND.glitter_width_measured(L_off, camK, 8.0, 16.0, mask=mw,
+                                       n_bin=nb)
+        lad_on.append(float('nan') if a is None else a['width'])
+        lad_off.append(float('nan') if b is None else b['width'])
+    check(1, 'the SMOOTH path\'s width does not depend on the bin count',
+          float(np.nanmax(lad_off) / np.nanmin(lad_off)), 1.0, 0.12,
+          'THE CONTROL FOR THE NEXT ROW. On the ensemble-mean field the '
+          'azimuth profile is deterministic, so widening the bins from 181 '
+          'to 15 changes the FWHM by nothing that matters: %s deg against a '
+          'closed form of %.3f. The estimator is unbiased there, which is '
+          'what makes its behaviour on a realisation a statement about the '
+          'realisation and not about the estimator being bad in general.'
+          % (' '.join('%.3f' % v for v in lad_off), cf))
+    openq(3, 'the width estimator is BIASED LOW on one realisation',
+          '%.3f -> %.3f deg' % (lad_on[0], lad_on[-1]), '%.3f deg' % cf,
+          'THE PRICE OF THIS WAVE, MEASURED AND NOT ARGUED AWAY. Bar section '
+          'K makes the path\'s angular width a readout of the mean square '
+          'slope, and the total mss did not move -- so the width should not '
+          'have moved. It does, in the ESTIMATOR: `fwhm` walks out from the '
+          'peak to the FIRST half-crossing, and on a realised path the bin '
+          'means are heavy-tailed, so a single low bin ends the walk early. '
+          'The bias falls as the bins widen -- %s deg at 181/45/15 bins '
+          'against the closed form %.3f -- and on the hero raster the same '
+          'ladder runs 5.74 -> 10.45 against 10.56. So the ensemble width IS '
+          'still there and the single-frame estimator can no longer see it '
+          'cheaply. OPEN rather than FAIL: this is a measurement instrument '
+          'that needs replacing (a crossing that must persist over several '
+          'bins, or an average over seeds), not a defect in the surface. It '
+          'is the one thing wave 18 made worse and it is logged as such.'
+          % (' '.join('%.3f' % v for v in lad_on), cf))
+
+
+
+def _scatter(L, mw, vals):
+    """Put a per-water-pixel field back into a full-frame buffer."""
+    out = np.zeros(L.shape[:2] + (vals.shape[-1],)) if vals.ndim > 1 \
+        else np.zeros(L.shape[:2])
+    out[mw] = vals
+    return out
+
+
+# ------------------------------------------------------------ the wave-18 bugs
+def _bug_glit_no_realisation(mod):
+    """WAVES 4-17 PUT BACK: the realisation never reaches the surface.
+
+    One flag, and it is the shipping code path with one field switched off --
+    which is what makes the pair a measurement. `Water.__init__` still builds
+    the object; `shade_water` never asks it for anything."""
+    orig = mod.Water.__init__
+
+    def init(self, *a, **kw):
+        orig(self, *a, **kw)
+        self.subgrid_on = False
+    mod.Water.__init__ = init
+
+
+def _bug_glit_no_budget(mod):
+    """THE REALISATION ADDED ON TOP INSTEAD OF CARVED OUT.
+
+    The field is drawn at full Cox & Munk variance AND the density keeps the
+    full Cox & Munk variance, so the surface is rough twice. It is the single
+    most likely way to write this feature by hand, it makes the picture MORE
+    granular rather than less, and only an energy row can see it."""
+    import beach_optics as O
+    orig = O.subgrid_realisation
+
+    def sg(mss_u=0.0, mss_c=0.0, **kw):
+        return orig(0.0, 0.0, **kw)
+    O.subgrid_realisation = sg
+    orig_res = O.SlopeRealisation.residual
+    O.SlopeRealisation.residual = lambda self, a, b, floor=1e-9: (
+        np.full(np.shape(a), self.su2), np.full(np.shape(b), self.sc2))
+    mod._w18_orig = (orig, orig_res)
+
+
+def _bug_glit_no_footprint(mod):
+    """THE FILTER DROPPED: every pixel resolves the whole spectrum.
+
+    `foot=None` inside `slope`, so a horizon pixel four kilometres across
+    draws centimetre facets. The moment rows all still pass -- the field's
+    total variance is right -- and it is the FOOTPRINT ladder and the
+    ensemble-mean control that catch it. This is the aliasing wave 13 spent a
+    round on, in a new band."""
+    import beach_optics as O
+    orig = O.SlopeRealisation.slope
+
+    def slope(self, x, y, foot_c=None, foot_a=None, ea=None, trunc=30.0):
+        return orig(self, x, y, foot_c=None, foot_a=None, ea=None, trunc=trunc)
+    O.SlopeRealisation.slope = slope
+
+
+def _bug_glit_u10_as_u125(mod):
+    """ANSWER KEY G2 PUT BACK: the ten-metre wind fed to the 12.5 m fit.
+
+    Exactly what `beach_optics` did for fourteen waves. It moves the mss by
+    1.9%, which is a sixth of the published uncertainty, so the only rows
+    that can see it are the two written for it."""
+    import beach_optics as O
+    O.U125_OVER_U10 = 1.0
+
+
+GLITTER_BUGS = ('glit-no-realisation', 'glit-no-budget', 'glit-no-footprint',
+                'glit-u10-as-u125')
+
+BUGS.update({
+    'glit-no-realisation': _bug_glit_no_realisation,
+    'glit-no-budget': _bug_glit_no_budget,
+    'glit-no-footprint': _bug_glit_no_footprint,
+    'glit-u10-as-u125': _bug_glit_u10_as_u125,
+})
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -10104,7 +10862,16 @@ def run_suite():
                       # after that section is most of what makes this one
                       # affordable.
                       (_sec_view, 'the viewpoint, and the plateau patch wave '
-                                  '11 scored 3/10')):
+                                  '11 scored 3/10'),
+                      # WAVE 18, the glitter lane. It renders TWICE at
+                      # 240 x 320 and it must run after `_sec_land` for the
+                      # same reason `_sec_seam` and `_sec_foamtex` do: the
+                      # full-scale bay is in `ctx['_bay']` by then, and
+                      # building it a third time would cost more than every
+                      # row in the section.
+                      (_sec_glitter_field, 'the sub-footprint slope '
+                                           'realisation and the glitter path '
+                                           'it draws')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -10418,6 +11185,41 @@ if __name__ == '__main__':
             print('%-24s %d  %s' % (name, len(caught),
                                     '; '.join(c[:70] for c in caught[:5])))
         importlib.reload(WSP)
+        sys.exit(0)
+    if '--bugs-glitter' in sys.argv:
+        # WAVE 18. Its own driver, because three of the four defects patch
+        # `beach_optics` or `beach_render` -- modules the whole-suite driver
+        # does not reload -- and a patched `SlopeRealisation.slope` left in
+        # place would make every later row in the table a measurement of the
+        # loop's order. Both are reloaded between every defect, and the bay is
+        # rebuilt with them, which is what lets `glit-no-footprint` reach the
+        # field the shader actually samples.
+        import importlib
+        import beach_optics as _BO
+        import beach_render as _RND
+        _run_section(_sec_glitter_field, 'the glitter path')
+        base = set(_fail_names())
+        print('clean glitter section: %d pass / %d FAIL / %d open'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base),
+                 sum(r.status == 'OPEN' for r in ROWS)))
+        print()
+        print('%-24s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 110)
+        for name in GLITTER_BUGS:
+            importlib.reload(_BO)
+            importlib.reload(_RND)
+            BUGS[name](_RND)
+            try:
+                _run_section(_sec_glitter_field, 'the glitter path')
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-24s %d' % (name, len(caught)))
+            for c in caught:
+                print('%-24s   %s' % ('', c[:84]))
+        importlib.reload(_BO)
+        importlib.reload(_RND)
         sys.exit(0)
     if '--bugs-surface' in sys.argv:
         import importlib
