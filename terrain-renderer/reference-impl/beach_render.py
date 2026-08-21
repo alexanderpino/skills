@@ -2283,8 +2283,12 @@ def wind_check(w, L, cam, ex, el_band=(6.0, 14.0)):
                      100 * abs(out['u_glitter'] / u_w - 1.0)))
             # the SENSITIVITIES, which are the real finding
             su2, sc2 = BO.cox_munk_mss(BO.U10)
-            dmss_du = BO.CM_A_U + BO.CM_A_C
-            dwid_du = 0.5 * dmss_du / (su2 + sc2)       # d(ln width)/dU
+            # WAVE 18: the chain rule through the mast height. Cox & Munk's
+            # coefficients are per m/s at 12.5 m and the whitecap law below is
+            # per m/s at 10 m; pairing them without `U125_OVER_U10` compares
+            # two derivatives taken with respect to two different winds.
+            dmss_du = (BO.CM_A_U + BO.CM_A_C) * BO.U125_OVER_U10
+            dwid_du = 0.5 * dmss_du / (su2 + sc2)       # d(ln width)/dU10
             dW_du = FM.MOM80_N / BO.U10                 # d(ln W)/dU
             out['sens'] = (dwid_du, dW_du)
             print('     SENSITIVITY at this wind: d(ln width)/dU = %.4f per '

@@ -818,13 +818,28 @@ CM_B_C = 0.003
 U125_OVER_U10 = WSP.u125_over_u10()
 
 
+def cox_munk_mss_at_mast(u125):
+    """(sigma_u^2, sigma_c^2) FROM THE PUBLISHED FIT, argument at 12.5 m.
+
+    THE FIT AND THE HEIGHT CONVERSION ARE TWO OBJECTS AND THIS WAVE SPLIT
+    THEM, because folding the conversion into `cox_munk_mss` made a suite row
+    that had asserted the 1954 coefficients EXACTLY since wave 4 start failing
+    -- and the row was not wrong about the coefficients, it was right about
+    them and silent about the height. Whichever way that is resolved by
+    widening a tolerance, the row stops pinning the coefficients. So the
+    published relation keeps a function of its own, evaluated at the mast
+    height it was fitted at, and the row keeps its 1e-12."""
+    u = np.asarray(u125, float)
+    return CM_A_U * u, CM_B_C + CM_A_C * u
+
+
 def cox_munk_mss(u10):
     """(sigma_u^2, sigma_c^2), the along- and cross-wind slope variances.
 
-    `u10` IS THE TEN-METRE WIND and is converted to Cox & Munk's own 12.5 m
-    mast height before the fit is evaluated. See `U125_OVER_U10` above."""
-    u = np.asarray(u10, float) * U125_OVER_U10
-    return CM_A_U * u, CM_B_C + CM_A_C * u
+    `u10` IS THE TEN-METRE WIND -- every other wind in this project is -- and
+    is converted to Cox & Munk's own 12.5 m mast before the published fit
+    above is evaluated. See `U125_OVER_U10`."""
+    return cox_munk_mss_at_mast(np.asarray(u10, float) * U125_OVER_U10)
 
 
 def wind_from_mss(mss):

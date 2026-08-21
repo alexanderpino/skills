@@ -4504,12 +4504,25 @@ def _sec_optics(ctx):
          'the separation the two-layer column buys')
 
     # ------------------------------------------- 7.10 the glitter, Cox & Munk
+    # ⚠️ `cox_munk_mss_at_mast` AND NOT `cox_munk_mss`, AND THE DIFFERENCE IS
+    # WAVE 18'S. These rows pin the PUBLISHED COEFFICIENTS to 1e-12, and the
+    # published fit's argument is the wind at a 12.5 m mast. Until wave 18
+    # `beach_optics` had one function which took `U10` by name and evaluated
+    # the 12.5 m fit on it -- answer key G2, live for fourteen waves -- so
+    # these rows were, without knowing it, asserting the coefficients AND the
+    # wrong height in one comparison. Correcting the height made them fail,
+    # which is a row failing because a defect was FIXED. The fix is not a
+    # wider tolerance -- that would stop the row pinning the coefficients at
+    # all -- it is to ask the question these rows were written to ask, of the
+    # function that answers it. The height now has its own rows in section 18.
     for u in (0.0, 3.0, 6.0, 12.0):
-        su2, sc2 = O.cox_munk_mss(u)
-        check(2, 'Cox & Munk (1954) component mss at U = %g m/s' % u, su2 + sc2,
-              0.003 + 5.08e-3 * u, 1e-12,
+        su2, sc2 = O.cox_munk_mss_at_mast(u)
+        check(2, 'Cox & Munk (1954) component mss at U(12.5 m) = %g m/s' % u,
+              su2 + sc2, 0.003 + 5.08e-3 * u, 1e-12,
               'sigma_u^2 = 3.16e-3 U and sigma_c^2 = 0.003 + 1.92e-3 U, which '
-              'is what this file stores; their sum is 0.003 + 5.08e-3 U.')
+              'is what this file stores; their sum is 0.003 + 5.08e-3 U. U is '
+              'the 12.5 m mast wind, which is what `cox_munk_mss_at_mast` '
+              'takes; `cox_munk_mss` takes U10 and converts.')
         between(2, 'and against the paper\'s own COMBINED fit at U = %g' % u,
                 su2 + sc2, (0.003 + 5.12e-3 * u) * 0.99,
                 (0.003 + 5.12e-3 * u) * 1.01,
@@ -4524,7 +4537,22 @@ def _sec_optics(ctx):
     check(1, 'the wind readout inverts the slope law', O.wind_from_mss(
         sum(O.cox_munk_mss(7.5))), 7.5, 1e-9,
         'Bar section K asks for the width as a READOUT of the wind, which '
-        'means the map has to run both ways.')
+        'means the map has to run both ways. Both sides are in TEN-METRE '
+        'wind, so this row also pins that the forward and inverse maps apply '
+        'the mast conversion in opposite directions rather than both ways or '
+        'neither -- which is the way a height correction is usually got '
+        'wrong, and it would leave the round trip 4.3%% out.')
+    check(1, 'the two Cox & Munk entry points differ by exactly the mast',
+          float(sum(O.cox_munk_mss(6.0))
+                / sum(O.cox_munk_mss_at_mast(6.0))), 1.01927, 1e-5,
+          'WAVE 18, AND IT IS THE ROW THAT KEEPS THE SPLIT HONEST. Two '
+          'functions now evaluate one published relation: '
+          '`cox_munk_mss_at_mast` takes the 12.5 m wind the paper fitted and '
+          '`cox_munk_mss` takes the ten-metre wind everything else in this '
+          'project uses. If they ever stop differing by exactly the log-'
+          'profile ratio, one of them has been edited and the other has not '
+          '-- which is precisely how a project ends up with two constants '
+          'that used to agree. 1.9%% on the mss at this wind.')
     # the pdf is a pdf
     zz = np.linspace(-1.2, 1.2, 1201)
     ZX, ZY = np.meshgrid(zz, zz)
@@ -6275,12 +6303,24 @@ def _sec_foam(ctx):
          'uncertainty')
     # THE CROSS-CHECK THE BAR ASKS FOR: one wind, two readouts
     su2, sc2 = BOP.cox_munk_mss(BOP.U10)
-    d_width = 0.5 * (BOP.CM_A_U + BOP.CM_A_C) / (su2 + sc2)
+    # ⚠️ THE CHAIN RULE, AND WAVE 18 PUT IT IN. Both halves of this comparison
+    # are derivatives with respect to the TEN-METRE wind -- the whitecap half
+    # has to be, because Monahan & O'Muircheartaigh is parameterised on U10 --
+    # and Cox & Munk's coefficients are per metre per second AT THE 12.5 m
+    # MAST. d(mss)/dU10 is therefore (a_u + a_c) x dU12.5/dU10, and the factor
+    # is `U125_OVER_U10`. Leaving it out gives d(ln width)/dU12.5 under a
+    # label that says U10 and pairs it against a U10 derivative: a 2.1% error
+    # in a ratio the section then reports as a FINDING. It is exactly the
+    # class of mistake the mast conversion exists to stop, one level up.
+    d_width = (0.5 * (BOP.CM_A_U + BOP.CM_A_C) * BOP.U125_OVER_U10
+               / (su2 + sc2))
     d_W = F.MOM80_N / BOP.U10
-    check(1, 'd(ln glitter width)/dU at U10 = 6 m/s', d_width, 0.075866, 1e-5,
-          'width goes as sqrt(mss) and mss = 0.003 + 5.08e-3 U, so '
-          'd(ln width)/dU = (a_u + a_c)/(2 mss). ABSOLUTE, and it is one half '
-          'of the comparison bar section K\'s cross-check actually settles.',
+    check(1, 'd(ln glitter width)/dU at U10 = 6 m/s', d_width, 0.076006, 1e-5,
+          'width goes as sqrt(mss) and mss = 0.003 + 5.08e-3 U(12.5 m), so '
+          'd(ln width)/dU10 = (a_u + a_c)(U12.5/U10)/(2 mss). ABSOLUTE, and '
+          'it is one half of the comparison bar section K\'s cross-check '
+          'actually settles. The value was 0.075866 through wave 17, when the '
+          'mast factor was missing from both this row and the shipped mss.',
           unit='per m/s')
     check(1, 'd(ln whitecap coverage)/dU at U10 = 6 m/s', d_W, 0.568333, 1e-5,
           'W goes as U^n, so d(ln W)/dU = n/U. The other half.',
