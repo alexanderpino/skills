@@ -12024,53 +12024,98 @@ def _sec_modes_reach(ctx):
           'water. Max deck %.4f with the climate against %.4f without.'
           % (float(np.max(w2.deck)), float(np.max(w1.deck))), '-')
 
+    # WHERE THE TWO LINES ARE COMES FROM THE BED, NOT FROM THE PICTURE, which
+    # is what makes the pixel count a test rather than a description: the two
+    # windows are placed by `breakpoints` on the plan transform's centre row,
+    # and the render is then asked whether anything white landed in each.
+    jc = bay2['h'].shape[0] // 2
+    xb = []
+    for trp in bay2['tr_parts']:
+        bp = B.breakpoints(B.row_slice(trp, jc))
+        if bp:
+            xb.append(bp[0]['x'])
+    xb = sorted(xb)
+
     cam = RND.hero_cameras(w2, 240, 320, out=lambda *a, **kw: None)[3]
+
+    # THE CODE-PATH TEST, ISOLATED FROM THE BED. `w2` and `w2c` are the SAME
+    # two-bar bay rendered from the SAME camera; the only difference is whether
+    # the deck is the union over the partitions or the carrier's alone. That is
+    # exactly the question ruling 18 asks -- does the new branch change a pixel
+    # -- and comparing the two BEDS instead would have answered a different one.
+    RND.DECK_UNION = False
+    try:
+        w2c = RND.Water(bay2)
+    finally:
+        RND.DECK_UNION = True
     out = {}
-    for nm, w in (('one', w1), ('two', w2)):
+    for nm, w in (('one', w1), ('two', w2), ('carrier', w2c)):
         L, ex = RND.render(cam, w)
-        mw = ex['water_mask']
-        sh = ex['water']
-        P = ex['water_P']
-        dk = np.asarray(sh['deck'], float).reshape(-1)
-        xw = P[..., 0].reshape(-1)
-        lit = dk > 0.25
+        dk = np.asarray(ex['water']['deck'], float).reshape(-1)
         out[nm] = dict(n_frame=int(L.shape[0] * L.shape[1]),
-                       n_water=int(mw.sum()), n_lit=int(lit.sum()),
-                       x=xw[lit], dk=dk)
-    # the two lines, off the buffer: split the lit set at the trough between
-    # the two breakpoints, which comes from the BED and not from the picture
-    md = ctx.get('_modes')
-    xsplit = float(np.mean(md['cb2']['x'])) if md else 420.0
-    # the plan grid's x runs to the domain edge, so shift by the bay's own
-    # shoreline offset: use the lit set's own median as the frame's reference
-    lo = out['two']['x'] < np.median(out['two']['x'])
-    check(1, 'the second surf line reaches PIXELS: both bands are populated',
-          [int(lo.sum()) > 200, int((~lo).sum()) > 200], [True, True], 0,
-          'RULING 18, AS INTEGERS OFF THE RENDERED BUFFER. Frame is %d px, '
-          '%d of them water (%.1f%% of frame), %d carrying deck > 0.25 with '
-          'the climate against %d without (%.1f%% against %.1f%% of frame). '
-          'Split at the lit set\'s own median world x, the seaward band holds '
-          '%d px and the shoreward band %d. Without the climate the same '
-          'split holds %d and %d, and the two are one band rather than two '
-          'because there is only one roller field to lay them.'
+                       n_water=int(ex['water_mask'].sum()),
+                       dk=dk, x=ex['water_P'][..., 0].reshape(-1),
+                       n_lit=int((dk > 0.25).sum()), L=L)
+    d_uni, d_car = out['two']['dk'], out['carrier']['dk']
+    diff = np.abs(d_uni - d_car) > 1e-6
+    check(1, 'the union deck reaches PIXELS: the branch changes the buffer',
+          int(diff.sum()) > 0, True, 0,
+          'RULING 18, AS INTEGERS OFF THE RENDERED BUFFER, AND THE BED HELD '
+          'FIXED. Same bay, same camera, same resolution; the only thing that '
+          'moves is whether `Water` reads `bay["tr_parts"]`. Frame %d px, %d '
+          'water (%.1f%% of frame), and %d of them -- %.2f%% of frame, %.1f%% '
+          'of the water -- carry a different deck value, by up to %.4f. The '
+          'difference lies between x = %.0f and %.0f m, which brackets the '
+          'wind sea\'s own breakpoint at x = %.0f m. Turn the branch off with '
+          '`--bug modes-deck-carrier-only` and this row is the only one in '
+          'the file that fires.'
           % (out['two']['n_frame'], out['two']['n_water'],
              100.0 * out['two']['n_water'] / out['two']['n_frame'],
-             out['two']['n_lit'], out['one']['n_lit'],
-             100.0 * out['two']['n_lit'] / out['two']['n_frame'],
-             100.0 * out['one']['n_lit'] / out['one']['n_frame'],
-             int(lo.sum()), int((~lo).sum()),
-             int((out['one']['x'] < np.median(out['one']['x'])).sum()),
-             int((out['one']['x'] >= np.median(out['one']['x'])).sum())),
-          'px')
-    info(1, 'white pixels gained by the second partition',
-         out['two']['n_lit'] - out['one']['n_lit'],
-         'The frame\'s own answer to "did the round change a picture": %d '
-         'water pixels carry deck > 0.25 with the two-partition boundary '
-         'condition against %d with one, on the same camera, the same '
-         'resolution and the same coast. A round that moved the physics and '
-         'not the buffer would read zero here.'
-         % (out['two']['n_lit'], out['one']['n_lit']))
-    ctx['_modes_reach'] = out
+             int(diff.sum()),
+             100.0 * diff.sum() / out['two']['n_frame'],
+             100.0 * diff.sum() / max(out['two']['n_water'], 1),
+             float(np.max(np.abs(d_uni - d_car))),
+             float(out['two']['x'][diff].min()),
+             float(out['two']['x'][diff].max()), xb[-1]), 'px')
+
+    HALF = 15.0     # m. Half the window, and it is the bar's own scale: the
+                    # bar this loop builds is ~11 m wide at half amplitude, so
+                    # 30 m centred on a breakpoint is the bar and its flanks.
+    nwin = {}
+    for nm in ('one', 'two'):
+        nwin[nm] = [int(((np.abs(out[nm]['x'] - c) <= HALF)
+                         & (out[nm]['dk'] > 0.25)).sum()) for c in xb]
+    openq(1, 'the two lines are NOT separable in the rendered white',
+          '%d px at the outer breakpoint, %d at the inner' % tuple(nwin['two']),
+          'a dark band between them',
+          'THE ROUND\'S RESIDUAL, MEASURED AT THE PIXEL AND NOT ONLY IN THE '
+          'PROFILE, and the first draft of this section got it wrong. The bed '
+          'genuinely carries two breakpoints -- x = %s m on this plan '
+          'transform\'s centre row -- and the deck genuinely reads both. But '
+          'the deck in the SHOREWARD window is %d px with the climate against '
+          '%d WITHOUT it: the wind sea breaks INSIDE the swell\'s saturated '
+          'surf zone, where the roller fraction is already at 1, so the union '
+          'has nothing left to add. That is the same statement as the OPEN in '
+          '`_sec_modes` -- H/d never returns under gamma_s, so the white '
+          'never stops -- arriving through a completely different instrument. '
+          'Two breakpoints on the bed; ONE band of white on the water.'
+          % (['%.0f' % v for v in xb], nwin['two'][1], nwin['one'][1]))
+    info(1, 'white pixels, two partitions against one',
+         [out['two']['n_lit'], out['one']['n_lit']],
+         'AND THE TOTAL GOES DOWN, WHICH IS WORTH READING RATHER THAN '
+         'HIDING. %d water pixels carry deck > 0.25 on the two-partition bed '
+         'against %d on the one-partition bed -- %+d, same camera, same '
+         'resolution, same coast. It is the BED and not the deck: the '
+         'swell\'s bar moves seaward and its surf zone moves with it. A round '
+         'that changed WHERE the waves break rather than HOW MUCH is supposed '
+         'to read something other than "more white".'
+         % (out['two']['n_lit'], out['one']['n_lit'],
+            out['two']['n_lit'] - out['one']['n_lit']))
+    ctx['_modes_reach'] = dict(nwin=nwin, xb=xb, n_diff=int(diff.sum()),
+                               n_lit=[out['two']['n_lit'],
+                                      out['one']['n_lit']],
+                               n_water=out['two']['n_water'],
+                               n_frame=out['two']['n_frame'])
 
 
 def _bug_modes_no_gate(mod):
@@ -12311,6 +12356,52 @@ if __name__ == '__main__':
                 print('%-26s   %s' % ('', c[:88]))
         importlib.reload(BOP)
         importlib.reload(RND)
+        sys.exit(0)
+    if '--bugs-modes' in sys.argv:
+        # WAVE 19, THE BATHYMETRY LANE. Its own driver for the reason wave 10's
+        # and wave 19's population lane both have one: the two sections cost a
+        # morphodynamic run each, and the generic `--bugs` table would pay for
+        # the whole file per defect. Two of the three defects patch `beach`,
+        # whose reload clears `_BAY_CACHE` -- so `_sec_modes_reach` is run only
+        # for the defect that can reach it, and the 1-D section carries the
+        # other two.
+        import importlib
+        import beach_render as RND
+
+        def _run_modes(with_reach=False):
+            del ROWS[:]
+            c = dict(B=BCH, T=BCH.T_SWELL, omega=2.0 * math.pi / BCH.T_SWELL,
+                     x=BCH.make_grid())
+            guard(_sec_modes, 'the offshore climate has modes', c)
+            if with_reach:
+                guard(_sec_modes_reach, 'do pixels reach it', c)
+            return c
+        _run_modes()
+        base = set(_fail_names())
+        print('clean modes section: %d pass / %d FAIL / %d OPEN'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base),
+                 sum(r.status == 'OPEN' for r in ROWS)))
+        print()
+        print('%-28s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 118)
+        for name in ('modes-no-gate', 'modes-one-partition',
+                     'modes-deck-carrier-only'):
+            importlib.reload(BCH)
+            _MODE_CACHE.clear()
+            reach = name == 'modes-deck-carrier-only'
+            BUGS[name](RND if reach else BCH)
+            try:
+                _run_modes(with_reach=reach)
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                          # noqa: BLE001
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            RND.DECK_UNION = True
+            print('%-28s %d' % (name, len(caught)))
+            for c in caught:
+                print('%-28s   %s' % ('', c[:86]))
+        importlib.reload(BCH)
+        _MODE_CACHE.clear()
         sys.exit(0)
     if '--bugs-population' in sys.argv:
         # WAVE 19. ITS OWN DRIVER, AND THE REASON IS THE BAY. `_sec_population`
