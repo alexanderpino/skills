@@ -25,7 +25,7 @@ the first, and gives the density only the second:
 | individual facets clipping | `p_sub(z* − z_res)`, the *unresolved* density at the drawn residual | `beach_optics.glitter_radiance(slope0=…, var=…)` |
 | dark water between them | the residual variance is smaller, so the Gaussian is narrower and falls away faster off each facet | `SlopeRealisation.residual` |
 | the scale of the grain | `k_res = π/L`, the wavenumber the footprint can carry, per pixel and per axis | `SlopeRealisation.slope(foot_c, foot_a, ea)` |
-| the grain coarsening toward the near field | footprint 0.10 → 2.66 m up the crop; the resolved share follows `ln(k_res/k_lo)/ln(k_hi/k_lo)` | `beach_optics.mss_fraction_below` |
+| the grain coarsening toward the horizon | footprint 0.21 → 13.2 m up the crop; the resolved share follows `ln(k_res/k_lo)/ln(k_hi/k_lo)` | `beach_optics.mss_fraction_below` |
 | the amplitude of each band | Phillips' `k⁻⁴` saturation range, total pinned to Cox & Munk **minus the swell the geometry already draws** | `subgrid_realisation` |
 | the elongation along the view | the footprint is stretched `1/\|d_z\|` along the view and not at all across it | `beach_render.render` |
 
@@ -37,12 +37,18 @@ map, no roughness parameter. The seed is 1954 and no frame was drawn twice to pi
 Interior coefficient of variation on a core strip 15% of the path's own half-maximum width, and the
 median bright-run length on a box 60% of it, both measured on `L` before any tone curve:
 
-| rows | footprint | CV before | CV after | run before | run after |
+| rows | footprint (p90) | CV before | CV after | run before | run after |
 |---|---|---|---|---|---|
-| 600–720 | 2.66 m | 0.374 | **0.663** | 56 px | **3 px** |
-| 720–840 | 0.42 m | 0.624 | **1.110** | 9 px | **2 px** |
-| 840–960 | 0.15 m | 0.475 | **1.356** | 16 px | **2 px** |
-| 960–1080 | 0.10 m | 0.413 | **1.016** | 10 px | **1 px** |
+| 600–720 | 13.2 m | 0.374 | **0.663** | 56 px | **3 px** |
+| 720–840 | 0.72 m | 0.624 | **1.110** | 9 px | **2 px** |
+| 840–960 | 0.21 m | 0.475 | **1.356** | 16 px | **2 px** |
+| 960–1080 | — | *dropped* | *dropped* | 10 px | **1 px** |
+
+The fourth band is **dropped and said so.** In the near field the path runs off the bottom of the
+crop, so its column profile stops having a peak: the located width comes out at 14 px against its
+neighbours' 105–164, which is a failed measurement and not a narrow path. Measuring a core strip on
+it would put a number in this table that means nothing, which is worse than a gap. Its run median
+is reported because the run box does not depend on locating a half-maximum.
 
 **The run median is the honest discriminator, not the CV.** The "before" CV is not zero, and saying
 why matters: the left panel still carries the swell tilting the specular condition, the whitecap
@@ -64,9 +70,12 @@ above or below it is the change. The key is a display decision, it is identical 
 and every number quoted above is taken from the scene-linear buffer before that division.
 
 For completeness, and only because the reference photographs are 8-bit: through that same encode
-the core strip's standard deviation goes **43.3 → 66.3**, **42.9 → 58.4**, **21.2 → 34.6** and
-**14.2 → 11.2** grey levels down the four bands. Those are display-referred numbers, produced by a
-declared exposure, and they are quoted here rather than used as evidence.
+the core strip's standard deviation goes **43.3 → 66.3**, **42.9 → 58.4** and **21.2 → 34.6** grey
+levels down the three measurable bands, on means of 193 → 190, 108 → 100 and 81 → 56. Those are
+display-referred numbers, produced by a declared exposure, and they are quoted here rather than used
+as evidence — the reference set's 41–70 levels were measured on frames whose own exposure is
+unknown, and comparing an 8-bit spread against another 8-bit spread taken at a different exposure is
+a comparison of two grades.
 
 *Drawn by `terrain-renderer/reference-impl/glitter_evidence.py`. No burned-in text: the panels are
 pixels and nothing else, so a critic can be shown them without being told which is which.*
