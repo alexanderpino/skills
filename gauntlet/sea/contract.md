@@ -247,7 +247,29 @@ next thing was being logged identically to a round that fixed nothing. The run
 could not converge by construction — not because the work was not converging,
 but because the record admitted no arrival.
 
-**Ruling 15 — a round that closes its gap is logged `--severity none`.** The
+**Ruling 15 — CORRECTED AT WAVE 18, and the script caught me.** It first read
+*"a round that closes its gap is logged `--severity none`"*, and that conflated
+two different things. `severity` is a statement about **the dimension against
+the bar**, not about **the round against its brief**. `none` means *no
+meaningful gap left*; it feeds the clean streak and therefore the stop
+conditions. A round can close the gap it was handed and leave the dimension
+nowhere near the bar — wave 18 did exactly that twice, and `gauntlet.py` warned
+both times: *"severity is 'none' but score 7 is below the target of 9 — 'no
+meaningful gap left' below the bar is contradictory."* It was right and I was
+not.
+
+**So the corrected ruling is:** log `--severity none` only when the *dimension*
+has no meaningful gap left against the bar. Log progress in the **score**, which
+is what moves and what the trend reads, and log the residual as the new gap —
+in its own record, never stapled to the round that closed the previous one.
+
+**And my original diagnosis was half wrong, which is worth keeping.** I read
+`0 gap(s) closed` after fifteen waves and concluded the bookkeeping was hiding
+arrivals. It was not: **there had been no arrivals.** What was actually true is
+narrower — the record never distinguished a round that *moved the number* from
+one that did not, because I was logging each lane's standing state rather than
+each round's result. The score already carries that distinction and I was not
+using it. The
 next gap gets its own record, or goes to `backlog.md`. Never stapled to the
 round that closed the previous one. A clean round is a fact about the artifact
 and the log has to be able to state it.
