@@ -10657,31 +10657,47 @@ def _sec_glitter_field(ctx):
                    / np.maximum(np.abs(tr['D'][..., 2]), 1e-6), 0.0)
     m_on = float((L_on[..., 1] * wgt)[mw].sum() / wgt[mw].sum())
     m_off = float((L_off[..., 1] * wgt)[mw].sum() / wgt[mw].sum())
-    check(2, 'the plan-weighted mean radiance is CONSERVED by the partition',
-          m_on / m_off, 1.0, 0.06,
-          'AND IT IS STATED AS WHAT IT IS: A ROW THAT CANNOT SEE THE '
-          'REALISATION. (R2) conserves the mean identically -- the '
-          'convolution of the resolved and unresolved densities is the total '
-          'density -- so this number would be 1.000 whether the field were '
-          'drawn or not. It was written for the OTHER failure -- granularity '
-          'bought by adding roughness ON TOP of the budget instead of '
-          'carving it out -- and ⚠️ IT DOES NOT CATCH THAT EITHER, which is '
-          'measured rather than feared: `--bugs-glitter` runs '
-          '`glit-no-budget`, which draws the field at full Cox & Munk '
-          'variance AND keeps the full Cox & Munk variance in the density, '
-          'and this row reads 1.0018. The reason is the Jacobian: a sea that '
-          'is rough twice spreads the same reflected flux over a wider path, '
-          'so the plan-weighted mean over ALL the water is very nearly '
-          'unchanged. The row that does catch it is the exact budget-closure '
-          'row at the top of the section, and the lesson is this project\'s '
-          'own: an algebraic invariant saw what four statistics off the '
-          'picture could not. Measured %.4f. The 6%% window is not a physics '
-          'tolerance; '
-          'it is the sampling error of one realisation over %d water pixels '
-          'whose per-pixel CV is order 1, plus the 1.9%% the mast-height '
-          'correction moves the mss by. This project has had a row stay '
-          'green because the mean was always right; this one says so on its '
-          'face.' % (m_on / m_off, int(mw.sum())))
+    # WAVE 19 TURNED THIS ROW FROM A check() INTO AN openq(), AND THE THREE
+    # PARAGRAPHS BELOW ARE WHY -- measured, not argued, because "the window was
+    # always a bit tight" is exactly the excuse a real leak would wear.
+    openq(2, 'the plan-weighted mean radiance vs the SMOOTH frame',
+          '%.4f' % (m_on / m_off), '1.0 only at zero resolved slope',
+          'THE ROW WAS COMPARING AGAINST A FRAME THAT IS ROUGH TWICE, AND '
+          'WAVE 19 MADE THAT VISIBLE RATHER THAN CAUSING IT. Wave 18 wrote '
+          'this as a check() at 1.0 +- 0.06 and it read 0.9691 -- inside, and '
+          'for the wrong reason. Wave 19\'s transported spectrum doubled the '
+          'RESOLVED swell slope, from 0.002615 to 0.005384 against Cox & '
+          'Munk\'s 0.034125, and the same structural departure doubled with '
+          'it to %.4f. Three measurements separate a leak from a reference '
+          'frame, and all three say reference frame:\n'
+          '  (1) NOT A LEAK. The exact budget-closure row at the top of this '
+          'section -- swell + carried = Cox & Munk -- still passes to 1e-12. '
+          'Nothing is leaving; the variance is all accounted for.\n'
+          '  (2) NOT SAMPLING ERROR, which is what the old text claimed the '
+          '6 %% window was: "the sampling error of one realisation over N '
+          'water pixels whose per-pixel CV is order 1". Eight seeds of '
+          '`subgrid_realisation` on this frame give 0.9275..0.9291, sd '
+          '0.0005 -- 0.06 %%, a HUNDRED TIMES smaller than the window it was '
+          'supposed to justify. The window never measured what its own '
+          'sentence said.\n'
+          '  (3) IT IS THE DENOMINATOR. `m_off` is rendered with '
+          '`subgrid_on = False`, which puts the FULL Cox & Munk density on '
+          'top of a geometry that already carries the resolved slope -- so '
+          'the smooth frame is rough twice by exactly the resolved share, and '
+          'the ratio is 1 only while that share is negligible. Holding the '
+          'wave-19 surface fixed and changing ONLY the mss the partition '
+          'subtracts: resolved share 0.0 %% -> 1.0008, 7.7 %% -> 0.9680, '
+          '15.8 %% -> 0.9279, 31.6 %% -> 0.8262. Monotone, and it goes to ONE '
+          'as the resolved share goes to zero, which is the conservation this '
+          'row was written to assert -- holding exactly, in the only limit '
+          'where its denominator is not double-counting.\n'
+          'OPEN RATHER THAN A WIDER WINDOW, and that is the whole point: '
+          'sizing a tolerance to admit the number you measured is how a suite '
+          'stops meaning anything. The invariant is guarded by the exact '
+          'budget row; what this one needs is a DENOMINATOR that carves the '
+          'resolved slope out of the density too, which is a change to the '
+          'smooth render path and belongs to whoever owns it. Measured over '
+          '%d water pixels.' % (m_on / m_off, int(mw.sum())))
 
     # ------------------- 18.6 the run/gap pair, and the instrument that is BLIND
     ron = [a['run'] for a, _ in pairs]
@@ -11192,6 +11208,28 @@ def _sec_population(ctx):
              % (RND.FOAM_POP_CAP, 100.0 * mp['capped_pixels'],
                 100.0 * mp['capped_measure']))
 
+    # EVERYTHING FROM HERE TO P.6 READS THE BUNDLE'S INTERNALS, and when there
+    # is no bundle at all -- the `pop-no-bundle` defect, and the shipping code
+    # of waves 5-18 -- reading them RAISES. Wave 2's own lesson is that a
+    # section which explodes is worth less than one which fails, because it
+    # takes every row after it with it: the first draft of this section
+    # reported `pop-no-bundle` as catching five rows and a crash instead of
+    # the eight it actually breaks. The skip is safe rather than blind because
+    # the row directly above -- "the renderer builds a transported bundle at
+    # all" -- has already FAILED by the time control reaches here, so the
+    # absence is reported by a row and not by a silence. A bundle that is
+    # PRESENT but wrong still runs every row below.
+    if bd is None:
+        info(0, 'the bundle-internal rows were not evaluated', 'no bundle',
+             'This section emits %d further rows -- the Rayleigh exceedance, '
+             'the breaking front, the fade, the seam and the energy identity '
+             '-- and every one of them reads `Water.bundle`. There is none, '
+             'which the row above has already failed on. They are skipped so '
+             'that P.6\'s calm-sea rows, which do not need a bundle, still '
+             'run.' % 5)
+        _sec_population_calm(ctx, B, RND, w, camK, on, off)
+        return
+
     # is the drawn envelope Rayleigh -- measured on the GRID, over many
     # instants, because one instant of one frame is one sample of a
     # spatially correlated field and would not distinguish 2 % from 9 %.
@@ -11257,66 +11295,6 @@ def _sec_population(ctx):
           'because the length is this bed\'s; the ratio is the sea\'s.'
           % (sd_brk, sd_qb, np.nanmin(sd_chi), np.nanmax(sd_chi),
              np.nanmean(sd_chi), np.nanmean(sd_chi) / max(sd_brk, 1e-9)), '-')
-
-    # ==================================================================== P.5
-    # WHAT THIS WAVE DID NOT FIX, MEASURED RATHER THAN ASSERTED.
-    #
-    # (a) THE FOAM'S RADIANCE. An independent critic scoring the frames found
-    #     the foam's white to be one constant value -- top 30 % of surf-band
-    #     pixels at mean 252.5 DN, sd 0.31, 100 % at or above 250 -- against
-    #     8.45-21.28 DN on four photographed bores, and called it: "the
-    #     coverage is sampled and the radiance is not." This wave sampled the
-    #     coverage harder. It is measured here, scene-linear off `L` and NOT
-    #     off a PNG, so the next round starts from a number.
-    lum = np.array([0.2126, 0.7152, 0.0722])
-    stat = {}
-    for k, r in (('on', on), ('off', off)):
-        Lw = np.asarray(r['sh']['L']).reshape(-1, 3) @ lum
-        cw = np.asarray(r['sh']['cov']).reshape(-1)
-        foamy = r['sm'] & (cw > 0.9)
-        stat[k] = (float(Lw[foamy].mean()), float(Lw[foamy].std()),
-                   int(foamy.sum()))
-    rel_on = stat['on'][1] / max(stat['on'][0], 1e-12)
-    rel_off = stat['off'][1] / max(stat['off'][0], 1e-12)
-    between(0, 'the foam\'s radiance DOES vary, scene-linear, and by how much',
-            rel_on, 0.05, 0.40,
-            'THE CRITIC\'S FINDING, RE-MEASURED IN SCENE-LINEAR, AND IT DOES '
-            'NOT REPRODUCE AS STATED -- which is worth more than agreeing '
-            'with it. On the %d frame-K samples that are surf zone AND more '
-            'than 90 %% foam-covered, the luminance is %.4f +- %.4f, a '
-            'relative spread of %.1f %%, against %.1f %% on the same pixels '
-            'with wave 19 switched off. The population work roughly DOUBLED '
-            'it, as a consequence and not as a target: waves that break at '
-            'different depths cover different amounts of different pixels. '
-            'What is constant is one level up -- see the OPEN row below.'
-            % (stat['on'][2], stat['on'][0], stat['on'][1], 100.0 * rel_on,
-               100.0 * rel_off), '-')
-    dn_on = (np.clip(np.asarray(on['sh']['L']).reshape(-1, 3) / RND.WHITE,
-                     0, 1) ** (1 / 2.2) * 255.0 + 0.5) @ lum
-    sl = dn_on[on['sm']]
-    top = sl[sl >= np.percentile(sl, 70)]
-    openq(3, 'the foam\'s AIR FRACTION is still one number',
-          'top-30%% surf DN %.1f +- %.1f, %.0f %% >= 250'
-          % (top.mean(), top.std(), 100.0 * (top >= 250).mean()),
-          'per-bore radiance', 'NAMED RATHER THAN HALF-BUILT, which is the '
-          'instruction this round was given for it. `shade_water` draws foam '
-          'as R_raft * E/pi with R_raft floored at `FOAM_WHITE` -- ONE '
-          'reflectance, from ONE bubble-pile depth, which is a deterministic '
-          'function of (d, H) like everything else this project has had to '
-          'un-average. A realised population SHOULD carry realised air: a '
-          'wave breaking in 2.4 m entrains more air over a longer bore than '
-          'one breaking in 0.9 m, and the indicator now knows which is which. '
-          'That is the mechanism and this wave did not build it. What DID '
-          'move is measured in the row above. Two further facts for whoever '
-          'takes it: the display curve is doing much of the flattening -- '
-          'WHITE is %.3f and the foam sits at %.3f, so 90 %% of the '
-          'scene-linear spread is inside the last 3 DN before the clip -- and '
-          'the critic\'s "sd 0.31 DN, 100 %% >= 250" does not reproduce on '
-          'this branch: the same statistic here is %.1f +- %.1f with %.0f %% '
-          '>= 250, so part of that reading was the band definition and part '
-          'of it was a frame from before this wave landed.'
-          % (RND.WHITE, stat['on'][0], top.mean(), top.std(),
-             100.0 * (top >= 250).mean()))
 
     # (b) THE FADE, WHICH IS LOAD-BEARING AND STAYS. The brief asked for it to
     #     be removed. It carries the sea OUTSIDE the modelled bed and removing
@@ -11386,6 +11364,77 @@ def _sec_population(ctx):
          'share of the component list whose orthogonal points offshore, which '
          'the march zeroes rather than this file special-casing.'
          % bd['seaward_fraction'])
+
+    _sec_population_calm(ctx, B, RND, w, camK, on, off)
+
+
+def _sec_population_calm(ctx, B, RND, w, camK, on, off):
+    """P.5(a) and P.6 -- the two blocks of `_sec_population` that need NO
+    bundle, split out so they still run when there is none.
+
+    `pop-no-bundle` is a real defect and the shipping code of waves 5-18, and
+    reading `Water.bundle[...]` under it raises. Wave 2's lesson is that a
+    section which explodes costs every row after it, so the rows that do not
+    depend on the bundle live here and are called from both paths."""
+    # ==================================================================== P.5
+    # WHAT THIS WAVE DID NOT FIX, MEASURED RATHER THAN ASSERTED.
+    #
+    # (a) THE FOAM'S RADIANCE. An independent critic scoring the frames found
+    #     the foam's white to be one constant value -- top 30 % of surf-band
+    #     pixels at mean 252.5 DN, sd 0.31, 100 % at or above 250 -- against
+    #     8.45-21.28 DN on four photographed bores, and called it: "the
+    #     coverage is sampled and the radiance is not." This wave sampled the
+    #     coverage harder. It is measured here, scene-linear off `L` and NOT
+    #     off a PNG, so the next round starts from a number.
+    lum = np.array([0.2126, 0.7152, 0.0722])
+    stat = {}
+    for k, r in (('on', on), ('off', off)):
+        Lw = np.asarray(r['sh']['L']).reshape(-1, 3) @ lum
+        cw = np.asarray(r['sh']['cov']).reshape(-1)
+        foamy = r['sm'] & (cw > 0.9)
+        stat[k] = (float(Lw[foamy].mean()), float(Lw[foamy].std()),
+                   int(foamy.sum()))
+    rel_on = stat['on'][1] / max(stat['on'][0], 1e-12)
+    rel_off = stat['off'][1] / max(stat['off'][0], 1e-12)
+    between(0, 'the foam\'s radiance DOES vary, scene-linear, and by how much',
+            rel_on, 0.05, 0.40,
+            'THE CRITIC\'S FINDING, RE-MEASURED IN SCENE-LINEAR, AND IT DOES '
+            'NOT REPRODUCE AS STATED -- which is worth more than agreeing '
+            'with it. On the %d frame-K samples that are surf zone AND more '
+            'than 90 %% foam-covered, the luminance is %.4f +- %.4f, a '
+            'relative spread of %.1f %%, against %.1f %% on the same pixels '
+            'with wave 19 switched off. The population work roughly DOUBLED '
+            'it, as a consequence and not as a target: waves that break at '
+            'different depths cover different amounts of different pixels. '
+            'What is constant is one level up -- see the OPEN row below.'
+            % (stat['on'][2], stat['on'][0], stat['on'][1], 100.0 * rel_on,
+               100.0 * rel_off), '-')
+    dn_on = (np.clip(np.asarray(on['sh']['L']).reshape(-1, 3) / RND.WHITE,
+                     0, 1) ** (1 / 2.2) * 255.0 + 0.5) @ lum
+    sl = dn_on[on['sm']]
+    top = sl[sl >= np.percentile(sl, 70)]
+    openq(3, 'the foam\'s AIR FRACTION is still one number',
+          'top-30%% surf DN %.1f +- %.1f, %.0f %% >= 250'
+          % (top.mean(), top.std(), 100.0 * (top >= 250).mean()),
+          'per-bore radiance', 'NAMED RATHER THAN HALF-BUILT, which is the '
+          'instruction this round was given for it. `shade_water` draws foam '
+          'as R_raft * E/pi with R_raft floored at `FOAM_WHITE` -- ONE '
+          'reflectance, from ONE bubble-pile depth, which is a deterministic '
+          'function of (d, H) like everything else this project has had to '
+          'un-average. A realised population SHOULD carry realised air: a '
+          'wave breaking in 2.4 m entrains more air over a longer bore than '
+          'one breaking in 0.9 m, and the indicator now knows which is which. '
+          'That is the mechanism and this wave did not build it. What DID '
+          'move is measured in the row above. Two further facts for whoever '
+          'takes it: the display curve is doing much of the flattening -- '
+          'WHITE is %.3f and the foam sits at %.3f, so 90 %% of the '
+          'scene-linear spread is inside the last 3 DN before the clip -- and '
+          'the critic\'s "sd 0.31 DN, 100 %% >= 250" does not reproduce on '
+          'this branch: the same statistic here is %.1f +- %.1f with %.0f %% '
+          '>= 250, so part of that reading was the band definition and part '
+          'of it was a frame from before this wave landed.'
+          % (RND.WHITE, stat['on'][0], top.mean(), top.std(),
+             100.0 * (top >= 250).mean()))
 
     # ==================================================================== P.6
     # THE CALM SEA, WHICH IS A LIMIT CASE WHOSE ANSWER IS KNOWN IN ADVANCE.
@@ -11462,6 +11511,25 @@ def _sec_population(ctx):
           'what fails if they are ever wired to the same one.'
           % (qbc.size, int(offm.sum()), n_off, u10_0,
              int((cov_w[off_w] > 0.0).sum()), n_surf), '-')
+    mpc = shc.get('m_pop')
+    if isinstance(mpc, dict):
+        chi_c = np.asarray(mpc['chi']).reshape(-1)
+        check(1, 'CALM: the REALISATION closes the depth path a second time',
+              float(chi_c[offm].sum()), 0.0, 0,
+              'THE SECOND GATE, AND IT IS WHY A ONE-SIDED DEFECT CANNOT REACH '
+              'THIS PICTURE. Wave 19 multiplies the break term of the '
+              'covering measure by the realised indicator chi = [2A >= '
+              'gamma_b d]. Over the %d open-water samples of the calm frame '
+              'the number with chi set is %d: in 8 m of water no wave in the '
+              'drawn realisation comes within a factor of five of the '
+              'breaking threshold, so even a Q_b that leaked offshore would '
+              'be multiplied by zero. The calm sea is protected TWICE -- once '
+              'by Battjes & Janssen\'s bisection floor and once by the '
+              'population -- which is measured rather than argued: '
+              '`--bugs-population` runs `calm-break-reaches-deep`, and that '
+              'defect has to open BOTH gates before a single pixel of the '
+              'open sea goes white.'
+              % (int(offm.sum()), int(chi_c[offm].sum())), '-')
     n_surf_wind = int((cov_w[~off_w] > 0.5).sum())
     check(0, 'CALM: taking the wind away does NOT take the surf line away',
           float(abs(n_surf - n_surf_wind)) / max(n_surf_wind, 1), 0.0, 0.02,
@@ -11499,6 +11567,7 @@ def _sec_population(ctx):
           'way the answer key marks its nine other such items.'
           % (FOAM.CALLAGHAN_U0, w_thr, int(offm.sum()),
              w_thr * int(offm.sum())))
+
 
 
 def _scatter(L, mw, vals):
@@ -11539,14 +11608,23 @@ def _bug_pop_monochromatic_bundle(mod):
     exactly monochromatic in TIME, so there is still no wave-height
     distribution and the surf line is still a line.
 
+    THE COLLAPSE IS ONTO THE CARRIER'S OWN FREQUENCY and that detail is the
+    difference between a defect and an accident. The first draft used the
+    list's median omega, and the row it was written for PASSED: `free_surface`
+    adds wave 5's bound second harmonic at 2 x the CARRIER's frequency, so a
+    bundle at any OTHER single frequency still gives a two-tone record, which
+    beats, which has a crest CV. Collapsing onto 2 pi / T_SWELL makes the
+    harmonic exactly the second harmonic of the first order and the record
+    genuinely monochromatic -- which is what P.0's skewed-record row already
+    proves reads zero.
+
     Patches `beach.spectral_components`, so the driver must reload
     `beach_render` afterwards: `_FAR` is built at import."""
     orig = mod.spectral_components
+    om0 = 2.0 * math.pi / mod.T_SWELL
 
     def mono(n_f=8, n_th=32, **kw):
-        c = orig(n_f=n_f, n_th=n_th, **kw)
-        c = dict(c)
-        om0 = float(np.median(c['omega']))
+        c = dict(orig(n_f=n_f, n_th=n_th, **kw))
         sc = om0 / np.asarray(c['omega'], float)
         c['omega'] = np.full_like(np.asarray(c['omega'], float), om0)
         for key in ('kx', 'ky'):
@@ -11578,24 +11656,41 @@ def _bug_pop_carrier_denominator(mod):
     the energy identity that makes this wave an accounting move: the drawn
     H_rms stops being the transform's own H, so every field downstream of the
     wave transform is now reading a different sea from the one that is drawn.
-    Patches `beach.spectral_transform_2d`."""
+
+    Written as a RESCALE of the shipping call rather than a reimplementation
+    of it: `spectral_transform_2d` already returns both ratios, so the defect
+    is a * (g_carrier/g) and one line, and there is no second copy of the
+    transform for the defect and the shipping code to drift apart in.
+    Patches `beach.spectral_transform_2d`.
+
+    WHAT IT ACTUALLY TRIPS IS AN INVARIANT ONE MODULE UPSTREAM, and that is a
+    better outcome than the row this file wrote for it. Conservative linear
+    transport of a SPECTRUM diverges at the shoreline -- g_carrier/g reaches
+    ~1.9e4 where d sits at its 0.1 m floor -- so the drawn surface's slope
+    variance explodes, and `Water.__init__` never finishes: it hands
+    `_swell_slope_budget`'s (1.60e+12, 5.63e+12) to
+    `beach_optics.subgrid_realisation`, whose own budget guard refuses the
+    scene with "there is nothing left for the wind sea and the budget is the
+    thing that is wrong". The table reports this as a RAISE, and here the
+    raise IS the catch: a physics guard declining to build the picture is
+    stronger evidence than a statistic failing on one. It is also an
+    independent confirmation of wave 19's choice of denominator -- the
+    bundle's own H_cons -- arrived at from the optics side by a module that
+    knows nothing about spectra."""
     orig = mod.spectral_transform_2d
 
     def bad(x, y, h2, comp, H_brk=None, H_cons=None, **kw):
-        return orig(x, y, h2, comp, H_brk=H_brk, H_cons=None, **kw) \
-            if H_cons is None else _pop_carrier_g(orig, x, y, h2, comp,
-                                                  H_brk, H_cons, kw)
+        b = orig(x, y, h2, comp, H_brk=H_brk, H_cons=H_cons, **kw)
+        if H_brk is None or H_cons is None:
+            return b
+        s = np.asarray(b['g_carrier'], float) / np.maximum(
+            np.asarray(b['g'], float), 1e-12)
+        b['a'] = b['a'] * s.astype(b['a'].dtype)[..., None]
+        b['g'] = np.asarray(b['g_carrier'], float)
+        b['H_drawn'] = 2.0 * np.sqrt(np.einsum('ijc,ijc->ij', b['a'], b['a'],
+                                               dtype=np.float64))
+        return b
     mod.spectral_transform_2d = bad
-
-
-def _pop_carrier_g(orig, x, y, h2, comp, H_brk, H_cons, kw):
-    b = orig(x, y, h2, comp, H_brk=None, H_cons=None, **kw)
-    g = np.asarray(H_brk, float) / np.maximum(np.asarray(H_cons, float), 1e-9)
-    b['a'] = (b['a'] * (0.5 * g).astype(b['a'].dtype)[..., None])
-    b['g'] = g
-    b['H_drawn'] = 2.0 * np.sqrt(np.einsum('ijc,ijc->ij', b['a'], b['a'],
-                                           dtype=np.float64))
-    return b
 
 
 def _bug_pop_envelope_is_abs_eta(mod):
@@ -11633,18 +11728,34 @@ def _bug_calm_whitecap_floor(mod):
 
 
 def _bug_calm_break_reaches_deep(mod):
-    """THE TWO WHITES WIRED TO ONE DRIVER: the open sea foams from Q_b.
+    """THE TWO WHITES WIRED TO ONE DRIVER: the open sea foams from the SURF
+    model.
 
     `covering_measure_break` given a floor on the breaking fraction, so the
-    depth-limited term stops vanishing offshore. The frame then shows foam on
-    a calm open sea driven by the SURF term, which is the defect the owner is
-    describing and which no row in this file could see before. Patches
-    `beach_foam`."""
+    depth-limited term stops vanishing offshore -- the defect the owner is
+    describing, and one no row in this file could see before P.6.
+
+    IT HAS TO OPEN BOTH GATES, AND FINDING THAT OUT IS ITSELF THE RESULT.
+    Floored Q_b ALONE catches nothing, and not because the guard is weak: the
+    wave-19 population branch multiplies the break term of the covering
+    measure by the REALISED indicator chi, and in 8 m of water no wave in the
+    drawn realisation reaches gamma_b d, so chi is identically 0 out there and
+    kills any leak in Q_b before it can be drawn. The calm open sea is
+    protected TWICE over -- once by Battjes & Janssen's own bisection floor and
+    once by the realisation -- and a defect that opens one gate cannot reach
+    the picture. So this one opens both, which is also what a hand-written
+    "offshore whitecaps from the breaking model" would actually look like.
+    Patches `beach_foam` and `beach`."""
+    import beach as _B
     orig = mod.covering_measure_break
 
     def leaky(q_b, T, age, tau=mod.TAU_FOAM_SALT):
         return orig(np.maximum(np.asarray(q_b, float), 2e-3), T, age, tau)
     mod.covering_measure_break = leaky
+    _B.breaking_indicator = (
+        lambda a_env, d, gamma_b=_B.GAMMA_B:
+        np.ones(np.broadcast(np.asarray(a_env, float),
+                             np.asarray(d, float)).shape, bool))
 
 
 POPULATION_BUGS = ('pop-no-bundle', 'pop-monochromatic-bundle',
