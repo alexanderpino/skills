@@ -545,7 +545,7 @@ def fig_climate_modes(path):
     bp1 = B.breakpoints(tr1)
     cb = B.climate_breakpoints(x, h2)
 
-    img = P.canvas(1180, 1180)
+    img = P.canvas(1180, 1290)
 
     ax = P.Axes(img, (95, 58, 1130, 360), (280, 500), (-4.0, 0.5),
                 title='The bed: one partition leaves one bar, two leave two',
@@ -560,7 +560,7 @@ def fig_climate_modes(path):
                   (BAR, 'one partition (H0 = 1.5 m, T = 9 s) -- waves 1-18'),
                   (WAVE, 'two partitions: the same swell + the wind sea '
                          'U10 = 6 m/s implies'),
-                  (GREEN, 'where a partition starts breaking')], 284, -3.55)
+                  (GREEN, 'where a partition starts breaking')], 286, -2.55)
 
     ax2 = P.Axes(img, (95, 430, 1130, 730), (280, 500), (0.0, 1.0),
                  title='H/d: the count of crossings of the breaker index goes '
@@ -574,14 +574,14 @@ def fig_climate_modes(path):
     ax2.hline(B.GAMMA_STABLE, PURPLE, 2, (4, 4))
     for xb in cb['x']:
         ax2.marker(xb, B.GAMMA_B, (20, 20, 24), 5)
-    ax2.text(284, B.GAMMA_B + 0.03, 'gamma_b = 0.78', (20, 20, 24))
-    ax2.text(284, B.GAMMA_STABLE - 0.07,
+    ax2.text(400, B.GAMMA_B + 0.03, 'gamma_b = 0.78', (20, 20, 24))
+    ax2.text(400, B.GAMMA_STABLE - 0.07,
              'gamma_s = 0.40 -- still never reached', PURPLE)
     P.legend(ax2, [(BAR, 'swell alone, on the one-partition bed: 1 crossing'),
                    (WAVE, 'swell, on the two-partition bed'),
-                   (GREEN, 'wind sea, on the same bed')], 284, 0.30)
+                   (GREEN, 'wind sea, on the same bed')], 286, 0.98)
 
-    ax3 = P.Axes(img, (95, 800, 1130, 1055), (280, 500), (0.0, 1.05),
+    ax3 = P.Axes(img, (95, 800, 1130, 1080), (280, 500), (0.0, 1.05),
                  title='The foam source: the deck each partition lays, and '
                        'their union',
                  xlabel='cross-shore distance, m (shoreward ->)',
@@ -594,7 +594,7 @@ def fig_climate_modes(path):
     ax3.line(x, 1.0 - (1.0 - f_s) * (1.0 - f_w), (20, 20, 24), 3)
     P.legend(ax3, [(WAVE, 'swell'), (GREEN, 'wind sea'),
                    ((20, 20, 24), 'union 1 - PROD(1 - f): what the renderer '
-                                  'lays')], 284, 0.42)
+                                  'lays')], 286, 0.98)
 
     P.caption(img, [
         'The critic measured one surf zone against bar section J\'s three to four lines and read the cause as bathymetric. Half of that is right.',
