@@ -69,6 +69,12 @@ import atmosphere as ATM
 
 FAST = '--fast' in sys.argv
 OUT = '../../gauntlet/sea/evidence'
+DECK_UNION = True       # WAVE 19. Whether the foam deck is the UNION of every
+                        # offshore partition's roller or only the carrier's.
+                        # A module switch rather than an argument because the
+                        # suite's `--bug modes-deck-carrier-only` flips it, and
+                        # a defect that can only be reintroduced by editing the
+                        # file is a defect nobody re-fires.
 SUBGRID_SEED = 1954     # the year of Cox & Munk's flight, and it is a SEED and
                         # not a tuning: no frame in this project is drawn twice
                         # to pick a better draw of it, which standing ruling 3
@@ -353,6 +359,28 @@ class Water:
         # one the dissipation, the undertow and the bar have all used since
         # wave 1.
         self.deck = FM.deck_source(tr)
+        # WAVE 19 -- THE DECK IS LAID BY EVERY WAVE SYSTEM ON THE WATER, not
+        # only by the carrier. When the bay's offshore boundary carries more
+        # than one partition (`beach.CLIMATE_SCENE` -- the remote swell and the
+        # local wind sea the same `U10` already sets the glitter from), each
+        # partition breaks at its OWN depth and lays its OWN roller, and a
+        # photograph shows both. Waves 1-18 had one partition and this line was
+        # the whole story; with two it is half of it, and the missing half is
+        # the second surf line the critic measured in bar section J.
+        #
+        # THE UNION, NOT THE SUM, AND IT IS DERIVED. `deck_source` returns the
+        # fraction of the surface a roller covers. Two rollers from independent
+        # wave systems overlap at random, so the fraction covered by AT LEAST
+        # one of them is 1 - PROD(1 - f_p) -- the standard independent-coverage
+        # union. Summing them would exceed 1 where the two surf zones overlap
+        # and would put more white on the water than there is water.
+        self.tr_parts = bay.get('tr_parts')
+        self.climate = bay.get('climate')
+        if self.tr_parts and DECK_UNION:
+            un = np.ones_like(self.deck)
+            for trp in self.tr_parts:
+                un = un * (1.0 - np.clip(FM.deck_source(trp), 0.0, 1.0))
+            self.deck = 1.0 - un
         self.bub = FM.bubble_scatter()
         self.air = FM.entrained_air(self.D_w, self.H, self.T_wave)
         # THE PLUME IS EVALUATED PER PIXEL, NOT PER CELL, because it is

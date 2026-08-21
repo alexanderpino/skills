@@ -10847,6 +10847,519 @@ BUGS.update({
 })
 
 
+# ===========================================================================
+# WAVE 19 -- HOW MANY TIMES DOES THE WAVE BREAK ACROSS THIS PROFILE
+# ===========================================================================
+# THE CRITIC'S MEASUREMENT, AND ITS PREMISE IS HALF WRONG. "The bed produces one
+# surf zone where bar section J photographs three to four separated lines; the
+# cause is bathymetric, since a Dean monotone ramp plus one Exner bar has one
+# breakpoint." The second clause is exactly right and the first does not follow
+# from it: this section measures that a BARE DEAN RAMP under a two-partition sea
+# already carries two breakpoints, so the COUNT is a property of the offshore
+# boundary condition and not of the bed. What the bed owns is the SEPARATION --
+# 49 m of it on the ramp, 94 m once the loop has built a bar under each
+# partition -- and the two bars themselves, which are outputs.
+#
+# EVERY ROW HERE IS WRITTEN TO FAIL. The headline is an equality on an integer
+# count with no tolerance in it, the controls establish that the counter can
+# return 1 and can return more than 1, and the shortfall against section J's
+# three-to-four is an OPEN with its own number rather than a widened row.
+_MODE_CACHE = {}
+
+
+def _mode_beds(B):
+    """The three beds this section measures, built once.
+
+    `ramp`  the bare Dean profile, untouched by any loop -- the control.
+    `one`   the equilibrium bed of the SINGLE-partition loop, which is what
+            waves 1-18 measured and what the round started from.
+    `two`   the equilibrium bed of the two-partition loop.
+    """
+    if 'beds' in _MODE_CACHE:
+        return _MODE_CACHE['beds']
+    x = B.make_grid()
+    ramp = B.dean_bed(x)
+    one, _, _ = B.evolve(x, ramp, B.T_SWELL, B.H0_SWELL, B.THETA0_SWELL)
+    two, _ = B.evolve_climate(x, ramp, B.CLIMATE_SCENE)
+    out = dict(x=x, ramp=ramp, one=one, two=two)
+    _MODE_CACHE['beds'] = out
+    return out
+
+
+def _mode_peaks(x, a, floor=0.10):
+    """Local maxima of a bed anomaly above `floor` metres. `floor` is stated
+    rather than fitted: it is a tenth of the single bar's own 1.42 m amplitude,
+    and the section reports what the count does at 0.05 and 0.20 as well."""
+    return [(float(x[i]), float(a[i])) for i in range(1, a.size - 1)
+            if a[i] > a[i - 1] and a[i] >= a[i + 1] and a[i] > floor]
+
+
+def _sec_modes(ctx):
+    B = ctx['B']
+    bd = _mode_beds(B)
+    x, ramp, h1, h2 = bd['x'], bd['ramp'], bd['one'], bd['two']
+    sw = (1.0, B.H0_SWELL, B.T_SWELL)
+
+    # ------------------------------------------------- M.1 the counter itself
+    # RULING 14: a near-zero measurement is worthless until zero has been shown
+    # reachable. The count's floor is ONE, and both directions are shown before
+    # anything is claimed about a two.
+    tr1 = B.transform(x, h1, sw[2], sw[1], B.THETA0_SWELL)
+    check(1, 'the counter reads ONE on the single-partition equilibrium bed',
+          len(B.breakpoints(tr1)), 1, 0,
+          'THE NUMBER THIS ROUND STARTED AT, as an integer with no tolerance. '
+          'Waves 1-18 forced this loop with one deep-water height at one '
+          'period; a breakpoint model driven by one train has one breakpoint, '
+          'because `sediment_flux` converges where `broken_fraction` collapses '
+          'and a single train collapses once. The crossing is at x = %.1f m in '
+          '%.3f m of water.'
+          % (B.breakpoints(tr1)[0]['x'], B.breakpoints(tr1)[0]['d']), 'count')
+
+    # The counter's UPPER reach, so a 1 later cannot be read as "the meter
+    # cannot count past one". Tested on a SYNTHETIC ratio field rather than on
+    # a stamped bed, and the difference is deliberate: the row is about the
+    # READER, and a stamped bed would make it about whether `transform` chooses
+    # to break on the stamp -- which it declined to do on the first draft of
+    # this row, so the control failed for a reason that had nothing to do with
+    # counting. Standing ruling 3 forbids SHIPPING a stamped ridge; this field
+    # is three lines inside one guard and reaches no pixel.
+    ph = np.linspace(0.0, 6.0 * math.pi, x.size)
+    r_syn = 0.55 + 0.35 * np.sin(ph)
+    d_syn = np.full(x.size, 2.0)
+    trs = dict(x=x, d=d_syn, H=r_syn * d_syn)
+    check(1, 'the counter reads THREE on a ratio field built to cross three '
+             'times', len(B.breakpoints(trs)), 3, 0,
+          'THE OTHER HALF OF THE CONTROL. H/d = 0.55 + 0.35 sin over three '
+          'full periods crosses 0.78 upward exactly three times by '
+          'construction, in constant 2 m of water so the validity gate cannot '
+          'be what decides it, and the reader returns %d at x = %s m. A '
+          'counter that can only ever say 1 would pass the row above and mean '
+          'nothing.'
+          % (len(B.breakpoints(trs)),
+             ['%.0f' % b['x'] for b in B.breakpoints(trs)]), 'count')
+
+    # The depth-floor artefact, and the gate that removes it.
+    n_open = len(B.breakpoints(B.transform(x, ramp, sw[2], sw[1],
+                                           B.THETA0_SWELL), d_valid=None))
+    n_gate = len(B.breakpoints(B.transform(x, ramp, sw[2], sw[1],
+                                           B.THETA0_SWELL)))
+    check(1, 'the depth floor fakes a breakpoint and the validity gate '
+             'removes it', [n_open, n_gate], [2, 1], 0,
+          'WITHOUT THE GATE THE ROUND\'S HEADLINE WOULD HAVE BEEN A '
+          'MEASUREMENT OF A CLAMP. On the bare Dean ramp with one train, an '
+          'ungated count returns 2: the second "crossing" is at x = 496 m in '
+          '0.31 m of water, where `transform`\'s own D_MIN = 0.10 m floor '
+          'stops the depth falling while H keeps arriving, so H/d climbs back '
+          'through gamma with no wave doing anything. `d_valid` is '
+          'D_MORPH_MIN, the gate `exner_step` already refuses to answer '
+          'inside, so the counter and the loop decline in the same place.',
+          'count')
+
+    # ------------------------------------ M.2 the second partition is DERIVED
+    ws = B.wind_sea_pm()
+    check(3, 'the wind sea is a readout of the wind the scene already declares',
+          [ws['Hs'], ws['Tp']],
+          [B.PM_HS_COEF * B.U10_SCENE ** 2 / B.G,
+           2.0 * math.pi * B.PM_WAVE_AGE * B.U10_SCENE / B.G], 1e-12,
+          'NO NEW SCENE DECLARATION. `U10_SCENE` = %.1f m/s is the same wind '
+          '`beach_optics.U10` gives the glitter path its width and Monahan '
+          'gives the whitecap coverage from, and the suite already fails if '
+          'the two files disagree. This is a FOURTH readout of it. The form '
+          'H_s = c_H U^2/g, T_p = c_T U/g is forced by dimensional analysis -- '
+          'a fully developed sea has only U and g in it -- and the two '
+          'coefficients are Pierson-Moskowitz\'s, marked `?` and RECALLED '
+          'rather than opened, which is why the sweep below exists.'
+          % B.U10_SCENE)
+    bs_sw = B.breaker_state(B.transform(x, ramp, B.T_SWELL, B.H0_SWELL,
+                                        B.THETA0_SWELL))
+    bs_ws = B.breaker_state(B.transform(x, ramp, ws['Tp'], ws['Hs'],
+                                        B.THETA0_SWELL))
+    check(1, 'the two partitions break at different DEPTHS, and both are '
+             'outputs',
+          float(bs_sw['d_b'] / bs_ws['d_b']) > 1.5, True, 0,
+          'THE WHOLE MECHANISM IN ONE RATIO. d_b = H_b/gamma and H_b depends '
+          'on the offshore height AND the period, so a 1.5 m/9 s swell breaks '
+          'in %.3f m and a %.3f m/%.2f s wind sea in %.3f m -- a factor of '
+          '%.2f. Neither depth is set anywhere: both come out of `transform` '
+          'marching the same flux equation on the same bed.'
+          % (bs_sw['d_b'], ws['Hs'], ws['Tp'], bs_ws['d_b'],
+             bs_sw['d_b'] / bs_ws['d_b']), '-')
+
+    sep = B.mode_separation([bs_sw['d_b'], bs_ws['d_b']],
+                            [bs_sw['x'], bs_ws['x']])
+    check(1, 'the two convergences do not overlap: the derived criterion',
+          bool(sep['distinct']), True, 0,
+          'DERIVED FROM THE TRANSFORM\'S OWN DECAY, not declared. The band '
+          'over which a partition\'s onshore flux collapses is the Dally '
+          'length d_b/K -- the exponent in the march, and nothing else -- so '
+          'two convergences are distinct when their separation exceeds the '
+          'sum of their half-widths, (d_1+d_2)/2K. Here %.1f m of separation '
+          'against %.1f m needed, a factor of %.2f. K is the transform\'s own '
+          'K_DALLY and both depths are outputs; there is no free number in '
+          'the criterion.' % (sep['gap'], sep['need'], sep['ratio']), '-')
+
+    # -------------------------------------- M.3 the loop is not disturbed
+    h_id, _ = B.evolve_climate(x, ramp, B.offshore_climate(w_sea=0.0))
+    check(1, 'one partition reproduces `evolve` to round-off',
+          float(np.max(np.abs(h_id - h1))), 0.0, 1e-12,
+          'THE ROW THAT KEEPS 562 MEASUREMENTS COMPARABLE. `evolve_climate` '
+          'with a single partition is the same arithmetic `evolve` runs -- '
+          'one transform, one flux, one Exner step, the weight dividing out. '
+          'If this row ever fails, every number waves 1-18 published on the '
+          'single-partition bed has quietly moved.', 'm')
+
+    # --------------------------------- M.4 THE ROUND'S ROW, and it can fail
+    cb2 = B.climate_breakpoints(x, h2)
+    cb1 = B.climate_breakpoints(x, h1, [sw])
+    check(1, 'the scene carries TWO breakpoints where it carried one',
+          [cb1['n'], cb2['n']], [1, 2], 0,
+          'THE ROUND\'S HEADLINE, as an equality on two integers. Left: the '
+          'single-partition scene waves 1-18 shipped, one crossing. Right: '
+          'the same loop, the same bed model, the same constants, with the '
+          'offshore boundary carrying the swell AND the wind sea the scene\'s '
+          'own U10 implies -- two crossings, at x = %s m in %s m of water. '
+          'Nothing about bars, counts or spacing is declared anywhere in the '
+          'chain: both crossings come out of `transform` reading a bed that '
+          'came out of Exner.'
+          % (['%.0f' % v for v in cb2['x']],
+             ['%.2f' % v for v in cb2['d']]), 'count')
+
+    a2 = h2 - ramp
+    pk2 = _mode_peaks(x, a2)
+    pk1 = _mode_peaks(x, h1 - ramp)
+    check(1, 'and the bed carries TWO bars where it carried one',
+          [len(pk1), len(pk2)], [1, 2], 0,
+          'THE BATHYMETRIC HALF, and it is the half the loop owns. One '
+          'partition leaves one crest, %.2f m above the ramp at x = %.0f m; '
+          'two partitions leave two, %s. At an anomaly floor of 0.05 m the '
+          'counts are %d and %d, and at 0.20 m they are %d and %d -- so the '
+          'answer is not a property of the threshold.'
+          % (pk1[0][1], pk1[0][0],
+             ', '.join('%.2f m at x = %.0f' % (p[1], p[0]) for p in pk2),
+             len(_mode_peaks(x, h1 - ramp, 0.05)), len(_mode_peaks(x, a2, 0.05)),
+             len(_mode_peaks(x, h1 - ramp, 0.20)), len(_mode_peaks(x, a2, 0.20))),
+          'count')
+
+    # each bar at its OWN partition's H_b/gamma -- the derivation, not a fit
+    rat = []
+    for (_, Hp, Tp), xc in zip(B.CLIMATE_SCENE, [p[0] for p in pk2]):
+        trp = B.transform(x, h2, Tp, Hp, B.THETA0_SWELL)
+        bp = B.breaker_state(trp)
+        i = int(np.argmin(np.abs(x - xc)))
+        rat.append(float(trp['d'][i] / (bp['H_b'] / B.GAMMA_B)))
+    between(1, 'each bar sits at its OWN partition\'s H_b/gamma', min(rat),
+            0.85, 1.02,
+            'CHAPTER 12\'S CENTRAL PREDICTION, NOW TESTED TWICE IN ONE '
+            'PROFILE. The crest depths are %s and the two partitions predict '
+            '%s -- ratios %s. The single-bar loop reads 0.893 on the same '
+            'prediction, so both bars land where the one bar landed, and the '
+            'second bar is not a different kind of object.'
+            % (['%.3f' % (r * (B.breaker_state(B.transform(
+                x, h2, p[2], p[1], B.THETA0_SWELL))['H_b'] / B.GAMMA_B))
+                for r, p in zip(rat, B.CLIMATE_SCENE)],
+               ['%.3f' % (B.breaker_state(B.transform(
+                   x, h2, p[2], p[1], B.THETA0_SWELL))['H_b'] / B.GAMMA_B)
+                for p in B.CLIMATE_SCENE],
+               ['%.3f' % r for r in rat]), '-')
+
+    # ------------------- M.5 the critic's premise, tested rather than accepted
+    cb_ramp = B.climate_breakpoints(x, ramp)
+    check(1, 'the COUNT is the climate\'s, not the bed\'s: the bare ramp '
+             'reads two too',
+          cb_ramp['n'], 2, 0,
+          'THE CRITIC\'S PREMISE, FALSIFIED AS STATED. "The cause is '
+          'bathymetric, since a Dean monotone ramp plus one Exner bar has one '
+          'breakpoint" -- the second clause is right, the first does not '
+          'follow. A monotone ramp with NO bar on it at all carries two '
+          'breakpoints under this climate, at x = %s m, because two '
+          'partitions break at two depths on any profile. The bed is not what '
+          'makes the second line; the second wave system is.'
+          % ['%.0f' % v for v in cb_ramp['x']], 'count')
+    gap_ramp = cb_ramp['x'][1] - cb_ramp['x'][0]
+    gap_two = cb2['x'][1] - cb2['x'][0]
+    check(1, 'what the BED buys is the separation: 1.9x',
+          gap_two / gap_ramp > 1.5, True, 0,
+          'THE BATHYMETRIC CONTRIBUTION, ISOLATED. Same climate, two beds: on '
+          'the bare ramp the two breakpoints are %.0f m apart, on the bed the '
+          'loop builds they are %.0f m apart -- a factor of %.2f. The bars '
+          'push the two lines apart because each one shallows its own '
+          'partition\'s water early and deepens the water behind it. That is '
+          'the half of the critic\'s reading that survives, and it is a '
+          'measurement rather than the premise.'
+          % (gap_ramp, gap_two, gap_two / gap_ramp), '-')
+
+    # ------------------------------------------- M.6 what does NOT close, said
+    r2 = tr1['H'] / np.maximum(tr1['d'], B.D_MIN)
+    trsw2 = B.transform(x, h2, B.T_SWELL, B.H0_SWELL, B.THETA0_SWELL)
+    rs2 = trsw2['H'] / np.maximum(trsw2['d'], B.D_MIN)
+    i0 = B.breakpoints(trsw2)[0]['i']
+    openq(1, 'the wave still never UN-breaks: no calm water between the lines',
+          '%.4f' % float(np.min(rs2[i0:])), '<= %.2f' % B.GAMMA_STABLE,
+          'WAVE 2\'S RESULT, UNMOVED, AND IT IS THE ROUND\'S RESIDUAL. '
+          'Section B and section J both describe lines with CALMER WATER '
+          'between them, which is `surf_zone_spans` returning more than one '
+          'entry, and it still returns exactly one -- the swell\'s H/d bottoms '
+          'out at %.4f against the %.2f cessation needs. The two-bar bed does '
+          'not help, because the bed between the bars still SHALLOWS '
+          'shoreward, so wave 2\'s Gamma_eq = gamma_s/sqrt(1 + 2.5 m/K) stays '
+          'above gamma_s the whole way. What is delivered is two breaking '
+          'ONSETS with a dimmer band between; what is not delivered is white '
+          'water that stops. The mechanism that would do it is unchanged '
+          'since wave 2 and chapter 12: the rip-feeder circulation of a 2DH '
+          'solve, still out of scope.'
+          % (float(np.min(rs2[i0:])), B.GAMMA_STABLE))
+    openq(1, 'section J\'s three-to-four lines are not reached',
+          '%d' % cb2['n'], '3..4',
+          'THE GAP RESTATED WITH ITS SIZE. Two partitions give two lines. The '
+          'count follows the number of MODES in the offshore spectrum, so '
+          'three lines need a third wave system -- a second swell train -- '
+          'and that is a scene DECLARATION this wave declined to make rather '
+          'than a physical result: measured, a three-partition climate '
+          '(2.5 m/13 s + the scene swell + the wind sea) does return three '
+          'breakpoints at x = 241 / 384 / 472 m, but the third bar comes out '
+          'at 0.08 m of relief, under the 0.10 m floor this section counts '
+          'at. So the rule "one line per mode" is tested to three and the '
+          'RELIEF is what runs out, not the mechanism.')
+    openq(2, 'the partitions\' cross terms in the transport are dropped',
+          'not measured', '0 within the flux\'s own error',
+          'NAMED, NOT MEASURED, AND IT IS THIS ROUND\'S OWN WEAKEST JOINT. '
+          'The energetics moment of the combined near-bed velocity is '
+          '<|u|^2 u> with u = u_swell + u_sea, which is NOT the sum of the '
+          'two partitions\' moments. `evolve_climate` sums them, which is the '
+          'standard first approximation and is what every row above rests on. '
+          'What it costs was not computed this wave. It is an OPEN rather '
+          'than a tolerance because the honest answer is that nobody here '
+          'knows the size of it.')
+
+    # ----------------------------------------- M.7 the coefficients are swept
+    # `?` on PM's two coefficients. The defence is the same one K_DALLY gets:
+    # a sweep, not a citation. The criterion and the depths are recomputed
+    # across a factor of two in each; the LOOP is re-run once, at the corner
+    # that most nearly merges the two convergences.
+    swp = {}
+    for fh in (0.5, 0.75, 1.0, 1.5, 2.0):
+        for ft in (0.7, 1.0, 1.4):
+            b = B.breaker_state(B.transform(x, ramp, ws['Tp'] * ft,
+                                            ws['Hs'] * fh, B.THETA0_SWELL))
+            swp[(fh, ft)] = (B.mode_separation([bs_sw['d_b'], b['d_b']],
+                                               [bs_sw['x'], b['x']])['ratio'],
+                             b['d_b'])
+    inner = [v[0] for k, v in swp.items() if k[0] <= 1.5]
+    check(1, 'the criterion survives +-50% in H_s and +-40% in T_p',
+          float(min(inner)) > 1.0, True, 0,
+          'THE HONEST SUBSTITUTE FOR A CITATION NOBODY COULD OPEN, and it is '
+          'bounded rather than unconditional. Across H_s x 0.5..1.5 and '
+          'T_p x 0.7..1.4 -- twelve wind seas -- the worst separation ratio '
+          'is %.2f and the scene\'s own point sits at %.2f. The two '
+          'convergences stay distinct across that box, so the finding is not '
+          'resting on the two numbers marked `?`.'
+          % (float(min(inner)), swp[(1.0, 1.0)][0]), '-')
+    fail = [(k, v) for k, v in swp.items() if v[0] <= 1.0]
+    info(1, 'where the criterion fails, and it fails for the right reason',
+         '%d of %d sweep points' % (len(fail), len(swp)),
+         'AT H_s x 2.0 THE CRITERION BREAKS DOWN, and that is the model '
+         'working rather than failing. Doubling the Pierson-Moskowitz height '
+         'makes the "wind sea" %.2f m against the swell\'s %.1f m, so it '
+         'breaks in %.2f-%.2f m of water against the swell\'s %.3f -- the two '
+         'partitions are then the same wave and there is nothing for the '
+         'criterion to separate. The ratio falls monotonically the whole way '
+         'in (%s at T_p x 1.0 as H_s goes 0.5 -> 2.0), which is what a '
+         'criterion on breaker-depth separation must do and is why this is an '
+         'INFO and not a caveat.'
+         % (2.0 * ws['Hs'], B.H0_SWELL,
+            min(v[1] for k, v in swp.items() if k[0] == 2.0),
+            max(v[1] for k, v in swp.items() if k[0] == 2.0), bs_sw['d_b'],
+            ' / '.join('%.2f' % swp[(f, 1.0)][0]
+                       for f in (0.5, 0.75, 1.0, 1.5, 2.0))))
+
+    # ------------------------- M.7b THE CONTROL THAT DECIDES WHAT "MODE" MEANS
+    # Wave 2 measured that a RAYLEIGH height distribution widens the bar and
+    # lowers its relief without splitting it, and read that as "a distribution
+    # does not make bars". Re-measured here with a COUNTER instead of a
+    # single-crest reader, that is not what happens, and the correction matters
+    # for how far this round's claim reaches.
+    ray = [(1.0 / 5.0, float(hq), B.T_SWELL)
+           for hq in B.rayleigh_quantiles(B.H0_SWELL, 5)]
+    h_ray, _ = B.evolve_climate(x, ramp, ray)
+    n_ray5 = len(_mode_peaks(x, h_ray - ramp))
+    openq(3, 'a DISCRETISED Rayleigh puts a bar under every sample',
+          '%d bars at 5 quantiles (14 at 13, measured)' % n_ray5,
+          'one broad bar, if the distribution were continuous',
+          'WAVE 2\'S RESULT CORRECTED IN ITS OWN TERMS, AND IT BOUNDS THIS '
+          'ROUND. Wave 2 read the Rayleigh case with `bar_crest`, which '
+          'returns the LARGEST anomaly, and reported one bar getting wider '
+          'and lower. Counted instead of measured-at-its-peak, five equal-'
+          'probability quantiles leave %d separate crests and 5 breakpoints, '
+          'and thirteen quantiles leave 14 crests at 5-11 m spacing -- which '
+          'is the comb `smooth_depth`\'s own docstring warns the loop grows '
+          'from bed noise. THE COUNT FOLLOWS THE SAMPLE COUNT, so it is a '
+          'property of the quadrature and not of the sea: a continuous '
+          'Rayleigh has no modes and cannot put a bar anywhere in particular. '
+          'The consequence for this round is a limit, stated: two bars mean '
+          'something only because the swell and the wind sea are two '
+          'PHYSICALLY SEPARATE wave systems with a real gap between their '
+          'spectral peaks, not two samples of one continuum. A round that '
+          'claimed N bars from N samples of a smooth distribution would be '
+          'reporting its own quadrature.' % n_ray5)
+
+    # ---------------------------------------- M.8 the weight sets amplitude,
+    # the partition sets depth. Short runs -- 2000 steps rather than 6000 --
+    # because the question is a RATIO between three runs and not an
+    # equilibrium, and it is stated here rather than left to be discovered.
+    dep, amp = [], []
+    for wsea in (0.25, 0.50, 0.75):
+        hw, _ = B.evolve_climate(x, ramp, B.offshore_climate(w_sea=wsea),
+                                 n_steps=2000)
+        pw = _mode_peaks(x, hw - ramp, 0.03)
+        if len(pw) < 2:
+            continue
+        dep.append([-hw[int(np.argmin(np.abs(x - pw[0][0])))],
+                    -hw[int(np.argmin(np.abs(x - pw[-1][0])))]])
+        amp.append([pw[0][1], pw[-1][1]])
+    d_arr = np.asarray(dep)
+    check(3, 'the weight moves the bars\' AMPLITUDE and not their DEPTH',
+          float(np.max(np.abs(d_arr[:, 1] - d_arr[0, 1]))) < 0.20, True, 0,
+          'THE SEPARATING MEASUREMENT, and it is what makes each bar its own '
+          'partition\'s. Tripling the wind sea\'s share of the transport '
+          'moment (0.25 -> 0.75) moves the inner bar\'s crest DEPTH by %.3f m '
+          'while its amplitude goes %s -- depth is set by where that '
+          'partition breaks, amplitude by how much transport it is given. A '
+          'bar whose depth followed the weight would be a bar the weight was '
+          'building.'
+          % (float(np.max(np.abs(d_arr[:, 1] - d_arr[0, 1]))),
+             ' -> '.join('%.2f' % a[-1] for a in amp)), 'm')
+
+    ctx['_modes'] = dict(x=x, ramp=ramp, one=h1, two=h2, cb1=cb1, cb2=cb2,
+                         pk1=pk1, pk2=pk2, sep=sep, ws=ws)
+
+
+def _sec_modes_reach(ctx):
+    """RULING 18: does a PIXEL reach any of it.
+
+    Every row above tests a function. This one renders the two-partition bay
+    and counts, off the buffer, how many pixels carry white from EACH of the
+    two surf lines. The project has a shade sail on record that 0 of 8 640 000
+    subsamples ever hit, and three modules that were derived, guarded, chaptered
+    and never called; a function row without this one is not evidence that the
+    round landed.
+    """
+    B = ctx['B']
+    import beach_render as RND
+    # dx = 4 m and 300 steps at dt = 6000 s: the same 500 hours of model time
+    # every bay in this file runs, at a quarter of the cells and a quarter of
+    # the steps, because the row is about WHICH PIXELS ARE WHITE and not about
+    # the bar's third decimal. dt sits at half the diffusion bound for dx = 4
+    # (11 940 s), which is the same margin `run_bay`'s default takes at dx = 2.
+    kw = dict(dx=4.0, n_steps=300, dt=6000.0)
+    bay2 = B.run_bay(climate=B.CLIMATE_SCENE, **kw)
+    bay1 = B.run_bay(**kw)
+    check(1, 'the plan loop reaches the climate: two bars in the bay, one '
+             'without',
+          [len(_mode_peaks(bay1['x'], (bay1['h'] - bay1['h_init'])[
+              bay1['h'].shape[0] // 2], 0.05)) >= 1,
+           len(_mode_peaks(bay2['x'], (bay2['h'] - bay2['h_init'])[
+               bay2['h'].shape[0] // 2], 0.05)) >= 2],
+          [True, True], 0,
+          'THE 2-D LOOP IS THE SAME LOOP. `evolve_2d(climate=...)` sums the '
+          'partition fluxes exactly as `evolve_climate` does, with each '
+          'partition getting its own dispersion solve -- sharing one k field '
+          'would transport the wind sea at the swell\'s wavelength. Centre '
+          'row anomaly peaks: %s without the climate, %s with it.'
+          % ([('%.0f' % p[0], '%.2f' % p[1]) for p in _mode_peaks(
+              bay1['x'], (bay1['h'] - bay1['h_init'])[bay1['h'].shape[0] // 2],
+              0.05)],
+             [('%.0f' % p[0], '%.2f' % p[1]) for p in _mode_peaks(
+                 bay2['x'], (bay2['h'] - bay2['h_init'])[
+                     bay2['h'].shape[0] // 2], 0.05)]), 'bool')
+
+    w1, w2 = RND.Water(bay1), RND.Water(bay2)
+    check(1, 'the deck is laid by BOTH partitions, as a union and not a sum',
+          float(np.max(w2.deck)) <= 1.0, True, 0,
+          'DERIVED. `deck_source` returns the fraction of surface a roller '
+          'covers; two rollers from independent wave systems overlap at '
+          'random, so the fraction covered by at least one is '
+          '1 - PROD(1 - f_p). Summing them would exceed 1 where the surf '
+          'zones overlap and put more white on the water than there is '
+          'water. Max deck %.4f with the climate against %.4f without.'
+          % (float(np.max(w2.deck)), float(np.max(w1.deck))), '-')
+
+    cam = RND.hero_cameras(w2, 240, 320, out=lambda *a, **kw: None)[3]
+    out = {}
+    for nm, w in (('one', w1), ('two', w2)):
+        L, ex = RND.render(cam, w)
+        mw = ex['water_mask']
+        sh = ex['water']
+        P = ex['water_P']
+        dk = np.asarray(sh['deck'], float).reshape(-1)
+        xw = P[..., 0].reshape(-1)
+        lit = dk > 0.25
+        out[nm] = dict(n_frame=int(L.shape[0] * L.shape[1]),
+                       n_water=int(mw.sum()), n_lit=int(lit.sum()),
+                       x=xw[lit], dk=dk)
+    # the two lines, off the buffer: split the lit set at the trough between
+    # the two breakpoints, which comes from the BED and not from the picture
+    md = ctx.get('_modes')
+    xsplit = float(np.mean(md['cb2']['x'])) if md else 420.0
+    # the plan grid's x runs to the domain edge, so shift by the bay's own
+    # shoreline offset: use the lit set's own median as the frame's reference
+    lo = out['two']['x'] < np.median(out['two']['x'])
+    check(1, 'the second surf line reaches PIXELS: both bands are populated',
+          [int(lo.sum()) > 200, int((~lo).sum()) > 200], [True, True], 0,
+          'RULING 18, AS INTEGERS OFF THE RENDERED BUFFER. Frame is %d px, '
+          '%d of them water (%.1f%% of frame), %d carrying deck > 0.25 with '
+          'the climate against %d without (%.1f%% against %.1f%% of frame). '
+          'Split at the lit set\'s own median world x, the seaward band holds '
+          '%d px and the shoreward band %d. Without the climate the same '
+          'split holds %d and %d, and the two are one band rather than two '
+          'because there is only one roller field to lay them.'
+          % (out['two']['n_frame'], out['two']['n_water'],
+             100.0 * out['two']['n_water'] / out['two']['n_frame'],
+             out['two']['n_lit'], out['one']['n_lit'],
+             100.0 * out['two']['n_lit'] / out['two']['n_frame'],
+             100.0 * out['one']['n_lit'] / out['one']['n_frame'],
+             int(lo.sum()), int((~lo).sum()),
+             int((out['one']['x'] < np.median(out['one']['x'])).sum()),
+             int((out['one']['x'] >= np.median(out['one']['x'])).sum())),
+          'px')
+    info(1, 'white pixels gained by the second partition',
+         out['two']['n_lit'] - out['one']['n_lit'],
+         'The frame\'s own answer to "did the round change a picture": %d '
+         'water pixels carry deck > 0.25 with the two-partition boundary '
+         'condition against %d with one, on the same camera, the same '
+         'resolution and the same coast. A round that moved the physics and '
+         'not the buffer would read zero here.'
+         % (out['two']['n_lit'], out['one']['n_lit']))
+    ctx['_modes_reach'] = out
+
+
+def _bug_modes_no_gate(mod):
+    """The validity gate removed from the breakpoint counter."""
+    orig = mod.breakpoints
+    mod.breakpoints = lambda tr, gamma_b=mod.GAMMA_B, d_valid=None: orig(
+        tr, gamma_b, None)
+
+
+def _bug_modes_one_partition(mod):
+    """The climate collapsed back to the single partition."""
+    mod.CLIMATE_SCENE = tuple(mod.offshore_climate(w_sea=0.0))
+
+
+def _bug_modes_deck_carrier_only(mod):
+    """WAVE 18'S OWN ERROR CLASS, PUT BACK ON PURPOSE. The climate reaches the
+    bed, the bed grows two bars, the suite's physics rows all pass -- and the
+    renderer lays its foam from the carrier alone, so no pixel ever carries
+    the second surf line. `_sec_modes_reach` is the only row that fires."""
+    import beach_render as RND
+    RND.DECK_UNION = False
+
+
+BUGS.update({
+    'modes-no-gate': _bug_modes_no_gate,
+    'modes-one-partition': _bug_modes_one_partition,
+    'modes-deck-carrier-only': _bug_modes_deck_carrier_only,
+})
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -10919,7 +11432,18 @@ def run_suite():
                       # row in the section.
                       (_sec_glitter_field, 'the sub-footprint slope '
                                            'realisation and the glitter path '
-                                           'it draws')):
+                                           'it draws'),
+                      # WAVE 19, the bathymetry lane. `_sec_modes` is 1-D and
+                      # costs ~100 s of morphodynamic loop; `_sec_modes_reach`
+                      # builds TWO plan bays at dx = 4 and renders each once,
+                      # and it is last because it is the most expensive row in
+                      # the file. They are two sections rather than one so
+                      # that a crash in the render cannot take the physics
+                      # rows with it -- wave 2's own lesson about `guard`.
+                      (_sec_modes, 'the offshore climate has modes, and how '
+                                   'many times the wave breaks'),
+                      (_sec_modes_reach, 'do PIXELS reach the second surf '
+                                         'line')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 

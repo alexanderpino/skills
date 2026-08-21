@@ -522,6 +522,95 @@ def fig_hd_transect(sc, path):
     return P.save(img, path)
 
 
+def fig_climate_modes(path):
+    """WAVE 19. The offshore climate's two modes, and the two bars and two
+    breakpoints they leave -- against the same loop forced with one.
+
+    Three panels, and every curve is an output of `beach.py` on this figure's
+    own two runs. Nothing here is read off a previous PNG and nothing is
+    stamped: the beds come out of `evolve` and `evolve_climate` and the
+    breakpoints come out of `breakpoints`.
+    """
+    x = B.make_grid()
+    ramp = B.dean_bed(x)
+    h1, _, _ = B.evolve(x, ramp, B.T_SWELL, B.H0_SWELL, B.THETA0_SWELL)
+    h2, _ = B.evolve_climate(x, ramp, B.CLIMATE_SCENE)
+    ws = B.wind_sea_pm()
+    tr1 = B.transform(x, h1, B.T_SWELL, B.H0_SWELL, B.THETA0_SWELL)
+    tr2s = B.transform(x, h2, B.T_SWELL, B.H0_SWELL, B.THETA0_SWELL)
+    tr2w = B.transform(x, h2, ws['Tp'], ws['Hs'], B.THETA0_SWELL)
+    r1 = tr1['H'] / np.maximum(tr1['d'], 0.1)
+    r2s = tr2s['H'] / np.maximum(tr2s['d'], 0.1)
+    r2w = tr2w['H'] / np.maximum(tr2w['d'], 0.1)
+    bp1 = B.breakpoints(tr1)
+    cb = B.climate_breakpoints(x, h2)
+
+    img = P.canvas(1180, 1180)
+
+    ax = P.Axes(img, (95, 58, 1130, 360), (280, 500), (-4.0, 0.5),
+                title='The bed: one partition leaves one bar, two leave two',
+                ylabel='bed elevation, m')
+    ax.frame(_ticks(280, 500), [-4, -3, -2, -1, 0])
+    ax.line(x, ramp, GREY, 2, dash=(5, 5))
+    ax.line(x, h1, BAR, 2)
+    ax.line(x, h2, WAVE, 3)
+    for xb, db in zip(cb['x'], cb['d']):
+        ax.vline(xb, GREEN, 1, (3, 4))
+    P.legend(ax, [(GREY, 'the Dean ramp both loops start from'),
+                  (BAR, 'one partition (H0 = 1.5 m, T = 9 s) -- waves 1-18'),
+                  (WAVE, 'two partitions: the same swell + the wind sea '
+                         'U10 = 6 m/s implies'),
+                  (GREEN, 'where a partition starts breaking')], 284, -3.55)
+
+    ax2 = P.Axes(img, (95, 430, 1130, 730), (280, 500), (0.0, 1.0),
+                 title='H/d: the count of crossings of the breaker index goes '
+                       '1 -> 2',
+                 ylabel='H / d')
+    ax2.frame(_ticks(280, 500), [0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    ax2.line(x, r1, BAR, 2, dash=(6, 4))
+    ax2.line(x, r2s, WAVE, 3)
+    ax2.line(x, r2w, GREEN, 3)
+    ax2.hline(B.GAMMA_B, (20, 20, 24), 2, (6, 5))
+    ax2.hline(B.GAMMA_STABLE, PURPLE, 2, (4, 4))
+    for xb in cb['x']:
+        ax2.marker(xb, B.GAMMA_B, (20, 20, 24), 5)
+    ax2.text(284, B.GAMMA_B + 0.03, 'gamma_b = 0.78', (20, 20, 24))
+    ax2.text(284, B.GAMMA_STABLE - 0.07,
+             'gamma_s = 0.40 -- still never reached', PURPLE)
+    P.legend(ax2, [(BAR, 'swell alone, on the one-partition bed: 1 crossing'),
+                   (WAVE, 'swell, on the two-partition bed'),
+                   (GREEN, 'wind sea, on the same bed')], 284, 0.30)
+
+    ax3 = P.Axes(img, (95, 800, 1130, 1055), (280, 500), (0.0, 1.05),
+                 title='The foam source: the deck each partition lays, and '
+                       'their union',
+                 xlabel='cross-shore distance, m (shoreward ->)',
+                 ylabel='roller fraction')
+    ax3.frame(_ticks(280, 500), [0, 0.25, 0.5, 0.75, 1.0])
+    f_s = np.clip(B.roller_fraction(tr2s), 0.0, 1.0)
+    f_w = np.clip(B.roller_fraction(tr2w), 0.0, 1.0)
+    ax3.line(x, f_s, WAVE, 2)
+    ax3.line(x, f_w, GREEN, 2)
+    ax3.line(x, 1.0 - (1.0 - f_s) * (1.0 - f_w), (20, 20, 24), 3)
+    P.legend(ax3, [(WAVE, 'swell'), (GREEN, 'wind sea'),
+                   ((20, 20, 24), 'union 1 - PROD(1 - f): what the renderer '
+                                  'lays')], 284, 0.42)
+
+    P.caption(img, [
+        'The critic measured one surf zone against bar section J\'s three to four lines and read the cause as bathymetric. Half of that is right.',
+        'The COUNT is the offshore boundary condition\'s: a bare Dean ramp under this two-partition sea already carries two breakpoints, %.0f m apart.'
+        % (B.climate_breakpoints(x, ramp)['x'][1]
+           - B.climate_breakpoints(x, ramp)['x'][0]),
+        'What the BED buys is the separation -- %.0f m once the loop has grown a bar under each partition -- and the two bars themselves, which sit at'
+        % (cb['x'][1] - cb['x'][0]),
+        '%.2f m and %.2f m, their own partitions\' H_b/gamma. The second partition costs no new scene declaration: it is the wind U10 = %.1f m/s that'
+        % (cb['d'][0], cb['d'][1], B.U10_SCENE),
+        'already sets the glitter and the whitecaps, read through Pierson-Moskowitz. What is NOT delivered is calm water between the lines: H/d bottoms',
+        'out at %.4f against the %.2f cessation needs, so the surf zone is one band with two bright onsets in it. Scene-linear throughout; `beach_evidence.fig_climate_modes`.'
+        % (float(np.min(r2s[bp1[0]['i']:])), B.GAMMA_STABLE)])
+    return P.save(img, path)
+
+
 def fig_ratio_resolved(path):
     """d_bar/(H_b/gamma) across sea states and across grids: the trend wave 1
     reported as falsifiable is the grid."""
@@ -1298,7 +1387,8 @@ def main():
                      (fig_bar_alongshore, (bay, 's3-bar-alongshore.png')),
                      (fig_surface_shape, (sc, 's5-surface-shape.png')),
                      (fig_phase_alongshore, (bay, 's13-phase-alongshore.png')),
-                     (fig_terrace_ladder, ('s13-terrace-ladder.png',))):
+                     (fig_terrace_ladder, ('s13-terrace-ladder.png',)),
+                     (fig_climate_modes, ('s19-climate-modes.png',))):
         if not want(args[-1]):
             continue
         a = list(args)
