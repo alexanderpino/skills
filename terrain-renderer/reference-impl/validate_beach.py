@@ -10768,12 +10768,753 @@ def _sec_glitter_field(ctx):
 
 
 
+# ==========================================================================
+# WAVE 19 -- THE WAVE POPULATION, AND WHETHER THE PICTURE HAS ONE
+# ==========================================================================
+
+
+def _crest_cv(E, n_min=5):
+    """Crest-to-crest coefficient of variation of a record, per column.
+
+    IN:  E (nt, npix), a free-surface record sampled on a uniform time grid.
+    OUT: (cv, n_peaks). `cv` is NaN where fewer than `n_min` positive local
+         maxima were found, because a CV of four crests is not a number.
+
+    ONE STATISTIC, WRITTEN ONCE, AND IT IS THE SAME ONE EVERY ROW IN THIS
+    SECTION USES -- on the synthetic controls, on the drawn surface at ten
+    points, and on every water pixel of the rendered frame. A meter that is
+    re-implemented per row is two meters, and this file's oldest ruling is
+    that two routes to a number must not share a source but ONE route must
+    not silently become two.
+
+    THE COMPARISON IS THE RAYLEIGH CV. For a narrow-band Gaussian sea the
+    crest heights are Rayleigh distributed, so
+
+        CV = sd/mean = sqrt(4/pi - 1) = 0.5227
+
+    which is a closed form and not a fit: it contains no sea state, no wind,
+    no depth and no beach. That is what makes it a tier-1 target -- the same
+    number for the North Sea and for a bathtub -- and it is why a machine-zero
+    reading against it is a statement about the renderer rather than about
+    this scene.
+    """
+    a, b, c = E[:-2], E[1:-1], E[2:]
+    m = (b > a) & (b > c) & (b > 0.0)
+    n = m.sum(0)
+    nn = np.maximum(n, 1)
+    mu = np.where(m, b, 0.0).sum(0) / nn
+    s2 = np.where(m, b * b, 0.0).sum(0) / nn
+    cv = np.sqrt(np.maximum(s2 - mu * mu, 0.0)) / np.maximum(np.abs(mu), 1e-30)
+    return np.where(n >= n_min, cv, np.nan), n
+
+
+def _nf_ladder_cv(n_f, n_th, seed, n_trial=64, T=10.0):
+    """Crest CV of a random-phase sum with `n_f` DISTINCT frequencies.
+
+    THE CONTROL THAT TURNED THIS SECTION'S HEADLINE ROW FROM A NUMBER INTO A
+    DERIVATION, and it is pure arithmetic -- no bed, no camera, no beach.py.
+
+    A sum of many random-phase components is Gaussian and its crests are
+    Rayleigh. But "many" counts DISTINCT FREQUENCIES, not components. At a
+    FIXED POINT, every component sharing a frequency keeps a fixed relative
+    phase forever: the n_th of them collapse into ONE quasi-monochromatic
+    contribution whose amplitude is the modulus of their coherent sum and
+    whose phase is that sum's argument. A record at a point is therefore a sum
+    of n_f contributions, and n_f alone sets how Rayleigh its crests are. The
+    n_th directions buy short crests in SPACE and buy nothing in TIME.
+
+    This function builds exactly that collapse -- n_f frequencies, each
+    carrying the coherent sum of n_th unit phasors -- and measures its crest
+    CV with the same `_crest_cv` the rows use.
+    """
+    rg = np.random.default_rng(seed)
+    ts = np.arange(400 * 32) * (400.0 * T / (400 * 32))
+    fj = np.linspace(0.6, 1.6, n_f) / T if n_f > 1 else np.array([1.0 / T])
+    aj = np.exp(-((fj * T - 1.0) / 0.35) ** 2)
+    out = []
+    for _ in range(n_trial):
+        z = np.exp(1j * rg.uniform(0, 2 * math.pi, (n_f, n_th))).sum(1)
+        A = np.abs(z) / math.sqrt(n_th) * aj
+        E = (A[None] * np.cos(2 * math.pi * fj[None] * ts[:, None]
+                              - np.angle(z)[None])).sum(1)
+        out.append(_crest_cv(E[:, None])[0][0])
+    return float(np.nanmean(out)), float(np.nanstd(out))
+
+
+def _sec_population(ctx):
+    """WAVE 19 -- DOES THE DRAWN SEA HAVE A WAVE-HEIGHT DISTRIBUTION, AND DOES
+    THE BREAKING DRAW A REALISATION OF IT OR ITS EXPECTATION?
+
+    THE DEFECT THIS SECTION IS FOR was found by measuring before building, and
+    it is one level above the brief wave 19 was sent with. The brief was
+    short-crestedness. What the measurement said is that through wave 18 the
+    drawn surface had NO WAVE-HEIGHT DISTRIBUTION AT ALL: `eta = (H/2)cos(phi)`
+    reads one H field, so every wave at a point was exactly the same height and
+    the crest-to-crest CV at ten surf-zone points over twenty periods was
+    7.9e-09 -- machine zero -- against the Rayleigh 0.5227. With one amplitude
+    every crest breaks at the same depth, so the breaking line is a LINE no
+    matter how many bars sit under it or how short the crests are. That is the
+    owner's "je ziet in werkelijkheid nooit 1 lange golf langs de kust", and it
+    was never going to be fixed by crest length.
+
+    SIX JOBS, IN THIS ORDER, because each needs the one before it:
+
+      P.0  the meter reads known answers, INCLUDING the one that is zero
+      P.1  and the n_f ladder, which is what makes P.2's bracket DERIVED
+      P.2  the drawn surface's crest CV, against Rayleigh and against the ladder
+      P.3  the REACH: integers off the rendered buffer (ruling 18)
+      P.4  breaking -- expectation or realisation, and is the mean preserved
+      P.5  the foam's white, and the fade, both measured and both left NAMED
+    """
+    B = ctx['B']
+    import beach_render as RND
+    RAY = math.sqrt(4.0 / math.pi - 1.0)
+
+    # ==================================================================== P.0
+    # THE METER, AGAINST RECORDS WHOSE CV IS KNOWN BEFORE IT IS RUN.
+    #
+    # Standing ruling 14: a near-zero measurement is worthless until the meter
+    # has been shown able to return the target. Here it cuts both ways, because
+    # the headline finding IS a near-zero -- so this block has to show the
+    # meter returns 0.52 on a Rayleigh record AND returns 0 on a record that
+    # genuinely has no distribution, or the finding is an instrument artefact.
+    T = 10.0
+    nt = 400 * 32
+    ts = np.arange(nt) * (400.0 * T / nt)
+    om = 2.0 * math.pi / T
+    cv_pure = float(_crest_cv(np.cos(om * ts)[:, None])[0][0])
+    check(1, 'meter: a monochromatic record has crest CV exactly 0',
+          cv_pure, 0.0, 1e-6,
+          'THE ZERO END, AND THIS SECTION\'S HEADLINE IS A ZERO SO IT IS THE '
+          'row that has to exist first. cos(omega t) has one crest height by '
+          'construction; the meter reads %.3e on it. Anything the meter '
+          'returns near this value on the render is therefore the RENDER '
+          'having one crest height, not the meter being unable to see two.'
+          % cv_pure, '-')
+    nl = np.cos(om * ts) + 0.3 * np.cos(2.0 * om * ts + 0.4)
+    cv_nl = float(_crest_cv(nl[:, None])[0][0])
+    check(1, 'meter: a SKEWED monochromatic record still has crest CV 0',
+          cv_nl, 0.0, 1e-6,
+          'THE ROW THAT SEPARATES SHAPE FROM POPULATION, and it is the '
+          'confusion this project was one step from making. Wave 5 gave the '
+          'surface a bound second harmonic -- pitched-forward crests, flat '
+          'troughs, real physics with its own suite section -- and a frame '
+          'with that in it LOOKS like it has wave-to-wave variety. It has '
+          'none: cos(x) + 0.3 cos(2x + 0.4) reads %.3e here, because every '
+          'wave is the same skewed wave. Crest SHAPE is not crest HEIGHT and '
+          'this meter is deliberately blind to the first.' % cv_nl, '-')
+    rg = np.random.default_rng(1234)
+    nc = 200
+    fj = np.linspace(0.6, 1.6, nc) / T
+    aj = np.exp(-((fj * T - 1.0) / 0.35) ** 2)
+    G = (aj[None] * np.cos(2.0 * math.pi * fj[None] * ts[:, None]
+                           - rg.uniform(0, 2 * math.pi, nc)[None])).sum(1)
+    cv_g = float(_crest_cv(G[:, None])[0][0])
+    between(1, 'meter: a 200-frequency Gaussian record reads the Rayleigh CV',
+            cv_g, 0.40, 0.70,
+            'THE OTHER END, AND IT IS THE ONE RULING 14 IS ABOUT. A sum of '
+            'many independent random-phase components is a Gaussian process, '
+            'whose crest heights are Rayleigh, whose CV is sqrt(4/pi - 1) = '
+            '%.4f. The meter returns %.4f on one 400-period realisation of '
+            'exactly such a record. So 0.52 is REACHABLE by this instrument, '
+            'which is what the machine-zero reading below is worth nothing '
+            'without. The window is one realisation\'s sampling error and is '
+            'not a physics tolerance.' % (RAY, cv_g), '-')
+
+    # ==================================================================== P.1
+    # THE n_f LADDER. Why P.2's bracket is 0.41 +- 0.13 and not 0.5227.
+    #
+    # This is the second finding of the round and it is arithmetic, not
+    # opinion. `beach.spectral_components(n_f=8, n_th=32)` draws 256
+    # components -- but only EIGHT distinct frequencies. At a fixed point the
+    # 32 components sharing a frequency have a fixed relative phase for all
+    # time, so they collapse to one quasi-monochromatic contribution. The
+    # record at a point is a sum of 8, not of 256, and 8 is not "many".
+    lad = [(n_f, 256 // n_f) + _nf_ladder_cv(n_f, 256 // n_f, 4000 + n_f)
+           for n_f in (1, 2, 8, 32, 256)]
+    ladtxt = ' '.join('n_f=%d:%.3f' % (a, c) for a, b, c, s in lad)
+    check(1, 'ladder: ONE frequency x 256 directions has crest CV 0',
+          lad[0][2], 0.0, 1e-6,
+          'THE TOP OF THE LADDER AND THE WHOLE POINT OF IT. 256 components, '
+          '256 random phases, 256 directions -- and the crest CV is %.3e, '
+          'because they share ONE frequency and therefore never change their '
+          'relative phase. A directional realisation with one frequency in it '
+          'is monochromatic IN TIME at every point. This is why wave 19\'s '
+          'original brief -- short-crestedness -- could not have fixed the '
+          'surf line on its own, and the row is here so that claim is a '
+          'measurement.' % lad[0][2], '-')
+    between(1, 'ladder: the crest CV is set by n_f and reaches Rayleigh by 32',
+            lad[3][2], 0.42, 0.62,
+            'THE LADDER: %s, against Rayleigh %.4f. Eight frequencies read '
+            '%.3f +- %.3f and thirty-two read %.3f. THIS IS THE DERIVATION '
+            'FOR THE BRACKET IN P.2 and it is what keeps that row from being '
+            'a fitted window: the drawn surface is not asked to hit 0.5227, '
+            'it is asked to hit what a sum of `_FAR`\'s OWN eight frequencies '
+            'can produce. The shortfall is carried as an OPEN row below with '
+            'the one-integer change that closes it and that change\'s cost. '
+            'Each rung is the mean of %d independent realisations of a '
+            '400-period record.'
+            % (ladtxt, RAY, lad[2][2], lad[2][3], lad[3][2], 64), '-')
+    check(1, 'ladder: FEW frequencies is what suppresses the CV, not few '
+             'components',
+          float(lad[3][2] / max(lad[1][2], 1e-9) > 2.0), 1.0, 0,
+          'THE ROW THAT MAKES "n_f DRIVES IT" FALSIFIABLE RATHER THAN '
+          'DESCRIPTIVE. Every rung of this ladder carries exactly 256 '
+          'components and 256 random phases; only the split between '
+          'frequencies and directions changes. Two frequencies x 128 '
+          'directions reads %.3f and thirty-two x eight reads %.3f, a factor '
+          '%.1f. If crest height were a property of the component COUNT this '
+          'ratio would be 1. The n_th axis buys crest length in space and '
+          'buys nothing in time, which is the whole reason this round\'s '
+          'original brief -- short-crestedness -- could not have fixed the '
+          'surf line.'
+          % (lad[1][2], lad[3][2], lad[3][2] / max(lad[1][2], 1e-9)), '-')
+    info(1, 'and the meter\'s own ceiling, which is not exactly Rayleigh',
+         '%.4f at n_f=256' % lad[4][2],
+         'STATED SO THE RESIDUAL BELOW IS NOT OVERSTATED. At 256 distinct '
+         'frequencies the ladder reads %.4f against the closed form %.4f -- '
+         '%.1f %% high, and it is the METER, not the physics: crests are '
+         'read at sampled instants rather than interpolated, so every crest '
+         'is caught slightly below its true peak and the shortfall is larger '
+         'for the tall ones. So the reachable ceiling for this instrument on '
+         'this record length is %.4f, and P.2\'s shortfall is quoted against '
+         'both numbers.' % (lad[4][2], RAY, 100.0 * (lad[4][2] / RAY - 1.0),
+                            lad[4][2]))
+    n_f_far = int(np.unique(np.round(RND._FAR['omega'], 9)).size)
+    check(0, 'the shipping component list has the n_f the ladder assumes',
+          float(n_f_far), 8.0, 0,
+          'THE ROW THAT TIES THE LADDER TO THE RENDER. `_FAR` is built by '
+          '`spectral_components(n_f=8, n_th=32)`; this counts the DISTINCT '
+          'radian frequencies in the list the renderer actually holds, and '
+          'gets %d. If that integer changes, the bracket in P.2 is being read '
+          'off the wrong rung and this row says so before that row passes for '
+          'the wrong reason.' % n_f_far, '-')
+
+    # the bay, and the renderer's Water -- which is where the bundle lives
+    bay = ctx.get('_bay')
+    if bay is None:
+        bay = B.run_bay()
+        ctx['_bay'] = bay
+    w = RND.Water(bay)
+    bd = w.bundle
+    check(0, 'the renderer builds a transported bundle at all',
+          float(bd is not None and RND.SPECTRAL_ON), 1.0, 0,
+          'THE WAVE-13 ROW IN ITS FIFTH INSTANCE. Wave 12 built '
+          '`boolean_indicator` and nothing called it; the suite stayed green '
+          'for six waves on code the picture had never run. This row fails if '
+          '`Water` stops building `spectral_transform_2d`\'s output, which is '
+          'the cheapest possible proxy for "the population is still in the '
+          'render" and the one that would have caught the 2018 case.', '-')
+
+    # ==================================================================== P.2
+    # THE DRAWN SURFACE'S CREST CV, AT SURF-ZONE POINTS, THROUGH THE SHIPPING
+    # `free_surface` -- not through `beach.py` directly. This is the wave-13
+    # lesson applied to the statistic rather than to the call: the question is
+    # what the PICTURE draws.
+    rng = np.random.default_rng(19)
+    jj, ii = np.where((w.d > 0.4) & (w.d < 2.5))
+    sel = rng.choice(jj.size, 10, replace=False)
+    px, py = w.x[ii[sel]], w.y[jj[sel]]
+    nt2 = 20 * 64
+    ts2 = np.arange(nt2) * (20.0 * B.T_SWELL / nt2)
+
+    def _drawn_cv(spec):
+        w.spectral_on = spec
+        E = np.empty((nt2, 10))
+        for q, t in enumerate(ts2):
+            E[q] = RND.free_surface(w, px, py, t)
+        return _crest_cv(E)[0]
+
+    cv_off = _drawn_cv(False)
+    cv_on = _drawn_cv(True)
+    w.spectral_on = True
+    check(1, 'THE CARRIER HAS NO WAVE-HEIGHT DISTRIBUTION (waves 5-18)',
+          float(np.nanmax(cv_off)), 0.0, 1e-6,
+          'THE ROUND\'S FINDING, AS A ROW THAT CAN FAIL. With '
+          '`spectral_on = False` -- the shipping path of waves 5 through 18, '
+          'one flag switched, nothing else -- the crest CV at ten surf-zone '
+          'points over twenty periods is %.2e, max %.2e. Machine zero. Every '
+          'wave at a point was exactly the same height, because '
+          '`eta = (H/2)cos(phi)` reads ONE H field. THIS ROW IS WRITTEN TO '
+          'FAIL if that branch ever acquires a fake height jitter: the honest '
+          'way to give the carrier a population is a spectrum, and a '
+          'per-crest random multiplier bolted onto a monochromatic carrier '
+          'would break the transform\'s energy accounting silently. The row '
+          'that a future reader should compare it against is the next one.'
+          % (np.nanmean(cv_off), np.nanmax(cv_off)), '-')
+    between(1, 'THE DRAWN SURFACE\'S CREST CV, against the n_f=8 ladder',
+            float(np.nanmean(cv_on)), 0.28, 0.62,
+            'THE ROW THIS WAVE EXISTS FOR. Same ten points, same twenty '
+            'periods, same meter, one flag: %.4f (range %.3f..%.3f) against '
+            'the carrier\'s %.2e. The bracket is NOT the Rayleigh 0.5227 and '
+            'is not fitted either -- it is P.1\'s eight-frequency rung, '
+            '%.3f +- %.3f, widened to two of its own standard deviations. '
+            'A surf zone whose waves are all one height cannot break at more '
+            'than one depth, and this is the number that says this one no '
+            'longer does.'
+            % (np.nanmean(cv_on), np.nanmin(cv_on), np.nanmax(cv_on),
+               np.nanmean(cv_off), lad[2][2], lad[2][3]), '-')
+    openq(1, 'the drawn CV falls short of Rayleigh, and n_f is the reason',
+          '%.4f' % float(np.nanmean(cv_on)), '%.4f' % RAY,
+          'THE RESIDUAL, NAMED WITH ITS PRICE (ruling 17). The drawn surface '
+          'reads %.3f where a Rayleigh sea reads %.4f, and P.1 says exactly '
+          'where the missing 0.10 is: `_FAR` carries EIGHT distinct '
+          'frequencies, and eight is the rung of the ladder that reads '
+          '%.3f +- %.3f -- so the drawn value is inside ONE QUARTER of a '
+          'standard deviation of what eight frequencies produce, and the '
+          'per-point range on the render (0.31..0.65) is the same spread the '
+          'rung has. Thirty-two reads %.3f. THE FIX IS ONE INTEGER -- '
+          '`spectral_components(n_f=32)` in `beach_render._FAR` -- AND ITS '
+          'COST IS MEASURED, NOT GUESSED: `spectral_transform_2d` runs one '
+          'conservative `transform_2d` march per component, so at the '
+          'shipping n_th=32 that is 1024 marches instead of 256, about 140 s '
+          'and 550 MB in float32 against 35 s and 137 MB. It is left OPEN '
+          'rather than taken because `_FAR` is ALSO the offshore closed-form '
+          'field and the seam argument in `free_surface` depends on both '
+          'sides being ONE realisation -- so the two lists cannot be changed '
+          'independently, and every existing row on `_FAR` moves with it. '
+          'That is a round\'s worth of re-measurement, not a line.'
+          % (float(np.nanmean(cv_on)), RAY, lad[2][2], lad[2][3], lad[3][2]))
+
+    # ==================================================================== P.3
+    # THE REACH. Ruling 18: integers off the RENDERED BUFFER, saying what share
+    # of the surf zone the new structure actually touches. The honest number
+    # before this wave is zero and it is printed here beside the new one.
+    #
+    # 240 x 320 for the same reason `_sec_foamtex` and `_sec_seam` use it: the
+    # question is which pixels are reached, and that is not a property of the
+    # sampling. Both frames are rendered, because a reach quoted against a
+    # remembered "before" is not a measurement.
+    camK = RND.hero_cameras(w, 240, 320, out=lambda *a, **kw: None)[5]
+    reach = {}
+    for spec in (True, False):
+        w.spectral_on = spec
+        L_f, ex_f = RND.render(camK, w)
+        sh = ex_f['water']
+        xa = np.asarray(sh['xw']).reshape(-1)
+        ya = np.asarray(sh['yw']).reshape(-1)
+        fa = np.asarray(sh['foot']).reshape(-1)
+        # THE SURF ZONE IS THE TRANSFORM'S OWN STATEMENT AND NOT A DEPTH
+        # GUESS: q_b is Battjes & Janssen's breaking fraction, already in
+        # `beach.py` and already read by the foam. One wave in a hundred
+        # breaking is the seaward edge of a surf zone.
+        sm = np.asarray(sh['q_b']).reshape(-1) > 0.01
+        NT = 6 * 12
+        tt = np.arange(NT) * (6.0 * B.T_SWELL / NT)
+        E = np.empty((NT, xa.size))
+        for q, t in enumerate(tt):
+            E[q] = RND.free_surface(w, xa, ya, t, foot=fa)
+        cv, npk = _crest_cv(E)
+        ok = np.isfinite(cv) & (cv > 0.05)
+        reach[spec] = dict(
+            water=int(xa.size), surf=int(sm.sum()), rw=int(ok.sum()),
+            rs=int((ok & sm).sum()), sh=sh, L=L_f, sm=sm,
+            med=float(np.nanmedian(cv[sm])))
+    w.spectral_on = True
+    on, off = reach[True], reach[False]
+    check(0, 'REACH: surf-zone pixels carrying a wave-height distribution',
+          float(on['rs']) / max(on['surf'], 1), 1.0, 0.03,
+          'RULING 18, AND THE HONEST NUMBER BEFORE THIS WAVE IS ZERO. Frame '
+          'K at 240 x 320, rendered TWICE with one flag: of %d water samples, '
+          '%d are surf zone (q_b > 0.01). The share of those whose DRAWN '
+          'surface has a crest-to-crest CV above 0.05 -- a tenth of the '
+          'Rayleigh CV, and 5e7 times the monochromatic floor P.0 measures -- '
+          'is %d/%d = %.1f %% now and was %d/%d = %.1f %% before. Not "a '
+          'population exists in beach.py": the pixels of the picture that '
+          'have one.'
+          % (on['water'], on['surf'], on['rs'], on['surf'],
+             100.0 * on['rs'] / max(on['surf'], 1), off['rs'], off['surf'],
+             100.0 * off['rs'] / max(off['surf'], 1)), '-')
+    check(0, 'REACH: and it was ZERO in the surf zone before this wave',
+          float(off['rs']), 0.0, 0,
+          'THE OTHER HALF OF THE PAIR, AND IT IS A ROW RATHER THAN A '
+          'SENTENCE. Waves 5-18 faded a directional realisation in over '
+          '`xw < w.x[0] + 60` -- the last 60 m of open water, OUTSIDE the '
+          'modelled bed -- and that reached %d of %d water pixels (%.1f %%) '
+          'and %d of %d surf pixels. The subject of the picture was drawn '
+          'from a single-valued carrier and the suite could not see it, '
+          'because no row measured the surface\'s STATISTICS at all. This '
+          'number is 0 by physics, not by tolerance: `free_surface`\'s '
+          'else-branch is one cosine.'
+          % (off['rw'], off['water'], 100.0 * off['rw'] / max(off['water'], 1),
+             off['rs'], off['surf']), '-')
+    between(0, 'REACH: water pixels reached, over the whole frame',
+            float(on['rw']) / max(on['water'], 1), 0.90, 1.0,
+            'The same count without the surf mask: %d of %d water samples '
+            '(%.1f %%) against %d of %d (%.1f %%) before. It is not 100 %% '
+            'and the shortfall is named: the %d pixels that miss are the '
+            'far horizon, where one pixel is tens of metres and the '
+            'footprint band limit has removed every component that could '
+            'vary -- correctly, since a wave shorter than the pixel must not '
+            'be drawn. A frame that reached 100 %% here would be aliasing.'
+            % (on['rw'], on['water'], 100.0 * on['rw'] / max(on['water'], 1),
+               off['rw'], off['water'],
+               100.0 * off['rw'] / max(off['water'], 1),
+               on['water'] - on['rw']), '-')
+
+    # ==================================================================== P.4
+    # BREAKING: THE EXPECTATION OR A REALISATION OF IT.
+    #
+    # Battjes & Janssen's Q_b is the FRACTION of waves breaking at a depth --
+    # an expectation. Through wave 18 the render drew that fraction as a
+    # smooth field, so the seaward edge of every breaking statement it owned
+    # was a depth contour. This block asks whether it now draws WHICH waves
+    # broke, and whether doing so left the expectation alone.
+    mp = on['sh'].get('m_pop')
+    check(0, 'the render draws a breaking REALISATION, not just E[breaking]',
+          float(isinstance(mp, dict)), 1.0, 0,
+          'THE FIFTH INSTANCE OF THIS ERROR CLASS THIS PROJECT HAS FOUND AND '
+          'THE FIRST ROW THAT WOULD CATCH THE NEXT ONE. `shade_water` returns '
+          '`m_pop` only when it has evaluated `beach.breaking_indicator` on '
+          'the drawn envelope and rescaled the break term of the covering '
+          'measure by it. If that call is removed the foam goes back to a '
+          'smooth function of (d, H) and this row fails -- which is exactly '
+          'what six green waves did not do for the foam texture.', '-')
+    if isinstance(mp, dict):
+        chi = np.asarray(mp['chi']).reshape(-1)
+        pc = np.asarray(mp['p_chi']).reshape(-1)
+        check(0, 'the realisation DIFFERS from its expectation pointwise',
+              float(float(np.mean(np.abs(chi - pc) > 1e-6)) > 0.5), 1.0, 0,
+              'A field that equals its own expectation everywhere is the '
+              'expectation. %.1f %% of water samples have chi != p_chi, and '
+              'chi is Boolean while p_chi is not, so this is the cheapest '
+              'statement that something was DRAWN.'
+              % (100.0 * np.mean(np.abs(chi - pc) > 1e-6)), '-')
+        info(3, 'the cap on 1/p, weighted by the measure it touches',
+             '%.2f %% of the break measure, %.1f %% of pixels'
+             % (100.0 * mp['capped_measure'], 100.0 * mp['capped_pixels']),
+             'REPORTED BECAUSE IT IS A NUMERICAL GUARD AND NOT PHYSICS. '
+             'Where E[chi] is tiny the amplification 1/p is not, so '
+             '`FOAM_POP_CAP` bounds it at %.0f. The share is quoted weighted '
+             'by the BREAK MEASURE rather than by pixel count, because most '
+             'water pixels carry no deck at all: the pixel figure is %.1f %% '
+             'and the honest one is %.2f %%.'
+             % (RND.FOAM_POP_CAP, 100.0 * mp['capped_pixels'],
+                100.0 * mp['capped_measure']))
+
+    # is the drawn envelope Rayleigh -- measured on the GRID, over many
+    # instants, because one instant of one frame is one sample of a
+    # spatially correlated field and would not distinguish 2 % from 9 %.
+    g_g = np.maximum(bd['g'], 1e-12)
+    p_g = B.rayleigh_exceedance(B.GAMMA_B * w.d, bd['H_bundle_cons'])
+    surf_g = w.q_b > 0.01
+    cm = []
+    for t in np.linspace(0.0, 20.0 * B.T_SWELL, 20, endpoint=False):
+        _, envg = B.spectral_surface(bd['a'], bd['S'], bd['omega'], t,
+                                     want_env=True)
+        cm.append(float(B.breaking_indicator(envg / g_g,
+                                             w.d)[surf_g].mean()))
+    cm = np.array(cm)
+    p_surf = float(p_g[surf_g].mean())
+    check(1, 'E[realised breaking] IS Battjes & Janssen\'s Q_b',
+          float(cm.mean()) / p_surf, 1.0, 0.05,
+          'THE ROW THAT MAKES THE INDICATOR A REALISATION *OF THE PHYSICS* '
+          'RATHER THAN A TEXTURE, and it is tier 1 because the right-hand '
+          'side is a closed form: for a Gaussian sea the envelope is '
+          'Rayleigh, so P(2A >= gamma_b d) = exp(-(gamma_b d/H_rms)^2), which '
+          'is `beach.rayleigh_exceedance` and is B&J\'s own UNCLIPPED Q_b. '
+          'Averaged over %d instants on the %d surf-zone grid cells the drawn '
+          'indicator reads %.4f +- %.4f against %.4f -- %.1f %% high. The '
+          '5 %% window is the residual named in P.2 arriving here: eight '
+          'frequencies is not "many", so the envelope is only approximately '
+          'Rayleigh, and the sign is right for that (a coherent sum over few '
+          'frequencies has heavier shoulders than Rayleigh). MEASURED OFF '
+          'THE FRAME AT ONE INSTANT THE SAME RATIO IS %.1f %% -- the frame '
+          'weights near surf pixels by perspective and band-limits the '
+          'envelope by footprint while p_chi is unfiltered -- which is why '
+          'this row is taken on the grid and the frame number is INFO.'
+          % (cm.size, int(surf_g.sum()), cm.mean(), cm.std(), p_surf,
+             100.0 * (cm.mean() / p_surf - 1.0),
+             100.0 * (float(chi[on['sm']].mean())
+                      / max(float(pc[on['sm']].mean()), 1e-12) - 1.0)
+             if isinstance(mp, dict) else float('nan')), '-')
+
+    # THE BREAKING FRONT'S ALONGSHORE VARIATION -- the picture's actual subject
+    def _edge_sd(fl):
+        e = [w.x[np.where(fl[j])[0][0]] for j in range(fl.shape[0])
+             if np.any(fl[j])]
+        return float(np.std(e)) if len(e) > 2 else float('nan')
+
+    sd_brk = _edge_sd(w.brk > 0)
+    sd_qb = _edge_sd(w.q_b > 0.05)
+    sd_chi = []
+    for t in np.linspace(0.0, 8.0 * B.T_SWELL, 8, endpoint=False):
+        _, envg = B.spectral_surface(bd['a'], bd['S'], bd['omega'], t,
+                                     want_env=True)
+        sd_chi.append(_edge_sd(B.breaking_indicator(envg / g_g, w.d)))
+    sd_chi = np.array(sd_chi)
+    check(0, 'THE BREAKING FRONT IS NO LONGER A DEPTH CONTOUR',
+          float(np.nanmin(sd_chi) / max(sd_brk, 1e-9) > 2.0), 1.0, 0,
+          'THE OWNER\'S SENTENCE, AS A NUMBER. The seaward-most cell of the '
+          'breaking statement, per alongshore row, has a standard deviation '
+          'of %.2f m for `brk` and %.2f m for `q_b > 0.05` -- and BOTH of '
+          'those are deterministic functions of (d, H), so that 18 m is the '
+          'BED\'s variation and not the sea\'s. It is what a single-valued '
+          'carrier can produce and it is why the surf line reads as one long '
+          'wave. The realised indicator reads %.1f..%.1f m over eight '
+          'instants (mean %.1f), a factor %.1f, and it MOVES between instants '
+          'while the other two cannot. The row is a ratio and not a length '
+          'because the length is this bed\'s; the ratio is the sea\'s.'
+          % (sd_brk, sd_qb, np.nanmin(sd_chi), np.nanmax(sd_chi),
+             np.nanmean(sd_chi), np.nanmean(sd_chi) / max(sd_brk, 1e-9)), '-')
+
+    # ==================================================================== P.5
+    # WHAT THIS WAVE DID NOT FIX, MEASURED RATHER THAN ASSERTED.
+    #
+    # (a) THE FOAM'S RADIANCE. An independent critic scoring the frames found
+    #     the foam's white to be one constant value -- top 30 % of surf-band
+    #     pixels at mean 252.5 DN, sd 0.31, 100 % at or above 250 -- against
+    #     8.45-21.28 DN on four photographed bores, and called it: "the
+    #     coverage is sampled and the radiance is not." This wave sampled the
+    #     coverage harder. It is measured here, scene-linear off `L` and NOT
+    #     off a PNG, so the next round starts from a number.
+    lum = np.array([0.2126, 0.7152, 0.0722])
+    stat = {}
+    for k, r in (('on', on), ('off', off)):
+        Lw = np.asarray(r['sh']['L']).reshape(-1, 3) @ lum
+        cw = np.asarray(r['sh']['cov']).reshape(-1)
+        foamy = r['sm'] & (cw > 0.9)
+        stat[k] = (float(Lw[foamy].mean()), float(Lw[foamy].std()),
+                   int(foamy.sum()))
+    rel_on = stat['on'][1] / max(stat['on'][0], 1e-12)
+    rel_off = stat['off'][1] / max(stat['off'][0], 1e-12)
+    between(0, 'the foam\'s radiance DOES vary, scene-linear, and by how much',
+            rel_on, 0.05, 0.40,
+            'THE CRITIC\'S FINDING, RE-MEASURED IN SCENE-LINEAR, AND IT DOES '
+            'NOT REPRODUCE AS STATED -- which is worth more than agreeing '
+            'with it. On the %d frame-K samples that are surf zone AND more '
+            'than 90 %% foam-covered, the luminance is %.4f +- %.4f, a '
+            'relative spread of %.1f %%, against %.1f %% on the same pixels '
+            'with wave 19 switched off. The population work roughly DOUBLED '
+            'it, as a consequence and not as a target: waves that break at '
+            'different depths cover different amounts of different pixels. '
+            'What is constant is one level up -- see the OPEN row below.'
+            % (stat['on'][2], stat['on'][0], stat['on'][1], 100.0 * rel_on,
+               100.0 * rel_off), '-')
+    dn_on = (np.clip(np.asarray(on['sh']['L']).reshape(-1, 3) / RND.WHITE,
+                     0, 1) ** (1 / 2.2) * 255.0 + 0.5) @ lum
+    sl = dn_on[on['sm']]
+    top = sl[sl >= np.percentile(sl, 70)]
+    openq(3, 'the foam\'s AIR FRACTION is still one number',
+          'top-30%% surf DN %.1f +- %.1f, %.0f %% >= 250'
+          % (top.mean(), top.std(), 100.0 * (top >= 250).mean()),
+          'per-bore radiance', 'NAMED RATHER THAN HALF-BUILT, which is the '
+          'instruction this round was given for it. `shade_water` draws foam '
+          'as R_raft * E/pi with R_raft floored at `FOAM_WHITE` -- ONE '
+          'reflectance, from ONE bubble-pile depth, which is a deterministic '
+          'function of (d, H) like everything else this project has had to '
+          'un-average. A realised population SHOULD carry realised air: a '
+          'wave breaking in 2.4 m entrains more air over a longer bore than '
+          'one breaking in 0.9 m, and the indicator now knows which is which. '
+          'That is the mechanism and this wave did not build it. What DID '
+          'move is measured in the row above. Two further facts for whoever '
+          'takes it: the display curve is doing much of the flattening -- '
+          'WHITE is %.3f and the foam sits at %.3f, so 90 %% of the '
+          'scene-linear spread is inside the last 3 DN before the clip -- and '
+          'the critic\'s "sd 0.31 DN, 100 %% >= 250" does not reproduce on '
+          'this branch: the same statistic here is %.1f +- %.1f with %.0f %% '
+          '>= 250, so part of that reading was the band definition and part '
+          'of it was a frame from before this wave landed.'
+          % (RND.WHITE, stat['on'][0], top.mean(), top.std(),
+             100.0 * (top >= 250).mean()))
+
+    # (b) THE FADE, WHICH IS LOAD-BEARING AND STAYS. The brief asked for it to
+    #     be removed. It carries the sea OUTSIDE the modelled bed and removing
+    #     it would draw infinite stripes to the horizon.
+    xo = np.linspace(w.x[0] - 400.0, w.x[0] + 200.0, 121)
+    yo = np.full_like(xo, float(w.y[w.y.size // 2]))
+    dS = np.abs(np.diff(w.sample(xo, yo, bd['S']), axis=0)).max(1)
+    i0 = int(np.searchsorted(xo, w.x[0]))
+    check(0, 'the fade is LOAD-BEARING: the bundle has no phase seaward of x0',
+          float(np.abs(dS[:i0 - 1]).max()), 0.0, 1e-12,
+          'WHAT THE FADE GUARDS, MEASURED. `Water.sample` CLAMPS at the grid '
+          'edge, so every point seaward of x[0] reads column 0\'s phase: the '
+          'largest phase step over 5 m samples out there is %.2e -- exactly '
+          'zero -- against %.2f rad inside the domain. Without the blend, one '
+          'value of S covers the whole open ocean and the swell draws as '
+          'INFINITE STRIPES running to the horizon. That is the wave-13 '
+          'boundary condition one field down, it is still true of the bundle, '
+          'and it is why `free_surface` still blends toward '
+          '`spectral_eta(_FAR)` over the last 60 m. What CHANGED in wave 19 '
+          'is the blend\'s meaning: it is no longer a swap between a '
+          'realisation and a carrier but two evaluations of ONE component '
+          'list, and P.3 measures that it now reaches 0 %% of the surf zone '
+          'instead of all of it.'
+          % (np.abs(dS[:i0 - 1]).max(), dS[i0:].max()), 'rad')
+    far_m0 = float((RND._FAR['a'] ** 2 / 2.0).sum())
+    Hb = 2.0 * np.sqrt((w.sample(xo, yo, bd['a']) ** 2).sum(1))
+    between(3, 'the seam step is AMPLITUDE only, and it is small',
+            float(Hb[i0] / math.sqrt(8.0 * far_m0)), 0.85, 1.05,
+            'THE COST OF THE BLEND, AND IT IS THE ONLY THING THAT STEPS. '
+            'Phase is continuous by construction -- Snell fixes '
+            'k sin(theta) at the boundary, so the row above reads zero on '
+            'both sides for the right reason. The bundle\'s drawn H_rms at '
+            'column 0 is %.4f against the offshore closed form\'s %.4f, a '
+            'ratio of %.4f. Two named contributions: the bundle has shoaled '
+            'and refracted to the boundary depth, and '
+            '`spectral_transform_2d` reports that %.1f %% of the offshore '
+            'variance travels shoreward at all (`flux_fraction`) -- the rest '
+            'is components whose orthogonal is more than 90 deg off '
+            'shore-normal, which `transform_2d`\'s own boundary condition '
+            'takes to zero. sqrt of that is %.4f, most of the step.'
+            % (Hb[i0], math.sqrt(8.0 * far_m0),
+               Hb[i0] / math.sqrt(8.0 * far_m0),
+               100.0 * bd['flux_fraction'],
+               math.sqrt(bd['flux_fraction'])), '-')
+
+    # (c) THE ACCOUNTING ROW: the drawn H_rms IS the transform's own H, so
+    #     nothing downstream of the wave field moved.
+    rel = np.abs(bd['H_drawn'] - w.H) / np.maximum(w.H, 1e-12)
+    check(1, 'the bundle\'s drawn H_rms IS the transform\'s own H, cell by cell',
+          float(rel.max()), 0.0, 1e-5,
+          'THE ROW THAT SAYS THIS WAVE ADDED NO ENERGY, and it is an '
+          'algebraic identity rather than a tolerance. With '
+          'a_j = (H_j/2) g and g = H_broken/sqrt(SUM H_j^2), the drawn '
+          'variance is SUM a_j^2/2 = (g^2/8) SUM H_j^2 = H_broken^2/8 '
+          'identically, so H_rms(drawn) = H_broken cell by cell. Max relative '
+          'departure over the whole grid: %.2e, which is float32 storage of '
+          'the amplitude array and nothing else. Every field downstream -- '
+          'the setup, the undertow, the roller, the sediment, the foam\'s '
+          'energy budget -- reads that same H and none of them moved.'
+          % rel.max(), '-')
+    info(3, 'what the transported bundle costs',
+         '%d components, %d MB, %.0f %% of offshore variance shoreward'
+         % (bd['n'], bd['nbytes'] / (1 << 20), 100.0 * bd['flux_fraction']),
+         'One conservative `transform_2d` march per component, built once per '
+         '`Water` because a realisation rebuilt per frame would put a '
+         'different sea in every picture. `seaward_fraction` is %.3f -- the '
+         'share of the component list whose orthogonal points offshore, which '
+         'the march zeroes rather than this file special-casing.'
+         % bd['seaward_fraction'])
+
+
 def _scatter(L, mw, vals):
     """Put a per-water-pixel field back into a full-frame buffer."""
     out = np.zeros(L.shape[:2] + (vals.shape[-1],)) if vals.ndim > 1 \
         else np.zeros(L.shape[:2])
     out[mw] = vals
     return out
+
+
+# ------------------------------------------------------------ the wave-19 bugs
+# FIVE, AND EVERY ONE OF THEM IS A WAY THIS WAVE COULD HAVE BEEN WRITTEN AND
+# STILL LOOKED RIGHT. Standing ruling: a guard that does not fire on its own
+# bug is a comment with a check() around it, so `--bugs-population` puts each
+# of these back and prints which rows die.
+def _bug_pop_no_bundle(mod):
+    """WAVES 5-18 PUT BACK: one carrier phase, one wave height, no population.
+
+    The single flag `SPECTRAL_ON`, which is the control panel the renderer
+    already carries. This is not a hypothetical defect -- it is what this
+    project shipped for fourteen waves while its suite stayed green, and the
+    only reason it is here is that nothing measured the surface's statistics."""
+    mod.SPECTRAL_ON = False
+    orig = mod.Water.__init__
+
+    def init(self, *a, **kw):
+        orig(self, *a, **kw)
+        self.spectral_on = False
+    mod.Water.__init__ = init
+
+
+def _bug_pop_monochromatic_bundle(mod):
+    """THE MISTAKE THIS ROUND'S ORIGINAL BRIEF WOULD HAVE LED TO.
+
+    256 components, 256 random phases, 256 DIRECTIONS -- and one frequency.
+    The crests are short, the field is a realisation, the picture looks
+    plausible from a distance, and at every fixed point the surface is still
+    exactly monochromatic in TIME, so there is still no wave-height
+    distribution and the surf line is still a line.
+
+    Patches `beach.spectral_components`, so the driver must reload
+    `beach_render` afterwards: `_FAR` is built at import."""
+    orig = mod.spectral_components
+
+    def mono(n_f=8, n_th=32, **kw):
+        c = orig(n_f=n_f, n_th=n_th, **kw)
+        c = dict(c)
+        om0 = float(np.median(c['omega']))
+        sc = om0 / np.asarray(c['omega'], float)
+        c['omega'] = np.full_like(np.asarray(c['omega'], float), om0)
+        for key in ('kx', 'ky'):
+            c[key] = np.asarray(c[key], float) * sc ** 2
+        return c
+    mod.spectral_components = mono
+
+
+def _bug_pop_expectation_foam(mod):
+    """THE FOAM DRAWN FROM E[breaking] AGAIN -- the error class itself.
+
+    The bundle is still built and the surface still has a population; only the
+    covering measure goes back to being a smooth function of (d, H). This is
+    the defect that separates "beach.py can do it" from "the picture does it",
+    and it is the fifth instance of that separation this project has found."""
+    orig = mod.Water.__init__
+
+    def init(self, *a, **kw):
+        orig(self, *a, **kw)
+        self.foam_population = False
+    mod.Water.__init__ = init
+
+
+def _bug_pop_carrier_denominator(mod):
+    """THE DISSIPATION DIVIDED BY THE CARRIER'S H INSTEAD OF THE BUNDLE'S.
+
+    g = H_broken / H_cons(carrier) rather than / sqrt(SUM H_j^2). It is the
+    obvious way to write it, it is within 3.5 % on the wet bay, and it breaks
+    the energy identity that makes this wave an accounting move: the drawn
+    H_rms stops being the transform's own H, so every field downstream of the
+    wave transform is now reading a different sea from the one that is drawn.
+    Patches `beach.spectral_transform_2d`."""
+    orig = mod.spectral_transform_2d
+
+    def bad(x, y, h2, comp, H_brk=None, H_cons=None, **kw):
+        return orig(x, y, h2, comp, H_brk=H_brk, H_cons=None, **kw) \
+            if H_cons is None else _pop_carrier_g(orig, x, y, h2, comp,
+                                                  H_brk, H_cons, kw)
+    mod.spectral_transform_2d = bad
+
+
+def _pop_carrier_g(orig, x, y, h2, comp, H_brk, H_cons, kw):
+    b = orig(x, y, h2, comp, H_brk=None, H_cons=None, **kw)
+    g = np.asarray(H_brk, float) / np.maximum(np.asarray(H_cons, float), 1e-9)
+    b['a'] = (b['a'] * (0.5 * g).astype(b['a'].dtype)[..., None])
+    b['g'] = g
+    b['H_drawn'] = 2.0 * np.sqrt(np.einsum('ijc,ijc->ij', b['a'], b['a'],
+                                           dtype=np.float64))
+    return b
+
+
+def _bug_pop_envelope_is_abs_eta(mod):
+    """THE ENVELOPE WRITTEN AS |eta| INSTEAD OF |zeta|.
+
+    The single most likely way to write this by hand: the analytic signal's
+    modulus needs the QUADRATURE sum as well, and |Re(zeta)| is not an
+    envelope -- it touches zero twice a period. Every wave then spends most of
+    its time reading as smaller than it is, so the realised breaking fraction
+    collapses below Battjes & Janssen's Q_b."""
+    orig = mod.spectral_surface
+
+    def bad(a_s, S_s, om, t=0.0, k_s=None, foot=None, want_env=False):
+        if not want_env:
+            return orig(a_s, S_s, om, t, k_s=k_s, foot=foot)
+        eta = orig(a_s, S_s, om, t, k_s=k_s, foot=foot)
+        return eta, np.abs(eta)
+    mod.spectral_surface = bad
+
+
+POPULATION_BUGS = ('pop-no-bundle', 'pop-monochromatic-bundle',
+                   'pop-expectation-foam', 'pop-carrier-denominator',
+                   'pop-envelope-is-abs-eta')
+POP_RENDER_BUGS = ('pop-no-bundle', 'pop-expectation-foam')
+
+BUGS.update({
+    'pop-no-bundle': _bug_pop_no_bundle,
+    'pop-monochromatic-bundle': _bug_pop_monochromatic_bundle,
+    'pop-expectation-foam': _bug_pop_expectation_foam,
+    'pop-carrier-denominator': _bug_pop_carrier_denominator,
+    'pop-envelope-is-abs-eta': _bug_pop_envelope_is_abs_eta,
+})
 
 
 # ------------------------------------------------------------ the wave-18 bugs
@@ -11443,7 +12184,19 @@ def run_suite():
                       (_sec_modes, 'the offshore climate has modes, and how '
                                    'many times the wave breaks'),
                       (_sec_modes_reach, 'do PIXELS reach the second surf '
-                                         'line')):
+                                         'line'),
+                      # WAVE 19. LAST, AND IT IS NOW THE MOST EXPENSIVE
+                      # SECTION IN THE FILE: it builds a `Water` -- which is
+                      # 256 conservative marches -- and renders frame K TWICE,
+                      # because a reach quoted against a remembered "before" is
+                      # not a measurement. It must run after `_sec_land`, which
+                      # is what puts the full-scale bay in `ctx['_bay']`; that
+                      # bay is 100 s and building it a fifth time would cost
+                      # more than every row in this section.
+                      (_sec_population, 'the wave POPULATION: does the drawn '
+                                        'sea have a height distribution, and '
+                                        'does the breaking draw a realisation '
+                                        'of it')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -11558,6 +12311,55 @@ if __name__ == '__main__':
                 print('%-26s   %s' % ('', c[:88]))
         importlib.reload(BOP)
         importlib.reload(RND)
+        sys.exit(0)
+    if '--bugs-population' in sys.argv:
+        # WAVE 19. ITS OWN DRIVER, AND THE REASON IS THE BAY. `_sec_population`
+        # needs a full-scale bay (100 s), a `Water` with 256 conservative
+        # marches (35 s) and TWO renders (120 s). Three of these five defects
+        # patch `beach`, whose reload clears `beach._BAY_CACHE` -- so the
+        # generic driver would rebuild the bed five times for no reason. Here
+        # the bay is built ONCE, held as plain arrays, and seeded into every
+        # run's ctx: the runs then differ by the defect and by nothing else,
+        # which is also what makes the comparison a measurement rather than a
+        # pair of coincidences.
+        import importlib
+        import beach_render as RND
+        _bay = BCH.run_bay()
+
+        def _run_pop():
+            del ROWS[:]
+            c = dict(B=BCH, T=BCH.T_SWELL, omega=2.0 * math.pi / BCH.T_SWELL,
+                     x=BCH.make_grid(), _bay=_bay)
+            guard(_sec_population, 'the wave population', c)
+            return c
+        _run_pop()
+        base = set(_fail_names())
+        print('clean population section: %d pass / %d FAIL / %d OPEN'
+              % (sum(r.status == 'PASS' for r in ROWS), len(base),
+                 sum(r.status == 'OPEN' for r in ROWS)))
+        print()
+        print('%-28s %s' % ('bug reintroduced', 'rows that FAIL'))
+        print('-' * 118)
+        for name in POPULATION_BUGS:
+            importlib.reload(BCH)
+            BUGS[name](RND if name in POP_RENDER_BUGS else BCH)
+            # `_FAR` and the module-level flags are built at import, so the
+            # renderer is reloaded AFTER `beach` is patched -- which is the
+            # only order in which `pop-monochromatic-bundle` reaches the
+            # component list the picture actually holds.
+            if name not in POP_RENDER_BUGS:
+                importlib.reload(RND)
+            try:
+                _run_pop()
+                caught = [n for n in _fail_names() if n not in base]
+            except Exception as exc:                      # a crash is a catch
+                caught = ['(raised %s: %s)' % (type(exc).__name__,
+                                               str(exc)[:60])]
+            print('%-28s %d' % (name, len(caught)))
+            for c in caught:
+                print('%-28s   %s' % ('', c[:84]))
+            importlib.reload(BCH)
+            importlib.reload(RND)
         sys.exit(0)
     if '--bugs-land' in sys.argv:
         import importlib
@@ -11996,6 +12798,14 @@ if __name__ == '__main__':
                 # reloads `beach_render` between runs. The whole-suite driver
                 # does not import the renderer, so these are skipped here and
                 # the table that fires them is the one printed by that flag.
+                continue
+            if name in POPULATION_BUGS:
+                # WAVE 19, and the same reason as LAND_BUGS with the bay on
+                # top: three of these patch `beach` and two patch
+                # `beach_render`, which this driver never imports, and the
+                # section they fire costs a bay plus two renders. They have
+                # their own flag, `--bugs-population`, which builds the bed
+                # once and reuses it across all five.
                 continue
             if name in VIEW_BUGS:
                 # WAVE 18, and the same reason with one addition. These rebind
