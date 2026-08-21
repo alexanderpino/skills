@@ -7,6 +7,9 @@ code this round, and the scripts that produced them are named at the end.
 This document answers the re-opened sections A and F of `bar/bar.md`. It does
 **not** re-close them, and it does not recommend closing them.
 
+**Evidence:** `evidence/s20-overturning.png`, caption in
+`evidence/s20-overturning.caption.md`.
+
 ---
 
 ## 0 · The one-paragraph answer
@@ -686,17 +689,30 @@ this project's longest-standing `0.0000` into a distance.
 
 ## 7 · Reproducing this
 
-Two read-only scripts, kept out of `reference-impl/` on purpose:
+Three read-only scripts in `gauntlet/sea/scout/`, kept out of `reference-impl/`
+on purpose, with their logs beside them:
 
-- `measure_overturn.py` — the scene's breaker class, the nonlinear surface state
-  and its clamp, the closed-form ceiling, the face-angle census (both branches of
-  `SPECTRAL_ON`, two `eps`, a fine zoom) and the kinematic criterion.
-- `measure_class.py` — the breaker class and derived slope limits over the whole
-  domain, and the slope-window ladder of §1.1.
+- `measure-overturning.py` — the scene's breaker class, the nonlinear surface
+  state and its clamp, the closed-form ceiling, the face-angle census (both
+  branches of `SPECTRAL_ON`, two `eps`, a fine zoom) and the kinematic
+  criterion. **585 s** under the contention described in §1.0.
+- `measure-breaker-class.py` — the breaker class and the derived slope limits
+  over the whole domain, the slope-window ladder of §1.1, and the cross-shore
+  profile across the bar flank. **Seconds**, once the bay is cached.
+- `figure-overturning.py` — the evidence figure,
+  `evidence/s20-overturning.png`, with its caption in the sidecar
+  `evidence/s20-overturning.caption.md`.
 
-Both import `beach`, `beach_render` and `beach_foam` from
+All three import `beach`, `beach_render`, `beach_foam` and `beach_plot` from
 `terrain-renderer/reference-impl/` and write nothing into it. The bay is cached
-to a pickle because `run_bay()` costs 117.8 s and every number here needs it.
+to a pickle **outside the repository** (`$SCOUT_CACHE`, default `/tmp`) because
+`run_bay()` costs 117.8 s and every number here needs it.
+
+⚠️ **One defect found in the scout's own instrument and fixed in place**, because
+it is the same class as §1.1's: `-∇h` is *negative* on a shoaling bed, so taking
+`argmax` of the signed array found the trough's landward wall instead of the
+bar's seaward flank and reported ξ = 0.509 instead of 1.110. The magnitude is
+what the Iribarren number wants; the comment in the script says so.
 
 **Nothing in this round was built, and nothing in `reference-impl/` was
 modified.** `git status` was clean at the start and the only file added is this
