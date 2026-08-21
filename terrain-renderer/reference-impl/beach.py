@@ -4804,6 +4804,295 @@ def transform_2d(x, y, h2, T, H0, theta0, breaking=True, gamma_b=GAMMA_B,
                 E0=E0, dx=dx, dy=dy)
 
 
+# ============================================================================
+# SECTION S2 -- THE SPECTRUM TRANSPORTED, AND THE WAVE POPULATION IT RESTORES
+# ============================================================================
+#
+# WAVE 19, AND THE DEFECT IT IS FOR IS ONE LEVEL ABOVE THE ONE THE ROUND WAS
+# BRIEFED ON. The brief was short-crestedness: `beach_render.free_surface`
+# fades the directional realisation out over the last 60 m of open water, so
+# the surf zone -- the picture's subject -- is drawn from ONE carrier phase.
+# That is true and it is fixed below. But measured first, on the champion:
+#
+#   THE DRAWN SURFACE HAS NO WAVE-HEIGHT DISTRIBUTION AT ALL. Sampling
+#   `free_surface` at ten surf-zone points over twenty periods, the
+#   crest-to-crest coefficient of variation is 3.7e-16 -- machine zero. Every
+#   wave at a point is exactly the same height, because `eta = (H/2) cos(phi)`
+#   reads ONE H field. A Rayleigh sea gives CV = sqrt(4/pi - 1) = 0.5227.
+#
+# That matters more than the crest length, and the arithmetic says so. At this
+# scene's own wind and swell `spread_smax` returns smax = 96.4, whose
+# band-integrated `spectrum_anisotropy` is 3.52 -- so the crests ARE long,
+# about 445 m on a 1408 m coast, and `crest_length_ratio` at the peak is 7.0.
+# Worse for the brief: Snell conserves k_y, so the ALONGSHORE wavenumber spread
+# is invariant through refraction. The crest length in metres does not shrink
+# shoreward while the wavelength does. **Refraction straightens crests; it does
+# not break them up.** Carrying the directional realisation inshore is
+# necessary and it is NOT what makes a surf line discontinuous.
+#
+# What makes it discontinuous is that individual waves have different heights,
+# so they break at different depths. Battjes & Janssen's Q_b is the FRACTION of
+# waves breaking at a depth, and this render draws that expectation as a smooth
+# field: measured on the champion, the seaward edge of every breaking statement
+# it owns -- `brk`, `q_b`, `deck` -- has an alongshore standard deviation of
+# 18.8, 18.5 and 17.8 m, and all three are deterministic functions of (d, H),
+# so that 18 m is the BED's variation and not the sea's. A Rayleigh population
+# breaks over depths spanning 0.33 to 1.52 times the H_rms breakpoint across
+# its 10th-to-90th percentile alone.
+#
+# ONE CONSTRUCTION FIXES BOTH AND ADDS NOTHING. A sum of many random-phase
+# components is a Gaussian process; its crest heights are Rayleigh and its
+# envelope groups, both as CONSEQUENCES. So transporting the realisation
+# `spectral_components` already draws -- component by component, each with its
+# own frequency, its own direction, its own shoaling and its own refraction --
+# delivers the short crests, the groups AND the height population together, out
+# of physics that is already in this file. Nothing is dialled. Measured on the
+# untransported bundle as the control (ruling 14: a near-zero is worthless
+# until the target has been shown reachable): crest CV 0.5274 against the
+# Rayleigh 0.5227, and `groupiness_factor` 0.823 against 0.0 for the carrier.
+#
+# THE DISSIPATION IS THE ONE THING THAT CANNOT BE DONE PER COMPONENT, and the
+# reason is physical rather than budgetary. Depth-limited breaking is a
+# property of the SURFACE, not of a Fourier mode: a 10 cm component of a 1.5 m
+# sea does not break in 2 m of water on its own. The closure used here is the
+# one every spectral wave model uses and the one this project already owns --
+# the total dissipation is distributed over components in proportion to their
+# energy -- and it is applied as a single dimensionless field
+#
+#       g(x, y) = H_broken(x, y) / H_conservative(x, y)   in (0, 1]
+#
+# where H_conservative is the BUNDLE's own, sqrt(SUM H_j^2). No constant is
+# introduced. The consequence is exact and is the property that makes this an
+# accounting move rather than an addition of energy: with a_j = (H_j/2) g, the
+# drawn surface's variance is
+#
+#       SUM a_j^2 / 2  =  (g^2 / 8) SUM H_j^2  =  H_broken^2 / 8
+#
+# identically, so the drawn H_rms IS the transform's own H, cell by cell. Every
+# downstream field -- the setup, the undertow, the roller, the sediment, the
+# foam's energy budget -- reads that same transform and none of them moves.
+#
+# AND THE DENOMINATOR HAD TO BE THE BUNDLE'S, WHICH IS A MEASUREMENT AND NOT A
+# PREFERENCE. The first build divided by the CARRIER's conservative H, which
+# leaves the bundle's own shoaling in the drawn amplitude. On the wet bay that
+# ratio is a well-behaved 0.965 -- the bundle shoals a little less than its own
+# peak component, and sqrt(band fraction) = 0.991 is most of it. In the swash
+# it is not well-behaved at all. Measured on this bed's centre row, with d at
+# its D_MIN = 0.1 m floor:
+#
+#     x       carrier H_cons     bundle H_cons     ratio
+#    700          3.647             14.678          4.0
+#    800          3.300            113.386         34
+#    900          2.960           4464.379       1508
+#   1000          2.695          51419.906      19080
+#
+# CONSERVATIVE LINEAR TRANSPORT OF A SPECTRUM DIVERGES AT THE SHORELINE, and
+# it diverges twice over: Green's law alone sends H as d^(-1/4), and the
+# refraction march's transverse-divergence term compounds it component by
+# component at large obliquity where the carrier -- one component near
+# shore-normal -- never goes. The physics that stops it is breaking, which by
+# construction is NOT in a per-component conservative march. Dividing by the
+# bundle's own H_cons cancels the divergence identically rather than clamping
+# it, which is why that is the form used; the carrier ratio is kept beside it
+# as `g_carrier` because the two together are the diagnostic and neither alone
+# is. The residual this leaves is named: the bundle's differential shoaling no
+# longer reaches the drawn TOTAL -- only the drawn SHAPE, which is the
+# short-crestedness, the groups and the height population this is for.
+#
+# WHAT THAT COSTS, STATED. The dissipation is applied in the MEAN: every
+# component is damped by the same g, so a big wave in the realisation stays
+# proportionally big past the bar instead of being clipped harder than a small
+# one. The realisation of WHICH waves are breaking is recovered separately, in
+# `breaking_indicator` below, off the drawn envelope -- and its expectation is
+# checkable against `breaking_fraction_bj`, which is the row that says the
+# realisation is a realisation OF the physics rather than a texture.
+# The second-order bound harmonic stays on the carrier: a second-order sum over
+# a spectrum needs the full quadratic interaction kernel, which `spectral_eta`
+# already says is not in this file, and it is still not.
+
+
+def spectral_transform_2d(x, y, h2, comp, H_brk=None, H_cons=None,
+                          dtype=np.float32, progress=None, **tkw):
+    """Transport EVERY component of a directional realisation across the bed.
+
+    IN:  x, y, h2 as `transform_2d`; `comp` a `spectral_components` dict.
+         `H_brk` (ny, nx) the carrier's BROKEN height -- the numerator of the
+         dissipation field g, whose denominator is the BUNDLE's own
+         conservative H_rms. `H_cons` is the carrier's conservative height and
+         is DIAGNOSTIC ONLY: it buys `g_carrier`, the dissipation proper, whose
+         ratio to g is the bundle-versus-carrier shoaling difference. Pass no
+         `H_brk` and g is 1, which is the conservative bundle -- correct
+         offshore and divergent at the shoreline, as the note above measures.
+    OUT: dict with
+         a     (ny, nx, C) drawn amplitude, ALREADY carrying g
+         S     (ny, nx, C) phase, with the component's own random phase folded in
+         k     (ny, nx, C) local wavenumber, for the per-pixel band limit
+         omega (C,)        each component's own radian frequency
+         g     (ny, nx)    the dissipation ratio that was applied
+         plus the bookkeeping every claim above is checked against.
+
+    The surface is  eta(x, y, t) = SUM_j a_j(x, y) cos(S_j(x, y) - omega_j t),
+    and its analytic signal -- whose modulus is the envelope the breaking
+    realisation reads -- is the same sum with exp(i .) in place of cos.
+
+    EACH COMPONENT IS MARCHED WITH `breaking=False` and that is the point: the
+    transport is linear and conservative, so it is exactly the shoaling and
+    refraction this file already derives, applied C times. All of the
+    non-linearity lives in g, in one place, where it can be read.
+
+    COMPONENTS TRAVELLING SEAWARD ARE NOT SPECIAL-CASED. The cos-2s spreading
+    has support over the whole circle, and a component whose orthogonal is more
+    than 90 deg off shore-normal carries no shoreward flux -- `transform_2d`'s
+    own boundary condition, Phi = E0 cg0 cos(theta0)/cos(theta), takes it to
+    zero or negative and the march's `maximum(Fx_new, 0)` holds it there. That
+    is the right answer and not a guard, so the fraction of the offshore
+    variance it removes is REPORTED (`flux_fraction`) rather than hidden.
+    """
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    h2 = np.asarray(h2, float)
+    ny, nx = h2.shape
+    kx, ky, amp, ph = comp['kx'], comp['ky'], comp['a'], comp['phase']
+    om = np.asarray(comp['omega'], float)
+    th = np.asarray(comp['theta'], float)
+    C = amp.size
+
+    A = np.empty((ny, nx, C), dtype)
+    Sf = np.empty((ny, nx, C), dtype)
+    Kf = np.empty((ny, nx, C), dtype)
+    for j in range(C):
+        tj = transform_2d(x, y, h2, 2.0 * math.pi / om[j], 2.0 * amp[j],
+                          th[j], breaking=False, **tkw)
+        A[..., j] = tj['H']
+        Sf[..., j] = tj['S'] + ph[j]
+        Kf[..., j] = tj['k']
+        if progress is not None and (j % 32) == 0:
+            progress(j, C)
+
+    # the bundle's own conservative H_rms: H_rms = sqrt(SUM H_j^2), because
+    # m0 = SUM a_j^2/2 = SUM H_j^2/8 and H_rms = sqrt(8 m0).
+    H_bundle = np.sqrt(np.einsum('ijc,ijc->ij', A, A, dtype=np.float64))
+    if H_brk is None:
+        g = np.ones((ny, nx))
+        g_car = g
+    else:
+        g = np.asarray(H_brk, float) / np.maximum(H_bundle, 1e-9)
+        g_car = (g if H_cons is None
+                 else np.asarray(H_brk, float)
+                 / np.maximum(np.asarray(H_cons, float), 1e-9))
+    A *= (0.5 * g).astype(dtype)[..., None]
+
+    cs0 = np.cos(th)
+    E0j = amp ** 2 / 2.0                        # m0 share of each component
+    flux = float((E0j * np.maximum(cs0, 0.0)).sum() / max(E0j.sum(), 1e-30))
+    return dict(a=A, S=Sf, k=Kf, omega=om, g=g, g_carrier=g_car, n=C,
+                H_bundle_cons=H_bundle,
+                H_drawn=2.0 * np.sqrt(np.einsum('ijc,ijc->ij', A, A,
+                                                dtype=np.float64)),
+                flux_fraction=flux,
+                seaward_fraction=float((cs0 <= 0.0).sum()) / C,
+                m0_offshore=float(E0j.sum()), comp=comp,
+                nbytes=int(A.nbytes + Sf.nbytes + Kf.nbytes))
+
+
+def spectral_surface(a_s, S_s, om, t=0.0, k_s=None, foot=None, want_env=False):
+    """Evaluate a transported bundle at already-SAMPLED per-point fields.
+
+    IN:  `a_s`, `S_s` and optionally `k_s`, each (..., C) -- the amplitude, the
+         phase and the local wavenumber SAMPLED at the points. Sampling is the
+         caller's job because only the caller owns the grid; this function is
+         the arithmetic, and it is here rather than in the renderer so the
+         suite can test it without a camera.
+    OUT: eta, or (eta, A) with A = |zeta| the envelope, when `want_env`.
+
+    THE BAND LIMIT IS THE LOCAL WAVENUMBER AND NOT THE DEEP-WATER ONE. A
+    component that has shoaled from 126 m to 30 m needs four times the
+    exponent at the same pixel footprint, and using the offshore k would alias
+    exactly where the wave is shortest. Same exp(-k^2 sigma^2 / 2) that
+    `spectral_eta` derives from the footprint's second moment, evaluated on
+    k(x, y) instead of on k0.
+
+    THE ENVELOPE IS THE ANALYTIC SIGNAL'S MODULUS AND IT IS FREE HERE. eta is
+    Re(zeta) for zeta = SUM a_j exp(i psi_j); |zeta| is the same sum's modulus,
+    so one pass over the components returns both. Computing it by a Hilbert
+    transform afterwards -- which is what `envelope` does for a 1-D record --
+    would be an approximation of a quantity this sum already has exactly.
+    """
+    psi = np.asarray(S_s, float) - np.asarray(om, float) * float(t)
+    aa = a_s
+    if foot is not None and k_s is not None:
+        s2 = (np.asarray(foot, float) * FOOT_SIGMA) ** 2
+        aa = a_s * np.exp(-0.5 * np.asarray(k_s, float) ** 2
+                          * np.asarray(s2)[..., None])
+    cs = np.cos(psi)
+    eta = np.einsum('...c,...c->...', aa, cs)
+    if not want_env:
+        return eta
+    sn = np.sin(psi)
+    qi = np.einsum('...c,...c->...', aa, sn)
+    return eta, np.sqrt(eta * eta + qi * qi)
+
+
+def breaking_indicator(a_env, d, gamma_b=GAMMA_B):
+    """WHICH WAVE IS BREAKING HERE, NOW -- a realisation, not a fraction.
+
+    A wave of height H breaks where H >= gamma_b * d. In a realisation the
+    local wave height is twice the envelope of the analytic signal, so the
+    indicator is
+
+        chi(x, y, t) = [ 2 A(x, y, t) >= gamma_b * d(x, y) ]
+
+    with A the envelope. NO NEW CONSTANT: gamma_b is the same GAMMA_B the
+    deterministic `transform_2d` threshold, the Dally stable ratio and
+    `breaking_fraction_bj` all use.
+
+    THE ENVELOPE PASSED IN MUST BE THE CONSERVATIVE ONE, |zeta| / g, AND THAT
+    IS A CAUSALITY ARGUMENT RATHER THAN A CONVENTION. Dissipation is the
+    CONSEQUENCE of breaking, not its cause. Deciding whether a wave breaks from
+    the height it has AFTER the surf zone has already taken the energy out of
+    it is circular, and it is quantitatively catastrophic in exactly the place
+    the picture is about. Measured on this scene's centre row, with the drawn
+    (post-dissipation) envelope on the left and the conservative one on the
+    right:
+
+        x      d     E[chi] drawn   E[chi] conservative
+       500    2.16       0.345            0.379
+       550    2.00       0.075            0.443
+       600    0.84       0.149            0.916
+       700    0.10       0.022            1.000
+
+    The post-dissipation form says 2 per cent of waves are breaking in ten
+    centimetres of water on a saturated foreshore. The conservative form says
+    all of them, which is what a surf zone is. That is also the content of
+    Battjes & Janssen's CLIP: broken waves sit at H_max, so a distribution
+    written in post-breaking heights cannot be asked how many exceeded the
+    threshold that broke them.
+
+    AND ITS EXPECTATION IS ALREADY IN THIS FILE, which is what makes it a
+    realisation OF the physics rather than a texture. For a Gaussian sea the
+    envelope is Rayleigh, so
+
+        P(2A >= gamma_b d) = exp( -(gamma_b d / H_rms)^2 )
+
+    with H_rms the CONSERVATIVE root-mean-square height -- `rayleigh_exceedance`
+    below. The suite draws the indicator over the frame and compares its
+    measured mean against that closed form on the same cells; a disagreement
+    would mean the drawn envelope is not Rayleigh, which is a statement about
+    the realisation and not about the closure.
+    """
+    return (2.0 * np.asarray(a_env, float)
+            >= float(gamma_b) * np.asarray(d, float))
+
+
+def rayleigh_exceedance(H_thresh, H_rms):
+    """P(H >= H_thresh) for a Rayleigh height distribution of the given H_rms.
+
+    The closed form the indicator above must average to. Written out on its own
+    so the suite can test the indicator AGAINST it rather than beside it."""
+    hr = np.maximum(np.asarray(H_rms, float), 1e-12)
+    return np.exp(-(np.asarray(H_thresh, float) / hr) ** 2)
+
+
 def contour_alignment(tr2, field='wave', d_min=0.5, d_max=None,
                       slope_min=0.004):
     """The angle between the wave crest and the local depth contour, degrees.

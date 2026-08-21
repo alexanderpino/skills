@@ -402,6 +402,26 @@ class Water:
         # LEFT OF IT. Built here, once, because it is a property of the SCENE
         # -- of this wind and this swell -- and not of a camera. A realisation
         # rebuilt per frame would put a different sea in every picture.
+        # --- WAVE 19: THE SPECTRUM, TRANSPORTED ACROSS THE BED. Built here,
+        # once, for the same reason the sub-footprint realisation is: it is a
+        # property of THIS bed and THIS offshore sea state, not of a camera,
+        # and a bundle rebuilt per frame would put a different sea in every
+        # picture. 256 conservative marches, 17 s, 137 MB in float32.
+        #
+        # `tr` IS ALREADY THE BROKEN CARRIER and the conservative one has to be
+        # asked for: the dissipation field g needs both, and running the second
+        # transform here rather than inside `run_bay` keeps the bay's own
+        # output bit-identical.
+        self.spectral_on = SPECTRAL_ON
+        if self.spectral_on:
+            trc = B.transform_2d(bay['x'], bay['y'], bay['h'], tr['T'],
+                                 tr['H0'], tr['theta0'], breaking=False)
+            self.bundle = B.spectral_transform_2d(
+                bay['x'], bay['y'], bay['h'], _FAR,
+                H_brk=tr['H'], H_cons=trc['H'])
+        else:
+            self.bundle = None
+
         self.mss_swell = self._swell_slope_budget()
         self.subgrid = BO.subgrid_realisation(self.mss_swell['su2'],
                                               self.mss_swell['sc2'],
@@ -540,24 +560,140 @@ _R0 = 0.5 * B.H0_SWELL * _K0 / 2.0
 # the ensemble moment rows still PASS and only the lobe row fires.
 _FAR = B.spectral_components(n_f=8, n_th=32)
 
+# --- WAVE 19. `SPECTRAL_ON` IS A CONTROL PANEL AND NOT A SETTING, exactly as
+# `plume_on`, `foam_realise` and `subgrid_on` are: it exists so the pair can be
+# rendered and measured, not so the carrier can be chosen. False reproduces
+# waves 13-18 bit for bit -- one carrier phase inside the domain and the
+# directional realisation faded in only over the last 60 m of open water.
+SPECTRAL_ON = True
+# The chunk is a MEMORY bound and nothing else. A chunk of n pixels holds
+# n x 256 float32 per sampled field, so 65536 costs 67 MB an array and about
+# 400 MB at the peak of `spectral_surface`; the result is identical at any
+# chunk size and the suite has a row that says so.
+SPECTRAL_CHUNK = 65536
+# The largest factor by which one realised breaking wave may amplify the break
+# term of the covering measure above its expectation. It is a numerical guard
+# on 1/p as p -> 0 and NOT a physical statement, which is why the share of the
+# frame where it binds is measured and reported rather than assumed small.
+FOAM_POP_CAP = 20.0
 
-def free_surface(w, xw, yw, t=0.0, foot=None):
-    H = w.sample(xw, yw, w.H)
+
+def _bundle_surface(w, xw, yw, t=0.0, foot=None, want_env=False):
+    """The transported bundle, evaluated at world points, in chunks.
+
+    THE SAMPLING IS `Water.sample`'S OWN and no second interpolator is written:
+    it already handles a field of shape (ny, nx, C) -- the `field.ndim == 2`
+    branch is what the two-dimensional case takes -- so the component axis
+    comes through bilinear interpolation with the identical weights every other
+    field in this renderer uses.
+    """
+    b = w.bundle
+    sh = np.broadcast(np.asarray(xw, float), np.asarray(yw, float)).shape
+    xa = np.broadcast_to(np.asarray(xw, float), sh).reshape(-1)
+    ya = np.broadcast_to(np.asarray(yw, float), sh).reshape(-1)
+    fa = None if foot is None else np.broadcast_to(
+        np.asarray(foot, float), sh).reshape(-1)
+    n = xa.size
+    eta = np.empty(n)
+    env = np.empty(n) if want_env else None
+    om = b['omega'].astype(np.float32)
+    tt = np.float32(t)
+    for i0 in range(0, n, SPECTRAL_CHUNK):
+        sl = slice(i0, min(i0 + SPECTRAL_CHUNK, n))
+        xs, ys = xa[sl], ya[sl]
+        a_s = w.sample(xs, ys, b['a'])
+        S_s = w.sample(xs, ys, b['S'])
+        k_s = None if fa is None else w.sample(xs, ys, b['k'])
+        r = B.spectral_surface(a_s, S_s, om, tt, k_s=k_s,
+                               foot=None if fa is None else fa[sl],
+                               want_env=want_env)
+        if want_env:
+            eta[sl], env[sl] = r
+        else:
+            eta[sl] = r
+    return (eta.reshape(sh), env.reshape(sh)) if want_env else eta.reshape(sh)
+
+
+def free_surface(w, xw, yw, t=0.0, foot=None, want_env=False):
+    """The drawn free surface at world (x, y) and one instant.
+
+    WAVE 19 REPLACES THE FIRST-ORDER TERM AND NOTHING ELSE. Waves 5-18 drew
+    eta = (H/2)[cos(phi) + r cos(2 phi + psi)] off ONE carrier -- one height,
+    one phase, one direction per cell -- with the directional realisation faded
+    in only over `xw < w.x[0] + 60`, i.e. outside the modelled bed. Measured on
+    the champion at 320 x 400, that fade reached 6.2 % of frame K's water
+    pixels and 0.0 % of its surf zone. The subject of the picture was drawn
+    from a single-valued carrier.
+
+    The first-order term is now the transported bundle: every component of the
+    SAME offshore realisation `_FAR` already stated, shoaled and refracted
+    across this bed by `beach.spectral_transform_2d`. That is where the short
+    crests, the groups and -- the thing that turned out to matter more -- the
+    wave-to-wave HEIGHT DISTRIBUTION come from, all three as consequences of
+    one sum and none of them dialled.
+
+    THE BOUND HARMONIC STAYS ON THE CARRIER, and that is a stated residual
+    rather than an oversight. A second-order sum over a spectrum needs the full
+    quadratic interaction kernel, which `beach.spectral_eta`'s own docstring
+    says is not in this project and it still is not. So the skewness and the
+    pitched-forward bore shape -- `surface_state`'s r and psi, wave 5's physics
+    and every suite row on it -- are added to the bundle at the carrier phase,
+    unchanged. What that costs: the second harmonic is long-crested while the
+    first is not.
+
+    THE OFFSHORE BLEND SURVIVES AND ITS MEANING CHANGES. `Water.sample` clamps
+    at the grid edge, so seaward of x[0] the bundle would read column 0's phase
+    for the whole open ocean -- the infinite-stripe boundary condition wave 13
+    diagnosed, one field down. Outside the bed the same component list is
+    evaluated in its deep-water closed form. The blend is therefore no longer a
+    swap between two different physics but two evaluations of ONE realisation,
+    and it is continuous in PHASE exactly: the transform sets theta[:,0] by
+    Snell, so k[:,0] sin(theta[:,0]) = k0 sin(theta0) identically, and its
+    alongshore phase boundary integrates that same k_y from y = 0. What steps
+    across the seam is the AMPLITUDE, by the shoaling-and-refraction
+    coefficient at the boundary depth, which is physical and is measured by
+    `seam_report` rather than asserted here.
+    """
     S = w.sample(xw, yw, w.S)
     r = w.sample(xw, yw, w.r2)
     psi = w.sample(xw, yw, w.psi2)
     om = 2.0 * math.pi / B.T_SWELL
-    # ONE EXPRESSION FOR THE SHAPE, and it lives in `beach.py`. Writing the
-    # sum out here as well would put the surface in two places, which is the
-    # duplication this project's own standing ruling on shared physics is
-    # about -- one file down from where it usually bites.
     ph = S - om * t
-    eta = B.nonlinear_eta(0.5 * H, r, psi, ph)
+    spec = getattr(w, 'spectral_on', False) and w.bundle is not None
+    if spec:
+        # first order from the bundle; second order from the carrier
+        res = _bundle_surface(w, xw, yw, t, foot=foot, want_env=want_env)
+        eta1, env = res if want_env else (res, None)
+        H = w.sample(xw, yw, w.H)
+        eta = eta1 + 0.5 * H * r * np.cos(2.0 * ph + psi)
+    else:
+        H = w.sample(xw, yw, w.H)
+        # ONE EXPRESSION FOR THE SHAPE, and it lives in `beach.py`. Writing the
+        # sum out here as well would put the surface in two places, which is
+        # the duplication this project's own standing ruling on shared physics
+        # is about -- one file down from where it usually bites.
+        eta = B.nonlinear_eta(0.5 * H, r, psi, ph)
+        # WITHOUT THE BUNDLE THERE IS NO ENVELOPE AND `None` SAYS SO. A
+        # monochromatic carrier's "local wave height" is 2*(H/2) at every
+        # point and every instant -- returning |eta| here would hand the
+        # breaking realisation a number that is not an envelope and would let
+        # the population branch run on a field that has no population. The
+        # caller tests for None; the control panel therefore turns the whole
+        # of wave 19 off in one flag rather than half of it.
+        env = None
     f = np.clip((w.x[0] + 60.0 - xw) / 60.0, 0.0, 1.0)
-    if not np.any(f > 0.0):
-        return eta
-    far = B.spectral_eta(_FAR, xw, yw, t, foot=foot)
-    return eta * (1.0 - f) + far * f
+    if np.any(f > 0.0):
+        far = B.spectral_eta(_FAR, xw, yw, t, foot=foot)
+        eta = eta * (1.0 - f) + far * f
+        if env is not None:
+            # the open sea's own envelope is not carried: `spectral_eta`
+            # returns Re(zeta) alone, and beyond the domain the breaking
+            # indicator is not asked anything -- there is no bed to break on.
+            # Fading the envelope toward the drawn amplitude keeps it finite
+            # and the seaward blend region is 6.2 % of frame K, all of it in
+            # water too deep for `gamma_b d` to be reachable.
+            env = env * (1.0 - f) + np.abs(far) * f
+    return (eta, env) if want_env else eta
 
 
 def surface_slope(w, xw, yw, t=0.0, eps=0.5, foot=None):
@@ -768,6 +904,12 @@ def shade_water(w, P, D, t_now, foot=None, foot_c=None):
     """
     xw, yw = P[..., 0], P[..., 1]
     zx, zy = surface_slope(w, xw, yw, t_now, foot=foot)
+    # WAVE 19: THE LOCAL WAVE HEIGHT OF THIS REALISATION, which is twice the
+    # envelope of the bundle's analytic signal. One extra evaluation of the
+    # same sum -- `spectral_surface` returns |zeta| beside Re(zeta) for the
+    # cost of a sine, so this is 25 % on top of the four the central difference
+    # above already spends, and it is what the breaking realisation reads.
+    _, env = free_surface(w, xw, yw, t_now, foot=foot, want_env=True)
     # THE GEOMETRIC NORMAL -- the swell and nothing else. Term 4 marches a ray
     # through the body of a wave and needs the surface's actual shape; the
     # sub-footprint field below is explicitly NOT geometry (its own amplitudes
@@ -962,6 +1104,81 @@ def shade_water(w, P, D, t_now, foot=None, foot_c=None):
     deck = (w.sample(xw, yw, w.deck) if getattr(w, 'foam_roller', True)
             else q_b)
     cov1, m_cov = FM.surface_foam(deck, w.T_wave, age, BO.U10, w.tau_foam)
+    # --- WAVE 19: WHICH WAVES BROKE, AND IT IS THE FOURTH TIME THIS PROJECT
+    # HAS FOUND ITS OWN DOMINANT ERROR ONE LEVEL UP.
+    #
+    # Wave 12 found the foam drawn as E[chi] and built the Boolean realisation;
+    # wave 18 finally called it, so the foam's TEXTURE is a realisation. What
+    # neither touched is the INTENSITY FIELD that realisation is drawn from.
+    # `m_cov` above is a smooth function of (d, H) and of nothing else, because
+    # `deck` is. Measured on the champion, the seaward edge of every breaking
+    # statement this renderer owns -- `brk`, `q_b`, `deck` -- has an alongshore
+    # standard deviation of 18.8, 18.5 and 17.8 m, and since all three are
+    # deterministic functions of the same two fields that 18 m is the BED's
+    # variation, not the sea's. The frame therefore draws E[breaking]: a smooth
+    # band whose edge follows a depth contour, which is exactly the owner's
+    # "je ziet in werkelijkheid nooit 1 lange golf langs de kust".
+    #
+    # WHAT ACTUALLY BREAKS A BREAKING LINE UP is that individual waves have
+    # different heights and therefore break at different depths. Through wave
+    # 18 the drawn surface had NO height distribution at all -- crest-to-crest
+    # CV 3.7e-16, machine zero, against 0.523 for a Rayleigh sea -- so there was
+    # no population for a per-wave criterion to read. There is one now, and it
+    # came free with the bundle above.
+    #
+    # THE CRITERION IS THE TRANSFORM'S OWN, EVALUATED ON THE REALISATION. A
+    # wave breaks where its height passes gamma_b d; the local wave height in a
+    # realisation is twice the envelope of its analytic signal, which
+    # `free_surface` returns beside eta at no extra sampling.
+    # `beach.breaking_indicator` is that one comparison and it introduces no
+    # constant -- GAMMA_B is the same one `transform_2d`'s threshold, the Dally
+    # stable ratio and `breaking_fraction_bj` all use.
+    #
+    # AND THE MEAN IS PRESERVED BY CONSTRUCTION, which is the property that
+    # makes this a realisation OF the physics rather than a mask laid over it.
+    # For a Gaussian sea the envelope is Rayleigh, so E[chi] is
+    # exp(-(gamma_b d/H_rms)^2) in closed form -- `beach.rayleigh_exceedance`,
+    # which is Battjes & Janssen's own unclipped Q_b. Dividing the BREAK term
+    # of the covering measure by that expectation and multiplying by the drawn
+    # indicator leaves E[m_break] exactly unchanged at every point, and the
+    # suite carries that as a row rather than this comment carrying it as a
+    # claim. The measure is a covering measure and not a fraction, so nothing
+    # needs clipping at 1: `coverage(m) = 1 - exp(-m)` saturates on its own.
+    #
+    # THE ENVELOPE IS DIVIDED BY g BEFORE THE TEST, and that is the round's
+    # second finding rather than a detail. `breaking_indicator`'s own docstring
+    # carries the table: asking the POST-dissipation height whether it exceeds
+    # the threshold that dissipated it is circular, and it answers that 2 % of
+    # waves are breaking in ten centimetres of water on a saturated foreshore.
+    # The conservative envelope answers 100 %, which is what a surf zone is.
+    #
+    # WHAT IS CAPPED AND WHY IT IS REPORTED. Where the expectation is tiny the
+    # ratio 1/p is not, and a rare breaking wave far offshore would be given the
+    # covering measure of a thousand. The amplification is capped at
+    # `FOAM_POP_CAP` and the share of the BREAK MEASURE the cap touches is
+    # returned -- weighted by the measure and not by pixel count, because most
+    # water pixels carry no deck at all and a pixel-count figure would report
+    # 76 % where the honest number is 5 %.
+    m_pop = None
+    if env is not None and getattr(w, 'foam_population', True):
+        g_s = np.maximum(w.sample(xw, yw, w.bundle['g']), 1e-12)
+        H_cons = w.sample(xw, yw, w.bundle['H_bundle_cons'])
+        chi = B.breaking_indicator(env / g_s, dep)
+        p_chi = B.rayleigh_exceedance(B.GAMMA_B * dep, H_cons)
+        raw = 1.0 / np.maximum(p_chi, 1e-12)
+        amp = np.minimum(raw, FOAM_POP_CAP)
+        m_wind = FM.covering_measure_wind(BO.U10)
+        m_break = np.maximum(m_cov - m_wind, 0.0)
+        tot = float(m_break.sum())
+        m_pop = dict(chi=chi, p_chi=p_chi,
+                     chi_mean=float(chi.mean()), p_mean=float(p_chi.mean()),
+                     capped_measure=float((m_break * (raw > FOAM_POP_CAP)).sum()
+                                          / max(tot, 1e-30)),
+                     capped_pixels=float(np.mean(raw > FOAM_POP_CAP)),
+                     mean_before=float(m_break.mean()))
+        m_cov = m_break * amp * chi + m_wind
+        m_pop['mean_after'] = float(np.mean(m_cov - m_wind))
+        cov1 = FM.coverage(m_cov)
     if getattr(w, 'foam_realise', True):
         fp = (np.full(xw.shape, 1e9) if foot is None
               else np.broadcast_to(np.asarray(foot, float), xw.shape))
@@ -993,7 +1210,8 @@ def shade_water(w, P, D, t_now, foot=None, foot_c=None):
     L = L * (1.0 - cov) + L_foam * cov
     return dict(L=L, L_sky=L_sky, L_glit=L_glit, L_up=L_up, L_path=L_path,
                 chord=chord, cov=cov[..., 0], lit=lit, cos_v=cos_v,
-                foam_stats=foam_stats, foot=foot, xw=xw, yw=yw, deck=deck,
+                foam_stats=foam_stats, m_pop=m_pop, env=env,
+                foot=foot, xw=xw, yw=yw, deck=deck,
                 age=age, q_b=q_b, m_cov=m_cov, R_p=R_p, T_p=T_p,
                 R_bed_seen=R_bed_seen, R_bed=R_bed, R_sub=R_sub, R_tot=R_tot,
                 R_raft=R_raft, bed_factor=bed_factor, dep=dep, t_col=t_col,
