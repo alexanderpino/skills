@@ -114,12 +114,35 @@ Measure in **scene-linear, before the tone map**. Never read a PNG for physics.
     warning and restores the clone to an older commit; the remote is the only
     durable state. Commit and push as soon as a coherent unit exists, and
     re-fetch before starting.
-13. **RUN LONG JOBS IN THE FOREGROUND.** Measured in this container: a
-    backgrounded process gets about **22 seconds of CPU per ten minutes** of wall
-    clock, while a foreground call gets the full machine. The sea suite takes
-    ~9 minutes foreground and effectively never finishes backgrounded. One wave
-    lost an hour to this and reported a suite total as the sum of two partial
-    runs rather than one.
+13. **~~RUN LONG JOBS IN THE FOREGROUND.~~ — WITHDRAWN AT WAVE 18, MEASURED
+    FALSE.** This ruling claimed a backgrounded process gets about *22 seconds
+    of CPU per ten minutes* of wall clock while a foreground call gets the full
+    machine. **It is not true.** Measured directly, a busy loop backgrounded
+    through the same tool returns **89.9 s of CPU in 90.0 s of wall clock —
+    100%** — and a foreground loop returns 19.9 s in 20.0 s. There is no
+    throttle in either direction.
+
+    The ruling shipped in **every builder brief for six waves** and shaped how
+    every one of them ran its suites. A builder finally contradicted it with its
+    own measurement (*"a backgrounded suite ran at ~104% CPU"*) and named the
+    real cause in the same breath: **three of its own stale processes surviving
+    a `pkill`, and cross-builder contention on 4 cores.**
+
+    That is this project's own error class, committed by the lead agent: **a
+    number measured once, under conditions nobody recorded, written down as a
+    property.** The original observation was almost certainly real — several
+    concurrent builders each running a ~400 s suite on four cores will each see
+    a fraction of a core — but the *explanation* was invented and the number was
+    generalised from one state.
+
+    **What survives, for a different reason:** `nproc` is **4**, and a wave
+    routinely has three builders plus the lead running suites. Long jobs still
+    should not be casually parallelised, and a suite total taken while four
+    others are running is not comparable to one taken alone. That is
+    **contention**, which you manage by not running four suites at once and by
+    saying what else was running when you took a total — not by avoiding the
+    background.
+
 14. **A near-zero measurement is worthless until zero has been shown to be
     reachable.** Wave 9's ruling — the fourteenth way a measurement lies, with
     the sign flipped. Build the control whose answer is known in advance; wave 9
