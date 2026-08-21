@@ -560,6 +560,46 @@ class Camera:
         return d / np.linalg.norm(d, axis=-1, keepdims=True)
 
 
+class CropCamera:
+    """ONE RECTANGLE OF A CAMERA'S RASTER, at that camera's own pixel pitch.
+
+    WAVE 18, AND THE POINT IS THAT IT IS NOT A SMALLER RENDER. Wave 11's
+    plateau score, wave 16's re-measurement and this wave's guard all read the
+    same 300 x 100 pixels of a 720 x 960 frame; rendering the frame to get them
+    costs about eight minutes, which is more than the whole suite. Rendering a
+    720 x 960-shaped frame at lower resolution instead would be a DIFFERENT
+    measurement -- the statistic is a high-frequency standard deviation over a
+    17-px box, so it moves with the pixel pitch, and it is bounded below by the
+    pixel's footprint on the ground.
+
+    So the pitch is held and the raster is cropped. `rays()` returns exactly the
+    parent's rays for the window, and `h` is deliberately the PARENT's height,
+    because `2*tan/h` is the pixel's angular size and the pixel did not change
+    size when the frame around it was cropped away. Everything downstream --
+    `trace`, `render`, the ground footprint that drives `rock_bare_mask` -- then
+    sees the pixels it would have seen, and the crop is exact rather than
+    approximate. Checked in the suite against the full frame's own pixels.
+    """
+
+    def __init__(self, cam, r0, r1, c0, c1):
+        self.parent = cam
+        self.pos, self.f, self.r, self.u = cam.pos, cam.f, cam.r, cam.u
+        self.tan = cam.tan
+        self.w, self.h = cam.w, cam.h           # the PARENT's, on purpose
+        self.win = (int(r0), int(r1), int(c0), int(c1))
+
+    def rays(self):
+        r0, r1, c0, c1 = self.win
+        px = (np.arange(c0, c1) + 0.5) / self.w * 2.0 - 1.0
+        py = 1.0 - (np.arange(r0, r1) + 0.5) / self.h * 2.0
+        gx, gy = np.meshgrid(px, py)
+        asp = self.w / self.h
+        d = (self.f[None, None]
+             + gx[..., None] * self.tan * asp * self.r[None, None]
+             + gy[..., None] * self.tan * self.u[None, None])
+        return d / np.linalg.norm(d, axis=-1, keepdims=True)
+
+
 # ================================================================ intersection
 def trace(cam, w, t=0.0, n_march=384, far=40000.0):
     """Ray-cast the combined surface: land where h > 0, free surface where not.
@@ -1583,6 +1623,73 @@ def downsample(L, ss):
         return L
     h, wd = L.shape[0] // ss, L.shape[1] // ss
     return L[:h * ss, :wd * ss].reshape(h, ss, wd, ss, 3).mean((1, 3))
+
+
+# ============================ WAVE 18: THE PLATEAU PATCH, AS A MEASURED OBJECT
+#
+# Wave 11's critic scored the coastal plain 3/10 on the high-frequency standard
+# deviation of ONE rectangle of the hero frame. Waves 12, 13, 15 and 16 all had
+# to re-derive that rectangle and its estimator from prose, and wave 16 had to
+# recover the estimator by CALIBRATION because the record did not carry it. It
+# is carried here now, so that the number a round quotes and the number the
+# suite guards are produced by the same three lines.
+HERO_WH = (720, 960)                    # the hero frame's output pixels
+HERO_SS = 2                             # ...supersampled by this
+PLATEAU_PATCH = (620, 720, 60, 360)     # rows, cols, in OUTPUT pixels
+PATCH_BOX = 17                          # the high-pass box, in output pixels
+
+
+def hf_sd(L, n=PATCH_BOX):
+    """THE ESTIMATOR, and the ruling is that it is read SCENE-LINEAR.
+
+    `L` minus its own n x n box mean, standard deviation per channel. Wave 16
+    reconstructed this from wave 11's published triple by calibration and found
+    it reproduces that triple to 2-4% per channel when it is run on the 8-bit
+    display frame -- and found, running it on the SAME frame un-quantised, that
+    the published figure was TWELVE TIMES SMALLER, i.e. that what wave 11 scored
+    was mostly the quantiser. So the display-referred route is not offered here.
+    This function takes radiance and nothing else, which is the standing ruling
+    -- measure before the tone map, never read a PNG for physics -- applied to
+    the one statistic in this project that had been violating it since wave 11.
+    """
+    a = np.asarray(L, float)
+    r = int(n) // 2
+    p = np.pad(a, ((r, r), (r, r), (0, 0)), mode='reflect')
+    c = np.cumsum(np.cumsum(p, 0), 1)
+    c = np.pad(c, ((1, 0), (1, 0), (0, 0)))
+    n = int(n)
+    m = (c[n:, n:] - c[:-n, n:] - c[n:, :-n] + c[:-n, :-n]) / float(n * n)
+    return np.std(a - m, axis=(0, 1))
+
+
+def display_levels(L, key=None, gamma=2.2):
+    """How many distinct 8-bit values the patch would occupy, per channel.
+
+    DISPLAY-REFERRED ON PURPOSE and said so, which the amendment allows. It is
+    not a physical quantity and no verdict rests on it; it is the one number
+    that says plainly whether a surface is a surface or a single colour, and
+    "one level across 30000 pixels" is a sentence a reader understands
+    immediately where 1.7e-06 is not. It uses `_save`'s own curve so it cannot
+    drift from what the evidence PNG shows.
+    """
+    k = WHITE if key is None else key
+    img = np.clip(np.asarray(L, float) / max(k, 1e-9), 0.0, 1.0) ** (1.0 / gamma)
+    q = (img * 255.0 + 0.5).astype(np.uint8)
+    return [int(np.unique(q[..., c]).size) for c in range(3)]
+
+
+def patch_render(cam, w, t=0.0, window=PLATEAU_PATCH, ss=HERO_SS, air=True):
+    """Render ONLY the patch's pixels of `cam`'s frame, at `cam`'s own pitch.
+
+    `cam` is the full-resolution (supersampled) hero camera. Returns the
+    downsampled patch buffer -- the identical pixels a full render would
+    produce, at about a twentieth of the cost. The suite checks that identity
+    on a handful of pixels rather than taking it on trust.
+    """
+    r0, r1, c0, c1 = window
+    crop = CropCamera(cam, r0 * ss, r1 * ss, c0 * ss, c1 * ss)
+    L, ex = render(crop, w, t, air=air)
+    return downsample(L, ss), ex
 
 
 # ==================================================== WAVE 8: THE AIR, AND IT
@@ -2829,21 +2936,79 @@ def viewpoint(w, y_cam, h_eye):
     Wave 7's first attempt walked inland looking for height and got a frame 64%
     coastal plain. Where a camera can stand is part of the landform, and on this
     landform there is exactly one place.
+
+    WAVE 18: BOTH HALVES OF THAT SEARCH WERE WRONG ON A TERRACED BED, AND THE
+    DOCSTRING ABOVE IS THE THING THAT PROVES IT. Two independent defects, and
+    together they walked the camera to the landward boundary of the domain --
+    the LANDWARD-most cell there is -- and stood it on the oldest tread. The
+    frame that came back was 66.4% land and 1.6% water, against 51.1 and 16.8
+    on the bed before, and wave 16 measured the near ground at ONE RGB triple
+    across 30000 pixels. The paragraph above predicts that outcome in its own
+    words: "walked inland looking for height and got a frame 64% coastal
+    plain". It was describing this function's failure mode and the function
+    then walked into it.
+
+      (1) THE THRESHOLD WAS A MULTIPLE OF A STATISTIC THE LANDFORM MOVES.
+          `3 * median(slope)` is a threshold that shrinks when the ground gets
+          flatter, which is exactly when it must not. The docstring says the
+          factor three "only has to separate 0.08 from 1.24" -- and 0.08 is
+          `beach.S_PLAIN`, the plain's own declared gradient, so the median was
+          never the reference, it was a PROXY for S_PLAIN that held only while
+          the plain was the only land in the profile. A marine terrace makes
+          the tread 63% of the land: the median collapses from 0.0800 to
+          0.0007, the threshold collapses with it to 0.0021, and the tread's
+          own microrelief -- slope 0.0019 to 0.0027, the very relief the
+          terrace was built to produce -- CLEARS IT. The search fired two cells
+          in from the boundary on the landform it was supposed to measure.
+          Anchoring the threshold to `S_PLAIN` costs nothing on the un-terraced
+          bed (its median IS 0.0800, so the two thresholds are the same number
+          and the answer is bit-identical) and restores the separation on the
+          terraced one: tread 0.002 against a threshold of 0.24 against a cliff
+          of 1.24.
+
+      (2) "THE FIRST STEEP CELL" IS ONLY "THE SEAWARD-MOST" WHEN THERE IS ONE
+          SLOPE BREAK. An emerged terrace flight has a RISER per rung, and a
+          riser is a slope break that is not the cliff: this bed carries one at
+          x = 934-954 rising 15.1 -> 28.6 m, and the sea cliff at x = 632-644
+          rising 2.3 -> 13.4 m, with 286 m of tread between them. Stopping at
+          the first break found while walking seaward stops on the RISER and
+          leaves the camera on the upper tread with the lower tread occluding
+          the sea. The docstring's own word is SEAWARD-MOST, and `cliff_edge`
+          -- the function this one refines -- takes the seaward-most crossing
+          of its contour, so the two agreed on the feature and disagreed only
+          on how to find it. The loop now runs to the end of the land and keeps
+          the LAST break, which is the top of the face whose foot is the
+          shoreline. On a profile with one break that is the same cell it
+          returned before.
+
+    Neither correction knows anything about what ends up in frame. The brow is
+    still a landform feature, still found and not declared, and the only
+    constant either clause adds is `S_PLAIN`, which the bed generator already
+    declares and this file already builds the plain from.
     """
     j = int(np.argmin(np.abs(w.y - y_cam)))
     prof = w.h[j]
     x = w.x
     dx = float(x[1] - x[0])
     slope = np.abs(np.gradient(prof, dx))
-    land = prof > 2.0
-    ramp = float(np.median(slope[land])) if land.any() else 0.08
+    # (1) the threshold is the PLAIN'S OWN GRADIENT, not the profile's median.
+    thr = 3.0 * float(B.S_PLAIN)
+    # (2) ...and the walk does not stop at the first break. It records the TOP
+    # of every break it passes and keeps the last one, which is the seaward-most
+    # -- the top of the face whose foot is the shoreline. The top of a run and
+    # not its foot: `i + 1` is the last flat cell only on the cell where the run
+    # STARTS in walk order, so the assignment is guarded by `not was_steep`.
+    # Without that guard the answer is the cliff's FOOT (measured: x = 634 m,
+    # h = 4.48 m, a camera standing halfway down the cliff face).
     i_brow = None
+    was_steep = False
     for i in range(x.size - 2, 1, -1):
         if prof[i] <= 2.0:
             break
-        if slope[i] > 3.0 * ramp:
+        steep = slope[i] > thr
+        if steep and not was_steep:
             i_brow = i + 1                          # the last flat cell
-            break
+        was_steep = steep
     if i_brow is None:
         xc, zc = cliff_edge(w, y_cam)
         return xc, zc, float('nan')

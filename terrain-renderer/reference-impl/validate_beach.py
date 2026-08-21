@@ -9530,6 +9530,517 @@ def _sec_foamtex(ctx):
          % dsrc)
 
 
+# ===========================================================================
+# WAVE 18 -- THE VIEWPOINT, AND THE ONE STATISTIC THIS PROJECT HAS BEEN
+# SCORED ON SINCE WAVE 11
+# ===========================================================================
+#
+# THE DEBT THIS SECTION PAYS. Wave 11's critic scored the coastal plain 3/10 on
+# the high-frequency standard deviation of rows 620-720, cols 60-360 of the
+# hero frame. That rectangle has been re-derived from prose by waves 12, 13, 15
+# and 16, its estimator was LOST and had to be recovered by calibration, and in
+# seven waves it has never had a suite row. Wave 13 rebuilt the bed underneath
+# it and did not re-measure; the suite stayed green throughout, on a landform
+# it had never heard of. That is ruling 16's ten-second check failing in the
+# one place it was written for, and it is why this section exists before the
+# chapter paragraph does.
+#
+# WHAT IS GUARDED, in three groups and in falling order of how much they can be
+# taken on trust:
+#
+#   V.1  THE BROW SEARCH AS A CLOSED FORM, on profiles built here whose answer
+#        is known before the function is called. Ruling 14. Each of the two
+#        defects is isolated on the control that shows only that defect, and
+#        the LEGACY search is run beside the fixed one on every control, so a
+#        row that says "these agree" and a row that says "these differ" are the
+#        same row twice and neither can pass by accident.
+#   V.2  THE SEARCH ON THE REAL TERRACED BED, including the regression row that
+#        the un-terraced bed's camera does not move AT ALL.
+#   V.3  THE RENDERED PATCH: the statistic itself, scene-linear, un-quantised,
+#        with a floor. This is THE row.
+#
+# AND THE COST, because a row nobody can afford to run is a row that gets
+# deleted. The terraced embayed bed is the cheap one (`dx = 4`, 300 steps, the
+# same construction `_sec_bathy` uses), 57 s; the patch is rendered through
+# `beach_render.CropCamera` at the hero frame's own pixel pitch, 10 s against
+# the 470 s the full frame costs, and it is EXACT rather than approximate --
+# checked bit-for-bit against a full render before this section was written.
+
+
+def _view_profile(kind, dx=2.0, x_max=1000.0):
+    """A control landform whose brow is known before the search is run.
+
+    Piecewise linear through stated knots, so every slope in it is arithmetic
+    and the expected answer is a knot rather than a measurement. `sea` is the
+    seaward end, the profile crosses z = 2 m once, and the plain's gradient is
+    `beach.S_PLAIN` wherever a plain is meant.
+    """
+    x = np.arange(0.0, x_max + dx, dx)
+    sp = float(BCH.S_PLAIN)
+    if kind == 'one-break':
+        # a shore, a cliff, and one plain at S_PLAIN. The landform every wave
+        # before 13 had, and the profile on which the legacy search is RIGHT.
+        kx = [0.0, 600.0, 620.0, 1000.0]
+        kz = [-5.0, 0.0, 15.0, 15.0 + sp * 380.0]
+    elif kind == 'tread':
+        # the same cliff and the same plain, with FLAT GROUND added behind it.
+        # Nothing seaward of x = 700 has moved, so the brow has not moved --
+        # and that is the whole content of defect (1).
+        kx = [0.0, 600.0, 620.0, 700.0, 1000.0]
+        kz = [-5.0, 0.0, 15.0, 15.0 + sp * 80.0, 15.0 + sp * 80.0]
+    elif kind == 'flight':
+        # a cliff AND a terrace riser, 280 m apart, with treads between and
+        # above them. Two slope breaks, and only one of them is the cliff.
+        kx = [0.0, 600.0, 620.0, 900.0, 920.0, 1000.0]
+        kz = [-5.0, 0.0, 15.0, 15.2, 29.0, 29.06]
+    else:
+        raise ValueError(kind)
+    return x, np.interp(x, kx, kz)
+
+
+def _view_world(x, prof, ny=5, dy=16.0):
+    """The three attributes `viewpoint` reads, and nothing else."""
+    class _W:
+        pass
+    w = _W()
+    w.x = np.asarray(x, float)
+    w.y = (np.arange(ny) - ny // 2) * dy
+    w.h = np.repeat(np.asarray(prof, float)[None], ny, axis=0)
+    return w
+
+
+def _brow_legacy(w, y_cam, h_eye):
+    """THE WAVE-7..17 SEARCH, kept verbatim so the guard has something to fail
+    against. Threshold from the profile's own median; stops at the FIRST break.
+    This is not a bug injection -- it is the code that shipped for ten waves,
+    and every row below that says "the fixed search differs here" is only worth
+    reading beside a row that says "and here it does not"."""
+    j = int(np.argmin(np.abs(w.y - y_cam)))
+    prof, x = w.h[j], w.x
+    slope = np.abs(np.gradient(prof, float(x[1] - x[0])))
+    land = prof > 2.0
+    ramp = float(np.median(slope[land])) if land.any() else 0.08
+    for i in range(x.size - 2, 1, -1):
+        if prof[i] <= 2.0:
+            break
+        if slope[i] > 3.0 * ramp:
+            return float(x[i + 1]), float(prof[i + 1])
+    return float('nan'), float('nan')
+
+
+def _sec_view(ctx):
+    import beach_render as RND
+    B = BCH
+    dx = 2.0
+    thr = 3.0 * float(B.S_PLAIN)
+
+    # ------------------------------------------- V.1 the controls (ruling 14)
+    ctrl = {}
+    for kind in ('one-break', 'tread', 'flight'):
+        x, prof = _view_profile(kind, dx=dx)
+        w = _view_world(x, prof)
+        fx = RND.viewpoint(w, 0.0, 1.6)
+        lg = _brow_legacy(w, 0.0, 1.6)
+        ctrl[kind] = dict(x=x, prof=prof, w=w, fixed=fx, legacy=lg)
+
+    check(1, 'control ONE BREAK: the fixed search reproduces the legacy one '
+             'EXACTLY',
+          [ctrl['one-break']['fixed'][0], ctrl['one-break']['fixed'][1]],
+          [ctrl['one-break']['legacy'][0], ctrl['one-break']['legacy'][1]],
+          1e-12,
+          'THE ROW THAT SAYS THE CHANGE IS NOT A NEW POLICY. On the landform '
+          'the legacy rule was written for -- one shore, one cliff, one plain '
+          'at S_PLAIN -- the two searches are the same function, because the '
+          'profile\'s median slope IS S_PLAIN there and there is only one '
+          'break to stop at. Every difference measured below is therefore a '
+          'difference the TERRACE introduced, not a difference of taste. If '
+          'this row ever fails, the correction has started moving frames it '
+          'was never supposed to touch.', unit='m')
+
+    xb = ctrl['one-break']['fixed'][0]
+    check(1, 'control ONE BREAK: the brow is the TOP of the break, not its '
+             'foot',
+          [float(np.abs(np.gradient(ctrl['one-break']['prof'], dx))[
+              int(round(xb / dx))] <= thr),
+           float(np.abs(np.gradient(ctrl['one-break']['prof'], dx))[
+               int(round(xb / dx)) - 1] > thr)],
+          [1.0, 1.0], 0.0,
+          'The DEFINING PROPERTY of a brow, checked as a property rather than '
+          'as a coordinate: the cell itself is flatter than the threshold and '
+          'the cell one step SEAWARD of it is steeper. A search that returns '
+          'the foot of the face passes neither half. The first draft of wave '
+          '18\'s clause (2) did exactly that -- it walked to the seaward end '
+          'of the steep RUN instead of its landward end and put the camera at '
+          'x = 634 m, h = 4.48 m, halfway down a 13 m cliff. Nothing else in '
+          'this section would have caught it: the frame still had sea in it.',
+          unit='bool')
+
+    check(1, 'control TREAD: flat ground added LANDWARD does not move the brow',
+          ctrl['tread']['fixed'][0], ctrl['one-break']['fixed'][0], 1e-12,
+          'DEFECT (1), ISOLATED. `tread` is `one-break` with 300 m of exactly '
+          'level ground appended behind x = 700 m. Nothing seaward of that '
+          'has moved, so no landform property of the brow has moved, so the '
+          'brow must not move. The legacy search moves it, and the row below '
+          'measures how far.', unit='m')
+
+    check(1, 'control TREAD: the LEGACY search moves the brow 80 m inland',
+          ctrl['tread']['legacy'][0] - ctrl['one-break']['legacy'][0],
+          80.0, 1e-9,
+          'THE SAME DEFECT, STATED AS THE DAMAGE. Adding level ground drags '
+          'the median land slope toward zero, so `3 * median` -- the legacy '
+          'threshold -- collapses toward zero with it, and the first cell '
+          'with ANY gradient at all now clears it. The search stops at the '
+          'junction between the tread and the plain rather than at the cliff. '
+          'This is the mechanism that put the shipped camera on the oldest '
+          'terrace tread; on the real bed the collapse is 0.0800 -> 0.0007 '
+          'and it carries the eye 332 m further than it does here. A '
+          'threshold that shrinks when the ground gets flatter is a threshold '
+          'that fails exactly when it is needed.', unit='m')
+
+    check(1, 'control FLIGHT: the fixed search takes the SEAWARD break (the '
+             'cliff)',
+          ctrl['flight']['fixed'][0], ctrl['one-break']['fixed'][0], 1e-12,
+          'DEFECT (2), ISOLATED, and the threshold is not involved: `flight` '
+          'has a cliff at x = 600-620 m and a terrace RISER at x = 900-920 m, '
+          'both far steeper than 3*S_PLAIN, so both searches can see both. '
+          'The cliff is the seaward one and `viewpoint`\'s own docstring says '
+          'SEAWARD-MOST, so the answer is the cliff\'s brow -- the same cell '
+          '`one-break` gives, because the cliff is in the same place.',
+          unit='m')
+
+    check(1, 'control FLIGHT: the LEGACY search stops on the RISER, 300 m '
+             'inland',
+          ctrl['flight']['legacy'][0] - ctrl['flight']['fixed'][0],
+          300.0, 1e-9,
+          'A riser is a slope break and it is not the cliff. An emerged '
+          'terrace flight has one per rung by construction -- that is what a '
+          'flight IS -- so "the first break found walking inland-to-seaward" '
+          'stopped being "the seaward-most break" on the day wave 13 gave '
+          'this coast a sea-level history. The camera then stands on the '
+          'upper tread with the lower tread between it and the water.',
+          unit='m')
+
+    # --------------------------------------------- V.2 the real terraced bed
+    # THE CHEAPEST BED THAT CARRIES THE DEFECT, and the two words matter
+    # separately. `dx = 4` and 75 steps because the brow is a property of the
+    # COASTAL loop -- `run_coast`'s notch, cliff and terrace ladder -- and not
+    # of `evolve_2d`, which moves the submerged bed the camera is looking over
+    # rather than the ground it is standing on. Checked rather than assumed:
+    # against 300 steps this bed returns the same brow to the cell and the same
+    # patch statistic to every digit printed (0.000880 / 0.000879 / 0.000418,
+    # 9 / 8 / 6 levels), for 32 s instead of 62.
+    #
+    # AND THE UN-TERRACED BED IS NOT BUILT AT ALL: `_sec_land` runs before this
+    # section and leaves `B.run_bay()` in `ctx['_bay']`, which is exactly the
+    # bed the regression row wants -- the one waves 1-12 published from. A
+    # second copy of it would be 110 s to re-derive a surface already in hand.
+    if '_view_bay' not in ctx:
+        ctx['_view_bay'] = B.run_bay(dx=4.0, n_steps=75, dt=6000.0,
+                                     embay=True, stands=4)
+    bay = ctx['_view_bay']
+    bay0 = ctx.get('_bay') or B.run_bay()
+    w = RND.Water(bay)
+    w0 = RND.Water(bay0)
+    y_cam = float(w.y[2])
+    fx = RND.viewpoint(w, y_cam, 1.6)
+    lg = _brow_legacy(w, y_cam, 1.6)
+    fx0 = RND.viewpoint(w0, float(w0.y[2]), 1.6)
+    lg0 = _brow_legacy(w0, float(w0.y[2]), 1.6)
+
+    check(1, 'REGRESSION: on the UN-TERRACED bed the camera does not move at '
+             'all',
+          [fx0[0], fx0[1]], [lg0[0], lg0[1]], 0.0,
+          'ABSOLUTE ZERO TOLERANCE, and it can be, because on that bed the '
+          'two searches evaluate the same predicate at the same cells. Every '
+          'measurement waves 1-12 published was taken through this camera and '
+          'this row is the promise that none of them moved. It is also the '
+          'cheapest possible statement of why `S_PLAIN` is the right anchor '
+          'rather than a new constant: the un-terraced profile\'s median land '
+          'slope IS 0.0800, so substituting the one for the other is an '
+          'identity there and a repair everywhere else.', unit='m')
+
+    prof = w.h[int(np.argmin(np.abs(w.y - y_cam)))]
+    slope = np.abs(np.gradient(prof, float(w.x[1] - w.x[0])))
+    i_b = int(np.argmin(np.abs(w.x - fx[0])))
+    check(1, 'terraced bed: the brow is the top of a break here too',
+          [float(slope[i_b] <= thr), float(slope[i_b - 1] > thr)], [1.0, 1.0],
+          0.0,
+          'The control\'s property row, run on the landform instead of on a '
+          'construction. Same predicate, no knots, nothing declared.',
+          unit='bool')
+
+    between(1, 'terraced bed: the brow stands seaward of the domain\'s '
+               'landward half',
+            fx[0], 400.0, 800.0,
+            'THE ROW THAT WOULD HAVE CAUGHT THIS IN ONE LINE. The legacy '
+            'search returns %.0f m on this bed -- against a domain that ends '
+            'at %.0f m, so it is standing at the LANDWARD boundary and '
+            'calling it "the seaward-most standing point at the top of the '
+            'cliff face". A camera at the edge of the world is not a camera '
+            'on a landform, and no measurement of what is in the frame was '
+            'needed to know it.' % (lg[0], w.x[-1]), unit='m')
+
+    check(1, 'terraced bed: the brow stands ABOVE the storm run-up limit and '
+             'BELOW the oldest tread',
+          [float(fx[1] > B.BACKSHORE_Z), float(fx[1] < float(prof.max()) - 5.0)],
+          [1.0, 1.0], 0.0,
+          'Two ways to be wrong that the coordinate row does not separate. '
+          'Below `BACKSHORE_Z` the eye is in the swash and the "cliff brow" '
+          'is a beach; within 5 m of the profile\'s maximum it is back on the '
+          'highest ground, which is where the legacy search went. The brow '
+          'this bed has is 13.7 m against a maximum of %.1f m.'
+          % float(prof.max()), unit='bool')
+
+    # ------------------------- V.3 THE ROW THIS WHOLE SECTION IS HERE FOR
+    SS, (WW, HH) = RND.HERO_SS, RND.HERO_WH
+    L_surf, s_lines = RND.surf_line_scale(w)
+    D_lines = float(0.5 * (w.y[-1] - w.y[0]))
+    az_j, _bear = RND.frame_azimuth_J(
+        w, y_cam, RND.CAM.portrait_fov(13.0)[1])
+    cam, inf = RND.build_frame(w, y_cam, RND.CAM.J_CONTENT, 'J', az_j,
+                               WW * SS, HH * SS, D_lines, s_lines)
+
+    # V.3.0 THE CROP IS A WINDOW, NOT A SMALLER FRAME -- and this row exists
+    # because the first version of this section did not have it and the bug
+    # driver caught nothing at all with `crop-camera-rescales` in place. The
+    # whole of V.3 is measured through `CropCamera`, so an error there is an
+    # error in every number this section reports, and it would be a SILENT
+    # one: a rescaled crop still renders a plausible patch of ground with a
+    # plausible standard deviation. Nothing else here compares it to anything.
+    small = RND.Camera(cam.pos, cam.pos + cam.f, 40.0, 64, 48)
+    win = (12, 30, 7, 41)
+    crp = RND.CropCamera(small, *win)
+    check(1, 'CropCamera reproduces the parent raster\'s rays EXACTLY over its '
+             'window',
+          crp.rays(), small.rays()[win[0]:win[1], win[2]:win[3]], 0.0,
+          'ABSOLUTE ZERO, on direction cosines. The patch is rendered as a '
+          'crop because the full frame costs 470 s against this one\'s 10 s, '
+          'and that trade is only legitimate if the crop is the SAME PIXELS. '
+          'Verified bit-for-bit against a full 720x960 render once by hand '
+          '(max abs difference 0.0 in radiance); this row is what keeps it '
+          'true afterwards, on a 64 x 48 parent so it costs nothing.',
+          unit='dir')
+    check(1, 'CropCamera keeps the PARENT\'s pixel pitch',
+          [crp.w, crp.h, 2.0 * crp.tan / crp.h],
+          [small.w, small.h, 2.0 * small.tan / small.h], 0.0,
+          'THE HALF OF THE IDENTITY THE RAY ROW DOES NOT COVER, and the more '
+          'dangerous half. `2*tan/h` is the pixel\'s angular size; it feeds '
+          'the ground footprint, which drives `beach.rock_bare_mask`\'s '
+          'return to its own mean and every filter width downstream of it. A '
+          'crop that renumbered its pixels would report a high-frequency '
+          'standard deviation for a pixel pitch the hero frame does not have '
+          '-- and the statistic is bounded below by that footprint, so the '
+          'error would move the number this whole section is about, in the '
+          'flattering direction, with every other row still green.',
+          unit='px')
+
+    Lp, ex = RND.patch_render(cam, w)
+    sd = RND.hf_sd(Lp)
+    lv = RND.display_levels(Lp)
+
+    check(1, 'THE PLATEAU PATCH: high-frequency sd, SCENE-LINEAR and '
+             'UN-QUANTISED, clears its floor',
+          [float(sd.min() > 1.0e-4)], [1.0], 0.0,
+          'THE ROW WAVE 11 SCORED AND NOBODY GUARDED, and it is stated the '
+          'way the standing ruling requires rather than the way the score was '
+          'published. Wave 16 established that the published 0.00092 was '
+          'MOSTLY THE QUANTISER -- the same estimator on the same patch, '
+          'un-quantised, reads 7.1e-05, twelve times smaller -- so the '
+          'display-referred figure is not the baseline and is not used as '
+          'one. The floor is 1.0e-04 scene-linear in EVERY channel. Measured '
+          'here: %.3e / %.3e / %.3e. The camera this section repairs reads '
+          '2.0e-07 / 2.3e-07 / 4.4e-07 on the same pixels, which is 400 to '
+          '2000 times under the floor, so the row cannot be passed by a '
+          'camera standing on a plane. It is a FLOOR and not a band on '
+          'purpose: a patch with more structure in it than this is not a '
+          'regression, and the only failure this project has ever had here is '
+          'in one direction.' % (sd[0], sd[1], sd[2]), unit='bool')
+
+    check(1, 'THE PLATEAU PATCH: it is a surface and not a colour',
+          [float(min(lv) >= 3)], [1.0], 0.0,
+          'DISPLAY-REFERRED AND SAID SO, which the amendment permits for a '
+          'figure and this row treats as a legibility check rather than as '
+          'physics -- the row above is the physics. Wave 16 measured ONE '
+          'distinct 8-bit value across all 30000 pixels of this patch, in '
+          'every channel. A floor of three levels is the weakest statement '
+          'that separates a surface from a paint chip, and it is here because '
+          '"1 / 1 / 1" is a sentence a reader understands without a decimal '
+          'exponent. Measured: %d / %d / %d.' % tuple(lv), unit='bool')
+
+    # the frame's composition, from a trace at a quarter of the linear
+    # resolution -- a mask fraction converges long before a radiance does, and
+    # this costs a second where the full frame costs eight minutes.
+    cam_q, _i = RND.build_frame(w, y_cam, RND.CAM.J_CONTENT, 'J', az_j,
+                                WW // 4, HH // 4, D_lines, s_lines)
+    trq = RND.trace(cam_q, w, 0.0)
+    Dq = trq['D']
+    upq = Dq[..., 2] >= 0.0
+    water = float((trq['water'] & ~upq).mean())
+    landm = trq['hit_land'] & ~trq['water'] & ~upq
+    between(1, 'the hero frame still contains a sea', water, 0.10, 0.30,
+            'BAR SECTION J IS AN EMBAYMENT OVERVIEW and the legacy camera '
+            'reduced its water to 1.6% of the frame while raising its land to '
+            '66.4%. This is not a composition rule -- nothing here says where '
+            'to point the camera -- it is the statement that a viewpoint '
+            'derived from a COASTAL landform which shows almost no coast has '
+            'derived something else. The band is wide on purpose; the failure '
+            'it exists to catch is off by a factor of eight.', unit='frac')
+
+    # -------------------------------------- V.4 THE RESIDUAL, NAMED NOT FIXED
+    px = 2.0 * cam_q.tan / cam_q.h
+    nz = np.clip(np.abs(Dq[..., 2]), 1.0 / 20.0, 1.0)
+    foot = trq['t_land'] * px / nz
+    info(2, 'median land-pixel footprint on the ground, hero camera',
+         float(np.median(foot[landm])),
+         'THE RESIDUAL, AND IT IS THE REASON THIS ROUND DID NOT ALSO BUILD A '
+         'SOIL OR A VEGETATION FIELD. The hero camera resolves the ground '
+         'about 500x finer than the bed is stored: a median land pixel covers '
+         'a few millimetres against a grid of dx = %.0f m, and 99%% of land '
+         'pixels fall below half a cell. Every field the bed generator '
+         'computes -- slope, aspect, regolith depth, cover fraction, the '
+         'planed mask -- lives ON that grid, so an albedo driven by any of '
+         'them is CONSTANT across the whole near field no matter how much '
+         'structure it has at 4 m. The near ground is a bilinear interpolant '
+         'of four corners and it is a plane by construction. Structure at '
+         'this scale can only come from a SUB-GRID process with its own '
+         'closed form -- which is what `beach.rock_bare_mask` already is for '
+         'rock pockets, and there is no such model in this project for a '
+         'soil-mantled tread. Named, measured, not drawn.' % bay['dx'])
+    info(2, 'share of land pixels whose footprint is under half a bed cell',
+         float((foot[landm] < bay['dx'] / 2).mean()),
+         'The same statement as a fraction. A render this far inside its own '
+         'grid is showing the interpolant, and the 1:1274 "slope" wave 16 '
+         'measured over the patch is a property of that interpolant rather '
+         'than of the landform: the tread\'s own median slope on the grid is '
+         '1:8. THE RELIEF WAS NEVER MISSING AND IT WAS NEVER VISIBLE.')
+    info(2, 'patch hf sd, scene-linear, per channel', np.round(sd, 8),
+         'Carried as an INFO row beside its own guard so a future round can '
+         'read the value without re-deriving the estimator, which is the '
+         'failure wave 16 spent its budget repairing.')
+
+
+def _bug_brow_threshold_from_median(mod):
+    """DEFECT (1) PUT BACK: the brow threshold as a multiple of the profile's
+    own median slope. Ten waves of shipped code, and correct on every bed that
+    had no terrace on it."""
+    import beach_render as RND
+    orig = RND.viewpoint
+
+    def bad(w, y_cam, h_eye):
+        j = int(np.argmin(np.abs(w.y - y_cam)))
+        prof, x = w.h[j], w.x
+        slope = np.abs(np.gradient(prof, float(x[1] - x[0])))
+        land = prof > 2.0
+        ramp = float(np.median(slope[land])) if land.any() else 0.08
+        i_brow, was = None, False
+        for i in range(x.size - 2, 1, -1):
+            if prof[i] <= 2.0:
+                break
+            st = slope[i] > 3.0 * ramp
+            if st and not was:
+                i_brow = i + 1
+            was = st
+        if i_brow is None:
+            return orig(w, y_cam, h_eye)
+        ze = prof[i_brow] + h_eye
+        sel = np.arange(0, max(i_brow - 4, 1))
+        m = float(((ze - prof[sel]) / (x[i_brow] - x[sel])).max())
+        return (float(x[i_brow]), float(prof[i_brow]),
+                float(x[i_brow] - ze / m))
+    RND.viewpoint = bad
+
+
+def _bug_brow_first_break(mod):
+    """DEFECT (2) PUT BACK: stop at the first slope break found walking
+    seaward. Indistinguishable from the fixed search on any profile with one
+    break, and wrong on every terrace flight."""
+    import beach_render as RND
+    orig = RND.viewpoint
+
+    def bad(w, y_cam, h_eye):
+        j = int(np.argmin(np.abs(w.y - y_cam)))
+        prof, x = w.h[j], w.x
+        slope = np.abs(np.gradient(prof, float(x[1] - x[0])))
+        thr = 3.0 * float(BCH.S_PLAIN)
+        i_brow = None
+        for i in range(x.size - 2, 1, -1):
+            if prof[i] <= 2.0:
+                break
+            if slope[i] > thr:
+                i_brow = i + 1
+                break
+        if i_brow is None:
+            return orig(w, y_cam, h_eye)
+        ze = prof[i_brow] + h_eye
+        sel = np.arange(0, max(i_brow - 4, 1))
+        m = float(((ze - prof[sel]) / (x[i_brow] - x[sel])).max())
+        return (float(x[i_brow]), float(prof[i_brow]),
+                float(x[i_brow] - ze / m))
+    RND.viewpoint = bad
+
+
+def _bug_brow_run_bottom(mod):
+    """THE DEFECT WAVE 18 WROTE ITSELF AND CAUGHT WITH THIS SECTION: walk the
+    whole run and keep its SEAWARD end, which is the foot of the cliff rather
+    than its top. Measured at x = 634 m, h = 4.48 m -- a camera standing a
+    third of the way down a 13 m face, with sea still in the frame."""
+    import beach_render as RND
+    orig = RND.viewpoint
+
+    def bad(w, y_cam, h_eye):
+        j = int(np.argmin(np.abs(w.y - y_cam)))
+        prof, x = w.h[j], w.x
+        slope = np.abs(np.gradient(prof, float(x[1] - x[0])))
+        thr = 3.0 * float(BCH.S_PLAIN)
+        i_brow = None
+        for i in range(x.size - 2, 1, -1):
+            if prof[i] <= 2.0:
+                break
+            if slope[i] > thr:
+                i_brow = i + 1
+        if i_brow is None:
+            return orig(w, y_cam, h_eye)
+        ze = prof[i_brow] + h_eye
+        sel = np.arange(0, max(i_brow - 4, 1))
+        m = float(((ze - prof[sel]) / (x[i_brow] - x[sel])).max())
+        return (float(x[i_brow]), float(prof[i_brow]),
+                float(x[i_brow] - ze / m))
+    RND.viewpoint = bad
+
+
+def _bug_crop_camera_rescales(mod):
+    """`CropCamera` built as a SMALLER FRAME rather than a WINDOW: the pixel
+    pitch follows the crop, so the patch is rendered at the wrong resolution
+    and the high-frequency statistic -- which is bounded below by the pixel's
+    own footprint -- is measured on pixels the hero frame does not have. The
+    plausible version of this class, and the reason the suite checks the crop
+    against the full frame rather than assuming it."""
+    import beach_render as RND
+    orig = RND.CropCamera            # BOUND HERE, not looked up inside `Bad`:
+    #                                  a rebound global would make `Bad.__init__`
+    #                                  call itself. Wave 18 wrote that recursion
+    #                                  and the bug reported "caught 0 rows",
+    #                                  because a section that RAISES fails no row
+    #                                  in a driver that counts failures.
+
+    class Bad(orig):
+        def __init__(self, cam, r0, r1, c0, c1):
+            orig.__init__(self, cam, r0, r1, c0, c1)
+            self.w, self.h = c1 - c0, r1 - r0        # the CROP's, wrongly
+    RND.CropCamera = Bad
+
+
+VIEW_BUGS = {'brow-threshold-from-median', 'brow-first-break',
+             'brow-run-bottom', 'crop-camera-rescales'}
+
+BUGS.update({
+    'brow-threshold-from-median': _bug_brow_threshold_from_median,
+    'brow-first-break': _bug_brow_first_break,
+    'brow-run-bottom': _bug_brow_run_bottom,
+    'crop-camera-rescales': _bug_crop_camera_rescales,
+})
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -9583,7 +10094,17 @@ def run_suite():
                       # bay twice would cost more than every row in it.
                       (_sec_foamtex, 'the foam as a REALISATION: is it drawn, '
                                      'and does its texture have the '
-                                     'photographs\' scale')):
+                                     'photographs\' scale'),
+                      # WAVE 18, the viewpoint lane. Last, and it is the
+                      # expensive one: a terraced embayed bed at dx = 4 plus
+                      # one cropped render. It is here rather than beside
+                      # `_sec_camera` because it needs a bed with a sea-level
+                      # history -- only `_sec_terrace` above it otherwise
+                      # builds one, and `run_coast` is cached, so arriving
+                      # after that section is most of what makes this one
+                      # affordable.
+                      (_sec_view, 'the viewpoint, and the plateau patch wave '
+                                  '11 scored 3/10')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 
@@ -10101,6 +10622,15 @@ if __name__ == '__main__':
                 # reloads `beach_render` between runs. The whole-suite driver
                 # does not import the renderer, so these are skipped here and
                 # the table that fires them is the one printed by that flag.
+                continue
+            if name in VIEW_BUGS:
+                # WAVE 18, and the same reason with one addition. These rebind
+                # `beach_render.viewpoint` and `beach_render.CropCamera`, and
+                # this driver never reloads that module -- so a patch applied
+                # for one row would still be in place for every row after it,
+                # and the table would report catches that belong to a bug it
+                # already finished testing. They are fired one at a time with
+                # `--bug`, which exits after a single suite.
                 continue
             patch(CMR if name in CAMERA_BUGS
                   else (FOAM if name in FOAM_BUGS
