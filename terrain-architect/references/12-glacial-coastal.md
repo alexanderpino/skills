@@ -1503,6 +1503,68 @@ moves the trough minimum *away* from `γ_s` (see the hygiene note below); *relie
 but misdescribed, because it is a joint condition on relief **and** distance and distance is the
 binding axis.
 
+> **Correction — the whole argument above is written for ONE wave train, and the section never says
+> so.** Everything from `profileStep(h[], H_0, T, dt)` down takes a single deep-water height at a
+> single period. That is not wrong, but it silently answers a different question from the one a
+> reader arrives with. *How many lines of white water does this coast show?* is **not** a question
+> about the bed. It is a question about the **offshore boundary condition**, and the section's own
+> loop diagram cannot express it.
+>
+> **The measurement that separates them** (`terrain-renderer/reference-impl/beach.py`,
+> `evolve_climate` and `climate_breakpoints`; 500 m of profile, 6000 morphological steps, the same
+> transform and the same constants as every number above). Force the loop with **two simultaneous
+> partitions** instead of one — a remote swell at 1.5 m / 9 s and the local wind sea a 6 m/s wind
+> implies, `H_s ≈ 0.886 m`, `T_p ≈ 4.38 s`, both Pierson-Moskowitz on a wind that scene had already
+> declared for its glitter and its whitecaps:
+>
+> | | breakpoints, `H/d` upcrossing `γ_b` | bars in the bed | their separation |
+> |---|---|---|---|
+> | one partition, the equilibrium bed | 1 | 1 | — |
+> | **two partitions**, same loop | **2** (x = 373.5, 467.6 m) | **2** (d = 2.10 m, 1.11 m) | **94.1 m** |
+> | **two partitions on a BARE DEAN RAMP** | **2** (x = 424.0, 472.5 m) | **0** | 48.5 m |
+>
+> **Read the third row before the second.** A monotone ramp with no bar on it at all carries two
+> breakpoints under a two-partition sea, because two partitions break at two depths on any profile.
+> So the **count is the boundary condition's**; what the **bed** contributes is the **separation**,
+> ×1.94 here, and the two bars — each of which lands at **its own partition's `H_b/γ`**, ratios 0.90
+> and 0.94 against the single-bar loop's 0.893 on the same prediction. That is this section's central
+> quantitative claim, tested twice in one profile instead of once.
+>
+> **The criterion for "two and not one" is a length, and it is the march's own.** The band over which
+> a partition's onshore flux collapses is the Dally length `d_b/K` — the exponent in
+> `F₊ = F_s + (F − F_s)·exp(−K·Δx/d)` and nothing else — so two convergences are distinct when
+>
+> > **`|x_b1 − x_b2| > (d_b1 + d_b2) / (2·K)`**
+>
+> Measured 48.5 m against 11.7 m needed. Swept over ±50% in `H_s` and ±40% in `T_p` the worst ratio
+> is 1.60; at `H_s × 2` it fails, and correctly — the "wind sea" is then the same size as the swell
+> and breaks in the same water.
+>
+> **What this does NOT overturn.** The reform argument above stands in full: with two partitions the
+> swell's `H/d` still bottoms out at **0.4389** against the 0.40 cessation needs, so `surf_zone_spans`
+> still returns **one** entry. Two breaking *onsets* with a dimmer band between them is not two lines
+> with calm water between them, and the missing mechanism is unchanged — the rip-feeder circulation
+> of the 2DH solve this section declares out of scope. What changes is the *diagnosis of the picture*:
+> a reader counting lines in a photograph was being pointed at the reform, and most of that count is
+> the spectrum.
+>
+> **And one candidate on the dead list is dead for the wrong reason.** *Forcing history — a Rayleigh
+> height distribution lowers the relief* is what a **largest-anomaly** reader returns. Counted
+> instead, five equal-probability quantiles leave **4 separate crests and 5 breakpoints**, and
+> thirteen leave **14 crests at 5–11 m spacing**. **The count follows the SAMPLE count**, so it is
+> quadrature and not sea: a continuous Rayleigh has no modes and cannot put a bar anywhere in
+> particular. The verdict "it does not reform" survives; the reason given for it did not distinguish
+> a bed with one bar from a bed with four. ⚠️ **This is exactly why the two-partition result above is
+> stated as depending on the swell and the wind sea being two PHYSICALLY SEPARATE systems with a real
+> gap between their spectral peaks** — N bars from N samples of a smooth distribution would be a
+> model reporting its own quadrature.
+>
+> **Tier.** The two-breakpoint result and the separation criterion are **implemented and measured**
+> on one reference loop, with their sweep, exactly as `L ≈ d_crest/K` is. The Pierson-Moskowitz
+> coefficients behind the wind sea are **`?`** and ⚠️ **recalled, not opened** — which is why the
+> criterion is swept rather than asserted. The `H_b/γ` crest prediction the two bars are checked
+> against is unchanged at **P**.
+
 **Tier.** `Γ_eq` and the `(d/d_c)^(−a)` integral are **P** — closed forms off a
 published model (Dally, Dean & Dalrymple 1985), derived and checked here against an independent
 march. The Raubenheimer et al. corroboration is **P**, ⚠️ relayed. The `L ≈ d_crest/K` identity and

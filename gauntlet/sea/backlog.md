@@ -68,3 +68,33 @@ this run added.
   whether it is right. Closing it means a bed or a camera where a ray crosses a
   face at exactly zero range — a tangency — which nothing in this scene
   produces.
+
+- **The transport reads one of the two moments its own wave shape carries.**
+  `terrain-architect/references/12-glacial-coastal.md` names this in its own
+  words, measures it — `(1 − f_brk)` is a straight line standing in for `cos ψ`
+  and reads **29.3 % low at half breaking** — and the code has not followed it.
+  `grep` at wave 19: `beach.surface_moments` computes `As`, **nothing in
+  `sediment_flux` reads it**, and outside `beach.py` the symbol appears only in
+  the suite. The missing half is the acceleration-skewness transport (Hoefel &
+  Elgar 2003), which is the published mechanism for onshore bar migration and
+  the natural candidate for an INNER bar. Not closed at wave 19 because it moves
+  every bar depth in the file and needs its own round with its own controls; the
+  chapter's `Sk² + As² = g(r)` invariant means the total third moment is fixed,
+  so this is a redistribution and not a new source.
+
+- **The wind sea's two Pierson–Moskowitz coefficients are recalled, not read.**
+  `PM_HS_COEF` and `PM_WAVE_AGE` in `beach.py` carry the second offshore
+  partition, and wave 19 defended them with a sweep (±50 % in `H_s`, ±40 % in
+  `T_p`, the separation criterion holding throughout) rather than a citation,
+  because no copy of Pierson & Moskowitz (1964) was reachable. The *form* is
+  forced by dimensional analysis and is not at risk; the two numbers are.
+
+- **Two breakpoints on the bed, one band of white on the water.** Wave 19's own
+  residual, measured twice by two instruments: `H/d` bottoms at **0.4389**
+  against the 0.40 cessation needs, and in the rendered buffer the shoreward
+  breakpoint's ±15 m window holds **2301 px of deck with the second partition
+  and 2303 without** — the wind sea breaks inside the swell's saturated surf
+  zone, where the roller fraction is already 1. Separated lines need white water
+  that *stops*, which needs the wave to un-break, which needs the trough to be
+  two Dally e-foldings wide, which needs the rip-feeder circulation of a 2DH
+  solve. Unchanged since wave 2 and still the same exclusion.
