@@ -111,3 +111,37 @@ report failure forever while doing good work.
 3. **Waves are chosen from this route**, and when an owner observation redirects
    one, that gets written here as an amendment rather than silently replacing
    the plan that did not exist.
+
+## Amendment, wave 19 — the third thing that breaks a crest up
+
+Owner: *"Nabij de kust breken golven op. Je ziet in werkelijkheid nooit 1 lange
+golf langs de kust."*
+
+Step 2 named two mechanisms — short-crestedness faded out of the surf zone, and
+one bar giving one breaking line. **There is a third, and it may dominate both.**
+
+Suppose step 2 succeeds completely: crests short and groupy to the shoreline,
+three or four bars to break over. If breaking is still applied as a
+**deterministic threshold on a single carrier amplitude** — `H/d > γ` on one `H`
+field — then every crest of the same height breaks at the same depth. The result
+is **more parallel lines, not broken ones.**
+
+What breaks a breaking line up is that **individual waves in a random sea have
+different heights.** Rayleigh-distributed, so they break at different depths, at
+different moments, at different places alongshore. The breaking "line" is a
+scatter of segments whose envelope only resembles a line in a long exposure.
+
+**That is Battjes & Janssen's own statement**, and it is why this is suspicious
+rather than speculative: `Q_b` is *the fraction of waves breaking at a given
+depth*, not *the wave breaks here*. The foam field is already built on `Q_b`.
+
+So the question, put to the wave-field lane mid-round: **does the render draw
+`E[breaking]`, or a realisation of which individual waves broke?** If it draws
+the expectation, that is this run's dominant error class — mean where a
+realisation belongs — at a level nobody has inspected: not the foam patch, not
+the slope field, but **the wave population**. It would produce exactly the smooth
+band the owner is describing.
+
+If breaking turns out to already be a realisation over the height distribution,
+that is a claim surviving a serious attempt to break it, and this project records
+those as wins rather than passing over them.
