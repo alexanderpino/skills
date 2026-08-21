@@ -118,8 +118,9 @@ this run added.
   where the local Iribarren number is ξ = 1.110 (0.967–1.203 over 89 rows) —
   plunging on both published threshold sets, on every row.** So the model
   already says this scene overturns; what refuses it is that `η(x, y)` admits
-  one height per point. Exactly one candidate survives standing ruling 4 — the
-  exact parametric cubic free surface of Longuet-Higgins (1982), which is a
+  one height per point. Two candidates survive standing ruling 4 and only one
+  is affordable — the exact parametric cubic free surface of
+  Longuet-Higgins (1982), which is a
   solution rather than a sculpt; an authored mesh, a flipbook and a particle
   sheet all fail ruling 4, and a particle surface fails ruling 3 as well
   because its smoothing radius is a constant chosen to make the picture right.

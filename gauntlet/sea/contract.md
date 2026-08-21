@@ -208,8 +208,9 @@ in a fine zoom) — *past* Stokes' corner and past 41.48° — and section A is 
 unreachable, because chapter 12's criterion is on the **sum** of two crossings,
 82.96°; and `surface_state`'s validity clamp bites on **74.78 %** of the wet bay
 at up to 154× the shape's own limit. **The boundary is topological, not angular.**
-Exactly one candidate representation survives standing ruling 4, priced at
-2 waves + 2–4, and it is blocked on provenance. Sections A and F stay **open**.
+Two candidate representations survive standing ruling 4 and only one is
+affordable — an exact parametric free surface, priced at 2 waves + 2–4 and
+blocked on provenance. Sections A and F stay **open**.
 
 **Kept as a warning about method**, because it is the more useful lesson: a
 correct theorem, cited accurately, closed a question for six waves by answering a

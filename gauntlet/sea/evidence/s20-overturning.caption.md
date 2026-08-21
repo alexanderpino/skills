@@ -52,3 +52,12 @@ pre-image of the representation change priced in
 **What else was running.** `nproc` = 4, two other builders' `python3` processes
 at 100 % and 124 % CPU throughout. Wall-clock costs quoted in the price document
 are upper bounds.
+
+**The companion measurement, which has no panel because it is one number.**
+`scout/measure-two-cone.py`, `M`, 45.9 s: over **10 889 060** admissible
+ray-pairs on the drawn surface — pairs whose joining segment lies below the free
+surface everywhere between, which is chapter 12's own condition — the best
+`α₁ + α₂` anywhere in the scene is **68.48°** against the 82.96° two-cone floor,
+**none** clears it, and the per-start-point p99.9 is 43.20°. The carrier alone
+reaches 31.31°. 68.48° is already past the 60° a wave of permanent form can
+reach, so the remaining 14.48° is not available to steepness.

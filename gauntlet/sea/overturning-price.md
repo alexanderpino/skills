@@ -20,13 +20,21 @@ its own Exner bar, where the local bed slope is **1 : 4.4** and the local
 surf-similarity number is **ξ = 1.11 (range 0.97–1.20 over 89 rows)** — squarely
 inside Battjes' plunging band on both published threshold sets. What refuses the
 overturn is not the sea state, not the bed and not the steepness: it is that
-`η(x, y)` admits one height per point. **Exactly one candidate representation
-survives standing ruling 4**, and it is the analytic one — the parametric cubic
-free surface of Longuet-Higgins (1982), which is an *exact solution of the
-free-surface equations* rather than a sculpted mesh. Priced at **2 waves for the
-geometry-and-measurement half and 2–4 more for the renderer half**, with a hard
-provenance gate in front of both. The cheapest thing that would confirm or refute
-it costs about a minute and is described in §6.
+`η(x, y)` admits one height per point. **Two candidate representations survive
+standing ruling 4 and only one of them is affordable** — the analytic one: the
+parametric cubic free surface of Longuet-Higgins (1982), which is an *exact
+solution of the free-surface equations* rather than a sculpted mesh. (The other
+is a level set whose motion is *solved* rather than shaped; it costs 8+ waves and
+is refused at this budget. An authored mesh, a flipbook and a particle sheet all
+fail ruling 4 outright.) Priced at **2 waves for the geometry-and-measurement
+half and 2–4 more for the renderer half**, with a hard provenance gate in front
+of both. **The measurement that would refute that recommendation was named and
+then taken (§6), and it confirms it instead:** over **10 889 060** admissible
+ray-pairs on the drawn surface, **not one** clears chapter 12's two-cone floor of
+82.96°, the best in the whole scene is **68.48°** — already past the 60° any
+*steady* wave can reach — and the typical good pair sits at 43°. The deficit
+cannot be bought with steepness, because the surface has already passed the
+ceiling steepness has.
 
 ---
 
@@ -34,8 +42,9 @@ it costs about a minute and is described in §6.
 
 ### 1.0 The instrument, and what else was running
 
-Everything in this section comes from two read-only scripts driving the shipped
-modules — `beach.py`, `beach_render.py` — through their own entry points. No
+Everything in this document comes from three read-only measuring scripts and one
+figure script, driving the shipped modules — `beach.py`, `beach_render.py`,
+`beach_foam.py`, `beach_plot.py` — through their own entry points. No
 file in `terrain-renderer/reference-impl/` was modified. Measurements are on the
 free surface itself, before any tone map; no PNG was read for physics.
 
@@ -149,7 +158,10 @@ tail is real rather than an interpolation artefact.
    `α₁ + α₂ ≥ 2(90° − θ_c) = 82.96°`, and a face is only half of it. A
    single-valued surface with a 47° face still has to bring its partner face up
    to 36°, on the *same crest*, on the *same ray*. That is what folding buys and
-   steepening does not.
+   steepening does not — and §6 turns that `0.0000` into a distance: over
+   **10 889 060** admissible pairs on the drawn surface the best `α₁ + α₂` in the
+   scene is **68.48°**, none clears 82.96°, and the typical good pair (p99.9)
+   sits at **43.20°**.
 
 ⚠️ **The `eps` sensitivity is confounded and is reported that way.** A second
 census at `eps = 0.125 m` returned p99.9 = **18.19°** against 18.09° and
@@ -407,10 +419,16 @@ solution's validity, which ends where the surface self-intersects.
 
 **Cost in run time.** Bounded and small. The lip exists only where the breaking
 criterion fires — the 16 m-wide flank band, ~11.9 % of the 0.5–5 m band, a few
-percent of water pixels in the hero frames. A parametric sheet is intersected
-analytically (a cubic in the parameter), so the per-pixel cost is a root solve,
-not a march. Expect **single-digit percent** on frame time, dominated by the
-branch, not the arithmetic.
+percent of water pixels in the hero frames. The sheet is a **swept parametric
+curve**, so a ray against it is a small two-parameter root solve rather than a
+march — cheaper than the 384-step land march the tracer already does, and far
+cheaper than the 32-step `through_face` march. ⚠️ It is *not* a closed-form
+quadratic like the pool's solids; the cost is a Newton iterate on two
+parameters, and how well-conditioned that is at grazing incidence is **not
+known** and should be measured in wave A rather than assumed. Expect
+**single-digit percent** on frame time, dominated by the branch, not the
+arithmetic — and treat that as an estimate rather than a measurement, because
+nothing here has been built.
 
 **What it breaks.**
 
@@ -609,7 +627,10 @@ and Beer–Lambert the cuvette already uses.
 
 **1 · Buy the geometry-and-measurement half of the analytic lip. Two waves.**
 Not the renderer. The deliverable is `beach_lip.py` plus a suite section plus a
-figure, and it answers section A's real question **without drawing anything**:
+figure, and it answers section A's real question **without drawing anything**.
+**Confirmed by §6 rather than argued**: a single-valued surface on this scene
+cannot reach section A, at any steepness, and the measurement that would have
+sent this recommendation the other way was taken and did not.
 
 - *Wave A (1 wave):* obtain Longuet-Higgins (1982); implement the parametric
   cubic; verify it satisfies the free-surface conditions to machine precision;
@@ -656,35 +677,67 @@ budget.**
 
 ---
 
-## 6 · The one cheap measurement
+## 6 · The one cheap measurement — named, and then taken
 
-**Instrument `through_face` to report `α₁ + α₂` for every ray that *enters* the
-water, not only for the ones that exit, and render one hero frame at 240 × 320.**
+**The measurement.** `through_face` reports the fraction of view rays that leave
+the far side of a crest, and it has read **0.0000** for six waves. A zero with no
+distribution behind it cannot tell *close* from *nowhere near*, and the whole
+recommendation turns on which it is. So: **convert that zero into a distance.**
 
-Cost: no new physics, about twenty lines in a copy of the function, one
-low-resolution render — **of order a minute** once `Water` is built.
+Chapter 12's two-cone result makes this a property of the **surface alone**, with
+no camera and no render in it. A sightline crosses the surface twice; the ray
+between the crossings is straight, so a pair of surface points is admissible only
+if the segment joining them lies *inside the water* — below the free surface
+everywhere between. Over every admissible pair on the drawn surface, what is
+`α₁ + α₂`, against the floor of **82.96°**?
 
-What it decides:
+The admissibility test is `O(n)` per start point rather than `O(n²)`: with
+`g(j) = (z_j − z_i)/(s_j − s_i)`, the chord `i→j` lies below the curve for every
+intermediate `k` exactly when `g(j) ≤ g(k)` for all `i < k < j`, so one sweep
+with a running minimum decides every `j`.
 
-- `through_face` already computes the entry normal (via `Nn`) and the far-side
-  normal (`Nf`, after the march). It currently throws away everything about rays
-  that never exit — and *every* ray in this scene is one of those, which is why
-  the reported number has been **0.0000** for six waves. A zero with no
-  distribution behind it cannot tell "close" from "nowhere near".
-- Report the distribution of `α₁ + α₂` over entered rays against the
-  **82.96°** floor. Two outcomes, and they point opposite ways:
-  - **If the tail sits at 25–50°** — which §1.2's per-face percentiles predict —
-    then the deficit is 30–58° of *summed* inclination, no single-valued surface
-    closes it, and **the lip is the only route**. Rank 1 is confirmed and the
-    two waves are worth buying.
-  - **If the tail is already brushing 80°+**, then a steeper single-valued
-    surface can reach section A, the whole representation change is unnecessary
-    for A, and rank 1 should be spent on steepness instead. **Refuted for one
-    minute.**
+**Cost: 46 s including building `Water`.** `scout/measure-two-cone.py`,
+cross-shore transects at 12 alongshore positions and 6 instants over one period,
+window 30 m, sampling step swept.
 
-It is the cheapest decisive measurement in the set because it uses an instrument
-that already exists, on a frame that already renders, and because it converts
-this project's longest-standing `0.0000` into a distance.
+**Result — and it confirms rank 1.**
+
+| | carrier only | shipped, 0.25 m step | shipped, 0.10 m step |
+|---|---|---|---|
+| admissible pairs examined | — | 1 781 371 | **10 889 060** |
+| **best `α₁ + α₂` anywhere in the scene** | **31.31°** | 67.06° | **68.48°** |
+| per-start-point best, p99.9 | — | 42.94° | 43.20° |
+| per-start-point best, median | — | 9.98° | 10.02° |
+| share of start points clearing 60° (a steady wave's best) | — | 6.63e−05 | 8.61e−05 |
+| **share clearing the 82.96° floor** | — | **0.000e+00** | **0.000e+00** |
+| **deficit at the best pair** | 51.65° | 15.90° | **14.48°** |
+
+**Not one pair in ten point nine million clears the floor**, and the numbers are
+stable across a 2.5× refinement of the sampling step, so this is the surface and
+not the instrument.
+
+**Three readings, and the third is the decisive one.**
+
+1. **The shipped surface already beats what a steady wave can do.** Stokes' corner
+   caps a wave of permanent form at 30° a face and therefore at **60°** summed;
+   the drawn surface reaches **68.48°**. So the remaining 14.48° **cannot** be
+   bought with more nonlinearity, a higher Stokes order, a finer grid or a bigger
+   sea — the surface is past the ceiling those levers have.
+2. **And the extreme is not where the phenomenon lives.** The typical good pair
+   (p99.9) sits at **43.20°**, half the floor. Chapter 12's transmittance table
+   says the green face needs ≈ 50– 55° *per face* to pass a tenth to a fifth of
+   the intercepted flux — `α₁ + α₂` of **100–110°** — so the honest deficit for a
+   *visible* backlit face is **32–42°**, not 14.
+3. **Therefore the lip is the route, and steepness is not.** This is the branch
+   the measurement was written to distinguish, and it came out on the side that
+   confirms the recommendation. Had the tail been brushing 80°, rank 1 should
+   have been spent on steepness instead; it is not, and it cannot be.
+
+**What it does not decide.** It says a single-valued surface cannot reach section
+A on this scene. It does **not** say the parametric lip *will* — that is wave A's
+first row, and it is the same measurement run against the lip's own geometry
+instead of `η`. If the lip's own `α₁ + α₂` does not clear 82.96° with flux to
+spare, the build is refused on its own evidence.
 
 ---
 
@@ -700,6 +753,9 @@ on purpose, with their logs beside them:
 - `measure-breaker-class.py` — the breaker class and the derived slope limits
   over the whole domain, the slope-window ladder of §1.1, and the cross-shore
   profile across the bar flank. **Seconds**, once the bay is cached.
+- `measure-two-cone.py` — §6's `α₁ + α₂` census over every admissible pair on
+  the drawn surface, at two sampling steps and both branches of `SPECTRAL_ON`.
+  **45.9 s** including building `Water`.
 - `figure-overturning.py` — the evidence figure,
   `evidence/s20-overturning.png`, with its caption in the sidecar
   `evidence/s20-overturning.caption.md`.

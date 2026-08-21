@@ -1,0 +1,32 @@
+patched
+bay + Water  36.1 s
+the two-cone floor, alpha_1 + alpha_2 >= 82.96 deg
+Stokes' corner allows a steady wave at most 2 x 30 = 60 deg
+
+step 0.25 m, span 30 m, 60336 start points, 1781371 admissible pairs
+   MAX (alpha_1 + alpha_2) anywhere          67.06 deg
+   per-start-point best, distribution:
+      p50                                   9.98 deg
+      p90                                  19.63 deg
+      p99                                  31.13 deg
+      p99.9                                42.94 deg
+   share of start points whose best beats 60.00 deg (a steady wave's best) 6.630e-05
+   share whose best beats the 82.96 deg floor            0.000e+00
+   THE DEFICIT AT THE BEST PAIR IN THE SCENE: 15.90 deg
+step 0.10 m, span 30 m, 151056 start points, 10889060 admissible pairs
+   MAX (alpha_1 + alpha_2) anywhere          68.48 deg
+   per-start-point best, distribution:
+      p50                                  10.02 deg
+      p90                                  19.71 deg
+      p99                                  31.32 deg
+      p99.9                                43.20 deg
+   share of start points whose best beats 60.00 deg (a steady wave's best) 8.606e-05
+   share whose best beats the 82.96 deg floor            0.000e+00
+   THE DEFICIT AT THE BEST PAIR IN THE SCENE: 14.48 deg
+
+CARRIER ONLY (waves 5-18), step 0.25 m:
+   max (alpha_1 + alpha_2)        31.31 deg   deficit 51.65 deg
+
+total 45.9 s
+
+[exited with code 0]
