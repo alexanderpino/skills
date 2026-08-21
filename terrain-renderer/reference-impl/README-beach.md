@@ -4975,3 +4975,263 @@ over 15703 water pixels whose per-pixel CV is order 1"* — so the population's
 realisation has widened that sampling error past the window, and whether the
 right answer is a wider window or a defect in the new surface is the
 **wave-field lane's** call, not this one's. Handed over with both numbers.
+
+---
+
+# WAVE 19 · THE WAVE POPULATION LANE
+
+## P0 · The verdict first
+
+**Through wave 18 the drawn sea had no wave-height distribution at all.**
+Sampling the shipping `free_surface` at ten surf-zone points over twenty
+periods, the crest-to-crest coefficient of variation is **3.1e-08** — machine
+zero — against **0.5227** for a Rayleigh sea, which is `sqrt(4/π − 1)` and
+contains no wind, no depth and no beach. Every wave at a point was exactly the
+same height, because `eta = (H/2)cos(φ)` reads one `H` field.
+
+That is the answer to the owner's *"je ziet in werkelijkheid nooit 1 lange golf
+langs de kust"*. With one amplitude every crest breaks at the same depth, so
+the breaking line is a **line** no matter how many bars sit under it and no
+matter how short the crests are. The shipping path now reads **0.4237**.
+
+`4481c11` built the fix — `beach.spectral_transform_2d`, which transports every
+component of the offshore realisation across the bed — and pushed no guard for
+it. `git log` on `validate_beach.py` had no wave-19 entry. This lane's first
+commit is `_sec_population`, 26 rows and seven deliberate defects, and it
+landed before anything else this round touched. That is ruling 16, applied to
+its own inversion.
+
+## P1 · Why the crest CV is 0.4237 and not 0.5227, and it is arithmetic
+
+`beach.spectral_components(n_f=8, n_th=32)` draws **256 components** — but only
+**eight distinct frequencies**. At a *fixed point* the 32 components sharing a
+frequency hold their relative phase for all time: they collapse into one
+quasi-monochromatic contribution whose amplitude is the modulus of their
+coherent sum. **A record at a point is a sum of 8, not of 256.** The `n_th`
+axis buys crest length in *space* and buys nothing in *time*.
+
+`_nf_ladder_cv` measures that with no beach in it — 256 components and 256
+random phases at every rung, only the split changing, 64 realisations of a
+400-period record each:
+
+| split | crest CV |
+|---|---|
+| `n_f=1` × 256 dirs | **0.0000** |
+| `n_f=2` × 128 | 0.1959 |
+| `n_f=8` × 32 | **0.4568 ± 0.1454** |
+| `n_f=32` × 8 | 0.5183 |
+| `n_f=256` × 1 | 0.5434 |
+
+The drawn 0.4237 sits **a quarter of a standard deviation** from its own rung,
+and the per-point range on the render (0.31–0.65) is that rung's own spread.
+So the shortfall is *derived*, not tolerated, and the bracket in the headline
+row is the ladder's rung rather than a fitted window.
+
+**This also kills the brief this round arrived with.** Short-crestedness alone
+could never have broken up a surf line: `n_f=1` × 256 directions is a
+short-crested realisation with a crest CV of exactly zero. That is a row
+(`lad(32)/lad(2) > 2`), not a remark.
+
+**The fix is one integer and its price is measured.** `n_f=32` in
+`beach_render._FAR` takes the ladder to 0.5183; `spectral_transform_2d` runs
+one conservative march per component, so at the shipping `n_th=32` that is 1024
+marches instead of 256 — about 140 s and 550 MB against 35 s and 137 MB. It is
+**left OPEN**, because `_FAR` is *also* the offshore closed-form field and
+`free_surface`'s seam argument depends on both sides being one realisation, so
+the two cannot move independently and every existing row on `_FAR` moves with
+them.
+
+**And the meter's own ceiling is stated so the residual is not overstated.** At
+256 frequencies the ladder reads 0.5434, 4.0 % above the closed form: crests
+are read at sampled instants rather than interpolated, so every crest is caught
+slightly below its true peak.
+
+## P2 · The reach — ruling 18, and the honest number was zero
+
+Frame K at 240 × 320, rendered **twice** with one flag, because a reach quoted
+against a remembered "before" is not a measurement. The surf zone is the
+transform's own statement, `q_b > 0.01`, not a depth guess.
+
+| | water samples | surf zone | surf pixels with a height distribution | whole frame |
+|---|---|---|---|---|
+| waves 5–18 | 15 689 | 12 782 | **0 / 12 782** | 485 / 15 689 (3.1 %) |
+| wave 19 | 15 703 | 12 817 | **12 817 / 12 817** | 15 244 / 15 703 (97.1 %) |
+
+"Carries a height distribution" is the same statistic as the headline: the
+drawn surface's crest CV above 0.05, a tenth of the Rayleigh value and 5×10⁷
+times the monochromatic floor. The 459 water pixels that miss are the far
+horizon, where the footprint band limit has correctly removed every component
+that could vary — a frame reaching 100 % there would be aliasing.
+
+## P3 · Breaking draws a realisation, and the mean survives it
+
+`Q_b` is the *fraction* of waves breaking at a depth. Through wave 18 the
+render drew that expectation as a smooth field. It now draws which waves broke,
+and the expectation is preserved rather than replaced:
+
+- **E[realised breaking] vs the closed form.** Over 20 instants on 17 477
+  surf-zone grid cells the drawn indicator reads **0.8259 ± 0.0074** against
+  `rayleigh_exceedance`'s **0.8095** — 2.0 % high, and the sign is P1's
+  residual arriving here (eight frequencies is not "many", so the envelope is
+  only approximately Rayleigh). Taken on the grid because the same ratio off
+  one frame reads 8.6 %: the frame weights near pixels by perspective and
+  band-limits the envelope while `p_chi` is unfiltered.
+- **The breaking front's alongshore sd.** 18.75 m for `brk`, 18.70 m for
+  `q_b > 0.05` — both deterministic in `(d, H)`, so that 18 m is the **bed's**
+  variation, not the sea's — against **49.2–60.8 m** for the realised
+  indicator, which also *moves between instants* while the other two cannot.
+- **No energy was added.** The drawn `H_rms` is the transform's own `H` cell by
+  cell to **1.1e-07** relative, which is float32 storage and nothing else.
+
+## P4 · The fade was load-bearing, and it stays
+
+The brief asked for its removal. `Water.sample` **clamps** at the grid edge, so
+the largest phase step over 5 m samples seaward of `x[0]` is **exactly 0.0**
+against 1.32 rad inside the domain: without the blend one value of `S` covers
+the whole open ocean and the swell draws as **infinite stripes to the horizon**.
+That is wave 13's boundary condition one field down and it is still true of the
+bundle.
+
+What changed is the blend's *meaning* — two evaluations of one component list
+rather than a swap between a realisation and a carrier — and it now reaches
+**0 % of the surf zone** instead of all of it. The seam step is amplitude only,
+0.973, of which `sqrt(0.918)` — the shoreward flux fraction — is most.
+
+## P5 · The calm sea, and a claim that survived a serious attempt to break it
+
+The owner: *"Soms zijn er geen hoge golven, dan lijkt de zee net een meer. Maar
+dan zie je zeker niet van die witte 'koppen'."* Two whites, two drivers, and
+the render already knows the difference.
+
+- **Structurally separate.** `surface_foam` is
+  `covering_measure_break(q_b, T, age) + covering_measure_wind(u10)`, two
+  covering measures that add because coverages do not. The first reads no wind;
+  the second reads no depth.
+- **The depth term really vanishes offshore.** At this bed's boundary — 8.0 m
+  of water — `Q_b` is 6.8e-09 and the surface deck is **exactly 0.0**. Battjes
+  & Janssen's bisection bottoms out at its 1e-12 floor once
+  `H_rms/(γ_b d) < 0.16`, so it is a hard zero and not an asymptote.
+- **The reach row is an integer and it is zero.** Frame K rendered a *third*
+  time with `beach_optics.U10 = 0`: of 2 886 samples seaward of the surf zone,
+  the number carrying **any** drawn foam is **0**. At 6 m/s it is 2 886.
+- **And the shore still breaks**, which is what stops that row passing on an
+  empty frame: swinging the wind from 6 m/s to nothing moves the surf zone's
+  foam count from 3 272 to 3 268, **0.12 %**.
+- **The calm sea is protected twice.** The population branch multiplies the
+  break term by the realised indicator `chi`, which is identically 0 in 8 m of
+  water. A defect that opens only one gate cannot reach the picture — measured:
+  `calm-break-reaches-deep` had to open both before a single open-water pixel
+  went white.
+
+**Power law or threshold: it is a power law, and the difference is sized.**
+`whitecap_coverage` is `a·U^3.41`, so `W(0) = 0` **exactly** — the owner's limit
+is met — but it is merely small, never identically zero, below any finite wind.
+Callaghan et al. (2008) is piecewise with an onset at `U₁₀ = 3.70 m/s`, and
+this file already carries that number as `CALLAGHAN_U0`, **marked published and
+never used**. At 3.69 m/s the two forms disagree by 3.30e-04 in coverage, which
+over this frame's 2 886 open-water samples is **0.95 pixels expected**.
+
+It is **not taken**, and the reason is the standing rule rather than the size:
+answer-key G11 marks Callaghan `P` — an attribution — and the paper is not in
+this container, so the branch point and the two branch exponents cannot be
+read. Installing a piecewise law from a cited onset alone would be transcribing
+a shape. Logged OPEN and attribution-only.
+
+Answer-key **G12** already asked for exactly this count and had no row in the
+suite. It has one now.
+
+## P6 · What did NOT reproduce
+
+**The critic's foam-white finding, as stated.** Scoring the frames, an
+independent critic measured the top 30 % of surf-band pixels at mean 252.5 DN,
+**sd 0.31**, 100 % at or above 250, and concluded *"the coverage is sampled and
+the radiance is not."* Re-measured on this branch:
+
+| | scene-linear, foam-dominated pixels (`cov > 0.9`) | top-30 % surf band, DN |
+|---|---|---|
+| waves 5–18 | 3.4004 ± 0.2427 (**7.1 %**) | — |
+| wave 19 | 3.4307 ± 0.4765 (**13.9 %**) | 248.5 ± 7.7, 53 % ≥ 250 |
+
+So the radiance **does** vary, the population work roughly **doubled** the
+variation as a consequence rather than a target — waves breaking at different
+depths cover different amounts of different pixels — and the DN statistic is
+7.7, not 0.31, with half the pixels below 250 rather than none.
+
+**The part that is true is one level up, and it is named rather than
+half-built.** `shade_water` draws foam as `R_raft · E/π` with `R_raft` floored
+at a single `FOAM_WHITE` from a single bubble-pile depth — a deterministic
+function of `(d, H)` like everything else this project has had to un-average. A
+realised population *should* carry realised air: a wave breaking in 2.4 m
+entrains more over a longer bore than one breaking in 0.9 m, and the indicator
+now knows which is which. That is the mechanism and this wave did not build it.
+Two facts for whoever takes it: the display curve does much of the flattening
+(`WHITE` is 3.483 and the foam sits at 3.528, so most of the scene-linear
+spread lies inside the last few DN before the clip), and the measurement must
+be taken scene-linear off `L`, never off a PNG.
+
+## P7 · The one FAIL on the merged tree, settled by measurement
+
+`_sec_glitter_field`'s conservation row read **0.927941** against a 6 % window.
+Wave 19's surface is what moved it — with `SPECTRAL_ON = False` the same row
+reads 0.9691 and passes. Three measurements separate a leak from a reference
+frame, and all three say reference frame:
+
+1. **Not a leak.** The exact budget-closure row at the top of the same section
+   — swell + carried = Cox & Munk — still passes to **1e-12**. Nothing is
+   leaving.
+2. **Not sampling error**, which is what the row's own text claimed its window
+   was: *"the sampling error of one realisation over N water pixels whose
+   per-pixel CV is order 1"*. **Eight seeds** of `subgrid_realisation` give
+   0.9275–0.9291, sd **0.0005 — 0.06 %**, a hundred times smaller than the
+   window it was meant to justify. The window never measured what its sentence
+   said. (The carrier surface: 0.9693 ± 0.0005, equally tight.)
+3. **It is the denominator.** `m_off` renders with `subgrid_on = False`, which
+   puts the *full* Cox & Munk density on top of a geometry that already carries
+   the resolved slope — the smooth frame is rough twice by exactly the resolved
+   share. Holding the wave-19 surface fixed and changing **only** the mss the
+   partition subtracts:
+
+   | resolved share of Cox & Munk | `m_on/m_off` |
+   |---|---|
+   | 0.0 % | **1.0008** |
+   | 7.7 % (the carrier) | 0.9680 |
+   | 15.8 % (the bundle) | 0.9279 |
+   | 31.6 % (twice the bundle) | 0.8262 |
+
+   Monotone, and it goes to **one** as the resolved share goes to zero — which
+   is the conservation the row asserts, holding exactly in the only limit where
+   its denominator is not double-counting. Wave 19 doubled the resolved swell
+   slope, 0.002615 → 0.005384 against Cox & Munk's 0.034125, and the same
+   structural departure doubled with it.
+
+The row is now **OPEN** carrying all three measurements, **not** a wider
+window: sizing a tolerance to admit the number you measured is how a suite
+stops meaning anything. The invariant is guarded by the exact budget row; what
+this one needs is a denominator that carves the resolved slope out of the
+density too, which is a change to the smooth render path.
+
+## P8 · The chapter, checked rather than relayed (ruling 9)
+
+`terrain-architect/references/12-glacial-coastal.md` mentions a Rayleigh height
+distribution exactly once, in its dead-candidate list: forcing the
+morphodynamic loop with one **lowers** the relief, so steady monochromatic
+forcing is that model's most favourable case. That is a statement about the
+**bed**, and it is right.
+
+**What the chapter has nothing to say about is one level up.** The same file's
+surf-zone section — and every renderer built from it — carries the wave field
+as a single `H(x, y)`, and the question *does the drawn sea have a height
+distribution at all* is never asked. It is a different question from the
+chapter's, it has a different answer, and it is the one that decides whether a
+frame shows one breaking line or many: `Q_b` is an expectation, and drawing an
+expectation gives a band whose edge follows a depth contour however the bed is
+shaped. Worth the paragraph the chapter does not have.
+
+**And the two lanes only meet here.** The bathymetry lane's two bars give
+`H/d` bottoming at 0.4389 against the 0.40 needed, so there is no calm water
+between its lines — two *parallel* lines, not three or four. A population
+without two bars breaks at scattered depths on one bar; two bars without a
+population break every wave at the same two depths. With both, the big waves of
+the swell find the outer bar while the small ones carry past it. Neither lane
+reaches the owner's *"golven zijn geen lange lijnen"* alone, and this is the
+first round in which both halves exist.
