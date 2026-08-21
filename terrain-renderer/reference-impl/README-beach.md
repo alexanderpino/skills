@@ -5210,6 +5210,57 @@ stops meaning anything. The invariant is guarded by the exact budget row; what
 this one needs is a denominator that carves the resolved slope out of the
 density too, which is a change to the smooth render path.
 
+## P7b · The suite
+
+**604 pass / 0 FAIL / 0 ERROR / 36 open / 108 info**, one run, **1748.6 s**,
+with nothing else on the box — the sibling builders' worktrees were idle by
+then, which matters because the standing ruling is that there is no background
+CPU throttle but there *is* contention on four cores. The suite was 1399.7 s
+and **1 FAIL** at the start of this lane's round.
+
+`_sec_population` is **26 pass / 0 FAIL / 3 open / 3 info** in **~360 s**, and
+it is now the most expensive section in the file: it builds a `Water` (256
+conservative marches, ~35 s) and renders frame K **three** times — the bundle,
+the carrier, and the calm sea — because every one of its reach rows is a pair
+and a pair quoted against a remembered "before" is not a measurement.
+
+**One cost this lane owes the file and did not hide.** `Water.__init__` now
+transports the bundle, and the suite constructs eight `Water` objects, so wave
+19 added roughly 280 s to the suite outside its own section. A cache keyed on
+the bay was considered and **rejected**: `--bugs-population` reuses one bay
+across all seven defects, and a bundle cached on that bay would survive the
+patch and make `pop-monochromatic-bundle` and `pop-carrier-denominator`
+invisible — which is precisely the trap `beach._BAY_CACHE` has already sprung
+on three other bug families in this file.
+
+`--bugs-population` fires all seven defects; the bed is built **once** and
+reused, so the runs differ by the defect and by nothing else:
+
+| defect | rows caught |
+|---|---|
+| `pop-no-bundle` | 6 |
+| `calm-break-reaches-deep` | 4 |
+| `pop-monochromatic-bundle` | 3 |
+| `pop-expectation-foam` | 2 |
+| `calm-whitecap-floor` | 2 |
+| `pop-envelope-is-abs-eta` | 1 |
+| `pop-carrier-denominator` | 1 (a **raise**, see below) |
+
+Three of these did not fire on the first attempt and the fixes are the
+interesting part. `pop-monochromatic-bundle` collapsed onto the list's *median*
+frequency, and `free_surface` adds the bound second harmonic at twice the
+**carrier's** — so the record was still two-tone, it beat, and it passed the row
+it was written for; collapsing onto `2π/T_SWELL` makes it genuinely
+monochromatic. `calm-break-reaches-deep` caught nothing until it opened **both**
+gates (see P5). And `pop-carrier-denominator` never gets as far as a row:
+`g_carrier/g` reaches 1.9×10⁴ at the `D_MIN` floor, the drawn slope variance
+goes to (1.60e+12, 5.63e+12), and `beach_optics.subgrid_realisation` **refuses
+to build the scene** — *"there is nothing left for the wind sea and the budget
+is the thing that is wrong"*. A physics guard declining the picture is stronger
+evidence than a statistic failing on it, and it is an independent confirmation
+of `4481c11`'s choice of denominator from a module that knows nothing about
+spectra.
+
 ## P8 · The chapter, checked rather than relayed (ruling 9)
 
 `terrain-architect/references/12-glacial-coastal.md` mentions a Rayleigh height
