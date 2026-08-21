@@ -145,3 +145,35 @@ band the owner is describing.
 If breaking turns out to already be a realisation over the height distribution,
 that is a claim surviving a serious attempt to break it, and this project records
 those as wins rather than passing over them.
+
+## Amendment, wave 19 — the calm sea, and why it is a free falsification
+
+Owner: *"Soms zijn er geen hoge golven, dan lijkt de zee net een meer. Maar dan
+zie je zeker niet van die witte 'koppen'."*
+
+**A limit case whose answer is known in advance** — ruling 14's shape, and the one
+that has found every real defect in this run. Set the wind low and the swell low:
+the frame must show **no whitecaps offshore at all**, while still showing
+depth-limited breaking at the shore.
+
+**It separates two whites the render may be conflating.** Open-water whitecapping
+is **wind**-driven — steepness exceeding a limit, coverage rising steeply with
+`U`. Surf-zone breaking is **depth**-limited, `H/d > γ`, and happens at any wind.
+If the offshore white is driven by `Q_b` rather than by wind, a calm sea shows
+foam where there should be none.
+
+**And it has a sharp edge that the run has already half-recorded.** Section K's
+own note says the whitecap literature spreads — *"3.41 quoted, 3.52 optimal, an
+offset cubic in Callaghan et al. 2008"*. That difference is exactly the owner's
+observation: **a pure power law never reaches zero**, it only becomes small; an
+offset form has a **threshold wind speed below which coverage is identically
+zero.** If the code carries the bare power law, it paints a little white on a
+mirror-flat sea forever, and no amount of population work removes it.
+
+**Why it is worth more than its cost.** It falsifies the whole foam path at the
+cheap end of the parameter range, and it tests something the wave-population work
+structurally cannot: the population decides *which* waves break and *how high*
+they are, and it will not stop a wind-independent term from painting the calm
+sea. The row must assert **exactly zero** offshore whitecap pixels, with a reach
+integer — a row asserting "small" is the thirteenth way, a tolerance the size of
+the thing it covers.
