@@ -1,8 +1,9 @@
 # Screen-space water — the raster reference
 
 The other half of `../references/12-water-rendering.md`. The offline reference in
-`../reference-impl/` carries 285 guarded quantities on the pool and 173 on the
-sea, and every one of them is a statement about an **integral**. The chapter's
+`../reference-impl/` carries hundreds of guarded quantities across two suites -- the
+pool's and the coast's -- and every one of them is a statement about an
+**integral**. The chapter's
 real-time sections are statements about **what you are allowed to do to that
 integral before the frame starts** — split it, table it, sample it, drop the
 part that refracts — and the offline path cannot test any of them, structurally:

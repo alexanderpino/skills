@@ -4,33 +4,51 @@ A second reference scene, built to the same standard as the pool: the physics is
 computed, every constant is derived beside itself or cited, and the tests check
 it against things that were not written here.
 
+**`beach_render.py --scene` is the entry point.** Everything else in this file is a
+record of how the scene got here, section by section, and each `main_wave*` in
+`beach_render.py` still draws the scene as it stood when the physics that section
+describes was built. Only `--scene` draws it as it stands now.
+
+    python3 beach_render.py --scene   # THE CURRENT SCENE: frames J, K and F, with
+                                      # the reach of each branch counted off the
+                                      # buffer it drew
+    python3 beach_render.py --scene --fast     # the same code path at 180 x 240
     python3 beach.py             # the loop, and a page of diagnostics
     python3 validate_beach.py    # the suite; -v prints every tolerance's reason
-    python3 validate_beach.py --bugs   # twenty-six defects, one at a time
-    python3 beach_evidence.py    # the figures, into reference-impl/evidence/
-    python3 beach_render.py      # wave 4: the three rendered frames, and every
-                                 # number in "Wave 4" below
-    python3 validate_beach.py --bugs-camera   # wave 7's six camera defects
-    python3 validate_beach.py --bugs-land     # wave 8's seven land/air defects
+    python3 validate_beach.py --bugs          # the deliberate defects, one at a time
+    python3 validate_beach.py --bugs-camera   # the camera defects
+    python3 validate_beach.py --bugs-land     # the land/air defects
+    python3 beach_evidence.py    # the diagnostic figures, into evidence/
+    python3 beach_render.py      # the earliest frame set, kept as its own evidence
 
 | File | Owns |
 |---|---|
-| `beach.py` | The bed, the wave transform, radiation stress, the currents, the sediment flux, Exner and the ray tracer in 1-D; and — wave 3 — the coastal loop, the plan-view bed, the 2-D wave transform and the 2-D morphodynamic loop. No prints on import; every diagnostic is in `_print_report`. |
+| `beach.py` | The bed, the wave transform, radiation stress, the currents, the sediment flux, Exner and the ray tracer in 1-D; the coastal loop, the plan-view bed, the 2-D wave transform and the 2-D morphodynamic loop; the offshore climate's partitions; the wave-height population. No prints on import; every diagnostic is in `_print_report`. |
 | `beach_plot.py` | Axes, polylines and labels into a PIL image. No physics. |
-| `beach_evidence.py` | The seventeen evidence figures (eight `s1-`, five `s2-`, four `s3-`). Reads `beach.py`, computes nothing of its own. |
-| `beach_optics.py` | **Wave 4.** The coastal IOPs — chapter 28's three constituents, the Babin bridge, the suspension balance, the two transports, the cuvette inversion, Cox & Munk's glitter, and the foam placeholder. No rendering, no scene, no prints. |
-| `beach_render.py` | **Wave 4.** The camera, the ray cast, the shading and the three frames; every measurement taken from the scene-linear buffer before the tone map. |
-| `beach_camera.py` | **Wave 7.** Where the photograph was taken from — the lens table, the horizon dip, the frame projection, the surf-line separation and its closed-form ceiling, and the two frame inferences with their intervals. No scene, no rendering, no prints on import. |
-| `validate_beach.py` | The suite — a list of guarded **sections** — three tiers, plus the deliberate-bug harness. |
+| `beach_evidence.py` | The diagnostic figures. Reads `beach.py`, computes nothing of its own. |
+| `beach_optics.py` | The coastal IOPs — the three constituents, the Babin bridge, the suspension balance, the two transports, the cuvette inversion, Cox & Munk's glitter (as a **limit** of the derived spectrum, not an input) and the foam optics. No rendering, no scene, no prints. |
+| `beach_render.py` | The camera, the ray cast, the shading, the frames, and `--scene` with `scene_reach`. Every measurement taken from the scene-linear buffer before the tone map. |
+| `beach_camera.py` | Where the photograph was taken from — the lens table, the horizon dip, the frame projection, the surf-line separation and its closed-form ceiling, and the two frame inferences with their intervals. No scene, no rendering, no prints on import. |
+| `beach_diffract.py` | Sommerfeld's half-plane, Penney & Price's water waves, and the **fan** an embayment requires — reached through `run_bay(diffract=...)`, which makes it the offshore boundary condition rather than a module the suite exercises alone. |
+| `beach_foam.py` | The white: the covering measure both sources add into, Monahan's wind law, the Boolean realisation and its texture. |
+| `wind_spectrum.py` | The wind-wave spectrum the slope statistics are **derived** from, with Cox & Munk recovered as its large-scale limit. |
+| `validate_beach.py` | The suite — a list of guarded **sections** — three tiers, the deliberate-bug harness, and the reach section that asks whether a shipping caller reaches each of them. |
 
 **Nothing here touches the pool.** `optics.py` and `atmosphere.py` are imported
 and never copied; `render.py`, `field.py`, `wake.py` and `validate.py` are not
-sliced and not modified. This scene adds five files and edits none, so
-`render.py`'s seventeen frame hashes cannot have moved; `validate.py` was re-run
-after the beach existed and is **285 pass / 0 FAIL / 54 info** — re-run at the
-end of wave 2, of wave 3 and of wave 4, still exactly that. Wave 4 adds two files
-and edits none of the pool's, and the one place the shared modules would not
-stretch is written up as a finding (`F6`) rather than patched.
+sliced and not modified. This scene only ever *adds* files, so `render.py`'s
+seventeen frame hashes cannot have moved, and `validate.py` has been re-run at
+the end of every section below and has never changed its verdict. The one place
+the shared modules would not stretch is written up as a finding (`F6`) rather
+than patched.
+
+⚠️ **The pool's suite has grown since the earliest sections were written, and
+they quote what it read at the time.** Every `285 pass / 0 FAIL / 54 info` below
+is a *contemporaneous* reading, kept because a section that says "unchanged"
+means unchanged *from its own baseline*. The current standing is
+**306 pass / 0 FAIL / 64 info**, and the same is true of the beach's own counts:
+read a number in a section against that section, and read the current standing
+off a run.
 
 The import is load-bearing rather than ceremonial: `atmosphere.solar_position`,
 given the surf frames' own place and clock, returns **27.165° apparent /
