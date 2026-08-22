@@ -53,6 +53,7 @@ a FINDING about the module rather than a shortcut -- see README-beach.md, "What
 the shared modules would not stretch to".
 """
 import math
+import os
 import sys
 import time
 
@@ -68,7 +69,11 @@ import atmosphere as ATM
 
 
 FAST = '--fast' in sys.argv
-OUT = '../../gauntlet/sea/evidence'
+# WHERE THE FRAMES GO. Inside the skill, so a checkout of this directory alone
+# can render its own evidence; override with BEACH_OUT for a scratch run.
+OUT = os.environ.get(
+    'BEACH_OUT', os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              'evidence'))
 DECK_UNION = True       # WAVE 19. Whether the foam deck is the UNION of every
                         # offshore partition's roller or only the carrier's.
                         # A module switch rather than an argument because the
@@ -1956,6 +1961,9 @@ def _save(L, path, key=None, gamma=2.2, caption=None):
     im = Image.fromarray((img * 255.0 + 0.5).astype(np.uint8))
     if caption is not None:
         im = _caption(im, caption)
+    d = os.path.dirname(os.path.abspath(path))
+    if d:
+        os.makedirs(d, exist_ok=True)
     im.save(path)
     return k
 
@@ -5702,8 +5710,256 @@ def main_wave12():
                 cam=camJ, inf=infJ)
 
 
+# ==========================================================================
+#  THE SCENE ENTRY POINT
+# ==========================================================================
+# Every `main_*` above renders the scene as it stood when that piece of physics
+# was built, and each is kept because the frame it draws is the evidence for
+# that piece. None of them renders the scene as it stands NOW: the offshore
+# climate, the diffracted fan, the spectral surface, the sub-footprint slope
+# realisation, the Boolean foam realisation, the wave-height population and the
+# union foam deck all arrived after the last of them was written, so the newest
+# entry point drew a bed and a surface several changes out of date.
+#
+# `--scene` is the current one, and it exists for a second reason that outranks
+# the picture: a quantity can be DERIVED, GUARDED BY THE SUITE, AND NEVER
+# CALLED, and every coverage instrument reports it as covered because the suite
+# is the caller. `scene_reach` answers the question the suite cannot -- it
+# counts, off the rendered buffer, how many pixels each branch actually moved.
+
+SCENE_FRAMES = ('J', 'K', 'F')
+
+
+def scene_cameras(w, W, H, out=print):
+    """The three framings, from ONE camera inference and one exposure key.
+
+    J and K are `hero_cameras`' own two, unchanged. F is `main`'s surf-zone
+    frame: the eye 8 m up and 55 m shoreward-alongshore of the largest wave in
+    the bed, pitched 26 deg, with the sun deliberately out of frame so that a
+    glitter measurement is not reading the disc.
+    """
+    c = hero_cameras(w, W, H, out=out)
+    ib = int(np.argmax(np.max(w.H, axis=0)))
+    jb = int(np.argmax(w.H[:, ib]))
+    x_f = float(w.x[ib]) + 55.0
+    y_f = float(w.y[jb]) + 55.0
+    camF = Camera((x_f, y_f, 8.0), (x_f - 75.0, y_f - 75.0, 0.0), 26.0, W, H)
+    return dict(J=c[3], K=c[5], F=camF), dict(J=c[4], K=c[6], F=None)
+
+
+def scene_reach(ex, w):
+    """INTEGERS, OFF THE RENDERED BUFFER, scene-linear and before the tone map.
+
+    The instrument for standing ruling 18: a branch that changed no pixel did
+    not ship, whatever the suite says about it. Every number here is a count or
+    a world coordinate read back out of the frame that was just drawn -- never
+    a flag, never a configuration value, and never a re-run of the branch under
+    its own test.
+    """
+    n_frame = int(ex['sky_mask'].size)
+    r = dict(n_frame=n_frame,
+             n_water=int(ex.get('water_mask', np.zeros(1, bool)).sum()),
+             n_land=int(ex.get('land_mask', np.zeros(1, bool)).sum()),
+             n_sky=int(ex['sky_mask'].sum()))
+    if 'water' not in ex:
+        return r
+    sh = ex['water']
+    x = ex['water_P'][..., 0].reshape(-1)
+
+    deck = np.asarray(sh['deck'], float).reshape(-1)
+    r['n_deck_gt_025'] = int((deck > 0.25).sum())
+    r['n_deck_gt_001'] = int((deck > 0.01).sum())
+
+    # THE WAVE-HEIGHT POPULATION. `m_pop` is None when the branch did not run.
+    # When it did, the PRE-population covering measure is recomputed from the
+    # same stored fields the shader used, so the difference is exact rather
+    # than a second render's worth of noise.
+    if sh.get('m_pop') is None:
+        r['population'] = dict(ran=False)
+    else:
+        mp = sh['m_pop']
+        _, m_pre = FM.surface_foam(np.asarray(sh['deck'], float), w.T_wave,
+                                   np.asarray(sh['age'], float), BO.U10,
+                                   w.tau_foam)
+        m_pre = m_pre.reshape(-1)
+        m_post = np.asarray(sh['m_cov'], float).reshape(-1)
+        hit = np.abs(m_post - m_pre) > 1e-6
+        dcov = np.abs(FM.coverage(m_post) - FM.coverage(m_pre))
+        r['population'] = dict(
+            ran=True, n_changed=int(hit.sum()),
+            pct_water=100.0 * hit.sum() / max(r['n_water'], 1),
+            n_cov_change_gt_002=int((dcov > 0.02).sum()),
+            max_dcov=float(dcov.max()),
+            x_lo=float(x[hit].min()) if hit.any() else None,
+            x_hi=float(x[hit].max()) if hit.any() else None,
+            chi_mean=float(mp['chi_mean']), p_mean=float(mp['p_mean']))
+
+    # THE SUB-FOOTPRINT SLOPE REALISATION
+    if sh.get('sub') is None:
+        r['subgrid'] = dict(ran=False)
+    else:
+        mag = np.hypot(np.asarray(sh['sub']['zx'], float).reshape(-1),
+                       np.asarray(sh['sub']['zy'], float).reshape(-1))
+        r['subgrid'] = dict(
+            ran=True, n_nonzero=int((mag > 0).sum()),
+            pct_frame=100.0 * (mag > 0).sum() / n_frame,
+            rms=float(np.sqrt((mag ** 2).mean())),
+            p99=float(np.percentile(mag, 99)))
+
+    # THE FOAM BOOLEAN REALISATION
+    fs = sh.get('foam_stats') or {}
+    r['foam_realise'] = dict(
+        ran=bool(np.isfinite(fs.get('mean_drawn', float('nan')))),
+        visible=float(fs.get('visible', float('nan'))),
+        mean_drawn=float(fs.get('mean_drawn', float('nan'))),
+        mean_field=float(fs.get('mean_field', float('nan'))))
+    cov = np.asarray(sh['cov'], float).reshape(-1)
+    r['n_cov_gt_05'] = int((cov > 0.5).sum())
+    r['cov_mean'] = float(cov.mean())
+
+    lg = np.asarray(sh['L_glit'], float).reshape(-1, 3)[..., 1]
+    r['glitter'] = dict(mean=float(lg.mean()),
+                        p999=float(np.percentile(lg, 99.9)),
+                        n_gt_white=int((lg > WHITE).sum()))
+    return r
+
+
+def scene_bars(ex, xb, half=15.0):
+    """Is there white at EVERY partition's breakpoint, or only the swell's?
+
+    The second breaker bar's whole claim is that the COUNT of lines belongs to
+    the offshore boundary condition and not to the bed. A frame in which only
+    one of them carries foam has not made that claim -- it has drawn one bar
+    and a computed second.
+    """
+    if 'water' not in ex:
+        return []
+    sh = ex['water']
+    x = ex['water_P'][..., 0].reshape(-1)
+    deck = np.asarray(sh['deck'], float).reshape(-1)
+    cov = np.asarray(sh['cov'], float).reshape(-1)
+    out = []
+    for xbk in xb:
+        m = np.abs(x - float(xbk)) <= half
+        out.append(dict(x=float(xbk), n_px=int(m.sum()),
+                        n_deck_gt_025=int((m & (deck > 0.25)).sum()),
+                        n_cov_gt_05=int((m & (cov > 0.5)).sum())))
+    return out
+
+
+def scene_bay(diffract='dir'):
+    """THE BED THE SCENE STANDS ON, and every flag it turns on is named here
+    rather than left as a default somebody has to go and read.
+
+    `'dir'` AND NOT `'full'`, AND THE REASON IS A MEASUREMENT. The amplitude
+    half of the fan is real physics and it is very strong on this geometry:
+    K_d falls to 0.073 in the deepest sheltered row, so `'full'` hands those
+    rows a 0.11 m sea. Measured, that suppresses the wind partition's breaking
+    line entirely -- the centre row goes from three surf lines to one -- so the
+    scene would be trading the second bar, which the bed is built to show, for
+    a shelter gradient. The direction fan is what the module was needed for
+    (it is what lets a curved coast be a zero-transport one at all) and it
+    already moves ~66 % of the bed's cells. `'full'` stays one argument away
+    for a frame whose subject IS the shelter.
+    """
+    return B.run_bay(embay=True, climate=B.CLIMATE_SCENE, diffract=diffract)
+
+
+def main_scene():
+    """`python3 beach_render.py --scene [--fast] [--frames J,K]`
+
+    The current scene, at the current defaults, with the reach of each branch
+    measured off the buffer it drew.
+    """
+    t0 = time.time()
+    _set_runup()
+    frames = SCENE_FRAMES
+    for a in sys.argv[1:]:
+        if a.startswith('--frames='):
+            frames = tuple(s.strip().upper() for s in a[9:].split(',') if s.strip())
+    W, H, SS = (W_HERO, H_HERO, SS_HERO) if not FAST else (180, 240, 1)
+
+    print('xi = %.3f, runup = %.2f m' % (_XI, RUNUP))
+    print('CLIMATE_SCENE = %s' % (B.CLIMATE_SCENE,))
+    bay = scene_bay()
+    print('bed: diffract=%s, %d fan rows, theta_0 %.2f..%.2f deg, K_d %.3f..%.3f'
+          % (bay['diffract'], bay['fan']['theta0'].size,
+             math.degrees(bay['fan']['theta0'].min()),
+             math.degrees(bay['fan']['theta0'].max()),
+             bay['fan']['kd'].min(), bay['fan']['kd'].max()))
+    w = Water(bay)
+    # `getattr(..., True)` mirrors the shader's own default, which is what the
+    # branch actually does when nobody has set the attribute -- printing None
+    # for an absent attribute would report a branch as off while it runs.
+    print('water: spectral_on=%s subgrid_on=%s foam_realise=%s '
+          'foam_population=%s deck_union=%s'
+          % (w.spectral_on, w.subgrid_on, getattr(w, 'foam_realise', True),
+             getattr(w, 'foam_population', True), DECK_UNION))
+
+    # where each offshore partition breaks, on the centre row
+    jc = bay['h'].shape[0] // 2
+    xb = []
+    for trp in (bay['tr_parts'] or [bay['tr']]):
+        bp = B.breakpoints(B.row_slice(trp, jc))
+        if bp:
+            xb.append(float(bp[0]['x']))
+    xb = sorted(xb)
+    print('breakpoints (centre row): %s m'
+          % ', '.join('%.0f' % v for v in xb))
+
+    cams, infs = scene_cameras(w, W * SS, H * SS, out=lambda *a, **k: None)
+    res = {}
+    for fname in frames:
+        if fname not in cams:
+            raise SystemExit('unknown frame %r -- have %s'
+                             % (fname, ', '.join(sorted(cams))))
+        t = time.time()
+        L, ex = render(cams[fname], w)
+        Ld = downsample(L, SS)
+        path = '%s/scene-%s.png' % (OUT, fname.lower())
+        _save(Ld, path)
+        rr = scene_reach(ex, w)
+        rr['bars'] = scene_bars(ex, xb)
+        rr['seconds'] = time.time() - t
+        rr['path'] = path
+        rr['hf_sd'] = [float(v) for v in hf_sd(Ld)]
+        res[fname] = rr
+        print('\n--- frame %s: %.1f s -> %s' % (fname, rr['seconds'], path))
+        print('    %d water / %d land / %d sky of %d px'
+              % (rr['n_water'], rr['n_land'], rr['n_sky'], rr['n_frame']))
+        if 'glitter' in rr:
+            print('    foam deck > 0.25: %d px; coverage > 0.5: %d px; '
+                  'glitter mean %.4g, %d px over white'
+                  % (rr['n_deck_gt_025'], rr['n_cov_gt_05'],
+                     rr['glitter']['mean'], rr['glitter']['n_gt_white']))
+            print('    subgrid: %s' % (
+                'ran, %d px non-zero (%.2f%% of frame), rms %.4g'
+                % (rr['subgrid']['n_nonzero'], rr['subgrid']['pct_frame'],
+                   rr['subgrid']['rms'])
+                if rr['subgrid']['ran'] else 'DID NOT RUN'))
+            print('    population: %s' % (
+                'ran, %d px changed (%.2f%% of water), max dcoverage %.4f'
+                % (rr['population']['n_changed'], rr['population']['pct_water'],
+                   rr['population']['max_dcov'])
+                if rr['population']['ran'] else 'DID NOT RUN'))
+            print('    foam realisation: %s' % (
+                'ran, drawn %.4f against field %.4f'
+                % (rr['foam_realise']['mean_drawn'],
+                   rr['foam_realise']['mean_field'])
+                if rr['foam_realise']['ran'] else 'DID NOT RUN'))
+            for b in rr['bars']:
+                print('    bar at x = %.0f m: %d px, %d with deck > 0.25, '
+                      '%d with coverage > 0.5'
+                      % (b['x'], b['n_px'], b['n_deck_gt_025'],
+                         b['n_cov_gt_05']))
+    print('\n%.1f s total' % (time.time() - t0))
+    return dict(bay=bay, w=w, cams=cams, infs=infs, frames=res, xb=xb)
+
+
 if __name__ == '__main__':
-    if '--wave12' in sys.argv:
+    if '--scene' in sys.argv:
+        main_scene()
+    elif '--wave12' in sys.argv:
         main_wave12()
     elif '--wave10' in sys.argv:
         main_wave10()

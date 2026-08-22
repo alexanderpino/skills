@@ -12405,6 +12405,166 @@ BUGS.update({
 })
 
 
+# ==========================================================================
+#  DERIVED, GUARDED, AND NEVER CALLED
+# ==========================================================================
+def _callers_of(sym, own):
+    """Which files in this directory name `sym`, excluding its own module,
+    this suite, and the single-use evidence drivers.
+
+    THE DETECTOR FOR THE ERROR CLASS THIS SECTION EXISTS FOR. A module can be
+    derived from first principles, guarded by a hundred rows, cited in the
+    chapter and executed by nothing -- and every coverage instrument on the
+    market reports it as covered, because the suite is the caller. Coverage
+    answers "was this line executed"; the question here is "was it executed by
+    the thing that ships", and only a reader that knows which files those are
+    can answer it. Evidence drivers are excluded for the same reason the suite
+    is: they exist to exercise the module, so their calling it proves nothing.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    skip = {os.path.basename(own), os.path.basename(__file__)}
+    out = []
+    for fn in sorted(os.listdir(here)):
+        if not fn.endswith('.py') or fn in skip:
+            continue
+        if fn.endswith('_evidence.py') or fn.endswith('_figures.py'):
+            continue
+        try:
+            with open(os.path.join(here, fn)) as f:
+                src = f.read()
+        except OSError:
+            continue
+        if sym in src:
+            out.append(fn)
+    return out
+
+
+def _sec_reach(ctx):
+    """RULING 18, GENERALISED: does a SHIPPING caller reach each of these.
+
+    `_sec_modes_reach` above asks the question for one branch by counting
+    pixels. This section asks it for the branches whose answer was NO, and it
+    asks in two ways, because the two failures are different:
+
+      the CALLER test  -- some file that is neither the defining module nor a
+                          test names the symbol. Catches "nothing outside the
+                          suite ever runs this".
+      the PIXEL test   -- the rendered buffer changes when the branch is turned
+                          off. Catches "it is called, and it changes nothing".
+
+    A branch needs both. `beach_diffract` had a hundred passing rows and no
+    importer in the render path; `run_bay(climate=)` had one caller in the
+    whole tree and it was this file.
+    """
+    B = ctx['B']
+    import beach_render as RND
+
+    # ---- 1. THE CALLER TEST, for the two symbols that failed it.
+    c_diff = _callers_of('beach_diffract', 'beach_diffract.py')
+    check(1, 'beach_diffract has a caller that is not a test or a driver',
+          len(c_diff) >= 1, True, 0,
+          'RULING 18. Sommerfeld\'s half-plane was derived, guarded by the '
+          'diffraction section above, chaptered -- and imported by nothing '
+          'except its own evidence driver and this file, so no rendered pixel '
+          'ever carried a diffracted crest. `run_bay(diffract=)` makes the '
+          'fan the offshore boundary condition, which is what the module was '
+          'built to be. Callers found: %s.'
+          % (', '.join(c_diff) or 'NONE'), 'bool')
+
+    c_clim = _callers_of('CLIMATE_SCENE', 'beach.py')
+    check(1, 'CLIMATE_SCENE has a caller that is not a test or a driver',
+          len(c_clim) >= 1, True, 0,
+          'RULING 18, THE VARIANT WHERE THE SUITE IS THE SOLE CALLER -- which '
+          'is the one every instrument reports as covered. The offshore '
+          'climate builds the second breaker bar, and for one round the only '
+          'code that passed it was the row testing it. `beach_render.'
+          'scene_bay` passes it now. Callers found: %s.'
+          % (', '.join(c_clim) or 'NONE'), 'bool')
+
+    check(1, 'the scene entry point exists and names its own flags',
+          [hasattr(RND, 'main_scene'), hasattr(RND, 'scene_reach'),
+           hasattr(RND, 'scene_bay')], [True, True, True], 0,
+          'THE ENTRY POINT IS PART OF THE DELIVERABLE. Every `main_wave*` in '
+          '`beach_render.py` renders the scene as it stood when that piece of '
+          'physics was built; without a current one, a checkout of this '
+          'directory can run its suites and cannot draw its own scene. '
+          '`--scene` is that path and `scene_reach` is its instrument.',
+          'bool')
+
+    # ---- 2. THE FAN REACHES THE BED. Cheap bay, same 500 hours of model
+    # time as every other bay in this file, at a quarter of the cells.
+    kw = dict(dx=4.0, n_steps=300, dt=6000.0, embay=True)
+    b_plane = B.run_bay(**kw)
+    b_fan = B.run_bay(diffract='dir', **kw)
+    dh = np.abs(b_fan['h'] - b_plane['h'])
+    n_moved = int((dh > 1e-6).sum())
+    check(1, 'the diffracted fan moves the bed the morphodynamic loop builds',
+          n_moved > 0.10 * dh.size, True, 0,
+          'THE POINT OF THE MODULE, MEASURED RATHER THAN ASSERTED. A curved '
+          'static-equilibrium bay cannot exist under PLANE crests -- Snell '
+          'forces theta_local = 0 at every station and integrating that gives '
+          'one zero-transport plan-form, a straight line. So the fan is not a '
+          'decoration on the boundary condition, it is what lets the boundary '
+          'condition hold the shape. %d of %d bed cells move, by up to %.3f m '
+          '(mean %.4f m).'
+          % (n_moved, dh.size, float(dh.max()), float(dh.mean())), 'cells')
+
+    th = b_fan['fan']['theta0']
+    kd = b_fan['fan']['kd']
+    between(1, 'the fan spans a real range of offshore direction',
+            float(np.degrees(th.max() - th.min())), 5.0, 180.0,
+            'A FAN THAT DOES NOT FAN IS A PLANE CREST WITH EXTRA STEPS. '
+            'Sommerfeld\'s direction field is grad(arg u) of an exact wave '
+            'solution, not a stated per-row angle; on this scene it runs '
+            '%.2f to %.2f deg while the plane crest is %.2f deg everywhere.'
+            % (math.degrees(th.min()), math.degrees(th.max()),
+               math.degrees(B.THETA0_SWELL)), 'deg')
+
+    between(2, 'the sheltered rows sit well inside Sommerfeld\'s shadow',
+            float(kd.min()), 0.0, 0.60,
+            'CITED, and it is the chapter\'s own number: K_d = 0.5000 exactly '
+            'on the geometric shadow boundary, falling to 0.31 / 0.20 / 0.11 '
+            'at Fresnel parameter v = 0.5 / 1 / 2 into the shadow. The '
+            'deepest row of this scene sits at K_d = %.4f, i.e. well inside '
+            'it, which is what a headland that shelters a bay has to do.'
+            % float(kd.min()), '-')
+
+    b_full = B.run_bay(diffract='full', **kw)
+    check(1, 'the amplitude half is a SEPARATE switch from the direction half',
+          [np.ndim(b_fan['H0_row']), np.ndim(b_full['H0_row'])],
+          [0, 1], 0,
+          'BECAUSE THE TWO ARE NOT INTERCHANGEABLE AS EVIDENCE. Q goes as '
+          'H_b^(5/2), so an amplitude shadow that halves the height cuts the '
+          'longshore transport by 5.7x for a reason that has nothing to do '
+          'with the shoreline reaching equilibrium. A transport number read '
+          'off the amplitude-on bay would be measuring the shelter, not the '
+          'bay. `diffract="dir"` leaves H_0 scalar; `diffract="full"` makes '
+          'it K_d * H_0 per row.', 'bool')
+
+    ctx['_reach'] = dict(callers_diffract=c_diff, callers_climate=c_clim,
+                         n_bed_moved=n_moved, n_bed=int(dh.size),
+                         fan_deg=[float(math.degrees(th.min())),
+                                  float(math.degrees(th.max()))],
+                         kd=[float(kd.min()), float(kd.max())])
+
+
+def _bug_reach_no_fan(mod):
+    """THE DEFECT THIS SECTION EXISTS TO CATCH, PUT BACK ON PURPOSE. The
+    diffracted fan is computed and then discarded, so `beach_diffract` runs,
+    the suite's diffraction rows all pass, and the boundary condition the bed
+    is built under is a plane crest again."""
+    orig = mod.run_bay
+
+    def run_bay(*a, **kw):
+        kw.pop('diffract', None)
+        return orig(*a, **kw)
+
+    mod.run_bay = run_bay
+
+
+BUGS.update({'reach-no-fan': _bug_reach_no_fan})
+
+
 def run_suite():
     del ROWS[:]
     B = BCH
@@ -12500,7 +12660,16 @@ def run_suite():
                       (_sec_population, 'the wave POPULATION: does the drawn '
                                         'sea have a height distribution, and '
                                         'does the breaking draw a realisation '
-                                        'of it')):
+                                        'of it'),
+                      # LAST, AND IT IS THE ONE THAT ASKS ABOUT THE OTHERS. It
+                      # builds two more cheap bays (dx = 4, 300 steps) rather
+                      # than reusing one, because the whole row is a
+                      # difference between two boundary conditions and a
+                      # remembered "before" is not a measurement. The caller
+                      # rows above it are free -- they read the directory.
+                      (_sec_reach, 'derived, guarded, and never called: does '
+                                   'a SHIPPING caller reach the fan and the '
+                                   'climate')):
         guard(fn, label, ctx)
     return ctx.get('sc')
 

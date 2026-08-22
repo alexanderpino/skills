@@ -6544,16 +6544,52 @@ def run_terrace(n_stands=TERRACE_STANDS, n_steps=TERRACE_STEPS,
 
 def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
             theta0=THETA0_SWELL, coast=None, k_every=4, embay=False,
-            stands=None, climate=None, **flux_kw):
+            stands=None, climate=None, diffract=None, **flux_kw):
     """The whole scene: coastal loop -> plan bed -> 2-D transform -> Exner.
 
     `dt` is set from the same diffusion bound the 1-D loop uses,
     dt < dx^2/(2*D_eff) with D_eff ~ 6.7e-4 m^2/s -- 2985 s at dx = 2 m, and
     1500 s is half of it. n_steps*dt is held at 500 hours, the same physical
     duration waves 1 and 2 ran, so the bar is comparable across the three.
+
+    `diffract` IS THE FAN, AND IT IS WHY `beach_diffract` EXISTS. A curved
+    static-equilibrium bay cannot exist under PLANE crests: Snell forces
+    theta_local = 0 at every station, integrating that gives exactly one
+    zero-transport plan-form -- a straight line -- so a bay that holds its shape
+    requires the offshore orthogonals to FAN, and the fan is diffraction. The
+    scalar `theta0` above is a plane crest and therefore cannot hold the
+    embayment it is handed.
+
+      None / False   the plane crest. The default, so every row published on
+                     the plane-crest bed stays comparable in one place.
+      'dir'          Sommerfeld's DIRECTION field as the per-row offshore
+                     theta_0. The amplitude stays uniform.
+      'full' / True  direction AND amplitude, theta_0 and H_0 = K_d * H_0.
+
+    ⚠️ THE TWO ARE NOT INTERCHANGEABLE AS EVIDENCE. Q goes as H_b^(5/2), so an
+    amplitude shadow that halves the height cuts the longshore transport by
+    5.7x for a reason that has nothing to do with the shoreline reaching
+    equilibrium. Read a transport number off 'dir'; read a PICTURE off 'full',
+    because a lee that carries the exposed coast's wave height is the thing an
+    eye catches first. `bay['fan']` carries both so neither has to be re-derived.
+
+    Requires `embay=True`: the fan radiates from the sheltering headland's
+    diffraction point, which is the embayment's own pole, and there is no pole
+    on a straight coast.
     """
+    if diffract is True:
+        diffract = 'full'
+    if diffract not in (None, False, 'dir', 'full'):
+        raise ValueError('run_bay(diffract=%r): expected None, "dir" or "full"'
+                         % (diffract,))
+    if diffract and not embay:
+        raise ValueError('run_bay(diffract=%r) needs embay=True -- the fan '
+                         'radiates from the embayment pole, and a straight '
+                         'coast has no pole for it to radiate from.'
+                         % (diffract,))
     key = ('bay', dx, n_steps, dt, T, H0, theta0, k_every, bool(embay),
            stands, None if climate is None else tuple(map(tuple, climate)),
+           diffract or None,
            tuple(sorted((k, v) for k, v in flux_kw.items())))
     if coast is None and key in _BAY_CACHE:
         return _BAY_CACHE[key]
@@ -6569,6 +6605,19 @@ def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
     # four fields were, and the flag IS the curved/straight control the
     # transport measurement needs.
     ep = equilibrium_plan(coast=cs) if embay else None
+    # THE FAN, SOLVED RATHER THAN STATED. `theta_b`/`H_b` below replace the
+    # scalar boundary condition everywhere it is used, so the diffracted field
+    # reaches the morphodynamic loop, the shipped transform, every partition
+    # transform, and -- through `Water(bay)` -- the rendered pixels. Imported
+    # here and not at module scope because `beach_diffract` imports this file.
+    fan = None
+    theta_b, H_b = theta0, H0
+    if diffract:
+        import beach_diffract as _BD
+        fan = _BD.scene_fan(ep, where='pole', H0=H0)
+        theta_b = fan['theta0']
+        if diffract == 'full':
+            H_b = fan['H0']
     stand_age = 0.0
     if cs.get('record'):
         stand_age = float(cs['record'][0].get('age', 0.0))
@@ -6576,7 +6625,7 @@ def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
                                        sand_row=cs.get('sand_row'),
                                        plan=None if ep is None else ep['x_s'],
                                        stand_age=stand_age)
-    h, tr2, hist, edge = evolve_2d(x, y, h_init, T, H0, theta0,
+    h, tr2, hist, edge = evolve_2d(x, y, h_init, T, H_b, theta_b,
                                    n_steps=n_steps, dt=dt, k_every=k_every,
                                    climate=climate, **flux_kw)
     # WAVE 19. THE PARTITION TRANSFORMS, so the RENDERER can reach them. The
@@ -6585,15 +6634,21 @@ def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
     # over when the offshore boundary carries more than one wave system. It is
     # None on a single-partition bay, which is what keeps this bay's output
     # bit-identical to wave 18's.
+    # EACH PARTITION GETS THE FAN'S SHAPE AND ITS OWN LEVEL. `H_b/H0` is K_d
+    # when the amplitude half is on and exactly 1.0 when it is not, so the wind
+    # sea is sheltered by the same headland as the swell without either
+    # partition's stated height being overwritten by the other's.
+    kd_b = (1.0 if H_b is H0 else np.asarray(H_b, float) / float(H0))
     tr_parts = (None if climate is None
-                else [transform_2d(x, y, h, Tp, Hp, theta0)
+                else [transform_2d(x, y, h, Tp, Hp * kd_b, theta_b)
                       for _, Hp, Tp in climate])
     out = dict(x=x, y=y, h_init=h_init, h=h, tr=tr2, x_s=x_s, h_dean=h_dean,
                beach=bch, embay=bool(embay), plan=ep,
                hist=hist, coast=cs, stands=stands, stand_age=stand_age,
                dx=dx, dy=float(y[1] - y[0]), edge=edge, climate=climate,
-               tr_parts=tr_parts,
-               tr_init=transform_2d(x, y, h_init, T, H0, theta0))
+               tr_parts=tr_parts, diffract=diffract or None, fan=fan,
+               theta0_row=theta_b, H0_row=H_b,
+               tr_init=transform_2d(x, y, h_init, T, H_b, theta_b))
     if coast is None:
         _BAY_CACHE[key] = out
     return out

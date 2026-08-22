@@ -173,6 +173,10 @@ the reference implementation or read off a photograph, not supposed.
 | The saturated green backlit face never appears in the surf, however tall or steep the wave field is made | **Not a tuning shortfall — a bar on the representation.** A sightline through a wave crosses the surface twice, so the entry and exit inclinations must sum to `2(90° − θ_c)` = **82.96°**; Stokes' 120° corner caps a wave of permanent form at 30° a face, so its best sum is 60°. No single-valued height field of a steady wave reaches it, at any height, order or grid | [The 30° ceiling](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise) |
 | The whole nearshore is one continuous soft grey band with a smooth cross-shore hump, both of its edges continuous curves, and no bubble texture or alongshore break-up at any scale | The foam **coverage** painted where its **realisation** belongs. `1 − exp(−m)` is the void probability of a Boolean model, so alpha-blending by it draws `E[χ]` and never `χ` — and an expectation that varies smoothly in `x` *is* an airbrush gradient. Measured: correlation length 2.25 % of the patch width against 0.3–0.8 % in photographs, and clot runs of 328 px in a 500 px box against 8–52 px. Fourth instance of this defect class in this chapter | [`12a` 12a·13](12a-water-derivations.md#13--the-foam-is-a-boolean-model-and-a-coverage-is-its-first-moment) |
 | Foam that sits *seaward* of where the wave visibly breaks, and is far too thin through the saturated surf zone | The deck laid from a **random-sea exceedance** (`Q_b`) handed a monochromatic train — a category error, because there is no height distribution for the closure to operate on. The two statements differ in **placement**, not only in level: an exceedance peaks where `H/d` *approaches* `γ`, the dissipation where the wave *is* breaking. Measured: the exceedance's maximum lands on the first breaking cell at every cut, the roller's 41–68 cells shoreward | [`12a` 12a·13](12a-water-derivations.md#which-breaking-statement-lays-the-deck-and-the-two-differ-in-placement) |
+| One long unbroken line of surf running the length of the beach, arriving on a metronome, with every wave the same size | **The waves have no height distribution.** `η = (H/2)cos φ` reads one `H` field, so the crest-to-crest CV at a point is machine zero against a Rayleigh sea's **0.5227**. It is not short-crestedness: refraction *straightens* crests (Snell conserves `k_y`, so alongshore spread is invariant) — what breaks a line up is that individual waves break at different **depths** because they have different heights | [A surf line breaks up](#a-surf-line-breaks-up-because-the-waves-are-not-the-same-height) |
+| A component sum was built for exactly this, and the surf line is still a metronome | The components were spent on **directions instead of frequencies**. At a fixed point every component sharing a frequency keeps a fixed relative phase forever, so `n_θ` of them collapse into one quasi-monochromatic contribution. `n_f = 1 × 256 directions` gives a crest CV of **exactly zero** — short-crested and monochromatic at once | [A surf line breaks up](#a-surf-line-breaks-up-because-the-waves-are-not-the-same-height) |
+| One line of surf on a bed that has a bar, or a bar built and only one line of white on it | **The count of surf lines belongs to the offshore boundary condition, not to the bed.** One offshore partition has one depth where `H → γd` and builds one bar however long the loop runs; a swell plus a wind sea builds two. And if the bed grows two while the shader lays foam from the carrier alone, every physics test passes and no pixel shows it | [Shoal awareness](#shoal-awareness-is-depth-awareness-not-distance-awareness) |
+| Open water that carries a faint permanent haze of whitecaps at any wind, including none | A foam **floor**, or a wind-independent whitecap constant. `W(0) = 0` exactly — Monahan's law has no offset — so a calm-sea control must show **zero** open-water foam pixels while the shore keeps its surf. Also check the composition: coverages do not add, **covering measures** do, and a clamped sum hides the error instead of fixing it | [Where the white comes from](#where-the-white-comes-from-two-sources-one-field-and-coverages-do-not-add) |
 | Surf built as one particle system, and it reads as confetti over glass | **Three whites, three materials**: the blanket behind a break is a *coverage mask*, the opacity inside the wave mouth is a *participating medium*, the spray is *particles* — and the particles are the **smallest** share. All three are built on the same `1 − 1/n²` wall reflectance and share nothing else — and none of them whitens *because* of it: a bubble backscatters `b_b/b = 0.023`, so the white is multiple scattering | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
 | Water is right in the near field and goes black — or absurdly saturated — toward the horizon, and no fog or exposure setting fixes both halves | **The straight ray used as the traversal distance.** `d/cos θ_a` diverges at grazing; the transmitted ray refracts and `d/μ_w` is bounded by `1.33 d`. Median 12.1%, p95 46.5% on a measured frame, fixed by one `sqrt` | [Screen-space water, step 4](#screen-space-water-the-fullscreen-triangle-pass) |
 | Volumetric foam or a bubble plume that goes bright white but you can still see the bed through it | `1 − 1/n²` spent as a **backscatter fraction** instead of a wall reflectance — 19× too much return, and the transmittance that should have fallen with it never does. A conservative slab has `R = τ'/(1 + τ')` and `T = 1 − R`; whitening without hiding means the model has `R` and not `T` | [Aerated water](#aerated-water-foam-spray-and-whitewater) |
@@ -1136,6 +1140,74 @@ float  disp  = A * CrestProfile(phase, /*steepen by*/ A / max(h, 1e-3));
 // brk gates the breaker treatment (spill foam / plunge construct / surge run-up by slope mask)
 ```
 
+### A surf line breaks up because the waves are not the same height
+
+The bullet above says *"superpose two or three periods with a slow group envelope"*, and every
+renderer that has shipped a beach has written some version of it. It is worth knowing **what that
+line is standing in for**, because the usual implementation buys none of it.
+
+**Measure the thing before believing the story.** Take a shore-wave band built exactly as Tier 2
+describes — `η = (H/2)·cos(φ)` over a shoaled `H` field — and sample it at ten surf-zone points over
+twenty periods. The crest-to-crest coefficient of variation is **3.7 × 10⁻¹⁶**. Machine zero. Every
+wave at a point is *exactly* the same height, because there is one `H` field and one phase, and a
+metronome is what that surface is. A Rayleigh sea gives `CV = √(4/π − 1) = `**`0.5227`**.
+
+That is the defect, and it is one level above the one people reach for. The usual diagnosis of a
+too-clean surf line is **short-crestedness** — one long crest running the length of the beach — and
+that is real and separately worth fixing. But it is not what makes a surf line *break up*, and two
+measurements say so:
+
+- **Refraction straightens crests; it does not break them up.** Snell conserves `k_y`, so the
+  *alongshore* wavenumber spread is invariant through refraction: the crest length in metres does
+  not shrink shoreward while the wavelength does. On a representative coastal spectrum the crests
+  really are long — about 445 m on a 1408 m coast — and making them shorter changes the plan-view
+  texture without changing where the line breaks.
+- **A surf line is discontinuous because individual waves break at different depths**, and they
+  break at different depths because they have different heights. Battjes & Janssen's `Q_b` is the
+  **fraction of waves breaking** at a given depth — an ensemble statement — and a renderer that
+  alpha-blends by it draws the expectation. Measured on a metronome surface, the seaward edge of
+  every breaking field is smooth to an alongshore standard deviation of 18 m, and since those fields
+  are deterministic functions of `(d, H)`, **that 18 m is the bed's variation, not the sea's**. A
+  Rayleigh population breaks over depths spanning **0.33 to 1.52 ×** the `H_rms` breakpoint across
+  its 10th-to-90th percentile alone.
+
+⚠️ **This is the chapter's dominant error class, in its fourth costume** — see also
+[glitter](#sun-glitter-the-sparkle-path), [foam](#aerated-water-foam-spray-and-whitewater) and the
+run-up band. *A distribution painted where a realisation belongs.* An expectation that varies
+smoothly in `x` **is** an airbrush gradient; that is what the operation means, not a side effect
+of it.
+
+**One construction fixes both and introduces nothing.** A sum of many random-phase components is a
+Gaussian process; its crest heights are Rayleigh and its envelope groups, both as *consequences*.
+So transporting the directional realisation you already draw — component by component, each with its
+own frequency, direction, shoaling and refraction — delivers short crests, groups **and** the height
+population together, out of physics already present. Measured: crest CV **0.5274** against Rayleigh's
+0.5227, and a groupiness factor of **0.823** against **0.0** for the single carrier. Nothing is
+dialled, and there is no "wave height variation" parameter anywhere in it.
+
+⚠️ **And the count that matters is DISTINCT FREQUENCIES, not components.** This is the trap, and it
+is easy to ship: at a **fixed point**, every component sharing a frequency keeps a fixed relative
+phase forever, so `n_θ` directions at one frequency collapse into **one** quasi-monochromatic
+contribution. The directions buy short crests in *space* and buy exactly nothing in *time*. A ladder
+at a constant 256 components, redistributed:
+
+| distinct frequencies `n_f` | 1 | 8 | 32 | 256 |
+|---|---|---|---|---|
+| directions `n_θ` | 256 | 32 | 8 | 1 |
+| crest CV | **0.0000** | 0.4568 ± 0.1454 | — | **0.5434** |
+
+**`n_f = 1` with 256 directions gives a crest CV of exactly zero** — a perfectly short-crested,
+perfectly monochromatic sea, which is the metronome again wearing a different texture. Budget the
+component count along the *frequency* axis first.
+
+**The dissipation is the one thing that cannot be done per component**, and the reason is physical
+rather than budgetary: depth-limited breaking is a property of the **surface**, not of a Fourier
+mode — a 10 cm component of a 1.5 m sea does not break in 2 m of water on its own. Use the closure
+every spectral wave model uses: distribute the total dissipation over components in proportion to
+their energy, applied as one dimensionless field `g(x,y) = H_broken/H_conservative ∈ (0, 1]` where
+`H_conservative = √(Σ H_j²)` is the bundle's own. No constant is introduced, and the surface keeps
+its statistics through the surf zone instead of collapsing back to a carrier.
+
 ### Tier 3 — wave particles and packets
 
 The simulation-grade tier: Lagrangian carriers of wave energy advected over the bathymetry and
@@ -1158,10 +1230,37 @@ splash-and-ripple response. They can share the rasterize-to-overlay stage.
 Key the system off **depth**, never off distance-to-shore alone. An offshore sandbar or reef
 must brighten the water color ramp, steepen and break its own line of surf — hundreds of
 meters from any shoreline — and let the reformed, smaller wave travel on to break again at the
-beach. Double surf lines over bars are a signature of real coasts, and they fall out for free
-when shoaling, breaking, and the travel-time solve all read bathymetry; they are *impossible*
+beach. Double surf lines over bars are a signature of real coasts, and they are *impossible*
 when the surf system is keyed to the shoreline distance field. Shore distance drives only what
 genuinely belongs to the waterline: run-up, wet sand, and the final foam edge.
+
+⚠️ **They do not, however, "fall out for free" from the bathymetry, and this chapter said so for
+several revisions.** Depth awareness is *necessary* and it is not sufficient: **the number of surf
+lines belongs to the offshore boundary condition, not to the bed.** Run a morphodynamic loop under
+one offshore partition and it builds **one** bar, however long you run it and whatever the profile
+— because one wave height and one period have one depth at which `H → γd`, and the loop's own
+feedback then parks the bar there. Give the same bed **two** partitions — a swell and a locally
+generated wind sea, e.g. `(0.5, H₀ = 1.50 m, T = 9.0 s)` and `(0.5, H₀ = 0.89 m, T = 4.4 s)`, the
+weights being each system's share of the transport moment — and it builds two, at each partition's
+own `H_b/γ`. On one worked scene the three breaking lines sit at `x` = **491.8 / 587.2 / 604.2 m**
+in **2.34 / 1.18 / 0.59 m** of water: the swell's line is the seaward one, and the wind sea's are
+inshore of it on the gentler bed behind the bar.
+
+The consequences are worth stating separately because they pull in opposite directions from the
+usual intuition:
+
+- **Sweeping the partition weights moves the bars' amplitudes and not their depths.** Each crest
+  depth is set by its own partition's `H_b/γ`; amplitude is what transport pays for. So "how much
+  wind sea" is a *contrast* control, not a *position* control.
+- **A single-partition run is the correct control and must stay reachable**, arithmetically
+  identical to the no-climate path. Otherwise every number measured on the one-bar bed silently
+  stops being comparable the day the second partition arrives.
+- **The renderer has to lay foam from the union of every partition's roller**, not from the
+  carrier's alone — `1 − Π(1 − f_p)`, since two rollers from independent wave systems overlap at
+  random. Summing them exceeds 1 where the surf zones overlap and puts more white on the water than
+  there is water. A bed that grows two bars while the shader whitens one is the
+  [derived-and-never-drawn](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise) failure
+  in its most photogenic form: every physics test passes and no pixel shows it.
 
 ### Wave–current interaction: the flow field's part
 
@@ -1731,6 +1830,54 @@ Seed all three from the same criterion — the Jacobian/folding signal of
 [Shallow water](#shallow-water-shoaling-refraction-and-breakers) inshore, and turbulence
 intensity in rivers — so the classes stay consistent with each other and with the wave that made
 them.
+
+#### Where the white comes from: two sources, one field, and coverages do not add
+
+A sea has **two independent whitening mechanisms** and a renderer needs both, because each is
+absent in the other's regime. Inshore, waves break because the depth runs out; offshore, they break
+because the wind is strong. A frame with only the first has a dead-flat open sea in a gale; a frame
+with only the second has a beach with no surf.
+
+**The wind half is a published power law, and its spread is the finding.** Monahan &
+O'Muircheartaigh (1980) give fractional whitecap coverage `W = 3.84×10⁻⁶ · U₁₀^3.41` — the form
+universally quoted, and the one Koepke's whitecap reflectance model is built on. ⚠️ **The same paper's
+own optimal fit is `2.95×10⁻⁶ · U₁₀^3.52`**, and the two differ by **12% at 6 m/s and 25% at 20**.
+The literature at large is worse: Callaghan et al. (2008) fit a piecewise law with an **onset at
+`U₁₀ = 3.70 m/s`** and branches meeting at 10.18 m/s, which is not a power law at all. Carry the
+band `n ∈ (3.0, 3.52)`, not a number — and note that **inverting** a coverage to read a wind divides
+that spread by the exponent, which is the one direction in which the mess is forgiving.
+
+⚠️ **Coverages do not add. Covering measures do.** This is the same shape as the foam-realisation
+error and it bites the same way. `W` is a *coverage* — a fraction of area already saturated into
+`[0,1)` — so adding the surf zone's `W_surf` to the wind's `W_wind` can exceed 1, and clamping it
+hides the error rather than fixing it. Invert the saturation **once**, carry one **covering measure**
+`m`, and saturate **once** at the end:
+
+```
+m_wind  = -log(1 - W(U10))          # Monahan's coverage, back to a measure
+m_total = m_wind + m_surf           # measures add; this is the Boolean-model sum
+W_total = 1 - exp(-m_total)         # one saturation, at the end
+```
+
+The construction reduces to Monahan **exactly** where nothing is breaking, and to the surf zone's
+own field where there is no wind. One field carries both sources and no caller is ever in a position
+to write `1 − exp(−k·f)` with its own `k`.
+
+**The control that catches the whole family of mistakes is a calm sea.** `W(0) = 0` exactly — the
+power law has no offset, so at zero wind the open water must carry **zero** foam pixels while the
+shore keeps its surf. Run it: on one worked scene, **0 of 2886 open-water pixels** carry foam at
+`U₁₀ = 0` while 3268 shore pixels still do. Any implementation with a foam *floor*, an ambient white
+term, or a wind-independent whitecap constant fails this instantly, and it is a two-line test.
+
+⚠️ **And `Q_b` is a fraction of waves, not a switch on one.** Battjes & Janssen's `Q_b` answers *what
+fraction of the population is breaking at this depth* — it is an ensemble statement, and
+alpha-blending by it paints the expectation. That is the same defect the
+[wave-height population](#a-surf-line-breaks-up-because-the-waves-are-not-the-same-height) section
+prices, and it is why a foam field can be *correct on average* and still read as an airbrush: the
+covering measure has to be **drawn**, as a Boolean realisation with the photographs' own correlation
+length, not blended by its mean. A realised deck matches photographic clot statistics at a
+correlation length of **0.3–0.8%** of the patch width; the expectation drawn directly measures
+**2.25%**, and every edge in it is a continuous curve.
 
 **Aerated water changes the water's own optics, not just its albedo.** Where bubble density is
 high, scattering swamps absorption: the body colour washes out toward white, transparency
