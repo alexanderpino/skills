@@ -46,11 +46,25 @@ and a route to "chapter 12" means whichever of them holds the answer:
 | `12a-water-derivations.md` | The **mathematics and pseudocode** behind results the chapter quotes in a line | Re-deriving a number, or carrying one to different constants |
 | `12b-water-provenance.md` | **Sources & provenance for all of `12`**: every tier, every citation, every `?`, and the `P/T/D/F/N/?` convention restated so it reads alone | Before citing anything out of `12` — including the rows tagged `12` in the table below |
 
-`12`'s executable half is `terrain-renderer/reference-impl/`, and its `validate.py` is the arbiter
-for the chapter's numeric claims: it checks the implementation against closed forms, published
-measurements and independent methods. It **exited non-zero on eight rows** for several rounds — each
-a recorded finding with its tolerance justified from the estimator's own error, not a broken build —
-and all eight are now closed, with no tolerance widened and four of them tightened.
+`12`'s executable half is `terrain-renderer/reference-impl/` and `terrain-renderer/raster-impl/`,
+and **three suites** arbitrate the chapter's numeric claims by checking the implementation against
+closed forms, published measurements and independent methods:
+
+| Suite | Scope | Standing |
+|---|---|---|
+| `reference-impl/validate.py` | the pool, and the optics every other file shares | **306 pass / 0 FAIL / 64 info** |
+| `reference-impl/validate_beach.py` | the open coast — bed, wave transform, breaking, diffraction, foam, run-up | **604 pass / 0 FAIL / 0 ERROR** |
+| `raster-impl/validate_raster.py` | the real-time screen-space pass and its approximation error, which the offline path structurally cannot see | 200 rows, three tiers |
+
+`validate.py` **exited non-zero on eight rows** for several rounds — each a recorded finding with its
+tolerance justified from the estimator's own error, not a broken build — and all eight are now
+closed, with no tolerance widened and four of them tightened.
+
+⚠️ **Passing rows are not rendered pixels.** The recurring defect here is a quantity that is
+*derived, guarded, and never called*. Coverage instruments report such a module as covered, because
+the suite is the caller. The check that works is `grep` for the symbol requiring a hit **outside its
+defining module and outside the suite**, and `beach_render.py --scene` prints reach integers off the
+rendered buffer so the answer is observable rather than asserted.
 
 ## Figures, and the chapters that deliberately have none
 
@@ -60,7 +74,7 @@ and writes no physics of its own, so a figure cannot drift from the code that sh
 in the markdown beside the image, never in the pixels, where they can be read, diffed and corrected.
 
 ```
-python3 terrain-renderer/references/figures/make_figures.py             # redraw all fourteen
+python3 terrain-renderer/references/figures/make_figures.py             # redraw all fifteen
 python3 terrain-renderer/references/figures/make_figures.py --selftest  # prove the guard can fail
 ```
 
@@ -68,7 +82,7 @@ python3 terrain-renderer/references/figures/make_figures.py --selftest  # prove 
 |---|---|---|
 | `09` | 3 | The float32 spacing **staircase** against the smooth law that bounds it; reversed-Z **flat over seven decades** while three other curves climb as one; the cube-sphere's two mappings, and the direction each is worst in |
 | `10` | 3 | The Rayleigh aureole's **ceiling of ½** with the shipped constant above it; the two receiver weights, **equal in area and nothing else**; an `acos` **folding** about solar noon |
-| `12`, `12a` | 7 | Two Fresnel constants from one surface; a product that is not a mean; a series and its bound; a distribution painted where its realisation belongs; Sommerfeld's exact half; a width that is a function; **an integral still climbing where every instrument stops** |
+| `12`, `12a` | 8 | Two Fresnel constants from one surface; a product that is not a mean; a series and its bound; **a distribution painted where its realisation belongs — twice, once for foam and once for run-up**; Sommerfeld's exact half; a width that is a function; **an integral still climbing where every instrument stops** |
 | `19` | 1 | The Kelvin wedge as a **ratio**, self-similar in `V·t`, and the capillary band where the ratio leaves ½ |
 
 **The twenty-chapter gap is deliberate elsewhere, and the reasons are the useful part.** A figure
