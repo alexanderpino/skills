@@ -5527,8 +5527,17 @@ def evolve_2d(x, y, h0, T, H0, theta0, n_steps, dt, k_every=1, climate=None,
     h = np.asarray(h0, float).copy()
     dx = float(x[1] - x[0])
     dy = float(y[1] - y[0])
-    parts = ([(1.0, float(H0), float(T))] if climate is None
-             else [(float(w), float(Hp), float(Tp)) for w, Hp, Tp in climate])
+    # `H0` AND EACH PARTITION'S `Hp` MAY BE PER-ROW, and both branches have to
+    # honour that or the amplitude half of a diffracted boundary reaches the
+    # plan transform and not the loop that builds the bed under it -- two
+    # boundary conditions in one bay, which is worse than either. The caller
+    # owns the shading: `run_bay` multiplies each partition by the fan's K_d
+    # before passing the climate in, because only it knows which stated height
+    # the fan was solved against. `np.asarray` keeps the scalar case
+    # bit-identical -- 0-d float64 arithmetic is float arithmetic.
+    parts = ([(1.0, np.asarray(H0, float), float(T))] if climate is None
+             else [(float(w), np.asarray(Hp, float), float(Tp))
+                   for w, Hp, Tp in climate])
     wsum = float(sum(p[0] for p in parts))
     omega = 2.0 * math.pi / T
     kf = None
@@ -6610,14 +6619,26 @@ def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
     # reaches the morphodynamic loop, the shipped transform, every partition
     # transform, and -- through `Water(bay)` -- the rendered pixels. Imported
     # here and not at module scope because `beach_diffract` imports this file.
+    #
+    # `kd_b` IS THE SHAPE AND IT IS APPLIED BY THIS FUNCTION, not by
+    # `evolve_2d`, because only here is it known which stated height the fan
+    # was solved against: K_d = H_b/H0 for the swell, and the SAME K_d shades
+    # every other partition, so the wind sea is sheltered by the same headland
+    # without its own stated height being overwritten by the swell's. It is
+    # exactly 1.0 when the amplitude half is off, which keeps the plane-crest
+    # bay bit-identical.
     fan = None
-    theta_b, H_b = theta0, H0
+    theta_b, H_b, kd_b = theta0, H0, 1.0
     if diffract:
         import beach_diffract as _BD
         fan = _BD.scene_fan(ep, where='pole', H0=H0)
         theta_b = fan['theta0']
         if diffract == 'full':
             H_b = fan['H0']
+            kd_b = np.asarray(H_b, float) / float(H0)
+    climate_b = (None if climate is None
+                 else [(w, np.asarray(Hp, float) * kd_b, Tp)
+                       for w, Hp, Tp in climate])
     stand_age = 0.0
     if cs.get('record'):
         stand_age = float(cs['record'][0].get('age', 0.0))
@@ -6627,21 +6648,18 @@ def run_bay(dx=2.0, n_steps=1200, dt=1500.0, T=T_SWELL, H0=H0_SWELL,
                                        stand_age=stand_age)
     h, tr2, hist, edge = evolve_2d(x, y, h_init, T, H_b, theta_b,
                                    n_steps=n_steps, dt=dt, k_every=k_every,
-                                   climate=climate, **flux_kw)
+                                   climate=climate_b, **flux_kw)
     # WAVE 19. THE PARTITION TRANSFORMS, so the RENDERER can reach them. The
     # bay's `tr` stays the carrier's -- every field waves 1-18 read comes out
     # of it unchanged -- and `tr_parts` is the list the foam deck is summed
     # over when the offshore boundary carries more than one wave system. It is
     # None on a single-partition bay, which is what keeps this bay's output
     # bit-identical to wave 18's.
-    # EACH PARTITION GETS THE FAN'S SHAPE AND ITS OWN LEVEL. `H_b/H0` is K_d
-    # when the amplitude half is on and exactly 1.0 when it is not, so the wind
-    # sea is sheltered by the same headland as the swell without either
-    # partition's stated height being overwritten by the other's.
-    kd_b = (1.0 if H_b is H0 else np.asarray(H_b, float) / float(H0))
-    tr_parts = (None if climate is None
-                else [transform_2d(x, y, h, Tp, Hp * kd_b, theta_b)
-                      for _, Hp, Tp in climate])
+    # The same shaded partitions the loop ran on, so the deck the renderer
+    # sums is laid under the boundary condition that built the bed.
+    tr_parts = (None if climate_b is None
+                else [transform_2d(x, y, h, Tp, Hp, theta_b)
+                      for _, Hp, Tp in climate_b])
     out = dict(x=x, y=y, h_init=h_init, h=h, tr=tr2, x_s=x_s, h_dean=h_dean,
                beach=bch, embay=bool(embay), plan=ep,
                hist=hist, coast=cs, stands=stands, stand_age=stand_age,

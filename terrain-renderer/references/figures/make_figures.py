@@ -202,8 +202,22 @@ def preflight():
     # 5. The run-up reading that decides where the wet band ends.
     chk('sigma = R_2% / sqrt(ln 50)',
         B.swash_scale(), B.BERM_Z / np.sqrt(np.log(50.0)), 1e-12)
-    # 6. Cox & Munk's two components against the separately fitted total.
-    chk('mss components at 6 m/s', sum(BO.cox_munk_mss(6.0)), 0.03348, 1e-9)
+    # 6. Cox & Munk's two components against the separately fitted total, and
+    #    BOTH AT THE MAST HEIGHT THE 1954 PAPER FITTED THEM AT. This row used
+    #    to compare `cox_munk_mss(6.0)` -- which converts its argument from the
+    #    ten-metre wind to the 12.5 m mast -- against the literal 0.03348,
+    #    which is the components evaluated at 6 m/s AS a mast wind. The two
+    #    were the same number until the conversion was split out into
+    #    `cox_munk_mss_at_mast`, and then they were 1.9 % apart and the guard
+    #    refused to draw. Comparing a converted value to an unconverted literal
+    #    is the defect; comparing the two FITS at one height is the row that
+    #    was always meant, and its disagreement is the finding: the paper fit
+    #    its components and its total separately and they do not agree.
+    _cm_sum = sum(BO.cox_munk_mss_at_mast(6.0))
+    _cm_tot = WS.cox_munk_total(6.0)     # also a mast-height argument
+    chk('mss components at a 6 m/s mast wind', _cm_sum, 0.03348, 1e-9)
+    chk('components/total, separately fitted, at one height',
+        _cm_sum / _cm_tot, 0.99288, 1e-4)
     # 6a. `12a` §7a's slope integral, by TWO ROUTES THAT SHARE NO LINE. The
     #     figure draws `mss = INT B(k) d ln k` on a log-uniform grid; this
     #     re-derives it as `INT k^2 S(k) dk` on a LINEAR grid -- a different

@@ -1237,14 +1237,23 @@ genuinely belongs to the waterline: run-up, wet sand, and the final foam edge.
 ⚠️ **They do not, however, "fall out for free" from the bathymetry, and this chapter said so for
 several revisions.** Depth awareness is *necessary* and it is not sufficient: **the number of surf
 lines belongs to the offshore boundary condition, not to the bed.** Run a morphodynamic loop under
-one offshore partition and it builds **one** bar, however long you run it and whatever the profile
-— because one wave height and one period have one depth at which `H → γd`, and the loop's own
-feedback then parks the bar there. Give the same bed **two** partitions — a swell and a locally
-generated wind sea, e.g. `(0.5, H₀ = 1.50 m, T = 9.0 s)` and `(0.5, H₀ = 0.89 m, T = 4.4 s)`, the
-weights being each system's share of the transport moment — and it builds two, at each partition's
-own `H_b/γ`. On one worked scene the three breaking lines sit at `x` = **491.8 / 587.2 / 604.2 m**
-in **2.34 / 1.18 / 0.59 m** of water: the swell's line is the seaward one, and the wind sea's are
-inshore of it on the gentler bed behind the bar.
+one offshore partition and it builds **one** bar, however long you run it and whatever the profile —
+one wave height and one period have one depth at which `H → γd`, and the loop's own feedback parks
+the bar there. Give the same bed **two** partitions — a swell and a locally generated wind sea, e.g.
+`(0.5, H₀ = 1.50 m, T = 9.0 s)` and `(0.5, H₀ = 0.89 m, T = 4.4 s)`, the weights being each system's
+share of the transport moment — and it builds two, each at its own `H_b/γ`. On the shipped scene the
+two lines sit at `x` = **611 m** and **683 m**, and both carry foam in the frame.
+
+**The control is what makes this a finding rather than a coincidence, and it belongs to the
+generator side.** A **bare monotone Dean ramp with no bar on it at all** carries **two breakpoints**
+under a two-partition sea, because two partitions break at two depths on *any* profile. So the
+**count** is the boundary condition's; what the **bed** contributes is the **separation** (×1.94 on
+one measured pair), and the criterion for "two and not one" is the Dally length
+`|x_b1 − x_b2| > (d_b1 + d_b2)/(2K)` — 48.5 m measured against 11.7 m needed, holding under ±50% in
+`H_s` and ±40% in `T_p` and failing correctly at `H_s × 2`, where the "wind sea" is the same size as
+the swell and breaks in the same water. The full derivation, its sweep and the quadrature trap it
+rules out are in
+[terrain-architect `12`](../../terrain-architect/references/12-glacial-coastal.md).
 
 The consequences are worth stating separately because they pull in opposite directions from the
 usual intuition:
