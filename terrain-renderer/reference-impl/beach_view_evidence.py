@@ -103,7 +103,7 @@ def main(outdir):
     os.makedirs(outdir, exist_ok=True)
     # The radiance buffers are cached OUTSIDE the repository: three hero frames
     # are about 25 minutes of ray-casting and 130 MB of float64, and neither
-    # belongs in `gauntlet/`. Override with BEACH_EVIDENCE_CACHE.
+    # is not part of this directory. Override with BEACH_EVIDENCE_CACHE.
     cd = os.environ.get('BEACH_EVIDENCE_CACHE',
                         os.path.join(tempfile.gettempdir(), 'beach-s18'))
     os.makedirs(cd, exist_ok=True)
@@ -146,4 +146,5 @@ def main(outdir):
 
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv) > 1
-         else '../../gauntlet/sea/evidence')
+         else os.environ.get('BEACH_OUT', os.path.join(
+             os.path.dirname(os.path.abspath(__file__)), 'evidence')))

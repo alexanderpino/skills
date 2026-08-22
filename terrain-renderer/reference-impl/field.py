@@ -1,6 +1,6 @@
 """Water surface for the pool reference render: the wave field and the jet.
 
-Lane A of the gauntlet owns this file. Everything here answers one question --
+One lane owns this file. Everything here answers one question --
 what is the surface slope at (x, y)? -- and nothing here knows about light.
 
 Bands, in the order they were forced on the model by observation:

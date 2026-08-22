@@ -1,4 +1,4 @@
-"""The apparent-albedo re-take, as one picture, into `gauntlet/evidence/`.
+"""The apparent-albedo re-take, as one picture, into `evidence/`.
 
     python3 lobe_albedo_measure.py before      # the two runs this reads
     python3 lobe_albedo_measure.py after
@@ -68,7 +68,7 @@ import beach_plot as P                                          # noqa: E402
 import fix_lobe_evidence as FLE                                 # noqa: E402
 import validate as VAL                                          # noqa: E402
 
-OUT = os.path.join(HERE, '..', '..', 'gauntlet', 'evidence')
+OUT = os.environ.get('BEACH_OUT', os.path.join(HERE, 'evidence'))
 NPZ = os.environ.get('FIXLOBE_NPZ', '.')
 
 RED = (192, 56, 44)

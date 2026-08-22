@@ -1,4 +1,4 @@
-"""The beach scene's visual evidence, into `gauntlet/sea/evidence/`.
+"""The beach scene's visual evidence, into `evidence/`.
 
     python3 beach_evidence.py [outdir]
 
@@ -25,8 +25,7 @@ import beach_plot as P                                          # noqa: E402
 import optics as OPT                                            # noqa: E402
 
 OUT = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-')\
-    else os.path.join(
-    HERE, '..', '..', 'gauntlet', 'sea', 'evidence')
+    else os.environ.get('BEACH_OUT', os.path.join(HERE, 'evidence'))
 
 SAND = (208, 190, 158)
 SEA = (36, 92, 122)

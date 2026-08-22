@@ -250,7 +250,7 @@ TGT = EYE + 7.0 * np.array([np.cos(CAM_AZ) * np.cos(CAM_EL),
                             np.sin(CAM_AZ) * np.cos(CAM_EL), np.sin(CAM_EL)])
 
 # --- THE WHOLE-BASIN VIEW, AND WHY IT IS IN THE FILE NOW ---------------------
-# `gauntlet/evidence/w12-wide.png` was made on a SCRATCH COPY of this file with
+# The wide frame it refers to was made on a SCRATCH COPY of this file with
 # the camera moved by hand, and the water-to-stone ratio that opened this round
 # was measured off it. A number that carries a finding cannot come out of a copy
 # nobody can re-run, so the wide camera is now a switch on the shipped file and
@@ -8171,8 +8171,8 @@ if FLOAT_ON:
 
 # ===================================================== THE CAMERA UNDER THE WATER
 # Everything above this line is a view INTO the medium. This is the view from
-# inside it, and it is the last unrendered section of the bar (`gauntlet/bar/
-# photo-spec.md` section G). It is here rather than in a second file for the one
+# inside it, and it is the last unrendered section of the reference set (the
+# split shot). It is here rather than in a second file for the one
 # reason the section itself gives: it is judged on the SAME scene, the same code
 # and the same water, and a renderer tuned to look good from below would fail the
 # section by construction. Every map it reads -- the bed's caustics, the four

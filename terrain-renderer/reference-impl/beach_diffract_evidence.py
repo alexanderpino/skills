@@ -26,7 +26,8 @@ import beach as B                                            # noqa: E402
 import beach_diffract as DF                                  # noqa: E402
 import beach_plot as P                                       # noqa: E402
 
-OUT = '../../gauntlet/sea/evidence'
+OUT = os.environ.get('BEACH_OUT', os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'evidence'))
 
 C_INC = (44, 96, 176)          # incident / lit
 C_SHA = (196, 84, 40)          # shadow

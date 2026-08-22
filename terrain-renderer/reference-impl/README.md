@@ -300,7 +300,7 @@ because the glitter road is one per cent of the frame and the other ninety-nine
 are unchanged. The blown-white streak down the near-left edge of the hero is
 half of what it was.
 
-Two of the three figures are in `gauntlet/evidence/`, drawn by
+Two of the three figures are in `reference-impl/evidence/`, drawn by
 `fix_lobe_evidence.py` from the `HDRP` buffers themselves:
 `fig-pool-lobe-before-after.png` (before, after, and the **signed** difference
 with a colour bar labelled in absolute radiance — signed, because an absolute map
@@ -511,7 +511,7 @@ round recorded, matched to the byte after the fix.
 
 ## Split — the physics left `render.py` before the beach arrived, and no pixel moved
 
-The owner's ruling, recorded in `gauntlet/chapter-backlog.md`: *"Als we een 2e
+The owner's ruling: *"Als we een 2e
 scene bouwen, met strand, moet het zwembad niet verdwijnen."* A second reference
 scene is coming — a beach, for waves, shoaling, breaking and coastal optics — and
 the default outcome of a second scene is a **fork that drifts**, which leaves
@@ -1226,7 +1226,7 @@ sphere test through six inter-reflection passes plus the fillet ring and
 if the sphere test in `scene_hit` ever needs to come back, the plan-space prune
 the cylinders already use is the place.
 
-`gauntlet/evidence/w17-*.png`: the float from above and from below, the window's
+`reference-impl/evidence/w17-*.png`: the float from above and from below, the window's
 rim band as an A/B against wave 16, refreshed hero, wide and underwater frames,
 and the two archived comparisons this round invalidates — the risers and the
 coping's waterline — re-rendered as wave 16 above / wave 17 below so that what did
@@ -1669,7 +1669,7 @@ passes — the solve reads **272.7 s → 281.8 s**, which is scheduling noise on
 same 6 × (200 × 100 × 576) gather — and the illuminant block itself is
 milliseconds against twelve minutes.
 
-Archived: `gauntlet/evidence/w16-hero-above.png`, `w16-wall-waterline.png` — the
+Archived: `reference-impl/evidence/w16-hero-above.png`, `w16-wall-waterline.png` — the
 **same crop of the north waterline in both renders, wave 15 above and wave 16
 below**, which is the picture this round is about: coping, grey bead, dry blue
 band, meniscus line, submerged liner, water, with the *bottom* three now the
@@ -1683,7 +1683,7 @@ with `w12-wide.png`, `w14-wide.png` and `w15-wide.png`.
 This round was handed a finding: *the render's water is too dark against its own
 physics, by a factor of 1.5–2.5*, from a closed form predicting a
 water-to-sunlit-stone luminance ratio of **0.61–1.00** against **0.401** measured
-off `gauntlet/evidence/w12-wide.png`. It was to be recomputed before being acted
+off `reference-impl/evidence/w12-wide.png`. It was to be recomputed before being acted
 on. It was, and it does not survive: **the prediction is 13% high and the
 measurement is 1.8× low, and between them they are the whole of the factor.**
 The render's water agrees with a corrected closed form to **−4.8%**.
@@ -1890,7 +1890,7 @@ the old audit had, caught this time before it shipped.
 ## Closed — the step unit's stripes, and the diagnosis that was wrong
 
 Wave 13 marked `RIS_NT = 512` as the cause of the visible banding on the step unit
-in `gauntlet/evidence/w13-underwater.png` — 18.4 mm arc bins, 26 output pixels
+in `reference-impl/evidence/w13-underwater.png` — 18.4 mm arc bins, 26 output pixels
 wide at 1.2 m, *"striped with the estimator's own noise"*, sized at ≈4×. The hero
 was frozen then and it is not now, so the first thing this round did was spend it.
 
@@ -2278,7 +2278,7 @@ geometry. Bar section J's *"the water is pale, and it is pale nearly everywhere"
 is a visual reading and this is not a claim to have met it; it is the direction,
 from physics that was missing rather than from a constant.
 
-Archived: `gauntlet/evidence/w15-hero-above.png`, `w15-wall-waterline.png` — the
+Archived: `reference-impl/evidence/w15-hero-above.png`, `w15-wall-waterline.png` — the
 **same crop of the north waterline in both renders, wave 14 above and wave 15
 below**, which is the picture the whole round is about: coping, grey bead, dry
 blue band, meniscus line, submerged liner, water — and the top three of those six
@@ -2586,7 +2586,7 @@ photograph should look at *both* halves of it.
 
 **Built this round.** It was the largest single inversion left in the model —
 everything else is a view *into* the medium, this is a view *from inside* it —
-and it is the last unrendered section of the bar (`gauntlet/bar/photo-spec.md`
+and it is the last unrendered section of the reference set (the split shot,
 section G). The numbers below were computed from the constants already in
 `render.py` before it was built; what follows each of them now is what the frame
 actually produced.
@@ -3244,7 +3244,7 @@ smaller by sqrt(2). Two of the five bands were once normalised in the per-axis
 convention while the rest used the total, which put two units on the two sides of
 the slope budget; `field.rms_slope` exists so that cannot recur.
 
-## The figures — `pool_figures.py`, into `gauntlet/evidence/`
+## The figures — `pool_figures.py`, into `reference-impl/evidence/`
 
 The pool had 285 validated quantities and not one picture. All of it lived in
 `validate.py`'s stdout and `render.py`'s, which is a transcript that scrolls

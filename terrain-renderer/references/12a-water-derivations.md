@@ -1681,7 +1681,7 @@ spectrum.
 
 *Implemented in `reference-impl/wind_spectrum.py`; guarded by `_sec_spectrum` in `validate_beach.py`
 — 20 rows, 8 deliberate defects, all caught, one of them only after the row was **moved** (see
-[What did not reproduce](#what-did-not-reproduce)). Figures: `gauntlet/sea/evidence/s17-*.png`.
+[What did not reproduce](#what-did-not-reproduce)). Figures: `reference-impl/evidence/s17-*.png`.
 ⚠️ **Provenance: `P (attribution)` for ECKV — the 1997 paper is not held in this repository.** The
 equations are the intersection of four independent restatements (Mobley's *Ocean Optics Web Book*;
 Wang et al. 2025, AMT 18, 6329; Zhang et al., PMC6111991; Hwang & Fois, arXiv:2204.11591), all read
@@ -1849,7 +1849,7 @@ Cox & Munk row runs at, so no headline check will ever catch it either.
 
 *Implemented in `reference-impl/beach_optics.py` (`SlopeRealisation`, `subgrid_realisation`) and
 `beach_render.py` (`shade_water`); guarded by `_sec_glitter_field` in `validate_beach.py` — 17 rows,
-4 deliberate defects, all caught. Figures: `gauntlet/sea/evidence/s18-glitter-1to1.png` and
+4 deliberate defects, all caught. Figures: `reference-impl/evidence/s18-glitter-1to1.png` and
 `s18-cv-floor.png`. Provenance: `D` throughout for (7b.1)–(7b.4); `P` for Cox & Munk's two variances
 and for the Pierson–Moskowitz peak; `P (attribution)` for ECKV as in §7a.*
 
@@ -2916,7 +2916,7 @@ the picture still an airbrush, because the last step threw the realisation away.
 
 The diagnosis needs no render around it: mapped 0–1 to 0–255, the coverage buffer of a hero frame
 is a set of perfectly smooth diagonal ribbons with continuous edges and no break-up at any scale.
-That picture, and the crops below, are in `gauntlet/sea/evidence/s18-foam-*`.
+That picture, and the crops below, are in `reference-impl/evidence/s18-foam-*`.
 
 ### The realisation needs exactly one quantity the coverage does not carry
 
@@ -2994,7 +2994,7 @@ zero, so it is skipped — on a frame whose sea plane runs to 40 km that is a re
 
 ### What it measures, against photographs, and the instrument had to be controlled first
 
-`gauntlet/sea/bar/generic/` converts section C's verbal criterion into a **dimensionless** one: the
+A set of nine openly-licensed reference photographs converts section C's verbal criterion into a **dimensionless** one: the
 correlation length inside a foam patch is **0.3–0.8 % of that patch's own width**, across six boxes
 in two photographs, with clot runs at q90 of 8–52 px and dark gaps of 2–7 px *inside every white*.
 Dimensionless is the point — no exposure, white balance, tone curve or grade enters it.

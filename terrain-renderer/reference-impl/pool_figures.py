@@ -1,4 +1,4 @@
-"""The pool scene's physics, as pictures, into `gauntlet/evidence/`.
+"""The pool scene's physics, as pictures, into `evidence/`.
 
     python3 pool_figures.py [outdir]
 
@@ -54,7 +54,7 @@ import optics as OPT                                            # noqa: E402
 import validate as VAL                                          # noqa: E402
 
 OUT = (sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-')
-       else os.path.join(HERE, '..', '..', 'gauntlet', 'evidence'))
+       else os.environ.get('BEACH_OUT', os.path.join(HERE, 'evidence')))
 
 # ---------------------------------------------------------------- plot furniture
 RED = (192, 56, 44)

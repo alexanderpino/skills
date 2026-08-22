@@ -41,7 +41,8 @@ import beach_render as R
 import beach_plot as P
 
 OUT = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-') \
-    else '../../gauntlet/sea/evidence'
+    else os.environ.get('BEACH_OUT', os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 'evidence'))
 SS = 2                              # the hero raster's own supersampling
 GAMMA = 2.2
 

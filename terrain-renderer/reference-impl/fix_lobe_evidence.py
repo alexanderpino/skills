@@ -1,4 +1,4 @@
-"""The lobe-receiver fix, as pictures, into `gauntlet/evidence/`, under the
+"""The lobe-receiver fix, as pictures, into `evidence/`, under the
 `fig-pool-` prefix the pool loop's other six figures already use.
 
     python3 fix_lobe_render.py before       # the three buffers, one full
@@ -56,7 +56,7 @@ import atmosphere as ATM                                        # noqa: E402
 import beach_plot as P                                          # noqa: E402
 import validate as VAL                                          # noqa: E402
 
-OUT = os.path.join(HERE, '..', '..', 'gauntlet', 'evidence')
+OUT = os.environ.get('BEACH_OUT', os.path.join(HERE, 'evidence'))
 NPZ = os.environ.get('FIXLOBE_NPZ', '.')
 
 RED = (192, 56, 44)

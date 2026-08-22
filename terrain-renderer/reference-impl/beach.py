@@ -7,7 +7,7 @@ builds the bar.
 
 SCOPE. Everything up to the point of breaking. The free surface here is still a
 graph over the plane -- the plunging lip is not, and it is deliberately the last
-problem in this project rather than the first (`gauntlet/sea/bar.md` F). No
+problem in this project rather than the first. No
 optics, no foam, no spray, no turbidity, no rocks, no run-up rendering: the
 sediment flux is computed and exposed because the turbidity work will consume it,
 and nothing here renders it.

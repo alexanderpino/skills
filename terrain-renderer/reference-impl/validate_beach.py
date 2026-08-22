@@ -2257,7 +2257,7 @@ def _sec_states(ctx):
         37.3167, -8.8000, 2026, 8, 12, 18, 8, 0.0, 1.0)[:4]
     check(2, "the bar's own solar elevation for the surf frames", el_app, 27.17,
           0.02,
-          'gauntlet/sea/bar.md states 27.17 deg / 268.31 deg / air mass 2.182 '
+          'The reference frame states 27.17 deg / 268.31 deg / air mass 2.182 '
           'for 2026-08-12 18:08 WEST. This row recomputes them through the '
           'POOL\'s shared module, which knew nothing about this beach. Two '
           'decimal places is the precision the bar quotes.', unit='deg')
@@ -5593,7 +5593,7 @@ def _sec_land(ctx):
 def _sec_camera(ctx):
     """WAVE 7 -- WHERE THE PHOTOGRAPH WAS TAKEN FROM.
 
-    The gauntlet's first hyper-realism criterion is FRAME TO MATCH, and meeting
+    The first hyper-realism criterion is FRAME TO MATCH, and meeting
     it means inferring a camera from photographs that carry no EXIF and are not
     in this repository. Everything the inference produces is an angle or a
     length; nothing in it is a level, which is the standing ruling. This section
@@ -8987,7 +8987,7 @@ BUGS.update({
 # whether the shipping code path uses the realisation, and it is written so
 # that deleting the call makes it FAIL rather than making it vacuous.
 #
-# WHAT THE ROWS ARE MEASURED AGAINST. `gauntlet/sea/bar/generic/` measured nine
+# WHAT THE ROWS ARE MEASURED AGAINST. Nine openly-licensed photographs were
 # photographs and converted section C's verbal criteria into two dimensionless
 # brackets that survive a stranger's exposure, white balance and grade:
 #
@@ -9017,7 +9017,7 @@ def _foam_encode8(L, white, gamma=2.2):
 
 
 def _foam_texture(P, hp=61):
-    """A LINE-FOR-LINE PORT of `gauntlet/sea/bar/generic/measure.py::texture`.
+    """A LINE-FOR-LINE PORT of the reference set's own `measure.py::texture`.
 
     It is copied rather than imported because the generic set is run state and
     this file must not depend on it existing -- and it is copied VERBATIM,
@@ -9258,8 +9258,12 @@ def _sec_foamtex(ctx):
             'is worthless without.' % t_ref['lW'], '%')
 
     # and against the photographs themselves, when the generic set is present
-    _gen = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        '..', '..', 'gauntlet', 'sea', 'bar', 'generic')
+    # AN OPTIONAL SET, AND THE ROWS BELOW SAY SO. The nine openly-licensed
+    # reference photographs are not part of this directory; point FOAM_PHOTOS
+    # at them to turn the port's check on, and the two controls above still
+    # pin the meter when they are absent.
+    _gen = os.environ.get('FOAM_PHOTOS', os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 'photos'))
     _pub = [('f2-swash-foam-lace.jpg', (560, 540, 1060, 640), 0.81),
             ('f2-swash-foam-lace.jpg', (460, 690, 960, 800), 0.76),
             ('f1-breaker-three-whites.jpg', (1250, 830, 1750, 960), 0.54)]
@@ -9371,7 +9375,7 @@ def _sec_foamtex(ctx):
          'being quoted against a verbal 100 %.')
     between(0, 'foam patch l/W, the DRAWN field, vs photographs 0.3-0.8 %',
             t_after['lW'], 0.25, 0.95,
-            'THE ROW THIS WAVE EXISTS FOR. `gauntlet/sea/bar/generic/` measures '
+            'THE ROW THIS SECTION EXISTS FOR. The photographic set measures '
             'the correlation length inside a foam patch at 0.3-0.8 %% of that '
             'patch\'s own width across six boxes in two photographs, and the '
             'bracket is dimensionless so no exposure, white balance or grade '

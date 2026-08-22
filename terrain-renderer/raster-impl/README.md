@@ -11,7 +11,7 @@ approximation error is invisible to a code path that does not approximate.
     python3 validate_raster.py        # 200 rows, three tiers, ~2 min, non-zero exit on FAIL
     python3 validate_raster.py -v     # every tolerance's justification
     python3 validate_raster.py --fast # skip the frame-level tiers (~15 s)
-    python3 evidence.py               # the eight figures in gauntlet/raster/evidence/
+    python3 evidence.py               # the eight figures in raster-impl/evidence/
     python3 evidence.py r2-           # just the wave set
 
 | File | Owns |
@@ -176,7 +176,7 @@ and over all three bands, and the finding is that the table needs a band label.
 
 ### What it costs in a frame — and the chapter is right that you cannot see it
 
-`gauntlet/raster/evidence/r1-frame-factorisation.png`. Same geometry, same
+`raster-impl/evidence/r1-frame-factorisation.png`. Same geometry, same
 camera, same table size; only the bake differs.
 
 | upwelling | whole frame, red / green / blue | worst binned red |
@@ -208,7 +208,7 @@ Two things the chapter does not say, both of which came out of building the pass
 
 ## Where the pass fails against the offline reference
 
-`gauntlet/raster/evidence/r1-pass-vs-offline.png`. 157 641 water pixels, post
+`raster-impl/evidence/r1-pass-vs-offline.png`. 157 641 water pixels, post
 silhouette excluded, scene-linear, all three bands.
 
 | traversal rule | median | p95 | max | median absolute |
@@ -378,7 +378,7 @@ the whole road inside the resolved regime; half puts all of it past the filter.
 
 ### The collapse, measured
 
-`gauntlet/raster/evidence/r2-variance-vs-distance.png`. Absolute rms slopes at
+`raster-impl/evidence/r2-variance-vs-distance.png`. Absolute rms slopes at
 the pass's own footprints, `s = sqrt(<|∇h|²>)` throughout — `field.py`'s one
 convention, and every number below goes through `field.rms_slope` or
 `field._plane_rms` rather than an expression written out here.
@@ -440,7 +440,7 @@ a bias bracket of 0.122 at 4–8 m, and 0.928 against 0.084 at 8–16 m.
 
 ### The fix, priced
 
-`gauntlet/raster/evidence/r2-error-and-cost.png`. Best of three runs, numpy on a
+`raster-impl/evidence/r2-error-and-cost.png`. Best of three runs, numpy on a
 CPU: what transfers is the ratio and the operation count, not the milliseconds.
 
 | path | ms / frame | µs / px | × naive | median frame error | p95 | absolute median |
@@ -716,7 +716,7 @@ to remove. Exact duplicate depths are grouped by float equality, which is exact
 and buys the flat shelf for one call. 16:9 with an odd number of 2×2 quad rows,
 so the helper-lane audit is not run on a size that hides a parity bug.
 
-## Evidence — `gauntlet/raster/evidence/`, `r1-` prefix
+## Evidence — `raster-impl/evidence/`, `r1-` prefix
 
 Every caption is burnt into its frame and every number in it is formatted from
 the run that drew it: if a constant moves the caption moves with it, and if a

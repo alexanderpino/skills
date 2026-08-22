@@ -1,7 +1,7 @@
-"""The evidence frames, written to `gauntlet/raster/evidence/` with an `r1-`
+"""The evidence frames, written to `evidence/` with an `r1-`
 prefix.
 
-    python3 evidence.py            # all five figures
+    python3 evidence.py            # all eight figures
     python3 evidence.py r1-pass    # just the ones whose name starts with this
 
 EVERY NUMBER IN EVERY CAPTION IS FORMATTED FROM THE RUN THAT DREW THE FRAME.
@@ -49,8 +49,8 @@ import sswater as WA                                            # noqa: E402
 import waves as WV                                              # noqa: E402
 import waveref as WR                                            # noqa: E402
 
-OUT = os.path.abspath(os.path.join(_HERE, '..', '..', 'gauntlet', 'raster',
-                                   'evidence'))
+OUT = os.path.abspath(os.environ.get(
+    'RASTER_OUT', os.path.join(_HERE, 'evidence')))
 Y709 = np.array([0.2126, 0.7152, 0.0722])
 RED, GRN, BLU = (196, 62, 48), (44, 132, 78), (52, 96, 190)
 ORANGE, PURPLE = (214, 130, 30), (128, 72, 168)

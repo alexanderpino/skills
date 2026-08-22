@@ -1,6 +1,6 @@
 """beach_camera.py -- wave 7. WHERE THE PHOTOGRAPH WAS TAKEN FROM.
 
-The sea gauntlet's `config.json` carries four hyper-realism criteria and the
+The sea reference carries four hyper-realism criteria and the
 FIRST of them is unmet by every frame this project has drawn:
 
     FRAME TO MATCH. A reference render must be shot from a viewpoint one of the

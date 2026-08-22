@@ -2784,7 +2784,7 @@ def main():
     clocks_figure(w, frep, '%s/s6-clocks.png' % OUT)
 
     # ---- WAVE 7: THE OWNER'S TWO CLIFF VIEWPOINTS, UPRIGHT ------------------
-    # The gauntlet's first hyper-realism criterion, attempted for the first
+    # The first hyper-realism criterion, attempted for the first
     # time. THE PORTRAIT ASPECT IS PART OF THE FRAMING, not a layout choice:
     # bar J and bar K both record the frame upright, and an upright 4:3 held by
     # the same lens is 1.33x taller and 0.75x wider than the same lens held
@@ -3286,7 +3286,7 @@ def horizon_check(L, cam, edge_frac=0.12):
 
 
 # ============================================ WAVE 7 -- THE OWNER'S VIEWPOINTS
-# The gauntlet's first hyper-realism criterion is FRAME TO MATCH, and no frame
+# The first hyper-realism criterion is FRAME TO MATCH, and no frame
 # in this project has met it. Everything below is the attempt: the camera is
 # inferred in `beach_camera.py` from the bar's inventory of what is in each
 # photograph, placed on this bed's own landform, and then the frame it produces
@@ -5511,7 +5511,9 @@ def main_wave10():
 # frames carry no text at all. Wave 11's three critics each reported, without
 # being asked, that the blind was defeated because every evidence frame had the
 # builder's changelog burned into its pixels, and one had to crop a hero frame
-# before it could judge it. `gauntlet-loop/references/blind-protocol.md`.
+# before it could judge it: a caption in the corner answers "is this a
+# photograph" before the viewer reaches the image. Render captions to a
+# sidecar and hand the critic the frame alone.
 def _sidecar(path, text):
     with open(path.replace('.png', '.caption.md'), 'w') as f:
         f.write(text.rstrip() + '\n')
@@ -5851,16 +5853,23 @@ def scene_bay(diffract='dir'):
     """THE BED THE SCENE STANDS ON, and every flag it turns on is named here
     rather than left as a default somebody has to go and read.
 
-    `'dir'` AND NOT `'full'`, AND THE REASON IS A MEASUREMENT. The amplitude
-    half of the fan is real physics and it is very strong on this geometry:
+    `'dir'` AND NOT `'full'`, AND THE REASON IS A MEASUREMENT, not a taste.
+    The amplitude half is real physics and it is very strong on this geometry:
     K_d falls to 0.073 in the deepest sheltered row, so `'full'` hands those
-    rows a 0.11 m sea. Measured, that suppresses the wind partition's breaking
-    line entirely -- the centre row goes from three surf lines to one -- so the
-    scene would be trading the second bar, which the bed is built to show, for
-    a shelter gradient. The direction fan is what the module was needed for
-    (it is what lets a curved coast be a zero-transport one at all) and it
-    already moves ~66 % of the bed's cells. `'full'` stays one argument away
-    for a frame whose subject IS the shelter.
+    rows a 0.11 m sea. Rendered both ways at the same size:
+
+        diffract='dir'   breakpoints at 611 and 683 m; 6018 px of deck,
+                         2185 px of coverage > 0.5, foam at BOTH bars
+        diffract='full'  ONE breakpoint at 699 m; 2926 px of deck, 367 px of
+                         coverage > 0.5
+
+    The shelter suppresses the wind partition's line entirely, so `'full'`
+    trades the second bar -- which is what the two-partition bed exists to
+    show -- for a shelter gradient. The direction fan is what the module was
+    needed for in the first place (it is what lets a curved coast be a
+    zero-transport one at all) and it already moves about two thirds of the
+    bed's cells. `'full'` stays one argument away for a frame whose subject IS
+    the shelter.
     """
     return B.run_bay(embay=True, climate=B.CLIMATE_SCENE, diffract=diffract)
 

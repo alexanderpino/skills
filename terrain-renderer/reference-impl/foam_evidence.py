@@ -199,7 +199,7 @@ not, deliberately.
 **Measured on this crop, leftmost 500 px:** correlation length
 `l/W` = %(lW).2f %% of the box width, acf 1/e = %(acf).2f px, run q90 =
 %(run_q90).0f px, gap median = %(gap_med).0f px. The photographs in
-`gauntlet/sea/bar/generic/` give 0.3-0.8 %% and 8-52 px.
+the reference photographs give 0.3-0.8 %% and 8-52 px.
 """
 
 CAP_AFTER = """# s18-foam-edge-after

@@ -1,6 +1,6 @@
 """Wave 17's evidence: the slope statistics derived, and Cox & Munk as a limit.
 
-Three figures, drawn with `beach_plot` into `gauntlet/sea/evidence/` as
+Three figures, drawn with `beach_plot` into `evidence/` as
 `s17-*.png`. Every number comes from `wind_spectrum.py`; nothing is read back
 out of a PNG and nothing here computes physics of its own.
 
@@ -20,8 +20,8 @@ import beach_optics as BOP                                      # noqa: E402
 import beach_plot as BP                                         # noqa: E402
 import wind_spectrum as W                                       # noqa: E402
 
-EV = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                  '..', '..', 'gauntlet', 'sea', 'evidence')
+EV = os.environ.get('BEACH_OUT', os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'evidence'))
 
 # a palette: one hue per cut-off, cool to warm as the instrument gets finer
 CUT_COL = [(38, 70, 132), (32, 118, 160), (46, 150, 128), (170, 140, 40),
