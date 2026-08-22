@@ -237,7 +237,8 @@ k = 2 g / ( c^2 + sqrt(c^4 - c_min^4) )
 
 Two readings fall out of that form immediately. `c >> c_min` sends it to `g/c²`, the deep-water
 limit. And at `c = c_min` the exact root is `k = √(ρg/σ_t)`, i.e. `λ = 2π√(σ_t/ρg) = 17.1 mm` —
-`LAM_MIN`, the same wavelength the capillary–gravity minimum sits at — while `g/c²` gives 34.2 mm.
+`LAM_MIN`, the same wavelength the capillary–gravity minimum sits at (chapter 12 prints the same
+number as **1.712 cm**; one `σ`, one closed form, two notations) — while `g/c²` gives 34.2 mm.
 **A factor of two at the fan edge.** Launching the gravity limit while cutting the fan at the
 capillary-aware `arccos(c_min/U)` takes the two halves of one condition from different branches, and
 leaves the fan edge carrying a wave that does not in fact stand still (`|H|/σ = 0.088` at launch —

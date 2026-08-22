@@ -1401,9 +1401,31 @@ hemisphere at a wedge and marching the refracted ray (`D`, here): zero rays ente
 the threshold is insensitive to the split — 30+53.1, 20+63.1 and 10+73.1 all open at the same sum
 and pass the same 83 rays. And on the reference implementation's own bay, `beach_render.py`'s
 `through_face` marches the refracted view ray until the free surface comes back down to meet it:
-over ~70 000 water pixels the fraction that leave the far side of a crest is **0.0000** at a linear
-surface (steepest face **8.23°**) and **0.0000** at a second-order Stokes surface (**15.78°**, a
-×1.95 steepening that bought exactly nothing here) — `D`, both recomputed.
+the fraction that leave the far side of a crest is **0.0000**, on every surface the implementation
+can draw (`D`, recomputed).
+
+**And the second check disposes of the obvious objection, which is that the surface was not steep
+enough.** `surface_slope` over 90 000 world points and 8 instants across one period, on the shipped
+spectral surface, reads median **1.69°**, p99.9 **18.09°**, p99.99 **22.09°**, max **43.53°** — and
+a fine zoom at 0.2 m spacing around the steepest sample reads **46.89°**, so the tail is real and
+the coarse grid was undersampling it. ⚠️ **Quote the percentiles, not the max**: a max over a random
+field is an extreme-value statistic and moves with the sample count, not with the physics (a census
+at half the difference-operator step agreed to a tenth of a degree at p99.9 and p99.99, and differed
+by 9° at the max only because it ran half as many instants).
+
+So the shipped surface is **already past Stokes' corner** — 30° is exceeded by about one wet sample
+in 115 000 and 41.48° by about one in 690 000. That is not a defect; 30° caps a wave of **permanent
+form**, and a linear sum of 256 components is not one. What it disposes of is the *framing*: the
+surface does not fail for want of a steep enough face. It has faces past 41.48°, and the far side is
+still unreachable — because the criterion is on the **sum**, and a face is only half of it. A
+single-valued surface with a 47° face still has to bring its partner face up to 36°, on the *same
+crest*, on the *same ray*.
+
+**Turned from a zero into a distance.** Over **10 889 060** admissible entry/exit pairs on the drawn
+surface, the best `α₁ + α₂` anywhere in the scene is **68.48°** against the 82.96° needed, and the
+typical good pair (p99.9) sits at **43.20°** (`D`). The remaining 14.48° is the measured width of
+the gap — and note that 68.48° **already exceeds the 60° a wave of permanent form can reach**, so
+no amount of the steepening the corner allows will close it. What closes it is folding.
 
 **And the geometric wall is not the operative one, which is the practical half.** Even where the
 cones just overlap, both crossings are at near-grazing incidence and Fresnel collapses: at
@@ -1490,11 +1512,23 @@ is which: the first is `r`, the second is `ψ`, and only the second reaches the 
 **And the family's own ceiling, swept rather than assumed.** Along the validity boundary the gain is
 monotone in `ψ` — 1.299 at 0°, 1.480 at −10°, 1.710 at −30°, 1.927 at −60°, **1.99999 at −90°**
 (`D`, `stokes2_crest_limit` bisected at each `ψ`). **×2.000 is the ceiling of the entire
-second-order family**, at any `r`, any `ψ`, any depth. Measured against the reference bay, whose
-linear steepest face is 8.23°: `×2` on that slope is **16.13°**, and the bay's second-order surface
-reached **15.78°** — **97.7% of the ceiling of the whole family**. Second order was not
-under-exploited there; it was spent. Combined with [the 30° ceiling](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise)
-above, the ordering of the two limits is the useful part: **the shape family runs out first, the
+second-order family**, at any `r`, any `ψ`, any depth.
+
+**And a single carrier sits on that ceiling, in closed form.** On the reference bay's own
+`(r, ψ)` the gain maxes at exactly **2.000** — the pure-asymmetry limit — while `a·k` maxes at
+**0.1481 = 8.42°**, so the product is **0.2945 = 16.41°**; the carrier measures **16.02°**, which is
+that number less the difference operator's own attenuation. **97.6% of the ceiling of the whole
+family.** Second order was not under-exploited; it was spent.
+
+⚠️ **This ceiling binds one carrier, and the shipped surface is not one carrier.** A linear sum of
+components has no such closed form and is not bound by it — the same bay's spectral surface reaches
+**43.53°**, nearly three times the carrier's ceiling, and it still does not open the far side of a
+crest. Read the two numbers as what they are: 16.41° is *how much a single wave shape can be asked
+for*, and 43.53° is *what the drawn surface actually does*. Quoting the first where the second
+belongs is the mistake this paragraph exists to prevent.
+
+Combined with [the 30° ceiling](#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise)
+above, the ordering of the limits is the useful part: **the shape family runs out first, the
 representation runs out second, and neither runs out because of the implementation.**
 
 ## Aerated water: foam, spray and whitewater
@@ -3080,9 +3114,13 @@ shadow now arrives at **92%** of its own depth against 91% (`D`) — the shadow 
 interiors filled, which is exactly what a *directional* return does and a raised ambient cannot.
 
 **Truncating the trap at one bounce is a real error with a computable size, and it is not small.**
-The closed geometric series and its truncations, at the diffuse constant and at the wrong cone:
+The closed geometric series and its truncations, at the diffuse constant and at the wrong cone.
+⚠️ **Every column here is at `τ = 0`** — the summed column is the exact value *of the series*, which
+is an **upper bound on the gain**, not the gain; the figure caption below prices the difference and
+the [round-trip section](#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them)
+carries the depth-aware form. Read the rows against each other, not against a pool.
 
-| bed albedo ρ | exact `1/(1 − ρ·R_int)` | one bounce | two bounces | one bounce over `1 − 1/n²` |
+| bed albedo ρ | closed series, `τ = 0` | one bounce | two bounces | one bounce over `1 − 1/n²` |
 |---|---|---|---|---|
 | 0.222 (this liner, red) | 1.1182 | 1.1057 (−1.1%) | 1.1169 (−0.1%) | 1.0974 (−1.9%) |
 | 0.400 (luminance) | 1.2353 | 1.1905 (−3.6%) | 1.2267 (−0.7%) | 1.1755 (−4.8%) |

@@ -194,10 +194,20 @@ least-confident-claims ledger in `00-index.md`.
   WMO codes conflict across secondary sources (Douglas 1921/1929; WMO wave codes 1946/1947/1970)
   and are deliberately **not** stated as fact here — only the NOAA descriptor wording is
   authoritative in this section.
-- **P** — Capillary–gravity dispersion `ω² = (gk + (σ/ρ)k³)·tanh(kh)` and its **minimum phase speed
-  ≈ 23.1 cm/s at ≈ 1.73 cm wavelength** — the hard short-wavelength bound used in
-  [Calm water](12-water-rendering.md#calm-water-the-low-energy-regime). Classical fluid mechanics; the constants were
-  web-verified 2026-08 against standard references, the original derivation was not chased.
+- **P/? + D** — Capillary–gravity dispersion `ω² = (gk + (σ/ρ)k³)·tanh(kh)` and its **minimum phase
+  speed 23.12 cm/s at 1.712 cm wavelength** — the hard short-wavelength bound used in
+  [Calm water](12-water-rendering.md#calm-water-the-low-energy-regime). Classical fluid mechanics.
+  ⚠️ **This entry previously recorded the pair `≈ 23.1 cm/s at ≈ 1.73 cm` as web-verified *as a
+  pair*, and that claim is retracted.** Each half was checked alone and each is inside the published
+  spread for clean water, but they are not consistent with one another: 23.1 cm/s implies
+  `σ = 0.07256 N/m`, 1.73 cm implies `σ = 0.07437 N/m`, **2.5% apart**. A pair-check is exactly what
+  would have caught that, and it had not been made. The chapter now **declares one `σ`
+  (0.0728 N/m, `reference-impl/wake.py::SIG`, tier `P/?`) and derives both halves from it** by the
+  closed forms `c_min = (4gσ/ρ)^¼` and `λ_min = 2π√(σ/ρg)` (tier `D`), so the two cannot drift apart
+  again. Nothing downstream moved at the quoted precision — this was a provenance defect, not a
+  numerical one. **The wake-geometry entry further down quotes the same minimum** as `0.231 m/s at
+  17.1 mm`; that is the identical pair in millimetres, from the identical `σ`, and it is the same
+  constant, not a second measurement.
 - **P** — Whitecap and foam optics: **void fraction 60–99%**, **mean bubble diameter 0.16–1 mm**,
   visible reflectance **~50% fresh breaking / ~40% active whitecap / ~18% thin residual foam**, and
   NIR reflectance troughs at **~750, 980, 1200 nm** from liquid-water absorption enhanced by
@@ -1240,11 +1250,19 @@ least-confident-claims ledger in `00-index.md`.
   own unpolarised Fresnel on both crossings over a cosine-weighted incidence hemisphere. Its role is
   to say the geometric floor is *not* the operative threshold; the ≈50° / ≈55° figures for a tenth
   and a fifth of the flux are read off that table and are not sharp constants.
-  **The render measurement** — through-face fraction **0.0000** at 8.23° and at 15.78° steepest
-  face, ~70 000 water pixels a side — is `D`, recomputed here from `reference-impl/beach_render.py`
-  (`surface_report`, `chord_report`/`through_face`) at half the shipped frame resolution. It is
-  consistent with the theorem and does **not** test it: 15.78 + 15.78 = 31.6° is nowhere near the
-  floor, so the frame confirms the scene, not the bound. The bound is carried by the geometry.
+  **The render measurement** — through-face fraction **0.0000** — is `D`, recomputed here from
+  `reference-impl/beach_render.py` (`surface_report`, `chord_report`/`through_face`) at half the
+  shipped frame resolution. ⚠️ **On its own this confirms the scene, not the bound**: a zero is
+  consistent with the theorem and does not test it. What tests it is the **pair census** — over
+  **10 889 060** admissible entry/exit pairs on the drawn surface the best `α₁ + α₂` anywhere is
+  **68.48°** against the 82.96° floor, p99.9 sits at **43.20°**, and nothing clears it. That is `D`
+  as well, and it converts the zero into a measured distance of 14.48°. The **face angles** that go
+  with it — median 1.69°, p99.9 18.09°, p99.99 22.09°, max 43.53° over 90 000 world points × 8
+  instants, and 46.89° in a 0.2 m zoom — are `D` from `beach.surface_slope`. ⚠️ **The max is an
+  extreme-value statistic**: a census at half the difference-operator step reproduced p99.9 and
+  p99.99 to a tenth of a degree but returned a max of 34.36° because it ran 4 instants and not 8.
+  Percentiles are comparable across censuses; maxima are not. The bound itself is carried by the
+  geometry, not by any of these numbers.
 - **P/D** — [A peaked crest is not a steep face](12-water-rendering.md#a-peaked-crest-is-not-a-steep-face-one-harmonic-two-moments).
   Second-order Stokes' bound harmonic `η = a[cos φ + r cos(2φ+ψ)]` and its depth function
   `C(kd) = cosh(kd)(2 + cosh 2kd)/sinh³(kd)` are **`P`** (Dean & Dalrymple, *Water Wave Mechanics for
@@ -1257,8 +1275,12 @@ least-confident-claims ledger in `00-index.md`.
   sign changes of `dη/dφ` across the limit (2 → 3 → 4 roots at `r` = 0.24 / 0.25 / 0.26); the exact
   slope gains **3√3/4** and **1 + 2r**, against `beach.slope_gain`'s numerical maximum
   (1.2990380 vs 1.2990381); and the monotone sweep along the validity boundary establishing **2.000
-  as the family ceiling**. The 97.7% figure is the reference bay's 15.78° against `×2` on its own
-  8.23° linear face — one scene, quoted as a scene.
+  as the family ceiling**. The 97.6% figure is the reference bay's **carrier** — `slope_gain` at its
+  own `(r, ψ)` maxing at exactly 2.000, `a·k` maxing at 0.1481 = 8.42°, product 0.2945 = **16.41°**,
+  measured **16.02°** after the difference operator's attenuation. One scene, quoted as a scene.
+  ⚠️ **This ceiling binds one carrier and nothing else.** The same bay's shipped surface is a linear
+  sum of components, has no such closed form, and reaches **43.53°** — quoting the carrier's ceiling
+  as the bay's face angle is the error this note exists to block.
   ⚠️ **`?` on `ψ` itself.** Nothing above fixes what `ψ` *is* for a real shoaling wave; the section
   is deliberately written so that no claim depends on it — the two endpoints are derived (a bound
   harmonic is phase-locked at `ψ = 0`; a fully broken bore is a sawtooth at `ψ = −π/2`) and every
