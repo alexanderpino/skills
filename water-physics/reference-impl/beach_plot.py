@@ -28,6 +28,19 @@ INK = (28, 30, 34)
 GRID = (214, 212, 206)
 MUTED = (120, 122, 128)
 
+# Every clip `Axes.line` performs, recorded here for the caller to inspect.
+# See the note in `Axes.line`: an axis set below its data removes samples and
+# reports nothing, so the removal is made visible instead of trusted.
+CLIPPED = []
+
+
+def clip_report(reset=True):
+    """Return the clips recorded since the last call, and clear the log."""
+    out = list(CLIPPED)
+    if reset:
+        del CLIPPED[:]
+    return out
+
 
 class Axes:
     """One rectangular plotting frame with linear x and y scales."""
@@ -93,6 +106,20 @@ class Axes:
             # curve that leaves the axes and is drawn anyway lands on the title.
             keep = ((px >= self.x0 - 1) & (px <= self.x1 + 1)
                     & (py >= self.y0 - 1) & (py <= self.y1 + 1))
+            # ⚠️ AND COUNT WHAT WAS DROPPED. Clipping is the only operation in
+            # this file that removes evidence and never errors: a y-limit set
+            # below the data silently truncates the curve, and a truncated rise
+            # reads as a plateau -- which is how a cubic growth shipped looking
+            # like it levelled off. The count is reported by the caller so that
+            # deliberate clipping (a curve that genuinely leaves the frame) can
+            # be told apart from an axis that is simply too small.
+            n_drop = int(px.size - int(keep.sum()))
+            if n_drop:
+                y_over = int(np.count_nonzero(np.isfinite(py) & (py < self.y0 - 1)))
+                y_under = int(np.count_nonzero(np.isfinite(py) & (py > self.y1 + 1)))
+                CLIPPED.append({'axes': (self.x0, self.y0, self.x1, self.y1),
+                                'dropped': n_drop, 'of': int(px.size),
+                                'above_ylim': y_over, 'below_ylim': y_under})
             px, py = px[keep], py[keep]
         pts = [(float(a), float(b)) for a, b in zip(px, py)
                if np.isfinite(a) and np.isfinite(b)]
@@ -101,18 +128,33 @@ class Axes:
         if dash is None:
             self.d.line(pts, fill=colour, width=width, joint='curve')
         else:
-            on, off = dash
+            # ⚠️ THE PHASE IS TAKEN MODULO THE PERIOD, and the version that did
+            # not is why this note exists. The walker used to toggle on
+            # `(acc // on) % 2`, which is only a period when `off` is an odd
+            # multiple of `on`; for `dash=(2, 4)` the parity locks after the
+            # first dash and the line is drawn ONCE and then never again --
+            # 1% ink where 33% belongs, which reads as "the line was never
+            # added" rather than as a dash bug. Silently deleting a curve is
+            # the worst failure a plot library has, so the state here is a
+            # position within one period, not a parity.
+            on, off = float(dash[0]), float(dash[1])
+            period = on + off
+            if period <= 0.0:
+                raise ValueError('dash period must be positive: %r' % (dash,))
             acc = 0.0
             for (ax, ay), (bx, by) in zip(pts[:-1], pts[1:]):
                 seg = float(np.hypot(bx - ax, by - ay))
                 t = 0.0
                 while t < seg:
-                    step = min(on if (acc // on) % 2 == 0 else off, seg - t)
-                    if (acc // on) % 2 == 0:
+                    phase = acc % period
+                    if phase < on:
+                        step = min(on - phase, seg - t)
                         f0, f1 = t / seg, (t + step) / seg
                         self.d.line([ax + (bx - ax) * f0, ay + (by - ay) * f0,
                                      ax + (bx - ax) * f1, ay + (by - ay) * f1],
                                     fill=colour, width=width)
+                    else:
+                        step = min(period - phase, seg - t)
                     t += step
                     acc += step
 

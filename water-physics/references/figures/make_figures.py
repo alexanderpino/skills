@@ -1599,11 +1599,293 @@ def fig_kelvin_wake(out):
     return P.save(img, os.path.join(out, 'kelvin-wake-angle.png'))
 
 
+# ==========================================================================
+#  THE FIVE KINDS OF WATER THE SKILL COULD NOT REACH
+# ==========================================================================
+def fig_ice_vs_water(out):
+    """Ice is not tinted water: a different spectrum AND a different mechanism.
+
+    The claim needs two panels because it is two claims. Left: the absorption
+    triples, which match in green and diverge by 4x in blue -- a SHAPE, not a
+    scale. Right: Kubelka-Munk reflectance against bubble density, where the
+    same material walks from clear-blue lake ice to white firn without any
+    parameter but S."""
+    import ice as ICE
+    img = P.canvas(1180, 700)
+
+    ax = P.Axes(img, (92, 54, 556, 520), (0.0, 3.0), (-3.2, 0.35),
+                xlabel='', ylabel='log10 absorption coefficient, 1/m')
+    ax.frame(xticks=[], yticks=[-3, -2, -1, 0], yfmt='%.0f')
+    aw = np.asarray(O.ABS, float)
+    ai = np.asarray(ICE.ABS_ICE, float)
+    names = ('red 610 nm', 'green 550 nm', 'blue 450 nm')
+    for k in range(3):
+        x0 = k + 0.18
+        ax.fill_between(np.array([x0, x0 + 0.28]), np.array([-3.2, -3.2]),
+                        np.array([np.log10(aw[k])] * 2), FILL_C)
+        ax.fill_between(np.array([x0 + 0.34, x0 + 0.62]),
+                        np.array([-3.2, -3.2]),
+                        np.array([np.log10(ai[k])] * 2), FILL_B)
+        ax.text(x0 + 0.14, np.log10(aw[k]) + 0.06, '%.4f' % aw[k], INK,
+                anchor='ms')
+        ax.text(x0 + 0.48, np.log10(ai[k]) + 0.06, '%.5f' % ai[k], BLU,
+                anchor='ms')
+        ax.text(x0 + 0.31, -3.13, names[k], MUTED, anchor='ms')
+        ax.text(x0 + 0.31, np.log10(min(aw[k], ai[k])) - 0.22,
+                '%.2fx' % (aw[k] / ai[k]), ACCENT, anchor='ms')
+    _legend(ax, [(FILL_C, None, 'water'), (FILL_B, None, 'ice')], 2.05, 0.22)
+    ax.text(0.06, 0.22, 'green matches to 1.3%', MUTED)
+    ax.text(0.06, 0.05, 'blue differs 4.0x', MUTED)
+
+    bx = P.Axes(img, (676, 54, 1140, 520), (5.0, 11.0), (0.0, 1.0),
+                xlabel='log10 bubble number density, 1/m%s' % '³',
+                ylabel='Kubelka-Munk reflectance of a thick slab')
+    bx.frame(xticks=[5, 6, 7, 8, 9, 10, 11], yticks=[0, 0.25, 0.5, 0.75, 1.0],
+             xfmt='%.0f', yfmt='%.2f')
+    nd = np.logspace(5.0, 11.0, 400)
+    S = ICE.bubble_scattering(1e-4, nd)
+    for k, col in ((0, RED), (1, GRN), (2, BLU)):
+        bx.line(np.log10(nd), ICE.km_reflectance_infinite(ai[k], S), col,
+                width=3)
+    for lab, n in (('lake ice', 2e6), ('glacier', 5e8), ('firn', 2e10)):
+        bx.vline(np.log10(n), MUTED, width=1, dash=(3, 4))
+        bx.text(np.log10(n), 0.035, lab, MUTED, anchor='ms')
+    _legend(bx, [(RED, None, 'red 610 nm'), (GRN, None, 'green 550 nm'),
+                 (BLU, None, 'blue 450 nm')], 5.2, 0.94)
+    P.caption(img, [
+        'ICE IS NOT TINTED WATER, AND THE TWO PANELS ARE TWO SEPARATE REASONS. Left: at this project\'s own band points the two absorption',
+        'triples MATCH in green to 1.3% and differ by 4.0x in blue. That is a change of SHAPE, and no tint reproduces a shape. Red:blue',
+        'selectivity is 55.0 for ice against 25.6 for water -- 2.15x steeper across the visible, which is the quantitative answer to "why is',
+        'glacier ice blue". Right: the MECHANISM differs too. A thick scattering slab\'s colour depends on K/S alone, so unlike clear water it',
+        'does not vanish as the slab thins -- and one parameter, the bubble density, walks the same material from clear-blue lake ice to',
+        'white firn. For water the colour is the path; for ice the colour is K/S. Data: Warren & Brandt (2008). Drawn from',
+        'reference-impl/ice.py, guarded by validate_phases.py.'])
+    return P.save(img, os.path.join(out, 'ice-vs-water.png'))
+
+
+def fig_jet_regimes(out):
+    """One axis orders the waterfall, the fountain, the hose and the pistol."""
+    import jet as J
+    img = P.canvas(1180, 620)
+
+    ax = P.Axes(img, (92, 54, 1140, 380), (-2.0, 4.0), (0.0, 1.0),
+                xlabel='log10 aerodynamic Weber number  We_g = %s U%s d / %s'
+                       % ('ρ_air', '²', 'σ'),
+                ylabel='')
+    ax.frame(xticks=[-2, -1, 0, 1, 2, 3, 4], yticks=[], xfmt='%.0f')
+    bnds = [(-2.0, np.log10(J.WE_RAYLEIGH), FILL_A, 'Rayleigh'),
+            (np.log10(J.WE_RAYLEIGH), np.log10(J.WE_FIRST_WIND), FILL_B,
+             'first wind-induced'),
+            (np.log10(J.WE_FIRST_WIND), np.log10(J.WE_SECOND_WIND), FILL_C,
+             'second'),
+            (np.log10(J.WE_SECOND_WIND), 4.0, (226, 206, 206), 'atomization')]
+    for lo, hi, col, lab in bnds:
+        ax.fill_between(np.array([lo, hi]), np.array([0.0, 0.0]),
+                        np.array([1.0, 1.0]), col)
+        ax.text(0.5 * (lo + hi), 0.93, lab, INK, anchor='ms')
+        if lab == 'second':
+            ax.text(0.5 * (lo + hi), 0.87, 'wind-induced', INK, anchor='ms')
+    cases = (('slow trickle', 0.6, 4e-3), ('water pistol', 8.0, 1.5e-3),
+             ('garden hose', 12.0, 12e-3), ('fountain jet', 9.0, 25e-3),
+             ('fog nozzle', 35.0, 1.0e-3), ('fire hose', 30.0, 29e-3))
+    for i, (lab, u, d) in enumerate(cases):
+        x = float(np.log10(J.weber_aero(u, d)))
+        y = 0.66 - 0.11 * i
+        ax.marker(x, y, ACCENT, r=5)
+        ax.text(x + 0.09, y - 0.018, '%s  (%.1f m/s, %.1f mm)'
+                % (lab, u, d * 1e3), INK)
+    P.caption(img, [
+        'FOUR EVERYDAY JETS, FOUR REGIMES, AND NOBODY TUNED THE BOUNDARIES TO FIT THEM. Lin & Reitz (1998) classify jet breakup on the',
+        'AERODYNAMIC Weber number -- built on the AIR\'s density, because the air is what tears the surface. Building it on the liquid\'s is an',
+        '829x error and puts every jet past atomization, which is why "everything atomises" is a common misreading. The boundaries 0.4 / 13 /',
+        '40.3 sort a trickle, a water pistol, a garden hose and a fire hose without adjustment. The counter-intuitive consequence is the',
+        'point of the axis: a fire hose\'s momentum makes its stream LESS coherent, not more, because the aerodynamic force tearing it grows',
+        'as U-squared while the surface tension holding it together does not.',
+        'Drawn from reference-impl/jet.py, guarded by validate_phases.py.'], y=430)
+    return P.save(img, os.path.join(out, 'jet-breakup-regimes.png'))
+
+
+def fig_water_entry(out):
+    """Four events, and the second bright one is DELAYED from the first."""
+    import impact as IMP
+    img = P.canvas(1180, 760)
+    d, u = 0.12, 8.0
+    t_p = float(IMP.cavity_pinchoff_time(d, u))
+    t = _lin(0.0, 2.2 * t_p, 700)
+
+    # ⚠️ THE TIME AXIS CARRIES TICKS. It shipped with `xticks=None` -- an axis
+    # labelled "time after contact, ms" annotated with "pinch-off at 221 ms"
+    # and no scale to read either against. A delay is the one claim this figure
+    # exists to make, and a delay without a scale is a shape.
+    ax = P.Axes(img, (92, 54, 556, 520), (0.0, float(t[-1]) * 1e3),
+                (0.0, 1.15), xlabel='time after contact, ms',
+                ylabel='normalised brightness of the event')
+    ax.frame(xticks=[0, 100, 200, 300, 400],
+             yticks=[0.0, 0.5, 1.0], yfmt='%.1f')
+    crown = np.clip(IMP.crown_radius(t, u, d) / IMP.crown_radius(t_p, u, d), 0, 2)
+    crown = crown * np.exp(-3.0 * t / t_p)
+    ax.line(t * 1e3, crown / max(crown.max(), 1e-9), RED, width=3)
+    jet = np.where(t >= t_p, np.exp(-4.0 * (t - t_p) / t_p), 0.0)
+    ax.line(t * 1e3, jet, BLU, width=3, dash=(9, 5))
+    ax.vline(t_p * 1e3, ACCENT, width=2, dash=(7, 5))
+    ax.text(t_p * 1e3 + 3, 1.06, 'pinch-off at %.0f ms' % (t_p * 1e3), ACCENT)
+    ax.text(4, 1.06, 'crown', RED)
+    # The curves are labelled INLINE and there is no legend box: with only two
+    # curves a legend adds a second thing to read and, at this aspect ratio,
+    # lands on top of the decay it is describing.
+    ax.text(t_p * 1e3 + 45, 0.86, 'Worthington jet', BLU)
+
+    # WHICH VARIABLE CARRIES WHAT -- shown, not asserted. The caption used to
+    # claim "the timing carries the body size, the depth carries the speed"
+    # and the figure did not test it. Here the impact speed is swept at fixed
+    # body size and each quantity is normalised to its value at 2 m/s: the
+    # pinch-off TIME is flat, the jet speed rises as sqrt(U), the pinch-off
+    # DEPTH rises linearly. Three different exponents off one variable is the
+    # whole reason tying the second flash to impact energy misplaces it.
+    bx = P.Axes(img, (676, 54, 1140, 520), (2.0, 20.0), (0.0, 11.0),
+                xlabel='impact speed U, m/s  (body size fixed at 120 mm)',
+                ylabel='quantity / its value at U = 2 m/s')
+    bx.frame(xticks=[2, 5, 10, 15, 20], yticks=[0, 2, 4, 6, 8, 10])
+    us = _lin(2.0, 20.0, 400)
+    ref = 2.0
+    # ⚠️ THE ARGUMENT ORDERS DIFFER between these three -- `(d, u)` for the two
+    # cavity quantities and `(u, d)` for the jet -- so they are called by name
+    # rather than uniformly. A loop over bare function objects here would have
+    # silently swapped 0.12 m and 8 m/s and drawn three plausible curves.
+    series = (
+        (lambda uu: IMP.cavity_pinchoff_time(d, uu), RED, None,
+         'pinch-off time     U⁰ (flat)'),
+        (lambda uu: IMP.worthington_jet_speed(uu, d), GRN, (9, 5),
+         'jet speed          U^1/2'),
+        (lambda uu: IMP.cavity_pinchoff_depth(d, uu), BLU, (2, 4),
+         'pinch-off depth    U¹'),
+    )
+    for fn, col, dash, lab in series:
+        y = np.broadcast_to(np.asarray(fn(us), float), us.shape) / float(fn(ref))
+        bx.line(us, y, col, width=3, dash=dash)
+    _legend(bx, [(c, dh, lb) for _, c, dh, lb in series], 2.8, 10.3)
+
+    P.caption(img, y=566, lines=[
+        'THE SECOND BRIGHT EVENT IS DELAYED FROM THE FIRST, AND THAT IS WHY ONE PARTICLE BURST CANNOT BE TUNED INTO LOOKING RIGHT. A body',
+        'entering water produces four events: an ejecta crown at contact, an air cavity dragged down behind it, a pinch-off when hydrostatic',
+        'pressure closes that cavity, and a Worthington jet fired UPWARD out of the collapse -- often higher than the crown. No decay curve',
+        'on one impulse produces a second impulse. The timing carries the BODY SIZE and not the impact speed (t_p ~ sqrt(d/g)); the pinch-off',
+        'DEPTH carries the speed. So tying the jet to impact energy puts the dependency on the wrong variable. Sequence and scalings after',
+        'Truscott, Epps & Belden (2014). Drawn from reference-impl/impact.py, guarded by validate_phases.py.'])
+    return P.save(img, os.path.join(out, 'water-entry-sequence.png'))
+
+
+def fig_hydraulic_jump(out):
+    """White water that stands: depth ratio and a cubic energy loss."""
+    import openchannel as OC
+    img = P.canvas(1180, 760)
+    fr = _lin(1.0, 12.0, 800)
+    h1 = 1.0
+    h2 = OC.conjugate_depth(h1, fr)
+
+    ax = P.Axes(img, (92, 54, 556, 520), (1.0, 12.0), (0.0, 17.0),
+                xlabel='upstream Froude number Fr%s' % '₁',
+                ylabel='conjugate depth ratio h%s/h%s' % ('₂', '₁'))
+    ax.frame(xticks=[1, 2, 4, 6, 8, 10, 12], yticks=[0, 4, 8, 12, 16])
+    for lo, hi, col in ((1.0, 1.7, FILL_A), (1.7, 2.5, FILL_B),
+                        (2.5, 4.5, FILL_C), (4.5, 9.0, (222, 214, 200)),
+                        (9.0, 12.0, (226, 206, 206))):
+        ax.fill_between(np.array([lo, hi]), np.array([0.0, 0.0]),
+                        np.array([17.0, 17.0]), col)
+    # LABELS STAGGERED, because the two narrow classes are 0.7 and 0.8 wide
+    # and their names are not. A label that collides is worse than absent.
+    for x, y, lab in ((1.35, 16.2, 'undular'), (2.1, 15.0, 'weak'),
+                      (3.5, 16.2, 'oscillating'), (6.7, 16.2, 'steady'),
+                      (10.5, 16.2, 'strong')):
+        ax.text(x, y, lab, MUTED, anchor='ms')
+    ax.line(fr, h2 / h1, INK, width=3)
+    ax.hline(1.0, MUTED, width=1, dash=(3, 4))
+
+    # ⚠️ THE TOP OF THIS AXIS WAS BELOW THE CURVE. At Fr = 12 the loss reaches
+    # log10 1.75 and the limit was 1.5, so `Axes.line`'s clip DROPPED the last
+    # quarter of the sweep: the curve stopped at Fr ~ 9.4 against the top
+    # border, which reads as the rise flattening there. That is the opposite of
+    # the cubic growth the panel exists to show, and it is the failure mode of
+    # clipping-as-safety -- it never errors, it just removes evidence. The
+    # limit is taken from the data's own maximum with headroom, never guessed.
+    bx = P.Axes(img, (676, 54, 1140, 520), (1.0, 12.0), (-4.0, 2.0),
+                xlabel='upstream Froude number Fr%s' % '₁',
+                ylabel='log10 energy loss %sE / h%s' % ('Δ', '₁'))
+    bx.frame(xticks=[1, 2, 4, 6, 8, 10, 12],
+             yticks=[-4, -3, -2, -1, 0, 1, 2], yfmt='%.0f')
+    dE = OC.energy_loss(h1, h2)
+    bx.line(fr, np.log10(np.maximum(dE / h1, 1e-9)), BLU, width=3)
+    bx.text(6.2, -3.4, 'a CUBE in the depth rise:', INK)
+    bx.text(6.2, -3.75, '%sE = (h%s - h%s)%s / (4 h%s h%s)'
+            % ('Δ', '₂', '₁', '³', '₁', '₂'), INK)
+    P.caption(img, [
+        'A RAPID IS NOT A WAVE -- THE WATER MOVES AND THE STRUCTURE DOES NOT, which is why a flow-mapped river surface can never produce one',
+        'and why white water in rapids ends up hand-painted. Belanger closes the jump on MOMENTUM and not on energy, because energy is not',
+        'conserved across it: that is what a jump is for. An energy closure returns the upstream depth and no jump at all. Right: the loss',
+        'goes as the CUBE of the depth rise, which is why strong jumps are violent out of all proportion to their size, and it is handed to',
+        'the foam sections as a RATE (a power per unit width) rather than as a mask -- so the white in a rapid comes out of the same',
+        'covering-measure model as the white in surf. Bands are the standard five classes, and they are a LOOK, not a taxonomy. Drawn from',
+        'reference-impl/openchannel.py, guarded by validate_phases.py.'], y=566)
+    return P.save(img, os.path.join(out, 'hydraulic-jump.png'))
+
+
+def fig_thin_film(out):
+    """Three samples cannot describe a spectrum that oscillates."""
+    import thinfilm as TF
+    img = P.canvas(1180, 760)
+    lam = _lin(380e-9, 730e-9, 2400)
+
+    # ⚠️ THE Y-LIMIT IS THE FIGURE'S OWN PITFALL. A water/oil/water stack
+    # reflects a few percent, not a third; drawn on a 0..0.35 axis the fringes
+    # collapse into the bottom fifth and the aliasing they exist to show is
+    # invisible. The axis is set from the data's own range, not from a round
+    # number -- the same rule this skill applies to tolerances.
+    ax = P.Axes(img, (92, 54, 556, 520), (380.0, 730.0), (0.0, 0.08),
+                xlabel='wavelength, nm', ylabel='reflectance of the film')
+    ax.frame(xticks=[400, 450, 500, 550, 600, 650, 700],
+             yticks=[0.0, 0.02, 0.04, 0.06, 0.08], yfmt='%.2f')
+    for d_nm, col, dash in ((200, GRN, None), (800, RED, (9, 5))):
+        ax.line(lam * 1e9, TF.airy_reflectance(lam, d_nm * 1e-9, 0.8), col,
+                width=3, dash=dash)
+    # The three sample points, LABELLED -- unlabelled they read as gridlines,
+    # and they are the entire argument: at 610 nm the thick film sits on a
+    # maximum, at 550 nm on a minimum, at 450 nm halfway up. Three numbers,
+    # 2.4 oscillations, and nothing in the samples says so.
+    for lam0, col, lab in ((610.0, RED, 'R'), (550.0, GRN, 'G'),
+                           (450.0, BLU, 'B')):
+        ax.vline(lam0, col, width=1, dash=(2, 4))
+        ax.text(lam0, 0.0045, lab, col, anchor='mm')   # below the curves,
+        #                                                not up in the legend
+    _legend(ax, [(GRN, None, 'film 200 nm  (0.6 fringe)'),
+                 (RED, (9, 5), 'film 800 nm  (2.4 fringes)')], 392.0, 0.076)
+
+    bx = P.Axes(img, (676, 54, 1140, 520), (1.6, 3.9), (-3.0, 0.2),
+                xlabel='log10 film thickness, nm',
+                ylabel='log10 relative error of 3-sample RGB')
+    bx.frame(xticks=[2, 2.5, 3, 3.5], yticks=[-3, -2, -1, 0], yfmt='%.0f')
+    ds = np.logspace(1.7, 3.8, 160)
+    err = np.array([TF.rgb_aliasing_error(x * 1e-9, 0.8)[0] for x in ds])
+    bx.line(np.log10(ds), np.log10(np.maximum(err, 1e-6)), INK, width=3)
+    bx.hline(np.log10(0.05), ACCENT, width=1, dash=(6, 5))
+    bx.text(1.7, np.log10(0.05) + 0.10, '5% error', ACCENT)
+    P.caption(img, y=566, lines=[
+        'AN OIL SHEEN IS THE ONE WATER APPEARANCE DRIVEN BY PHASE, and it lands squarely on this chapter\'s own trap. The interference term',
+        'oscillates in 1/lambda, so past a few hundred nanometres of film the spectrum has more oscillations than three RGB samples can',
+        'represent and the rendered hue becomes a function of which three wavelengths were picked. Measured here: the error grows more than',
+        'TENFOLD between one fringe across the visible band and two. That is "a channel is a band, not a wavelength" at its sharpest, and it',
+        'is why the production model (Belcour & Barla 2017) pre-integrates the spectral response analytically instead of sampling it. The',
+        'other signature no tint can fake is that the hue swings with viewing angle, because the optical path carries cos(theta_t). Drawn',
+        'from reference-impl/thinfilm.py, guarded by validate_phases.py.'])
+    return P.save(img, os.path.join(out, 'thin-film-aliasing.png'))
+
+
 FIGURES = (fig_two_sides, fig_factorisation, fig_trapped_series,
            fig_runup, fig_sommerfeld, fig_glitter_path, fig_mss_cutoff,
            fig_float_binades, fig_depth_precision, fig_cube_sphere,
            fig_aureole_ceiling, fig_receiver_weights, fig_azimuth_fold,
-           fig_kelvin_wake)
+           fig_kelvin_wake,
+           fig_ice_vs_water, fig_jet_regimes, fig_water_entry,
+           fig_hydraulic_jump, fig_thin_film)
 
 # WHERE EACH FIGURE IS WRITTEN, and why this file did not split when the skill
 # did. Seven of these belong to chapters that live in `terrain-renderer` --
@@ -1772,13 +2054,103 @@ def selftest():
 def main(argv):
     if '--selftest' in argv:
         return selftest()
-    forced = argv[1] if len(argv) > 1 else None
+    # ⚠️ `--only` EXISTS BECAUSE ITS ABSENCE WAS A TRAP. The positional argument
+    # is an output DIRECTORY, so `--only fig_thin_film` used to be read as a
+    # directory name: it silently created `./--only/` and wrote all nineteen
+    # figures into it, leaving the real ones untouched. An unrecognised flag
+    # that succeeds is worse than one that fails, so unknown `--` arguments are
+    # now refused rather than reinterpreted.
+    only = None
+    args = list(argv[1:])
+    if '--only' in args:
+        i = args.index('--only')
+        if i + 1 >= len(args):
+            print('--only needs a figure name', file=sys.stderr)
+            return 2
+        only = args[i + 1]
+        del args[i:i + 2]
+    bad = [a for a in args if a.startswith('--')]
+    if bad:
+        print('unknown option(s): %s' % ' '.join(bad), file=sys.stderr)
+        return 2
+    forced = args[0] if args else None
+    figures = FIGURES
+    if only is not None:
+        figures = tuple(f for f in FIGURES if only in (f.__name__,
+                                                       f.__name__[4:]))
+        if not figures:
+            print('no figure named %r; have: %s' % (
+                only, ' '.join(f.__name__ for f in FIGURES)), file=sys.stderr)
+            return 2
     preflight()
-    for fn in FIGURES:
+    # ⚠️ CLIPPING IS REPORTED, NOT TRUSTED. `Axes.line` drops samples that fall
+    # outside the frame, which is right for a curve that genuinely leaves it
+    # and wrong for an axis set below its own data -- and the two look
+    # identical on the page. `fig_hydraulic_jump` shipped with the second: a
+    # y-limit of 1.5 against a curve reaching 1.75, so the last quarter of a
+    # CUBIC rise was removed and read as a plateau. Found by eye, which does
+    # not scale to nineteen figures; the log below does.
+    P.clip_report()                                   # start from empty
+    clipped = {}
+    for fn in figures:
         out = forced if forced else ELSEWHERE.get(fn, _HERE)
         os.makedirs(out, exist_ok=True)
         print(fn(out))
+        rec = P.clip_report()
+        if rec:
+            clipped[fn.__name__] = rec
+    if only is None and forced is None:
+        return _check_clips(clipped)
+    for name, rec in sorted(clipped.items()):
+        print('  %-22s %5d clipped' % (name, sum(r['dropped'] for r in rec)),
+              file=sys.stderr)
     return 0
+
+
+# THE CLIPS THAT ARE MEANT, with the count each produces. A baseline rather
+# than a threshold: every entry below was looked at in the rendered image and
+# is a curve that genuinely leaves its frame -- the standard-Z float32 error
+# falling under 1e-8 near the near plane, the wake half-angle diverging past
+# 60 degrees at capillary wavelengths, the film aliasing error under 1e-3.
+# ⚠️ DO NOT WIDEN AN ENTRY TO MAKE A RUN QUIET. A count that grew means either
+# the data moved or an axis is now too small for it, and the second is the
+# defect this exists to catch. Look at the figure, then edit the number.
+ACCEPTED_CLIPS = {
+    'fig_sommerfeld': 198,
+    'fig_glitter_path': 2980,
+    'fig_depth_precision': 221,
+    'fig_kelvin_wake': 156,
+    'fig_hydraulic_jump': 5,
+    'fig_thin_film': 8,
+}
+
+
+def _check_clips(clipped):
+    """Compare this run's clipping against the accepted baseline."""
+    got = {k: sum(r['dropped'] for r in v) for k, v in clipped.items()}
+    bad = []
+    for name in sorted(set(got) | set(ACCEPTED_CLIPS)):
+        a, b = ACCEPTED_CLIPS.get(name, 0), got.get(name, 0)
+        if a != b:
+            bad.append((name, a, b))
+    if not bad:
+        print('\nclipping matches the accepted baseline (%d figures, %d samples)'
+              % (len(got), sum(got.values())), file=sys.stderr)
+        return 0
+    print('\nCLIPPING CHANGED -- an axis may now be smaller than its data.',
+          file=sys.stderr)
+    for name, a, b in bad:
+        for rec in clipped.get(name, []):
+            if rec['above_ylim'] or rec['below_ylim']:
+                break
+        print('  %-22s accepted %d, drew %d' % (name, a, b), file=sys.stderr)
+        for rec in clipped.get(name, []):
+            if rec['above_ylim'] or rec['below_ylim']:
+                print('      %d above ylim, %d below, in one call'
+                      % (rec['above_ylim'], rec['below_ylim']), file=sys.stderr)
+    print('  Look at the figure before touching ACCEPTED_CLIPS.',
+          file=sys.stderr)
+    return 1
 
 
 if __name__ == '__main__':
