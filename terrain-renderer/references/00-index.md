@@ -51,7 +51,7 @@ sat where terrain rendering itself is thinnest.
 provenance appendix is `water-physics`'s `12b` in every case; read it before citing anything water.
 
 ⚠️ **This skill ships no runnable implementation.** `water-physics` carries three — a pool, an open
-coast and a screen-space pass — arbitrated by suites of **306**, **611** and **200** guarded rows.
+coast and a screen-space pass — arbitrated by suites of **306**, **611** and **200** guarded rows, all passing.
 Everything in *this* skill is curated practice with a provenance tier, and the tier table above says
 what each one is worth. A `T`- or `F`-tier claim here does not carry the confidence of a `D`-tier
 one there.

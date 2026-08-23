@@ -101,8 +101,8 @@ what the others test.
 | Directory | What it is | Its arbiter |
 |---|---|---|
 | `reference-impl/` (pool) | A 1.40 m domestic pool: the cleanest optics laboratory available — flat datum, known bed, known depth, `b_b ≈ 0`. Every doctrine statement carrying a number was derived or falsified here | `python3 validate.py` — **306 pass / 0 FAIL / 64 info**, ~2 min |
-| `reference-impl/` (coast) | An open coast: bathymetry and the morphodynamic loop, wave transform and depth-limited breaking, Sommerfeld diffraction, the wave-height population, the foam realisation, the camera and the renderer | `python3 validate_beach.py` — **604 pass / 0 FAIL / 0 ERROR**, ~25 min |
-| `raster-impl/` | The real-time screen-space pass, its LUT and its wave surface. It exists because the offline path **structurally cannot** test approximation error — a code path that does not approximate has none | `python3 validate_raster.py` — 200 rows, three tiers, ~2 min |
+| `reference-impl/` (coast) | An open coast: bathymetry and the morphodynamic loop, wave transform and depth-limited breaking, Sommerfeld diffraction, the wave-height population, the foam realisation, the camera and the renderer | `python3 validate_beach.py` — **611 pass / 0 FAIL / 0 ERROR / 36 open**, ~27 min |
+| `raster-impl/` | The real-time screen-space pass, its LUT and its wave surface. It exists because the offline path **structurally cannot** test approximation error — a code path that does not approximate has none | `python3 validate_raster.py` — **200 rows / 0 FAIL**, three tiers, ~2 min |
 
 **Every tolerance is justified from the estimator's own error, never from the disagreement it
 reports**, and `-v` prints that justification per row. `validate_beach.py --bugs` re-runs the
