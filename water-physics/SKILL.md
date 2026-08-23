@@ -101,7 +101,7 @@ what the others test.
 | Directory | What it is | Its arbiter |
 |---|---|---|
 | `reference-impl/` (pool) | A 1.40 m domestic pool: the cleanest optics laboratory available — flat datum, known bed, known depth, `b_b ≈ 0`. Every doctrine statement carrying a number was derived or falsified here | `python3 validate.py` — **306 pass / 0 FAIL / 64 info**, ~2 min |
-| `reference-impl/` (coast) | An open coast: bathymetry and the morphodynamic loop, wave transform and depth-limited breaking, Sommerfeld diffraction, the wave-height population, the foam realisation, the camera and the renderer | `python3 validate_beach.py` — **612 pass / 0 FAIL / 0 ERROR / 36 open**, ~27 min |
+| `reference-impl/` (coast) | An open coast: bathymetry and the morphodynamic loop, wave transform and depth-limited breaking, Sommerfeld diffraction, the wave-height population, the foam realisation, the camera and the renderer | `python3 validate_beach.py` — **612 pass / 0 FAIL / 0 ERROR / 36 open / 107 info**, ~28 min |
 | `reference-impl/` (phases) | The five axes: `ice.py` (phase), `jet.py` (Weber), `impact.py` (impulse), `openchannel.py` (travelling vs standing) and `thinfilm.py` (interference). Closed forms and named scalings, with every fitted constant exposed as an argument rather than baked in | `python3 validate_phases.py` — **30 pass / 0 FAIL / 1 info**, seconds; `--bugs` catches **6 of 6**. Its prose is guarded separately by `validate_chapter.py` — **100 numbers / 0 drifted** |
 | `raster-impl/` | The real-time screen-space pass, its LUT and its wave surface. It exists because the offline path **structurally cannot** test approximation error — a code path that does not approximate has none | `python3 validate_raster.py` — **200 rows / 0 FAIL**, three tiers, ~2 min |
 
