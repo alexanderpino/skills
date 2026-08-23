@@ -25,6 +25,16 @@ same: **the result the full-grind loop would have reached — the same bar met,
 deciding-grade rigour at every decision — faster and cheaper**, and the report
 proves it against the intake projection rather than asserting it.
 
+That promise is a number, not an adjective: **≥ 80% of the target bar for ≤ 20%
+of the undisciplined cost**. `gauntlet.py efficiency` scores both halves from the
+log, `status` prints the one-line read every wave, and `report` states the
+verdict with its denominator visible. The denominator is *this run without the
+discipline* — same lanes, same waves, one round each, unoptimised, nothing
+pruned — because that is the only counterfactual a run can compute rather than
+imagine. Neither half is optional: a never-judged dimension counts as zero, so a
+run cannot buy the ratio by doing less work (`references/cost-discipline.md`,
+where the 5× is derived lever by lever).
+
 The method is Matt Shumer's, published 27 July 2026 as the technique behind the
 "Claude of Duty" run (`https://somethingbig.ai/gauntlet-loop`, prompt at
 `https://github.com/mshumer/Claude-of-Duty`). This skill adds an intake contract,
@@ -194,6 +204,7 @@ python3 scripts/gauntlet.py bar-request               # what this run still need
 python3 scripts/gauntlet.py quote --current-score 4   # the quality-price menu: what 7, 8, 9 cost; 10 is not a price
 python3 scripts/gauntlet.py plan --current-score 4    # draft plan.md: build stages in order, priced — the forward scaffold
 python3 scripts/gauntlet.py park --lane a --dimension visual --reason "..."
+python3 scripts/gauntlet.py efficiency   # score the contract: % of bar vs % of undisciplined cost
 python3 scripts/gauntlet.py board    # regenerate workbench.md + settled.md from the log
 python3 scripts/gauntlet.py extend --waves 3 --reason "..."   # only on a user grant
 python3 scripts/gauntlet.py report   # draft the end-of-run report
@@ -222,7 +233,14 @@ one reversible build in the workspace.
    named comparator, or one you propose in a line: an external artifact you can
    open, not a checklist you wrote. Score against a **provisional target of 7**;
    Phase 2 sets the real one.
-4. **Show the user** the artifact and the verdict.
+4. **Measure what that round cost, in tokens.** First light is the one
+   *unoptimised* round the run will ever have — full payloads, deciding tier,
+   cold cache, no gates declared yet — which makes it the denominator of the
+   efficiency contract. Record it at `init` (`--baseline-round-tokens <N>`) or
+   with `efficiency --baseline-round-tokens <N>`. Skip it and the run cannot
+   score its own cost claim for the rest of its life; there is no second chance
+   at an unoptimised round.
+5. **Show the user** the artifact and the verdict.
 
 Then the arithmetic, out loud, on **provisional** numbers: the *lanes* you expect
 to cut (independently judgeable parts of the artifact — Phase 3) and the default
@@ -543,6 +561,15 @@ and `report`. `report` drafts every section from the log; you fill in the smoke
 test (what you opened, what you saw), the one thing it cannot know — whether the
 bar was raised mid-run — and your honest read.
 
+**Score the contract, whichever way it went.** `report` prints the efficiency
+verdict — % of the bar reached against % of the undisciplined cost — and it is
+not a section to quietly drop when it reads badly. `too-expensive` means the
+levers were off and the next run should know which. `too-cheap` means the ratio
+was bought by leaving work unjudged, which is the one result this method must
+never present as a win. `unmeasured` means nobody logged `--tokens` or nobody
+recorded first light's cost, and the honest sentence is that the run cannot show
+it met its own promise.
+
 **The surplus is the deliverable.** The promise of this variant is the same
 result at lower cost, so when every lane retires with budget unspent, the
 surplus **returns to the user by default** — stop, report, and state the
@@ -623,4 +650,4 @@ Three are not cited inline:
 Subagent briefs: `builder.md`, `critic.md`, `smoother.md` — and
 `grounding.md`, which binds builders and critics alike: what to look up rather
 than recall, which sources carry authority, and how to cite them.
-Tooling: `scripts/gauntlet.py` (init / bar-request / quote / plan / log-round / gate / status / park / board / extend / report).
+Tooling: `scripts/gauntlet.py` (init / bar-request / quote / plan / log-round / gate / status / park / efficiency / board / extend / report).

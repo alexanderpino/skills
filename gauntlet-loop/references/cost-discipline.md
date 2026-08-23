@@ -4,6 +4,77 @@ A gauntlet is a loop that spends money on purpose. The question is never "how do
 we run it cheaply" — a cheap loop that closes no gaps is pure waste — but "does
 this call buy a gap". Everything here is about killing the calls that do not.
 
+## The contract: 80% of the bar for 20% of the cost
+
+That is the whole reason this variant exists, so it is a number the run scores
+itself against rather than a claim in a README:
+
+> **≥ 80% of the target bar, for ≤ 20% of the undisciplined cost.**
+
+```bash
+python3 scripts/gauntlet.py efficiency
+```
+
+Both halves are computed from the log, and the command prints `pass`,
+`too-expensive`, `too-cheap`, `missing-both`, or `unmeasured`. `status` prints
+the one-line version at every wave boundary and `report` scores it at the end,
+so a broken promise surfaces at wave 2 rather than in the post-mortem.
+
+**The denominator is this run without the discipline.** Not a guess at what
+someone else's prompt would have cost — that is unmeasurable, and a ratio
+against an imagined number is a marketing exercise. The counterfactual is: the
+same lanes, the same waves, one round per lane per wave, every round at the
+unoptimised price, nothing retired, nothing parked, no dimension decided by a
+machine, no verdict at a cheaper tier. That *is* the loop this method descends
+from, and every lever below is a line item against it.
+
+**The unoptimised price is measured, once.** First light is that round by
+construction: full payloads, deciding tier, cold cache, no gates declared yet.
+Record what it cost and the ratio has a real denominator:
+
+```bash
+python3 scripts/gauntlet.py efficiency --baseline-round-tokens 130000
+```
+
+Without it the command refuses to compute a ratio. A run that cannot score its
+own contract has not met it, and the report says so in those words.
+
+**Both halves, or neither.** The cheapest possible run leaves every dimension
+unjudged, so quality counts a never-judged dimension as **zero, not as absent** —
+that is what the `too-cheap` verdict catches, and it is the verdict this contract
+exists to make impossible to hide. Cost discipline that costs quality is not the
+deal. Equally, `too-expensive` names the levers that are off, because "spend
+less" is not an instruction anyone can act on.
+
+### Where the 5× comes from
+
+A target nobody can derive is a wish. The rules below multiply in two separate
+places — **inside the round** and **over the round count** — and the contract
+needs both. Modelled from a 130k lane-round (builder ~50k, critic ~70k, lead
+~10k); the 70k critic call is measured, from this skill's own self-run, and the
+multipliers are estimates until a run measures its own:
+
+| Lever | Where it bites | Round cost |
+|---|---|---|
+| — | the undisciplined round | 130k |
+| Prompt caching (rule 10) | the stable prefix — brief, contract, frozen bar, settled — read at ~0.1× | ~71k |
+| Script counts and publishes (rule 7) | the lead narrates nothing `status` can compute | ~64k |
+| Screening tier (rule 8) | routine verdicts on a cheaper model | ~52k |
+| Machine gates (rule 1) | machine-decided dimensions leave the critic's scope | **~46k (35%)** |
+
+Per-round discipline alone lands at roughly a third — **not** at a fifth. The
+rest is the round *count*: the WIP limit funds depth over breadth, retirement
+and parking stop funding what is finished or dead, the review cap stops the
+fourth look at one gap, and no-gap-no-builder skips the round that has nothing
+to close. A run that funds 8 lane-rounds where the undisciplined loop funds 15
+is at 53% of the work.
+
+**0.35 × 0.53 ≈ 0.19.** That is the contract, and it says something useful about
+which corners cannot be cut: neither half reaches it alone. Cheap rounds without
+pruning stop at ~35%; pruning without cheap rounds stops at ~50%. This is also
+why `efficiency` lists the levers individually — a missed ceiling is nearly
+always two or three of them switched off, not one bad wave.
+
 Two numbers govern the run, both printed by `gauntlet.py status`:
 
 - **calls spent** — the running total

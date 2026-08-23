@@ -37,6 +37,8 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | A real defect timed out by the cap | "we reviewed it three times" applied to a credential leak | `--blocking` gaps are exempt from the cap, block `bar-met` at any severity, and refuse to park without `--force` |
 | Scope snowball | more lanes at wave 6 than wave 1 | frozen lane set, backlog |
 | Token burn | cost per closed gap climbing | machine gates, one critic call, WIP, LOD ladder, degradation order |
+| A cost claim nobody checks | "cheaper" asserted in the docs, never scored on a run | the efficiency contract: ≥80% of the bar for ≤20% of the undisciplined cost, computed by `efficiency` against a measured first-light round, printed by `status` every wave and by `report` at the end |
+| The ratio bought by doing less | 20% of the cost because a third of the work was never judged | a never-judged dimension scores zero, not absent; the `too-cheap` verdict names it and refuses to read as a win |
 | The cache never hits | every round pays full price for the same frozen bar | stable prefix first and byte-identical, volatile tail last, warm once before fanning out, one model per track |
 | Critic softens; reads as progress | severity easing over near-empty diffs | softening tripwire (`--diff-lines`) in `status` |
 | Blind quietly never happens | every round logged rubric, promotions unblinded | blind promotions by default, `--blind` share in `status` |

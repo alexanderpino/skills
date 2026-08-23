@@ -15,6 +15,8 @@ Commands:
   gate         Run the mechanical checks; skip those whose inputs are unchanged
   status       State per lane/dimension, the next-wave plan, fired stop conditions
   park         Stop spending on a lane/dimension that stopped moving (or resume it)
+  efficiency   Score the contract: quality reached vs cost against the same run
+               without the discipline (>= 80% of the bar for <= 20% of the cost)
   board        Regenerate gauntlet/workbench.md from the log (no model tokens)
   extend       Raise the wave budget after the user grants an extension
   report       Draft the end-of-run gauntlet report from the log
@@ -84,6 +86,20 @@ DEFAULT_CONFIG = {
     # Lane/dimension pairs deliberately stopped short of retirement, appended by
     # `park`. Their gaps stay open in the report; their budget goes back.
     "parked": [],
+    # The efficiency contract this variant exists to meet: at least this share of
+    # the target-bar quality, for at most this share of what the same run costs
+    # without the discipline. Both are computed from the log by `efficiency`, not
+    # asserted — a cost claim nobody measures is marketing.
+    "efficiency": {
+        "quality_floor": 0.8,
+        "cost_ceiling": 0.2,
+        # Tokens one *unoptimised* lane-round costs: full payloads, deciding
+        # tier, cold cache, nothing gated. First light is exactly that round,
+        # which is why it is measured before any lever is switched on. null =
+        # never measured, and `efficiency` refuses to compute a ratio rather
+        # than inventing a denominator.
+        "baseline_round_tokens": None,
+    },
     # Mechanical checks a command can decide. Each names the paths it depends on;
     # a gate whose inputs are unchanged since it last passed is NOT re-run, and
     # its result is handed to the critic so no round pays to re-derive it.
@@ -121,6 +137,9 @@ def load_config(root):
     cfg.setdefault("stops", {})
     for k, v in DEFAULT_CONFIG["stops"].items():
         cfg["stops"].setdefault(k, v)
+    cfg.setdefault("efficiency", {})
+    for k, v in DEFAULT_CONFIG["efficiency"].items():
+        cfg["efficiency"].setdefault(k, v)
     return cfg
 
 
@@ -250,6 +269,19 @@ def cmd_init(args):
             "only on an explicit user grant, and record the grant in contract.md",
             file=sys.stderr,
         )
+    for key, val, lo, hi in (
+        ("quality_floor", args.quality_floor, 0.0, 1.0),
+        ("cost_ceiling", args.cost_ceiling, 0.0, 1.0),
+    ):
+        if val is not None:
+            if not (lo < val <= hi):
+                die(f"--{key.replace('_', '-')} must be a share between 0 and 1 "
+                    f"(0.8 = 80%), got {val}")
+            cfg["efficiency"][key] = val
+    if args.baseline_round_tokens is not None:
+        if args.baseline_round_tokens < 1:
+            die("--baseline-round-tokens must be positive")
+        cfg["efficiency"]["baseline_round_tokens"] = args.baseline_round_tokens
     if args.wip_limit is not None:
         if args.wip_limit < 1:
             die("wip-limit must be at least 1")
@@ -300,6 +332,29 @@ def cmd_init(args):
         f"(WIP limit {cfg['wip_limit']} lane(s)), ~{total_calls} "
         f"over the {cfg['stops']['budget_waves']}-wave budget"
     )
+    # Preflight on the efficiency contract. The levers that make the ceiling
+    # reachable are configuration, and configuration is decided here — telling
+    # the user at the end of the run that it was never reachable is useless.
+    eff = cfg["efficiency"]
+    missing = []
+    if not cfg.get("gates"):
+        missing.append("no machine gates declared — every dimension will pay a critic call")
+    if cfg["lanes"] and cfg["wip_limit"] >= len(cfg["lanes"]):
+        missing.append(f"WIP limit {cfg['wip_limit']} funds every one of the "
+                       f"{len(cfg['lanes'])} lanes each wave — no depth-over-breadth saving")
+    if not eff.get("baseline_round_tokens"):
+        missing.append("no baseline round measured — the cost ratio cannot be computed at all "
+                       "(`efficiency --baseline-round-tokens <N>` from first light)")
+    if missing:
+        print(
+            f"\nefficiency contract: >= {eff['quality_floor']:.0%} of the bar for "
+            f"<= {eff['cost_ceiling']:.0%} of the undisciplined cost. Not reachable as "
+            "configured:"
+        )
+        for m in missing:
+            print(f"  - {m}")
+        print("  Fix these now, at intake, or lower the contract deliberately "
+              "(--cost-ceiling).")
     tb = cfg["stops"].get("budget_tokens")
     if tb:
         print(f"token budget: {tb:,} — ~{tb // max(1, total_calls):,} per call at that projection")
@@ -895,6 +950,138 @@ def _lane_dim_status(rounds, cfg):
         )
     }
     return out, retired_lanes, closed_lanes
+
+
+def _lane_round_groups(rounds):
+    """Distinct (lane, wave, round) triples — the unit that costs money.
+
+    One triple is one builder call plus one critic call, whatever number of
+    dimension records it produced: the combined critic judges several dimensions
+    in a single inspection, and counting records instead of rounds would price
+    that saving as a cost.
+    """
+    groups = {}
+    for r in rounds:
+        g = groups.setdefault((r["lane"], r["wave"], r["round"]), {"tokens": None})
+        if "tokens" in r:
+            g["tokens"] = (g["tokens"] or 0) + r["tokens"]
+    return groups
+
+
+def _efficiency(rounds, cfg, per):
+    """Measure the contract: ≥ quality_floor of the bar for ≤ cost_ceiling of
+    the undisciplined cost. Both halves from the log; neither is asserted.
+
+    **The counterfactual is this run without the discipline** — not a guess at
+    what someone else's prompt would cost. Same lanes, same waves, one round per
+    lane per wave, every round at the unoptimised price, nothing retired, nothing
+    parked, no dimension decided by a machine, no verdict at a cheaper tier. That
+    is the loop this variant descends from, and it is the only baseline that can
+    be computed rather than imagined.
+
+    The unoptimised price is `baseline_round_tokens`: first light, measured
+    before a single lever is switched on.
+    """
+    eff = cfg.get("efficiency") or {}
+    floor = eff.get("quality_floor", 0.8)
+    ceiling = eff.get("cost_ceiling", 0.2)
+    out = {"floor": floor, "ceiling": ceiling, "blockers": [], "levers": []}
+
+    # --- quality: distance to the target bar, per declared dimension ---
+    declared = [k for k in per] or []
+    scores, unjudged = [], []
+    for key in sorted(declared):
+        s = per[key]
+        if s["last_score"] is None:
+            unjudged.append(key)
+            scores.append(0.0)
+        else:
+            scores.append(min(1.0, s["last_score"] / max(1, s["target"])))
+    out["quality"] = sum(scores) / len(scores) if scores else None
+    out["quality_min"] = min(scores) if scores else None
+    out["unjudged"] = unjudged
+
+    # --- cost: measured, with unmeasured lane-rounds priced at the measured mean ---
+    groups = _lane_round_groups(rounds)
+    measured = [g["tokens"] for g in groups.values() if g["tokens"] is not None]
+    out["lane_rounds"] = len(groups)
+    out["measured_rounds"] = len(measured)
+    if measured:
+        mean = sum(measured) / len(measured)
+        out["actual_tokens"] = int(sum(measured) + mean * (len(groups) - len(measured)))
+        out["mean_round"] = int(mean)
+    else:
+        out["actual_tokens"] = None
+        out["mean_round"] = None
+
+    base_round = eff.get("baseline_round_tokens")
+    out["baseline_round"] = base_round
+    waves = max((r["wave"] for r in rounds), default=0)
+    lanes = len(cfg.get("lanes") or []) or len({l for l, _w, _r in groups}) or 1
+    out["baseline_rounds"] = lanes * waves
+    out["baseline_tokens"] = base_round * lanes * waves if base_round else None
+    out["ratio"] = (
+        out["actual_tokens"] / out["baseline_tokens"]
+        if out["baseline_tokens"] and out["actual_tokens"] is not None
+        else None
+    )
+    # End-of-run credit: the undisciplined loop has no early stop, so a run that
+    # retires under budget saves the waves it never ran. Reported separately —
+    # the headline stays the like-for-like number, which cannot be accused of
+    # crediting itself for work it simply did not do.
+    budget = cfg["stops"]["budget_waves"]
+    out["full_budget_ratio"] = (
+        out["actual_tokens"] / (base_round * lanes * budget)
+        if base_round and out["actual_tokens"] is not None and budget else None
+    )
+
+    # --- which levers are actually on (a missed ratio has to be actionable) ---
+    bar_recs = [r for r in rounds if r["mode"] in BAR_MODES]
+    gates = cfg.get("gates") or []
+    screening = sum(1 for r in bar_recs if r.get("tier") == "screening")
+    models = {r.get("critic_model") for r in bar_recs if r.get("critic_model")}
+    wip, n_lanes = cfg.get("wip_limit") or 0, len(cfg.get("lanes") or [])
+    pruned = sum(1 for s in per.values() if s["retired"] or s["parked"])
+    for on, name, detail in (
+        (bool(gates), "machine gates",
+         f"{len(gates)} declared" if gates else "none declared — every dimension pays a critic"),
+        (screening > 0, "screening tier",
+         f"{screening} of {len(bar_recs)} bar rounds"
+         if bar_recs else "no bar rounds yet"),
+        (len(models) > 1, "mixed critic models",
+         ", ".join(sorted(models)) if models else "not recorded (--critic-model)"),
+        (n_lanes <= 1 or wip < n_lanes, "WIP limit",
+         "single lane — nothing to limit" if n_lanes == 1
+         else f"{wip} of {n_lanes} lanes per wave" if n_lanes else "no lanes declared"),
+        (pruned > 0, "retire / park",
+         f"{pruned} of {len(per)} dimensions no longer funded"),
+    ):
+        out["levers"].append({"on": on, "name": name, "detail": detail})
+        if not on:
+            out["blockers"].append(f"{name}: {detail}")
+
+    if out["ratio"] is None:
+        out["verdict"] = "unmeasured"
+    elif out["quality"] is None:
+        out["verdict"] = "unmeasured"
+    elif out["quality"] >= floor and out["ratio"] <= ceiling:
+        out["verdict"] = "pass"
+    elif out["ratio"] > ceiling and out["quality"] >= floor:
+        out["verdict"] = "too-expensive"
+    elif out["ratio"] <= ceiling:
+        out["verdict"] = "too-cheap"  # under budget, under the bar
+    else:
+        out["verdict"] = "missing-both"
+    return out
+
+
+EFFICIENCY_READS = {
+    "pass": "the contract holds: the bar was reached for a fraction of the undisciplined cost",
+    "too-expensive": "quality is there, the saving is not — switch on the levers below before the next wave",
+    "too-cheap": "cheap, but under the bar. Cost discipline that costs quality is not the deal; spend the saving on the weakest dimension",
+    "missing-both": "under the bar and over the cost — check the bar is reachable before spending more",
+    "unmeasured": "not computable yet: log --tokens on rounds and set baseline_round_tokens from first light",
+}
 
 
 def _active_keys(per):
@@ -1887,6 +2074,18 @@ def cmd_status(args):
     else:
         print("tokens: not measured. Waves are what the user agreed to; tokens are what "
               "burns. Pass --tokens on log-round or the budget is in the wrong unit.")
+    # One line, every wave boundary: is the run still meeting its own contract?
+    # A cost promise checked only at the end is a cost promise discovered broken.
+    e = _efficiency(rounds, cfg, per)
+    if e["ratio"] is not None:
+        flag = "" if e["verdict"] == "pass" else f"  ** {e['verdict']} **"
+        print(f"contract: {e['quality']:.0%} of the bar "
+              f"(floor {e['floor']:.0%}) at {e['ratio']:.0%} of undisciplined "
+              f"(ceiling {e['ceiling']:.0%}){flag}"
+              + ("   → efficiency" if e["verdict"] != "pass" else ""))
+    elif tok:
+        print("contract: not scored — no baseline round measured "
+              "(`efficiency --baseline-round-tokens <N>`)")
     print()
 
     for (lane, dim), s in sorted(per.items()):
@@ -2011,6 +2210,84 @@ def cmd_status(args):
         _print_extension_offer(rounds, cfg, per, retired, max_wave)
 
 
+def cmd_efficiency(args):
+    """Is the run meeting its own contract? Computed, never asserted."""
+    root = Path(args.root)
+    cfg = load_config(root)
+    rounds = load_rounds(root)
+    per, _retired, _closed = _lane_dim_status(rounds, cfg)
+    if args.baseline_round_tokens is not None:
+        if args.baseline_round_tokens < 1:
+            die("--baseline-round-tokens must be positive")
+        cfg["efficiency"]["baseline_round_tokens"] = args.baseline_round_tokens
+        save_config(root, cfg)
+        print(f"recorded baseline round: {args.baseline_round_tokens:,} tokens "
+              "(one unoptimised lane-round — the denominator for every ratio below)\n")
+    e = _efficiency(rounds, cfg, per)
+    pct = lambda x: f"{100 * x:.0f}%"
+
+    print(f"CONTRACT: >= {pct(e['floor'])} of the target bar "
+          f"for <= {pct(e['ceiling'])} of the undisciplined cost\n")
+
+    if e["quality"] is None:
+        print("QUALITY: no dimensions declared")
+    else:
+        print(f"QUALITY: {pct(e['quality'])} of target (weakest dimension "
+              f"{pct(e['quality_min'])})"
+              + ("  ** below the floor **" if e["quality"] < e["floor"] else ""))
+        for key in sorted(per):
+            s = per[key]
+            sc = f"{s['last_score']}/{s['target']}" if s["last_score"] is not None \
+                else "never judged"
+            print(f"  [{key[0]} / {key[1]}] {sc}  {s['state'].lower()}")
+    if e["unjudged"]:
+        print("  a never-judged dimension counts as zero, not as absent — "
+              "quality you did not measure is not quality you have")
+    print()
+
+    if e["ratio"] is None:
+        print("COST: not computable.")
+        if not e["baseline_round"]:
+            print("  no baseline round measured. First light is the unoptimised round —"
+                  " full payloads,\n  deciding tier, cold cache, nothing gated. Record what"
+                  " it cost:")
+            print("    python3 scripts/gauntlet.py efficiency --baseline-round-tokens <N>")
+        if not e["measured_rounds"]:
+            print("  no round carries --tokens. The ratio is a token ratio; calls are a proxy"
+                  " that\n  hides exactly the savings this contract is about.")
+    else:
+        floor_note = (
+            f" (measured on {e['measured_rounds']} of {e['lane_rounds']} lane-rounds; "
+            "the rest priced at the measured mean)"
+            if e["measured_rounds"] < e["lane_rounds"] else ""
+        )
+        print(f"COST: {pct(e['ratio'])} of undisciplined"
+              + ("  ** over the ceiling **" if e["ratio"] > e["ceiling"] else ""))
+        print(f"  actual   {e['actual_tokens']:,} tokens over {e['lane_rounds']} "
+              f"lane-round(s){floor_note}")
+        print(f"  baseline {e['baseline_tokens']:,} tokens = {e['baseline_rounds']} "
+              f"lane-round(s) x {e['baseline_round']:,} unoptimised")
+        print("           (same lanes, same waves, one round each, nothing pruned, "
+              "no cheaper tier)")
+        if e["full_budget_ratio"] is not None and e["full_budget_ratio"] < e["ratio"]:
+            print(f"  against the full agreed budget: {pct(e['full_budget_ratio'])} — "
+                  "the waves this run\n           never needed. Credit at the end, "
+                  "not a headline mid-run.")
+    print()
+
+    print("LEVERS")
+    for lv in e["levers"]:
+        print(f"  [{'on ' if lv['on'] else 'OFF'}] {lv['name']} — {lv['detail']}")
+    print("  (prompt caching has no line of its own: it shows up as a lower measured\n"
+          "   cost per round, which is where it belongs)")
+    print()
+    print(f"VERDICT: {e['verdict']} — {EFFICIENCY_READS[e['verdict']]}")
+    if e["verdict"] == "too-expensive" and e["blockers"]:
+        print("Switch on before the next wave:")
+        for b in e["blockers"]:
+            print(f"  - {b}")
+
+
 def cmd_board(args):
     """Regenerate the workbench from the log. Deterministic, so keeping the
     user's progress surface current costs zero model tokens."""
@@ -2021,6 +2298,11 @@ def cmd_board(args):
     if not rounds:
         out.write_text("# Gauntlet workbench\n\nNo rounds logged yet.\n")
         print(f"wrote {out}")
+        # Wave 1's critics are handed this path like every other wave's. An
+        # empty file says "nothing is settled yet"; a missing one says "the
+        # rule does not apply here", which is not the same thing.
+        per, _r, _c = _lane_dim_status([], cfg)
+        print(f"wrote {_write_settled(root, [], cfg, per)}")
         return
     per, _retired, _closed = _lane_dim_status(rounds, cfg)
     max_wave = max(r["wave"] for r in rounds)
@@ -2288,6 +2570,49 @@ def cmd_report(args):
             + ".",
             "",
         ]
+    # The efficiency contract, scored. This is the claim the whole variant rests
+    # on, so the report states it as a measurement with its denominator visible
+    # — or says plainly that it was never measurable.
+    e = _efficiency(rounds, cfg, per)
+    lines += [
+        "## Efficiency contract",
+        "",
+        f"Agreed: **>= {e['floor']:.0%} of the target bar for <= {e['ceiling']:.0%} of the"
+        " undisciplined cost** — the same lanes and waves, one round each, at the"
+        " unoptimised round price, nothing retired or parked, nothing machine-decided,"
+        " no cheaper tier. That counterfactual is this run without the discipline, which"
+        " is the loop this method descends from.",
+        "",
+    ]
+    if e["ratio"] is None:
+        lines += [
+            f"**Not measured.** {EFFICIENCY_READS['unmeasured']}. Quality reached"
+            + (f" {e['quality']:.0%} of target." if e["quality"] is not None else "."),
+            "",
+            "A run that cannot score its own contract has not met it — say so here rather"
+            " than implying it held.",
+            "",
+        ]
+    else:
+        lines += [
+            f"- Quality: **{e['quality']:.0%}** of target (weakest dimension"
+            f" {e['quality_min']:.0%})",
+            f"- Cost: **{e['ratio']:.0%}** of undisciplined — {e['actual_tokens']:,} tokens"
+            f" against {e['baseline_tokens']:,} ({e['baseline_rounds']} lane-rounds ×"
+            f" {e['baseline_round']:,})",
+        ]
+        if e["full_budget_ratio"] is not None and e["full_budget_ratio"] < e["ratio"]:
+            lines.append(
+                f"- Against the full agreed budget: **{e['full_budget_ratio']:.0%}** — the"
+                " waves this run never needed"
+            )
+        lines += [
+            f"- Verdict: **{e['verdict']}** — {EFFICIENCY_READS[e['verdict']]}",
+            "",
+            "Levers: "
+            + ", ".join(f"{lv['name']} {'on' if lv['on'] else 'OFF'}" for lv in e["levers"]),
+            "",
+        ]
     ext = cfg.get("extensions") or []
     if ext:
         lines += [
@@ -2444,6 +2769,13 @@ def main():
                         "decide instead of reviewing again (default 3; --blocking gaps exempt)")
     p.add_argument("--target-score", type=int,
                    help="score the target bar sits at, 1-10 (default 7); record higher ambition as a stretch")
+    p.add_argument("--baseline-round-tokens", type=int,
+                   help="tokens one unoptimised lane-round costs, measured at first light — "
+                        "the denominator the efficiency contract is scored against")
+    p.add_argument("--quality-floor", type=float,
+                   help="minimum share of the target bar the run must reach (default 0.8)")
+    p.add_argument("--cost-ceiling", type=float,
+                   help="maximum share of the undisciplined cost the run may spend (default 0.2)")
     p.add_argument("--dimension-targets",
                    help='per-dimension target overrides, e.g. "gameplay=8,graphics=6" — a blanket '
                         "10/10 request is decomposed into these at intake; unnamed dimensions use "
@@ -2533,6 +2865,15 @@ def main():
     p = sub.add_parser("gate", help="run the mechanical checks; skip those whose inputs have not changed")
     p.add_argument("--force", action="store_true", help="re-run every gate, ignoring the cache")
     p.set_defaults(fn=cmd_gate)
+
+    p = sub.add_parser("efficiency",
+                       help="measure the contract: quality reached vs cost against the same "
+                            "run without the discipline")
+    p.add_argument("--baseline-round-tokens", type=int,
+                   help="record what one unoptimised lane-round costs (first light: full "
+                        "payloads, deciding tier, cold cache, nothing gated). This is the "
+                        "denominator of every cost ratio")
+    p.set_defaults(fn=cmd_efficiency)
 
     p = sub.add_parser("board", help="regenerate gauntlet/workbench.md from the log")
     p.set_defaults(fn=cmd_board)
