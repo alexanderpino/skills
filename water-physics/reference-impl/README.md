@@ -34,6 +34,18 @@ or falsified here.
 | `field.py` | The water surface: wind, reverberant tail, wall reflections, jet boil, jet wake. Answers "what is the slope at (x,y)". Knows nothing about light. | mostly — the basin's walls are in it |
 | `wake.py`  | Eikonal ray tracing of the jet's stationary wake through its own drift field. | yes |
 | `render.py`| **This scene**: the basin's plan and bed, the coping and its section, the liner and the tiles, the step unit, the cameras and their justifications, the jet, the sail and the float — plus every diagnostic `print` in the project, which is why its stdout did not move when the physics did. | no, by construction |
+| `ice.py` | The **phase axis**: Warren & Brandt's `n`, `k` for ice, absorption from `k`, red:blue selectivity, geometric bubble scattering, Kubelka–Munk both ways, path amplification, and ice-over-water as a layered medium. | **yes** — no scene, no depth |
+| `jet.py` | The **Weber axis**: the aerodynamic and liquid Weber numbers, Ohnesorge, Reynolds and the `Oh = √We_l/Re` identity, Lin & Reitz's four regimes, Rayleigh drop size, breakup length (⚠️ NaN outside its own regime), orifice exit speed, the drag-free arc and the Stokes number. | **yes** |
+| `impact.py` | The **impulse axis**: impact speed, the Froude and Weber groups, pinch-off time and depth, the Worthington jet, crown spreading, and the two-number cavity criterion. | **yes** |
+| `openchannel.py` | **Travelling versus standing**: the channel Froude number, critical depth, Bélanger's conjugate depth, specific energy, the cubic head loss, the five jump classes, roller length, and the aeration power handed to the foam sections as a source term. | **yes** |
+| `thinfilm.py` | **Interference**: Snell, *signed* Fresnel amplitudes, the round-trip phase, the Airy sum, fringe spacing, and the measured RGB aliasing error. | **yes** |
+
+The last five are the skill's newest material and they share a property the
+first five do not: **nothing in them knows about a scene.** Each is closed
+forms and named scalings along one axis, with every fitted constant exposed as
+an argument rather than baked in, so the suite can check a **scaling** and
+never a fitted number. They are guarded by `validate_phases.py` (physics) and
+`validate_chapter.py` (the chapter's prose against the code).
 
 Sun position is no longer asserted: `atmosphere.solar_position` takes the
 reference photograph's place and clock (Aljezur, 37.319 N 8.803 W, 2026-08-10
