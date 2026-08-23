@@ -35,6 +35,7 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | Settled work re-judged, checks re-derived | the log grows, the artifact does not | settled-work rule, hash-cached `gate` |
 | Scope snowball | more lanes at wave 6 than wave 1 | frozen lane set, backlog |
 | Token burn | cost per closed gap climbing | machine gates, one critic call, WIP, LOD ladder, degradation order |
+| The cache never hits | every round pays full price for the same frozen bar | stable prefix first and byte-identical, volatile tail last, warm once before fanning out, one model per track |
 | Critic softens; reads as progress | severity easing over near-empty diffs | softening tripwire (`--diff-lines`) in `status` |
 | Blind quietly never happens | every round logged rubric, promotions unblinded | blind promotions by default, `--blind` share in `status` |
 | Savings spent instead of returned | target met, run keeps polishing | surplus returns by default; stretch only on a user grant |

@@ -87,6 +87,10 @@ changed between rounds. Swap the critic's model mid-lane and a flat score might
 mean the artifact stopped moving — or that the new critic is stricter. The run
 then parks a healthy lane, or funds a dead one, on a confounded reading.
 
+Prompt caches are model-scoped too, so a mid-lane tier switch discards the
+cached prefix as well as the readable trend — the evidence argument and the
+cost argument point the same way (`cost-discipline.md`).
+
 So: pick the tier when the lane is cut, keep it for the lane's life, and change
 it only at a re-cut, announced and recorded. Under the LOD ladder this applies
 **per track**: one fixed model for the lane's screening verdicts, one for its

@@ -34,7 +34,7 @@ Note what is not on that list: nothing about the *number of waves*. Waves are th
 budget unit the user agreed to. The savings live inside the wave, and a saved
 call is a call the next wave can spend on a real gap.
 
-## The ten rules
+## The eleven rules
 
 ### 1. Machine gates before critics
 
@@ -213,7 +213,50 @@ Two failure modes to avoid while doing this:
   which is worse than not having the gate — you would at least have known you
   were unchecked.
 
-### 10. Read each reference once, at its phase
+### 10. Shape the round so the prompt cache can work
+
+A gauntlet is unusually cache-shaped and usually wastes it. Every critic call in
+a run opens the same brief, the same contract and the **same frozen bar** — a
+prefix that is identical by construction, because freezing it is already the
+rule. Only the tail differs: this round's artifact or diff, and one gap line.
+
+Prompt caching is a **prefix match**: the cache key is the exact bytes up to a
+breakpoint, and any byte that changes invalidates everything after it. Render
+order is `tools` → `system` → `messages`. So the whole technique is an ordering
+discipline, and it is free:
+
+- **Stable first, volatile last.** Brief, contract, bar, baked measurements —
+  then the diff, the region, the gap. A gap line pasted above the bar makes the
+  bar uncacheable for the rest of the run.
+- **Byte-identical, not merely equivalent.** A restated bar is different bytes
+  every time; the frozen path is the same bytes forever. "Paths, not payloads"
+  (rule 3) was already the bar-erosion fix — it is the caching fix too.
+- **Nothing volatile in the prefix.** Timestamps, wave numbers, run ids, an
+  unsorted JSON dump: each one is a per-call prefix and a guaranteed miss. The
+  wave number belongs in the tail with the gap, not in the header.
+- **Warm once, then fan out.** A cache entry becomes readable only once the
+  first response starts streaming, so N parallel critics with the same prefix
+  all pay full price. Fire one lane's call, wait for its first token, then
+  release the rest of the wave. That single ordering change is the difference
+  between one write and N.
+- **Caches are model-scoped.** Switching tiers mid-lane throws the cache away as
+  well as confounding the trend (`model-routing.md`) — the LOD ladder pays best
+  when each track keeps its model for the lane's life.
+- **Mind the TTL against the wave clock.** The default entry lives ~5 minutes; a
+  1-hour TTL survives the gap between waves but costs a 2× write instead of
+  1.25×, so it needs three reads to pay off rather than two. Reads cost ~0.1×.
+  A three-lane wave with several rounds clears that easily; a two-round run does
+  not. Where the harness exposes it, `usage.cache_read_input_tokens` says whether
+  any of this is actually happening — zero across a wave means something in the
+  prefix is moving.
+
+Where a harness builds the calls for you (Claude Code's subagents, for
+instance), you do not place the breakpoints — but you still own the prompt's
+shape and the order the calls go out in, which is where most of the saving
+lives. Verify current mechanics before quoting numbers into a contract: this is
+API behaviour, and it moves (`grounding.md`).
+
+### 11. Read each reference once, at its phase
 
 The reference files are indexed by phase at the bottom of `SKILL.md`. Reading all
 of them at intake costs the whole set before the run has decided anything, and

@@ -149,7 +149,14 @@ Rationale and exceptions: → `references/cost-discipline.md`
    check whose inputs have not changed is not re-run (`gate` caches on a content
    hash), and the frozen bar is measured **once** — bake its machine numbers at
    the freeze, never re-derive them per round.
-10. **Read each reference once, at its phase.**
+10. **Shape the round so the cache can work.** Every critic call opens the
+    same brief, contract and frozen bar — an identical prefix by construction.
+    Keep it first and byte-identical (paths, never restatements; no timestamps
+    or wave numbers in the header), put the diff and the gap last, and warm the
+    prefix with one call before fanning a wave out — parallel calls cannot read
+    a cache none of them has finished writing.
+    → `references/cost-discipline.md`
+11. **Read each reference once, at its phase.**
 
 ## State: one directory, one script
 
