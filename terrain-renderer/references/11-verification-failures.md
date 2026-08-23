@@ -354,7 +354,7 @@ golden-image test cannot catch, because nothing about the image is wrong.
   right-hand side is the number 1 and no constant of the renderer appears in it). The procedural
   rule: for each interface, enumerate the transports across it, and check that each has a row that
   is not a ratio taken on one side. Water's case, with the arithmetic and the constants, is in
-  [`12`](12-water-rendering.md#radiance-is-not-conserved-across-the-interface).
+  [`12`](../../water-physics/references/12-water-physics.md#radiance-is-not-conserved-across-the-interface).
 - **A phone photograph is not a colorimeter, and it fails on three separate axes.** The newest, the
   one most likely to cost a week, and the only entry here where the instrument is outside the
   codebase. A reference photograph is treated as ground truth about a renderer's chromaticity and
@@ -466,8 +466,8 @@ waterline is the same sheet of pigment as the submerged bed, lit directly, with 
 interface and no `n²` between it and the eye, so it pins the albedo on its own and its ratio against
 the bed then pins the absorption path — two measurements from one photograph, no reference chart,
 and the target is in the frame for nothing. The arithmetic is
-[`12a`](12a-water-derivations.md#the-calibration); what it defends against a fitted-constants
-objection is [`12`](12-water-rendering.md#radiance-is-not-conserved-across-the-interface).
+[`12a`](../../water-physics/references/12a-water-derivations.md#the-calibration); what it defends against a fitted-constants
+objection is [`12`](../../water-physics/references/12-water-physics.md#radiance-is-not-conserved-across-the-interface).
 
 **State which way each bias runs, so a bound survives even when the value does not.** A biased
 instrument with a *known sign* still yields a one-sided bound, and recovering one is almost always
@@ -641,7 +641,7 @@ and the answer is a row number. Four were reintroduced here:
 against the limit). That is the same blindness the old audit had, caught before it shipped this
 time, and it is why the discipline is *two* guards with named blind spots rather than one guard with
 a good name. The physics case is [`12`'s water
-transport](12-water-rendering.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them);
+transport](../../water-physics/references/12-water-physics.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them);
 the mechanism is general.
 
 Three questions to ask of any test that has never failed, in the order they are cheapest to answer:
@@ -772,7 +772,7 @@ Rules, equipment). Mid-range gives `R = 0.11061 m`, `m = 0.425 kg`, a mean densi
 and a draught that is then *solved* rather than set — **39.61 mm of a 221.2 mm ball**, with the
 contact line's own tension carrying **13.0%** of the weight (the balance, and the tangency condition
 it then makes falsifiable, are
-[`12a` §3](12a-water-derivations.md#a-floating-body-and-the-split-its-own-meniscus-hides)).
+[`12a` §3](../../water-physics/references/12a-water-derivations.md#a-floating-body-and-the-split-its-own-meniscus-hides)).
 
 **The standard supplies the tolerance as well as the value, and that is half the point.** Across the
 published **mass** band the draught runs **38.40 → 40.79 mm** (±3.0%) and across the published

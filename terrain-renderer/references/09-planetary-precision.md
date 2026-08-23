@@ -39,7 +39,7 @@ precision from the same code, and the bound hides that behind a smooth-looking l
 ![The float32 spacing staircase against the rule that bounds it, and the size of the overstatement](figures/float32-binade-staircase.png)
 
 > **Figure 9·1 — the spacing is a staircase, and `x · 2^-23` is its bound.** `D`, and the underlying
-> format is `P` (IEEE-754). Drawn by [`figures/make_figures.py`](figures/make_figures.py)
+> format is `P` (IEEE-754). Drawn by [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py)
 > (`fig_float_binades`) by asking numpy's own `float32` where the representable values are — the
 > machine is the authority here, so there is no constant in the figure to drift from. The window is
 > 10 km to 10 000 km because eleven binades is few enough that a tread is a tread; over the twelve
@@ -103,7 +103,7 @@ Six orders of magnitude of view distance breaks naive depth too. The stack, in o
 
 > **Figure 9·2 — reversed-Z is flat, and in fixed point it buys exactly nothing.** `D`, on `P`
 > (IEEE-754 and the standard projection). Drawn by
-> [`figures/make_figures.py`](figures/make_figures.py) (`fig_depth_precision`). **There is not one
+> [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py) (`fig_depth_precision`). **There is not one
 > chosen number in it.** With the infinite far plane above, the projection collapses to `z = near/w`
 > (reversed) or `z = 1 − near/w` (standard), so `|dw/dz| = w²/near` for both and `near` cancels: the
 > x axis is the dimensionless `w/near` and the y axis is the ratio `Δw/w`. The only input left is
@@ -173,7 +173,7 @@ The tiling and its precision discipline in one sketch:
 
 > **Figure 9·3 — the re-derivation this chapter's provenance table asks for.** `D`; the two figures
 > were previously **F** ("widely reproduced numbers, no single canonical citation; re-derive before
-> quoting in print"). Drawn by [`figures/make_figures.py`](figures/make_figures.py)
+> quoting in print"). Drawn by [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py)
 > (`fig_cube_sphere`) from the two mappings as this section states them — the Jacobian of
 > `(u, v, 1)` onto the sphere, `(1 + u² + v²)^(−3/2)`, times `du'/du = (π/4)sec²(uπ/4)` per axis for
 > the tangent variant. Every number is computed, none quoted. **Left:** density along the diagonal

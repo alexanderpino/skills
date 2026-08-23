@@ -35,55 +35,59 @@ not been checked against the primary sources**; (2) engine-doc links (Epic, Unit
 are version-sensitive and drift. When you verify a further row, upgrading this file is the
 right fix.
 
-## Where a chapter is more than one file
+## Where the water physics went
 
-Most chapters are one file, and the `Chapter` column below names it directly. **`12` is three**,
-and a route to "chapter 12" means whichever of them holds the answer:
+`12` used to be three files and an implementation. The physics half is now a **sibling skill**,
+`water-physics`, and the split was decided by measurement: chapter `12`'s family was **54 % of this
+skill's prose and 100 % of its code**, one chapter of twenty, so the strongest warrant in the skill
+sat where terrain rendering itself is thinnest.
 
-| File | Holds | Go there for |
-|---|---|---|
-| `12-water-rendering.md` | The chapter itself: doctrine, mechanisms, the **diagnostic index** near its front (symptom on screen → mechanism → section), and the pitfall catalogue | Everything by default |
-| `12a-water-derivations.md` | The **mathematics and pseudocode** behind results the chapter quotes in a line | Re-deriving a number, or carrying one to different constants |
-| `12b-water-provenance.md` | **Sources & provenance for all of `12`**: every tier, every citation, every `?`, and the `P/T/D/F/N/?` convention restated so it reads alone | Before citing anything out of `12` — including the rows tagged `12` in the table below |
+| Question | Where |
+|---|---|
+| How to **draw** water: surface LOD, the fullscreen-triangle pass, the shore-wave tier ladder, rivers, distance and filtering, shoreline integration, pass ordering, what to pre-cook, engine-native water | `12-water-rendering.md`, here — including its **diagnostic index** and **pitfall catalogue**, which stay whole because routing a symptom to a mechanism is a renderer's job |
+| What the **number** is: the interface and its two Fresnel constants, IOPs and where a body's colour comes from, glitter, caustics, aerated water, shoaling and breaking, diffraction, the wave-height population, the pool as an optics laboratory | [`water-physics` `12`](../../water-physics/references/12-water-physics.md), with derivations in that skill's `12a` and **all provenance for both chapters** in its [`12b`](../../water-physics/references/12b-water-provenance.md) |
 
-`12`'s executable half is `terrain-renderer/reference-impl/` and `terrain-renderer/raster-impl/`,
-and **three suites** arbitrate the chapter's numeric claims by checking the implementation against
-closed forms, published measurements and independent methods:
+⚠️ **Rows tagged `12`, `12a` or `12b` in the master index below may point at either chapter.** The
+provenance appendix is `water-physics`'s `12b` in every case; read it before citing anything water.
 
-| Suite | Scope | Standing |
-|---|---|---|
-| `reference-impl/validate.py` | the pool, and the optics every other file shares | **306 pass / 0 FAIL / 64 info** |
-| `reference-impl/validate_beach.py` | the open coast — bed, wave transform, breaking, diffraction, foam, run-up | **604 pass / 0 FAIL / 0 ERROR** |
-| `raster-impl/validate_raster.py` | the real-time screen-space pass and its approximation error, which the offline path structurally cannot see | 200 rows, three tiers |
-
-`validate.py` **exited non-zero on eight rows** for several rounds — each a recorded finding with its
-tolerance justified from the estimator's own error, not a broken build — and all eight are now
-closed, with no tolerance widened and four of them tightened.
-
-⚠️ **Passing rows are not rendered pixels.** The recurring defect here is a quantity that is
-*derived, guarded, and never called*. Coverage instruments report such a module as covered, because
-the suite is the caller. The check that works is `grep` for the symbol requiring a hit **outside its
-defining module and outside the suite**, and `beach_render.py --scene` prints reach integers off the
-rendered buffer so the answer is observable rather than asserted.
+⚠️ **This skill ships no runnable implementation.** `water-physics` carries three — a pool, an open
+coast and a screen-space pass — arbitrated by suites of **306**, **611** and **200** guarded rows.
+Everything in *this* skill is curated practice with a provenance tier, and the tier table above says
+what each one is worth. A `T`- or `F`-tier claim here does not carry the confidence of a `D`-tier
+one there.
 
 ## Figures, and the chapters that deliberately have none
 
-Every image in `references/` is drawn by the single script
-[`figures/make_figures.py`](figures/make_figures.py), which imports the implementation **read-only**
-and writes no physics of its own, so a figure cannot drift from the code that ships. Captions live
-in the markdown beside the image, never in the pixels, where they can be read, diffed and corrected.
+Every image in `references/` is drawn by one script, which imports the implementation
+**read-only** and writes no physics of its own, so a figure cannot drift from the code that ships.
+Captions live in the markdown beside the image, never in the pixels, where they can be read, diffed
+and corrected.
+
+⚠️ **That script now lives in `water-physics`**, because the implementation it reads went there —
+and it deliberately did **not** split when the skill did. Splitting it would duplicate its
+preflight or leave a stub importing across a skill boundary, and both weaken the invariant it
+exists for. It writes each figure into the directory of the chapter that uses it, so the seven
+below are written back into `terrain-renderer/references/figures/`.
 
 ```
-python3 terrain-renderer/references/figures/make_figures.py             # redraw all fifteen
-python3 terrain-renderer/references/figures/make_figures.py --selftest  # prove the guard can fail
+python3 water-physics/references/figures/make_figures.py             # redraw all fourteen, into both skills
+python3 water-physics/references/figures/make_figures.py --selftest  # prove the guard can fail
 ```
+
+(The fifteenth, `12a`'s foam pair, is a pair of **rendered crops** rather than a plot and is written
+by `water-physics/reference-impl/foam_evidence.py`, which needs the renderer rather than the plotter.)
 
 | Chapter | Figures | The shape each one carries |
 |---|---|---|
 | `09` | 3 | The float32 spacing **staircase** against the smooth law that bounds it; reversed-Z **flat over seven decades** while three other curves climb as one; the cube-sphere's two mappings, and the direction each is worst in |
 | `10` | 3 | The Rayleigh aureole's **ceiling of ½** with the shipped constant above it; the two receiver weights, **equal in area and nothing else**; an `acos` **folding** about solar noon |
-| `12`, `12a` | 8 | Two Fresnel constants from one surface; a product that is not a mean; a series and its bound; **a distribution painted where its realisation belongs — twice, once for foam and once for run-up**; Sommerfeld's exact half; a width that is a function; **an integral still climbing where every instrument stops** |
 | `19` | 1 | The Kelvin wedge as a **ratio**, self-similar in `V·t`, and the capillary band where the ratio leaves ½ |
+
+The eight that moved with the physics — two Fresnel constants from one surface; a product that is
+not a mean; a series and its bound; a distribution painted where its realisation belongs, twice;
+Sommerfeld's exact half; a width that is a function; and an integral still climbing where every
+instrument stops — are in
+[`water-physics`](../../water-physics/references/12-water-physics.md) and its `12a`.
 
 **The twenty-chapter gap is deliberate elsewhere, and the reasons are the useful part.** A figure
 earns its place when a claim has a **shape** — a curve that crosses, two factors that diverge, a

@@ -401,7 +401,7 @@ Worked on the two suns this skill's water chapter is calibrated against — Alje
 Everything a comparison needs follows from those two rows, and the *water* consequences — how much
 of the beam enters the surface, how far it travels to the bed, and which of those differences cancel
 in a ratio and which do not — are worked in
-[`12`](12-water-rendering.md#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not).
+[`12`](../../water-physics/references/12-water-physics.md#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not).
 
 ### The quadrant trap, and why the elevation stays right
 
@@ -437,7 +437,7 @@ crossing the rules returns the mirror of a true azimuth: a real compass bearing,
 ![Azimuth across a day by atan2 and by the two acos branches, with the elevation below](figures/azimuth-quadrant-fold.png)
 
 > **Figure 10·3 — an `acos` cannot know the afternoon, and the elevation never tells on it.** `D`.
-> Drawn by [`figures/make_figures.py`](figures/make_figures.py) (`fig_azimuth_fold`) by sweeping
+> Drawn by [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py) (`fig_azimuth_fold`) by sweeping
 > `reference-impl/atmosphere.py`'s own `solar_position` across 2026-08-12 at Aljezur and feeding the
 > declination and elevation it returns into the two `acos` forms above — one routine, evaluated the
 > chapter's three ways. **Top:** `atan2` rises monotonically through the day and passes 180° at
@@ -502,7 +502,7 @@ a sky for that sun to sit in, invert the colour you already have; if it does not
 atmosphere, the grade and the physics are already fighting.
 
 The consumer that exposes all of this first is water — see `12`'s
-[sun glitter](12-water-rendering.md#sun-glitter-the-sparkle-path), where a sun lobe fitted by eye
+[sun glitter](../../water-physics/references/12-water-physics.md#sun-glitter-the-sparkle-path), where a sun lobe fitted by eye
 turns small blinding points into a broad pale smear.
 
 ### An illuminant is that sky's own cosine integral, and the disc is not in it
@@ -520,7 +520,7 @@ the only judgement left is **which lobes of it belong inside the integral**, and
 an audit rather than by taste.
 
 **A term may appear in exactly one of {beam, environment}, and the flux identity says which.** A
-sun disc built the way [`12a` §6](12a-water-derivations.md#6-the-sun-as-lobes) builds one carries
+sun disc built the way [`12a` §6](../../water-physics/references/12a-water-derivations.md#6-the-sun-as-lobes) builds one carries
 the direct beam *exactly*: its peak, width and flux land on the sun together, so
 `∫_disc L dω = π·SUN_COL` to a part in a thousand. Every diffuse receiver in the frame already gets
 that beam as an explicit `SUN_COL·(N·L)·vis` term. **Integrate the disc as well and the frame has
@@ -593,7 +593,7 @@ the physics *only* through the phase function and the phase function's angular m
 
 > **Figure 10·1 — a ceiling, three points under it, and three points where nothing can be.** `D` on
 > `P` (Rayleigh's phase function and its angular moments). Drawn by
-> [`figures/make_figures.py`](figures/make_figures.py) (`fig_aureole_ceiling`) from
+> [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py) (`fig_aureole_ceiling`) from
 > `reference-impl/atmosphere.py`'s own environment and its own quadrature — `sky(lobes=())` is the
 > gradient, `SKY_DIFFUSE_LOBES` adds the aureole, and `env_irradiance` integrates both against the
 > same horizontal receiver. Nothing is re-integrated in the figure. **Left:** `share = m/(1+m)`
@@ -658,7 +658,7 @@ costs elsewhere is the difference between a `cos θ sin θ` weight and a `sin² 
 
 > **Figure 10·2 — same area, nothing else the same.** `P/synthesis` for the weights (the cosine law
 > integrated over each receiver's visible azimuth), `D` for the reflectances. Drawn by
-> [`figures/make_figures.py`](figures/make_figures.py) (`fig_receiver_weights`); the exact ½ is
+> [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py) (`fig_receiver_weights`); the exact ½ is
 > checked before any pixel against `atmosphere.env_irradiance`'s own spherical quadrature, which
 > shares no line with the 1-D forms above. **Left:** the two weights normalised to unit area, which
 > is what makes them comparable at all. The horizontal receiver's peaks at 45° and is symmetric
@@ -701,7 +701,7 @@ alternative is a constant that is right for the ground and wrong for every wall 
 direction that changes with the sun's azimuth — which is to say, a constant that will be
 re-tuned every time the time of day changes and will never be right twice. `12` carries the water
 consumer of all three results:
-[an illuminant per receiver, and what it costs a waterline](12-water-rendering.md#an-illuminant-per-receiver-and-what-that-costs-at-a-waterline).
+[an illuminant per receiver, and what it costs a waterline](../../water-physics/references/12-water-physics.md#an-illuminant-per-receiver-and-what-that-costs-at-a-waterline).
 
 ## Time-of-day dynamics
 

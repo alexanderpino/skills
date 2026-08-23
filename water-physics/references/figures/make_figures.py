@@ -1605,6 +1605,33 @@ FIGURES = (fig_two_sides, fig_factorisation, fig_trapped_series,
            fig_aureole_ceiling, fig_receiver_weights, fig_azimuth_fold,
            fig_kelvin_wake)
 
+# WHERE EACH FIGURE IS WRITTEN, and why this file did not split when the skill
+# did. Seven of these belong to chapters that live in `terrain-renderer` --
+# `09`'s precision trio, `10`'s illuminant trio and `19`'s Kelvin wedge -- and
+# the rest to this skill's own chapters. Splitting the script along that line
+# would either duplicate `preflight` or leave a stub importing across a skill
+# boundary, and both weaken the one invariant it exists for: A FIGURE CANNOT
+# DRIFT FROM THE CODE THAT SHIPS. One script, one preflight, one import of the
+# implementation; it writes each figure into the directory of the chapter that
+# uses it. Pass an explicit output directory to override and collect them all
+# in one place.
+_TR_FIGS = os.path.abspath(os.path.join(
+    _HERE, '..', '..', '..', 'terrain-renderer', 'references', 'figures'))
+ELSEWHERE = {
+    fig_float_binades: _TR_FIGS,      # 09, float32 spacing
+    fig_depth_precision: _TR_FIGS,    # 09, reversed-Z
+    fig_cube_sphere: _TR_FIGS,        # 09, the two cube-sphere mappings
+    fig_aureole_ceiling: _TR_FIGS,    # 10, the Rayleigh aureole's ceiling
+    fig_receiver_weights: _TR_FIGS,   # 10, the two receiver weights
+    fig_azimuth_fold: _TR_FIGS,       # 10, the acos fold about solar noon
+    fig_kelvin_wake: _TR_FIGS,        # 19, the Kelvin wedge as a ratio
+}
+
+# ⚠️ NOT EVERY FIGURE IN THIS SKILL IS DRAWN HERE. `foam-mean-vs-realisation.png`
+# is written by `reference-impl/foam_evidence.py`, because it is a pair of
+# RENDERED CROPS rather than a plot and needs the renderer, not `beach_plot`.
+# The index used to claim a single script draws every image; it does not.
+
 
 # --- the guard's own guard ---------------------------------------------------
 def selftest():
@@ -1745,10 +1772,11 @@ def selftest():
 def main(argv):
     if '--selftest' in argv:
         return selftest()
-    out = argv[1] if len(argv) > 1 else _HERE
-    os.makedirs(out, exist_ok=True)
+    forced = argv[1] if len(argv) > 1 else None
     preflight()
     for fn in FIGURES:
+        out = forced if forced else ELSEWHERE.get(fn, _HERE)
+        os.makedirs(out, exist_ok=True)
         print(fn(out))
     return 0
 

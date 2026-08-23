@@ -1168,7 +1168,7 @@ wavelength and of `F₀`, because `Θ` enters only through the phase function an
 are fixed. The identity runs backwards as a diagnostic: any claimed aureole share inverts to a
 `⟨cos²Θ⟩_w` and a value above 1 does not exist. `10` spends this on a hand-written deck illuminant
 whose aureole term implied `⟨cos²Θ⟩_w = 2.125` —
-[the aureole has a ceiling](10-lighting-shadows.md#the-aureole-has-a-ceiling-and-no-quadrature-is-needed-to-find-it).
+[the aureole has a ceiling](../../terrain-renderer/references/10-lighting-shadows.md#the-aureole-has-a-ceiling-and-no-quadrature-is-needed-to-find-it).
 
 ### The aerosol lobe, derived to zero
 
@@ -1401,7 +1401,7 @@ is the same ½ as `tir_vert(0)` only because both are the half-hemisphere split.
 ### One interface, two diffuse reflectances
 
 This file and `12` both use the word "reflectance" for two different numbers, and the sections above
-use one of them while [`12`'s composition](12-water-rendering.md#shading-and-optics) uses the other.
+use one of them while [`12`'s composition](12-water-physics.md#shading-and-optics) uses the other.
 One flat water surface carries **two** diffuse Fresnel constants — the two directions through one
 boundary — and nothing in a shader's spelling tells them apart:
 
@@ -1422,7 +1422,7 @@ quadrature is split there or it is wrong at the third digit:
 
 (`D`, 2000-node Gauss–Legendre here, split at `μ_c`.) Three things follow, and each is load-bearing
 somewhere in `12`. All three are visible at once in
-[`12`'s figure 12·1](12-water-rendering.md#surface-reflection-names-two-opposite-things-a-loss-and-a-trap),
+[`12`'s figure 12·1](12-water-physics.md#surface-reflection-names-two-opposite-things-a-loss-and-a-trap),
 which draws the two directional curves and then the decomposition **as areas** under the
 cosine-weighted integrand — the geometric block, the Fresnel remnant, and `R_ext` on the same
 scale. `figures/fresnel-two-sides.png`, from `figures/make_figures.py`.
@@ -1447,14 +1447,14 @@ R_int = (1 - 1/n^2)                                geometry: R = 1 exactly for e
 inside the cone. That is why `1 − 1/n²` and `R_int` are so often confused with each other as well as
 with `R_ext`: they differ by 3.74 points, which is small enough to hide and large enough to matter —
 using `1 − 1/n²` where `R_int` belongs costs 1.9% of a red trap and 12.2% of a blue one
-([the truncation table in `12`](12-water-rendering.md#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point)).
+([the truncation table in `12`](12-water-physics.md#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point)).
 
 **And `1 − 1/n²` is the constant that whitens foam.** An air bubble seen from the water side is the
 same water→air interface as the surface seen from below, so it has the same critical angle and
 mirrors the same `43.874%` of everything that strikes it. One number runs the mirror outside Snell's
 window and the opacity of whitewater; a renderer that derives one and paints the other has
 special-cased one face of a single constant. The bubble side is
-[`12`'s aerated water](12-water-rendering.md#aerated-water-foam-spray-and-whitewater).
+[`12`'s aerated water](12-water-physics.md#aerated-water-foam-spray-and-whitewater).
 
 **The directional pair, for the same reason.** `R_ext` and `R_int` are hemispherical means and are
 correct only for hemispherical quantities; per direction, use `R(θ)` on the right index pair and read
@@ -1552,7 +1552,7 @@ interface, chosen by where the photographer stood. Weighting directions off the 
 Jacobian above measures *what the window contains*, which is a property of the scene and the
 interface and of no camera. On the reference implementation the two agree on the non-sky **total** to
 0.13 percentage points and disagree on individual entries by up to **4.6×**
-([`12`](12-water-rendering.md#what-the-window-actually-contains-and-why-the-rim-is-where-the-world-is)) —
+([`12`](12-water-physics.md#what-the-window-actually-contains-and-why-the-rim-is-where-the-world-is)) —
 which is not a discrepancy to reconcile. Quote route 1 for a cost or a visibility question and route
 2 for a physics one, and never mix an entry from one with a total from the other.
 
@@ -1562,7 +1562,7 @@ which is not a discrepancy to reconcile. Quote route 1 for a cost or a visibilit
 
 **Derived from:** a wind-wave spectrum, integrated. **Replaces:** a fitted line, quoted.
 
-Every mean square slope in [`12`](12-water-rendering.md) had, until this derivation, one source:
+Every mean square slope in [`12`](../../terrain-renderer/references/12-water-rendering.md) had, until this derivation, one source:
 `mss = 0.003 + 5.12×10⁻³ U`. It is cited, so it is honest; it is **not derived**, and that matters
 because the standing discipline of this skill is that a number comes from a physical effect and not
 from a constant chosen to make a picture right. Cox & Munk (1954) is a *fitted boundary condition* —
@@ -1721,7 +1721,7 @@ simplification — it is a statement about the surface which the surface contrad
 
 ⚠️ **This is the single most common way a physically-correct glitter model still renders as vinyl.**
 Everything in [§5](#5-the-reflected-slope-ellipse) and in
-[`12`'s glitter section](12-water-rendering.md#sun-glitter-the-sparkle-path) can be right — the
+[`12`'s glitter section](12-water-physics.md#sun-glitter-the-sparkle-path) can be right — the
 Jacobian, Cox & Munk's two variances, Smith shadowing, the width as a function of view elevation —
 and the path will still come out as a solid lozenge, because every one of those is a statement about
 the **ensemble** and none of them says anything about what one pixel does.
@@ -1799,7 +1799,7 @@ Moving variance from `p_sub` into `p_res` **conserves the total identically** �
 content of (7b.2) — so:
 
 - **the path's angular width does not move.** It is a readout of the *total* mean square slope
-  ([`12`](12-water-rendering.md#sun-glitter-the-sparkle-path)), and the total is untouched. A
+  ([`12`](12-water-physics.md#sun-glitter-the-sparkle-path)), and the total is untouched. A
   realisation that widens or narrows the path has broken the budget.
 - **the mean radiance does not move.** Measured on a reference frame with one flag switched: 2.1%,
   which is sampling error plus the mast-height correction below.
@@ -2004,7 +2004,7 @@ found, so nothing in the pass assumes a single depth.
 ### The focusing number, derived
 
 (The *name* is `12`'s own, not a standard dimensionless group — see [the vocabulary
-rule](12-water-rendering.md#the-vocabulary-and-which-half-of-it-you-can-look-up). What follows is
+rule](12-water-physics.md#the-vocabulary-and-which-half-of-it-you-can-look-up). What follows is
 the derivation; everything in it is standard.)
 
 A surface slope `s` turns the refracted ray by `s(1 − 1/n)`, so at depth `d` the landing point moves
@@ -2159,7 +2159,7 @@ lossless check, every white-bed energy audit and every zero-absorption limit pas
 What sees it is a check at the file's own absorption with nothing averaged in it: the 400 000-photon
 analog walk in `validate.py`, which attenuates each photon over its **own** `1/μ` and agrees with
 the joint form to **0.15% at worst, under 0.1% in green and blue**. A second quadrature would have
-shared the premise — the fourth way in [`11`](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
+shared the premise — the fourth way in [`11`](../../terrain-renderer/references/11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
 
 **The two forms this section replaced, priced on the same constants** (`D`, luminance weighted by
 this file's own `SUN_COL`, `ρ_bed = 0.222 / 0.585 / 0.681`):
@@ -2176,7 +2176,7 @@ already accounted for the column. The numerator must carry exactly **one** up le
 denominator exactly **one** round trip.
 
 The renderer-facing consequence — that this is the shape of every water lookup table anyone is about
-to bake — is [`12`](12-water-rendering.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them).
+to bake — is [`12`](12-water-physics.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them).
 
 ### The calibration
 
@@ -2819,7 +2819,7 @@ asymptotics enter, because `X = 0` there and `F(0) = 0`. The two outer lines are
 spiral's limits**, `C(±inf) = S(±inf) = ±1/2`, which is why the half is a half and not something
 else. Drawn — the coefficient across the boundary and the spiral beside it, with the three
 collinear points that make the chord from the origin exactly half the chord from the far eye — in
-[`12`'s figure 12·4](12-water-rendering.md#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it)
+[`12`'s figure 12·4](12-water-physics.md#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it)
 (`figures/sommerfeld-half-plane.png`, from `figures/make_figures.py`).
 
 **Why `2π − φ − φ_0` and not `φ + φ_0`.** Both produce the same reflected plane wave, since
@@ -3383,7 +3383,7 @@ arithmetic slip in a write-up rather than a defect in the code.
    draught the ring's own meniscus climbs **0.93 mm**, **17.7%** of it, so a waterline reading on an
    inflatable is a surface-tension measurement wearing a buoyancy label. *(`D`, all four numbers
    recomputed here; the method rule this belongs to is
-   [`11`](11-verification-failures.md#pick-instruments-whose-parameters-someone-else-has-fixed).)*
+   [`11`](../../terrain-renderer/references/11-verification-failures.md#pick-instruments-whose-parameters-someone-else-has-fixed).)*
 
 9. **A guard that could not see the exponent it was guarding.** *Found and closed while building
    [§7a](#7a-the-slope-statistics-from-the-forcing--and-cox--munk-as-the-limit); recorded because
@@ -3408,7 +3408,7 @@ arithmetic slip in a write-up rather than a defect in the code.
    argument at all. Widening nothing, moving one argument, turned an invisible defect into an
    unmissable one.
 
-   This is [`11`](11-verification-failures.md)'s "no row at a degenerate argument" arriving in a
+   This is [`11`](../../terrain-renderer/references/11-verification-failures.md)'s "no row at a degenerate argument" arriving in a
    disguise worth naming: the degenerate argument was not a fixed point of the *map* (zero load,
    unit albedo, normal incidence) but a fixed point of the **parameterisation** — a base near 1,
    where every exponent agrees. *(`D`, `validate_beach.py --bugs-spectrum`; the escape is recorded

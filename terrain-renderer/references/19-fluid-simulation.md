@@ -259,7 +259,7 @@ wedge and is not drawn as one.
 
 > **Figure 19·1 — the angle is a ratio, and the ratio is not always ½.** `P` for the construction
 > (Kelvin 1887), `D` for the capillary band. Drawn by
-> [`figures/make_figures.py`](figures/make_figures.py) (`fig_kelvin_wake`); `r` is never assumed —
+> [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py) (`fig_kelvin_wake`); `r` is never assumed —
 > it is measured from `reference-impl/wake.py`'s `sigma_w` and `c_group`, one capillary-gravity
 > dispersion relation with both halves taken from it. **Left, drawn isometrically so the angle is
 > the angle:** the constant-age loci at three speeds. They are three different sizes and the tangent

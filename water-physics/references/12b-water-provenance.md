@@ -1,6 +1,6 @@
 # Water Rendering — Sources & Provenance
 
-The provenance appendix to [`12-water-rendering.md`](12-water-rendering.md). It was that
+The provenance appendix to [`12-water-rendering.md`](../../terrain-renderer/references/12-water-rendering.md). It was that
 chapter's last section until it stopped being a section: 428 lines, the fastest-growing part of
 the file, and the part a reviewer opens on its own rather than after reading everything above it.
 The move removed nothing — every entry below stood in `12` and says what it said there. Four
@@ -65,7 +65,7 @@ least-confident-claims ledger in `00-index.md`.
   Transitions from Geometry to BRDF" (Computer Graphics Forum 29(2), 2010): the principled
   treatment of wave detail crossing from geometry band to shading band — the slope-variance
   tensor, the roughness-aware Fresnel fit, and the variance-filtered environment fetch used in
-  [Distance and filtering](12-water-rendering.md#distance-and-filtering-why-far-water-turns-to-plastic).
+  [Distance and filtering](../../terrain-renderer/references/12-water-rendering.md#distance-and-filtering-why-far-water-turns-to-plastic).
   [HAL open access](https://inria.hal.science/inria-00443630).
 - **P** — Cox & Munk, "Measurement of the Roughness of the Sea Surface from Photographs of the
   Sun's Glitter" (Journal of the Optical Society of America 44(11), 838–850, 1954): the
@@ -185,7 +185,7 @@ least-confident-claims ledger in `00-index.md`.
   Letters* 17, 2022). The full first-principles chain is assembled here rather than quoted from a
   single proglacial-lake IOP study; the mechanism is sound and now grounded.
 - **D** — Beaufort wind force scale with its standard sea descriptions: the observational ladder
-  used for [Sea states](12-water-rendering.md#sea-states-the-energy-ladder). Descriptor wording taken verbatim from
+  used for [Sea states](12-water-physics.md#sea-states-the-energy-ladder). Descriptor wording taken verbatim from
   NOAA's Storm Prediction Center table (fetched 2026-08) — whitecaps first at Force 3, spray at
   Force 5, foam streaks at Force 7, spindrift at Force 8, "sea completely white" at Force 12.
   [NOAA SPC](https://www.spc.noaa.gov/faq/tornado/beaufort.html). The **WMO sea state code** (built
@@ -196,7 +196,7 @@ least-confident-claims ledger in `00-index.md`.
   authoritative in this section.
 - **P/? + D** — Capillary–gravity dispersion `ω² = (gk + (σ/ρ)k³)·tanh(kh)` and its **minimum phase
   speed 23.12 cm/s at 1.712 cm wavelength** — the hard short-wavelength bound used in
-  [Calm water](12-water-rendering.md#calm-water-the-low-energy-regime). Classical fluid mechanics.
+  [Calm water](12-water-physics.md#calm-water-the-low-energy-regime). Classical fluid mechanics.
   ⚠️ **This entry previously recorded the pair `≈ 23.1 cm/s at ≈ 1.73 cm` as web-verified *as a
   pair*, and that claim is retracted.** Each half was checked alone and each is inside the published
   spread for clean water, but they are not consistent with one another: 23.1 cm/s implies
@@ -299,7 +299,7 @@ least-confident-claims ledger in `00-index.md`.
   Brewster value `R(atan n) = ((n²−1)/(n²+1))²/2` — 0.03894/0.03948/0.04050 on this file's three
   IORs, against Schlick's 0.0303/0.0306/0.0314, i.e. **22% low** (`P`, arithmetic).
 - **P/D** — [Radiance is not conserved across the
-  interface](12-water-rendering.md#radiance-is-not-conserved-across-the-interface). The invariance of
+  interface](12-water-physics.md#radiance-is-not-conserved-across-the-interface). The invariance of
   `L/n²` across a refracting boundary is standard radiometry — the **n-squared law for radiance**,
   also called the *fundamental theorem of radiometry*, a consequence of the étendue `n² dA dΩ` being
   the conserved quantity. Cite **Nicodemus, "Radiance", *American Journal of Physics* 31(5) 368–377
@@ -323,13 +323,13 @@ least-confident-claims ledger in `00-index.md`.
   without the divisor and 1.31 with a `1/n` — is energy conservation and contains no constant of the
   renderer (`P`, arithmetic). The **verification** half of this entry, and why a Fresnel suite cannot
   see any of it, is `11`'s
-  [sixth way a measurement lies](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
+  [sixth way a measurement lies](../../terrain-renderer/references/11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
   ⚠️ **What that audit could not see, added in this pass:** it borrows exactly one name from the
   renderer, so it certifies the divisor and nothing else. The replacement pair and the
   reintroduced-bug table are `11`'s
-  [eighth way](11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement).
+  [eighth way](../../terrain-renderer/references/11-verification-failures.md#the-eighth-way-is-about-the-test-not-the-measurement).
 - **P/D** — [Attenuation and escape do not
-  factorise](12-water-rendering.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them),
+  factorise](12-water-physics.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them),
   and the same derivation in
   [`12a` §10](12a-water-derivations.md#the-diffuse-exit-and-why-its-two-factors-may-not-be-separated).
   The identity `⟨fg⟩ = ⟨f⟩⟨g⟩ + Cov(f, g)`, and its relative form `r·CV_f·CV_g`, are elementary
@@ -383,8 +383,8 @@ least-confident-claims ledger in `00-index.md`.
   (emergent red 0.855 of nadir at 60° against 0.955 in blue), which is a signed inference rule when
   two cameras at different heights disagree.
 - **P/D** — [The illuminant is part of the
-  comparison](12-water-rendering.md#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not).
-  The **solar position** half lives in [`10`](10-lighting-shadows.md#computing-the-illuminant-from-a-place-and-a-time)
+  comparison](12-water-physics.md#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not).
+  The **solar position** half lives in [`10`](../../terrain-renderer/references/10-lighting-shadows.md#computing-the-illuminant-from-a-place-and-a-time)
   and carries its own provenance rows there — the low-order NOAA/Meeus algorithm (`P`), Bennett
   refraction (`P`), Kasten–Young air mass (`P`), and the Aljezur table computed here (`D`). What is
   this file's to price is the **water** half, and all of it is arithmetic recomputed here on the
@@ -408,21 +408,21 @@ least-confident-claims ledger in `00-index.md`.
   illuminant difference runs the wrong way to explain a red *deficit* — is unchanged by the
   correction. The two limits stated at the end of the section (the ambient-to-direct mixture does
   not cancel, and none of it survives a nonlinear camera) are this chapter's composition, the second
-  routing to [`11`](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
+  routing to [`11`](../../terrain-renderer/references/11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one).
 - **D/?** — The two claims in that section and in the
-  [diagnostic index](12-water-rendering.md#diagnostic-index-symptom-to-mechanism) that are about
+  [diagnostic index](../../terrain-renderer/references/12-water-rendering.md#diagnostic-index-symptom-to-mechanism) that are about
   *this* project's open finding rather than about physics: that the render's water reads less red
   than the reference photograph's, and that the measured water-to-sunlit-stone ratio gap is about
   twice the 1.246 the illuminant difference can account for. Both are measured on `reference-impl`
   against photographs of the reference pool (`D` for the render side) but the photographic side is
   **not** a colorimetric measurement (`?`) — it is a phone frame, and what it can and cannot support
-  is [`11`](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one), whose
+  is [`11`](../../terrain-renderer/references/11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one), whose
   provenance table prices the Display-P3 and tone-curve figures the index row quotes. The finding is
   recorded here as open, which is the only status it can have until a RAW capture or an in-frame
   neutral exists. What is durable regardless is the **inference rule**: a confound whose direction
   is known either shrinks a discrepancy or strengthens it, and it must be signed before it is
   invoked.
-- **P/D** — [The view from inside, and the split shot](12-water-rendering.md#the-view-from-inside-and-the-split-shot).
+- **P/D** — [The view from inside, and the split shot](12-water-physics.md#the-view-from-inside-and-the-split-shot).
   The critical angle, the exactness of total internal reflection outside it, the `d/n` apparent
   depth and the flat-port field narrowing (46° → ≈34° at `n = 1.333`) are textbook geometrical
   optics, recomputed here. The **0.39° dispersive rim** is arithmetic on the reference
@@ -433,7 +433,7 @@ least-confident-claims ledger in `00-index.md`.
   cue and the "one straight edge settles which port" check are this chapter's composition, and both
   are cheap to falsify.
 - **P/D** — [What the window actually contains, and why the rim is where the world
-  is](12-water-rendering.md#what-the-window-actually-contains-and-why-the-rim-is-where-the-world-is),
+  is](12-water-physics.md#what-the-window-actually-contains-and-why-the-rim-is-where-the-world-is),
   derived in [`12a`
   §7](12a-water-derivations.md#the-window-from-below-snells-jacobian-and-where-the-horizon-goes).
   **Snell's Jacobian** `dΩ_w/dΩ_a = cos θ_a/(n² cos θ_w)` is differentiated Snell and carries no free
@@ -460,7 +460,7 @@ least-confident-claims ledger in `00-index.md`.
   textbook treatment in Dean & Dalrymple, *Water Wave Mechanics for Engineers and Scientists*
   (1991). Constants quoted from model knowledge of the textbooks, not re-derived.
 - **P/?/D** — The **static-equilibrium (headland-)bay** plan-form
-  ([`12`](12-water-rendering.md#the-shoreline-is-part-of-the-wave-field-and-a-straight-one-is-a-test-that-cannot-fail),
+  ([`12`](12-water-physics.md#the-shoreline-is-part-of-the-wave-field-and-a-straight-one-is-a-test-that-cannot-fail),
   [`12a` §11](12a-water-derivations.md#11-the-static-equilibrium-bay)). Three separable claims and
   they do not share a tier.
   **`P`** — that a sandy shore between rock control points relaxes to zero longshore transport, and
@@ -481,7 +481,7 @@ least-confident-claims ledger in `00-index.md`.
   indentation on this scene), not closed.
 - **D** — **The "cross-shore distance" in the Dean profile is a distance to the shoreline CURVE, and
   an offset along a grid axis is not one.**
-  ([`12`](12-water-rendering.md#the-cross-shore-distance-is-a-distance-to-a-curve-and-this-is-where-a-renderer-gets-it-wrong),
+  ([`12`](12-water-physics.md#the-cross-shore-distance-is-a-distance-to-a-curve-and-this-is-where-a-renderer-gets-it-wrong),
   [`12a` §11](12a-water-derivations.md#what-cross-shore-distance-means-on-a-curved-coast--and-why-an-axis-offset-is-not-a-normal-offset),
   and the authoring rule routed to `terrain-architect/references/12-glacial-coastal.md`.)
   **`D`** — that `d = A(x_s(y) − x)^(2/3)` generates the family of *translates* of the shoreline
@@ -602,14 +602,14 @@ least-confident-claims ledger in `00-index.md`.
   physical solution, and it says so itself. Verified 2026-08.
   [NVIDIA](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-2-rendering-water-caustics).
 - **P** — Caustic sharpness floor from the solar disc: 0.53° subtense (the same figure used in
-  [Sun glitter](12-water-rendering.md#sun-glitter-the-sparkle-path)), compressed on entry by `cos θ_i/(n cos θ_t)` —
+  [Sun glitter](12-water-physics.md#sun-glitter-the-sparkle-path)), compressed on entry by `cos θ_i/(n cos θ_t)` —
   differentiated Snell, `≈ 1/n` near normal incidence. Arithmetic (0.53°/1.33 ≈ 0.40° ≈ 7.0 mrad,
   ≈ 0.7 cm blur per metre of depth) derived here and checked, not quoted from a source.
 - **P/?** — Visible-band dispersion of water (`n ≈ 1.337 at 486 nm` to `≈ 1.331 at 656 nm`):
   standard optical data, quoted from model knowledge and **not** web-verified — treat the third
   decimal as indicative. The qualitative claim (fold sets separate per channel, so caustic edges
   fringe) is robust regardless.
-- **P/D** — [A channel is a band](12-water-rendering.md#a-channel-is-a-band-not-a-wavelength). That a three-IOR render is
+- **P/D** — [A channel is a band](12-water-physics.md#a-channel-is-a-band-not-a-wavelength). That a three-IOR render is
   a three-point spectral quadrature, and that a step edge at the dispersion scale therefore resolves
   as a comb, is an argument rather than a cited result — but it is falsifiable and was falsified the
   right way round: the silhouette speckle it predicts was present and the fold fringing it exempts
@@ -623,7 +623,7 @@ least-confident-claims ledger in `00-index.md`.
   spectral stratification over the subsample grid is this chapter's composition — the idea is
   ordinary stratified spectral sampling, the point worth keeping is that the resolve filter is
   already an integral and can carry it for free.
-- **P/D** — [Pick the kernel on purpose](12-water-rendering.md#pick-the-kernel-on-purpose-and-give-the-variance-a-receiver).
+- **P/D** — [Pick the kernel on purpose](../../terrain-renderer/references/12-water-rendering.md#pick-the-kernel-on-purpose-and-give-the-variance-a-receiver).
   `W(k)` for box/tent/Gaussian, the sinc's −0.217 first negative lobe, `σ_box = 1/(2√3) = 0.2887·fp`,
   the 0.663 amplitude (44% of variance) a box-matched Gaussian passes at Nyquist, and
   `σ = √(2 ln 2)/π = 0.3748·fp` with its "half gone at `fp = λ/2`, 94% gone at `fp = λ`" reading are
@@ -633,14 +633,14 @@ least-confident-claims ledger in `00-index.md`.
   minor axis) is the reference implementation's (`D`). Which kernel to prefer, and the
   attenuate-amplitude / per-component / output-footprint rules, are this chapter's composition from
   that arithmetic.
-- **P/D** — [The sun must be a disc](12-water-rendering.md#sun-glitter-the-sparkle-path). `n = 2/θ_s² − 1` making a
+- **P/D** — [The sun must be a disc](12-water-physics.md#sun-glitter-the-sparkle-path). `n = 2/θ_s² − 1` making a
   `cos^n` lobe's hemispherical flux `2π/(n+1)` equal `Ω_sun = πθ_s²` is exact for small `θ_s` and
   was recomputed here (`n = 93 493`, `Ω_sun = 6.72×10⁻⁵ sr` at `θ_s = 0.265°`). The audit figures —
   1563× under-peak, 7.8× over-width, three lobes carrying 0.695 against a direct beam of 24.1 — are
   measured on the reference implementation against its own constants (`D`), so they price *that*
   fitted lobe rather than fitted lobes in general; the failure mode they illustrate is the general
   claim. The atmosphere half of the argument lives in `10`.
-- **P/D** — [The glitter path's width as a readout of the mean-square slope](12-water-rendering.md#sun-glitter-the-sparkle-path).
+- **P/D** — [The glitter path's width as a readout of the mean-square slope](12-water-physics.md#sun-glitter-the-sparkle-path).
   The slope regressions are Cox & Munk's (`P`, entry above). Everything the chapter reports *around*
   them is measured on the reference implementation's second scene
   (`terrain-renderer/reference-impl/beach_optics.py`, `glitter_width_deg`; all figures recomputed
@@ -653,7 +653,7 @@ least-confident-claims ledger in `00-index.md`.
   path narrows and brightens toward the horizon. Re-measure the constants for another geometry.
   The closed forms beside them — `β₀ = |θ_sun − θ_view|/2`, and the azimuth-to-tilt steepening —
   are half-vector geometry derived here and checked against the model (`D`).
-- **D** — [The pdf is the ensemble mean, and per-pixel use declares the pixel unresolved](12-water-rendering.md#every-equation-above-is-about-the-ensemble-and-a-pixel-is-not-one),
+- **D** — [The pdf is the ensemble mean, and per-pixel use declares the pixel unresolved](12-water-physics.md#every-equation-above-is-about-the-ensemble-and-a-pixel-is-not-one),
   with the mathematics at [`12a` §7b](12a-water-derivations.md#7b-shading-with-the-slope-pdf-declares-the-pixel-unresolved).
   The convolution `p_tot = p_res * p_sub`, its degenerate case `p_res = δ`, and the closed-form
   coefficient of variation `CV² = (1+ρ_u)(1+ρ_c)/√((1+2ρ_u)(1+2ρ_c)) − 1` are derived here; the
@@ -672,7 +672,7 @@ least-confident-claims ledger in `00-index.md`.
   ⚠️ **The `U₁₂.₅/U₁₀ = 1.02117` conversion is `D` on ECKV's own drag coefficient** and is required
   wherever a `U₁₀` meets Cox & Munk — including inside a derivative, where omitting it silently
   compares `d/dU₁₀` against `d/dU₁₂.₅`.
-- **P/D** — [What a single-bounce glitter model loses below the horizon](12-water-rendering.md#sun-glitter-the-sparkle-path).
+- **P/D** — [What a single-bounce glitter model loses below the horizon](12-water-physics.md#sun-glitter-the-sparkle-path).
   The two integrals — the radiance over the upward hemisphere, and `ρ_F(ω) cos ω · p/cos β` over
   slope space — are the Cox–Munk construction (`P`); their agreement to 7×10⁻⁵ relative, and the
   share of intercepted flux whose mirror direction points *down*, are measured here on
@@ -682,7 +682,7 @@ least-confident-claims ledger in `00-index.md`.
   "negligible above 45°" reading is that table's, not a published result. **Not modelled anywhere in
   this chapter** — the multiple-surface-bounce term that would return the light is named and left
   open.
-- **P/D** — [The forward glow is not Beer–Lambert](12-water-rendering.md#water-body-optical-identity-where-the-iops-come-from).
+- **P/D** — [The forward glow is not Beer–Lambert](12-water-physics.md#water-body-optical-identity-where-the-iops-come-from).
   The single-scattering integral collapsing to `b·p(Θ)·E·L·e^{−cL}` is textbook radiative transfer
   done in one line here — the two exponentials multiply to `e^{−cL}` independent of `s`, so the
   integral is the path length — and the cuvette relation `c = −ln(T₂/T₁)/(L₂−L₁)` is standard
@@ -698,7 +698,7 @@ least-confident-claims ledger in `00-index.md`.
   (0.012, 0.026, 0.038 inferred), not the bias being insensitive to geometry. Quote the formula,
   not the percentage.
 - **P/D** — [K_d is half the solution; the other half is a
-  direction](12-water-rendering.md#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it)
+  direction](12-water-physics.md#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it)
   (the section was renamed and this link had rotted; **figure 12·4** there now draws the
   coefficient and the Cornu spiral),
   wave 10. **Sommerfeld 1896** (the exact half-plane solution) and **Penney & Price 1952** (its
@@ -716,18 +716,18 @@ least-confident-claims ledger in `00-index.md`.
   convention — a coherent sum of two half-plane edge fields, `2·K_d((W/2)√(2/(λr)))` — is `D` and is
   newly stated**: it was not in the chapter's words and a Fresnel–Kirchhoff aperture integral on the
   same geometry gives 0.431 where the table gives 0.51.
-- **D** — [A shore-attached headland does not shelter its own bay](12-water-rendering.md#a-shore-attached-headland-does-not-shelter-its-own-bay-and-the-geometry-says-so-first).
+- **D** — [A shore-attached headland does not shelter its own bay](12-water-physics.md#a-shore-attached-headland-does-not-shelter-its-own-bay-and-the-geometry-says-so-first).
   `protrusion / tan θ₀` and the 5-of-89 / 1-of-66 shadow count are measured on the coastal loop's own
   plan-form; the criterion is derived from the geometry and has no citation behind it. The screen
   bearing at the pole is `?` and both sensitivities quoted beside it (0.051° over 80° of rotation,
   0.034° over 4 m → deep water) are `D`.
-- **D/M** — [The fan is an OUTPUT](12-water-rendering.md#the-fan-is-an-output-and-making-it-one-overturns-the-attribution-above).
+- **D/M** — [The fan is an OUTPUT](12-water-physics.md#the-fan-is-an-output-and-making-it-one-overturns-the-attribution-above).
   The six-row transport table is `D` on `beach.py` + `beach_diffract.py`, one offshore spectrum, one
   ramp, one transform, one CERC closure. The overturn of wave 9's residual decomposition is `M` — a
   claim this project made and this project withdrew: the 0.71° and 1.46° were measured at exactly
   radial incidence and are not an additive floor under a different one, demonstrated by a pair that
   differs in the incidence alone (2.371° → 1.278°) and confirmed by grid refinement to `dx = 1 m`.
-- **P/D** — [Diffraction is not refraction](12-water-rendering.md#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it).
+- **P/D** — [Diffraction is not refraction](12-water-physics.md#diffraction-is-not-refraction-and-nothing-above-contains-any-of-it).
   The Sommerfeld half-plane solution and its coastal-engineering use for breakwaters
   (Penney & Price 1952) are `P` — cited for the *structure*, and **not** re-verified against those
   papers this run. The numbers beside them are `D`, evaluated here from Fresnel integrals rather
@@ -744,7 +744,7 @@ least-confident-claims ledger in `00-index.md`.
   isolated rock; `?` for that scene's wavelength and obstacle width, which is why the chapter states
   the regime rather than a number for it.
 - **D** — The wall as a light carrier, in
-  [Caustics](12-water-rendering.md#caustics-the-other-half-of-the-light-path). The 35% mean / 77% worst-texel wall share
+  [Caustics](12-water-physics.md#caustics-the-other-half-of-the-light-path). The 35% mean / 77% worst-texel wall share
   of the bed's cosine-weighted hemisphere is an exact rectangle view factor computed per texel; the
   58% of the total-internal-reflection return meeting a wall follows from the 48.6° critical angle
   needing ≥1.59 m of horizontal run out of 1.40 m of depth in a 4 m basin; the 2.2× red gradient
@@ -775,7 +775,7 @@ least-confident-claims ledger in `00-index.md`.
   the *ordering* of two surfaces at one depth through one water is invariant to exposure, tone curve
   and white point, being a ratio of radiances within a single frame.
 - **P/D** — [What a submerged vertical face sees of the
-  sky](12-water-rendering.md#what-a-submerged-vertical-face-sees-of-the-sky), derived in
+  sky](12-water-physics.md#what-a-submerged-vertical-face-sees-of-the-sky), derived in
   [`12a` §7](12a-water-derivations.md#the-window-and-the-mirror-two-halves-of-one-hemisphere). The
   physics is standard optics with no free parameter: past `θ_c = asin(1/n)` the underside of a flat
   water surface is a **perfect mirror** and inside it the sky arrives compressed into that cone
@@ -801,7 +801,7 @@ least-confident-claims ledger in `00-index.md`.
   The fault itself is **open** (`?`): closing it needs the window's share *and* the mirror's missing
   bounces, and moving the sky constant alone runs the wrong way.
 - **D** — [A caustic on a vertical
-  face](12-water-rendering.md#a-caustic-on-a-vertical-face-is-not-the-beds-pattern-at-that-faces-own-position).
+  face](12-water-physics.md#a-caustic-on-a-vertical-face-is-not-the-beds-pattern-at-that-faces-own-position).
   The correction is conservation of flux along one refracted direction, which is `P` and has no free
   parameter: the point at height `z` on a vertical face is lit by the beam that would have landed at
   `face_xy + (z − z_foot)·tan θ_t·ŝ`, with `θ_t` the **refracted** sun angle. The geometry figures
@@ -852,7 +852,7 @@ least-confident-claims ledger in `00-index.md`.
   spends the reflectance as `b_b/b` whitens without hiding, which is the symptom rather than the
   mechanism.
 - **P/D** — [Surface reflection names two opposite things: a loss and a
-  trap](12-water-rendering.md#surface-reflection-names-two-opposite-things-a-loss-and-a-trap),
+  trap](12-water-physics.md#surface-reflection-names-two-opposite-things-a-loss-and-a-trap),
   derived in [`12a` §7](12a-water-derivations.md#one-interface-two-diffuse-reflectances). That one
   interface carries two diffuse Fresnel constants, that they are the same integral over `2μ dμ` with
   the index pair swapped, and that they are tied by Walsh's relation, are standard optics (`P`; the
@@ -876,7 +876,7 @@ least-confident-claims ledger in `00-index.md`.
   `c = sqrt(g/k + σk/ρ)`) was derived and checked here. Framing these as *review tests*, and the
   claim that a still frame cannot separate real glitter from noise-perturbed specular, is this
   skill's composition — production observation, not a cited result.
-- **P/F** — [The meniscus line](12-water-rendering.md#the-meniscus-line-where-reachability-cannot-fail). `a = √(σ/ρg)` and
+- **P/F** — [The meniscus line](12-water-physics.md#the-meniscus-line-where-reachability-cannot-fail). `a = √(σ/ρg)` and
   `h = a·√(2(1 − sin θ))` are textbook capillary rise on a vertical plate; `a = 2.727 mm`, `h = 3.856`
   / `2.727 mm` at `θ = 0°`/`30°`, recomputed here (`σ = 0.0728`, `ρ = 998`, `g = 9.81` SI). Contact
   angle **unmeasured** (`?`) so the rise is a range; the 5–10 mm fillet is order-of-magnitude; the σ
@@ -910,7 +910,7 @@ least-confident-claims ledger in `00-index.md`.
   (0.400–0.450 kg) are both published, so the draught is an output with a published tolerance —
   **38.40–40.79 mm** across the mass band and **40.15–39.10 mm** across the circumference band — is
   `P/D` and is stated as method in
-  [`11`](11-verification-failures.md#pick-instruments-whose-parameters-someone-else-has-fixed).
+  [`11`](../../terrain-renderer/references/11-verification-failures.md#pick-instruments-whose-parameters-someone-else-has-fixed).
   ⚠️ **A correction made in this pass:** an inflatable ring of tube radius 90 mm and skin 0.25 mm has
   `ρ_eff = ρ_PVC·2t/r + ρ_air = 8.42 kg/m³` and floats at 0.842% of its volume, which is
   **5.27 mm of a 180 mm tube** — not the 9 mm in circulation, which needs 18.7 kg/m³ and looks like a
@@ -945,8 +945,8 @@ least-confident-claims ledger in `00-index.md`.
   arithmetic recomputed here on the corrected red, as are the liner albedos (`0.8` white,
   `(0.24, 0.54, 0.70)` mid-blue PVC), which are representative values, not measured product data.
 - **P** — The chapter's vocabulary, in [Saying it in
-  OpenPBR](12-water-rendering.md#saying-it-in-openpbr-and-where-the-mapping-stops) and [The
-  vocabulary](12-water-rendering.md#the-vocabulary-and-which-half-of-it-you-can-look-up). Two
+  OpenPBR](12-water-physics.md#saying-it-in-openpbr-and-where-the-mapping-stops) and [The
+  vocabulary](12-water-physics.md#the-vocabulary-and-which-half-of-it-you-can-look-up). Two
   standards, no house style.
   **OpenPBR Surface** supplies the interface names (`base_color`, `base_weight`, `specular_ior`,
   `specular_roughness`, `transmission_color`, `transmission_depth`, `transmission_scatter`,
@@ -986,7 +986,7 @@ least-confident-claims ledger in `00-index.md`.
   the two-term composite (`refracted·T_beam + L_scatter·(1 − T_diff)`) is a renderer construction
   and not a solution of the radiative transfer equation.
 - **P/D** — Pool chemistry, in
-  [Pool optics](12-water-rendering.md#pool-optics-the-colour-is-the-bottom-not-the-water). The hypochlorite absorption
+  [Pool optics](12-water-physics.md#pool-optics-the-colour-is-the-bottom-not-the-water). The hypochlorite absorption
   peak at **292 nm** and hypochlorous acid at 235 nm, with `ε ≈ 300–380 M⁻¹cm⁻¹`, are standard
   solution spectroscopy from model knowledge and were **not** chased to a primary source (`?` on the
   molar absorptivity in particular). The **0.5–1.5 m⁻¹ in the UV** at a 1–3 mg/L dose is arithmetic
@@ -1029,11 +1029,11 @@ least-confident-claims ledger in `00-index.md`.
   far field is set by that file's `WIND_RMS` and `REVERB_RMS`, which are **chosen, not measured**
   (`?`), so citing them back as measurement would be circular. This link is the weakest in the chain.
 - **P** — The wake geometry. `c_min = (4gσ/ρ)^(1/4) = 0.231 m/s` at 17.1 mm is the standard
-  capillary–gravity minimum already cited in [Calm water](12-water-rendering.md#calm-water-the-low-energy-regime);
+  capillary–gravity minimum already cited in [Calm water](12-water-physics.md#calm-water-the-low-energy-regime);
   `U0 = C_d√(2ΔP/ρ)` is Bernoulli with an orifice discharge coefficient (`C_d ≈ 0.92` assumed, a
   typical eyeball value from model knowledge); the stationary condition `c(k) = U·cos ψ` is textbook
   wave–current interaction, the same Doppler machinery this chapter cites for
-  [rivers](12-water-rendering.md#rivers-flow-driven-surfaces). That a running return's pattern is a narrow downstream
+  [rivers](../../terrain-renderer/references/12-water-rendering.md#rivers-flow-driven-surfaces). That a running return's pattern is a narrow downstream
   band and cannot be a ring system follows from those with no free parameter, and is the durable
   part. The **±19° energy fan** is narrower than the ±78° range of stationary *wavevectors* because
   energy travels at `c_g·k̂ + U`; the figure is the output of integrating the ray equations
@@ -1057,7 +1057,7 @@ least-confident-claims ledger in `00-index.md`.
   waves is physics, not caution: the inextensible limit needs film elasticity large against the
   wave, which fails for swell.
 - **`?`** — **Waterline weathering: the zones, the mechanisms and their signs**, in [A liner in
-  service is an albedo field](12-water-rendering.md#a-liner-in-service-is-an-albedo-field-and-the-waterline-is-its-coordinate).
+  service is an albedo field](12-water-physics.md#a-liner-in-service-is-an-albedo-field-and-the-waterline-is-its-coordinate).
   The organising claim — that a liner in service is an albedo *field* keyed to `h = z − z_water`
   rather than one swatch — is this skill's framing over the project owner's ruling that not every
   pool is newly laid. The chemistry under it is **standard in kind and unsourced in quantity**, and
@@ -1077,7 +1077,7 @@ least-confident-claims ledger in `00-index.md`.
   - **Biofilm and algae in dead-circulation corners**, darkening and green-shifted, is
     pool-operation practice plus direct observation (`F`); the establishment and kill times are
     stated as orders of magnitude and are `?`. That corners are the dead zones *because* the return
-    jets sweep the open water is this chapter's own [driven-basin](12-water-rendering.md#the-wave-field-is-a-driven-basin-not-a-spectrum)
+    jets sweep the open water is this chapter's own [driven-basin](12-water-physics.md#the-wave-field-is-a-driven-basin-not-a-spectrum)
     reasoning, not a measured circulation map (`?`).
   - **Abrasion** on treads and the shallow end is `F`; the claim that its roughness change is a more
     reliable cue than its albedo change is this chapter's and is untested (`?`).
@@ -1090,7 +1090,7 @@ least-confident-claims ledger in `00-index.md`.
     mechanism in each, and the **sign**, and the signs are checkable against any photograph of a pool
     that has been in service.
 - **D/?** — **The weathering amplification**, in [Where a weathering profile is allowed to come
-  from](12-water-rendering.md#where-a-weathering-profile-is-allowed-to-come-from-and-what-the-water-does-to-it).
+  from](12-water-physics.md#where-a-weathering-profile-is-allowed-to-come-from-and-what-the-water-does-to-it).
   `A = ρ/(1 − ρ·R_int)`, `G = 1/(1 − ρ·R_int)` and the identity `dlnA/dlnρ = G` are algebra,
   recomputed here (`D`); the four-row table at `R_int = 0.47617` (the green diffuse internal
   reflectance already quadratured in the Fresnel entry above) reproduces to every digit printed, as
@@ -1098,7 +1098,7 @@ least-confident-claims ledger in `00-index.md`.
   **The depth-aware table is the load-bearing correction and it is per-channel.** For a bed at depth
   the denominator is `1 − ρ·G_rt(τ)`, not `1 − ρ·R_int` — `G_rt → R_int` only as `τ → 0`, exactly as
   [Attenuation and escape do not
-  factorise](12-water-rendering.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them)
+  factorise](12-water-physics.md#attenuation-and-escape-do-not-factorise-and-a-lut-is-where-you-will-separate-them)
   establishes — so on this chapter's pool (`G_rt = 0.0965 / 0.3277 / 0.4445` at
   `τ = 0.3664 / 0.0742 / 0.0143`, both already `D` in the LUT entry above) the gain runs **1.04–1.07
   in red against 1.22–1.45 in blue** where the diffuse constant promises 1.24–1.50. The diffuse-
@@ -1111,18 +1111,18 @@ least-confident-claims ledger in `00-index.md`.
   against `reference-impl/` (`?`).
   One bookkeeping note for anyone comparing the two tables in `12`: the `Apparent` column of the
   liner table in [The two materials a pool actually
-  has](12-water-rendering.md#the-two-materials-a-pool-actually-has-and-neither-is-water) is **not**
+  has](12-water-physics.md#the-two-materials-a-pool-actually-has-and-neither-is-water) is **not**
   `ρ·G` — across all six of its rows it is consistent with `ρ·G` carrying a constant first-surface
   factor of ≈ 0.934 = `1 − R_ext`. The two tables agree exactly on gain and on every ratio; only the
   absolute column differs, and only by that constant.
 - **F** — **The stated/derived doctrine and the runtime form of the profile**, in the same section.
   That light transport is derived and material parameters are stated is [OpenPBR's own
-  division](12-water-rendering.md#saying-it-in-openpbr-and-where-the-mapping-stops) restated, and
+  division](12-water-physics.md#saying-it-in-openpbr-and-where-the-mapping-stops) restated, and
   the freeze-then-render test (*would you have written the same profile if you had never seen the
   render?*) is this skill's doctrine, not a cited method. The runtime rules — two `z_water` (datum
   for the deposit, instantaneous surface for the wet film), `h` sourced from the same field every
   other consumer reads, exclusion from RVT/VT page generation carried over from `13`'s
-  [state-layer doctrine](13-snow-weather-surface-state.md#static-says-possible-runtime-says-current),
+  [state-layer doctrine](../../terrain-renderer/references/13-snow-weather-surface-state.md#static-says-possible-runtime-says-current),
   the 1-D-LUT-in-`h` form with a non-linear parameterisation, and the prohibition on touching
   `transmission_*` — are this chapter's composition over contracts it already owns. The texel
   arithmetic is exact (±2 m at 256 texels is 15.6 mm/texel) but the tide-line width it is compared
@@ -1133,11 +1133,11 @@ least-confident-claims ledger in `00-index.md`.
   scattering one, and the man-made gating table: this skill's composition from the optics above
   plus standard pool-operation practice.
 - **P/synthesis, with three `D` measurements and one `?`** — **[An illuminant per receiver, and
-  what that costs at a waterline](12-water-rendering.md#an-illuminant-per-receiver-and-what-that-costs-at-a-waterline).**
+  what that costs at a waterline](12-water-physics.md#an-illuminant-per-receiver-and-what-that-costs-at-a-waterline).**
   The general result — that an illuminant is `(1/π)∫L(ω)(ω·N)⁺dω` and therefore a property of the
   *receiver's orientation*, with weights `cos θ sin θ` for a horizontal face and `sin² θ` for a
   vertical one, agreeing at exactly ½ under a uniform sky and nowhere else — is derived in
-  [`10`](10-lighting-shadows.md#an-illuminant-is-a-property-of-the-receivers-orientation-not-of-the-scene)
+  [`10`](../../terrain-renderer/references/10-lighting-shadows.md#an-illuminant-is-a-property-of-the-receivers-orientation-not-of-the-scene)
   from the cosine law alone; the ½ was verified here by quadrature to 10⁻¹¹. **D** for the three
   measured triples, all recomputed here on the reference implementation's own sky and basin: the
   band's own hemisphere against half the derived deck illuminant (1.232 / 1.099 / 0.966), the
@@ -1159,7 +1159,7 @@ least-confident-claims ledger in `00-index.md`.
   zero, so the answer is set by how far the strip's top sits below the ledge — a section question,
   not a lighting one. Quote the profile or the foot, never the mean.
 - **D/P, with one derived bound** — **[The upgoing half, traced: the return leg, the mirror, and the
-  fixed point](12-water-rendering.md#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point).**
+  fixed point](12-water-physics.md#the-upgoing-half-traced-the-return-leg-the-mirror-and-the-fixed-point).**
   The gather's shape — trace the upgoing half, let the trace decide window from mirror, exact
   per-direction internal Fresnel by Stokes reversibility, walls as emitters — is `reference-impl/`'s
   `up_gather` read as doctrine (**D**), and the physics in it is standard (**P**). **D** for the
@@ -1178,7 +1178,7 @@ least-confident-claims ledger in `00-index.md`.
   (the wave field is not on the mirror leg) — stated as an approximation, with its argument, not as
   a result.
 - **`?` throughout, and deliberately** — **[Fouling in the corners, from an
-  algorithm](12-water-rendering.md#fouling-in-the-corners-from-an-algorithm-rather-than-from-a-texture).**
+  algorithm](12-water-physics.md#fouling-in-the-corners-from-an-algorithm-rather-than-from-a-texture).**
   Nothing in this section is rendered, measured or falsified; it is a specification written before
   implementation so the choices can be argued with rather than discovered in a diff. What is **P**
   in it: potential flow as the classical first approximation, and the corner solution
@@ -1197,9 +1197,9 @@ least-confident-claims ledger in `00-index.md`.
   (susceptibility on the material, the `neglect` path on the instance) and for the non-zero default,
   which rests on an observation about pools in service rather than on a measurement.
 - **D/P, with the IOPs `?`** — **[The surf zone: what a pool reference lends the sea, and the one
-  thing it cannot](12-water-rendering.md#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot)**,
+  thing it cannot](12-water-physics.md#the-surf-zone-what-a-pool-reference-lends-the-sea-and-the-one-thing-it-cannot)**,
   and the three-whites table in [Aerated
-  water](12-water-rendering.md#aerated-water-foam-spray-and-whitewater). The transfer table is
+  water](12-water-physics.md#aerated-water-foam-spray-and-whitewater). The transfer table is
   bookkeeping over results already provenanced in this file — Fresnel both sides, the critical
   angle, `L/n²`, Beer–Lambert, the trapped series and dispersion are properties of an interface and
   an IOR and carry unchanged; **`b_b ≈ 0` does not, and it is the only entry that does not.**
@@ -1211,7 +1211,7 @@ least-confident-claims ledger in `00-index.md`.
   coastal IOPs themselves: no spectrum was extracted from any of the nine frames, and the CDOM /
   chlorophyll attribution of a green wave face is an identification, not a measurement. **`?`** for
   the sediment transport in [Water-body optical
-  identity](12-water-rendering.md#water-body-optical-identity-where-the-iops-come-from) — the
+  identity](12-water-physics.md#water-body-optical-identity-where-the-iops-come-from) — the
   entrainment law and the fall velocity in `db/dt + u·∇b = E − w_s b/d` are named to give the
   *shape* of the coupling, and neither term is quantified here. The load-bearing claim is
   categorial and needs no number: in the surf zone an IOP is a **state variable produced by the
@@ -1224,7 +1224,7 @@ least-confident-claims ledger in `00-index.md`.
   of it. **The reference set has a named gap** — no frame catches the backwash lifting sand, i.e.
   the erosive half of the swash cycle, and the inference that would fill it from the other eight is
   exactly the inference not to make.
-- **T/D** — [The 30° ceiling](12-water-rendering.md#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise).
+- **T/D** — [The 30° ceiling](12-water-physics.md#the-30-ceiling-a-single-valued-crest-cannot-be-read-lengthwise).
   Two independent results, and they are different tiers.
   **Stokes' corner is `T`**: the stagnation/wedge exponent match giving `2α = 120°` is Stokes (1880),
   standard in every water-wave text, and it is *reproduced here in full* rather than quoted — the
@@ -1263,7 +1263,7 @@ least-confident-claims ledger in `00-index.md`.
   p99.99 to a tenth of a degree but returned a max of 34.36° because it ran 4 instants and not 8.
   Percentiles are comparable across censuses; maxima are not. The bound itself is carried by the
   geometry, not by any of these numbers.
-- **P/D** — [A peaked crest is not a steep face](12-water-rendering.md#a-peaked-crest-is-not-a-steep-face-one-harmonic-two-moments).
+- **P/D** — [A peaked crest is not a steep face](12-water-physics.md#a-peaked-crest-is-not-a-steep-face-one-harmonic-two-moments).
   Second-order Stokes' bound harmonic `η = a[cos φ + r cos(2φ+ψ)]` and its depth function
   `C(kd) = cosh(kd)(2 + cosh 2kd)/sinh³(kd)` are **`P`** (Dean & Dalrymple, *Water Wave Mechanics for
   Engineers and Scientists*, the second-order surface profile) — structure cited, and this appendix
