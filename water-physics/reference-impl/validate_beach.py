@@ -9267,16 +9267,26 @@ def _sec_foamtex(ctx):
     _pub = [('f2-swash-foam-lace.jpg', (560, 540, 1060, 640), 0.81),
             ('f2-swash-foam-lace.jpg', (460, 690, 960, 800), 0.76),
             ('f1-breaker-three-whites.jpg', (1250, 830, 1750, 960), 0.54)]
+    # ⚠️ THE `except` IS NARROW ON PURPOSE, AND IT USED NOT TO BE. A bare
+    # `except Exception` here caught a ValueError from this loop's own
+    # unpacking -- `_pub` holds three-tuples and the loop asked for two -- and
+    # reported it as "generic set absent". The row therefore could not fire
+    # with the photographs present OR absent, and said the wrong cause either
+    # way. That is the ninth way a verification fails wearing a new coat: an
+    # exception handler that turns a code defect into a data-availability
+    # message. Only a missing file is allowed to skip this row; anything else
+    # is a bug and must surface as one.
     _got = []
-    try:
-        from PIL import Image as _Im
-        for fn, (a, b, c, d) in _pub:
-            p = os.path.join(_gen, fn)
-            if not os.path.exists(p):
-                raise IOError(fn)
-            A = np.asarray(_Im.open(p).convert('RGB'), float)
-            _got.append(_foam_texture(_foam_luma8(A)[b:d, a:c])['lW'])
-    except Exception:
+    _missing = False
+    from PIL import Image as _Im
+    for fn, (a, b, c, d), _exp in _pub:
+        _p = os.path.join(_gen, fn)
+        if not os.path.exists(_p):
+            _missing = True
+            break
+        A = np.asarray(_Im.open(_p).convert('RGB'), float)
+        _got.append(_foam_texture(_foam_luma8(A)[b:d, a:c])['lW'])
+    if _missing:
         _got = []
     if _got:
         check(1, 'the port reproduces the published photograph l/W rows',
