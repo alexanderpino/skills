@@ -132,6 +132,7 @@ that catches nothing is the failure this guards against.
 | `references/12-water-physics.md` | The chapter: the interface and its two Fresnel constants, radiance transport across it, the trapped series as a **bound**, what a submerged face sees, IOPs and where a body's colour comes from, sun glitter, caustics and the masking contract, aerated water, sea states, calm water, shoaling and refraction and breaking, diffraction, the wave-height population, the surf zone and the representation limits on it |
 | `references/12a-water-derivations.md` | The **mathematics and pseudocode** behind every result the chapter quotes in a line, with the suite row that guards each |
 | `references/12b-water-provenance.md` | **Sources and provenance**: every tier, every citation, every `?`, and the `P/T/D/F/N/?` convention restated so it reads alone. Read before citing anything out of this skill |
+| `references/12c-uncovered.md` | **What this skill does not cover, and where to read it.** Six known gaps — ice optics, the free jet along its Weber axis, water entry and the Worthington jet, thin-film iridescence, the hydraulic jump, and vortex structure — five with a verified primary source, one openly admitted as unsourced. Read it before concluding that something is absent by oversight |
 | `references/figures/` | The figures, drawn by one script that imports the implementation read-only and writes no physics of its own — so a figure cannot drift from the code that ships |
 
 ## Cross-skill routing

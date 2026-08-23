@@ -1486,6 +1486,21 @@ above except the TotK physics talk is community reconstruction or press/footage 
   tinted through the scattering term reads identically over every liner and at every depth, which
   is exactly the tell.
 
+## Known gaps in the physics, and where to read them
+
+`water-physics` keeps a register of what it does **not** cover, each with a verified primary
+source: [`12c-uncovered.md`](../../water-physics/references/12c-uncovered.md). Six entries, and
+several are things a terrain renderer asks for by name — **ice** (frozen lakes, glaciers, sea ice:
+optically scattering-dominated, not tinted water), the **free jet in air** (fountain, hose, water
+pistol — one phenomenon along a Weber axis the chapters derive the endpoint of but not the
+parameter), **water entry** (the splash crown, the cavity, and the Worthington jet that fires
+*after* the impact burst most renderers stop at), **thin-film iridescence** (oil sheen),
+the **hydraulic jump** (rapids and weirs as standing structure rather than travelling waves), and
+**vortex structure**.
+
+Read it before assuming an absence is an oversight. It also records the pattern that found them:
+the subject was usually present and the *unifying axis* was missing.
+
 ## Sources & provenance
 
 Every tier, citation and `?` behind the water material — this chapter's and the physics it routes
