@@ -2,42 +2,54 @@
   "stops": {
     "bar_met_n": 2,
     "clean_streak_n": 2,
-    "budget_waves": 10,
-    "hard_cap_waves": null
+    "no_progress_n": 2,
+    "budget_waves": 3,
+    "hard_cap_waves": null,
+    "target_score": 9
   },
+  "wip_limit": 3,
   "dimensions": [
-    "physics",
-    "visual",
-    "prose"
+    "quality"
   ],
   "lanes": [
-    "surface",
-    "optics",
-    "chapter"
+    "tokens",
+    "first-show",
+    "speed"
   ],
-  "bar_kind": "reference",
-  "extensions": [
+  "bar_kind": "acceptance criteria",
+  "extensions": [],
+  "parked": [],
+  "gates": [
     {
-      "ts": "2026-08-11T15:34:14+00:00",
-      "at_wave": 6,
-      "from_waves": 6,
-      "to_waves": 7,
-      "waves": 1,
-      "reason": "Owner granted ONE wave. CAM_AZ sits 0.3 deg off the sun's bearing so the eye looks into the sun and the mirror point lands on the water; the reference photograph was taken at bearing 255 against a sun at 273.75. Measured, not suspected. CORRECTION: --waves is a delta, not a target, so this was first recorded as 6 -> 13. Corrected by hand to 6 -> 7, which is what the owner actually granted.",
-      "log_read": "nothing-open",
-      "forced": false,
-      "against_log_read": false
+      "name": "no-orphan-references",
+      "cmd": "cd gauntlet-loop && for f in references/*.md; do grep -q \"$(basename $f)\" SKILL.md || echo \"ORPHAN $f\"; done",
+      "paths": [
+        "gauntlet-loop/SKILL.md",
+        "gauntlet-loop/references"
+      ]
     },
     {
-      "ts": "2026-08-12T14:18:33+00:00",
-      "at_wave": 12,
-      "from_waves": 7,
-      "to_waves": 10,
-      "waves": 3,
-      "reason": "Owner ruling: 'Rond het zwembad af, start nog een paar gauntlet loop waves indien nodig', with five reference photographs attached -- three of them split-shot or looking-up-from-below. Sections G and H of the bar are the only ones never rendered; both stand in README.md under 'Not modelled yet'. Three waves: G (the camera inside the water), H (the split shot, port modelled explicitly), and one closing judgement wave.",
-      "log_read": "G and H unrendered; refract() TIR branch built but unreached from any call site",
-      "forced": false,
-      "against_log_read": false
+      "name": "no-dangling-paths",
+      "cmd": "cd gauntlet-loop && grep -oE 'references/[a-z-]+\\.md' SKILL.md | sort -u | while read q; do [ -f \"$q\" ] || echo \"DANGLING $q\"; done",
+      "paths": [
+        "gauntlet-loop/SKILL.md",
+        "gauntlet-loop/references"
+      ]
+    },
+    {
+      "name": "no-unknown-flags",
+      "cmd": "cd gauntlet-loop && grep -oE '\\-\\-[a-z-]{3,}' SKILL.md | sort -u | while read q; do grep -q -- \"\\\"$q\\\"\" scripts/gauntlet.py || echo \"UNKNOWN $q\"; done",
+      "paths": [
+        "gauntlet-loop/SKILL.md",
+        "gauntlet-loop/scripts/gauntlet.py"
+      ]
+    },
+    {
+      "name": "script-compiles",
+      "cmd": "python3 -m py_compile gauntlet-loop/scripts/gauntlet.py",
+      "paths": [
+        "gauntlet-loop/scripts/gauntlet.py"
+      ]
     }
   ]
 }

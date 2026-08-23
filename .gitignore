@@ -1,6 +1,8 @@
 terrain-architect-workspace/
 __pycache__/
 *.py[cod]
+gauntlet/.gates.lock
+gauntlet-loop-workspace/
 
 # Agent worktrees. The harness checks a full copy of the repo out under here
 # when a subagent runs with worktree isolation; committing it would nest the
