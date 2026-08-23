@@ -20,6 +20,7 @@ Contents: [Sea states: the energy ladder](#sea-states-the-energy-ladder) ·
 [Calm water: the low-energy regime](#calm-water-the-low-energy-regime) ·
 [Shallow water: the physics](#shallow-water-the-physics) ·
 [Aerated water: foam, spray and whitewater](#aerated-water-foam-spray-and-whitewater) ·
+[Five axes the rest of this chapter is a point on](#five-axes-the-rest-of-this-chapter-is-a-point-on) ·
 [Man-made water: pools, tanks and channels](#man-made-water-pools-tanks-and-channels) ·
 [Shading and optics](#shading-and-optics) ·
 [Caustics: the other half of the light path](#caustics-the-other-half-of-the-light-path) ·
@@ -1299,6 +1300,551 @@ look), and the mist plume is a **lit participating medium**, not a billboard dis
 element that grounds the fall in the scene, because it scatters sunlight and shadows the rock
 behind it. The recurring structural defect remains the one in
 [Rivers](../../terrain-renderer/references/12-water-rendering.md#rivers-flow-driven-surfaces): a fall authored where the flow field does not support it.
+
+## Five axes the rest of this chapter is a point on
+
+Everything above this line is organised by **subject** — a sea state, a pool, a waterfall, a foam
+patch. That is how the chapter grew and it is why it had the gaps it had, because a subject list
+can only be extended by thinking of another subject. Five things were missing from it, and four of
+the five were missing the same way: **the subject was present and the axis it sits on was never
+drawn.** Snow was covered and ice was not, because nothing here named the *phase* axis. The
+waterfall's breakup was derived — Rayleigh–Plateau, most-unstable mode — and a fire hose was not,
+because nothing named the *Weber* axis. Splashes were mentioned and the four-event sequence was
+not, because nothing named the *impulse* axis. Rapids were absent because nothing distinguished
+structure that **travels** from structure that **stands**.
+
+So this section is not five more subjects. It is the five axes, each with the closed forms that
+order it, and each ending in the same place: the parameter a renderer must read to know **which of
+several looks it is drawing**. Where a subject already appears above, the axis is what tells you
+*which point on it* you have.
+
+The fifth is different in kind and is here because it has nowhere else to be: an oil sheen is the
+one water appearance driven by **interference**, and none of this chapter's absorption, scattering
+or Fresnel machinery reaches it.
+
+Everything below is implemented in `reference-impl/ice.py`, `jet.py`, `impact.py`,
+`openchannel.py` and `thinfilm.py`, and guarded by
+[`validate_phases.py`](../reference-impl/validate_phases.py) — 30 rows, and the `--bugs` harness
+proves all six of its deliberate defects fire.
+
+---
+
+### The phase axis: ice is not tinted water, and the mechanism differs twice
+
+**The category error, stated first.** The obvious move is to draw ice as water with a lower
+roughness, a higher `F0` and a blue tint. Every part of that is close enough to be tempting and
+the last part is wrong in a way no parameter fixes, because *ice and water are blue for different
+reasons.* Water is blue because red light is **absorbed along a path**; the colour is the path,
+and a thin enough layer of water has no colour. Glacier ice is blue because red light is absorbed
+*while blue survives many scattering events and returns*; the colour is a **ratio**, and it does
+not vanish as the slab thins. That difference is the whole section and it decides which knob a
+renderer is even allowed to have.
+
+**The interface, which is the part that nearly transfers.** At this chapter's own band points, from
+Warren & Brandt's compilation at −7 °C (`P`):
+
+| | red 610 nm | green 550 nm | blue 450 nm |
+|---|---|---|---|
+| `n` ice | 1.3091 | 1.3110 | 1.3157 |
+| `k` ice | 6.890 × 10⁻⁹ | 2.289 × 10⁻⁹ | 9.239 × 10⁻¹¹ |
+
+`n` is 1.311 against water's 1.334, so `F0` is **0.01811** against **0.02048** — 11.6% lower, and
+the critical angle moves from 48.56° to 49.71° (`D`). Real, small, and *not* what makes ice look
+like ice. A renderer that changes only these has drawn slightly duller water.
+
+**The absorption, which is where it stops transferring.** The absorption coefficient follows from
+the imaginary index by
+
+```
+a = 4·π·k / λ                    [m^-1]     -- k dimensionless, lambda in metres
+```
+
+and evaluating it at the three band points against the water values this chapter already carries:
+
+| | red 610 | green 550 | blue 450 |
+|---|---|---|---|
+| `a` ice, m⁻¹ | 0.14194 | 0.05230 | 0.00258 |
+| `a` water, m⁻¹ | 0.26170 | 0.05299 | 0.01022 |
+| water / ice | **1.84×** | **1.01×** | **3.96×** |
+
+**Read the last row, because it is a shape and not an offset.** In green the two materials are the
+same substance to **1.3%**. In blue they differ by **a factor of four**. A tint is a scale — it
+multiplies a spectrum and cannot change its shape — so **no tint on water reproduces ice**, and no
+amount of artist time on a `iceColor` swatch will find it. The single number that names the shape
+is the red-to-blue selectivity:
+
+```
+sel = a_red / a_blue          ice 55.01     water 25.61     ratio 2.148  (D)
+```
+
+Ice is **2.15× more selective across the visible band than water is.** That is the quantitative
+answer to "why is glacier ice *that* blue" and it is checkable in one line.
+
+**The mechanism, and the parameter that runs the whole material.** Ice's appearance is dominated by
+**scattering from air inclusions, bubbles and grain boundaries**, not by path absorption. For
+bubbles large against the wavelength the scattering coefficient is geometric:
+
+```
+S = N · Q_ext · π · r²         Q_ext -> 2 in the large-particle limit   (P)
+```
+
+and a thick slab's diffuse reflectance follows Kubelka–Munk:
+
+```
+R_inf = 1 + K/S - sqrt( (K/S)² + 2·K/S )         K = absorption, S = scattering
+K/S   = (1 - R_inf)² / (2·R_inf)                 the inverse, for reading R back
+```
+
+⚠️ **`R_inf` depends on `K/S` alone**, and that is the sentence to carry: it contains **no
+thickness**. Halving a glacier does not halve its blue. Everywhere else in this chapter a colour is
+`exp(−a·d)` and thinning the medium returns it to clear; here it does not, and a renderer built on
+the path-length doctrine will fight this material until it stops trying to.
+
+One parameter — the bubble number density — walks the same ice from clear to white (`D`, at 0.5 mm
+bubbles):
+
+| | `N`, m⁻³ | `S`, m⁻¹ | `R_∞` red | `R_∞` green | `R_∞` blue | reads as |
+|---|---|---|---|---|---|---|
+| clear lake ice | 2 × 10⁶ | 3.14 | 0.741 | 0.833 | 0.960 | dark, strongly blue |
+| glacier ice | 5 × 10⁸ | 785 | 0.981 | 0.989 | 0.997 | bright, faintly blue |
+| firn / snow-ice | 2 × 10¹⁰ | 3.14 × 10⁴ | 0.997 | 0.998 | 1.000 | white |
+
+**Two readings, and the second is the useful one.** First: the *contrast* between channels
+collapses as `S` rises, which is why glacier ice is pale blue and firn is white — not because the
+absorption changed, but because light stops going far enough for absorption to matter. Second, and
+the reason scattering makes ice blue at all: the mean path a photon travels before returning is
+**amplified** by scattering, so a material whose absorption is far too weak to colour a straight
+path colours a scattered one. At glacier density the amplification is **104× in red and 779× in
+blue** (`D`) — the blue photons are the ones that survive to make the long journeys.
+
+**Ice on water is a layered medium, not a blend.** Where a frozen surface sits over open water the
+two reflectances compose through the interreflection series this chapter already sums for a pool
+liner:
+
+```
+R_total = R_ice + T_ice² · R_water / (1 - R_ice · R_water)
+```
+
+Same geometric series, same fixed point, different layers — so nothing new has to be written to
+render lake ice over a dark bed, and a renderer that blends the two colours instead has dropped the
+trapped term that makes thin ice over deep water read as *depth* rather than as paint.
+
+![Ice against water: the two absorption triples at this chapter's band points, and Kubelka–Munk reflectance against bubble density](figures/ice-vs-water.png)
+
+> **Figure 12·7 — the same substance, two mechanisms, and neither panel is a tint.** `D` from `P`
+> data. Drawn by [`figures/make_figures.py`](figures/make_figures.py) (`fig_ice_vs_water`) from
+> `reference-impl/ice.py`'s own `ABS_ICE`, `bubble_scattering` and `km_reflectance_infinite` —
+> the same functions the suite checks. **Left:** the two absorption triples at 610/550/450 nm on a
+> log axis, with the water:ice ratio printed on each pair. Green matches to 1.3% and blue differs
+> by 3.96×: that is a change of *shape*, and no tint reproduces a shape. **Right:** `R_∞` against
+> bubble number density for the three channels, with clear lake ice, glacier ice and firn marked.
+> The three curves rise together and converge, which is the material walking from dark-and-blue to
+> white under **one** parameter — and they never depend on thickness, because `R_∞` is a function
+> of `K/S` only. Guarded by `validate_phases.py`.
+
+**What to carry away.** *For water the colour is the path; for ice the colour is `K/S`.* If a
+renderer has one water shader and wants ice, the honest minimum is a second, scattering-dominated
+path with bubble density as its axis — and the reward is that lake ice, glacier ice, icicles and
+firn stop being four materials.
+
+---
+
+### The Weber axis: a trickle, a pistol, a hose and a fountain are one jet
+
+**The waterfall section above derives the endpoint and never names the parameter.** It has
+Rayleigh–Plateau breakup and the most-unstable mode, so it can tell you what a column *becomes*.
+It cannot tell you that a water pistol and a fire hose are the same phenomenon at different points,
+because the ordering parameter was never drawn — and the consequence is exactly backwards from
+intuition:
+
+> **A fire hose's momentum makes its stream *less* coherent, not more.** The aerodynamic force
+> tearing the surface grows as `U²`; the surface tension holding it together does not grow at all.
+
+**The three numbers, and the one that is usually built wrong.**
+
+```
+We_g = rho_air · U² · d / sigma        aerodynamic Weber -- the regime axis
+We_l = rho_water · U² · d / sigma      liquid Weber -- inertia against surface tension
+Oh   = mu / sqrt(rho · sigma · d)      Ohnesorge -- viscosity against inertia and tension
+Re   = rho · U · d / mu
+Oh   = sqrt(We_l) / Re                 the identity that ties the three together
+```
+
+⚠️ **`We_g` is built on the AIR's density.** The jet is torn by the gas it moves through, so the
+relevant inertia is the gas's. Using `rho_water` here is an error of **829×** in the direction that
+puts every jet past atomization, and it is the commonest misreading of the regime diagram —
+"everything atomises" is the symptom. The identity `Oh = √We_l/Re` is checked in the suite rather
+than asserted, because it is what says the diagram's two axes are not independent choices.
+
+Note also that **velocity does not appear in `Oh`.** It is a property of the fluid and the nozzle,
+which is precisely why the classical diagram puts `Oh` on one axis and a velocity-carrying number
+on the other.
+
+**The four regimes**, after Lin & Reitz (1998) (`P`):
+
+| regime | `We_g` | what breaks it | drop size against the jet |
+|---|---|---|---|
+| Rayleigh | < 0.4 | its own capillary instability | **larger** than the jet, regularly spaced |
+| first wind-induced | 0.4 – 13 | capillary, with aerodynamic help | ≈ the jet diameter |
+| second wind-induced | 13 – 40.3 | short aerodynamic waves strip the surface | **much smaller** than the jet |
+| atomization | > 40.3 | breakup begins **at the nozzle** | a spray; no intact core |
+
+And the everyday jets sorted by it, with nothing tuned (`D`):
+
+| | `U`, m/s | `d`, mm | `We_g` | regime |
+|---|---|---|---|---|
+| slow trickle | 0.6 | 4.0 | 0.024 | Rayleigh |
+| water pistol | 8.0 | 1.5 | 1.59 | first wind-induced |
+| fog nozzle | 35.0 | 1.0 | 20.3 | second wind-induced |
+| garden hose | 12.0 | 12 | 28.6 | second wind-induced |
+| fountain jet | 9.0 | 25 | 33.5 | second wind-induced |
+| fire hose | 30.0 | 29 | **432** | atomization |
+
+**Four everyday objects, four regimes, and no boundary was moved to make them fit.** That is the
+check worth having: a scale that sorts the familiar cases correctly without adjustment is a scale,
+and one that needs a fudge per object is a lookup table with extra steps.
+
+**Drop size in the Rayleigh regime, which a particle system usually gets wrong.** The
+fastest-growing disturbance on an inviscid column has `λ = 4.508·d` (`P`, Rayleigh 1878), and one
+wavelength of column becomes one drop, so by volume conservation:
+
+```
+(pi/4)·d²·lambda = (pi/6)·D³      =>      D = d · (1.5 · lambda/d)^(1/3)  =  1.891 · d
+```
+
+**The drops are nearly twice the diameter of the jet that made them.** A particle system that sizes
+its droplets to the nozzle is wrong by a factor of two in the one regime where the drops are
+regular enough for the error to be visible.
+
+**Breakup length, and the trend reversal that a single "coherence" slider cannot represent.** In
+the Rayleigh regime the disturbance needs a fixed number of growth times, and a faster jet covers
+more distance in that time, so the intact length **grows** with speed:
+
+```
+L = C · sqrt(We_l) · d          C ~ 10, experimental  (P; C exposed, never baked)
+```
+
+A 4 mm trickle at 0.6 m/s gives `L ≈ 44 d` (`D`). Past the first wind-induced boundary aerodynamic
+stripping takes over and the trend **reverses**, which is why this is a curve with a maximum rather
+than a slider. ⚠️ `breakup_length_rayleigh` therefore **returns NaN outside its own regime**:
+evaluated on a fire hose the correlation gives roughly 6000 diameters of intact column, which is
+not merely inaccurate but backwards. A correlation that keeps returning a plausible number outside
+its range is how a wrong trend ships.
+
+**Where the drops go, and whether they are drops at all.** Two more closed forms finish the axis:
+
+```
+U0 = C_d · sqrt(2·dP/rho)                        Bernoulli through an orifice, C_d ~ 0.92 (?)
+R  = (vx/g)·(vy + sqrt(vy² + 2·g·h0))            drag-free ballistic range
+St = rho_d · D² · U / (18 · mu_air · L)          Stokes number
+```
+
+The ballistic range is stated as the **upper bound it is**: a coherent column has a small
+area-to-mass ratio and tracks it closely, while the droplets it becomes do not — so a fountain's
+arc falls short at its tip and not at its root, and *that divergence is the visual signature*. One
+trajectory for the whole jet reads as a hose of pellets.
+
+`St` decides the drawing method rather than the physics. At 30 m/s over a 1 m scale a 1 mm drop
+has **St ≈ 92** — ballistic, ignores the air, draw it as a particle — and a 50 µm drop has
+**St ≈ 0.23** — carried by the air, draw it as a participating medium (`D`). That is the same
+ladder the waterfall cascade above already climbs, now with its rung boundary named instead of
+eyeballed.
+
+![Six everyday jets placed on the aerodynamic Weber axis against the four Lin & Reitz regimes](figures/jet-breakup-regimes.png)
+
+> **Figure 12·8 — one axis, four regimes, six objects, nothing tuned.** `D` from `P` boundaries.
+> Drawn by [`figures/make_figures.py`](figures/make_figures.py) (`fig_jet_regimes`) from
+> `reference-impl/jet.py`'s `weber_aero` and `regime`. The bands are Lin & Reitz's boundaries at
+> `We_g` = 0.4 / 13 / 40.3; each marker is an everyday jet at its own stated speed and diameter,
+> placed by the formula and not by hand. A trickle, a water pistol, a garden hose and a fire hose
+> land in four different regimes without adjustment — and the fire hose is furthest **into**
+> atomization precisely because it is the most powerful, which is the counter-intuitive
+> consequence the axis exists to make unavoidable. Guarded by `validate_phases.py`.
+
+---
+
+### The impulse axis: four events, and the bright one is not the first
+
+**The defect this exists to prevent.** A renderer emits one particle burst when something touches
+the water. That draws the **first** of four events and skips the three that follow — and the ones
+it skips are the ones that read as water rather than as a puff:
+
+1. **crown** — an ejecta sheet rises at the contact ring, thin and translucent
+2. **cavity** — the body drags an air cavity down behind it
+3. **pinch-off** — hydrostatic pressure closes that cavity at depth, splitting it
+4. **Worthington jet** — the collapse fires a narrow column **upward** out of the surface, often
+   higher than the crown, and **delayed** from it
+
+**The delay is the tell, and it is why one burst cannot be tuned into looking right.** The two
+bright events are separated in time by the cavity's whole life, and *no decay curve on one impulse
+produces a second impulse.* No amount of work on the particle system reaches it, because the thing
+missing is not a parameter.
+
+**The two groups, and they are needed together.**
+
+```
+Fr = U² / (g·d)                inertia against gravity      -- is there a cavity?
+We = rho·U²·d / sigma          inertia against surface tension -- does the crown break up?
+```
+
+⚠️ **A Froude threshold alone is not the criterion, and this file shipped that error until a suite
+row caught it.** A 2.5 mm drip at 1 m/s has `Fr ≈ 41` — comfortably "high" — and leaves no
+persistent cavity, because at millimetre scale **surface tension closes the cavity long before
+hydrostatic pressure would**. Both numbers have to clear:
+
+```
+cavity        <=>   Fr > 10  AND  We > 100
+crown breaks  <=>   We > 500
+```
+
+The second condition is what separates a drip from a pebble, and the suite checks the *pair*
+(`splash_regime(1.0, 2.5e-3)` → no cavity; `splash_regime(20.0, 1.2)` → cavity) rather than either
+threshold alone.
+
+**The kinematic skeleton: when the second event happens, and where it comes from.**
+
+```
+t_p = C · sqrt(d/g)            pinch-off TIME      C order unity, fitted (P)
+h_p = C · d · sqrt(Fr)         pinch-off DEPTH     C order unity, fitted (P)
+r   = C · sqrt(U·d·t)          crown radius, inertial phase
+```
+
+**Read which variable is in which.** The pinch-off *time* scales on the **gravitational time of the
+body's own size** and the impact speed does not enter it at all — `cavity_pinchoff_time` names its
+`u` argument and then `del`s it, so the independence is documented in the code rather than trusted.
+Hitting the water harder makes the cavity **deeper**, not longer-lived. So:
+
+> A faster impact does not delay the second flash. It moves it further down and makes the jet that
+> follows faster.
+
+That single sentence is the whole scheduling rule, and tying the second event to impact *energy* —
+the natural thing to do — puts the dependency on the wrong variable.
+
+**The jet is faster than the impact, and that is not a mistake.** The cavity's walls converge on a
+line, so a large area of slowly-moving water is focused into a small one — the same singular
+focusing a collapsing bubble does. Taking a fraction `eta` of the cavity's potential energy into a
+column of the neck's area:
+
+```
+U_jet ~ sqrt(2·eta·g·h_p) · (d / d_neck)
+```
+
+⚠️ `eta` and the neck ratio are **not** derived here; this is a scaling with its assumptions
+exposed, and the suite checks only that the jet **exceeds** the impact speed for a deep cavity —
+the qualitative fact a renderer must not get backwards.
+
+**Worked, on four bodies** (`D`, `t_p` and `h_p` at the module's default constants):
+
+| | `d` | `U`, m/s | `Fr` | `We` | `t_p`, ms | `h_p`, m |
+|---|---|---|---|---|---|---|
+| falling raindrop | 2.5 mm | 7.0 | 1999 | 1680 | 31.9 | 0.056 |
+| pebble | 20 mm | 5.0 | 127 | 6856 | 90.3 | 0.113 |
+| rock | 120 mm | 8.0 | 54.4 | 105 300 | **221** | 0.442 |
+| body | 350 mm | 6.0 | 10.5 | 172 800 | **378** | 0.567 |
+
+A fifth of a second between the splash and the jet for a thrown rock; well over a third for a
+diver. **These are animation-scale delays, not sub-frame ones**, which is why the missing events
+are missing *visibly*.
+
+And the crown's expansion is a **square root**, not a line: `r ∝ √t` gives 98 mm at 10 ms and
+196 mm at 40 ms for the rock above — a factor of 2 for a factor of 4 in time (`D`). A crown drawn
+with linear expansion is wrong early **and** wrong late, and no keyframe fixes both ends.
+
+![The two bright events separated in time, and the three different exponents the impact speed produces](figures/water-entry-sequence.png)
+
+> **Figure 12·9 — a second impulse, and which variable schedules it.** `D` from `P` scalings.
+> Drawn by [`figures/make_figures.py`](figures/make_figures.py) (`fig_water_entry`) from
+> `reference-impl/impact.py`. **Left:** the crown and the Worthington jet against time after
+> contact for a 120 mm body at 8 m/s, with the pinch-off marked at 221 ms. The gap between the two
+> peaks is the cavity's life; a single burst has no way to produce the second one. **Right:** the
+> impact speed swept at fixed body size, each quantity normalised to its value at 2 m/s. The
+> pinch-off time is **flat** (`U⁰`), the jet speed rises as `U^½`, the pinch-off depth as `U¹` —
+> **three different exponents off one variable**, which is the quantitative form of "tying the
+> second flash to impact energy puts the dependency on the wrong variable." Guarded by
+> `validate_phases.py`.
+
+---
+
+### Travelling or standing: the hydraulic jump
+
+**Why this is not a wave section.** Everything above describes water that moves *through* the
+scene — swell, surf, wakes, capillary rings. A rapid, a weir and a spillway are the opposite: the
+water moves and the **structure does not**. A flow-mapped river surface scrolls texture over a bed
+and can never produce one, so white water in rapids ends up hand-painted — and painted white water
+has a signature: it does not move when the discharge changes, and it sits in the wrong place when
+the level does.
+
+**The mechanism in one sentence.** Where fast shallow flow (`Fr > 1`, supercritical — disturbances
+cannot travel upstream) meets slow deep flow (`Fr < 1`), the transition cannot be gradual, because
+there is no steady profile connecting them: the flow **jumps**, and the energy that cannot be
+carried across is dissipated in place as turbulence and entrained air.
+
+```
+Fr  = U / sqrt(g·h)                            flow speed against shallow-water wave speed
+h_c = (q²/g)^(1/3)                             critical depth for unit discharge q
+E   = h + q²/(2·g·h²)                          specific energy: depth plus velocity head
+```
+
+`Fr`'s meaning here is **kinematic, not energetic**: shallow-water waves travel at `√(g·h)`, so
+`Fr > 1` means the flow outruns its own disturbances and nothing downstream can signal upstream.
+That is what makes the transition abrupt.
+
+**Bélanger, and the closure that has to be momentum.**
+
+```
+h2/h1 = (1/2) · ( -1 + sqrt(1 + 8·Fr1²) )                          (P)
+```
+
+⚠️ **Derived from momentum, not energy, and that is the whole point.** Energy is *not* conserved
+across a jump — that is what a jump is *for* — so the closure has to be the momentum flux plus
+pressure force, which survives the dissipation. **A model that conserves energy here produces no
+jump at all and quietly returns the upstream depth.** That failure is silent and plausible, which
+is why it is a suite row.
+
+**The dissipation is a cube, and that is the number that explains the violence.**
+
+```
+dE = (h2 - h1)³ / (4·h1·h2)              head lost across the jump, metres
+P  = rho·g·q·dE                          power per unit width, W/m -- the aeration budget
+L_roller ~ 6·(h2 - h1)                   along-stream extent of the white water (C ~ 6, experimental)
+```
+
+Doubling the depth rise costs **eight times** the head. Worked on a 0.30 m upstream depth (`D`):
+
+| `Fr₁` | `U₁`, m/s | `h₂`, m | `h₂/h₁` | `ΔE`, m | roller, m | power, W/m | class |
+|---|---|---|---|---|---|---|---|
+| 1.4 | 2.40 | 0.463 | 1.54 | 0.0077 | 0.98 | 55 | undular — standing waves, no roller, little air |
+| 2.0 | 3.43 | 0.712 | 2.37 | 0.082 | 2.47 | 823 | weak — a smooth roller, surface fairly flat |
+| 3.5 | 6.00 | 1.342 | 4.47 | 0.703 | 6.25 | 12 400 | oscillating — the jet wanders, waves travel down |
+| 6.0 | 10.29 | 2.400 | 8.00 | 3.216 | 12.60 | 97 200 | steady — well-defined roller, the classic rapid |
+| 10.0 | 17.15 | 4.095 | 13.65 | 11.124 | 22.77 | 560 000 | strong — rough, violent, heavy spray |
+
+**A factor of 7 in Froude number buys a factor of 10 000 in dissipated power.** The five classes
+are worth carrying because they are a **look**, not a taxonomy: each names what the surface does,
+and a renderer drawing the same white water for all of them is drawing one of five things.
+
+**And the last column is a rate, which is what makes this compose.** The power per unit width is
+handed to the aerated-water sections above as a **source term**, not as a coverage: the covering
+measure the whitecap machinery already sums grows at a rate this sets. So the white in a rapid
+comes out of the same model as the white in surf, instead of being a second, unrelated mask with
+its own artist-facing controls.
+
+⚠️ **The limitation travels with every number here.** Bélanger neglects bed roughness, and a rapid
+is the roughest bed there is — so this gives the **geometry** of the jump and **overstates the
+energy that survives it**.
+
+![The conjugate depth ratio across the five jump classes, and the cubic energy loss beside it](figures/hydraulic-jump.png)
+
+> **Figure 12·10 — white water that stands, from momentum and a cube.** `D` from `P` relation.
+> Drawn by [`figures/make_figures.py`](figures/make_figures.py) (`fig_hydraulic_jump`) from
+> `reference-impl/openchannel.py`'s `conjugate_depth` and `energy_loss`. **Left:** `h₂/h₁` against
+> upstream Froude number, with the five standard classes as bands. The curve is very nearly linear
+> in `Fr₁` past about 2 — the square root of `8·Fr₁²` dominates — so the *depth* is the mild part.
+> **Right:** the head loss on a log axis, spanning more than five decades over the same sweep,
+> which is the cubic in `(h₂ − h₁)` doing its work. That gap between a mild geometric change and a
+> violent energetic one is why strong jumps look disproportionate to their size. Guarded by
+> `validate_phases.py`.
+
+---
+
+### The other phase axis: thin-film interference, and this chapter's own trap at its sharpest
+
+**Why it needs to be here.** An oil slick already appears above as a *slick* — a surface-tension
+film that damps capillary waves. That is a different physical effect and it is covered. The
+**colour** is not, and it cannot be reached from anything else in this chapter: every other colour
+here comes from absorption, scattering or Fresnel, and an oil sheen comes from **interference**.
+
+The signature that no tint reproduces is that the hue **changes with viewing angle**
+(goniochromatism) while a tint does not.
+
+**The Airy summation — and the one difference that matters.**
+
+```
+delta = 4·pi·n_film·d·cos(theta_t) / lambda            round-trip phase through the film
+R     = |r01 + r12·e^{-i·delta}|² / |1 + r01·r12·e^{-i·delta}|²      per polarisation
+```
+
+This is **the same interreflection geometric series** this chapter sums for a pool's trapped light
+— and it is done in **amplitude** instead of intensity. That is the only difference, and it is
+total: summing intensities loses the phase and gives a smooth, colourless result; summing
+amplitudes keeps it and gives the fringes.
+
+The factor in `delta` is **four** π and not two — the light crosses the film twice — and the
+`cos(theta_t)` is the entire visual signature. At grazing the optical path shortens, the fringes
+shift, and the sheen runs through its colour sequence. Measured on a 400 nm film (`D`): the
+reflectance peak sits at **470 nm at normal incidence** and **603 nm at 70°**, with the peak
+reflectance rising from 0.056 to 0.199. *The hue crosses most of the visible band on view angle
+alone.*
+
+⚠️ **The Fresnel sign cannot be discarded here.** Everywhere else in this chapter Fresnel appears
+as an intensity `|r|²` and the sign is irrelevant. In a thin film **the sign is a phase shift of
+π**, and dropping it inverts the interference: the wavelengths that should cancel reinforce, and
+the colour comes out complementary. A sheen that looks "right but the wrong colour" is usually
+exactly this, and it is a suite row for that reason.
+
+**The trap, measured rather than warned about.** The interference term oscillates in `1/λ`, so the
+number of fringes across the visible band grows with thickness:
+
+```
+dlambda ~ lambda² / (2·n·d·cos)          separation between adjacent maxima
+```
+
+At 800 nm of film that spacing is **141 nm** — three RGB samples across a 350 nm band cannot
+represent a signal that turns over every 141 nm. Integrating the true spectrum at 401 wavelengths
+against a 3-sample evaluation (`D`):
+
+| film thickness | fringes across the band | relative error of 3-sample RGB |
+|---|---|---|
+| 100 nm | 0.30 | 0.7% |
+| 200 nm | 0.61 | 2.2% |
+| 400 nm | 1.22 | 5.7% |
+| 800 nm | 2.44 | **25.7%** |
+
+**The error grows more than tenfold between one fringe across the band and two.** Note the claim
+is a *ratio* and not a threshold: a fixed "under 2%" bar would have been picked to pass, and the
+ratio is the thing the physics actually predicts. Past two fringes the rendered hue becomes a
+function of **which three wavelengths you happened to pick** — which is
+[a channel is a band, not a wavelength](#a-channel-is-a-band-not-a-wavelength) at its sharpest.
+
+The production answer is therefore not "sample more carefully" but **pre-integrate the spectral
+response analytically**, which is what Belcour & Barla (2017) (`P`) do, over a rough base layer, so
+that RGB and spectral renderers agree. This section derives the underlying summation and measures
+the aliasing that motivates their model; it does not reimplement it.
+
+![Two film thicknesses across the visible band with the RGB sample points marked, and the aliasing error against thickness](figures/thin-film-aliasing.png)
+
+> **Figure 12·11 — three samples cannot describe a spectrum that oscillates.** `D`. Drawn by
+> [`figures/make_figures.py`](figures/make_figures.py) (`fig_thin_film`) from
+> `reference-impl/thinfilm.py`'s `airy_reflectance` and `rgb_aliasing_error`. **Left:** a 200 nm
+> film (0.6 fringe) and an 800 nm film (2.4 fringes) with the R/G/B sample wavelengths marked. On
+> the thick film the red sample lands on a maximum, the green on a minimum and the blue halfway up
+> — three numbers, and nothing in them records that there were 2.4 oscillations. **Right:** the
+> relative error of the 3-sample answer against the band-integrated truth, over film thickness. It
+> crosses 5% around 400 nm of film and keeps climbing; the deep notches are where the sampled
+> answer happens to cross the truth, which is coincidence and not accuracy. Guarded by
+> `validate_phases.py`.
+
+---
+
+### What these five change elsewhere in the chapter
+
+None of the five is a self-contained addition; each one hands something back to a section that was
+already here, and that is the test of whether an axis was the right thing to add.
+
+| axis | hands back to | what it supplies |
+|---|---|---|
+| phase (ice) | [Shading and optics](#shading-and-optics) | a second, scattering-dominated appearance path — and the layered `R_ice + T²R_water/(1−RR)` reuses the pool's own trapped series |
+| Weber (jets) | [Aerated water](#aerated-water-foam-spray-and-whitewater) | the regime and the `St` boundary that decide whether a waterfall's cascade is drawn as particles or as a medium |
+| impulse (entry) | [Aerated water](#aerated-water-foam-spray-and-whitewater) | the four-event schedule, so a splash is a sequence with a delay rather than one burst |
+| standing structure | [Aerated water](#aerated-water-foam-spray-and-whitewater) | `P = ρ·g·q·ΔE` as a **source term** into the covering measure the whitecap model already sums |
+| interference | [A channel is a band](#a-channel-is-a-band-not-a-wavelength) | the sharpest measured instance of the RGB-sampling error the chapter already warns about |
+
+And the search rule that produced four of them, kept because it predicts: **do not look for another
+subject — look for another axis.** Phase, confinement scale, energy input, composition, and whether
+the structure travels or stands. The one axis still open is recorded in
+[`12c-uncovered.md`](12c-uncovered.md): **vortex structure** — the eddy behind a boulder, the shed
+vortex street, the drain vortex, the whirlpool — which remains absent *and unsourced*, and is
+recorded as an admitted gap rather than given an invented citation.
 
 ## Man-made water: pools, tanks and channels
 
