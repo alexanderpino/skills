@@ -144,12 +144,24 @@ fixed within a lane so score trends stay readable.
 
 ### 9. Never pay twice for the same verdict
 
-Two different things get paid for twice, and both need stopping.
+Three different things get paid for twice, and all three need stopping.
 
 **A judgement, re-argued.** A closed gap stays closed and a retired dimension is
 not re-opened. `log-round` warns when a record lands on a retired dimension,
 because that round is money spent on ground the run already covered
-(`failure-modes.md` → Re-litigation).
+(`failure-modes.md` → Re-litigation). Rules the critic never sees do not hold, so
+`board` generates `gauntlet/settled.md` — retired, closed, parked, out of scope —
+and every critic prompt hands it over with the bar. It is generated from the log,
+so being current costs nothing.
+
+**A gap, re-reviewed.** A round that names a gap the last round already named
+buys an opinion, not a closed gap. The loop allows three (`gap_rounds_n`) and
+then forces a decision: re-cut, backlog, accept, or escalate. Matching is on
+content, not on string equality — a critic rewording yesterday's gap is the
+normal case, and exact-match counting was the same as no cap. Blocking gaps
+(security, data loss, correctness) are exempt: those get closed, not timed out.
+Three rounds at ~40k tokens each is a real bill for one unclosed gap, and it is
+paid quietly, wave after wave, by runs that look healthy.
 
 **A check, re-derived.** This one is subtler and costs more. Anything a command
 can decide — paths that exist, flags that match, code that compiles, a number

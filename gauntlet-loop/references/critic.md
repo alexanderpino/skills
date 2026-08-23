@@ -22,6 +22,12 @@ All visible text you produce (goals, gaps, next fixes, notes, reports) MUST be w
   and re-verifying it is the commonest way a round costs money and returns
   nothing. If you believe a gate is wrong, say so in NOTES and name the gate —
   do not silently re-run its work.
+- **`gauntlet/settled.md`** — what is already decided: dimensions that met their
+  bar, gaps the log has closed, work parked on purpose, scope ruled out of this
+  run. It is generated from the log, so it is current. **Read it before you
+  judge and do not re-raise anything on it.** A critic arrives with no memory,
+  which is exactly why it re-discovers the gap the last three waves closed;
+  this file is the memory you are allowed to have. The one exception is below.
 - The lane goal (one specific thing, not the whole project)
 - The bar for the dimension you are judging: reference artifact, target
   measurement, or competing implementation — read it from the **bar path you were
@@ -141,16 +147,30 @@ different source asset, a structural change below this lane, or a decision only
 the user can make, say that in one line in NOTES. It is the most useful thing you
 can tell the run: it stops the loop funding rounds that cannot reach the problem.
 
-**Do not re-open settled work.** A gap the log has closed is closed, and a
-dimension that has retired is not yours to re-argue. Judge this round's artifact
-on this round's dimension.
+**Do not re-open settled work.** Everything in `gauntlet/settled.md` is decided:
+a gap the log has closed is closed, a dimension that has retired is not yours to
+re-argue, and parked or backlogged work is out of this run by decision, not by
+oversight. Judge this round's artifact on this round's dimension.
 
-The one exception is a **regression**: if something previously closed has
-visibly broken, say so in NOTES with the evidence and label it a regression. That
-is a report of new damage, not a re-review — and it is exactly what the promotion
-comparison exists to catch, so it should be rare. Re-litigating a closed gap
-because you would have judged it differently costs the run a round and teaches it
-nothing.
+Two exceptions, both narrow:
+
+- A **regression** — something previously closed has visibly broken. Say so in
+  NOTES with the evidence and label it a regression. That is new damage, not a
+  re-review, and the promotion comparison exists to catch it, so it should be
+  rare.
+- A **blocking defect** — security, data loss, or plain incorrectness. Name it
+  even if it sits on settled ground, and say which of the three it is. The run
+  exempts these from every round cap because they must be closed, not timed out.
+
+Re-litigating a closed gap because you would have judged it differently is
+neither. It costs the run a round and teaches it nothing.
+
+**Say whether the gap moved.** If your gap is the same one the last round named
+— in your words or theirs — say so explicitly and say whether the artifact moved
+toward it at all. The run caps how many rounds it will spend on one gap (three by
+default), and that cap is only as good as your read on whether the last attempt
+achieved anything. "Same gap, no movement" is a valuable verdict; quietly
+rewording the gap so it reads as fresh is how a loop runs forever.
 
 ## When our side wins the bar comparison
 

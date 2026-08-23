@@ -44,6 +44,12 @@ DEFAULT_CONFIG = {
         # Rounds of no movement on a dimension before parking is recommended.
         # This is the prune: a lane that stopped moving stops getting funded.
         "no_progress_n": 3,
+        # Review rounds spent on one and the same gap before the loop must stop
+        # reviewing and decide instead. Critic loops do not end on their own: a
+        # gap that survived this many rounds is a decision (re-cut, backlog,
+        # accept, escalate), not one more review. Gaps logged --blocking
+        # (security, data loss, correctness) are exempt — those get closed.
+        "gap_rounds_n": 3,
         "budget_waves": 12,
         # The budget the user agrees is in waves; the thing actually consumed is
         # tokens. Without this the two never meet and consent is uninformed.
@@ -191,6 +197,7 @@ def cmd_init(args):
         ("bar_met_n", args.bar_met_n),
         ("clean_streak_n", args.clean_streak_n),
         ("no_progress_n", args.no_progress_n),
+        ("gap_rounds_n", args.gap_rounds_n),
         ("budget_waves", args.budget_waves),
         ("budget_tokens", args.budget_tokens),
         ("target_score", args.target_score),
@@ -333,11 +340,27 @@ def cmd_log_round(args):
         # bar; re-running it is the commonest way a long run spends money on
         # ground it already covered.
         per_prior, _r, _c = _lane_dim_status(prior, cfg)
-        if per_prior.get((args.lane, args.dimension), {}).get("retired"):
+        s_prior = per_prior.get((args.lane, args.dimension), {})
+        if s_prior.get("retired"):
             print(
                 f"warning: [{args.lane} / {args.dimension}] has retired — settled work is not "
                 "re-judged. Log this only as a regression check (say so in the gap text); "
                 "otherwise you are paying to re-review a closed dimension.",
+                file=sys.stderr,
+            )
+        # The review cap: this round is about to be spent on a gap the log says
+        # has already survived its allotted reviews. Warn, don't block — the
+        # legitimate case is the round that acts on the decision (a re-cut, an
+        # escalation) rather than reviewing again.
+        elif s_prior.get("gap_capped") and args.mode in BAR_MODES and not args.blocking:
+            cap = cfg["stops"].get("gap_rounds_n", 3)
+            print(
+                f"warning: [{args.lane} / {args.dimension}] hit the review cap — "
+                f"{s_prior['gap_streak']} rounds on the same gap ({cap} allowed). Round "
+                f"{s_prior['gap_streak'] + 1} on it buys another opinion, not a closed gap. "
+                "Decide instead: re-cut the lane, backlog the gap, accept it and retire, or "
+                "escalate to the user. Genuinely blocking (security / data loss / "
+                "correctness)? Log it --blocking and the cap steps aside.",
                 file=sys.stderr,
             )
     # A retried command (timeout, double-pasted shell line) writes a second
@@ -434,6 +457,9 @@ def cmd_log_round(args):
         rec["calls"] = args.calls
 
     if args.mode == "champion":
+        if args.blocking:
+            die("--blocking marks a bar gap that must be closed regardless of the review "
+                "cap; champion mode compares two of ours and names no bar gap")
         # Promotion decision: challenger vs previous champion.
         if args.action not in ACTIONS:
             die("champion-mode records require --action promoted|reverted")
@@ -460,6 +486,11 @@ def cmd_log_round(args):
             die("the named gap is too thin to build against — say what differs and where")
         rec["severity"] = args.severity
         rec["gap"] = args.gap or "none"
+        if args.blocking:
+            if args.severity == "none":
+                die("--blocking with severity none — a blocking gap has to be a gap. "
+                    "Name it, or drop the flag")
+            rec["blocking"] = True
         target = target_for(cfg, args.dimension)
         if args.severity == "major" and args.score >= target:
             print(
@@ -511,10 +542,15 @@ def _streaks(records, target):
     retire at 3/10 with an open major gap and read as a success. The target
     is per dimension (target_for): a run can hold gameplay to 8 and graphics
     to 6 without one number lying about both.
+
+    A round carrying an open --blocking gap never advances bar-met either, at
+    any severity. "Beats the comparator, minor gap, and by the way it leaks
+    credentials" is not the bar being met.
     """
     bar_met = clean = 0
     for r in reversed(records):
-        if r["winner"] == "ours" and r.get("severity") != "major" and r["score"] >= target:
+        if r["winner"] == "ours" and r.get("severity") != "major" \
+                and not r.get("blocking") and r["score"] >= target:
             if r.get("tier") == "screening":
                 continue
             bar_met += 1
@@ -532,6 +568,86 @@ def _streaks(records, target):
 
 MARGIN_RANK = {"decisive": 3, "clear": 2, "thin": 1}
 SEVERITY_RANK = {"major": 3, "minor": 2, "none": 1}
+
+def _stem(w):
+    """Crude suffix stripping. Not linguistics — just enough that "bands",
+    "banding" and "band" are one token, because two critics describing one gap
+    will not agree on the inflection."""
+    for suf, keep in (("ing", 5), ("ed", 4), ("es", 4), ("ly", 4)):
+        if len(w) > keep and w.endswith(suf):
+            return w[: -len(suf)]
+    if len(w) > 3 and w.endswith("s") and not w.endswith(("ss", "us", "is")):
+        return w[:-1]
+    return w
+
+
+# Two stoplists. The first is ordinary English glue. The second is the
+# vocabulary of *judging* — the words every gap sentence carries whatever it is
+# about. Keeping them made "the rock/ground contact shadow is missing" read as a
+# different gap from "no contact shadow where rock meets ground plane", which is
+# the same gap written by a different critic. What identifies a gap is its
+# subject, not the verdict wrapped around it.
+GAP_STOPWORDS = frozenset(_stem(w) for w in """
+a an and are as at be been but by can for from had has have how in into is it
+its more most much no not of off on one only or our out over should so some
+still such than that the their them then there these they this those to too
+very was were what when where which while who will with would you your
+absent appears bad fail fails feels gap issue lacking lacks looks missing must
+needs need poor problem reads seems wrong
+""".split())
+
+
+def _gap_tokens(text):
+    words = (_stem(w) for w in re.findall(r"[a-z0-9]+", (text or "").lower()))
+    return {w for w in words if len(w) > 2 and w not in GAP_STOPWORDS}
+
+
+def _same_gap(a, b, threshold=0.6):
+    """Is this the same gap, reworded?
+
+    Exact string equality was the whole rule, and it almost never fired: a
+    critic writes "shadows are too soft at the terminator" one round and "soft
+    terminator shadows" the next, and the loop reads two fresh gaps and funds
+    another review. Token overlap (Jaccard over content words, plus containment
+    of the shorter phrasing) catches the rewording, which is what a review cap
+    has to count to mean anything.
+
+    Bag-of-words cannot tell "no contact shadow under the rock" from "...under
+    the tree", and it is deliberately left erring that way: the cost of a false
+    match is one decision prompt to an agent that can say "different gaps,
+    continuing", while the cost of a miss is the endless review this exists to
+    stop. Three rounds of near-identical gaps on adjacent subjects is usually a
+    lane that should be re-cut around the class of gap anyway.
+    """
+    ta, tb = _gap_tokens(a), _gap_tokens(b)
+    if not ta or not tb:
+        return False
+    inter = len(ta & tb)
+    if inter >= 4 and inter == min(len(ta), len(tb)):
+        return True  # one phrasing is contained in the other
+    return inter / len(ta | tb) >= threshold
+
+
+def _gap_streak(bar_recs):
+    """Trailing rounds that named the same gap. Returns (n, gap, blocking).
+
+    Counts back from the latest verdict while each round names (fuzzily) the
+    same gap. A clean round ends the streak — the gap closed. `blocking` is
+    true when any round in the streak carried --blocking, which exempts the
+    streak from the review cap: a security or correctness gap is closed, not
+    timed out.
+    """
+    if not bar_recs or bar_recs[-1].get("severity") in (None, "none"):
+        return 0, None, False
+    latest = bar_recs[-1].get("gap")
+    n = 0
+    blocking = False
+    for r in reversed(bar_recs):
+        if r.get("severity") in (None, "none") or not _same_gap(latest, r.get("gap")):
+            break
+        n += 1
+        blocking = blocking or bool(r.get("blocking"))
+    return n, latest, blocking
 
 
 def _softening_read(bar_recs, window=3):
@@ -610,7 +726,11 @@ def _stall_read(bar_recs, champ_recs, stops, target):
         # most honest work. Found by running this loop on itself.
         window = bar_recs[-n:]
         named = [r.get("gap") for r in window if r.get("severity") not in (None, "none")]
-        if len(named) == len(window) and len(set(named)) == len(named):
+        distinct = all(
+            not _same_gap(named[i], named[j])
+            for i in range(len(named)) for j in range(i + 1, len(named))
+        )
+        if len(named) == len(window) and distinct:
             if len(bar_recs) < 2 * n:
                 return False, (
                     f"score flat over {n} rounds, but each round named a different gap — "
@@ -624,11 +744,14 @@ def _stall_read(bar_recs, champ_recs, stops, target):
     rate = _revert_rate(champ_recs)
     if rate is not None and rate > 0.5:
         return True, f"revert rate {int(rate * 100)}% — challengers losing more than winning"
-    # The same gap named three times running is a structural ceiling, not a lane
-    # that needs one more push.
-    gaps = [r.get("gap") for r in bar_recs[-n:] if r.get("severity") not in (None, "none")]
-    if len(gaps) >= 3 and len(set(gaps)) == 1:
-        return True, f"the same gap named {len(gaps)} rounds running — structural, not closeable here"
+    # The same gap surviving the review cap is a structural ceiling, not a lane
+    # that needs one more push. A blocking gap is exempt: it gets closed.
+    gap_n, _gap, gap_blocking = _gap_streak(bar_recs)
+    if gap_n >= stops.get("gap_rounds_n", 3) and not gap_blocking:
+        return True, (
+            f"the same gap named {gap_n} rounds running — the review cap; this is a "
+            "decision (re-cut, backlog, accept, escalate), not another review"
+        )
     return False, trend["note"]
 
 
@@ -715,6 +838,11 @@ def _lane_dim_status(rounds, cfg):
             if r.get("severity") == "none"
             and any(p.get("severity") in ("major", "minor") for p in bar_recs[:i])
         )
+        # Review rounds already spent on the gap that is open right now. The
+        # cap counts every tier: a screening re-review costs less, but it is
+        # still money spent looking at a gap the loop has already looked at.
+        gap_streak, _gap_text, gap_blocking = _gap_streak(bar_recs)
+        gap_capped = gap_streak >= stops.get("gap_rounds_n", 3) and not gap_blocking
         retired = bar_met >= stops["bar_met_n"] or clean >= stops["clean_streak_n"]
         stalled, stall_note = _stall_read(track_recs, champ_recs, stops, tgt)
         is_parked = key in parked
@@ -735,6 +863,9 @@ def _lane_dim_status(rounds, cfg):
             "recent_margins": margins,
             "rubric_share": round(rubric_share, 2),
             "open_gap": last_gap,
+            "gap_streak": gap_streak,
+            "gap_blocking": gap_blocking,
+            "gap_capped": bool(gap_capped and not retired and not is_parked),
             "last_score": bar_recs[-1]["score"] if bar_recs else None,
             "gaps_closed": gaps_closed,
             "retired": retired,
@@ -1083,6 +1214,17 @@ def cmd_park(args):
             f"[{args.lane} / {args.dimension}] is still moving ({stats['trend']['note']}) — "
             "parking a lane that is still paying for its rounds throws away the run's best work. "
             "Use --force if you are parking it for a reason outside the log (scope, priority)."
+        )
+    # Parking leaves the gap open and stops funding it. For a gap logged
+    # --blocking that is the one wrong answer: the exception to the review cap
+    # exists so the gap gets closed, not so it gets quietly defunded.
+    if stats and stats["gap_blocking"] and not args.force:
+        die(
+            f"[{args.lane} / {args.dimension}] has an open BLOCKING gap: {stats['open_gap']}\n"
+            "Parking it stops the spend and leaves it open — for a security, data-loss or "
+            "correctness gap that is shipping the defect with a note attached. Close it, or "
+            "escalate it to the user by name. --force records the park anyway; the report "
+            "will carry it as an accepted blocking gap."
         )
     if key in parked_keys(cfg):
         die(f"[{args.lane} / {args.dimension}] is already parked")
@@ -1765,10 +1907,15 @@ def cmd_status(args):
               f"  margins {' → '.join(s['recent_margins']) or '—'}  trend: {s['trend']['note']}")
         if s["softening"]:
             print(f"  SOFTENING TRIPWIRE: {s['softening']}")
-        if s["stalled"]:
+        if s["gap_capped"]:
+            print(f"  REVIEW CAP REACHED: {s['gap_streak']} rounds on the same gap")
+        elif s["stalled"]:
             print(f"  PARK RECOMMENDED: {s['stall_note']}")
         if s["open_gap"]:
-            print(f"  open gap: {s['open_gap']}")
+            blocking = " [BLOCKING — exempt from the review cap, must be closed]" \
+                if s["gap_blocking"] else ""
+            seen = f" (round {s['gap_streak']} on it)" if s["gap_streak"] > 1 else ""
+            print(f"  open gap{seen}: {s['open_gap']}{blocking}")
         print()
 
     champ_all = [r for r in rounds if r["mode"] == "champion"]
@@ -1778,7 +1925,26 @@ def cmd_status(args):
               "Export both under randomised labels and log the round with --blind.\n")
 
     funded, deferred = _next_wave_plan(per, cfg)
-    stalled = _park_candidates(per)
+    capped = sorted(k for k, s in per.items() if s["gap_capped"])
+    # A capped key is stalled too (the stall read defers to the cap), but it
+    # gets the decision block, not a bare park line — parking is only one of
+    # the four ways out.
+    stalled = [k for k in _park_candidates(per) if k not in capped]
+    if capped:
+        cap_n = cfg["stops"].get("gap_rounds_n", 3)
+        print(f"DECIDE FIRST — review cap ({cap_n} rounds on one gap) reached. No further "
+              "review round\non these until one of the four is chosen and recorded:")
+        for lane, dim in capped:
+            s = per[(lane, dim)]
+            print(f"  [{lane} / {dim}] {s['gap_streak']} rounds on: {s['open_gap']}")
+        print("    1. RE-CUT   the lane — the gap is real but this lane cannot reach it")
+        print("       python3 scripts/gauntlet.py init --force --lanes <new,cut>")
+        print("    2. BACKLOG  it — out of scope for this run; append it to gauntlet/backlog.md")
+        print("    3. ACCEPT   it — at target and shippable; park it so the gap stays in the report")
+        print("       python3 scripts/gauntlet.py park --lane <l> --dimension <d> --reason \"<read>\"")
+        print("    4. ESCALATE to the user — the gap needs a decision the run may not make")
+        print("    (security / data loss / correctness? log it --blocking; the cap steps aside)")
+        print()
     if funded:
         below = [
             k for k in _active_keys(per)
@@ -1894,7 +2060,9 @@ def cmd_board(args):
         active,
         ["lane / dimension", "rounds", "score", "trend", "open gap", "last evidence"],
         lambda k: [
-            f"{k[0]} / {k[1]}" + (" ⚠ park?" if per[k]["stalled"] else ""),
+            f"{k[0]} / {k[1]}"
+            + (" ⚠ DECIDE (review cap)" if per[k]["gap_capped"]
+               else " ⚠ park?" if per[k]["stalled"] else ""),
             str(per[k]["bar_rounds"]),
             f"{per[k]['last_score']}/{per[k]['target']}"
             if per[k]["last_score"] is not None else "—",
@@ -1946,6 +2114,116 @@ def cmd_board(args):
     L.append("")
     out.write_text("\n".join(L))
     print(f"wrote {out}")
+    print(f"wrote {_write_settled(root, rounds, cfg, per)}")
+
+
+def _write_settled(root, rounds, cfg, per):
+    """Write settled.md — what a critic must NOT re-open.
+
+    Every round the loop funds, it hands a critic an artifact and asks what is
+    wrong with it. Nothing in that prompt says which questions are already
+    answered, so a fresh-context critic re-raises the gap the last three waves
+    closed, and the loop pays to relitigate its own decisions. This file is the
+    answer: retired, closed, parked, out of scope. It is generated, so keeping
+    it current costs no model tokens.
+    """
+    out = root / "settled.md"
+    bar_by_key = {}
+    for r in rounds:
+        if r["mode"] in BAR_MODES:
+            bar_by_key.setdefault((r["lane"], r["dimension"]), []).append(r)
+    # A named gap is closed when a later verdict on the same key came back with
+    # no gap. Rewordings of one gap collapse to a single line (_same_gap).
+    closed = []
+    for key, recs in sorted(bar_by_key.items()):
+        pending = []
+        for r in recs:
+            if r.get("severity") == "none":
+                closed += [(key, g, r["wave"]) for g in pending]
+                pending = []
+            elif r.get("gap") and r["gap"] != "none" and \
+                    not any(_same_gap(g, r["gap"]) for g in pending):
+                pending.append(r["gap"])
+
+    def cell(text):
+        return (text or "—").replace("|", "/").replace("\n", " ")
+
+    L = [
+        "# Settled — do not re-raise",
+        "",
+        f"Updated {now()} — generated by `gauntlet.py board`. Do not edit by hand.",
+        "",
+        "**Critics read this before judging.** Everything below is decided: it met its",
+        "bar, its gap was closed, it was deliberately unfunded, or it is out of scope for",
+        "this run. Re-raising a line from this file costs a round and closes nothing —",
+        "and a run that keeps re-deciding settled questions never finishes. Judge what is",
+        "open (the Active table in `workbench.md`) against the frozen bar in `bar/`.",
+        "",
+        "One exception, and only one: **new evidence that a settled item is actually",
+        "broken** — a regression you can point at, or a security, data-loss or",
+        "correctness defect. Say which, cite the evidence, and log the round `--blocking`.",
+        "A better opinion about a closed question is not new evidence.",
+        "",
+        "## Retired — bar met, not re-judged",
+        "",
+    ]
+    retired_keys = sorted(k for k, s in per.items() if s["retired"])
+    if retired_keys:
+        L += ["| lane / dimension | how | rounds |", "|---|---|---|"]
+        L += [
+            f"| {k[0]} / {k[1]} | "
+            + ("bar-met" if per[k]["bar_met_streak"] >= cfg["stops"]["bar_met_n"]
+               else "clean-streak")
+            + f" at {per[k]['target']} | {per[k]['bar_rounds']} |"
+            for k in retired_keys
+        ]
+        L += [""]
+    else:
+        L += ["_none yet_", ""]
+
+    L += ["## Closed gaps — named, then gone from a later verdict", ""]
+    if closed:
+        L += ["| lane / dimension | gap | closed by wave |", "|---|---|---|"]
+        L += [f"| {k[0]} / {k[1]} | {cell(g)} | {w} |" for k, g, w in closed]
+        L += [""]
+    else:
+        L += ["_none yet_", ""]
+
+    L += ["## Parked — deliberately unfunded; the gap is known and stays open", ""]
+    parked = cfg.get("parked") or []
+    if parked:
+        L += ["| lane / dimension | reason | open gap |", "|---|---|---|"]
+        L += [
+            f"| {p['lane']} / {p['dimension']} | {cell(p['reason'])} |"
+            f" {cell(p.get('open_gap'))} |"
+            for p in parked
+        ]
+        L += [""]
+    else:
+        L += ["_none_", ""]
+
+    L += ["## Out of scope for this run — `backlog.md`", ""]
+    backlog = root / "backlog.md"
+    items = [
+        ln.strip() for ln in (backlog.read_text().splitlines() if backlog.exists() else [])
+        if ln.strip().startswith(("-", "*"))
+    ]
+    L += items or ["_none_"]
+    L += [""]
+
+    L += ["## Still open — this is what a critic judges", ""]
+    open_keys = sorted(k for k, s in per.items() if s["state"] in ("OPEN", "STALLED"))
+    if open_keys:
+        for k in open_keys:
+            s = per[k]
+            mark = " **[BLOCKING]**" if s["gap_blocking"] else ""
+            L.append(f"- **{k[0]} / {k[1]}** (score {s['last_score'] or '—'}/{s['target']}):"
+                     f" {cell(s['open_gap'])}{mark}")
+    else:
+        L.append("_nothing open — every dimension is retired or parked_")
+    L += [""]
+    out.write_text("\n".join(L))
+    return out
 
 
 def cmd_report(args):
@@ -2084,7 +2362,14 @@ def cmd_report(args):
         state = " *(parked)*" if s["parked"] else ""
         if s["open_gap"]:
             any_gap = True
-            lines.append(f"- [{lane} / {dim}]{state} {s['open_gap']}")
+            # A blocking gap left open is the one line in this report nobody
+            # may skim past, and the review cap never applied to it — it is
+            # open because it was accepted, not because the loop timed out.
+            mark = " **[BLOCKING — accepted open]**" if s["gap_blocking"] else (
+                f" *(review cap: {s['gap_streak']} rounds, then a decision)*"
+                if s["gap_streak"] >= cfg["stops"].get("gap_rounds_n", 3) else ""
+            )
+            lines.append(f"- [{lane} / {dim}]{state}{mark} {s['open_gap']}")
         elif not s["bar_rounds"]:
             # A dimension the run declared and never judged is a hole in the
             # evidence, not a closed gap. The report says so.
@@ -2154,6 +2439,9 @@ def main():
     p.add_argument("--clean-streak-n", type=int)
     p.add_argument("--no-progress-n", type=int,
                    help="rounds of no movement before a dimension is flagged for parking (default 3)")
+    p.add_argument("--gap-rounds-n", type=int,
+                   help="review rounds allowed on one and the same gap before the loop must "
+                        "decide instead of reviewing again (default 3; --blocking gaps exempt)")
     p.add_argument("--target-score", type=int,
                    help="score the target bar sits at, 1-10 (default 7); record higher ambition as a stretch")
     p.add_argument("--dimension-targets",
@@ -2189,6 +2477,10 @@ def main():
                    help="screening verdicts steer rounds but never advance retirement streaks")
     p.add_argument("--blind", action="store_true",
                    help="champion mode only: the promotion comparison ran under the blind protocol")
+    p.add_argument("--blocking", action="store_true",
+                   help="bar modes only: this gap is security, data loss or plain "
+                        "incorrectness. It is exempt from the review cap and blocks bar-met "
+                        "until it is closed — use it for gaps that must not be accepted")
     p.add_argument("--diff-lines", type=int,
                    help="lines changed by this round's build — feeds the softening tripwire")
     p.add_argument("--critic-model",

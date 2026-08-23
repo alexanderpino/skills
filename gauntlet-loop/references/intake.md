@@ -105,7 +105,12 @@ thin (`decomposition.md`).
 **Stop.** Ask explicitly. See `stop-conditions.md`. Users routinely want several
 armed at once and that is correct — first to fire wins. Mention `no-progress`
 specifically: it is the one that stops funding a lane that stopped moving, and
-users are reassured to hear the loop will prune itself rather than grind.
+users are reassured to hear the loop will prune itself rather than grind. Say
+the review cap out loud in the same breath (`--gap-rounds-n`, default 3): one
+gap gets three rounds, then the run decides instead of reviewing again — and
+gaps logged `--blocking` (security, data loss, correctness) are exempt, because
+those must be closed, not timed out. It is the answer to the question every
+user of a review loop eventually asks, which is when it ends.
 
 **Kill.** One or two lines of pre-agreed evidence that ends the run early: "visual
 not at target by wave 4 → stop", "more than half the lanes parked → stop". Cheap
@@ -212,7 +217,7 @@ Initialise the state directory as part of confirming the contract:
 ```bash
 python3 scripts/gauntlet.py init --lanes <a,b,c> --dimensions <d1,d2> \
     --bar-kind <kind> --target-score 7 --wip-limit 3 \
-    --bar-met-n 2 --clean-streak-n 2 --no-progress-n 3 \
+    --bar-met-n 2 --clean-streak-n 2 --no-progress-n 3 --gap-rounds-n 3 \
     --budget-waves <N> --budget-tokens <T> [--hard-cap-waves <M>]
 ```
 

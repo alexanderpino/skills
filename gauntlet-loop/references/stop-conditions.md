@@ -50,8 +50,9 @@ when a dimension stops paying for its rounds, computed by `status` from the log:
   no severity easing, no margin narrowing across the last N bar rounds
 - **reverts outpacing promotions** — over 50% of the recent champion rounds ended
   in a revert, so builders are making it worse more often than better
-- **the same gap named three rounds running** — the distance is structural, and
-  no amount of lane-level work reaches it
+- **the review cap reached** — the same gap has survived its allowed rounds
+  (below), so the distance is structural and no amount of lane-level work
+  reaches it
 
 `status` prints `PARK RECOMMENDED` with the reason and the exact command:
 
@@ -83,6 +84,44 @@ call from outside the log), and it warns if you log a round against a parked one
 evidence only*: a re-cut that includes the structural element, a fixed inspection
 path, a new source asset, a revised bar. "It might work this time" is sunk cost
 with extra steps. The resume reason lands in the run history either way.
+
+### `review-cap` — the per-gap round limit
+
+Retirement conditions end a lane that succeeded; the prune ends one that stopped
+moving. Neither stops the third failure mode: **one gap, reviewed forever.** A
+critic names it, a builder attempts it, the next critic names it again in
+slightly different words, and the loop reads two different gaps and funds a third
+round. Nothing in the streak counters notices, because a lane naming a *new* gap
+every round is a lane doing honest work.
+
+So the loop caps it. **Three rounds on one gap (config `gap_rounds_n`), then a
+decision.** `status` prints `DECIDE FIRST` with the four ways out, and there is
+no fifth:
+
+1. **Re-cut** the lane — the gap is real, this lane cannot reach it
+2. **Backlog** it — out of scope for this run (`backlog.md`, reaches the report)
+3. **Accept** it — at target and shippable; park it so the gap stays visible
+4. **Escalate** — the gap needs a decision the run may not make alone
+
+"Same gap" is matched on content, not on string equality. A critic who writes
+"shadows are too soft at the terminator" and then "soft terminator shadows" has
+named one gap twice, and the script counts it once —
+exact-match counting was the same as no cap at all.
+
+**The exception: blocking gaps.** A gap logged `--blocking` — security, data
+loss, or plain incorrectness — is exempt. It never times out, and it cannot be
+parked without `--force`, because "we reviewed it three times and moved on" is
+not an acceptable outcome for a credential leak. It also blocks `bar-met`, at any
+severity: beating the comparator while leaking session tokens is not the bar
+being met.
+
+```bash
+python3 scripts/gauntlet.py log-round ... --severity minor --blocking \
+    --gap "session token is written in plaintext to the replay file"
+```
+
+Use it for gaps that must be *closed*, not for gaps that are merely important.
+A run where everything is blocking has no cap at all.
 
 ## The run-level conditions
 
@@ -250,6 +289,7 @@ Typical unattended configuration:
 {
   "stops": {
     "bar_met_n": 2, "clean_streak_n": 2, "no_progress_n": 3,
+    "gap_rounds_n": 3,
     "target_score": 7, "budget_waves": 8, "hard_cap_waves": null
   },
   "wip_limit": 3

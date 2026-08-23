@@ -7,14 +7,24 @@ main reason people stop letting loops run long enough to work.
 ## The board is generated, not written
 
 ```bash
-python3 scripts/gauntlet.py board     # writes gauntlet/workbench.md from the log
+python3 scripts/gauntlet.py board     # writes workbench.md + settled.md from the log
 ```
 
 `board` renders `gauntlet/workbench.md` from `rounds.jsonl` and `config.json`:
 wave and budget, cost so far, target score, the WIP limit, which lanes the next
-wave funds, then three columns — **Active** (with a park flag where `status`
-recommends one), **Parked** with each open gap and the reason it stopped, and
-**Retired** — plus the last twelve rounds.
+wave funds, then three columns — **Active** (flagged `⚠ park?` where `status`
+recommends one, `⚠ DECIDE` where the review cap has been reached), **Parked**
+with each open gap and the reason it stopped, and **Retired** — plus the last
+twelve rounds.
+
+The same command writes `gauntlet/settled.md`, which has a different reader.
+The workbench is for the user; **settled.md is for the critics** — retired
+dimensions, closed gaps, parked work, scope ruled out — and every critic prompt
+hands over its path with the bar. Critics arrive with no memory by design, which
+is exactly why one re-discovers the gap three waves closed; a rule nobody hands
+them is not a rule. It carries one exception, deliberately narrow: new evidence
+that a settled item is actually broken — a regression, or a security, data-loss
+or correctness defect (`critic.md`, `cost-discipline.md` rule 9).
 
 Regenerate it at every wave boundary and after every park or extension. It is
 deterministic, so keeping the user's progress surface current costs zero model
@@ -91,9 +101,11 @@ Records may also carry these optional fields, each set by its `log-round` flag:
 `"calls": N` and `"tokens": N` (real cost — unmeasured rounds fall back to the
 estimate, and `status` reports partial measurement as a floor), `"tier":
 "screening"` (steers rounds, never advances retirement), `"blind": true`
-(champion mode: the promotion ran under the blind protocol), `"diff_lines": N`
-(feeds the softening tripwire), and `"critic_model": "<id>"` (the report prints
-the distribution).
+(champion mode: the promotion ran under the blind protocol), `"blocking": true`
+(bar modes: a security, data-loss or correctness gap — exempt from the review
+cap, blocks `bar-met` at any severity, refuses to park without `--force`),
+`"diff_lines": N` (feeds the softening tripwire), and `"critic_model": "<id>"`
+(the report prints the distribution).
 
 ## Reading the log
 

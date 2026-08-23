@@ -35,7 +35,11 @@ against a bar you can look at yourself.
    different source asset, a structural change below this lane, or a decision
    only the user can make, stop and say so in one line instead of shipping an
    approximation. That sentence is what lets the run park the lane instead of
-   funding three more rounds against something you cannot reach.
+   funding three more rounds against something you cannot reach. Say it on the
+   *first* round you know it — the run allows three rounds on one gap before it
+   stops reviewing and decides, and your line is the cheapest evidence it has.
+   A gap marked **blocking** (security, data loss, correctness) is the one that
+   never times out: close it, or say precisely what stops you.
 
 ## Rules
 

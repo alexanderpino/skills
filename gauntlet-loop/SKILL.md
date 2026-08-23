@@ -166,7 +166,7 @@ model judges; the script counts.
 `gauntlet/` holds `config.json` (lanes, dimensions, stops, WIP, parks,
 extensions, **gates**), `contract.md`, the frozen `bar/`, `ownership.md`,
 `backlog.md`, `rounds.jsonl` (the log — script-written only), and the generated
-`workbench.md` and `report.md`. Layout and git conventions:
+`workbench.md`, `settled.md` and `report.md`. Layout and git conventions:
 `references/state-and-resume.md`.
 
 **Declare gates before wave 1**, one `config.json` entry per mechanical check:
@@ -194,7 +194,7 @@ python3 scripts/gauntlet.py bar-request               # what this run still need
 python3 scripts/gauntlet.py quote --current-score 4   # the quality-price menu: what 7, 8, 9 cost; 10 is not a price
 python3 scripts/gauntlet.py plan --current-score 4    # draft plan.md: build stages in order, priced — the forward scaffold
 python3 scripts/gauntlet.py park --lane a --dimension visual --reason "..."
-python3 scripts/gauntlet.py board    # regenerate workbench.md from the log
+python3 scripts/gauntlet.py board    # regenerate workbench.md + settled.md from the log
 python3 scripts/gauntlet.py extend --waves 3 --reason "..."   # only on a user grant
 python3 scripts/gauntlet.py report   # draft the end-of-run report
 ```
@@ -298,8 +298,8 @@ dimensions have machine gates) · ranked **lanes** + WIP limit · armed **stops*
 **autonomy**.
 
 Stops (`references/stop-conditions.md`): `bar-met`, `clean-streak`,
-`no-progress` (parks a lane), `budget`, `judgment` — armed in combination, first
-to fire wins.
+`no-progress` (parks a lane), `review-cap` (three rounds on one gap, then a
+decision), `budget`, `judgment` — armed in combination, first to fire wins.
 
 **Cold start is normal.** With no artifact yet, wave 1 is a bootstrap wave: first
 versions, no champion comparison, first bar comparison as soon as there is output
@@ -430,7 +430,8 @@ Then, per lane, per round:
    and safe to run concurrently: its cache is locked, and a suite whose inputs
    another lane just moved simply re-runs. Machine checks cost seconds; making
    them a wave barrier to save those seconds would cost a wave. Then one critic
-   call covering both comparisons
+   call covering both comparisons — with the gate results **and the path to
+   `gauntlet/settled.md`**, so the round is not spent re-finding a closed gap
    (→ `references/critic.md`, `references/blind-protocol.md`):
    - **Promotion:** challenger vs champion, **blind by default** — both sides
      are ours, so this comparison is always blindable even when the bar is not:
@@ -500,6 +501,12 @@ anything. Run `status`, then act:
   dead on this lane; diversity is the one move not yet tried, it costs one extra
   builder call, and either it breaks the ceiling or it hardens the park report.
   Once per lane per run — a second tournament is grinding with extra steps.
+- **Decide what `status` marks `DECIDE FIRST`.** Three rounds on one gap is the
+  review cap: the loop will not fund a fourth review of the same gap, because
+  another opinion is not a closed gap. Choose one of four — re-cut, backlog,
+  accept (park, gap stays in the report), or escalate to the user — and record
+  it. The exception is a gap logged `--blocking` (security, data loss,
+  correctness): those are exempt from the cap and must be closed, not timed out.
 - **Re-cut** when the smoother reports the same seam twice, or two lanes' critics
   keep citing each other's territory. Between waves, never mid-wave; the protocol
   is in `references/decomposition.md`.
@@ -518,7 +525,10 @@ anything. Run `status`, then act:
   artifact. Gates are declared inside the run and nothing else ever reviews the
   suite (`references/cost-discipline.md`).
 - **Check the kill criteria** from intake. They fire early on purpose.
-- **Publish** with `board`. Free, and it keeps the user out of your context.
+- **Publish** with `board`. Free, and it keeps the user out of your context. It
+  also regenerates `settled.md` — what is retired, closed, parked or out of
+  scope — which every critic prompt hands over next wave so nobody pays to
+  re-discover a closed gap.
 
 ## Phase 7 — Stop and hand off
 

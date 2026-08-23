@@ -32,7 +32,9 @@ the mapping. A guardrail with no row here is ceremony and belongs deleted.
 | Context bleed | critic echoes builder justifications | critic gets artifact + bar only |
 | Built from memory what a source had settled | confident detail that is a version behind, or a fabricated citation | grounding rule: normative source first, authority by author not venue, cite only what was opened |
 | Gold plating | rounds spent past a retired dimension | retirement is a stop, not a suggestion |
-| Settled work re-judged, checks re-derived | the log grows, the artifact does not | settled-work rule, hash-cached `gate` |
+| Settled work re-judged, checks re-derived | the log grows, the artifact does not | settled-work rule, generated `settled.md` handed to every critic, hash-cached `gate` |
+| The endless review | one gap re-named in new words every wave, funded every time | per-gap review cap (`gap_rounds_n`, default 3) on content-matched gaps; at the cap, four decisions and no fifth |
+| A real defect timed out by the cap | "we reviewed it three times" applied to a credential leak | `--blocking` gaps are exempt from the cap, block `bar-met` at any severity, and refuse to park without `--force` |
 | Scope snowball | more lanes at wave 6 than wave 1 | frozen lane set, backlog |
 | Token burn | cost per closed gap climbing | machine gates, one critic call, WIP, LOD ladder, degradation order |
 | The cache never hits | every round pays full price for the same frozen bar | stable prefix first and byte-identical, volatile tail last, warm once before fanning out, one model per track |
@@ -154,10 +156,42 @@ answered three waves ago — and a lead agent nervous about quality will invite 
 
 **Repair.** Settled is settled: a closed gap and a retired dimension are not
 re-judged (`critic.md`), and `log-round` warns when a record lands on a retired
-dimension. Regressions are caught *mechanically* rather than by re-review — the
-champion/challenger comparison catches them within a dimension, and machine gates
-re-run every wave catch them across dimensions. A critic that believes something
-previously closed has broken reports it as a regression in NOTES, with evidence.
+dimension. Telling a critic that costs nothing to be current — `board` generates
+`gauntlet/settled.md` (retired, closed, parked, out of scope) from the log, and
+the critic reads it before judging. A rule nobody hands the critic is a rule that
+does not exist: each one arrives with no memory, which is exactly why it
+re-discovers the gap the last three waves closed. Regressions are caught
+*mechanically* rather than by re-review — the champion/challenger comparison
+catches them within a dimension, and machine gates re-run every wave catch them
+across dimensions. A critic that believes something previously closed has broken
+reports it as a regression in NOTES, with evidence.
+
+## The endless review
+
+**Signal.** One gap, reviewed forever. A critic names it, a builder attempts it,
+the next critic names it again in slightly different words, and the loop funds
+another round. Wave 9 is still discussing wave 3's gap. Nothing looks wrong in
+the counters: no streak is advancing, but no rule is being broken either.
+
+**Cause.** Two holes. The loop's only same-gap rule matched on exact string
+equality, and critics never write the same sentence twice — so "shadows are too
+soft at the terminator" and "soft terminator shadows" read as two fresh gaps and
+bought two fresh rounds. And nothing bounded review at all: `no-progress` prunes
+a lane that stopped *moving*, but a lane naming a new gap every round looks like
+a lane doing honest work.
+
+**Repair.** A per-gap round cap (`gap_rounds_n`, default 3) with content-based
+matching: token overlap, so a rewording still counts as the same gap. At the cap
+`status` prints `DECIDE FIRST` and the four ways out — re-cut, backlog, accept,
+escalate — and there is no fifth. Critics are asked to say, in words, whether
+their gap is the previous round's gap and whether the artifact moved toward it;
+"same gap, no movement" is a valuable verdict.
+
+**The exception that keeps it honest.** A gap logged `--blocking` — security,
+data loss, plain incorrectness — is exempt from the cap, cannot be parked without
+`--force`, and blocks `bar-met` at any severity. A timer is the wrong instrument
+for a credential leak. Reserve it for gaps that must be *closed*, not for gaps
+that are merely important: a run where everything is blocking has no cap at all.
 
 ## Scope snowball
 
