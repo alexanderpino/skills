@@ -381,6 +381,48 @@ table.
   global dynamics apply at sample time, outside the cache; `13` owns the season/weather state
   targets and `14` owns their compositing order.
 
+## Neural texture compression, and what it does to this chapter's arithmetic
+
+⚠️ **Frontier, not doctrine.** Tier `D`/`T`: the API is standardised and the SDKs are public; it is
+**not yet in shipped games** as of 2026-08, and engine integration is announced rather than
+delivered. Treat everything here as a budget you can *plan* against and not a technique to
+prescribe. Re-verify before quoting — this is the fastest-moving row in the skill.
+
+**What it is.** Instead of a fixed block-compression codec, a small neural network — a couple of
+layers, a handful of neurons wide — reconstructs texel values on demand from compact learned latent
+features. The decode runs *inside the shader* at sample time, which is what makes it a streaming and
+residency technique rather than an offline one.
+
+**Why it lands on terrain first.** Terrain is the most texture-hungry system in the frame: a virtual
+texture over a large world, plus splat layers, plus the aux-map registry of `14`. The budget in
+[Virtual texturing](#virtual-texturing) above is dominated by resident tile bytes, and NTC multiplies
+exactly that term.
+
+| | |
+|---|---|
+| the mechanism it replaces | fixed BCn block compression, ~4:1 (BC7) |
+| reported ratios | **16:1 to 32:1** at quality comparable to BC7 at 4:1 |
+| one vendor demo, end to end | **6.5 GB of BCn → 970 MB**, image quality close to the original |
+| what carries it | DirectX **cooperative vectors** (Shader Model 6.9) and the equivalent Vulkan path, on hardware matrix units |
+
+**The consequence for the budget is a multiplier on one term, and it is worth being precise about
+which.** Resident bytes fall; the *page table*, the feedback pass, the indirection and the tile count
+do not move at all. So a virtual-texturing system that was page-table-bound or feedback-bound gains
+nothing, and one that was VRAM-bound gains most of the ratio. `reference-impl/budget.py`'s
+`tile_bytes` is where that multiplier goes, and the residency rows are already written so that
+changing the codec changes one input rather than the model.
+
+⚠️ **Three things it does not fix**, and each is a place this chapter has already warned about:
+decode cost is per *sample* rather than per *tile*, so a shader that samples the same page many
+times pays repeatedly where a decompressed tile would have paid once; filtering across a neural
+decode is not free and the naive answer (decode, then filter) is not the same as filtering the
+underlying signal; and **nothing about it changes the mip-halo defect** of independently filtered
+weights and content, which is a compositing error and survives any codec.
+
+**What to do about it in 2026.** Keep the codec behind the same interface the rest of the chapter
+assumes — a tile is bytes with a format — so the budget is a parameter rather than an assumption.
+That is the whole preparation, and it costs nothing if the technology slips.
+
 ## Terrain-mesh integration
 
 - **Meshes sampling the terrain composite**: rocks, cliffs, and debris meshes intersecting the

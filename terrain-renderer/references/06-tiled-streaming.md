@@ -234,6 +234,44 @@ Beyond the pyramid's practical depth-from-camera, stop paying per-tile geometry 
   at runtime where possible; if you bake lighting, re-bake when time-of-day is dynamic or accept a
   fixed-lighting far world (`10` owns this contract).
 
+### 3D Gaussian splatting as a far representation — where it actually fits
+
+⚠️ **Frontier, and narrower than the enthusiasm suggests.** Tier `P`/`D`: the primitive is
+well-published and now has engine integrations and a glTF extension in flight, but its established
+production use for terrain is **capture and previsualisation**, not the authored far world. Recorded
+here so a reader can place it rather than reach for it.
+
+**What it is, in this chapter's vocabulary.** A cloud of anisotropic Gaussians, each with position,
+covariance, opacity and a view-dependent colour, rasterised by sorted alpha blending. It is a *far
+representation* in exactly the sense the bullets above mean — it replaces per-tile geometry cost
+with something cheaper at range — and it competes with impostors and baked HLOD rather than with
+the heightfield.
+
+**Why it is tempting for the far world.** It degrades gracefully with distance, has no silhouette
+problem, and captures the one thing impostors handle worst: soft, high-frequency aggregate detail
+(distant forest canopy, scree slopes, haze-lit rock) where a billboard reads as a card and a merged
+mesh reads as fudge.
+
+**Why it is not the answer yet, and each reason is one of this chapter's own contracts:**
+
+- **It does not stream like a tile pyramid.** LOD for splats is an active research area — octree
+  and continuous-LOD schemes exist and are recent — and none of them is the clean SSE-driven
+  refinement of `01` that the rest of this chapter's residency machinery assumes.
+- **It has no collision and no gameplay query.** Everything in *Collision and gameplay streaming*
+  below needs a surface; a Gaussian cloud is not one, so the far world would need a parallel
+  representation anyway.
+- **Alpha-blended, sorted, unlit.** It does not compose with the deferred/visibility-buffer path of
+  `08`, and relighting it under `10`'s time-of-day is not a solved problem — which is the same
+  *lighting consistency across the swap* trap the bullets above already name, in a harder form.
+- **Authoring is capture-shaped.** Its production pipeline is photogrammetry-like: capture a real
+  place, import, use as reference or backdrop. That is a genuinely useful terrain workflow and it is
+  a *content* pipeline, not a rendering tier.
+
+**The honest 2026 position.** Use it where its shape fits — captured backdrops, previs, a distant
+real location — and keep it behind the same far-world swap contract as any other far representation:
+same sun, same sky, same fog, or the boundary reads as a wall. Do not plan a terrain LOD chain
+around it.
+
 ## Collision and gameplay streaming
 
 **Render residency and collision residency are different problems; never couple them.**
