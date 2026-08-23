@@ -1352,6 +1352,12 @@ Warren & Brandt's compilation at −7 °C (`P`):
 the critical angle moves from 48.56° to 49.71° (`D`). Real, small, and *not* what makes ice look
 like ice. A renderer that changes only these has drawn slightly duller water.
 
+⚠️ **And note the sign, because the common instruction has it backwards.** Shading guidance for
+snow — including this project's own snow ramp, now corrected — reaches for *"ice = low roughness,
+**high** `F0`"*. `F0` goes **down**, not up: 0.0181 is below water's 0.0205 and below half the 0.04
+dielectric default an engine ships with. Raising `F0` to sell "icy" is a change the physics does not
+support, and it buys nothing, because the look is not in the interface at all.
+
 **The absorption, which is where it stops transferring.** The absorption coefficient follows from
 the imaginary index by
 

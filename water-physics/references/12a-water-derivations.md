@@ -3124,6 +3124,39 @@ and none was about whether the **render path calls them**.
 
 ---
 
+## 14 · The five axes, and why their algebra is not in this file
+
+**A deliberate exception to this file's contract, stated so it does not read as an omission.**
+Chapter `12`'s section
+[Five axes the rest of this chapter is a point on](12-water-physics.md#five-axes-the-rest-of-this-chapter-is-a-point-on)
+— ice on the phase axis, the free jet on the Weber axis, water entry on the impulse axis, the
+hydraulic jump, and thin-film interference — carries **its own formulas inline** rather than
+quoting one-line results and deferring the algebra here.
+
+**Why.** This file exists because a reader with only `12` could not rebuild the eikonal wake solve
+or the meniscus flux integral: those are long derivations whose intermediate steps do not fit a
+doctrine chapter. The five axes are the opposite case. Each is one or two closed forms — Beer's law
+from `k`, Kubelka–Munk, the Weber and Ohnesorge groups, Bélanger's conjugate depth, the Airy sum —
+and splitting a two-line derivation across two files makes it *harder* to check, not easier.
+Repeating them here would be the restatement this file's opening forbids.
+
+**Where the working actually is.** In `reference-impl/ice.py`, `jet.py`, `impact.py`,
+`openchannel.py` and `thinfilm.py`, each of which carries its derivation and its ⚠️ notes in the
+docstring beside the code that ships. Guarded by
+[`validate_phases.py`](../reference-impl/validate_phases.py) (30 rows, `--bugs` catches 6 of 6),
+and the chapter's own quoted numbers by
+[`validate_chapter.py`](../reference-impl/validate_chapter.py) (100 numbers, held to half a unit in
+their last printed digit).
+
+⚠️ **What that costs, named rather than hidden.** Those five modules' fitted constants — the
+pinch-off coefficients, the roller constant `C ≈ 6`, the breakup constant `C ≈ 10`, the jet
+efficiency `eta` — are **scalings with order-unity coefficients**, not closed forms. They are
+exposed as arguments and never baked in, and the suite checks the **scaling** rather than the
+constant. That is a weaker warrant than most of this file carries, and it is stated on every row
+that has it.
+
+---
+
 ## What checks what
 
 `validate.py` runs in three tiers: **1** closed form (a disagreement is a bug in one of the two),
