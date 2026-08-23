@@ -1,0 +1,6 @@
+# Renderer outputs have no business here. `render.py` lives in the sibling
+# water-physics skill and writes its pool frames beside itself; they landed in
+# THIS directory twice, both times because a blanket `git add -A` found files
+# left on disk in a path that had just been emptied. The rule is cheap and the
+# recurrence was not.
+reference-impl/pool_*.png
