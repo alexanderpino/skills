@@ -50,11 +50,12 @@ sat where terrain rendering itself is thinnest.
 ⚠️ **Rows tagged `12`, `12a` or `12b` in the master index below may point at either chapter.** The
 provenance appendix is `water-physics`'s `12b` in every case; read it before citing anything water.
 
-⚠️ **This skill ships no runnable implementation.** `water-physics` carries three — a pool, an open
-coast and a screen-space pass — arbitrated by suites of **306**, **611** and **200** guarded rows, all passing.
-Everything in *this* skill is curated practice with a provenance tier, and the tier table above says
-what each one is worth. A `T`- or `F`-tier claim here does not carry the confidence of a `D`-tier
-one there.
+⚠️ **Water numbers are `water-physics`'s**, arbitrated there by suites of **306**, **612** and
+**200** guarded rows. *This* skill now guards its own arithmetic too —
+`reference-impl/validate_terrain.py`, 30 rows over screen-space error, the crack contract, clipmap
+scrolling, the isosurface case analysis and the residency budget — but **only the arithmetic**.
+Everything else here is curated practice with a provenance tier, and the tier table above says what
+each is worth. A `T`- or `F`-tier claim does not carry the confidence of a guarded one.
 
 ## Figures, and the chapters that deliberately have none
 

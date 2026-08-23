@@ -12,6 +12,33 @@ Contents: [Failure catalogue](#the-failure-catalogue) · [Metrics & budgets](#me
 [Profiling method](#profiling-method) · [Regression testing](#regression-testing) ·
 [Review checklist](#review-checklist) · [Sources](#sources--provenance)
 
+
+## This chapter now applies to the skill that contains it
+
+For twenty chapters this file told the reader to specify tests before implementation while nothing
+in the skill was tested. That is the ninth way a verification fails — *the code no pixel reached* —
+applied to a whole body of doctrine, and it had already cost something: the ring-residency column
+of `06`'s worked example was wrong by about fifty tiles, and it was found by adding it up rather
+than by reading it.
+
+`reference-impl/validate_terrain.py` guards the arithmetic now: 30 rows over screen-space error and
+its inverse, the CDLOD morph shortfall, the 2:1 crack contract, the clipmap scroll invariant, the
+isosurface case analysis and the residency budget. Three tiers, every tolerance justified from the
+estimator's own error, and `--bugs` re-runs the whole suite once per deliberately reintroduced
+defect — currently **6 of 6 caught**, including the factor-of-two in the field-of-view halving and
+`floor` for `ceil` in the HiZ mip rule.
+
+⚠️ **It guards arithmetic, and nothing else.** There is no GPU behind it, so every claim in this
+skill about throughput, bandwidth, driver behaviour or how a technique *looks* remains unguarded
+practice with a provenance tier. The suite's honesty depends on saying which is which, which is
+this chapter's own first rule.
+
+**One row failed on its first run, and the fix is the point.** The mip-chain ratio cannot reach
+`4/3` exactly, because tile sizes are integers and the byte count rounds. The tolerance is now half
+a byte over the base — derived from the rounding — rather than widened until the row went green.
+Widening is the move this chapter exists to name: it converts a finding into a decoration, and
+`-v` prints every justification so the move is visible in a diff.
+
 ## The failure catalogue
 
 Diagnose from the symptom column; the mechanism tells you *why* so you don't fix the wrong layer;

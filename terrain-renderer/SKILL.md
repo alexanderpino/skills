@@ -480,13 +480,37 @@ screen to its mechanism is a renderer's job, and most of those routes now point 
 this skill quotes is stated with its route, so a reader can act without leaving and verify without
 guessing.
 
-⚠️ **This skill ships no runnable implementation, and says so.** `water-physics` carries three —
-a pool, an open coast and a screen-space pass — arbitrated by three suites (**306**, **611** and
-**200** guarded rows) in which every tolerance is justified from the estimator's own error rather
-than from the disagreement it reports. The other nineteen chapters here are **curated practice with
-provenance tiers**, not measured results, and `00-index.md` marks which is which. Do not present a
-`T`- or `F`-tier claim from this skill with the confidence that belongs to a `D`-tier one from that
-one.
+For water numbers, `water-physics` carries three implementations — a pool, an open coast and a
+screen-space pass — arbitrated by **306**, **612** and **200** guarded rows.
+
+## What this skill verifies about itself
+
+Chapter `11` tells the reader to specify debug views and worst-case tests *before* implementation.
+For twenty chapters none of that was applied here, and one of the numbers this skill shipped —
+`06`'s ring-residency column — was wrong by about fifty tiles until somebody added it up.
+
+`reference-impl/` guards the arithmetic, and specifically the claims **whose errors are silent**: a
+screen-space error off by a factor of two still draws a picture, and a case table with one wrong
+entry still meshes 255 configurations correctly.
+
+    python3 reference-impl/validate_terrain.py          # 30 rows, three tiers, seconds
+    python3 reference-impl/validate_terrain.py -v       # every tolerance's justification
+    python3 reference-impl/validate_terrain.py --bugs   # prove the rows can fail
+
+| Module | Guards |
+|---|---|
+| `lod.py` | the projection identity **and its inverse** — the factor-of-two in `tan(fov/2)` that is invisible in a still frame — distance-to-nearest-point against distance-to-centre, the CDLOD morph shortfall `(1−k)·Δh`, the 2:1 crack contract and the T-junction count, skirt depth, the clipmap's whole-texel scroll |
+| `tables.py` | the isosurface case analysis **derived, not transcribed**: the cube group built from signed permutation matrices, its orbits counted, ambiguity enumerated, and the asymptotic decider's half-turn invariance — the property that makes two neighbours agree |
+| `budget.py` | pyramid and ring residency in closed form, the mip chain's exact third, the HiZ `ceil(log2)` rule tested as the property it guarantees rather than as an argument, per-request latency, Morton locality measured against row-major |
+
+⚠️ **What it cannot see, and does not claim.** There is no GPU here: nothing about throughput,
+bandwidth or driver behaviour is testable and none is asserted. The suite answers only questions of
+the form *"does this quantity equal that expression"* — which is most of what a LOD controller, a
+crack contract, a residency budget and a case table are made of.
+
+**Everything else in this skill remains curated practice with a provenance tier**, and
+`00-index.md` marks which is which. Do not present a `T`- or `F`-tier claim with the confidence
+that belongs to a guarded one.
 
 ## Routing table
 
