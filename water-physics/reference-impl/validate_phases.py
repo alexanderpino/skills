@@ -25,6 +25,7 @@ import jet as JET                                               # noqa: E402
 import openchannel as OC                                        # noqa: E402
 import optics as OPT                                            # noqa: E402
 import thinfilm as TF                                           # noqa: E402
+import vortex as VTX                                            # noqa: E402
 
 
 class Row(object):
@@ -420,6 +421,132 @@ def _sec_film():
 # ==========================================================================
 #  the deliberate defects
 # ==========================================================================
+def _sec_vortex():
+    # The Rankine surface is an INTEGRAL of the velocity profile -- checked by
+    # integrating it numerically rather than by restating the closed form.
+    a, om = 0.02, 20.0
+    gam = VTX.circulation_from_core_rate(om, a)
+    r = np.linspace(1e-6, 6.0, 600001)
+    v = VTX.rankine_velocity(r, a, gam)
+    slope = VTX.surface_slope(v, r)
+    h = np.concatenate(([0.0], np.cumsum(0.5 * (slope[1:] + slope[:-1])
+                                         * np.diff(r))))
+    check(3, 'the dip depth integrates the cyclostrophic balance',
+          float(h[-1]), float(VTX.rankine_depth(a, gam)), 3e-5,
+          'INDEPENDENT METHOD. The closed form comes from integrating '
+          'dh/dr = v^2/(g r) analytically on each branch; this row integrates '
+          'the same balance numerically over the shipped velocity profile. '
+          'Tolerance 3e-5 relative is the trapezoid error plus the 1/r^2 tail '
+          'truncated at r = 6 m -- both estimated from the quadrature itself, '
+          'and the measured disagreement is 5.5e-6.', 'm', True)
+
+    # The halves are equal -- the result a renderer needs and cannot guess.
+    i = int(np.searchsorted(r, a))
+    check(1, 'core and free tail contribute equal halves of the depth',
+          float(h[-1] - h[i]) / float(h[i]), 1.0, 1e-3,
+          'DERIVED. Integrating the two branches gives Omega^2 a^2/(2g) each, '
+          'so the visible funnel is exactly half the dent. Tolerance 1e-3 is '
+          'the same quadrature error as the row above carried through a '
+          'ratio. THIS IS THE ROW WITH A CONSEQUENCE: a renderer that models '
+          'only the hole has half the depth, and a flat surface where the '
+          'real one still slopes.', '-', True)
+
+    # A free vortex with no core has no bottom.
+    check(1, 'the depth diverges as the core shrinks at fixed circulation',
+          VTX.rankine_depth(1e-4, gam) / VTX.rankine_depth(1e-1, gam),
+          1.0e6, 1e-9,
+          'DERIVED. dh = Gamma^2/(4 pi^2 g a^2) goes as a^-2, so shrinking the '
+          'core by 1000 deepens the dip by 1e6. An exact ratio, so the '
+          'tolerance is round-off. This is why a pure free vortex is not a '
+          'model: with no core the surface has no finite bottom.', '-', True)
+
+    # Surface tension has a scale, and it is the capillary length.
+    check(2, 'the capillary length is 2.7 mm on this skill own sigma',
+          float(VTX.capillary_length()), 2.7e-3, 0.02,
+          'PUBLISHED FORM, SHIPPED CONSTANTS. sqrt(sigma/(rho g)) with the '
+          'sigma jet.py and wake.py already share. 2 %% is the spread of the '
+          'quoted 2.7 mm itself, not a slack. Andersen et al. (2006) found '
+          'surface tension had to be included for their needle-tipped dip; '
+          'this is the length that says when.', 'm', True)
+    check(1, 'a bathtub dip needs the curvature term and a river eddy does not',
+          [bool(VTX.surface_tension_matters(2e-3)),
+           bool(VTX.surface_tension_matters(2.0))], [True, False], 0,
+          'DERIVED from the row above. The test is against 5 capillary '
+          'lengths, so a millimetric core is inside it and a metre-scale one '
+          'is three orders outside. No tolerance -- it is a pair of booleans.',
+          '-')
+
+    # --- the shed half: a clock, and a regime that has no clock at all -------
+    check(2, 'shedding onset, mode transition and shear-layer Reynolds numbers',
+          [VTX.RE_SHEDDING_ONSET, VTX.RE_MODE_A, VTX.RE_SHEAR_LAYER],
+          [47.0, 180.0, 1300.0], 0,
+          'PUBLISHED, AND READ. Jiang & Cheng (2017), J. Fluid Mech. 832, '
+          '170-188, state the onset at Re = 47 and the secondary-wake and '
+          'shear-layer instabilities at Re ~ 180 and ~ 1300. An exact '
+          'transcription of numbers that were opened and read, so there is no '
+          'tolerance. The originals they attribute them to were NOT opened.',
+          '-')
+
+    # The guard that stops a frequency being invented where there is none.
+    check(1, 'no shedding frequency is returned below the onset Reynolds number',
+          [bool(np.isnan(VTX.shedding_frequency(0.02, 0.002))),
+           bool(np.isfinite(VTX.shedding_frequency(1.5, 0.30)))],
+          [True, True], 0,
+          'DERIVED, AND A REFUSAL RATHER THAN A VALUE. A 2 mm grain in a 2 '
+          'cm/s current sits at Re = 40, below onset, where the wake is a '
+          'steady pair of attached eddies with no frequency at all. The bare '
+          'St U / D returns 2 Hz there and an animation will consume it. Same '
+          'guard as jet.py refusing the breakup length outside its regime.',
+          '-')
+
+    # St = f D / U is a definition, so it must round-trip exactly.
+    u, d = 1.5, 0.30
+    check(1, 'the Strouhal number round-trips through f = St U / D',
+          float(VTX.shedding_frequency(u, d, st=0.2)) * d / u, 0.2, 1e-15,
+          'DEFINITION. St = f D / U, so recovering it from the frequency this '
+          'file computes is an identity and the tolerance is round-off. It is '
+          'here because the DIRECTION is what a caller gets wrong: St is the '
+          'input and f the output, not the reverse.', '-')
+
+    # The shipped default against three READ estimates.
+    check(2, 'the shipped St = 0.2 sits inside the read Re = 1000 estimates',
+          float(VTX.shedding_frequency(1.5, 0.30)) * 0.30 / 1.5,
+          VTX.ST_AT_RE_ANCHOR, 0.06,
+          'PUBLISHED, READ OFF A TABLE. Jiang & Cheng table 3 at Re = 1000 '
+          'compares their own 3D DNS across five meshes (0.2098-0.2125) with '
+          'Williamson & Brown (1998) at 0.212 and Norberg (1994) at 0.210 -- '
+          'three independent estimates agreeing to under 1 %%. The 6 %% '
+          'tolerance is because the SHIPPED default is the round 0.2 a '
+          'renderer would use; the row asks whether that rounding is '
+          'defensible, not whether the estimates agree.', '-', True)
+
+    # The fitted family, checked as a SHAPE because its constants were not read.
+    plateau = [float(VTX.strouhal_plateau(x, 0.21, -1.0, 0.5))
+               for x in (100.0, 1e3, 1e4, 1e5)]
+    check(1, 'the St fit family rises monotonically toward its plateau',
+          [bool(np.all(np.diff(plateau) > 0)), bool(plateau[-1] < 1.0),
+           bool(plateau[-1] > 0.98)], [True, True, True], 0,
+          'DERIVED, AND DELIBERATELY NOT A FIT. The source that was read gives '
+          'the FORM St = A + B/Re^p and says its coefficients are curve fits, '
+          'so it supplies no constants -- and this file shipped RECALLED ones '
+          'for a round until this row refused the shape they implied. What '
+          'survives not knowing A and B is that a negative B makes St climb '
+          'monotonically to A without reaching it, and that is all this row '
+          'asserts. The A and B here are the row own, not the literature.',
+          '-')
+
+    check(2, 'the universal wake Strouhal band is claimed only on its domain',
+          [bool(VTX.strouhal_is_universal(1e3)),
+           bool(VTX.strouhal_is_universal(10.0))], [True, False], 0,
+          'PUBLISHED DOMAIN, READ. Williamson & Brown (1998) report St* ~ '
+          '0.176 (0.164-0.186) over Re 55 to 1.4e5, as quoted by Jiang & '
+          'Cheng. The function returns the claim own domain rather than an '
+          'opinion outside it -- an attribution is not a licence to '
+          'extrapolate. Note St* is the WAKE Strouhal number, built on the '
+          'wake width and separating velocity, not interchangeable with St.',
+          '-')
+
+
 def _bug_ice_tinted_water(mod):
     """Ice given water's absorption spectrum, scaled -- the category error."""
     mod.ABS_ICE = np.asarray(OPT.ABS, float) * 0.55
@@ -464,6 +591,24 @@ def _bug_film_drops_sign(mod):
     mod.fresnel_rs_rp = bad
 
 
+def _bug_vortex_no_core(mod):
+    """The core dropped -- a pure free vortex, whose dip has no bottom."""
+    orig = mod.rankine_velocity
+
+    def bad(r, core_radius, circulation):
+        del core_radius
+        return orig(r, 1e-9, circulation)
+    mod.rankine_velocity = bad
+
+
+def _bug_vortex_frequency_below_onset(mod):
+    """The onset guard removed -- a frequency invented for a steady wake."""
+    def bad(u, d, st=0.2, nu=mod.NU_W):
+        del nu
+        return float(st) * np.asarray(u, float) / np.asarray(d, float)
+    mod.shedding_frequency = bad
+
+
 BUGS.update({
     'ice-tinted-water': (_bug_ice_tinted_water, 'ice'),
     'jet-liquid-weber': (_bug_jet_liquid_weber, 'jet'),
@@ -471,13 +616,17 @@ BUGS.update({
     'impact-time-carries-speed': (_bug_impact_time_carries_speed, 'impact'),
     'jump-energy-closure': (_bug_jump_energy_closure, 'openchannel'),
     'film-drops-sign': (_bug_film_drops_sign, 'thinfilm'),
+    'vortex-no-core': (_bug_vortex_no_core, 'vortex'),
+    'vortex-frequency-below-onset':
+        (_bug_vortex_frequency_below_onset, 'vortex'),
 })
 
 SECTIONS = ((_sec_ice, 'ice: a different spectrum and a different mechanism'),
             (_sec_jet, 'the free jet along the Weber axis'),
             (_sec_impact, 'water entry: cavity, pinch-off, Worthington jet'),
             (_sec_jump, 'the hydraulic jump'),
-            (_sec_film, 'thin-film interference'))
+            (_sec_film, 'thin-film interference'),
+            (_sec_vortex, 'vortices: the standing dent and the shed clock'))
 
 
 def run_suite():
@@ -531,7 +680,7 @@ def report(verbose=False):
 def run_bugs():
     import importlib
     mods = {'ice': ICE, 'jet': JET, 'impact': IMP, 'openchannel': OC,
-            'thinfilm': TF}
+            'thinfilm': TF, 'vortex': VTX}
     print('%-28s %-8s %s' % ('defect', 'caught', 'rows that fired'))
     print('-' * 100)
     missed = []
