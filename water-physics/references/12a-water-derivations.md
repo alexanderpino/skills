@@ -1,3 +1,15 @@
+---
+type: Reference
+title: Water Rendering — Derivations
+description: The derivations behind every number the water chapter quotes in a line, each naming the test that guards it or stating that none does.
+tags: [water, derivations, pseudocode]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-24T09:31:02Z }
+sources:
+  - id: impl
+    resource: reference-impl/
+    title: The executable form of the same material
+---
 # Water Rendering — Derivations
 
 The doctrine chapter `12` states *what is true*. This file states *where each of those numbers comes

@@ -1,3 +1,11 @@
+---
+type: Evidence
+title: Generic reference set — nine openly-licensed photographs, and what each one is evidence for
+description: Nine openly-licensed reference photographs and the full licence trail for each.
+tags: [water, photographs, licences]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T15:52:23Z }
+---
 # Generic reference set — nine openly-licensed photographs, and what each one is evidence for
 
 **This is not the bar.** The bar is `../bar.md` and it is frozen. Nothing in this

@@ -1,3 +1,11 @@
+---
+type: Reference
+title: "Smooth Voxel Terrain: Isosurface Extraction & LOD"
+description: "Smooth voxel terrain: isosurface extraction, the marching-cubes case count and its ambiguous faces, dual methods, and LOD across chunk seams."
+tags: [terrain, voxel, isosurface, marching-cubes, dual-contouring]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T18:35:25Z }
+---
 # Smooth Voxel Terrain: Isosurface Extraction & LOD
 
 You are rendering a scalar field somebody else authored — the density/SDF comes from the

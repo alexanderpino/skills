@@ -1,3 +1,11 @@
+---
+type: Reference
+title: "Vegetation & scatter rendering"
+description: "Vegetation and scatter rendering: instancing, impostors, density fields and the LOD boundary where a plant stops being geometry."
+tags: [terrain, vegetation, scatter, instancing]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-30T09:56:09+02:00 }
+---
 # Vegetation & scatter rendering
 
 The generator decides what grows where — terrain-architect `07`/`13` own the placement algorithms

@@ -1,3 +1,11 @@
+---
+type: Reference
+title: "Verification, profiling & the failure catalogue"
+description: "Verification, profiling and the failure catalogue: how each mechanism in this skill is checked, and the symptoms that say it is not."
+tags: [terrain, verification, profiling, failures]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T18:35:25Z }
+---
 # Verification, profiling & the failure catalogue
 
 Terrain rendering is judged by eye at 60+ fps, which makes it uniquely vulnerable to **plausible

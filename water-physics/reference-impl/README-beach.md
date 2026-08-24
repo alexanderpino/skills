@@ -1,3 +1,11 @@
+---
+type: Implementation Notes
+title: The beach at Aljezur — bathymetry, the wave transform, and the bar
+description: "The open coast at Aljezur: bathymetry and the morphodynamic loop, the wave transform, diffraction, foam as a realisation, and the camera."
+tags: [water, coast, waves, foam, suite]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+---
 # The beach at Aljezur — bathymetry, the wave transform, and the bar
 
 A second reference scene, built to the same standard as the pool: the physics is

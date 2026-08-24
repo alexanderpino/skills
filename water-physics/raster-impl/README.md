@@ -1,3 +1,11 @@
+---
+type: Implementation Notes
+title: Screen-space water — the raster reference
+description: "The real-time screen-space pass, its LUT and its wave surface: the only place in this skill where approximation error can be measured at all."
+tags: [water, screen-space, raster, suite]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+---
 # Screen-space water — the raster reference
 
 The other half of `../references/12-water-rendering.md`. The offline reference in

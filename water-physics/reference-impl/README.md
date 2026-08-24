@@ -1,3 +1,11 @@
+---
+type: Implementation Notes
+title: Pool reference implementation
+description: "The pool: a 1.40 m domestic basin used as the cleanest available optics laboratory, its modules, and what its suite establishes."
+tags: [water, pool, optics, suite]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-24T09:31:02Z }
+---
 # Pool reference implementation
 
 A physically-motivated renderer for a 1.40 m domestic pool, written to check the

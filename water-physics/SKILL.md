@@ -1,4 +1,5 @@
 ---
+type: Skill
 name: water-physics
 description: >-
   The measured physics of water, for renderers: the air/water interface (exact Fresnel, the
@@ -15,6 +16,16 @@ description: >-
   "what reflectance is foam", "how much light comes back up", "is this glitter path the right
   width", "where does the wave break". For the render-side architecture - LOD, passes, engine
   water systems - route terrain-renderer 12. For generating the bed, route terrain-architect.
+tags: [water, rendering, physics, optics]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-24T09:31:02Z }
+sources:
+  - id: chapter
+    resource: references/12-water-physics.md
+    title: The water chapter
+  - id: provenance
+    resource: references/12b-water-provenance.md
+    title: Sources and tiers
 ---
 
 # Water Physics

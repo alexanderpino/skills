@@ -1,3 +1,11 @@
+---
+type: Reference
+title: "Planetary Rendering & Numerical Precision"
+description: "Planetary rendering and numerical precision: the float32 binade staircase, reversed-Z, camera-relative transforms and cube-sphere mappings."
+tags: [terrain, planetary, precision, reversed-z, float32]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+---
 # Planetary Rendering & Numerical Precision
 
 Planet rendering is two problems wearing one coat: a **numerical precision problem** that starts

@@ -1,3 +1,11 @@
+---
+type: Reference
+title: "Tiled Worlds & Streaming"
+description: "Tiled worlds and streaming: residency budgets, prefetch radius, and the arithmetic that decides whether a tile arrives in time."
+tags: [terrain, streaming, tiles, budget]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T18:38:25Z }
+---
 # Tiled Worlds & Streaming
 
 Once the world outgrows what fits in memory, the terrain becomes a **tile pyramid with a residency

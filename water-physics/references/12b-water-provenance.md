@@ -1,3 +1,11 @@
+---
+type: Provenance
+title: "Water Rendering — Sources & Provenance"
+description: Every source, tier and unverified mark behind the water chapters, restated so it reads alone. Read before citing anything out of this skill.
+tags: [water, sources, citations, tiers]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+---
 # Water Rendering — Sources & Provenance
 
 The provenance appendix to [`12-water-rendering.md`](../../terrain-renderer/references/12-water-rendering.md). It was that

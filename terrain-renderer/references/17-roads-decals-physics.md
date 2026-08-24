@@ -1,3 +1,11 @@
+---
+type: Reference
+title: Roads, decals, runtime modification, and the physics handoff
+description: Roads, decals, runtime modification and the physics handoff, including the replayable stamp list that keeps them cache-safe.
+tags: [terrain, roads, decals, physics]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-30T09:56:09+02:00 }
+---
 # Roads, decals, runtime modification, and the physics handoff
 
 This chapter owns everything that stamps onto, deforms, or reads back the rendered terrain at

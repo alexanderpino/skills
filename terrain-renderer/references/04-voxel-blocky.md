@@ -1,3 +1,11 @@
+---
+type: Reference
+title: "Blocky Voxel Rendering: The Minecraft Family"
+description: "Blocky voxel rendering: meshing, face culling, greedy merging and the streaming shape the Minecraft family settled on."
+tags: [terrain, voxel, blocky, greedy-meshing]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-30T04:53:08Z }
+---
 # Blocky Voxel Rendering: The Minecraft Family
 
 This chapter owns turning an already-generated blocky voxel world into frames: chunk render data,

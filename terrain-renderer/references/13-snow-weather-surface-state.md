@@ -1,3 +1,11 @@
+---
+type: Reference
+title: Snow, weather, and dynamic surface state
+description: "Snow, weather and dynamic surface state as a runtime state machine: its storage, its writers and its readers."
+tags: [terrain, snow, weather, surface-state]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T21:30:44Z }
+---
 # Snow, weather, and dynamic surface state
 
 The generator bakes where snow and moisture *can* exist — terrain-architect `13` computes the

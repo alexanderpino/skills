@@ -1,3 +1,11 @@
+---
+type: Reference
+title: Real-Time Fluid Simulation
+description: "Real-time fluid simulation on terrain: shallow-water and pipe models, their stability limits, and what each one cannot represent."
+tags: [terrain, fluid, simulation, shallow-water]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+---
 # Real-Time Fluid Simulation
 
 The engine half of "the tool provides causes, the engine provides motion". `12` covers water as a

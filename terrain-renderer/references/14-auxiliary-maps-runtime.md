@@ -1,3 +1,11 @@
+---
+type: Reference
+title: "Auxiliary maps at runtime: consuming the generator's field registry"
+description: "Auxiliary maps at runtime: consuming the generator field registry without re-deriving it in the sampling shader."
+tags: [terrain, maps, runtime, handoff]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-04T19:10:29Z }
+---
 # Auxiliary maps at runtime: consuming the generator's field registry
 
 terrain-architect `27` ends at the wire: a registry of raw R32F cause-maps — climate, geology,

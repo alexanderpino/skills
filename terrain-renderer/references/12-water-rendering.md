@@ -1,3 +1,15 @@
+---
+type: Reference
+title: Water Rendering
+description: "The render-side architecture of water: surface LOD, pass ordering, engine-native systems and shoreline integration. Routes to water-physics for every number it quotes."
+tags: [terrain, water, rendering, architecture]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T20:31:24Z }
+sources:
+  - id: physics
+    resource: ../../water-physics/references/12-water-physics.md
+    title: The physics this chapter routes to
+---
 # Water Rendering
 
 Water on terrain — oceans, rivers, lakes — arrives from the generation side as *still data*: flat

@@ -1,3 +1,11 @@
+---
+type: Reference
+title: "Engine-Native Terrain: Unreal Landscape & Friends"
+description: "Engine-native terrain systems: Unreal Landscape, Nanite Landscape and Mesh Terrain, and what each one fixes the shape of."
+tags: [terrain, unreal, landscape, engine]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T18:38:25Z }
+---
 # Engine-Native Terrain: Unreal Landscape & Friends
 
 This chapter owns the engine-native terrain systems — primarily Unreal's Landscape and its UE5

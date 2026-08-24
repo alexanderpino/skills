@@ -1,3 +1,11 @@
+---
+type: Reference
+title: Terrain materials, splatting, and virtual texturing
+description: Terrain materials, splatting and virtual texturing, including the cache-invalidation traps that runtime state walks into.
+tags: [terrain, materials, splatting, virtual-texturing]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T18:38:25Z }
+---
 # Terrain materials, splatting, and virtual texturing
 
 This chapter owns how terrain gets its surface: splat/weight blending, blend quality, the
