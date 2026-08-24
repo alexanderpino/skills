@@ -20,7 +20,7 @@ Contents: [Sea states: the energy ladder](#sea-states-the-energy-ladder) ·
 [Calm water: the low-energy regime](#calm-water-the-low-energy-regime) ·
 [Shallow water: the physics](#shallow-water-the-physics) ·
 [Aerated water: foam, spray and whitewater](#aerated-water-foam-spray-and-whitewater) ·
-[Five axes the rest of this chapter is a point on](#five-axes-the-rest-of-this-chapter-is-a-point-on) ·
+[Six axes the rest of this chapter is a point on](#six-axes-the-rest-of-this-chapter-is-a-point-on) ·
 [Man-made water: pools, tanks and channels](#man-made-water-pools-tanks-and-channels) ·
 [Shading and optics](#shading-and-optics) ·
 [Caustics: the other half of the light path](#caustics-the-other-half-of-the-light-path) ·
@@ -1301,31 +1301,38 @@ element that grounds the fall in the scene, because it scatters sunlight and sha
 behind it. The recurring structural defect remains the one in
 [Rivers](../../terrain-renderer/references/12-water-rendering.md#rivers-flow-driven-surfaces): a fall authored where the flow field does not support it.
 
-## Five axes the rest of this chapter is a point on
+## Six axes the rest of this chapter is a point on
 
 Everything above this line is organised by **subject** — a sea state, a pool, a waterfall, a foam
 patch. That is how the chapter grew and it is why it had the gaps it had, because a subject list
-can only be extended by thinking of another subject. Five things were missing from it, and four of
-the five were missing the same way: **the subject was present and the axis it sits on was never
+can only be extended by thinking of another subject. Six things were missing from it, and five of
+the six were missing the same way: **the subject was present and the axis it sits on was never
 drawn.** Snow was covered and ice was not, because nothing here named the *phase* axis. The
 waterfall's breakup was derived — Rayleigh–Plateau, most-unstable mode — and a fire hose was not,
 because nothing named the *Weber* axis. Splashes were mentioned and the four-event sequence was
-not, because nothing named the *impulse* axis. Rapids were absent because nothing distinguished
-structure that **travels** from structure that **stands**.
+not, because nothing named the *impulse* axis. Rapids were absent, and drain vortices with them,
+because nothing distinguished structure that **travels** from structure that **stands**.
 
-So this section is not five more subjects. It is the five axes, each with the closed forms that
+So this section is not six more subjects. It is the six axes, each with the closed forms that
 order it, and each ending in the same place: the parameter a renderer must read to know **which of
 several looks it is drawing**. Where a subject already appears above, the axis is what tells you
 *which point on it* you have.
 
-The fifth is different in kind and is here because it has nowhere else to be: an oil sheen is the
-one water appearance driven by **interference**, and none of this chapter's absorption, scattering
-or Fresnel machinery reaches it.
+One of the six is different in kind and is here because it has nowhere else to be: an oil sheen is
+the one water appearance driven by **interference**, and none of this chapter's absorption,
+scattering or Fresnel machinery reaches it.
+
+⚠️ **And the sixth was not found the same way as the other five.** Vortex structure was the one
+gap the register held open *with no citation* — the axis had been identified and a source had not,
+and this project does not write physics from memory. It closes below because two papers were
+finally located, downloaded and read. That distinction is kept in the text because the two kinds
+of work are different: five of these were a failure of **organisation**, and one was a failure of
+**search**.
 
 Everything below is implemented in `reference-impl/ice.py`, `jet.py`, `impact.py`,
-`openchannel.py` and `thinfilm.py`, and guarded by
-[`validate_phases.py`](../reference-impl/validate_phases.py) — 30 rows, and the `--bugs` harness
-proves all six of its deliberate defects fire.
+`openchannel.py`, `thinfilm.py` and `vortex.py`, and guarded by
+[`validate_phases.py`](../reference-impl/validate_phases.py) — **41 rows**, and the `--bugs`
+harness proves all **eight** of its deliberate defects fire.
 
 ---
 
@@ -1832,7 +1839,230 @@ the aliasing that motivates their model; it does not reimplement it.
 
 ---
 
-### What these five change elsewhere in the chapter
+---
+
+### The frame axis: a vortex that stands and a vortex that travels
+
+**This was the register's last open gap, and it was open for a reason worth
+keeping.** [`12c`](12c-uncovered.md) recorded five gaps with a verified primary
+source and a sixth — vortex structure — with none, because none had been found.
+Inventing a plausible citation to make the table symmetric is exactly what
+[`12b`](12b-water-provenance.md)'s convention forbids, so it stayed open. It
+closes here because two papers were located, downloaded and **read**:
+
+| | |
+|---|---|
+| `P` | Andersen, A., Bohr, T., Stenum, B., Juul Rasmussen, J. & Lautrup, B. (2006), *"The bathtub vortex in a rotating container"*, **J. Fluid Mech. 556**, 121–146, doi:[10.1017/S0022112006009463](https://doi.org/10.1017/S0022112006009463). The standing half. The cyclostrophic balance below is their **equation (5.7)**, the surface curvature their **(5.6)**, and the Ekman and Rossby numbers their **table 1**. Short-form companion: Phys. Rev. Lett. **91**, 104502 (2003). |
+| `P` | Jiang, H. & Cheng, L. (2017), *"Strouhal–Reynolds number relationship for flow past a circular cylinder"*, **J. Fluid Mech. 832**, 170–188. The travelling half: the onset, the instability boundaries, the family of fitted forms, and the `Re = 1000` anchor come from their text and their **table 3**. |
+
+⚠️ **And what is attributed rather than read.** Roshko (1954, 1955), Fey et al.
+(1998), Norberg (1994), Williamson (1996a) and Williamson & Brown (1998) appear
+below *because Jiang & Cheng name them*. Their own papers were not opened —
+Annual Reviews and APS both refused the request — so they are attributions, in
+the same sense `jet.py` marks Ohnesorge (1936). Every number in this section was
+read in one of the two papers above, or derived here from a closed form.
+
+**The axis is which frame the vortex lives in**, and the two kinds are not
+versions of one thing:
+
+- a **drain vortex stands.** The water moves through it and the funnel does not.
+  It is a surface **shape**.
+- a **shed vortex travels.** It is released at a rate and carried downstream. It
+  is a **clock**.
+
+A renderer needs the shape from one and the frequency from the other, and this
+chapter supplied neither.
+
+#### The standing vortex: the dent is an integral of the swirl
+
+**The one relation, and it is the section.** Andersen et al.'s equation (5.7) is
+the radial balance at the free surface:
+
+```
+v²/r  =  g·dh/dr  −  (α/ρ)·dκ/dr                         their (5.7)
+κ     =  h′ / (r·[1 + h′²]^½)  +  h″ / [1 + h′²]^(3/2)   their (5.6), the curvature
+```
+
+Drop the curvature term and it reads `dh/dr = v²/(g·r)`. **The surface dent is
+an integral of the velocity profile.** That is the statement to carry, because
+it says a renderer may not author the dip and the swirl separately: two
+independent controls are two things that can disagree, and once they do, neither
+is the physics.
+
+**The core is what makes the answer finite.** For a Rankine vortex — solid-body
+inside, free outside:
+
+```
+v(r) = Γ·r / (2π·a²)      r ≤ a          (forced core, ω = Γ/(2πa²))
+v(r) = Γ / (2π·r)         r > a          (free vortex)
+```
+
+integrating the balance on each branch gives the surface, measured down from the
+far field:
+
+```
+r >  a :   h = −Γ² / (8π²·g·r²)                          the 1/r² tail
+r ≤ a :   h = −Γ²/(4π²·g·a²)  +  Ω²·r²/(2g)             a paraboloid in the core
+Δh    =    Γ² / (4π²·g·a²)   =   Ω²·a²/g                 total depth, axis to far field
+```
+
+continuous at `r = a` by construction rather than by fitting. A **pure** free
+vortex — no core — has `v → ∞` on the axis and a dip with no bottom; the depth
+goes as `a⁻²`, so shrinking the core by 1000 deepens the dip by a factor of 10⁶
+(`D`). Every real vortex has a core, and a model without one has no finite
+answer to give.
+
+**The result a renderer cannot guess: the halves are equal.**
+
+```
+outside the core :  Ω²a²/(2g)          inside the core :  Ω²a²/(2g)
+```
+
+The free tail contributes **exactly as much depth as the core does**. So a
+renderer that draws only the visible funnel has **half the dent** — and worse, a
+surface that is *flat where the real one is still sloping*, because the outer
+half of the depression lies outside anything that looks like a hole. On the
+section's worked case (`a = 20 mm`, `Ω = 20 rad/s`, so `Γ = 0.0503 m²/s` and a
+peak swirl of 0.40 m/s) the dip is **16.3 mm**, and 8.2 mm of it is already spent
+by the time you reach the rim of the funnel (`D`, and checked in the suite by
+integrating the balance numerically against the closed form — they agree to
+5.5 × 10⁻⁶).
+
+**When the curvature term stops being optional.** Andersen et al. found surface
+tension had to be included for a quantitative account of their experiment,
+because their dip narrows to a needle. The scale that says when is the capillary
+length:
+
+```
+l_c = √(σ / (ρ·g))  =  2.73 mm                           on this skill's own σ
+```
+
+Once the tip's radius of curvature approaches `l_c`, the `dκ/dr` term is no
+longer a correction. **A bathtub vortex is millimetric at the tip and lives right
+on this boundary; a river eddy is metres across and does not** — so the simple
+form above is enough for a scene and wrong for a sink.
+
+**And it is a three-dimensional object, not a dent.** Andersen et al. find the
+fast downflow confined to a narrow, rapidly rotating *drainpipe* running from the
+surface to the drain, with slow **upward** flow all around it, generated by the
+Ekman layer on the floor. The fluid that feeds the funnel arrives along the
+bottom, not from the sides:
+
+```
+δ  = √(ν/Ω)              Ekman layer depth      0.89 mm at 12 r.p.m.  (D)
+Ek = ν / (2·Ω·L²)        Ekman number           1.0 × 10⁻⁵ at L = 0.2 m  (D)
+```
+
+⚠️ **One honest limit on all of the above.** These are the relations for a
+*steady, axisymmetric* vortex. Andersen et al. also report a **tip instability**:
+above a critical rotation rate the tip oscillates vertically, and higher still it
+sheds air bubbles. A renderer wanting a violent drain vortex is outside every
+closed form on this page.
+
+#### The travelling vortex: a clock, and a regime that has no clock
+
+```
+Re = U·D/ν                          does it shed at all?
+f  = St·U/D          St ≈ 0.2       how often, in Hz
+```
+
+**The onset is the part that gets drawn wrong.** Jiang & Cheng state shedding
+emerges at **`Re = 47`**. Below that, the wake is a **steady pair of attached
+eddies** that sit there and do not detach.
+
+> ⚠️ The steady regime is not a slow version of the oscillating one. There is no
+> frequency at all. An animation that scales its shedding rate down with velocity
+> draws a slow beat where the truth is *no beat* — and `f = St·U/D` will happily
+> return a number there. `vortex.py::shedding_frequency` returns **NaN** below
+> onset for that reason, the same refusal `jet.py` makes outside the Rayleigh
+> regime.
+
+**The regimes, boundaries read rather than recalled** (Jiang & Cheng):
+
+| `Re` | what the wake is |
+|---|---|
+| < 47 | steady — a fixed pair of eddies, no shedding and no frequency |
+| 47 – 180 | laminar shedding — a clean two-dimensional Kármán street |
+| 180 – 260 | wake transition — mode A then mode B; `St` drops and is twin-peaked |
+| 260 – 1300 | three-dimensional shedding — the street persists, the cores do not |
+| 1300 – 2×10⁵ | shear-layer instability — turbulent wake, the periodic street survives |
+| > 2×10⁵ | boundary-layer transition — the drag crisis, shedding goes irregular |
+
+**Worked, on things a scene contains** (`D`):
+
+| | `D` | `U`, m/s | `Re` | shedding |
+|---|---|---|---|---|
+| silt grain | 2 mm | 0.02 | 40 | **none** — below onset |
+| reed | 8 mm | 0.4 | 3 190 | **10 Hz** |
+| boulder | 0.30 m | 1.5 | 4.5 × 10⁵ | **1.0 Hz** |
+| bridge pier | 1.2 m | 2.0 | 2.4 × 10⁶ | **0.33 Hz** |
+
+**One second per vortex behind a boulder.** That is an animation-rate number
+falling straight out of two quantities a scene already has, and it is the payoff:
+the wake behind a rock is not noise, it has a period, and the period is
+computable.
+
+**What the value of `St` rests on, stated precisely.** At `Re = 1000` Jiang &
+Cheng's table 3 compares their own 3-D DNS across five meshes (**0.2098–0.2125**)
+against Williamson & Brown's experiment (**0.212**) and Norberg's (**0.210**) —
+three independent estimates agreeing to under 1%. The round **0.2** a renderer
+would use is 6% below that, which is defensible and is checked as such.
+
+⚠️ **The fitted forms carry no constants here, deliberately.** Jiang & Cheng list
+three in use —
+
+```
+St = A + B/Re          Roshko (1954), Ponta & Aref (2004)
+St = A + B/√Re         Fey et al. (1998), Williamson & Brown (1998), Ponta (2006)
+St = 1/(A + B/Re)      Roushan & Wu (2005)
+```
+
+— and say plainly that all of them *"were still derived ultimately through curve
+fitting"*. **The paper that was read gives the form and never quotes the
+coefficients.** `vortex.py` shipped recalled defaults for one round and a suite
+row caught them by asserting a shape they do not have; the defaults are gone and
+`A` and `B` are required arguments. What survives not knowing them is that a
+negative `B` makes `St` climb monotonically toward `A` without reaching it, and
+that is the only claim this skill makes about the family. The exponent carries
+the physics: `√Re` is the shear-layer thickness (attributed to Williamson &
+Brown), where `Re⁻¹` is not derived from anything.
+
+⚠️ **And `St*` is not `St`.** Williamson & Brown's near-universal **0.176**
+(0.164–0.186, over `Re` 55 to 1.4 × 10⁵) is the **wake** Strouhal number
+`St* = f·D′/U_s`, built on the wake width and the separating velocity — not on
+the obstacle diameter and the free stream. Conflating the two is a 20% error, and
+`strouhal_is_universal` returns the claim's own domain rather than an opinion
+outside it: an attribution is not a licence to extrapolate.
+
+![A Rankine vortex's swirl and the surface it implies, and the plane in which obstacles shed](figures/vortex-two-frames.png)
+
+> **Figure 12·12 — a shape and a clock, and neither is the other.** `D` from `P`
+> relations. Drawn by [`figures/make_figures.py`](figures/make_figures.py)
+> (`fig_vortex`) from `reference-impl/vortex.py`. **Left:** both quantities are
+> normalised by their own extreme, because the swirl peaks at 0.40 m/s while the
+> dip is 16 mm and on a shared linear axis the surface is a flat line on zero.
+> Normalised, the claim lands *on* the axis: `−h/Δh` passes through exactly
+> **0.5 at `r = a`** (marked), so half the depression is already spent at the rim
+> of the visible funnel. **Right:** obstacle size and flow speed are independent,
+> so shedding is a **plane** rather than a curve. The `Re = 47` onset has slope
+> −1 and the iso-frequency lines slope +1; below the boundary there is no
+> frequency at all, which is why that region is a block and not a continued
+> curve. Guarded by `validate_phases.py`.
+
+#### What this sixth axis hands back
+
+| hands back to | what it supplies |
+|---|---|
+| [Aerated water](#aerated-water-foam-spray-and-whitewater) | the shedding frequency behind an obstacle, so foam in a wake has a rate instead of a scroll speed |
+| [Travelling or standing](#travelling-or-standing-the-hydraulic-jump) | the second member of the standing-structure family — a jump stands across the flow, a drain vortex stands in it |
+| the surface itself | a dent that is an *integral of the flow field*, which is the only member of this chapter where the shading and the animation are forced to share one source |
+
+**And the register can now be read as a method rather than a list.** Five gaps
+were closed by asking what *axis* was missing rather than what subject; the sixth
+was closed by finding a source instead of assuming one did not exist. Those are
+two different kinds of work, and the second is the one that had been deferred.
+
+### What these six change elsewhere in the chapter
 
 None of the five is a self-contained addition; each one hands something back to a section that was
 already here, and that is the test of whether an axis was the right thing to add.
@@ -1844,13 +2074,25 @@ already here, and that is the test of whether an axis was the right thing to add
 | impulse (entry) | [Aerated water](#aerated-water-foam-spray-and-whitewater) | the four-event schedule, so a splash is a sequence with a delay rather than one burst |
 | standing structure | [Aerated water](#aerated-water-foam-spray-and-whitewater) | `P = ρ·g·q·ΔE` as a **source term** into the covering measure the whitecap model already sums |
 | interference | [A channel is a band](#a-channel-is-a-band-not-a-wavelength) | the sharpest measured instance of the RGB-sampling error the chapter already warns about |
+| frame (vortices) | [Aerated water](#aerated-water-foam-spray-and-whitewater), and the surface itself | a shedding frequency behind an obstacle, and a surface dent that is an *integral of the flow field* rather than a second authored control |
 
-And the search rule that produced four of them, kept because it predicts: **do not look for another
-subject — look for another axis.** Phase, confinement scale, energy input, composition, and whether
-the structure travels or stands. The one axis still open is recorded in
-[`12c-uncovered.md`](12c-uncovered.md): **vortex structure** — the eddy behind a boulder, the shed
-vortex street, the drain vortex, the whirlpool — which remains absent *and unsourced*, and is
-recorded as an admitted gap rather than given an invented citation.
+**The search rule that produced five of the six, kept because it predicts:** *do not look for
+another subject — look for another axis.* Phase, confinement scale, energy input, composition, and
+whether the structure travels or stands. That question closed five gaps in one pass.
+
+**And the sixth is the more useful lesson, because it is the one that nearly did not close.** The
+axis was identified at the same time as the others; what was missing was a *source*, and the entry
+sat in the register marked open **and unsourced** rather than being written from memory. It closed
+only when two papers were found, downloaded and read. So the register's own rule earns its keep in
+both directions: it refused an invented citation for as long as that was the honest state, and it
+named precisely what would end the refusal.
+
+⚠️ **What is still not covered, now that the register is empty of gaps it can name.** An empty gap
+list is not the same as completeness — it is the boundary of what this skill has *thought to
+ask*. Two limits are known and stated rather than left implicit: the standing-vortex relations
+above are for a **steady, axisymmetric** vortex and say nothing about the tip instability Andersen
+et al. report past a critical rotation rate; and every Strouhal number here is for a **circular
+cylinder**, which a boulder is not.
 
 ## Man-made water: pools, tanks and channels
 

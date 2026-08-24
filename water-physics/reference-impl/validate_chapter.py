@@ -33,9 +33,10 @@ import impact as IMP                                            # noqa: E402
 import jet as JET                                               # noqa: E402
 import openchannel as OC                                        # noqa: E402
 import thinfilm as TF                                           # noqa: E402
+import vortex as VTX                                            # noqa: E402
 
 CHAPTER = '../references/12-water-physics.md'
-SECTION = 'Five axes the rest of this chapter is a point on'
+SECTION = 'Six axes the rest of this chapter is a point on'
 
 ROWS = []
 BUGS = {}
@@ -177,11 +178,45 @@ def _film():
         quoted('peak reflectance at cos=%.2f' % cos_i, r_p, r.max())
 
 
+# --- the frame axis: vortices ------------------------------------------------
+def _vortex():
+    a, om = 0.02, 20.0
+    gam = VTX.circulation_from_core_rate(om, a)
+    quoted('circulation of the worked core, m2/s', '0.0503', gam)
+    quoted('peak swirl of the worked core, m/s', '0.40',
+           VTX.rankine_velocity(a, a, gam))
+    quoted('total dip depth, mm', '16.3', 1e3 * VTX.rankine_depth(a, gam))
+    quoted('half the dip, mm', '8.2', 0.5e3 * VTX.rankine_depth(a, gam))
+    quoted('depth ratio for a 1000x smaller core', '1000000',
+           VTX.rankine_depth(a / 1000.0, gam) / VTX.rankine_depth(a, gam))
+    quoted('capillary length, mm', '2.73', 1e3 * VTX.capillary_length())
+    omega_12rpm = 2.0 * np.pi * 12.0 / 60.0
+    quoted('Ekman layer depth at 12 rpm, mm', '0.89',
+           1e3 * VTX.ekman_layer_depth(omega_12rpm))
+    quoted('Ekman number at L = 0.2 m, 12 rpm', '1.0e-5',
+           VTX.ekman_number(omega_12rpm, 0.2))
+    for name, u, d, re_p, f_p in (
+            ('silt grain', 0.02, 0.002, '40', None),
+            ('reed', 0.4, 0.008, '3190', '10'),
+            ('boulder', 1.5, 0.30, '4.5e5', '1.0'),
+            ('bridge pier', 2.0, 1.2, '2.4e6', '0.33')):
+        quoted('Re, %s' % name, re_p, VTX.reynolds(u, d))
+        if f_p is not None:
+            quoted('shedding frequency, %s, Hz' % name, f_p,
+                   VTX.shedding_frequency(u, d))
+    quoted('shedding onset Reynolds number', '47', VTX.RE_SHEDDING_ONSET)
+    quoted('mode-A boundary', '180', VTX.RE_MODE_A)
+    quoted('shear-layer boundary', '1300', VTX.RE_SHEAR_LAYER)
+    quoted('St read at Re = 1000', '0.212', VTX.ST_AT_RE_ANCHOR)
+    quoted('universal wake St', '0.176', VTX.ST_WAKE_UNIVERSAL)
+
+
 SECTIONS = ((_ice, 'the phase axis: ice'),
             (_jet, 'the Weber axis: free jets'),
             (_impact, 'the impulse axis: water entry'),
             (_jump, 'travelling or standing: the hydraulic jump'),
-            (_film, 'interference: thin films'))
+            (_film, 'interference: thin films'),
+            (_vortex, 'the frame axis: vortices'))
 
 
 # --- the harness's own guard -------------------------------------------------
@@ -241,6 +276,12 @@ def _bugs():
                    lambda: setattr(OC, 'roller_length',
                                    lambda a, b, c=5.5: saved['roller'](a, b, c)),
                    lambda: setattr(OC, 'roller_length', saved['roller']))
+    saved['core'] = VTX.rankine_depth
+    allgood &= run('vortex depth off by 1 %',
+                   lambda: setattr(VTX, 'rankine_depth',
+                                   lambda a_, g_, g=VTX.G:
+                                   saved['core'](a_, g_, g) * 1.01),
+                   lambda: setattr(VTX, 'rankine_depth', saved['core']))
     saved['n_oil'] = TF.N_OIL
     allgood &= run('film index 1.47 -> 1.48',
                    lambda: setattr(TF, 'N_OIL', 1.48),

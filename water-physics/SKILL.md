@@ -102,7 +102,7 @@ what the others test.
 |---|---|---|
 | `reference-impl/` (pool) | A 1.40 m domestic pool: the cleanest optics laboratory available — flat datum, known bed, known depth, `b_b ≈ 0`. Every doctrine statement carrying a number was derived or falsified here | `python3 validate.py` — **306 pass / 0 FAIL / 64 info**, ~2 min |
 | `reference-impl/` (coast) | An open coast: bathymetry and the morphodynamic loop, wave transform and depth-limited breaking, Sommerfeld diffraction, the wave-height population, the foam realisation, the camera and the renderer | `python3 validate_beach.py` — **612 pass / 0 FAIL / 0 ERROR / 36 open / 107 info**, ~28 min |
-| `reference-impl/` (phases) | The five axes: `ice.py` (phase), `jet.py` (Weber), `impact.py` (impulse), `openchannel.py` (travelling vs standing) and `thinfilm.py` (interference). Closed forms and named scalings, with every fitted constant exposed as an argument rather than baked in | `python3 validate_phases.py` — **30 pass / 0 FAIL / 1 info**, seconds; `--bugs` catches **6 of 6**. Its prose is guarded separately by `validate_chapter.py` — **100 numbers / 0 drifted** |
+| `reference-impl/` (axes) | The six axes: `ice.py` (phase), `jet.py` (Weber), `impact.py` (impulse), `openchannel.py` (travelling vs standing), `thinfilm.py` (interference) and `vortex.py` (frame). Closed forms and named scalings, with every fitted constant exposed as an argument rather than baked in — and where a source gives a form without its coefficients, **there are no defaults** | `python3 validate_phases.py` — **41 pass / 0 FAIL / 1 info**, seconds; `--bugs` catches **8 of 8**. Its prose is guarded separately by `validate_chapter.py` — **120 numbers / 0 drifted** |
 | `raster-impl/` | The real-time screen-space pass, its LUT and its wave surface. It exists because the offline path **structurally cannot** test approximation error — a code path that does not approximate has none | `python3 validate_raster.py` — **200 rows / 0 FAIL**, three tiers, ~2 min |
 
 **Every tolerance is justified from the estimator's own error, never from the disagreement it
@@ -113,12 +113,12 @@ that catches nothing is the failure this guards against.
 **And two invariants keep the *documentation* from drifting from the code**, because a chapter can
 go stale in ways no physics suite notices. `make_figures.py` imports the implementation rather than
 restating it, so **a figure cannot drift from the code that ships**; `validate_chapter.py` re-derives
-**100 numbers quoted in the chapter's prose** and holds each to half a unit in its own last printed
+**120 numbers quoted in the chapter's prose** and holds each to half a unit in its own last printed
 digit — so a stale sentence fails a run instead of surviving one. Both carry a `--bugs` harness of
 their own.
 
     python3 reference-impl/beach_render.py --scene         # the current scene, with reach integers
-    python3 reference-impl/validate_chapter.py             # prose against code, 100 numbers
+    python3 reference-impl/validate_chapter.py             # prose against code, 120 numbers
     python3 references/figures/make_figures.py --selftest  # prove the figure guard can fail
 
 ## What transfers from a pool to the sea, and the one thing that does not
@@ -138,10 +138,10 @@ their own.
 
 | Reference | Covers |
 |---|---|
-| `references/12-water-physics.md` | The chapter: the interface and its two Fresnel constants, radiance transport across it, the trapped series as a **bound**, what a submerged face sees, IOPs and where a body's colour comes from, sun glitter, caustics and the masking contract, aerated water, sea states, calm water, shoaling and refraction and breaking, diffraction, the wave-height population, the surf zone and the representation limits on it — and the **five axes** the rest of it is a point on: phase (ice), Weber (every free jet from a trickle to a fire hose), impulse (water entry and the Worthington jet), travelling-vs-standing (the hydraulic jump) and interference (thin films) |
+| `references/12-water-physics.md` | The chapter: the interface and its two Fresnel constants, radiance transport across it, the trapped series as a **bound**, what a submerged face sees, IOPs and where a body's colour comes from, sun glitter, caustics and the masking contract, aerated water, sea states, calm water, shoaling and refraction and breaking, diffraction, the wave-height population, the surf zone and the representation limits on it — and the **six axes** the rest of it is a point on: phase (ice), Weber (every free jet from a trickle to a fire hose), impulse (water entry and the Worthington jet), travelling-vs-standing (the hydraulic jump), interference (thin films) and frame (a drain vortex that stands, a shed vortex that travels) |
 | `references/12a-water-derivations.md` | The **mathematics and pseudocode** behind every result the chapter quotes in a line, with the suite row that guards each |
 | `references/12b-water-provenance.md` | **Sources and provenance**: every tier, every citation, every `?`, and the `P/T/D/F/N/?` convention restated so it reads alone. Read before citing anything out of this skill |
-| `references/12c-uncovered.md` | **The gap register, and what closed.** Six gaps were found by searching along **axes** rather than listing subjects; five are now closed with formulas, an implementation, a figure and suite rows — ice optics, the free jet's Weber axis, water entry, thin-film iridescence, the hydraulic jump. The sixth, **vortex structure**, is open *and unsourced*, and is recorded as an admitted gap rather than given an invented citation. Read it before concluding that something is absent by oversight |
+| `references/12c-uncovered.md` | **The gap register, and how each entry closed.** All six are now closed with formulas, an implementation, a figure and suite rows. Five were found by searching along **axes** rather than listing subjects; the sixth, vortex structure, had its axis from the start and was missing a **source** — it sat marked *open and unsourced* for several rounds rather than being written from memory. The file keeps that distinction because the two failures have different remedies. Read it before concluding that something is absent by oversight |
 | `references/figures/` | The figures, drawn by one script that imports the implementation read-only and writes no physics of its own — so a figure cannot drift from the code that ships |
 
 ## Cross-skill routing

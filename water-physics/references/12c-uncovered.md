@@ -1,4 +1,4 @@
-# What this skill does not cover, and where it was read
+# The gap register: what was missing, and how each entry closed
 
 **A register of known gaps and their closures.** Kept because a skill that knows its own boundary is
 more useful than one that is merely silent at it — and because the way these were found is worth
@@ -6,9 +6,16 @@ keeping: each came from asking *"what kind of water is this?"* along an **axis**
 listing subjects. Four of the six had the same shape, and it is the shape to look for next: **the
 subject was present and the unifying axis was missing.**
 
-**Status of this register.** Five of the six entries below are now **closed**: each has a chapter
-section with its formulas, a reference implementation, a figure, and suite rows. The sixth is
-**open and unsourced**, and is recorded as an admitted gap rather than given an invented citation.
+**Status of this register: all six entries are now closed.** Each has a chapter section with its
+formulas, a reference implementation, a figure, and suite rows. Five of them closed together, by
+searching along **axes**; the sixth took longer and closed differently, and that difference is the
+part of this file worth keeping — see [the pattern](#the-pattern-kept-because-it-predicted) at the
+end.
+
+⚠️ **An empty gap list is not completeness.** It is the boundary of what this skill has thought to
+*ask*. The register's value was never the six entries; it was the habit of writing down what is
+missing, and of refusing to fill an entry with an invented citation while the honest state was
+"open and unsourced".
 
 Tiers follow [`12b`](12b-water-provenance.md)'s convention. Sources were web-verified 2026-08; the
 skill's rule against citing what has not been read applies to this file as much as to any other.
@@ -20,10 +27,12 @@ skill's rule against citing what has not been read applies to this file as much 
 | 3 | Water entry | **closed** | [the impulse axis](12-water-physics.md#the-impulse-axis-four-events-and-the-bright-one-is-not-the-first) · `reference-impl/impact.py` |
 | 4 | Thin-film interference | **closed** | [the other phase axis](12-water-physics.md#the-other-phase-axis-thin-film-interference-and-this-chapters-own-trap-at-its-sharpest) · `reference-impl/thinfilm.py` |
 | 5 | The hydraulic jump | **closed** | [travelling or standing](12-water-physics.md#travelling-or-standing-the-hydraulic-jump) · `reference-impl/openchannel.py` |
-| 6 | Vortex structure | **open, unsourced** | nowhere — see below |
+| 6 | Vortex structure | **closed** | [the frame axis](12-water-physics.md#the-frame-axis-a-vortex-that-stands-and-a-vortex-that-travels) · `reference-impl/vortex.py` |
 
-All five closures are guarded by [`validate_phases.py`](../reference-impl/validate_phases.py):
-30 rows, 0 FAIL, and its `--bugs` harness proves 6 of 6 deliberate defects fire.
+All six closures are guarded by [`validate_phases.py`](../reference-impl/validate_phases.py):
+**41 rows, 0 FAIL**, and its `--bugs` harness proves **8 of 8** deliberate defects fire. The prose
+that quotes them is guarded separately by
+[`validate_chapter.py`](../reference-impl/validate_chapter.py): **120 numbers, 0 drifted**.
 
 ---
 
@@ -136,35 +145,76 @@ survives it**.
 
 ---
 
-## 6 · Vortex structure: eddies, whirlpools, drain vortices — **open, and unsourced**
+## 6 · Vortex structure: eddies, whirlpools, drain vortices — **closed**
 
-**Status: absent, and no verified anchor.** Zero mentions in either skill.
+**Was:** absent, **and unsourced** — the only entry here that carried no reference, because none
+had been found. It stayed that way rather than being given a plausible-looking citation, which is
+what [`12b`](12b-water-provenance.md)'s convention requires and what made this entry take a second
+pass to close.
 
-⚠️ **This entry has no reference because none was found and checked.** The other five carry one
-because one was verified; inventing a plausible citation to make the table symmetric is exactly
-what [`12b`](12b-water-provenance.md)'s convention forbids. The eddy behind a boulder, the shed
-vortex street, the bathtub vortex and the whirlpool are real, common, and currently outside
-everything here.
+**Now:** the frame axis, and the two kinds turn out not to be versions of one thing. A drain vortex
+**stands** — the water moves through it and the funnel does not — and is a surface **shape**; a
+shed vortex **travels** and is a **clock**.
 
-**What closing it would need**, stated so the next pass has a target rather than a topic: a
-circulation-carrying description that survives being sampled on a surface — the surface signature
-of a vertical vortex (the depression profile and the spiral of surface debris), the shedding
-frequency behind an obstacle as a Strouhal number, and the question this skill would have to answer
-before writing anything, which is whether a vortex belongs in the **flow field** the river sections
-already assume or in the **surface** they render. Until a source is opened, nothing above this
-paragraph is asserted.
+The standing half's result is that **the surface dent is an integral of the swirl** (the
+cyclostrophic balance `v²/r = g·dh/dr − (α/ρ)·dκ/dr`), so a renderer may not author the dip and the
+swirl as two controls. Integrating a Rankine profile gives `Δh = Ω²a²/g`, and **the halves are
+equal**: the free tail outside the core contributes exactly as much depth as the core does, so
+drawing only the visible funnel loses half the dent — and leaves the surface flat where the real
+one is still sloping. The core is also what makes the answer finite at all; depth goes as `a⁻²`, so
+a pure free vortex has no bottom.
+
+The travelling half's result is that **below `Re = 47` there is no frequency at all** — not a slow
+one. Above it `f = St·U/D` puts a boulder in a stream at 1 Hz and a reed at 10 Hz, which are
+animation-rate numbers falling out of two quantities a scene already has.
+
+| | |
+|---|---|
+| `P` | Andersen, A., Bohr, T., Stenum, B., Juul Rasmussen, J. & Lautrup, B. (2006), *"The bathtub vortex in a rotating container"*, **J. Fluid Mech. 556**, 121–146, doi:[10.1017/S0022112006009463](https://doi.org/10.1017/S0022112006009463). The balance used here is their eq. (5.7), the curvature their (5.6), the Ekman and Rossby numbers their table 1. Short-form companion: **Phys. Rev. Lett. 91**, 104502 (2003). |
+| `P` | Jiang, H. & Cheng, L. (2017), *"Strouhal–Reynolds number relationship for flow past a circular cylinder"*, **J. Fluid Mech. 832**, 170–188. The onset, the instability boundaries, the family of fitted forms and the `Re = 1000` anchor come from their text and their table 3. |
+
+⚠️ **Attributions, not readings.** Roshko (1954, 1955), Fey et al. (1998), Norberg (1994),
+Williamson (1996a) and Williamson & Brown (1998) are named *because Jiang & Cheng name them*;
+Annual Reviews and APS both refused the request for the originals. They are marked the way
+`jet.py` marks Ohnesorge (1936). One consequence is concrete: the two fitted `St`–`Re` forms are
+shipped **without coefficients**, because the paper that was read gives the form and says the
+constants are curve fits without quoting them. `vortex.py` carried recalled defaults for exactly
+one round before a suite row refused the shape they implied.
+
+⚠️ **Two limits that travel with the numbers.** The standing-vortex relations are for a **steady,
+axisymmetric** vortex and say nothing about the tip instability Andersen et al. report past a
+critical rotation rate; and every Strouhal number here is for a **circular cylinder**, which a
+boulder is not.
 
 ---
 
 ## The pattern, kept because it predicted
 
-Four of these six were found by the same question, and all four had the same shape: **the subject
+Five of these six were found by the same question, and all five had the same shape: **the subject
 was present and the axis was missing.** Snow was covered and ice was not, because the phase axis
 was never drawn. Waterfalls were derived and hoses were not, because the Weber axis was never
 drawn. Splashes were named and their sequence was not, because the impulse axis was never drawn.
-Rapids were absent because nothing separated structure that travels from structure that stands.
+Rapids and drain vortices were both absent because nothing separated structure that travels from
+structure that stands.
 
-So the next place to look is not another subject. It is another **axis**: phase, confinement scale,
-energy input, composition, and whether the structure travels or stands. That search closed five
-gaps in one pass, and the one it did not close is the one where an axis was found and a **source**
-was not — which is the honest place for a register to stop.
+So the first rule holds: **do not look for another subject — look for another axis.** Phase,
+confinement scale, energy input, composition, and whether the structure travels or stands.
+
+**But the sixth entry taught the more useful thing, and it is the reason this file was worth
+keeping open.** Its axis was identified at the same time as the other five. What was missing was
+not organisation but a **source** — and the entry sat here marked *open and unsourced* through
+several rounds rather than being written from memory or given a citation that looked right. It
+closed only when two papers were located, downloaded and read, and one of those readings
+immediately falsified something the implementation had already shipped.
+
+That is two different failure modes with two different remedies:
+
+| | the failure | what ends it |
+|---|---|---|
+| five of six | the subject was there and the **axis** was not | ask what axis is missing, not what subject |
+| the sixth | the axis was there and the **source** was not | keep the gap open and named until a source is actually read |
+
+The second is slower and it is the one a register exists for. A skill that quietly writes the
+physics it half-remembers has no way to tell those two states apart; one that records *"absent, and
+I could not find a source"* can come back to it — and can be shown, later, exactly what it got
+wrong in the meantime.

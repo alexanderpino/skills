@@ -39,8 +39,9 @@ or falsified here.
 | `impact.py` | The **impulse axis**: impact speed, the Froude and Weber groups, pinch-off time and depth, the Worthington jet, crown spreading, and the two-number cavity criterion. | **yes** |
 | `openchannel.py` | **Travelling versus standing**: the channel Froude number, critical depth, Bélanger's conjugate depth, specific energy, the cubic head loss, the five jump classes, roller length, and the aeration power handed to the foam sections as a source term. | **yes** |
 | `thinfilm.py` | **Interference**: Snell, *signed* Fresnel amplitudes, the round-trip phase, the Airy sum, fringe spacing, and the measured RGB aliasing error. | **yes** |
+| `vortex.py` | **The frame axis**: the Rankine profile, the cyclostrophic balance and the surface it integrates to, the capillary-length threshold for the curvature term, the Ekman layer, and — for the shed half — the Reynolds regimes, the shedding frequency (⚠️ NaN below onset) and the fitted `St` family, which ships **without coefficients** because the source read gives the form and not the constants. | **yes** |
 
-The last five are the skill's newest material and they share a property the
+The last six are the skill's newest material and they share a property the
 first five do not: **nothing in them knows about a scene.** Each is closed
 forms and named scalings along one axis, with every fitted constant exposed as
 an argument rather than baked in, so the suite can check a **scaling** and
