@@ -1879,13 +1879,123 @@ def fig_thin_film(out):
     return P.save(img, os.path.join(out, 'thin-film-aliasing.png'))
 
 
+def fig_vortex(out):
+    """The dent is an integral of the swirl; shedding is a clock with an onset."""
+    import vortex as VTX
+    img = P.canvas(1180, 760)
+
+    # --- left: the profile and the surface, BOTH NORMALISED -----------------
+    # ⚠️ THE TWO QUANTITIES CANNOT SHARE A LINEAR AXIS, and the first draft
+    # tried. The swirl peaks at 0.40 m/s and the dip is 16 mm, so drawn
+    # together in metres the surface curve is a flat line on zero and the
+    # panel's whole claim -- that half the depth lies outside the core -- is
+    # invisible. Normalising each by its own extreme puts the claim ON the
+    # axis: -h/dh passes through exactly 0.5 at r = a, and that crossing IS
+    # the result.
+    a, om = 0.02, 20.0
+    gam = VTX.circulation_from_core_rate(om, a)
+    r = _lin(1e-4, 0.12, 3000)
+    v = VTX.rankine_velocity(r, a, gam)
+    h = VTX.rankine_surface(r, a, gam)
+    depth = float(VTX.rankine_depth(a, gam))
+
+    ax = P.Axes(img, (92, 54, 556, 520), (0.0, 0.12), (0.0, 1.15),
+                xlabel='radius from the axis, m   (core radius a = 20 mm)',
+                ylabel='each quantity over its own extreme')
+    ax.frame(xticks=[0.0, 0.02, 0.04, 0.06, 0.08, 0.10, 0.12],
+             yticks=[0.0, 0.25, 0.5, 0.75, 1.0], xfmt='%.2f', yfmt='%.2f')
+    ax.fill_between(np.array([0.0, a]), np.array([0.0, 0.0]),
+                    np.array([1.15, 1.15]), FILL_A)
+    ax.text(a / 2, 1.07, 'core', MUTED, anchor='ms')
+    ax.text(a * 3.6, 1.07, 'free vortex,  v ~ 1/r', MUTED, anchor='ms')
+    ax.line(r, v / v.max(), BLU, width=3)
+    ax.line(r, -h / depth, RED, width=3, dash=(9, 5))
+    ax.vline(a, ACCENT, width=2, dash=(7, 5))
+    ax.hline(0.5, MUTED, width=1, dash=(2, 6))
+    ax.marker(a, 0.5, ACCENT, 5)
+    ax.text(a + 0.006, 0.55,
+            'half the %.1f mm dip is already spent at r = a' % (depth * 1e3),
+            ACCENT)
+    _legend(ax, [(BLU, None, 'swirl speed,  v / v_max'),
+                 (RED, (9, 5), 'depth below far field,  -h / dh')],
+            0.040, 0.28)
+
+    # --- right: WHERE things shed, as a plane rather than a curve -----------
+    # The first draft swept one 0.30 m obstacle in speed and then marked a
+    # reed, a boulder and a pier on the result -- three objects of DIFFERENT
+    # size, so none of them lay on the line and the panel read as broken.
+    # Size and speed are independent axes; the honest figure is the plane.
+    bx = P.Axes(img, (676, 54, 1140, 520), (-3.2, 0.6), (-3.0, 1.2),
+                xlabel='log10 obstacle size D, m',
+                ylabel='log10 flow speed U, m/s')
+    bx.frame(xticks=[-3, -2, -1, 0], yticks=[-3, -2, -1, 0, 1], yfmt='%.0f')
+
+    # ⚠️ EVERY LINE HERE IS SAMPLED, NOT DRAWN FROM TWO ENDPOINTS, and the
+    # reason is a real failure of the first draft. `Axes.line` clips samples
+    # outside the frame and then returns early if fewer than two survive -- so
+    # a two-point line with one endpoint off-axis is silently DROPPED, not
+    # trimmed. All four iso-frequency lines vanished that way and the clip
+    # counter reported exactly 5 dropped samples, one per line plus the onset.
+    # Dense sampling leaves plenty in range, and the label is placed at the
+    # last surviving point instead of at a guessed corner.
+    LX0, LX1, LY0, LY1 = -3.2, 0.6, -3.0, 1.2
+    lx = np.linspace(LX0, LX1, 400)
+
+    def _tag(x, y, lab, col, anchor='rs'):
+        """Label a line where it actually leaves the frame."""
+        inside = (y >= LY0) & (y <= LY1)
+        if not np.any(inside):
+            return
+        k = int(np.max(np.nonzero(inside)[0]))
+        bx.text(min(x[k], LX1 - 0.05), y[k] + 0.05, lab, col, anchor=anchor)
+
+    # Onset: Re = U D / nu = 47  =>  log U = log(47 nu) - log D. Slope -1.
+    onset = np.log10(VTX.RE_SHEDDING_ONSET * VTX.NU_W) - lx
+    bx.fill_between(lx, np.full_like(lx, LY0), np.clip(onset, LY0, LY1),
+                    (226, 206, 206))
+    bx.line(lx, onset, ACCENT, width=3)
+    # Placed clear of the 0.1 Hz iso-line, which runs along y = -3.0 near
+    # x = -2.7 and crossed this label in the previous draft.
+    bx.text(LX0 + 0.08, LY0 + 0.44, 'no shedding:', ACCENT)
+    bx.text(LX0 + 0.08, LY0 + 0.26, 'Re < 47, a steady eddy pair', ACCENT)
+
+    # Iso-frequency: f = St U / D  =>  log U = log(f/St) + log D. Slope +1.
+    for f_hz, lab in ((0.1, '0.1 Hz'), (1.0, '1 Hz'), (10.0, '10 Hz'),
+                      (100.0, '100 Hz')):
+        yy = np.log10(f_hz / 0.2) + lx
+        bx.line(lx, yy, MUTED, width=1, dash=(3, 5))
+        _tag(lx, yy, lab, MUTED)
+
+    # ⚠️ ANCHORS CHOSEN PER POINT, not uniformly. The pier at (1.2 m, 2 m/s)
+    # and the boulder at (0.30 m, 1.5 m/s) are close on a log plane, so two
+    # labels on the same side collide -- they did.
+    for lab, u_o, d_o, anc in (('reed', 0.4, 0.008, 'lm'),
+                               ('boulder', 1.5, 0.30, 'rm'),
+                               ('bridge pier', 2.0, 1.2, 'lm'),
+                               ('silt grain', 0.02, 0.002, 'rm')):
+        bx.marker(np.log10(d_o), np.log10(u_o), INK, 5)
+        dx = 0.10 if anc == 'lm' else -0.10
+        bx.text(np.log10(d_o) + dx, np.log10(u_o), lab, INK, anchor=anc)
+
+    P.caption(img, y=566, lines=[
+        'A VORTEX IS TWO DIFFERENT OBJECTS AND THE AXIS IS WHICH FRAME IT LIVES IN. A drain vortex STANDS -- the water moves through it and',
+        'the funnel does not -- while a shed vortex TRAVELS. Left: the surface dent is an INTEGRAL of the swirl (Andersen et al. 2006, their',
+        'eq. 5.7: v^2/r = g dh/dr), so authoring the dip and the swirl separately gives two things that can disagree. The core is what makes',
+        'the depth finite -- a pure 1/r vortex has no bottom -- and the free tail outside it contributes EXACTLY as much depth as the core,',
+        'which is the marked crossing at r = a. A renderer drawing only the visible funnel has half the dent, and a flat surface where the',
+        'real one still slopes. Right: size and speed are independent, so shedding is a PLANE, not a curve. Below Re = 47 there is no',
+        'frequency at all -- not a slow one -- and above it f = St U / D with St ~ 0.2 gives the dashed iso-frequency lines. A silt grain',
+        'sits in the dead zone; a reed beats ten times a second. Boundaries read in Jiang & Cheng (2017). From reference-impl/vortex.py.'])
+    return P.save(img, os.path.join(out, 'vortex-two-frames.png'))
+
+
 FIGURES = (fig_two_sides, fig_factorisation, fig_trapped_series,
            fig_runup, fig_sommerfeld, fig_glitter_path, fig_mss_cutoff,
            fig_float_binades, fig_depth_precision, fig_cube_sphere,
            fig_aureole_ceiling, fig_receiver_weights, fig_azimuth_fold,
            fig_kelvin_wake,
            fig_ice_vs_water, fig_jet_regimes, fig_water_entry,
-           fig_hydraulic_jump, fig_thin_film)
+           fig_hydraulic_jump, fig_thin_film, fig_vortex)
 
 # WHERE EACH FIGURE IS WRITTEN, and why this file did not split when the skill
 # did. Seven of these belong to chapters that live in `terrain-renderer` --
@@ -2122,6 +2232,12 @@ ACCEPTED_CLIPS = {
     'fig_kelvin_wake': 156,
     'fig_hydraulic_jump': 5,
     'fig_thin_film': 8,
+    # The onset line and the four iso-frequency lines are drawn across the
+    # whole x-range and genuinely leave the frame top and bottom -- that is
+    # what the dense sampling is FOR. Sampling them as two endpoints instead
+    # dropped every one of them silently (one surviving point is not a line),
+    # so this figure's large count is the fix for a defect, not a symptom.
+    'fig_vortex': 599,
 }
 
 
