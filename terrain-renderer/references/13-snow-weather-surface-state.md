@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: Snow, weather, and dynamic surface state
 description: "Snow, weather and dynamic surface state as a runtime state machine: its storage, its writers and its readers."
 tags: [terrain, snow, weather, surface-state]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T21:30:44Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Snow, weather, and dynamic surface state
 

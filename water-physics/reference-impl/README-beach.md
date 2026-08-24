@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Implementation Notes
 title: The beach at Aljezur — bathymetry, the wave transform, and the bar
 description: "The open coast at Aljezur: bathymetry and the morphodynamic loop, the wave transform, diffraction, foam as a realisation, and the camera."
 tags: [water, coast, waves, foam, suite]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # The beach at Aljezur — bathymetry, the wave transform, and the bar
 

@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: "Planetary Rendering & Numerical Precision"
 description: "Planetary rendering and numerical precision: the float32 binade staircase, reversed-Z, camera-relative transforms and cube-sphere mappings."
 tags: [terrain, planetary, precision, reversed-z, float32]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Planetary Rendering & Numerical Precision
 

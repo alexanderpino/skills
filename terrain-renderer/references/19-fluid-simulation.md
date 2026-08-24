@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: Real-Time Fluid Simulation
 description: "Real-time fluid simulation on terrain: shallow-water and pipe models, their stability limits, and what each one cannot represent."
 tags: [terrain, fluid, simulation, shallow-water]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Real-Time Fluid Simulation
 

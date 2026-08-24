@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: Roads, decals, runtime modification, and the physics handoff
 description: Roads, decals, runtime modification and the physics handoff, including the replayable stamp list that keeps them cache-safe.
 tags: [terrain, roads, decals, physics]
 status: stable
 generated: { by: process:claude-code, at: 2026-07-30T09:56:09+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Roads, decals, runtime modification, and the physics handoff
 

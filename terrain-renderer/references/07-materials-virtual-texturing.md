@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: Terrain materials, splatting, and virtual texturing
 description: Terrain materials, splatting and virtual texturing, including the cache-invalidation traps that runtime state walks into.
 tags: [terrain, materials, splatting, virtual-texturing]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T18:38:25Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Terrain materials, splatting, and virtual texturing
 

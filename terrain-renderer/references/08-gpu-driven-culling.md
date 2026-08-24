@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: "GPU-driven culling & submission"
 description: "GPU-driven culling and submission: the hierarchical depth pyramid, its mip selection rule, and indirect draw construction."
 tags: [terrain, culling, gpu-driven, hiz]
 status: stable
 generated: { by: process:claude-code, at: 2026-07-30T09:56:09+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # GPU-driven culling & submission
 

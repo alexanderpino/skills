@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Implementation Notes
 title: Pool reference implementation
 description: "The pool: a 1.40 m domestic basin used as the cleanest available optics laboratory, its modules, and what its suite establishes."
 tags: [water, pool, optics, suite]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-24T09:31:02Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Pool reference implementation
 

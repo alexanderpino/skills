@@ -1,4 +1,5 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: Water Physics
 description: "The mechanism side of water: the interface and its two Fresnel constants, where a body colour comes from, shoaling and breaking, foam as a covering measure, and the six axes the rest of the chapter is a point on."
@@ -8,14 +9,15 @@ generated: { by: process:claude-code, at: 2026-08-24T09:31:02Z }
 verified: { by: process:validate_chapter.py, at: 2026-08-24T11:51:35Z }
 sources:
   - id: derivations
-    resource: references/12a-water-derivations.md
+    resource: /references/12a-water-derivations.md
     title: The algebra behind each number
   - id: provenance
-    resource: references/12b-water-provenance.md
+    resource: /references/12b-water-provenance.md
     title: Every source and tier
   - id: impl
-    resource: reference-impl/
+    resource: /reference-impl/
     title: The implementations the numbers were measured on
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Water Physics
 

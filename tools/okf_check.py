@@ -10,8 +10,10 @@ report. It is deliberately a SEPARATE file from `okf_apply.py`: a generator
 that also grades its own output cannot catch a document edited by hand
 afterwards, and hand edits are the normal case.
 
-THE RULES, from `okf/SPEC.md` section 11 (Google Cloud's knowledge-catalog
-repository, read 2026-08-24). A bundle is conformant when:
+THE RULES, from SPEC.md section 11 -- github.com/GoogleCloudPlatform/
+open-knowledge-format, read 2026-08-24. (The spec was first read at the older
+`knowledge-catalog/okf/SPEC.md`; the two are byte-identical, but that path is
+no longer the canonical home.) A bundle is conformant when:
 
   1. every non-reserved `.md` file has a parseable YAML frontmatter block
   2. every such block carries a non-empty `type`
@@ -115,6 +117,29 @@ def check(trees, quiet=False):
         for path in walk(tree):
             rel = os.path.relpath(path, ROOT)
             if os.path.basename(path) in RESERVED:
+                # SPEC section 8: index files carry NO frontmatter, with one
+                # exception -- a bundle-root `index.md` MAY carry `okf_version`
+                # (section 12), and that is the only place a bundle declares
+                # which revision it targets. Both halves are checked, because
+                # an undeclared version is a silent guess for every consumer.
+                blk, ok = frontmatter(path)
+                at_root = os.path.dirname(path) == os.path.join(ROOT, tree)
+                if ok and not at_root:
+                    problems.append((rel, 'a non-root index.md must carry no '
+                                          'frontmatter (SPEC section 8)'))
+                elif ok and at_root:
+                    keys = [k for k in top_keys(blk) if k != 'okf_version']
+                    if keys:
+                        problems.append(
+                            (rel, 'a bundle-root index.md may carry only '
+                                  'okf_version, found %s' % ', '.join(keys)))
+                    v = field(blk, 'okf_version')
+                    if v and v.strip('"\'') != '0.2':
+                        problems.append(
+                            (rel, 'declares okf_version %s, not 0.2' % v))
+                elif at_root:
+                    problems.append((rel, 'bundle root index.md declares no '
+                                          'okf_version (SPEC section 12)'))
                 continue
             n += 1
             block, ok = frontmatter(path)
@@ -137,6 +162,23 @@ def check(trees, quiet=False):
                     'draft', 'stable', 'deprecated'):
                 problems.append((rel, 'status %r is not draft/stable/deprecated'
                                  % st))
+            # ⚠️ PATH-VALUED FIELDS ARE RESOLVED, and nothing resolved them for
+            # a round. The markdown link checker only ever looked at BODY
+            # links, so four of eight `sources[].resource` paths pointed at
+            # files that do not exist -- written as if bundle-relative but
+            # without the leading slash SPEC section 6.2 requires for that
+            # form, so they were read relative to the document instead.
+            # A provenance pointer that does not resolve is worse than none.
+            for res in re.findall(r'^\s+resource:[ \t]*(\S+)\s*$', block,
+                                  re.M):
+                if res.startswith(('http://', 'https://')):
+                    continue
+                base = os.path.join(ROOT, tree) if res.startswith('/') \
+                    else os.path.dirname(path)
+                tgt = os.path.normpath(os.path.join(base, res.lstrip('/')))
+                if not os.path.exists(tgt):
+                    problems.append(
+                        (rel, 'sources resource %r does not resolve' % res))
     if not quiet:
         print('OKF v0.2 conformance: %s' % ', '.join(trees))
         print('  %d concept documents' % n)
@@ -178,6 +220,19 @@ def bugs(trees):
         ('verifier that does not exist',
          src.replace('---\n', '---\nverified: { by: process:no_such.py, '
                      'at: 2026-01-01T00:00:00Z }\n', 1)),
+        # The path check, as the real defect it was written for: a
+        # bundle-relative pointer missing its leading slash, which is how four
+        # of these shipped.
+        ('sources resource that does not resolve',
+         src.replace('---\n', '---\nsources:\n  - id: broken\n'
+                     '    resource: references/no-such-file.md\n', 1)),
+    ]
+    index_cases = [
+        ('bundle root index without okf_version',
+         os.path.join(ROOT, trees[0], 'index.md'), '# no version here\n'),
+        ('non-root index carrying frontmatter',
+         os.path.join(ROOT, trees[0], 'references', 'index.md'),
+         '---\ntype: Index\n---\n# should not have frontmatter\n'),
     ]
     good = True
     print('proving the OKF checks can fail (on %s):'
@@ -189,6 +244,19 @@ def bugs(trees):
                               else 'MISSED  <-- the check is blind here'))
         good &= fired
     shutil.move(backup, target)
+    # The two index rules need their own files, not a perturbed concept.
+    for name, path, body in index_cases:
+        had = os.path.exists(path)
+        prev = open(path, encoding='utf-8').read() if had else None
+        open(path, 'w', encoding='utf-8').write(body)
+        fired = bool(check(trees, quiet=True))
+        print('  %-32s %s' % (name, 'caught' if fired
+                              else 'MISSED  <-- the check is blind here'))
+        good &= fired
+        if had:
+            open(path, 'w', encoding='utf-8').write(prev)
+        else:
+            os.remove(path)
     ok_after = not check(trees, quiet=True)
     print('  %-32s %s' % ('restored, clean again',
                           'yes' if ok_after else 'NO  <-- restore failed'))

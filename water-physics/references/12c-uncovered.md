@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Gap Register
 title: "The gap register: what was missing, and how each entry closed"
 description: "The six gaps this skill knew it had and how each closed: five by finding a missing axis, one by finding a missing source."
 tags: [water, gaps, method]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-24T09:31:02Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # The gap register: what was missing, and how each entry closed
 

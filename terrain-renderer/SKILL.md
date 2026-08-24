@@ -1,5 +1,15 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Skill
+title: Terrain Renderer
+tags: [terrain, rendering, lod, streaming]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T18:35:25Z }
+sources:
+  - id: index
+    resource: /references/00-index.md
+    title: The technique index
+# --- end okf v0.2 ----------------------------------------------------
 name: terrain-renderer
 description: >-
   Principal terrain-rendering authority for real-time worlds, across every
@@ -17,13 +27,6 @@ description: >-
   planet renderer). Not for terrain generation (terrain-architect), BRDF math
   (physically-based-rendering), or the measured physics of water - optics, IOPs, glitter,
   caustics, foam, breaking, diffraction - which is water-physics.
-tags: [terrain, rendering, lod, streaming]
-status: stable
-generated: { by: process:claude-code, at: 2026-08-23T18:35:25Z }
-sources:
-  - id: index
-    resource: references/00-index.md
-    title: The technique index
 ---
 
 # Terrain Renderer

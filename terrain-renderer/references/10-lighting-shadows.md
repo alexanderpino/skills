@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: Lighting, shadows, and terrain integration
 description: "Lighting, shadows and terrain integration: cascade snapping, the sky illuminant, receiver weights and the azimuth fold about solar noon."
 tags: [terrain, lighting, shadows, cascades, sky]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Lighting, shadows, and terrain integration
 

@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: "Smooth Voxel Terrain: Isosurface Extraction & LOD"
 description: "Smooth voxel terrain: isosurface extraction, the marching-cubes case count and its ambiguous faces, dual methods, and LOD across chunk seams."
 tags: [terrain, voxel, isosurface, marching-cubes, dual-contouring]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T18:35:25Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Smooth Voxel Terrain: Isosurface Extraction & LOD
 

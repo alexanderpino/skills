@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: "Tool Viewports: Interactive Preview Rendering for Terrain Authoring"
 description: "Tool viewports: interactive preview rendering for terrain authoring, and why the editor path is not the runtime path."
 tags: [terrain, tools, viewport, authoring]
 status: stable
 generated: { by: process:claude-code, at: 2026-07-30T05:01:00Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Tool Viewports: Interactive Preview Rendering for Terrain Authoring
 

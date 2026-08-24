@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: "Engine-Native Terrain: Unreal Landscape & Friends"
 description: "Engine-native terrain systems: Unreal Landscape, Nanite Landscape and Mesh Terrain, and what each one fixes the shape of."
 tags: [terrain, unreal, landscape, engine]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T18:38:25Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Engine-Native Terrain: Unreal Landscape & Friends
 

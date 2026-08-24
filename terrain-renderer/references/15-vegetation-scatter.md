@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: "Vegetation & scatter rendering"
 description: "Vegetation and scatter rendering: instancing, impostors, density fields and the LOD boundary where a plant stops being geometry."
 tags: [terrain, vegetation, scatter, instancing]
 status: stable
 generated: { by: process:claude-code, at: 2026-07-30T09:56:09+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Vegetation & scatter rendering
 

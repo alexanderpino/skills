@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Index
 title: Technique Index
 description: "The technique index: every mechanism in this skill, its tier, and the chapter that owns it."
 tags: [terrain, index, routing]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T18:38:25Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Technique Index
 

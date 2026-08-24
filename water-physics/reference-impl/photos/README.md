@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Evidence
 title: Generic reference set — nine openly-licensed photographs, and what each one is evidence for
 description: Nine openly-licensed reference photographs and the full licence trail for each.
 tags: [water, photographs, licences]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T15:52:23Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Generic reference set — nine openly-licensed photographs, and what each one is evidence for
 

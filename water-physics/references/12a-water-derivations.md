@@ -1,4 +1,5 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: Water Rendering — Derivations
 description: The derivations behind every number the water chapter quotes in a line, each naming the test that guards it or stating that none does.
@@ -7,8 +8,9 @@ status: stable
 generated: { by: process:claude-code, at: 2026-08-24T09:31:02Z }
 sources:
   - id: impl
-    resource: reference-impl/
+    resource: /reference-impl/
     title: The executable form of the same material
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Water Rendering — Derivations
 

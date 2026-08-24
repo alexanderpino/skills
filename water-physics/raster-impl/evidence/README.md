@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Evidence
 title: Generated frames
 description: Frames written by the screen-space raster pass.
 tags: [water, frames]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Generated frames
 

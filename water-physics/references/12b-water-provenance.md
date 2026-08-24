@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Provenance
 title: "Water Rendering — Sources & Provenance"
 description: Every source, tier and unverified mark behind the water chapters, restated so it reads alone. Read before citing anything out of this skill.
 tags: [water, sources, citations, tiers]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Water Rendering — Sources & Provenance
 

@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: "Heightfield Ray Marching: from Voxel Space to Relief Mapping and Heightfield Ray Tracing"
 description: Heightfield ray marching from Voxel Space to relief mapping, and the step-count arithmetic that decides whether it is affordable.
 tags: [terrain, raymarching, relief-mapping]
 status: stable
 generated: { by: process:claude-code, at: 2026-07-30T09:56:09+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Heightfield Ray Marching: from Voxel Space to Relief Mapping and Heightfield Ray Tracing
 

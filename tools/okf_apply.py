@@ -6,10 +6,17 @@
 
 WHAT OKF IS. The Open Knowledge Format, version 0.2 -- a vendor-neutral
 convention for knowledge as plain markdown with YAML frontmatter, published by
-Google Cloud at github.com/GoogleCloudPlatform/knowledge-catalog (`okf/SPEC.md`,
-read 2026-08-24). Only `type` is required (SPEC section 11); `title`,
+Google Cloud. Only `type` is required (SPEC section 11); `title`,
 `description`, `resource` and `tags` are recommended; and v0.2 adds the
 optional provenance / trust / lifecycle families this file uses.
+
+⚠️ THE CANONICAL HOME MOVED, and this file cited the old one for a round.
+The spec now lives at github.com/GoogleCloudPlatform/open-knowledge-format,
+`SPEC.md` at the repository root -- not `knowledge-catalog/okf/SPEC.md`, which
+still resolves today and is where this was first read. The two are
+byte-identical as of 2026-08-24, so nothing read from the old path was wrong;
+the citation was simply pointing at a location that is no longer canonical,
+which is the kind of rot a reader cannot detect from the text.
 
 WHY IT FITS HERE WITH ALMOST NOTHING NEW. This project already had the SUBSTANCE
 of everything v0.2 added and only lacked the frontmatter to say it:
@@ -57,19 +64,19 @@ DOCS = {
  'water-physics/SKILL.md': dict(
    type='Skill', tags=['water', 'rendering', 'physics', 'optics'],
    description='Entry point to the water-physics skill: what it warrants, which of its four suites arbitrates each claim, and where every number is derived.',
-   sources=[('chapter', 'references/12-water-physics.md', 'The water chapter'),
-            ('provenance', 'references/12b-water-provenance.md', 'Sources and tiers')]),
+   sources=[('chapter', '/references/12-water-physics.md', 'The water chapter'),
+            ('provenance', '/references/12b-water-provenance.md', 'Sources and tiers')]),
  'water-physics/references/12-water-physics.md': dict(
    type='Reference', tags=['water', 'optics', 'waves', 'foam', 'caustics'],
    description='The mechanism side of water: the interface and its two Fresnel constants, where a body colour comes from, shoaling and breaking, foam as a covering measure, and the six axes the rest of the chapter is a point on.',
    verified=[('process:validate_chapter.py', VERIFIED_AT)],
-   sources=[('derivations', 'references/12a-water-derivations.md', 'The algebra behind each number'),
-            ('provenance', 'references/12b-water-provenance.md', 'Every source and tier'),
-            ('impl', 'reference-impl/', 'The implementations the numbers were measured on')]),
+   sources=[('derivations', '/references/12a-water-derivations.md', 'The algebra behind each number'),
+            ('provenance', '/references/12b-water-provenance.md', 'Every source and tier'),
+            ('impl', '/reference-impl/', 'The implementations the numbers were measured on')]),
  'water-physics/references/12a-water-derivations.md': dict(
    type='Reference', tags=['water', 'derivations', 'pseudocode'],
    description='The derivations behind every number the water chapter quotes in a line, each naming the test that guards it or stating that none does.',
-   sources=[('impl', 'reference-impl/', 'The executable form of the same material')]),
+   sources=[('impl', '/reference-impl/', 'The executable form of the same material')]),
  'water-physics/references/12b-water-provenance.md': dict(
    type='Provenance', tags=['water', 'sources', 'citations', 'tiers'],
    description='Every source, tier and unverified mark behind the water chapters, restated so it reads alone. Read before citing anything out of this skill.'),
@@ -98,7 +105,7 @@ DOCS = {
  'terrain-renderer/SKILL.md': dict(
    type='Skill', tags=['terrain', 'rendering', 'lod', 'streaming'],
    description='Entry point to the terrain-renderer skill: the paradigms, the routing table from a symptom on screen to a mechanism, and where each claim is warranted.',
-   sources=[('index', 'references/00-index.md', 'The technique index')]),
+   sources=[('index', '/references/00-index.md', 'The technique index')]),
  'terrain-renderer/references/00-index.md': dict(
    type='Index', tags=['terrain', 'index', 'routing'],
    description='The technique index: every mechanism in this skill, its tier, and the chapter that owns it.'),
@@ -163,23 +170,111 @@ DOCS = {
 }
 
 
+# ⚠️ FROZEN, NOT LOOKED UP, AND THE LOOKUP WAS WRONG. `generated.at` is defined
+# by SPEC section 5.2 as "the content's last meaningful change". An earlier
+# version read it live from `git log -1 -- <path>`, which means the moment this
+# header was added BECOMES the answer -- and every future header-only edit
+# moves it again, so a purely cosmetic commit would keep claiming the content
+# had just changed. The times below were taken once, from the history as it
+# stood immediately before the header commit, and they are literals now: a
+# content change should move them, and a header change must not.
+CONTENT_TIME = {
+    'terrain-renderer/SKILL.md':
+        '2026-08-23T18:35:25Z',
+    'terrain-renderer/references/00-index.md':
+        '2026-08-23T18:38:25Z',
+    'terrain-renderer/references/01-heightfield-lod.md':
+        '2026-07-30T09:56:09+02:00',
+    'terrain-renderer/references/02-cluster-virtualized-geometry.md':
+        '2026-07-30T09:56:09+02:00',
+    'terrain-renderer/references/03-engine-terrain-unreal.md':
+        '2026-08-23T18:38:25Z',
+    'terrain-renderer/references/04-voxel-blocky.md':
+        '2026-07-30T04:53:08Z',
+    'terrain-renderer/references/05-voxel-smooth-isosurface.md':
+        '2026-08-23T18:35:25Z',
+    'terrain-renderer/references/06-tiled-streaming.md':
+        '2026-08-23T18:38:25Z',
+    'terrain-renderer/references/07-materials-virtual-texturing.md':
+        '2026-08-23T18:38:25Z',
+    'terrain-renderer/references/08-gpu-driven-culling.md':
+        '2026-07-30T09:56:09+02:00',
+    'terrain-renderer/references/09-planetary-precision.md':
+        '2026-08-23T08:47:50Z',
+    'terrain-renderer/references/10-lighting-shadows.md':
+        '2026-08-23T08:47:50Z',
+    'terrain-renderer/references/11-verification-failures.md':
+        '2026-08-23T18:35:25Z',
+    'terrain-renderer/references/12-water-rendering.md':
+        '2026-08-23T20:31:24Z',
+    'terrain-renderer/references/13-snow-weather-surface-state.md':
+        '2026-08-23T21:30:44Z',
+    'terrain-renderer/references/14-auxiliary-maps-runtime.md':
+        '2026-08-04T19:10:29Z',
+    'terrain-renderer/references/15-vegetation-scatter.md':
+        '2026-07-30T09:56:09+02:00',
+    'terrain-renderer/references/16-tool-viewports.md':
+        '2026-07-30T05:01:00Z',
+    'terrain-renderer/references/17-roads-decals-physics.md':
+        '2026-07-30T09:56:09+02:00',
+    'terrain-renderer/references/18-heightfield-raymarching.md':
+        '2026-07-30T09:56:09+02:00',
+    'terrain-renderer/references/19-fluid-simulation.md':
+        '2026-08-23T08:47:50Z',
+    'water-physics/SKILL.md':
+        '2026-08-24T09:31:02Z',
+    'water-physics/raster-impl/README.md':
+        '2026-08-23T08:47:50Z',
+    'water-physics/raster-impl/evidence/README.md':
+        '2026-08-23T08:47:50Z',
+    'water-physics/reference-impl/README-beach.md':
+        '2026-08-23T08:47:50Z',
+    'water-physics/reference-impl/README.md':
+        '2026-08-24T09:31:02Z',
+    'water-physics/reference-impl/evidence/README.md':
+        '2026-08-23T08:47:50Z',
+    'water-physics/reference-impl/photos/README.md':
+        '2026-08-23T15:52:23Z',
+    'water-physics/references/12-water-physics.md':
+        '2026-08-24T09:31:02Z',
+    'water-physics/references/12a-water-derivations.md':
+        '2026-08-24T09:31:02Z',
+    'water-physics/references/12b-water-provenance.md':
+        '2026-08-23T08:47:50Z',
+    'water-physics/references/12c-uncovered.md':
+        '2026-08-24T09:31:02Z',
+}
+
+
 def git_time(path):
-    """Last commit time of a file, ISO 8601. Never the moment this script ran."""
-    out = subprocess.run(['git', 'log', '-1', '--format=%cI', '--', path],
-                         capture_output=True, text=True, cwd=ROOT).stdout.strip()
-    if not out:
-        raise SystemExit('%s is untracked; refusing to stamp a made-up time' % path)
-    # git gives +02:00 offsets; OKF wants ISO 8601, which that is. Normalise
-    # to UTC 'Z' form only when the offset is already zero.
-    return out.replace('+00:00', 'Z')
+    """The frozen content time for a document."""
+    t = CONTENT_TIME.get(path)
+    if not t:
+        raise SystemExit('%s has no frozen content time; add one deliberately'
+                         % path)
+    return t
 
 
 def title_of(path):
-    """The document's own H1 -- never invented, never derived from the filename."""
-    for line in open(path, encoding='utf-8'):
+    """The document's own H1, read from the BODY.
+
+    ⚠️ THE FRONTMATTER IS SKIPPED, and skipping it is the whole point. This
+    scanned the raw file for the first line starting with "# " -- and a YAML
+    comment starts with "# " too, so on the second run it read this script's
+    own marker line and wrote
+    `title: --- okf v0.2, written by tools/okf_apply.py ---`
+    into every document. A helper that reads plausibly and returns garbage is
+    worse than one that raises.
+    """
+    src = open(path, encoding='utf-8').read()
+    if src.startswith('---\n'):
+        end = src.find('\n---\n', 3)
+        if end >= 0:
+            src = src[end + 5:]
+    for line in src.split('\n'):
         if line.startswith('# '):
             return line[2:].strip()
-    raise SystemExit('%s has no H1 to take a title from' % path)
+    raise SystemExit('%s has no H1 in its body to take a title from' % path)
 
 
 def yaml_quote(s):
@@ -188,43 +283,140 @@ def yaml_quote(s):
     return s
 
 
+BEGIN = '# --- okf v0.2, written by tools/okf_apply.py -----------------------'
+END = '# --- end okf v0.2 ----------------------------------------------------'
+
+
 def build(relpath, spec):
+    """Return (path, new_text, old_text) for one document.
+
+    ⚠️ IDEMPOTENT, AND THE FIRST VERSION WAS NOT. It re-emitted whatever
+    frontmatter it found and then appended its own keys, so a second run
+    produced `type:` twice and a third produced it three times. The script is
+    committed and reads as safe to re-run, which is the worst combination: a
+    tool that corrupts what it wrote the first time, silently, on the exact
+    operation a maintainer would reach for. The generated keys now live
+    between two marker comments and are REPLACED, not appended; anything
+    outside the markers -- the loader's own `name` and `description` on a
+    SKILL.md -- is preserved untouched.
+    """
     full = os.path.join(ROOT, relpath)
     src = open(full, encoding='utf-8').read()
-    existing = ''
+    foreign, body = '', src
     if src.startswith('---\n'):
         end = src.find('\n---\n', 3)
         if end < 0:
             raise SystemExit('%s has an unterminated frontmatter block' % relpath)
-        existing = src[4:end + 1]
-        body = src[end + 5:]
-    else:
-        body = src
+        block, body = src[4:end + 1], src[end + 5:]
+        # Drop a previously generated region, keep everything else verbatim.
+        if BEGIN in block and END in block:
+            block = block[:block.index(BEGIN)] + block[block.index(END) + len(END) + 1:]
+        foreign = block.strip('\n')
 
-    lines = ['---', 'type: %s' % yaml_quote(spec['type'])]
-    # ⚠️ EXISTING KEYS ARE KEPT, NOT REPLACED. The SKILL.md files carry the
-    # loader's own `name` and `description`; OKF says consumers must tolerate
-    # unknown keys, and the converse matters more here -- dropping `name` would
-    # break the skill. Existing keys are re-emitted verbatim after `type`.
-    if existing:
-        lines.append(existing.rstrip('\n'))
-    else:
-        lines.append('title: %s' % yaml_quote(title_of(full)))
-        lines.append('description: %s' % yaml_quote(spec['description']))
+    gen = [BEGIN, 'type: %s' % yaml_quote(spec['type'])]
+    # `title` and `description` are only written when the document does not
+    # already carry them: a SKILL.md's `description` belongs to the loader.
+    if 'title:' not in foreign:
+        gen.append('title: %s' % yaml_quote(title_of(full)))
+    if 'description:' not in foreign:
+        gen.append('description: %s' % yaml_quote(spec['description']))
     if spec.get('tags'):
-        lines.append('tags: [%s]' % ', '.join(spec['tags']))
-    lines.append('status: stable')
-    lines.append('generated: { by: %s, at: %s }' % (AGENT, git_time(relpath)))
+        gen.append('tags: [%s]' % ', '.join(spec['tags']))
+    gen.append('status: stable')
+    gen.append('generated: { by: %s, at: %s }' % (AGENT, git_time(relpath)))
     for by, at in spec.get('verified', []):
-        lines.append('verified: { by: %s, at: %s }' % (by, at))
+        gen.append('verified: { by: %s, at: %s }' % (by, at))
     if spec.get('sources'):
-        lines.append('sources:')
+        gen.append('sources:')
         for sid, res, title in spec['sources']:
-            lines.append('  - id: %s' % sid)
-            lines.append('    resource: %s' % res)
-            lines.append('    title: %s' % yaml_quote(title))
-    lines.append('---')
+            gen.append('  - id: %s' % sid)
+            gen.append('    resource: %s' % res)
+            gen.append('    title: %s' % yaml_quote(title))
+    gen.append(END)
+
+    lines = ['---'] + gen + ([foreign] if foreign else []) + ['---']
     return full, '\n'.join(lines) + '\n' + body, src
+
+
+def write_index(bundle):
+    """Write the bundle-root `index.md` that SPEC sections 8 and 12 describe.
+
+    Two jobs. First, progressive disclosure: a reader or agent sees what is in
+    the bundle before opening anything. Second, and the reason this exists at
+    all, it is THE ONLY PLACE A BUNDLE MAY DECLARE ITS OWN OKF VERSION
+    (section 12) -- `okf_version` in a bundle-root index is the sole exception
+    to "index files carry no frontmatter". Without it a consumer has to guess
+    which revision these documents target, and guessing is the thing the whole
+    format exists to remove.
+
+    Descriptions are read back out of each concept's own frontmatter rather
+    than restated, so this file cannot disagree with the documents it lists.
+    """
+    root = os.path.join(ROOT, bundle)
+    groups = {}
+    for rel in sorted(DOCS):
+        if not rel.startswith(bundle + '/'):
+            continue
+        inner = rel[len(bundle) + 1:]
+        if inner == 'index.md':
+            continue
+        block, _ = read_frontmatter(os.path.join(ROOT, rel))
+        desc = scalar(block, 'description') or ''
+        title = scalar(block, 'title') or inner
+        group = inner.split('/')[0] if '/' in inner else 'Entry point'
+        groups.setdefault(group, []).append((title, inner, desc))
+    out = ['---', 'okf_version: "0.2"', '---',
+           '# %s' % bundle,
+           '',
+           'An OKF v0.2 knowledge bundle. Every document below carries its own',
+           '`type`, `status` and provenance in frontmatter; the trust tier a',
+           'consumer derives from `verified` is deliberately **unverified** on',
+           'all but the documents a checker actually re-derives.',
+           '']
+    for g in sorted(groups):
+        out.append('# %s' % g)
+        out.append('')
+        for title, inner, desc in sorted(groups[g]):
+            out.append('* [%s](%s)%s' % (title, inner, ' - ' + desc if desc else ''))
+        out.append('')
+    path = os.path.join(root, 'index.md')
+    open(path, 'w', encoding='utf-8').write('\n'.join(out).rstrip('\n') + '\n')
+    return path
+
+
+def read_frontmatter(path):
+    src = open(path, encoding='utf-8').read()
+    if not src.startswith('---\n'):
+        return '', src
+    end = src.find('\n---\n', 3)
+    return (src[4:end + 1], src[end + 5:]) if end >= 0 else ('', src)
+
+
+def scalar(block, name):
+    """A top-level scalar, including YAML block scalars.
+
+    ⚠️ BLOCK SCALARS ARE FOLDED HERE, and ignoring them produced visible
+    nonsense. A SKILL.md writes its description as `description: >-` followed
+    by indented continuation lines; a naive same-line read returns the literal
+    ">-" and the generated index listed the skill as
+    `[Water Physics](SKILL.md) - >-`. The marker is not the value.
+    """
+    import re as _re
+    m = _re.search(r'^%s:[ \t]*(.*)$' % _re.escape(name), block, _re.M)
+    if not m:
+        return None
+    v = m.group(1).strip()
+    if v[:1] in ('>', '|'):
+        fold = v[0] == '>'
+        lines = block[m.end():].split('\n')[1:]
+        out = []
+        for line in lines:
+            if line.strip() and not line[:1].isspace():
+                break                      # dedented: the next top-level key
+            out.append(line.strip())
+        text = (' ' if fold else '\n').join(x for x in out if x)
+        return text.strip()
+    return v[1:-1] if len(v) > 1 and v[0] == v[-1] == '"' else v
 
 
 def main(argv):
@@ -243,6 +435,9 @@ def main(argv):
             open(full, 'w', encoding='utf-8').write(new)
     print('%d of %d documents %s' % (changed, len(DOCS),
                                      'would change' if dry else 'written'))
+    if not dry:
+        for bundle in sorted({r.split('/')[0] for r in DOCS}):
+            print('  index: %s' % os.path.relpath(write_index(bundle), ROOT))
     return 0
 
 

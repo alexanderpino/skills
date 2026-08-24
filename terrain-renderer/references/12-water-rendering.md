@@ -1,4 +1,5 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: Water Rendering
 description: "The render-side architecture of water: surface LOD, pass ordering, engine-native systems and shoreline integration. Routes to water-physics for every number it quotes."
@@ -9,6 +10,7 @@ sources:
   - id: physics
     resource: ../../water-physics/references/12-water-physics.md
     title: The physics this chapter routes to
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Water Rendering
 

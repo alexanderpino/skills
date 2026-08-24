@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: "Verification, profiling & the failure catalogue"
 description: "Verification, profiling and the failure catalogue: how each mechanism in this skill is checked, and the symptoms that say it is not."
 tags: [terrain, verification, profiling, failures]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T18:35:25Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Verification, profiling & the failure catalogue
 

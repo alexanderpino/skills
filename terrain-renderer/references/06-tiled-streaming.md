@@ -1,10 +1,12 @@
 ---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
 type: Reference
 title: "Tiled Worlds & Streaming"
 description: "Tiled worlds and streaming: residency budgets, prefetch radius, and the arithmetic that decides whether a tile arrives in time."
 tags: [terrain, streaming, tiles, budget]
 status: stable
 generated: { by: process:claude-code, at: 2026-08-23T18:38:25Z }
+# --- end okf v0.2 ----------------------------------------------------
 ---
 # Tiled Worlds & Streaming
 
