@@ -64,9 +64,13 @@ renders/<slice-id>/r<N>/
 ```
 
 `renders/` holds whatever a critic has to *look at* rather than read — screenshots,
-plots, frames, exported pages. One directory per round, so a verification round can put
-the new render beside the old one instead of taking the builder's word that the visual
-finding is fixed.
+plots, frames, exported pages. **`r<N>` pairs with the snapshot `v<N>`**: the builder's
+first render is `r1` alongside the baseline snapshot, and each later fix produces both a
+`v<N>` and the `r<N>` taken from it. Keeping the two indices in step is what lets a
+verification round put the new render beside the old one instead of taking the builder's
+word that the visual finding is fixed. Don't index renders by verification round — round 1
+of verification produces `r2`, and a run that conflates the two overwrites its own
+baseline.
 
 ## The loop
 
@@ -162,6 +166,13 @@ because it must not vary: two candidates screenshotted at different widths are t
 about different things, and the critics' scores stop being comparable. The recipe is
 identical for everyone; only the slice id in the output path comes from the delta.
 
+**Run that recipe once yourself before you seal.** A recipe that needs a browser this
+environment doesn't have, or a dev server nobody started, fails identically in all N
+builders — and because the brief is sealed you cannot repair it without starting a new
+run. One dry run before `seal` is the cheapest check in the whole loop. If the render
+genuinely can't be produced here, say so in the brief and drop the visual axis from the
+rubric rather than shipping a recipe you know will fail.
+
 **Fill `rubric.md` before any builder runs.** A rubric written after seeing the candidates
 is a rationalisation of the one you already liked. Three to six axes, each with a concrete
 failure example, plus the blocking conditions that force `reject` regardless of score. If
@@ -255,10 +266,11 @@ Score against the rubric, not against your taste. Every finding needs an anchor 
 candidate — an unfalsifiable objection is not a finding.
 
 Where the brief names a visual surface, your evidence must say what you saw in the
-render. If it is missing, stale, or the recipe errored, do not grade the source in its
-place: return "revise" with one finding whose check is the render you need, stated
-precisely enough for someone to produce it — what to render, at which state, viewport
-and seed. Where the brief names none, do not ask for one.
+render. Check it is current — a render older than the files it renders is stale, and a
+stale render is not evidence. If it is missing, stale, empty, or the recipe errored, do
+not grade the source in its place: return "revise" with one finding whose check is the
+render you need, stated precisely enough for someone to produce it — what to render, at
+which state, viewport and seed. Where the brief names none, do not ask for one.
 
 Calibrate severity to consequence, not to how strongly you feel about it. Be blunt about
 anything provably wrong — correctness, data loss, security, an unmet acceptance
@@ -302,17 +314,31 @@ The rule is conditional, and both halves of the condition do work:
 recipe (Step 2) and the builder runs it (Step 3), so in the normal case the render is
 already sitting in `renders/<slice-id>/r1/` and the demand never has to be made.
 
-**When the critic demands and finds nothing to look at** — missing, stale, empty, or a
-recipe that errored — that is a broken inspection path, not a low score. The critic states
-the demand precisely (what to render, at which state, viewport, seed) and returns `revise`
-with a finding whose `check` is the render's own existence: `renders/<slice-id>/r1/empty-state.png
-exists and shows the placeholder copy at 1280px`. It does not fall back to grading the
-source — a guess dressed as a verdict is worse than a stalled round, because the fold
-cannot tell the two apart.
+**When the critic demands and finds nothing to look at** — missing, empty, stale, or a
+recipe that errored — that is a broken inspection path, not a low score. *Stale* has a
+mechanical tell worth stating in the prompt: a render older than the files it renders is
+a picture of a candidate that no longer exists, and grading it is worse than grading
+nothing, because the verdict looks evidenced. The critic states the demand precisely (what
+to render, at which state, viewport, seed) and returns `revise` with a finding whose
+`check` is the render's own existence:
+
+```
+severity: "blocker"
+check: "renders/hero-empty/r1/empty-state.png exists, is newer than the candidate,
+        and shows the placeholder copy at 1280px"
+```
+
+`blocker`, not `minor` — only `blocker` and `major` hold the gate, so a softer severity
+ships a visual axis nobody ever judged, which is the exact hole this section exists to
+close. And the critic does not fall back to grading the source: a guess dressed as a
+verdict is worse than a stalled round, because the fold cannot tell the two apart.
 
 Then **satisfy the demand rather than waving it away.** Re-run the recipe yourself if it is
 mechanical, hand the demand back to the builder if it is not, and re-spawn the critic on
 the render. That round is cheap: the demand is delta text and the prefix is still warm.
+Where you produced the render yourself the finding still closes honestly — mark it
+`verified` once the render exists, with the `reason` saying who made it, since a harness
+you had to fix by hand is a fact about the run worth carrying into the fold report.
 Only when the render genuinely cannot be produced here — no headless renderer, no harness,
 an asset nobody has — do you record the visual axis as **unscored** in the fold report and
 say why. Never let a source-only verdict stand in for it silently.
@@ -336,6 +362,10 @@ Calibrate both the severity and the tone that carries it to what being wrong wou
   curve, not insult, and it is never a licence for contempt. Where the candidate is sound,
   say so plainly — a critic that finds nothing has produced a result, not failed at its
   job, as long as its `evidence` shows it looked.
+- **Softness applies to severity, never to `approved`.** Going easy on a preference is
+  free; listing a file as approved to be generous is not, because the re-open logic in
+  Step 5 treats that list as examined and will not look there again. Approve exactly what
+  you inspected, however warm the rest of the verdict is.
 - **A defect in the brief is not a defect in the candidate.** When a builder was misled by
   an ambiguous brief, say that in the finding's `claim` and keep the severity honest. The
   brief is the orchestrator's error to fix between runs, not the builder's to absorb.
@@ -387,8 +417,9 @@ else (out of scope, do not read).
 **4. Run the cheap oracles first, and re-render.** Build, tests, lint, a grep for what the
 `check` describes. Every finding a mechanical check resolves is one the critic never sees.
 If the slice has a visual surface, re-run the render recipe — same command, same state —
-into `renders/<slice-id>/r<N>/`. A finding on a visual axis is verified by looking at the
-new render beside the old one; "fixed the clipping" is a claim, and a claim is not a check.
+into the `r<N>` that matches the snapshot you just took in step 3 (`v2` → `r2`). A finding
+on a visual axis is verified by looking at the new render beside the old one; "fixed the
+clipping" is a claim, and a claim is not a check.
 
 **5. Spawn the verifier** — same shared prefix, tiny delta:
 
@@ -401,9 +432,9 @@ VERIFICATION ROUND <N> for <slice-id>.
 
 Open findings to verify: <run-dir>/verdicts/<slice-id>.json (status == "open")
 In-scope diff and re-opened files: <paste the `scope` output>
-Renders: <run-dir>/renders/<slice-id>/r<N>/ against r<N-1> — for any finding on a
-visual axis, decide it by comparing the two renders, not by reading the change that
-was supposed to produce them.
+Renders: <paste both paths — the new render dir and the previous one> — for any
+finding on a visual axis, decide it by comparing the two renders, not by reading the
+change that was supposed to produce them.
 
 For each open finding, decide `verified` or `unresolved` against its own `check` — not
 against a better fix you would have preferred. Record the observation that decided it in
@@ -437,6 +468,12 @@ For `partition` runs, the integration critic on the merged result reviews **the 
 only** — the interfaces between slices. Slice internals were already approved by their own
 critic and are not its business.
 
+Where the seams are visual, that critic needs a render of the **merged** result, not the
+per-slice renders. A clashing heading scale, a doubled margin, two different empty states:
+none of those exist in any single slice's picture, which is exactly why the per-slice
+critics all passed. Render the merge before spawning it, or it is judging the seam from
+two photographs taken in different rooms.
+
 ## Step 6 — Adjudicate and fold
 
 Read the **verdicts**, not the candidates. That keeps your context small enough to hold the
@@ -465,6 +502,12 @@ A missing, empty, or truncated candidate is a **failed** slice, not a rejected o
 is nothing to judge, so don't spawn a critic for it and don't let it enter the fold as a
 low score. Re-spawn once with the identical prompt; a second failure points at the slice or
 the brief, so escalate rather than trying a third time.
+
+A render recipe that fails is different again: it is sealed and identical for everyone, so
+if every builder reports the same error, that is a defect in the brief and re-spawning
+will reproduce it exactly. Fix the recipe in a new run, or finish this one with the visual
+axis unscored and say so. One builder failing where the others rendered fine is that
+builder's problem and re-spawns normally.
 
 The same goes for a verdict that won't parse or arrives with an empty `evidence` array —
 that is not a verdict. Re-spawn once, then judge that slice yourself and say so in the fold

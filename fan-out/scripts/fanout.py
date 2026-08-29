@@ -576,6 +576,20 @@ def cmd_status(args) -> None:
     print(f"\ncandidates ({len(cands)}): {', '.join(cands) or '-'}")
     print(f"verdicts   ({len(verds)}): {', '.join(verds) or '-'}")
 
+    # Renders are reported only once some slice has one: a run with no visual surface
+    # should not be nagged about pictures it was never supposed to produce.
+    rendered = {}
+    for slice_dir in sorted((d / "renders").glob("*")):
+        rounds = sorted(p.name for p in slice_dir.glob("r*") if p.is_dir())
+        if rounds:
+            rendered[slice_dir.name] = rounds
+    if rendered:
+        print("renders:    " + "  ".join(
+            f"{name}({','.join(rounds)})" for name, rounds in rendered.items()))
+        if unrendered := [c for c in cands if c not in rendered]:
+            print(f"  no render: {', '.join(unrendered)}"
+                  "   — critics judge the render; produce it before spawning them")
+
     if missing := [c for c in cands if c not in verds]:
         print(f"\nawaiting critique: {', '.join(missing)}")
 
