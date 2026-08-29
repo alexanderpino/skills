@@ -41,13 +41,22 @@ An artifact-level verdict (`accept` / `revise`) can't survive a round trip, beca
 state machine:
 
 ```
-open ──► verified     (the check now holds)
-     ├─► unresolved   (the check still fails — carries to the next round)
-     └─► waived       (orchestrator overrules; ships as a known issue)
+open ──► verified     (the check now holds — terminal)
+     ├─► unresolved   (the check still fails) ──┐
+     │        ▲                                 │
+     │        └───── next round ────────────────┘
+     └─► waived       (orchestrator overrules; ships as a known issue — terminal)
 ```
 
-Three states, plus two optional fields: `reason` (free text, mandatory on `waived`, useful
-on `unresolved`) and `late` (a boolean, see the ratchet guard). Resist adding a fourth. An
+Only `verified` and `waived` are terminal. `unresolved` is a cycle: it is re-sent to the
+builder and re-judged, and the gate treats it exactly as it treats `open` — which is why
+`fanout.py` blocks on both and why an anchor that stops resolving becomes `unresolved`
+rather than disappearing.
+
+Three transitions out of `open`, plus two optional fields: `reason` (free text, **enforced**
+on `waived` — the gate stops on an unreasoned waive, because that is the one path where a
+blocker leaves the loop by decision rather than by fix) and `late` (a boolean, see the
+ratchet guard). Resist adding a fourth. An
 earlier draft separated "the critic was wrong" from "valid but we ship anyway"; both mean
 "does not block", the distinction lives in `reason`, and the gate only ever needed to know
 which findings hold it shut.
@@ -71,8 +80,19 @@ The `severity` scale decides what blocks:
 - `minor` — worth fixing, doesn't block
 - `nit` — preference; logged, never actioned in this run
 
-Only `blocker` and `major` hold the gate. Everything else lands in the fold report as a
-follow-up, which is the honest place for it.
+Only `blocker` and `major` hold the gate. Everything else becomes a follow-up — and a
+follow-up needs somewhere to go, or "logged" means "left in a JSON file nobody opens after
+the fold":
+
+```bash
+python scripts/fanout.py followups
+```
+
+Writes `follow-ups.md` in the run dir: everything waived (with the reason that justified
+it), everything raised late, and every unresolved `minor` and `nit`, across all slices. Run
+it before the fold and hand the file forward. A finding that still holds the gate is
+deliberately excluded — that is work, not a follow-up, and a late `blocker` reopens the
+round rather than draining into a file.
 
 ## Scope: what a verification round is allowed to read
 
@@ -144,6 +164,14 @@ worth trusting less.
 Late `minor` and `nit` findings are logged as follow-ups and never block. Only a late
 `blocker` reopens the round.
 
+**There is deliberately no late `major`.** The escape hatch is for damage you cannot ship —
+correctness, data loss, security — and `major` means "will cause a real problem, but the
+artifact is not wrong today", which by definition can wait for the follow-up list. Note
+that the gate does not know this rule: it blocks on any unresolved `major`, `late` or not.
+So a critic that files one has quietly widened the round past the ratchet guard, and you
+either re-file it at its honest severity or accept it as work. The rule holds because you
+enforce it at the prompt, not because the tooling catches it.
+
 ## Anchor drift
 
 Line numbers are invalid the moment the builder edits the file, so a finding anchored on
@@ -163,6 +191,12 @@ resolve, the finding is marked `unresolved` with `reason: "anchor lost"`, never 
 dropped. An anchor that stops resolving usually means the builder rewrote the region
 wholesale, which is exactly the case that deserves a look rather than a shrug.
 
+Watch what that does to termination, though. An anchor-lost `blocker` holds the gate while
+pointing at nothing, so the builder has no target and each round re-loses it until the cap
+escalates. Don't spend the rounds: re-anchor it yourself against the current artifact and
+re-file, or escalate immediately. It is the one `unresolved` that another round cannot
+move.
+
 ## Cheap oracles before expensive judgement
 
 Run the mechanical checks before spawning anything. Compilation, tests, linters, a grep
@@ -176,7 +210,14 @@ compile ──► tests ──► static checks ──► grep/AST for specific 
 ```
 
 A round where the build is broken should never reach an agent; the build failure is the
-finding. In practice a large share of `check` fields on a code slice are mechanically
+finding. Two things follow that are easy to get wrong. Stopping at the first failing gate
+is right for *not spawning the critic* and wrong for *what you send the builder* — you
+still cannot see the test failures behind a compile error, so send what you have and expect
+another mechanical pass rather than pretending the list is complete. And a round that never
+reached an agent does not spend the round budget: the cap counts judgement rounds, tracked
+by the verdict's `round` field, so a slice that fails to compile three times has used none
+of them. Otherwise a slice can exhaust its budget on mechanical failures and escalate
+having never once been reviewed. In practice a large share of `check` fields on a code slice are mechanically
 decidable, and the verifier agent ends up looking at a handful of judgement calls rather
 than the whole file. That's the real cost reduction — bigger than the scope narrowing.
 
@@ -197,8 +238,10 @@ Verification rounds are the cheapest agents in the run if you keep the shape rig
 - `brief.md` is sealed, so it is still byte-identical — verifiers hit the prefix the
   builders already paid for. Never put the findings ledger in the shared block.
 - The delta below the `---` is small: open findings plus a scope listing, not an artifact.
-- Spawn verifiers for all slices in the same turn, immediately after the builders return,
-  while the prefix is warm.
+- Spawn verifiers for all slices in the same turn, immediately after the builders return.
+  Whether the prefix is still warm is not up to you: the TTL runs from when a request
+  starts, so a builder that spent longer than the TTL fixing findings has already aged out
+  the entry. Spawn together anyway — it costs nothing and it is the only part you control.
 - Don't re-warm with a pathfinder for a verification wave. The prefix already exists and
   the wave is short.
 

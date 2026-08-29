@@ -16,6 +16,7 @@ a stable set of paths.
     fanout.py gate <slice>                    # 0 done, 1 another round, 2 escalate
 
     fanout.py calibration [<slice>]           # lint the critique itself (advisory)
+    fanout.py followups                       # drain deferred/late/waived to a file
     fanout.py status                          # candidates, verdicts, open findings
 """
 
@@ -411,11 +412,12 @@ def cmd_gate(args) -> None:
     print(f"  verified:  {len(verified)}")
     print(f"  blocking:  {len(blocking)}   (blocker/major still open)")
     print(f"  deferred:  {len(deferred)}   (minor/nit — follow-ups, never block)")
+    unreasoned = [f for f in waived if not (f.get("reason") or "").strip()]
     if waived:
         print(f"  waived:    {len(waived)}   (shipped as known issues)")
         for f in waived:
             reason = f.get("reason")
-            print(f"      {f.get('id')}: {reason or 'NO REASON GIVEN — record one'}")
+            print(f"      {f.get('id')}: {reason or 'NO REASON GIVEN'}")
     if late:
         print(f"  late:      {len(late)}   (raised outside scope — round 1 under-reviewed)")
 
@@ -428,10 +430,19 @@ def cmd_gate(args) -> None:
         if reason := f.get("reason"):
             print(f"      reason: {reason}")
 
+    # Waiving is the one path where a blocker leaves the loop by decision rather than by
+    # fix. An unreasoned waive is therefore a silent ship, and the fold report has nothing
+    # to carry. Cheap to enforce, and the only place the gate second-guesses the operator.
+    if unreasoned:
+        print(f"\nSTOP — {len(unreasoned)} waived finding(s) carry no reason.")
+        print("A waive ships a known issue on your authority; the reason is what makes\n"
+              "that decision reviewable. Record one on each, then re-run the gate.")
+        sys.exit(2)
+
     if not blocking:
         print("\nPASS — no open blockers or majors.")
         if deferred:
-            print("Carry the deferred findings into the fold report as follow-ups.")
+            print("Run `fanout.py followups` to drain the deferred findings before folding.")
         sys.exit(0)
 
     if rnd > cap:
@@ -442,6 +453,79 @@ def cmd_gate(args) -> None:
 
     print("\nANOTHER ROUND — snapshot, send only these findings, then `scope`.")
     sys.exit(1)
+
+
+def cmd_followups(args) -> None:
+    """Drain the findings that leave the run unfixed, into one file.
+
+    Every other path through this loop has an outlet: a finding gets fixed, or it holds
+    the gate. Deferred, late and waived findings have neither — without somewhere to go
+    they stay inside verdict JSON that nobody opens after the fold, which is how a run
+    'ships clean' while carrying a dozen things a critic actually flagged.
+    """
+    d = run_dir()
+    meta = json.loads((d / "run.json").read_text())
+    names = sorted(p.stem for p in (d / "verdicts").glob("*.json"))
+    if not names:
+        sys.exit("no verdicts yet — nothing to drain")
+
+    waived, late, deferred = [], [], []
+    for name in names:
+        for f in load_verdict(d, name).get("findings", []):
+            entry = (name, f)
+            holds_gate = (f.get("severity") in BLOCKING
+                          and f.get("status", "open") in UNRESOLVED)
+            if f.get("status") == "waived":
+                waived.append(entry)
+            elif holds_gate:
+                # Still work, not a follow-up — a late blocker reopens the round rather
+                # than draining. The gate is where it belongs until it resolves.
+                continue
+            elif f.get("late"):
+                late.append(entry)
+            elif f.get("severity") in ("minor", "nit"):
+                deferred.append(entry)
+
+    def render(title, note, items):
+        if not items:
+            return []
+        out = [f"## {title}", "", note, ""]
+        for slice_id, f in items:
+            anchor = f.get("anchor", {})
+            where = anchor.get("symbol") or anchor.get("file") or "?"
+            out.append(f"- **[{f.get('severity')}] {f.get('id')}** "
+                       f"({slice_id} — {where}) {f.get('claim', '')}")
+            if check := f.get("check"):
+                out.append(f"  - check: {check}")
+            if reason := f.get("reason"):
+                out.append(f"  - reason: {reason}")
+        out.append("")
+        return out
+
+    lines = [f"# Follow-ups — {meta['task']}", "",
+             f"Drained from {len(names)} verdict(s) by `fanout.py followups`. Everything "
+             "here was seen by a critic and deliberately not fixed in this run. Nothing "
+             "here blocked the gate; that is the point of writing it down.", ""]
+    lines += render("Shipped as known issues", "Waived on the orchestrator's authority. "
+                    "The reason is the record of that decision.", waived)
+    lines += render("Raised late", "Surfaced after round 1, outside the scope the ratchet "
+                    "guard allows. A cluster here means round 1 under-reviewed.", late)
+    lines += render("Deferred", "Minor findings and nits. Never actioned in this run by "
+                    "design.", deferred)
+    if not (waived or late or deferred):
+        lines += ["Nothing deferred, waived or late. The run closed clean.", ""]
+    lines += ["---", "",
+              "Not captured here: assumptions a builder recorded in its candidate Notes "
+              "that no critic verified. Those need reading by eye — see the fold report "
+              "step in SKILL.md."]
+
+    dest = d / "follow-ups.md"
+    dest.write_text("\n".join(lines) + "\n")
+    total = len(waived) + len(late) + len(deferred)
+    print(f"wrote {dest}  ({total} item(s): "
+          f"{len(waived)} waived, {len(late)} late, {len(deferred)} deferred)")
+    if total:
+        print("Fold this file into the report rather than restating it from memory.")
 
 
 def cmd_calibration(args) -> None:
@@ -737,6 +821,7 @@ def main() -> None:
         ("check", cmd_check, "fail if the shared block drifted", False),
         ("scope", cmd_scope, "in-scope / re-opened / out-of-scope", True),
         ("gate", cmd_gate, "stop condition for a slice", True),
+        ("followups", cmd_followups, "drain deferred/late/waived findings to a file", False),
         ("status", cmd_status, "candidates, verdicts, open findings", False),
     ):
         sp = sub.add_parser(name, help=helptext)

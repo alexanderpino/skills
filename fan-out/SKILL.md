@@ -507,7 +507,10 @@ a slice can't converge in three attempts, the brief was wrong or the slice was b
 both your errors, not the builder's. Escalate with what the rounds disagreed about.
 
 To ship a known issue past the gate, set that finding's status to `waived` with a `reason`.
-That is an orchestrator decision, it is recorded, and it appears in the fold report.
+That is an orchestrator decision, it is recorded, and it appears in the fold report. The
+`reason` is not optional — `gate` stops on an unreasoned waive, because a waive is the one
+path where a blocker leaves the loop by decision rather than by fix, and an unexplained one
+is indistinguishable from a mistake.
 
 For `partition` runs, the integration critic on the merged result reviews **the seams
 only** — the interfaces between slices. Slice internals were already approved by their own
@@ -537,10 +540,23 @@ For a `compete` run with a visual surface, look at the renders side by side your
 you rank — the verdicts tell you what each critic saw one at a time, and a comparison
 across candidates is the one judgement no critic was allowed to make.
 
-Finish with a short fold report: what shipped, what was rejected and why, every `waived`
-finding with its reason, any visual axis left unscored because the render could not be
-produced, the late and nit findings deferred to follow-ups, and any assumption a builder
-recorded that nobody verified. Those last two are where fan-out runs actually go wrong — not in what the critics caught, but in what everyone agreed to stop
+Before writing the report, drain the findings that are leaving unfixed:
+
+```bash
+python scripts/fanout.py followups
+```
+
+That writes `follow-ups.md` — everything waived with its reason, everything raised late,
+every deferred `minor` and `nit`, across all slices. Every other finding in this loop has
+an outlet: it gets fixed, or it holds the gate. These have neither, and with nowhere to
+land they stay in verdict JSON that nobody opens again — which is how a run reports clean
+while carrying a dozen things a critic actually flagged.
+
+Finish with a short fold report: what shipped, what was rejected and why, any visual axis
+left unscored because the render could not be produced, a pointer to `follow-ups.md`, and
+any assumption a builder recorded that nobody verified. That last one is the only part the
+tooling cannot drain for you, and together with the follow-ups it is where fan-out runs
+actually go wrong — not in what the critics caught, but in what everyone agreed to stop
 looking at.
 
 ## When an agent fails
@@ -593,7 +609,8 @@ step.
 - `references/incremental-review.md` — the finding lifecycle, why re-opening approved scope
   is necessary, cross-slice cascades, the ratchet guard, anchor drift. Read before running a
   verification round or changing the verdict schema.
-- `scripts/fanout.py` — run dir, seal/check, plan, snapshot/scope/gate, calibration, status.
-  Deterministic; no model calls. `plan` and `scope` apply the same coupling rule, before and
-  after the fact respectively. `gate` decides the work; `calibration` lints the critique and
-  decides nothing.
+- `scripts/fanout.py` — run dir, seal/check, plan, snapshot/scope/gate, calibration,
+  followups, status. Deterministic; no model calls. `plan` and `scope` apply the same
+  coupling rule, before and after the fact respectively. `gate` decides the work;
+  `calibration` lints the critique and decides nothing; `followups` drains what the run is
+  choosing not to fix.
