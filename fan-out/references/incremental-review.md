@@ -202,9 +202,10 @@ Verification rounds are the cheapest agents in the run if you keep the shape rig
 - Don't re-warm with a pathfinder for a verification wave. The prefix already exists and
   the wave is short.
 
-If the run has been idle long enough for the 5-minute TTL to expire, the verification
-prompts are small enough that a cold prefix costs little — the brief dominates, and you'd
-be re-writing it either way.
+If the TTL has expired, the verification prompts are small enough that a cold prefix costs
+little — the brief dominates, and you'd be re-writing it either way. Note that expiry
+doesn't require the run to have been idle: the clock runs from the start of each request,
+so a builder that spent five minutes fixing findings has aged the entry out by itself.
 
 ## Failure modes
 

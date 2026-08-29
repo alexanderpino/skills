@@ -193,8 +193,12 @@ Spawn builder #1 **alone** and wait for it to return, then spawn #2..N **in the 
 The pathfinder does real work on a real slice; it goes first only so its request writes the
 shared prefix that the other N-1 read from cache.
 
-Skip it and fire everything at once when the brief is under roughly 1,000 tokens or N is 2.
-Read `references/prompt-caching.md` before deviating further.
+Skip it and fire everything at once when the brief is too short to cache at all — the
+minimum runs from 512 to 4,096 tokens depending on which model the agents run on, so a
+brief over ~4K always caches and one under ~512 never does — or when you want the
+wall-clock more than the tokens. Keep the whole wave on one model either way; caches don't
+cross models, so critics on a cheaper model than the builders share nothing with them. Read
+`references/prompt-caching.md` before deviating further.
 
 **Builder prompt — this exact shape, shared block first:**
 
@@ -227,8 +231,12 @@ candidate. They do not see each other's verdicts and they do not see the other c
 a critic that has already read three candidates is anchored, and anchored critics converge
 on the first thing they read.
 
-Critics read the same `brief.md` first, so they hit the prefix the builders just paid for.
-A long pause between build and critique costs you the cache (5-minute default TTL).
+Critics read the same `brief.md` first, so they hit the prefix the builders just paid for —
+provided they run on the same model, since caches don't cross models. The 5-minute default
+TTL is measured from when a request *starts*, not from when it returns, so the builders'
+own generation time is spent out of it: a wave that took six minutes to think has already
+expired the entry the critics were meant to read. Spawn them immediately, and treat a long
+build as a cold critic wave rather than assuming warmth you no longer have.
 
 **Critic prompt:**
 
