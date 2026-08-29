@@ -82,6 +82,16 @@ BRIEF_TEMPLATE = """# Brief
 <!-- Paths, excerpts, specs, conventions. Everything the agents would otherwise
      each go rediscover on their own. -->
 
+## Visual surface
+
+<!-- Only if there is something to look at: a page, chart, UI state, frame, diagram,
+     laid-out document. Give ONE render command and the exact state to render in —
+     viewport, seed, theme, sample input, which page. Identical for every agent, or
+     the candidates are not comparable. Builders write output to
+     renders/<slice-id>/r1/; critics judge that, not the source behind it.
+     Delete this section if the work has no visual surface — an invented one costs a
+     round and proves nothing. -->
+
 ## Acceptance criteria
 
 <!-- Concrete and checkable. "Works well" is not a criterion. -->
@@ -99,6 +109,9 @@ RUBRIC_TEMPLATE = """# Rubric
      rationalisation of the candidate you already liked. -->
 
 ## Axes (score 1-5)
+
+<!-- If the brief names a visual surface, at least one axis must be scoreable ONLY
+     from the render. Otherwise critics score the source that produces the picture. -->
 
 ### <axis-name>
 What 5 looks like:
@@ -214,6 +227,7 @@ def cmd_init(args) -> None:
     (d / "candidates").mkdir(parents=True)
     (d / "verdicts").mkdir()
     (d / "revisions").mkdir()
+    (d / "renders").mkdir()
 
     (d / "brief.md").write_text(BRIEF_TEMPLATE.format(task=args.task))
     (d / "rubric.md").write_text(RUBRIC_TEMPLATE)

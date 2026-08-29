@@ -60,7 +60,13 @@ tooling silently fails to correlate them:
 
 ```
 candidates/<slice-id>.md     verdicts/<slice-id>.json     revisions/<slice-id>/v<N>/
+renders/<slice-id>/r<N>/
 ```
+
+`renders/` holds whatever a critic has to *look at* rather than read — screenshots,
+plots, frames, exported pages. One directory per round, so a verification round can put
+the new render beside the old one instead of taking the builder's word that the visual
+finding is fixed.
 
 ## The loop
 
@@ -149,9 +155,19 @@ problem.
 "you are agent 3 of 7", or anything else that differs between agents.
 `references/prompt-caching.md` explains why each of those is fatal.
 
+**If the work has a visual surface, the brief carries the recipe for reaching it.** One
+command that renders the candidate, plus the exact state to render it in — viewport, seed,
+theme, sample input, which page or frame. This belongs in the shared block precisely
+because it must not vary: two candidates screenshotted at different widths are two facts
+about different things, and the critics' scores stop being comparable. The recipe is
+identical for everyone; only the slice id in the output path comes from the delta.
+
 **Fill `rubric.md` before any builder runs.** A rubric written after seeing the candidates
 is a rationalisation of the one you already liked. Three to six axes, each with a concrete
-failure example, plus the blocking conditions that force `reject` regardless of score.
+failure example, plus the blocking conditions that force `reject` regardless of score. If
+there is something to look at, at least one axis must be scoreable **only** from the
+render — otherwise the critics quietly score the source that produces the picture, which
+is the failure Step 4 exists to prevent.
 
 ```bash
 python scripts/fanout.py seal
@@ -180,6 +196,12 @@ Write your candidate to <run-dir>/candidates/<slice-id>.md (plus any code files 
 describes). End it with a "Notes" section: what you assumed, what you were unsure
 about, and what you would check next.
 
+If the brief names a visual surface, produce it before you finish: run the render
+recipe exactly as written, write the output to <run-dir>/renders/<slice-id>/r1/, and
+link it from your candidate. Your critic will judge the render rather than your
+description of it, so an unrendered candidate is judged on a missing artifact. If the
+recipe fails, say so in your notes with the error — do not substitute a description.
+
 ---
 YOUR SLICE: <the one line that differs>
 ```
@@ -205,7 +227,8 @@ Then read <run-dir>/rubric.md.
 
 ---
 Judge exactly one artifact: <run-dir>/candidates/<slice-id>.md
-Do not read any other candidate.
+If the brief names a visual surface, open <run-dir>/renders/<slice-id>/r1/ and judge
+what you see there. Do not read any other candidate.
 Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:
 
 {
@@ -230,6 +253,19 @@ Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:
 
 Score against the rubric, not against your taste. Every finding needs an anchor into the
 candidate — an unfalsifiable objection is not a finding.
+
+Where the brief names a visual surface, your evidence must say what you saw in the
+render. If it is missing, stale, or the recipe errored, do not grade the source in its
+place: return "revise" with one finding whose check is the render you need, stated
+precisely enough for someone to produce it — what to render, at which state, viewport
+and seed. Where the brief names none, do not ask for one.
+
+Calibrate severity to consequence, not to how strongly you feel about it. Be blunt about
+anything provably wrong — correctness, data loss, security, an unmet acceptance
+criterion, a failing check: state it flatly with its anchor, no hedging and no softening.
+Be gentle about preference — a defensible call the brief left open, a structure you would
+have built differently: one line, "nit" or "minor", and say plainly what you found sound.
+Never raise a severity to make a preference get attention.
 ```
 
 Three fields carry the whole re-review design:
@@ -245,6 +281,75 @@ Three fields carry the whole re-review design:
 
 Critics that can run something (compile it, execute the tests, diff it) should. A critic
 whose `evidence` contains only opinions is a weak gate; treat its `accept` as unproven.
+
+### Demand the visual when there is a visual to demand
+
+The rule is conditional, and both halves of the condition do work:
+
+- **Something visual exists — or the candidate already ships what produces it — so the
+  critic demands it and judges that.** A rendered page, a chart, a UI state, a game frame,
+  a diagram, a laid-out document. Never grade the markup, the shader, or the plotting call
+  in place of the thing they produce: source that *should* centre the legend and a render
+  showing the legend clipped are two different facts, and only one of them is the artifact.
+  A verdict on a visual axis whose `evidence` names no render is unproven in exactly the
+  way an untested `accept` is unproven.
+- **Nothing visual exists** — a pure refactor, an API design, a parser, a prose slice with
+  no layout — **so the critic does not ask for one.** A screenshot manufactured to satisfy
+  a checklist costs a round and proves nothing, and a critic that pushes a builder to
+  invent a visual surface has widened the brief on its own authority.
+
+**Producing it is the builder's job and yours, never the critic's.** The brief carries the
+recipe (Step 2) and the builder runs it (Step 3), so in the normal case the render is
+already sitting in `renders/<slice-id>/r1/` and the demand never has to be made.
+
+**When the critic demands and finds nothing to look at** — missing, stale, empty, or a
+recipe that errored — that is a broken inspection path, not a low score. The critic states
+the demand precisely (what to render, at which state, viewport, seed) and returns `revise`
+with a finding whose `check` is the render's own existence: `renders/<slice-id>/r1/empty-state.png
+exists and shows the placeholder copy at 1280px`. It does not fall back to grading the
+source — a guess dressed as a verdict is worse than a stalled round, because the fold
+cannot tell the two apart.
+
+Then **satisfy the demand rather than waving it away.** Re-run the recipe yourself if it is
+mechanical, hand the demand back to the builder if it is not, and re-spawn the critic on
+the render. That round is cheap: the demand is delta text and the prefix is still warm.
+Only when the render genuinely cannot be produced here — no headless renderer, no harness,
+an asset nobody has — do you record the visual axis as **unscored** in the fold report and
+say why. Never let a source-only verdict stand in for it silently.
+
+### Soft where it can be, harsh where it must be
+
+Severity is a claim about consequence, not a measure of how strongly the critic felt.
+Calibrate both the severity and the tone that carries it to what being wrong would cost:
+
+- **Harsh** where the artifact is wrong and provably so — correctness, data loss, security,
+  an unmet acceptance criterion, a failing oracle, a claim the candidate makes that its own
+  render or test output contradicts. State it flatly, once, with the anchor: no hedging, no
+  praise sandwich, no "you might consider". Softening a real failure is the expensive
+  direction; the gate opens and the fold reports as shipped something nobody approved.
+- **Soft** where the disagreement is preference — a defensible call the brief left open, a
+  structure the critic would have built differently, a style choice with no consequence
+  downstream. Say it once as a `nit` or `minor`, phrase it in the builder's own terms, and
+  approve the surrounding work explicitly. Do not inflate severity to make a preference get
+  attention; that is precisely how `major` stops meaning anything.
+- **Soft on the builder, never soft on the check.** Harshness is refusal to grade on a
+  curve, not insult, and it is never a licence for contempt. Where the candidate is sound,
+  say so plainly — a critic that finds nothing has produced a result, not failed at its
+  job, as long as its `evidence` shows it looked.
+- **A defect in the brief is not a defect in the candidate.** When a builder was misled by
+  an ambiguous brief, say that in the finding's `claim` and keep the severity honest. The
+  brief is the orchestrator's error to fix between runs, not the builder's to absorb.
+
+The tie-breaker when a finding sits between `major` and `nit`: ask what it costs to be
+wrong in each direction. Wrong-harsh on a nit costs one builder round. Wrong-soft on a
+blocker ships the blocker. Where the two are symmetric, go soft; where they are not, go
+harsh.
+
+The loop punishes each failure direction differently, and both are visible in the run. A
+uniformly harsh critic inflates severities until the gate can no longer discriminate and
+the builder spends its two rounds on taste. A uniformly soft critic returns `accept` with a
+thin `evidence` array and the gate becomes theatre. If a critic's verdict shows either
+pattern, re-read it yourself before folding on it.
 
 ## Step 5 — Verification rounds (never re-review what was approved)
 
@@ -279,8 +384,11 @@ Prints three sets: changed hunks (in scope), previously-approved files referenci
 touched by the diff (**re-opened** — this is what keeps delta-review honest), and everything
 else (out of scope, do not read).
 
-**4. Run the cheap oracles first.** Build, tests, lint, a grep for what the `check`
-describes. Every finding a mechanical check resolves is one the critic never sees.
+**4. Run the cheap oracles first, and re-render.** Build, tests, lint, a grep for what the
+`check` describes. Every finding a mechanical check resolves is one the critic never sees.
+If the slice has a visual surface, re-run the render recipe — same command, same state —
+into `renders/<slice-id>/r<N>/`. A finding on a visual axis is verified by looking at the
+new render beside the old one; "fixed the clipping" is a claim, and a claim is not a check.
 
 **5. Spawn the verifier** — same shared prefix, tiny delta:
 
@@ -293,10 +401,15 @@ VERIFICATION ROUND <N> for <slice-id>.
 
 Open findings to verify: <run-dir>/verdicts/<slice-id>.json (status == "open")
 In-scope diff and re-opened files: <paste the `scope` output>
+Renders: <run-dir>/renders/<slice-id>/r<N>/ against r<N-1> — for any finding on a
+visual axis, decide it by comparing the two renders, not by reading the change that
+was supposed to produce them.
 
 For each open finding, decide `verified` or `unresolved` against its own `check` — not
 against a better fix you would have preferred. Record the observation that decided it in
-a "reason" field.
+a "reason" field. A fix that satisfies the check is verified even where you would have
+written it differently; a check that still fails is unresolved even where the builder
+clearly tried. Do not promote a nit to keep the round busy.
 
 You may raise a new finding ONLY if it sits inside the in-scope diff or a re-opened file.
 Anything outside that is out of bounds — except a genuine blocker (correctness, data
@@ -336,10 +449,14 @@ candidate only when a verdict is contested or unclear.
   often correct: take the winner's structure and the runner-up's specific better idea, and
   say which is which.
 
+For a `compete` run with a visual surface, look at the renders side by side yourself before
+you rank — the verdicts tell you what each critic saw one at a time, and a comparison
+across candidates is the one judgement no critic was allowed to make.
+
 Finish with a short fold report: what shipped, what was rejected and why, every `waived`
-finding with its reason, the late and nit findings deferred to follow-ups, and any
-assumption a builder recorded that nobody verified. Those last two are where fan-out runs
-actually go wrong — not in what the critics caught, but in what everyone agreed to stop
+finding with its reason, any visual axis left unscored because the render could not be
+produced, the late and nit findings deferred to follow-ups, and any assumption a builder
+recorded that nobody verified. Those last two are where fan-out runs actually go wrong — not in what the critics caught, but in what everyone agreed to stop
 looking at.
 
 ## When an agent fails

@@ -19,7 +19,10 @@ Before spawning anything:
 2. Propose the slices (or the competing constraints), run `fanout.py plan` to measure the
    coupling between them, and merge what it flags. N is an output of that analysis, not a
    number you pick.
-3. Write `brief.md` and `rubric.md` in full, then `seal`.
+3. Write `brief.md` and `rubric.md` in full, then `seal`. If the work has a visual
+   surface, the brief must carry the one render recipe every agent uses and the rubric an
+   axis that can only be scored from the render — critics judge the rendered thing, never
+   a description of it. If it has none, do not invent one.
 
 Confirm the slicing with the user before spawning if the cut is non-obvious. Then run the
 loop and finish with the fold report.
