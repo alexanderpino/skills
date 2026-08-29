@@ -15,6 +15,7 @@ a stable set of paths.
     fanout.py scope <slice>                   # in-scope diff / re-opened / out of scope
     fanout.py gate <slice>                    # 0 done, 1 another round, 2 escalate
 
+    fanout.py calibration [<slice>]           # lint the critique itself (advisory)
     fanout.py status                          # candidates, verdicts, open findings
 """
 
@@ -55,6 +56,16 @@ COMMON = frozenset("""
 """.split())
 
 STOPWORDS = KEYWORDS | COMMON
+
+# A `check` must be an observation ("Frame() returns early when entity is invalid"), not
+# an instruction ("Add a null guard"). A leading imperative is the mechanical tell, and
+# this is the single most common quality leak in the loop — see incremental-review.md.
+# Kept deliberately tight: every word here is one no observation ever opens with.
+IMPERATIVES = frozenset("""
+    add fix improve make use refactor consider ensure remove rename update change
+    clarify handle avoid implement replace delete move split extract document simplify
+    verify check validate rewrite
+""".split())
 
 # Keywords that open a statement rather than a definition. A line starting with one of
 # these never defines anything, whatever shape the rest of it has.
@@ -433,6 +444,86 @@ def cmd_gate(args) -> None:
     sys.exit(1)
 
 
+def cmd_calibration(args) -> None:
+    """Lint the critique, not the work.
+
+    Every signal here is a documented failure mode of a critic, computed from the verdict
+    JSON alone. It is ADVISORY and always exits 0: miscalibration is a reason to read a
+    verdict yourself before folding on it, never a reason to hold a slice. Wiring this
+    into the gate would let a heuristic about tone block real findings.
+    """
+    d = run_dir()
+    if getattr(args, "slice", None):
+        names = [args.slice]
+    else:
+        names = sorted(p.stem for p in (d / "verdicts").glob("*.json"))
+    if not names:
+        sys.exit("no verdicts yet — critics must run first")
+
+    total_flags = 0
+    for name in names:
+        v = load_verdict(d, name)
+        findings = v.get("findings", [])
+        evidence = v.get("evidence", [])
+        approved = v.get("approved", [])
+        blocking = [f for f in findings if f.get("severity") in BLOCKING]
+        counts = {sev: sum(1 for f in findings if f.get("severity") == sev)
+                  for sev in ("blocker", "major", "minor", "nit")}
+
+        flags = []
+        # Severity has stopped discriminating: everything is urgent, so nothing is.
+        if len(findings) >= 4 and len(blocking) / len(findings) >= 0.75:
+            flags.append(("INFLATION",
+                          f"{len(blocking)}/{len(findings)} findings block the gate",
+                          "Re-read them: a preference filed as major spends a builder "
+                          "round on taste."))
+        # The opposite failure: a pass with nothing behind it.
+        if v.get("verdict") == "accept" and len(evidence) < 2:
+            flags.append(("RUBBER-STAMP",
+                          f"verdict 'accept' on {len(evidence)} evidence entr"
+                          f"{'y' if len(evidence) == 1 else 'ies'}",
+                          "An accept this thin is unproven; treat it as unreviewed."))
+        # Approval claims must be proportional to what was actually examined.
+        if len(approved) > 3 * max(len(evidence), 1):
+            flags.append(("OVER-APPROVED",
+                          f"{len(approved)} approved against {len(evidence)} evidence",
+                          "Step 5 will not look at approved scope again — this is where "
+                          "a regression walks through."))
+        # A blocker nobody can mechanically resolve, or one that will lose its anchor.
+        for f in blocking:
+            check = (f.get("check") or "").strip()
+            first = re.sub(r"[^a-z]", "", check.split(" ")[0].lower()) if check else ""
+            if not check:
+                flags.append(("UNCHECKABLE", f"{f.get('id')} has no check",
+                              "A blocker with no observation cannot be verified or "
+                              "closed."))
+            elif first in IMPERATIVES:
+                flags.append(("CHECK-AS-DEMAND", f"{f.get('id')}: {check[:60]!r}",
+                              "Phrase it as what would be observably true once fixed."))
+            anchor = f.get("anchor", {})
+            if not anchor.get("symbol") and not anchor.get("quote"):
+                flags.append(("THIN-ANCHOR", f"{f.get('id')} has only a line hint",
+                              "Line numbers move on the first edit; this finding will "
+                              "be lost."))
+
+        hist = "  ".join(f"{sev} {counts[sev]}" for sev in
+                         ("blocker", "major", "minor", "nit") if counts[sev])
+        print(f"{name}   {v.get('verdict', '?')}   round {v.get('round', 1)}")
+        print(f"  findings: {hist or 'none'}")
+        print(f"  evidence: {len(evidence)}   approved: {len(approved)}")
+        for tag, what, why in flags:
+            print(f"  [{tag}] {what}\n      {why}")
+        total_flags += len(flags)
+        print()
+
+    if total_flags:
+        print(f"{total_flags} calibration flag(s) across {len(names)} verdict(s).")
+        print("Advisory only — read those verdicts yourself before folding on them.\n"
+              "The gate is unaffected; it still turns on open blockers and majors.")
+    else:
+        print(f"No calibration flags across {len(names)} verdict(s).")
+
+
 def cmd_plan(args) -> None:
     """Measure coupling between proposed slices. Cut where coupling is weakest.
 
@@ -636,6 +727,10 @@ def main() -> None:
     s.add_argument("slice")
     s.add_argument("paths", nargs="+")
     s.set_defaults(func=cmd_snapshot)
+
+    c = sub.add_parser("calibration", help="lint the critique itself (advisory)")
+    c.add_argument("slice", nargs="?", help="omit to lint every verdict in the run")
+    c.set_defaults(func=cmd_calibration)
 
     for name, fn, helptext, needs_slice in (
         ("seal", cmd_seal, "hash brief + rubric", False),

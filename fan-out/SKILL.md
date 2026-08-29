@@ -383,11 +383,48 @@ wrong in each direction. Wrong-harsh on a nit costs one builder round. Wrong-sof
 blocker ships the blocker. Where the two are symmetric, go soft; where they are not, go
 harsh.
 
-The loop punishes each failure direction differently, and both are visible in the run. A
-uniformly harsh critic inflates severities until the gate can no longer discriminate and
-the builder spends its two rounds on taste. A uniformly soft critic returns `accept` with a
-thin `evidence` array and the gate becomes theatre. If a critic's verdict shows either
-pattern, re-read it yourself before folding on it.
+The loop punishes each failure direction differently. A uniformly harsh critic inflates
+severities until the gate can no longer discriminate and the builder spends its two rounds
+on taste. A uniformly soft critic returns `accept` with a thin `evidence` array and the
+gate becomes theatre. Both leave the same kind of fingerprint on the verdict JSON, so don't
+eyeball it — measure it:
+
+```bash
+python scripts/fanout.py calibration
+```
+
+It reports the severity histogram per critic and flags five documented failure modes:
+`INFLATION` (three quarters of findings blocking), `RUBBER-STAMP` (`accept` on almost no
+evidence), `OVER-APPROVED` (an approved list out of proportion to what was examined),
+`CHECK-AS-DEMAND` (a `check` that opens with an imperative — the most common quality leak
+in the loop), and `THIN-ANCHOR` (a blocker anchored only on a line number, which the first
+edit will lose).
+
+**It is advisory and always exits 0.** Miscalibration is a reason to read a verdict
+yourself before folding on it, never a reason to hold a slice — a heuristic about tone must
+not block a real finding. Run it after the critic wave and again before the fold; a flagged
+verdict gets read in full, and any calibration you overruled belongs in the fold report.
+
+### Why there is no strictness dial
+
+The obvious next thought is tiered critics: a lenient screening pass to catch gross
+failures cheaply, then a strict gate round. Resist it, for three reasons that are specific
+to how this loop is built.
+
+Screening is already done, and done better. A missing, empty or truncated candidate never
+reaches a critic (see *When an agent fails*), and the cheap oracles in Step 5 — build,
+tests, lint, grep, the render — resolve the mechanical failures a lenient critic would
+catch, at near-zero cost and with better reliability than an agent reading code.
+
+Strictness is not comparable across critics. In `compete` mode the scores rank candidates,
+so a soft critic on one candidate and a harsh one on another produce a ranking that
+measures the critics rather than the work. This is the same reason the brief is sealed and
+the rubric is written first.
+
+And the axis that genuinely should differ between rounds already does — it just isn't
+strictness. Round 1 reviews everything and may raise anything; a verification round reviews
+the delta under the ratchet guard. That difference is mechanically computed by
+`fanout.py scope` rather than asked for in prose, which is what makes it hold.
 
 ## Step 5 — Verification rounds (never re-review what was approved)
 
@@ -486,7 +523,9 @@ two photographs taken in different rooms.
 
 Read the **verdicts**, not the candidates. That keeps your context small enough to hold the
 whole picture, which is the only place cross-cutting judgement can happen. Pull up a full
-candidate only when a verdict is contested or unclear.
+candidate only when a verdict is contested, unclear, or flagged by
+`fanout.py calibration` — reading verdicts instead of candidates only works while the
+verdicts are worth reading.
 
 - `partition` → merge slices that passed the gate. Never edit the brief to fix a slice.
 - `compete` → rank by rubric score, break ties on unresolved findings weighted by severity,
@@ -554,6 +593,7 @@ step.
 - `references/incremental-review.md` — the finding lifecycle, why re-opening approved scope
   is necessary, cross-slice cascades, the ratchet guard, anchor drift. Read before running a
   verification round or changing the verdict schema.
-- `scripts/fanout.py` — run dir, seal/check, plan, snapshot/scope/gate, status.
+- `scripts/fanout.py` — run dir, seal/check, plan, snapshot/scope/gate, calibration, status.
   Deterministic; no model calls. `plan` and `scope` apply the same coupling rule, before and
-  after the fact respectively.
+  after the fact respectively. `gate` decides the work; `calibration` lints the critique and
+  decides nothing.
