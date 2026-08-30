@@ -13,6 +13,7 @@ a stable set of paths.
 
     fanout.py snapshot <slice> <path>...      # record the bytes under review
     fanout.py scope <slice>                   # in-scope diff / re-opened / out of scope
+    fanout.py deciders <slice>                # the mechanical deciders, to run yourself
     fanout.py gate <slice>                    # 0 done, 1 another round, 2 escalate
 
     fanout.py calibration [<slice>]           # lint the critique itself (advisory)
@@ -389,6 +390,51 @@ def cmd_scope(args) -> None:
           "missed one ships a regression. Overrule sparingly and note it in the fold.")
 
 
+def cmd_deciders(args) -> None:
+    """Print the mechanical deciders for a slice's unresolved findings.
+
+    A `check` is an observation, and an observation a shell command can settle costs
+    nothing: the finding closes before a verifier is spawned at all. This command only
+    PRINTS those commands — it never runs them. The strings were written by a critic
+    agent, and a script that executes agent-authored commands on sight is a hole this
+    tool has no business opening. Run them where you can see them.
+    """
+    d = run_dir()
+    verdict = load_verdict(d, args.slice)
+    findings = [f for f in verdict.get("findings", [])
+                if f.get("status", "open") in UNRESOLVED]
+    if not findings:
+        print(f"{args.slice}: no unresolved findings — nothing to decide.")
+        return
+
+    mechanical = [f for f in findings if (f.get("check_cmd") or "").strip()]
+    judgement = [f for f in findings if not (f.get("check_cmd") or "").strip()]
+
+    print(f"deciders {args.slice}   round {verdict.get('round', 1)}   "
+          f"{len(mechanical)}/{len(findings)} mechanised")
+
+    if mechanical:
+        print("\nRun these. Exit 0 means the check holds.\n")
+        for f in mechanical:
+            print(f"  # [{f.get('severity')}] {f.get('id')}  {f.get('check', '')}")
+            print(f"  {f['check_cmd'].strip()}\n")
+        print("A command that exits 0 closes its finding here: set status to 'verified'\n"
+              "with a reason naming the command and what it printed. The verifier never\n"
+              "sees it. A non-zero exit is not a fix attempt gone wrong — it is the\n"
+              "finding still standing, so leave it open and send it to the builder.")
+        print("\nDo not close a finding on a visual axis this way. A render is decided by\n"
+              "looking at it beside the previous one, and a command that proves the file\n"
+              "exists has not looked.")
+
+    if judgement:
+        print(f"\nNo decider ({len(judgement)}) — these cost a verifier round:\n")
+        for f in judgement:
+            print(f"  [{f.get('severity')}] {f.get('id')}  {f.get('check', '')}")
+        print("\nSome of these are genuinely judgement. Where one is not — a condition a\n"
+              "grep or a test would settle — write the command onto the finding as\n"
+              "`check_cmd` yourself rather than paying an agent to read for it.")
+
+
 def cmd_gate(args) -> None:
     """Stop condition. 0 = done, 1 = another round, 2 = escalate."""
     d = run_dir()
@@ -421,14 +467,31 @@ def cmd_gate(args) -> None:
     if late:
         print(f"  late:      {len(late)}   (raised outside scope — round 1 under-reviewed)")
 
+    # A finding that arrives at a verification round already `unresolved` has survived a
+    # builder attempt against its check alone. Naming a remedy is the one place this loop
+    # lets a critic say *how*, and it is earned by evidence that saying *what* did not
+    # land — see incremental-review.md, "When the check alone stops working".
+    unguided = [f for f in blocking
+                if f.get("status") == "unresolved" and not (f.get("remedy") or "").strip()]
+
     for f in blocking:
         anchor = f.get("anchor", {})
         where = anchor.get("symbol") or anchor.get("file") or "?"
         print(f"\n  [{f.get('severity')}] {f.get('id')}  {where}")
         print(f"      claim: {f.get('claim', '')}")
         print(f"      check: {f.get('check', '')}")
+        if cmd := f.get("check_cmd"):
+            print(f"      check_cmd: {cmd}")
         if reason := f.get("reason"):
             print(f"      reason: {reason}")
+        if remedy := f.get("remedy"):
+            print(f"      remedy: {remedy}   (non-binding — the check is the contract)")
+
+    if unguided:
+        print(f"\n  {len(unguided)} unresolved finding(s) carry no remedy.")
+        print("  Each has now survived a builder round against its check. Ask the next\n"
+              "  verifier for a remedy on them, or say they are not closeable here — a\n"
+              "  third identical round is the expensive way to learn the same thing.")
 
     # Waiving is the one path where a blocker leaves the loop by decision rather than by
     # fix. An unreasoned waive is therefore a silent ship, and the fold report has nothing
@@ -449,6 +512,11 @@ def cmd_gate(args) -> None:
         print(f"\nESCALATE — {rnd - 1} verification rounds spent, still blocking.")
         print("Three attempts failing points at the brief or the slice cut, not the\n"
               "builder. Take the disagreement to the user rather than spawning another.")
+        if remedies := [f for f in blocking if (f.get("remedy") or "").strip()]:
+            print("\nCarry these remedies into the escalation — they are the critic's own\n"
+                  "account of what it would take, and the user is deciding, not guessing:")
+            for f in remedies:
+                print(f"  {f.get('id')}: {f['remedy']}")
         sys.exit(2)
 
     print("\nANOTHER ROUND — snapshot, send only these findings, then `scope`.")
@@ -497,8 +565,13 @@ def cmd_followups(args) -> None:
                        f"({slice_id} — {where}) {f.get('claim', '')}")
             if check := f.get("check"):
                 out.append(f"  - check: {check}")
+            if cmd := f.get("check_cmd"):
+                out.append(f"  - check_cmd: `{cmd}`")
             if reason := f.get("reason"):
                 out.append(f"  - reason: {reason}")
+            # Whoever picks this up later did not watch the rounds that produced it.
+            if remedy := f.get("remedy"):
+                out.append(f"  - remedy (non-binding): {remedy}")
         out.append("")
         return out
 
@@ -595,6 +668,12 @@ def cmd_calibration(args) -> None:
         print(f"{name}   {v.get('verdict', '?')}   round {v.get('round', 1)}")
         print(f"  findings: {hist or 'none'}")
         print(f"  evidence: {len(evidence)}   approved: {len(approved)}")
+        # Reported, never flagged: some findings are genuinely judgement, and a critic
+        # inventing commands to raise this number would cost more than it saves.
+        if blocking:
+            mech = sum(1 for f in blocking if (f.get("check_cmd") or "").strip())
+            print(f"  mechanised: {mech}/{len(blocking)} blocking finding(s) carry a "
+                  "check_cmd")
         for tag, what, why in flags:
             print(f"  [{tag}] {what}\n      {why}")
         total_flags += len(flags)
@@ -820,6 +899,7 @@ def main() -> None:
         ("seal", cmd_seal, "hash brief + rubric", False),
         ("check", cmd_check, "fail if the shared block drifted", False),
         ("scope", cmd_scope, "in-scope / re-opened / out-of-scope", True),
+        ("deciders", cmd_deciders, "mechanical deciders for the open findings", True),
         ("gate", cmd_gate, "stop condition for a slice", True),
         ("followups", cmd_followups, "drain deferred/late/waived findings to a file", False),
         ("status", cmd_status, "candidates, verdicts, open findings", False),

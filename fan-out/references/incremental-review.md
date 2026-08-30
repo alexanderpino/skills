@@ -5,10 +5,12 @@ Read this before running a verification round or changing the verdict schema.
 ## Contents
 - [The problem](#the-problem)
 - [Findings are the unit of state, not artifacts](#findings-are-the-unit-of-state-not-artifacts)
+- [Give the check a decider](#give-the-check-a-decider)
 - [Scope: what a verification round is allowed to read](#scope-what-a-verification-round-is-allowed-to-read)
 - [Re-opening approved scope](#re-opening-approved-scope)
 - [Cross-slice cascades](#cross-slice-cascades)
 - [The ratchet guard](#the-ratchet-guard)
+- [When the check alone stops working](#when-the-check-alone-stops-working)
 - [Anchor drift](#anchor-drift)
 - [Cheap oracles before expensive judgement](#cheap-oracles-before-expensive-judgement)
 - [Termination](#termination)
@@ -72,6 +74,41 @@ that is true or false about the artifact, not an instruction:
 
 If a finding can't be phrased as an observation, it's taste. Taste is worth recording as a
 `nit`, and nits are follow-ups, never gates.
+
+### Give the check a decider
+
+An observation stated precisely enough is often one a command can settle. `check_cmd` is
+that command, written so **exit 0 means the check holds**:
+
+```json
+"check": "QueryChunk() returns nullopt when index >= count",
+"check_cmd": "ctest -R chunk_bounds --output-on-failure"
+```
+
+A finding with a decider never reaches an agent: `fanout.py deciders <slice-id>` prints
+them, you run them, and each exit-0 closes its finding with a `reason` naming the command.
+That is the same saving as *cheap oracles before expensive judgement* below, moved to
+where it can be automated — the critic knows what would settle its own finding, and
+writing it down costs one line while re-deriving it costs a verifier wave.
+
+Four constraints keep it from rotting:
+
+- **The critic writes only commands it ran**, here, against this candidate. An invented
+  command is worse than no field: it fails for the wrong reason and the finding looks
+  unfixed.
+- **It must fail when filed.** A `check_cmd` that exits 0 at the moment the finding is
+  raised means the check is wrong or the finding isn't real. Either way, resolving that at
+  filing time is free and resolving it in round 2 is not.
+- **It decides, it does not instruct.** `grep -n 'nullopt' store.cpp` tells the builder
+  nothing about how to satisfy it, which is exactly why it is safe. A command that
+  hard-codes the shape of the fix is a prescription wearing a shell prompt.
+- **Never on a visual axis.** A render is decided by looking at the new one beside the
+  old; a command that proves a PNG exists has not looked. `fanout.py deciders` says so, but
+  the rule lives here.
+
+`fanout.py` prints these commands and does not run them. The strings come from an agent,
+and a tool that shells out to agent-authored text on sight would be handing the critique
+loop an execution channel it has no reason to have. The operator runs them, in view.
 
 The `severity` scale decides what blocks:
 
@@ -172,6 +209,51 @@ So a critic that files one has quietly widened the round past the ratchet guard,
 either re-file it at its honest severity or accept it as work. The rule holds because you
 enforce it at the prompt, not because the tooling catches it.
 
+## When the check alone stops working
+
+The `check`-not-instruction rule is right as a default and wrong as an absolute. Its cost
+is real: a builder who cannot see what the critic sees can satisfy nothing three times in
+a row, and the loop spends its whole cap discovering that.
+
+So there is one licensed escape, and it is unlocked by evidence rather than by preference:
+
+> Every finding a verifier marks `unresolved` carries a `remedy` — a concrete route to the
+> check, at the anchor — or, where there is no route from here, a statement in `remedy` of
+> what the gap actually needs.
+
+The trigger is the `unresolved` transition and nothing else. Not severity, not the critic's
+confidence, not how strongly it was phrased: a finding is `unresolved` exactly when a
+builder has spent a round on it against the check and not closed it, which is the loop
+*measuring* that the check alone did not land. A round-1 finding never gets a remedy —
+that would hand every finding a suggested fix and reintroduce compliance-grading wholesale,
+before there is any evidence the builder needed it.
+
+Waiting one transition longer is tempting and wrong at the default cap. Three attempts per
+slice means: build, fix, fix. A finding that only earns its remedy after two `unresolved`
+verdicts gets it at the escalation, where the builder is no longer running — so the field
+would only ever inform the user, never speed a round. Attaching it at the first
+`unresolved` puts it in the one attempt that can still use it.
+
+Three properties keep `remedy` from becoming the target:
+
+- **The check remains the contract.** Verification decides against `check`, never against
+  `remedy` — a builder who satisfies the check by a different route is `verified`, and one
+  who follows the remedy exactly while the check still fails is `unresolved`. The verifier
+  prompt says this in as many words.
+- **It is non-binding to the builder**, who is asked to say in its notes when it took
+  another route. That sentence is what lets you tell a bad remedy from a bad builder.
+- **It is not a new status.** The state machine stays at three transitions. `remedy` is a
+  field on a finding that is still `unresolved` and still holds the gate.
+
+The "not closeable here" branch is the more valuable half. A remedy that reads *this needs
+a schema change in another slice* ends the loop a round and a half early, and it is
+information no gate can compute — only something that has now looked at the same gap
+three times.
+
+`fanout.py gate` prints unresolved blocking findings that carry no remedy, and repeats
+every remedy in the escalation block, so the user deciding at the cap sees the critic's own
+account of what it would take rather than a summary of the disagreement.
+
 ## Anchor drift
 
 Line numbers are invalid the moment the builder edits the file, so a finding anchored on
@@ -196,6 +278,11 @@ pointing at nothing, so the builder has no target and each round re-loses it unt
 escalates. Don't spend the rounds: re-anchor it yourself against the current artifact and
 re-file, or escalate immediately. It is the one `unresolved` that another round cannot
 move.
+
+It is also the one `unresolved` with no honest remedy to attach — there is no route to a
+check that points nowhere. Re-anchoring *is* the remedy, and it is yours, not the
+verifier's. Where the gate lists an anchor-lost finding as carrying none, that is the
+nudge working.
 
 ## Cheap oracles before expensive judgement
 
@@ -267,4 +354,16 @@ without anyone deciding it should.
 
 **`check` written as an instruction.** The verifier then evaluates "did you do what I
 said" instead of "is the problem gone", and accepts a fix that follows the letter of a bad
-suggestion. This is the most common quality leak in the whole loop.
+suggestion. This is the most common quality leak in the whole loop. A `remedy` does not
+make this safe — it makes it avoidable, by giving the instruction somewhere to live that
+nothing grades against.
+
+**`check_cmd` the critic never ran.** It fails for its own reasons — wrong path, missing
+target, a test that does not exist — and the finding reads as unfixed however good the
+fix was. Worse, it fails *silently* in the useful direction: nobody re-examines a finding
+that looks still-open. A command in this field is a claim to have run it.
+
+**`remedy` graded instead of `check`.** The verifier reads the remedy, sees the builder
+did something else, and marks `unresolved` on a check that now holds. That is the original
+leak coming back through the escape hatch, which is why the field is non-binding in the
+verifier prompt, in the builder's round instructions, and in the gate's own output.

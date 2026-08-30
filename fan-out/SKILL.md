@@ -262,6 +262,7 @@ Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:
                  "quote": "<short verbatim excerpt>", "line_hint": 42},
       "claim": "what is wrong",
       "check": "the concrete observation that would prove this fixed",
+      "check_cmd": "<optional: a command whose exit 0 means the check now holds>",
       "status": "open"
     }
   ],
@@ -272,6 +273,13 @@ Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:
 
 Score against the rubric, not against your taste. Every finding needs an anchor into the
 candidate — an unfalsifiable objection is not a finding.
+
+Where a command would settle the check — a grep for the condition, a failing test, a
+compile — put it in `check_cmd`, written so exit 0 means the check holds. Only commands
+you actually ran here, against this candidate: a plausible-looking command that does not
+exist costs more than the field saves. Omit it where the check needs judgement or a
+render, and never state a fix in it. If it exits 0 the moment you file the finding, you
+have written the wrong check or found nothing — resolve that before you hand it on.
 
 Where the brief names a visual surface, your evidence must say what you saw in the
 render. Check it is current — a render older than the files it renders is stale, and a
@@ -299,8 +307,30 @@ Three fields carry the whole re-review design:
 - **`approved` is a claim you'll be held to** — whatever is listed there is out of scope for
   every later round unless the code underneath it changes.
 
+A fourth field, `check_cmd`, is optional and is where the round budget actually goes. A
+check phrased as an observation is often one a command can decide, and a finding decided
+by a command never reaches an agent at all: `fanout.py deciders <slice-id>` prints them for
+you to run in Step 5. It stays a *decider*, never a fix — "`grep -n 'nullopt' store.cpp`"
+tells the builder nothing about how to get there, which is the point. See
+`references/incremental-review.md`.
+
 Critics that can run something (compile it, execute the tests, diff it) should. A critic
 whose `evidence` contains only opinions is a weak gate; treat its `accept` as unproven.
+
+### Direction, not prescription
+
+A finding tells the builder *where* (`anchor`), *what* (`claim`), and *what done looks
+like* (`check`). It withholds *how*, and that is not the critic being terse — a `check`
+written as an instruction turns the next round into "did you do what I said" instead of
+"is the problem gone", which is the most common quality leak in this loop. The direction
+comes from the check being observable, not from the critic explaining itself.
+
+So the two ways to reach a good result faster are not "say more". They are: make the
+check decidable without an agent (`check_cmd`, above), and stop the loop early when the
+gap is not closeable here. Prescription has exactly one licensed place — the `remedy`
+field in Step 5, unlocked only after a finding has survived a builder round against its
+check, where the evidence says direction-free feedback is not landing and another
+identical round costs more than the risk.
 
 ### Demand the visual when there is a visual to demand
 
@@ -446,7 +476,9 @@ Without this there is no delta and the round degenerates into a full re-review.
 
 > Fix only these findings. If a fix requires changing something outside them, say so in
 > your notes instead of doing it silently — an unexplained out-of-scope edit re-opens
-> everything it touches.
+> everything it touches. Where a finding carries a `remedy`, it is one route and not the
+> target: satisfy the `check` your own way if you have a better one, and say in your notes
+> why, so the next round judges the artifact rather than your compliance.
 
 **3. Compute the scope mechanically before spawning any critic.**
 
@@ -466,6 +498,22 @@ into the `r<N>` that matches the snapshot you just took in step 3 (`v2` → `r2`
 on a visual axis is verified by looking at the new render beside the old one; "fixed the
 clipping" is a claim, and a claim is not a check.
 
+```bash
+python scripts/fanout.py deciders <slice-id>
+```
+
+Prints the `check_cmd` each critic attached to its own findings, and lists the ones that
+carry none. Run them — the script deliberately does not, because executing command strings
+an agent wrote is a decision that belongs in front of you. Exit 0 closes that finding:
+set it `verified` with a `reason` naming the command and its output. Non-zero means the
+finding still stands, so it goes to the builder unchanged. This is the largest single
+saving in the loop, ahead of the scope narrowing — a slice whose findings are mostly
+mechanised can pass a verification round with no agent spawned at all.
+
+Two things it must not swallow. A visual finding is decided by the renders above, never by
+a command proving a file exists. And a finding with no `check_cmd` is not thereby weaker:
+most judgement calls have none, which is what the verifier is for.
+
 **5. Spawn the verifier** — same shared prefix, tiny delta:
 
 ```
@@ -482,10 +530,20 @@ finding on a visual axis, decide it by comparing the two renders, not by reading
 change that was supposed to produce them.
 
 For each open finding, decide `verified` or `unresolved` against its own `check` — not
-against a better fix you would have preferred. Record the observation that decided it in
-a "reason" field. A fix that satisfies the check is verified even where you would have
-written it differently; a check that still fails is unresolved even where the builder
-clearly tried. Do not promote a nit to keep the round busy.
+against a better fix you would have preferred, and not against any `remedy` on the
+finding. Record the observation that decided it in a "reason" field. A fix that satisfies
+the check is verified even where you would have written it differently; a check that
+still fails is unresolved even where the builder clearly tried. Do not promote a nit to
+keep the round busy.
+
+Every finding you mark `unresolved` must also carry a "remedy": one or two sentences
+naming a concrete route to the check — the specific change, at the anchor. A builder has
+now spent a round on this finding against the check alone and not closed it, so the check
+alone has been measured and found insufficient. The remedy is non-binding and it is not
+the target: the check stays the contract, and next round you judge the check, not whether
+the remedy was followed. If you cannot name a route because the gap needs a decision, an
+asset, or a change outside this slice, write that in "remedy" instead and say what is
+missing. That sentence ends the loop early, which is worth more than another round.
 
 You may raise a new finding ONLY if it sits inside the in-scope diff or a re-opened file.
 Anything outside that is out of bounds — except a genuine blocker (correctness, data
@@ -607,10 +665,11 @@ step.
   ordering rules, and why the pathfinder goes first. Read before changing prompt shapes or
   the spawn sequence.
 - `references/incremental-review.md` — the finding lifecycle, why re-opening approved scope
-  is necessary, cross-slice cascades, the ratchet guard, anchor drift. Read before running a
-  verification round or changing the verdict schema.
-- `scripts/fanout.py` — run dir, seal/check, plan, snapshot/scope/gate, calibration,
-  followups, status. Deterministic; no model calls. `plan` and `scope` apply the same
-  coupling rule, before and after the fact respectively. `gate` decides the work;
-  `calibration` lints the critique and decides nothing; `followups` drains what the run is
-  choosing not to fix.
+  is necessary, mechanical deciders, when a check earns a remedy, cross-slice cascades, the
+  ratchet guard, anchor drift. Read before running a verification round or changing the
+  verdict schema.
+- `scripts/fanout.py` — run dir, seal/check, plan, snapshot/scope/deciders/gate,
+  calibration, followups, status. Deterministic; no model calls, and `deciders` prints the
+  critics' commands rather than running them. `plan` and `scope` apply the same coupling
+  rule, before and after the fact respectively. `gate` decides the work; `calibration` lints
+  the critique and decides nothing; `followups` drains what the run is choosing not to fix.
