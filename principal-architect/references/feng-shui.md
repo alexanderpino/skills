@@ -30,8 +30,8 @@ The Gang of Four adopted that format for software and cite him in *Design Patter
 (1994) — while noting their patterns are not his. What transferred there was the
 **method** of capturing arrangement knowledge, not the arrangements themselves
 (nothing about Observer is spatial). This file attempts the narrower, riskier
-transfer — content, not just format — which is exactly why it is bound to the
-corroboration contract above.
+transfer — content, not just format — riskier in kind, which is exactly why it is
+bound to the corroboration contract above.
 
 **Convergences, not rediscoveries.** Several modern maxims, and this skill's own
 standing rules, reduce to the same invariants as §1's principles. The mappings are
@@ -44,7 +44,7 @@ structures keep arriving at the same answers.
 | Modern maxim / rule | Form-school principle | The shared invariant |
 |---|---|---|
 | **YAGNI** | declutter — its prospective half | possessions in proportion to *present* use: declutter removes what no longer serves; YAGNI declines what doesn't yet |
-| **KISS** | declutter, applied to the design itself | ornament in the structure blocks flow exactly as objects in the room do |
+| **KISS** | declutter, applied to the design itself | ornament in the structure blocks flow much as objects in the room do |
 | **SRP** (the S of SOLID) | one room, one purpose | mixed purpose taxes every occupant — a bed in the office *is* mixed responsibility (= cohesion/CCP, `structure.md` §2) |
 | **DIP** (the D), SDP | backing | depend on the stable; face the volatile knowingly (§1.6) |
 | **MoSCoW** prioritisation | balance | attention in proportion to purpose: Musts take the commanding position of a release; Won'ts are clutter declined in advance |
@@ -175,8 +175,8 @@ below are design-altitude and deliberately stay out of it.
 | User-error protection | is the dangerous door out of the walkway, marked, and reversible? |
 | Self-descriptiveness | does the space explain itself as you move, or need a guide? |
 | User engagement | is the room balanced — inviting rather than crowded or bare? |
-| Inclusivity | is there more than one way in and through (input modes, assistive tech)? |
-| User assistance | when you're stuck mid-task, does help reach you where you stand, or must you leave the room to find it? |
+| Inclusivity | does the room serve occupants of every background — ages, cultures, languages, circumstances? |
+| User assistance | can occupants with the widest range of abilities move through the room — alternate doors, ramps, rails (input modes, assistive tech)? |
 
 **Screen-level tactics** (each buys interaction quality at a cost — disclosure
 hides, convention constrains, confirmation slows — so record the trade like any
@@ -186,7 +186,8 @@ large, near targets for frequent actions (Fitts's law — the quantitative form 
 "commanding position") · grouping by proximity and common region (Gestalt — walls
 make rooms) · safe defaults, confirmation + undo for destructive actions (no poison
 arrows) · one primary action per screen (one mouth) · contextual help at the point
-of need (user assistance).
+of need (self-descriptiveness, learnability) · operable by keyboard, assistive
+tech, and alternate inputs (user assistance).
 
 **A worked `Q.xx`**, in the 6-part scenario form (`methods.md` §7):
 
