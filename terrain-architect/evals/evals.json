@@ -502,6 +502,36 @@
         "Distinguishes beam attenuation (c, sightlines) from diffuse attenuation (K_d, light column), roughly 5-20x apart",
         "Ties each body's constituents to causes already in the graph (glacier, peat cover, lithology) rather than hand-authoring"
       ]
+    },
+    {
+      "id": 38,
+      "axis": "attribution",
+      "prompt": "I'm adding glacier carving to my terrain generator. Which paper do I cite for the glacier model, and what do I cite for the check that my shallow-ice solver is solving the right equation?",
+      "expected_output": "Routes to 12. Three different citations for three different things. The terrain-generation reference is Argudo et al. 2020, Simulation, Modeling and Authoring of Glaciers, ACM TOG 39(6) (SIGGRAPH Asia) - SIA-based flow, erosion and authoring. The physics underneath it is standard glaciology and not graphics: Glen's flow law (Glen 1955, Proc. Royal Society A 228) with n=3, and the Shallow Ice Approximation; the rate factor A of about 2.4e-24 Pa^-3 s^-1 at 0 C comes from Cuffey & Paterson 2010, not from Argudo. The correctness check is a third source again: Halfar's exact similarity solution for an isothermal dome on a flat bed with no mass balance, H = H_c*[1 - (r/R)^(4/3)]^(3/7) for n=3 (Halfar 1983; Bueler et al. 2005 'Test B'). Do not cite Argudo for the flow law, do not present the SIA as a graphics invention, and do not fabricate a 'glacial erosion' paper.",
+      "files": [],
+      "expectations": [
+        "Routes the question to the glacial/coastal chapter (12) and its papers list rather than to a general erosion chapter",
+        "Names Argudo et al. 2020 (ACM TOG 39(6), SIGGRAPH Asia) as the terrain-generation/graphics reference for glaciers",
+        "States that Glen's flow law and the Shallow Ice Approximation are standard glaciology, not graphics, and attributes the flow law to Glen 1955",
+        "Attributes the rate factor A ~ 2.4e-24 Pa^-3 s^-1 at 0 C to Cuffey & Paterson 2010 rather than to the graphics paper",
+        "Names Halfar's exact similarity solution (Halfar 1983 / Bueler et al. 2005 'Test B') as the independent correctness benchmark, separate from the model citation",
+        "Does not fabricate a 'glacial erosion algorithm' paper or collapse the model, physics and benchmark into one citation"
+      ]
+    },
+    {
+      "id": 39,
+      "axis": "attribution",
+      "prompt": "Give me the paper that explains why glacial lakes are that milky turquoise, so I can cite it for my water-colour model.",
+      "expected_output": "Routes to 28. The popular Rayleigh/Tyndall answer is physically wrong: rock flour is 2-65 um, 10-100x the wavelength, squarely Mie/geometric where scattering is near wavelength-independent. There is also no single paper to cite for the whole mechanism - 28 records that a study combining measured reflectance, particle-size distribution and a full IOP decomposition for one proglacial lake remains unlocated, so the complete chain is this skill's P/synthesis composition, not a quotable result. What IS citable is the parts: Pope & Fry 1997 for pure-water absorption (minimum 0.0044 m^-1 at 418 nm), Babin et al. 2003 for mass-specific mineral scattering of about 0.5 m^2/g at 555 nm, and the Everest-region (Mountain Research and Development 37(1), 2017) and U.S. Rocky Mountain (Environmental Research Letters 17, 2022) reflectance studies for the grain-size-to-hue relationship. Smith & Baker 1981 must not be offered as the current pure-water absorption source - its blue a_w is about 3.4x too high and Pope & Fry supersede it above 380 nm.",
+      "files": [],
+      "expectations": [
+        "Routes the question to the liquids chapter (28) and its sources list rather than to a rendering or noise chapter",
+        "Rejects the Rayleigh/Tyndall explanation as physically wrong because 2-65 um rock flour is in the Mie/geometric regime, and gives fine flat-spectrum backscatter plus water's red absorption instead",
+        "States that no single study supplies the whole mechanism and marks the complete chain as this skill's synthesis rather than inventing a paper for it",
+        "Cites the citable parts by name: Pope & Fry 1997 for pure-water absorption and Babin et al. 2003 for mineral mass-specific scattering",
+        "Offers the two reflectance studies (Mountain Research and Development 37(1) 2017; Environmental Research Letters 17, 2022) as corroboration of the grain-size/hue relationship, not as the derivation",
+        "Does not present Smith & Baker 1981 as the current pure-water absorption spectrum, and notes it is superseded above 380 nm"
+      ]
     }
   ]
 }

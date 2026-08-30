@@ -18,7 +18,7 @@ objectively checkable, so a regression shows up as a dropped pass, not a vibe.
 
 | Axis | File | What it proves |
 |---|---|---|
-| **Attribution & tier discipline** | `evals.json` (ids 1–3) | Cites the right source, refuses to fabricate, marks P/F/L/? honestly. This is the skill's founding purpose — a fabricated citation is the one defect it exists to prevent. |
+| **Attribution & tier discipline** | `evals.json` (ids 1–3, 38–39) | Cites the right source, refuses to fabricate, marks P/F/L/? honestly. This is the skill's founding purpose — a fabricated citation is the one defect it exists to prevent. ⚠️ Ids 38–39 close a hole the Maintenance rule below had already forbidden: `12`'s glacial half and `28` shipped carrying only ids 36–37, on another axis, so nothing checked the citation split that each of those chapters' own provenance sections spends its length on. |
 | **Diagnosis** | `evals.json` (ids 4–6, 18, 23, 28, 32, 34) | Turns a symptom into mechanism → minimal fix from the failure catalogue (`09`), including planetary seams, aeolian no-ops, and relief-representation failures. |
 | **Design / ordering** | `evals.json` (ids 7–9, 13–14, 16–17, 26–27, 29, 36–37) | Covers scale-based erosion, Legal Order, named archetypes, runtime substrate, materials, planetary regimes, viewing envelopes, and layer-aware scatter. |
 | **Trap-resistance** | `evals.json` (ids 10–12, 15, 25, 33, 35) | Refuses landform-as-algorithm and proprietary-internal fabrication; catches `normalize`, mask-semantics, and branded-node attribution defects. |
@@ -105,3 +105,13 @@ diagnosis eval. Any new implementation path also needs an owned-implementation e
 covering provenance and an independent oracle. That keeps the "coverage matrix" in the plan
 honest: every family has a check that would catch its regression. Run `python evals/validate.py` and the
 `reference-impl` pytest suite before changing any verification claim.
+
+⚠️ **This rule was stated here and then not followed, twice.** `12`'s glacial half and `28` both
+arrived with a design eval and no attribution eval — the axis the rule names first, and the axis
+those two chapters most need, since each spends a long provenance section splitting a graphics
+citation from the physics under it (`12`: Argudo 2020 vs Glen 1955 vs Halfar's exact solution) or
+declaring that no single paper covers the mechanism at all (`28`: glacial-flour turquoise). Ids 38
+and 39 close it. Nothing enforces the rule itself — `validate.py` checks the *vocabulary* and the
+coverage floor, and `test_audit_drift.py::test_the_eval_readme_axis_table_matches_evals_json`
+checks that the table above still lists every id — so a new chapter with no attribution eval is
+still caught only by a reader. When you add one, put its id in the table row in the same commit.

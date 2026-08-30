@@ -149,7 +149,7 @@ turbidity slider to make a tannin-stained river gives you mud.
 > tail** — for peaks at 440 and 675 that is around 590 nm, not 560.
 >
 > **Measured** (an implementation of this chapter's own three-constituent split,
-> `terrain-renderer/reference-impl/beach_optics.py`; every figure below recomputed here rather than
+> `water-physics/reference-impl/beach_optics.py`; every figure below recomputed here rather than
 > relayed). Its declared `a_ph` shape — two Gaussians on a floor, peaks pinned at the chapter's 440
 > and 675, every other parameter `?` — minimises at **591.5 nm**. Swept across 400 variants of the
 > declared widths (25–60 nm blue, 15–40 nm red), the red/blue amplitude ratio (0.3–1.2) and the
@@ -503,7 +503,7 @@ producer gap named at the top of this file; register the fields in `08` and `27`
   `a_w` (P); that the minimum of two absorption lines sits between them is arithmetic. The
   wavelengths — 591.5 nm for one declared shape, 532–627 nm over 400 variants of its `?` widths, and
   the 420 → 521 → 557 → 575 nm walk of `argmin(a_ph + a_w)` with pigment load — are **D**,
-  recomputed here (2026-08) on `terrain-renderer/reference-impl/beach_optics.py`'s declared shape
+  recomputed here (2026-08) on `water-physics/reference-impl/beach_optics.py`'s declared shape
   and on this chapter's own `a_w` anchors. Robust to those `?` is the **direction**, not the
   wavelengths. Found by an implementation writing the pigment's line shape down, which is the thing
   a chapter stating a mechanism in prose never has to do.

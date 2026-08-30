@@ -155,7 +155,7 @@ engine's foam edge crawls. The *scale* was wrong, and the failure is not cosmeti
 
 **Where the correction comes from.** A reference implementation of `12`'s surf-zone loop was
 built against these two chapters and took this row literally
-(`terrain-renderer/reference-impl/beach.py`, `smooth_depth()` and `transform(filter_scale=…)`;
+(`water-physics/reference-impl/beach.py`, `smooth_depth()` and `transform(filter_scale=…)`;
 the scene is 500 m of cross-shore profile under `H_0 = 1.5 m`, `T = 9 s`). Measured on the
 barred bed that loop produces:
 
@@ -183,12 +183,25 @@ The wave stops breaking on the bar that made it.
   own scale.** In a loop the depth field is a **state variable**: the bed the transform reads is
   the bed the loop is writing, and filtering it at the wavelength cuts the feedback. Measured, in
   the same file: running `12`'s loop with the `L₀/10` filter, the bar grows to a crest in
-  **1.065 m** of water against the `H_b/γ = 2.333 m` the chapter predicts — a ratio of **0.46**
-  where the unfiltered-scale run gives **0.89** — because the growth-limiting feedback never
-  fires. That feedback is: *a growing bar makes the wave break earlier, which moves the flux
-  convergence seaward off the crest, which stops the crest growing.* Filter the bar out of the
-  depth field and the wave never notices it, so nothing ever tells the crest to stop. A wrong
-  constant makes a picture wrong; this silently **disables a physical loop**.
+  **1.065 m** of water against the `H_b/γ = 2.333 m` the chapter predicts — a **raw-bed** ratio of
+  **0.46**, where the shipped grid-noise-scale run gives **0.893** read off the same raw bed —
+  because the growth-limiting feedback never fires. That feedback is: *a growing bar makes the
+  wave break earlier, which moves the flux convergence seaward off the crest, which stops the
+  crest growing.* Filter the bar out of the depth field and the wave never notices it, so nothing
+  ever tells the crest to stop. A wrong constant makes a picture wrong; this silently **disables a
+  physical loop**.
+
+  > ⚠️ **Both ratios in that bullet are *raw-bed* readings, and neither is this relation's current
+  > value. `12` is the source of record for `d_bar ≈ H_b/γ`; requote it, not this page.** This
+  > chapter previously quoted the grid-noise-scale run as **0.89** with no field named. `12`'s
+  > round 2 (its *"`d_bar ≈ H_b/γ` — attacked twice and standing"* section) re-measured the ratio
+  > **within one depth field** and supersedes that figure: on this same base scene
+  > (`H_0 = 1.5 m`, `Δx = 1 m`) it is **0.9734**, and the `0.9734 − 0.8930 = 0.0804` gap is the
+  > filter's own lift `δ·γ/H_b` over an 11 m crest — an artefact of straddling two fields, not
+  > physics. The pair above is kept raw-against-raw because that is the only way the two *filter
+  > scales* compare like for like, and because no same-field number is published for the `L₀/10`
+  > run. The general guard is `12`'s, and it is not a coastal one: **a ratio must name the field
+  > each of its terms came from.**
 
 **So ship two things, or one thing and a rule.** Filter at the **grid-noise scale** (order one to
 two cells — enough to kill single-cell dither, narrow enough to preserve any real bedform) for the

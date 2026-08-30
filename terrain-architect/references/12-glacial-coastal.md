@@ -474,7 +474,7 @@ faster than bays, which is correct and self-reinforcing until the coast straight
 
 > **The "until the coast straightens" clause is right, and it is exactly why this chapter is
 > missing a landform.** Found by implementing the block against a photographed embayment
-> (`terrain-renderer/reference-impl/beach.py`; 1408 m of coast, one offshore spectrum
+> (`water-physics/reference-impl/beach.py`; 1408 m of coast, one offshore spectrum
 > `H₀ = 1.5 m, T = 9 s, θ₀ = 20°`). Impose zero longshore transport on the CERC closure below —
 > `Q ∝ sin(2·θ_loc)`, so `Q = 0 ⟺ θ_loc = 0` — with **plane offshore crests and shore-parallel
 > contours**, and Snell gives `sin θ_b = (c_b/c₀)·sin θ₀,local` with `c_b/c₀ > 0`, so `θ_b = 0`
@@ -503,7 +503,7 @@ faster than bays, which is correct and self-reinforcing until the coast straight
 > crest carries **twice** the straight coast's transport rather than none. The derivation of why the
 > spiral (a constant residual obliquity forces a constant tangent-to-radius angle, which is the
 > logarithmic spiral and nothing else) and the measured residuals are in
-> `terrain-renderer/references/12a-water-derivations.md` §11.
+> `water-physics/references/12a-water-derivations.md` §11.
 >
 > **One derived member, for anyone adding this here.** If the orthogonals radiate from the
 > diffraction point, "shore normal to the orthogonal" reads "shore normal to the radius" and the bay
@@ -518,7 +518,7 @@ the retreat loop are in conflict as written. See below.**
 
 > **Correction — `coastalStep` taken literally stops retreating, and its two stated remedies are
 > mutually exclusive.** This was found by implementing the block
-> (`terrain-renderer/reference-impl/beach.py`, `coastal_step()` / `evolve_coast()`; 1408 m of
+> (`water-physics/reference-impl/beach.py`, `coastal_step()` / `evolve_coast()`; 1408 m of
 > coast, 4 m grid, run here at every setting quoted). It is a defect in the pseudocode, not in the
 > physics above it.
 >
@@ -984,7 +984,7 @@ practical consequences:
 
 > **"Distance" in `depth ∝ distance^⅔` is the distance to the shoreline CURVE, and the obvious
 > implementation is not that.** Found by implementing this bullet against a curved coast
-> (`terrain-renderer/reference-impl/beach.py`). The natural code is
+> (`water-physics/reference-impl/beach.py`). The natural code is
 > `d = A·(x_s(y) − x)^(2/3)` — one array subtract per row — and on a curved shore it is a
 > *different surface* from the one this bullet asks for. `x_s(y) − x` is an offset along the grid's
 > cross-shore **axis**, and the family of curves it generates is the family of **translates** of the
@@ -1023,7 +1023,7 @@ practical consequences:
 > smooth the plan-form you key to, or accept the crease knowingly. **M**
 >
 > Derivation and the transport measurements:
-> `terrain-renderer/references/12a-water-derivations.md` §11.
+> `water-physics/references/12a-water-derivations.md` §11.
 
 **One bounded exception, below.** The rule above governs the seabed *below wave base*. Inside the
 surf zone the bed genuinely is reworked every day, and that band gets a real morphodynamic step —
@@ -1147,7 +1147,7 @@ bar seaward; calm swell walks it back — the profile breathes on a storm/calm c
 > difference decides what an implementer builds first.
 >
 > **The measurement.** A reference implementation of this loop
-> (`terrain-renderer/reference-impl/beach.py`, `sediment_flux(undertow_on=…)` inside `evolve()`;
+> (`water-physics/reference-impl/beach.py`, `sediment_flux(undertow_on=…)` inside `evolve()`;
 > 500 m of profile, `H_0 = 1.5 m`, `T = 9 s`, 6000 morphological steps from a monotone Dean ramp)
 > was run with the offshore term **deleted entirely** — no undertow, no roller, nothing carrying
 > sand seaward:
@@ -1273,7 +1273,7 @@ the last breaker removed. So the cap is a **mask, not a transform**, and everyth
 on a broken wave *staying* broken is outside its reach — which includes the break–reform–break
 couplet over a bar, the thing this section exists to explain.
 
-**The measurement** (`terrain-renderer/reference-impl/beach.py`, `transform()`; the `min` form
+**The measurement** (`water-physics/reference-impl/beach.py`, `transform()`; the `min` form
 evaluated on the same barred bed that file's loop produced). Take two stations in **the same
 depth**, one seaward of the bar with an unbroken wave, one 44 m landward with a wave that has just
 broken across the crest:
@@ -1341,7 +1341,7 @@ depths in which the wave is broken but has not restarted — which is the trough
 > symptom to warn them.
 >
 > **Measured** (same bed, same sea state, the 1-D march against a 2-D one on an alongshore-uniform
-> bed, so only this term can differ; `terrain-renderer/reference-impl/beach.py`, run here):
+> bed, so only this term can differ; `water-physics/reference-impl/beach.py`, run here):
 >
 > | deep-water angle `θ₀` | worst height disagreement | as a share of peak `H` | crest angle where it breaks |
 > |---|---|---|---|
@@ -1434,7 +1434,7 @@ family**, not a value any real surf zone sits at, and the pseudocode's `elif H_w
 cessation test the inner surf zone can never satisfy. **The wave can only un-break where the bed
 *deepens*.**
 
-**Measured** (`terrain-renderer/reference-impl/beach.py`, `transform()` and `saturated_ratio()`;
+**Measured** (`water-physics/reference-impl/beach.py`, `transform()` and `saturated_ratio()`;
 recomputed here rather than relayed — the plane-slope march below was rewritten independently and
 the numbers are this chapter's own):
 
@@ -1545,7 +1545,7 @@ binding axis.
 > about the bed. It is a question about the **offshore boundary condition**, and the section's own
 > loop diagram cannot express it.
 >
-> **The measurement that separates them** (`terrain-renderer/reference-impl/beach.py`,
+> **The measurement that separates them** (`water-physics/reference-impl/beach.py`,
 > `evolve_climate` and `climate_breakpoints`; 500 m of profile, 6000 morphological steps, the same
 > transform and the same constants as every number above). Force the loop with **two simultaneous
 > partitions** instead of one — a remote swell at 1.5 m / 9 s and the local wind sea a 6 m/s wind
@@ -1650,7 +1650,7 @@ space — which is why its finest row blew up and is missing from the table rath
 
 > **Correction, round 2 — the ratio straddled two depth fields, and that is the entire trend.**
 > Re-measured on the same implementation with the comparison made *within* one field
-> (`terrain-renderer/reference-impl/beach.py`, `crest_depth_ratio(tr, cr, b, field=…)`; the numbers
+> (`water-physics/reference-impl/beach.py`, `crest_depth_ratio(tr, cr, b, field=…)`; the numbers
 > below were reproduced independently here, not relayed).
 >
 > **The two fields.** `H_b` and `d_b` are outputs of `transform()`, which does not read the bed —
@@ -1861,8 +1861,9 @@ cannot; and check the domain's **sand volume** to round-off, since a loop that q
 will build any bar you ask for.
 
 **Tested against an implementation.** Four claims in this section were re-derived and measured by
-a reference implementation written against it (`terrain-renderer/reference-impl/beach.py`,
-`validate_beach.py`; the corrections are inline above, each with its file, function and number).
+a reference implementation written against it (`water-physics/reference-impl/beach.py`,
+`water-physics/reference-impl/validate_beach.py`; the corrections are inline above, each with its
+file, function and number).
 **Two were corrected** — the bar's mechanism (the undertow sets relief, not position) and the
 runnable core's transform (memoryless; cannot reform). **One was extended** — the longshore
 coefficient now carries its derivation. **One was attacked twice and stood both times**:
