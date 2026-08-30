@@ -77,6 +77,7 @@ the team decide deliberately (a "we accept this for now" ADR is a legitimate
 outcome).
 
 To make the noticing systematic rather than incidental, `feng-shui.md` walks the
-same smells as seven placement-and-flow questions (blocked doorway, poison arrow,
-clutter, …) you can ask of any component you enter — record what it finds in the
-standard vocabulary above, never in the lens's.
+same smells as seven placement-and-flow questions (commanding position, clear
+entrance, flow, poison arrows, clutter, backing, balance) you can ask of any
+component you enter — record what it finds in the standard vocabulary above, never
+in the lens's.

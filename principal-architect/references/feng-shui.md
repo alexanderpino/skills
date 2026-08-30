@@ -1,62 +1,65 @@
 # Feng shui — placement & flow in inhabited structures
 
 A structure is *inhabited* when people move through it repeatedly and their
-effectiveness depends on how it is arranged. A building is one such structure. So is
-a codebase (inhabited by the engineer who arrives in six months), a screen (inhabited
-by the end user), and this skill's own docs tree (inhabited by the next agent). Feng
-shui's **form school** is the oldest surviving body of heuristics about arranging
-inhabited space — where to place things, how movement should flow, what accumulation
-does to a space — and those heuristics transfer to the newer structures because they
-are about *human response to arrangement*, not about buildings.
+effectiveness depends on how it is arranged. A building is one; so is a codebase
+(inhabited by the engineer who arrives in six months), a screen (by the end user),
+and this skill's docs tree (by the next agent). Feng shui's **form school** is a
+long-lived body of vernacular heuristics about arranging inhabited space — where to
+place things, how movement should flow, what accumulation does to a space. This file
+reduces its transferable principles to corroborated invariants (§1), applies them to
+the three spaces this skill touches — the codebase (§3), the screen (§4, the skill's
+home for interaction-arrangement guidance), the docs tree (§5) — and confines the
+vocabulary so it never leaks into produced artifacts (§6).
 
-This file states the transferable principles once (§1), then applies them to the
-three spaces this skill touches: the codebase (§3), the screen (§4) — which also
-closes the skill's UI/interaction gap — and the docs tree (§5). §6 confines the
-vocabulary so it never leaks into produced artifacts.
+**Epistemic status — the contract for everything below.** Feng shui has two halves.
+The **form school** (*luan tou*) deals in approach, sightlines, backing, blockage,
+and accumulation. The **compass school** (*li qi* — cardinal directions, birth
+charts, flying stars) depends on a literal orientation on the earth and does **not**
+transfer; nothing below uses it. And the form school itself is a vernacular
+tradition, not a body of evidence — it carries plenty that stays behind too (dragon
+veins, fortune). So the rule for this file: a principle appears only as an invariant
+that a named modern source corroborates (§7), and it is always that source — never
+feng shui — that you cite in a produced document (§6). The lens is a *checklist
+generator, not an authority*: a way of noticing, never a way of justifying. Where a
+principle and the evidence disagree, the evidence wins.
 
-**This is not a foreign philosophy bolted on — it names the one already underneath.**
-Modern software and requirements maxims keep independently rediscovering the form
-school, which is itself the evidence that the heuristics track something stable in
-the *inhabitants* rather than in any era's structures. The rediscoveries, with the
-shared invariant each pair converged on:
+**The precedent.** Christopher Alexander — a building architect — codified what makes
+inhabited space work as a *pattern language*: named, composable problem-in-context /
+resolution pairs (*A Pattern Language*, 1977; *The Timeless Way of Building*, 1979).
+The Gang of Four adopted that format for software and cite him in *Design Patterns*
+(1994) — while noting their patterns are not his. What transferred there was the
+**method** of capturing arrangement knowledge, not the arrangements themselves
+(nothing about Observer is spatial). This file attempts the narrower, riskier
+transfer — content, not just format — which is exactly why it is bound to the
+corroboration contract above.
 
-| Modern maxim | Form-school principle | The shared invariant |
+**Convergences, not rediscoveries.** Several modern maxims, and this skill's own
+standing rules, reduce to the same invariants as §1's principles. The mappings are
+constructed here, after the fact — Beck was not reading feng shui — so they prove
+nothing by themselves; the named sources in §7 carry all the authority. What the
+convergence buys is cheaper and still real: confidence that §1's questions are worth
+asking of structures the form school never saw, because practitioners of those
+structures keep arriving at the same answers.
+
+| Modern maxim / rule | Form-school principle | The shared invariant |
 |---|---|---|
 | **YAGNI** | declutter — its prospective half | possessions in proportion to *present* use: declutter removes what no longer serves; YAGNI declines what doesn't yet |
 | **KISS** | declutter, applied to the design itself | ornament in the structure blocks flow exactly as objects in the room do |
 | **SRP** (the S of SOLID) | one room, one purpose | mixed purpose taxes every occupant — a bed in the office *is* mixed responsibility (= cohesion/CCP, `structure.md` §2) |
 | **DIP** (the D), SDP | backing | depend on the stable; face the volatile knowingly (§1.6) |
-| **MoSCoW** (DSDM/BABOK prioritisation) | balance | attention in proportion to purpose: Musts take the commanding position of a release; Won'ts are clutter declined in advance |
+| **MoSCoW** prioritisation | balance | attention in proportion to purpose: Musts take the commanding position of a release; Won'ts are clutter declined in advance |
 | this skill's *"documentation must earn its keep"* | declutter | every artifact pays attention-rent |
 | *conceptual integrity*; ubiquitous language | balance; one voice per room | one coherent style per inhabited space |
 | the README manifest ("two reads instead of twenty") | one clear mouth | a legible entrance orients every arrival |
 
-And an honest negative result, because forcing a map would be the very clutter the
-lens warns against: **O, L, and I of SOLID do not survive the transfer** — Liskov
-substitutability has no spatial analogue. That agrees, independently, with
-`structure.md` §2's own verdict that SOLID's architectural payload is DIP alone;
-where the lens and the standards refuse the same correspondence, both are probably
-right.
-
-**Epistemic status — read this first.** Feng shui has two halves. The **form school**
-(*luan tou*) is empirical vernacular: observations about approach, sightlines,
-backing, blockage, and accumulation, refined over centuries of watching people occupy
-structures. The **compass school** (*li qi* — cardinal directions, birth charts,
-flying stars) depends on a literal orientation on the earth and does **not**
-transfer; nothing below uses it. And the form school is used here as a *checklist
-generator, not an authority*: every principle in §1 is independently corroborated by
-a named modern source (§7), and it is always the modern source — not feng shui — that
-you cite in a produced document (§6). If a principle and the evidence ever disagree,
-the evidence wins; the lens is a way of *noticing*, never a way of *justifying*.
-
-**This transfer has a precedent.** Christopher Alexander — a building architect —
-codified what makes inhabited space work as named, reusable configurations
-(*A Pattern Language*, 1977; *The Timeless Way of Building*, 1979). The Gang of Four
-ported that structure into software wholesale and cite him in *Design Patterns*
-(1994). The software profession's entire pattern vocabulary is already a port of
-spatial-arrangement thinking into a medium its originators never saw. This file makes
-the same move from an older source, and holds it to the same standard: a principle
-earns its place only when it maps to something independently verified.
+And a negative result, held to the same honesty: **O, L, and I of SOLID have no
+spatial analogue** — Liskov substitutability is about types, not placement — and
+forcing a map would be the very clutter the lens warns against. That sits
+consistently with where `structure.md` §2 already draws the altitude line: SOLID's
+architectural payload there is *DIP → the Dependency Rule plus the component
+principles* — dependency direction and cohesion, exactly the two parts that map here
+(backing; one room, one purpose) — while O, L, and I stay at code altitude in both
+files.
 
 ---
 
@@ -110,62 +113,59 @@ concept names it in the doc.
 
 ## 3. The codebase as a space
 
-The lens lands on machinery this skill already has — it adds a way of *noticing*, not
-new rules. Walk a codebase the way a form-school practitioner walks a site: enter
-where a newcomer enters, follow the paths a change would take, watch where things
-pile up.
+Walk a codebase the way a form-school practitioner walks a site: enter where a
+newcomer enters (the README, the index, the published interface), follow the paths a
+change would take, and watch where things pile up. The §2 matrix gives the
+correspondences; what this section adds is the judgment calls the matrix can't carry,
+and what to do on a hit.
 
-- **Commanding position + backing** *is* the Dependency Rule (`structure.md` §2): the
-  domain core is the occupant, ports give it sight of everything that enters,
-  adapters keep it out of the traffic, and SDP — depend in the direction of
-  stability — is literally "the mountain behind." A core that imports a volatile
-  framework is a desk with its back to a window.
-- **One clear mouth** — per bounded context, the Open Host Service / published
-  language (`structure.md` §1, `interfaces.md`). A context reachable by three ad-hoc
-  routes has no mouth, and every route will be depended on.
-- **Poison arrow** — a dependency that bypasses the published interface to strike at
-  internals: reaching into another context's tables, importing a private module
-  across a boundary, a "temporary" direct call around the gateway. This is the
-  data-ownership smell of `data-architecture.md` and ADP/boundary violations of
-  `structure.md` §2, seen as a line you could draw on the context map.
-- **Blocked flow** — the god object / mega-service every request funnels through
-  (a blocked doorway), and its inverse, the *rushing corridor*: a pass-through layer
-  that touches everything and transforms nothing, pure ceremony in every path.
-- **Clutter** — dead code, near-duplicate names for different things, stale feature
-  flags, abstractions built for a future that never came. Feng shui's claim is the
-  sharp one: accumulation isn't neutral storage, it *costs* — every reader pays
-  attention-rent to what no longer serves.
-- **Balance** — fan-in/fan-out and size metrics (`methods.md` §9) read as
-  proportion: a 40-file module beside six one-file neighbours is an over-stuffed
-  room next to empty ones, and usually a boundary drawn in the wrong place.
+- **Hub or chokepoint?** The commanding position and the blocked doorway can look
+  alike — both have high fan-in. Two tests separate them. *Terminate vs transit:*
+  does traffic arrive through defined ports and get **answered** there (a healthy
+  core is a destination), or does it pass **through** on the way to somewhere else
+  (pass-through coupling)? *Cohesion:* does it hold one purpose (CCP,
+  `structure.md` §2), or accrete logic that belongs to its callers? A hexagonal
+  domain core passes both; a god object fails both; a layer that touches everything
+  and transforms nothing fails the first — that is the rushing corridor.
+- **Poison arrows** are lines you could draw on the context map: reaching into
+  another context's tables, importing a private module across a boundary, a
+  "temporary" call around the gateway (`data-architecture.md` ownership;
+  ADP/boundary rules, `structure.md` §2).
+- **Clutter** is the sharp claim worth importing: dead code, stale feature flags,
+  near-duplicate names, abstractions built for a future that never came are not
+  neutral storage — every reader pays attention-rent to what no longer serves.
+- **Balance** reads fan-in/out and size metrics (`methods.md` §9) as proportion: a
+  40-file module beside six one-file neighbours is usually a boundary drawn in the
+  wrong place.
 
-What to do on a hit is unchanged: name the finding in standard vocabulary, record it
-in the SD/HLD "known issues / debt" section with the quality attribute it threatens
-(`significance.md`), and let a deliberate ADR — including "we accept this for now" —
-be the outcome. The lens only makes the walk-through systematic: seven questions,
-asked of every space you enter.
+On a hit, the procedure is the skill's existing one, unchanged: name the finding in
+standard vocabulary, record it in the SD/HLD "known issues / debt" section with the
+quality attribute it threatens (`significance.md`), and let a deliberate ADR —
+including "we accept this for now" — be the outcome.
 
 ---
 
 ## 4. The screen as a space — UI & interaction
 
-Software architecture and UI didn't exist when these principles were formed, but a
-screen is an inhabited space in exactly the form-school sense: it has an entrance
-(where the eye lands), paths (task flows), a commanding position (where the primary
-action sits), and clutter. This section is the skill's home for reasoning about
-interaction arrangement — a gap nothing else in the skill covers.
+A screen is an inhabited space in exactly the form-school sense: an entrance (where
+the eye lands), paths (task flows), a commanding position (where the primary action
+sits), and clutter. The skill already *names* interaction quality — **ISO/IEC
+25010:2023 Interaction capability** (`standards.md`) — and can already derive
+measured scenarios for it (`methods.md` §7). What nothing else covers is how to
+reason about the **arrangement** that meets those scenarios; that lives here.
 
-**Where it lands in the artifact set.** UI quality is **not** a new document type.
-The quality is an **Interaction capability** driver — ISO/IEC 25010:2023's
-characteristic (formerly Usability; sub-characteristics in `standards.md`) — written
-as a measured `Q.xx` scenario in the PRD like any other quality. The *arrangement*
-that meets it is design content in the SD for that screen or feature (views, states,
-flows), chosen and traded like any tactic. A deliberate interaction-structure choice
-that is costly to reverse — a navigation paradigm, a disclosure strategy, dropping a
-platform convention — passes the `significance.md` test and gets an ADR.
+**Where it lands in the artifact set.** No new document type. The quality is a
+`Q.xx` driver in the PRD, written as a 6-part scenario like any other; the
+arrangement that meets it is design content in the SD for that screen or feature;
+and an interaction-structure choice that is costly to reverse — a navigation
+paradigm, a disclosure strategy, dropping a platform convention — passes the
+`significance.md` test and gets an ADR. The *architectural* end of interaction
+quality (separating the UI concern, supporting undo/cancel, maintaining task and
+user models) lives in `structure.md` §3's tactic table; the screen-level tactics
+below are design-altitude and deliberately stay out of it.
 
-**The sub-characteristics, read spatially.** Each ISO 25010 Interaction capability
-sub-characteristic is one of §1's questions asked of a screen:
+**The eight sub-characteristics, read spatially** (ISO 25010:2023; names per
+`standards.md`):
 
 | 25010 sub-characteristic | The spatial question |
 |---|---|
@@ -176,38 +176,40 @@ sub-characteristic is one of §1's questions asked of a screen:
 | Self-descriptiveness | does the space explain itself as you move, or need a guide? |
 | User engagement | is the room balanced — inviting rather than crowded or bare? |
 | Inclusivity | is there more than one way in and through (input modes, assistive tech)? |
+| User assistance | when you're stuck mid-task, does help reach you where you stand, or must you leave the room to find it? |
 
-**The tactics** (the §3-of-`structure.md` "supply side," for this quality): visual
-hierarchy (weight ∝ importance) · progressive disclosure (declutter in time, not
-just space) · consistent placement & platform convention (backing) · large, near
-targets for frequent actions (Fitts's law — the quantitative form of "commanding
-position") · grouping by proximity and common region (Gestalt — walls make rooms) ·
-safe defaults, confirmation + undo for destructive actions (no poison arrows) ·
-one primary action per screen (one mouth). Each buys interaction quality at a cost —
-disclosure hides, convention constrains, confirmation slows — so record the trade
-like any tactic.
+**Screen-level tactics** (each buys interaction quality at a cost — disclosure
+hides, convention constrains, confirmation slows — so record the trade like any
+tactic): visual hierarchy (weight ∝ importance) · progressive disclosure (declutter
+in time, not just space) · consistent placement & platform convention (backing) ·
+large, near targets for frequent actions (Fitts's law — the quantitative form of
+"commanding position") · grouping by proximity and common region (Gestalt — walls
+make rooms) · safe defaults, confirmation + undo for destructive actions (no poison
+arrows) · one primary action per screen (one mouth) · contextual help at the point
+of need (user assistance).
 
 **A worked `Q.xx`**, in the 6-part scenario form (`methods.md` §7):
 
 > **Q.07 — Interaction capability (operability, learnability).** A first-time user
-> (*source*) attempting the primary task (*stimulus*) on the main screen under
-> normal load (*environment*) of the web UI (*artifact*) completes it unaided
-> (*response*) within 3 interactions and 60 seconds, primary action visible without
-> scrolling at supported viewports (*response measure*). Verified by moderated
-> usability test (5 users) and the production analytics funnel.
+> (*source*) attempting the primary task (*stimulus*) on first visit, with no
+> onboarding, at a default supported viewport (*environment*), in the web UI
+> (*artifact*), completes it unaided (*response*) within 3 interactions and 60
+> seconds, primary action visible without scrolling (*response measure*). Verified
+> by moderated usability test (5 users) and the production analytics funnel.
 
-Grounding for this section is modern and testable — ISO 9241-110's interaction
-principles, Gestalt grouping, Fitts (1954), Nielsen's heuristics (§7). The feng shui
-framing adds the discipline of *walking the screen as a space*: enter where the eye
-enters, follow the task path, note what blocks it and what has accumulated.
+Grounding for this section is modern and testable — ISO 9241-110:2020
+(self-descriptiveness, conformity with user expectations, and use-error robustness
+are three of its seven interaction principles), Gestalt grouping, Fitts (1954),
+Nielsen's heuristics (§7). The lens adds the walk-through discipline: enter where
+the eye enters, follow the task path, note what blocks it and what has accumulated.
 
 ---
 
 ## 5. The docs tree as a space
 
-`repository-structure.md` is already a form-school document — it just doesn't use the
-words: one clear mouth (the README manifest — "an agent loads one file to learn the
-whole map"), one concept per room with a stable name (ADR/SD/driver IDs), sight
+`repository-structure.md` is already a form-school document — it just doesn't use
+the words: one clear mouth (the README manifest — "an agent loads one file to learn
+the whole map"), one concept per room with a stable name (ADR/SD/driver IDs), sight
 lines from the inside back out (`ARCH-REF:` markers), no clutter by construction
 (triage — "documentation must earn its keep"), and append-only decisions so no room
 silently changes purpose. Nothing to add there; but when you *extend* the tree, ask
@@ -239,22 +241,23 @@ with the stakeholder who holds it named, and requirements written verifiably
 ## 7. Grounding
 
 Same rule as `structure.md`: the lens generates the checklist; a named modern source
-corroborates every item you act on.
+corroborates every item you act on. Claims *about* the tradition itself are kept
+descriptive and minimal — this file asserts no history it cannot source.
 
 | Claim (this file) | Corroborated by | Body / author |
 |---|---|---|
 | Form-school principles (§1) | vernacular tradition, used descriptively — never cited as authority | — |
-| Spatial patterns → software patterns is a valid transfer | *A Pattern Language*; *The Timeless Way of Building*; cited in *Design Patterns* (1994) | Christopher Alexander; Gamma, Helm, Johnson & Vlissides |
+| Pattern-language *format* transfers to software | *A Pattern Language*; *The Timeless Way of Building*; adopted and cited in *Design Patterns* (1994) | Christopher Alexander; Gamma, Helm, Johnson & Vlissides |
 | Commanding position / backing → dependency direction (§3) | Dependency Rule; SDP/ADP component principles | Robert C. Martin (see `structure.md` §2) |
 | One mouth per context (§3) | Open Host Service, Published Language | Evans; The Open Group O-AA (see `structure.md` §1) |
 | Poison arrow = ownership/boundary violation (§3) | data ownership & context boundaries | `data-architecture.md`; Evans |
 | Clutter costs the reader (§3) | dead code / duplicate-name smells | `methods.md` §9; Fowler, *Refactoring* |
-| UI quality is a named, measurable characteristic (§4) | **ISO/IEC 25010:2023** Interaction capability | ISO/IEC |
-| Interaction principles (§4) | **ISO 9241-110:2020** (self-descriptiveness, conformity with expectations, error robustness) | ISO |
+| UI quality is a named, measurable characteristic; 8 sub-characteristics (§4) | **ISO/IEC 25010:2023** Interaction capability | ISO/IEC |
+| Interaction principles (§4) | **ISO 9241-110:2020** (7 principles; three named in §4) | ISO |
 | Commanding position on screen, quantified (§4) | Fitts's law (1954); visibility & hierarchy heuristics | Fitts; Nielsen (10 usability heuristics) |
 | Grouping = walls make rooms (§4) | Gestalt principles (proximity, common region) | Wertheimer; Palmer |
 | Docs tree navigability (§5) | the RAG-optimisation rationale | `repository-structure.md` |
-| Rediscovery table (intro) — YAGNI; KISS; SRP/DIP; MoSCoW | Extreme Programming; the Lockheed design maxim; *Agile Software Development*; DSDM / BABOK prioritisation | Beck & Jeffries; Kelly Johnson; Robert C. Martin; Dai Clegg (DSDM Consortium) |
+| Convergence table (intro) — YAGNI; KISS; SRP/DIP; MoSCoW | Extreme Programming; the Lockheed design maxim; *Agile Software Development*; MoSCoW (devised at Oracle, adopted by DSDM) | Beck & Jeffries; Kelly Johnson; Robert C. Martin; Dai Clegg |
 
 When any of this disagrees with the org's mandated standard or house style, conform
 to theirs (the skill's standing rule) — this lens least of all is worth a divergence.

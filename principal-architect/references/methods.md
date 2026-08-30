@@ -45,9 +45,10 @@ system. Carry these stances into every step:
   numbers.
 - **Treat every structure as inhabited space.** A codebase, a screen, a docs tree —
   each is a space people move through repeatedly, and its arrangement either serves
-  or taxes the people in it. This is the skill's one guiding idea older than any
-  standard it cites (`references/feng-shui.md`): placement-and-flow heuristics have
-  survived centuries because inhabitants haven't changed, only the structures have.
+  or taxes the people in it. `references/feng-shui.md` turns this stance into a
+  walkable checklist — old placement-and-flow heuristics, kept only where a named
+  modern source corroborates them, on the bet that inhabitants change less than
+  structures do.
 
 ---
 

@@ -176,7 +176,7 @@ rejections; caching buys performance at the cost of staleness). Record the quali
 | **Security** (overlaps the mandatory threat model) | gateway / BFF · authn/z at the edge · secrets management · encryption in transit & at rest · rate limiting · input validation (→ HLD §8, `privacy.md`) |
 | **Maintainability** (modularity, modifiability, testability) | ports & adapters · ACL · layering · the component principles (§2) · contract tests (`interfaces.md`) |
 | **Compatibility** (interoperability) | published language / OHS · API gateway · message translator (EIP) · versioned contracts (`interfaces.md`) |
-| **Interaction capability** (recognizability, learnability, operability, error protection, inclusivity) | visual hierarchy · progressive disclosure · platform convention & consistent placement · large/near targets (Fitts) · Gestalt grouping · safe defaults + undo · one primary action per screen — the spatial method, sub-characteristic map, and a worked `Q.xx` are in `feng-shui.md` §4 |
+| **Interaction capability** (operability, learnability, user-error protection) | separate the UI concern (MVC / BFF) · support undo & cancel · maintain task/user/system models (SEI usability tactics) · conform to published platform conventions — screen-level arrangement (hierarchy, disclosure, Fitts) is design-altitude, not ADR-per-choice: `feng-shui.md` §4 |
 
 **Integration style** — choose *per boundary*, then record it; the style is itself an
 architectural commitment (`significance.md` item 6):
