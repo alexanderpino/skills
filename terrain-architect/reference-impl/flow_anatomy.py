@@ -13,9 +13,15 @@ You can write both sentences. You cannot make a reader SEE that they are opposit
 same quantity until the two accumulations sit side by side, and that is what panels a and b do.
 
 Panel c is the fix the chapter recommends -- MFD on the hillslope, D8 once `A` clears a
-channelisation threshold -- and panel d stops the whole thing being an opinion: it measures the
-accumulation across one transect, so "concentrated" and "smeared" become a width in cells rather
-than two adjectives.
+channelisation threshold -- and panel d stops the whole thing being an opinion: it sweeps the
+relief and plots the concentration statistic for both routers, so "concentrated" and "smeared"
+become a curve rather than two adjectives. (The FIRST measurement tried was a transect width; it
+returned the claim backwards. `half_drainage_cells` records why.)
+
+⚠️ TWO STATISTICS, BECAUSE ONE CANNOT SEE A HYBRID. `half_drainage_cells` is dominated by the
+trunk, which is exactly where the hybrid runs D8 -- so it scores the hybrid as D8 and reports no
+difference. `hillslope_wetted` covers the other half: the share of cells receiving anything from
+upslope, where the hybrid scores as MFD. Both are drawn, because the pair IS the claim.
 
 ⚠️ WHAT THIS FIGURE DELIBERATELY DOES NOT DRAW. `03` also derives Quinn's contour-length weighting
 (`w = L·s`, `L = 0.354·cellSize` diagonal against `0.5·cellSize` cardinal) and notes that dropping
@@ -63,15 +69,27 @@ def terrain(n=N, seed=SEED):
 def routings(dem, cellsize=CELLSIZE, channel_cells=CHANNEL_CELLS):
     """The three accumulations the chapter contrasts, from the shipped routers.
 
-    The hybrid is composed here rather than living in `flow.py`, because `03` presents it as a
-    COMPOSITION of the two routers and not as a third algorithm -- keeping it that way means the
-    figure cannot claim a capability the module does not have.
+    ⚠️ PANEL C USED TO BE A SPLICE, AND A SPLICE IS NOT A ROUTING. The first version read
+
+        hybrid = np.where(d8 >= channel_cells * cellarea, d8, mfd)
+
+    -- run both routers to completion, then pick a value per cell. It looks like the chapter's
+    rule and it is not: accumulation is CUMULATIVE, so choosing between two finished totals
+    invents water at every boundary where the chosen field is the larger one. Measured against
+    the domain total (D8 = 1.000 by construction), the splice summed to **1.583** -- 58% of the
+    drainage conjured by the compositing step itself. It also cannot be what `03` describes,
+    because the chapter's rule switches on the accumulation being built, which a finished field
+    no longer has.
+
+    A hybrid has to be ONE pass: walk the cells in the routing order once, and at each cell
+    decide from the area accumulated SO FAR whether to split MFD-style or send everything to the
+    steepest neighbour. That is `flow.hybrid_accumulation`, and it sums to 1.018 -- the small
+    excess is MFD's genuine dispersion off the domain edge, the same effect that puts pure MFD at
+    1.109, not a compositing artefact.
     """
     d8 = flow.d8_accumulation(dem, cellsize)
     mfd = flow.mfd_accumulation(dem, cellsize)
-    cellarea = cellsize * cellsize
-    channel = d8 >= channel_cells * cellarea
-    hybrid = np.where(channel, d8, mfd)
+    hybrid = flow.hybrid_accumulation(dem, cellsize, channel_cells=channel_cells)
     return d8, mfd, hybrid
 
 
@@ -147,6 +165,22 @@ def diagonal_share(dem):
     return float(diag.sum()) / float(max(moved.sum(), 1))
 
 
+def hillslope_wetted(acc, cellsize=CELLSIZE):
+    """Share of cells receiving ANY water from upslope — the hillslope half of the claim.
+
+    ⚠️ THIS EXISTS BECAUSE `half_drainage_cells` IS STRUCTURALLY BLIND TO IT. The concentration
+    statistic is dominated by the trunk, since that is where the water is; the hybrid runs D8 in
+    the trunk by construction, so it scores as D8 (1.48% against 1.47%) and the statistic reports
+    "no difference". The difference is real and lives on the hillslope, where the hybrid runs MFD
+    and D8 leaves a quarter of all cells carrying nothing but their own area.
+
+    One statistic answering "is it D8?" with yes and another answering "is it MFD?" with yes is
+    not a contradiction — it is what a hybrid IS, and it takes two statistics to show.
+    """
+    a = np.asarray(acc, float)
+    return float((a > 1.001 * cellsize * cellsize).mean())
+
+
 def measurements(dem=None):
     """Everything the figure prints, in one call the test can re-run."""
     dem = terrain() if dem is None else dem
@@ -158,7 +192,11 @@ def measurements(dem=None):
         'hybrid_half': half_drainage_cells(hybrid),
         'd8_frac': half_drainage_cells(d8) / tot,
         'mfd_frac': half_drainage_cells(mfd) / tot,
+        'hybrid_frac': half_drainage_cells(hybrid) / tot,
         'ratio': half_drainage_cells(mfd) / max(half_drainage_cells(d8), 1),
+        'd8_wet': hillslope_wetted(d8),
+        'mfd_wet': hillslope_wetted(mfd),
+        'hybrid_wet': hillslope_wetted(hybrid),
         'diagonal_share': diagonal_share(dem),
     }
 
@@ -212,9 +250,16 @@ def build():
     d8, mfd, hybrid = routings(dem)
     m = measurements(dem)
     sweep = relief_sweep()
+    # The crossing, found from the data rather than eyeballed. Hoisted above the canvas
+    # because the caption quotes it and the canvas is now sized FROM the caption.
+    cross = next((a for (a, x, y) in sweep if x < y), None)
 
     W = PAD * 2 + COLS * PANEL_W
-    H = TOP + PAD + ROWS * PANEL_H + 110
+    # ⚠️ Sized from the caption it actually has, not from a hand-tuned constant. The sibling
+    # figure `halfar_anatomy.py` shipped with `+ 196` here, the caption outgrew it, and the
+    # last line — the one carrying the result — was silently clipped off the canvas.
+    caption = caption_lines(m, cross)
+    H = CAP_TOP + len(caption) * CAP_LEADING + CAP_MARGIN
     img = Image.new('RGB', (W, H), BG)
     d = ImageDraw.Draw(img)
     f_t, f_h, f_s, f_b = _font(26, True), _font(15, True), _font(13), _font(13, True)
@@ -226,13 +271,15 @@ def build():
     side = PANEL_W - 34
     panels = [
         ('a.  D8 — one receiver', d8, RED, 'converges hard; stripes at the lattice angles',
-         '%.1f%% of cells carry half the drainage' % (100 * m['d8_frac'])),
+         'half in %.1f%% of cells · %.1f%% wetted'
+         % (100 * m['d8_frac'], 100 * m['d8_wet'])),
         ('b.  MFD — every lower neighbour', mfd, BLU, 'never fully converges',
-         '%.1f%% — %.1f× as many as D8' % (100 * m['mfd_frac'], m['ratio'])),
+         'half in %.1f%% — %.1f× · %.1f%% wetted'
+         % (100 * m['mfd_frac'], m['ratio'], 100 * m['mfd_wet'])),
         ('c.  hybrid — MFD, D8 past A', hybrid, GRN,
-         'threshold %.0f cells of area' % CHANNEL_CELLS,
-         '%.1f%% — the line, without the stripes'
-         % (100 * m['hybrid_half'] / dem.size)),
+         'threshold %.0f cells · ONE pass, not a splice' % CHANNEL_CELLS,
+         'half in %.1f%% like D8 · %.1f%% wetted like MFD'
+         % (100 * m['hybrid_frac'], 100 * m['hybrid_wet'])),
     ]
     for k, (title, acc, col, sub, meas) in enumerate(panels):
         x0 = PAD + k * PANEL_W
@@ -269,8 +316,6 @@ def build():
         for p in pts:
             d.ellipse([p[0] - 3, p[1] - 3, p[0] + 3, p[1] + 3], fill=col)
         d.text((pts[-1][0] - 4, pts[-1][1] - 16), name, col, font=f_b, anchor='rs')
-    # the crossing, found from the data rather than eyeballed
-    cross = next((a for (a, x, y) in sweep if x < y), None)
     if cross is not None:
         d.line([px(cross), ax[1], px(cross), ax[3]], fill=(150, 60, 130), width=1)
         d.text((px(cross) + 4, ax[1] + 4), 'D8 wins above here', (150, 60, 130),
@@ -286,22 +331,39 @@ def build():
     d.text((x0 + 30, TOP + side + 42), 'below ~%.0f m the order reverses'
            % (cross if cross else 0), INK, font=f_b)
 
-    cap = TOP + PANEL_H + 10
-    for i, line in enumerate([
+    for i, line in enumerate(caption):
+        d.text((PAD, CAP_TOP + i * CAP_LEADING), line, INK if i == 0 else MUTED, font=f_s)
+    return img
+
+
+CAP_TOP = TOP + PANEL_H + 10
+CAP_LEADING = 17
+CAP_MARGIN = 20
+
+
+def caption_lines(m, cross):
+    """The caption, as a list, so `build` can size the canvas from it."""
+    return [
         'D8 AND MFD FAIL IN OPPOSITE DIRECTIONS ON THE SAME QUANTITY, which is why `03` recommends neither alone. D8 gives every cell a single',
         'receiver, so flow can only leave in one of eight directions; it converges hard — %.1f%% of cells carry half the drainage — and prints stripes'
         % (100 * m['d8_frac']),
         'at the lattice angles into anything driven by drainage area. MFD splits to every lower neighbour, so it never fully converges and needs',
-        '%.1f× as many cells for the same half. The hybrid in c runs MFD on the hillslope and switches to D8 past a channelisation threshold.'
+        '%.1f× as many cells for the same half. The hybrid in c runs MFD on the hillslope and switches to D8 past a channelisation threshold —'
         % m['ratio'],
+        'in ONE pass, deciding from the area accumulated so far. ⚠️ It is NOT `where(A > threshold, d8, mfd)`: picking between two FINISHED',
+        'accumulations invents water at every boundary, and that splice — which this panel used to draw — summed to 1.58× the domain\'s drainage.',
+        '⚠️ AND IT TAKES TWO STATISTICS TO SEE A HYBRID. The concentration number is dominated by the trunk, where the hybrid is D8 by',
+        'construction, so it reports %.1f%% against D8\'s %.1f%% — no difference. The difference is on the hillslope: %.1f%% of cells receive water'
+        % (100 * m['hybrid_frac'], 100 * m['d8_frac'], 100 * m['hybrid_wet']),
+        'from upslope under the hybrid and %.1f%% under MFD, against only %.1f%% under D8. Answering "is it D8?" yes and "is it MFD?" yes is not a'
+        % (100 * m['mfd_wet'], 100 * m['d8_wet']),
+        'contradiction — it is what a hybrid is, and one statistic could not have shown it.',
         'Panel d is the part prose keeps missing: sweep the relief and the order REVERSES below about %.0f m, because with almost nothing to steer'
         % (cross if cross else 0),
         'them D8\'s parallel paths never merge — the stripe artefact and the concentration statistic are the same phenomenon seen twice.',
         '%.0f%% of D8 receivers leave diagonally here. Drawn from flow.py — the shipped routers — and guarded by tests/test_flow_anatomy.py.'
         % (100.0 * m['diagonal_share']),
-    ]):
-        d.text((PAD, cap + i * 17), line, INK if i == 0 else MUTED, font=f_s)
-    return img
+    ]
 
 
 if __name__ == '__main__':

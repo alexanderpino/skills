@@ -87,10 +87,33 @@ def test_03_ratio(flow_m):
 
 
 def test_03_hybrid_share(flow_m):
-    m, fa = flow_m
-    dem = fa.terrain()
-    share = m["hybrid_half"] / float(dem.size)
-    check("03-flow-routing.md", r"the hybrid \*\*([0-9.]+)%\*\*", share, 100.0)
+    """⚠️ THE ROW THAT WENT STALE, KEPT AS THE REASON THIS FILE EXISTS.
+
+    `03` used to print **3.7%** here, and it was wrong — not stale but never right. Panel c drew
+    `where(A > threshold, d8, mfd)`, a pick between two FINISHED accumulations, which invents
+    water and landed the statistic halfway between its parents. That midpoint read as exactly
+    what a hybrid ought to score, which is why nobody looked at it twice. The real one-pass
+    hybrid scores **1.5%**, indistinguishable from D8, because the trunk dominates the statistic
+    and the hybrid IS D8 in the trunk.
+    """
+    m, _ = flow_m
+    check("03-flow-routing.md", r"scores the hybrid at \*\*([0-9.]+)%\*\*", m["hybrid_frac"], 100.0)
+
+
+@pytest.mark.parametrize("router,pattern", [
+    ("hybrid_wet", r"upslope is \*\*([0-9.]+)%\*\* under the hybrid"),
+    ("mfd_wet", r"under the hybrid and \*\*([0-9.]+)%\*\* under\n> MFD"),
+    ("d8_wet", r"against only \*\*([0-9.]+)%\*\* under D8"),
+])
+def test_03_hillslope_wetting(flow_m, router, pattern):
+    """The second statistic, which is the only one that can see the hybrid do anything.
+
+    Bound here rather than left in prose because these three numbers carry the whole corrected
+    claim: without them `03` reports the hybrid and D8 as identical and says nothing about why
+    anyone would build one.
+    """
+    m, _ = flow_m
+    check("03-flow-routing.md", pattern, m[router], 100.0)
 
 
 def test_03_reversal_relief(flow_m):

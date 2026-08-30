@@ -41,12 +41,59 @@ def test_mfd_needs_more_cells_than_d8_for_half_the_drainage(dem):
 
 
 def test_hybrid_sits_between_its_two_parents(dem):
-    """The hybrid is a composition, so it cannot be outside the pair it composes."""
+    """The hybrid is a composition, so it cannot be outside the pair it composes.
+
+    ⚠️ THIS ROW ALONE IS NOT ENOUGH, and the record of why belongs next to it. Panel c was
+    originally `np.where(d8 >= threshold, d8, mfd)` — a per-cell pick between two FINISHED
+    accumulations. That splice passed this row comfortably, because a value chosen from one of
+    two fields is trivially bracketed by them. What it did not do is conserve water: see
+    `test_the_hybrid_conserves_drainage_which_a_splice_does_not` below, which is the row that
+    would have caught it.
+    """
     d8, mfd, hybrid = FA.routings(dem)
     n_d8, n_mfd = FA.half_drainage_cells(d8), FA.half_drainage_cells(mfd)
     n_hy = FA.half_drainage_cells(hybrid)
     assert n_d8 <= n_hy <= n_mfd, (
         "hybrid %d is outside [D8 %d, MFD %d]" % (n_hy, n_d8, n_mfd))
+
+
+def test_the_hybrid_conserves_drainage_which_a_splice_does_not(dem):
+    """The row that separates a routing from a compositing operation.
+
+    Every cell contributes its own area exactly once, so summing the accumulation over the domain
+    counts each cell once per downstream cell it reaches. D8 gives one path per cell and sets the
+    scale; MFD disperses, and some of that dispersion leaves the domain edge, so its total drifts
+    a little above D8's. A genuine hybrid must sit in that same narrow band, because it too routes
+    each cell's water exactly once.
+
+    A splice cannot. Choosing per cell between two completed fields invents water wherever the
+    chosen field happens to be the larger one, and the invention compounds downstream. Measured:
+    D8 1.000, MFD 1.109, hybrid 1.018 — and the splice this figure used to draw, 1.583.
+    """
+    d8, mfd, hybrid = FA.routings(dem)
+    ratio = hybrid.sum() / d8.sum()
+    assert ratio <= mfd.sum() / d8.sum() + 0.01, (
+        "the hybrid moves more water than pure MFD (%.3f vs %.3f relative to D8) — it is "
+        "compositing finished fields, not routing" % (ratio, mfd.sum() / d8.sum()))
+    assert ratio < 1.15, (
+        "the hybrid's drainage total is %.3f x D8's; a one-pass routing cannot manufacture "
+        "that much water" % ratio)
+
+
+def test_the_splice_the_figure_used_to_draw_is_caught(dem):
+    """Prove the conservation row can fail. A guard never seen to fail is not known to be a guard.
+
+    This reconstructs the exact expression panel c shipped with and asserts the row above
+    rejects it. If someone "simplifies" `hybrid_accumulation` back into a `np.where`, this is
+    what says no.
+    """
+    d8, mfd, _hybrid = FA.routings(dem)
+    cellarea = FA.CELLSIZE * FA.CELLSIZE
+    splice = np.where(d8 >= FA.CHANNEL_CELLS * cellarea, d8, mfd)
+    ratio = splice.sum() / d8.sum()
+    assert ratio > 1.15, (
+        "the splice no longer manufactures water (%.3f x D8) — this control has gone quiet and "
+        "the conservation row above is no longer known to be able to fail" % ratio)
 
 
 def test_the_low_relief_reversal_the_figure_claims():

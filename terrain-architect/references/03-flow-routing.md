@@ -254,7 +254,26 @@ threshold. This costs almost nothing and is what most good terrain tools do.
 > by `tests/test_flow_anatomy.py`. **a–c:** the same 160×160 DEM routed three ways, log-compressed
 > because drainage area spans four decades and a linear ramp would show the trunk and nothing else.
 > **The statistic is the share of cells needed to carry half the total drainage**, which has no
-> threshold to tune: D8 needs **1.5%**, MFD **7.1%** — 4.8× as many — and the hybrid **3.7%**.
+> threshold to tune: D8 needs **1.5%** and MFD **7.1%** — 4.8× as many.
+>
+> ⚠️ **It takes two statistics to see a hybrid, and the first one alone says "no difference".**
+> The concentration number is dominated by the trunk, because that is where the water is — and
+> the trunk is exactly where the hybrid runs D8. So it scores the hybrid at **1.5%**, against
+> D8's 1.5%: indistinguishable, and it would be a mistake to read that as the hybrid doing
+> nothing. The difference is on the hillslope, and a second statistic finds it — the share of
+> cells receiving *any* water from upslope is **99.6%** under the hybrid and **99.7%** under
+> MFD, against only **76.0%** under D8. A quarter of the domain is bone dry under D8 and wet
+> under both of the others. Answering *"is it D8?"* yes and *"is it MFD?"* yes is not a
+> contradiction — it is what a hybrid **is**, and one number could not have shown it.
+>
+> ⚠️ **The hybrid must be one pass, and this figure used to get that wrong.** Panel c originally
+> drew `where(A > threshold, d8, mfd)` — both routers run to completion, then a per-cell pick.
+> That is compositing, not routing: accumulation is *cumulative*, so choosing between two
+> finished totals invents water at every boundary where the chosen field is larger, and the
+> splice summed to **1.58×** the domain's drainage. `flow.hybrid_accumulation` decides *during*
+> the single accumulation pass, from the area gathered so far, and sums to 1.018 — the residue
+> is MFD's genuine dispersion off the domain edge, which puts pure MFD at 1.109.
+>
 > **d** is the part the prose above misses. Sweeping the relief on the ramp, the order **reverses**
 > below about 8 m of texture: with almost nothing to steer them, D8's paths run as parallel stripes
 > at the lattice angles and never merge, so the router that is supposed to converge stops
