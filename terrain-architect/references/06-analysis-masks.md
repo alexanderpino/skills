@@ -433,9 +433,23 @@ snow is white because it is a white *substance*, not because "high == white".
 - **Masks must partition — `Σ ≤ 1`, not `Σ = 1`, and the difference is the base material.**
   Raw coverage masks are independent fields in `[0, 1]`: nothing makes them sum to anything.
   `Σ > 1` means two producers claim the same ground, which is a real bug. `Σ < 1` is ordinary —
-  the shortfall belongs to the bare base. Build them as an explicit priority stack (snow beats
+  **any** shortfall belongs to the bare base. Build them as an explicit priority stack (snow beats
   rock beats grass, each subsequent mask multiplied by `(1 − Σ previous)`), which yields `Σ ≤ 1`
   by construction, or normalise explicitly and know that you did.
+
+  **`≤`, and not `<`, because a well-formed stack that names its base as a channel reaches exactly
+  1.** That is the ordinary case, not an edge case: `reference-impl/analysis.py`'s `derive_materials`
+  and `derive_substances` both append `(base, 1 − Σ claimed)` as a final channel, so they hit `1.0`
+  everywhere. The `<` only holds for a stack whose base is left *implicit* — and that is a property
+  of the example, not of the rule. Even without a closing channel, `[1.0, 0.6, 0.6]` stacks to
+  exactly 1: the first mask claims everything and the remainder is genuinely zero.
+
+  **So state it as two assertions at two sites, not one.** At the mask fan-in (`14`), where the
+  masks are raw and the base is implicit, assert `Σ ≤ 1`. At the point where you *close* the stack
+  by emitting the base as its own channel, assert `Σ = 1` — that one is a real check on your closure
+  arithmetic, and it is the assertion `08` needs before the weights reach a shader. Two sites, two
+  statements, both mechanically checkable; the single-number version of this rule is what made the
+  chapters look like they contradicted each other.
 
   ⚠️ **This bullet used to say "sum to 1.3 and the splatmap normalisation will silently rescale,
   so your rock ends up 30% weaker".** That is wrong twice over, and both halves are worth
@@ -446,15 +460,38 @@ snow is white because it is a white *substance*, not because "high == white".
   `Σ wᵢ · materialᵢ` has no base layer to absorb a shortfall, so there `= 1` is a genuine
   requirement on the data.
 
-  Second — **there is no silent rescale, and that is the actual danger.** The shipped compositor
-  (`reference-impl/render.py`'s `splat_blend`) is an ordered over-composite, `out·(1 − m) +
-  colour·m`, not a weighted sum. Feed it masks summing to **1.8** and the effective weights still
-  sum to **1.0000000000**, the base absorbing `Π(1 − mᵢ)` exactly; at masks summing to **3.0** the
-  output is still inside the convex hull of its input colours. Nothing is rescaled, nothing dims,
-  nothing goes out of range. Over-subscription produces **no artefact at all** — the compositing
-  *order* quietly arbitrates a conflict nobody decided to have. That is why `14` puts the
-  `Σ masks ≤ 1` assertion at the mask fan-in: downstream there is nothing left to detect.
-  (`reference-impl/tests/test_mask_partition.py`)
+  Second — **whether over-subscription leaves a trace depends entirely on which compositor the
+  consumer picked, and that is the actual argument for asserting upstream.** The old bullet said a
+  splatmap "silently rescales"; the correction that replaced it over-reached in the other direction
+  and said there is no artefact *at all*. Both are wrong, because "the compositor" is not one thing.
+  Measured on `reference-impl/render.py` with a realistic pale-terrain palette
+  (`[[205,210,220], [210,216,228], [200,207,221]]`), `shade=False`:
+
+  - **Ordered over-composite — `splat_blend`, `out·(1 − m) + colour·m`.** No trace, exactly as
+    claimed. Masks summing to **1.8** still give effective weights summing to **1.0000000000**, the
+    base absorbing `Π(1 − mᵢ)`; at **3.0** the output is still inside the convex hull of its input
+    colours. Nothing rescales, nothing dims, nothing leaves range. **This path cannot report the
+    bug** — the compositing *order* quietly arbitrates a conflict nobody decided to have.
+  - **Base-less weighted sum — `render.material_rgb`, `Σ wᵢ·materialᵢ`.** It *does* leave a trace,
+    and a loud one. `Σ = 1.00` → unclipped `[205 211 223]`, shipped `[204 211 222]` (float→uint8
+    truncation, ±1 — a convex combination, inside the palette's hull). `Σ = 1.80` → unclipped
+    `[369 380 401]`, shipped `[255 255 255]`: every channel past 255 and every channel clipped.
+    A rescale, a brightness error and an
+    out-of-range value, all three at once. This is not a hypothetical shader: it ships in the same
+    module as `splat_blend`, `GROUNDING.md` names it the **default** colorizer, and `gallery.py:117`
+    and `graph_demo.py:420` feed `06` masks straight into it with no compositing stage between.
+  - **Chained `blend_rgb` in a non-`normal` mode** is worse again — monotone dimming toward black
+    under `multiply` (128 → 84.7 at `Σ = 0.6`, → 27.2 at `Σ = 1.8`) and toward white under `screen`
+    (→ 154.5, → 199.8). That is precisely the "blotchy lighting" tell `08` names.
+
+  So the bug's visibility is a property of the *consumer*, not of the masks — which is the whole
+  reason the assertion belongs at the fan-in (`14`), one place, independent of who consumes it.
+  A producer cannot know which compositor is downstream, and one of the three shipping choices
+  reports nothing. (`reference-impl/tests/test_mask_partition.py`)
+
+  ⚠️ **And do not "fix" `material_rgb` by making it normalise.** It is currently the only thing in
+  the tree that detects a partition bug at all. Normalising it would make the old "no artefact"
+  sentence true by destroying the only signal that exists.
 - **Aspect matters and is cheap.** `northness = dot(aspectVec(aspect), northDir)`. With the
   downslope aspect above and the STANDARD raster convention — row index increases *southward*, so
   row 0 = north and the `y` axis points SOUTH — that is `-sin(aspect)`: +1 facing north, −1 facing

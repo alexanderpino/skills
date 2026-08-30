@@ -522,7 +522,7 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Every port range-checked and finiteness-swept at the node that produced it (`14`)?
 - [ ] Each chained sim sub-cycled under its **own** stability limit, with a safety factor — not a shared `Δt` (`14`)?
 - [ ] Guards named with a unit and a reason, clamp events counted, and a rising clamp count treated as a failure (`14`)?
-- [ ] Masks partition to 1?
+- [ ] Masks partition — **`Σ ≤ 1` on the raw coverage masks at the fan-in** (`06`, `14`), and `Σ = 1` at the point the stack is *closed* by emitting the base as its own channel (`06`, `08`)? (two assertions at two sites, not one number: `Σ > 1` at the fan-in means two producers claim the same ground, and whether that leaves a visible trace depends on which compositor the consumer picked — `render.splat_blend` hides it, `render.material_rgb` clips)
 - [ ] Every hard threshold noise-perturbed?
 - [ ] Any directional/"anisotropy" control sourced from a **field** (strike, wind, ice flow), not a global angle that will land on the axes? (rotate-the-domain test, at an angle that is *not* a lattice symmetry)
 - [ ] Vertex- vs pixel-centring documented and consistent?

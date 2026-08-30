@@ -562,20 +562,37 @@ the coverage masks `06` produces, and conflating the two is why `14` appears to 
 line. A shader computing `Σ wᵢ · materialᵢ` has no base layer to absorb a shortfall, so `Σ = 1`
 is a requirement on the data. Raw coverage masks are independent fields in `[0, 1]` with nothing
 making them sum to anything, so on *those* the assertion is `Σ ≤ 1` (`14`) — a check for two
-simulations claiming the same ground, with the remainder belonging to the base material. Either
-enforce the weight normalisation in the graph (`06`) or normalise in the shader. Doing neither
-means your material blend brightness varies with the mask sum, which reads as inexplicable
-blotchy lighting.
+simulations claiming the same ground, with **any** remainder belonging to the base material.
+(`≤` and not `<`: a stack that emits its base as a channel reaches exactly 1, which is the
+ordinary case — `06` states these as two assertions at two sites.) Either enforce the weight
+normalisation in the graph (`06`) or normalise in the shader. Doing neither means your material
+blend brightness varies with the mask sum, which reads as inexplicable blotchy lighting.
 
-⚠️ **An ordered over-composite is exempt, and that exemption is a trap.** If you composite by
-laying each material over the last (`out·(1 − m) + colour·m`, which is what
-`reference-impl/render.py`'s `splat_blend` does) the effective weights sum to exactly 1 whatever
-the masks do — the base absorbs `Π(1 − mᵢ)`. Measured: masks summing to **1.8** still give
-effective weights summing to **1.0000000000**; at masks summing to **3.0** the output is still
-inside the convex hull of its input colours. So over-subscription produces no artefact, no
-dimming and no out-of-range value — the compositing *order* silently arbitrates a conflict
-nobody chose to have. That is precisely why `14` puts the `Σ ≤ 1` assertion upstream: downstream
-there is nothing left to detect. (`reference-impl/tests/test_mask_partition.py`)
+⚠️ **An ordered over-composite is exempt, and that exemption is a trap — but the exemption is
+the operator's, not the pipeline's.** If you composite by laying each material over the last
+(`out·(1 − m) + colour·m`, which is what `reference-impl/render.py`'s `splat_blend` does) the
+effective weights sum to exactly 1 whatever the masks do — the base absorbs `Π(1 − mᵢ)`.
+Measured: masks summing to **1.8** still give effective weights summing to **1.0000000000**; at
+masks summing to **3.0** the output is still inside the convex hull of its input colours. Under
+*that* operator over-subscription produces no artefact, no dimming and no out-of-range value —
+the compositing *order* silently arbitrates a conflict nobody chose to have, and **that path
+cannot report the bug**.
+
+Under a **base-less weighted sum it reports it loudly**, and the `Σ wᵢ · materialᵢ` shader two
+paragraphs above is not hypothetical — it is `render.material_rgb`, which ships in the same
+module as `splat_blend` and which `GROUNDING.md` names as the **default** colorizer (`gallery.py`
+and `graph_demo.py` feed `06` masks straight into it). Measured on a pale-terrain palette,
+`shade=False`: `Σ = 1.00` gives unclipped `[205 211 223]` and shipped `[204 211 222]` — inside the
+palette's hull, ±1 for the float→uint8 truncation; `Σ = 1.80` gives unclipped `[369 380 401]` and
+shipped `[255 255 255]`, every channel over and every channel clipped. That is the rescale, the brightness
+error and the out-of-range value, together. Chained `blend_rgb` in a non-`normal` mode is worse
+still — monotone dimming toward black under `multiply` and toward white under `screen` as `Σ`
+rises, which is exactly the blotchy lighting named above.
+
+**So whether the bug is visible depends on which compositor a consumer picked** — and a producer
+cannot know that. Which is precisely why `14` puts the `Σ ≤ 1` assertion at the fan-in: one place,
+independent of the consumer, rather than relying on a downstream operator that may be the one that
+stays silent. (`reference-impl/tests/test_mask_partition.py`)
 
 **Resolution.** Splatmaps are usually 1/2 or 1/4 the heightmap resolution. They're
 pixel-centred while the heightmap is vertex-centred (see above) — mind the offset.

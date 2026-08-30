@@ -170,7 +170,7 @@ that produced it instead of three nodes downstream where it finally manifests.
 | Drainage area (m²) | Finite, `≥ cellArea` — every cell drains at least itself (`03`) |
 | Slope (tan) | Finite, `≥ 0` |
 | `NormalField` | Finite, unit length within tolerance |
-| `MaterialField` / layer weights | Finite, each `[0, 1]`, and **partitioning to 1** (SKILL.md, mask semantics) |
+| `MaterialField` / layer weights | Finite, each `[0, 1]`, and **partitioning to exactly 1** — `= 1`, not `≤ 1`, and the difference from `MaskField` is the point: a `MaterialField` is a *closed* stack that names its base as a channel (`analysis.derive_materials` / `derive_substances` append `(base, 1 − Σ claimed)`, so they hit `1.0` everywhere), whereas a `MaskField` is one raw coverage mask with the base left implicit, asserted `Σ ≤ 1` at the fan-in below. Two assertions, two sites (`06`, `08`'s *Normalisation*) |
 
 The sweep costs a fraction of any node's own evaluation, and it is the difference between "node 7
 emitted a negative depth" and "the export has holes in it".
@@ -322,18 +322,26 @@ Two consequences worth stating because they surprise people:
 - **It is a fan-in, so it is also the natural place for the partition assertion.** Since every
   coverage mask passes through one node, assert `Σ masks ≤ 1` there once, rather than hoping each
   consumer checks. **`≤`, not `=`** — these are the raw coverage masks, independent `[0, 1]`
-  fields, and the shortfall is the base material's share. `08`'s "splat weights must sum to 1"
-  is a different object one stage later, after compositing has filled the remainder; the two
-  are not in conflict.
+  fields, and **any** shortfall is the base material's share. `≤` rather than `<` because a
+  well-formed stack that names its base as a channel reaches exactly 1: that is the `MaterialField`
+  contract in the table above, a *second* assertion at a *second* site, and it is `08`'s "splat
+  weights must sum to 1" — a different object one stage later, after compositing has filled the
+  remainder. Two assertions, two sites, no conflict.
 
-  ⚠️ **And the assertion has to live here because downstream it is undetectable.** If the
-  consumer composites by laying each material over the last — `out·(1 − m) + colour·m`, the
-  shipped `render.splat_blend` — the effective weights sum to exactly 1 no matter what the masks
-  do, the base absorbing `Π(1 − mᵢ)`. Measured, masks summing to **1.8** still give effective
-  weights summing to **1.0000000000**, and at **3.0** the output is still inside the convex hull
-  of its inputs. Two simulations claiming the same ground therefore produce no artefact at all;
-  the node insertion order quietly decides which one wins, which is the same
-  order-dependence rule (1) above exists to forbid.
+  ⚠️ **And the assertion has to live here because whether it is detectable downstream depends on
+  a choice this node cannot see.** If the consumer composites by laying each material over the
+  last — `out·(1 − m) + colour·m`, the shipped `render.splat_blend` — the effective weights sum to
+  exactly 1 no matter what the masks do, the base absorbing `Π(1 − mᵢ)`. Measured, masks summing
+  to **1.8** still give effective weights summing to **1.0000000000**, and at **3.0** the output
+  is still inside the convex hull of its inputs: under *that* operator two simulations claiming
+  the same ground produce no artefact at all, and node insertion order quietly decides which one
+  wins — the same order-dependence rule (1) above exists to forbid. But if the consumer is a
+  base-less weighted sum — `render.material_rgb`, `Σ wᵢ·materialᵢ`, which ships beside
+  `splat_blend` and is the default colorizer — the same masks drive channels past 255 and clip:
+  `Σ = 1.8` on a pale palette gives an unclipped `[369 380 401]`, shipped as `[255 255 255]`.
+  So the defect is either invisible or a hard clip depending on a downstream choice. The producer
+  cannot know which, which is exactly why the check belongs here — one place, independent of the
+  consumer — and not in whichever compositor happens to be wired up.
   (`reference-impl/tests/test_mask_partition.py`)
 
 **Tier.** **F** — an editor-ergonomics pattern, not a result. The correctness rules are not

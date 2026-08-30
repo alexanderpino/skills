@@ -121,8 +121,19 @@ def test_selectors_are_masks_in_unit_range():
 
 
 def test_material_masks_partition():
-    """A priority material stack partitions: every mask in [0,1] and they sum to ~1 (else a
-    splatmap silently rescales them)."""
+    """A CLOSED priority stack sums to exactly 1: every mask in [0,1] and Σ = 1.
+
+    This is the `Σ = 1` half of `06`'s two-assertions-at-two-sites rule, and it is not in tension
+    with `test_mask_partition.py`'s `Σ ≤ 1` row — that one is about RAW coverage masks at the
+    fan-in, where the base is implicit. `derive_materials` closes its stack by appending
+    ("grass", 1 - claimed), so here the base IS a channel and the sum reaches 1 exactly. `≤` and
+    `=` are assertions about two different objects at two different sites.
+
+    ⚠️ The rationale used to read "else a splatmap silently rescales them", which is false: the
+    shipped over-composite rescales nothing whatever the masks sum to. The real consequence of a
+    broken partition is downstream and consumer-dependent — `render.material_rgb` clips, and
+    `render.splat_blend` stays silent. `tests/test_mask_partition.py` measures both.
+    """
     n, cs = 40, 20.0
     rng = np.random.default_rng(3)
     h = _paraboloid(n=n, R=300.0, cellsize=cs) + rng.uniform(0, 30, (n, n))

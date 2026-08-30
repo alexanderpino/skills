@@ -183,9 +183,21 @@ def derive_materials(height, slope_tan, area, cellsize, *, snow_line=None,
                      channel_area=None, rng_seed=0):
     """A partitioned material stack from the analysis fields (06, Masks -> materials). Returns
     an ordered list of (name, MaskField) built as a PRIORITY STACK — each mask multiplied by
-    (1 - sum of the masks above it) — so the masks partition (sum <= 1) and a splatmap won't
-    silently rescale them. Order: water -> snow -> rock -> sand -> grass. Thresholds are world
-    units; snow_line / channel_area default to sensible fractions of the field's own range."""
+    (1 - sum of the masks above it), which gives sum <= 1 by construction. This stack is then
+    CLOSED: "grass" is appended as (1 - claimed), so the returned stack sums to exactly 1.0
+    everywhere and is a MaterialField, not a bag of raw MaskFields (14's field contracts).
+
+    ⚠️ The rationale here used to read "so a splatmap won't silently rescale them". That is
+    false and 06 no longer says it: the shipped over-composite (`render.splat_blend`) rescales
+    nothing whatever the masks sum to — its effective weights always total 1. What DOES go wrong
+    is the base-less weighted sum (`render.material_rgb`, `Σ wᵢ·materialᵢ`): masks summing to 1.8
+    drive channels past 255 and clip. So the reason to close the stack is that the consumer's
+    behaviour is not knowable from here — which is why 14 asserts `Σ ≤ 1` at the fan-in and 06
+    asserts `Σ = 1` here, at the site where the stack is closed. See
+    `tests/test_mask_partition.py`.
+
+    Order: water -> snow -> rock -> sand -> grass. Thresholds are world units;
+    snow_line / channel_area default to sensible fractions of the field's own range."""
     height = np.asarray(height, dtype=np.float64)
     slope_tan = np.asarray(slope_tan, dtype=np.float64)
     area = np.asarray(area, dtype=np.float64)

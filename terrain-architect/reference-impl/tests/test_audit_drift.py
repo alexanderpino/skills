@@ -216,10 +216,10 @@ def test_the_eval_readme_axis_table_matches_evals_json():
 
 
 # --------------------------------------------------------------------------- #
-# SIMULATION-AUDIT.md — the "Ours" column, which is where this document lied twice
+# SIMULATION-AUDIT.md — the "Ours" column, which is where this document lied four times
 #
 # ⚠️ THIS FILE GUARDED THE WRONG DOCUMENT FOR MONTHS. `CLAIMABLE` above covers only
-# NODE-PARITY-AUDIT.md, so SIMULATION-AUDIT.md's scorecard was unguarded, and two of
+# NODE-PARITY-AUDIT.md, so SIMULATION-AUDIT.md's scorecard was unguarded, and four of
 # its rows understated what ships:
 #
 #   Lava flow  — said "ejecta CA only ... **gap** ... upgrade: thermo-rheological CA",
@@ -230,71 +230,236 @@ def test_the_eval_readme_axis_table_matches_evals_json():
 #   Karst caves — said "— (prose only)", while landforms.karst_sinkholes ships dolines
 #                with a lognormal size distribution and the sink_mask that 03 must not
 #                fill, tested in test_landforms.py.
+#   Hydraulic  — said "Lagrangian droplet ... solid, not SOTA ... don't make physical
+#                claims on it", naming Mei 2007 as the SOTA it lacked — while
+#                erosion_pipe.py IS Mei 2007, ships, and is tested by test_pipe.py, and
+#                two other cells of this same document said so.
+#   Coastal    — said "simple cliff retreat", understating a notch -> thermal collapse ->
+#                retreat loop with a wave-cut platform (sims_illustrative.coastal_retreat).
+#                Only the wave-energy-proportional rate law is genuinely absent.
 #
-# Both are the SAME failure and it is the expensive one: a reader planning work off this
-# scorecard sets out to build something that already exists.
+# All four are the SAME failure and it is the expensive one: a reader planning work off
+# this scorecard sets out to build something that already exists.
 #
-# ⚠️ WHY THIS CHECKS THE "OURS" CELL AND NOT THE VERDICT. A **gap** verdict can be
-# perfectly honest while something adjacent ships — karst is exactly that case: the
-# surface expression exists, the 3-D conduit network genuinely does not, and forcing that
-# row to stop saying "gap" would replace one false statement with another. What can never
-# be honest is an "Ours" cell claiming we have nothing when a tested callable is sitting
-# in the tree. So the verdict is left to a human and the inventory is made mechanical.
+# ⚠️ WHY THE PRIMARY CHECK IS "DOES THE CELL NAME THE CALLABLE", NOT "DOES IT SAY NOTHING".
+# The first guard here asked whether the "Ours" cell was empty. That is the wrong question
+# twice over. It misses every cell that says something FALSE rather than nothing — the lava
+# row's "ejecta CA only" and the hydraulic row's "Lagrangian droplet" both sail through it —
+# and, on the empty case it does target, it is defeated by any spelling of a dash a writer
+# might reach for: `**—**`, `*—*`, an en dash, a figure dash, `--`, a backticked dash,
+# `&mdash;`, a trailing footnote marker, "docs only", "not implemented", "TBD". Only karst
+# ever LOOKED like an empty cell; lava, hydraulic and karst are one failure mode.
+#
+# So the primary row asserts the literal attribute name appears in the cell. There is no
+# regex to keep in step with a writer's imagination, and it fails on all four historical
+# defects. `_CLAIMS_NOTHING` is kept behind it as belt-and-braces — widened, and matched
+# against a NORMALISED cell — with the escape table pinned below as a parametrised negative
+# test, so a future narrowing of the matcher fails immediately instead of silently.
+#
+# ⚠️ AND THE VERDICT IS STILL LEFT TO A HUMAN. A **gap** verdict can be perfectly honest
+# while something adjacent ships — karst is exactly that case: the surface expression exists,
+# the 3-D conduit network genuinely does not, and forcing that row to stop saying "gap" would
+# replace one false statement with another. The inventory is mechanical; the judgement is not.
 
 SIMAUDIT_OURS = {
-    # row subject          -> (module, attribute) that contradicts an empty "Ours" cell
+    # row subject                      -> (module, attribute) the "Ours" cell must NAME
     "Lava flow": ("sims_illustrative", "lava_flow"),
     "Karst caves": ("landforms", "karst_sinkholes"),
+    "Hydraulic (detail/interactive)": ("erosion_pipe", "pipe_erode"),
+    "Coastal": ("sims_illustrative", "coastal_retreat"),
+    "Sediment / deposition": ("erosion_pipe", "pipe_erode"),
+    "Aeolian (dunes + abrasion)": ("aeolian", "yardang"),
+    "Glacial": ("glacier", "glacier_carve"),
 }
 
-# Cells that assert we ship nothing. Matched against the "Ours" cell only.
-_CLAIMS_NOTHING = re.compile(r"^\s*(—|-|none|n/?a)?\s*(\(?\s*prose[- ]only\s*\)?)?\s*$", re.I)
+# Dash characters a writer might reach for where a plain hyphen was meant: hyphen, non-breaking
+# hyphen, figure dash, en dash, em dash, horizontal bar, minus sign.
+_DASHES = "‐‑‒–—―−"
+
+
+def _plain(cell):
+    """A scorecard cell with markdown emphasis, entities and dash spellings normalised away.
+
+    ⚠️ THE OLD CODE DID `cells[0].strip("* ")`, which strips only the ENDS — a cell like
+    `**gap** (see below)` kept its inner `**`, and `**—**` normalised to `—`, an em dash the
+    matcher below did not list. Everything the matcher sees goes through here first, so the
+    matcher only ever has to know one spelling of each word.
+    """
+    c = cell.replace("&mdash;", "-").replace("&ndash;", "-").replace("&#8212;", "-")
+    c = re.sub(r"[*_`]", "", c)                       # markdown emphasis and code ticks
+    for d in _DASHES:
+        c = c.replace(d, "-")
+    c = re.sub(r"-{2,}", "-", c)                      # `--`, `---`
+    c = re.sub(r"\[\^?[\w\d]+\]", " ", c)             # footnote / link references
+    c = re.sub(r"[()\[\]]", " ", c)                   # so "— (docs only)" reads as "- docs only"
+    c = " ".join(c.split())                           # collapses "prose  only" too
+    return c.strip(" .,;:!?")
+
+
+def _strip_emphasis(cell):
+    """Leading/trailing `**` only — for header and subject cells, where inner text is content."""
+    return re.sub(r"^\**|\**$", "", cell.strip()).strip()
+
+
+# Cells that assert we ship nothing, matched against `_plain(...)` of the "Ours" cell only.
+# Deliberately generous: a false negative here is a scorecard row that lies unguarded.
+_NOTHING = (r"(?:-|none(?:\s+yet)?|nil|nothing|n/?a|tbd|todo|planned|unimplemented"
+            r"|not\s+implemented|not\s+built|absent|missing|gap)")
+_ONLY = r"(?:(?:prose|docs?|documentation|text|paper|design|pseudocode)[\s-]*only)"
+_CLAIMS_NOTHING = re.compile(
+    r"^\s*%s?\s*%s?\s*%s?\s*$" % (_NOTHING, _ONLY, _NOTHING), re.I)
+
+_SCORECARD_HEADING = "## Part 2 — Per-process simulation scorecard"
 
 
 def _simaudit_rows():
-    """(subject, ours_cell) for every scorecard row, from the shipped markdown table."""
-    rows = []
-    for line in SIMAUDIT_RAW.splitlines():
-        if not line.startswith("|") or set(line) <= set("|- "):
+    """(subject, ours_cell) for every DATA row of the Part 2 scorecard, and nothing else.
+
+    ⚠️ THE OLD PARSE READ EVERY `|` LINE IN THE FILE. SIMULATION-AUDIT.md has three tables
+    (Part 1 representation tiers, Part 2 the scorecard, Part 3 the metric vector) and only one
+    of them has an "Ours" column, so `cells[1]` meant "Represents" in Part 1 and "Real-Earth
+    target" in Part 3. It also parsed header rows as data. A false PASS was reachable in one
+    edit: delete the karst scorecard row and write `| Karst caves | see Part 5 |` anywhere else
+    in the document — the mapping-staleness row would still find a "row", and the "Ours" cell it
+    checked would be prose from another table.
+
+    So: bound the parse to the Part 2 section, take the first table in it, find the "Ours"
+    column BY ITS HEADER, and fail loudly if no header cell is literally `Ours` — which is what
+    a column reorder or a rename looks like, and is exactly what the staleness row was for.
+    """
+    start = SIMAUDIT_RAW.index(_SCORECARD_HEADING) + len(_SCORECARD_HEADING)
+    section = SIMAUDIT_RAW[start:]
+    nxt = section.find("\n## ")
+    if nxt >= 0:
+        section = section[:nxt]
+
+    rows, ours_col, in_table = [], None, False
+    for line in section.splitlines():
+        line = line.strip()
+        if not line.startswith("|"):
+            if in_table:
+                break                       # the table ended; ignore anything after it
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) < 2:
+        in_table = True
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if all(set(c) <= set("-: ") for c in cells):
+            continue                        # `|---|---|` separator
+        if ours_col is None:                # the header row, consumed not emitted
+            headers = [_strip_emphasis(c) for c in cells]
+            assert "Ours" in headers, (
+                "SIMULATION-AUDIT.md's Part 2 scorecard has no column headed exactly 'Ours' "
+                "(headers: %s). Either the table was reorganised or this parser is stale; "
+                "both need a human, and guessing a column index is how the guard goes quiet."
+                % headers)
+            ours_col = headers.index("Ours")
             continue
-        subject = cells[0].strip("* ")
-        rows.append((subject, cells[1]))
+        if len(cells) <= ours_col:
+            continue
+        rows.append((_strip_emphasis(cells[0]), cells[ours_col]))
+    assert ours_col is not None, (
+        "SIMULATION-AUDIT.md's Part 2 section contains no markdown table; the scorecard guard "
+        "below would silently pass on an empty parse.")
     return rows
 
 
-@pytest.mark.parametrize("subject", sorted(SIMAUDIT_OURS))
-def test_simulation_audit_does_not_claim_we_ship_nothing_when_we_do(subject):
-    """An "Ours" cell that says nothing ships must be true of the tree it describes.
+def _ours_cells(subject):
+    matching = [ours for subj, ours in _simaudit_rows() if subj == subject]
+    assert matching, (
+        "SIMULATION-AUDIT.md's Part 2 scorecard no longer has a row for %r — either the "
+        "scorecard changed or this mapping is stale. Both need a human." % subject)
+    return matching
 
-    This is the row that would have caught the lava scorecard on the day `lava_flow`
-    landed, and the karst row on the day `karst_sinkholes` did — instead of a reader
-    catching both, months apart.
+
+@pytest.mark.parametrize("subject", sorted(SIMAUDIT_OURS))
+def test_the_ours_cell_names_the_callable_that_ships(subject):
+    """⚠️ THE PRIMARY GUARD: an "Ours" cell must NAME the callable it is describing.
+
+    This is the row that would have caught the lava scorecard on the day `lava_flow` landed,
+    the karst row on the day `karst_sinkholes` did, and — unlike the "says nothing" matcher it
+    replaces — the hydraulic row, whose cell was not empty at all but confidently named the
+    wrong model while `erosion_pipe.pipe_erode` sat two rows below it.
+
+    Asserting the literal attribute name is what makes this robust: `ejecta CA only`,
+    `Lagrangian droplet (Beyer/Lague)`, `**—**`, `&mdash;`, `docs only` and every other
+    spelling of "we have nothing" fail it identically, and there is no pattern to maintain.
     """
     module_name, attr = SIMAUDIT_OURS[subject]
     if not _exists(module_name, attr):
         pytest.skip("%s.%s does not exist, so the row's claim is honest" % (module_name, attr))
-    matching = [ours for subj, ours in _simaudit_rows() if subj == subject]
-    assert matching, (
-        "SIMULATION-AUDIT.md no longer has a row for %r — either the scorecard changed or "
-        "this mapping is stale. Both need a human." % subject)
-    for ours in matching:
-        assert not _CLAIMS_NOTHING.match(ours), (
-            "SIMULATION-AUDIT.md's %r row says we ship %r, but %s.%s exists and is callable. "
-            "A reader planning work off this scorecard would rebuild it. Describe what ships; "
-            "leave the Verdict cell to a human, since a gap can be honest while something "
+    for ours in _ours_cells(subject):
+        assert attr in ours, (
+            "SIMULATION-AUDIT.md's %r row describes what we ship as %r, which does not name "
+            "%s.%s — a callable that exists, is tested, and is what the row is about. A reader "
+            "planning work off this scorecard would rebuild it. Name the callable in the Ours "
+            "cell; leave the Verdict cell to a human, since a gap can be honest while something "
             "adjacent exists." % (subject, ours, module_name, attr))
 
 
+@pytest.mark.parametrize("subject", sorted(SIMAUDIT_OURS))
+def test_simulation_audit_does_not_claim_we_ship_nothing_when_we_do(subject):
+    """Belt-and-braces behind the row above: the cell must not read as "we have nothing".
+
+    Kept because it fails with a different, blunter message, and because it still fires if a
+    future edit drops the attribute name into an otherwise-empty cell (`— (`pipe_erode`)`).
+    Matched against `_plain(...)`, so dash spellings and emphasis cannot smuggle a claim past.
+    """
+    module_name, attr = SIMAUDIT_OURS[subject]
+    if not _exists(module_name, attr):
+        pytest.skip("%s.%s does not exist, so the row's claim is honest" % (module_name, attr))
+    for ours in _ours_cells(subject):
+        assert not _CLAIMS_NOTHING.match(_plain(ours)), (
+            "SIMULATION-AUDIT.md's %r row says we ship %r, but %s.%s exists and is callable. "
+            "Describe what ships." % (subject, ours, module_name, attr))
+
+
+# Every spelling of "we ship nothing" that the FIRST version of `_CLAIMS_NOTHING` let through.
+# Fixture strings, not the corpus: this pins the matcher itself, so narrowing it fails here
+# rather than months later on a real row.
+_ESCAPES_THAT_MUST_BE_CAUGHT = [
+    "—", "-", "–", "‒", "―", "−", "--", "---",
+    "**—**", "*—*", "`—`", "**--**", "&mdash;", "&ndash;",
+    "—.", "— ", " — ", "—[^1]",
+    "prose only", "prose  only", "(prose only)", "**(prose only)**",
+    "docs only", "doc only", "text only", "documentation only", "pseudocode only",
+    "— (prose only)", "**—** (text only)", "&mdash; (docs only)",
+    "not implemented", "Not Implemented", "none yet", "none", "nothing", "nil",
+    "n/a", "N/A", "na", "planned", "TBD", "todo", "unimplemented", "missing", "absent",
+    "",
+]
+
+
+@pytest.mark.parametrize("cell", _ESCAPES_THAT_MUST_BE_CAUGHT)
+def test_the_claims_nothing_matcher_catches_every_known_escape(cell):
+    """The negative half of the belt-and-braces matcher, against fixtures rather than the file."""
+    assert _CLAIMS_NOTHING.match(_plain(cell)), (
+        "%r reads as 'we ship nothing' but the matcher does not catch it; a scorecard row "
+        "spelled that way would go unguarded" % cell)
+
+
+@pytest.mark.parametrize("cell", [
+    "`sims_illustrative.lava_flow` — thermo-rheological CA",
+    "**now: `erosion_pipe.pipe_erode`** (Mei-2007 coupled flow+sediment, conserved)",
+    "surface karst only — `landforms.karst_sinkholes`",
+    "D8 + MFD + priority-flood",
+    "ejecta CA only",                      # false, but it is a CLAIM — the row above catches it
+])
+def test_the_claims_nothing_matcher_does_not_swallow_a_real_claim(cell):
+    """The other half: a cell that describes something must never read as empty."""
+    assert not _CLAIMS_NOTHING.match(_plain(cell)), (
+        "%r describes something we ship, but the matcher reads it as an empty cell; the "
+        "belt-and-braces row would then fire on an honest row" % cell)
+
+
 def test_the_simulation_audit_mapping_is_not_stale():
-    """Every mapped subject must still name a row in the scorecard.
+    """Every mapped subject must still name a row in the Part 2 scorecard.
 
     Without this the dict quietly rots into a set of no-ops the moment the table is
     reorganised — the same way `CLAIMABLE`'s "spectral band" needle sat dead for months.
+    Bounded to the scorecard, so a `| Karst caves | ... |` line in some other table cannot
+    stand in for the row that was deleted.
     """
     subjects = {subj for subj, _ours in _simaudit_rows()}
     missing = sorted(set(SIMAUDIT_OURS) - subjects)
     assert not missing, (
-        "these SIMAUDIT_OURS keys name no row in SIMULATION-AUDIT.md: %s" % missing)
+        "these SIMAUDIT_OURS keys name no row in SIMULATION-AUDIT.md's Part 2 scorecard: %s"
+        % missing)
