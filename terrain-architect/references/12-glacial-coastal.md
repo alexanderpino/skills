@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Glacial, Coastal & Marine"
+description: Glacial carving on the shallow-ice approximation, and the coastal chain from radiation stress through nearshore currents to the bar and rip system.
+tags: [glacial, coastal, surf, sia]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-21T14:22:53Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Glacial, Coastal & Marine
 
 Contents: [Glacial: why it matters](#glacial-why-it-matters) · [Mass balance](#mass-balance) ·

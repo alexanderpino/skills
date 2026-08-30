@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Coverage Register
+title: "Atomic-base coverage & scope"
+description: Which atomic bases are implemented, which are documented but deliberately deferred, and the harness that keeps the list honest against the modules.
+tags: [terrain, atoms, scope]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T20:51:26Z }
+verified: { by: process:test_atom_coverage.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Atomic-base coverage & scope
 
 **What this is.** The reference implementation is a **curated core** of the atomic bases — the

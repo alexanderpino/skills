@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Primitives, Operators, Filters & Warps"
+description: The SDF and gradient primitives, the combiners, and the three distinct roles a curve plays — the distinction that costs the most rebuilds when missed.
+tags: [primitives, sdf, filters, warp]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-05T18:35:04Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Primitives, Operators, Filters & Warps
 
 The "boring" nodes. They have no papers, which is exactly why they ship broken — nobody

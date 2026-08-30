@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Hydraulic Erosion
+description: "Stream power, droplet and pipe erosion: what each one is a model OF, and which is right for a given scale."
+tags: [erosion, stream-power, droplet]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-30T20:29:13Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Hydraulic Erosion
 
 Contents: [Attribution correction](#attribution-correction-read-first) · [Choosing](#choosing-a-backbone) ·

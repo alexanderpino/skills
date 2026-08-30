@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Liquids: Optical & Rheological Identity"
+description: "Per-body water identity from its causes: CDOM darkens and sediment brightens, and the constants a renderer needs follow from the catchment."
+tags: [liquids, optics, cdom]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-14T08:04:02Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Liquids: Optical & Rheological Identity
 
 The property-bundle chapter for **fluids**, the sibling of `18`'s bundle for solids. `18` answers

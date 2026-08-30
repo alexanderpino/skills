@@ -8,16 +8,50 @@ SKILL_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_skill_frontmatter_contract():
+    """`name` first, `description` as a folded scalar, and both within bounds.
+
+    ⚠️ THIS USED TO FORBID EVERY OTHER KEY, AND ONLY BY ACCIDENT. It read
+    `lines[3:end]` — everything from the description's first continuation line
+    to the closing delimiter — as description text, and then required each line
+    to be indented. That is a fine way to read a two-key file and an accidental
+    prohibition on a third key, which is what it became when OKF v0.2 headers
+    were added. The contract's real content is the two assertions in the
+    docstring above; the description block now ends where the indentation ends,
+    and anything after it is somebody else's business.
+    """
     lines = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8").splitlines()
     assert lines[0] == "---"
     end = lines.index("---", 1)
     assert lines[1] == "name: terrain-architect"
     assert lines[2] == "description: >-"
-    description_lines = lines[3:end]
-    assert description_lines
-    assert all(line.startswith("  ") for line in description_lines)
+    description_lines = []
+    for line in lines[3:end]:
+        if not line.startswith("  "):
+            break                      # the folded scalar ended; a new key began
+        description_lines.append(line)
+    assert description_lines, "the description block is empty"
     description = " ".join(line.strip() for line in description_lines)
     assert 1 <= len(description) <= 1024
+
+
+def test_skill_frontmatter_keys_are_wellformed():
+    """Every top-level key after the description parses as `key: value`.
+
+    Replaces the guarantee the old parser gave by accident — that nothing
+    unexpected sits in the block — without forbidding additional keys.
+    """
+    import re as _re
+    lines = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8").splitlines()
+    end = lines.index("---", 1)
+    seen_description = False
+    for line in lines[1:end]:
+        if line.startswith("  ") or not line.strip() or line.lstrip().startswith("#"):
+            continue
+        assert _re.match(r"^[A-Za-z_][\w-]*:", line), (
+            "frontmatter line is not a key: %r" % line)
+        if line.startswith("description:"):
+            seen_description = True
+    assert seen_description
 
 
 def test_eval_integrity():

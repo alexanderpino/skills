@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Flow Routing
+description: Depression filling and the routing family — D8, D-infinity, MFD and the hybrid — with the concentration statistic that separates them and reverses at low relief.
+tags: [flow, d8, mfd, drainage]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-30T14:39:04Z }
+verified: { by: process:test_flow_anatomy.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Flow Routing
 
 Contents: [Order of operations](#order-of-operations) · [Depression handling](#depression-handling-mandatory) ·

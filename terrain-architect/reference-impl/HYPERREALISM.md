@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Audit
+title: Toward hyperrealism — what each archetype would need
+description: What each archetype would still need to read as real, and where the numpy sandbox honestly tops out.
+tags: [terrain, realism, roadmap]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-25T06:11:37Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Toward hyperrealism — what each archetype would need
 
 A research-grounded ledger of what it takes to push the archetype/screen-world tiles from

@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Reference-Informed, Engine-Native Implementation
+description: How to reimplement these algorithms in an engine without copying source, and where the licence boundary actually sits.
+tags: [implementation, clean-room, licensing]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-20T16:01:56+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Reference-Informed, Engine-Native Implementation
 
 How to turn papers and open-source geoscience libraries into an engine-owned terrain stack when

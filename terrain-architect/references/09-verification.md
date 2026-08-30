@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Verification
+description: "How each mechanism is checked: the estimator ladder, the controls that make a metric evidence, and the lattice-anisotropy trap that scores a broken operator perfectly."
+tags: [verification, metrics, anisotropy]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-05T12:21:21Z }
+verified: { by: process:test_anatomy_figures.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Verification
 
 Terrain is judged by eye, which makes it uniquely vulnerable to **plausible wrongness**: a

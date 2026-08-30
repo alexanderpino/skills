@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Output Contract
+description: "What a generator must export and in what units: the field registry, precision doctrine, and the tiling and seam rules."
+tags: [output, contract, export]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-05T17:55:10Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Output Contract
 
 Contents: [The field contract](#the-field-contract) · [The layer stack](#the-layer-stack) ·

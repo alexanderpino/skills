@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Engine Data Handoff & First-Class Auxiliary Maps"
+description: What the generator hands the renderer, as a registry with units and lifetimes rather than a folder of images.
+tags: [handoff, auxiliary-maps, registry]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-13T16:58:14Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Engine Data Handoff & First-Class Auxiliary Maps
 
 Contents: [Why this chapter exists](#why-this-chapter-exists) ·

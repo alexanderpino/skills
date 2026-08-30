@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Audit
+title: "Are we using the best simulations? — a grounded SOTA audit"
+description: A per-process SOTA scorecard against both the commercial and the academic frontier, with the metrics that would settle each verdict.
+tags: [terrain, sota, simulation]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-25T19:04:00Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Are we using the best simulations? — a grounded SOTA audit
 
 *How to find out whether each simulation in this skill is best-in-class, how to measure it objectively,

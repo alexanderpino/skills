@@ -13,6 +13,20 @@ description: >-
   fit (CPU/GPU scheduling, streaming, determinism, serialisation). Do not use for generic
   geology teaching, standalone GIS plotting, hiking, real-world erosion control, non-terrain
   texturing, or generic fluid simulation.
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Skill
+title: Terrain Architect
+tags: [terrain, generation, procedural, heightfield]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+sources:
+  - id: index
+    resource: /references/00-index.md
+    title: The algorithm index
+  - id: validation
+    resource: /reference-impl/VALIDATION.md
+    title: The validity evidence ledger
+# --- end okf v0.2 ----------------------------------------------------
 ---
 
 # Terrain Architect

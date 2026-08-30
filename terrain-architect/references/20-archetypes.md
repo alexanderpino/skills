@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Archetype Blueprints
+description: Named landscapes as ordered compositions of atoms, each with the geomorphology it still owes.
+tags: [archetypes, blueprints]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-25T06:11:37Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Archetype Blueprints
 
 The **province** altitude of composition. `00`'s landform table composes *one landform*

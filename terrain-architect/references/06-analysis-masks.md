@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Analysis & Masks"
+description: Deriving slope, curvature, aspect and flow-based masks from a heightfield, and the estimator errors each one carries.
+tags: [analysis, masks, curvature]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-29T12:53:41Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Analysis & Masks
 
 Contents: [Ordering rule](#ordering-rule) · [Slope & aspect](#slope--aspect) ·

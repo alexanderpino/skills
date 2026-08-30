@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Voxel & Streaming Chunk Generation"
+description: "Generation for volumetric worlds: chunk-local determinism, caves and overhangs as a separate paradigm from the heightfield."
+tags: [voxel, streaming, chunks]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-21T12:24:27+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Voxel & Streaming Chunk Generation
 
 A **family** of terrain generators, not one game: infinite-or-bounded, lazily-streamed, editable

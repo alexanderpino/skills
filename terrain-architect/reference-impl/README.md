@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Implementation Notes
+title: Reference implementations
+description: "The reference implementation: what each module owns, how the pieces compose into a generator, and which audit answers which question."
+tags: [terrain, reference-impl, atoms]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-30T14:13:37Z }
+verified: { by: process:test_audit_drift.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Reference implementations
 
 Runnable, **numpy-only, pytest-verified** mirrors of the simulation pseudocode in the

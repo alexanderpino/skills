@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Graph Runtime
+description: "The node graph as an executable object: evaluation order, the resolution pyramid, memory and scheduling."
+tags: [graph, runtime, scheduling]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-30T20:39:48Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Graph Runtime
 
 The substrate layer of a terrain tool: what a node *is*, what a parameter *is*, and how

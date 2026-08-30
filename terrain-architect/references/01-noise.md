@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Noise
+description: "Noise as the base layer: Perlin, value, simplex, Worley and Gabor, the fractal compositions over them, and the lattice pinch points that make lacunarity exactly 2 a defect."
+tags: [noise, fbm, fractal]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-30T15:58:16Z }
+verified: { by: process:test_pseudocode_drift.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Noise
 
 Contents: [Choosing](#choosing) · [Perlin](#perlin-1985--improved-perlin-2002) ·

@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Thermal & Aeolian Erosion"
+description: Talus and mass wasting by angle of repose, and the Bagnold-grounded aeolian transport that builds dunes.
+tags: [erosion, thermal, aeolian, dunes]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T20:51:26Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Thermal & Aeolian Erosion
 
 Contents: [Thermal](#thermal-erosion-musgrave-et-al-1989) · [Repose angles](#repose-angles) ·

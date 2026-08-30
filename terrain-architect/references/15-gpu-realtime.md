@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "GPU & Realtime"
+description: What moves to the GPU and what cannot, and the determinism the runtime path has to preserve.
+tags: [gpu, realtime, determinism]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-29T13:07:20Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # GPU & Realtime
 
 How the algorithm families actually land on a GPU, and which of them can run per-frame versus

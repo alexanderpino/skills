@@ -102,6 +102,157 @@ DOCS = {
    type='Evidence', tags=['water', 'frames'],
    description='Frames written by the screen-space raster pass.'),
 
+ # --- terrain-architect ------------------------------------------------------
+ # ⚠️ SEVEN OF THESE CARRY `verified`, AGAINST ONE IN WATER-PHYSICS, AND THE
+ # DIFFERENCE IS REAL RATHER THAN GENEROUS. This skill's harnesses check
+ # DOCUMENTS, not only code: test_atom_coverage fails when ATOM-COVERAGE.md and
+ # the modules disagree, test_audit_drift when an audit's claims outrun the
+ # code, test_pseudocode_drift when a chapter's pseudocode defaults do, and the
+ # two anatomy harnesses when a figure stops drawing the geometry its chapter
+ # claims. Every other document here is left `unverified`, which is the honest
+ # reading of a chapter nothing re-derives.
+ 'terrain-architect/SKILL.md': dict(
+   type='Skill', tags=['terrain', 'generation', 'procedural', 'heightfield'],
+   description='Entry point to the terrain-architect skill: the algorithm index, the provenance tiers, and the reference implementation each claim is measured on.',
+   sources=[('index', '/references/00-index.md', 'The algorithm index'),
+            ('validation', '/reference-impl/VALIDATION.md', 'The validity evidence ledger')]),
+ 'terrain-architect/evals/README.md': dict(
+   type='Evals', tags=['terrain', 'evals'],
+   description='How the capability and trigger evals are structured and what each axis is meant to probe.'),
+ 'terrain-architect/reference-impl/README.md': dict(
+   type='Implementation Notes', tags=['terrain', 'reference-impl', 'atoms'],
+   description='The reference implementation: what each module owns, how the pieces compose into a generator, and which audit answers which question.',
+   verified=[('process:test_audit_drift.py', VERIFIED_AT)]),
+ 'terrain-architect/reference-impl/VALIDATION.md': dict(
+   type='Provenance', tags=['terrain', 'validity', 'benchmarks'],
+   description='The validity evidence ledger: five rungs from dimensional consistency to agreement with real DEMs, kept explicit about what each rung does and does not prove.',
+   verified=[('process:test_audit_drift.py', VERIFIED_AT)]),
+ 'terrain-architect/reference-impl/ATOM-COVERAGE.md': dict(
+   type='Coverage Register', tags=['terrain', 'atoms', 'scope'],
+   description='Which atomic bases are implemented, which are documented but deliberately deferred, and the harness that keeps the list honest against the modules.',
+   verified=[('process:test_atom_coverage.py', VERIFIED_AT)]),
+ 'terrain-architect/reference-impl/NODE-PARITY-AUDIT.md': dict(
+   type='Audit', tags=['terrain', 'parity', 'gaea', 'world-machine', 'houdini'],
+   description='What Gaea, World Machine and Houdini ship node by node, and which atomic capabilities are genuinely missing here after composites are excluded.',
+   verified=[('process:test_audit_drift.py', VERIFIED_AT)]),
+ 'terrain-architect/reference-impl/SIMULATION-AUDIT.md': dict(
+   type='Audit', tags=['terrain', 'sota', 'simulation'],
+   description='A per-process SOTA scorecard against both the commercial and the academic frontier, with the metrics that would settle each verdict.'),
+ 'terrain-architect/reference-impl/CANON-COMPARISON.md': dict(
+   type='Audit', tags=['terrain', 'canon', 'comparison'],
+   description='Every atom judged side by side against a canonical published output of the same algorithm, with per-atom verdicts.'),
+ 'terrain-architect/reference-impl/GROUNDING.md': dict(
+   type='Provenance', tags=['terrain', 'grounding', 'sources'],
+   description='Where each sandbox behaviour comes from and which cross-check covers it, node by node.'),
+ 'terrain-architect/reference-impl/HYPERREALISM.md': dict(
+   type='Audit', tags=['terrain', 'realism', 'roadmap'],
+   description='What each archetype would still need to read as real, and where the numpy sandbox honestly tops out.'),
+ 'terrain-architect/reference-impl/ARCHETYPES.md': dict(
+   type='Implementation Notes', tags=['terrain', 'archetypes'],
+   description='The archetype compositions: which atoms each named landscape is built from, in order.'),
+ 'terrain-architect/reference-impl/GALLERY.md': dict(
+   type='Evidence', tags=['terrain', 'figures'],
+   description='The committed visual reference montages and the script that regenerates each one.'),
+ 'terrain-architect/reference-impl/REVIEW-BRIEF.md': dict(
+   type='Review Brief', tags=['terrain', 'review'],
+   description='The standing brief an external reviewer works from, and the capability grid it refers to.',
+   verified=[('process:test_audit_drift.py', VERIFIED_AT)]),
+
+ 'terrain-architect/references/00-index.md': dict(
+   type='Index', tags=['index', 'routing', 'tiers'],
+   description="The skill's map of its own knowledge: every mechanism, its provenance tier, and the chapter that owns it."),
+ 'terrain-architect/references/01-noise.md': dict(
+   type='Reference', tags=['noise', 'fbm', 'fractal'],
+   description='Noise as the base layer: Perlin, value, simplex, Worley and Gabor, the fractal compositions over them, and the lattice pinch points that make lacunarity exactly 2 a defect.',
+   verified=[('process:test_pseudocode_drift.py', VERIFIED_AT)]),
+ 'terrain-architect/references/02-macro-tectonics.md': dict(
+   type='Reference', tags=['tectonics', 'uplift', 'isostasy'],
+   description='Continental form before erosion: plate uplift, fault scarps and the isostatic response that decides what the erosion runs on.'),
+ 'terrain-architect/references/03-flow-routing.md': dict(
+   type='Reference', tags=['flow', 'd8', 'mfd', 'drainage'],
+   description='Depression filling and the routing family — D8, D-infinity, MFD and the hybrid — with the concentration statistic that separates them and reverses at low relief.',
+   verified=[('process:test_flow_anatomy.py', VERIFIED_AT)]),
+ 'terrain-architect/references/04-erosion-hydraulic.md': dict(
+   type='Reference', tags=['erosion', 'stream-power', 'droplet'],
+   description='Stream power, droplet and pipe erosion: what each one is a model OF, and which is right for a given scale.'),
+ 'terrain-architect/references/05-erosion-thermal-aeolian.md': dict(
+   type='Reference', tags=['erosion', 'thermal', 'aeolian', 'dunes'],
+   description='Talus and mass wasting by angle of repose, and the Bagnold-grounded aeolian transport that builds dunes.'),
+ 'terrain-architect/references/06-analysis-masks.md': dict(
+   type='Reference', tags=['analysis', 'masks', 'curvature'],
+   description='Deriving slope, curvature, aspect and flow-based masks from a heightfield, and the estimator errors each one carries.'),
+ 'terrain-architect/references/07-scatter.md': dict(
+   type='Reference', tags=['scatter', 'poisson', 'placement'],
+   description='Blue-noise and density-driven scatter, layer interactions, and why variable density is the hard case.'),
+ 'terrain-architect/references/08-output-contract.md': dict(
+   type='Reference', tags=['output', 'contract', 'export'],
+   description='What a generator must export and in what units: the field registry, precision doctrine, and the tiling and seam rules.'),
+ 'terrain-architect/references/09-verification.md': dict(
+   type='Reference', tags=['verification', 'metrics', 'anisotropy'],
+   description='How each mechanism is checked: the estimator ladder, the controls that make a metric evidence, and the lattice-anisotropy trap that scores a broken operator perfectly.',
+   verified=[('process:test_anatomy_figures.py', VERIFIED_AT)]),
+ 'terrain-architect/references/10-primitives-ops-filters.md': dict(
+   type='Reference', tags=['primitives', 'sdf', 'filters', 'warp'],
+   description='The SDF and gradient primitives, the combiners, and the three distinct roles a curve plays — the distinction that costs the most rebuilds when missed.'),
+ 'terrain-architect/references/11-geological.md': dict(
+   type='Reference', tags=['geology', 'strata', 'karst'],
+   description='Strata, lithology contrast, karst, duricrust and relief inversion: structure the erosion inherits rather than invents.'),
+ 'terrain-architect/references/12-glacial-coastal.md': dict(
+   type='Reference', tags=['glacial', 'coastal', 'surf', 'sia'],
+   description='Glacial carving on the shallow-ice approximation, and the coastal chain from radiation stress through nearshore currents to the bar and rip system.'),
+ 'terrain-architect/references/13-climate-ecosystem.md': dict(
+   type='Reference', tags=['climate', 'biome', 'moisture'],
+   description='Insolation, moisture and temperature fields, and the biome assignment that reads them.'),
+ 'terrain-architect/references/14-graph-runtime.md': dict(
+   type='Reference', tags=['graph', 'runtime', 'scheduling'],
+   description='The node graph as an executable object: evaluation order, the resolution pyramid, memory and scheduling.'),
+ 'terrain-architect/references/15-gpu-realtime.md': dict(
+   type='Reference', tags=['gpu', 'realtime', 'determinism'],
+   description='What moves to the GPU and what cannot, and the determinism the runtime path has to preserve.'),
+ 'terrain-architect/references/16-arid-desert.md': dict(
+   type='Reference', tags=['arid', 'desert', 'fans'],
+   description='Inselbergs, alluvial fans, evaporite crusts and wadis: the arid assemblage and what each one requires upstream.'),
+ 'terrain-architect/references/17-periglacial.md': dict(
+   type='Reference', tags=['periglacial', 'permafrost'],
+   description='Patterned ground, thermokarst and pingos, on the Kessler & Werner sorting model.'),
+ 'terrain-architect/references/18-materials.md': dict(
+   type='Reference', tags=['materials', 'splat'],
+   description='Deriving a material stack from slope, curvature and drainage rather than painting one.'),
+ 'terrain-architect/references/19-lava.md': dict(
+   type='Reference', tags=['lava', 'volcanic', 'rheology'],
+   description='Lava as a Bingham fluid: the driving stress, the yield behaviour, and the flow-length limit that follows.'),
+ 'terrain-architect/references/20-archetypes.md': dict(
+   type='Reference', tags=['archetypes', 'blueprints'],
+   description='Named landscapes as ordered compositions of atoms, each with the geomorphology it still owes.'),
+ 'terrain-architect/references/21-clean-room-implementation.md': dict(
+   type='Reference', tags=['implementation', 'clean-room', 'licensing'],
+   description='How to reimplement these algorithms in an engine without copying source, and where the licence boundary actually sits.'),
+ 'terrain-architect/references/22-open-source-grounding.md': dict(
+   type='Provenance', tags=['grounding', 'open-source'],
+   description='Which open-source implementations each algorithm was checked against, and which remain port targets rather than reimplementations.'),
+ 'terrain-architect/references/23-generator-blueprint.md': dict(
+   type='Reference', tags=['blueprint', 'pipeline'],
+   description='The whole pipeline assembled: pre-cooked and runtime paths, and the handoffs between them.'),
+ 'terrain-architect/references/24-voxel-streaming-generation.md': dict(
+   type='Reference', tags=['voxel', 'streaming', 'chunks'],
+   description='Generation for volumetric worlds: chunk-local determinism, caves and overhangs as a separate paradigm from the heightfield.'),
+ 'terrain-architect/references/25-planetary-spherical.md': dict(
+   type='Reference', tags=['planetary', 'sphere', 'projection'],
+   description='Cube-sphere and geodesic parameterisations, their distortion, and what changes when the domain has no edges.'),
+ 'terrain-architect/references/26-hexagonal-grids.md': dict(
+   type='Reference', tags=['hex', 'grid', 'tiling'],
+   description='The hexagonal working grid: two vertex classes, the rhombille tiling, the three meshes over one field, and what corner-only sampling costs.',
+   verified=[('process:test_anatomy_figures.py', VERIFIED_AT)]),
+ 'terrain-architect/references/27-engine-data-handoff.md': dict(
+   type='Reference', tags=['handoff', 'auxiliary-maps', 'registry'],
+   description='What the generator hands the renderer, as a registry with units and lifetimes rather than a folder of images.'),
+ 'terrain-architect/references/28-liquids.md': dict(
+   type='Reference', tags=['liquids', 'optics', 'cdom'],
+   description='Per-body water identity from its causes: CDOM darkens and sediment brightens, and the constants a renderer needs follow from the catchment.'),
+ 'terrain-architect/references/99-papers.md': dict(
+   type='Bibliography', tags=['papers', 'bibliography'],
+   description='Every source this skill cites, with the tier at which it was read.'),
+
  'terrain-renderer/SKILL.md': dict(
    type='Skill', tags=['terrain', 'rendering', 'lod', 'streaming'],
    description='Entry point to the terrain-renderer skill: the paradigms, the routing table from a symptom on screen to a mechanism, and where each claim is warranted.',
@@ -179,6 +330,92 @@ DOCS = {
 # stood immediately before the header commit, and they are literals now: a
 # content change should move them, and a header change must not.
 CONTENT_TIME = {
+    'terrain-architect/SKILL.md':
+        '2026-08-23T08:47:50Z',
+    'terrain-architect/evals/README.md':
+        '2026-07-29T13:19:50+02:00',
+    'terrain-architect/reference-impl/README.md':
+        '2026-08-30T14:13:37Z',
+    'terrain-architect/reference-impl/VALIDATION.md':
+        '2026-08-30T14:13:37Z',
+    'terrain-architect/reference-impl/ATOM-COVERAGE.md':
+        '2026-07-28T20:51:26Z',
+    'terrain-architect/reference-impl/NODE-PARITY-AUDIT.md':
+        '2026-08-30T14:13:37Z',
+    'terrain-architect/reference-impl/SIMULATION-AUDIT.md':
+        '2026-07-25T19:04:00Z',
+    'terrain-architect/reference-impl/CANON-COMPARISON.md':
+        '2026-07-25T06:11:37Z',
+    'terrain-architect/reference-impl/GROUNDING.md':
+        '2026-07-25T06:11:37Z',
+    'terrain-architect/reference-impl/HYPERREALISM.md':
+        '2026-07-25T06:11:37Z',
+    'terrain-architect/reference-impl/ARCHETYPES.md':
+        '2026-07-25T06:11:37Z',
+    'terrain-architect/reference-impl/GALLERY.md':
+        '2026-07-28T21:24:36Z',
+    'terrain-architect/reference-impl/REVIEW-BRIEF.md':
+        '2026-07-25T06:11:37Z',
+    'terrain-architect/references/00-index.md':
+        '2026-08-16T09:19:11Z',
+    'terrain-architect/references/01-noise.md':
+        '2026-08-30T15:58:16Z',
+    'terrain-architect/references/02-macro-tectonics.md':
+        '2026-08-05T18:01:57Z',
+    'terrain-architect/references/03-flow-routing.md':
+        '2026-08-30T14:39:04Z',
+    'terrain-architect/references/04-erosion-hydraulic.md':
+        '2026-07-30T20:29:13Z',
+    'terrain-architect/references/05-erosion-thermal-aeolian.md':
+        '2026-07-28T20:51:26Z',
+    'terrain-architect/references/06-analysis-masks.md':
+        '2026-07-29T12:53:41Z',
+    'terrain-architect/references/07-scatter.md':
+        '2026-07-29T13:19:50+02:00',
+    'terrain-architect/references/08-output-contract.md':
+        '2026-08-05T17:55:10Z',
+    'terrain-architect/references/09-verification.md':
+        '2026-08-05T12:21:21Z',
+    'terrain-architect/references/10-primitives-ops-filters.md':
+        '2026-08-05T18:35:04Z',
+    'terrain-architect/references/11-geological.md':
+        '2026-07-28T13:10:16Z',
+    'terrain-architect/references/12-glacial-coastal.md':
+        '2026-08-21T14:22:53Z',
+    'terrain-architect/references/13-climate-ecosystem.md':
+        '2026-07-29T13:07:20Z',
+    'terrain-architect/references/14-graph-runtime.md':
+        '2026-07-30T20:39:48Z',
+    'terrain-architect/references/15-gpu-realtime.md':
+        '2026-07-29T13:07:20Z',
+    'terrain-architect/references/16-arid-desert.md':
+        '2026-07-28T11:16:00Z',
+    'terrain-architect/references/17-periglacial.md':
+        '2026-07-28T21:14:16Z',
+    'terrain-architect/references/18-materials.md':
+        '2026-07-25T06:11:37Z',
+    'terrain-architect/references/19-lava.md':
+        '2026-07-28T20:51:26Z',
+    'terrain-architect/references/20-archetypes.md':
+        '2026-07-25T06:11:37Z',
+    'terrain-architect/references/21-clean-room-implementation.md':
+        '2026-07-20T16:01:56+02:00',
+    'terrain-architect/references/22-open-source-grounding.md':
+        '2026-07-20T16:01:56+02:00',
+    'terrain-architect/references/23-generator-blueprint.md':
+        '2026-07-29T13:07:20Z',
+    'terrain-architect/references/24-voxel-streaming-generation.md':
+        '2026-07-21T12:24:27+02:00',
+    'terrain-architect/references/25-planetary-spherical.md':
+        '2026-07-28T13:10:16Z',
+    'terrain-architect/references/26-hexagonal-grids.md':
+        '2026-07-28T21:24:36Z',
+    'terrain-architect/references/27-engine-data-handoff.md':
+        '2026-08-13T16:58:14Z',
+    'terrain-architect/references/28-liquids.md':
+        '2026-08-14T08:04:02Z',
+    'terrain-architect/references/99-papers.md':
+        '2026-08-05T12:21:21Z',
     'terrain-renderer/SKILL.md':
         '2026-08-23T18:35:25Z',
     'terrain-renderer/references/00-index.md':
@@ -334,7 +571,14 @@ def build(relpath, spec):
             gen.append('    title: %s' % yaml_quote(title))
     gen.append(END)
 
-    lines = ['---'] + gen + ([foreign] if foreign else []) + ['---']
+    # ⚠️ THE GENERATED BLOCK GOES AFTER ANY EXISTING KEYS, NOT BEFORE, and a
+    # test in another skill is why. terrain-architect asserts a strict
+    # line-by-line frontmatter contract -- `name` on line 1, `description: >-`
+    # on line 2 -- which keeps its SKILL.md greppable and diffable. YAML is
+    # unordered, so OKF does not care where its keys sit; the local contract
+    # does, and the local contract is the one with a test behind it. Putting
+    # the block first broke it immediately.
+    lines = ['---'] + ([foreign] if foreign else []) + gen + ['---']
     return full, '\n'.join(lines) + '\n' + body, src
 
 

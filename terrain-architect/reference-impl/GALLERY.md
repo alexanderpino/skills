@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Evidence
+title: Visual reference gallery
+description: The committed visual reference montages and the script that regenerates each one.
+tags: [terrain, figures]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T21:24:36Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Visual reference gallery
 
 ![gallery](gallery.png)

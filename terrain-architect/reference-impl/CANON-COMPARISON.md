@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Audit
+title: Canon Comparison — every atom vs its canonical online counterpart
+description: Every atom judged side by side against a canonical published output of the same algorithm, with per-atom verdicts.
+tags: [terrain, canon, comparison]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-25T06:11:37Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Canon Comparison — every atom vs its canonical online counterpart
 
 A verification rung that complements the numeric benchmarks (Halfar, Landlab, RichDEM, Pike,

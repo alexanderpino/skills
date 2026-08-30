@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Provenance
+title: "Sandbox grounding & provenance"
+description: Where each sandbox behaviour comes from and which cross-check covers it, node by node.
+tags: [terrain, grounding, sources]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-25T06:11:37Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Sandbox grounding & provenance
 
 Where each node in the graph demo comes from, what tested library it is grounded in, under

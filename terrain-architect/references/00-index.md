@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Index
+title: Algorithm Index
+description: "The skill's map of its own knowledge: every mechanism, its provenance tier, and the chapter that owns it."
+tags: [index, routing, tiers]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-16T09:19:11Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Algorithm Index
 
 The skill's map of its own knowledge. Every row carries a **provenance tier**, because the

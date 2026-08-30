@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Evals
+title: terrain-architect evals
+description: How the capability and trigger evals are structured and what each axis is meant to probe.
+tags: [terrain, evals]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-29T13:19:50+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # terrain-architect evals
 
 A measurable definition of "authority" for this skill: not "does it sound expert",

@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Provenance
+title: Validity evidence ledger
+description: "The validity evidence ledger: five rungs from dimensional consistency to agreement with real DEMs, kept explicit about what each rung does and does not prove."
+tags: [terrain, validity, benchmarks]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-30T14:13:37Z }
+verified: { by: process:test_audit_drift.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Validity evidence ledger
 
 Evidence that the skill's **concepts, pseudocode and math are valid** — kept honest about what

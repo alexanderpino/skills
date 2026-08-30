@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Audit
+title: Node-Parity Audit — Gaea vs World Machine vs Houdini vs our atoms
+description: What Gaea, World Machine and Houdini ship node by node, and which atomic capabilities are genuinely missing here after composites are excluded.
+tags: [terrain, parity, gaea, world-machine, houdini]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-30T14:13:37Z }
+verified: { by: process:test_audit_drift.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Node-Parity Audit — Gaea vs World Machine vs Houdini vs our atoms
 
 Question: what do the three baseline tools ship out of the box, and which **atoms** do we not have yet?

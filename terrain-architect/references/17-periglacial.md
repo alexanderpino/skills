@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Periglacial & Permafrost Landforms"
+description: "Patterned ground, thermokarst and pingos, on the Kessler & Werner sorting model."
+tags: [periglacial, permafrost]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T21:14:16Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Periglacial & Permafrost Landforms
 
 Contents: [The periglacial frame](#the-periglacial-frame) ·

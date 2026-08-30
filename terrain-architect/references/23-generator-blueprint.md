@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Advanced Terrain Generator Blueprint
+description: "The whole pipeline assembled: pre-cooked and runtime paths, and the handoffs between them."
+tags: [blueprint, pipeline]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-29T13:07:20Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Advanced Terrain Generator Blueprint
 
 The end-to-end assembly for an agent implementing an advanced terrain generator. The other
