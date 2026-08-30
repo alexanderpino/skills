@@ -131,7 +131,7 @@ targets and gives a measurable response. The **nine** product-quality characteri
 | Functional suitability | completeness, correctness, appropriateness |
 | Performance efficiency | time behaviour, resource utilization, capacity |
 | Compatibility | co-existence, interoperability |
-| **Interaction capability** *(was Usability)* | appropriateness recognizability, learnability, operability, user-error protection, **user engagement** *(was UI aesthetics)*, **inclusivity** *(new)*, **self-descriptiveness** *(new)* |
+| **Interaction capability** *(was Usability)* | appropriateness recognizability, learnability, operability, user-error protection, **user engagement** *(was UI aesthetics)*, **inclusivity** *(new)*, **user assistance** *(new)*, **self-descriptiveness** *(new)* |
 | Reliability | **faultlessness** *(was maturity)*, availability, fault tolerance, recoverability |
 | Security | confidentiality, integrity, non-repudiation, accountability, authenticity, **resistance** *(new)* |
 | Maintainability | modularity, reusability, analysability, modifiability, testability |

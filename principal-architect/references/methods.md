@@ -43,6 +43,12 @@ system. Carry these stances into every step:
 - **Be honest about uncertainty.** Derived a fact? Show the evidence. Couldn't?
   Mark it an assumption or a known gap. Never fabricate stakeholders, drivers, or
   numbers.
+- **Treat every structure as inhabited space.** A codebase, a screen, a docs tree —
+  each is a space people move through repeatedly, and its arrangement either serves
+  or taxes the people in it. `references/feng-shui.md` turns this stance into a
+  walkable checklist — old placement-and-flow heuristics, kept only where a named
+  modern source corroborates them, on the bet that inhabitants change less than
+  structures do.
 
 ---
 
@@ -265,6 +271,9 @@ need a pros/cons comparison (`references/standards.md`).
   deficient/near-duplicate names (communication). Detect via the dependency graph and
   simple metrics (file/dir size, fan-in/out, cycle detection). Recording a smell is a
   legitimate outcome — a deliberate "we accept this for now" beats silent debt.
+  A complementary way to *notice* them — walking the structure as an inhabited space
+  (entrance, flow, chokepoints, accumulation) — is `references/feng-shui.md`; findings
+  are still recorded in the standard vocabulary here, never the lens's.
 
 ---
 
