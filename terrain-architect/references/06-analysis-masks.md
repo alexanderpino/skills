@@ -430,11 +430,31 @@ snow is white because it is a white *substance*, not because "high == white".
   perfect edge, and nothing in nature does. Multiply the threshold by low-amplitude noise:
   `smoothstep(t - w, t + w, slope + noiseAmp * fbm(p))`. This is nearly free and it's the
   difference between "procedural" and "photographed".
-- **Masks must partition.** If your masks sum to 1.3 in places, the splatmap normalisation
-  will silently rescale and your carefully tuned rock will be 30% weaker on steep slopes than
-  you specified. Either build them as an explicit priority stack (snow beats rock beats
-  grass — each subsequent mask multiplied by `(1 − Σ previous)`), or normalise explicitly and
-  know that you did.
+- **Masks must partition — `Σ ≤ 1`, not `Σ = 1`, and the difference is the base material.**
+  Raw coverage masks are independent fields in `[0, 1]`: nothing makes them sum to anything.
+  `Σ > 1` means two producers claim the same ground, which is a real bug. `Σ < 1` is ordinary —
+  the shortfall belongs to the bare base. Build them as an explicit priority stack (snow beats
+  rock beats grass, each subsequent mask multiplied by `(1 − Σ previous)`), which yields `Σ ≤ 1`
+  by construction, or normalise explicitly and know that you did.
+
+  ⚠️ **This bullet used to say "sum to 1.3 and the splatmap normalisation will silently rescale,
+  so your rock ends up 30% weaker".** That is wrong twice over, and both halves are worth
+  correcting because the wrong version is the intuitive one. First, `Σ = 1` is the wrong target
+  here: the very remedy this bullet prescribes, `(1 − Σ previous)`, produces `Σ ≤ 1` — the
+  headline and the fix disagreed. `08`'s "splat weights must sum to 1" is a *different object*,
+  one stage later, after compositing has filled the remainder; a shader computing
+  `Σ wᵢ · materialᵢ` has no base layer to absorb a shortfall, so there `= 1` is a genuine
+  requirement on the data.
+
+  Second — **there is no silent rescale, and that is the actual danger.** The shipped compositor
+  (`reference-impl/render.py`'s `splat_blend`) is an ordered over-composite, `out·(1 − m) +
+  colour·m`, not a weighted sum. Feed it masks summing to **1.8** and the effective weights still
+  sum to **1.0000000000**, the base absorbing `Π(1 − mᵢ)` exactly; at masks summing to **3.0** the
+  output is still inside the convex hull of its input colours. Nothing is rescaled, nothing dims,
+  nothing goes out of range. Over-subscription produces **no artefact at all** — the compositing
+  *order* quietly arbitrates a conflict nobody decided to have. That is why `14` puts the
+  `Σ masks ≤ 1` assertion at the mask fan-in: downstream there is nothing left to detect.
+  (`reference-impl/tests/test_mask_partition.py`)
 - **Aspect matters and is cheap.** `northness = dot(aspectVec(aspect), northDir)`. With the
   downslope aspect above and the STANDARD raster convention — row index increases *southward*, so
   row 0 = north and the `y` axis points SOUTH — that is `-sin(aspect)`: +1 facing north, −1 facing
