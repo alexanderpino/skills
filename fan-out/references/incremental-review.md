@@ -5,10 +5,15 @@ Read this before running a verification round or changing the verdict schema.
 ## Contents
 - [The problem](#the-problem)
 - [Findings are the unit of state, not artifacts](#findings-are-the-unit-of-state-not-artifacts)
+- [The check names the target, not the deviation](#the-check-names-the-target-not-the-deviation)
+- [A finding is a delta, not a complaint](#a-finding-is-a-delta-not-a-complaint)
+- [When the critic does not know the target either](#when-the-critic-does-not-know-the-target-either)
+- [Give the check a decider](#give-the-check-a-decider)
 - [Scope: what a verification round is allowed to read](#scope-what-a-verification-round-is-allowed-to-read)
 - [Re-opening approved scope](#re-opening-approved-scope)
 - [Cross-slice cascades](#cross-slice-cascades)
 - [The ratchet guard](#the-ratchet-guard)
+- [When the check alone stops working](#when-the-check-alone-stops-working)
 - [Anchor drift](#anchor-drift)
 - [Cheap oracles before expensive judgement](#cheap-oracles-before-expensive-judgement)
 - [Termination](#termination)
@@ -72,6 +77,132 @@ that is true or false about the artifact, not an instruction:
 
 If a finding can't be phrased as an observation, it's taste. Taste is worth recording as a
 `nit`, and nits are follow-ups, never gates.
+
+### The check names the target, not the deviation
+
+An observation can be true, anchored, non-imperative — and still useless, because it
+describes what is wrong instead of what would be right:
+
+| Bad (`check` as a deviation) | Good (`check` as a target) |
+|---|---|
+| "The body colour is off" | "The body is `#C8102E`, as in `reference.png`" |
+| "Frame time is too high" | "The p99 frame time is under 16.6 ms at 1080p, seed 7" |
+| "The tone is inconsistent" | "Every section uses second person, as `intro.md` does" |
+| "Error handling is weak here" | "Every `vkCreate*` return code is inspected before use" |
+
+The left column is the same sentence as the `claim`. That is the tell: `claim` says what is
+wrong, `check` says what would be true once it is right, and if the two say the same thing
+the finding is carrying no target at all.
+
+What it costs is a whole run. Told the colour is off, a builder paints the car blue — a
+sincere attempt, and wrong, because the finding admitted an infinite set of satisfying
+states and the critic was holding exactly one. Round 2 rejects it again. Round 3 rejects it
+again. Every round is spent transmitting, one bit at a time, a fact the critic could have
+written in six words. The escalation then reads as a builder that could not converge, which
+is the wrong lesson: it was never told where to converge to.
+
+There is also a soundness argument, independent of cost. A finding whose check only the
+critic can evaluate is unfalsifiable, and an unfalsifiable finding is not a gate — it is a
+veto. The verifier in the next round is a *different agent instance*, and it cannot read
+the target out of the first critic's head. It either invents its own (the target moves
+between rounds, which is the non-convergence this whole document exists to prevent) or it
+defers to the builder (the gate rubber-stamps). Neither is review.
+
+So a check must be **satisfiable by aiming**: a value, a range, a threshold with its
+measurement conditions, a named reference to compare against, or a quoted line of the brief
+or rubric. Where the target lives in the bar rather than in the text — "matches
+`reference.png`" — naming the referent is enough, because the builder can go and look.
+
+### A finding is a delta, not a complaint
+
+The target is one end of a line. `observed` is the other, in the same units:
+
+```json
+"claim":    "the hero body renders grey, not the brand red",
+"observed": "#808080 at the body panel — r1/hero.png, centre, 1280px",
+"check":    "the body is #C8102E, as in bar/reference.png",
+"sites":    ["hero.svg:carBody", "thumb.svg:carBody"]
+```
+
+Every field there is something the critic read off the artifact while it had the artifact
+open. That is what makes them cheap to write and expensive to omit: the critic pays one
+line, the builder pays a round.
+
+- **`observed` without `check`** is the guessing game above.
+- **`check` without `observed`** makes the builder re-measure what the critic just
+  measured — and re-measure it *differently*, which is how a round gets spent arguing about
+  whether the colour was ever grey.
+- **Both** give a delta, and a delta is the only form a builder can act on directly and a
+  verifier can decide without re-deriving anything.
+
+`sites` closes the other repeat-round trap. A defect that occurs in three places, anchored
+at one, is fixed at one and rejected for the other two — and the critic knew all three when
+it looked. Listing them is not widening the finding; it is describing the finding
+accurately, which is why the sites are in-bounds for the builder (see Step 5.2 in
+SKILL.md). `scope` still sees those edits and still reviews them — that part is mechanical
+and should not change — but they arrive as work the finding asked for rather than as
+unexplained drift, which is the difference between a re-open and a suspicion. An empty
+`sites` is a positive claim that the defect is local, in the same way `approved` is a
+claim.
+
+The discipline that keeps this from becoming verbosity: **detail about the observation,
+never about the opinion.** A measurement, a location, a list of sites, a command that was
+run — all bounded, all verifiable, all reusable by the next round. Rationale for the
+severity, an argument for why the finding matters, a survey of what the critic considered —
+unbounded, unverifiable, and carried by every agent downstream. A finding that needs a
+paragraph of justification is usually a preference filed at the wrong severity.
+
+### When the critic does not know the target either
+
+The rule above has a failure case that must not be papered over. Sometimes the critic
+genuinely cannot name the target, because nothing ever fixed it — the brief never said what
+colour the car should be. The critic then knows only that the current colour is *a* choice,
+not that it is the *wrong* choice.
+
+That is a defect in the brief, and it is already the orchestrator's error rather than the
+builder's (see *soft where it can be, harsh where it must be* in SKILL.md). The critic says
+so in the `claim`, at the honest severity, and does not file a check the builder cannot aim
+at. Filing one anyway is the worst outcome available: the run burns its cap discovering
+that the critic's private preference was never written down, and the fold reports a slice
+that failed to converge when what actually happened is that nobody specified it.
+
+A run that produces these repeatedly is telling you the brief was thin. Fix it between
+runs — that is what a sealed brief is for, and what the ratchet guard cannot do for you.
+
+### Give the check a decider
+
+An observation stated precisely enough is often one a command can settle. `check_cmd` is
+that command, written so **exit 0 means the check holds**:
+
+```json
+"check": "QueryChunk() returns nullopt when index >= count",
+"check_cmd": "ctest -R chunk_bounds --output-on-failure"
+```
+
+A finding with a decider never reaches an agent: `fanout.py deciders <slice-id>` prints
+them, you run them, and each exit-0 closes its finding with a `reason` naming the command.
+That is the same saving as *cheap oracles before expensive judgement* below, moved to
+where it can be automated — the critic knows what would settle its own finding, and
+writing it down costs one line while re-deriving it costs a verifier wave.
+
+Four constraints keep it from rotting:
+
+- **The critic writes only commands it ran**, here, against this candidate. An invented
+  command is worse than no field: it fails for the wrong reason and the finding looks
+  unfixed.
+- **It must fail when filed.** A `check_cmd` that exits 0 at the moment the finding is
+  raised means the check is wrong or the finding isn't real. Either way, resolving that at
+  filing time is free and resolving it in round 2 is not.
+- **It decides, it does not instruct.** `grep -n 'nullopt' store.cpp` tells the builder
+  nothing about how to satisfy it, which is exactly why it is safe. A command that
+  hard-codes the shape of the fix is a prescription wearing a shell prompt.
+- **Never on a visual axis.** A render is decided by looking at the new one beside the
+  old; a command that proves a PNG exists has not looked. `fanout.py deciders` says so, but
+  the rule lives here.
+
+`fanout.py` prints these commands and does not run them. The strings come from an agent,
+and a tool that shells out to agent-authored text on sight would be handing the critique
+loop an execution channel it has no reason to have. The operator runs them, in view.
 
 The `severity` scale decides what blocks:
 
@@ -172,6 +303,51 @@ So a critic that files one has quietly widened the round past the ratchet guard,
 either re-file it at its honest severity or accept it as work. The rule holds because you
 enforce it at the prompt, not because the tooling catches it.
 
+## When the check alone stops working
+
+The `check`-not-instruction rule is right as a default and wrong as an absolute. Its cost
+is real: a builder who cannot see what the critic sees can satisfy nothing three times in
+a row, and the loop spends its whole cap discovering that.
+
+So there is one licensed escape, and it is unlocked by evidence rather than by preference:
+
+> Every finding a verifier marks `unresolved` carries a `remedy` — a concrete route to the
+> check, at the anchor — or, where there is no route from here, a statement in `remedy` of
+> what the gap actually needs.
+
+The trigger is the `unresolved` transition and nothing else. Not severity, not the critic's
+confidence, not how strongly it was phrased: a finding is `unresolved` exactly when a
+builder has spent a round on it against the check and not closed it, which is the loop
+*measuring* that the check alone did not land. A round-1 finding never gets a remedy —
+that would hand every finding a suggested fix and reintroduce compliance-grading wholesale,
+before there is any evidence the builder needed it.
+
+Waiting one transition longer is tempting and wrong at the default cap. Three attempts per
+slice means: build, fix, fix. A finding that only earns its remedy after two `unresolved`
+verdicts gets it at the escalation, where the builder is no longer running — so the field
+would only ever inform the user, never speed a round. Attaching it at the first
+`unresolved` puts it in the one attempt that can still use it.
+
+Three properties keep `remedy` from becoming the target:
+
+- **The check remains the contract.** Verification decides against `check`, never against
+  `remedy` — a builder who satisfies the check by a different route is `verified`, and one
+  who follows the remedy exactly while the check still fails is `unresolved`. The verifier
+  prompt says this in as many words.
+- **It is non-binding to the builder**, who is asked to say in its notes when it took
+  another route. That sentence is what lets you tell a bad remedy from a bad builder.
+- **It is not a new status.** The state machine stays at three transitions. `remedy` is a
+  field on a finding that is still `unresolved` and still holds the gate.
+
+The "not closeable here" branch is the more valuable half. A remedy that reads *this needs
+a schema change in another slice* ends the loop a round and a half early, and it is
+information no gate can compute — only something that has now looked at the same gap
+three times.
+
+`fanout.py gate` prints unresolved blocking findings that carry no remedy, and repeats
+every remedy in the escalation block, so the user deciding at the cap sees the critic's own
+account of what it would take rather than a summary of the disagreement.
+
 ## Anchor drift
 
 Line numbers are invalid the moment the builder edits the file, so a finding anchored on
@@ -196,6 +372,11 @@ pointing at nothing, so the builder has no target and each round re-loses it unt
 escalates. Don't spend the rounds: re-anchor it yourself against the current artifact and
 re-file, or escalate immediately. It is the one `unresolved` that another round cannot
 move.
+
+It is also the one `unresolved` with no honest remedy to attach — there is no route to a
+check that points nowhere. Re-anchoring *is* the remedy, and it is yours, not the
+verifier's. Where the gate lists an anchor-lost finding as carrying none, that is the
+nudge working.
 
 ## Cheap oracles before expensive judgement
 
@@ -267,4 +448,29 @@ without anyone deciding it should.
 
 **`check` written as an instruction.** The verifier then evaluates "did you do what I
 said" instead of "is the problem gone", and accepts a fix that follows the letter of a bad
-suggestion. This is the most common quality leak in the whole loop.
+suggestion. This is the most common quality leak in the whole loop. A `remedy` does not
+make this safe — it makes it avoidable, by giving the instruction somewhere to live that
+nothing grades against.
+
+**`check` names the deviation, not the target.** The builder aims at nothing and the same
+finding comes back round after round. The tell is in the ledger rather than in any single
+verdict: the same finding `unresolved` twice, with the `reason` field naming a *different*
+wrong state each time (grey, then blue). That is a critic revealing it held a target it
+never wrote down. `fanout.py calibration` flags the shape as `NO-TARGET`; the ledger tell
+is yours to notice. Re-file the check with the target in it — and if you cannot name the
+target either, that is a brief defect, not another round.
+
+**A defect fixed at its anchor and rejected for its unnamed siblings.** The critic saw
+three call sites and anchored one. Round 2 rejects the fix as incomplete, and from the
+builder's side the target moved. `sites` exists for exactly this; a critic that leaves it
+empty on a pattern defect is filing one third of a finding.
+
+**`check_cmd` the critic never ran.** It fails for its own reasons — wrong path, missing
+target, a test that does not exist — and the finding reads as unfixed however good the
+fix was. Worse, it fails *silently* in the useful direction: nobody re-examines a finding
+that looks still-open. A command in this field is a claim to have run it.
+
+**`remedy` graded instead of `check`.** The verifier reads the remedy, sees the builder
+did something else, and marks `unresolved` on a check that now holds. That is the original
+leak coming back through the escape hatch, which is why the field is non-binding in the
+verifier prompt, in the builder's round instructions, and in the gate's own output.

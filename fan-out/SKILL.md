@@ -261,7 +261,10 @@ Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:
       "anchor": {"file": "<path>", "symbol": "<function or heading>",
                  "quote": "<short verbatim excerpt>", "line_hint": 42},
       "claim": "what is wrong",
+      "observed": "the current state, measured — in the same terms as the check",
       "check": "the concrete observation that would prove this fixed",
+      "check_cmd": "<optional: a command whose exit 0 means the check now holds>",
+      "sites": ["<every other anchor with the same defect>", ...],
       "status": "open"
     }
   ],
@@ -272,6 +275,40 @@ Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:
 
 Score against the rubric, not against your taste. Every finding needs an anchor into the
 candidate — an unfalsifiable objection is not a finding.
+
+`claim` says what is wrong. `check` says what would be TRUE once it is right, and those
+are different sentences. "The body colour is off" is a claim; the check is "the body is
+#C8102E, as in reference.png". A check that only restates the deviation — off, wrong,
+inconsistent, unclear, too slow — leaves the target to be guessed, and the builder will
+guess: told the colour is off, it ships blue, and you reject again having still never
+said red. Name the value, the range, the reference, or the source. If the brief or rubric
+fixes the target, quote it in the check so the builder does not have to go looking.
+
+Where you do NOT know the target — the brief never said what colour the car should be —
+that is a defect in the brief, and you say so in `claim` at the honest severity. Do not
+file a finding whose check only you can evaluate. A target you hold and do not write down
+is a guessing game you win every round, and it costs the run its whole cap.
+
+`observed` is the near side of that same line: what the artifact does NOW, measured, in
+the terms the check uses. "Renders #808080 at the body panel, r1/hero.png centre" against
+a check of "#C8102E". Give the number you read, the string you saw, the timing you took,
+and where you took it — not "the colour is wrong" again. You have just looked; the builder
+has not, and making it re-derive your measurement is a round spent reproducing work that
+is already done. A finding whose `observed` and `check` are the same distance apart in
+every round is also how you catch yourself rejecting a moving target.
+
+`sites` is the rest of the pattern. When the same defect occurs in more than one place,
+list every one of them — anchors, not a count, and not "and others". Fixing the anchored
+site and rejecting for the two you saw but did not name is the single most demoralising
+round this loop can produce, and you had the list when you looked. Where the defect is
+genuinely local, leave `sites` empty; an empty list is a claim that you checked.
+
+Where a command would settle the check — a grep for the condition, a failing test, a
+compile — put it in `check_cmd`, written so exit 0 means the check holds. Only commands
+you actually ran here, against this candidate: a plausible-looking command that does not
+exist costs more than the field saves. Omit it where the check needs judgement or a
+render, and never state a fix in it. If it exits 0 the moment you file the finding, you
+have written the wrong check or found nothing — resolve that before you hand it on.
 
 Where the brief names a visual surface, your evidence must say what you saw in the
 render. Check it is current — a render older than the files it renders is stale, and a
@@ -288,19 +325,90 @@ have built differently: one line, "nit" or "minor", and say plainly what you fou
 Never raise a severity to make a preference get attention.
 ```
 
-Three fields carry the whole re-review design:
+A finding is a **measurement**, and the fields are what a measurement needs to be acted on
+by someone who was not there:
 
-- **`check` is an observation, not an instruction.** "Add a null guard" is a demand;
-  "`Frame()` returns early when `entity` is invalid" is a check, and a later round can
-  confirm it mechanically. What can't be phrased as an observation is taste, and taste is a
-  `nit` at most.
 - **`anchor` must survive an edit** — symbol name plus a short verbatim quote, line as a
   hint only. Line numbers shift the moment the builder touches the file.
+- **`observed` and `check` are the two ends of one line.** Where it is now, where it must
+  be, in the same units. Either one alone is half a finding: a target with no measurement
+  makes the builder re-derive what you just read, and a measurement with no target is the
+  guessing game above.
+- **`check` is an observation, not an instruction — and it names the target, not the
+  deviation.** "Add a null guard" is a demand; "the null case is handled better" is the
+  deviation restated; "`Frame()` returns early when `entity` is invalid" is a check, and a
+  later round can confirm it mechanically. Two tests it must pass: could a builder that has
+  read only this sentence aim at the right state, and could a second critic decide it the
+  same way? What can't be phrased as an observation is taste, and taste is a `nit` at most.
+- **`sites` is the pattern**, listed in full or empty. It also settles scope: every site
+  named here is inside this finding, so fixing them all is not an out-of-scope edit and
+  does not re-open anything the builder was not asked to touch.
+- **`check_cmd` is optional and is where the round budget actually goes.** A check phrased
+  as an observation is often one a command can decide, and a finding decided by a command
+  never reaches an agent at all: `fanout.py deciders <slice-id>` prints them for you to run
+  in Step 5. It stays a *decider*, never a fix — "`grep -n 'nullopt' store.cpp`" tells the
+  builder nothing about how to get there, which is the point.
 - **`approved` is a claim you'll be held to** — whatever is listed there is out of scope for
   every later round unless the code underneath it changes.
 
 Critics that can run something (compile it, execute the tests, diff it) should. A critic
 whose `evidence` contains only opinions is a weak gate; treat its `accept` as unproven.
+
+### Detailed about the observation, never about the opinion
+
+"Be more detailed" is good advice pointed in one direction only. Every field above records
+something the critic *saw*: a measurement, a location, a list of sites, a command that was
+run. None of them records what the critic *thinks* — no rationale for the severity, no
+argument for why this matters, no account of what it considered and rejected.
+
+That asymmetry is the whole discipline, and it is worth stating plainly because the two
+kinds of detail read alike on the page and behave nothing alike downstream:
+
+- **Observation detail is bounded and reusable.** "#808080 at r1/hero.png centre" is one
+  line, it is the same length whoever writes it, the builder can act on it without trusting
+  the critic's judgement, and the next round can check whether it moved.
+- **Opinion detail is unbounded and load-bearing on nothing.** A paragraph on why the
+  colour matters does not tell the builder what colour to use, cannot be verified, and is
+  carried by every agent downstream of the verdict — the fold reads all of it.
+
+So: give the number, the location and the list, in one or two lines each. Do not argue.
+A finding that needs a paragraph of justification to land is usually a preference filed at
+the wrong severity, and the fix is the severity.
+
+The cost is small and lands in the right place. Findings are per-slice delta text sent to
+one builder — never the cached shared prefix — so a few extra lines are far cheaper than
+the round they save. What must stay short is the *count* of findings, not their precision:
+specific still beats comprehensive, and the ratchet guard in Step 5 is what holds that.
+
+### The target is not the route
+
+A finding tells the builder *where* (`anchor`, `sites`), *what is wrong* (`claim`), *where
+it stands now* (`observed`) and *what would be true once it is right* (`check`). It
+withholds only the route — the specific edit that gets there. Those are separate things,
+and the loop fails differently when you drop each:
+
+| Withheld | The builder | Cost |
+|---|---|---|
+| the route (`how`) | picks its own way to the stated target | none — this is the design |
+| the target (`check` names the deviation) | guesses; red, then blue, then green | every round, from round 1 |
+| nothing (`check` states the fix) | complies | the check stops testing the artifact |
+
+The middle row is the expensive one, and it is the one that looks fine on inspection: "the
+colour is off" is a legitimate observation, it is anchored, it is not an instruction, and
+it is unfalsifiable in exactly the way that matters — only the critic can tell when it
+stops being true. Naming the target is not prescription. "The car is red" is a fact about
+the destination; "respray it with PPG Viper Red" is a route. A critic that will not say
+red is not protecting the builder's autonomy, it is running a guessing game.
+
+Withholding the route stays right, and `remedy` (Step 5) is its one licensed exception,
+unlocked after a builder has spent a round against a stated target and still missed. That
+gate only means anything if the target was stated. A `remedy` handed out to rescue a check
+that never named its target is the loop paying an extra round to say what round 1 should
+have said in six words.
+
+So the ways to reach a good result faster are not "say more": state the target in the
+check, make it decidable without an agent (`check_cmd`, above), and stop the loop early
+when the gap is not closeable here.
 
 ### Demand the visual when there is a visual to demand
 
@@ -393,12 +501,18 @@ eyeball it — measure it:
 python scripts/fanout.py calibration
 ```
 
-It reports the severity histogram per critic and flags five documented failure modes:
+It reports the severity histogram per critic and flags seven documented failure modes:
 `INFLATION` (three quarters of findings blocking), `RUBBER-STAMP` (`accept` on almost no
 evidence), `OVER-APPROVED` (an approved list out of proportion to what was examined),
 `CHECK-AS-DEMAND` (a `check` that opens with an imperative — the most common quality leak
-in the loop), and `THIN-ANCHOR` (a blocker anchored only on a line number, which the first
-edit will lose).
+in the loop), `NO-TARGET` (a `check` that names the deviation and not the target — "the
+colour is off", which the builder can only answer by guessing), `NO-DELTA` (a `check` with
+no `observed` beside it, so the builder must re-measure what the critic just measured), and
+`THIN-ANCHOR` (a blocker anchored only on a line number, which the first edit will lose).
+
+`NO-TARGET` and `NO-DELTA` are the two worth fixing before the builder sees the finding
+rather than after. The others cost you a misjudged severity or a weak approval; those two
+cost the round itself, and then the next one.
 
 **It is advisory and always exits 0.** Miscalibration is a reason to read a verdict
 yourself before folding on it, never a reason to hold a slice — a heuristic about tone must
@@ -446,7 +560,10 @@ Without this there is no delta and the round degenerates into a full re-review.
 
 > Fix only these findings. If a fix requires changing something outside them, say so in
 > your notes instead of doing it silently — an unexplained out-of-scope edit re-opens
-> everything it touches.
+> everything it touches. A finding's own `sites` are part of that finding — fix all of
+> them, and that is not an out-of-scope edit. Where a finding carries a `remedy`, it is one
+> route and not the target: satisfy the `check` your own way if you have a better one, and
+> say in your notes why, so the next round judges the artifact rather than your compliance.
 
 **3. Compute the scope mechanically before spawning any critic.**
 
@@ -466,6 +583,22 @@ into the `r<N>` that matches the snapshot you just took in step 3 (`v2` → `r2`
 on a visual axis is verified by looking at the new render beside the old one; "fixed the
 clipping" is a claim, and a claim is not a check.
 
+```bash
+python scripts/fanout.py deciders <slice-id>
+```
+
+Prints the `check_cmd` each critic attached to its own findings, and lists the ones that
+carry none. Run them — the script deliberately does not, because executing command strings
+an agent wrote is a decision that belongs in front of you. Exit 0 closes that finding:
+set it `verified` with a `reason` naming the command and its output. Non-zero means the
+finding still stands, so it goes to the builder unchanged. This is the largest single
+saving in the loop, ahead of the scope narrowing — a slice whose findings are mostly
+mechanised can pass a verification round with no agent spawned at all.
+
+Two things it must not swallow. A visual finding is decided by the renders above, never by
+a command proving a file exists. And a finding with no `check_cmd` is not thereby weaker:
+most judgement calls have none, which is what the verifier is for.
+
 **5. Spawn the verifier** — same shared prefix, tiny delta:
 
 ```
@@ -482,10 +615,20 @@ finding on a visual axis, decide it by comparing the two renders, not by reading
 change that was supposed to produce them.
 
 For each open finding, decide `verified` or `unresolved` against its own `check` — not
-against a better fix you would have preferred. Record the observation that decided it in
-a "reason" field. A fix that satisfies the check is verified even where you would have
-written it differently; a check that still fails is unresolved even where the builder
-clearly tried. Do not promote a nit to keep the round busy.
+against a better fix you would have preferred, and not against any `remedy` on the
+finding. Record the observation that decided it in a "reason" field. A fix that satisfies
+the check is verified even where you would have written it differently; a check that
+still fails is unresolved even where the builder clearly tried. Do not promote a nit to
+keep the round busy.
+
+Every finding you mark `unresolved` must also carry a "remedy": one or two sentences
+naming a concrete route to the check — the specific change, at the anchor. A builder has
+now spent a round on this finding against the check alone and not closed it, so the check
+alone has been measured and found insufficient. The remedy is non-binding and it is not
+the target: the check stays the contract, and next round you judge the check, not whether
+the remedy was followed. If you cannot name a route because the gap needs a decision, an
+asset, or a change outside this slice, write that in "remedy" instead and say what is
+missing. That sentence ends the loop early, which is worth more than another round.
 
 You may raise a new finding ONLY if it sits inside the in-scope diff or a re-opened file.
 Anything outside that is out of bounds — except a genuine blocker (correctness, data
@@ -607,10 +750,11 @@ step.
   ordering rules, and why the pathfinder goes first. Read before changing prompt shapes or
   the spawn sequence.
 - `references/incremental-review.md` — the finding lifecycle, why re-opening approved scope
-  is necessary, cross-slice cascades, the ratchet guard, anchor drift. Read before running a
-  verification round or changing the verdict schema.
-- `scripts/fanout.py` — run dir, seal/check, plan, snapshot/scope/gate, calibration,
-  followups, status. Deterministic; no model calls. `plan` and `scope` apply the same
-  coupling rule, before and after the fact respectively. `gate` decides the work;
-  `calibration` lints the critique and decides nothing; `followups` drains what the run is
-  choosing not to fix.
+  is necessary, mechanical deciders, when a check earns a remedy, cross-slice cascades, the
+  ratchet guard, anchor drift. Read before running a verification round or changing the
+  verdict schema.
+- `scripts/fanout.py` — run dir, seal/check, plan, snapshot/scope/deciders/gate,
+  calibration, followups, status. Deterministic; no model calls, and `deciders` prints the
+  critics' commands rather than running them. `plan` and `scope` apply the same coupling
+  rule, before and after the fact respectively. `gate` decides the work; `calibration` lints
+  the critique and decides nothing; `followups` drains what the run is choosing not to fix.
