@@ -120,7 +120,7 @@ glacierStep(bed, H, Δt):
     # eroded volume → a moraine/sediment field at margins and terminus (the mass budget)
 ```
 
-![The SIA solver against Halfar's exact similarity solution: profiles, self-similar collapse, residual and the recovered exponent](../reference-impl/halfar_anatomy.png)
+![The SIA solver against Halfar's exact similarity solution: profiles, self-similar collapse, residual, the recovered exponent, and the spreading rate against the closed-form characteristic time](../reference-impl/halfar_anatomy.png)
 
 > **The one benchmark in this skill against an EXACT solution.** `P` (Halfar 1983; Bueler et al.
 > 2005 'Test B'), measured `D`. Drawn by

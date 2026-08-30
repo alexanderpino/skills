@@ -20,25 +20,32 @@ validity (the equation is the right one).
 
 A closed-form oracle derived from the same equation the code implements proves the code
 **solves it correctly** — not that the equation is **right**. A wrong coefficient mirrored into
-both the code and its analytic check passes green. So "427 tests pass" is self-consistency.
+both the code and its analytic check passes green. So "436 tests pass" is self-consistency.
 Validity needs evidence from an **independent source**.
 
-⚠️ **That figure said 117 for a long time, against a suite that has since passed 427**, and the staleness undercut the
+⚠️ **That figure said 117 for a long time, against a suite that had already grown past 400**, and the staleness undercut the
 very sentence it appears in: a reference implementation that misreports its own scale by a factor of
 three is not the thing to cite about rigour. `tests/test_audit_drift.py` now counts the suite and
 fails when the quoted number drifts more than 10 % from it.
 
+**Two different counts, so say which.** 436 is the number of `def test` **functions** across
+`tests/` — the quantity `test_audit_drift.py` recomputes. A run reports more, because parametrised
+cases expand: re-measured 2026-08-30, `python3 -m pytest -q` gives **617 passed, 6 skipped**. Neither
+number is the rigour claim; the point of the sentence is that all of them are self-consistency.
+
 ## The evidence ladder (weakest → strongest) and current status
 
-| Rung | Evidence type | What it proves | Status |
-|---|---|---|---|
-| 1 | **Dimensional consistency** | Necessary condition; a unit-inconsistent equation is invalid | ✅ `tests/test_dimensional.py` (below) |
-| 2 | **Independent-implementation agreement** | Our result matches a separately-developed library | ✅ 4 families (RichDEM/pysheds/Landlab) — RichDEM runs in the base env; the pysheds/Landlab checks `pytest.importorskip` and run once `requirements-crossvalidate.txt` is installed |
-| 3 | **Published-benchmark agreement** | Matches a number in the primary source / a standard analytic solution | ✅ catalogue below (incl. the **Halfar/Bueler SIA** exact solution) |
-| 4 | **Primary-source audit** | Citations real, papers say what's claimed, constants correct | ✅ **full** — 34/34 load-bearing citations confirmed (below) |
-| 5 | **Empirical vs real data** | Generated statistics live in the real-terrain distribution | ✅ **real DEMs** (below) — ours in-range on all 3 metrics |
+| Rung | Evidence type | What it proves | Status | Runs in a bare `requirements.txt` install? |
+|---|---|---|---|---|
+| 1 | **Dimensional consistency** | Necessary condition; a unit-inconsistent equation is invalid | ✅ `tests/test_dimensional.py` (below) | ⏭ **no** — needs `pint` (`requirements-validate.txt`) |
+| 2 | **Independent-implementation agreement** | Our result matches a separately-developed library | ✅ 4 families (RichDEM/pysheds/Landlab) | ⏭ **no — none of them, RichDEM included.** All three libraries live in `requirements-crossvalidate.txt`; every check `pytest.importorskip`s and SKIPS without it (below) |
+| 3 | **Published-benchmark agreement** | Matches a number in the primary source / a standard analytic solution | ✅ catalogue below (incl. the **Halfar/Bueler SIA** exact solution) | ✅ yes — numpy only |
+| 4 | **Primary-source audit** | Citations real, papers say what's claimed, constants correct | ✅ **full** — 34/34 load-bearing citations confirmed (below) | n/a — a human/web audit, not a test |
+| 5 | **Empirical vs real data** | Generated statistics live in the real-terrain distribution | ✅ **real DEMs** (below) — ours in-range on all 3 metrics | ✅ yes (the real-DEM half caches tiles; `tests/test_empirical.py` is numpy-only) |
 
-All five rungs carry evidence, at full coverage of the load-bearing set.
+All five rungs carry evidence, at full coverage of the load-bearing set — but **rungs 1 and 2 are
+gated on optional dependencies, so a green run of the default suite is not evidence that either of
+them executed.** The last column exists because that distinction was previously misstated here.
 
 ## Rung 5 — empirical agreement with real-terrain statistics
 
@@ -74,18 +81,50 @@ careful channel extraction.
 ## Rung 2 — independent-implementation agreement
 
 Our result compared **by test** against a mature library developed separately from the same
-papers (agreement = two independent readings converge). `tests/test_crossvalidate*.py`. **Only
-RichDEM is a base-environment dependency and always runs; the pysheds and Landlab checks
-`pytest.importorskip` those libraries and are exercised when `requirements-crossvalidate.txt` is
-installed (CI / a dev machine), so in a bare install they SKIP rather than fail** — real external
-validation, but gated on the optional dependency being present:
+papers (agreement = two independent readings converge). `tests/test_crossvalidate*.py`.
 
-| Family | Independent implementation | Check |
-|---|---|---|
-| Priority-flood fill | RichDEM (Barnes) | correlated raised-height, no interior pit |
-| D8 accumulation | pysheds · Landlab `FlowAccumulator` | drainage-area correlation > 0.9 |
-| Stream power | Landlab `FastscapeEroder` | slope-area exponent = −m/n, and agree |
-| Hillslope diffusion | Landlab `LinearDiffuser` | single-mode decay factor matches |
+⚠️ **This page used to say "Only RichDEM is a base-environment dependency and always runs". It is
+not, and it does not.** `requirements.txt` is two lines — `numpy>=1.24`, `pytest>=7.0` — and
+**richdem, pysheds and landlab all live in `requirements-crossvalidate.txt`**. Every check below
+opens with `pytest.importorskip`, RichDEM's at `tests/test_crossvalidate.py:26`, so in a bare
+install **all five SKIP**. `README.md:44` has described this correctly all along; this document did
+not, and a validity ledger that overstates which cross-validations executed is the worst thing in
+the repo to get wrong. Re-run in this environment, 2026-08-30 — not copied from the previous text:
+
+```
+$ python3 -m pytest -q -rs tests/test_crossvalidate*.py
+sssss                                                                    [100%]
+SKIPPED [1] tests/test_crossvalidate.py:26: could not import 'richdem': No module named 'richdem'
+SKIPPED [1] tests/test_crossvalidate.py:44: could not import 'pysheds': No module named 'pysheds'
+SKIPPED [1] tests/test_crossvalidate_landlab.py:42: could not import 'landlab': No module named 'landlab'
+SKIPPED [1] tests/test_crossvalidate_landlab.py:79: could not import 'landlab': No module named 'landlab'
+SKIPPED [1] tests/test_crossvalidate_landlab.py:107: could not import 'landlab': No module named 'landlab'
+5 skipped in 0.13s
+```
+
+The evidence below is real external validation *when the optional file is installed* (CI / a dev
+machine). The last column records what happened in **this** run, so that a green suite line is never
+mistaken for the rung having been exercised:
+
+| Family | Independent implementation | Check | Guard | This run |
+|---|---|---|---|---|
+| Priority-flood fill | RichDEM (Barnes) | correlated raised-height, no interior pit | `test_crossvalidate.py:26` | ⏭ skipped |
+| D8 accumulation | pysheds · Landlab `FlowAccumulator` | drainage-area correlation > 0.9 | `test_crossvalidate.py:44`; `test_crossvalidate_landlab.py:42` | ⏭ skipped |
+| Stream power | Landlab `FastscapeEroder` | slope-area exponent = −m/n, and agree | `test_crossvalidate_landlab.py:79` | ⏭ skipped |
+| Hillslope diffusion | Landlab `LinearDiffuser` | single-mode decay factor matches | `test_crossvalidate_landlab.py:107` | ⏭ skipped |
+
+**What the default suite does prove, measured the same day.** The full run is green and the six
+skips are exactly the optional rungs — nothing else is silently absent:
+
+```
+$ python3 -m pytest -q -rs
+617 passed, 6 skipped in 433.06s (0:07:13)
+    5 × cross-validation (richdem / pysheds / landlab, above)
+    1 × tests/test_dimensional.py:18  (could not import 'pint')
+```
+
+So: rungs 3 and 5 — the analytic benchmarks and the real-DEM comparison — **did** run. Rungs 1 and 2
+did not. Install `requirements-crossvalidate.txt` and `requirements-validate.txt` to exercise them.
 
 ## Rung 3 — published-benchmark agreement
 
@@ -145,8 +184,12 @@ reference length). This is a **real, long-standing convention** of the Beven–K
 transcription error — recorded here rather than hidden. Any port should be aware the index is
 scale-referenced.
 
-All 10 checks pass. Dimensional validity is a *necessary* condition met across the load-bearing
-physics — it does not by itself prove the equations are physically right (that is rungs 2–5).
+All 10 checks pass **when `pint` is installed** — and, like rung 2, that is not the default. `pint`
+is in `requirements-validate.txt`, not `requirements.txt`, and `tests/test_dimensional.py:18` is a
+module-level `pytest.importorskip("pint")`, so the whole file skips in a bare install (it is the
+sixth skip in the full-suite run quoted under rung 2). Dimensional validity is a *necessary*
+condition met across the load-bearing physics — it does not by itself prove the equations are
+physically right (that is rungs 2–5).
 
 Run: `pip install -r requirements-validate.txt && pytest -q tests/test_dimensional.py`
 

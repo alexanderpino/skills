@@ -22,7 +22,15 @@ WHAT THE PANELS SHOW. a: the profile at t=0 and after 1600 model years, with the
 the evolved radius on top of it. b: the same profiles at four times, each normalised by its OWN
 centre height and radius, collapsing onto one curve — self-similarity is the claim, and a collapse
 is what it looks like. c: the residual against radius with the 3% acceptance band, showing WHERE
-the error lives. d: the exponent recovered by fitting, against the analytic 3/7.
+the error lives — the curve stops at the 0.7R fit-window edge, which the axis is ticked to make
+plain. d: the exponent recovered by fitting, against the analytic 3/7.
+
+e: THE RATE, and it is the panel that makes the other four mean anything. a–d all measure SHAPE,
+and shape here is nearly vacuous on its own: the initial condition IS the Halfar profile, so a
+solver that barely moves the ice matches it trivially — `H^(n+1)` in place of `H^(n+2)` leaves
+every shape row green and LOWERS the residual. Panel e compares the characteristic time recovered
+from the numerical thinning against Halfar's closed form, which no near-no-op can fake. See the
+RATE section below for the derivation and the measured numbers.
 
 The numpy half carries no Pillow dependency, so `tests/test_halfar_anatomy.py` imports the
 measurements from here. Writes `halfar_anatomy.png`. Run: `python halfar_anatomy.py`.
@@ -125,7 +133,7 @@ def volume_error(steps=8):
 # with the run starting at t = t0. So the SAME t0 can be recovered from the numerical
 # thinning, and the two must agree. That comparison is sensitive to the diffusivity by
 # construction — `H^(n+1)` puts the fitted t0 at 4.06e13 against an analytic 9.22e9,
-# a factor of 4405.
+# a factor of 4406.
 #
 # Note `n + 2` appears in Gamma. That is NOT the solver's exponent leaking in: it is the
 # published Test B constant (Bueler et al. 2005), written from the paper like the 4/3
@@ -355,10 +363,10 @@ def build():
         d.ellipse([px_ - 4, py_ - 4, px_ + 4, py_ + 4], fill=BLU)
         d.text((px_, TOP + side + 6), '%d' % st, MUTED, font=f_s, anchor='ma')
     d.text((x0 + 44, TOP + side + 24), 't0 recovered / t0 closed form', MUTED, font=f_s)
-    # The broken solver's point is 4405 — four orders of magnitude off the top of this axis.
+    # The broken solver's point is 4406 — four orders of magnitude off the top of this axis.
     # Stating the number is the only honest way to draw it; a clipped marker would imply it
     # sits just above the frame.
-    d.text((x0 + 44, TOP + side + 42), 'H^(n+1) lands at 4405 ↑', RED, font=f_b)
+    d.text((x0 + 44, TOP + side + 42), 'H^(n+1) lands at 4406 ↑', RED, font=f_b)
 
     cap = CAP_TOP
     for i, line in enumerate(caption_lines(m)):
@@ -402,7 +410,7 @@ def caption_lines(m):
         '0.49%. What a near-no-op cannot fake is the RATE — panel e. Halfar fixes it with no free parameters: t0 = (1/18)/Γ·(7/4)³·R0⁴/H0⁷ with',
         'Γ = 2A(ρg)ⁿ/(n+2), and H_c = H0(t/t0)^(−1/9), so t0 can be read back out of the thinning. Closed form %.3e s against %.3e s'
         % (m['t0_analytic'], m['t0_fitted']),
-        'recovered from the run — %.2f%% apart, converging as the timestep falls. Under H^(n+1) that recovery returns 4.06e13 s, a factor of 4405.'
+        'recovered from the run — %.2f%% apart, converging as the timestep falls. Under H^(n+1) that recovery returns 4.06e13 s, a factor of 4406.'
         % (100 * m['rate_error']),
         'Drawn from sims_illustrative.py, guarded by tests/test_halfar_anatomy.py.',
     ]

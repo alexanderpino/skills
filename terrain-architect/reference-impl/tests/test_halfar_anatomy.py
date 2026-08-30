@@ -102,7 +102,7 @@ def test_the_spreading_RATE_matches_the_closed_form_not_just_the_shape():
     Measured: analytic 9.221e9 s against a fitted 9.243e9 s, 0.23% apart, and the fit
     converges toward the closed form as the step count rises (9.326e9 / 9.275e9 / 9.243e9 /
     9.226e9 at 2/4/8/16 steps) — which is what discretisation error is supposed to do.
-    Under `H^(n+1)` the fitted t0 is 4.06e13, a factor of **4405** out. That is the
+    Under `H^(n+1)` the fitted t0 is 4.06e13, a factor of **4406** out. That is the
     discriminator this file was missing.
     """
     analytic = HA.t0_analytic()

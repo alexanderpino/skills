@@ -66,8 +66,27 @@ Verdict scale: **SOTA** · **solid (not SOTA)** · **superseded** · **gap**. "U
 | **Sediment / deposition** | **now: `erosion_pipe.pipe_erode`** (Mei-2007 coupled flow+sediment, conserved) + droplet; SPL still detachment-only | conserved sediment field (Šťava 2008 … Schott 2024, McDonald 2026) | **gap closed** for the pipe model (fans/deltas/fill + mass conservation); SPL core still detachment-limited | add the transport-limited closure to the SPL stage too |
 | **Flow routing / hydrology** | D8 + MFD + priority-flood (× RichDEM/pysheds/Landlab) | + D-infinity (Tarboton 1997); Fill-Spill-Merge (Barnes 2020) for real lakes; FastFlow 2024 | **current / solid** | optional D-∞; **Fill-Spill-Merge** for real lakes vs filled-flat |
 | **Karst caves** | — (prose only) | Paris 2021 geologically-coherent cave networks | **gap** (if in scope) | anisotropic-shortest-path conduits + SDF |
-| **Lava flow** | ejecta CA only | MAGFLOW/MOLASSES CA or SPH thermal flow | **gap** (if in scope) | thermo-rheological CA or shallow-water thermal |
+| **Lava flow** | **thermo-rheological grid CA** — `sims_illustrative.lava_flow` (`19`): temperature-dependent Bingham yield gate `τ_y = max(τ_y0 + gain·(T_solidus − T), 1)`, flux `q = k(τ−τ_y)L²/η` only where `τ > τ_y`, heat advected with the mass, freeze-to-bedrock, mass budget closed (Miyamoto & Sasaki 1997, C&G 23:283) | MAGFLOW (flux law derived from a steady-state Bingham Navier–Stokes solution; INGV, operational at Etna) / MOLASSES; FLOWGO 1-D channel heat budget; SPH thermal flow | **solid, not SOTA** — the model class this row used to *ask for* already ships. Caveat: it is **illustrative-tier** (invariant-checked, no decisive oracle — the README coverage boundary), so "solid" is about the model, not about verified numbers | four *specific* deltas vs MAGFLOW / Miyamoto & Sasaki, none of them "write the CA": **(1) Monte-Carlo neighbour selection** — M&S's actual contribution, the fix for lattice quantisation; ours is a deterministic D8 proportional split. **(2) radiative cooling `εσ(T⁴−T_env⁴)` + crust insulation** — ours is a uniform linear `cool·dt`, so there is no margin/core cooling asymmetry and hence **no emergent levées**. **(3) `η(T)`** — ours is a constant `eta`. **(4)** MAGFLOW's NS-derived flux law — ours is the ad-hoc Bingham form |
 | **Debris runout** | Voellmy 1955 | Jain/Beneš/Cordonnier 2024 debris-flow | **solid** | frontier watch |
+
+⚠️ **The lava row was wrong on both halves, and it is the drift this document exists to avoid.** It
+read *"ours = ejecta CA only … **gap** … upgrade: thermo-rheological CA"*. Verified 2026-08-30:
+
+- **The thermo-rheological CA already ships.** `sims_illustrative.py:28–78` is a temperature-carrying
+  Bingham CA (`tau_y = np.maximum(tau_y0 + tau_y_gain * (T_solidus - T), 1.0)` at line 47; the flux is
+  gated on `tau > tau_y` at line 53). It is tested (`tests/test_sims_illustrative.py`, 7 passed),
+  dimensionally audited (`tests/test_dimensional.py::test_lava_bingham_flux_is_area_per_time`, the
+  Bingham-flux row of [`VALIDATION.md`](VALIDATION.md)'s rung-1 table), citation-audited to Miyamoto &
+  Sasaki 1997 in that document's rung-4 table, drawn as **gallery panel 30** and as the
+  `capability_grid.py` tile *"19 Lava CA"*, and written up as runnable pseudocode in
+  `references/19-lava.md`.
+- **There is no "ejecta CA" anywhere in the repo.** The only ejecta model is `crater.py`'s blanket —
+  an analytic, mass-conserving `r^-3` deposit with an azimuthal weight (`crater.py:61,109–121`), not a
+  cellular automaton, and unrelated to lava.
+
+A reader planning work off the old row would have rebuilt a shipped, tested module — precisely the
+failure `tests/test_audit_drift.py` was written for after the braided-river drift. That harness does
+not currently cover `SIMULATION-AUDIT.md`; a row for it would have caught this one.
 
 ---
 
@@ -165,7 +184,9 @@ Process SOTA: Braun & Willett 2013 (Geomorphology, 10.1016/j.geomorph.2012.10.00
 Schott et al. 2023 (TOG, 10.1145/3592787) & 2024 multi-scale (10.1145/3658200); McDonald & Cordonnier 2026 (TOG, 10.1145/3811336);
 Musgrave et al. 1989 (SIGGRAPH); Roering et al. 1999 (WRR, 10.1029/1998WR900090); Werner 1995 (Geology); Paris et al. 2019 *Desertscape*
 (CGF, 10.1111/cgf.13815); Cordonnier et al. 2023 *Glacial Erosion* (TOG, 10.1145/3592422); Jouvet et al. 2022 *IGM* (J. Glaciology);
-Paris et al. 2021 *Caves* (CGF, 10.1111/cgf.14420); Tarboton 1997 (WRR, 10.1029/96WR03137); Barnes et al. 2014 *Priority-Flood* (C&G);
+Paris et al. 2021 *Caves* (CGF, 10.1111/cgf.14420); Miyamoto & Sasaki 1997 (Computers & Geosciences 23:283 — the lava CA this skill implements,
+citation-audited ✅ in `VALIDATION.md`); Harris & Rowland 2001 *FLOWGO* (Bull. Volcanol. 63) and **MAGFLOW** (INGV Catania), both as named in
+`references/19-lava.md`; Tarboton 1997 (WRR, 10.1029/96WR03137); Barnes et al. 2014 *Priority-Flood* (C&G);
 Barnes et al. 2020 *Fill-Spill-Merge* (ESurf); Jain et al. 2024 *FastFlow* (CGF, 10.1111/cgf.15243); Walkden & Hall 2005 *SCAPE* (Coastal Eng.).
 Metrics & validation: Hack 1957; Horton 1945; Strahler 1952; Montgomery & Dietrich 1992 (Science); Whipple & Tucker 1999 (JGR);
 Rigon et al. 1996 (WRR); Perron et al. 2008 (JGR, 10.1029/2007JF000866); Jasiewicz & Stepinski 2013 (Geomorphology); Rajasekaran et al.
