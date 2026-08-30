@@ -92,11 +92,13 @@ covering the visual dimension. `perf` needs no critic — Lighthouse decides it.
 python3 scripts/gauntlet.py log-round --wave 1 --lane typography --dimension visual \
   --round 1 --mode blind --winner other --margin decisive --score 4 --severity major \
   --gap "no optical tracking compensation at display sizes" \
+  --closed-when "tracking at 48px+ matches bar/specimen.png letter-fit, headline row" \
   --evidence gauntlet/shots/w1-typo-ab.png --critic-framing default
 
 python3 scripts/gauntlet.py log-round --wave 1 --lane imagery --dimension perf \
   --round 1 --mode rubric --winner other --margin clear --score 4 --severity major \
   --gap "hero image 1.8MB uncompressed; LCP 3.4s against a 1.5s budget" \
+  --closed-when "LCP under 1.5s on the wave-1 Lighthouse profile" \
   --evidence gauntlet/bench/w1.json
 ```
 
