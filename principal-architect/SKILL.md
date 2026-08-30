@@ -6,7 +6,8 @@ description: >-
   any change affecting structure, boundaries, interfaces, dependencies, data, security, or a
   quality attribute — read first, then update. Also use when the user mentions architecture, a
   PRD/HLD/SD/SAD/RFC/ADR, C4/ArchiMate/BPMN diagrams, capabilities, landscape, roadmap, migration,
-  threat modeling, SLOs, data models/ERDs, cloud cost, user stories, or acceptance criteria. The
+  threat modeling, SLOs, data models/ERDs, cloud cost, user stories, acceptance criteria, or
+  UI/interaction quality (usability, screen layout, navigation structure). The
   agent acts as a master architect and business analyst: it picks the altitude, derives content
   from evidence, writes user stories/acceptance criteria in the company's house format, and
   triages so only needed artifacts are produced. Captures software with C4, records decisions via
@@ -376,6 +377,13 @@ manifest in the index README). Condensed:
   component-dependency principles, and a forward **tactic→ISO 25010 quality** catalogue
   (cloud/distributed patterns, EIP) — each with its trade-offs. Companion to `methods.md`;
   the architectural home for DDD/SOLID/patterns (code-altitude ones stay pointers).
+- `references/feng-shui.md` — **placement & flow in inhabited structures**: one spatial
+  lens (form-school principles, each reduced to a verified invariant) applied to the
+  codebase (a second way to notice the `structure.md` §2 / smell findings), the **screen**
+  (the skill's home for UI/interaction arrangement — ISO 25010 Interaction capability as
+  `Q.xx` scenarios, the tactic menu, when an interaction choice is ADR-worthy), and the
+  docs tree. Read for any UI/interaction work, or to walk a structure for smells; its
+  vocabulary stays out of produced docs (§6).
 - `references/data-architecture.md` — **data as a structural concern**: ownership &
   boundaries (one owning context per dataset; shared writable stores are ADR-worthy),
   storage selection keyed to `Q.xx` (CAP/PACELC), schema evolution (expand–contract,

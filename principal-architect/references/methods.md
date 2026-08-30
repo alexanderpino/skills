@@ -265,6 +265,9 @@ need a pros/cons comparison (`references/standards.md`).
   deficient/near-duplicate names (communication). Detect via the dependency graph and
   simple metrics (file/dir size, fan-in/out, cycle detection). Recording a smell is a
   legitimate outcome — a deliberate "we accept this for now" beats silent debt.
+  A complementary way to *notice* them — walking the structure as an inhabited space
+  (entrance, flow, chokepoints, accumulation) — is `references/feng-shui.md`; findings
+  are still recorded in the standard vocabulary here, never the lens's.
 
 ---
 

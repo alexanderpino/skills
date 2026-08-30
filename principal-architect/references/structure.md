@@ -143,6 +143,12 @@ the architecture-altitude cousins of SOLID, and more relevant here than SOLID it
 > an architecture description. Its architectural payload is *DIP → the Dependency
 > Rule* and the component principles above.
 
+**A second way to check the same shape** — placement and flow, walked as a
+newcomer walks it (where's the entrance, what does everything funnel through, what
+pierces a boundary, what has accumulated) — is `feng-shui.md`. Same findings as the
+principles above, different way of noticing them; its vocabulary stays out of the
+produced docs (`feng-shui.md` §6).
+
 ---
 
 ## 3. Selecting tactics & patterns for a quality scenario (forward catalogue)
@@ -170,6 +176,7 @@ rejections; caching buys performance at the cost of staleness). Record the quali
 | **Security** (overlaps the mandatory threat model) | gateway / BFF · authn/z at the edge · secrets management · encryption in transit & at rest · rate limiting · input validation (→ HLD §8, `privacy.md`) |
 | **Maintainability** (modularity, modifiability, testability) | ports & adapters · ACL · layering · the component principles (§2) · contract tests (`interfaces.md`) |
 | **Compatibility** (interoperability) | published language / OHS · API gateway · message translator (EIP) · versioned contracts (`interfaces.md`) |
+| **Interaction capability** (recognizability, learnability, operability, error protection, inclusivity) | visual hierarchy · progressive disclosure · platform convention & consistent placement · large/near targets (Fitts) · Gestalt grouping · safe defaults + undo · one primary action per screen — the spatial method, sub-characteristic map, and a worked `Q.xx` are in `feng-shui.md` §4 |
 
 **Integration style** — choose *per boundary*, then record it; the style is itself an
 architectural commitment (`significance.md` item 6):
@@ -294,4 +301,5 @@ skill's standing rule, `standards.md`); record the divergence in an ADR.
 
 Cross-references: boundaries & decisions — `methods.md` §§1, 4, 8; significance —
 `significance.md`; quality scenarios — `methods.md` §7, `standards.md`; contracts —
-`interfaces.md`; transformation — `migration.md`; enforcement — `automation.md`.
+`interfaces.md`; transformation — `migration.md`; enforcement — `automation.md`;
+placement & flow (code, UI, docs tree) — `feng-shui.md`.
