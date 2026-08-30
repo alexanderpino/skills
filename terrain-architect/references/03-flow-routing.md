@@ -235,6 +235,26 @@ diffuse and rivers look like broad damp smears rather than lines. The standard f
 **hybrid**: MFD where `A` is small (hillslope), D8 or D∞ where `A` exceeds a channelisation
 threshold. This costs almost nothing and is what most good terrain tools do.
 
+![D8, MFD and the hybrid accumulation on one DEM, and the concentration statistic against relief](../reference-impl/flow_anatomy.png)
+
+> **The two failures, side by side and measured.** `D`, drawn by
+> [`reference-impl/flow_anatomy.py`](../reference-impl/flow_anatomy.py) from `flow.py`'s own
+> `d8_accumulation` and `mfd_accumulation` — the shipped routers, not a restatement — and guarded
+> by `tests/test_flow_anatomy.py`. **a–c:** the same 160×160 DEM routed three ways, log-compressed
+> because drainage area spans four decades and a linear ramp would show the trunk and nothing else.
+> **The statistic is the share of cells needed to carry half the total drainage**, which has no
+> threshold to tune: D8 needs **1.5%**, MFD **7.1%** — 4.8× as many — and the hybrid **3.7%**.
+> **d** is the part the prose above misses. Sweeping the relief on the ramp, the order **reverses**
+> below about 8 m of texture: with almost nothing to steer them, D8's paths run as parallel stripes
+> at the lattice angles and never merge, so the router that is supposed to converge stops
+> converging. ⚠️ **The stripe artefact and the concentration statistic are the same phenomenon seen
+> twice** — which means a generator working at low relief gets the worst of D8 without the one
+> thing D8 is chosen for.
+>
+> ⚠️ The figure deliberately does **not** draw Quinn's contour-length weighting from the block
+> above: `flow.py` ships Freeman's `slope^p`, so that panel would illustrate pseudocode this skill
+> does not run. A figure here is drawn from the implementation or not at all.
+
 ## D6 (hexagonal grids)
 
 On a hexagonal working grid (`26`) the routing family above simplifies: every

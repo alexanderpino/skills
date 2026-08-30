@@ -27,3 +27,4 @@ out/
 # silently in exactly this direction, by omission rather than by error.
 !hex_anatomy.png
 !anisotropy_anatomy.png
+!flow_anatomy.png
