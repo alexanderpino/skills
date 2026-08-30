@@ -22,6 +22,7 @@ prose or the module moved, and somebody has to say which.
 that. This only checks that the chapters say what the code computes. Both are needed: prose can
 faithfully quote a wrong number, and correct code can be described by stale prose.
 """
+import math
 import re
 from pathlib import Path
 
@@ -174,3 +175,65 @@ def test_26_corner_only_costs_one_third():
     text = (CHAPTERS / "26-hexagonal-grids.md").read_text(encoding="utf-8")
     assert re.search(r"H/3|×1/3|H\+0\+0\)/3", text), (
         "26 no longer states the corner-only 1/3 attenuation; this row is stale")
+
+
+# --------------------------------------------------------------------------- #
+# 12 — the veneer coverage fractions, checked against the chapter's OWN formula
+#
+# ⚠️ THE REACH THIS ADDS. Every row above re-derives a chapter number from a
+# MODULE. `12` has no module here — the surf loop it describes is not shipped in
+# this skill — but it states a closed form beside its numbers:
+#
+#     f   = Phi(u)                        covered area fraction
+#     reg = sigma_r * (phi(u) + u*Phi(u)) mean sand depth, the volume book
+#
+# so the chapter can be checked against ITSELF: evaluate the formula it gives
+# and confirm it produces the percentages it prints next to it. That catches the
+# case a module-based row cannot — a number updated without re-deriving, or a
+# formula that does not produce the values beside it — and it works for every
+# chapter that writes its algebra down, implementation or no implementation.
+
+def _std_normal_cdf(z):
+    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+
+def _std_normal_pdf(z):
+    return math.exp(-0.5 * z * z) / math.sqrt(2.0 * math.pi)
+
+
+def _veneer_coverage(depth_in_sigma):
+    """Solve `phi(u) + u*Phi(u) = reg/sigma_r` for u, then return `f = Phi(u)`.
+
+    Bisection rather than a solver import: the function is monotone in u and the
+    reference implementation carries no scipy dependency.
+    """
+    lo, hi = -6.0, 6.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if mid * _std_normal_cdf(mid) + _std_normal_pdf(mid) < depth_in_sigma:
+            lo = mid
+        else:
+            hi = mid
+    return _std_normal_cdf(0.5 * (lo + hi))
+
+
+@pytest.mark.parametrize("depth,pattern", [
+    (1.00, r"covers \*\*([0-9.]+)%\*\* of the area"),
+    (0.50, r"Half a\s+roughness covers ([0-9.]+)%"),
+    (0.25, r"a quarter ([0-9.]+)%"),
+])
+def test_12_veneer_coverage_matches_its_own_closed_form(depth, pattern):
+    check("12-glacial-coastal.md", pattern, _veneer_coverage(depth), 100.0)
+
+
+def test_12_states_the_distribution_the_numbers_depend_on():
+    """The percentages hold for a GAUSSIAN roughness and for no other.
+
+    A reader who took `81.6%` as a property of veneers rather than of `N(0, sigma_r)` would carry
+    it to a distribution where it is simply false, so the chapter naming the distribution is part
+    of the claim rather than background.
+    """
+    text = (CHAPTERS / "12-glacial-coastal.md").read_text(encoding="utf-8")
+    assert re.search(r"z\s*~\s*N\(0,\s*.?_?r?\)", text) or "N(0, σ_r)" in text, (
+        "12 no longer states that the rock elevation is Gaussian; the coverage percentages "
+        "beside it are only true for that distribution")
