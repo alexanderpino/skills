@@ -261,8 +261,10 @@ Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:
       "anchor": {"file": "<path>", "symbol": "<function or heading>",
                  "quote": "<short verbatim excerpt>", "line_hint": 42},
       "claim": "what is wrong",
+      "observed": "the current state, measured — in the same terms as the check",
       "check": "the concrete observation that would prove this fixed",
       "check_cmd": "<optional: a command whose exit 0 means the check now holds>",
+      "sites": ["<every other anchor with the same defect>", ...],
       "status": "open"
     }
   ],
@@ -287,6 +289,20 @@ that is a defect in the brief, and you say so in `claim` at the honest severity.
 file a finding whose check only you can evaluate. A target you hold and do not write down
 is a guessing game you win every round, and it costs the run its whole cap.
 
+`observed` is the near side of that same line: what the artifact does NOW, measured, in
+the terms the check uses. "Renders #808080 at the body panel, r1/hero.png centre" against
+a check of "#C8102E". Give the number you read, the string you saw, the timing you took,
+and where you took it — not "the colour is wrong" again. You have just looked; the builder
+has not, and making it re-derive your measurement is a round spent reproducing work that
+is already done. A finding whose `observed` and `check` are the same distance apart in
+every round is also how you catch yourself rejecting a moving target.
+
+`sites` is the rest of the pattern. When the same defect occurs in more than one place,
+list every one of them — anchors, not a count, and not "and others". Fixing the anchored
+site and rejecting for the two you saw but did not name is the single most demoralising
+round this loop can produce, and you had the list when you looked. Where the defect is
+genuinely local, leave `sites` empty; an empty list is a claim that you checked.
+
 Where a command would settle the check — a grep for the condition, a failing test, a
 compile — put it in `check_cmd`, written so exit 0 means the check holds. Only commands
 you actually ran here, against this candidate: a plausible-looking command that does not
@@ -309,35 +325,67 @@ have built differently: one line, "nit" or "minor", and say plainly what you fou
 Never raise a severity to make a preference get attention.
 ```
 
-Three fields carry the whole re-review design:
+A finding is a **measurement**, and the fields are what a measurement needs to be acted on
+by someone who was not there:
 
+- **`anchor` must survive an edit** — symbol name plus a short verbatim quote, line as a
+  hint only. Line numbers shift the moment the builder touches the file.
+- **`observed` and `check` are the two ends of one line.** Where it is now, where it must
+  be, in the same units. Either one alone is half a finding: a target with no measurement
+  makes the builder re-derive what you just read, and a measurement with no target is the
+  guessing game above.
 - **`check` is an observation, not an instruction — and it names the target, not the
   deviation.** "Add a null guard" is a demand; "the null case is handled better" is the
   deviation restated; "`Frame()` returns early when `entity` is invalid" is a check, and a
   later round can confirm it mechanically. Two tests it must pass: could a builder that has
   read only this sentence aim at the right state, and could a second critic decide it the
   same way? What can't be phrased as an observation is taste, and taste is a `nit` at most.
-- **`anchor` must survive an edit** — symbol name plus a short verbatim quote, line as a
-  hint only. Line numbers shift the moment the builder touches the file.
+- **`sites` is the pattern**, listed in full or empty. It also settles scope: every site
+  named here is inside this finding, so fixing them all is not an out-of-scope edit and
+  does not re-open anything the builder was not asked to touch.
+- **`check_cmd` is optional and is where the round budget actually goes.** A check phrased
+  as an observation is often one a command can decide, and a finding decided by a command
+  never reaches an agent at all: `fanout.py deciders <slice-id>` prints them for you to run
+  in Step 5. It stays a *decider*, never a fix — "`grep -n 'nullopt' store.cpp`" tells the
+  builder nothing about how to get there, which is the point.
 - **`approved` is a claim you'll be held to** — whatever is listed there is out of scope for
   every later round unless the code underneath it changes.
-
-A fourth field, `check_cmd`, is optional and is where the round budget actually goes. A
-check phrased as an observation is often one a command can decide, and a finding decided
-by a command never reaches an agent at all: `fanout.py deciders <slice-id>` prints them for
-you to run in Step 5. It stays a *decider*, never a fix — "`grep -n 'nullopt' store.cpp`"
-tells the builder nothing about how to get there, which is the point. See
-`references/incremental-review.md`.
 
 Critics that can run something (compile it, execute the tests, diff it) should. A critic
 whose `evidence` contains only opinions is a weak gate; treat its `accept` as unproven.
 
+### Detailed about the observation, never about the opinion
+
+"Be more detailed" is good advice pointed in one direction only. Every field above records
+something the critic *saw*: a measurement, a location, a list of sites, a command that was
+run. None of them records what the critic *thinks* — no rationale for the severity, no
+argument for why this matters, no account of what it considered and rejected.
+
+That asymmetry is the whole discipline, and it is worth stating plainly because the two
+kinds of detail read alike on the page and behave nothing alike downstream:
+
+- **Observation detail is bounded and reusable.** "#808080 at r1/hero.png centre" is one
+  line, it is the same length whoever writes it, the builder can act on it without trusting
+  the critic's judgement, and the next round can check whether it moved.
+- **Opinion detail is unbounded and load-bearing on nothing.** A paragraph on why the
+  colour matters does not tell the builder what colour to use, cannot be verified, and is
+  carried by every agent downstream of the verdict — the fold reads all of it.
+
+So: give the number, the location and the list, in one or two lines each. Do not argue.
+A finding that needs a paragraph of justification to land is usually a preference filed at
+the wrong severity, and the fix is the severity.
+
+The cost is small and lands in the right place. Findings are per-slice delta text sent to
+one builder — never the cached shared prefix — so a few extra lines are far cheaper than
+the round they save. What must stay short is the *count* of findings, not their precision:
+specific still beats comprehensive, and the ratchet guard in Step 5 is what holds that.
+
 ### The target is not the route
 
-A finding tells the builder *where* (`anchor`), *what is wrong* (`claim`), and *what would
-be true once it is right* (`check`). It withholds only the route — the specific edit that
-gets there. Those are three separate things, and the loop fails differently when you drop
-each:
+A finding tells the builder *where* (`anchor`, `sites`), *what is wrong* (`claim`), *where
+it stands now* (`observed`) and *what would be true once it is right* (`check`). It
+withholds only the route — the specific edit that gets there. Those are separate things,
+and the loop fails differently when you drop each:
 
 | Withheld | The builder | Cost |
 |---|---|---|
@@ -453,17 +501,18 @@ eyeball it — measure it:
 python scripts/fanout.py calibration
 ```
 
-It reports the severity histogram per critic and flags six documented failure modes:
+It reports the severity histogram per critic and flags seven documented failure modes:
 `INFLATION` (three quarters of findings blocking), `RUBBER-STAMP` (`accept` on almost no
 evidence), `OVER-APPROVED` (an approved list out of proportion to what was examined),
 `CHECK-AS-DEMAND` (a `check` that opens with an imperative — the most common quality leak
 in the loop), `NO-TARGET` (a `check` that names the deviation and not the target — "the
-colour is off", which the builder can only answer by guessing), and `THIN-ANCHOR` (a
-blocker anchored only on a line number, which the first edit will lose).
+colour is off", which the builder can only answer by guessing), `NO-DELTA` (a `check` with
+no `observed` beside it, so the builder must re-measure what the critic just measured), and
+`THIN-ANCHOR` (a blocker anchored only on a line number, which the first edit will lose).
 
-`NO-TARGET` is the one worth fixing before the builder sees the finding rather than after.
-The others cost you a misjudged severity or a weak approval; this one costs the round
-itself, and then the next one.
+`NO-TARGET` and `NO-DELTA` are the two worth fixing before the builder sees the finding
+rather than after. The others cost you a misjudged severity or a weak approval; those two
+cost the round itself, and then the next one.
 
 **It is advisory and always exits 0.** Miscalibration is a reason to read a verdict
 yourself before folding on it, never a reason to hold a slice — a heuristic about tone must
@@ -511,9 +560,10 @@ Without this there is no delta and the round degenerates into a full re-review.
 
 > Fix only these findings. If a fix requires changing something outside them, say so in
 > your notes instead of doing it silently — an unexplained out-of-scope edit re-opens
-> everything it touches. Where a finding carries a `remedy`, it is one route and not the
-> target: satisfy the `check` your own way if you have a better one, and say in your notes
-> why, so the next round judges the artifact rather than your compliance.
+> everything it touches. A finding's own `sites` are part of that finding — fix all of
+> them, and that is not an out-of-scope edit. Where a finding carries a `remedy`, it is one
+> route and not the target: satisfy the `check` your own way if you have a better one, and
+> say in your notes why, so the next round judges the artifact rather than your compliance.
 
 **3. Compute the scope mechanically before spawning any critic.**
 

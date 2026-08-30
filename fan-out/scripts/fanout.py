@@ -502,7 +502,13 @@ def cmd_gate(args) -> None:
         where = anchor.get("symbol") or anchor.get("file") or "?"
         print(f"\n  [{f.get('severity')}] {f.get('id')}  {where}")
         print(f"      claim: {f.get('claim', '')}")
+        # observed → check is the delta. Printed adjacent so a target that never moves
+        # while the observation does is visible at a glance across rounds.
+        if observed := f.get("observed"):
+            print(f"      observed: {observed}")
         print(f"      check: {f.get('check', '')}")
+        if sites := f.get("sites"):
+            print(f"      sites: {', '.join(str(s) for s in sites)}")
         if cmd := f.get("check_cmd"):
             print(f"      check_cmd: {cmd}")
         if reason := f.get("reason"):
@@ -586,8 +592,12 @@ def cmd_followups(args) -> None:
             where = anchor.get("symbol") or anchor.get("file") or "?"
             out.append(f"- **[{f.get('severity')}] {f.get('id')}** "
                        f"({slice_id} — {where}) {f.get('claim', '')}")
+            if observed := f.get("observed"):
+                out.append(f"  - observed: {observed}")
             if check := f.get("check"):
                 out.append(f"  - check: {check}")
+            if sites := f.get("sites"):
+                out.append(f"  - sites: {', '.join(str(s) for s in sites)}")
             if cmd := f.get("check_cmd"):
                 out.append(f"  - check_cmd: `{cmd}`")
             if reason := f.get("reason"):
@@ -677,6 +687,12 @@ def cmd_calibration(args) -> None:
                 flags.append(("UNCHECKABLE", f"{f.get('id')} has no check",
                               "A blocker with no observation cannot be verified or "
                               "closed."))
+            # Half a finding: the builder is told where to land but not where it stands,
+            # and re-measures — differently — what the critic just measured.
+            if check and not (f.get("observed") or "").strip():
+                flags.append(("NO-DELTA", f"{f.get('id')} has a check but no observed",
+                              "Record what you measured, in the check's own units. The "
+                              "builder cannot see what you saw."))
             elif first in IMPERATIVES:
                 flags.append(("CHECK-AS-DEMAND", f"{f.get('id')}: {check[:60]!r}",
                               "Phrase it as what would be observably true once fixed."))

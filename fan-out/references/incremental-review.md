@@ -6,6 +6,7 @@ Read this before running a verification round or changing the verdict schema.
 - [The problem](#the-problem)
 - [Findings are the unit of state, not artifacts](#findings-are-the-unit-of-state-not-artifacts)
 - [The check names the target, not the deviation](#the-check-names-the-target-not-the-deviation)
+- [A finding is a delta, not a complaint](#a-finding-is-a-delta-not-a-complaint)
 - [When the critic does not know the target either](#when-the-critic-does-not-know-the-target-either)
 - [Give the check a decider](#give-the-check-a-decider)
 - [Scope: what a verification round is allowed to read](#scope-what-a-verification-round-is-allowed-to-read)
@@ -111,6 +112,45 @@ So a check must be **satisfiable by aiming**: a value, a range, a threshold with
 measurement conditions, a named reference to compare against, or a quoted line of the brief
 or rubric. Where the target lives in the bar rather than in the text — "matches
 `reference.png`" — naming the referent is enough, because the builder can go and look.
+
+### A finding is a delta, not a complaint
+
+The target is one end of a line. `observed` is the other, in the same units:
+
+```json
+"claim":    "the hero body renders grey, not the brand red",
+"observed": "#808080 at the body panel — r1/hero.png, centre, 1280px",
+"check":    "the body is #C8102E, as in bar/reference.png",
+"sites":    ["hero.svg:carBody", "thumb.svg:carBody"]
+```
+
+Every field there is something the critic read off the artifact while it had the artifact
+open. That is what makes them cheap to write and expensive to omit: the critic pays one
+line, the builder pays a round.
+
+- **`observed` without `check`** is the guessing game above.
+- **`check` without `observed`** makes the builder re-measure what the critic just
+  measured — and re-measure it *differently*, which is how a round gets spent arguing about
+  whether the colour was ever grey.
+- **Both** give a delta, and a delta is the only form a builder can act on directly and a
+  verifier can decide without re-deriving anything.
+
+`sites` closes the other repeat-round trap. A defect that occurs in three places, anchored
+at one, is fixed at one and rejected for the other two — and the critic knew all three when
+it looked. Listing them is not widening the finding; it is describing the finding
+accurately, which is why the sites are in-bounds for the builder (see Step 5.2 in
+SKILL.md). `scope` still sees those edits and still reviews them — that part is mechanical
+and should not change — but they arrive as work the finding asked for rather than as
+unexplained drift, which is the difference between a re-open and a suspicion. An empty
+`sites` is a positive claim that the defect is local, in the same way `approved` is a
+claim.
+
+The discipline that keeps this from becoming verbosity: **detail about the observation,
+never about the opinion.** A measurement, a location, a list of sites, a command that was
+run — all bounded, all verifiable, all reusable by the next round. Rationale for the
+severity, an argument for why the finding matters, a survey of what the critic considered —
+unbounded, unverifiable, and carried by every agent downstream. A finding that needs a
+paragraph of justification is usually a preference filed at the wrong severity.
 
 ### When the critic does not know the target either
 
@@ -419,6 +459,11 @@ wrong state each time (grey, then blue). That is a critic revealing it held a ta
 never wrote down. `fanout.py calibration` flags the shape as `NO-TARGET`; the ledger tell
 is yours to notice. Re-file the check with the target in it — and if you cannot name the
 target either, that is a brief defect, not another round.
+
+**A defect fixed at its anchor and rejected for its unnamed siblings.** The critic saw
+three call sites and anchored one. Round 2 rejects the fix as incomplete, and from the
+builder's side the target moved. `sites` exists for exactly this; a critic that leaves it
+empty on a pattern defect is filing one third of a finding.
 
 **`check_cmd` the critic never ran.** It fails for its own reasons — wrong path, missing
 target, a test that does not exist — and the finding reads as unfixed however good the
