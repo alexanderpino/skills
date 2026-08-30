@@ -110,3 +110,53 @@ def test_every_audit_document_is_reachable_from_the_readme():
     assert not unlinked, (
         "these audit documents are not linked from reference-impl/README.md: "
         + ", ".join(unlinked))
+
+
+def test_the_eval_readme_axis_table_matches_evals_json():
+    """`evals/README.md` lists id ranges per axis. Those ranges rot.
+
+    ⚠️ THREE OF FIVE ROWS WERE STALE and one axis was missing entirely. The table is the
+    document a maintainer reads to know what the suite covers, and the release bar in that same
+    README is defined PER AXIS — so a row that under-reports its ids under-reports the coverage
+    the bar is computed on. A harsh-critic pass found this; nothing in the repo would have.
+
+    The check is deliberately on MEMBERSHIP rather than on the exact range string: `1-3` and
+    `1, 2, 3` are the same claim, and a test that fails on formatting teaches people to edit the
+    test.
+    """
+    import json
+    root = REF.parent
+    evals = json.loads((root / "evals" / "evals.json").read_text(encoding="utf-8"))["evals"]
+    readme = (root / "evals" / "README.md").read_text(encoding="utf-8")
+
+    by_axis = {}
+    for e in evals:
+        by_axis.setdefault(e["axis"], set()).add(int(e["id"]))
+
+    problems = []
+    for axis, ids in sorted(by_axis.items()):
+        # the table row naming this axis, matched on the `evals.json (ids ...)` cell
+        rows = [ln for ln in readme.splitlines()
+                if ln.startswith("|") and "evals.json" in ln and "(ids" in ln
+                and axis.split("-")[0].lower() in ln.lower()]
+        if not rows:
+            problems.append("axis %r has no row in the README table" % axis)
+            continue
+        cell = re.search(r"\(ids ([^)]*)\)", rows[0]).group(1)
+        listed = set()
+        for part in cell.replace("\u2013", "-").split(","):
+            part = part.strip()
+            if "-" in part:
+                lo, hi = part.split("-")
+                listed.update(range(int(lo), int(hi) + 1))
+            elif part.isdigit():
+                listed.add(int(part))
+        missing = sorted(ids - listed)
+        extra = sorted(listed - ids)
+        if missing:
+            problems.append("axis %r: ids %s are in evals.json but not in the README row"
+                            % (axis, missing))
+        if extra:
+            problems.append("axis %r: ids %s are in the README row but not on that axis"
+                            % (axis, extra))
+    assert not problems, "evals/README.md's axis table is stale:\n  " + "\n  ".join(problems)

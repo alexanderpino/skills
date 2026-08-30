@@ -4,6 +4,20 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
+# The axes an eval may declare. `review` earns its place: ids 30 and 31 hand the
+# skill someone else's design and ask what is wrong with it, which is a different
+# act from diagnosing a symptom you were handed.
+ALLOWED_AXES = {
+    "attribution",
+    "diagnosis",
+    "design",
+    "implementation",
+    "trap-resistance",
+    "review",
+}
+
+# The subset the suite must actually COVER. A vocabulary and a coverage floor are
+# two different things, and this file previously had only the second.
 REQUIRED_AXES = {
     "attribution",
     "diagnosis",
@@ -44,6 +58,26 @@ def validate_capability_evals():
         for item in evals if not REQUIRED_KEYS <= set(item)
     ]
     assert not malformed, "\n".join(malformed)
+
+    # ⚠️ THE VOCABULARY CHECK, AND ITS ABSENCE WAS A REAL HOLE. The line below
+    # asserted only that every REQUIRED axis is used somewhere. It never asserted
+    # the converse -- that each eval's axis is a MEMBER of the vocabulary -- so
+    # `axis` was effectively unvalidated free text: setting one eval's axis to
+    # "desgin" and another's to "banana" passed with exit 0.
+    #
+    # The harm is not hypothetical. `README.md` defines the release bar PER AXIS
+    # ("a clear positive delta on the attribution and trap-resistance axes"), so a
+    # typo silently drops an eval out of the roll-up that bar is computed on and
+    # nothing goes red. And the drift had already happened: ids 30 and 31 carried
+    # an undeclared `review` axis for as long as they have existed.
+    #
+    # Sharper still: the shape check above was added to stop malformed eval
+    # records, on the same change that gave ids 36 and 37 an `axis` -- and it
+    # checked that the key was PRESENT while leaving its VALUE unchecked.
+    unknown = sorted({item["axis"] for item in evals} - ALLOWED_AXES)
+    assert not unknown, (
+        "these evals declare an axis outside the vocabulary: %s (allowed: %s)"
+        % (", ".join(unknown), ", ".join(sorted(ALLOWED_AXES))))
 
     missing_axes = REQUIRED_AXES - {item["axis"] for item in evals}
     assert not missing_axes, (
