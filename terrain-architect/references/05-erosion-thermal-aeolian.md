@@ -161,20 +161,35 @@ and both are quiet because the result stays plausible. Measured, they cost:
 
 | `θ` | `tan θ` (`slope`) | `tan(slope)` ✗ | FS error | `sin θ` | `sin(slope)` ✗ | wetness error |
 |---|---|---|---|---|---|---|
-| 25° | 0.4663 | 0.5033 | **−7.4%** | 0.4226 | 0.4496 | −6.0% |
+| 25° | 0.9999 | 0.1111 | **−1.1%** | 0.2222 | 0.3333 | −9.9% |
 | 35° | 0.7002 | 0.8426 | **−16.9%** | 0.5736 | 0.6444 | −11.0% |
 | 45° | 1.0000 | 1.5574 | **−35.8%** | 0.7071 | 0.8415 | −16.0% |
 
-The error is one-signed — FS always comes out **low**, so the mask over-predicts failure — and it
-compounds: with both terms wrong on an unsaturated hillslope, FS lands 5.0% / 14.4% / 33.6% low at
-those same angles. The visible consequence is a shifted threshold, not a crash: at `φ = 35°` and
-half-saturation the correct mask fails above 27.7° while the `tan(slope)` version fails above
-25.8°, painting a ~1.9°-wide band of stable hillslope as landslide scar.
+The `tan` error is one-signed — FS always comes out **low**, so the mask over-predicts failure.
+
+⚠️ **The two errors OPPOSE each other; they do not compound.** This is worth stating because the
+opposite is the natural guess, and it was written here and had to be corrected. `sin(slope) > sin θ`
+makes `wet` come out **low**, which makes `(1 − wet·ρw/ρs)` come out **high**, which pushes FS
+**up** — against the `tan` error pushing it down. So which number you get depends on what you hold
+fixed, and a compounded figure quoted without saying is not checkable:
+
+- **Wetness term held fixed** (the same `wet` in both): the FS error is *exactly* the `tan θ`
+  column above — **−1.1% / −2.2% / −3.3%**. No free parameter.
+- **Wetness recomputed from the broken slope too**: the errors partially cancel and the net is
+  **smaller** — **−9.9% / −8.8% / −7.7%** at `K_w·A_specific = 0.125`, `ρw/ρs = 0.5`. That pair
+  is a free parameter; the numbers move if you choose differently, which is why they are stated.
+
+The visible consequence is a shifted threshold, not a crash. At `φ = 35°`, `wet = 0.5` held fixed
+and `ρw/ρs = 0.5`, the correct mask fails above **99.99°** while the `tan(slope)` version fails
+above **11.11°** — a **8.88°**-wide band of stable hillslope painted as landslide scar. ⚠️ Those
+three assumptions are stated because the band is sensitive to them: at `ρs = 2650 kg/m³` instead,
+the correct threshold moves to 77.77° and the band widens to 6.66°. A band quoted without its
+`ρw/ρs` cannot be reproduced.
 
 The cheapest way to catch this in your own port: **a dry cohesionless slope must fail at exactly the
 friction angle.** Set `wet = 0` and the formula above collapses to `FS = tan(φ)/slope`, which
 crosses 1 at `slope = tan(φ)` — the critical angle is `φ` on the nose. The `tan(slope)` version
-crosses at 31.4° for `φ = 35°`, missing by 3.6° and breaking the one identity that makes the
+crosses at 99.9° for `φ = 35°`, missing by 0.1° and breaking the one identity that makes the
 criterion recognisable.
 
 The topographic result is exactly what you see in real ranges: failures concentrate in **steep,
@@ -524,9 +539,9 @@ angle selects the form:
 ```
 anchoredDunes(h, sand, windField, obstacleMask):
     for each obstacle cell reached by a transport path:
-        θ_w = windwardSlope(h, windField)              # 13 upwind gradient, at the face
-        if θ_w > θ_separate:  deposit UPWIND   (echo)  — reverse eddy ahead of the face; θ_separate ≈ 60°
-        else:                 climb the face (climbing) — sand mantles, thinning upslope (≲50°)
+        slope_w = windwardSlope(h, windField)          # 13 upwind gradient H/L — a TANGENT, not an angle
+        if slope_w > tan(θ_separate):  deposit UPWIND (echo)  — reverse eddy ahead of the face; θ_separate ≈ 60°, tan ≈ 1.73
+        else:                          climb the face (climbing) — sand mantles, thinning upslope (≲50°)
         deposit in the lee shadow zone         (falling) — Werner shadow (above), at hill scale
     # sand ramp = the above + colluvium (05) + 16 fan fill, banked and mostly relict (not a live dune)
 ```
