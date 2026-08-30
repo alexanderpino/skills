@@ -4,8 +4,11 @@ SCOPE STATEMENT (`ATOM-COVERAGE.md`). It does NOT prove the atoms are numericall
 per-atom oracle tests (test_noise, test_ops_filters, the solver tests) do that. It proves the *set*
 is consistent: nothing is claimed-but-missing, built-but-undocumented, or deferred-but-secretly-present
 (the class of gap that had let Simplex/Gabor sit in the pseudocode with no implementation)."""
+import functools
 import importlib
+import io
 import re
+import tokenize
 from pathlib import Path
 
 import pytest
@@ -14,32 +17,57 @@ REF = Path(__file__).resolve().parents[1]                 # reference-impl/
 SKILL_ROOT = REF.parent                                    # terrain-architect/
 
 # --------------------------------------------------------------------------- #
-# HOW THE DOC SIDE OF EVERY ROW BELOW IS SEARCHED.
+# HOW EVERY ROW BELOW IS SEARCHED — AND WHY THE TWO SIDES SHARE ONE MATCHER.
 #
-# A needle that cannot miss is not a check. Two ways a doc-side needle goes vacuous, both
-# of which had actually happened here:
+# A needle that cannot miss is not a check. Four ways a needle goes vacuous, all of which had
+# actually happened in this file:
 #
-#   1. FRONTMATTER. Every chapter now opens with an OKF header written by `tools/okf_apply.py`,
-#      and that header contains the literal text `okf v0.2`. The crater depth/diameter row
-#      searched for the bare substring "0.2" — which the HEADER satisfies. Deleting every real
-#      mention of d/D from the chapter left the row still passing. Boilerplate the generator
-#      writes is never evidence that a human documented anything, so it is stripped before any
-#      search.
-#   2. A NEEDLE THAT IS A SUBSTRING OF UNRELATED PROSE. "disc" is inside "discussed",
-#      "rect" is inside "correctness", "compose" is inside "composed", "0.2" is inside
-#      "g^(−0.22)". Rows that ask "is this atom named?" therefore match whole IDENTIFIERS, and
-#      rows that ask "is this constant documented?" carry a needle with its symbol or unit
-#      attached, never a bare number.
+#   1. FRONTMATTER. Every chapter opens with an OKF header written by `tools/okf_apply.py`, and
+#      that header contains the literal text `okf v0.2`. The crater depth/diameter row searched
+#      for the bare substring "0.2" — which the HEADER satisfies. Boilerplate the generator writes
+#      is never evidence that a human documented anything, so it is stripped (`_body`) before any
+#      search, and `test_no_searched_document_leaks_its_okf_header` proves the strip worked on
+#      every document this file reads.
+#   2. A NEEDLE THAT IS A SUBSTRING OF UNRELATED PROSE. "disc" is inside "discussed", "rect" is
+#      inside "correctness", "0.2" is inside "g^(−0.22)". So no row here matches a bare substring.
+#   3. A NEEDLE WITH NO TRAILING BOUNDARY. This is the same bug as (2) pointed the other way, and
+#      it is the one that survived the last repair: the code side got a boundary and the doc side
+#      did not, so `n = 3` still matched a chapter saying `n = 3.5`, `p = 1.1` matched `p = 1.15`,
+#      `d/D ~0.2` matched `d/D ~0.25`. Nine such value drifts across six chapters left the suite
+#      green. Carrying a symbol makes a needle LONGER, not COMPLETE. Both sides therefore now go
+#      through ONE matcher, `_complete()` — the two of them diverging is what produced the hole.
+#   4. A NAME FOUND IN PROSE RATHER THAN IN A LISTING. `hex_grid.ring` was satisfied by the
+#      hyphenated English "one-ring" (the identifier scan does not treat `-` as part of a token)
+#      and `noise.value` by "pure value maps". Listings in `ATOM-COVERAGE.md` live in backtick
+#      code spans; prose does not. So the scope-doc rows read code spans only (`_code_spans`).
 #
-# Text is also whitespace-flattened before matching so a needle cannot be defeated by the
-# chapter being re-wrapped across a line break.
-_FRONTMATTER = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.S)
+# Text is also whitespace-flattened before matching so a needle cannot be defeated by the chapter
+# being re-wrapped across a line break, and `_complete` tolerates spacing differences *within* a
+# needle (`n = 3` and `n=3` are the same claim) while still demanding the boundary.
+#
+# The matchers below are themselves unit-tested against fixture strings at the bottom of this
+# file. A guard whose matcher has no tests is how this class of hole keeps recurring.
+
+# Anchored on the END MARKER the generator writes, not on a bare `---`. A bare-`---` regex is
+# right only by luck: a document with no frontmatter that opens with an hrule, or one whose block
+# is closed by `----`, would have its whole first section (and every constant in it) DELETED
+# before the search, and a document with two blocks would leak the boilerplate back.
+_OKF_HEADER = re.compile(r"\A---\r?\n(?:[^\n]+\r?\n)*?# --- end okf v[0-9.]+ -+\r?\n---\r?\n")
 _IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_CODE_SPAN = re.compile(r"`([^`]+)`")
+_FENCE = re.compile(r"^```[^\n]*\n(.*?)^```", re.S | re.M)
 
 
 def _body(path):
-    """Doc text with the OKF frontmatter header removed (boilerplate is not documentation)."""
-    return _FRONTMATTER.sub("", path.read_text(encoding="utf-8"), count=1)
+    """Doc text with the OKF frontmatter header removed (boilerplate is not documentation).
+
+    If the header is not there in the exact shape the generator writes, NOTHING is removed —
+    deleting a document's first real section is far worse than leaving a header in, and the
+    corpus test below proves no searched document actually keeps one.
+    """
+    text = path.read_text(encoding="utf-8")
+    m = _OKF_HEADER.match(text)
+    return text[m.end():] if m else text
 
 
 def _flat(text):
@@ -47,27 +75,136 @@ def _flat(text):
     return " ".join(text.split())
 
 
+def _fenced(text):
+    """Only the contents of ``` fenced blocks — i.e. the PSEUDOCODE, not the prose around it."""
+    return "\n".join(_FENCE.findall(text))
+
+
+def _code_spans(text):
+    """Only the contents of `backtick` code spans — i.e. the LISTINGS, not the prose around them."""
+    return " ".join(_CODE_SPAN.findall(text))
+
+
 def _idents(text):
     """The whole identifiers in `text` — so "disc" is not found inside "discussed"."""
     return set(_IDENT.findall(text))
 
 
-def _code_mentions(src, literal):
-    """True if `literal` appears in source as a COMPLETE literal, not as a prefix.
+# --------------------------------------------------------------------------- #
+# ONE completeness matcher, used by BOTH the code side and the doc side of a faithfulness row.
 
-    Without the boundary, `n=3` is satisfied by `n=30` and `A=0.1` by `A=0.15`: the code side
-    of a faithfulness row would then stop failing exactly when the constant drifts.
+_WORDISH = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_."
+_NUMERIC = "0123456789."
+_TOKEN = re.compile(r"[A-Za-z0-9_.]+|\s+|[^\sA-Za-z0-9_.]+")
+
+
+def _wordish(ch):
+    return bool(ch) and ch in _WORDISH
+
+
+def _numeric(ch):
+    return bool(ch) and ch in _NUMERIC
+
+
+@functools.lru_cache(maxsize=None)
+def _pattern(literal):
+    """Compile `literal` into a regex that matches it as a COMPLETE claim.
+
+    Two jobs, and both sides of a faithfulness row need both:
+
+    SPACING IS NOT MEANING. `n = 3` (PEP8), `n=3` and `KARMAN  =  0.4` (aligned) state the same
+    constant, and a guard that rejects the spelling the author actually used turns the suite red
+    with a message pointing at the wrong file. So each run of whitespace inside the literal becomes
+    `\\s*` — or `\\s+` where dropping it would fuse two words ("MORE erodible").
+
+    A PREFIX IS NOT A MATCH. `n=3` must not be satisfied by `n=3.5`, `n=30`, `n=3e5` or `n=3_000`;
+    `0.2 * D` must not be satisfied by the SIGN-FLIPPED `-0.2 * D`. So the literal is bracketed by
+    boundaries chosen from its own first and last characters: a numeric edge may not touch another
+    numeric char, an exponent/imaginary/underscore continuation, or a sign; an identifier edge may
+    not touch another identifier char. An edge that is already punctuation (`(-3.0)`, `^2.2`)
+    carries its own boundary and gets none added — which is what lets the register keep literals
+    that embed an operator without the sign rule fighting them.
     """
-    for m in re.finditer(re.escape(literal), src):
-        after = src[m.end():m.end() + 1]
-        before = src[max(0, m.start() - 1):m.start()]
-        if after not in "0123456789." and not re.match(r"[A-Za-z0-9_.]", before or " "):
-            return True
-    return False
+    toks = [t for t in _TOKEN.findall(literal) if t]
+    parts, prev, gap = [], "", False
+    for t in toks:
+        if t.isspace():
+            gap = True
+            continue
+        if parts:
+            parts.append(r"\s+" if (gap and _wordish(prev[-1]) and _wordish(t[0])) else r"\s*")
+        parts.append(re.escape(t))
+        prev, gap = t, False
+    if not parts:
+        raise ValueError("empty literal")
+
+    first, last = literal.strip()[0], literal.strip()[-1]
+    lead = ""
+    if _numeric(first):
+        lead = r"(?<![A-Za-z0-9_.+\-])"
+    elif _wordish(first):                       # identifier start; `.` is allowed (`self.n=3`)
+        lead = r"(?<![A-Za-z0-9_])"
+    tail = ""
+    if _numeric(last):
+        tail = r"(?![0-9._eEjJ])"
+    elif _wordish(last):
+        tail = r"(?![A-Za-z0-9_])"
+    return re.compile(lead + "".join(parts) + tail)
 
 
-COVERAGE = _body(REF / "ATOM-COVERAGE.md")
-COVERAGE_NAMES = _idents(COVERAGE)
+def _complete(text, literal):
+    """True if `literal` occurs in `text` as a complete claim, not as a prefix of a longer one."""
+    return _pattern(literal).search(text) is not None
+
+
+def _strip_py_comments(src):
+    """Source with comments and string literals blanked out (line/column layout preserved).
+
+    A constant that appears only in a `#` comment or a docstring is prose, not code: the code side
+    of a faithfulness row must not be satisfied by a module merely *talking* about the value it no
+    longer uses.
+    """
+    starts, off = [], 0
+    for line in src.splitlines(keepends=True):
+        starts.append(off)
+        off += len(line)
+    chars = list(src)
+
+    def blank(a, b):
+        for i in range(a, min(b, len(chars))):
+            if chars[i] != "\n":
+                chars[i] = " "
+
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+            name = tokenize.tok_name.get(tok.type, "")
+            if name in ("COMMENT", "STRING") or name.startswith("FSTRING_MIDDLE"):
+                (r1, c1), (r2, c2) = tok.start, tok.end
+                blank(starts[r1 - 1] + c1, starts[r2 - 1] + c2)
+    except (tokenize.TokenError, IndentationError, SyntaxError):     # pragma: no cover
+        return src
+    return "".join(chars)
+
+
+def _code_mentions(src, literal):
+    """True if `literal` appears in module source as a COMPLETE literal, in CODE (not a comment)."""
+    return _complete(_strip_py_comments(src), literal)
+
+
+def _doc_states(chap, doc_str):
+    """True if `doc_str` appears in the (flattened) chapter as a COMPLETE statement.
+
+    The same matcher as `_code_mentions`, deliberately: the doc side having no boundary while the
+    code side had one is exactly how nine value drifts crossed six chapters unnoticed.
+    """
+    return _complete(chap, doc_str)
+
+
+COVERAGE_DOC = REF / "ATOM-COVERAGE.md"
+COVERAGE = _body(COVERAGE_DOC)
+# Listings live in code spans; prose does not. Deferred atoms are the one exception — they have no
+# code to span, so they are named in bold prose, and only they are matched against the prose set.
+COVERAGE_PROSE_NAMES = _idents(COVERAGE)
 
 # The manifest is the source of truth: module -> the atoms the skill claims to IMPLEMENT.
 IMPLEMENTED = {
@@ -97,6 +234,55 @@ IMPLEMENTED = {
                   "place_coords", "affine", "compose", "transform_coords", "sample_coords"],
 }
 
+# WHICH PARAGRAPH OF THE SCOPE DOC MUST CARRY EACH MODULE'S ATOMS.
+#
+# `test_scope_doc_lists_every_implemented_atom` used to assert `fn in <every name in the doc>`,
+# with `module` used only in the failure message — so `placement.disc` was satisfied by hex_grid's
+# listing and vice versa, and deleting the whole placement paragraph still left `placement.disc`
+# passing on the hex line. The doc groups atoms by PROCESS, not by module (14 of the 18 modules
+# have no paragraph naming their own `.py` file), so "one paragraph per module" would mean
+# rewriting the doc. This register says instead, per module, WHICH paragraph is allowed to satisfy
+# it — precise, and no doc edit. The paragraphs are blank-line separated; the anchor is matched
+# against the flattened paragraph so a re-wrap cannot break it.
+_SOLVERS = "Solver atoms (iterative, stateful"
+DOC_SECTION = {
+    "noise": "**Noise (`noise.py`",
+    "ops_filters": "**SDF / gradient / combiner / tonal primitives (`ops_filters.py`",
+    "placement": "**Placement & masking (`placement.py`",
+    "hex_grid": "**Hexagonal working grid (`hex_grid.py`",
+    "flow": _SOLVERS,
+    "erosion_streampower": _SOLVERS,
+    "erosion_droplet": _SOLVERS,
+    "erosion_thermal": _SOLVERS,
+    "diffusion": _SOLVERS,
+    "erosion_pipe": _SOLVERS,
+    "shallow_water": _SOLVERS,
+    "meander": _SOLVERS,
+    "braided": _SOLVERS,
+    "glacier": _SOLVERS,
+    "snow": _SOLVERS,
+    "winds": _SOLVERS,
+    "aeolian": _SOLVERS,
+    "tectonics": _SOLVERS,
+}
+
+_PARAGRAPHS = [_flat(b) for b in re.split(r"\n[ \t]*\n", COVERAGE) if b.strip()]
+
+
+def _section(module):
+    """The one paragraph of ATOM-COVERAGE.md that must carry `module`'s atoms."""
+    anchor = DOC_SECTION[module]
+    hits = [p for p in _PARAGRAPHS if anchor in p]
+    assert len(hits) == 1, (
+        f"the scope-doc section register no longer resolves for {module}: {anchor!r} matches "
+        f"{len(hits)} paragraphs of ATOM-COVERAGE.md (the doc was restructured — move the anchor)")
+    return hits[0]
+
+
+def _section_names(module):
+    return _idents(_code_spans(_section(module)))
+
+
 # ops_filters also carries a filter/morphology TOOLBOX that is not a generative atom — excluded from
 # the surface check so it isn't mistaken for an undocumented atom.
 _OPS_NON_ATOM = {"gaussian", "box_filter", "median", "bilateral", "guided_filter", "perona_malik",
@@ -110,17 +296,25 @@ _ATOMS = [(m, f) for m, fns in IMPLEMENTED.items() for f in fns]
 
 # Landform GENERATORS (macros over the atoms) must stay DOCUMENTED in their chapter — an existence guard
 # against adding/keeping a generator with no backing pseudocode (the Simplex/Gabor drift class, for the
-# generator family). This checks the generator is named in the chapter; it does NOT verify that the
-# pseudocode's CONSTANTS match the code (e.g. a profile exponent) — prose-vs-code constant drift is caught
-# by the review/faithfulness passes, not here.
+# generator family). This checks the generator is named as a ROUTINE IN THE PSEUDOCODE; it does NOT
+# verify that the pseudocode's CONSTANTS match the code (e.g. a profile exponent) — prose-vs-code
+# constant drift is caught by the review/faithfulness passes, not here.
+#
+# The chapters write routine names in camelCase (`alluvialFan`), the modules in snake_case — the same
+# split `test_pseudocode_drift.py` handles with its own explicit name map. So each row declares BOTH
+# names. Before this column existed, the `alluvial_fan` row had no pseudocode satisfier at all and was
+# passing on one line of PROSE that happened to cite the Python name; deleting that prose failed the
+# row while the pseudocode it is supposed to guard sat untouched.
+#   python fn -> (chapter, pseudocode routine name)
 GENERATORS = {
-    "mountain": "references/11-geological.md",
-    "ridge": "references/11-geological.md",
-    "volcano": "references/11-geological.md",
-    "canyon": "references/11-geological.md",
-    "fault_block_butte": "references/11-geological.md",
-    "alluvial_fan": "references/16-arid-desert.md",
+    "mountain": ("references/11-geological.md", "mountain"),
+    "ridge": ("references/11-geological.md", "ridge"),
+    "volcano": ("references/11-geological.md", "volcano"),
+    "canyon": ("references/11-geological.md", "canyon"),
+    "fault_block_butte": ("references/11-geological.md", "fault_block_butte"),
+    "alluvial_fan": ("references/16-arid-desert.md", "alluvialFan"),
 }
+_GENERATOR_ROWS = [(fn, chapter, pseudo) for fn, (chapter, pseudo) in GENERATORS.items()]
 
 
 def _public_callables(module_name):
@@ -129,6 +323,11 @@ def _public_callables(module_name):
             if not n.startswith("_")
             and callable(getattr(mod, n))
             and getattr(getattr(mod, n), "__module__", None) == module_name}
+
+
+def _norm_name(name):
+    """`OpenSimplex2`, `open_simplex2` and `opensimplex2` are the same atom under different casings."""
+    return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
 @pytest.mark.parametrize("module,fn", _ATOMS)
@@ -141,13 +340,44 @@ def test_every_documented_atom_is_implemented(module, fn):
 
 @pytest.mark.parametrize("module,fn", _ATOMS)
 def test_scope_doc_lists_every_implemented_atom(module, fn):
-    """The scope statement must name every implemented atom (doc <-> manifest stay in sync).
+    """The scope statement must name every implemented atom IN THAT MODULE'S OWN SECTION, as a
+    code-span listing (doc <-> manifest stay in sync).
 
-    Matched as a whole IDENTIFIER: with a bare substring, `placement.disc` was satisfied by the
-    word "discussed", `placement.rect` by "correctness"/"directional", `placement.compose` by
-    "composed" and `hex_grid.ring` by "one-ring" — those four rows could not fail.
+    Two ways this row used to be unable to fail, both fixed here:
+      * MODULE-BLIND. It searched the whole document, so `placement.disc` passed on hex_grid's
+        listing (and vice versa) and deleting the entire placement paragraph failed only 11 of its
+        12 rows. It now searches only the paragraph `DOC_SECTION` assigns to the module.
+      * PROSE. It searched every identifier in the doc, and the identifier scan does not treat `-`
+        as part of a token, so `hex_grid.ring` was satisfied by the English "one-ring" and
+        `noise.value` by "pure value maps". Listings live in backtick code spans; it now reads
+        those only.
     """
-    assert fn in COVERAGE_NAMES, f"{module}.{fn} implemented but not listed in ATOM-COVERAGE.md"
+    assert fn in _section_names(module), (
+        f"{module}.{fn} implemented but not listed as `{fn}` in ATOM-COVERAGE.md's "
+        f"{DOC_SECTION[module]!r} section (a listing elsewhere in the doc, or a mention in prose, "
+        f"does not count — it is another module's claim)")
+
+
+def test_no_two_modules_sharing_a_doc_section_can_satisfy_each_other():
+    """What makes the shared solver paragraph safe, stated as itself.
+
+    `DOC_SECTION` groups fourteen solver modules into one paragraph, so within that paragraph the
+    scope-doc row is still name-based. That is sound only while no two of those modules ship an
+    atom of the same NAME — otherwise one module's listing would silently satisfy the other's row,
+    which is the very defect this register was written to close. Pin it.
+    """
+    collisions = {}
+    for section in set(DOC_SECTION.values()):
+        mods = [m for m in IMPLEMENTED if DOC_SECTION.get(m) == section]
+        seen = {}
+        for m in mods:
+            for fn in IMPLEMENTED[m]:
+                if fn in seen:
+                    collisions.setdefault(section, []).append(f"{seen[fn]}.{fn} vs {m}.{fn}")
+                seen[fn] = m
+    assert not collisions, (
+        "these modules share one ATOM-COVERAGE.md section AND an atom name, so each would satisfy "
+        f"the other's listing row: {collisions}. Split the section, or qualify the listing.")
 
 
 def test_noise_surface_has_no_undocumented_atom():
@@ -163,29 +393,65 @@ def test_ops_surface_is_fully_accounted_for():
     assert not unaccounted, f"ops_filters functions neither atom nor listed non-atom: {sorted(unaccounted)}"
 
 
-@pytest.mark.parametrize("fn,chapter", GENERATORS.items())
-def test_landform_generators_are_documented(fn, chapter):
-    """Each landform generator must exist AND be named in its chapter's pseudocode — so a generator can't
-    be added (or kept) as code-only. (Existence here; the load-bearing CONSTANTS are checked separately
-    by test_key_constant_agrees_between_chapter_and_code below.)"""
+@pytest.mark.parametrize("fn,chapter,pseudo", _GENERATOR_ROWS, ids=[r[0] for r in _GENERATOR_ROWS])
+def test_landform_generators_are_documented(fn, chapter, pseudo):
+    """Each landform generator must exist AND be called as a routine in its chapter's PSEUDOCODE — so a
+    generator can't be added (or kept) as code-only. (Existence here; the load-bearing CONSTANTS are
+    checked separately by test_key_constant_agrees_between_chapter_and_code below.)
+
+    Searched inside ``` fenced blocks only, which is what "documented as a routine" has always meant.
+    Over the whole chapter the row could not fail: `ridge`, `mountain` and `volcano` are ordinary
+    English here (25, 3 and 12 occurrences), and the old `name\\s*(` pattern let prose-plus-parenthetical
+    stand in for a call — "a freshly stripped ridge (thin soil)" and "blocked by a ridge (`09`)" both
+    matched, so deleting the chapter's ONLY real `ridge(...)` routine header left the row green.
+    A call has no space before its paren, so the `\\s*` is gone too.
+    """
     lf = importlib.import_module("landforms")
     assert callable(getattr(lf, fn, None)), f"landforms.{fn} missing"
-    # Named in its CALL form (`ridge(`, `alluvial_fan(`), i.e. as a routine in the pseudocode.
-    # A bare substring is no check for this family: "ridge", "mountain" and "volcano" are ordinary
-    # English in these chapters (25, 3 and 12 occurrences), so the row passed on prose alone.
-    chap = _flat(_body(SKILL_ROOT / chapter))
-    named = re.search(r"(?<![A-Za-z0-9_])" + re.escape(fn) + r"\s*\(", chap)
-    assert named, f"landforms.{fn} not documented as a routine (`{fn}(...)`) in {chapter}"
+    blocks = _flat(_fenced(_body(SKILL_ROOT / chapter)))
+    named = re.search(r"(?<![A-Za-z0-9_])" + re.escape(pseudo) + r"\(", blocks)
+    assert named, (f"landforms.{fn} not documented as a routine (`{pseudo}(...)`) in a fenced "
+                   f"pseudocode block of {chapter} — prose naming it does not count")
+
+
+@pytest.mark.parametrize("fn,chapter,pseudo", _GENERATOR_ROWS, ids=[r[0] for r in _GENERATOR_ROWS])
+def test_generator_pseudocode_names_are_declared_headers(fn, chapter, pseudo):
+    """Companion to the row above: the DECLARED pseudocode name must be a routine HEADER, at the start
+    of a line in a fenced block.
+
+    This is what makes a rename fail loudly on either side rather than degrade into a prose match:
+    rename the module function and `callable(...)` above fails; rename (or delete) the chapter's
+    routine header and this fails; change one without updating this register and one of the two fails.
+    """
+    blocks = _fenced(_body(SKILL_ROOT / chapter))
+    header = re.search(r"^[ \t]*" + re.escape(pseudo) + r"\(", blocks, re.M)
+    assert header, (f"{chapter} has no `{pseudo}(...)` routine HEADER in a fenced block, but the "
+                    f"register declares it as the pseudocode name of landforms.{fn} "
+                    f"(renamed in the chapter? then rename it here and in landforms.py too)")
 
 
 @pytest.mark.parametrize("name,chapter", DEFERRED.items())
 def test_deferred_atoms_are_discussed_but_absent(name, chapter):
     """A deferred atom must be genuinely absent from the code, yet actually discussed in its chapter
-    and listed in the scope doc — so 'deferred' is an honest, checked status, not a silent gap."""
+    and listed in the scope doc — so 'deferred' is an honest, checked status, not a silent gap.
+
+    Absence is probed against the module's whole public surface with BOTH sides case/underscore
+    normalised: the old `hasattr(mod, name.lower())` probed `opensimplex2`, while the name a Python
+    author actually writes is `open_simplex2` — so the atom could ship, be listed as implemented, and
+    still be called deferred here, with every row green. The manifest is cross-checked too: a name
+    cannot honestly sit in both registers.
+    """
     mod = importlib.import_module("noise")
-    assert not hasattr(mod, name.lower()), f"{name} is listed deferred but exists in noise"
+    target = _norm_name(name)
+    surface = {_norm_name(n) for n in vars(mod) if not n.startswith("_")}
+    assert target not in surface, (
+        f"{name} is listed deferred but noise exposes it "
+        f"(as {sorted(n for n in vars(mod) if _norm_name(n) == target)}) — it shipped; move it to "
+        f"IMPLEMENTED and out of the deferred list")
+    both = [f"{m}.{f}" for m, fns in IMPLEMENTED.items() for f in fns if _norm_name(f) == target]
+    assert not both, f"{name} is listed BOTH deferred and implemented ({both}) — pick one"
     assert name in _idents(_body(SKILL_ROOT / chapter)), f"{name} not discussed in {chapter}"
-    assert name in COVERAGE_NAMES, f"deferred {name} not listed in ATOM-COVERAGE.md"
+    assert name in COVERAGE_PROSE_NAMES, f"deferred {name} not listed in ATOM-COVERAGE.md"
 
 
 # --------------------------------------------------------------------------- #
@@ -198,11 +464,16 @@ def test_deferred_atoms_are_discussed_but_absent(name, chapter):
 # contributor rule, mechanised. Sampled (the load-bearing constants), not exhaustive; a defect here
 # is prose-vs-code DRIFT, not numeric wrongness (the oracle/benchmark/cross-val tests cover that).
 #
-# EVERY doc-side needle here carries its SYMBOL, UNIT or SURROUNDING SYNTAX. A bare number is not
-# a check: "0.2" was satisfied by the frontmatter's own `okf v0.2` (and, failing that, by the
-# unrelated exponent `g^(−0.22)` two lines away), "1.1" by "1.109", and the word "weak" by
-# "weak, hot lithosphere" in an unrelated paragraph about elastic thickness. The needle must be
-# unique to the CLAIM, not merely present in the file.
+# BOTH sides go through `_complete`. Carrying a SYMBOL or UNIT next to the number — which is all the
+# doc side used to do — makes a needle longer, not complete: "n = 3" still matched a chapter saying
+# "n = 3.5". The needle must be unique to the CLAIM, so it needs the symbol AND the boundary.
+#
+# WHAT BELONGS IN A CODE LITERAL, since `_complete` now rejects a leading sign. Write the literal as
+# the assignment or expression the module actually contains, INCLUDING any operator that is part of
+# the constant's meaning — `(-3.0)` and `(1.0 - rn) ** 2.2` are correct as written, and their
+# punctuation edges are their own boundaries. What the sign rule forbids is a bare `0.2 * D` being
+# satisfied by `-0.2 * D`: flipping a sign is a change of physics, not of spelling. Spacing is free
+# — `n=3`, `n = 3` and `n  =  3` are all the same row.
 FAITHFUL = [
     # (module, code literal in the module source, chapter/doc file, string that must be in that doc, what)
     ("dunes.py", "shadow_tan=0.268", "references/05-erosion-thermal-aeolian.md", "tan(15°)",
@@ -245,6 +516,13 @@ FAITHFUL = [
      "fault-as-K SIGN: a fault trace is WEAK rock -> HIGHER erodibility, so valleys follow structure"),
 ]
 
+# Every document this file searches — each must strip its OKF header cleanly (see F9 below).
+_SEARCHED_DOCS = sorted({COVERAGE_DOC}
+                        | {SKILL_ROOT / c for c in DEFERRED.values()}
+                        | {SKILL_ROOT / c for c, _ in GENERATORS.values()}
+                        | {SKILL_ROOT / e[2] for e in FAITHFUL},
+                        key=lambda p: str(p))
+
 
 @pytest.mark.parametrize("module,code_lit,doc,doc_str,what", FAITHFUL, ids=[e[0] + ":" + e[1] for e in FAITHFUL])
 def test_key_constant_agrees_between_chapter_and_code(module, code_lit, doc, doc_str, what):
@@ -253,12 +531,224 @@ def test_key_constant_agrees_between_chapter_and_code(module, code_lit, doc, doc
 
     The chapter is searched with its OKF frontmatter stripped and its whitespace flattened: header
     boilerplate must not be able to satisfy a row (it silently satisfied the crater d/D row), and a
-    re-wrapped line must not be able to break one.
+    re-wrapped line must not be able to break one. BOTH sides use `_complete`, so a chapter that
+    changes `n = 3` to `n = 3.5` fails here instead of quietly still matching.
     """
     src = (REF / module).read_text(encoding="utf-8")
     assert _code_mentions(src, code_lit), \
         f"{what}: code literal {code_lit!r} missing from reference-impl/{module} " \
         f"(the code constant changed — update the code, or fix this manifest AND the chapter)"
     chap = _flat(_body(SKILL_ROOT / doc))
-    assert doc_str in chap, f"{what}: {doc_str!r} missing from {doc} " \
-                            f"(the chapter drifted from the code constant {code_lit!r} — resync the pseudocode)"
+    assert _doc_states(chap, doc_str), f"{what}: {doc_str!r} missing from {doc} " \
+                                       f"(the chapter drifted from the code constant {code_lit!r} — resync the pseudocode)"
+
+
+def _assert_no_okf_leak(path):
+    """`_body` must actually have removed the generator boilerplate from `path`.
+
+    `_body` is deliberately conservative — a document whose header is not in the exact shape
+    `tools/okf_apply.py` writes is left untouched rather than having its first section deleted. That
+    safety has a cost: the strip could silently stop happening (a second frontmatter block ahead of
+    the header, a reformatted end marker). So the outcome is asserted directly, and loudly.
+    """
+    body = _body(path)
+    assert "okf v" not in body, (
+        f"{path.name} still carries its OKF header after _body() — generator boilerplate is now "
+        f"searchable evidence (the `okf v0.2` in it once satisfied the crater d/D row by itself)")
+    assert not body.lstrip().startswith("---\n"), \
+        f"{path.name} still opens with a frontmatter fence after _body()"
+
+
+@pytest.mark.parametrize("path", _SEARCHED_DOCS, ids=[p.name for p in _SEARCHED_DOCS])
+def test_no_searched_document_leaks_its_okf_header(path):
+    """Corpus-wide: every document this file searches must strip its header cleanly."""
+    _assert_no_okf_leak(path)
+
+
+# =========================================================================== #
+# UNIT TESTS FOR THE MATCHERS THEMSELVES.
+#
+# Every hole repaired above was a hole in one of these four functions, and each was found by a
+# reader trying strings against them by hand — never by a test, because the matchers had none and
+# were only ever exercised through the corpus, which by construction contains only strings that
+# pass. These fixtures are the cases that broke them.
+
+_DOC_ACCEPT = [
+    ("n = 3", "with n = 3, A ≈ 2.4e-24 Pa⁻³ s⁻¹"),
+    ("n = 3", "ε̇ = A · τⁿ with n=3 at 0 °C"),            # spacing is not meaning
+    ("p = 1.1", "**`p = 1.1` is Freeman's calibrated value**"),
+    ("d/D ~0.2", "bowl (paraboloid) to depth d(D) # d/D ~0.2 simple, less if complex"),
+    ("A ≈ 0.1", "`A ≈ 0.1` for turbulent flow"),
+    ("ν ≈ 0.25", "`ν ≈ 0.25` (Poisson), and `Te` the"),
+    ("κ = 0.4", "von Karman `κ = 0.4` in the law of the wall"),
+    ("^2.2", ": (1 - rn)^2.2 # strato: CONCAVE-UP sweep"),
+    ("917 kg/m³", "with `ρ_ice ≈ 917 kg/m³`. Then ice thickness"),
+    ("33.7°", "angle of repose **33.7°** = tan⁻¹(2/3)"),
+    ("concave downfan", "with a concave downfan thinning profile"),
+]
+
+# The critic's nine value drifts: a chapter edited to a NEARBY value, with no code change.
+# Every one of these used to pass, because a bare `in` has no trailing boundary.
+_DOC_REJECT = [
+    ("n = 3", "with n = 3.5, A ≈ 2.4e-24 Pa⁻³ s⁻¹"),          # Glen 3 -> 3.5
+    ("n = 3", "with n = 30"),
+    ("p = 1.1", "**`p = 1.15` is Freeman's calibrated value**"),   # Freeman 1.1 -> 1.15
+    ("A ≈ 0.1", "`A ≈ 0.15` for turbulent flow"),                 # Bagnold 0.1 -> 0.15
+    ("ν ≈ 0.25", "`ν ≈ 0.255` (Poisson)"),                        # Poisson 0.25 -> 0.255
+    ("κ = 0.4", "von Karman `κ = 0.45` in the law of the wall"),   # von Karman 0.4 -> 0.45
+    ("d/D ~0.2", "to depth d(D) # d/D ~0.25 simple"),             # crater d/D 0.2 -> 0.25
+    ("^2.2", ": (1 - rn)^2.25 # strato: CONCAVE-UP sweep"),       # stratovolcano 2.2 -> 2.25
+    ("917 kg/m³", "with `ρ_ice ≈ 9170 kg/m³`"),
+    ("concave downfan", "with a concave downfanning profile"),
+]
+
+
+@pytest.mark.parametrize("needle,text", _DOC_ACCEPT, ids=[n for n, _ in _DOC_ACCEPT])
+def test_doc_states_accepts_the_real_chapter_wording(needle, text):
+    assert _doc_states(text, needle), f"{needle!r} should be found in {text!r}"
+
+
+@pytest.mark.parametrize("needle,text", _DOC_REJECT, ids=[n + " vs " + t[:24] for n, t in _DOC_REJECT])
+def test_doc_states_rejects_a_drifted_value(needle, text):
+    assert not _doc_states(text, needle), \
+        f"{needle!r} must NOT be satisfied by the drifted {text!r} — a needle with no trailing " \
+        f"boundary is how nine chapter drifts stayed green"
+
+
+# `_code_mentions` used to be a prefix test with no left-hand sign rule, no comment stripping and a
+# plain bug: `after not in "0123456789."` is False when `after == ""`, because `"" in s` is always
+# True — so a literal at end-of-file was rejected.
+_CODE_ACCEPT = [
+    ("n=3", "def glacier_carve(bed, H, steps, *, A=_A_YR, n=3, rho=917.0):"),
+    ("n=3", "n = 3\n"),                                   # PEP8 spacing
+    ("n=3", "self.n=3\n"),                                # attribute assignment
+    ("KARMAN = 0.4", "KARMAN  =  0.4  # aligned with the block below\n"),
+    ("KARMAN = 0.4", "KARMAN=0.4\n"),
+    ("0.2 * D", "depth = 0.2*D * scale\n"),               # spaces removed
+    ("0.2 * D", "    depth = 0.2 * D * ((complex_D / D) ** 0.3)\n"),
+    ("k_fault=6.0", "def fault_weakness(shape, *, k_fault=6.0)"),   # ... and at EOF:
+    ("k_fault=6.0", "def fault_weakness(shape, *, k_fault=6.0"),
+    ("(-3.0)", "ejecta = rim * 0.5 * (np.maximum(r, R) / R) ** (-3.0)\n"),
+    ("(1.0 - rn) ** 2.2", "prof = (1.0 - rn) ** 2.2\n"),
+    ("(1.0 - rn) ** 2.2", "prof = (1.0-rn)**2.2\n"),
+]
+
+_CODE_REJECT = [
+    ("n=3", "n=3_000\n"),                                 # underscore-grouped literal
+    ("n=3", "n=3e5\n"),                                   # exponent
+    ("n=3", "n=3.5\n"),
+    ("n=3", "n=30\n"),
+    ("0.2 * D", "depth = -0.2 * D\n"),                    # SIGN FLIP: not the same constant
+    ("0.2 * D", "depth = 10.2 * D\n"),
+    ("n=3", "# the old default was n=3; we now ship 4\n"),          # comment only
+    ("n=3", '"""Historically n=3 (Glen); this module no longer uses it."""\n'),   # docstring only
+    ("KARMAN = 0.4", "KARMAN = 0.45\n"),
+]
+
+
+@pytest.mark.parametrize("lit,src", _CODE_ACCEPT, ids=[f"{l}|{s[:28]!r}" for l, s in _CODE_ACCEPT])
+def test_code_mentions_accepts_the_spellings_authors_actually_write(lit, src):
+    assert _code_mentions(src, lit), (
+        f"{lit!r} should be found in {src!r} — a false REJECT here has no backstop and turns the "
+        f"suite red with a message pointing at the wrong file")
+
+
+@pytest.mark.parametrize("lit,src", _CODE_REJECT, ids=[f"{l}|{s[:28]!r}" for l, s in _CODE_REJECT])
+def test_code_mentions_rejects_a_drifted_or_prose_only_constant(lit, src):
+    assert not _code_mentions(src, lit), f"{lit!r} must NOT be satisfied by {src!r}"
+
+
+def test_strip_py_comments_preserves_code_and_layout():
+    src = 'A = 1  # A = 2\n"""A = 3"""\nB = 4\n'
+    out = _strip_py_comments(src)
+    assert _complete(out, "A = 1") and _complete(out, "B = 4")
+    assert not _complete(out, "A = 2") and not _complete(out, "A = 3")
+    assert out.count("\n") == src.count("\n")
+
+
+def test_idents_does_not_split_a_hyphenated_word_into_atom_names():
+    """The `_idents` behaviour that made `hex_grid.ring` unable to fail, stated as itself.
+
+    `-` is not an identifier character, so the scan legitimately reports "one-ring" as {one, ring}.
+    That is not a bug in `_idents`; it is a bug in using `_idents` over PROSE to answer "is this
+    atom LISTED?". The fix is the input, not the matcher: listings are read from code spans.
+    """
+    assert _idents("gradient6 (one-ring world-space gradient)") >= {"one", "ring"}
+    assert _idents("pure value maps") >= {"value"}
+    # ...and the code-span reading, which is what the scope rows now use, sees neither.
+    prose = "`gradient6` (one-ring world-space gradient), `laplacian6`, pure value maps"
+    assert _idents(_code_spans(prose)) == {"gradient6", "laplacian6"}
+    assert "ring" not in _idents(_code_spans(prose))
+    assert "value" not in _idents(_code_spans(prose))
+
+
+_OKF = ("---\n# --- okf v0.2, written by tools/okf_apply.py ---\n"
+        "title: x\n# --- end okf v0.2 ---------\n---\n")
+
+
+def test_body_strips_the_generator_header_and_nothing_else(tmp_path):
+    p = tmp_path / "a.md"
+    p.write_text(_OKF + "# Real title\n\nbody 0.2 here\n", encoding="utf-8")
+    assert _body(p) == "# Real title\n\nbody 0.2 here\n"
+
+
+# Each fixture is a document the bare-`---` regex DELETES the first section of — the constant below
+# sits inside the region that regex swallows, so these cases fail against it and pass against the
+# OKF-anchored one. (A fixture whose constant sits *after* the swallowed region passes either way and
+# would pin nothing — which is the same mistake as a needle with no boundary, one level up.)
+@pytest.mark.parametrize("text,why", [
+    ("---\nconstant n = 3 lives here\n---\ntail\n",
+     "a document with NO frontmatter that opens with an hrule"),
+    ("---\ntitle: x\n----\nconstant n = 3 lives here\n---\ntail\n",
+     "a frontmatter block closed by `----`, so the strip runs on to the next rule"),
+])
+def test_body_never_deletes_a_real_section(tmp_path, text, why):
+    """`_body` anchored on a bare `---` was safe only by luck.
+
+    It assumed the file opens with `---`, closes with exactly `---`, and has one block. Each shape
+    here breaks one of those assumptions, and `\\A---\\r?\\n.*?\\r?\\n---\\r?\\n` answers by DELETING
+    everything up to the next `---` line — every constant in it — so a faithfulness row would fail
+    pointing at a chapter that says exactly what it should. Anchoring on the end marker the generator
+    actually writes means an unrecognised header is left alone instead.
+    """
+    p = tmp_path / "b.md"
+    p.write_text(text, encoding="utf-8")
+    assert "constant n = 3 lives here" in _body(p), f"_body ate a real section: {why}"
+
+
+def test_body_leaves_a_document_with_no_frontmatter_untouched(tmp_path):
+    p = tmp_path / "c.md"
+    p.write_text("# Title\n\nn = 3\n", encoding="utf-8")
+    assert _body(p) == "# Title\n\nn = 3\n"
+
+
+def test_a_leaked_okf_header_is_caught_loudly_rather_than_silently_searched(tmp_path):
+    """The other half of F9: the conservative `_body` can leave a header in, and that must be LOUD.
+
+    A second frontmatter block ahead of the OKF one defeats the `\\A` anchor, so `_body` returns the
+    boilerplate — and boilerplate is searchable evidence (`okf v0.2` once satisfied the crater d/D
+    row by itself). `_assert_no_okf_leak`, run over every searched document, is what turns that from
+    a silent vacuous row into a failure.
+    """
+    p = tmp_path / "d.md"
+    p.write_text("---\nfirst: block\n---\n\n" + _OKF + "body\n", encoding="utf-8")
+    assert "okf v" in _body(p), "fixture should leak — _body is conservative, not magic"
+    with pytest.raises(AssertionError, match="OKF header"):
+        _assert_no_okf_leak(p)
+
+
+def test_fenced_reads_pseudocode_only():
+    doc = ("A freshly stripped ridge (thin soil) produces talus; blocked by a ridge (`09`).\n"
+           "```\nridge(shape, asymmetry):\n    s0 = ...\n```\nmore prose about a ridge (really).\n")
+    blocks = _fenced(doc)
+    assert "ridge(shape" in blocks
+    assert "thin soil" not in blocks and "really" not in blocks
+    # the pattern the generator rows use: prose-plus-parenthetical is NOT a call
+    call = r"(?<![A-Za-z0-9_])ridge\("
+    assert re.search(call, _flat(blocks))
+    assert not re.search(call, _flat("A freshly stripped ridge (thin soil) produces talus."))
+
+
+def test_norm_name_sees_through_the_casing_a_deferred_atom_could_ship_under():
+    assert _norm_name("OpenSimplex2") == _norm_name("open_simplex2") == "opensimplex2"
+    assert _norm_name("Wavelet") == "wavelet"
