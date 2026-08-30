@@ -302,3 +302,133 @@ def test_12_halfar_volume_claim_is_exactness(halfar_m):
     assert "conserved **exactly**" in text, "12 no longer claims exact conservation"
     assert halfar_m["volume_error"] == 0.0, (
         "12 claims exact volume conservation; measured %.3e" % halfar_m["volume_error"])
+
+
+# --------------------------------------------------------------------------- #
+# 09 — the rotate-the-domain table
+#
+# ⚠️ THE FAILURE THIS CLOSES. `09`'s whole argument for the rotation test rests on one table of six
+# measured numbers plus the 90° trap, and until now nothing tied them to `anisotropy_anatomy.py`.
+# Five of the six had drifted: the control column — the FLOOR the separation is measured against —
+# read 0.016/0.014/0.020 against a module computing 0.013/0.010/0.018, which inflates the floor and
+# understates the very separation the chapter is arguing for. A table this load-bearing needs a row
+# per cell, not a row per claim.
+
+@pytest.fixture(scope="module")
+def aniso():
+    import anisotropy_anatomy as aa
+    return {d: (aa.error(aa.axis_locked, math.radians(d)),
+                aa.error(aa.isotropic, math.radians(d))) for d in (23, 30, 45, 90)}
+
+
+@pytest.mark.parametrize("deg", [23, 30, 45])
+def test_09_axis_locked_column(aniso, deg):
+    """The defect column: a 4-neighbour max, scored by rotation residual."""
+    check("09-verification.md", r"\| %d° \| `([0-9.]+)` \|" % deg, aniso[deg][0])
+
+
+@pytest.mark.parametrize("deg", [23, 30, 45])
+def test_09_isotropic_control_column(aniso, deg):
+    """The floor column. `09`'s own rule is that a metric with no control is not evidence, so a
+    stale floor is worse than a stale defect number — it corrupts the comparison, not just a cell."""
+    check("09-verification.md", r"\| %d° \| `[0-9.]+` \| `([0-9.]+)` \|" % deg, aniso[deg][1])
+
+
+def test_09_the_ninety_degree_row_is_exactness_not_smallness(aniso):
+    """THE TRAP ROW. The chapter prints `0.000` for both columns at 90°, and the claim is that a
+    quarter turn is a SYMMETRY of the square lattice — so this must be exactly zero, not merely
+    round to it. A near-zero here would still be a passing table and a broken argument."""
+    for pattern in (r"\| \*\*90°\*\* \| \*\*`([0-9.]+)`\*\* \|",
+                    r"\| \*\*90°\*\* \| \*\*`[0-9.]+`\*\* \| `([0-9.]+)` \|"):
+        assert float(_quoted("09-verification.md", pattern)) == 0.0, (
+            "09 no longer prints 0.000 in the 90° row; this row is stale")
+    locked, floor = aniso[90]
+    assert locked == 0.0 and floor == 0.0, (
+        "09 claims exact equivariance at 90°; measured %.3e / %.3e" % (locked, floor))
+
+
+# --------------------------------------------------------------------------- #
+# 10 — the cost of moving a raster instead of moving coordinates
+#
+# ⚠️ THESE MOVED, AND WHY. They were measured at `lacunarity=2.0` — the degenerate value `01` and
+# `test_noise_pinch.py` exist to warn about, where every octave's zero set coincides. That was the
+# last working use of 2.0 in the repo; `tests/test_placement.py` now builds at the shipped 2.03 and
+# `10` was re-measured against it. The window-variance figure is the one to watch: it was ±6% at
+# lacunarity 2 because the un-shifted base window sits ON the pinch lattice and is systematically
+# flatter than any shifted one, so what looked like window variance was a second face of the defect.
+
+def _placement_detail_losses():
+    """Re-run `test_placement.py`'s experiment: mean |laplacian| and high-frequency band energy,
+    after one and after four chained bilinear moves. Returns fractions, not percentages."""
+    import noise
+    import ops_filters
+    from test_placement import _bilinear_shift, _detail
+
+    n = 192
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    build = lambda gx, gy: noise.fbm(gx / n * 3.0, gy / n * 3.0, seed=7,
+                                     octaves=6, lacunarity=2.03, gain=0.5)
+    band = lambda f: float(np.abs(f - ops_filters.gaussian(f, sigma=2.0)).mean())
+    h = build(xx, yy)
+    dx, dy = 0.037 * n, 0.023 * n
+    out = {}
+    for metric, tag in ((_detail, "lap"), (band, "band")):
+        base, raster = metric(h), h
+        for k in range(1, 5):
+            raster = _bilinear_shift(raster, dx, dy)
+            out["%s%d" % (tag, k)] = 1.0 - metric(raster) / base
+    # window-to-window spread of the SAME generator sampled elsewhere — the trap the chapter names
+    rng = np.random.RandomState(3)
+    ratios = [_detail(build(xx + ox, yy + oy)) / _detail(h)
+              for ox, oy in rng.rand(40, 2) * 400.0 - 200.0]
+    out["window"] = max(abs(r - 1.0) for r in ratios)
+    return out
+
+
+@pytest.fixture(scope="module")
+def placement_loss():
+    return _placement_detail_losses()
+
+
+def test_10_one_raster_move_laplacian(placement_loss):
+    check("10-primitives-ops-filters.md",
+          r"one move loses ~([0-9.]+)% of the fine detail", placement_loss["lap1"], 100.0)
+
+
+def test_10_four_raster_moves_laplacian(placement_loss):
+    check("10-primitives-ops-filters.md",
+          r"four chained moves ~([0-9.]+)%\*\*", placement_loss["lap4"], 100.0)
+
+
+def test_10_one_raster_move_band_energy(placement_loss):
+    """The same experiment on a different metric. `10`'s point is that the metric must be quoted
+    with the number, which only means anything if both numbers are actually the module's."""
+    check("10-primitives-ops-filters.md",
+          r"reads ~([0-9.]+)% and ~[0-9.]+% instead", placement_loss["band1"], 100.0)
+
+
+def test_10_four_raster_moves_band_energy(placement_loss):
+    check("10-primitives-ops-filters.md",
+          r"reads ~[0-9.]+% and ~([0-9.]+)% instead", placement_loss["band4"], 100.0)
+
+
+def test_10_window_to_window_variance(placement_loss):
+    """The measurement trap: placement lands on a different window, and different windows are
+    different terrain. At the detuned lacunarity that spread is small — read it as a loss and you
+    have measured your own sampling noise."""
+    check("10-primitives-ops-filters.md",
+          r"\*\*±([0-9.]+)% at 192²\*\*", placement_loss["window"], 100.0)
+
+
+def test_10_does_not_restate_the_stale_cross_implementation_number(placement_loss):
+    """`10` used to cite an independent JS implementation agreeing at 24.7% / 53.8% 'on the same
+    metric'. That was the lacunarity-2.0 build, no module here can reproduce it, and it has not
+    been re-run — so it must stay marked as stale rather than quoted as live agreement."""
+    text = (CHAPTERS / "10-primitives-ops-filters.md").read_text(encoding="utf-8")
+    if "24.7" in text:
+        assert "stale" in text and "2.0" in text, (
+            "10 still quotes the 24.7% / 53.8% cross-implementation figure without marking it "
+            "stale; nothing in this repo can re-derive it at the shipped lacunarity")
+    assert not re.search(r"two implementations, one number", text), (
+        "10 claims two implementations agree on one number, but the second implementation's "
+        "measurement was taken at lacunarity 2.0 and the first has moved off it")

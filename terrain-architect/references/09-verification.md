@@ -457,9 +457,9 @@ is not evidence). Measured, on a 4-neighbour max against a disc max of the same 
 
 | θ | Axis-locked operator | Isotropic control (the floor) |
 |---|---|---|
-| 23° | `0.093` | `0.016` |
-| 30° | `0.111` | `0.014` |
-| 45° | `0.128` | `0.020` |
+| 23° | `0.092` | `0.013` |
+| 30° | `0.111` | `0.010` |
+| 45° | `0.127` | `0.018` |
 | **90°** | **`0.000`** | `0.000` |
 
 **The 90° row is the trap.** A quarter turn is a *symmetry of the square lattice*, so it maps the

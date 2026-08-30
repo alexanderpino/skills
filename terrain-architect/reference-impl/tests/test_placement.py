@@ -278,11 +278,17 @@ def test_raster_transform_loses_detail_that_placement_keeps():
     so it costs nothing however many times you move it. The percentages quoted in `placement.py` and
     references/10 are pinned here; they are metric-dependent (mean |laplacian|) and meaningless
     without that qualifier, which is the point of measuring rather than asserting.
+
+    LACUNARITY. This measured at `lacunarity=2.0` until it was the last working use of that value
+    left in the repo — the degenerate case `01` and `test_noise_pinch.py` exist to warn about, where
+    every octave's zero set coincides and the base window sits on a grid of exact pinch points. It
+    now uses `noise.fbm`'s shipped `2.03`, so the terrain under test is terrain the skill would
+    actually recommend generating. The numbers moved when it changed; `10` was re-measured with it.
     """
     n = 192
     yy, xx = np.mgrid[0:n, 0:n].astype(float)
     build = lambda gx, gy: noise.fbm(gx / n * 3.0, gy / n * 3.0, seed=7,
-                                     octaves=6, lacunarity=2.0, gain=0.5)
+                                     octaves=6, lacunarity=2.03, gain=0.5)
     h = build(xx, yy)
     base = _detail(h)
     dx, dy = 0.037 * n, 0.023 * n                 # deliberately non-integer: the worst case
@@ -305,6 +311,6 @@ def test_raster_transform_loses_detail_that_placement_keeps():
     assert placed_ratios[-1] > placed_ratios[0] - 0.15, (
         f"coordinate placement must not degrade with depth, got {placed_ratios}")
 
-    assert 0.15 < losses[0] < 0.35, f"one raster move lost {losses[0]:.1%}, expected ~24%"
-    assert 0.45 < losses[3] < 0.65, f"four raster moves lost {losses[3]:.1%}, expected ~53%"
+    assert 0.15 < losses[0] < 0.40, f"one raster move lost {losses[0]:.1%}, expected ~29%"
+    assert 0.45 < losses[3] < 0.65, f"four raster moves lost {losses[3]:.1%}, expected ~57%"
     assert losses == sorted(losses), f"raster loss must compound with each move, got {losses}"

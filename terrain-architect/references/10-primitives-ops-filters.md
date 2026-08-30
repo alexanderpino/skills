@@ -596,22 +596,32 @@ argument that applies it. Placing at the native centre is the identity; placing 
 crest at exactly the requested offset.
 
 **Raster transform (after sampling).** Moving the *output* resamples it, and bilinear resampling is a
-low-pass filter. Measured on 6-octave fBm with a non-integer offset, scored as **mean |laplacian|**:
-**one move loses ~24% of the fine detail, four chained moves ~53%** — the losses compound, because
+low-pass filter. Measured on 6-octave fBm (`lacunarity 2.03`, the shipped detuned value — `01`) with a
+non-integer offset, scored as **mean |laplacian|**:
+**one move loses ~29% of the fine detail, four chained moves ~57%** — the losses compound, because
 each hop filters the already-filtered result. Coordinate placement loses none of it at any depth. Use
 a raster transform only for fields you cannot re-evaluate — an imported DEM, or the output of an
 erosion simulation — which is exactly what a Transform node is for.
 
 **Always quote the metric with the number.** The same experiment scored on high-frequency band energy
-(field minus a σ=2 gaussian) reads ~9% and ~26% instead. Neither is wrong; a bare percentage is.
+(field minus a σ=2 gaussian) reads ~9.8% and ~27.2% instead. Neither is wrong; a bare percentage is.
 `tests/test_placement.py::test_raster_transform_loses_detail_that_placement_keeps` pins these so the
-prose cannot drift from the code, and the Terrain Studio's independent JS implementation measures
-24.7% / 53.8% on the same metric — two implementations, one number.
+prose cannot drift from the code. ⚠️ A cross-implementation check once quoted here — the Terrain
+Studio's independent JS measuring 24.7% / 53.8% "on the same metric" — was taken against this
+experiment's **old `lacunarity 2.0`** build, which is the degenerate value `01` warns about. It has
+not been re-run at 2.03 and no module in this repo can reproduce it, so it is recorded as a stale
+figure rather than restated as agreement.
 
 A second measurement trap sits inside this one: coordinate placement lands on a *different window* of
-the same fBm, and detail energy genuinely varies window to window (±6% at 192²). Read that variance as
-"placement lost detail too" and you have measured your own sampling noise. The invariant that survives
-is **no systematic decline with depth**, not equality.
+the same fBm, and detail energy varies window to window — **±0.5% at 192²**, over 40 random windows
+on the detuned build. ⚠️ That number was **±6%** while this measured at `lacunarity 2.0`, and the
+difference was not window
+variance at all: at lacunarity exactly 2 the un-shifted base window sits on the pinch lattice (every
+octave zero at once, `01`), so it is systematically *flatter* than any shifted window and every ratio
+comes back high. Detuning collapses the spread by an order of magnitude. The trap is still real —
+different windows are different terrain — but at the recommended lacunarity it is small, and the
+version of it worth ~6% was a second symptom of the lattice defect. The invariant that survives
+either way is **no systematic decline with depth**, not equality.
 
 One honest caveat: a generator that normalises by its **own** extremes is not perfectly
 translation-invariant, because moving it changes what is in frame. Measured on `ridge`, that shows up
@@ -636,4 +646,4 @@ Two things the matrix form buys: **non-uniform scale and shear**, which the deco
 cannot express, and **composition** — `compose(A, B, C)` collapses a chain into one transform. For a
 generator that is merely tidier (sampling is exact either way), but for a **raster** it is a real
 quality win: each extra resample is another low-pass filter, so collapsing four moves into one avoids
-the ~53% detail loss measured above.
+the ~57% detail loss measured above.
