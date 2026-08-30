@@ -109,15 +109,23 @@ terrain *atoms*.
 
 ## Bottom line
 
-After excluding composites, **one** genuine atomic geomorphic capability is missing versus all three
-baseline tools: **braided / anastomosing river channels**. Everything else the tools ship is an atom we
-have, a composite of atoms we have, or a non-atomic category (color/output/utility/stylized). The two
-cheap "exposed-composite" follow-ups are a spectral band terrain filter and a seamless/tileable wrap
-mode; caves/overhangs (3D noise) are a separate voxel paradigm (chapter `24`), not a heightfield atom.
+After excluding composites, **no** genuine atomic geomorphic capability is missing versus the three
+baseline tools. Everything they ship is an atom we have, a composite of atoms we have, or a non-atomic
+category (color/output/utility/stylized). The two cheap "exposed-composite" follow-ups remain a spectral
+band terrain filter and a seamless/tileable wrap mode; caves/overhangs (3D noise) are a separate voxel
+paradigm (chapter `24`), not a heightfield atom.
 
-**Recommended next atom:** braided rivers via the Murray & Paola (1994) braided-stream cellular model
-(discharge split among multiple threads around emergent bars; lateral switching), with an oracle for
-multi-thread topology (braiding index > 1) — the one addition that closes the last node-level gap.
+⚠️ **This paragraph said the opposite for a while, and the correction is worth keeping.** It named
+**braided / anastomosing river channels** as the one remaining gap and recommended Murray & Paola
+(1994) as the next atom to build. That atom **was** built — `braided.braided_river`, on exactly that
+model, with four tests and an entry in `ATOM-COVERAGE.md` — and this file was never updated. So the
+skill's own audit understated it: a reader planning work from this page would have re-implemented
+something that already shipped.
+
+The mechanism is the ordinary one and it is worth naming because it will recur: **an audit is a
+snapshot, and nothing links it to the code it audits.** `ATOM-COVERAGE.md` does not have this problem,
+because `tests/test_atom_coverage.py` fails when its list and the modules disagree. This file had no
+such harness, so it drifted the moment the gap it named was closed.
 
 Sources: Gaea `docs.gaea.app/reference`; World Machine `help.world-machine.com` + `learn.php?page=devref`;
 Houdini `sidefx.com/docs/houdini`. Braided-river grounding: Murray & Paola 1994 (*A cellular model of

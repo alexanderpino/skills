@@ -179,7 +179,16 @@ scorecard (ours vs Gaea/WM/Houdini vs the academic frontier), the objective real
 you, and the prioritised gaps — see **`SIMULATION-AUDIT.md`**. For every atom judged **side-by-side
 against a canonical online counterpart** — published outputs of the *same algorithm* (Quilez, Werner
 CA repos, LIC, Landlab/Halfar) and real landform imagery (NASA/Commons) — with per-atom verdicts and
-the follow-ups the comparison surfaced, see **`CANON-COMPARISON.md`**.
+the follow-ups the comparison surfaced, see **`CANON-COMPARISON.md`**. For what the three baseline
+tools ship **node by node** and which atomic capabilities are genuinely missing — the inventory
+behind the parity claim — see **`NODE-PARITY-AUDIT.md`**. For the standing brief a reviewer works
+from, see **`REVIEW-BRIEF.md`**.
+
+⚠️ **These two were unreachable from this page until a harness said so.** An audit nobody can
+navigate to is an audit nobody re-runs, and `NODE-PARITY-AUDIT.md` had in fact gone stale while
+out of sight — it named braided rivers as the last open gap for some time after `braided.py`
+closed it. `tests/test_audit_drift.py` now fails if any audit document in this directory is not
+linked from here.
 
 ## Coverage boundary and production paths
 

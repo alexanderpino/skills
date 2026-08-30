@@ -9,8 +9,13 @@ validity (the equation is the right one).
 
 A closed-form oracle derived from the same equation the code implements proves the code
 **solves it correctly** — not that the equation is **right**. A wrong coefficient mirrored into
-both the code and its analytic check passes green. So "117 tests pass" is self-consistency.
+both the code and its analytic check passes green. So "383 tests pass" is self-consistency.
 Validity needs evidence from an **independent source**.
+
+⚠️ **That figure said 117 for a long time, against a suite of 383**, and the staleness undercut the
+very sentence it appears in: a reference implementation that misreports its own scale by a factor of
+three is not the thing to cite about rigour. `tests/test_audit_drift.py` now counts the suite and
+fails when the quoted number drifts more than 10 % from it.
 
 ## The evidence ladder (weakest → strongest) and current status
 
