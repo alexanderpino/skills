@@ -22,8 +22,10 @@ prose or the module moved, and somebody has to say which.
 that. This only checks that the chapters say what the code computes. Both are needed: prose can
 faithfully quote a wrong number, and correct code can be described by stale prose.
 """
+import importlib
 import math
 import re
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -644,3 +646,53 @@ def test_10_the_outside_figure_is_never_restated_as_agreement(placement_loss):
         m = agree.search(s)
         assert m is None or negate.search(s), (
             "10 asserts agreement with the outside figure in an un-negated sentence: %r" % s)
+
+
+# --------------------------------------------------------------------------- #
+# 12 — the one chapter number whose producer lives in ANOTHER skill
+
+WATER_PHYSICS = CHAPTERS.parent.parent / "water-physics" / "reference-impl"
+
+
+@pytest.mark.skipif(not (WATER_PHYSICS / "beach.py").exists(),
+                    reason="the water-physics skill is not checked out beside this one; 12's "
+                           "surf-zone numbers are computed there, not in this reference-impl")
+def test_12_crest_depth_ratio_is_quoted_in_one_field():
+    """⚠️ THE NUMBER THAT SUPERSEDED A STALE ONE, AND SO MOST NEEDS BINDING.
+
+    `27` quoted **0.89** for this quantity long after `12` had superseded it with **0.9734**, and
+    nothing pointed either number at the code — which is exactly how the 0.89 survived. Binding
+    the replacement is the only thing that stops the same drift happening again.
+
+    ⚠️ AND THE TWO NUMBERS ARE NOT INTERCHANGEABLE, which is the trap this row also guards.
+    `crest_depth_ratio` takes a `field` argument: `'bed'` gives 0.8930 and `'wave'` gives 0.9734.
+    They are the same quantity read off two different fields, and `12:1738-1745` establishes the
+    rule that a ratio must name the field each of its terms came from. Swapping one for the other
+    to "fix" a mismatch is the mixed-field error, not a correction — so this row asserts BOTH and
+    asserts they differ, rather than checking the headline figure alone.
+
+    This is the only chapter number in this skill that no module here can re-derive: the surf-zone
+    loop is `water-physics/reference-impl/beach.py`. It earns a row anyway — a superseding number
+    with nothing pointing at its source is how the last one went stale — and it skips cleanly when
+    the sibling skill is absent. ~20 s: it runs the full 6000-step loop.
+    """
+    sys.path.insert(0, str(WATER_PHYSICS))
+    try:
+        beach = importlib.import_module("beach")
+    finally:
+        sys.path.pop(0)
+
+    scene = beach.run_scene()
+    crest = beach.bar_crest(scene["x"], scene["h"], scene["h_dean"])
+    breaker = beach.breaker_state(scene["tr"])
+    wave = beach.crest_depth_ratio(scene["tr"], crest, breaker, field="wave")
+    bed = beach.crest_depth_ratio(scene["tr"], crest, breaker, field="bed")
+
+    check("12-glacial-coastal.md",
+          r"measured gap of `([\d.]+) [−-] [\d.]+ = [\d.]+`", wave)
+    check("12-glacial-coastal.md",
+          r"measured gap of `[\d.]+ [−-] ([\d.]+) = [\d.]+`", bed)
+    assert abs(wave - bed) > 0.05, (
+        "the wave-field and bed-field readings have converged (%.4f vs %.4f); the chapter's "
+        "whole point is that they differ by the filter's own lift, so either the loop changed "
+        "or this row is now measuring one field twice" % (wave, bed))
