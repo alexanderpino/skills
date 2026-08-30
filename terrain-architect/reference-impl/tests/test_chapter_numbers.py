@@ -237,3 +237,45 @@ def test_12_states_the_distribution_the_numbers_depend_on():
     assert re.search(r"z\s*~\s*N\(0,\s*.?_?r?\)", text) or "N(0, σ_r)" in text, (
         "12 no longer states that the rock elevation is Gaussian; the coverage percentages "
         "beside it are only true for that distribution")
+
+
+# --------------------------------------------------------------------------- #
+# 12 — the Halfar benchmark figures quoted in the chapter
+
+@pytest.fixture(scope="module")
+def halfar_m():
+    import halfar_anatomy
+    return halfar_anatomy.measurements()
+
+
+def test_12_halfar_centre_thins_to(halfar_m):
+    check("12-glacial-coastal.md", r"centre thins\s+\*\*3000 → ([0-9]+) m\*\*",
+          halfar_m["centre_final"])
+
+
+def test_12_halfar_margin_advances_to(halfar_m):
+    check("12-glacial-coastal.md", r"\*\*500 → ([0-9]+) km\*\*",
+          halfar_m["radius_final"] / 1e3)
+
+
+def test_12_halfar_shape_error(halfar_m):
+    check("12-glacial-coastal.md", r"holds to \*\*([0-9.]+)%\*\*",
+          halfar_m["shape_error"], 100.0)
+
+
+def test_12_halfar_fitted_exponent(halfar_m):
+    check("12-glacial-coastal.md", r"gets \*\*([0-9.]+)\*\* against the analytic",
+          halfar_m["exponent"])
+
+
+def test_12_halfar_analytic_exponent(halfar_m):
+    check("12-glacial-coastal.md", r"against the analytic \*\*([0-9.]+)\*\*",
+          halfar_m["exponent_analytic"])
+
+
+def test_12_halfar_volume_claim_is_exactness(halfar_m):
+    """The chapter says `exactly` and prints `0.0`. Exactness is the claim, not smallness."""
+    text = (CHAPTERS / "12-glacial-coastal.md").read_text(encoding="utf-8")
+    assert "conserved **exactly**" in text, "12 no longer claims exact conservation"
+    assert halfar_m["volume_error"] == 0.0, (
+        "12 claims exact volume conservation; measured %.3e" % halfar_m["volume_error"])

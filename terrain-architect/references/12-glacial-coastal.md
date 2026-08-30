@@ -120,6 +120,31 @@ glacierStep(bed, H, Δt):
     # eroded volume → a moraine/sediment field at margins and terminus (the mass budget)
 ```
 
+![The SIA solver against Halfar's exact similarity solution: profiles, self-similar collapse, residual and the recovered exponent](../reference-impl/halfar_anatomy.png)
+
+> **The one benchmark in this skill against an EXACT solution.** `P` (Halfar 1983; Bueler et al.
+> 2005 'Test B'), measured `D`. Drawn by
+> [`reference-impl/halfar_anatomy.py`](../reference-impl/halfar_anatomy.py) from
+> `sims_illustrative.glacier_sia`, guarded by `tests/test_halfar_anatomy.py`. An isothermal dome on
+> a flat bed with no mass balance spreads self-similarly as
+> `H = H_c·[1 − (r/R)^(4/3)]^(3/7)` for Glen `n = 3`.
+>
+> ⚠️ **Neither exponent appears anywhere in the solver.** `4/3 = (n+1)/n` and `3/7 = n/(2n+1)` are
+> consequences of the analytic solution; `glacier_sia` carries an `H^(n+2)` diffusivity and nothing
+> else. That independence is what makes this the top rung of
+> [`VALIDATION.md`](../reference-impl/VALIDATION.md)'s ladder — the rung that separates *the code
+> solves its equation correctly* from *the equation is right* — and it is the property most easily
+> lost to a refactor that shares a constant, which is why a test greps the solver for it.
+>
+> Over **1600 model years** the centre thins **3000 → 2439 m** while the margin advances
+> **500 → 564 km**; the interior shape holds to **1.13%** against the suite's 3% bound; and ice
+> volume is conserved **exactly** — the relative change is `0.0`, not merely small. Panel **b** is
+> the claim itself: four different times, each normalised by its own centre height and radius,
+> falling on one curve. Panel **d** fits the shape exponent back out of the numerical profile and
+> gets **0.4455** against the analytic **0.4286**. Panel **c** shows the residual growing toward
+> the margin, which is where the SIA is expected to degenerate — the exact profile has an infinite
+> surface slope there.
+
 *Runnable reference: `reference-impl/glacier.py` (`glacier_carve` = this `glacierStep`; SIA transport
 reused from `sims_illustrative.glacier_sia`, Halfar-validated), verified by `tests/test_glacier.py`.
 Invariant-checked (illustrative-morphological tier): it reduces to the ice-only sim when `K_g=0`,
