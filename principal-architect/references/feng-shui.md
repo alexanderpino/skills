@@ -15,15 +15,28 @@ closes the skill's UI/interaction gap — and the docs tree (§5). §6 confines 
 vocabulary so it never leaks into produced artifacts.
 
 **This is not a foreign philosophy bolted on — it names the one already underneath.**
-The skill's standing rules echo the form school without knowing it: *documentation
-must earn its keep* is declutter; *protect conceptual integrity* is balance; one
-ubiquitous language per bounded context is one voice per room; *depend in the
-direction of stability* is the mountain behind; the README manifest that lets "an
-agent navigate in two reads instead of twenty" is the clear mouth. The lens is the
-skill's guiding philosophy made explicit — the thing its newer, standard-bearing
-rules keep independently rediscovering, which is itself the evidence that the
-heuristics track something stable in the inhabitants rather than in any era's
-structures.
+Modern software and requirements maxims keep independently rediscovering the form
+school, which is itself the evidence that the heuristics track something stable in
+the *inhabitants* rather than in any era's structures. The rediscoveries, with the
+shared invariant each pair converged on:
+
+| Modern maxim | Form-school principle | The shared invariant |
+|---|---|---|
+| **YAGNI** | declutter — its prospective half | possessions in proportion to *present* use: declutter removes what no longer serves; YAGNI declines what doesn't yet |
+| **KISS** | declutter, applied to the design itself | ornament in the structure blocks flow exactly as objects in the room do |
+| **SRP** (the S of SOLID) | one room, one purpose | mixed purpose taxes every occupant — a bed in the office *is* mixed responsibility (= cohesion/CCP, `structure.md` §2) |
+| **DIP** (the D), SDP | backing | depend on the stable; face the volatile knowingly (§1.6) |
+| **MoSCoW** (DSDM/BABOK prioritisation) | balance | attention in proportion to purpose: Musts take the commanding position of a release; Won'ts are clutter declined in advance |
+| this skill's *"documentation must earn its keep"* | declutter | every artifact pays attention-rent |
+| *conceptual integrity*; ubiquitous language | balance; one voice per room | one coherent style per inhabited space |
+| the README manifest ("two reads instead of twenty") | one clear mouth | a legible entrance orients every arrival |
+
+And an honest negative result, because forcing a map would be the very clutter the
+lens warns against: **O, L, and I of SOLID do not survive the transfer** — Liskov
+substitutability has no spatial analogue. That agrees, independently, with
+`structure.md` §2's own verdict that SOLID's architectural payload is DIP alone;
+where the lens and the standards refuse the same correspondence, both are probably
+right.
 
 **Epistemic status — read this first.** Feng shui has two halves. The **form school**
 (*luan tou*) is empirical vernacular: observations about approach, sightlines,
@@ -241,6 +254,7 @@ corroborates every item you act on.
 | Commanding position on screen, quantified (§4) | Fitts's law (1954); visibility & hierarchy heuristics | Fitts; Nielsen (10 usability heuristics) |
 | Grouping = walls make rooms (§4) | Gestalt principles (proximity, common region) | Wertheimer; Palmer |
 | Docs tree navigability (§5) | the RAG-optimisation rationale | `repository-structure.md` |
+| Rediscovery table (intro) — YAGNI; KISS; SRP/DIP; MoSCoW | Extreme Programming; the Lockheed design maxim; *Agile Software Development*; DSDM / BABOK prioritisation | Beck & Jeffries; Kelly Johnson; Robert C. Martin; Dai Clegg (DSDM Consortium) |
 
 When any of this disagrees with the org's mandated standard or house style, conform
 to theirs (the skill's standing rule) — this lens least of all is worth a divergence.
