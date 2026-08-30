@@ -143,6 +143,27 @@ standard vocabulary, record it in the SD/HLD "known issues / debt" section with 
 quality attribute it threatens (`significance.md`), and let a deliberate ADR —
 including "we accept this for now" — be the outcome.
 
+**A worked walk (one trial — evidence, not proof).** The lens was exercised once
+against a real ~8,600-line, 42-module Python codebase: two independent reviewers,
+same output contract (verified findings with file:line evidence, standard
+vocabulary), one walking with §§1–3, the other with the `methods.md` §9 smell list
+and dependency-graph metrics. They **converged** on the major duplications, the
+flat-namespace problem, and — a good sign for both — identical clean checks (no
+cycles, healthy high-fan-in hubs, no dead code). Each also found real, code-verified
+issues the other missed. Lens-unique finds map exactly to the questions the smell
+list has no category for: *poison arrows* surfaced five modules consuming another
+module's underscore-private helpers as their de facto API (13+ call sites); *backing*
+surfaced a published output depending on the module its own README calls a
+throwaway sandbox (a stability inversion, SDP); *one clear mouth* surfaced manifest
+drift — a README section reading "two files, both deliberately small" above three
+bullets, the first a 513-line module. Baseline-unique finds were metric-shaped: an
+exhaustive count of a helper duplicated seven times, and a 568-line mega-module the
+lens walk *missed*. The honest conclusion from n=1: the seven questions and the
+smell list cover **complementary failure classes** — boundary piercing, stability
+direction, and entrance legibility on one side; exhaustive counting and bulk on the
+other. Walk with both, which is why this file sits beside `methods.md` §9 rather
+than replacing it.
+
 ---
 
 ## 4. The screen as a space — UI & interaction
