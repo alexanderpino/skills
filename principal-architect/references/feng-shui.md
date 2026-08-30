@@ -29,9 +29,9 @@ resolution pairs (*A Pattern Language*, 1977; *The Timeless Way of Building*, 19
 The Gang of Four adopted that format for software and cite him in *Design Patterns*
 (1994) — while noting their patterns are not his. What transferred there was the
 **method** of capturing arrangement knowledge, not the arrangements themselves
-(nothing about Observer is spatial). This file attempts the narrower, riskier
-transfer — content, not just format — riskier in kind, which is exactly why it is
-bound to the corroboration contract above.
+(nothing about Observer is spatial). This file attempts the riskier
+transfer — content, not just format — which is exactly why it is bound to the
+corroboration contract above.
 
 **Convergences, not rediscoveries.** Several modern maxims, and this skill's own
 standing rules, reduce to the same invariants as §1's principles. The mappings are
@@ -144,10 +144,13 @@ quality attribute it threatens (`significance.md`), and let a deliberate ADR —
 including "we accept this for now" — be the outcome.
 
 **A worked walk (one trial — evidence, not proof).** The lens was exercised once
-against a real ~8,600-line, 42-module Python codebase: two independent reviewers,
-same output contract (verified findings with file:line evidence, standard
-vocabulary), one walking with §§1–3, the other with the `methods.md` §9 smell list
-and dependency-graph metrics. They **converged** on the major duplications, the
+against a real ~8,600-line, 42-module Python codebase — the `terrain-architect/
+reference-impl` corpus in this skill's source repository
+(github.com/alexanderpino/skills), as of 2026-08; the corpus is live, so the
+figures below are anchored to that snapshot. Two reviewers, blind to each other's
+findings, worked the same output contract (verified findings with file:line
+evidence, standard vocabulary), one walking with §§1–3, the other with the
+`methods.md` §9 smell list and dependency-graph metrics. They **converged** on the major duplications, the
 flat-namespace problem, and — a good sign for both — identical clean checks (no
 cycles, healthy high-fan-in hubs, no dead code). Each also found real, code-verified
 issues the other missed. Lens-unique finds map exactly to the questions the smell
@@ -280,6 +283,7 @@ descriptive and minimal — this file asserts no history it cannot source.
 | Grouping = walls make rooms (§4) | Gestalt principles (proximity, common region) | Wertheimer; Palmer |
 | Docs tree navigability (§5) | the RAG-optimisation rationale | `repository-structure.md` |
 | Convergence table (intro) — YAGNI; KISS; SRP/DIP; MoSCoW | Extreme Programming; the Lockheed design maxim; *Agile Software Development*; MoSCoW (devised at Oracle, adopted by DSDM) | Beck & Jeffries; Kelly Johnson; Robert C. Martin; Dai Clegg |
+| Worked walk, n=1 (§3) | `terrain-architect/reference-impl` @ github.com/alexanderpino/skills, 2026-08 snapshot; every figure re-verified adversarially against the code | this skill's source repository |
 
 When any of this disagrees with the org's mandated standard or house style, conform
 to theirs (the skill's standing rule) — this lens least of all is worth a divergence.
