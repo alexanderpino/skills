@@ -14,6 +14,17 @@ three spaces this skill touches: the codebase (§3), the screen (§4) — which 
 closes the skill's UI/interaction gap — and the docs tree (§5). §6 confines the
 vocabulary so it never leaks into produced artifacts.
 
+**This is not a foreign philosophy bolted on — it names the one already underneath.**
+The skill's standing rules echo the form school without knowing it: *documentation
+must earn its keep* is declutter; *protect conceptual integrity* is balance; one
+ubiquitous language per bounded context is one voice per room; *depend in the
+direction of stability* is the mountain behind; the README manifest that lets "an
+agent navigate in two reads instead of twenty" is the clear mouth. The lens is the
+skill's guiding philosophy made explicit — the thing its newer, standard-bearing
+rules keep independently rediscovering, which is itself the evidence that the
+heuristics track something stable in the inhabitants rather than in any era's
+structures.
+
 **Epistemic status — read this first.** Feng shui has two halves. The **form school**
 (*luan tou*) is empirical vernacular: observations about approach, sightlines,
 backing, blockage, and accumulation, refined over centuries of watching people occupy

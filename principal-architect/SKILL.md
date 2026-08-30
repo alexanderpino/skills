@@ -46,6 +46,13 @@ recovered/forward decisions — is in **`references/methods.md`**. Read it whene
 need to *produce* facts rather than just record ones you already have; it is the
 architect's playbook that turns a blank template into a true description.
 
+Underneath these stances runs one idea older than every standard this skill cites:
+**every structure you touch — codebase, screen, docs tree — is an inhabited space**,
+and its arrangement either serves or taxes the people who move through it. That
+guiding philosophy, its centuries-old placement-and-flow heuristics reduced to
+verified invariants, is `references/feng-shui.md` — the lens guides *you*; the
+documents you produce still speak the standards' language.
+
 ## Also a master business analyst
 
 Below the architecture sits the requirements work: **epics** (`EP-NNN`, large outcomes) that
