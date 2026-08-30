@@ -35,6 +35,8 @@ RATE section below for the derivation and the measured numbers.
 The numpy half carries no Pillow dependency, so `tests/test_halfar_anatomy.py` imports the
 measurements from here. Writes `halfar_anatomy.png`. Run: `python halfar_anatomy.py`.
 """
+from functools import lru_cache
+
 import numpy as np
 
 import sims_illustrative as sims
@@ -65,12 +67,23 @@ def halfar(r, centre_height, radius):
     return centre_height * np.maximum(1.0 - s ** P_RADIAL, 0.0) ** P_SHAPE
 
 
-def evolve(steps):
-    """Run the shipped SIA solver from the exact profile for `steps` steps."""
-    r, c = radius_field()
+@lru_cache(maxsize=None)
+def evolve(steps, n=N, cellsize=CELLSIZE):
+    """Run the shipped SIA solver from the exact profile for `steps` steps.
+
+    `n` and `cellsize` are open because the GRID is the knob that actually moves the rate
+    error (see `GRID_REFINEMENT` below); the three shipped pairs hold the domain width fixed
+    at ~1450 km so only the resolution changes.
+
+    ⚠️ MEMOISED, AND THE ARRAYS IT HANDS BACK ARE READ-ONLY BY CONVENTION. The figure and its
+    guard between them ask for the same eight-step run a dozen times, and the 241-cell
+    refinement run costs ~9 s on its own. Nothing in this module or its test mutates what
+    comes back; if something ever needs to, it must copy first.
+    """
+    r, c = radius_field(n, cellsize)
     h_init = halfar(r, H0, R0)
-    h = sims.glacier_sia(np.zeros((N, N)), h_init, steps=int(steps), A=A_GLEN,
-                         dt=DT, cellsize=CELLSIZE, beta=0.0, max_substeps=4000)
+    h = sims.glacier_sia(np.zeros((n, n)), h_init, steps=int(steps), A=A_GLEN,
+                         dt=DT, cellsize=cellsize, beta=0.0, max_substeps=4000)
     return r, c, h_init, h
 
 
@@ -152,12 +165,12 @@ def t0_analytic(A=A_GLEN, rho=RHO_ICE, g=G_ACC, n=N_GLEN, h0=H0, r0=R0):
     return (1.0 / 18.0) / gamma * (7.0 / 4.0) ** 3 * r0 ** 4 / h0 ** 7
 
 
-def t0_from_thinning(steps=8):
+def t0_from_thinning(steps=8, n=N, cellsize=CELLSIZE):
     """Recover t0 from how much the solver actually thinned the dome.
 
     `H_c(t0 + dt)/H0 = ((t0 + dt)/t0)^(-1/9)` inverts to `t0 = dt / ((H0/H_c)^9 - 1)`.
     """
-    r, c, _h0, h = evolve(steps)
+    r, c, _h0, h = evolve(steps, n, cellsize)
     _rad, _prof, hc, _rn = profile(h, r, c)
     dt_total = steps * DT
     return float(dt_total / ((H0 / hc) ** 9.0 - 1.0))
@@ -170,17 +183,78 @@ def t0_from_thinning(steps=8):
 # route returns 6.5e9–8.6e9 across the four step counts, non-monotonically — an instrument
 # whose noise dwarfs the effect it would police. It was written, measured, and removed.
 #
-# Nothing is lost by dropping it. Volume is conserved EXACTLY (asserted above), and exact
-# volume conservation plus the right thinning rate already fixes the spreading rate — the
-# ice has nowhere else to go.
+# Nothing is lost by dropping it — but ⚠️ NOT for the reason this comment used to give. It
+# argued from volume conservation, and volume conservation is vacuous AS EVIDENCE here:
+# `glacier_sia` transports in divergence form, so total ice is conserved to 0.000e+00 under
+# the BROKEN solver too — `H^(n+1)` scores exactly the same perfect zero. A quantity that
+# cannot tell a right solver from a wrong one is not evidence about either.
+#
+# The argument that does hold runs the other way round, from the two rows that ARE
+# discriminating. Panel b measures the SHAPE: the profiles at four times collapse onto the
+# analytic curve, so the numerical field is `H_c · f(r/R)` with Halfar's own `f`. Panel e
+# measures the THINNING RATE, which no near-no-op can fake. For a field of that form the
+# ice under it is proportional to `R^2 · H_c`, so once the shape is pinned and H_c(t) is
+# pinned, R(t) is not free — and THAT is the step conservation is used for: as an identity
+# closing an argument whose evidence comes from elsewhere, never as the evidence itself.
 
 
-def rate_error(steps=8):
+def rate_error(steps=8, n=N, cellsize=CELLSIZE):
     """Relative disagreement between the fitted and the closed-form t0."""
-    return float(abs(t0_from_thinning(steps) / t0_analytic() - 1.0))
+    return float(abs(t0_from_thinning(steps, n, cellsize) / t0_analytic() - 1.0))
 
 
-RATE_TOLERANCE = 0.05      # the fitted t0 must land within 5% of the closed form
+TIMESTEP_REFINEMENT = (1, 2, 4, 8, 16)
+
+
+@lru_cache(maxsize=None)
+def rate_error_at_refined_timestep(refine, steps=8, n=N, cellsize=CELLSIZE):
+    """Rate error with the TIMESTEP cut `refine`-fold at FIXED total model time.
+
+    ⚠️ THE CONTROL FOR A CLAIM THIS FIGURE USED TO MAKE AND WHICH WAS FALSE. Panel e's caption
+    read "converging as the timestep falls", pointing at the 2/4/8/16 series. But `DT` is a
+    fixed constant and `STEPS` multiplies TOTAL MODEL TIME — the axis says so — so that series
+    varies run LENGTH, not step size. Cutting the actual timestep with the total time held
+    fixed is what the sentence claimed, and it moves the answer AWAY, monotonically:
+    0.002327 / 0.002330 / 0.002338 / 0.002351 / 0.002376 at dt/1…dt/16. The step-count series
+    falls because the denominator `(H0/H_c)^9 - 1` grows with elapsed time — dilution, not
+    convergence — and past 16 steps it turns round again (0.000459 / 0.000451 / 0.000854 /
+    0.000999 at 16/32/64/128). This function exists so the corrected caption is guarded by a
+    measurement rather than by a comment.
+    """
+    total = float(steps) * DT
+    sub = int(steps) * int(refine)
+    r, c = radius_field(n, cellsize)
+    h_init = halfar(r, H0, R0)
+    h = sims.glacier_sia(np.zeros((n, n)), h_init, steps=sub, A=A_GLEN,
+                         dt=total / sub, cellsize=cellsize, beta=0.0, max_substeps=4000)
+    hc = float(h[c, c])
+    return float(abs(total / ((H0 / hc) ** 9.0 - 1.0) / t0_analytic() - 1.0))
+
+
+# ⚠️ DERIVED FROM THE MEASURED ERROR SERIES, NOT CHOSEN TO BE COMFORTABLE — the sibling
+# `SHAPE_TOLERANCE` cites `test_benchmarks.py` as its source, and this one needs a source too.
+# The correct solver's rate error, measured at 2/4/8/16 steps: 0.01134, 0.00580, 0.00233,
+# 0.00046. The row below is evaluated at 8 steps, so the bound is set at ~4x the 0.00233 that
+# run scores — enough headroom that a seed or a numpy version cannot redden it, and no more.
+#
+# WHY IT IS NOT 0.05. At 5% this benchmark was decorative. Mutations of `glacier_sia` and
+# their rate error at 8 steps, all of which a solver benchmark exists to catch:
+#     CFL factor 0.2 -> 0.6           0.0333      CFL 0.2 -> 0.45              0.0279
+#     substep floor 1e-6*dt -> 0.05*dt 0.0494     diffusivity x 1.04           0.0364
+#     face averaging mean -> max      0.0193
+# Every one of them passed at 0.05. All five fail at 0.01, and the shape rows — which the
+# rate row exists precisely because they are near-vacuous — catch none of them.
+RATE_TOLERANCE = 0.01
+
+# The GRID pairs panel e's companion row refines over: domain width held at ~1450 km, so the
+# only thing that changes is resolution. ⚠️ This is the knob that moves the rate error;
+# refining the TIMESTEP at fixed total time does not (see `caption_lines`).
+GRID_REFINEMENT = ((61, 24000.0), (121, 12000.0), (241, 6000.0))
+
+# Panel e's y-range. Named so `tests/test_halfar_anatomy.py` can assert the acceptance band
+# still fits inside the frame that is supposed to display it — the two used to be able to
+# drift apart, and did: the panel was drawn on ±3% while the bound was ±5%.
+RATE_PANEL_YLIM = (0.97, 1.03)
 
 
 def measurements():
@@ -198,6 +272,15 @@ def measurements():
         't0_analytic': t0_analytic(),
         't0_fitted': t0_from_thinning(8),
         'rate_error': rate_error(8),
+        # The grid-refinement series, measured rather than remembered, because the caption
+        # quotes it. Coarse/fine are the ends of GRID_REFINEMENT.
+        'rate_error_coarse': rate_error(8, *GRID_REFINEMENT[0]),
+        'rate_error_fine': rate_error(8, *GRID_REFINEMENT[-1]),
+        # …and the timestep series that does NOT converge, so the caption's correction is
+        # quoting a live measurement rather than a remembered one.
+        'rate_error_dt_coarse': rate_error_at_refined_timestep(TIMESTEP_REFINEMENT[0]),
+        'rate_error_dt_fine': rate_error_at_refined_timestep(TIMESTEP_REFINEMENT[-1]),
+        'rate_error_by_steps': tuple(rate_error(s) for s in STEPS),
         'years': 8 * DT / 3.15e7,
     }
 
@@ -351,10 +434,21 @@ def build():
     # --- e: the rate, which the four panels to the left cannot see -----------
     x0 = PAD + 4 * PANEL_W
     d.text((x0, TOP - 26), 'e.  the rate, unfakeable', GRN, font=f_h)
-    ex = _Ax(d, (x0 + 44, TOP, x0 + side + 44, TOP + side), (0.0, 5.0), (0.97, 1.03))
+    ex = _Ax(d, (x0 + 44, TOP, x0 + side + 44, TOP + side), (0.0, 5.0), RATE_PANEL_YLIM)
     for t in (0.98, 0.99, 1.00, 1.01, 1.02):
         ex.hline(t, GRID if abs(t - 1.0) > 1e-9 else GRN, 1 if abs(t - 1.0) > 1e-9 else 2)
         d.text((x0 + 40, ex.py(t)), '%.2f' % t, MUTED, font=f_s, anchor='rm')
+    # ⚠️ THE ACCEPTANCE BAND, DRAWN. Panel c draws its 3% bound and labels it; this panel used
+    # to draw nothing, on a frame of ±3% while the bound it was illustrating was ±5% — the band
+    # was WIDER than the whole panel, so the one panel with the loosest bound was the only one
+    # that could not show it. `RATE_PANEL_YLIM` and `RATE_TOLERANCE` are now checked against
+    # each other by tests/test_halfar_anatomy.py so they cannot drift apart again.
+    for t in (1.0 - RATE_TOLERANCE, 1.0 + RATE_TOLERANCE):
+        ex.hline(t, ACCENT, 2)
+    # Labelled at the LOWER band line: the upper one runs through the 2-step marker, which sits
+    # just outside the band because 400 model years give the thinning the least signal.
+    d.text((x0 + 48, ex.py(1.0 - RATE_TOLERANCE) + 3),
+           'suite bound, ±%.0f%% at 8 steps' % (100 * RATE_TOLERANCE), ACCENT, font=f_s)
     d.text((x0 + 48, ex.py(1.0) + 4), 'closed form', GRN, font=f_b)
     t0a = m['t0_analytic']
     for i, st in enumerate(STEPS):
@@ -362,11 +456,17 @@ def build():
         px_, py_ = ex.px(i + 1.0), ex.py(ratio)
         d.ellipse([px_ - 4, py_ - 4, px_ + 4, py_ + 4], fill=BLU)
         d.text((px_, TOP + side + 6), '%d' % st, MUTED, font=f_s, anchor='ma')
-    d.text((x0 + 44, TOP + side + 24), 't0 recovered / t0 closed form', MUTED, font=f_s)
+    # ⚠️ THE X AXIS IS STEP COUNT, WHICH IS TOTAL MODEL TIME — `DT` is fixed, so more steps is a
+    # LONGER RUN, not a finer one. The label was missing and the caption read the axis as a
+    # timestep refinement; it is not one. 2 steps sits above the band because 400 model years
+    # give the thinning almost no signal, not because a coarse step is inaccurate.
+    d.text((x0 + 44, TOP + side + 24), 'steps of 200 model years — longer run →',
+           MUTED, font=f_s)
+    d.text((x0 + 44, TOP + side + 42), 't0 recovered / t0 closed form', MUTED, font=f_s)
     # The broken solver's point is 4406 — four orders of magnitude off the top of this axis.
     # Stating the number is the only honest way to draw it; a clipped marker would imply it
     # sits just above the frame.
-    d.text((x0 + 44, TOP + side + 42), 'H^(n+1) lands at 4406 ↑', RED, font=f_b)
+    d.text((x0 + 44, TOP + side + 60), 'H^(n+1) lands at 4406 ↑', RED, font=f_b)
 
     cap = CAP_TOP
     for i, line in enumerate(caption_lines(m)):
@@ -410,8 +510,16 @@ def caption_lines(m):
         '0.49%. What a near-no-op cannot fake is the RATE — panel e. Halfar fixes it with no free parameters: t0 = (1/18)/Γ·(7/4)³·R0⁴/H0⁷ with',
         'Γ = 2A(ρg)ⁿ/(n+2), and H_c = H0(t/t0)^(−1/9), so t0 can be read back out of the thinning. Closed form %.3e s against %.3e s'
         % (m['t0_analytic'], m['t0_fitted']),
-        'recovered from the run — %.2f%% apart, converging as the timestep falls. Under H^(n+1) that recovery returns 4.06e13 s, a factor of 4406.'
-        % (100 * m['rate_error']),
+        'recovered from the run — %.2f%% apart, inside the ±%.0f%% band panel e now draws. Under H^(n+1) that recovery returns 4.06e13 s, ×4406.'
+        % (100 * m['rate_error'], 100 * RATE_TOLERANCE),
+        '⚠️ PANEL e\'S x AXIS IS RUN LENGTH, NOT STEP SIZE, and this caption used to say the opposite. DT is FIXED at 200 model years, so "more',
+        'steps" is a LONGER RUN. The sequence %s at 2/4/8/16 steps is the SIGNAL growing — the denominator (H0/H_c)⁹ − 1'
+        % ' / '.join('%.2f%%' % (100 * e) for e in m['rate_error_by_steps']),
+        'grows with elapsed time — not discretisation error shrinking; carry it past 16 steps and it turns round again. Cut the REAL timestep at',
+        'fixed total time, which is what the old sentence claimed, and the answer moves the WRONG way: %.4f%% → %.4f%% over dt/1…dt/16. The knob'
+        % (100 * m['rate_error_dt_coarse'], 100 * m['rate_error_dt_fine']),
+        'that does converge is the GRID, so that is the row the suite asserts: %.3f%% at 61 cells, %.3f%% at 121, %.3f%% at 241 — monotone.'
+        % (100 * m['rate_error_coarse'], 100 * m['rate_error'], 100 * m['rate_error_fine']),
         'Drawn from sims_illustrative.py, guarded by tests/test_halfar_anatomy.py.',
     ]
 

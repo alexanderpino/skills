@@ -99,11 +99,15 @@ def test_the_spreading_RATE_matches_the_closed_form_not_just_the_shape():
     `H_c(t) = H0 (t/t0)^(-1/9)`, so t0 can be read back out of the numerical thinning and
     the two must be the same number.
 
-    Measured: analytic 9.221e9 s against a fitted 9.243e9 s, 0.23% apart, and the fit
-    converges toward the closed form as the step count rises (9.326e9 / 9.275e9 / 9.243e9 /
-    9.226e9 at 2/4/8/16 steps) — which is what discretisation error is supposed to do.
-    Under `H^(n+1)` the fitted t0 is 4.06e13, a factor of **4406** out. That is the
+    Measured: analytic 9.221e9 s against a fitted 9.243e9 s, 0.23% apart, against a bound of
+    1%. Under `H^(n+1)` the fitted t0 is 4.06e13, a factor of **4406** out. That is the
     discriminator this file was missing.
+
+    ⚠️ THE BOUND WAS 0.05 AND THAT WAS 21x THE OBSERVED ERROR, which made this row decorative
+    on everything short of the one-character diffusivity edit. `HA.RATE_TOLERANCE` now carries
+    the derivation and the five solver mutations that used to walk past it;
+    `test_the_rate_row_rejects_a_solver_run_above_its_own_CFL_limit` is the control that
+    proves the tightened bound can still fail.
     """
     analytic = HA.t0_analytic()
     fitted = HA.t0_from_thinning(8)
@@ -115,16 +119,166 @@ def test_the_spreading_RATE_matches_the_closed_form_not_just_the_shape():
         % (fitted, analytic, 100 * rel, 100 * HA.RATE_TOLERANCE))
 
 
-def test_the_recovered_rate_converges_as_the_step_count_rises():
+def _sia_at_cfl(h_init, cfl, steps=8):
+    """`glacier_sia`'s transport loop, transcribed, with the CFL factor made an argument.
+
+    A local copy rather than a monkeypatch because the point is to run a solver that is wrong
+    in one specific, plausible way — the explicit diffusion pushed past the stability factor
+    the shipped code chose — without touching the shipped code. Everything else here matches
+    `sims_illustrative.glacier_sia` line for line at `beta=0`.
+    """
+    n_glen, rho, g = 3, 917.0, 9.81
+    c = 2.0 * HA.A_GLEN / (n_glen + 2) * (rho * g) ** n_glen
+    h = np.array(h_init, dtype=np.float64, copy=True)
+    cs = HA.CELLSIZE
+    for _ in range(int(steps)):
+        remaining, subs = HA.DT, 0
+        while remaining > 1e-6 * HA.DT and subs < 4000:
+            sy, sx = np.gradient(h, cs)
+            d = c * h ** (n_glen + 2) * np.hypot(sx, sy) ** (n_glen - 1)
+            dmax = float(d.max())
+            if dmax <= 0.0:
+                break
+            sub = min(remaining, cfl * cs * cs / dmax)
+            fx = 0.5 * (d[:, :-1] + d[:, 1:]) * (h[:, :-1] - h[:, 1:]) / cs
+            fy = 0.5 * (d[:-1, :] + d[1:, :]) * (h[:-1, :] - h[1:, :]) / cs
+            dh = np.zeros_like(h)
+            dh[:, :-1] -= fx
+            dh[:, 1:] += fx
+            dh[:-1, :] -= fy
+            dh[1:, :] += fy
+            h = np.maximum(h + sub / cs * dh, 0.0)
+            remaining -= sub
+            subs += 1
+    return h
+
+
+def test_the_rate_row_rejects_a_solver_run_above_its_own_CFL_limit():
+    """⚠️ MUTATION CONTROL for `RATE_TOLERANCE`. The row above must be able to fail.
+
+    `glacier_sia` subcycles its explicit diffusion at `0.2 * cellsize^2 / D_max`. Running the
+    same scheme at 0.6 — three times the chosen factor — is precisely the defect a solver
+    benchmark exists to catch, and at the old 5% bound it passed the entire file. Measured
+    rate error at 8 steps: 0.0333 against the correct solver's 0.00233.
+
+    The shape rows cannot see it either: the interior residual under CFL 0.6 is 0.0098,
+    *better* than the correct solver's 0.0113, for the same reason every shape row here is
+    near-vacuous. This row is the one that says no.
+    """
+    r, c = HA.radius_field()
+    h = _sia_at_cfl(HA.halfar(r, HA.H0, HA.R0), 0.6)
+    fitted = 8 * HA.DT / ((HA.H0 / float(h[c, c])) ** 9.0 - 1.0)
+    err = abs(fitted / HA.t0_analytic() - 1.0)
+    assert err > HA.RATE_TOLERANCE, (
+        "a solver run at CFL 0.6 — three times the factor glacier_sia chose — now scores "
+        "%.5f, inside the %.3f bound. The rate row has gone quiet and is no longer known to "
+        "be able to fail." % (err, HA.RATE_TOLERANCE))
+
+
+def test_the_rate_error_falls_as_the_GRID_is_refined():
     """A single agreeing number could be a coincidence; a converging sequence could not.
 
-    Halving the timestep must move the fitted t0 toward the closed form, not away. This is
-    the difference between "the answer is right" and "the answer is right for a reason".
+    ⚠️ THIS ROW USED TO REFINE THE WRONG THING, and the figure repeated the mistake. It
+    walked `HA.STEPS` and called that a falling timestep. `DT` is a fixed constant and
+    `STEPS` multiplies TOTAL MODEL TIME — panel d's own axis says "steps of 200 model years"
+    — so that sequence varies run LENGTH. It does fall (1.13 / 0.58 / 0.23 / 0.05% at
+    2/4/8/16), but because the denominator `(H0/H_c)^9 - 1` grows with elapsed time: signal
+    growth, i.e. dilution. It is not even convergent — carry it past 16 and it turns round
+    (0.000459 / 0.000451 / 0.000854 / 0.000999 at 16/32/64/128).
+
+    The GRID is the knob that actually moves this error, so the grid is what this asserts.
     """
-    errs = [abs(HA.t0_from_thinning(s) / HA.t0_analytic() - 1.0) for s in HA.STEPS]
+    errs = [HA.rate_error(8, n, cs) for n, cs in HA.GRID_REFINEMENT]
     assert errs[-1] < errs[0], (
-        "the fitted t0 does not converge on the closed form with more steps: %s"
-        % ["%.4f" % e for e in errs])
+        "refining the grid does not improve the recovered t0: %s at %s"
+        % (["%.5f" % e for e in errs], list(HA.GRID_REFINEMENT)))
+    assert errs == sorted(errs, reverse=True), (
+        "the grid-refinement sequence is not monotone: %s" % ["%.5f" % e for e in errs])
+
+
+def test_refining_the_TIMESTEP_is_not_what_moves_this_error():
+    """The control that keeps the corrected caption honest, rather than merely reworded.
+
+    The old caption said the recovery converged "as the timestep falls". Cut the real
+    timestep with total model time held fixed and the error moves the OTHER way, monotonically
+    (0.002327 → 0.002376 over dt/1…dt/16). If that ever stops being true the caption's
+    correction is itself stale, and this row is what says so.
+    """
+    errs = [HA.rate_error_at_refined_timestep(k) for k in HA.TIMESTEP_REFINEMENT]
+    assert errs[-1] > errs[0], (
+        "refining the timestep at fixed total time now DOES reduce the rate error (%s) — the "
+        "caption and the grid row above both need rewriting" % ["%.6f" % e for e in errs])
+
+
+# --------------------------------------------------------------------------- #
+# the independence of `t0_analytic`, scanned where it can actually be lost
+#
+# ⚠️ THE PREVIOUS VERSION OF THIS GUARD WAS THEATRE, AND THE RECORD BELONGS HERE. It sliced
+# `def t0_analytic` to the next `\ndef ` and asserted `"sims" not in` that slice. But
+# `t0_analytic` takes every physical number it uses from module constants defined ABOVE it —
+# A_GLEN, RHO_ICE, G_ACC, N_GLEN, H0, R0 — which the slice never saw. Rewriting those six to
+# read `sims.glacier_sia.__kwdefaults__` left all sixteen rows green; changing the solver's
+# rho from 917 to 800 on top of that (a mutation that normally reddens the rate row at ratio
+# 1.512) ALSO left sixteen green, because the "analytic" side had been wired to follow it.
+# The guard existed to stop exactly that and could not fire.
+#
+# The scan now covers the constants as well as the function, and `test_..._rejects_constants_
+# read_from_the_solver` below is the positive control that proves it can fail.
+
+T0_DEPENDENCIES = ("A_GLEN", "RHO_ICE", "G_ACC", "N_GLEN", "H0", "R0")
+
+
+_ASSIGN = re.compile(r"^([A-Za-z0-9_,\s]+?)=(?!=)")
+
+
+def _module_assignments(src):
+    """`name -> [the module-level lines that assign it]`, tuple targets included."""
+    out = {}
+    for ln in src.splitlines():
+        if not ln or ln[0].isspace() or ln.lstrip().startswith("#"):
+            continue                                   # indented, blank or comment
+        m = _ASSIGN.match(ln)
+        if not m:
+            continue
+        targets = [t.strip() for t in m.group(1).split(",")]
+        if not targets or not all(t.isidentifier() for t in targets):
+            continue                                   # `def f(a=1):`, calls, etc.
+        for t in targets:
+            out.setdefault(t, []).append(ln)
+    return out
+
+
+def _t0_independence_scan(src):
+    """The source `t0_analytic`'s answer actually depends on: the function AND its constants.
+
+    ⚠️ TRANSITIVELY, and the positive control below is why. A first version scanned only the
+    lines assigning the six named constants, and the control — which routes them through an
+    intermediate `_KW = sims.glacier_sia.__kwdefaults__` — walked straight past it. One hop of
+    indirection is the obvious shape of the refactor this guard exists to catch, so the scan
+    follows every module-level name a dependency's right-hand side mentions, to closure.
+
+    Returns the concatenated text. Raises if a dependency has no module-level assignment at
+    all, so renaming a constant fails loudly instead of quietly emptying the guard.
+    """
+    assigns = _module_assignments(src)
+    for name in T0_DEPENDENCIES:
+        assert name in assigns, (
+            "the independence scan cannot find where %s is defined, so it is no longer "
+            "scanning it — a renamed constant must not silently shrink this guard" % name)
+    pending, seen, picked = list(T0_DEPENDENCIES), set(), []
+    while pending:
+        name = pending.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        for ln in assigns[name]:
+            picked.append(ln)
+            for ident in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", ln.split("=", 1)[1]):
+                if ident in assigns and ident not in seen:
+                    pending.append(ident)
+    fn = src[src.index("def t0_analytic"):]
+    picked.append(fn[:fn.index("\ndef ") if "\ndef " in fn else len(fn)])
+    return "\n".join(dict.fromkeys(picked))
 
 
 def test_the_closed_form_time_is_not_read_out_of_the_solver():
@@ -134,13 +288,37 @@ def test_the_closed_form_time_is_not_read_out_of_the_solver():
     That coincidence is the opening for the same independence failure this file's first test
     guards: importing the constant "to keep them in sync" would make the rate check a
     restatement of the solver instead of a check on it.
+
+    The scan covers the six constants the closed form reads as well as the body that reads
+    them, because the body alone is not where this can be lost.
     """
     src = (REF / "halfar_anatomy.py").read_text(encoding="utf-8")
-    fn = src[src.index("def t0_analytic"):]
-    fn = fn[:fn.index("\ndef ")]
-    assert "sims" not in fn, (
-        "t0_analytic reads from the solver module; the rate comparison is no longer "
-        "independent of the code it checks")
+    scanned = _t0_independence_scan(src)
+    assert "sims" not in scanned, (
+        "t0_analytic, or a constant it reads, comes from the solver module; the rate "
+        "comparison is no longer independent of the code it checks:\n%s"
+        % "\n".join(ln for ln in scanned.splitlines() if "sims" in ln))
+
+
+def test_the_independence_guard_rejects_constants_read_from_the_solver():
+    """⚠️ POSITIVE CONTROL. A guard never seen to fail is not known to be a guard.
+
+    This rebuilds the exact refactor the row above exists to stop — the ice constants
+    "kept in sync" by reading `sims.glacier_sia.__kwdefaults__` — in an in-memory copy of
+    the source, and asserts the scan rejects it. The old body-only scan passed this.
+    """
+    src = (REF / "halfar_anatomy.py").read_text(encoding="utf-8")
+    patched = src.replace(
+        "N_GLEN = 3\nRHO_ICE, G_ACC = 917.0, 9.81",
+        "_KW = sims.glacier_sia.__kwdefaults__\n"
+        "N_GLEN = _KW['n']\nRHO_ICE, G_ACC = _KW['rho'], _KW['g']")
+    assert patched != src, (
+        "the control can no longer find the constants it patches, so it is not testing "
+        "anything — re-pin it to however RHO_ICE and G_ACC are now written")
+    scanned = _t0_independence_scan(patched)
+    assert "sims" in scanned, (
+        "the independence scan does not see constants rewritten to read out of the solver; "
+        "it is scanning the wrong text and would pass a benchmark wired to its own subject")
 
 
 def test_profiles_at_different_times_collapse_onto_one_curve():
@@ -153,6 +331,22 @@ def test_profiles_at_different_times_collapse_onto_one_curve():
         worst = max(worst, float(np.abs(prof[m] / hc - HA.halfar(rad[m], 1.0, rn)).max()))
     assert worst < HA.SHAPE_TOLERANCE, (
         "the normalised profiles do not collapse: worst deviation %.4f" % worst)
+
+
+def test_panel_e_can_show_the_bound_it_is_drawn_to_illustrate():
+    """⚠️ THE AXIS AND THE BOUND MUST NOT DRIFT APART, AND THEY HAD.
+
+    Panel e was drawn on (0.97, 1.03) while `RATE_TOLERANCE` was 0.05, so the acceptance band
+    was WIDER THAN THE WHOLE PANEL and could not be drawn inside it — the one panel with the
+    loosest bound was the only one not showing it, while panel c drew and labelled its 3%.
+    With the bound at 1% the band fits, `build` draws it, and this row keeps either number
+    from moving without the other.
+    """
+    lo, hi = HA.RATE_PANEL_YLIM
+    assert lo <= 1.0 - HA.RATE_TOLERANCE and 1.0 + HA.RATE_TOLERANCE <= hi, (
+        "panel e is drawn on %s but its acceptance band is %.3f-%.3f — the band does not fit "
+        "inside the frame that is supposed to display it"
+        % (HA.RATE_PANEL_YLIM, 1.0 - HA.RATE_TOLERANCE, 1.0 + HA.RATE_TOLERANCE))
 
 
 def test_figure_builds():
@@ -191,3 +385,21 @@ def test_the_caption_states_the_rate_result_not_only_the_shape():
     assert "t0" in text, "the caption never names the characteristic time it compares"
     assert "%.3e" % m["t0_analytic"] in text, (
         "the caption does not quote the closed-form t0 it claims to compare against")
+
+
+def test_the_caption_does_not_call_the_step_sweep_a_timestep_refinement():
+    """⚠️ THE PUBLISHED FIGURE CARRIED A FALSE CLAIM, AND THIS IS WHAT STOPS IT COMING BACK.
+
+    The caption read "converging as the timestep falls". `DT` is fixed; more steps is more
+    model time. Refining the actual timestep moves the error the other way, and the step
+    sequence is not convergent past 16 anyway. The phrase is banned rather than merely
+    corrected, because it is the natural thing to write again.
+    """
+    text = " ".join(HA.caption_lines(HA.measurements()))
+    for banned in ("as the timestep falls", "as the time step falls",
+                   "converging as the timestep", "timestep refinement"):
+        assert banned not in text.lower(), (
+            "the caption is back to describing the step-count sweep as a timestep "
+            "refinement (%r); it is a RUN-LENGTH sweep" % banned)
+    assert "RUN LENGTH" in text or "LONGER RUN" in text, (
+        "the caption no longer says what panel e's x axis actually varies")

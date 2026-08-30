@@ -93,10 +93,17 @@ def _paragraph_containing(chapter, needle):
     Locality is the point: a claim is guarded where it is made. Flattened because a markdown
     paragraph wraps mid-sentence, so a pattern written against the sentence would otherwise depend
     on where the line broke.
+
+    ⚠️ BLOCKQUOTE MARKERS COME OFF TOO, and they have to. Every figure caption in this skill is a
+    `>` block, so the continuation of a wrapped sentence begins `> ` — which is a line-break
+    artefact exactly like the newline beside it. Leaving them in is how `03`'s hillslope rows came
+    to be pinned to `under\\n> MFD`: a pattern matching the WRAP, in the same file whose `_flat`
+    sibling exists to say not to. Moving one line break with no number change failed the row.
     """
     text = (CHAPTERS / chapter).read_text(encoding="utf-8")
     blocks = [b for b in re.split(r"\n\s*\n", text) if needle in b]
-    return [re.sub(r"\s+", " ", b).strip() for b in blocks]
+    unquoted = [re.sub(r"(?m)^\s*>\s?", "", b) for b in blocks]
+    return [re.sub(r"\s+", " ", b).strip() for b in unquoted]
 
 
 def _sentences(blob):
@@ -143,7 +150,7 @@ def test_03_hybrid_share(flow_m):
 
 @pytest.mark.parametrize("router,pattern", [
     ("hybrid_wet", r"upslope is \*\*([0-9.]+)%\*\* under the hybrid"),
-    ("mfd_wet", r"under the hybrid and \*\*([0-9.]+)%\*\* under\n> MFD"),
+    ("mfd_wet", r"under the hybrid and \*\*([0-9.]+)%\*\* under MFD"),
     ("d8_wet", r"against only \*\*([0-9.]+)%\*\* under D8"),
 ])
 def test_03_hillslope_wetting(flow_m, router, pattern):
@@ -152,9 +159,20 @@ def test_03_hillslope_wetting(flow_m, router, pattern):
     Bound here rather than left in prose because these three numbers carry the whole corrected
     claim: without them `03` reports the hybrid and D8 as identical and says nothing about why
     anyone would build one.
+
+    ⚠️ MATCHED AGAINST THE FLATTENED PARAGRAPH, AND THE MIDDLE ROW SHOWS WHY. It used to read
+    `under\\n> MFD` — a pattern pinned to a markdown line break inside a blockquote, in the file
+    that ships `_paragraph_containing` and beside `test_audit_drift._flat`, whose docstring says
+    every phrase needle goes through a flattener for exactly this reason. Re-wrapping the caption
+    with no number changed failed the row. All three now go through the helper, which strips the
+    `> ` markers as well as the newlines, so they match the sentence rather than its typesetting.
     """
     m, _ = flow_m
-    check("03-flow-routing.md", pattern, m[router], 100.0)
+    paras = _paragraph_containing("03-flow-routing.md", "receiving *any* water from upslope")
+    assert len(paras) == 1, (
+        "the hillslope-wetting claim is made in %d paragraphs of 03; a number guarded in one "
+        "place and repeated in another is guarded nowhere" % len(paras))
+    check_in(paras[0], "03 (hillslope wetting)", pattern, m[router], 100.0)
 
 
 def test_03_reversal_relief(flow_m):

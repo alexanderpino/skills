@@ -86,11 +86,11 @@ the false claim. Where the reason is simply that nobody drew it, this table says
 | `shallow_water` | `simulate` → `depth` / `discharge` / `speed` | `capability_grid.py:207`, `hero.py` | **nobody drew it here.** The pipe water depth at 6,0 is `erosion_pipe`, not this |
 | `tectonics` | `fault_scarp`, `fault_weakness`, `plate_uplift` | `capability_grid.py:413,424` | **nobody drew it here** |
 | `glacier` | `glacier_carve` → `(bed, H, abrasion)` | `capability_grid.py:368` | **nobody drew it here.** ⚠️ **Panel 31 is `sims_illustrative.glacier_sia` — a different module**: ice flow only, no bed abrasion |
-| `hydrology` | `water_surface`, `water_depth`, `water_over_land` | `hero.py:191` | **nobody drew it here** |
+| `hydrology` | `water_surface`, `water_depth` | `hero.py:191` | **nobody drew it here.** ⚠️ `water_over_land` was listed here and does **not** belong in this column: it returns float **RGB**, `ndim=3` — a compositing stage, not a field |
 | `heightfield_io` | `load_heightfield`, `window` → an imported DEM | `capability_grid.py:460` | real reason: it is I/O, and the gallery's premise is one shared **synthetic** base |
 | `hex_grid` | `laplacian6`, `hessian6`, `gradient6` | `hex_anatomy.png` | real reason: a **different lattice** — it cannot share the square seed-0 base every panel here is built on |
 | `placement` | `disc`/`rect`/`capsule`/`path_mask` coverage masks | inside every `landforms` panel (`landforms.py:12,129,…`) | real reason: a transform/masking layer, visible through its consumers rather than as an operator of its own |
-| `empirical_dem` | `our_terrain`, `metrics` | — | real reason: a measurement/fetch harness (pulls SRTM over the network), not an operator; it is also the one module here with no `tests/test_*.py` of its own |
+| `empirical_dem` | `our_terrain` | — | real reason: a measurement/fetch harness (pulls SRTM over the network), not an operator; it is also the one module here with no `tests/test_*.py` of its own. ⚠️ `metrics` was listed here and does **not** belong in this column: it returns a tuple of three scalars `(hi, θ, hack)` |
 
 The other **13** of the 25 un-imported files are not algorithm modules at all — they are the figure,
 demo and harness scripts themselves: `gallery`, `capability_grid`, `archetypes`, `hero`,
@@ -118,7 +118,7 @@ guarded, because a figure that drifts from its text is worse than no figure.
 | Figure | Regenerate | Guard | Chapter that uses it |
 |---|---|---|---|
 | `hex_anatomy.png` | `python hex_anatomy.py` | `tests/test_anatomy_figures.py` | `26` — `references/26-hexagonal-grids.md`, line 24 |
-| `anisotropy_anatomy.png` | `python anisotropy_anatomy.py` | `tests/test_anatomy_figures.py` | `09` — `references/09-verification.md`, line 472 |
+| `anisotropy_anatomy.png` | `python anisotropy_anatomy.py` | `tests/test_anatomy_figures.py` | `09` — `references/09-verification.md`, line 482 |
 | `flow_anatomy.png` | `python flow_anatomy.py` | `tests/test_flow_anatomy.py` | `03` — `references/03-flow-routing.md`, line 249 |
 | `halfar_anatomy.png` | `python halfar_anatomy.py` | `tests/test_halfar_anatomy.py` | `12` — `references/12-glacial-coastal.md`, line 123 |
 
@@ -179,9 +179,20 @@ genuine one-pass router, `flow.hybrid_accumulation(channel_cells=60)`, which dec
 D8-steepest *per cell from the area accumulated so far*, **not** a `np.where` splice of two finished
 rasters — the splice conjured 58 % of the drainage at the compositing boundary, whereas the real
 router's total sits at **1.018 × D8's** (D8 being exact by construction), against pure MFD's
-**1.109 ×** — measured here as `hybrid.sum()/d8.sum()` and `mfd.sum()/d8.sum()`, the small excess
-being MFD's genuine dispersion off the domain edge; **d** the concentration statistic swept against
-relief, including the real order-reversal at very low relief.
+**1.109 ×** — measured here as `hybrid.sum()/d8.sum()` and `mfd.sum()/d8.sum()`; **d** the
+concentration statistic swept against relief, including the real order-reversal at very low relief.
+
+⚠️ **That excess is not water leaving the domain, and this page used to say it was.** "MFD's genuine
+dispersion off the domain edge" has the sign backwards: nothing leaves — the routers only look at
+in-bounds neighbours, so an edge cell with nothing lower beside it is an outlet and keeps its water —
+and water leaving early would make MFD's total *lower*, not higher. `acc.sum()` is not a water budget:
+each cell's area is counted once in **every** cell downstream of it, so a router that splits its flow
+visits more cells on the way down and each visit is another count. The conserved budget is the outlet
+sum — accumulation totalled over the cells with no strictly-lower neighbour, which must equal the
+domain area. `flow_anatomy.outlet_conservation` returns **1.000000000000** for D8, MFD *and* the
+hybrid; the splice returns **1.039**. `tests/test_flow_anatomy.py` asserts that invariant on three
+DEMs, having previously asserted a bound fitted to this one (`hybrid.sum()/d8.sum() < 1.15`) which
+false-failed a correct hybrid at 1.196 on a plane tilted to a corner.
 
 **It reports TWO statistics, because one cannot see a hybrid.** Re-measured 2026-08-30 via
 `python3 -c "import flow_anatomy; print(flow_anatomy.measurements())"`:
@@ -197,6 +208,12 @@ the hybrid runs MFD and scores as MFD. One statistic answering "is it D8?" yes a
 "is it MFD?" yes is not a contradiction; it is what a hybrid **is**, and it takes both to show it.
 (`diagonal_share` = 0.389 of D8 receivers leave diagonally — reported, not asserted.)
 
+⚠️ **Both readings hold at the 28 m relief drawn here and invert below about 8 m** — the same relief
+as panel d's order-reversal. On the same ramp family at 8 m, D8 needs 22.2 % of cells for half the
+drainage, MFD 23.9 %, and the hybrid **6.1 %**: several times *more* concentrated than either parent,
+not indistinguishable from D8. And D8 wets 98.7 % of cells there, so there is no dry quarter to find.
+`test_the_hillslope_statistic_is_a_claim_about_THIS_relief_only` pins that qualification.
+
 ### `halfar_anatomy.png` — the SIA solver against an exact solution (`12`)
 
 ![halfar anatomy](halfar_anatomy.png)
@@ -208,12 +225,15 @@ an isothermal dome on a flat bed with no mass balance spreads self-similarly as
 `sims_illustrative.glacier_sia` carries an `H^(n+2)` diffusivity and nothing else — which is what
 makes the agreement independent rather than a restatement.
 
-**FIVE panels (a–e), not four.** `COLS, ROWS = 5, 1` at `halfar_anatomy.py:205`. **a** the dome
+**FIVE panels (a–e), not four.** `COLS, ROWS = 5, 1` in `halfar_anatomy.py`. **a** the dome
 before and after, with the analytic shape overlaid; **b** four times normalised by their own centre
 height and radius, collapsing onto one curve; **c** the residual against radius with the 3 %
 acceptance band, its x-axis stopping at the 0.7 R fit-window edge (not the margin); **d** the shape
 exponent recovered by regression; **e** — the panel the other four cannot substitute for — **the
-spreading RATE**.
+spreading RATE**, now drawing its own ±1 % acceptance band and labelling its x axis.
+(An anchor rather than `halfar_anatomy.py:205`, which was the wrong line — it is at 296 today and
+was at 213 when it was written. A `file.py:NN` token is invisible to the path guards, so a line
+cite in this document rots silently; cite the text instead.)
 
 **Panel e exists because shape alone is nearly vacuous here.** The initial condition *is* the Halfar
 profile, so a solver that barely moves the ice scores **better** on the residual than the correct
@@ -237,6 +257,24 @@ two must agree. Re-measured 2026-08-30 via
 Both `H^(n+1)` numbers above were re-derived here rather than copied: patching that one exponent in a
 scratch copy of `sims_illustrative.py` gives `shape_error = 0.4922 %` (down from 1.13 %, i.e. the
 broken solver looks *better* on shape) and `t0_fitted = 4.063e13 s` — **a factor of 4406** against the
-closed form (the figure prints 4405). That is four orders of magnitude off the top of panel e's axis,
-which is why the figure states the number instead of clipping a marker.
-`tests/test_halfar_anatomy.py` bounds the rate at 5 %.
+closed form, which is what the figure prints. That is four orders of magnitude off the top of panel
+e's axis, which is why the figure states the number instead of clipping a marker.
+
+⚠️ **`tests/test_halfar_anatomy.py` bounds the rate at 1 %, and it used to be 5 % — 21× the observed
+error, which made this benchmark decorative.** Five plausible defects in `glacier_sia` passed the
+whole file at 5 %, none of them visible to the shape rows: CFL factor 0.2 → 0.6 (rate error 0.0333),
+the substep floor `1e-6·dt` → `0.05·dt` (0.0494), diffusivity ×1.04 (0.0364), CFL 0.2 → 0.45 (0.0279),
+face averaging `mean` → `max` (0.0193). The correct solver scores **0.00233** at 8 steps, so 0.01 is
+4× the observed error and all five now fail. `RATE_TOLERANCE` in `halfar_anatomy.py` carries that
+derivation, and `test_the_rate_row_rejects_a_solver_run_above_its_own_CFL_limit` is the control that
+proves the tightened bound can still fire.
+
+⚠️ **Panel e's step sweep is a RUN-LENGTH sweep, not a timestep refinement, and the caption used to
+say otherwise.** `DT` is a fixed 200 model years and `STEPS` multiplies total model time, so the
+falling sequence 1.13 / 0.58 / 0.23 / 0.05 % at 2/4/8/16 steps is the *signal* growing — the
+denominator `(H0/H_c)⁹ − 1` grows with elapsed time — not discretisation error shrinking. It is not
+even convergent: past 16 steps it turns round (0.000459 / 0.000451 / 0.000854 / 0.000999 at
+16/32/64/128). Refine the actual timestep at fixed total time and the answer moves *away*,
+monotonically (0.002327 → 0.002376 over dt/1…dt/16). The knob that does converge is the **grid** —
+0.265 % at 61 cells, 0.233 % at 121, 0.138 % at 241 — so that is the row the suite now asserts, with
+`test_refining_the_TIMESTEP_is_not_what_moves_this_error` keeping the correction from going stale.

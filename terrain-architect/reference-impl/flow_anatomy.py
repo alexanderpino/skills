@@ -83,9 +83,22 @@ def routings(dem, cellsize=CELLSIZE, channel_cells=CHANNEL_CELLS):
 
     A hybrid has to be ONE pass: walk the cells in the routing order once, and at each cell
     decide from the area accumulated SO FAR whether to split MFD-style or send everything to the
-    steepest neighbour. That is `flow.hybrid_accumulation`, and it sums to 1.018 -- the small
-    excess is MFD's genuine dispersion off the domain edge, the same effect that puts pure MFD at
-    1.109, not a compositing artefact.
+    steepest neighbour. That is `flow.hybrid_accumulation`, and it sums to 1.018.
+
+    ⚠️ THE EXCESS IS NOT WATER LEAVING THE DOMAIN, and this docstring said it was. "MFD's
+    genuine dispersion off the domain edge" has the sign backwards on its face: water leaving
+    early would make MFD's total LOWER, not higher, and none leaves anyway -- the routers only
+    ever look at in-bounds neighbours, so an edge cell with nothing lower beside it is an outlet
+    and keeps its water. Summed over the outlets, all three routers return 1.000000000000 of the
+    domain area (see `outlet_conservation`).
+
+    The real mechanism is that `acc.sum()` is not a water budget. Each cell's own area is counted
+    once in EVERY cell downstream of it, so the total measures path length as much as water: a
+    router that splits sends fractions of one cell's area down several paths at once, visiting
+    more cells on the way to the edge, and each visit is another count. A dispersive router
+    therefore totals HIGHER -- MFD at 1.109 -- for the same conserved water. The splice's 1.583
+    is a different thing entirely, and the outlet sum is what tells them apart: 1.000 against
+    1.039.
     """
     d8 = flow.d8_accumulation(dem, cellsize)
     mfd = flow.mfd_accumulation(dem, cellsize)
@@ -110,6 +123,45 @@ def half_drainage_cells(acc):
     a = np.sort(np.asarray(acc, float).ravel())[::-1]
     c = np.cumsum(a)
     return int(np.searchsorted(c, 0.5 * c[-1]) + 1)
+
+
+def outlet_cells(dem):
+    """Cells with no strictly-lower 8-neighbour — where a routed field's water ends up.
+
+    The routers only ever consider IN-BOUNDS neighbours, so a cell at the domain edge with
+    nothing lower beside it is an outlet exactly like an interior one. That is why nothing
+    leaves the domain and why the invariant below is exact rather than approximate.
+    """
+    dem = np.asarray(dem, float)
+    n, m = dem.shape
+    out = np.ones((n, m), bool)
+    for di, dj, _dist in flow._NB:
+        shifted = np.full((n, m), np.inf)
+        shifted[max(0, -di):n - max(0, di), max(0, -dj):m - max(0, dj)] = \
+            dem[max(0, di):n - max(0, -di), max(0, dj):m - max(0, -dj)]
+        out &= ~(shifted < dem)
+    return out
+
+
+def outlet_conservation(dem, acc, cellsize=CELLSIZE):
+    """`sum(acc over outlets) / domain area` — exactly 1 for any one-pass routing.
+
+    ⚠️ THE INVARIANT THAT REPLACED A FITTED BOUND. The conservation row used to assert
+    `hybrid.sum()/d8.sum() < 1.15` with the message that a one-pass routing "cannot manufacture
+    that much water". Both halves were wrong. The number was fitted to one fixture: on a 40x40
+    plane tilted to a corner (`dem = -(i+j)`, no pits at all) the genuine hybrid scores 1.1958
+    and the row FIRES -- while manufacturing no water whatsoever. And `acc.sum()` was never a
+    water budget in the first place; it counts each cell once per downstream cell it reaches, so
+    it grows with path length (see `routings`).
+
+    This is the statement that was meant. Every cell contributes its own area, every cell routes
+    what it holds to lower neighbours, so all of it arrives at cells with nowhere lower to go.
+    Exact, DEM-independent, no constant to tune -- and it separates the splice from the router by
+    nine orders of magnitude: 1.039 against 1.0 +/- 1e-12.
+    """
+    acc = np.asarray(acc, float)
+    domain = float(acc.size) * float(cellsize) * float(cellsize)
+    return float(acc[outlet_cells(dem)].sum() / domain)
 
 
 def lorenz(acc, points=220):
@@ -176,6 +228,23 @@ def hillslope_wetted(acc, cellsize=CELLSIZE):
 
     One statistic answering "is it D8?" with yes and another answering "is it MFD?" with yes is
     not a contradiction — it is what a hybrid IS, and it takes two statistics to show.
+
+    ⚠️ BOTH SENTENCES ABOVE ARE ABOUT THE 28 m RAMP, AND BOTH INVERT BELOW ROUGHLY 8 m — which is
+    the same relief where panel d's own order-reversal happens, so this is one phenomenon and not
+    two. Swept over the ramp family (120 cells, `relief_sweep`'s DEMs):
+
+        amp    d8_wet   hyb_wet | half%: d8    mfd     hyb
+         28    75.8%    99.7%   |        2.08   8.44   2.12
+         12    93.7%    99.9%   |        7.34  20.56   4.49
+          8    98.7%    99.9%   |       22.17  23.88   6.10
+          4    99.2%    99.9%   |       27.92  26.70   5.92
+
+    At 4-8 m no quarter of the domain is dry under D8 (98-99% wetted), so the wetting statistic
+    stops separating anything; and the hybrid is 4x MORE concentrated than EITHER parent rather
+    than indistinguishable from D8, because with nothing to steer them D8's stripes never merge
+    into a trunk while the hybrid's MFD hillslope still gathers one. Reporting either number
+    without its relief is how a single-relief measurement misleads — which is the mistake panel d
+    exists to prevent.
     """
     a = np.asarray(acc, float)
     return float((a > 1.001 * cellsize * cellsize).mean())
@@ -357,7 +426,9 @@ def caption_lines(m, cross):
         % (100 * m['hybrid_frac'], 100 * m['d8_frac'], 100 * m['hybrid_wet']),
         'from upslope under the hybrid and %.1f%% under MFD, against only %.1f%% under D8. Answering "is it D8?" yes and "is it MFD?" yes is not a'
         % (100 * m['mfd_wet'], 100 * m['d8_wet']),
-        'contradiction — it is what a hybrid is, and one statistic could not have shown it.',
+        'contradiction — it is what a hybrid is, and one statistic could not have shown it. ⚠️ BOTH NUMBERS ARE FOR THE 28 m RAMP DRAWN HERE and',
+        'both invert below about 8 m: D8 wets 98.7% of cells at 8 m so nothing is dry to find, and the hybrid concentrates 4× HARDER than either',
+        'parent rather than scoring as D8. Same relief as panel d\'s reversal, same cause — quoting either at one relief is the error d prevents.',
         'Panel d is the part prose keeps missing: sweep the relief and the order REVERSES below about %.0f m, because with almost nothing to steer'
         % (cross if cross else 0),
         'them D8\'s parallel paths never merge — the stripe artefact and the concentration statistic are the same phenomenon seen twice.',

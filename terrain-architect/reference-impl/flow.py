@@ -121,8 +121,18 @@ def hybrid_accumulation(dem, cellsize=1.0, p=1.1, channel_cells=60.0, cellarea=N
     `np.where(d8 >= t, d8, mfd)` -- splice two completed accumulations. That is not a drainage
     field. Each raster is the answer to a DIFFERENT routing of all the water, so gluing them
     creates water: measured on one 160x160 DEM the splice carries 1.58x D8's total, more even
-    than MFD's 1.11x, and it breaks downstream monotonicity on 17% of links because the MFD
-    hillslope's water never actually enters the D8 channel it appears to feed.
+    than MFD's 1.11x. The exact statement of the same failure is the outlet invariant -- sum the
+    accumulation over the cells that have no strictly-lower neighbour and it must equal the
+    domain area, because that is where all the routed water ends up. This router returns
+    1.000000000000 of it on every DEM tried; the splice returns 1.039.
+
+    ⚠️ A SECOND SYMPTOM WAS CLAIMED HERE AND IT WAS WRONG. This docstring used to add that the
+    splice "breaks downstream monotonicity on 17% of links". It does -- and so does the genuine
+    hybrid, at 16.7%, and pure MFD at 21.4%, against D8's 0.0%. Measured along single-receiver
+    D8 links, that number is ordinary multiple-flow behaviour: a cell that splits its water
+    sends only part of it to its steepest neighbour, so the neighbour can hold less. The
+    statistic does not distinguish a splice from a router, and the stated cause -- the MFD
+    hillslope's water never entering the D8 channel -- is refuted by the fix not moving it.
 
     A hybrid has to be ONE pass. Every cell is visited high to low exactly once, and the only
     thing that changes is how its accumulated area leaves: split among all lower neighbours by
@@ -132,7 +142,16 @@ def hybrid_accumulation(dem, cellsize=1.0, p=1.1, channel_cells=60.0, cellarea=N
 
     `channel_cells` is the channelisation threshold in CELLS of contributing area. `03` gives the
     rule and not the number -- it is a landscape property, not a constant -- so it is a parameter
-    and the caller states what it used.
+    and the caller states what it used. Two limits are worth knowing because they are what the
+    guard asserts: at `channel_cells <= 1` every cell is channelised from the start and this
+    returns `d8_accumulation` exactly; above the cell count of the domain nothing ever
+    channelises and it returns `mfd_accumulation` exactly.
+
+    ⚠️ NOTHING IN THIS PIPELINE CALLS THIS FUNCTION. `03` recommends the hybrid as "what most
+    good terrain tools do", but the shipped erosion and hydrology paths take `d8_accumulation`
+    or `mfd_accumulation`, and `graph_demo.py`'s `_area_fn` offers only those two. Its consumers
+    are `flow_anatomy.py` (panel c) and the tests. That is stated rather than quietly true, so a
+    reader is not left assuming the recommendation is wired in somewhere they have not looked.
     """
     dem = np.asarray(dem, dtype=np.float64)
     if cellarea is None:
