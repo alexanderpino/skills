@@ -37,6 +37,31 @@ SEVERITIES = ("major", "minor", "none")
 ACTIONS = ("promoted", "reverted")
 BAR_MODES = ("blind", "rubric")
 
+# A target names where the artifact must land: a value, a threshold with its conditions,
+# or the place in the bar to match. These words name the distance instead, and a builder
+# cannot aim at a distance — it guesses, and the next round rejects the guess.
+DEVIATION_WORDS = frozenset("""
+    off wrong incorrect inconsistent mismatched unclear insufficient inadequate suboptimal
+    awkward clumsy poor poorly weak weakly unnatural improper sloppy better worse cleaner
+    nicer smoother tighter too overly excessive excessively
+""".split())
+
+# ...unless the same sentence carries something to aim at. Any of these redeems it.
+TARGET_TELL = re.compile(
+    r"\d"                                            # a value, a range, a threshold
+    r"|[`\"']"                                       # a quoted or backticked literal
+    r"|#[0-9A-Fa-f]{3,8}\b"                          # a hex colour
+    r"|\b\w+\.(?:png|jpg|exr|svg|md|json|ya?ml|csv|txt|cpp|h|hlsl|glsl|py|ts|js|rs)\b"
+    r"|\b(?:matches?|matching|identical|equals?|same as|as in|per the|reference|bar|"
+    r"baseline|target|spec|specified|exactly)\b",
+    re.IGNORECASE)
+
+
+def _names_a_target(text: str) -> bool:
+    """False when the text describes the distance and never its far side."""
+    words = {re.sub(r"[^a-z]", "", w.lower()) for w in text.split()}
+    return not (words & DEVIATION_WORDS) or bool(TARGET_TELL.search(text))
+
 DEFAULT_CONFIG = {
     "stops": {
         "bar_met_n": 2,
@@ -458,8 +483,29 @@ def cmd_log_round(args):
             die("severity is major/minor but no gap named — name the gap or the round didn't happen")
         if args.gap and args.severity != "none" and len(args.gap.strip()) < 12:
             die("the named gap is too thin to build against — say what differs and where")
+        # A gap says where ours stands; the target says where it must land. Without the
+        # second the builder aims by guessing, and the log cannot tell a lane that would
+        # not converge from a target that was never written down.
+        if args.severity != "none" and not args.closed_when:
+            die("a named gap needs --closed-when: what is observably true once it is closed. "
+                "If the bar does not fix that target, the bar has a hole — say so in the "
+                "verdict's NOTES and run `bar-request` rather than logging a gap nobody can close.")
+        if args.closed_when and len(args.closed_when.strip()) < 12:
+            die("--closed-when is too thin to aim at — give the value, the threshold, or the "
+                "place in the bar to match")
         rec["severity"] = args.severity
         rec["gap"] = args.gap or "none"
+        rec["closed_when"] = args.closed_when or ""
+        # Deviation words describe the distance without naming its far side. Warned, not
+        # blocked: the shape is a strong tell but a legitimate target can contain one.
+        if args.closed_when and not _names_a_target(args.closed_when):
+            print(
+                f"warning: --closed-when reads as a deviation, not a target "
+                f"({args.closed_when.strip()[:60]!r}). Name the value, the threshold with "
+                "its conditions, or the place in the bar to match — a builder cannot aim at "
+                "'better' and a later round cannot decide it.",
+                file=sys.stderr,
+            )
         target = target_for(cfg, args.dimension)
         if args.severity == "major" and args.score >= target:
             print(
@@ -710,6 +756,8 @@ def _lane_dim_status(rounds, cfg):
             if bar_recs and bar_recs[-1].get("severity") not in (None, "none")
             else None
         )
+        # The gap travels with its target or the next builder re-derives it.
+        last_target = bar_recs[-1].get("closed_when", "") if last_gap else ""
         gaps_closed = sum(
             1 for i, r in enumerate(bar_recs)
             if r.get("severity") == "none"
@@ -735,6 +783,7 @@ def _lane_dim_status(rounds, cfg):
             "recent_margins": margins,
             "rubric_share": round(rubric_share, 2),
             "open_gap": last_gap,
+            "open_target": last_target,
             "last_score": bar_recs[-1]["score"] if bar_recs else None,
             "gaps_closed": gaps_closed,
             "retired": retired,
@@ -839,6 +888,8 @@ def _extension_evidence(rounds, cfg, per, retired):
             if not per[key]["bar_rounds"] else "last verdict named no gap"
         )
         lines.append(f"  [{lane} / {dim}] {mark} ({t['note']}) — open gap: {gap}")
+        if tgt_txt := per[key].get("open_target"):
+            lines.append(f"      closed when: {tgt_txt}")
 
     parked = sorted(k for k, s in per.items() if s["parked"])
     for lane, dim in parked:
@@ -1109,6 +1160,8 @@ def cmd_park(args):
     )
     if (stats or {}).get("open_gap"):
         print(f"  open gap carried into the report: {stats['open_gap']}")
+        if stats.get("open_target"):
+            print(f"  it would have closed when: {stats['open_target']}")
     print(f"  next wave now funds: {', '.join(funded) or 'nothing — every lane is retired or parked'}")
     if deferred:
         print(f"  waiting behind the WIP limit: {', '.join(deferred)}")
@@ -1769,6 +1822,8 @@ def cmd_status(args):
             print(f"  PARK RECOMMENDED: {s['stall_note']}")
         if s["open_gap"]:
             print(f"  open gap: {s['open_gap']}")
+            if s.get("open_target"):
+                print(f"  closed when: {s['open_target']}")
         print()
 
     champ_all = [r for r in rounds if r["mode"] == "champion"]
@@ -2181,6 +2236,10 @@ def main():
     p.add_argument("--score", type=int, required=True, help="0-10 integer score")
     p.add_argument("--severity", help="major|minor|none — bar modes only")
     p.add_argument("--gap", help="the named gap — required unless severity none")
+    p.add_argument("--closed-when",
+                   help="what is observably true once the gap is closed: a value, a threshold "
+                        "with its conditions, or the place in the bar to match. Required "
+                        "alongside a named gap — a gap with no target is aimed at by guessing")
     p.add_argument("--evidence", required=True, help="path/measurement actually inspected")
     p.add_argument("--action", help="promoted|reverted — champion mode only")
     p.add_argument("--champion-ref", help="git ref or snapshot path of the pre-round champion")

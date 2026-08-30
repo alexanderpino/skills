@@ -276,39 +276,29 @@ Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:
 Score against the rubric, not against your taste. Every finding needs an anchor into the
 candidate — an unfalsifiable objection is not a finding.
 
-`claim` says what is wrong. `check` says what would be TRUE once it is right, and those
-are different sentences. "The body colour is off" is a claim; the check is "the body is
-#C8102E, as in reference.png". A check that only restates the deviation — off, wrong,
-inconsistent, unclear, too slow — leaves the target to be guessed, and the builder will
-guess: told the colour is off, it ships blue, and you reject again having still never
-said red. Name the value, the range, the reference, or the source. If the brief or rubric
-fixes the target, quote it in the check so the builder does not have to go looking.
+Every field of a finding is something you SAW, not something you concluded:
 
-Where you do NOT know the target — the brief never said what colour the car should be —
-that is a defect in the brief, and you say so in `claim` at the honest severity. Do not
-file a finding whose check only you can evaluate. A target you hold and do not write down
-is a guessing game you win every round, and it costs the run its whole cap.
+- `claim` — what is wrong.
+- `observed` — what the artifact does NOW, measured, in the units the check uses:
+  "renders #808080 at the body panel, r1/hero.png centre". The number you read, the string
+  you saw, the timing you took, and where you took it.
+- `check` — what would be TRUE once it is right: "the body is #C8102E, as in
+  reference.png". Name the value, the range, the reference or the source, and quote the
+  brief or rubric where it fixes the target. A check that restates the deviation — off,
+  wrong, inconsistent, unclear, too slow — leaves the builder to guess, and it will guess.
+- `sites` — every other anchor with the same defect, in full. Not a count, not "and
+  others". Empty means you looked and it is local.
 
-`observed` is the near side of that same line: what the artifact does NOW, measured, in
-the terms the check uses. "Renders #808080 at the body panel, r1/hero.png centre" against
-a check of "#C8102E". Give the number you read, the string you saw, the timing you took,
-and where you took it — not "the colour is wrong" again. You have just looked; the builder
-has not, and making it re-derive your measurement is a round spent reproducing work that
-is already done. A finding whose `observed` and `check` are the same distance apart in
-every round is also how you catch yourself rejecting a moving target.
+Where you cannot name the target because nothing in the brief or rubric fixes it, say that
+in `claim` at the honest severity. Never file a check that only you can evaluate.
 
-`sites` is the rest of the pattern. When the same defect occurs in more than one place,
-list every one of them — anchors, not a count, and not "and others". Fixing the anchored
-site and rejecting for the two you saw but did not name is the single most demoralising
-round this loop can produce, and you had the list when you looked. Where the defect is
-genuinely local, leave `sites` empty; an empty list is a claim that you checked.
+Where a command settles the check, put it in `check_cmd`, written so exit 0 means the
+check holds. Only a command you ran here, against this candidate. Never a fix. If it exits
+0 as you file the finding, the check is wrong or there is nothing to file.
 
-Where a command would settle the check — a grep for the condition, a failing test, a
-compile — put it in `check_cmd`, written so exit 0 means the check holds. Only commands
-you actually ran here, against this candidate: a plausible-looking command that does not
-exist costs more than the field saves. Omit it where the check needs judgement or a
-render, and never state a fix in it. If it exits 0 the moment you file the finding, you
-have written the wrong check or found nothing — resolve that before you hand it on.
+Be detailed about what you observed and silent about why you think it matters. No
+rationale for a severity: a finding that needs a paragraph to justify it is a preference
+filed at the wrong severity.
 
 Where the brief names a visual surface, your evidence must say what you saw in the
 render. Check it is current — a render older than the files it renders is stale, and a

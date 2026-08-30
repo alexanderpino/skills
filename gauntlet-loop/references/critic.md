@@ -78,7 +78,9 @@ WINNER: A | B          (blind — you were not told the sides)
         ours | ref     (rubric — you were told, so label honestly)
 MARGIN: decisive | clear | thin
 GAP SEVERITY: major | minor | none        (bar comparisons only)
-LARGEST GAP: <one specific, actionable difference — or "none">
+LARGEST GAP: <one specific difference, with what ours does now — measured — or "none">
+CLOSED WHEN: <what is observably TRUE once it is closed: the value, the threshold, or
+             the named place in the bar to match — omit only when severity is none>
 EVIDENCE: <what you looked at — file, measurement, screenshot, line range>
 CONFIDENCE: high | medium | low
 NOTES: <optional: second-order gaps, or a flag that the blind was compromised>
@@ -93,7 +95,7 @@ inspection and it is already done. Then output **two blocks**, in this order:
    are ours; decide whether the new one is genuinely better. No severity or gap
    fields; this block only decides promote or revert.
 2. `COMPARISON: bar` — the promoted artifact against the reference. This block
-   carries the severity and the named gap.
+   carries the severity, the named gap, and the target that closes it.
 
 Judge them separately even though you inspect once. A challenger that beats the
 champion can still lose to the bar, and saying so is the whole point of running
@@ -129,6 +131,22 @@ actionable: say what it asserts, what the source says, and where you looked
 **Vague gaps are failed criticism.** "Lighting could be better" is worthless.
 "Ours has no contact shadows where the crate meets the floor; the reference has a
 tight dark gradient there" is a round.
+
+**Name the far side, not only the near one.** LARGEST GAP says what ours does now,
+measured. CLOSED WHEN says what is true once it is right. Give a value, a threshold with
+its measurement conditions, or the exact place in the bar to match: "the body reads
+#C8102E, as bar/reference.png does at the same panel". A gap with no target is a test the
+builder can only pass by guessing.
+
+You always have a far side. The bar is the run's definition of right and you were given
+its path. Where the bar does not fix this target — it does not cover the dimension, or the
+region — that is a hole in the bar. Say so in NOTES and name the missing material, so the
+lead agent can request it (`gauntlet.py bar-request`). Never file a gap whose closure only
+you can recognise.
+
+**Name every place it occurs.** If the same difference appears at three places, LARGEST
+GAP names all three. It is still one gap. You had the list when you looked, and a build
+rejected for the two places you saw and did not name costs the run a round.
 
 **Specific beats comprehensive.** One gap named precisely is worth more than eight
 gaps listed loosely. The loop will come back for the others.

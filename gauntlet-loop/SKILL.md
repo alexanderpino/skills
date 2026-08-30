@@ -180,7 +180,8 @@ python3 scripts/gauntlet.py init --lanes a,b --dimensions visual,perf \
     --budget-tokens 1500000
 python3 scripts/gauntlet.py log-round --wave 2 --lane a --dimension visual --round 3 \
     --mode blind --winner other --margin clear --score 7 --severity major \
-    --gap "..." --evidence shots/w2r3.png --tokens 74000 --critic-model sonnet
+    --gap "..." --closed-when "..." --evidence shots/w2r3.png --tokens 74000 \
+    --critic-model sonnet
 python3 scripts/gauntlet.py gate     # mechanical checks; skips those whose inputs are unchanged
 python3 scripts/gauntlet.py status   # state, next-wave plan, park list, fired stops
 python3 scripts/gauntlet.py bar-request               # what this run still needs before wave 1: comparison material, and direction where the artifact has layers

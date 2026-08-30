@@ -55,8 +55,11 @@ or the bar is too soft to discriminate.
 
 **Repair.** Force a winner with no tie option. The severity field is the
 counter-pressure: `none` is a strong, evidence-backed claim, not a shrug — and
-`log-round` rejects a major/minor verdict with no named gap outright. If gaps
-stay vague after that, the bar is the problem, not the critic.
+`log-round` rejects a major/minor verdict with no named gap outright, and rejects a
+named gap with no `--closed-when` — the target it must land on. A gap without a target
+is the vaguest verdict that still looks specific: it says what is wrong and leaves the
+builder to guess what right is, so the next round rejects the guess. If gaps stay vague
+after that, the bar is the problem, not the critic.
 
 The mechanical tripwire: log `--diff-lines` each round, and `status` flags any
 lane whose severity eases while the diffs stay near-empty. An artifact that
