@@ -321,7 +321,20 @@ Two consequences worth stating because they surprise people:
   tiling contract of its worst upstream, not its own.
 - **It is a fan-in, so it is also the natural place for the partition assertion.** Since every
   coverage mask passes through one node, assert `Σ masks ≤ 1` there once, rather than hoping each
-  consumer checks.
+  consumer checks. **`≤`, not `=`** — these are the raw coverage masks, independent `[0, 1]`
+  fields, and the shortfall is the base material's share. `08`'s "splat weights must sum to 1"
+  is a different object one stage later, after compositing has filled the remainder; the two
+  are not in conflict.
+
+  ⚠️ **And the assertion has to live here because downstream it is undetectable.** If the
+  consumer composites by laying each material over the last — `out·(1 − m) + colour·m`, the
+  shipped `render.splat_blend` — the effective weights sum to exactly 1 no matter what the masks
+  do, the base absorbing `Π(1 − mᵢ)`. Measured, masks summing to **1.8** still give effective
+  weights summing to **1.0000000000**, and at **3.0** the output is still inside the convex hull
+  of its inputs. Two simulations claiming the same ground therefore produce no artefact at all;
+  the node insertion order quietly decides which one wins, which is the same
+  order-dependence rule (1) above exists to forbid.
+  (`reference-impl/tests/test_mask_partition.py`)
 
 **Tier.** **F** — an editor-ergonomics pattern, not a result. The correctness rules are not
 discretionary though: they are the purity contract at the top of this chapter applied to a node that

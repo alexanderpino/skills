@@ -557,9 +557,25 @@ and terrain wants more.
   index and blend manually, or you'll interpolate between index 3 and index 7 and get material
   5, which is a spectacular bug.
 
-**Normalisation.** Splat weights must sum to 1. Either enforce it in the graph (`06`) or
-normalise in the shader. Doing neither means your material blend brightness varies with the
-mask sum, which reads as inexplicable blotchy lighting.
+**Normalisation.** Splat weights must sum to 1 — **weights**, which is not the same object as
+the coverage masks `06` produces, and conflating the two is why `14` appears to contradict this
+line. A shader computing `Σ wᵢ · materialᵢ` has no base layer to absorb a shortfall, so `Σ = 1`
+is a requirement on the data. Raw coverage masks are independent fields in `[0, 1]` with nothing
+making them sum to anything, so on *those* the assertion is `Σ ≤ 1` (`14`) — a check for two
+simulations claiming the same ground, with the remainder belonging to the base material. Either
+enforce the weight normalisation in the graph (`06`) or normalise in the shader. Doing neither
+means your material blend brightness varies with the mask sum, which reads as inexplicable
+blotchy lighting.
+
+⚠️ **An ordered over-composite is exempt, and that exemption is a trap.** If you composite by
+laying each material over the last (`out·(1 − m) + colour·m`, which is what
+`reference-impl/render.py`'s `splat_blend` does) the effective weights sum to exactly 1 whatever
+the masks do — the base absorbs `Π(1 − mᵢ)`. Measured: masks summing to **1.8** still give
+effective weights summing to **1.0000000000**; at masks summing to **3.0** the output is still
+inside the convex hull of its input colours. So over-subscription produces no artefact, no
+dimming and no out-of-range value — the compositing *order* silently arbitrates a conflict
+nobody chose to have. That is precisely why `14` puts the `Σ ≤ 1` assertion upstream: downstream
+there is nothing left to detect. (`reference-impl/tests/test_mask_partition.py`)
 
 **Resolution.** Splatmaps are usually 1/2 or 1/4 the heightmap resolution. They're
 pixel-centred while the heightmap is vertex-centred (see above) — mind the offset.
@@ -814,7 +830,8 @@ by a slope selector (`06`), or blend it in by slope.
 randomised offsets and blends *without* the ghosting naive random tiling causes. Cheaper folklore: two
 octaves of the same tile at different scales, multiplied.
 
-**What the graph owes the shader.** Partitioned splat weights (`06` — must sum to 1), the per-material
+**What the graph owes the shader.** Partitioned splat *weights* (`06` — must sum to 1; the raw
+coverage masks upstream of them are asserted `Σ ≤ 1` instead, see Normalisation above), the per-material
 assignment, and the macro maps baked from **R32F** (precision above). The shader does the blend, but
 the colour map, splatmap, and material blend are three views of *one* material decision — composite
 them from the **same `06` masks** or they drift apart as the camera closes in.
