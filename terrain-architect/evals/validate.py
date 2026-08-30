@@ -18,18 +18,44 @@ def load_json(path):
         return json.load(handle)
 
 
+# Every capability eval must carry exactly this shape. Named here rather than
+# implied by the checks below, so a malformed entry is reported as a schema
+# violation and not as a KeyError from whichever check happened to touch it
+# first.
+REQUIRED_KEYS = {"id", "axis", "prompt", "expected_output", "expectations"}
+
+
 def validate_capability_evals():
     payload = load_json(ROOT / "evals.json")
     assert payload["skill_name"] == "terrain-architect"
     evals = payload["evals"]
     ids = [item["id"] for item in evals]
     assert len(ids) == len(set(ids)), "Capability eval IDs must be unique"
-    assert REQUIRED_AXES <= {item["axis"] for item in evals}
+
+    # ⚠️ THE SHAPE IS CHECKED FIRST, AND IT DID NOT USED TO BE. Two evals were
+    # once appended with `assertions` instead of `expectations` and no `axis`
+    # at all. The axis check below then died with a bare `KeyError: 'axis'`
+    # inside a set comprehension -- a traceback that names the line but not the
+    # entry, so the failure read as a bug in the validator rather than as two
+    # malformed records. It took the whole eval suite red until someone looked.
+    malformed = [
+        "eval %r is missing %s" % (item.get("id", "<no id>"),
+                                   ", ".join(sorted(REQUIRED_KEYS - set(item))))
+        for item in evals if not REQUIRED_KEYS <= set(item)
+    ]
+    assert not malformed, "\n".join(malformed)
+
+    missing_axes = REQUIRED_AXES - {item["axis"] for item in evals}
+    assert not missing_axes, (
+        "no eval covers these required axes: %s" % ", ".join(sorted(missing_axes)))
     for item in evals:
-        assert item["prompt"].strip()
-        assert item["expected_output"].strip()
-        assert len(item["expectations"]) >= 2
-        assert all(expectation.strip() for expectation in item["expectations"])
+        assert item["prompt"].strip(), "eval %r has an empty prompt" % item["id"]
+        assert item["expected_output"].strip(), (
+            "eval %r has an empty expected_output" % item["id"])
+        assert len(item["expectations"]) >= 2, (
+            "eval %r needs at least two expectations" % item["id"])
+        assert all(e.strip() for e in item["expectations"]), (
+            "eval %r has a blank expectation" % item["id"])
     return {item["id"]: item for item in evals}
 
 

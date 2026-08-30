@@ -469,10 +469,11 @@
     },
     {
       "id": 36,
+      "axis": "design",
       "prompt": "I'm generating a barrier-island coast for a game world. The engine team wants offshore sandbars and rip channels they can actually render surf against, and they say their water shader needs current data at the beach. What should the generator produce, and what's the physics?",
       "expected_output": "Prescribes the surf-zone morphodynamic loop as the one bounded exception to 'author the shoreface, do not erode the seabed': waves -> currents (radiation stress) -> energetics sediment flux -> Exner bed update. Breakpoint bar from convergence of onshore skewness-driven transport and offshore undertow, crest near depth H_b/gamma. Beach state from Omega = H_b/(w_s*T) picks reflective / intermediate bar-rip / dissipative. Rips from setup gradients scouring gaps, quasi-rhythmic at O(100 m). Tidal inlets sized by O'Brien prism-area with ebb/flood deltas. Critically: the nearshore circulation (longshore current, rip and inlet jets) must be exported in flowVelocity across the surf band, not stopped at the waterline.",
       "files": [],
-      "assertions": [
+      "expectations": [
         "Frames the surf zone as a bounded exception to the Dean equilibrium-profile / do-not-erode-the-seabed doctrine, relaxing to that ramp in the far field",
         "Gives the loop: radiation stress -> nearshore currents -> sediment flux -> Exner bed update",
         "Places the breaker bar crest near depth H_b/gamma with gamma about 0.78",
@@ -487,10 +488,11 @@
     },
     {
       "id": 37,
+      "axis": "design",
       "prompt": "Our world has a glacial lake, a peat-bog river, and a chalk stream, and in-engine they all render as the same generic blue. The engine team says give us the right per-body constants. What should the generator export and how do we derive the values?",
       "expected_output": "Exports liquidBody[i] per the 08/27 contract: causal state (chl, cdom_a440, spm, lithology class, depth) plus derived optics (a, b_b, c, K_d per channel, scatter colour) and QA fields (Secchi, Jerlov/Forel-Ule). Derives each body from its causes: glacial = fine rock flour, flat-spectrum backscatter, low CDOM -> milky turquoise (and rejects the Rayleigh-scattering folklore); peat river = high CDOM absorption with no scattering -> transparent-but-dark amber/near-black, not turbid; chalk stream = aquifer-filtered, everything low -> gin-clear. Uses CDOM-darkens vs sediment-brightens as opposite controls, Z_SD = 1/min Kd as the authoring handle, and distinguishes beam attenuation c from diffuse K_d.",
       "files": [],
-      "assertions": [
+      "expectations": [
         "Exports a per-body liquidBody record (causal state + derived optics + QA fields), not one global water colour",
         "Derives glacial turquoise from fine flat-spectrum mineral backscatter plus water's red absorption, explicitly rejecting the Rayleigh/Tyndall explanation",
         "Models the peat river via CDOM: strong blue absorption, zero scattering, transparent-but-dark - and does not reach for a turbidity slider",
