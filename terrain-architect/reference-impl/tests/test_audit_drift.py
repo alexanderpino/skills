@@ -22,9 +22,12 @@ import importlib
 import re
 from pathlib import Path
 
+import pytest
+
 REF = Path(__file__).resolve().parents[1]                 # reference-impl/
 PARITY_RAW = (REF / "NODE-PARITY-AUDIT.md").read_text(encoding="utf-8")
 VALIDATION_RAW = (REF / "VALIDATION.md").read_text(encoding="utf-8")
+SIMAUDIT_RAW = (REF / "SIMULATION-AUDIT.md").read_text(encoding="utf-8")
 
 
 def _flat(text):
@@ -210,3 +213,88 @@ def test_the_eval_readme_axis_table_matches_evals_json():
             problems.append("axis %r: ids %s are in the README row but not on that axis"
                             % (axis, extra))
     assert not problems, "evals/README.md's axis table is stale:\n  " + "\n  ".join(problems)
+
+
+# --------------------------------------------------------------------------- #
+# SIMULATION-AUDIT.md — the "Ours" column, which is where this document lied twice
+#
+# ⚠️ THIS FILE GUARDED THE WRONG DOCUMENT FOR MONTHS. `CLAIMABLE` above covers only
+# NODE-PARITY-AUDIT.md, so SIMULATION-AUDIT.md's scorecard was unguarded, and two of
+# its rows understated what ships:
+#
+#   Lava flow  — said "ejecta CA only ... **gap** ... upgrade: thermo-rheological CA",
+#                while sims_illustrative.lava_flow IS a thermo-rheological CA with a
+#                temperature-dependent Bingham yield stress. It is tested, dimensionally
+#                audited, cited to Miyamoto & Sasaki 1997 and drawn as gallery panel 30.
+#                The "ejecta CA" it credited us with does not exist at all.
+#   Karst caves — said "— (prose only)", while landforms.karst_sinkholes ships dolines
+#                with a lognormal size distribution and the sink_mask that 03 must not
+#                fill, tested in test_landforms.py.
+#
+# Both are the SAME failure and it is the expensive one: a reader planning work off this
+# scorecard sets out to build something that already exists.
+#
+# ⚠️ WHY THIS CHECKS THE "OURS" CELL AND NOT THE VERDICT. A **gap** verdict can be
+# perfectly honest while something adjacent ships — karst is exactly that case: the
+# surface expression exists, the 3-D conduit network genuinely does not, and forcing that
+# row to stop saying "gap" would replace one false statement with another. What can never
+# be honest is an "Ours" cell claiming we have nothing when a tested callable is sitting
+# in the tree. So the verdict is left to a human and the inventory is made mechanical.
+
+SIMAUDIT_OURS = {
+    # row subject          -> (module, attribute) that contradicts an empty "Ours" cell
+    "Lava flow": ("sims_illustrative", "lava_flow"),
+    "Karst caves": ("landforms", "karst_sinkholes"),
+}
+
+# Cells that assert we ship nothing. Matched against the "Ours" cell only.
+_CLAIMS_NOTHING = re.compile(r"^\s*(—|-|none|n/?a)?\s*(\(?\s*prose[- ]only\s*\)?)?\s*$", re.I)
+
+
+def _simaudit_rows():
+    """(subject, ours_cell) for every scorecard row, from the shipped markdown table."""
+    rows = []
+    for line in SIMAUDIT_RAW.splitlines():
+        if not line.startswith("|") or set(line) <= set("|- "):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 2:
+            continue
+        subject = cells[0].strip("* ")
+        rows.append((subject, cells[1]))
+    return rows
+
+
+@pytest.mark.parametrize("subject", sorted(SIMAUDIT_OURS))
+def test_simulation_audit_does_not_claim_we_ship_nothing_when_we_do(subject):
+    """An "Ours" cell that says nothing ships must be true of the tree it describes.
+
+    This is the row that would have caught the lava scorecard on the day `lava_flow`
+    landed, and the karst row on the day `karst_sinkholes` did — instead of a reader
+    catching both, months apart.
+    """
+    module_name, attr = SIMAUDIT_OURS[subject]
+    if not _exists(module_name, attr):
+        pytest.skip("%s.%s does not exist, so the row's claim is honest" % (module_name, attr))
+    matching = [ours for subj, ours in _simaudit_rows() if subj == subject]
+    assert matching, (
+        "SIMULATION-AUDIT.md no longer has a row for %r — either the scorecard changed or "
+        "this mapping is stale. Both need a human." % subject)
+    for ours in matching:
+        assert not _CLAIMS_NOTHING.match(ours), (
+            "SIMULATION-AUDIT.md's %r row says we ship %r, but %s.%s exists and is callable. "
+            "A reader planning work off this scorecard would rebuild it. Describe what ships; "
+            "leave the Verdict cell to a human, since a gap can be honest while something "
+            "adjacent exists." % (subject, ours, module_name, attr))
+
+
+def test_the_simulation_audit_mapping_is_not_stale():
+    """Every mapped subject must still name a row in the scorecard.
+
+    Without this the dict quietly rots into a set of no-ops the moment the table is
+    reorganised — the same way `CLAIMABLE`'s "spectral band" needle sat dead for months.
+    """
+    subjects = {subj for subj, _ours in _simaudit_rows()}
+    missing = sorted(set(SIMAUDIT_OURS) - subjects)
+    assert not missing, (
+        "these SIMAUDIT_OURS keys name no row in SIMULATION-AUDIT.md: %s" % missing)

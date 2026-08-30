@@ -20,7 +20,7 @@ validity (the equation is the right one).
 
 A closed-form oracle derived from the same equation the code implements proves the code
 **solves it correctly** — not that the equation is **right**. A wrong coefficient mirrored into
-both the code and its analytic check passes green. So "436 tests pass" is self-consistency.
+both the code and its analytic check passes green. So "489 tests pass" is self-consistency.
 Validity needs evidence from an **independent source**.
 
 ⚠️ **That figure said 117 for a long time, against a suite that had already grown past 400**, and the staleness undercut the
