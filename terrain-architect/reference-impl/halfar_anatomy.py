@@ -105,6 +105,76 @@ def volume_error(steps=8):
     return float(abs(h.sum() - h_init.sum()) / h_init.sum())
 
 
+# --------------------------------------------------------------------------- #
+# The RATE, which is the half of the benchmark the shape cannot see.
+#
+# ⚠️ WHY THIS EXISTS. Everything above measures SHAPE, and shape alone is a nearly
+# vacuous check here: the initial condition IS the Halfar profile, so a solver that
+# barely moves the ice scores BETTER on the residual than the correct one. Replacing
+# the `H^(n+2)` diffusivity with `H^(n+1)` — a one-character edit — leaves every shape
+# row green and lowers the residual from 0.0113 to 0.0049. A guard that a broken solver
+# passes more comfortably than a correct one is not a guard.
+#
+# What the shape cannot see is HOW FAST the dome spreads, and Halfar fixes that too.
+# The characteristic time follows from the ice constants alone:
+#
+#     Gamma = 2 A (rho g)^n / (n + 2)
+#     t0    = (1/18)/Gamma * (7/4)^3 * R0^4 / H0^7
+#
+# and it enters the solution as H_c(t) = H0 (t/t0)^(-1/9), R(t) = R0 (t/t0)^(1/18),
+# with the run starting at t = t0. So the SAME t0 can be recovered from the numerical
+# thinning, and the two must agree. That comparison is sensitive to the diffusivity by
+# construction — `H^(n+1)` puts the fitted t0 at 4.06e13 against an analytic 9.22e9,
+# a factor of 4405.
+#
+# Note `n + 2` appears in Gamma. That is NOT the solver's exponent leaking in: it is the
+# published Test B constant (Bueler et al. 2005), written from the paper like the 4/3
+# and 3/7 above, and the test below checks it is not read out of sims_illustrative.
+
+N_GLEN = 3
+RHO_ICE, G_ACC = 917.0, 9.81
+
+
+def t0_analytic(A=A_GLEN, rho=RHO_ICE, g=G_ACC, n=N_GLEN, h0=H0, r0=R0):
+    """Halfar's characteristic time, from the ice constants and the dome alone.
+
+    No part of the numerical run enters this. It is the closed form.
+    """
+    gamma = 2.0 * A * (rho * g) ** n / (n + 2.0)
+    return (1.0 / 18.0) / gamma * (7.0 / 4.0) ** 3 * r0 ** 4 / h0 ** 7
+
+
+def t0_from_thinning(steps=8):
+    """Recover t0 from how much the solver actually thinned the dome.
+
+    `H_c(t0 + dt)/H0 = ((t0 + dt)/t0)^(-1/9)` inverts to `t0 = dt / ((H0/H_c)^9 - 1)`.
+    """
+    r, c, _h0, h = evolve(steps)
+    _rad, _prof, hc, _rn = profile(h, r, c)
+    dt_total = steps * DT
+    return float(dt_total / ((H0 / hc) ** 9.0 - 1.0))
+
+
+# ⚠️ THE MARGIN CANNOT DO THIS JOB, and the reason is worth keeping. `R = R0 (t/t0)^(1/18)`
+# inverts just as cleanly, and it looks like a free second opinion. It is not: `profile`
+# finds the margin by thresholding on a 12 km grid, so R is quantised to one cell, one cell
+# is 2.4% of R0, and the eighteenth power turns that into **53% in t0**. Measured, the margin
+# route returns 6.5e9–8.6e9 across the four step counts, non-monotonically — an instrument
+# whose noise dwarfs the effect it would police. It was written, measured, and removed.
+#
+# Nothing is lost by dropping it. Volume is conserved EXACTLY (asserted above), and exact
+# volume conservation plus the right thinning rate already fixes the spreading rate — the
+# ice has nowhere else to go.
+
+
+def rate_error(steps=8):
+    """Relative disagreement between the fitted and the closed-form t0."""
+    return float(abs(t0_from_thinning(steps) / t0_analytic() - 1.0))
+
+
+RATE_TOLERANCE = 0.05      # the fitted t0 must land within 5% of the closed form
+
+
 def measurements():
     """Everything the figure prints, in one call the test can re-run."""
     r, c, h_init, h = evolve(8)
@@ -117,6 +187,9 @@ def measurements():
         'volume_error': volume_error(8),
         'exponent': fitted_exponent(8),
         'exponent_analytic': P_SHAPE,
+        't0_analytic': t0_analytic(),
+        't0_fitted': t0_from_thinning(8),
+        'rate_error': rate_error(8),
         'years': 8 * DT / 3.15e7,
     }
 
@@ -129,7 +202,7 @@ except ImportError:                                          # pragma: no cover
     Image = None
 
 PANEL_W, PANEL_H = 300, 330
-COLS, ROWS = 4, 1
+COLS, ROWS = 5, 1
 PAD, TOP = 26, 92
 
 BG = (250, 249, 246)
@@ -181,11 +254,7 @@ def build():
         raise SystemExit('halfar_anatomy needs Pillow:  pip install pillow')
     m = measurements()
     W = PAD * 2 + COLS * PANEL_W
-    # 8 caption lines at 17 px from `cap`, plus a bottom margin. The first
-    # canvas was 30 px short and clipped the last line — the one carrying the
-    # volume result.
-    H = TOP + PAD + PANEL_H + 196
-    img = Image.new('RGB', (W, H), BG)
+    img = Image.new('RGB', (W, canvas_height(m)), BG)
     d = ImageDraw.Draw(img)
     f_t, f_h, f_s, f_b = _font(26, True), _font(15, True), _font(13), _font(13, True)
 
@@ -241,9 +310,17 @@ def build():
     cx.hline(SHAPE_TOLERANCE, ACCENT, 2)
     d.text((x0 + 44, cx.py(SHAPE_TOLERANCE) + 3), 'suite bound, 3%', ACCENT, font=f_s)
     cx.line(err_rad / rn, err_curve, BLU, 2)
-    d.text((x0 + 40, TOP + side + 8), 'r/R     |numeric − exact|', MUTED, font=f_s)
-    d.text((x0 + 40, TOP + side + 26), 'peak %.2f%%, at the margin' % (100 * err),
-           BLU, font=f_b)
+    # ⚠️ The x axis was unticked and the label read 'at the margin'. It is NOT the margin:
+    # `shape_residual` masks to r < 0.7R, so the curve stops at the edge of the FIT WINDOW,
+    # and the residual beyond it — where the SIA degenerates and the exact profile has an
+    # infinite slope — is not drawn at all. An unticked axis let that read as the full radius.
+    for t in (0.0, 0.35, 0.7):
+        d.line([cx.px(t), TOP + side, cx.px(t), TOP + side + 4], fill=MUTED)
+        d.text((cx.px(t), TOP + side + 6), '%.2f' % t, MUTED, font=f_s, anchor='ma')
+    d.line([cx.px(0.7), TOP, cx.px(0.7), TOP + side], fill=ACCENT, width=1)
+    d.text((x0 + 40, TOP + side + 24), 'r/R     |numeric − exact|', MUTED, font=f_s)
+    d.text((x0 + 40, TOP + side + 42),
+           'peak %.2f%% at the 0.7R window edge' % (100 * err), BLU, font=f_b)
 
     # --- d: the exponent, recovered -----------------------------------------
     x0 = PAD + 3 * PANEL_W
@@ -263,8 +340,48 @@ def build():
     d.text((x0 + 40, TOP + side + 42),
            'fitted %.4f vs 3/7 = %.4f' % (m['exponent'], P_SHAPE), RED, font=f_b)
 
-    cap = TOP + PANEL_H + 34
-    for i, line in enumerate([
+    # --- e: the rate, which the four panels to the left cannot see -----------
+    x0 = PAD + 4 * PANEL_W
+    d.text((x0, TOP - 26), 'e.  the rate, unfakeable', GRN, font=f_h)
+    ex = _Ax(d, (x0 + 44, TOP, x0 + side + 44, TOP + side), (0.0, 5.0), (0.97, 1.03))
+    for t in (0.98, 0.99, 1.00, 1.01, 1.02):
+        ex.hline(t, GRID if abs(t - 1.0) > 1e-9 else GRN, 1 if abs(t - 1.0) > 1e-9 else 2)
+        d.text((x0 + 40, ex.py(t)), '%.2f' % t, MUTED, font=f_s, anchor='rm')
+    d.text((x0 + 48, ex.py(1.0) + 4), 'closed form', GRN, font=f_b)
+    t0a = m['t0_analytic']
+    for i, st in enumerate(STEPS):
+        ratio = t0_from_thinning(st) / t0a
+        px_, py_ = ex.px(i + 1.0), ex.py(ratio)
+        d.ellipse([px_ - 4, py_ - 4, px_ + 4, py_ + 4], fill=BLU)
+        d.text((px_, TOP + side + 6), '%d' % st, MUTED, font=f_s, anchor='ma')
+    d.text((x0 + 44, TOP + side + 24), 't0 recovered / t0 closed form', MUTED, font=f_s)
+    # The broken solver's point is 4405 — four orders of magnitude off the top of this axis.
+    # Stating the number is the only honest way to draw it; a clipped marker would imply it
+    # sits just above the frame.
+    d.text((x0 + 44, TOP + side + 42), 'H^(n+1) lands at 4405 ↑', RED, font=f_b)
+
+    cap = CAP_TOP
+    for i, line in enumerate(caption_lines(m)):
+        d.text((PAD, cap + i * CAP_LEADING), line, INK if i == 0 else MUTED, font=f_s)
+    return img
+
+
+CAP_TOP = TOP + PANEL_H + 34
+CAP_LEADING = 17
+CAP_MARGIN = 20
+
+
+def caption_lines(m):
+    """The caption, as a list, so the CANVAS can be sized from it.
+
+    ⚠️ This is a list rather than a literal inside `build` for one reason: the height used to
+    be the hand-tuned constant `TOP + PAD + PANEL_H + 196`, and it was 30 px short — it silently
+    clipped the last line, the one carrying the volume result. A number that has to be re-tuned
+    by hand every time a sentence is added will eventually not be. `build` now measures this
+    list instead, and `tests/test_halfar_anatomy.py` asserts the last line lands inside the
+    canvas, so the failure mode is a red row rather than a missing sentence.
+    """
+    return [
         'THIS IS THE ONLY FIGURE IN THIS SKILL THAT CHECKS A SOLVER AGAINST AN EXACT SOLUTION, and it is the top rung of VALIDATION.md\'s own',
         'evidence ladder — the rung that separates "the code solves its equation correctly" from "the equation is right". Halfar (1983), as',
         'standardised by Bueler et al. (2005) Test B: an isothermal dome on a flat bed with no mass balance spreads self-similarly as',
@@ -277,11 +394,23 @@ def build():
         'and ice volume is conserved EXACTLY — the relative change is 0.0, not merely small. Panel d fits the shape exponent out of the'
         if m['volume_error'] == 0.0 else
         'and ice volume is conserved to %.1e relative. Panel d fits the shape exponent out of the' % m['volume_error'],
-        'numerical profile and gets %.4f against the analytic %.4f. Drawn from sims_illustrative.py, guarded by tests/test_halfar_anatomy.py.'
+        'numerical profile and gets %.4f against the analytic %.4f.'
         % (m['exponent'], P_SHAPE),
-    ]):
-        d.text((PAD, cap + i * 17), line, INK if i == 0 else MUTED, font=f_s)
-    return img
+        '',
+        '⚠️ SHAPE IS NOT ENOUGH, and saying so is part of the figure. The initial condition IS the Halfar profile, so a solver that barely moves',
+        'the ice still matches it — swapping the H^(n+2) diffusivity for H^(n+1) leaves every shape row above green and *lowers* the residual to',
+        '0.49%. What a near-no-op cannot fake is the RATE — panel e. Halfar fixes it with no free parameters: t0 = (1/18)/Γ·(7/4)³·R0⁴/H0⁷ with',
+        'Γ = 2A(ρg)ⁿ/(n+2), and H_c = H0(t/t0)^(−1/9), so t0 can be read back out of the thinning. Closed form %.3e s against %.3e s'
+        % (m['t0_analytic'], m['t0_fitted']),
+        'recovered from the run — %.2f%% apart, converging as the timestep falls. Under H^(n+1) that recovery returns 4.06e13 s, a factor of 4405.'
+        % (100 * m['rate_error']),
+        'Drawn from sims_illustrative.py, guarded by tests/test_halfar_anatomy.py.',
+    ]
+
+
+def canvas_height(m):
+    """Tall enough for the caption it actually has, measured rather than remembered."""
+    return CAP_TOP + len(caption_lines(m)) * CAP_LEADING + CAP_MARGIN
 
 
 if __name__ == '__main__':

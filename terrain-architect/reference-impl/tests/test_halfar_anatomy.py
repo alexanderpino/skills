@@ -83,6 +83,66 @@ def test_the_fitted_exponent_recovers_three_sevenths(steps):
         % (steps, p, HA.P_SHAPE, 100 * rel))
 
 
+def test_the_spreading_RATE_matches_the_closed_form_not_just_the_shape():
+    """⚠️ THE ROW THAT MAKES THE OTHER ROWS MEAN SOMETHING. Read this before touching them.
+
+    Every shape row above is close to vacuous on its own, and the demonstration is short:
+    change `H ** (n + 2)` to `H ** (n + 1)` in `glacier_sia` — one character — and all of
+    them stay green. Worse, the interior residual *improves*, 0.0113 to 0.0049, and the
+    fitted exponent stays inside its 6% band. The reason is structural: the initial condition
+    IS the Halfar profile, so a solver that hardly moves the ice trivially still looks like
+    Halfar. Shape agreement cannot distinguish "solves the equation" from "does almost
+    nothing", and four of the rows in this file are shape rows.
+
+    What a near-no-op cannot fake is the RATE. Halfar fixes it with no free parameters:
+    `t0 = (1/18)/Gamma · (7/4)^3 · R0^4 / H0^7` with `Gamma = 2A(rho g)^n/(n+2)`, and
+    `H_c(t) = H0 (t/t0)^(-1/9)`, so t0 can be read back out of the numerical thinning and
+    the two must be the same number.
+
+    Measured: analytic 9.221e9 s against a fitted 9.243e9 s, 0.23% apart, and the fit
+    converges toward the closed form as the step count rises (9.326e9 / 9.275e9 / 9.243e9 /
+    9.226e9 at 2/4/8/16 steps) — which is what discretisation error is supposed to do.
+    Under `H^(n+1)` the fitted t0 is 4.06e13, a factor of **4405** out. That is the
+    discriminator this file was missing.
+    """
+    analytic = HA.t0_analytic()
+    fitted = HA.t0_from_thinning(8)
+    rel = abs(fitted / analytic - 1.0)
+    assert rel < HA.RATE_TOLERANCE, (
+        "the dome spreads at the wrong RATE: t0 fitted from the thinning is %.4e s against "
+        "the closed-form %.4e s (%.1f%% off, bound %.0f%%). The shape rows cannot see this — "
+        "check the diffusivity exponent in glacier_sia."
+        % (fitted, analytic, 100 * rel, 100 * HA.RATE_TOLERANCE))
+
+
+def test_the_recovered_rate_converges_as_the_step_count_rises():
+    """A single agreeing number could be a coincidence; a converging sequence could not.
+
+    Halving the timestep must move the fitted t0 toward the closed form, not away. This is
+    the difference between "the answer is right" and "the answer is right for a reason".
+    """
+    errs = [abs(HA.t0_from_thinning(s) / HA.t0_analytic() - 1.0) for s in HA.STEPS]
+    assert errs[-1] < errs[0], (
+        "the fitted t0 does not converge on the closed form with more steps: %s"
+        % ["%.4f" % e for e in errs])
+
+
+def test_the_closed_form_time_is_not_read_out_of_the_solver():
+    """`t0_analytic` must be written from the paper, exactly like the 4/3 and 3/7 above.
+
+    `Gamma` legitimately contains `n + 2`, which is also the solver's diffusivity exponent.
+    That coincidence is the opening for the same independence failure this file's first test
+    guards: importing the constant "to keep them in sync" would make the rate check a
+    restatement of the solver instead of a check on it.
+    """
+    src = (REF / "halfar_anatomy.py").read_text(encoding="utf-8")
+    fn = src[src.index("def t0_analytic"):]
+    fn = fn[:fn.index("\ndef ")]
+    assert "sims" not in fn, (
+        "t0_analytic reads from the solver module; the rate comparison is no longer "
+        "independent of the code it checks")
+
+
 def test_profiles_at_different_times_collapse_onto_one_curve():
     """Self-similarity is the claim panel b draws, so it is measured rather than eyeballed."""
     worst = 0.0
@@ -100,3 +160,34 @@ def test_figure_builds():
     img = HA.build()
     assert img.size[0] == HA.PAD * 2 + HA.COLS * HA.PANEL_W
     assert img.size[1] > HA.TOP + HA.PANEL_H
+
+
+def test_the_whole_caption_fits_on_the_canvas():
+    """⚠️ This exact failure has already happened once, silently.
+
+    The canvas height was a hand-tuned constant and the caption grew past it, clipping the
+    last line — the one carrying the volume result. Nothing failed; the figure simply said
+    less than it claimed to. `canvas_height` is now measured from `caption_lines`, and this
+    row is what keeps the two from drifting apart again.
+    """
+    m = HA.measurements()
+    lines = HA.caption_lines(m)
+    bottom = HA.CAP_TOP + len(lines) * HA.CAP_LEADING
+    assert bottom <= HA.canvas_height(m), (
+        "the caption's %d lines end at y=%d on a canvas %d tall — the last %d line(s) are "
+        "clipped" % (len(lines), bottom, HA.canvas_height(m),
+                     1 + (bottom - HA.canvas_height(m)) // HA.CAP_LEADING))
+
+
+def test_the_caption_states_the_rate_result_not_only_the_shape():
+    """The figure's strongest claim must be *in* the figure, not only in this file.
+
+    A reader takes the caption as the summary. If the caption reports only the shape
+    agreement, the figure oversells itself by exactly the amount the shape rows are vacuous.
+    """
+    m = HA.measurements()
+    text = " ".join(HA.caption_lines(m))
+    assert "RATE" in text, "the caption never mentions the rate check"
+    assert "t0" in text, "the caption never names the characteristic time it compares"
+    assert "%.3e" % m["t0_analytic"] in text, (
+        "the caption does not quote the closed-form t0 it claims to compare against")
