@@ -53,6 +53,23 @@ by eye. With this convention, `aspectVec(a) = (cos a, sin a)` is the facing dire
 then a cheap float compare, and it composes with the repose-angle table in `05` directly.
 Convert to degrees for UI only.
 
+> **What `slope` is, and what it is NOT.** Throughout this skill `slope` is the **dimensionless
+> gradient magnitude** `|∇h|` — rise over run, already equal to `tan θ`. It is **not** an angle, and
+> it is **not** in degrees or radians. So:
+>
+> - **Never write `sin(slope)`, `tan(slope)`, or `cos(slope)`.** Those apply a trig function to a
+>   ratio and are a units error; `tan(slope)` is `tan(tan θ)`, which is not any quantity.
+> - To recover the angle, use `θ = atan(slope)` — `atan(slope)` is correct and appears in `09`.
+> - To get `sin θ` without leaving the tangent, use the exact identity
+>   `sin θ = slope / sqrt(1 + slope²)` (and `cos θ = 1 / sqrt(1 + slope²)`).
+> - A **threshold** is the other way round: the angle is the literal, so `tan(35°)` is right and
+>   `slope > tan(35°)` compares two tangents. `tan(<a number in degrees>)` = fine;
+>   `tan(<the symbol slope>)` = bug.
+>
+> This is not pedantry. Feeding the tangent into the infinite-slope stability formula in `05`
+> understated the factor of safety by **7.4% / 16.9% / 35.8% at 25° / 35° / 45°**, and moved the
+> dry critical angle off the friction angle by 3.6° — see the measured table in `05`.
+
 The central difference above is fine. Horn's method (the 3×3 Sobel-weighted version used by
 ArcGIS and most GIS tools) is more robust to noise:
 
@@ -272,15 +289,20 @@ above, and the solar-position formulas are textbook astronomy needing no citatio
 Topographic wetness index — where water lingers.
 
 ```
-TWI = ln( A_specific / tan(slope) )
+TWI = ln( A_specific / slope )                   # `slope` IS tan θ — do not tan() it again
 
 A_specific = A / contourWidth ≈ A / cellSize     # specific catchment area, m²/m
 ```
 
+Beven & Kirkby write this as `ln(a / tan β)` for a slope **angle** `β`. Here `slope` is already
+`tan θ` (the definition above), so the tangent is *already taken* and the division is by `slope`
+itself. Writing `ln(A_specific / tan(slope))` computes `tan(tan θ)` and biases TWI low by 0.08 /
+0.19 / 0.44 nats at 25° / 35° / 45° — a quiet shift that moves every downstream wetness threshold.
+
 ```
 twi(A, slope):
     a = max(A / cellSize, cellSize)              # guard: at least one cell's worth
-    s = max(slope, 0.001)                        # guard: flats → tan → 0 → ln(∞)
+    s = max(slope, 0.001)                        # guard: flats → slope → 0 → ln(∞)
     return log(a / s)
 ```
 

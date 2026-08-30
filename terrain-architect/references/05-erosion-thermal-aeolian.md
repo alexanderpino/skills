@@ -147,10 +147,35 @@ canonical shallow-landslide model (the basis of SHALSTAB) couples the topographi
 ```
 failureMask(slope, A, soilDepth):
     # cohesionless infinite slope: fails when driving stress exceeds friction
-    wet = min(1, K_w * A_specific / sin(slope))      # relative saturation ∝ a/sinθ (TOPOG/TWI, 06)
-    FS  = (1 - wet * ρw/ρs) * tan(φ) / tan(slope)    # factor of safety; φ ≈ internal friction ≈ repose
-    return FS < 1                                     # unconditionally unstable where slope ≥ φ
+    # `slope` is the DIMENSIONLESS gradient |∇h| = tan θ (06) — an angle NEVER goes in here
+    sinθ = slope / sqrt(1 + slope²)                  # exact, stays in the tangent
+    wet = min(1, K_w * A_specific / sinθ)            # relative saturation ∝ a/sinθ (TOPOG/TWI, 06)
+    FS  = (1 - wet * ρw/ρs) * tan(φ) / slope         # factor of safety; φ ≈ internal friction ≈ repose
+    return FS < 1                                     # unconditionally unstable where slope ≥ tan(φ)
 ```
+
+**Mind the units on `slope`.** `tan(φ)` is right — `φ` is an angle literal. `slope` bare is right —
+it is *already* `tan θ` from `06`, so dividing by it directly **is** the `tanφ/tanθ` of the textbook
+form. Writing `tan(slope)` computes `tan(tan θ)`, and `sin(slope)` likewise; both are units errors,
+and both are quiet because the result stays plausible. Measured, they cost:
+
+| `θ` | `tan θ` (`slope`) | `tan(slope)` ✗ | FS error | `sin θ` | `sin(slope)` ✗ | wetness error |
+|---|---|---|---|---|---|---|
+| 25° | 0.4663 | 0.5033 | **−7.4%** | 0.4226 | 0.4496 | −6.0% |
+| 35° | 0.7002 | 0.8426 | **−16.9%** | 0.5736 | 0.6444 | −11.0% |
+| 45° | 1.0000 | 1.5574 | **−35.8%** | 0.7071 | 0.8415 | −16.0% |
+
+The error is one-signed — FS always comes out **low**, so the mask over-predicts failure — and it
+compounds: with both terms wrong on an unsaturated hillslope, FS lands 5.0% / 14.4% / 33.6% low at
+those same angles. The visible consequence is a shifted threshold, not a crash: at `φ = 35°` and
+half-saturation the correct mask fails above 27.7° while the `tan(slope)` version fails above
+25.8°, painting a ~1.9°-wide band of stable hillslope as landslide scar.
+
+The cheapest way to catch this in your own port: **a dry cohesionless slope must fail at exactly the
+friction angle.** Set `wet = 0` and the formula above collapses to `FS = tan(φ)/slope`, which
+crosses 1 at `slope = tan(φ)` — the critical angle is `φ` on the nose. The `tan(slope)` version
+crosses at 31.4° for `φ = 35°`, missing by 3.6° and breaking the one identity that makes the
+criterion recognisable.
 
 The topographic result is exactly what you see in real ranges: failures concentrate in **steep,
 convergent hollows** (high `A_specific`, high slope) — not on ridges. That is why the mask needs
