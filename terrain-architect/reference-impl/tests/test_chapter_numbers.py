@@ -34,12 +34,21 @@ CHAPTERS = REF.parent / "references"
 
 
 def _half_unit(printed):
-    """Half a unit in the last significant place of `printed`."""
+    """Half a unit in the last PRINTED place of `printed` — trailing zeros included.
+
+    ⚠️ This used to strip trailing zeros before counting, so `30` was held to ±5 and `100` to ±50 —
+    a tenfold inflation on exactly the values a chapter is most likely to round. Under that rule,
+    rewriting a `~29%` whose module computes 28.568 into `~30%` — a 1.43-point divergence — passed.
+    That is the tolerance-widening this file's own docstring forbids, arriving through the tolerance
+    function instead of through a row. A printed `30` claims two digits; two digits is what it is
+    held to. Checked against every row here: none relied on the inflated band (the only integer
+    values any pattern captures are `12`'s Halfar figures, 2439 m and 564 km, which have no trailing
+    zero and were already on ±0.5).
+    """
     s = printed.strip().rstrip("%×").replace(",", "")
     if "." in s:
         return 0.5 * 10.0 ** (-len(s.split(".")[1]))
-    t = s.rstrip("0")
-    return 0.5 * 10.0 ** (len(s) - len(t)) if t else 0.5
+    return 0.5
 
 
 def _quoted(chapter, pattern):
@@ -51,15 +60,45 @@ def _quoted(chapter, pattern):
     return m.group(1)
 
 
-def check(chapter, pattern, actual, scale=1.0):
-    printed = _quoted(chapter, pattern)
+def check_in(blob, label, pattern, actual, scale=1.0):
+    """`check`, against an arbitrary slice of text rather than a whole chapter.
+
+    Exists so a row can be made LOCAL — pinned to the paragraph or sentence that makes the claim
+    instead of to any occurrence anywhere in the file. A chapter-global substring test passes on a
+    number that has drifted into an unrelated section, which is how the stale-figure guard below
+    used to be satisfiable by the word "2.0" appearing in "lacunarity 2.03".
+    """
+    m = re.search(pattern, blob)
+    assert m, ("%s no longer contains a number matching %r — either the prose changed or this "
+               "row is stale. Both need a human." % (label, pattern))
+    printed = m.group(1)
     exp = float(printed.rstrip("%×"))
     got = float(actual) * scale
     tol = _half_unit(printed)
     assert abs(got - exp) <= tol * (1 + 1e-9), (
         "%s prints %s; the code computes %.6g (tolerance %.3g, the printed precision). "
         "Fix the prose if the code moved deliberately; fix the code if it did not."
-        % (chapter, printed, got, tol))
+        % (label, printed, got, tol))
+
+
+def check(chapter, pattern, actual, scale=1.0):
+    check_in((CHAPTERS / chapter).read_text(encoding="utf-8"), chapter, pattern, actual, scale)
+
+
+def _paragraph_containing(chapter, needle):
+    """The markdown block (blank-line delimited) that carries `needle`, whitespace-flattened.
+
+    Locality is the point: a claim is guarded where it is made. Flattened because a markdown
+    paragraph wraps mid-sentence, so a pattern written against the sentence would otherwise depend
+    on where the line broke.
+    """
+    text = (CHAPTERS / chapter).read_text(encoding="utf-8")
+    blocks = [b for b in re.split(r"\n\s*\n", text) if needle in b]
+    return [re.sub(r"\s+", " ", b).strip() for b in blocks]
+
+
+def _sentences(blob):
+    return [s for s in re.split(r"(?<=[.!?:])\s+", blob) if s]
 
 
 # --------------------------------------------------------------------------- #
@@ -334,54 +373,83 @@ def test_09_isotropic_control_column(aniso, deg):
     check("09-verification.md", r"\| %d° \| `[0-9.]+` \| `([0-9.]+)` \|" % deg, aniso[deg][1])
 
 
-def test_09_the_ninety_degree_row_is_exactness_not_smallness(aniso):
-    """THE TRAP ROW. The chapter prints `0.000` for both columns at 90°, and the claim is that a
-    quarter turn is a SYMMETRY of the square lattice — so this must be exactly zero, not merely
-    round to it. A near-zero here would still be a passing table and a broken argument."""
+def test_09_the_ninety_degree_row_is_the_floating_point_floor(aniso):
+    """THE TRAP ROW — and the standard it is held to, reconciled with `tests/test_anisotropy.py`.
+
+    ⚠️ TWO FILES ASSERTED DIFFERENT THINGS ABOUT ONE NUMBER. `test_anisotropy.py` requires
+    `error(axis_locked, 90°) < 1e-12`; this row required `== 0.0`, and justified the difference by
+    the lattice theorem — a quarter turn is a symmetry of the square grid, so the residual must be
+    exactly zero. The theorem does not say that. It says the OPERATOR commutes with an exact quarter
+    turn. The measurement composes the operator with `anisotropy_anatomy.rotate`, a bilinear
+    resample whose 90° weights come out 1±6e-15 rather than 1 and 0, because `cos(pi/2)` is 6.1e-17
+    in binary floating point and not 0. The bit-exact `0.0` that comes back is an arithmetic
+    accident of the INPUT: the cone is 4-fold symmetric and smooth, so those residual weights fall
+    on equal neighbours and round away. Hand the same operator a random field and the residual is
+    2.5e-18 — still the floor, no longer zero. So `< 1e-12` is the claim the argument actually
+    supports, it is what the sibling file already asserts, and it is what this row asserts now.
+
+    The trap survives the change intact, because the trap was never about the last bit: at 90° the
+    axis-locked operator scores at the floating-point floor while at 30° the same operator scores
+    0.111. Thirteen orders of magnitude of separation is what makes a symmetry angle useless as a
+    test angle, and this row pins that ratio rather than a coincidence of rounding.
+    """
     for pattern in (r"\| \*\*90°\*\* \| \*\*`([0-9.]+)`\*\* \|",
                     r"\| \*\*90°\*\* \| \*\*`[0-9.]+`\*\* \| `([0-9.]+)` \|"):
         assert float(_quoted("09-verification.md", pattern)) == 0.0, (
             "09 no longer prints 0.000 in the 90° row; this row is stale")
     locked, floor = aniso[90]
-    assert locked == 0.0 and floor == 0.0, (
-        "09 claims exact equivariance at 90°; measured %.3e / %.3e" % (locked, floor))
+    assert locked < 1e-12 and floor < 1e-12, (
+        "09 claims equivariance at 90° to the floating-point floor; measured %.3e / %.3e"
+        % (locked, floor))
+    assert locked < 1e-9 * aniso[30][0], (
+        "the 90° trap is that a symmetry angle hides a defect the same operator shows plainly at "
+        "30°: %.3e at 90° against %.4f at 30°" % (locked, aniso[30][0]))
+
+    # ...and the generalising form of the same claim, which the cone's symmetry hides: the residual
+    # is at the floor on an input with no symmetry to exploit, where it is NOT bit-zero.
+    import anisotropy_anatomy as aa
+    rand = np.random.RandomState(0).rand(aa.N, aa.N)
+    assert aa.error(aa.axis_locked, math.radians(90), rand) < 1e-12, (
+        "equivariance at 90° must hold at the floor for any input, not only the 4-fold-symmetric "
+        "cone that rounds it to exactly zero")
 
 
 # --------------------------------------------------------------------------- #
 # 10 — the cost of moving a raster instead of moving coordinates
 #
-# ⚠️ THESE MOVED, AND WHY. They were measured at `lacunarity=2.0` — the degenerate value `01` and
-# `test_noise_pinch.py` exist to warn about, where every octave's zero set coincides. That was the
-# last working use of 2.0 in the repo; `tests/test_placement.py` now builds at the shipped 2.03 and
-# `10` was re-measured against it. The window-variance figure is the one to watch: it was ±6% at
-# lacunarity 2 because the un-shifted base window sits ON the pinch lattice and is systematically
-# flatter than any shifted one, so what looked like window variance was a second face of the defect.
+# ⚠️ ONE DEFINITION OF THE EXPERIMENT, IMPORTED. This block used to restate `test_placement.py`'s
+# setup — n, scale, seed, lacunarity, offsets — as its own literals. That is a guard that quietly
+# stops guarding: retune the experiment there and these rows go on measuring the abandoned one and
+# passing, which is exactly how the shipped file and the chapter could have drifted apart. The
+# constants and the builder now live in `test_placement.py` and are imported here, so there is one
+# experiment and both files are pinned to it.
+#
+# ⚠️ AND THE CAUSE `10` GAVE FOR THE WINDOW SPREAD WAS WRONG. It read the old build's large spread
+# as the lacunarity-2 pinch lattice — the un-shifted base window sitting where every octave is zero
+# at once. `test_placement.py::test_the_window_spread_tracks_px_per_cell_not_the_lacunarity`
+# falsifies that; the rows below pin the four measurements `10` now prints in its place, and the
+# refutation numbers that show the pinch points cannot be responsible for the statistic they were
+# blamed for.
 
 def _placement_detail_losses():
-    """Re-run `test_placement.py`'s experiment: mean |laplacian| and high-frequency band energy,
-    after one and after four chained bilinear moves. Returns fractions, not percentages."""
-    import noise
+    """Re-run `test_placement.py`'s experiment on both metrics: mean |laplacian| and high-frequency
+    band energy, after one and after four chained bilinear moves. Returns fractions, not
+    percentages. The setup comes from `test_placement` — nothing here restates it."""
     import ops_filters
-    from test_placement import _bilinear_shift, _detail
+    from test_placement import (SHIFT_FRAC, N, _bilinear_shift, _detail, experiment_build,
+                                experiment_grid)
 
-    n = 192
-    yy, xx = np.mgrid[0:n, 0:n].astype(float)
-    build = lambda gx, gy: noise.fbm(gx / n * 3.0, gy / n * 3.0, seed=7,
-                                     octaves=6, lacunarity=2.03, gain=0.5)
+    xx, yy = experiment_grid()
     band = lambda f: float(np.abs(f - ops_filters.gaussian(f, sigma=2.0)).mean())
-    h = build(xx, yy)
-    dx, dy = 0.037 * n, 0.023 * n
+    dx, dy = SHIFT_FRAC[0] * N, SHIFT_FRAC[1] * N
     out = {}
-    for metric, tag in ((_detail, "lap"), (band, "band")):
-        base, raster = metric(h), h
-        for k in range(1, 5):
-            raster = _bilinear_shift(raster, dx, dy)
-            out["%s%d" % (tag, k)] = 1.0 - metric(raster) / base
-    # window-to-window spread of the SAME generator sampled elsewhere — the trap the chapter names
-    rng = np.random.RandomState(3)
-    ratios = [_detail(build(xx + ox, yy + oy)) / _detail(h)
-              for ox, oy in rng.rand(40, 2) * 400.0 - 200.0]
-    out["window"] = max(abs(r - 1.0) for r in ratios)
+    for lac, suffix in ((None, ""), (2.0, "_lac2")):
+        h = (experiment_build() if lac is None else experiment_build(lacunarity=lac))(xx, yy)
+        for metric, tag in ((_detail, "lap"), (band, "band")):
+            base, raster = metric(h), h
+            for k in range(1, 5):
+                raster = _bilinear_shift(raster, dx, dy)
+                out["%s%d%s" % (tag, k, suffix)] = 1.0 - metric(raster) / base
     return out
 
 
@@ -412,23 +480,167 @@ def test_10_four_raster_moves_band_energy(placement_loss):
           r"reads ~[0-9.]+% and ~([0-9.]+)% instead", placement_loss["band4"], 100.0)
 
 
-def test_10_window_to_window_variance(placement_loss):
-    """The measurement trap: placement lands on a different window, and different windows are
-    different terrain. At the detuned lacunarity that spread is small — read it as a loss and you
-    have measured your own sampling noise."""
-    check("10-primitives-ops-filters.md",
-          r"\*\*±([0-9.]+)% at 192²\*\*", placement_loss["window"], 100.0)
+# --- the window-variance table, and the CAUSE it establishes ----------------- #
+#
+# ⚠️ WHAT THESE ROWS ARE FOR, WHICH IS NOT THE NUMBERS. `10` previously printed a correct,
+# reproducible, stably measured window-variance figure beside an INVENTED mechanism: it blamed the
+# lacunarity-2 pinch lattice. Thirteen rows pinning the numbers could not have caught that, because
+# every number was right. What catches a false cause is a table that varies the supposed cause
+# independently of the effect, so the four cells below are the experiment and not a decoration:
+# lacunarity 2 with the finest octave off 2 px/cell (no effect) and lacunarity 2.03 with it back on
+# 2 px/cell (full effect) are the two cells the old story predicts backwards.
+
+_CELL = r"\*{0,2}`%s`\*{0,2}"
+_TABLE_ROWS = [("2.00", "3.00"), ("2.00", "3.10"), ("2.03", "2.78478"), ("2.03", "3.00")]
 
 
-def test_10_does_not_restate_the_stale_cross_implementation_number(placement_loss):
-    """`10` used to cite an independent JS implementation agreeing at 24.7% / 53.8% 'on the same
-    metric'. That was the lacunarity-2.0 build, no module here can reproduce it, and it has not
-    been re-run — so it must stay marked as stale rather than quoted as live agreement."""
+def _window_row_patterns(lac, scale):
+    head = r"\| %s \| %s[^|]*\| " % (re.escape(lac), re.escape(scale))
+    return (head + _CELL % r"([0-9.]+)",
+            head + (_CELL % r"[0-9.]+") + r" \| " + _CELL % r"([0-9.]+)%")
+
+
+@pytest.fixture(scope="module")
+def window_table():
+    """The four (lacunarity, scale) cells `10` tabulates, measured through `test_placement`.
+
+    Shares `test_placement`'s cache, so the mechanism row there and these rows are the same numbers
+    from the same draw rather than two independent re-implementations that could disagree.
+    """
+    from test_placement import LACUNARITY, SCALE, SCALE_AT_TWO_PX, window_spread
+    cfg = {("2.00", "3.00"): (2.0, 3.0), ("2.00", "3.10"): (2.0, 3.1),
+           ("2.03", "2.78478"): (2.03, SCALE_AT_TWO_PX), ("2.03", "3.00"): (2.03, 3.0)}
+    # The row `10` labels "(shipped)" must actually be the shipped setting. The other three cells
+    # are deliberately literal — they are the falsifying arms of the experiment, and they must not
+    # drift when the shipped one is retuned — but this one is a claim about `test_placement`.
+    assert cfg[("2.03", "3.00")] == (LACUNARITY, SCALE), (
+        "10's table labels lacunarity 2.03 / scale 3.0 as the shipped setting, but test_placement "
+        "now ships %r / %r" % (LACUNARITY, SCALE))
+    return {k: (lac, sc, window_spread(scale=sc, lacunarity=lac)) for k, (lac, sc) in cfg.items()}
+
+
+@pytest.mark.parametrize("lac,scale", _TABLE_ROWS)
+def test_10_window_table_px_per_cell(window_table, lac, scale):
+    """The px/cell column — the quantity the chapter now says the effect tracks. It is derived from
+    the row's own lacunarity and scale, so a row whose first two columns were edited without
+    re-deriving the third fails here."""
+    from test_placement import px_per_cell
+    lacunarity, sc, _std = window_table[(lac, scale)]
+    check("10-primitives-ops-filters.md", _window_row_patterns(lac, scale)[0],
+          px_per_cell(scale=sc, lacunarity=lacunarity))
+
+
+@pytest.mark.parametrize("lac,scale", _TABLE_ROWS)
+def test_10_window_table_spread(window_table, lac, scale):
+    """The measured column: std of the per-window detail ratio over 40 windows from
+    `RandomState(3)`. std rather than `max |r-1|` because the max grows with the window count and
+    swings 2:1 across the seed — see `test_placement.window_spread`."""
+    check("10-primitives-ops-filters.md", _window_row_patterns(lac, scale)[1],
+          window_table[(lac, scale)][2], 100.0)
+
+
+def test_10_states_the_draw_the_window_spread_depends_on():
+    """A spread over random windows is not reproducible without the RNG and the sample count.
+
+    `10` used to print "over 40 random windows" and name neither the seed nor the statistic, which
+    made the printed value un-rederivable by a reader: over `RandomState(0..24)` the old `max |r-1|`
+    ranges 0.49-0.97%, so "±0.5%" was one draw out of twenty-five presented as the answer.
+    """
+    para = _paragraph_containing("10-primitives-ops-filters.md", "RandomState(3)")
+    assert para, "10 no longer names the RNG behind its window-spread figure"
+    assert re.search(r"\*\*40 windows\*\*|40 windows", para[0]), (
+        "10 names the RNG but not the window count; an extreme-value or spread statistic is not "
+        "reproducible without both")
+    assert "standard deviation" in para[0], (
+        "10 must name the statistic it prints; a bare percentage over windows could be a mean, a "
+        "max or a std, and those differ by an order of magnitude here")
+
+
+def test_10_the_pinch_lattice_refutation_numbers():
+    """The three numbers that show the pinch points cannot be responsible for the statistic they
+    were blamed for: how many exact zeros the old build has, how many of them the laplacian
+    interior can even see, and what deleting all of them does to mean |laplacian|."""
+    from test_placement import _detail, experiment_build, experiment_grid
+
+    xx, yy = experiment_grid()
+    h = experiment_build(lacunarity=2.0)(xx, yy)
+    lap = np.abs(4 * h[1:-1, 1:-1] - h[1:-1, :-2] - h[1:-1, 2:] - h[:-2, 1:-1] - h[2:, 1:-1])
+    zero = h == 0.0
+    inner = zero[1:-1, 1:-1]
+    para = _paragraph_containing("10-primitives-ops-filters.md", "invisible to any measure")[0]
+    check_in(para, "10 (pinch refutation)", r"build \*\*([0-9]+)\*\* of the 36864 pixels",
+             float(zero.sum()))
+    check_in(para, "10 (pinch refutation)", r"exact zeros, \*\*([0-9]+)\*\* of them",
+             float(inner.sum()))
+    check_in(para, "10 (pinch refutation)", r"moves mean \|laplacian\| by \*\*([0-9.]+)%\*\*",
+             abs(lap[~inner].mean() / lap.mean() - 1.0), 100.0)
+    assert _detail(h) > 0.0
+
+
+@pytest.mark.parametrize("px", [2.0, None], ids=["at-2-px-per-cell", "shipped"])
+def test_10_the_sample_phase_numbers(px):
+    """The mechanism in one measurement: at 2 px/cell every sample column sits on phase 0 or 0.5 of
+    the finest octave; at the shipped setting almost none do."""
+    from test_placement import LACUNARITY, N, OCTAVES, SCALE, SCALE_AT_TWO_PX
+
+    scale = SCALE_AT_TWO_PX if px == 2.0 else SCALE
+    phase = (np.arange(N) / N * scale * LACUNARITY ** (OCTAVES - 1)) % 1.0
+    near = np.mean((np.minimum(phase, 1.0 - phase) < 0.02) | (np.abs(phase - 0.5) < 0.02))
+    para = _paragraph_containing("10-primitives-ops-filters.md", "sample-grid commensurability")[0]
+    pat = (r"\*\*(100)%\*\* of columns" if px == 2.0
+           else r"against \*\*([0-9.]+)%\*\* at the shipped setting")
+    check_in(para, "10 (sample phase)", pat, near, 100.0)
+
+
+def test_10_the_outside_figure_is_never_restated_as_agreement(placement_loss):
+    """⚠️ THE GUARD THAT WAS BYPASSABLE, REBUILT.
+
+    It read: `if "24.7" in text: assert "stale" in text and "2.0" in text`. Both halves were
+    chapter-GLOBAL substrings, so `"2.0"` was satisfied for free by the words "lacunarity 2.03"
+    several paragraphs away, and `"stale"` by any use of the word anywhere in the file. Only the
+    literal phrase "two implementations, one number" was banned, which a paraphrase walks straight
+    past ("one figure").
+
+    The lock that does the real work here is not a word list — a word list loses to paraphrase by
+    construction. It is CO-LOCATION OF THE CONTRADICTION: the paragraph that quotes the outside
+    24.7% / 53.8% must also quote this repo's own measurement of the same pair at lacunarity 2.0,
+    and those two numbers are checked against the module. Restating the outside figure as agreement
+    then requires either deleting the numbers that refute it — which fails this row — or printing
+    them beside the claim, where any reader sees the contradiction. The word list below is the
+    cheap second lock, not the argument.
+    """
     text = (CHAPTERS / "10-primitives-ops-filters.md").read_text(encoding="utf-8")
-    if "24.7" in text:
-        assert "stale" in text and "2.0" in text, (
-            "10 still quotes the 24.7% / 53.8% cross-implementation figure without marking it "
-            "stale; nothing in this repo can re-derive it at the shipped lacunarity")
-    assert not re.search(r"two implementations, one number", text), (
-        "10 claims two implementations agree on one number, but the second implementation's "
-        "measurement was taken at lacunarity 2.0 and the first has moved off it")
+    if "24.7" not in text:
+        assert "53.8" not in text, "10 dropped 24.7 but kept its partner 53.8 unexplained"
+        return
+
+    paras = _paragraph_containing("10-primitives-ops-filters.md", "24.7")
+    assert len(paras) == 1, (
+        "the outside figure is quoted in %d paragraphs; a claim guarded in one place and repeated "
+        "in another is guarded nowhere" % len(paras))
+    para = paras[0]
+    flat = re.sub(r"\s+", " ", text)
+    for needle in ("24.7", "53.8"):
+        assert flat.count(needle) == para.count(needle), (
+            "%s appears outside the paragraph that qualifies it; a figure guarded in one place and "
+            "repeated in another is guarded nowhere" % needle)
+
+    # LOCK 1 — the repo's own contradicting measurement, in the same paragraph, module-verified.
+    check_in(para, "10 (own lacunarity-2.0 re-run)",
+             r"measures \*\*([0-9.]+)% / [0-9.]+%\*\*", placement_loss["lap1_lac2"], 100.0)
+    check_in(para, "10 (own lacunarity-2.0 re-run)",
+             r"measures \*\*[0-9.]+% / ([0-9.]+)%\*\*", placement_loss["lap4_lac2"], 100.0)
+    assert re.search(r"no provenance|not reproducible|cannot be re-derived|nothing here can "
+                     r"re-derive|stale figure", para), (
+        "the paragraph quoting 24.7 / 53.8 must say plainly that the figure has no provenance here")
+
+    # LOCK 2 — sentence-local: no sentence in that paragraph may assert agreement un-negated.
+    agree = re.compile(r"agree(?:s|d|ment)?|corroborat|confirms|independently (?:verif|reproduc)"
+                       r"|(?:same|one|a single) (?:number|figure|value|result)"
+                       r"|two implementations|cross-check(?:s|ed)?\b", re.I)
+    negate = re.compile(r"\bnot\b|\bnever\b|\bno\b|rather than|cannot|invented|stale|instead of",
+                        re.I)
+    for s in _sentences(para):
+        m = agree.search(s)
+        assert m is None or negate.search(s), (
+            "10 asserts agreement with the outside figure in an un-negated sentence: %r" % s)

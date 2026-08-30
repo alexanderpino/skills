@@ -463,11 +463,21 @@ is not evidence). Measured, on a 4-neighbour max against a disc max of the same 
 | **90°** | **`0.000`** | `0.000` |
 
 **The 90° row is the trap.** A quarter turn is a *symmetry of the square lattice*, so it maps the
-grid onto itself and a grossly axis-locked operator comes back exactly equivariant — a perfect
-score for a broken operator. **The test angle must not be a symmetry of the lattice under test**:
-avoid multiples of 90° on a square grid and of 60° on hex. Otherwise the separation is about an
-order of magnitude, which is plenty. Pinned by
-`reference-impl/tests/test_anisotropy.py::test_ninety_degrees_is_a_lattice_symmetry_and_hides_the_defect`.
+grid onto itself and a grossly axis-locked operator commutes with it — the residual drops to the
+floating-point floor, a perfect score for a broken operator. **The test angle must not be a symmetry
+of the lattice under test**: avoid multiples of 90° on a square grid and of 60° on hex. Otherwise the
+separation is about an order of magnitude, which is plenty.
+
+⚠️ *Floor, not exactly zero, and the difference matters when you write the assertion.* The symmetry
+argument is about the **operator**; the number in the table is the operator composed with a bilinear
+rotation, and `cos(90°)` is `6.1e-17` in floating point rather than 0, so that rotation is not a
+bit-exact permutation. On the cone it happens to come back bit-zero — the cone is 4-fold symmetric
+and smooth, so the leftover interpolation weights land on equal neighbours and round away. Run the
+same operator on a random field and the residual is `2.5e-18`: still the floor, no longer zero. So
+the assertion to write is `< 1e-12` against a defect scale of `0.09`–`0.13`, not `== 0`; an equality
+test here would be pinning an arithmetic accident of the test input and calling it a theorem. Pinned
+by `reference-impl/tests/test_anisotropy.py::test_ninety_degrees_is_a_lattice_symmetry_and_hides_the_defect`
+and `reference-impl/tests/test_chapter_numbers.py::test_09_the_ninety_degree_row_is_the_floating_point_floor`.
 
 ![anisotropy anatomy](../reference-impl/anisotropy_anatomy.png)
 
