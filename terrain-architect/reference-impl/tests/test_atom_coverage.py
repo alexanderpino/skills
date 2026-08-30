@@ -5,13 +5,69 @@ per-atom oracle tests (test_noise, test_ops_filters, the solver tests) do that. 
 is consistent: nothing is claimed-but-missing, built-but-undocumented, or deferred-but-secretly-present
 (the class of gap that had let Simplex/Gabor sit in the pseudocode with no implementation)."""
 import importlib
+import re
 from pathlib import Path
 
 import pytest
 
 REF = Path(__file__).resolve().parents[1]                 # reference-impl/
 SKILL_ROOT = REF.parent                                    # terrain-architect/
-COVERAGE = (REF / "ATOM-COVERAGE.md").read_text(encoding="utf-8")
+
+# --------------------------------------------------------------------------- #
+# HOW THE DOC SIDE OF EVERY ROW BELOW IS SEARCHED.
+#
+# A needle that cannot miss is not a check. Two ways a doc-side needle goes vacuous, both
+# of which had actually happened here:
+#
+#   1. FRONTMATTER. Every chapter now opens with an OKF header written by `tools/okf_apply.py`,
+#      and that header contains the literal text `okf v0.2`. The crater depth/diameter row
+#      searched for the bare substring "0.2" — which the HEADER satisfies. Deleting every real
+#      mention of d/D from the chapter left the row still passing. Boilerplate the generator
+#      writes is never evidence that a human documented anything, so it is stripped before any
+#      search.
+#   2. A NEEDLE THAT IS A SUBSTRING OF UNRELATED PROSE. "disc" is inside "discussed",
+#      "rect" is inside "correctness", "compose" is inside "composed", "0.2" is inside
+#      "g^(−0.22)". Rows that ask "is this atom named?" therefore match whole IDENTIFIERS, and
+#      rows that ask "is this constant documented?" carry a needle with its symbol or unit
+#      attached, never a bare number.
+#
+# Text is also whitespace-flattened before matching so a needle cannot be defeated by the
+# chapter being re-wrapped across a line break.
+_FRONTMATTER = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.S)
+_IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _body(path):
+    """Doc text with the OKF frontmatter header removed (boilerplate is not documentation)."""
+    return _FRONTMATTER.sub("", path.read_text(encoding="utf-8"), count=1)
+
+
+def _flat(text):
+    """Whitespace-normalised, so a needle survives the chapter being re-wrapped."""
+    return " ".join(text.split())
+
+
+def _idents(text):
+    """The whole identifiers in `text` — so "disc" is not found inside "discussed"."""
+    return set(_IDENT.findall(text))
+
+
+def _code_mentions(src, literal):
+    """True if `literal` appears in source as a COMPLETE literal, not as a prefix.
+
+    Without the boundary, `n=3` is satisfied by `n=30` and `A=0.1` by `A=0.15`: the code side
+    of a faithfulness row would then stop failing exactly when the constant drifts.
+    """
+    for m in re.finditer(re.escape(literal), src):
+        after = src[m.end():m.end() + 1]
+        before = src[max(0, m.start() - 1):m.start()]
+        if after not in "0123456789." and not re.match(r"[A-Za-z0-9_.]", before or " "):
+            return True
+    return False
+
+
+COVERAGE = _body(REF / "ATOM-COVERAGE.md")
+COVERAGE_NAMES = _idents(COVERAGE)
 
 # The manifest is the source of truth: module -> the atoms the skill claims to IMPLEMENT.
 IMPLEMENTED = {
@@ -85,8 +141,13 @@ def test_every_documented_atom_is_implemented(module, fn):
 
 @pytest.mark.parametrize("module,fn", _ATOMS)
 def test_scope_doc_lists_every_implemented_atom(module, fn):
-    """The scope statement must name every implemented atom (doc <-> manifest stay in sync)."""
-    assert fn in COVERAGE, f"{module}.{fn} implemented but not listed in ATOM-COVERAGE.md"
+    """The scope statement must name every implemented atom (doc <-> manifest stay in sync).
+
+    Matched as a whole IDENTIFIER: with a bare substring, `placement.disc` was satisfied by the
+    word "discussed", `placement.rect` by "correctness"/"directional", `placement.compose` by
+    "composed" and `hex_grid.ring` by "one-ring" — those four rows could not fail.
+    """
+    assert fn in COVERAGE_NAMES, f"{module}.{fn} implemented but not listed in ATOM-COVERAGE.md"
 
 
 def test_noise_surface_has_no_undocumented_atom():
@@ -109,7 +170,12 @@ def test_landform_generators_are_documented(fn, chapter):
     by test_key_constant_agrees_between_chapter_and_code below.)"""
     lf = importlib.import_module("landforms")
     assert callable(getattr(lf, fn, None)), f"landforms.{fn} missing"
-    assert fn in (SKILL_ROOT / chapter).read_text(encoding="utf-8"), f"landforms.{fn} not documented in {chapter}"
+    # Named in its CALL form (`ridge(`, `alluvial_fan(`), i.e. as a routine in the pseudocode.
+    # A bare substring is no check for this family: "ridge", "mountain" and "volcano" are ordinary
+    # English in these chapters (25, 3 and 12 occurrences), so the row passed on prose alone.
+    chap = _flat(_body(SKILL_ROOT / chapter))
+    named = re.search(r"(?<![A-Za-z0-9_])" + re.escape(fn) + r"\s*\(", chap)
+    assert named, f"landforms.{fn} not documented as a routine (`{fn}(...)`) in {chapter}"
 
 
 @pytest.mark.parametrize("name,chapter", DEFERRED.items())
@@ -118,8 +184,8 @@ def test_deferred_atoms_are_discussed_but_absent(name, chapter):
     and listed in the scope doc — so 'deferred' is an honest, checked status, not a silent gap."""
     mod = importlib.import_module("noise")
     assert not hasattr(mod, name.lower()), f"{name} is listed deferred but exists in noise"
-    assert name in (SKILL_ROOT / chapter).read_text(encoding="utf-8"), f"{name} not discussed in {chapter}"
-    assert name in COVERAGE, f"deferred {name} not listed in ATOM-COVERAGE.md"
+    assert name in _idents(_body(SKILL_ROOT / chapter)), f"{name} not discussed in {chapter}"
+    assert name in COVERAGE_NAMES, f"deferred {name} not listed in ATOM-COVERAGE.md"
 
 
 # --------------------------------------------------------------------------- #
@@ -131,45 +197,51 @@ def test_deferred_atoms_are_discussed_but_absent(name, chapter):
 # ledger). Change one side without the other and this fails, forcing a synchronised edit — the
 # contributor rule, mechanised. Sampled (the load-bearing constants), not exhaustive; a defect here
 # is prose-vs-code DRIFT, not numeric wrongness (the oracle/benchmark/cross-val tests cover that).
+#
+# EVERY doc-side needle here carries its SYMBOL, UNIT or SURROUNDING SYNTAX. A bare number is not
+# a check: "0.2" was satisfied by the frontmatter's own `okf v0.2` (and, failing that, by the
+# unrelated exponent `g^(−0.22)` two lines away), "1.1" by "1.109", and the word "weak" by
+# "weak, hot lithosphere" in an unrelated paragraph about elastic thickness. The needle must be
+# unique to the CLAIM, not merely present in the file.
 FAITHFUL = [
     # (module, code literal in the module source, chapter/doc file, string that must be in that doc, what)
-    ("dunes.py", "shadow_tan=0.268", "references/05-erosion-thermal-aeolian.md", "tan(15",
+    ("dunes.py", "shadow_tan=0.268", "references/05-erosion-thermal-aeolian.md", "tan(15°)",
      "Werner lee shadow line = 15deg flow-separation angle (tan 15 = 0.268)"),
-    ("dunes.py", "repose=2", "references/99-papers.md", "33.7",
+    ("dunes.py", "repose=2", "references/99-papers.md", "33.7°",
      "sand angle of repose 33.7deg = atan(2/3), the 2-slab drop under the 1:3 slab aspect"),
-    ("landforms.py", "(1.0 - rn) ** 2.2", "references/11-geological.md", "2.2",
+    ("landforms.py", "(1.0 - rn) ** 2.2", "references/11-geological.md", "^2.2",
      "stratovolcano concave-up flank profile exponent (Karatson 2010)"),
-    ("landforms.py", "0.2 * D", "references/11-geological.md", "0.2",
+    ("landforms.py", "0.2 * D", "references/11-geological.md", "d/D ~0.2",
      "impact-crater depth/diameter ~= 0.2 (Pike 1977)"),
-    ("landforms.py", "0.04 * D", "references/11-geological.md", "0.04",
+    ("landforms.py", "0.04 * D", "references/11-geological.md", "0.04·D",
      "impact-crater rim height ~= 0.04 D"),
     ("landforms.py", "(-3.0)", "references/11-geological.md", "r⁻³",
      "impact-crater ejecta blanket thins as r^-3 (McGetchin 1973)"),
-    ("glacier.py", "rho=917.0", "references/12-glacial-coastal.md", "917",
+    ("glacier.py", "rho=917.0", "references/12-glacial-coastal.md", "917 kg/m³",
      "glacier ice density 917 kg/m^3"),
     ("glacier.py", "n=3", "references/12-glacial-coastal.md", "n = 3",
      "Glen flow-law exponent n = 3"),
-    ("landforms.py", "concavity=1.7", "references/16-arid-desert.md", "concave",
+    ("landforms.py", "concavity=1.7", "references/16-arid-desert.md", "concave downfan",
      "alluvial-fan concave (steep-apex, gentle-distal) downfan profile (Blair & McPherson 1994)"),
-    ("flow.py", "p=1.1", "references/03-flow-routing.md", "1.1",
+    ("flow.py", "p=1.1", "references/03-flow-routing.md", "p = 1.1",
      "MFD multiple-flow-direction exponent p = 1.1 (Freeman 1991)"),
-    ("isostasy.py", "nu=0.25", "references/02-macro-tectonics.md", "0.25",
+    ("isostasy.py", "nu=0.25", "references/02-macro-tectonics.md", "ν ≈ 0.25",
      "crustal Poisson ratio nu = 0.25 in flexural rigidity D = E*Te^3 / 12(1-nu^2)"),
-    ("winds.py", "shadow_tan=0.268", "references/13-climate-ecosystem.md", "15°",
+    ("winds.py", "shadow_tan=0.268", "references/13-climate-ecosystem.md", "tan(15°)",
      "lee-shelter shadow line = the same 15deg flow-separation angle as Werner's dune shadow (05)"),
     ("aeolian.py", "A=0.1", "references/05-erosion-thermal-aeolian.md", "A ≈ 0.1",
      "Bagnold threshold coefficient A ~ 0.1 for turbulent flow"),
-    ("aeolian.py", "RHO_QUARTZ = 2650.0", "references/05-erosion-thermal-aeolian.md", "2650",
+    ("aeolian.py", "RHO_QUARTZ = 2650.0", "references/05-erosion-thermal-aeolian.md", "2650 kg/m³",
      "quartz grain density 2650 kg/m^3 in the threshold friction velocity"),
-    ("aeolian.py", "RHO_AIR = 1.22", "references/05-erosion-thermal-aeolian.md", "1.22",
+    ("aeolian.py", "RHO_AIR = 1.22", "references/05-erosion-thermal-aeolian.md", "1.22 kg/m³",
      "sea-level air density 1.22 kg/m^3 in the threshold and the saltation flux"),
     ("aeolian.py", "KARMAN = 0.4", "references/13-climate-ecosystem.md", "κ = 0.4",
      "von Karman constant 0.4 in the law of the wall converting wind SPEED to friction velocity"),
-    ("snow.py", "shed_lo_deg=50.0", "references/13-climate-ecosystem.md", "tan(50",
+    ("snow.py", "shed_lo_deg=50.0", "references/13-climate-ecosystem.md", "tan(50°)",
      "snow sheds off ground steeper than 50deg (smoothstep 50->60deg; Cordonnier 2018)"),
-    ("snow.py", "shed_hi_deg=60.0", "references/13-climate-ecosystem.md", "tan(60",
+    ("snow.py", "shed_hi_deg=60.0", "references/13-climate-ecosystem.md", "tan(60°)",
      "snow fully shed by 60deg"),
-    ("tectonics.py", "k_fault=6.0", "references/02-macro-tectonics.md", "weak",
+    ("tectonics.py", "k_fault=6.0", "references/02-macro-tectonics.md", "MORE erodible",
      "fault-as-K SIGN: a fault trace is WEAK rock -> HIGHER erodibility, so valleys follow structure"),
 ]
 
@@ -177,10 +249,16 @@ FAITHFUL = [
 @pytest.mark.parametrize("module,code_lit,doc,doc_str,what", FAITHFUL, ids=[e[0] + ":" + e[1] for e in FAITHFUL])
 def test_key_constant_agrees_between_chapter_and_code(module, code_lit, doc, doc_str, what):
     """A load-bearing physical constant must read the same in the code and in its chapter (faithfulness,
-    not just existence). Fails on prose<->code drift, so neither side can move alone."""
+    not just existence). Fails on prose<->code drift, so neither side can move alone.
+
+    The chapter is searched with its OKF frontmatter stripped and its whitespace flattened: header
+    boilerplate must not be able to satisfy a row (it silently satisfied the crater d/D row), and a
+    re-wrapped line must not be able to break one.
+    """
     src = (REF / module).read_text(encoding="utf-8")
-    assert code_lit in src, f"{what}: code literal {code_lit!r} missing from reference-impl/{module} " \
-                            f"(the code constant changed — update the code, or fix this manifest AND the chapter)"
-    chap = (SKILL_ROOT / doc).read_text(encoding="utf-8")
+    assert _code_mentions(src, code_lit), \
+        f"{what}: code literal {code_lit!r} missing from reference-impl/{module} " \
+        f"(the code constant changed — update the code, or fix this manifest AND the chapter)"
+    chap = _flat(_body(SKILL_ROOT / doc))
     assert doc_str in chap, f"{what}: {doc_str!r} missing from {doc} " \
                             f"(the chapter drifted from the code constant {code_lit!r} — resync the pseudocode)"
