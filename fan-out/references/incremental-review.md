@@ -5,6 +5,8 @@ Read this before running a verification round or changing the verdict schema.
 ## Contents
 - [The problem](#the-problem)
 - [Findings are the unit of state, not artifacts](#findings-are-the-unit-of-state-not-artifacts)
+- [The check names the target, not the deviation](#the-check-names-the-target-not-the-deviation)
+- [When the critic does not know the target either](#when-the-critic-does-not-know-the-target-either)
 - [Give the check a decider](#give-the-check-a-decider)
 - [Scope: what a verification round is allowed to read](#scope-what-a-verification-round-is-allowed-to-read)
 - [Re-opening approved scope](#re-opening-approved-scope)
@@ -74,6 +76,58 @@ that is true or false about the artifact, not an instruction:
 
 If a finding can't be phrased as an observation, it's taste. Taste is worth recording as a
 `nit`, and nits are follow-ups, never gates.
+
+### The check names the target, not the deviation
+
+An observation can be true, anchored, non-imperative — and still useless, because it
+describes what is wrong instead of what would be right:
+
+| Bad (`check` as a deviation) | Good (`check` as a target) |
+|---|---|
+| "The body colour is off" | "The body is `#C8102E`, as in `reference.png`" |
+| "Frame time is too high" | "The p99 frame time is under 16.6 ms at 1080p, seed 7" |
+| "The tone is inconsistent" | "Every section uses second person, as `intro.md` does" |
+| "Error handling is weak here" | "Every `vkCreate*` return code is inspected before use" |
+
+The left column is the same sentence as the `claim`. That is the tell: `claim` says what is
+wrong, `check` says what would be true once it is right, and if the two say the same thing
+the finding is carrying no target at all.
+
+What it costs is a whole run. Told the colour is off, a builder paints the car blue — a
+sincere attempt, and wrong, because the finding admitted an infinite set of satisfying
+states and the critic was holding exactly one. Round 2 rejects it again. Round 3 rejects it
+again. Every round is spent transmitting, one bit at a time, a fact the critic could have
+written in six words. The escalation then reads as a builder that could not converge, which
+is the wrong lesson: it was never told where to converge to.
+
+There is also a soundness argument, independent of cost. A finding whose check only the
+critic can evaluate is unfalsifiable, and an unfalsifiable finding is not a gate — it is a
+veto. The verifier in the next round is a *different agent instance*, and it cannot read
+the target out of the first critic's head. It either invents its own (the target moves
+between rounds, which is the non-convergence this whole document exists to prevent) or it
+defers to the builder (the gate rubber-stamps). Neither is review.
+
+So a check must be **satisfiable by aiming**: a value, a range, a threshold with its
+measurement conditions, a named reference to compare against, or a quoted line of the brief
+or rubric. Where the target lives in the bar rather than in the text — "matches
+`reference.png`" — naming the referent is enough, because the builder can go and look.
+
+### When the critic does not know the target either
+
+The rule above has a failure case that must not be papered over. Sometimes the critic
+genuinely cannot name the target, because nothing ever fixed it — the brief never said what
+colour the car should be. The critic then knows only that the current colour is *a* choice,
+not that it is the *wrong* choice.
+
+That is a defect in the brief, and it is already the orchestrator's error rather than the
+builder's (see *soft where it can be, harsh where it must be* in SKILL.md). The critic says
+so in the `claim`, at the honest severity, and does not file a check the builder cannot aim
+at. Filing one anyway is the worst outcome available: the run burns its cap discovering
+that the critic's private preference was never written down, and the fold reports a slice
+that failed to converge when what actually happened is that nobody specified it.
+
+A run that produces these repeatedly is telling you the brief was thin. Fix it between
+runs — that is what a sealed brief is for, and what the ratchet guard cannot do for you.
 
 ### Give the check a decider
 
@@ -357,6 +411,14 @@ said" instead of "is the problem gone", and accepts a fix that follows the lette
 suggestion. This is the most common quality leak in the whole loop. A `remedy` does not
 make this safe — it makes it avoidable, by giving the instruction somewhere to live that
 nothing grades against.
+
+**`check` names the deviation, not the target.** The builder aims at nothing and the same
+finding comes back round after round. The tell is in the ledger rather than in any single
+verdict: the same finding `unresolved` twice, with the `reason` field naming a *different*
+wrong state each time (grey, then blue). That is a critic revealing it held a target it
+never wrote down. `fanout.py calibration` flags the shape as `NO-TARGET`; the ledger tell
+is yours to notice. Re-file the check with the target in it — and if you cannot name the
+target either, that is a brief defect, not another round.
 
 **`check_cmd` the critic never ran.** It fails for its own reasons — wrong path, missing
 target, a test that does not exist — and the finding reads as unfixed however good the

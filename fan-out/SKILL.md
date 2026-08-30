@@ -274,6 +274,19 @@ Write your verdict to <run-dir>/verdicts/<slice-id>.json in this schema:
 Score against the rubric, not against your taste. Every finding needs an anchor into the
 candidate — an unfalsifiable objection is not a finding.
 
+`claim` says what is wrong. `check` says what would be TRUE once it is right, and those
+are different sentences. "The body colour is off" is a claim; the check is "the body is
+#C8102E, as in reference.png". A check that only restates the deviation — off, wrong,
+inconsistent, unclear, too slow — leaves the target to be guessed, and the builder will
+guess: told the colour is off, it ships blue, and you reject again having still never
+said red. Name the value, the range, the reference, or the source. If the brief or rubric
+fixes the target, quote it in the check so the builder does not have to go looking.
+
+Where you do NOT know the target — the brief never said what colour the car should be —
+that is a defect in the brief, and you say so in `claim` at the honest severity. Do not
+file a finding whose check only you can evaluate. A target you hold and do not write down
+is a guessing game you win every round, and it costs the run its whole cap.
+
 Where a command would settle the check — a grep for the condition, a failing test, a
 compile — put it in `check_cmd`, written so exit 0 means the check holds. Only commands
 you actually ran here, against this candidate: a plausible-looking command that does not
@@ -298,10 +311,12 @@ Never raise a severity to make a preference get attention.
 
 Three fields carry the whole re-review design:
 
-- **`check` is an observation, not an instruction.** "Add a null guard" is a demand;
-  "`Frame()` returns early when `entity` is invalid" is a check, and a later round can
-  confirm it mechanically. What can't be phrased as an observation is taste, and taste is a
-  `nit` at most.
+- **`check` is an observation, not an instruction — and it names the target, not the
+  deviation.** "Add a null guard" is a demand; "the null case is handled better" is the
+  deviation restated; "`Frame()` returns early when `entity` is invalid" is a check, and a
+  later round can confirm it mechanically. Two tests it must pass: could a builder that has
+  read only this sentence aim at the right state, and could a second critic decide it the
+  same way? What can't be phrased as an observation is taste, and taste is a `nit` at most.
 - **`anchor` must survive an edit** — symbol name plus a short verbatim quote, line as a
   hint only. Line numbers shift the moment the builder touches the file.
 - **`approved` is a claim you'll be held to** — whatever is listed there is out of scope for
@@ -317,20 +332,35 @@ tells the builder nothing about how to get there, which is the point. See
 Critics that can run something (compile it, execute the tests, diff it) should. A critic
 whose `evidence` contains only opinions is a weak gate; treat its `accept` as unproven.
 
-### Direction, not prescription
+### The target is not the route
 
-A finding tells the builder *where* (`anchor`), *what* (`claim`), and *what done looks
-like* (`check`). It withholds *how*, and that is not the critic being terse — a `check`
-written as an instruction turns the next round into "did you do what I said" instead of
-"is the problem gone", which is the most common quality leak in this loop. The direction
-comes from the check being observable, not from the critic explaining itself.
+A finding tells the builder *where* (`anchor`), *what is wrong* (`claim`), and *what would
+be true once it is right* (`check`). It withholds only the route — the specific edit that
+gets there. Those are three separate things, and the loop fails differently when you drop
+each:
 
-So the two ways to reach a good result faster are not "say more". They are: make the
-check decidable without an agent (`check_cmd`, above), and stop the loop early when the
-gap is not closeable here. Prescription has exactly one licensed place — the `remedy`
-field in Step 5, unlocked only after a finding has survived a builder round against its
-check, where the evidence says direction-free feedback is not landing and another
-identical round costs more than the risk.
+| Withheld | The builder | Cost |
+|---|---|---|
+| the route (`how`) | picks its own way to the stated target | none — this is the design |
+| the target (`check` names the deviation) | guesses; red, then blue, then green | every round, from round 1 |
+| nothing (`check` states the fix) | complies | the check stops testing the artifact |
+
+The middle row is the expensive one, and it is the one that looks fine on inspection: "the
+colour is off" is a legitimate observation, it is anchored, it is not an instruction, and
+it is unfalsifiable in exactly the way that matters — only the critic can tell when it
+stops being true. Naming the target is not prescription. "The car is red" is a fact about
+the destination; "respray it with PPG Viper Red" is a route. A critic that will not say
+red is not protecting the builder's autonomy, it is running a guessing game.
+
+Withholding the route stays right, and `remedy` (Step 5) is its one licensed exception,
+unlocked after a builder has spent a round against a stated target and still missed. That
+gate only means anything if the target was stated. A `remedy` handed out to rescue a check
+that never named its target is the loop paying an extra round to say what round 1 should
+have said in six words.
+
+So the ways to reach a good result faster are not "say more": state the target in the
+check, make it decidable without an agent (`check_cmd`, above), and stop the loop early
+when the gap is not closeable here.
 
 ### Demand the visual when there is a visual to demand
 
@@ -423,12 +453,17 @@ eyeball it — measure it:
 python scripts/fanout.py calibration
 ```
 
-It reports the severity histogram per critic and flags five documented failure modes:
+It reports the severity histogram per critic and flags six documented failure modes:
 `INFLATION` (three quarters of findings blocking), `RUBBER-STAMP` (`accept` on almost no
 evidence), `OVER-APPROVED` (an approved list out of proportion to what was examined),
 `CHECK-AS-DEMAND` (a `check` that opens with an imperative — the most common quality leak
-in the loop), and `THIN-ANCHOR` (a blocker anchored only on a line number, which the first
-edit will lose).
+in the loop), `NO-TARGET` (a `check` that names the deviation and not the target — "the
+colour is off", which the builder can only answer by guessing), and `THIN-ANCHOR` (a
+blocker anchored only on a line number, which the first edit will lose).
+
+`NO-TARGET` is the one worth fixing before the builder sees the finding rather than after.
+The others cost you a misjudged severity or a weak approval; this one costs the round
+itself, and then the next one.
 
 **It is advisory and always exits 0.** Miscalibration is a reason to read a verdict
 yourself before folding on it, never a reason to hold a slice — a heuristic about tone must

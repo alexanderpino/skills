@@ -69,6 +69,29 @@ IMPERATIVES = frozenset("""
     verify check validate rewrite
 """.split())
 
+# A `check` must name the target state ("the body is #C8102E, as in reference.png"), not
+# the deviation ("the colour is off"). A deviation restates the claim and leaves the target
+# to be guessed — the builder paints the car blue and the round is spent. These are the
+# words that describe a gap without ever naming its far side.
+DEVIATIONS = frozenset("""
+    off wrong incorrect inconsistent inconsistently mismatched mismatch unclear confusing
+    insufficient inadequate suboptimal awkward clumsy poor poorly weak weakly unnatural
+    improper unpolished sloppy better worse cleaner nicer smoother tighter
+    too overly excessive excessively
+""".split())
+
+# ...unless the same sentence also carries a target. A number, a quoted or backticked
+# literal, a path, a hex colour, or a named referent all give the builder something to aim
+# at, and any of them redeems a sentence that also contains a deviation word.
+TARGET_TELLS = re.compile(
+    r"\d"                                            # any number: value, range, threshold
+    r"|[`\"']"                                       # a quoted or backticked literal
+    r"|#[0-9A-Fa-f]{3,8}\b"                          # a hex colour
+    r"|\b\w+\.(?:png|jpg|svg|md|json|ya?ml|csv|txt|cpp|h|py|ts|tsx|js|rs|go)\b"
+    r"|\b(?:matches?|matching|identical|equals?|same as|as in|per the|reference|"
+    r"baseline|rubric|brief|spec|specified|exactly)\b",
+    re.IGNORECASE)
+
 # Keywords that open a statement rather than a definition. A line starting with one of
 # these never defines anything, whatever shape the rest of it has.
 STATEMENT_KEYWORDS = frozenset("""
@@ -657,6 +680,15 @@ def cmd_calibration(args) -> None:
             elif first in IMPERATIVES:
                 flags.append(("CHECK-AS-DEMAND", f"{f.get('id')}: {check[:60]!r}",
                               "Phrase it as what would be observably true once fixed."))
+            # A check that describes the gap without naming its far side. The builder can
+            # only guess at the target, and the critic can reject every guess.
+            elif (words := {re.sub(r"[^a-z]", "", w.lower()) for w in check.split()}
+                  ) & DEVIATIONS and not TARGET_TELLS.search(check):
+                worst = sorted(words & DEVIATIONS)[0]
+                flags.append(("NO-TARGET", f"{f.get('id')}: {check[:60]!r}",
+                              f"'{worst}' says what is wrong, not what right looks like. "
+                              "Name the value, threshold or reference — or, if nothing "
+                              "fixes it, say the brief is underspecified instead."))
             anchor = f.get("anchor", {})
             if not anchor.get("symbol") and not anchor.get("quote"):
                 flags.append(("THIN-ANCHOR", f"{f.get('id')} has only a line hint",
