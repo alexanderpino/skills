@@ -71,7 +71,8 @@ Precipitation / Slump / Flow Field* →
 `erosion_streampower`, `erosion_droplet`, `erosion_pipe`, `shallow_water`, `erosion_thermal`,
 `diffusion.hillslope_diffuse`, `glacier.glacier_carve`, `snow.snow_step`, `runout.voellmy_runout`
 (scree/debris runout), `flow.priority_flood_fill` (= WM *Flow Restructure* / Gaea *HydroFix*: make the
-terrain drain), `flow.d8/mfd_accumulation` (= *Flow Field*/*FlowMap*). The many Gaea erosion *variants*
+terrain drain), `flow.d8/mfd/hybrid_accumulation` (= *Flow Field*/*FlowMap*; the hybrid is the
+one-pass MFD-on-hillslope / D8-once-channelised router `03` recommends). The many Gaea erosion *variants*
 (Wizard/EasyErosion/Erosion2) are presets/engines over the same hydraulic process — composites.
 
 ### Hydrology / water — covered or composite

@@ -216,10 +216,10 @@ def test_the_eval_readme_axis_table_matches_evals_json():
 
 
 # --------------------------------------------------------------------------- #
-# SIMULATION-AUDIT.md — the "Ours" column, which is where this document lied four times
+# SIMULATION-AUDIT.md — the "Ours" column, which is where this document lied five times
 #
 # ⚠️ THIS FILE GUARDED THE WRONG DOCUMENT FOR MONTHS. `CLAIMABLE` above covers only
-# NODE-PARITY-AUDIT.md, so SIMULATION-AUDIT.md's scorecard was unguarded, and four of
+# NODE-PARITY-AUDIT.md, so SIMULATION-AUDIT.md's scorecard was unguarded, and five of
 # its rows understated what ships:
 #
 #   Lava flow  — said "ejecta CA only ... **gap** ... upgrade: thermo-rheological CA",
@@ -237,8 +237,14 @@ def test_the_eval_readme_axis_table_matches_evals_json():
 #   Coastal    — said "simple cliff retreat", understating a notch -> thermal collapse ->
 #                retreat loop with a wave-cut platform (sims_illustrative.coastal_retreat).
 #                Only the wave-energy-proportional rate law is genuinely absent.
+#   Flow routing — said "D8 + MFD + priority-flood", omitting `flow.hybrid_accumulation`:
+#                the one-pass MFD-on-hillslope / D8-once-channelised router that `03`
+#                actually recommends, that `flow_anatomy` panel c is built on, and that the
+#                node graph exposes. Found by a harsh-critic pass AFTER the four above had
+#                been fixed and this guard written — because the row was never MAPPED, and
+#                an unmapped row is a row this file does not look at. See the mapping note.
 #
-# All four are the SAME failure and it is the expensive one: a reader planning work off
+# All five are the SAME failure and it is the expensive one: a reader planning work off
 # this scorecard sets out to build something that already exists.
 #
 # ⚠️ WHY THE PRIMARY CHECK IS "DOES THE CELL NAME THE CALLABLE", NOT "DOES IT SAY NOTHING".
@@ -250,16 +256,57 @@ def test_the_eval_readme_axis_table_matches_evals_json():
 # `&mdash;`, a trailing footnote marker, "docs only", "not implemented", "TBD". Only karst
 # ever LOOKED like an empty cell; lava, hydraulic and karst are one failure mode.
 #
-# So the primary row asserts the literal attribute name appears in the cell. There is no
-# regex to keep in step with a writer's imagination, and it fails on all four historical
-# defects. `_CLAIMS_NOTHING` is kept behind it as belt-and-braces — widened, and matched
-# against a NORMALISED cell — with the escape table pinned below as a parametrised negative
-# test, so a future narrowing of the matcher fails immediately instead of silently.
+# So the primary row asserts the literal attribute name appears in the cell, and it fails on
+# all five historical defects. `_CLAIMS_NOTHING` is kept behind it as belt-and-braces —
+# widened, and matched against a NORMALISED cell — with the escape table pinned below as a
+# parametrised negative test, so a future narrowing of the matcher fails immediately.
+#
+# ⚠️ BUT NAMING THE CALLABLE IS NECESSARY, NOT SUFFICIENT, AND THIS COMMENT USED TO CLAIM
+# OTHERWISE ("there is no pattern to maintain"). A cell can name the callable IN ORDER TO
+# DENY IT, and every such cell satisfied both guards: `` `lava_flow` is not implemented ``,
+# `` no `lava_flow` yet ``, `` TODO: write `lava_flow` ``, `` gap; `lava_flow` would go here ``
+# and four more are pinned in `_DENIALS_THAT_NAME_THE_CALLABLE` below. `_CLAIMS_NOTHING`
+# cannot help: it is anchored `^...$`, so it only fires on a cell that is ENTIRELY a
+# nothing-phrase, and none of these are. The negation patterns are exactly what the
+# "no pattern to maintain" claim failed to see — so there IS one now, `_NEGATION`, and it is
+# far smaller than the `_NOTHING`/`_ONLY` pair.
+#
+# ⚠️ AND IT IS SCOPED PER CLAUSE, NOT PER CELL, BECAUSE HONEST ROWS NEGATE THINGS. A blanket
+# "no negation word anywhere in the cell" would fail the karst row, whose
+# "**surface karst only** … **no subsurface conduits**" is the most precise cell in the
+# document, and the coastal row's "what is absent is the rate law". The distinction is which
+# clause the negation sits in: a row is dishonest when the negation binds to the CALLABLE, and
+# honest when it binds to something else the row is careful to exclude. So the cell is split
+# into clauses and only the clause NAMING the attribute is searched.
+#
+# ⚠️ AND HERE IS WHAT THAT DELIBERATELY CANNOT CATCH, SO NOBODY READS MORE INTO IT THAN IT
+# DOES. A denial moved into a NEIGHBOURING clause is indistinguishable, by shape alone, from
+# karst's honest qualifier: `` `lava_flow` — never finished `` and `` gap; `lava_flow` goes
+# here `` both pass, and so they must, because `` `landforms.karst_sinkholes` … ; **no
+# subsurface conduits** `` is the same construction with the negation about a different noun.
+# Which noun a negation is about is a judgement, and judgement stays with the reader here as
+# it does in the Verdict column. What the guard buys is the eight cells pinned below — every
+# one of which denies the callable INSIDE the clause that names it, and every one of which
+# passed both of the older guards.
 #
 # ⚠️ AND THE VERDICT IS STILL LEFT TO A HUMAN. A **gap** verdict can be perfectly honest
 # while something adjacent ships — karst is exactly that case: the surface expression exists,
 # the 3-D conduit network genuinely does not, and forcing that row to stop saying "gap" would
 # replace one false statement with another. The inventory is mechanical; the judgement is not.
+#
+# ⚠️ AN UNMAPPED ROW IS AN UNGUARDED ROW, AND THAT IS HOW THE FIFTH DEFECT SURVIVED. The
+# first version of this dict held only the four rows that had already been caught being
+# wrong, which made the guard a record of past corrections rather than a check on the
+# scorecard. "Flow routing / hydrology" was never in it, so nothing noticed that it omitted
+# `flow.hybrid_accumulation`. EVERY row of the Part 2 scorecard is now mapped, and
+# `test_every_scorecard_row_is_mapped` fails if a new row is added without one — a row this
+# file does not look at is a row that can say anything.
+#
+# The mapping names ONE callable per row, the one the row is principally about; where a row
+# covers several (tectonics, flow routing) the cell names them all and the mapped one is the
+# anchor. If a row ever genuinely ships nothing, the guard already handles it: `_exists`
+# returns False and the row SKIPS, so the honest "—" stays legal and only becomes a failure
+# on the day the callable lands. That is the property that makes mapping every row safe.
 
 SIMAUDIT_OURS = {
     # row subject                      -> (module, attribute) the "Ours" cell must NAME
@@ -270,6 +317,11 @@ SIMAUDIT_OURS = {
     "Sediment / deposition": ("erosion_pipe", "pipe_erode"),
     "Aeolian (dunes + abrasion)": ("aeolian", "yardang"),
     "Glacial": ("glacier", "glacier_carve"),
+    "Flow routing / hydrology": ("flow", "hybrid_accumulation"),
+    "Fluvial (large-scale)": ("erosion_streampower", "stream_power_evolve"),
+    "Thermal / hillslope": ("erosion_thermal", "thermal_erosion"),
+    "Tectonic / orogeny": ("tectonics", "plate_uplift"),
+    "Debris runout": ("runout", "voellmy_runout"),
 }
 
 # Dash characters a writer might reach for where a plain hyphen was meant: hyphen, non-breaking
@@ -299,6 +351,45 @@ def _plain(cell):
 def _strip_emphasis(cell):
     """Leading/trailing `**` only — for header and subject cells, where inner text is content."""
     return re.sub(r"^\**|\**$", "", cell.strip()).strip()
+
+
+# Words that turn a MENTION of a callable into a DENIAL of it. Kept deliberately short: this is
+# the whole "pattern to maintain" that the primary guard's docstring used to claim it had none of.
+_NEGATION = re.compile(
+    r"\b(?:not|no|none|never|planned|todo|backlog|would|yet|unlike|absent|missing|gap)\b", re.I)
+
+# Clause boundaries. A negation binds to the clause it sits in, so this is what makes
+# "**no subsurface conduits**" legal in a cell that also names `karst_sinkholes`. `\s-\s` is a
+# hyphen used as a dash; a hyphen inside a word (`wave-cut`, `thermo-rheological`) is not a break.
+_CLAUSE_SPLIT = re.compile(r"[;,()\[\]%s]|--+|\.\s|\s-\s" % _DASHES)
+
+
+def _clauses(cell):
+    """The cell split into clauses, with markdown emphasis and code ticks removed.
+
+    ⚠️ THIS MUST NOT STRIP `_`, and `_plain` above does. The thing being searched for here is a
+    PYTHON IDENTIFIER, and `re.sub(r"[*_`]", "", cell)` rewrites `lava_flow` as `lavaflow`, which
+    no attribute name can ever match — so every check built on it passes unconditionally. That is
+    not hypothetical: the first draft of this helper reused that character class and all eight
+    pinned denials below came back clean, which is the failure mode this whole file exists to
+    stop. `test_a_cell_that_names_the_callable_to_deny_it_is_rejected` is what caught it, and
+    its `assert "lava_flow" in cell` line is there so a fixture can never go vacuous the same way.
+    """
+    return [p for p in _CLAUSE_SPLIT.split(re.sub(r"[*`]", "", cell)) if p.strip()]
+
+
+def _denial_naming(attr, cell):
+    """`(token, clause)` if the cell names `attr` only to DENY it, else `None`.
+
+    Scoped per clause on purpose — see the block comment above. The question is never "does this
+    cell contain the word 'no'", it is "does the clause that names the callable deny it".
+    """
+    for clause in _clauses(cell):
+        if attr in clause:
+            hit = _NEGATION.search(clause)
+            if hit:
+                return hit.group(0), clause.strip()
+    return None
 
 
 # Cells that assert we ship nothing, matched against `_plain(...)` of the "Ours" cell only.
@@ -379,9 +470,16 @@ def test_the_ours_cell_names_the_callable_that_ships(subject):
     replaces — the hydraulic row, whose cell was not empty at all but confidently named the
     wrong model while `erosion_pipe.pipe_erode` sat two rows below it.
 
-    Asserting the literal attribute name is what makes this robust: `ejecta CA only`,
-    `Lagrangian droplet (Beyer/Lague)`, `**—**`, `&mdash;`, `docs only` and every other
-    spelling of "we have nothing" fail it identically, and there is no pattern to maintain.
+    Asserting the literal attribute name is what makes the first half robust: `ejecta CA only`,
+    `Lagrangian droplet (Beyer/Lague)`, `**—**`, `&mdash;`, `docs only` and every other spelling
+    of "we have nothing" fail it identically.
+
+    ⚠️ AND IT IS ONLY HALF. `attr in ours` is necessary, not sufficient: a cell can name the
+    callable IN ORDER TO DENY IT, and `` `lava_flow` is not implemented `` satisfies this row and
+    the belt-and-braces row below it while denying shipped code. So the cell must ALSO not negate
+    the callable in the clause that names it — scoped per clause, because the karst row's
+    "**no subsurface conduits**" and the coastal row's "what is absent is the rate law" are
+    precise, honest statements that a cell-wide negation test would destroy.
     """
     module_name, attr = SIMAUDIT_OURS[subject]
     if not _exists(module_name, attr):
@@ -393,6 +491,14 @@ def test_the_ours_cell_names_the_callable_that_ships(subject):
             "planning work off this scorecard would rebuild it. Name the callable in the Ours "
             "cell; leave the Verdict cell to a human, since a gap can be honest while something "
             "adjacent exists." % (subject, ours, module_name, attr))
+        denial = _denial_naming(attr, ours)
+        assert denial is None, (
+            "SIMULATION-AUDIT.md's %r row names %s.%s and then denies it: %r in the clause %r. "
+            "That callable exists and is callable. Naming a thing in order to say we do not have "
+            "it is the same drift as omitting it, and costs a reader the same rebuilt module. If "
+            "the negation is about something genuinely absent, put it in its OWN clause (the "
+            "karst row's '**no subsurface conduits**' is the model); if it is about the callable, "
+            "it is wrong." % (subject, module_name, attr, denial[0], denial[1]))
 
 
 @pytest.mark.parametrize("subject", sorted(SIMAUDIT_OURS))
@@ -448,6 +554,85 @@ def test_the_claims_nothing_matcher_does_not_swallow_a_real_claim(cell):
     assert not _CLAIMS_NOTHING.match(_plain(cell)), (
         "%r describes something we ship, but the matcher reads it as an empty cell; the "
         "belt-and-braces row would then fire on an honest row" % cell)
+
+
+# Cells that NAME the callable and satisfy `attr in ours` — and deny it in the same breath.
+# All eight passed both guards before `_denial_naming` existed. The sixth is the pre-fix lava
+# cell plus four words, which is how small the edit is that turns a caught defect loose again.
+_DENIALS_THAT_NAME_THE_CALLABLE = [
+    "`lava_flow` is not implemented",
+    "unlike `lava_flow`, we have none",
+    "— (see `lava_flow` in the backlog)",
+    "no `lava_flow` yet",
+    "gap; `lava_flow` would go here",
+    "ejecta CA only (`lava_flow` is planned)",
+    "TODO: write `lava_flow`",
+    "prose only — `lava_flow` not built",
+]
+
+
+@pytest.mark.parametrize("cell", _DENIALS_THAT_NAME_THE_CALLABLE)
+def test_a_cell_that_names_the_callable_to_deny_it_is_rejected(cell):
+    """The positive control for `_denial_naming`: every one of these must be caught.
+
+    Fixtures rather than the live document, deliberately — this pins the MATCHER, so narrowing
+    `_NEGATION` or `_CLAUSE_SPLIT` fails here immediately instead of months later on a real row,
+    which is the failure mode that produced this file in the first place.
+    """
+    assert "lava_flow" in cell, "fixture is broken: it must satisfy the `attr in ours` half"
+    assert _denial_naming("lava_flow", cell) is not None, (
+        "%r names `lava_flow` only to deny it, but the guard reads it as an honest claim; a "
+        "scorecard row spelled that way would deny shipped code unguarded" % cell)
+
+
+# The other side of the same line: honest rows that negate something OTHER than the callable.
+# The karst shape is the one that matters — it is the most precise cell in the document, and a
+# cell-wide (rather than clause-scoped) negation test would reject it.
+_SCOPED_QUALIFIERS_THAT_MUST_PASS = [
+    ("karst_sinkholes",
+     "**surface karst only** — `landforms.karst_sinkholes` (dolines on soluble rock, returning "
+     "the `sink_mask` of pits `03` must *not* fill); **no subsurface conduits**"),
+    ("coastal_retreat",
+     "**the full loop ships** — `sims_illustrative.coastal_retreat` iterates notch → collapse → "
+     "retreat. **What is absent is the rate law**"),
+    ("hybrid_accumulation",
+     "`flow.hybrid_accumulation` — MFD on the hillslope, D8 once a cell channelises; "
+     "D-infinity is deliberately not reimplemented"),
+    ("pipe_erode",
+     "**now: `erosion_pipe.pipe_erode`** (Mei-2007, conserved); SPL still has no "
+     "transport-limited closure"),
+]
+
+
+@pytest.mark.parametrize("attr,cell", _SCOPED_QUALIFIERS_THAT_MUST_PASS,
+                         ids=[a for a, _c in _SCOPED_QUALIFIERS_THAT_MUST_PASS])
+def test_a_scoped_qualifier_beside_a_named_callable_still_passes(attr, cell):
+    """The negative control: a negation in a DIFFERENT clause is a row being careful, not lying."""
+    assert attr in cell, "fixture is broken: it must name the callable"
+    assert _denial_naming(attr, cell) is None, (
+        "%r names %s and qualifies something else, but the guard reads it as a denial: %r. "
+        "Precision is what these cells are for; a guard that punishes it teaches writers to "
+        "delete the qualifier." % (cell, attr, _denial_naming(attr, cell)))
+
+
+def test_every_scorecard_row_is_mapped():
+    """An unmapped row is an unguarded row — and that is how the flow-routing defect survived.
+
+    The four rows this file was written for were all mapped; "Flow routing / hydrology" was not,
+    so its "D8 + MFD + priority-flood" cell could omit `flow.hybrid_accumulation` indefinitely
+    with the suite green. Mapping every row is what turns this file from a record of past
+    corrections into a check on the scorecard, and this row is what keeps it that way when
+    somebody adds a process.
+
+    A row that genuinely ships nothing is fine here: `_exists` fails and the guards SKIP, so an
+    honest "—" stays legal until the callable lands.
+    """
+    unmapped = sorted({subj for subj, _ours in _simaudit_rows()} - set(SIMAUDIT_OURS))
+    assert not unmapped, (
+        "these SIMULATION-AUDIT.md Part 2 scorecard rows have no SIMAUDIT_OURS entry, so nothing "
+        "checks what they claim we ship: %s. Add `subject: (module, attr)` naming the callable "
+        "the row is principally about — if none ships yet, map the one that WOULD and the guard "
+        "will skip until it does." % unmapped)
 
 
 def test_the_simulation_audit_mapping_is_not_stale():
