@@ -131,13 +131,11 @@ Record:
 
 ## Phase 1: architecture gate
 
-Spawn the Architect using `references/roles.md`. It produces prioritized,
-constraint-carrying backlog items. If throughput is maximized, front-load
-interfaces/scaffolding that unlock siblings and keep sibling predicted semantic
-targets disjoint. Never manufacture filler.
+Before decomposing tickets, ensure the structural blueprint exists. For any massive migration, invoke the **`/principal-architect`** skill first to generate the High-Level Design (HLD), Architecture Decision Records (ADRs), C4 models, and threat models. 
 
-Gate the initial backlog with the user, or with a Plan Reviewer in fully
-autonomous mode. An ungated self-decomposing pipeline can invent work.
+Once the blueprint is approved, spawn the internal Mission Control Architect using `references/roles.md`. It acts as a Task Decomposer: it reads the ADRs/HLD and produces prioritized, constraint-carrying backlog items. If throughput is maximized, front-load interfaces/scaffolding that unlock siblings and keep sibling predicted semantic targets disjoint. Never manufacture filler.
+
+Gate the initial backlog with the user, or with a Plan Reviewer in fully autonomous mode. An ungated self-decomposing pipeline can invent work.
 
 ## Phase 2: continuous routing loop
 
@@ -333,8 +331,15 @@ Every brief must include a byte-identical shared block at the very top. This blo
 - the overarching Mission Goal and Repo Oracle instructions.
 Because this block is identical for every agent (Scout, Implementer, Verifier), it allows the LLM provider to utilize Prefix Caching. The Orchestrator must ensure the dynamic, ticket-specific details (the evidence directory, item ID, worktree paths, and explicit prohibitions) are placed *below* this shared block.
 
-Each role owns one artifact. Gates matter even when roles must run
-sequentially.
+Each role owns one artifact. Gates matter even when roles must run sequentially.
+
+## Advanced Delegation (Fan-Out, Gauntlets, & Principal-Architect)
+
+As the macro-orchestrator, you should delegate specialized tasks to specialized sub-skills rather than using the standard internal loops for everything:
+
+- **Enterprise Design:** Before starting a massive mission, invoke **`/principal-architect`** to generate the required ADRs, C4 diagrams, and threat models. The internal Architect uses these as the ground-truth blueprint for backlog decomposition.
+- **Wide/Parallelizable Tickets:** If a ticket is broad but mechanically straightforward (e.g., "Refactor these 15 data-access models"), invoke the **`/fan-out`** skill in `partition` mode. Let `fan-out` handle the parallel execution and merge the final artifact back into the `mission-control` sandbox.
+- **High-Stakes/Algorithmic Tickets:** If a ticket requires quantitative perfection (e.g., "Optimize the physics loop"), invoke the **`/gauntlet-loop`** skill. Let the adversarial benchmark cycle prove the code before transitioning the ticket to `merge-pending`.
 
 ## Audit and recovery
 
