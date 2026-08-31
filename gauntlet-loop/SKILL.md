@@ -199,7 +199,7 @@ the unit the user agreed to; **tokens are the unit that actually burns**, so pas
 the bill arrives in. Without it, `status` says `tokens: not measured`, which is
 the honest reading and a poor one.
 
-## Phase 0 — First light
+## Phase 0 — First light & The Estimate
 
 **Before the contract, not after it.** Get one real artifact and one working
 inspection path in front of the user in a single step. It needs no permission:
@@ -216,7 +216,8 @@ one reversible build in the workspace.
    named comparator, or one you propose in a line: an external artifact you can
    open, not a checklist you wrote. Score against a **provisional target of 7**;
    Phase 2 sets the real one.
-4. **Show the user** the artifact and the verdict.
+4. **Generate the Estimate (The Purchase Order):** Enterprises require upfront cost predictability. Run `gauntlet.py estimate` based on the first light score, the target bar, and the predicted number of lanes. This command outputs a strict financial projection (e.g., predicted token burn, model tier breakdown, and hard ceiling).
+5. **Show the user** the artifact, the verdict, and the Estimate.
 
 Then the arithmetic, out loud, on **provisional** numbers: the *lanes* you expect
 to cut (independently judgeable parts of the artifact — Phase 3) and the default
@@ -323,6 +324,7 @@ The highest-leverage decision in the run. → `references/bar-selection.md`
   need a reference artifact of their own. And mid-run, a question whose answer
   is a *choice* is escaped fog: back to the map or the user, never decided ad
   hoc by a builder. → `references/bar-selection.md`
+- **Test-Driven Bar Generation (The Falsifiable Standard):** Before freezing the bar, spawn a Test Generation Agent. If the bar is a spec, API contract, or UI design, this agent MUST write a deterministic test suite (e.g., `pytest`, Playwright) that *proves* the bar has been met. Freeze these tests alongside the bar. This shifts the burden of proof from LLM opinion to mechanical reality.
 - **Targets are per dimension when the ambitions differ** —
   `--dimension-targets "gameplay=8,graphics=6"`, and retirement on each
   dimension is judged against its own number. A blanket "10/10 like the
@@ -412,8 +414,7 @@ contend on the git index and capture each other's half-built trees — disjoint
 
 Then, per lane, per round:
 
-1. **Build.** Builder gets the lane goal, the bar path, the current artifact and
-   the last named gap — not the previous builder's reasoning.
+1. **Build (The Rubber Duck):** Builder gets the lane goal, the bar path, the current artifact and the last named gap. **Crucially, the Builder MUST use a `<scratchpad>` block to compile, run, or lint its own code BEFORE submitting the final artifact.** This "rubber duck" self-correction step prevents trivial syntax errors from burning a wave.
    → `references/builder.md`
    When the gap splits into gate-checkable pieces, the builder may take up to
    three **micro-rounds** — build, run `gate`, build again — before one critic
@@ -424,7 +425,8 @@ Then, per lane, per round:
    and safe to run concurrently: its cache is locked, and a suite whose inputs
    another lane just moved simply re-runs. Machine checks cost seconds; making
    them a wave barrier to save those seconds would cost a wave. Then one critic
-   call covering both comparisons
+   call covering both comparisons.
+3. **Semantic Diffing (The AST Ratchet):** When providing the diff to the Critic, do NOT use a raw, noisy `git diff`. Use a semantic AST differ (or a filtered diff that ignores whitespace and imports). The Critic must only see the structural changes (e.g., "Function X logic changed") to prevent hallucinated verdicts based on formatting noise.
    (→ `references/critic.md`, `references/blind-protocol.md`):
    - **Promotion:** challenger vs champion, **blind by default** — both sides
      are ours, so this comparison is always blindable even when the bar is not:
@@ -539,6 +541,8 @@ unasked. Spending the savings without a grant is how "cheaper" quietly becomes
 
 Do not soften the open-gaps section. A report that reads as a victory lap is
 worth less than one that says exactly where the artifact is still weak.
+
+**Report the Fog of War:** For any lane that was parked or failed to reach the target, you MUST explicitly identify the "fog of war" that blocked it. Differentiate between a simple execution failure (the agent just couldn't write good enough code) and a structural wall (e.g., "The API we were told to use does not support async rendering," or "The physics engine is hard-locked at 30fps"). This tells the user exactly what architectural decisions they need to make before attempting another run.
 
 **Budget stop:** a budget stop means the money ran out, not that the artifact is
 done. Run `status` — it prints the offer material, the honest read and the priced

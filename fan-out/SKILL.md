@@ -208,7 +208,11 @@ authoritative context for this task. Do not go looking for additional context; i
 brief is insufficient, say so in your notes rather than improvising.
 
 Write your candidate to <run-dir>/candidates/<slice-id>.md (plus any code files it
-describes). End it with a "Notes" section: what you assumed, what you were unsure
+describes). 
+
+**CRUCIAL (The Rubber Duck):** Before submitting your final artifact, you MUST use a `<scratchpad>` block to compile, run, or lint your own code. Self-correct any trivial syntax errors or test failures before finalizing. 
+
+End it with a "Notes" section: what you assumed, what you were unsure
 about, and what you would check next.
 
 If the brief names a visual surface, produce it before you finish: run the render
@@ -596,7 +600,11 @@ Then read <run-dir>/rubric.md.
 VERIFICATION ROUND <N> for <slice-id>.
 
 Open findings to verify: <run-dir>/verdicts/<slice-id>.json (status == "open")
-In-scope diff and re-opened files: <paste the `scope` output>
+
+**Semantic Diff (The AST Ratchet):** 
+<paste a semantic diff or filtered diff here. Do NOT paste a raw, noisy git diff. Only show structural changes.>
+Re-opened files: <paste the `scope` output>
+
 Renders: <paste both paths — the new render dir and the previous one> — for any
 finding on a visual axis, decide it by comparing the two renders, not by reading the
 change that was supposed to produce them.
