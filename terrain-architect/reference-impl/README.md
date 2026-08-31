@@ -37,9 +37,7 @@ permission.
 
 ```bash
 cd terrain-architect/reference-impl
-pip install -r requirements.txt      # numpy, pytest
-pip install pillow                   # NOT in any requirements file; without it the four
-                                     # anatomy-figure guards skip silently (see below)
+pip install -r requirements.txt      # numpy, pytest, pillow
 pytest -q                            # 1231 pass, 6 skip — the optional checks below
 
 # optional independent checks (validity evidence beyond the numpy-only oracles):
@@ -51,13 +49,14 @@ pytest -q                            # all optional checks now run
 ⚠️ **The counts here were `129 pass; 15 optional checks skip` and `144 pass` for a long time,
 against a suite of 1231.** They are quoted because `VALIDATION.md` holds this file up as the one
 that described the optional-dependency gating correctly — which it did, two lines from a figure
-that was wrong by a factor of eight. Requoted from a measured run; `530` is the number of `def
+that was wrong by a factor of nine. Requoted from a measured run; `530` is the number of `def
 test` functions, `1236` the collected count after parametrised expansion, and the three are
 different quantities.
 
-⚠️ **Pillow is a real dependency of the test suite and is in no requirements file.**
-`tests/test_anatomy_figures.py` has a module-level `importorskip("PIL")`; `test_flow_anatomy.py`
-and `test_halfar_anatomy.py` have one each. Install it or those guards vanish without a word.
+⚠️ **Pillow is a real dependency and is now IN `requirements.txt`.** It was not, and the
+consequence was worse than the missing figure guards: `heightfield_io.py` raises `RuntimeError`,
+not `ImportError`, on a missing PIL, so `importorskip` cannot catch it and a bare install
+**failed** — `2 failed, 1224 passed, 9 skipped`, exit 1 — rather than skipping quietly.
 
 ## What's here, and how each is verified
 

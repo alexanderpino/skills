@@ -34,13 +34,24 @@ cases expand: `python3 -m pytest -q --collect-only` collects **1236**, and a ful
 **1231 passed, 6 skipped**. Neither number is the rigour claim; the point of the sentence is that
 all of them are self-consistency.
 
+⚠️ **1236 is this environment's number too, and the arithmetic below it does not close by
+accident.** `test_dimensional.py`'s `importorskip("pint")` is at MODULE level, so its 10 tests are
+removed from *collection* entirely: the same tree collects 1233 with numpy+pytest alone, 1236 with
+Pillow, and 1246 once pint is installed. And 1231 + 6 = 1237, not 1236 — because five of the six
+skips are function-level and inside the collected count while the sixth happens at collect time and
+is outside it. That reconciliation is stated because this page's own proof technique one paragraph
+down is "617 + 6 = 623 cannot be a run of it"; a reader applying that method here and finding an
+unexplained off-by-one would be right to distrust the page.
+
 ⚠️ **This paragraph carried a fabricated-looking transcript and it is worth recording how.** It
 previously quoted "436 `def test` functions" and a run of "617 passed, 6 skipped", introduced as
-*"re-measured 2026-08-30"* and *"not copied from the previous text"*. Neither was true of the tree
-it sat in: that commit's suite defined **463** functions and collected **713**, so 617+6 cannot be
-a run of it, and nothing deselects 90 tests. The wall-clock had been kept from a real run of an
-older tree while the counts were not re-read. Both figures are now measured immediately before
-being written, and the run below is pasted from the command as it actually printed.
+*"re-measured 2026-08-30"* and *"not copied from the previous text"*. Those figures were born in
+`27f6cf7`, whose suite defined **463** functions and collected **713** — so 617+6 = 623 cannot be a
+run of it, and nothing deselects 90 tests. ⚠️ **And they were still there ten commits later**, at
+`1d44fb1`, by which point the suite had grown to **530 / 1236**: the gap at the moment of
+correction was 613, not 90. The wall-clock had been kept from a real run of an older tree while the
+counts were not re-read, and then nothing noticed for ten commits. Any count this page attributes
+to a past tree now cites the SHA it was measured on, so `git archive <sha>` reproduces it.
 
 ## The evidence ladder (weakest → strongest) and current status
 
@@ -122,11 +133,16 @@ mistaken for the rung having been exercised:
 | Stream power | Landlab `FastscapeEroder` | slope-area exponent = −m/n, and agree | `test_crossvalidate_landlab.py:79` | ⏭ skipped |
 | Hillslope diffusion | Landlab `LinearDiffuser` | single-mode decay factor matches | `test_crossvalidate_landlab.py:107` | ⏭ skipped |
 
-**What the default suite does prove.** Pasted from the command as it printed, on a container with
-`numpy`, `pytest` and `pillow` installed and nothing else:
+**What the default suite does prove.** On a container with `numpy`, `pytest` and `pillow`
+installed and nothing else. ⚠️ **The `| tail -8` is part of the transcript, not decoration.** `-q`
+prints a progress line per 72 tests whether or not stdout is a terminal, so the real output is 26
+lines and this is its last 8. An earlier version of this block showed the same 8 lines and called
+them "pasted from the command as it printed" — which was the very defect this paragraph exists to
+record, committed one paragraph below the warning about it. If the elision is not in the command,
+the paste is not a paste.
 
 ```
-$ python3 -m pytest -q -rs
+$ python3 -m pytest -q -rs | tail -8
 =========================== short test summary info ============================
 SKIPPED [1] tests/test_dimensional.py:18: could not import 'pint': No module named 'pint'
 SKIPPED [1] tests/test_crossvalidate.py:26: could not import 'richdem': No module named 'richdem'
@@ -137,17 +153,32 @@ SKIPPED [1] tests/test_crossvalidate_landlab.py:107: could not import 'landlab':
 1231 passed, 6 skipped in 490.35s (0:08:10)
 ```
 
-So: rungs 3 and 5 — the analytic benchmarks and the real-DEM comparison — **did** run. Rungs 1 and 2
-did not. Install `requirements-crossvalidate.txt` and `requirements-validate.txt` to exercise them.
+So: rung 3 — the analytic benchmarks — **did** run. ⚠️ **Rung 5's ESTIMATOR ran; its real-DEM half
+did not.** `tests/test_empirical_dem.py` says so in its own docstring — "`fetch_dem` needs the
+network, so it cannot be exercised here beyond its documented failure path" — and mocks `urlopen`.
+No run of this suite re-derives a single number in the rung-5 table; those are a dated measurement,
+not a test. Rungs 1 and 2 did not run either. Install `requirements-crossvalidate.txt` and `requirements-validate.txt` to exercise them.
 
 ⚠️ **"The six skips are exactly the optional rungs" is only true in an environment that has
 Pillow, and Pillow is in no requirements file.** `tests/test_anatomy_figures.py` carries a
 **module-level** `importorskip("PIL")`, and `test_flow_anatomy.py` and `test_halfar_anatomy.py`
-each carry one — so a genuinely bare `requirements.txt` install silently skips the figure guards
-too, three of which this document cites as evidence elsewhere. `tests/test_heightfield_io.py`
-skips again when the SRTM tile is neither reachable nor cached, and `.dem_cache/` is gitignored,
-so a fresh offline clone sees more still. The run above is *this* environment's six, not a
-property of the suite. A skip is not evidence, and that applies to this page's own transcript.
+each carry one — so a bare install adds **three skip entries, covering four figures and five
+tests**.
+
+⚠️ **And it does not merely skip: a bare install FAILS, exit 1.** `heightfield_io.py:59,94` raise
+`RuntimeError`, not `ImportError`, so `importorskip` cannot catch them and
+`tests/test_heightfield_io.py` reports **2 failed, 1224 passed, 9 skipped**. Measured in a real
+venv with `requirements.txt` and nothing else. The irony is exact: that file is the one an earlier
+version of this warning named as an extra *skip* source, and in the install that sentence is about
+it is a *failure* source. **Pillow is therefore a real dependency of the suite and is now in
+`requirements.txt`** — the alternative, converting those two `RuntimeError`s into skips, buys the
+"numpy-only" label by turning two real assertions into silence, which this page's own doctrine
+forbids.
+
+`tests/test_heightfield_io.py` also skips when the SRTM tile is neither reachable nor cached, and
+`.dem_cache/` is gitignored, so a fresh offline clone sees more still. The run above is *this*
+environment's six, not a property of the suite. A skip is not evidence, and that applies to this
+page's own transcript.
 
 ## Rung 3 — published-benchmark agreement
 
