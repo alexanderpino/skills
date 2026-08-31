@@ -438,6 +438,23 @@ def test_every_cited_line_number_is_inside_the_file():
 def test_pinned_snippets_appear_near_the_line_they_pin():
     """Where prose pins a line AND quotes the code there, the quote must be within ±3 lines.
 
+    ⚠️ THIS ROW IS DORMANT AND HAS NEVER FIRED ON THIS CORPUS. Measured: 38 citations carry a
+    usable line pin, and **zero** quoted spans reach the comparison. It is fixture-tested only,
+    so by this repo's own rule — a guard that has never been seen to fail is not known to be a
+    guard — it is not yet evidence of anything. It is labelled rather than deleted because the
+    check it wants to make is real, and because a dormant row nobody has flagged is exactly how
+    a reader comes to believe a claim is guarded when it is not.
+
+    The reason it is dormant is worth keeping, because the obvious fix is wrong. A first version
+    admitted any span holding an `=` or a `(`. That is satisfied by `(bed, H, abrasion)` — a type
+    signature — and by `τ_y = max(τ_y0 + gain·(T_solidus − T), 1)` — typeset maths — and it would
+    have failed both of those where they are written truthfully. Requiring the span to parse as
+    Python excludes them, and excludes everything else currently sitting on a pinned line too.
+
+    Making it live needs a corpus convention that marks a quotation AS a quotation, which does
+    not exist today. Until one does, a dormant labelled row is the honest state; a live row that
+    fails honest prose would be worse than no row, because it would be edited away.
+
     Narrow on purpose. It fires only when a backticked span sits on the same markdown line as a
     `file.py:NN` citation, holds no path separator, and is not itself a citation. Pins drift by a
     line or two under ordinary editing; ±3 forgives that and still catches a quote whose code has
