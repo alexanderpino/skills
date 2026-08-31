@@ -19,6 +19,15 @@ The table is now parsed rather than trusted: every module it lists must be impor
 function it names in that column must be callable here, and what comes back must contain a finite
 2-D array. `test_the_column_rejects_the_two_entries_that_were_wrong` is the control — it runs the
 two removed callables through the same checker and asserts they fail it.
+
+⚠️ AND THE OTHER HALF OF THE CELL, WHICH WAS UNGUARDED WHILE THE COLUMN READ AS VERIFIED. Each
+cell is `callable` **→** `named returns`, and the parser used to keep only the left. The `ndim=2`
+check unwraps a returned dict and passes on ANY 2-D numeric array inside it, so the field names
+printed to the right of the arrow — `simulate` → `depth` / `discharge` / `speed` — were matched
+against nothing. Renaming that `discharge` key to `flux` made GALLERY.md:86 stale with this whole
+file green; it now fails, while the `ndim=2` row still passes, which is what shows the gap was in
+the second half of the cell and not the first. Four of the twenty-two pairs name their returns:
+two dicts, checked as a key subset, and two positional tuples, checked on arity only.
 """
 import re
 from pathlib import Path
@@ -119,11 +128,40 @@ def _fields(obj, depth=0):
     return [a] if a.ndim == 2 and a.dtype.kind in "fiub" else []
 
 
-def _table_rows():
-    """`module -> [names in the '2-D field it returns' column]`, parsed from GALLERY.md.
+_NAME = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)`")
+_TUPLE = re.compile(r"`\(([^`)]*)\)`")
+
+
+def _named_return(text):
+    """`(kind, names)` for the text RIGHT of a cell's `→`, which names the returned fields.
+
+    Three shapes appear in that column, and only two of them say anything a machine can check:
+
+      - ``` `(bed, Q)` ```     — a positional tuple. The names are documentation, but the
+                                 ARITY is a fact about the return value.
+      - ``` `depth` / `discharge` / `speed` ``` — the keys of a returned dict, which are facts.
+      - `snow depth`, `bed`, `an imported DEM` — prose. Unbackticked, so it yields nothing and
+        is not asserted against; a description is not a promise about an identifier.
+    """
+    m = _TUPLE.search(text)
+    if m:
+        return "tuple", [t.strip() for t in m.group(1).split(",") if t.strip()]
+    names = _NAME.findall(text)
+    return ("dict", names) if names else (None, [])
+
+
+def _table_cells():
+    """`module -> (callables left of the `→`, kind and field names right of it)`.
 
     Only the second column is read. The fourth carries prose that legitimately names other
     modules and the two entries this column had to drop, and reading it would re-introduce them.
+
+    ⚠️ THE RIGHT OF THE `→` USED TO BE THROWN AWAY. This parser split on `→`, kept the left, and
+    dropped the rest as "outputs, not callables" — true, and it left the output names unchecked
+    by anything. `_fields` unwraps a returned dict and asks only whether some 2-D numeric array
+    is in there, so GALLERY.md:86 could print `simulate` → `depth` / `discharge` / `speed` while
+    the function returned `flux`, and the whole suite stayed green. The names are now returned
+    too, and `test_the_return_field_names_are_the_ones_actually_returned` asserts them.
     """
     text = GALLERY.read_text(encoding="utf-8")
     head = "| Module | 2-D field it returns"
@@ -137,13 +175,35 @@ def _table_rows():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if len(cells) < 2:
             continue
-        module = re.findall(r"`([A-Za-z_][A-Za-z0-9_]*)`", cells[0])
+        module = _NAME.findall(cells[0])
         assert module, "table row names no module: %r" % line
-        # Only what is left of the `→`. To its right the cell names the RETURN FIELDS
-        # (`depth` / `discharge` / `speed`), which are outputs, not callables.
-        entry = cells[1].split("→")[0]
-        rows[module[0]] = re.findall(r"`([A-Za-z_][A-Za-z0-9_]*)`", entry)
+        entry, _, returns = cells[1].partition("→")
+        rows[module[0]] = (_NAME.findall(entry), _named_return(returns))
     return rows
+
+
+def _table_rows():
+    """`module -> [names in the '2-D field it returns' column]` — the callables only."""
+    return {mod: fns for mod, (fns, _ret) in _table_cells().items()}
+
+
+def _table_returns():
+    """`(module, fn, kind, names)` for every row whose cell names its returned fields.
+
+    A row that names fields must name exactly one callable, or there is no saying whose return
+    value those names describe — the rows that do this today (`braided`, `meander`,
+    `shallow_water`, `glacier`) each name one.
+    """
+    out = []
+    for mod, (fns, (kind, names)) in sorted(_table_cells().items()):
+        if not kind:
+            continue
+        assert len(fns) == 1, (
+            "GALLERY.md's row for `%s` names %d callables and then names return fields %s after "
+            "the arrow; with more than one callable there is no saying whose return that "
+            "describes — split the row or drop the field names" % (mod, len(fns), names))
+        out.append((mod, fns[0], kind, tuple(names)))
+    return out
 
 
 def test_the_table_names_exactly_the_modules_this_file_calls(tmp_path):
@@ -177,6 +237,42 @@ def test_every_function_the_table_names_returns_a_finite_2d_field(module, fn, tm
     for a in fields:
         assert np.isfinite(np.asarray(a, float)).all(), (
             "%s.%s returns a 2-D field with non-finite values" % (module, fn))
+
+
+@pytest.mark.parametrize("module,fn,kind,names", _table_returns())
+def test_the_return_field_names_are_the_ones_actually_returned(module, fn, kind, names, tmp_path):
+    """The other half of the cell: `simulate` **→ `depth` / `discharge` / `speed`**.
+
+    ⚠️ THIS HALF WAS UNGUARDED WHILE THE ROW READ AS VERIFIED. The `ndim=2` check above unwraps a
+    returned dict and passes as soon as ANY 2-D numeric array is found in it, so the key names the
+    table prints were never matched against the keys the function returns. Renaming
+    `shallow_water.simulate`'s `discharge` key to `flux` left this file green and GALLERY.md:86
+    stale — which is the same failure mode as the two `ndim=3` cells, one column-half over.
+
+    Dict rows assert the printed names are a SUBSET of the keys: the table quotes the fields worth
+    naming, not the whole return (`simulate` also returns `budget`), so `<=` is the true relation
+    and `==` would fail on a function growing an output the table has no reason to list.
+
+    Tuple rows (`braided_river` **→ `(bed, Q)`**) can only be checked on arity — the names there
+    are positional labels, not identifiers the return value carries — so that is what is asserted,
+    and the docstring says so rather than implying more.
+    """
+    result = _calls(tmp_path)[(module, fn)]()
+    if kind == "dict":
+        assert isinstance(result, dict), (
+            "GALLERY.md names %s.%s's return fields %s, which only reads as a claim about dict "
+            "keys, but it returned %s" % (module, fn, list(names), type(result).__name__))
+        missing = sorted(set(names) - set(result))
+        assert not missing, (
+            "GALLERY.md's row for %s.%s prints return fields %s; %s not in the returned keys %s "
+            "— the table is stale" % (module, fn, list(names), missing, sorted(result)))
+    else:
+        assert isinstance(result, (tuple, list)), (
+            "GALLERY.md prints %s.%s's return as the tuple %s, but it returned %s"
+            % (module, fn, list(names), type(result).__name__))
+        assert len(result) == len(names), (
+            "GALLERY.md's row for %s.%s prints a %d-tuple %s; it returns %d values — the table "
+            "is stale" % (module, fn, len(names), list(names), len(result)))
 
 
 def test_the_column_rejects_the_two_entries_that_were_wrong(tmp_path):

@@ -158,6 +158,27 @@ def outlet_conservation(dem, acc, cellsize=CELLSIZE):
     what it holds to lower neighbours, so all of it arrives at cells with nowhere lower to go.
     Exact, DEM-independent, no constant to tune -- and it separates the splice from the router by
     nine orders of magnitude: 1.039 against 1.0 +/- 1e-12.
+
+    ⚠️ SCOPE: THIS IS A WATER BUDGET, NOT A ROUTING CHECK, and the name invites the stronger
+    reading. It says every unit of area arrives SOMEWHERE with nowhere lower to go. It is blind
+    to WHICH lower neighbour received it, and therefore to every question of routing correctness
+    -- direction, dispersion, the shape of the channel network. Two demonstrations on this
+    figure's own 160x160 fixture:
+
+        MFD p=1.1  -> outlet 1.000000000000, half-drainage 1807 cells   (the shipped p)
+        MFD p=0.05 -> outlet 1.000000000000, half-drainage 2778
+        MFD p=4.0  -> outlet 1.000000000000, half-drainage 1045
+
+    `p` is the whole of Freeman-1991 dispersion -- it is the only knob separating "broad damp
+    smear" from "single thread", and it moves the statistic panel d is built on by 2.7x -- yet
+    every value conserves, worst residual 3.3e-16 across p in [0.05, 4]. Likewise, reversing the
+    order of `flow._NB` changes D8's tie-break, moving one cell's receiver and two cells'
+    accumulation values, and the outlet sum does not move at all.
+
+    So a router could send every cell's water to the WRONG lower neighbour and still score
+    1.000000000000 here. This invariant is what catches a compositing step masquerading as a
+    routing (the splice, at 1.039); the routing itself is checked by the direction rows and by
+    the hybrid's two limit cases, not by this.
     """
     acc = np.asarray(acc, float)
     domain = float(acc.size) * float(cellsize) * float(cellsize)

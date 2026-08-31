@@ -102,8 +102,33 @@ def test_the_hybrid_conserves_drainage_which_a_splice_does_not(dem, name):
     returns 1.000000000000 for D8, MFD and the hybrid on all three DEMs here — and 1.039 for
     the splice, nine orders of magnitude away.
 
-    The `<= mfd + 0.01` half is kept: it survived every DEM tried, and it is the cheap second
-    lock that says the hybrid never disperses harder than the parent it disperses like.
+    ⚠️ WHAT THIS ROW DOES NOT CHECK, because its name reads stronger than it is. It is a WATER
+    BUDGET: every unit of area arrives somewhere with nowhere lower to go. It says nothing about
+    WHICH lower neighbour received it, so it is blind to routing correctness — a router that sent
+    every cell's water to the wrong neighbour would still score 1.000000000000. See
+    `test_the_conserved_total_is_blind_to_where_the_water_went`, which demonstrates that on the
+    dispersion exponent and on D8's tie-break rather than asserting it in prose. The routing
+    itself is checked by the direction rows and by the two limit cases above.
+
+    ⚠️ AND THE SECOND HALF OF THIS ROW WAS DELETED, because it was the SAME FITTED BOUND AGAIN.
+    It read `assert ratio <= mfd_ratio + 0.01` on `hybrid.sum()/d8.sum()`, described as "the
+    cheap second lock that says the hybrid never disperses harder than the parent it disperses
+    like". That is `test_the_hybrid_degenerates_to_each_parent_at_the_limits`'s already-retracted
+    claim — "a composition cannot be outside the pair it composes" — in a second statistic, kept
+    alive by a 0.01 fudge factor. It is false: the hybrid builds a THIRD field and its total
+    lands outside its parents. On `flow.priority_flood_fill(default_rng(36).normal(size=(24,24))
+    * 10)` the hybrid scores 1.0736 against MFD's 1.0552 — 0.0184 over, nearly twice the
+    allowance — while all three routers conserve to 2.2e-16. Nor is that DEM cherry-picked to
+    death: 8 of the 180 filled white-noise DEMs at n = 24/32/40 and seeds 0-59 breach the bound,
+    and 1 of 40 on an independent draw. It also caught nothing the row above misses. The only
+    defect it was aimed at is the
+    splice, and the only DEM parametrised here where the splice is a splice is the fixture — on
+    the corner plane and the 4 m ramp `np.where` picks MFD everywhere, so there is no defect to
+    catch (see `test_the_splice_the_figure_used_to_draw_is_caught`). On the fixture the splice
+    scores 1.583 against a 1.119 bound, but the outlet invariant already separates it by nine
+    orders of magnitude and that control pins it directly. So: no unique catch, and a measurable
+    false-failure rate on ordinary DEMs. That is worse than no check.
+    `test_the_hybrid_total_is_not_bracketed_by_its_parents` keeps the counterexample.
     """
     dem = {"fixture": dem, "corner-plane": _corner_plane(),
            "ramp-amp-4": _ramp(4.0)}[name]
@@ -114,11 +139,87 @@ def test_the_hybrid_conserves_drainage_which_a_splice_does_not(dem, name):
             "%s on %s delivers %.12f of the domain area to its outlets; a one-pass routing "
             "must deliver exactly 1 — water is being created or destroyed"
             % (label, name, share))
+
+
+def _white(n=24, seed=36):
+    """A filled white-noise DEM. No ramp, no structure — the ordinary case, not a pathology."""
+    return flow.priority_flood_fill(np.random.default_rng(seed).normal(size=(n, n)) * 10.0)
+
+
+def test_the_hybrid_total_is_not_bracketed_by_its_parents():
+    """⚠️ THE COUNTEREXAMPLE THAT RETIRED THE `<= mfd + 0.01` BOUND. Keeps it from coming back.
+
+    The intuition the deleted bound encoded — the hybrid disperses somewhere between D8 and MFD,
+    so its accumulation total must too — is wrong for the same reason the limit-cases row gives:
+    a one-pass hybrid is a third routing, not a blend of two finished ones. Its total counts
+    PATH LENGTH, and switching regime mid-descent can thread water through more cells than either
+    parent would have.
+
+    This row asserts the two facts together, because either alone is misreadable: the hybrid's
+    total exceeds MFD's here by more than the retired allowance, AND all three routers conserve
+    exactly. The second is what makes the first a fact about the statistic rather than a bug.
+    """
+    dem = _white()
+    d8, mfd, hybrid = FA.routings(dem)
     ratio, mfd_ratio = hybrid.sum() / d8.sum(), mfd.sum() / d8.sum()
-    assert ratio <= mfd_ratio + 0.01, (
-        "the hybrid threads water through more cells than pure MFD (%.3f vs %.3f relative to "
-        "D8) on %s — it is compositing finished fields, not routing"
-        % (ratio, mfd_ratio, name))
+    assert ratio > mfd_ratio + 0.01, (
+        "the hybrid no longer exceeds MFD's total by more than the retired 0.01 allowance here "
+        "(%.4f vs %.4f); if this is now a real bound someone should say so deliberately rather "
+        "than let it drift back in" % (ratio, mfd_ratio))
+    for label, acc in (("D8", d8), ("MFD", mfd), ("hybrid", hybrid)):
+        share = FA.outlet_conservation(dem, acc)
+        assert abs(share - 1.0) < 1e-9, (
+            "%s fails conservation (%.12f) on the very DEM used to show the total is not "
+            "bracketed — the counterexample would then be a bug, not a fact" % (label, share))
+
+
+def test_the_conserved_total_is_blind_to_where_the_water_went(dem):
+    """⚠️ THE SCOPE OF `outlet_conservation`, demonstrated rather than promised.
+
+    It is a WATER BUDGET, and its name reads like a routing check. It says every unit of area
+    ends up somewhere with nowhere lower to go; it does not say the water took the right path.
+    Two routers can disagree about every receiver and both score exactly 1.
+
+    Dispersion. `p` is the whole of Freeman-1991 — the only knob between a single thread and a
+    broad damp smear. Sweeping it 0.05 -> 4.0 moves `half_drainage_cells`, the statistic panel d
+    is built from, by about 2.7x (2778 -> 1045 on this fixture), and every value conserves.
+
+    Direction. Reversing `flow._NB` changes D8's tie-break, so a cell with two equally steep
+    lower neighbours picks the other one. The receiver field changes and the outlet sum does not.
+
+    This row exists so nobody reads the conservation row as covering routing correctness. It
+    fails only if conservation stops being blind — which would mean the invariant had quietly
+    become something else.
+    """
+    halves = {}
+    for p in (0.05, 1.1, 4.0):
+        acc = flow.mfd_accumulation(dem, FA.CELLSIZE, p=p)
+        share = FA.outlet_conservation(dem, acc)
+        assert abs(share - 1.0) < 1e-9, (
+            "MFD at p=%g delivers %.12f — conservation is supposed to hold for every "
+            "dispersion exponent" % (p, share))
+        halves[p] = FA.half_drainage_cells(acc)
+    assert halves[0.05] > 2.0 * halves[4.0], (
+        "p no longer changes the concentration statistic much (%s), so this row has stopped "
+        "demonstrating that conservation is blind to something that matters" % halves)
+
+    original = flow._NB
+    try:
+        flow._NB = tuple(reversed(original))
+        flipped_rec, _ = flow.d8_receivers(dem, FA.CELLSIZE)
+        flipped_acc = flow.d8_accumulation(dem, FA.CELLSIZE)
+    finally:
+        flow._NB = original
+    rec, _ = flow.d8_receivers(dem, FA.CELLSIZE)
+    moved = int((flipped_rec != rec).any(axis=-1).sum())
+    assert moved > 0, (
+        "reversing the neighbour order changed no receiver, so this half of the row is not "
+        "demonstrating anything; the fixture has stopped containing a tie")
+    share = FA.outlet_conservation(dem, flipped_acc)
+    assert abs(share - 1.0) < 1e-9, (
+        "D8 with a reversed neighbour order routes %d cells differently and delivers %.12f; "
+        "conservation is supposed to be indifferent to which lower neighbour receives"
+        % (moved, share))
 
 
 def test_the_splice_the_figure_used_to_draw_is_caught(dem):
