@@ -62,6 +62,26 @@ def test_ice_volume_is_conserved():
         "the sum to round-off" % err)
 
 
+def test_the_memoised_arrays_cannot_be_written_through():
+    """⚠️ `evolve` IS `lru_cache`D AND `profile` HANDS BACK VIEWS INTO WHAT IT RETURNS.
+
+    Every row in this file, and every panel in the figure, reads the same three arrays out of
+    one memoised eight-step run. A single write anywhere — a `-=` meant to be local, a
+    normalisation done in place — would poison every consumer downstream of it in the same
+    process, silently and only sometimes. The docstring said "read-only by convention" and the
+    arrays were writeable; now the flag says it too, and this row is what keeps the two
+    agreeing.
+    """
+    r, _c, h_init, h = HA.evolve(8)
+    for name, arr in (("radius", r), ("h_init", h_init), ("h", h)):
+        assert not arr.flags.writeable, (
+            "evolve's %s array is writeable, so one stray in-place edit anywhere in this "
+            "process silently rewrites the benchmark for every later row" % name)
+    _rad, prof, _hc, _rn = HA.profile(h, r, _c)
+    with pytest.raises(ValueError):
+        prof[0] = 0.0
+
+
 def test_the_dome_spreads_the_way_a_self_similar_solution_must():
     """Centre thins while the margin advances — the direction, not just the magnitude."""
     r, c, h_init, h = HA.evolve(8)
