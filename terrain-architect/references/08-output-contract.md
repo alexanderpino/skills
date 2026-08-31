@@ -578,21 +578,32 @@ masks summing to **3.0** the output is still inside the convex hull of its input
 the compositing *order* silently arbitrates a conflict nobody chose to have, and **that path
 cannot report the bug**.
 
-Under a **base-less weighted sum it reports it loudly**, and the `Σ wᵢ · materialᵢ` shader two
+Under a **base-less weighted sum it can report it**, and the `Σ wᵢ · materialᵢ` shader two
 paragraphs above is not hypothetical — it is `render.material_rgb`, which ships in the same
 module as `splat_blend` and which `GROUNDING.md` names as the **default** colorizer (`gallery.py`
-and `graph_demo.py` feed `06` masks straight into it). Measured on a pale-terrain palette,
-`shade=False`: `Σ = 1.00` gives unclipped `[205 211 223]` and shipped `[204 211 222]` — inside the
+and `graph_demo.py` feed `06` masks straight into it). Measured on a pale-terrain palette:
+`Σ = 1.00` gives unclipped `[205 211 223]` and shipped `[204 211 222]` — inside the
 palette's hull, ±1 for the float→uint8 truncation; `Σ = 1.80` gives unclipped `[369 380 401]` and
 shipped `[255 255 255]`, every channel over and every channel clipped. That is the rescale, the brightness
 error and the out-of-range value, together. Chained `blend_rgb` in a non-`normal` mode is worse
 still — monotone dimming toward black under `multiply` and toward white under `screen` as `Σ`
 rises, which is exactly the blotchy lighting named above.
 
-**So whether the bug is visible depends on which compositor a consumer picked** — and a producer
-cannot know that. Which is precisely why `14` puts the `Σ ≤ 1` assertion at the fan-in: one place,
-independent of the consumer, rather than relying on a downstream operator that may be the one that
-stays silent. (`reference-impl/tests/test_mask_partition.py`)
+⚠️ **"Can" and not "does": the weighted sum only reports where the palette has no headroom.** The
+numbers above are the pale palette, the best case. The shipped call sites pass *no* palette and get
+`render._MATERIAL_PALETTE`, whose materials leave 8-bit range at `Σ = 255 / max(channel)` —
+snow **1.02**, sand **1.28**, water **1.50**, grass **1.93**, rock **2.13** — so at that same
+`Σ = 1.80` four of the fifteen single- and pair-combinations (`rock`, `grass`, `water+grass`,
+`rock+grass`) clip nothing whatever. A real `derive_materials` bug that doubles every mask exports
+an ordinary steep hillside as an in-gamut pale sage `[216 250 188]`, 0 of 4096 pixels clipped,
+while the same bug on snowy ground clips ~7% of the frame. Only the clip is self-evident, too: the
+brightness half is not an error you can see without a reference image.
+
+**So whether the bug is visible depends on which compositor a consumer picked** — and, for the one
+that reports, on which palette it was handed. A producer cannot know either. Which is precisely why
+`14` puts the `Σ ≤ 1` assertion at the fan-in: one place, independent of the consumer, rather than
+relying on a downstream operator that may be the one that stays silent.
+(`reference-impl/tests/test_mask_partition.py`)
 
 **Resolution.** Splatmaps are usually 1/2 or 1/4 the heightmap resolution. They're
 pixel-centred while the heightmap is vertex-centred (see above) — mind the offset.

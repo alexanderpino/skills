@@ -337,12 +337,19 @@ Two consequences worth stating because they surprise people:
   the same ground produce no artefact at all, and node insertion order quietly decides which one
   wins — the same order-dependence rule (1) above exists to forbid. But if the consumer is a
   base-less weighted sum — `render.material_rgb`, `Σ wᵢ·materialᵢ`, which ships beside
-  `splat_blend` and is the default colorizer — the same masks drive channels past 255 and clip:
+  `splat_blend` and is the default colorizer — the same masks can drive channels past 255 and clip:
   `Σ = 1.8` on a pale palette gives an unclipped `[369 380 401]`, shipped as `[255 255 255]`.
-  So the defect is either invisible or a hard clip depending on a downstream choice. The producer
-  cannot know which, which is exactly why the check belongs here — one place, independent of the
-  consumer — and not in whichever compositor happens to be wired up.
-  (`reference-impl/tests/test_mask_partition.py`)
+
+  ⚠️ **And even that one reports conditionally**, which strengthens the case for checking here
+  rather than weakening it. Its sensitivity is set by the palette a consumer passes, another thing
+  this node cannot see: on the palette the shipped call sites actually get
+  (`render._MATERIAL_PALETTE`) a material leaves 8-bit range only at `Σ = 255 / max(channel)` —
+  snow 1.02, sand 1.28, water 1.50, grass 1.93, rock 2.13 — so at `Σ = 1.8` a rock-and-grass
+  hillside clips nothing, and a real producer bug doubling every mask can export entirely in gamut
+  (0 of 4096 pixels clipped). So the defect is invisible, or a hard clip, depending on **two**
+  downstream choices the producer cannot make and cannot see. That is exactly why the check belongs
+  here — one place, independent of the consumer — and not in whichever compositor happens to be
+  wired up. (`reference-impl/tests/test_mask_partition.py`)
 
 **Tier.** **F** — an editor-ergonomics pattern, not a result. The correctness rules are not
 discretionary though: they are the purity contract at the top of this chapter applied to a node that

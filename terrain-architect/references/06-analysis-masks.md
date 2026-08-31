@@ -465,33 +465,55 @@ snow is white because it is a white *substance*, not because "high == white".
   splatmap "silently rescales"; the correction that replaced it over-reached in the other direction
   and said there is no artefact *at all*. Both are wrong, because "the compositor" is not one thing.
   Measured on `reference-impl/render.py` with a realistic pale-terrain palette
-  (`[[205,210,220], [210,216,228], [200,207,221]]`), `shade=False`:
+  (`[[205,210,220], [210,216,228], [200,207,221]]`) — a *bright* one, which matters, see below:
 
   - **Ordered over-composite — `splat_blend`, `out·(1 − m) + colour·m`.** No trace, exactly as
     claimed. Masks summing to **1.8** still give effective weights summing to **1.0000000000**, the
     base absorbing `Π(1 − mᵢ)`; at **3.0** the output is still inside the convex hull of its input
     colours. Nothing rescales, nothing dims, nothing leaves range. **This path cannot report the
     bug** — the compositing *order* quietly arbitrates a conflict nobody decided to have.
-  - **Base-less weighted sum — `render.material_rgb`, `Σ wᵢ·materialᵢ`.** It *does* leave a trace,
-    and a loud one. `Σ = 1.00` → unclipped `[205 211 223]`, shipped `[204 211 222]` (float→uint8
-    truncation, ±1 — a convex combination, inside the palette's hull). `Σ = 1.80` → unclipped
-    `[369 380 401]`, shipped `[255 255 255]`: every channel past 255 and every channel clipped.
-    A rescale, a brightness error and an
-    out-of-range value, all three at once. This is not a hypothetical shader: it ships in the same
-    module as `splat_blend`, `GROUNDING.md` names it the **default** colorizer, and `gallery.py:117`
-    and `graph_demo.py:420` feed `06` masks straight into it with no compositing stage between.
+  - **Base-less weighted sum — `render.material_rgb`, `Σ wᵢ·materialᵢ`.** It *can* leave a trace —
+    it has no base to absorb the excess, so the excess leaves 8-bit range. On the pale palette
+    above: `Σ = 1.00` → unclipped `[205 211 223]`, shipped `[204 211 222]` (float→uint8 truncation,
+    ±1 — a convex combination, inside the palette's hull); `Σ = 1.80` → unclipped `[369 380 401]`,
+    shipped `[255 255 255]`: every channel past 255 and every channel clipped. A rescale, a
+    brightness error and an out-of-range value, all three at once. This is not a hypothetical
+    shader: it ships in the same module as `splat_blend`, `GROUNDING.md` names it the **default**
+    colorizer, and `gallery.py:117` and `graph_demo.py:434` feed `06` masks straight into it with
+    no compositing stage between.
+
+    ⚠️ **But it reports only where the palette has no headroom, and that is a smaller claim than
+    "loudly".** The shipped call sites pass *no* palette, so they get `render._MATERIAL_PALETTE`
+    (or `_SUBSTANCE_PALETTE` for a 7-channel substance stack) — terrain colours, not paper-white.
+    A cell of one material leaves range at `Σ = 255 / max(channel)`, measured:
+
+    | material | snow | sand / sediment | water | scree | grass / vegetation | ground | rock |
+    |---|---|---|---|---|---|---|---|
+    | clips at `Σ` | **1.02** | **1.28** | **1.50** | **1.68** | **1.93** | **2.06** | **2.13** |
+
+    So at `Σ = 1.80`, `rock`, `grass`, `water+grass` and `rock+grass` — **4 of the 15** single- and
+    pair-combinations of the five-material palette — clip *nothing*, and rock is the commonest
+    material `derive_materials` emits. This is reachable from the real producer: give
+    `derive_materials` a closing channel written `1.0` instead of `1 − claimed` (a 2.00× over-
+    subscription *everywhere*) and an ordinary steep hillside exports as `[216 250 188]`, an
+    in-gamut pale sage, **0 of 4096 pixels clipped**. The same bug on a mixed alpine fixture clips
+    ~279 of 4096 — the snow cells, snow being the one material whose threshold (1.02) almost any
+    over-subscription passes. What the detector measures is the *palette under the bug*, not the
+    size of the bug. Note too that only the clip is self-evident: the "brightness error" half is
+    not detectable without a reference image, and nobody exporting a splatmap has one.
   - **Chained `blend_rgb` in a non-`normal` mode** is worse again — monotone dimming toward black
     under `multiply` (128 → 84.7 at `Σ = 0.6`, → 27.2 at `Σ = 1.8`) and toward white under `screen`
     (→ 154.5, → 199.8). That is precisely the "blotchy lighting" tell `08` names.
 
   So the bug's visibility is a property of the *consumer*, not of the masks — which is the whole
   reason the assertion belongs at the fan-in (`14`), one place, independent of who consumes it.
-  A producer cannot know which compositor is downstream, and one of the three shipping choices
-  reports nothing. (`reference-impl/tests/test_mask_partition.py`)
+  A producer cannot know which compositor is downstream; one of the three shipping choices reports
+  nothing at all, and the one that does report depends on a palette the producer also cannot see.
+  (`reference-impl/tests/test_mask_partition.py`)
 
-  ⚠️ **And do not "fix" `material_rgb` by making it normalise.** It is currently the only thing in
-  the tree that detects a partition bug at all. Normalising it would make the old "no artefact"
-  sentence true by destroying the only signal that exists.
+  ⚠️ **And do not "fix" `material_rgb` by making it normalise.** Partial as it is, it is the only
+  thing in the tree that detects a partition bug at all. Normalising it would make the old "no
+  artefact" sentence true by destroying the only signal that exists.
 - **Aspect matters and is cheap.** `northness = dot(aspectVec(aspect), northDir)`. With the
   downslope aspect above and the STANDARD raster convention — row index increases *southward*, so
   row 0 = north and the `y` axis points SOUTH — that is `-sin(aspect)`: +1 facing north, −1 facing
