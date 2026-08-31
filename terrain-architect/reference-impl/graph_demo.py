@@ -187,10 +187,24 @@ def _fill_fn(p, ins, ctx):
     return flow.priority_flood_fill(ins[0])
 
 
+_AREA_METHODS = ("d8", "mfd", "hybrid")
+
+
 def _area_fn(p, ins, ctx):
-    if p.get("method", "d8") == "mfd":
+    """Drainage area by the router named in `method` — all three `flow` ships (03)."""
+    method = p.get("method", "d8")
+    if method == "mfd":                        # dispersive: right for hillslope quantities
         return flow.mfd_accumulation(ins[0], cellsize=ctx.cellsize)
-    return flow.d8_accumulation(ins[0], cellsize=ctx.cellsize)
+    if method == "hybrid":                     # 03's recommendation: MFD hillslope, D8 channel
+        return flow.hybrid_accumulation(ins[0], cellsize=ctx.cellsize,
+                                        channel_cells=p.get("channel_cells", 60.0))
+    if method == "d8":                         # single receiver: converges into channels
+        return flow.d8_accumulation(ins[0], cellsize=ctx.cellsize)
+    # A method this node does not understand is a failure, not a default. It used to fall
+    # through to D8, so a typo ("mdf", "MFD") routed the whole graph with the wrong router and
+    # returned a plausible field — the quiet wrong answer 14 forbids. Fail at dispatch instead.
+    raise ValueError(f"flow.accumulation: unknown method {method!r}; "
+                     f"expected one of {_AREA_METHODS}")
 
 
 def _slope_fn(p, ins, ctx):

@@ -3,6 +3,8 @@
 - priority_flood_fill: Barnes, Lehman & Mulla 2014 priority-flood + epsilon.
 - d8_receivers / d8_accumulation: O'Callaghan & Mark 1984 single-receiver routing.
 - mfd_accumulation: Freeman 1991 multiple-flow-direction (p = 1.1).
+- hybrid_accumulation: the hybrid `03` recommends — MFD on the hillslope, D8 once a cell's own
+  accumulated area has channelised — decided inside the single pass, not spliced afterwards.
 
 Pure-numpy + a heap; loops are explicit for readability, sized for test grids.
 D-infinity (Tarboton 1997) is intentionally NOT reimplemented here — use RichDEM /
@@ -147,11 +149,14 @@ def hybrid_accumulation(dem, cellsize=1.0, p=1.1, channel_cells=60.0, cellarea=N
     returns `d8_accumulation` exactly; above the cell count of the domain nothing ever
     channelises and it returns `mfd_accumulation` exactly.
 
-    ⚠️ NOTHING IN THIS PIPELINE CALLS THIS FUNCTION. `03` recommends the hybrid as "what most
-    good terrain tools do", but the shipped erosion and hydrology paths take `d8_accumulation`
-    or `mfd_accumulation`, and `graph_demo.py`'s `_area_fn` offers only those two. Its consumers
-    are `flow_anatomy.py` (panel c) and the tests. That is stated rather than quietly true, so a
-    reader is not left assuming the recommendation is wired in somewhere they have not looked.
+    WHERE IT IS WIRED IN, AND WHERE IT IS NOT. `03` recommends the hybrid as "what most good
+    terrain tools do", so the node graph can select it: `graph_demo.py`'s `_area_fn` routes
+    `method="hybrid"` here and passes `channel_cells` through, which makes the recommendation
+    reachable from the shipped graph rather than only from this module. What is still true is
+    that nothing takes it by *default* — the demo graph's `area` node ships `method="d8"`, and
+    the figure, gallery and archetype paths call `d8_accumulation` or `mfd_accumulation`
+    directly. Its other consumers are `flow_anatomy.py` (panel c) and `test_flow_anatomy.py`.
+    Stated rather than left quietly true, so a reader knows which paths this router is on.
     """
     dem = np.asarray(dem, dtype=np.float64)
     if cellarea is None:

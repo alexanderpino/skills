@@ -98,6 +98,54 @@ def test_scatter_node_places_spaced_boulders():
         assert d.min() >= g.nodes["scatter"].params["r_min"] - 1e-9
 
 
+def test_area_node_reaches_all_three_shipped_routers():
+    """`03`'s recommended hybrid must be selectable from the shipped graph, not just from
+    `flow.py`. All three routers are reachable through the `area` node's `method` param, all
+    three are valid drainage fields, and the hybrid is genuinely the third one — a field of its
+    own, not an alias that quietly re-ran D8 or MFD."""
+    g, (_, a_out), ctx = _small(size=32)
+    acc = {}
+    for method in ("d8", "mfd", "hybrid"):
+        g.nodes["area"].params["method"] = method
+        acc[method] = g.evaluate(a_out)
+        asserts.assert_finite(acc[method], f"area/{method}")
+        assert acc[method].min() >= ctx.cellsize ** 2 - 1e-9   # every cell drains at least itself
+    assert not np.allclose(acc["hybrid"], acc["d8"])
+    assert not np.allclose(acc["hybrid"], acc["mfd"])
+
+
+def test_hybrid_node_forwards_its_channelisation_threshold():
+    """`channel_cells` is a real port on the node, not a swallowed param. It is checked by the
+    two limits `test_flow_anatomy` proves exactly: at <= 1 cell every cell is channelised from
+    the start, so the hybrid IS D8; above the domain's cell count nothing channelises, so it IS
+    MFD. A node that dropped the param (always using flow.py's 60.0) fails both."""
+    g, (_, a_out), ctx = _small(size=32)
+    n_cells = float(ctx.resolution ** 2)
+    g.nodes["area"].params["method"] = "d8"
+    d8 = g.evaluate(a_out)
+    g.nodes["area"].params["method"] = "mfd"
+    mfd = g.evaluate(a_out)
+    g.nodes["area"].params.update(method="hybrid", channel_cells=1.0)
+    assert np.allclose(g.evaluate(a_out), d8, rtol=0, atol=0)
+    g.nodes["area"].params["channel_cells"] = n_cells + 1.0
+    assert np.allclose(g.evaluate(a_out), mfd, rtol=0, atol=0)
+
+
+def test_unknown_accumulation_method_is_rejected():
+    """A method the node does not understand must fail loudly. It used to fall through to D8,
+    so `"mdf"` or `"MFD"` silently routed the whole graph with the wrong router and returned a
+    plausible-looking drainage field — a quiet wrong answer, which is worse than a crash."""
+    g, (_, a_out), _ = _small(size=32)
+    for bad in ("mdf", "MFD", "d-8", ""):
+        g.nodes["area"].params["method"] = bad
+        try:
+            g.evaluate(a_out)
+        except ValueError as e:
+            assert repr(bad) in str(e) and "hybrid" in str(e)   # the offender and the legal set
+        else:
+            raise AssertionError(f"unknown method {bad!r} was silently accepted")
+
+
 def test_cache_recomputes_only_downstream_cone():
     """Editing the thermal node re-runs it and its cone; the upstream base/fluvial are
     served from cache (14, content-addressed caching)."""
