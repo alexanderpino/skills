@@ -71,23 +71,25 @@ def test_all_reference_chapters_are_routed():
         assert f"references/{chapter.name}" in skill_text
 
 
-def test_literal_skill_paths_resolve():
-    pattern = re.compile(r"`((?:references|reference-impl|evals)/[^`\s]+)`")
-    for markdown in SKILL_ROOT.rglob("*.md"):
-        text = markdown.read_text(encoding="utf-8")
-        for raw_path in pattern.findall(text):
-            # A pytest node ID (`tests/test_x.py::test_name`) is a legitimate way to cite a
-            # specific test; check the file it names, not the whole node ID. Without this the
-            # guard rejects the most precise citation form available and pushes prose toward
-            # vaguer references — which is the opposite of what it exists to enforce.
-            path, _, node = raw_path.partition("::")
-            path = path.rstrip(".,;:)")
-            target = SKILL_ROOT / path
-            assert target.exists(), f"{markdown}: missing {path}"
-            if node:                      # ...and the named test must actually be defined in it
-                node = node.rstrip(".,;:)")
-                assert f"def {node}(" in target.read_text(encoding="utf-8"), (
-                    f"{markdown}: {path} has no test named {node}")
+# `test_literal_skill_paths_resolve` was RETIRED from this file; `tests/test_cited_paths_exist.py`
+# is its successor. This is a deliberate deletion, and it was measured rather than assumed: every
+# citation the old regex found — 119 of them, across 30 documents — is also found by the new
+# recogniser, and none of them resolved only because the new guard added resolution roots, so no
+# citation lost a check. The successor scans 44 documents and 411 citations, and
+# `test_cited_paths_exist.py::test_no_unscanned_markdown_carries_citations` stands in for the old
+# `rglob("*.md")` sweep so that no future document escapes the enumerated set.
+#
+# The retirement is not tidying. The old check had two holes the successor closes:
+#
+#   * `f"def {node}(" in target.read_text()` is a SUBSTRING test. A comment, a docstring or a
+#     string literal holding the name satisfied it, so a function could be renamed away with the
+#     citation left false and this test still green. The successor resolves symbols by AST.
+#   * that same form rejected every symbol that is not a function, so a truthful citation of a
+#     module-level constant (`heightfield_io.py::_CACHE`) RED-tested. A guard that fails on true
+#     statements teaches people to edit the guard.
+#
+# If you are tempted to restore a path check here, extend the successor instead: two recognisers
+# for one job is how the sibling-skill citations stayed invisible to both.
 
 
 def test_crossvalidation_claim_matches_dependencies():
