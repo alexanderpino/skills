@@ -131,7 +131,7 @@ $ python3 -m pytest -q tests/test_flow_anatomy.py tests/test_halfar_anatomy.py t
 tests/test_flow_anatomy.py ..........                                    [ 34%]
 tests/test_halfar_anatomy.py ................                            [ 89%]
 tests/test_anatomy_figures.py ...                                        [100%]
-29 passed in 42.96s
+52 passed in 48.43s
 ```
 
 Note the guards are not one file: `test_anatomy_figures.py` covers the two *geometry* diagrams (it
@@ -265,7 +265,7 @@ error, which made this benchmark decorative.** Five plausible defects in `glacie
 whole file at 5 %, none of them visible to the shape rows: CFL factor 0.2 → 0.6 (rate error 0.0333),
 the substep floor `1e-6·dt` → `0.05·dt` (0.0494), diffusivity ×1.04 (0.0364), CFL 0.2 → 0.45 (0.0279),
 face averaging `mean` → `max` (0.0193). The correct solver scores **0.00233** at 8 steps, so 0.01 is
-4× the observed error and all five now fail. `RATE_TOLERANCE` in `halfar_anatomy.py` carries that
+4x the observed error. ⚠️ That framing was falsified: the bound polices AGREEMENT, not correctness. CFL error cancels the discretisation bias, so CFL 0.30 — 1.5x over the stability limit — scores 0.00016 and passes, better than the shipped solver's 0.00233. Tightening the bound would reject the correct solver at a refined timestep while still admitting 0.30, so `test_the_timestep_is_policed_where_the_rate_row_cannot_police_it` polices it instead, beside the CFL-0.6 control. `RATE_TOLERANCE` in `halfar_anatomy.py` carries that
 derivation, and `test_the_rate_row_rejects_a_solver_run_above_its_own_CFL_limit` is the control that
 proves the tightened bound can still fire.
 
@@ -276,5 +276,5 @@ denominator `(H0/H_c)⁹ − 1` grows with elapsed time — not discretisation e
 even convergent: past 16 steps it turns round (0.000459 / 0.000451 / 0.000854 / 0.000999 at
 16/32/64/128). Refine the actual timestep at fixed total time and the answer moves *away*,
 monotonically (0.002327 → 0.002376 over dt/1…dt/16). The knob that does converge is the **grid** —
-0.265 % at 61 cells, 0.233 % at 121, 0.138 % at 241 — so that is the row the suite now asserts, with
+0.265 % at 61 cells, 0.247 % at 81, 0.233 % at 121, 0.208 % at 161, 0.192 % at 181, 0.138 % at 241 — so that is the row the suite now asserts. ⚠️ It is a LADDER, not a law: n=31 scores 0.053 %, better than every rung, so a low rate error is not evidence of a good grid, and a row measures n=31 to keep that disclaimer from going stale. With
 `test_refining_the_TIMESTEP_is_not_what_moves_this_error` keeping the correction from going stale.
