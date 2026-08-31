@@ -438,13 +438,30 @@ def cmd_deciders(args) -> None:
 
     if mechanical:
         print("\nRun these. Exit 0 means the check holds.\n")
+        import subprocess
         for f in mechanical:
             print(f"  # [{f.get('severity')}] {f.get('id')}  {f.get('check', '')}")
             print(f"  {f['check_cmd'].strip()}\n")
-        print("A command that exits 0 closes its finding here: set status to 'verified'\n"
-              "with a reason naming the command and what it printed. The verifier never\n"
-              "sees it. A non-zero exit is not a fix attempt gone wrong — it is the\n"
-              "finding still standing, so leave it open and send it to the builder.")
+            if getattr(args, "run", False):
+                print("  Running automated decider...")
+                try:
+                    res = subprocess.run(f['check_cmd'].strip(), shell=True, capture_output=True, text=True, timeout=30)
+                    if res.returncode == 0:
+                        print(f"  SUCCESS! Setting {f['id']} to verified.")
+                        f['status'] = 'verified'
+                        f['reason'] = f"Automated decider succeeded:\n{res.stdout.strip()[:200]}"
+                    else:
+                        print(f"  FAILED. (exit {res.returncode})\n{res.stderr.strip()[:200]}")
+                except Exception as e:
+                    print(f"  FAILED TO RUN: {e}")
+        if getattr(args, "run", False):
+            (d / "verdicts" / f"{args.slice}.json").write_text(json.dumps(verdict, indent=2))
+            print("\nUpdated verdicts file with automated results.")
+        else:
+            print("A command that exits 0 closes its finding here: set status to 'verified'\n"
+                  "with a reason naming the command and what it printed. The verifier never\n"
+                  "sees it. A non-zero exit is not a fix attempt gone wrong — it is the\n"
+                  "finding still standing, so leave it open and send it to the builder.")
         print("\nDo not close a finding on a visual axis this way. A render is decided by\n"
               "looking at it beside the previous one, and a command that proves the file\n"
               "exists has not looked.")
@@ -729,7 +746,10 @@ def cmd_calibration(args) -> None:
 
     if total_flags:
         print(f"{total_flags} calibration flag(s) across {len(names)} verdict(s).")
-        print("Advisory only — read those verdicts yourself before folding on them.\n"
+        if getattr(args, "strict", False):
+            print("HARSH CRITIC MODE: Failing due to calibration flags.")
+            sys.exit(1)
+        print("Advisory only (unless --strict is passed) — read those verdicts yourself before folding on them.\n"
               "The gate is unaffected; it still turns on open blockers and majors.")
     else:
         print(f"No calibration flags across {len(names)} verdict(s).")
@@ -864,6 +884,12 @@ def cmd_plan(args) -> None:
     else:
         print("\nNo coupling above threshold — the cut is clean.")
 
+    total_lines = sum(len(read_text(Path(p))) for s in slices for p in s.get("files", []))
+    if total_lines < 100:
+        print("\nWARNING: Total touched lines across slices are very low (< 100 lines).\n"
+              "This task might be too small for a full fan-out loop. Consider tackling\n"
+              "it directly without fan-out.")
+
 
 def cmd_status(args) -> None:
     d = run_dir()
@@ -941,6 +967,7 @@ def main() -> None:
 
     c = sub.add_parser("calibration", help="lint the critique itself (advisory)")
     c.add_argument("slice", nargs="?", help="omit to lint every verdict in the run")
+    c.add_argument("--strict", action="store_true", help="exit non-zero if critical flags are found")
     c.set_defaults(func=cmd_calibration)
 
     for name, fn, helptext, needs_slice in (
@@ -955,6 +982,8 @@ def main() -> None:
         sp = sub.add_parser(name, help=helptext)
         if needs_slice:
             sp.add_argument("slice")
+        if name == "deciders":
+            sp.add_argument("--run", action="store_true", help="execute the deciders locally")
         sp.set_defaults(func=fn)
 
     args = p.parse_args()

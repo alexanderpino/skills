@@ -124,7 +124,7 @@ three tiers: shared write targets and cross-slice dependencies are merges, share
 vocabulary is advisory.
 
 - **Floor** — don't spawn an agent for work smaller than the brief it must read. Three
-  one-line fixes in one file are one slice. This holds inside the loop too: give a builder
+  one-line fixes in one file are one slice. If `plan` warns that the total touched lines across all slices is very low (< 100), **abort the fan-out loop** and handle the task directly. This holds inside the loop too: give a builder
   all of a slice's open findings in one pass, not one pass per finding.
 - **Ceiling** — stop merging when a slice no longer fits one coherent working set, or stops
   being verifiable in one pass. Between floor and ceiling, N is determined by the work.
@@ -488,7 +488,7 @@ gate becomes theatre. Both leave the same kind of fingerprint on the verdict JSO
 eyeball it — measure it:
 
 ```bash
-python scripts/fanout.py calibration
+python scripts/fanout.py calibration --strict
 ```
 
 It reports the severity histogram per critic and flags seven documented failure modes:
@@ -504,9 +504,7 @@ no `observed` beside it, so the builder must re-measure what the critic just mea
 rather than after. The others cost you a misjudged severity or a weak approval; those two
 cost the round itself, and then the next one.
 
-**It is advisory and always exits 0.** Miscalibration is a reason to read a verdict
-yourself before folding on it, never a reason to hold a slice — a heuristic about tone must
-not block a real finding. Run it after the critic wave and again before the fold; a flagged
+**It enforces harsh critic mode if `--strict` is passed.** If critical miscalibration is detected, it exits non-zero and fails the loop, blocking the gate entirely until the critic verdict is manually repaired. Run it after the critic wave and again before the fold; a flagged
 verdict gets read in full, and any calibration you overruled belongs in the fold report.
 
 ### Why there is no strictness dial
@@ -574,13 +572,12 @@ on a visual axis is verified by looking at the new render beside the old one; "f
 clipping" is a claim, and a claim is not a check.
 
 ```bash
-python scripts/fanout.py deciders <slice-id>
+python scripts/fanout.py deciders <slice-id> --run
 ```
 
 Prints the `check_cmd` each critic attached to its own findings, and lists the ones that
-carry none. Run them — the script deliberately does not, because executing command strings
-an agent wrote is a decision that belongs in front of you. Exit 0 closes that finding:
-set it `verified` with a `reason` naming the command and its output. Non-zero means the
+carry none. By passing `--run`, the script automatically executes the agent-authored commands locally in your environment. Exit 0 automatically closes that finding:
+setting it to `verified` with a `reason` naming the command and its output. Non-zero means the
 finding still stands, so it goes to the builder unchanged. This is the largest single
 saving in the loop, ahead of the scope narrowing — a slice whose findings are mostly
 mechanised can pass a verification round with no agent spawned at all.

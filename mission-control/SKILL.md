@@ -46,13 +46,15 @@ GOAL
                  └─ ORCHESTRATOR APPROVAL (high/critical only)
                       └─ APPROVED
                            └─ IMPLEMENTER ─ committed branch + handoff.md
-                                └─ VERIFIER ─ sandbox.json + verify.json
-                                     └─ CODE REVIEWER (medium+ only)
-                                          └─ MERGE PENDING
-                                               ├─ clean mechanical merge
-                                               └─ MERGE AGENT (conflicts only)
-                                                    └─ post-merge sandbox
-                                                         └─ CAS publish ─ DONE
+                                └─ MECHANICAL DECIDERS ─ auto-verify
+                                     └─ BLIND VERIFIER ─ delta-only sandbox check
+                                          └─ BLIND CODE REVIEWER (medium+ only)
+                                               └─ GAUNTLET LOOP (critical/benchmarks only)
+                                                    └─ MERGE PENDING
+                                                         ├─ clean mechanical merge
+                                                         └─ MERGE AGENT (conflicts only)
+                                                              └─ post-merge sandbox
+                                                                   └─ CAS publish ─ DONE
 ```
 
 Plan gates bless intent. Build gates bless the implementation. Merge gates
@@ -129,9 +131,7 @@ Record:
 
 ## Phase 1: architecture gate
 
-**Strategic Design (Principal Architect):** If the `principal-architect` skill is installed, the Orchestrator MUST invoke it first. The Principal Architect generates the PRD, High-Level Design (HLD), C4 diagrams, and defines the system boundaries. 
-
-Once the design is settled, spawn the Mission Control Architect using `references/roles.md`. It translates the Principal Architect's design into prioritized,
+Spawn the Architect using `references/roles.md`. It produces prioritized,
 constraint-carrying backlog items. If throughput is maximized, front-load
 interfaces/scaffolding that unlock siblings and keep sibling predicted semantic
 targets disjoint. Never manufacture filler.
@@ -193,12 +193,10 @@ python scripts/pipeline.py --root .mission-control worktree-add MC-7
 python scripts/pipeline.py --root .mission-control transition MC-7 building
 ```
 
-### Build and verify privately
+### Build, Verify, and the Gauntlet
 
 Implementers edit and commit only in their worktree. Build/test commands run
 through the sandbox lifecycle:
-
-**Quality-Ceiling Tasks (Gauntlet Loop):** If the backlog item requires hitting a strict quality, performance, or visual bar, the Implementer should run a **Gauntlet Loop** to optimize the artifact. The Gauntlet Loop MUST be initialized and executed entirely *inside* the `mc/<id>` worktree. Its champion/challenger iterations remain private to the worktree, and the Gauntlet's final champion commit becomes the Implementer's handoff.
 
 ```bash
 python scripts/pipeline.py --root .mission-control sandbox prepare MC-7
@@ -218,8 +216,21 @@ legacy host-side commands and warns on every invocation.
 
 Before verification the CLI computes a semantic diff between the worktree base
 and implementation commit. Every changed target must be covered by the lease
-snapshot. Verifier evidence must seal passing sandbox evidence. Medium+ changes
+snapshot.
+
+**1. Mechanical Deciders:**
+Run mechanical checks (tests, linters) in the sandbox. If they all pass and no human judgement is required, auto-verify.
+
+**2. Delta-Only Blind Verification (Ratchet Guard):**
+If mechanical deciders cannot fully verify, spawn a **Blind Verifier** (and a **Blind Code Reviewer** for medium+).
+- **Blind:** The QA agent must be a fresh, stateless agent. Do *not* pass it the Implementer's conversation history; anchoring bias ruins reviews.
+- **Delta-Only:** Pass the reviewer *only* the diff and mechanically re-opened semantic symbols.
+
+Verifier evidence must seal passing sandbox evidence. Medium+ changes
 then receive Code Review.
+
+**3. Adversarial Gauntlet & Benchmarking:**
+For critical or algorithmic changes, route the sandbox into an adversarial **Gauntlet Loop**. If the sandbox degrades baseline performance metrics, the state machine auto-rejects the ticket back to `building` with the benchmark delta.
 
 ### Merge; never complete manually
 
@@ -305,16 +316,22 @@ Agenda notes hold only non-derivable intent: user directives, deferred
 decisions, and scheduled follow-ups. Never record queue positions, free slots,
 merge candidates, or unblock conditions; `status` computes those.
 
-## Spawning discipline
+## Spawning discipline and Cost Efficiency
 
-Every brief must include:
+Mission Control is designed for scale, which means token inefficiency compounds rapidly. You must enforce these three rules to keep the pipeline economically viable:
 
+**1. Need-to-Know Context (Lazy Evaluation)**
+Agents must NEVER read the full `state.db`, `backlog.json`, or `queue.json` dumps to find their work. The Orchestrator must synthesize a tightly scoped prompt containing *only* the specific ticket's goal, its acquired semantic leases, and the exact files it touches.
+
+**2. Truncated Sandbox Logs**
+Do not feed raw sandbox logs to the Verifier or Implementer. A failing build can produce 10,000 lines of noise. The Orchestrator must grep/tail the sandbox output (e.g., `tail -n 100` or filtering for `Error:`) and pass only the relevant stack traces and failure summaries to the agents.
+
+**3. Prefix Caching the Mission Brief**
+Every brief must include a byte-identical shared block at the very top. This block must contain:
 - the exact role section from `references/roles.md`;
 - the relevant contract from `references/contracts.md`;
-- the evidence directory and item ID;
-- worktree/sandbox paths and repo oracle where applicable;
-- explicit prohibitions (for example Scout: no code; Reviewer: verdict, do not
-  fix; Merge Agent: no invariant override).
+- the overarching Mission Goal and Repo Oracle instructions.
+Because this block is identical for every agent (Scout, Implementer, Verifier), it allows the LLM provider to utilize Prefix Caching. The Orchestrator must ensure the dynamic, ticket-specific details (the evidence directory, item ID, worktree paths, and explicit prohibitions) are placed *below* this shared block.
 
 Each role owns one artifact. Gates matter even when roles must run
 sequentially.

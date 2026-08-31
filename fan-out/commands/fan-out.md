@@ -12,6 +12,8 @@ Task:
 
 $ARGUMENTS
 
+If the task above is exactly `?` or `help`, do NOT start the fan-out loop. Instead, read `SKILL.md` and output a concise, user-facing guide on how to use `/fan-out`, explaining what it does, the difference between `partition` and `compete` modes, and the general lifecycle, then stop.
+
 Before spawning anything:
 
 1. Decide `partition` vs `compete`. If the task doesn't clearly imply one, ask — once,
