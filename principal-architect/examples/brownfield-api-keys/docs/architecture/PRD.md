@@ -3,7 +3,7 @@ id: PRD
 title: LinkShort — Product Requirements
 status: current
 level: software
-updated: 2026-06-20
+updated: 2026-08-04
 owners: [team-platform]
 ---
 
@@ -48,10 +48,23 @@ steps, while protecting the platform from abuse and credential leakage.
 | **Response measure** | keys stored only as salted SHA-256 hashes; 0 plaintext keys recoverable |
 | **Means of verification** | code review + test asserting the store contains no plaintext key |
 
+### Q.02 — key verification stays available under a flooding key
+| Part | Value |
+|---|---|
+| **Quality characteristic (ISO 25010)** | reliability → availability |
+| **Source of stimulus** | one integrator's key issuing a request flood |
+| **Stimulus** | sustained requests far above that key's budget |
+| **Environment** | normal operation, shared API |
+| **Artifact** | the API as seen by every *other* key |
+| **Response** | the flooding key is throttled (F.03); other keys are unaffected |
+| **Response measure** | SLO: 99.9% of non-throttled requests succeed with p99 < 250 ms, rolling 30 d (error budget 43.8 min/mo) — see `references/operability.md` |
+| **Means of verification** | per-key success/latency SLI in production; load test with one hot key in CI |
+
 ### Quality / utility tree (prioritisation)
 | 25010 characteristic | Refinement | Scenario | Value | Difficulty |
 |---|---|---|---|---|
 | Security | Confidentiality | Q.01 | H | L |
+| Reliability | Availability | Q.02 | H | M |
 
 ## 6. Constraints
 - **C.01:** Must run within the existing Flask service and PostgreSQL store (no new datastore).

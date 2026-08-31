@@ -2,11 +2,12 @@
 id: HLD
 title: LinkShort — High-Level Design
 status: current
-version: 1.0.0
+version: 1.1.0
 level: software
-updated: 2026-06-20
+updated: 2026-08-04
+last-reviewed: 2026-08-04
 owners: [team-platform]
-satisfies: [F.01, F.02, F.03, Q.01]
+satisfies: [F.01, F.02, F.03, Q.01, Q.02]
 related-adrs: [ADR-0001]
 realizes-views: [V-CTX, V-CON]
 source: recovered
@@ -55,6 +56,14 @@ Single container image on the existing ECS service; PostgreSQL via RDS; Redis vi
 
 ## 7. Cross-cutting concerns
 AuthN reuses the existing integrator session; keys are bearer credentials going forward.
+
+### Operability — SLOs & recovery
+| SLI (what is measured) | SLO (target + window) | Error budget | Satisfies | Guarded by |
+|---|---|---|---|---|
+| non-throttled requests succeeding with p99 < 250 ms, per key | 99.9% / rolling 30 d | 43.8 min/mo | Q.02 | burn-rate alert; hot-key load test in CI |
+
+- **RTO / RPO:** 1 h / 5 min — RDS automated snapshots + WAL; verified by the quarterly restore drill.
+- **Observability:** existing OpenTelemetry traces on the Flask service; per-key request metrics feed the SLI.
 
 ## 8. Security — threat model (mandatory)
 STRIDE → OWASP Top 10:2025.
