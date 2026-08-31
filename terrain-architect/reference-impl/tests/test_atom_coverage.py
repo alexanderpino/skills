@@ -763,6 +763,14 @@ _DOC_REJECT = [
 ]
 
 
+# WHAT IS STILL NOT CAUGHT, stated rather than left to be discovered: an operator separated from
+# the constant by whitespace (`n = 3 - 1`, `n = 3 – 4`). The boundary is a lookaround on the
+# adjacent character, and widening it across whitespace would fail the mirror-image case, where a
+# constant legitimately FOLLOWS an operator — `azw = 0.12 + 0.88·w` would stop matching `0.88`.
+# The corpus decides which risk is real: these chapters write ranges closed up (`~10–20 km`,
+# `0.005–0.01 /yr`, `70–100 GPa`), which is the form that is now rejected.
+
+
 @pytest.mark.parametrize("needle,text", _DOC_ACCEPT, ids=[n for n, _ in _DOC_ACCEPT])
 def test_doc_states_accepts_the_real_chapter_wording(needle, text):
     assert _doc_states(text, needle), f"{needle!r} should be found in {text!r}"
@@ -791,7 +799,6 @@ _CODE_ACCEPT = [
     ("(-3.0)", "ejecta = rim * 0.5 * (np.maximum(r, R) / R) ** (-3.0)\n"),
     ("(1.0 - rn) ** 2.2", "prof = (1.0 - rn) ** 2.2\n"),
     ("(1.0 - rn) ** 2.2", "prof = (1.0-rn)**2.2\n"),
-    ("n=3", "n = 3 - 1  # still an n of 3, then a separate term\n"),   # SPACED: not `3-1`
 ]
 
 _CODE_REJECT = [
@@ -805,7 +812,6 @@ _CODE_REJECT = [
     # constant read as the constant: `n=3-1` is 2, and it satisfied `n=3`.
     ("n=3", "def carve(H, n=3-1):\n"),
     ("n=3", "def carve(H, n=3+1):\n"),
-    ("0.2 * D", "depth = 0.2 * D-1\n"),
     ("n=3", "# the old default was n=3; we now ship 4\n"),          # comment only
     ("n=3", '"""Historically n=3 (Glen); this module no longer uses it."""\n'),   # docstring only
     ("KARMAN = 0.4", "KARMAN = 0.45\n"),
@@ -830,6 +836,20 @@ def test_strip_py_comments_preserves_code_and_layout():
     assert _complete(out, "A = 1") and _complete(out, "B = 4")
     assert not _complete(out, "A = 2") and not _complete(out, "A = 3")
     assert out.count("\n") == src.count("\n")
+
+
+def test_a_module_that_does_not_tokenise_fails_loudly_instead_of_searching_its_comments():
+    """The direction the tokenise failure is handled in, pinned — because it used to be the other
+    one, under a `# pragma: no cover`.
+
+    `return src` on failure re-admits comments and docstrings as evidence: the source below states
+    the constant ONLY in a comment, and the two `_CODE_REJECT` rows that pin comment-only and
+    docstring-only prose would have gone on passing while this file's real job silently stopped.
+    """
+    prose_only = "# the old default was n=3; we now ship 4\nx = (\n"     # the `(` is unbalanced
+    assert re.search("n=3", prose_only), "fixture states the constant in a COMMENT and nowhere else"
+    with pytest.raises(AssertionError, match="does not tokenise"):
+        _code_mentions(prose_only, "n=3")
 
 
 def test_idents_does_not_split_a_hyphenated_word_into_atom_names():
@@ -918,3 +938,70 @@ def test_fenced_reads_pseudocode_only():
 def test_norm_name_sees_through_the_casing_a_deferred_atom_could_ship_under():
     assert _norm_name("OpenSimplex2") == _norm_name("open_simplex2") == "opensimplex2"
     assert _norm_name("Wavelet") == "wavelet"
+
+
+def test_a_deferred_atom_cannot_ship_under_its_upstream_variant_name():
+    """Casing was normalised; the VARIANT SUFFIX was not.
+
+    `OpenSimplex2S` and `OpenSimplex2F` are the actual upstream names (smooth and fast), so they
+    are what a contributor implementing the deferred atom would write — and under equality both
+    answered "not present", leaving the atom shipped and still called deferred.
+    """
+    target = _norm_name("OpenSimplex2")
+    for shipped_as in ("OpenSimplex2S", "OpenSimplex2F", "open_simplex2f", "opensimplex2"):
+        assert _ships_as(["fbm", "perlin", shipped_as], target) == [shipped_as]
+        # ...and equality, which is what the row used to use, sees none of the variants:
+        assert (_norm_name(shipped_as) == target) is (shipped_as == "opensimplex2")
+    # an unrelated atom is not swept up just for containing "simplex"
+    assert _ships_as(["simplex", "value", "worley"], target) == []
+
+
+# --------------------------------------------------------------------------- #
+# A NEEDLE SATISFIED BY AN UNRELATED SECTION — the vacuity the fixture sets had no case for, and
+# the reason the faithfulness rows carry a `section` column.
+
+_TWO_SECTION_CHAPTER = (
+    "## Threshold of motion\n\n"
+    "`A ≈ 0.1` for turbulent flow, `ρ_s` ≈ 2650 kg/m³ (quartz), `ρ_a` ≈ 1.22 kg/m³, `d` = grain\n"
+    "diameter.\n\n"
+    "## Slope stability\n\n"
+    "At `φ = 35°` and `ρs = 2650 kg/m³` instead, the correct threshold moves to 29.60°.\n")
+
+
+def test_a_needle_satisfied_by_an_unrelated_section_is_not_evidence(tmp_path):
+    """The exact shape of the aeolian grain-density row, on a two-paragraph fixture chapter.
+
+    Both paragraphs contain `2650 kg/m³`, and only the first one is the row's claim — the second is
+    a landslide-mask worked example that happens to quote the same density. So the document-wide
+    search cannot tell the aeolian threshold being REWRITTEN to basalt from it being intact, and
+    `_doc_paragraph` can.
+    """
+    intact, drifted = tmp_path / "intact.md", tmp_path / "drifted.md"
+    intact.write_text(_TWO_SECTION_CHAPTER, encoding="utf-8")
+    drifted.write_text(_TWO_SECTION_CHAPTER.replace("2650 kg/m³ (quartz)", "3300 kg/m³ (basalt)"),
+                       encoding="utf-8")
+
+    anchor = "for turbulent flow"
+    assert _doc_states(_doc_paragraph(intact, anchor, "fixture"), "2650 kg/m³")
+
+    # The claim is gone — the chapter now documents basalt — yet the whole document still says the
+    # string, in the OTHER section. This is what the row used to be asked.
+    assert _doc_states(_flat(_body(drifted)), "2650 kg/m³"), \
+        "fixture must keep an unrelated satisfier, or it pins nothing"
+    # Asked of the paragraph the register names, it fails, which is the point.
+    assert not _doc_states(_doc_paragraph(drifted, anchor, "fixture"), "2650 kg/m³")
+
+
+def test_an_anchor_that_stops_selecting_one_paragraph_fails_the_row(tmp_path):
+    """`_doc_paragraph` must refuse ambiguity rather than pick a winner.
+
+    An anchor matching two paragraphs is the document-wide search creeping back in, and an anchor
+    matching none is a row that can only ever fail with a message blaming the chapter. Both are
+    edits to the REGISTER, so both say so.
+    """
+    p = tmp_path / "amb.md"
+    p.write_text("the same anchor here\n\nand the same anchor here too\n", encoding="utf-8")
+    with pytest.raises(AssertionError, match="matches 2 paragraphs"):
+        _doc_paragraph(p, "the same anchor", "fixture")
+    with pytest.raises(AssertionError, match="matches 0 paragraphs"):
+        _doc_paragraph(p, "an anchor that is not there", "fixture")
