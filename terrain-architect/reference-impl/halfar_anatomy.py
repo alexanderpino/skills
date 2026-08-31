@@ -32,6 +32,14 @@ every shape row green and LOWERS the residual. Panel e compares the characterist
 from the numerical thinning against Halfar's closed form, which no near-no-op can fake. See the
 RATE section below for the derivation and the measured numbers.
 
+⚠️ **PANEL e BOUNDS AGREEMENT, NOT CORRECTNESS, AND THE DIFFERENCE MATTERS.** Its 0.23% is a
+systematic discretisation bias rather than noise, and CFL error cancels against it — the same
+scheme run at CFL 0.30, half again past the factor `glacier_sia` chose, scores *better* than the
+shipped solver, and every factor from 0.22 to 0.35 sits inside the band. `RATE_TOLERANCE` carries
+the measured sweep; `cfl_distance_from_refined_timestep` is the companion quantity that has no
+cancellation to hide in, and the two rows together are the guard. Neither one may be tightened
+without reading that comment.
+
 The numpy half carries no Pillow dependency, so `tests/test_halfar_anatomy.py` imports the
 measurements from here. Writes `halfar_anatomy.png`. Run: `python halfar_anatomy.py`.
 """
@@ -72,18 +80,22 @@ def evolve(steps, n=N, cellsize=CELLSIZE):
     """Run the shipped SIA solver from the exact profile for `steps` steps.
 
     `n` and `cellsize` are open because the GRID is the knob that actually moves the rate
-    error (see `GRID_REFINEMENT` below); the three shipped pairs hold the domain width fixed
-    at ~1450 km so only the resolution changes.
+    error (see `GRID_REFINEMENT` below); every shipped pair holds the domain SPAN fixed at
+    `(n - 1) * cellsize = 1440 km` so only the resolution changes.
 
-    ⚠️ MEMOISED, AND THE ARRAYS IT HANDS BACK ARE READ-ONLY BY CONVENTION. The figure and its
-    guard between them ask for the same eight-step run a dozen times, and the 241-cell
-    refinement run costs ~9 s on its own. Nothing in this module or its test mutates what
-    comes back; if something ever needs to, it must copy first.
+    ⚠️ MEMOISED, AND THE ARRAYS IT HANDS BACK ARE READ-ONLY — ENFORCED, NOT BY CONVENTION.
+    The figure and its guard between them ask for the same eight-step run a dozen times, and
+    the 241-cell refinement run costs ~10 s on its own. `profile` hands back VIEWS into these
+    arrays, so a single stray write would silently poison every row downstream of it in the
+    same process. The comment here used to say "read-only by convention" and the flags said
+    otherwise; now they agree. Anything needing to mutate must `.copy()` first.
     """
     r, c = radius_field(n, cellsize)
     h_init = halfar(r, H0, R0)
     h = sims.glacier_sia(np.zeros((n, n)), h_init, steps=int(steps), A=A_GLEN,
                          dt=DT, cellsize=cellsize, beta=0.0, max_substeps=4000)
+    for a in (r, h_init, h):
+        a.flags.writeable = False
     return r, c, h_init, h
 
 
@@ -235,7 +247,7 @@ def rate_error_at_refined_timestep(refine, steps=8, n=N, cellsize=CELLSIZE):
 # `SHAPE_TOLERANCE` cites `test_benchmarks.py` as its source, and this one needs a source too.
 # The correct solver's rate error, measured at 2/4/8/16 steps: 0.01134, 0.00580, 0.00233,
 # 0.00046. The row below is evaluated at 8 steps, so the bound is set at ~4x the 0.00233 that
-# run scores — enough headroom that a seed or a numpy version cannot redden it, and no more.
+# run scores.
 #
 # WHY IT IS NOT 0.05. At 5% this benchmark was decorative. Mutations of `glacier_sia` and
 # their rate error at 8 steps, all of which a solver benchmark exists to catch:
@@ -244,17 +256,147 @@ def rate_error_at_refined_timestep(refine, steps=8, n=N, cellsize=CELLSIZE):
 #     face averaging mean -> max      0.0193
 # Every one of them passed at 0.05. All five fail at 0.01, and the shape rows — which the
 # rate row exists precisely because they are near-vacuous — catch none of them.
+#
+# ⚠️ AND THE JUSTIFICATION ABOVE USED TO END "enough headroom that a seed or a numpy version
+# cannot redden it", WHICH TREATED 0.00233 AS NOISE. It is not noise; it is a systematic
+# discretisation bias, and CFL error CANCELS it, so this row is NOT monotone in the very
+# defect it is quoted above as policing. The signed error over the CFL factor, everything
+# else held at the shipped values (`rate_bias_at_cfl`, 8 steps, 121 cells):
+#     0.05 +0.00340   0.10 +0.00304   0.20 +0.00233   0.25 +0.00193   0.28 +0.00102
+#     0.30 -0.00016   0.32 -0.00139   0.35 -0.00528   0.38 -0.01023   0.45 -0.02792
+#     0.60 -0.03326
+# It is monotone DECREASING and crosses zero near 0.297. So CFL 0.30 — half again past the
+# 0.2 the solver chose — scores 0.00016, fifteen times BETTER than the shipped solver, and
+# every factor from 0.22 to 0.35 passes this bound. Refining toward stability makes the score
+# WORSE. The 0.6 mutation in the table above is real but it sits far out on the tail where
+# none of this is visible, which is exactly why it was the one that got written down.
+#
+# THEREFORE: this bound polices AGREEMENT, not correctness, and it cannot police the timestep
+# at all inside 0.22–0.35. `tests/test_halfar_anatomy.py` carries the second row that can —
+# distance from the refined-timestep answer, `CFL_REFERENCE` below — and the pair of them is
+# the guard. Do NOT tighten this number toward the observed 0.00233 to "close the gap": the
+# gap is a cancellation, not slack, and tightening would reject the correct solver at a
+# refined timestep (0.00340 at CFL 0.05) while still admitting CFL 0.30.
 RATE_TOLERANCE = 0.01
 
-# The GRID pairs panel e's companion row refines over: domain width held at ~1450 km, so the
-# only thing that changes is resolution. ⚠️ This is the knob that moves the rate error;
-# refining the TIMESTEP at fixed total time does not (see `caption_lines`).
-GRID_REFINEMENT = ((61, 24000.0), (121, 12000.0), (241, 6000.0))
+CFL_SHIPPED = 0.2                  # the factor `glacier_sia` hard-codes
+CFL_REFERENCE = 0.05               # 4x refined: the "exact in time" answer this grid can afford
+CFL_SWEEP = (CFL_REFERENCE, CFL_SHIPPED, 0.30, 0.45, 0.6)
+
+# The GRID pairs panel e's companion row refines over: the domain SPAN `(n - 1) * cellsize` is
+# held at exactly 1440 km, so the only thing that changes is resolution. ⚠️ This is the knob
+# that moves the rate error; refining the TIMESTEP at fixed total time does not (see
+# `caption_lines`).
+#
+# ⚠️ THE LADDER IS SIX POINTS BECAUSE THREE WERE NOT EVIDENCE OF ANYTHING. It was
+# (61, 121, 241) — 0.00265 / 0.00233 / 0.00138 — and the row asserted that sequence is
+# monotone, which reads as "finer is better". Over a wider set of grids at the same 1440 km
+# span that is FALSE, and the counterexamples are worth pinning here so nobody "helpfully"
+# adds one and reddens the row:
+#     n=31  0.000532  <- the BEST of every grid measured, beating n=321's 0.000975
+#     n=41  0.004375  <- the WORST
+#     n=73  0.000347     n=91  0.002534     n=97  0.003222     n=145 0.001525
+# n=73 and n=145 are the grids where `R0 / cellsize` is exactly 25 and 50 — the dome margin
+# lands on a cell boundary — and they dip well below their neighbours. The trend across the
+# six below is real and monotone; POINTWISE monotonicity in n is not a property of this
+# solver, and `test_a_low_rate_error_is_not_evidence_of_a_good_grid` keeps the row from being
+# read as if it were. Runtime is why the ladder stops at 241: n=289 costs ~23 s, n=321 ~34 s.
+GRID_REFINEMENT = ((61, 24000.0), (81, 18000.0), (121, 12000.0),
+                   (161, 9000.0), (181, 8000.0), (241, 6000.0))
+
+# The coarse grid whose score beats the whole ladder. Named so the guard can measure the
+# anomaly instead of quoting it. `(31 - 1) * 48000 = 1440 km`, the same span as the ladder.
+GRID_COARSE_ANOMALY = (31, 48000.0)
 
 # Panel e's y-range. Named so `tests/test_halfar_anatomy.py` can assert the acceptance band
 # still fits inside the frame that is supposed to display it — the two used to be able to
 # drift apart, and did: the panel was drawn on ±3% while the bound was ±5%.
 RATE_PANEL_YLIM = (0.97, 1.03)
+
+
+def sia_at_cfl(h_init, cfl, steps=8, n=N, cellsize=CELLSIZE):
+    """`glacier_sia`'s transport loop, transcribed, with the CFL factor made an argument.
+
+    ⚠️ A TRANSCRIPTION, AND THEREFORE A LIABILITY THE GUARD HAS TO CARRY. `glacier_sia`
+    hard-codes `0.2 * cellsize^2 / D_max`, so the only way to sweep that factor without editing
+    the shipped solver is to copy the loop. The copy is faithful today — at `cfl=0.2` it is
+    BITWISE identical to `evolve(steps)[3]`, max difference 0.000e+00 — and
+    `test_the_CFL_transcription_still_matches_the_shipped_solver` is what keeps it so. Without
+    that row a change to `glacier_sia` would leave this function quietly "proving" bounds about
+    a solver that no longer ships.
+
+    Everything outside the CFL factor matches `sims_illustrative.glacier_sia` at `beta=0` and a
+    zero bed line for line — including the ice constants, which are written here as the SOLVER's
+    literals rather than as `RHO_ICE`/`G_ACC`. Those are the ANALYTIC side's constants; reading
+    them here would wire the transcription to the thing it is being compared against.
+    """
+    n_glen, rho, g = 3, 917.0, 9.81
+    c = 2.0 * A_GLEN / (n_glen + 2) * (rho * g) ** n_glen
+    h = np.array(h_init, dtype=np.float64, copy=True)
+    cs = float(cellsize)
+    for _ in range(int(steps)):
+        remaining, subs = DT, 0
+        while remaining > 1e-6 * DT and subs < 4000:
+            sy, sx = np.gradient(h, cs)
+            d = c * h ** (n_glen + 2) * np.hypot(sx, sy) ** (n_glen - 1)
+            dmax = float(d.max())
+            if dmax <= 0.0:
+                break
+            sub = min(remaining, cfl * cs * cs / dmax)
+            fx = 0.5 * (d[:, :-1] + d[:, 1:]) * (h[:, :-1] - h[:, 1:]) / cs
+            fy = 0.5 * (d[:-1, :] + d[1:, :]) * (h[:-1, :] - h[1:, :]) / cs
+            dh = np.zeros_like(h)
+            dh[:, :-1] -= fx
+            dh[:, 1:] += fx
+            dh[:-1, :] -= fy
+            dh[1:, :] += fy
+            h = np.maximum(h + sub / cs * dh, 0.0)
+            remaining -= sub
+            subs += 1
+    return h
+
+
+@lru_cache(maxsize=None)
+def rate_bias_at_cfl(cfl, steps=8, n=N, cellsize=CELLSIZE):
+    """The SIGNED relative disagreement `t0_fitted / t0_analytic - 1` at CFL factor `cfl`.
+
+    ⚠️ SIGNED ON PURPOSE. `rate_error` takes the absolute value, and that is what hides the
+    defect recorded beside `RATE_TOLERANCE`: this quantity is monotone decreasing in `cfl` and
+    crosses zero at ~0.297, so |·| turns a monotone bias into a V and hands the best score to a
+    solver running half again past its own stability factor. Read the sign before concluding
+    anything from the magnitude.
+    """
+    r, c = radius_field(n, cellsize)
+    h = sia_at_cfl(halfar(r, H0, R0), cfl, steps, n, cellsize)
+    fitted = float(steps) * DT / ((H0 / float(h[c, c])) ** 9.0 - 1.0)
+    return float(fitted / t0_analytic() - 1.0)
+
+
+def cfl_distance_from_refined_timestep(cfl, steps=8):
+    """How far the recovered t0 sits from the SAME scheme run at `CFL_REFERENCE`.
+
+    ⚠️ THIS IS THE QUANTITY THAT BOUNDS CORRECTNESS, WHERE `rate_error` BOUNDS AGREEMENT.
+    The rate error at the shipped grid is a sum of a spatial bias (+0.00361 at cfl=0.02,
+    extrapolating to ~+0.0038 at cfl→0) and a time-integration bias (negative, growing with
+    `cfl`); they cancel near cfl=0.297, which is why the raw error is not monotone in the
+    timestep. Subtracting the refined-timestep answer removes the spatial half, leaving the
+    time-integration error alone — which IS monotone, and has nothing to cancel against.
+    Measured at 8 steps, 121 cells:
+        cfl 0.20 -> 0.00107    0.30 -> 0.00355    0.45 -> 0.03132    0.60 -> 0.03666
+    `CFL_REFERENCE` is 0.05 rather than 0 because it has to be affordable: it is 4x refined and
+    within 0.00022 of the cfl=0.02 answer, so it stands in for the exact-in-time solution to
+    about a ninth of the tolerance below.
+    """
+    return float(abs(rate_bias_at_cfl(cfl, steps) - rate_bias_at_cfl(CFL_REFERENCE, steps)))
+
+
+# The bound the row above is asserted against. Derived, like `RATE_TOLERANCE`, from the measured
+# series and not from comfort: the shipped CFL 0.2 scores 0.00107 and the first factor past the
+# stability limit that `RATE_TOLERANCE` cannot see — 0.30 — scores 0.00355. 0.002 sits at 1.9x
+# the shipped value and 0.56x the first defect, which is the widest separation the measurements
+# allow. Unlike `RATE_TOLERANCE` this quantity has no cancellation to hide in, so the margin
+# does not need to be 4x.
+CFL_CONSISTENCY_TOLERANCE = 0.002
 
 
 def measurements():
@@ -276,6 +418,16 @@ def measurements():
         # quotes it. Coarse/fine are the ends of GRID_REFINEMENT.
         'rate_error_coarse': rate_error(8, *GRID_REFINEMENT[0]),
         'rate_error_fine': rate_error(8, *GRID_REFINEMENT[-1]),
+        'rate_error_by_grid': tuple(rate_error(8, n, cs) for n, cs in GRID_REFINEMENT),
+        # …and the grid that beats every rung of that ladder while being the coarsest of all,
+        # because the caption says so and a caption that says so must measure it.
+        'rate_error_coarse_anomaly': rate_error(8, *GRID_COARSE_ANOMALY),
+        # The CFL cancellation, live: the shipped 0.2 against 0.30, which is half again past
+        # the stability factor and scores an order of magnitude BETTER on this row.
+        'rate_bias_shipped_cfl': rate_bias_at_cfl(CFL_SHIPPED),
+        'rate_bias_over_cfl': rate_bias_at_cfl(0.30),
+        'cfl_distance_shipped': cfl_distance_from_refined_timestep(CFL_SHIPPED),
+        'cfl_distance_over': cfl_distance_from_refined_timestep(0.30),
         # …and the timestep series that does NOT converge, so the caption's correction is
         # quoting a live measurement rather than a remembered one.
         'rate_error_dt_coarse': rate_error_at_refined_timestep(TIMESTEP_REFINEMENT[0]),
@@ -433,7 +585,10 @@ def build():
 
     # --- e: the rate, which the four panels to the left cannot see -----------
     x0 = PAD + 4 * PANEL_W
-    d.text((x0, TOP - 26), 'e.  the rate, unfakeable', GRN, font=f_h)
+    # ⚠️ THIS HEADING READ 'the rate, unfakeable'. It is unfakeable by a near-no-op, which is the
+    # claim panels a–d cannot make; it is NOT unfakeable in general — a solver run at CFL 0.30
+    # scores better on it than the shipped one (see RATE_TOLERANCE). Claim the thing that is true.
+    d.text((x0, TOP - 26), 'e.  the rate shape cannot fake', GRN, font=f_h)
     ex = _Ax(d, (x0 + 44, TOP, x0 + side + 44, TOP + side), (0.0, 5.0), RATE_PANEL_YLIM)
     for t in (0.98, 0.99, 1.00, 1.01, 1.02):
         ex.hline(t, GRID if abs(t - 1.0) > 1e-9 else GRN, 1 if abs(t - 1.0) > 1e-9 else 2)
@@ -518,8 +673,23 @@ def caption_lines(m):
         'grows with elapsed time — not discretisation error shrinking; carry it past 16 steps and it turns round again. Cut the REAL timestep at',
         'fixed total time, which is what the old sentence claimed, and the answer moves the WRONG way: %.4f%% → %.4f%% over dt/1…dt/16. The knob'
         % (100 * m['rate_error_dt_coarse'], 100 * m['rate_error_dt_fine']),
-        'that does converge is the GRID, so that is the row the suite asserts: %.3f%% at 61 cells, %.3f%% at 121, %.3f%% at 241 — monotone.'
-        % (100 * m['rate_error_coarse'], 100 * m['rate_error'], 100 * m['rate_error_fine']),
+        'that does converge is the GRID, so that is the row the suite asserts, over six of them at a fixed 1440 km span: %s%% at'
+        % ' / '.join('%.3f' % (100 * e) for e in m['rate_error_by_grid']),
+        '%s cells — monotone. ⚠️ BUT NOT MONOTONE IN THE GRID GENERALLY, and the row must not be read as "finer is better": n=31 scores'
+        % ' / '.join(str(n) for n, _cs in GRID_REFINEMENT),
+        '%.3f%%, better than every rung of that ladder, and n=73 and n=145 — the grids where R0/cellsize is exactly 25 and 50 — dip below their'
+        % (100 * m['rate_error_coarse_anomaly']),
+        'neighbours too. A low rate error is not by itself evidence of a good discretisation.',
+        '',
+        '⚠️ AND THE ±%.0f%% BAND IS AGREEMENT, NOT CORRECTNESS. The %.3f%% above is a systematic bias, not noise, and CFL error CANCELS it: run the'
+        % (100 * RATE_TOLERANCE, 100 * m['rate_error']),
+        'same scheme at CFL 0.30 — half again past the 0.2 glacier_sia chose — and it scores %.3f%%, better than the shipped solver, with everything'
+        % (100 * abs(m['rate_bias_over_cfl'])),
+        'from 0.22 to 0.35 inside the band. The bias is monotone in CFL and changes SIGN at ~0.297; taking |·| turns that into a V. So the suite',
+        'carries a second row that measures distance from the refined-timestep answer instead, where the shipped 0.2 scores %.3f%% and 0.30 scores'
+        % (100 * m['cfl_distance_shipped']),
+        '%.3f%% — no cancellation, and the timestep is policed where this band cannot police it.'
+        % (100 * m['cfl_distance_over']),
         'Drawn from sims_illustrative.py, guarded by tests/test_halfar_anatomy.py.',
     ]
 
