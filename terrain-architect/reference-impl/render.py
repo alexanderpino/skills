@@ -164,19 +164,80 @@ _MATERIAL_PALETTE = [
     (40, 90, 170), (240, 244, 250), (120, 118, 116), (200, 178, 120), (96, 132, 72),
 ]
 
+# water, snow, rock, scree, sediment, vegetation, ground — order matches
+# analysis.SUBSTANCE_NAMES. This is the palette the DEFAULT pairing needs
+# (`analysis.derive_substances` -> `material_rgb`, GROUNDING.md): that stack has SEVEN channels
+# and, before this existed, the five-row `_MATERIAL_PALETTE` was the only palette here, so the
+# documented default raised `ValueError: shape-mismatch for sum` out of the tensordot.
+_SUBSTANCE_PALETTE = [
+    (40, 90, 170), (240, 244, 250), (120, 118, 116), (152, 146, 138), (200, 178, 120),
+    (96, 132, 72), (124, 106, 78),
+]
 
-def material_rgb(masks, cellsize=1.0, palette=None, shade=True):
+# Which built-in palette a mask stack gets when the caller names none: by channel count, because
+# that is the only thing a bare `(K, H, W)` stack carries. Both shipped producers are covered —
+# `derive_materials` (5) and `derive_substances` (7).
+_PALETTES_BY_LENGTH = {len(_MATERIAL_PALETTE): _MATERIAL_PALETTE,
+                       len(_SUBSTANCE_PALETTE): _SUBSTANCE_PALETTE}
+
+
+def _palette_for(k, palette):
+    """The palette for a `k`-channel stack, or a ValueError that names both counts.
+
+    ⚠️ A LENGTH MISMATCH IS AN ERROR HERE, NOT A TRUNCATION. This used to read `pal[:k]`, which
+    silently dropped palette rows and — when the palette was the SHORTER of the two — handed
+    numpy a mismatched tensordot, so the documented default pairing died with
+    `ValueError: shape-mismatch for sum`, naming neither the stack nor the palette.
+    """
+    if palette is None:
+        if k not in _PALETTES_BY_LENGTH:
+            raise ValueError(
+                "material_rgb: no built-in palette for a %d-channel mask stack (built-ins: %s). "
+                "Pass palette= with one colour per channel."
+                % (k, ", ".join("%d = %s" % (n, nm) for n, nm in
+                                ((len(_MATERIAL_PALETTE), "analysis.MATERIAL_NAMES"),
+                                 (len(_SUBSTANCE_PALETTE), "analysis.SUBSTANCE_NAMES")))))
+        palette = _PALETTES_BY_LENGTH[k]
+    pal = np.asarray(palette, dtype=np.float64)
+    if len(pal) != k:
+        raise ValueError(
+            "material_rgb: the mask stack has %d channels but the palette has %d colours; "
+            "palette order must match mask order, one colour per channel" % (k, len(pal)))
+    return pal
+
+
+def material_rgb(masks, *, palette=None):
     """Colour a material stack. `masks` is either a partitioned `(K, H, W)` weight stack
     (blended by weight — the splatmap preview) or a categorical `(H, W)` index map. Palette
-    order must match the mask order. With `shade`, modulate by hillshade for relief."""
+    order must match the mask order; with no `palette` the built-in for that channel count is
+    used (5 = `analysis.MATERIAL_NAMES`, 7 = `analysis.SUBSTANCE_NAMES`), and any other count
+    is an error naming both numbers. Relief belongs to `hillshade` / `photoreal`, which take the
+    height field this function has no access to.
+
+    ⚠️ THIS IS A BASE-LESS WEIGHTED SUM, `Σ wᵢ·materialᵢ`, AND IT IS DELIBERATELY NOT
+    NORMALISED: over-subscribed masks push channels past 255 and clip. That clip is the only
+    downstream trace a partition bug leaves, and only when the palette is bright enough to have
+    no headroom — see `tests/test_mask_partition.py`, which measures where it does and does not
+    fire on these palettes."""
     masks = np.asarray(masks, dtype=np.float64)
-    pal = np.asarray(palette if palette is not None else _MATERIAL_PALETTE, dtype=np.float64)
     if masks.ndim == 2:                            # categorical index map -> one-hot
-        idx = np.clip(np.rint(masks).astype(int), 0, len(pal) - 1)
+        idx = np.rint(masks).astype(int)
+        top = int(idx.max()) + 1 if idx.size else 0
+        if palette is None:                        # an index map carries no channel count:
+            pal = np.asarray(                      # take the smallest built-in that spans it
+                _MATERIAL_PALETTE if top <= len(_MATERIAL_PALETTE) else _SUBSTANCE_PALETTE,
+                dtype=np.float64)
+        else:
+            pal = np.asarray(palette, dtype=np.float64)
+        if idx.size and (idx.min() < 0 or top > len(pal)):
+            raise ValueError(
+                "material_rgb: index map runs %d..%d but the palette has %d colours; this used "
+                "to clip the index and mis-colour those cells silently. Pass palette= with a "
+                "colour for every index" % (int(idx.min()), int(idx.max()), len(pal)))
         rgb = pal[idx]
     else:                                          # (K,H,W) soft weights -> weighted blend
-        k = masks.shape[0]
-        rgb = np.tensordot(np.moveaxis(masks, 0, -1), pal[:k], axes=([2], [0]))
+        pal = _palette_for(masks.shape[0], palette)
+        rgb = np.tensordot(np.moveaxis(masks, 0, -1), pal, axes=([2], [0]))
     return np.clip(rgb, 0, 255).astype(np.uint8)
 
 

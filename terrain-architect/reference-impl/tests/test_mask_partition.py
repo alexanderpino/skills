@@ -35,7 +35,7 @@ THEY ARE TWO ASSERTIONS AT TWO SITES, NOT ONE QUANTITY.
      (`test_the_over_composite_partitions_by_construction`).
 
 ⚠️ AND THE REASON THE ASSERTION BELONGS UPSTREAM IS THAT ONE SHIPPING CONSUMER HIDES THE BUG
-   WHILE ANOTHER SHIPPING CONSUMER CLIPS ON IT.
+   ENTIRELY, WHILE THE OTHER REPORTS IT ONLY ON SOME DATA.
 
      This file used to say, flatly, that over-subscription "produces no artefact, no brightness
      error, no clue of any kind". That is FALSE as stated. It is true of exactly one operator:
@@ -45,23 +45,38 @@ THEY ARE TWO ASSERTIONS AT TWO SITES, NOT ONE QUANTITY.
          `Π(1−mᵢ)`, and the result stays inside the convex hull of its inputs. THIS PATH CANNOT
          REPORT THE BUG — the compositing ORDER silently arbitrates the conflict.
 
-       * `render.material_rgb`, the base-less weighted sum `Σ wᵢ·materialᵢ`, DOES report it, and
-         loudly. It ships in the same module, `GROUNDING.md` names it the DEFAULT colorizer, and
-         `gallery.py` and `graph_demo.py` feed `06` masks straight into it with no compositing
-         stage between. On a light terrain palette, Σ = 1.8 drives channels to [348 360 384] and
-         ships [255 255 255]: a rescale, a brightness error and an out-of-range value at once.
-         `test_material_rgb_over_brightens_and_clips_when_the_masks_over_subscribe` measures it.
+       * `render.material_rgb`, the base-less weighted sum `Σ wᵢ·materialᵢ`, CAN report it — it
+         has no base to absorb the excess, so the excess goes out of range. It ships in the same
+         module, `GROUNDING.md` names it the DEFAULT colorizer, and `gallery.py` and
+         `graph_demo.py` feed `06` masks straight into it with no compositing stage between.
 
-     So whether the defect is visible depends on WHICH COMPOSITOR A CONSUMER PICKED. A producer
-     cannot know that, which is precisely why the assertion belongs at the fan-in — one place,
-     independent of the consumer — rather than in whichever compositor happens to be wired up.
-     That argument is strictly stronger than the old one, which rested on a claim that the very
-     next module in the tree falsifies.
+         ⚠️ BUT IT REPORTS ONLY WHERE THE PALETTE HAS NO HEADROOM, AND THIS FILE OVERSTATED IT.
+         The measurement below was made with `LIGHT_PALETTE` (min channel 200), where Σ = 1.8
+         drives channels to [369 380 401] and clips to [255 255 255] — three symptoms at once.
+         The SHIPPED call path passes NO palette (`gallery.py:117`, `graph_demo.py:434`), so it
+         gets `render._MATERIAL_PALETTE`, where a cell of rock (max channel 120) stays in range
+         until Σ = 2.13 and 4 of the 15 single-and-pair material combinations are SILENT at that
+         same Σ = 1.8. `test_material_rgb_detects_over_subscription_only_where_the_palette_has_
+         no_headroom` records the threshold per material on both shipped palettes, and
+         `test_a_producer_bug_ships_entirely_in_gamut_through_the_shipped_palette` walks a real
+         `derive_materials` bug (Σ = 2.00 everywhere) through to an export with 0 of 4096 pixels
+         clipped. Note also that only the CLIP is self-evident: the "brightness error" half needs
+         a reference image to be an error at all, and nobody exporting a splatmap has one.
 
-     ⚠️ AND `material_rgb` MUST NOT BE "FIXED" TO NORMALISE. It is currently the only downstream
-     detector of a partition bug anywhere in this tree. Normalising it would make the old "no
-     artefact" sentence true by destroying the only signal that exists.
+     So whether the defect is visible depends on WHICH COMPOSITOR A CONSUMER PICKED — and, given
+     the reporting one, on which palette it was handed. A producer cannot know either, which is
+     precisely why the assertion belongs at the fan-in — one place, independent of the consumer —
+     rather than in whichever compositor happens to be wired up. That argument is strictly
+     stronger than both the old one (which rested on a claim the very next module falsifies) and
+     the unconditional "and loudly" that replaced it: a detector that fires on some palettes and
+     not others is an argument FOR checking upstream, not a substitute for it.
+
+     ⚠️ AND `material_rgb` MUST NOT BE "FIXED" TO NORMALISE. Partial as it is, it is the only
+     downstream detector of a partition bug anywhere in this tree. Normalising it would make the
+     old "no artefact" sentence true by destroying the only signal that exists.
 """
+import itertools
+
 import numpy as np
 import pytest
 
@@ -71,8 +86,14 @@ import render
 MASKS_SUMMING_OVER_ONE = (0.6, 0.6, 0.6)
 
 # A realistic light-terrain palette: pale rock / snow / scree, the regime where over-brightening
-# actually clips. A dark palette would hide the defect behind headroom, which is the point —
+# actually clips. A darker palette hides the defect behind headroom, which is the point —
 # the bug's visibility is a property of the data as well as of the operator.
+#
+# ⚠️ AND THIS IS NOT THE PALETTE THE SHIPPED CALL PATH USES. `gallery.py:117` and
+# `graph_demo.py:434` pass no palette at all, so they get `render._MATERIAL_PALETTE`, which is
+# darker and therefore a weaker detector. Every row that quotes a number off LIGHT_PALETTE is
+# quoting a best case; the shipped case is measured in
+# `test_material_rgb_detects_over_subscription_only_where_the_palette_has_no_headroom`.
 LIGHT_PALETTE = np.array([[205.0, 210.0, 220.0],
                           [210.0, 216.0, 228.0],
                           [200.0, 207.0, 221.0]])
@@ -268,16 +289,24 @@ def test_material_rgb_over_brightens_and_clips_when_the_masks_over_subscribe():
     `render.material_rgb` is the base-less weighted sum `Σ wᵢ·materialᵢ`. `08` used to describe
     that shader as a hypothetical third case; it is not. It ships in `render.py` beside
     `splat_blend`, `GROUNDING.md` names it the DEFAULT colorizer, and `gallery.py:117` and
-    `graph_demo.py:420` feed `06` masks straight into it with no compositing stage between.
+    `graph_demo.py:434` feed `06` masks straight into it with no compositing stage between.
 
     With a partition (Σ = 1) it is a convex combination and lands inside the palette's hull, with
     no clipping. Over-subscribed (Σ = 1.8) the same code drives every channel past 255 and the
     output clips — a rescale, a brightness error and an out-of-range value, the three things the
     chapters used to say could not happen.
 
-    ⚠️ THE FIX IS NOT TO NORMALISE `material_rgb`. It is the only downstream detector of a
-    partition bug in this tree; normalising it would make the old sentence true by destroying the
-    only signal that exists. The masks are fixed upstream, at the fan-in, once.
+    ⚠️ THIS ROW IS THE BEST CASE, NOT THE SHIPPED CASE, AND IT IS WHERE THIS FILE OVERSTATED
+    ITSELF. It pins `LIGHT_PALETTE`, whose dimmest channel is 200, so every material in it is
+    out of range by Σ = 1.28. The palette the shipped call path actually gets is darker and says
+    nothing at this same Σ for several material mixes:
+    `test_material_rgb_detects_over_subscription_only_where_the_palette_has_no_headroom` and
+    `test_a_producer_bug_ships_entirely_in_gamut_through_the_shipped_palette` are the rows that
+    scope this one. Read alone, this row reads as a guarantee it cannot give.
+
+    ⚠️ THE FIX IS NOT TO NORMALISE `material_rgb`. Partial as it is, it is the only downstream
+    detector of a partition bug in this tree; normalising it would make the old sentence true by
+    destroying the only signal that exists. The masks are fixed upstream, at the fan-in, once.
     """
     shape = (4, 4)
 
@@ -292,7 +321,7 @@ def test_material_rgb_over_brightens_and_clips_when_the_masks_over_subscribe():
     over = MASKS_SUMMING_OVER_ONE
 
     u_norm = unclipped(normalised)
-    s_norm = render.material_rgb(stack(normalised), palette=LIGHT_PALETTE, shade=False)
+    s_norm = render.material_rgb(stack(normalised), palette=LIGHT_PALETTE)
     assert u_norm.max() <= 255.0 + 1e-9, (
         "the Σ=1 fixture already exceeds 255 (%.1f); pick a palette inside range or this row "
         "proves nothing" % u_norm.max())
@@ -303,7 +332,7 @@ def test_material_rgb_over_brightens_and_clips_when_the_masks_over_subscribe():
         "with Σ = 1.00 the weighted sum should be a convex combination, inside the palette hull")
 
     u_over = unclipped(over)
-    s_over = render.material_rgb(stack(over), palette=LIGHT_PALETTE, shade=False)
+    s_over = render.material_rgb(stack(over), palette=LIGHT_PALETTE)
     assert abs(sum(over) - 1.8) < 1e-9, "the over-subscription fixture drifted off Σ = 1.8"
     assert u_over.min() > 255.0, (
         "masks summing to %.2f no longer drive material_rgb past 255 on this palette (min "
@@ -335,6 +364,227 @@ def test_material_rgb_over_brightens_and_clips_when_the_masks_over_subscribe():
         % np.round(u_over[0, 0], 1))
     assert list(s_over[0, 0]) == [255, 255, 255], (
         "the chapters quote Σ=1.80 -> shipped [255 255 255]; got %s" % list(s_over[0, 0]))
+
+
+# --------------------------------------------------------------------------------------------- #
+# THE SCOPE OF THE DETECTOR: the two rows below are what keeps the row above from overstating.
+# --------------------------------------------------------------------------------------------- #
+SHIPPED_PALETTES = (("render._MATERIAL_PALETTE", render._MATERIAL_PALETTE, analysis.MATERIAL_NAMES),
+                    ("render._SUBSTANCE_PALETTE", render._SUBSTANCE_PALETTE, analysis.SUBSTANCE_NAMES))
+
+# ⚠️ MEASURED, NOT COPIED. `_measure_clip_threshold` below re-derives every one of these numbers
+# through `render.material_rgb` itself; they are recorded here so a palette edit that weakens the
+# detector fails a row instead of quietly widening the blind spot. A cell made ENTIRELY of one
+# material leaves 8-bit range at Σ = 255 / max(channel):
+#
+#     snow 1.02 · sediment/sand 1.28 · water 1.50 · scree 1.68 · vegetation/grass 1.93 ·
+#     ground 2.06 · rock 2.13
+#
+# The headline Σ = 1.80 this file uses everywhere else is BELOW four of those seven thresholds.
+CLIP_THRESHOLDS = {"water": 1.50, "snow": 1.02, "rock": 2.13, "sand": 1.28,
+                   "grass": 1.93, "scree": 1.68, "sediment": 1.28, "vegetation": 1.93,
+                   "ground": 2.06}
+
+
+def _uniform_stack(weights, shape=(8, 8)):
+    """A (K, H, W) stack of spatially uniform channels — one weight per palette row."""
+    return np.stack([np.full(shape, w, dtype=float) for w in weights])
+
+
+def _clips(weights, palette, shape=(8, 8)):
+    """Does `material_rgb` land on 255 anywhere, i.e. does the detector fire? Measured through
+    the shipped function, not through a re-implementation of it."""
+    return bool((render.material_rgb(_uniform_stack(weights, shape),
+                                     palette=np.asarray(palette, dtype=float)) == 255).any())
+
+
+def _measure_clip_threshold(index, palette, eps=0.02):
+    """Bracket the Σ at which an all-of-one-material cell starts clipping, through material_rgb."""
+    k = len(palette)
+    star = 255.0 / max(palette[index])
+    below = [0.0] * k
+    below[index] = star - eps
+    above = [0.0] * k
+    above[index] = star + eps
+    assert not _clips(below, palette) and _clips(above, palette), (
+        "the clip threshold for palette row %d is not at Σ = %.4f after all" % (index, star))
+    return star
+
+
+def test_material_rgb_detects_over_subscription_only_where_the_palette_has_no_headroom():
+    """⚠️ THE HEDGE THAT BELONGS IN THE HEADER, NOT IN A FIXTURE COMMENT.
+
+    `test_material_rgb_over_brightens_and_clips_when_the_masks_over_subscribe` measures the
+    detector on `LIGHT_PALETTE`, a pale palette whose dimmest channel is 200. The SHIPPED call
+    path — `gallery.py:117`, `graph_demo.py:434` — passes no palette at all and gets
+    `render._MATERIAL_PALETTE` (or, for a seven-channel substance stack,
+    `render._SUBSTANCE_PALETTE`). Those are terrain colours, not paper-white, and a weighted sum
+    of them has headroom to spare.
+
+    MEASURED HERE, through `material_rgb` itself. A cell of one material clips at
+    Σ = 255 / max(channel):
+
+        snow 1.02 · sand/sediment 1.28 · water 1.50 · scree 1.68 · grass/vegetation 1.93 ·
+        ground 2.06 · rock 2.13
+
+    So at this file's own headline Σ = 1.80, `rock`, `grass`, `water+grass` and `rock+grass` — 4
+    of the 15 single-and-pair combinations of the five-material palette — produce NO clipped
+    pixel at all. A partition bug on a rocky or grassy hillside is invisible to the detector this
+    file calls loud, and rock is the single most common material `derive_materials` emits.
+
+    On `LIGHT_PALETTE` all 3 singles and all 3 pairs clip at the same Σ = 1.80, which is exactly
+    why the original measurement read as unconditional: it was taken on the best case available.
+
+    This does not weaken the conclusion, it sharpens it. A detector whose sensitivity depends on
+    the palette a consumer happened to pass is one more thing the producer cannot know — the same
+    argument as `splat_blend`'s silence, one level in. The assertion still belongs at the fan-in.
+    """
+    for label, palette, names in SHIPPED_PALETTES:
+        assert len(palette) == len(names), (
+            "%s has %d colours but %s names %d substances; material_rgb selects the palette by "
+            "channel count, so these must stay in step"
+            % (label, len(palette), names, len(names)))
+        for i, name in enumerate(names):
+            star = _measure_clip_threshold(i, palette)
+            assert abs(star - CLIP_THRESHOLDS[name]) < 0.01, (
+                "%s: '%s' now clips at Σ = %.4f, not the recorded %.2f. Re-measure the table in "
+                "this file, in `06`, `08` and `14` — a darker colour here widens the detector's "
+                "blind spot and a brighter one narrows it."
+                % (label, name, star, CLIP_THRESHOLDS[name]))
+
+    # ...and the consequence at the headline Σ, enumerated over single materials and pairs.
+    sigma = 1.80
+    pal = render._MATERIAL_PALETTE
+    names = analysis.MATERIAL_NAMES
+    silent = []
+    for combo in list(itertools.combinations(range(len(pal)), 1)) \
+            + list(itertools.combinations(range(len(pal)), 2)):
+        w = [0.0] * len(pal)
+        for i in combo:
+            w[i] = sigma / len(combo)
+        if not _clips(w, pal):
+            silent.append("+".join(names[i] for i in combo))
+    assert silent == ["rock", "grass", "water+grass", "rock+grass"], (
+        "the shipped palette's blind spot at Σ = %.2f moved: %s. The header, `06`, `08` and `14` "
+        "all quote 'rock, grass, water+grass, rock+grass — 4 of 15'; re-measure them."
+        % (sigma, silent))
+
+    # the contrast that makes the point: on the pale palette the same Σ is caught every time
+    light = [tuple(c) for c in LIGHT_PALETTE]
+    light_silent = [c for c in (list(itertools.combinations(range(3), 1))
+                                + list(itertools.combinations(range(3), 2)))
+                    if not _clips([sigma / len(c) if i in c else 0.0 for i in range(3)], light)]
+    assert light_silent == [], (
+        "LIGHT_PALETTE stopped catching Σ = %.2f everywhere (%s); the row above it depends on "
+        "this palette being the best case." % (sigma, light_silent))
+
+
+def _steep_hillside(n=64, cellsize=10.0):
+    """A uniformly 45° hillside falling south, with hillslope-scale drainage areas.
+
+    Nothing exotic: rock claims almost every cell (`derive_materials` puts bedrock above 33°),
+    a few cells drain enough to be water, and there is no snow (no relief for a snowline) and no
+    sand (too steep). It is the most ordinary terrain in this file.
+    """
+    yy, _xx = np.mgrid[0:n, 0:n].astype(float)
+    h = (n - 1 - yy) * cellsize * np.tan(np.radians(45.0))
+    area = np.exp(np.random.default_rng(0).normal(0.0, 1.0, (n, n))) * cellsize * cellsize
+    return h, analysis.slope(h, cellsize), area, cellsize
+
+
+def _mixed_alpine(n=64, cellsize=30.0):
+    """A peak with real drainage: snow above the snowline, rock on the faces, grass below."""
+    import flow
+    rng = np.random.default_rng(3)
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    h = (900.0 * np.exp(-(((xx - 32) ** 2 + (yy - 30) ** 2) / 700.0))
+         + 260.0 * np.exp(-(((xx - 14) ** 2 + (yy - 44) ** 2) / 900.0))
+         + 30.0 * np.sin(xx / 5.0) * np.cos(yy / 6.0) + rng.normal(0.0, 8.0, (n, n)))
+    area = flow.d8_accumulation(flow.priority_flood_fill(h), cellsize)
+    return h, analysis.slope(h, cellsize), area, cellsize
+
+
+def _closing_channel_written_as_a_constant(stack, height):
+    """THE BUG: `derive_materials`' closing channel written `1.0` instead of `1 − claimed`.
+
+    One line, and the kind of line a reader writes from the prose rather than the arithmetic —
+    "the base material takes the rest" misread as "the base material is everywhere". The priority
+    stack above it is untouched and still sums to ≤ 1, so nothing upstream of the closure looks
+    wrong; the stack simply stops being a partition.
+    """
+    return stack[:-1] + [(stack[-1][0], np.ones_like(height))]
+
+
+def test_a_producer_bug_ships_entirely_in_gamut_through_the_shipped_palette():
+    """⚠️ THE BLIND SPOT IS REACHABLE FROM THE REAL PRODUCER, NOT ONLY FROM A HAND-BUILT FIXTURE.
+
+    `analysis.derive_materials` with its closing channel written as a constant `1.0` instead of
+    `1 − claimed` over-subscribes by exactly 2.00× everywhere. Run that through the shipped call
+    path — `material_rgb` with no palette, i.e. `render._MATERIAL_PALETTE` — on an ordinary steep
+    hillside and the export is `[216 250 188]`, a pale sage: IN GAMUT, 0 of 4096 pixels clipped,
+    nothing to see. Twice the correct mask weight, and the "loud" detector says nothing.
+
+    The same bug on a mixed alpine fixture clips ~279 of 4096 pixels, and the clipped cells are
+    the SNOW cells (mean snow weight 0.61 there against 0.011 elsewhere): snow's threshold is
+    1.02, so any over-subscription at all shows on snow. Note the severity is inverted — the
+    hillside is over-subscribed 2.00× and silent, the alpine 1.64× on average and loud. What the
+    detector measures is the palette under the bug, not the size of the bug.
+
+    That is the whole argument for the fan-in assertion, in one producer: the bug is the same,
+    the export is the same code, and whether anyone ever sees it depends on what the terrain
+    happened to be made of.
+    """
+    pal = np.asarray(render._MATERIAL_PALETTE, dtype=float)
+
+    def broken(fixture):
+        h, s, area, cs = fixture
+        stack = _closing_channel_written_as_a_constant(
+            analysis.derive_materials(h, s, area, cs, rng_seed=0), h)
+        masks = np.stack([m for _, m in stack])
+        unclipped = np.tensordot(np.moveaxis(masks, 0, -1), pal, axes=([2], [0]))
+        shipped = render.material_rgb(masks)
+        return dict(zip([n for n, _ in stack], masks)), masks, unclipped, shipped
+
+    # 1. the ordinary hillside: a 2.00x partition bug, exported entirely in gamut
+    named, masks, unclipped, shipped = broken(_steep_hillside())
+    sigma = masks.sum(axis=0)
+    assert abs(sigma.min() - 2.0) < 1e-9 and abs(sigma.max() - 2.0) < 1e-9, (
+        "the fixture stopped over-subscribing by exactly 2.00x (Σ ∈ [%.4f, %.4f]); it is meant "
+        "to be the WORST partition bug in this file, not a marginal one"
+        % (sigma.min(), sigma.max()))
+    assert named["snow"].max() == 0.0 and named["sand"].max() == 0.0, (
+        "the hillside grew snow (%.3f) or sand (%.3f); those are the two materials with enough "
+        "brightness to trip the detector, and this fixture exists to be the case without them"
+        % (named["snow"].max(), named["sand"].max()))
+    clipped = int((unclipped > 255.0).any(axis=-1).sum())
+    assert clipped == 0, (
+        "%d of %d pixels now clip on the shipped palette at Σ = 2.00. If that is a palette "
+        "change it is an improvement — re-measure the thresholds table; if it is material_rgb "
+        "normalising, the only detector in the tree is gone." % (clipped, sigma.size))
+    assert unclipped.max() <= 255.0 and shipped.max() < 255, (
+        "the in-gamut claim: the weighted sum peaks at %.1f and ships %d, so nothing about the "
+        "exported image says the masks were doubled" % (unclipped.max(), shipped.max()))
+    modal = list(shipped[shipped.shape[0] // 2, shipped.shape[1] // 2])
+    assert modal == [216, 250, 188], (
+        "the chapters quote the doubled rock+grass cell as the pale sage [216 250 188]; got %s"
+        % modal)
+
+    # 2. ...and the same bug where snow carries weight: loud, on the same palette
+    named_a, masks_a, unclipped_a, _shipped_a = broken(_mixed_alpine())
+    clip_mask = (unclipped_a > 255.0).any(axis=-1)
+    n_clipped = int(clip_mask.sum())
+    assert n_clipped > 0.05 * clip_mask.size, (
+        "the alpine fixture clipped %d of %d pixels (measured: 279); with snow on the ground the "
+        "detector is supposed to be strong, and if it is not, no palette catches this bug at all"
+        % (n_clipped, clip_mask.size))
+    assert named_a["snow"][clip_mask].mean() > 10.0 * named_a["snow"][~clip_mask].mean(), (
+        "the clipped cells are no longer the snow cells (%.3f vs %.3f), so the explanation in "
+        "this docstring — that snow's Σ = 1.02 threshold is what fires — no longer holds"
+        % (named_a["snow"][clip_mask].mean(), named_a["snow"][~clip_mask].mean()))
+    assert masks_a.sum(axis=0).mean() < sigma.mean(), (
+        "the alpine fixture is now over-subscribed harder (%.3f) than the silent hillside "
+        "(%.3f); the point of the pair is that the LESS broken one is the one that shows"
+        % (masks_a.sum(axis=0).mean(), sigma.mean()))
 
 
 def _priority_stack(raw):

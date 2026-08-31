@@ -431,7 +431,7 @@ def render_all(height, area, cellsize, outdir, materials=None, scatter_pts=None,
     emit("05_hypsometric.png", render.hypsometric(height, cellsize))
     emit("06_clip.png", render.false_colour_clip(height))
     if materials is not None:                                  # 11: the splatmap preview
-        emit("07_materials.png", render.material_rgb(materials, cellsize))
+        emit("07_materials.png", render.material_rgb(materials))
     if scatter_pts is not None:                                # 12: boulders over the hillshade
         base = render.hillshade(height, cellsize)
         emit("08_scatter.png", render.scatter_overlay(base, scatter_pts, cellsize,
