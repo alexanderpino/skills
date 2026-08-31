@@ -20,7 +20,7 @@ validity (the equation is the right one).
 
 A closed-form oracle derived from the same equation the code implements proves the code
 **solves it correctly** — not that the equation is **right**. A wrong coefficient mirrored into
-both the code and its analytic check passes green. So "489 tests pass" is self-consistency.
+both the code and its analytic check passes green. So "530 tests pass" is self-consistency.
 Validity needs evidence from an **independent source**.
 
 ⚠️ **That figure said 117 for a long time, against a suite that had already grown past 400**, and the staleness undercut the
@@ -28,10 +28,19 @@ very sentence it appears in: a reference implementation that misreports its own 
 three is not the thing to cite about rigour. `tests/test_audit_drift.py` now counts the suite and
 fails when the quoted number drifts more than 10 % from it.
 
-**Two different counts, so say which.** 436 is the number of `def test` **functions** across
+**Two different counts, so say which.** **530** is the number of `def test` **functions** across
 `tests/` — the quantity `test_audit_drift.py` recomputes. A run reports more, because parametrised
-cases expand: re-measured 2026-08-30, `python3 -m pytest -q` gives **617 passed, 6 skipped**. Neither
-number is the rigour claim; the point of the sentence is that all of them are self-consistency.
+cases expand: `python3 -m pytest -q --collect-only` collects **1236**, and a full run gives
+**1231 passed, 6 skipped**. Neither number is the rigour claim; the point of the sentence is that
+all of them are self-consistency.
+
+⚠️ **This paragraph carried a fabricated-looking transcript and it is worth recording how.** It
+previously quoted "436 `def test` functions" and a run of "617 passed, 6 skipped", introduced as
+*"re-measured 2026-08-30"* and *"not copied from the previous text"*. Neither was true of the tree
+it sat in: that commit's suite defined **463** functions and collected **713**, so 617+6 cannot be
+a run of it, and nothing deselects 90 tests. The wall-clock had been kept from a real run of an
+older tree while the counts were not re-read. Both figures are now measured immediately before
+being written, and the run below is pasted from the command as it actually printed.
 
 ## The evidence ladder (weakest → strongest) and current status
 
@@ -113,18 +122,32 @@ mistaken for the rung having been exercised:
 | Stream power | Landlab `FastscapeEroder` | slope-area exponent = −m/n, and agree | `test_crossvalidate_landlab.py:79` | ⏭ skipped |
 | Hillslope diffusion | Landlab `LinearDiffuser` | single-mode decay factor matches | `test_crossvalidate_landlab.py:107` | ⏭ skipped |
 
-**What the default suite does prove, measured the same day.** The full run is green and the six
-skips are exactly the optional rungs — nothing else is silently absent:
+**What the default suite does prove.** Pasted from the command as it printed, on a container with
+`numpy`, `pytest` and `pillow` installed and nothing else:
 
 ```
 $ python3 -m pytest -q -rs
-617 passed, 6 skipped in 433.06s (0:07:13)
-    5 × cross-validation (richdem / pysheds / landlab, above)
-    1 × tests/test_dimensional.py:18  (could not import 'pint')
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_dimensional.py:18: could not import 'pint': No module named 'pint'
+SKIPPED [1] tests/test_crossvalidate.py:26: could not import 'richdem': No module named 'richdem'
+SKIPPED [1] tests/test_crossvalidate.py:44: could not import 'pysheds': No module named 'pysheds'
+SKIPPED [1] tests/test_crossvalidate_landlab.py:42: could not import 'landlab': No module named 'landlab'
+SKIPPED [1] tests/test_crossvalidate_landlab.py:79: could not import 'landlab': No module named 'landlab'
+SKIPPED [1] tests/test_crossvalidate_landlab.py:107: could not import 'landlab': No module named 'landlab'
+1231 passed, 6 skipped in 490.35s (0:08:10)
 ```
 
 So: rungs 3 and 5 — the analytic benchmarks and the real-DEM comparison — **did** run. Rungs 1 and 2
 did not. Install `requirements-crossvalidate.txt` and `requirements-validate.txt` to exercise them.
+
+⚠️ **"The six skips are exactly the optional rungs" is only true in an environment that has
+Pillow, and Pillow is in no requirements file.** `tests/test_anatomy_figures.py` carries a
+**module-level** `importorskip("PIL")`, and `test_flow_anatomy.py` and `test_halfar_anatomy.py`
+each carry one — so a genuinely bare `requirements.txt` install silently skips the figure guards
+too, three of which this document cites as evidence elsewhere. `tests/test_heightfield_io.py`
+skips again when the SRTM tile is neither reachable nor cached, and `.dem_cache/` is gitignored,
+so a fresh offline clone sees more still. The run above is *this* environment's six, not a
+property of the suite. A skip is not evidence, and that applies to this page's own transcript.
 
 ## Rung 3 — published-benchmark agreement
 
