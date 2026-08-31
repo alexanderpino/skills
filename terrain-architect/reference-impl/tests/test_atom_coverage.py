@@ -30,16 +30,27 @@ SKILL_ROOT = REF.parent                                    # terrain-architect/
 #      every document this file reads.
 #   2. A NEEDLE THAT IS A SUBSTRING OF UNRELATED PROSE. "disc" is inside "discussed", "rect" is
 #      inside "correctness", "0.2" is inside "g^(−0.22)". So no row here matches a bare substring.
-#   3. A NEEDLE WITH NO TRAILING BOUNDARY. This is the same bug as (2) pointed the other way, and
-#      it is the one that survived the last repair: the code side got a boundary and the doc side
-#      did not, so `n = 3` still matched a chapter saying `n = 3.5`, `p = 1.1` matched `p = 1.15`,
-#      `d/D ~0.2` matched `d/D ~0.25`. Nine such value drifts across six chapters left the suite
-#      green. Carrying a symbol makes a needle LONGER, not COMPLETE. Both sides therefore now go
-#      through ONE matcher, `_complete()` — the two of them diverging is what produced the hole.
+#   3. A NEEDLE WITH NO TRAILING BOUNDARY. This is the same bug as (2) pointed the other way. It
+#      survived TWO repairs. First the code side got a boundary and the doc side did not, so
+#      `n = 3` still matched a chapter saying `n = 3.5` and `p = 1.1` matched `p = 1.15`; nine such
+#      value drifts across six chapters left the suite green. The fix — one matcher, `_complete()`,
+#      for both sides — closed that and left the boundary itself LOPSIDED: the lead excluded a sign
+#      and the tail did not, so `n = 3` matched Cuffey's real range `n = 3-4` (and `n = 3–4`, and
+#      `p = 1.1-1.5`), while a code literal `n=3` matched `def carve(H, n=3-1)`, which is 2. Worse,
+#      an edge that was neither numeric nor wordish emitted NO tail at all, so `r⁻³` was satisfied
+#      by `r⁻³·⁵`. A boundary on one side only is not a boundary: the two edges are now built from
+#      ONE character set (`_NUM_EDGE`/`_WORD_EDGE`/`_MATH_EDGE`) so they cannot drift apart again.
 #   4. A NAME FOUND IN PROSE RATHER THAN IN A LISTING. `hex_grid.ring` was satisfied by the
 #      hyphenated English "one-ring" (the identifier scan does not treat `-` as part of a token)
 #      and `noise.value` by "pure value maps". Listings in `ATOM-COVERAGE.md` live in backtick
 #      code spans; prose does not. So the scope-doc rows read code spans only (`_code_spans`).
+#   5. A NEEDLE SATISFIED BY AN UNRELATED SECTION. The document-wide search: `2650 kg/m³` was the
+#      aeolian threshold's grain density, and the row passed on the SLOPE-STABILITY paragraph of
+#      the same chapter, which quotes `ρs = 2650 kg/m³` for a landslide-mask worked example. Delete
+#      the aeolian sentence entirely and the row stayed green. Same shape as (4) — evidence found
+#      in the wrong place — and the same answer: every row names the one paragraph allowed to
+#      satisfy it (`DOC_SECTION` for the scope rows, the `section` column for the faithfulness
+#      rows), resolved by the one helper `_doc_paragraph`.
 #
 # Text is also whitespace-flattened before matching so a needle cannot be defeated by the chapter
 # being re-wrapped across a line break, and `_complete` tolerates spacing differences *within* a
@@ -97,6 +108,24 @@ _WORDISH = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_."
 _NUMERIC = "0123456789."
 _TOKEN = re.compile(r"[A-Za-z0-9_.]+|\s+|[^\sA-Za-z0-9_.]+")
 
+# THE CHARACTERS AN EDGE MAY NOT TOUCH — one set per kind of edge, used on BOTH sides of the
+# literal. A lead-only exclusion is not a boundary: excluding a sign before the number while
+# allowing one after it is what let `n = 3` match Cuffey's `n = 3-4` and a code literal `n=3` match
+# `n=3-1`. Each set is therefore named once and spent twice, in `lead` and in `tail`.
+#
+# `_SIGNS` carries the ASCII sign, the six Unicode dashes U+2010..U+2015 (chapters write ranges with
+# an EN DASH: `n = 3–4`) and the true MINUS SIGN U+2212 (the chapters use it: `g^(−0.22)`).
+# `_SUPSUB` is the superscript/subscript block, which is how a chapter continues an exponent:
+# `r⁻³` -> `r⁻³·⁵`, `D` -> `D₂`. `·` (U+00B7) is the DECIMAL POINT inside such a superscript, so it
+# closes a `³`/`°`/`)` edge — but it is NOT in `_NUM_EDGE`, because next to an ordinary digit the
+# same character is the chapters' MULTIPLICATION sign (`0.04·D`, `1.2·clip(...)`), and a constant
+# that is multiplied by something is still that constant.
+_SIGNS = "+\\-‐-―−"
+_SUPSUB = "⁰-₟"
+_NUM_EDGE = "0-9._" + _SIGNS + "°" + _SUPSUB          # `°`: `50` is not `50°`
+_WORD_EDGE = "A-Za-z0-9_" + _SUPSUB
+_MATH_EDGE = _SUPSUB + "·"                            # for an edge that is already punctuation
+
 
 def _wordish(ch):
     return bool(ch) and ch in _WORDISH
@@ -117,13 +146,20 @@ def _pattern(literal):
     with a message pointing at the wrong file. So each run of whitespace inside the literal becomes
     `\\s*` — or `\\s+` where dropping it would fuse two words ("MORE erodible").
 
-    A PREFIX IS NOT A MATCH. `n=3` must not be satisfied by `n=3.5`, `n=30`, `n=3e5` or `n=3_000`;
-    `0.2 * D` must not be satisfied by the SIGN-FLIPPED `-0.2 * D`. So the literal is bracketed by
-    boundaries chosen from its own first and last characters: a numeric edge may not touch another
-    numeric char, an exponent/imaginary/underscore continuation, or a sign; an identifier edge may
-    not touch another identifier char. An edge that is already punctuation (`(-3.0)`, `^2.2`)
-    carries its own boundary and gets none added — which is what lets the register keep literals
-    that embed an operator without the sign rule fighting them.
+    A PREFIX IS NOT A MATCH — AND NEITHER IS A SUFFIX. `n=3` must not be satisfied by `n=3.5`,
+    `n=30`, `n=3e5` or `n=3_000`; `0.2 * D` must not be satisfied by the SIGN-FLIPPED `-0.2 * D`,
+    and `n = 3` must not be satisfied by the RANGE `n = 3-4` or `n = 3–4` (Cuffey & Paterson quote
+    Glen's exponent as 3-4; the code hardcodes 3, so a chapter widening it to a range is exactly
+    the drift this row exists to catch). So the literal is bracketed by boundaries chosen from its
+    own first and last characters, and the two edges use the SAME character set:
+
+      * a numeric edge (`_NUM_EDGE`) may not touch another numeric char, an underscore/exponent/
+        imaginary continuation, a sign or dash, a degree sign, or a superscript;
+      * an identifier edge (`_WORD_EDGE`) may not touch another identifier char or a subscript;
+      * an edge that is already punctuation (`(-3.0)`, `^2.2`, `r⁻³`, `33.7°`) carries most of its
+        own boundary, so it gets only `_MATH_EDGE` — enough to stop a superscript being EXTENDED
+        (`r⁻³` -> `r⁻³·⁵`), and no more, which is what lets the register keep literals that embed
+        an operator without the sign rule fighting them.
     """
     toks = [t for t in _TOKEN.findall(literal) if t]
     parts, prev, gap = [], "", False
@@ -139,16 +175,18 @@ def _pattern(literal):
         raise ValueError("empty literal")
 
     first, last = literal.strip()[0], literal.strip()[-1]
-    lead = ""
     if _numeric(first):
-        lead = r"(?<![A-Za-z0-9_.+\-])"
+        lead = "(?<![A-Za-z" + _NUM_EDGE + "])"
     elif _wordish(first):                       # identifier start; `.` is allowed (`self.n=3`)
-        lead = r"(?<![A-Za-z0-9_])"
-    tail = ""
+        lead = "(?<![" + _WORD_EDGE + "])"
+    else:
+        lead = "(?<![" + _MATH_EDGE + "])"
     if _numeric(last):
-        tail = r"(?![0-9._eEjJ])"
+        tail = "(?![eEjJ" + _NUM_EDGE + "])"
     elif _wordish(last):
-        tail = r"(?![A-Za-z0-9_])"
+        tail = "(?![" + _WORD_EDGE + "])"
+    else:
+        tail = "(?![" + _MATH_EDGE + "])"
     return re.compile(lead + "".join(parts) + tail)
 
 
@@ -163,6 +201,14 @@ def _strip_py_comments(src):
     A constant that appears only in a `#` comment or a docstring is prose, not code: the code side
     of a faithfulness row must not be satisfied by a module merely *talking* about the value it no
     longer uses.
+
+    FAILURE IS LOUD, NOT SILENT. This used to `return src` unchanged when the source would not
+    tokenise, under a `# pragma: no cover` — a note that the branch was untested, which is what an
+    untested fallback usually is. Falling back to the raw source hands comments and docstrings back
+    as searchable evidence, i.e. it disables exactly the thing this function exists to do, and the
+    two `_CODE_REJECT` fixtures that pin it ("comment only", "docstring only") would stop holding
+    without turning anything red. A reference module that does not parse is a defect in its own
+    right, so it is raised — the same direction `test_slope_units.py` chose for the same call.
     """
     starts, off = [], 0
     for line in src.splitlines(keepends=True):
@@ -181,8 +227,11 @@ def _strip_py_comments(src):
             if name in ("COMMENT", "STRING") or name.startswith("FSTRING_MIDDLE"):
                 (r1, c1), (r2, c2) = tok.start, tok.end
                 blank(starts[r1 - 1] + c1, starts[r2 - 1] + c2)
-    except (tokenize.TokenError, IndentationError, SyntaxError):     # pragma: no cover
-        return src
+    except (tokenize.TokenError, IndentationError, SyntaxError) as exc:
+        raise AssertionError(
+            f"source does not tokenise, so comments and docstrings cannot be stripped from it: "
+            f"{exc}. Returning it unchanged would make prose searchable evidence again, which is "
+            f"the hole this function exists to close — fix the module (or the fixture)") from exc
     return "".join(chars)
 
 
@@ -266,17 +315,36 @@ DOC_SECTION = {
     "tectonics": _SOLVERS,
 }
 
-_PARAGRAPHS = [_flat(b) for b in re.split(r"\n[ \t]*\n", COVERAGE) if b.strip()]
+@functools.lru_cache(maxsize=None)
+def _paragraphs(path):
+    """A document's blank-line separated paragraphs, header-stripped and flattened.
+
+    One implementation, used by BOTH registers that name a section — the scope rows' `DOC_SECTION`
+    and the faithfulness rows' `section` column. The scope rows got this anchoring in the previous
+    repair and the faithfulness rows did not, which is how `2650 kg/m³` went on being satisfied by
+    a slope-stability worked example in another part of the same chapter.
+    """
+    return tuple(_flat(b) for b in re.split(r"\n[ \t]*\n", _body(path)) if b.strip())
+
+
+def _doc_paragraph(path, anchor, why):
+    """The ONE paragraph of `path` that `anchor` selects.
+
+    Exactly one: an anchor that matches nothing is a row that can only fail, and an anchor that
+    matches several has given back the document-wide search the column exists to remove. Either way
+    the register — not the chapter — is what needs the edit, so say so.
+    """
+    hits = [p for p in _paragraphs(path) if anchor in p]
+    assert len(hits) == 1, (
+        f"the section register no longer resolves for {why}: {anchor!r} matches {len(hits)} "
+        f"paragraphs of {path.name} (the document was restructured — move the anchor to the "
+        f"paragraph that now carries the claim; do NOT widen it to match several)")
+    return hits[0]
 
 
 def _section(module):
     """The one paragraph of ATOM-COVERAGE.md that must carry `module`'s atoms."""
-    anchor = DOC_SECTION[module]
-    hits = [p for p in _PARAGRAPHS if anchor in p]
-    assert len(hits) == 1, (
-        f"the scope-doc section register no longer resolves for {module}: {anchor!r} matches "
-        f"{len(hits)} paragraphs of ATOM-COVERAGE.md (the doc was restructured — move the anchor)")
-    return hits[0]
+    return _doc_paragraph(COVERAGE_DOC, DOC_SECTION[module], module)
 
 
 def _section_names(module):
@@ -328,6 +396,24 @@ def _public_callables(module_name):
 def _norm_name(name):
     """`OpenSimplex2`, `open_simplex2` and `opensimplex2` are the same atom under different casings."""
     return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+def _ships_as(surface, target):
+    """The names in `surface` under which the deferred atom `target` could have shipped.
+
+    PREFIX, not equality, and only for the ABSENCE probe. Casing and underscores were normalised
+    but VARIANT SUFFIXES were not, and the upstream names are `OpenSimplex2S` and `OpenSimplex2F`
+    (smooth / fast) — the two spellings an author would actually write. Both normalise to something
+    `!=` `opensimplex2`, so the atom could ship under its real name with this row still calling it
+    absent, which is the same "deferred-but-secretly-present" gap the file opens by naming.
+
+    This will also trip on a legitimately different `opensimplex2_gradient`, and that is the
+    intended trade: a public name that close to a deferred atom is worth a human look, and the fix
+    is one line in `DEFERRED` or `IMPLEMENTED`. The IMPLEMENTED cross-check below stays on
+    EQUALITY — there the question is "is this the same atom", and a prefix would let an unrelated
+    `simplex`-family entry answer it.
+    """
+    return sorted(n for n in surface if _norm_name(n).startswith(target))
 
 
 @pytest.mark.parametrize("module,fn", _ATOMS)
@@ -436,18 +522,22 @@ def test_deferred_atoms_are_discussed_but_absent(name, chapter):
     and listed in the scope doc — so 'deferred' is an honest, checked status, not a silent gap.
 
     Absence is probed against the module's whole public surface with BOTH sides case/underscore
-    normalised: the old `hasattr(mod, name.lower())` probed `opensimplex2`, while the name a Python
-    author actually writes is `open_simplex2` — so the atom could ship, be listed as implemented, and
-    still be called deferred here, with every row green. The manifest is cross-checked too: a name
-    cannot honestly sit in both registers.
+    normalised and the surface side matched by PREFIX: the old `hasattr(mod, name.lower())` probed
+    `opensimplex2`, while the name a Python author actually writes is `open_simplex2` — so the atom
+    could ship, be listed as implemented, and still be called deferred here, with every row green.
+    Normalising alone was not enough either: the upstream variants are `OpenSimplex2S`/`2F`, so
+    equality still let the atom ship under its real name (see `_ships_as`). The manifest is
+    cross-checked too: a name cannot honestly sit in both registers.
     """
     mod = importlib.import_module("noise")
     target = _norm_name(name)
-    surface = {_norm_name(n) for n in vars(mod) if not n.startswith("_")}
-    assert target not in surface, (
-        f"{name} is listed deferred but noise exposes it "
-        f"(as {sorted(n for n in vars(mod) if _norm_name(n) == target)}) — it shipped; move it to "
-        f"IMPLEMENTED and out of the deferred list")
+    surface = [n for n in vars(mod) if not n.startswith("_")]
+    shipped = _ships_as(surface, target)
+    assert not shipped, (
+        f"{name} is listed deferred but noise exposes it (as {shipped}) — it shipped; move it to "
+        f"IMPLEMENTED and out of the deferred list. If that name is genuinely a DIFFERENT atom "
+        f"that merely starts the same way, say so by renaming one of them: a public noise name "
+        f"this close to a deferred atom is not something to resolve silently")
     both = [f"{m}.{f}" for m, fns in IMPLEMENTED.items() for f in fns if _norm_name(f) == target]
     assert not both, f"{name} is listed BOTH deferred and implemented ({both}) — pick one"
     assert name in _idents(_body(SKILL_ROOT / chapter)), f"{name} not discussed in {chapter}"
@@ -474,45 +564,81 @@ def test_deferred_atoms_are_discussed_but_absent(name, chapter):
 # punctuation edges are their own boundaries. What the sign rule forbids is a bare `0.2 * D` being
 # satisfied by `-0.2 * D`: flipping a sign is a change of physics, not of spelling. Spacing is free
 # — `n=3`, `n = 3` and `n  =  3` are all the same row.
+#
+# AND WHICH PARAGRAPH OF THE CHAPTER IS ALLOWED TO SATISFY THE DOC SIDE (the `section` column).
+# Without it the doc side searched the WHOLE chapter, and six of these nineteen rows had more than
+# one satisfier. Two of the six were not restatements of the claim at all but unrelated text that
+# happened to contain the same characters:
+#   * `2650 kg/m³` — the aeolian threshold's quartz density was ALSO satisfied by the SLOPE-
+#     STABILITY paragraph's worked example ("at `ρs = 2650 kg/m³` instead, the correct threshold
+#     moves to 29.60°"). Delete the aeolian sentence and the row passed on landslide-mask prose.
+#   * `0.04·D` — the crater rim ratio had three satisfiers, one of them the `crater_demo.py`
+#     PRESENTATION paragraph. Change the pseudocode's rim to `0.10·D` and the row passed on prose
+#     describing a demo script.
+# The other four (`n = 3` x3, `917 kg/m³` x2, `p = 1.1` x2, `tan(15°)` x2 in 13) ARE genuine
+# restatements of one claim — but "genuine restatement" versus "unrelated text that happens to
+# match" is a judgement made by eye, and a judgement made by eye is exactly what a register is for
+# writing down. So every row is anchored, and the anchor names the paragraph that is the ROW'S OWN
+# evidence: the pseudocode block or the sentence that defines the constant, not a later pointer.
 FAITHFUL = [
-    # (module, code literal in the module source, chapter/doc file, string that must be in that doc, what)
+    # (module, code literal in the module source, chapter/doc file, string that must be in that
+    #  doc, anchor selecting the ONE paragraph allowed to carry it, what)
     ("dunes.py", "shadow_tan=0.268", "references/05-erosion-thermal-aeolian.md", "tan(15°)",
+     "inShadowZone(h, p, windDir): for k",   # the routine, not the call site in the dune loop
      "Werner lee shadow line = 15deg flow-separation angle (tan 15 = 0.268)"),
     ("dunes.py", "repose=2", "references/99-papers.md", "33.7°",
+     "The Physics of Blown Sand",
      "sand angle of repose 33.7deg = atan(2/3), the 2-slab drop under the 1:3 slab aspect"),
     ("landforms.py", "(1.0 - rn) ** 2.2", "references/11-geological.md", "^2.2",
+     "VOLCANO — a radial edifice",
      "stratovolcano concave-up flank profile exponent (Karatson 2010)"),
     ("landforms.py", "0.2 * D", "references/11-geological.md", "d/D ~0.2",
+     "crater(D): R = D/2",
      "impact-crater depth/diameter ~= 0.2 (Pike 1977)"),
     ("landforms.py", "0.04 * D", "references/11-geological.md", "0.04·D",
+     "crater(D): R = D/2",              # the pseudocode's `rimCrest`, NOT crater_demo's prose
      "impact-crater rim height ~= 0.04 D"),
     ("landforms.py", "(-3.0)", "references/11-geological.md", "r⁻³",
+     "**Simple crater** (small)",
      "impact-crater ejecta blanket thins as r^-3 (McGetchin 1973)"),
     ("glacier.py", "rho=917.0", "references/12-glacial-coastal.md", "917 kg/m³",
+     "ice thickness evolves by mass conservation",
      "glacier ice density 917 kg/m^3"),
     ("glacier.py", "n=3", "references/12-glacial-coastal.md", "n = 3",
+     "ε̇ = A · τⁿ",                     # the flow law itself, not the two paragraphs about it
      "Glen flow-law exponent n = 3"),
     ("landforms.py", "concavity=1.7", "references/16-arid-desert.md", "concave downfan",
+     "landforms.alluvial_fan(",
      "alluvial-fan concave (steep-apex, gentle-distal) downfan profile (Blair & McPherson 1994)"),
     ("flow.py", "p=1.1", "references/03-flow-routing.md", "p = 1.1",
+     "mfd(dem, c,",                     # the routine's own default, not the prose discussing it
      "MFD multiple-flow-direction exponent p = 1.1 (Freeman 1991)"),
     ("isostasy.py", "nu=0.25", "references/02-macro-tectonics.md", "ν ≈ 0.25",
+     "(Young's modulus)",
      "crustal Poisson ratio nu = 0.25 in flexural rigidity D = E*Te^3 / 12(1-nu^2)"),
     ("winds.py", "shadow_tan=0.268", "references/13-climate-ecosystem.md", "tan(15°)",
+     "The 15° shadow line is physics",  # not the closing `Runnable reference:` pointer
      "lee-shelter shadow line = the same 15deg flow-separation angle as Werner's dune shadow (05)"),
     ("aeolian.py", "A=0.1", "references/05-erosion-thermal-aeolian.md", "A ≈ 0.1",
+     "for turbulent flow",
      "Bagnold threshold coefficient A ~ 0.1 for turbulent flow"),
     ("aeolian.py", "RHO_QUARTZ = 2650.0", "references/05-erosion-thermal-aeolian.md", "2650 kg/m³",
+     "for turbulent flow",              # NOT the slope-stability worked example, which also says 2650
      "quartz grain density 2650 kg/m^3 in the threshold friction velocity"),
     ("aeolian.py", "RHO_AIR = 1.22", "references/05-erosion-thermal-aeolian.md", "1.22 kg/m³",
+     "for turbulent flow",
      "sea-level air density 1.22 kg/m^3 in the threshold and the saltation flux"),
     ("aeolian.py", "KARMAN = 0.4", "references/13-climate-ecosystem.md", "κ = 0.4",
+     "law of the wall",
      "von Karman constant 0.4 in the law of the wall converting wind SPEED to friction velocity"),
     ("snow.py", "shed_lo_deg=50.0", "references/13-climate-ecosystem.md", "tan(50°)",
+     "Snow doesn't stick to steep ground",
      "snow sheds off ground steeper than 50deg (smoothstep 50->60deg; Cordonnier 2018)"),
     ("snow.py", "shed_hi_deg=60.0", "references/13-climate-ecosystem.md", "tan(60°)",
+     "Snow doesn't stick to steep ground",
      "snow fully shed by 60deg"),
     ("tectonics.py", "k_fault=6.0", "references/02-macro-tectonics.md", "MORE erodible",
+     "`fault_weakness` is the K(x,y) coupling",
      "fault-as-K SIGN: a fault trace is WEAK rock -> HIGHER erodibility, so valleys follow structure"),
 ]
 
@@ -524,23 +650,33 @@ _SEARCHED_DOCS = sorted({COVERAGE_DOC}
                         key=lambda p: str(p))
 
 
-@pytest.mark.parametrize("module,code_lit,doc,doc_str,what", FAITHFUL, ids=[e[0] + ":" + e[1] for e in FAITHFUL])
-def test_key_constant_agrees_between_chapter_and_code(module, code_lit, doc, doc_str, what):
+@pytest.mark.parametrize("module,code_lit,doc,doc_str,section,what", FAITHFUL,
+                         ids=[e[0] + ":" + e[1] for e in FAITHFUL])
+def test_key_constant_agrees_between_chapter_and_code(module, code_lit, doc, doc_str, section, what):
     """A load-bearing physical constant must read the same in the code and in its chapter (faithfulness,
     not just existence). Fails on prose<->code drift, so neither side can move alone.
 
     The chapter is searched with its OKF frontmatter stripped and its whitespace flattened: header
     boilerplate must not be able to satisfy a row (it silently satisfied the crater d/D row), and a
     re-wrapped line must not be able to break one. BOTH sides use `_complete`, so a chapter that
-    changes `n = 3` to `n = 3.5` fails here instead of quietly still matching.
+    changes `n = 3` to `n = 3.5` — or to the range `n = 3-4` — fails here instead of quietly still
+    matching.
+
+    And the doc side reads ONE PARAGRAPH, the one the `section` column names. Over the whole
+    chapter the row asks "does this string appear anywhere in thirty pages", which the aeolian
+    grain density answered on a landslide-mask worked example and the crater rim ratio on a
+    paragraph about a demo script — both rows survived deleting the claim they guard.
     """
     src = (REF / module).read_text(encoding="utf-8")
     assert _code_mentions(src, code_lit), \
         f"{what}: code literal {code_lit!r} missing from reference-impl/{module} " \
         f"(the code constant changed — update the code, or fix this manifest AND the chapter)"
-    chap = _flat(_body(SKILL_ROOT / doc))
-    assert _doc_states(chap, doc_str), f"{what}: {doc_str!r} missing from {doc} " \
-                                       f"(the chapter drifted from the code constant {code_lit!r} — resync the pseudocode)"
+    para = _doc_paragraph(SKILL_ROOT / doc, section, f"{module}:{code_lit}")
+    assert _doc_states(para, doc_str), \
+        f"{what}: {doc_str!r} missing from the {section!r} paragraph of {doc} " \
+        f"(the chapter drifted from the code constant {code_lit!r} — resync the pseudocode. " \
+        f"The same string elsewhere in the chapter does NOT count: this row's evidence is that " \
+        f"paragraph, and a needle satisfiable by an unrelated section is not a check)"
 
 
 def _assert_no_okf_leak(path):
@@ -583,12 +719,23 @@ _DOC_ACCEPT = [
     ("κ = 0.4", "von Karman `κ = 0.4` in the law of the wall"),
     ("^2.2", ": (1 - rn)^2.2 # strato: CONCAVE-UP sweep"),
     ("917 kg/m³", "with `ρ_ice ≈ 917 kg/m³`. Then ice thickness"),
+    ("917 kg/m³", "| `ρ_ice` | 917 kg/m³ | | | `β` (mass balance) |"),   # a table cell
     ("33.7°", "angle of repose **33.7°** = tan⁻¹(2/3)"),
     ("concave downfan", "with a concave downfan thinning profile"),
+    ("r⁻³", "thinning roughly as `r⁻³`; depth ≈ 1/5 of diameter"),
+    ("0.04·D", "rimCrest ~ 0.04·D above the surroundings (Pike 1977 ratios)"),
+    # The tail must not over-reach: `·` is the chapters' MULTIPLICATION sign next to a digit, and a
+    # constant that is multiplied by something is still that constant.
+    ("1.2", "ecc = 1 + 1.2·clip((12−angle)/12, 0, 1)"),
+    ("0.88", "azw = 0.12 + 0.88·w"),
 ]
 
-# The critic's nine value drifts: a chapter edited to a NEARBY value, with no code change.
-# Every one of these used to pass, because a bare `in` has no trailing boundary.
+# HOW A CHAPTER ACTUALLY DRIFTS. Ten of these are the critic's original nine value drifts plus a
+# word drift — a chapter edited to a NEARBY value, no code change — and every one used to pass
+# because a bare `in` has no trailing boundary. The rest are the SECOND generation, which survived
+# that repair because the boundary it added was one-sided: a range, a sign, a Unicode dash, a
+# continued superscript. Appending a digit ten different ways is one fixture written ten times, and
+# a fixture set that rehearses one drift proves the matcher against one drift.
 _DOC_REJECT = [
     ("n = 3", "with n = 3.5, A ≈ 2.4e-24 Pa⁻³ s⁻¹"),          # Glen 3 -> 3.5
     ("n = 3", "with n = 30"),
@@ -600,6 +747,19 @@ _DOC_REJECT = [
     ("^2.2", ": (1 - rn)^2.25 # strato: CONCAVE-UP sweep"),       # stratovolcano 2.2 -> 2.25
     ("917 kg/m³", "with `ρ_ice ≈ 9170 kg/m³`"),
     ("concave downfan", "with a concave downfanning profile"),
+    # --- the drift the one-sided boundary let through. A RANGE is not the value: Cuffey & Paterson
+    # quote Glen's exponent as 3-4 and Freeman's p as a band, while the code hardcodes one number.
+    ("n = 3", "Glen's exponent n = 3-4 for real ice"),            # ASCII hyphen
+    ("n = 3", "with n = 3–4 (Cuffey & Paterson)"),                # EN DASH, how a chapter writes it
+    ("n = 3", "with n = 3−4 (Cuffey & Paterson)"),                # true MINUS SIGN U+2212
+    ("p = 1.1", "p = 1.1-1.5 band"),
+    ("A ≈ 0.1", "`A ≈ 0.1+0.02` for turbulent flow"),             # trailing sign, not just leading
+    ("κ = 0.4", "von Karman `κ = 0.4°` (a different quantity)"),
+    # --- ...and the same drift in a superscript, where NO tail was emitted at all.
+    ("r⁻³", "ejecta thinning as `r⁻³·⁵` in the far field"),       # `·` = the decimal point up here
+    ("r⁻³", "ejecta thinning as `r⁻³⁵`"),
+    ("917 kg/m³", "with `ρ_ice ≈ 917 kg/m³⁴`"),
+    ("0.04·D", "rimCrest ~ 0.04·D₂ above the surroundings"),      # subscripted variable
 ]
 
 
@@ -627,10 +787,11 @@ _CODE_ACCEPT = [
     ("0.2 * D", "depth = 0.2*D * scale\n"),               # spaces removed
     ("0.2 * D", "    depth = 0.2 * D * ((complex_D / D) ** 0.3)\n"),
     ("k_fault=6.0", "def fault_weakness(shape, *, k_fault=6.0)"),   # ... and at EOF:
-    ("k_fault=6.0", "def fault_weakness(shape, *, k_fault=6.0"),
+    ("k_fault=6.0", "k_fault=6.0"),                       # no trailing newline: `after` is ""
     ("(-3.0)", "ejecta = rim * 0.5 * (np.maximum(r, R) / R) ** (-3.0)\n"),
     ("(1.0 - rn) ** 2.2", "prof = (1.0 - rn) ** 2.2\n"),
     ("(1.0 - rn) ** 2.2", "prof = (1.0-rn)**2.2\n"),
+    ("n=3", "n = 3 - 1  # still an n of 3, then a separate term\n"),   # SPACED: not `3-1`
 ]
 
 _CODE_REJECT = [
@@ -640,6 +801,11 @@ _CODE_REJECT = [
     ("n=3", "n=30\n"),
     ("0.2 * D", "depth = -0.2 * D\n"),                    # SIGN FLIP: not the same constant
     ("0.2 * D", "depth = 10.2 * D\n"),
+    # The lead had a sign rule and the tail did not, so an arithmetic edit on the RIGHT of the
+    # constant read as the constant: `n=3-1` is 2, and it satisfied `n=3`.
+    ("n=3", "def carve(H, n=3-1):\n"),
+    ("n=3", "def carve(H, n=3+1):\n"),
+    ("0.2 * D", "depth = 0.2 * D-1\n"),
     ("n=3", "# the old default was n=3; we now ship 4\n"),          # comment only
     ("n=3", '"""Historically n=3 (Glen); this module no longer uses it."""\n'),   # docstring only
     ("KARMAN = 0.4", "KARMAN = 0.45\n"),
