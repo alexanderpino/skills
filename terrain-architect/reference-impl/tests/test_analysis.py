@@ -131,7 +131,8 @@ def test_material_masks_partition():
 
     ⚠️ The rationale used to read "else a splatmap silently rescales them", which is false: the
     shipped over-composite rescales nothing whatever the masks sum to. The real consequence of a
-    broken partition is downstream and consumer-dependent — `render.material_rgb` clips, and
+    broken partition is downstream and consumer-dependent — `render.material_rgb` clips ONLY where
+    the palette has no headroom (snow at 1.02x, rock not until 2.13x), and
     `render.splat_blend` stays silent. `tests/test_mask_partition.py` measures both.
     """
     n, cs = 40, 20.0

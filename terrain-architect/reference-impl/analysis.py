@@ -191,7 +191,9 @@ def derive_materials(height, slope_tan, area, cellsize, *, snow_line=None,
     false and 06 no longer says it: the shipped over-composite (`render.splat_blend`) rescales
     nothing whatever the masks sum to — its effective weights always total 1. What DOES go wrong
     is the base-less weighted sum (`render.material_rgb`, `Σ wᵢ·materialᵢ`): masks summing to 1.8
-    drive channels past 255 and clip. So the reason to close the stack is that the consumer's
+    CAN drive channels past 255 and clip — on `render._MATERIAL_PALETTE` only where snow or sand
+    carry weight; a rock/grass hillside over-subscribed 2x ships entirely in gamut, 0/4096 pixels
+    clipped. So the reason to close the stack is that the consumer's
     behaviour is not knowable from here — which is why 14 asserts `Σ ≤ 1` at the fan-in and 06
     asserts `Σ = 1` here, at the site where the stack is closed. See
     `tests/test_mask_partition.py`.
