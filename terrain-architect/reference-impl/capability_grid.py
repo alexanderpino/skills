@@ -366,9 +366,14 @@ def CELLS():
         """
         from PIL import Image
         try:
-            return np.asarray(Image.open(HERO_PNG).convert("RGB"))
-        except Exception:
-            return gray(_terr)
+            with Image.open(HERO_PNG) as im:
+                return np.asarray(im.convert("RGB"))
+        except Exception as e:
+            raise RuntimeError(
+                f"capability grid: the '09 Hero 3D raster' tile could not read {HERO_PNG!r} "
+                f"({type(e).__name__}: {e}). Build it first (`python hero.py`) and run from a "
+                "directory that has it; tools/regen_figures.py already orders the rebuild for "
+                "this reason. It must NOT fall back to another image.") from e
     add("09 Hero 3D raster", "z-buffer, back-face cull, translucent water", _hero)
 
     # ---- AAA-PARITY TRANCHE (appended; keeps earlier tile coordinates stable) ----
@@ -514,7 +519,7 @@ ON_ERROR = ("raise", "swatch")
 def _check_tile(k, title, tile):
     """The contract every capability thunk owes the montage: an H x W x 3 uint8 RGB image."""
     tile = np.ascontiguousarray(tile)
-    if tile.dtype != np.uint8 or tile.ndim != 3 or tile.shape[2] != 3 or min(tile.shape[:2]) < 2:
+    if tile.ndim != 3 or tile.shape[2] != 3 or min(tile.shape[:2]) < 2:
         raise TypeError(
             f"capability tile {k} {title!r} returned dtype {tile.dtype} shape {tile.shape}; "
             "every tile must be an H x W x 3 uint8 RGB image")
