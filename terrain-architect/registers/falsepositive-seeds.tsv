@@ -1,0 +1,49 @@
+# REGISTER 5 — falsepositive-seeds.tsv   FROZEN at HEAD 0cdd5b1
+# The inputs criterion C runs against. Frozen so that a later pass cannot quietly pick easier
+# inputs than the ones that produced the failures this plan exists to close.
+#
+# DENOMINATOR — guard families partition all 61 guards, no guard in two families, none outside:
+#   prose-scan (text/source scanners) ........ 9
+#   introspection ............................ 3
+#   binary-artifact .......................... 1
+#   numeric-field ............................ 48
+#   SUM ...................................... 61
+#   IDENTITY: 61 == 61 guard files -> HOLDS
+#   Family boundaries are the mechanical classification in guard-domains.tsv, not a judgement call.
+#
+# DENOMINATOR — corpora
+#   PROSE corpus rows: 6 of the 11 rows below name shipped .md line ranges, not arrays.
+#   frozen prose lines, units-keying corpus ... 111 lines across 5 chapters (05, 06, 17, 09 x3 regions)
+#   frozen prose spans, citation corpus ....... 683 backticked spans across 2 chapters
+#   frozen prose lines, audit corpus .......... 412 lines across 2 audit documents
+#   frozen prose lines, scope corpus .......... 860 lines across 3 documents
+#   frozen synthetic inputs ................... 9 generators from tests/inputs.py
+#   frozen seeds .............................. default_rng {0,1,2,3,5,7,11,36}; RandomState {0,3,7}
+#
+# WHY A PROSE CORPUS IS MANDATORY HERE
+#   The worst false positive in the session this plan closes was a guard that flagged CORRECT
+#   ENGLISH: 05's sentence 'sin(slope) > sin theta makes wet come out low' is right, and it was
+#   flagged for containing none of fourteen hardcoded negation cues. Random arrays cannot
+#   reproduce that failure mode at all. Any criterion-C pass that runs only on arrays has
+#   tested the guards against the one input class that never broke them.
+#
+# POSITIVE CONTROL. The units-keying prose corpus deliberately CONTAINS one real defect:
+# 09-verification.md:319, 'Wetness index -> Inf | `tan(slope)` -> 0 on flats'. A pass in which
+# the whole corpus comes back clean has proved the guard is off, not that it is precise.
+#
+# FREEZE RULE: seeds and corpora are final. A later wave may record results against these rows;
+# it may not substitute a different seed, widen a line range, or add a family. New inputs go to
+# OPEN-ITEMS.md.
+
+guard_family	input_kind	seed	n	notes
+prose-scan/units-keying (test_slope_units.py)	prose corpus — CORRECT English that names the banned form	references/05-erosion-thermal-aeolian.md:155-195; references/06-analysis-masks.md:55-70; references/06-analysis-masks.md:295-305; references/17-periglacial.md:68-80; references/09-verification.md:100-112; 238-246; 315-322	111 lines	THE headline false-positive corpus. Every line here is correct prose that MENTIONS sin(slope)/tan(slope) in order to forbid, explain or correct it. 05:171 ('sin(slope) > sin theta') is the exact sentence the previous guard flagged, shipping the tree red. A guard that flags ANY line in this corpus is crying wolf. 09:319 is inside 315-322 and is a REAL defect, not a false positive — it must be flagged; it is the corpus's built-in positive control.
+prose-scan/units-keying (test_slope_units.py)	in-guard string fixtures already frozen in the guard itself	test_slope_units.py:519-551 REINTRODUCTIONS (33 forms) and LEGITIMATE (17 lines)	33 + 17	Kept as a row so wave 2 does not re-derive them. These are synthetic strings, NOT shipped prose — which is exactly why the shipped-prose corpus above is also required.
+prose-scan/citation-resolution (test_cited_paths_exist.py)	prose corpus — backticked spans that are NOT paths	references/08-output-contract.md and references/26-hexagonal-grids.md, all backticked spans	683 spans	These two chapters are the densest users of backticks for NON-path content (formulae, matrices, channel names, `Sigma = 1`). The false positive to disprove is a backticked non-path being resolved as a file and reported missing.
+prose-scan/numeric-drift (test_chapter_numbers.py, test_pseudocode_drift.py)	prose corpus — fenced blocks of the chapters the guards name	the 12 chapters named by test_pseudocode_drift (01,02,03,04,05,06,07,11,12,13,17,19) and the 6 named by test_chapter_numbers (01,03,09,10,12,26), fenced blocks only	250 fenced blocks / 1896 lines corpus-wide	False positive to disprove: a number inside a comment, an array index, or a positional call argument being read as a stated CONSTANT. Register 2 counts 369 in-comment and 101 index tokens in exactly this corpus — each is an FP candidate.
+prose-scan/audit-claims (test_audit_drift.py)	prose corpus — correct English that a negation regex can misread	reference-impl/SIMULATION-AUDIT.md '## Part 2 - Per-process simulation scorecard' section; reference-impl/NODE-PARITY-AUDIT.md in full	268 + 144 lines	_NEGATION and _CLAIMS_NOTHING match words ('none', 'nothing', 'prose only', 'planned') that appear legitimately in correct scorecard English. This is the same failure shape as the slope guard's fourteen negation cues: a natural-language cue list applied to natural language.
+prose-scan/scope-and-routing (test_skill_integrity.py, test_atom_coverage.py, test_gallery_doc.py)	prose corpus — identifiers named in prose that are deliberately not implemented	reference-impl/ATOM-COVERAGE.md DEFERRED entries (OpenSimplex2, Wavelet) and references/01-noise.md; reference-impl/GALLERY.md undrawn-modules table	123 + 457 + 280 lines	False positive to disprove: a name that prose deliberately marks as deferred/undrawn being reported as a missing implementation.
+prose-scan/figure-leak (test_halfar_anatomy.py)	source corpus — legitimate appearances of the analytic exponents	reference-impl/sims_illustrative.py and reference-impl/halfar_anatomy.py, full files	749-line guard over 2 modules	The leak regex matches 3/7, 4/3, 0.4286, 1.3333 anywhere. False positive to disprove: those numerals appearing in a COMMENT that cites Halfar, or as an unrelated ratio, being read as the answer leaking into the solver.
+numeric-field (48 guards)	synthetic heightfields from tests/inputs.py	flat, constant_slope, cone, inverted_cone, two_basins, step, plateau, spike, sinusoid	n=48/64/65	The analytic bases every oracle already uses. Frozen here so a false-positive run uses the SAME inputs as the true-positive run.
+numeric-field (48 guards)	pseudorandom fields	numpy.random.default_rng(seed) with seed in {0,1,2,3,5,7,11,36}; numpy.random.RandomState(seed) with seed in {0,3,7}	n=64 and n=192 (192 is the size 10-primitives-ops-filters.md quotes for its 40-window statistic)	Exactly the seeds already present in reference-impl and its tests, enumerated so no new seed is invented mid-plan. A guard that fires on an unperturbed field at any of these seeds is a false positive.
+introspection (3 guards)	module signature set	reference-impl/*.py public functions as they stand at HEAD 0cdd5b1	309 public functions	No seed applies. The false positive to disprove: a function whose parameter is legitimately in cells or legitimately positional being reported as a contract violation.
+binary-artifact (1 guard)	rendered PNG bytes	reference-impl/*.png as built at HEAD 0cdd5b1	14 PNG files	No seed applies; no text keying, so no prose false positive is possible. Row present to keep the family partition complete.
