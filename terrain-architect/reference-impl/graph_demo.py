@@ -148,10 +148,26 @@ class Graph:
 # --------------------------------------------------------------------------- #
 # nodes: thin adapters over the verified reference-impl modules
 # --------------------------------------------------------------------------- #
+_NOISE_KINDS = ("perlin", "value", "ridged", "hybrid", "warp")
+
+
 def _noise_fn(p, ins, ctx):
+    """Base noise by the family named in `noise` — all five the demo advertises (01).
+
+    ⚠️ AN UNRECOGNISED `kind` IS A FAILURE, NOT A DEFAULT, AND THE REASON IS THE CACHE KEY, NOT
+    THE FIELD. This used to fall through to Perlin. The CLI is guarded by `argparse choices`, but
+    `build_graph(noise_kind=...)` is not — and `build_graph` mints the node's `type_id` as
+    `f"noise.{kind}/1"` from the same unvalidated string. So `noise_kind="simplex"` wrote a
+    content-addressed cache entry IDENTIFIED as `noise.simplex/1` whose contents were Perlin: the
+    Merkle key (14) then certifies a field as something it is not, and every downstream cone
+    hashed off that identity inherits the lie. That is worse than a wrong field, because the
+    wrongness is recorded as provenance. `_area_fn` had the identical defect; this matches it.
+    """
     xx, yy = _noise_coords(ctx, p["wavelength"])
     kind, oc, seed = p.get("noise", "perlin"), int(p["octaves"]), ctx.root_seed
-    if kind == "value":
+    if kind == "perlin":                       # the demo default: plain fBm
+        f = noise.fbm(xx, yy, seed, octaves=oc, base=noise.perlin)
+    elif kind == "value":
         f = noise.fbm(xx, yy, seed, octaves=oc, base=noise.value)
     elif kind == "ridged":
         f = noise.ridged_mf(xx, yy, seed, octaves=oc)
@@ -159,8 +175,8 @@ def _noise_fn(p, ins, ctx):
         f = noise.hybrid_mf(xx, yy, seed, octaves=oc)
     elif kind == "warp":
         f, _, _ = noise.domain_warp(xx, yy, seed, warp=p.get("warp", 4.0), octaves=oc)
-    else:                                                      # perlin fBm (default)
-        f = noise.fbm(xx, yy, seed, octaves=oc, base=noise.perlin)
+    else:
+        raise ValueError(f"noise: unknown kind {kind!r}; expected one of {_NOISE_KINDS}")
     f = (f - f.min()) / max(f.max() - f.min(), 1e-9)          # -> [0,1] for the demo
     return f * p["relief"]                                     # -> metres
 
@@ -183,8 +199,24 @@ def _thermal_fn(p, ins, ctx):
         ins[0], repose_slope=p["repose"], iters=int(p["iters"]), cellsize=ctx.cellsize)
 
 
+_FILL_METHODS = ("fill", "breach_fill")
+
+
 def _fill_fn(p, ins, ctx):
-    return flow.priority_flood_fill(ins[0])
+    """Depression handling by the policy named in `method` — both `flow` ships (03).
+
+    `"fill"` is Barnes priority-flood: every basin is raised to its rim. `"breach_fill"` is the
+    HYBRID policy `03` calls "the right default for terrain generation" — shallow pits are carved
+    out as the noise artefacts they are, deep ones are filled and become lakes. Selectable here
+    because a recommendation nothing in the shipped graph can reach is a recommendation the graph
+    does not actually offer; that is the defect `_area_fn` carried for `hybrid_accumulation`.
+    """
+    method = p.get("method", "fill")
+    if method == "fill":
+        return flow.priority_flood_fill(ins[0])
+    if method == "breach_fill":
+        return flow.breach_fill(ins[0], max_depth=p.get("max_depth", 10.0))
+    raise ValueError(f"flow.fill: unknown method {method!r}; expected one of {_FILL_METHODS}")
 
 
 _AREA_METHODS = ("d8", "mfd", "hybrid")
@@ -235,6 +267,13 @@ def _scatter_fn(p, ins, ctx):
 def build_graph(ctx, backbone="droplet", noise_kind="perlin"):
     """The sample pipeline, as a DAG in Legal Order. Returns the graph plus the names of
     the two output fields: (height, drainage_area)."""
+    if noise_kind not in _NOISE_KINDS:
+        # ⚠️ VALIDATED HERE AS WELL AS IN `_noise_fn`, BECAUSE THE TYPE_ID IS MINTED HERE. The
+        # node below interpolates `noise_kind` straight into its `type_id`, which is the identity
+        # half of the Merkle cache key (14). Catching the bad kind only at evaluation would still
+        # let a node called `noise.simplex/1` exist and be hashed into every downstream key.
+        raise ValueError(f"build_graph: unknown noise_kind {noise_kind!r}; "
+                         f"expected one of {_NOISE_KINDS}")
     g = Graph(ctx)
 
     # 1-3  base shape: real noise (01) in world coordinates (the initial condition)
@@ -260,7 +299,8 @@ def build_graph(ctx, backbone="droplet", noise_kind="perlin"):
           locality="NEIGHBOURHOOD", resolution="RESOLUTION_INVARIANT")
 
     # 4-5  analysis routing on the FINAL geometry: fill (mandatory) then accumulate
-    g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",), locality="GLOBAL")
+    g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",),
+          params={"method": "fill", "max_depth": 10.0}, locality="GLOBAL")
     g.add("area", "flow.accumulation/1", _area_fn, inputs=("filled",),
           params={"method": "d8"}, locality="GLOBAL")
 
@@ -333,7 +373,8 @@ def build_scene_graph(ctx):
           params={"levels": 7, "sharpness": 7.0}, locality="LOCAL")
     g.add("relaxed", "erosion.thermal/1", _thermal_fn, inputs=("strata",),
           params={"repose": 0.62, "iters": 8}, locality="NEIGHBOURHOOD")     # talus at repose (Musgrave 1989)
-    g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",), locality="GLOBAL")
+    g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",),
+          params={"method": "fill", "max_depth": 10.0}, locality="GLOBAL")
     g.add("area", "flow.accumulation/1", _area_fn, inputs=("filled",),
           params={"method": "d8"}, locality="GLOBAL")
     g.add("slope", "analysis.slope/1", _slope_fn, inputs=("relaxed",), locality="LOCAL")
@@ -470,8 +511,8 @@ def main(argv=None):
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--backbone", choices=("droplet", "streampower"), default="droplet",
                     help="erosion backbone; pick by extent (SKILL.md step 3)")
-    ap.add_argument("--noise", choices=("perlin", "value", "ridged", "hybrid", "warp"),
-                    default="perlin", help="base noise family (01)")
+    ap.add_argument("--noise", choices=_NOISE_KINDS, default="perlin",
+                    help="base noise family (01)")   # choices FROM the dispatcher, not beside it
     ap.add_argument("--size", type=int, default=96, help="cells per side")
     ap.add_argument("--extent-km", type=float, default=None,
                     help="world extent in km (default 1 for droplet, 120 for streampower)")

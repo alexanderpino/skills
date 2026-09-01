@@ -648,3 +648,315 @@ def test_the_simulation_audit_mapping_is_not_stale():
     assert not missing, (
         "these SIMAUDIT_OURS keys name no row in SIMULATION-AUDIT.md's Part 2 scorecard: %s"
         % missing)
+
+
+# --------------------------------------------------------------------------------------
+# NUMERIC CLAIMS — the family this file could not see, over a domain taken from disk
+#
+# ⚠️ WHAT WAS BROKEN. Everything above reads FOUR documents, named as literals at the top of the
+# file: NODE-PARITY-AUDIT.md, VALIDATION.md, SIMULATION-AUDIT.md and README.md. `reference-impl/`
+# holds ELEVEN. Seven were outside this file: ARCHETYPES, ATOM-COVERAGE, CANON-COMPARISON,
+# GALLERY, GROUNDING, HYPERREALISM and REVIEW-BRIEF. (ATOM-COVERAGE has its own harness in
+# `tests/test_atom_coverage.py`; the other six had nothing.) A hand-written list is a domain that
+# does not grow when the directory does — which is the same defect, one level up, as a guard keyed
+# on a literal string.
+#
+# ⚠️ AND WITHIN THE FOUR, ONLY ONE NUMBER WAS EVER CHECKED.
+# `test_validation_ledger_quotes_the_real_test_count` matches `"(\d+) tests pass"` — one sentence,
+# in one document. Measured, on this
+# tree: rewriting `VALIDATION.md:31`'s "**530** is the number of `def test` **functions**" to
+# **9999** left `tests/test_audit_drift.py` at **94 passed**. The same figure appears one screen
+# up inside the quoted phrase, so the ONE guarded spelling still said 530 and the row stayed
+# green while the document contradicted itself eight lines apart. A number that only one of its
+# two spellings is checked on is not guarded; it is lucky.
+#
+# WHAT THIS ADDS. The document set is `REF.glob("*.md")` — derived, not written — with its
+# denominator asserted below so it cannot go stale in silence. Over that set, two mechanical
+# families of numeric claim:
+#
+#   * COUNT CLAIMS, where a sentence quotes a quantity this repo can recount from disk. Each
+#     pattern names both the quantity it binds to and its own tolerance. The suite-size figures
+#     keep the original row's 10 % band, because they are rhetorical scale claims made in service
+#     of an argument, and a test that fails on ±1 teaches people to delete the number rather than
+#     requote it. "44 `.py` files on disk" gets 0 %: it is a count, not a scale.
+#   * SUM IDENTITIES, where a document states its own arithmetic — `19 + 12 + 13 = the 44 files on
+#     disk`, `183 nodes / 9 families (Primitive 23, Terrain 14, …)`. These need no oracle at all:
+#     the claim carries its own check, and corrupting either side breaks it.
+#
+# WHAT IT DELIBERATELY DOES NOT DO. It does not try to check every numeral. Most numbers in these
+# documents are citations, measured constants, or figures attributed to a named past commit, and a
+# guard that guessed at those would fail on true statements — which is how a guard gets edited
+# away. The claim is only that the numbers a document asserts about THIS tree, in a shape that
+# names what they count, are recomputed; `registers/numeric-claims.tsv` is where the rest is
+# enumerated and none of it is claimed as guarded here.
+# --------------------------------------------------------------------------------------
+
+AUDIT_DOCUMENTS = tuple(sorted(REF.glob("*.md")))
+
+# The denominator, asserted in-file so that adding a twelfth audit document is a decision. The
+# names are pinned too: a count alone is satisfied by a swap.
+AUDIT_DOCUMENT_COUNT = 11
+AUDIT_DOCUMENT_NAMES = frozenset({
+    "ARCHETYPES.md", "ATOM-COVERAGE.md", "CANON-COMPARISON.md", "GALLERY.md", "GROUNDING.md",
+    "HYPERREALISM.md", "NODE-PARITY-AUDIT.md", "README.md", "REVIEW-BRIEF.md",
+    "SIMULATION-AUDIT.md", "VALIDATION.md",
+})
+
+
+def _normalised(document):
+    """Whitespace-flattened, with markdown emphasis and code ticks removed.
+
+    Flattened for the reason `_flat` gives — these are hard-wrapped documents and every claim
+    below spans a wrap somewhere. Emphasis stripped because `**530**` and `530` are the same
+    claim, and a matcher that has to know both spellings will be defeated by the third.
+    """
+    return re.sub(r"[*`]", "", _flat(document.read_text(encoding="utf-8")))
+
+
+# ---- the oracles: quantities this repo can recount from disk ----------------------------
+
+def _count_test_functions():
+    return sum(
+        len(re.findall(r"^def test", p.read_text(encoding="utf-8"), re.M))
+        for p in sorted((REF / "tests").glob("test_*.py"))
+    )
+
+
+def _count_reference_impl_py_files():
+    return len(list(REF.glob("*.py")))
+
+
+RECOUNTABLE = {
+    "test functions": _count_test_functions,
+    "reference-impl .py files": _count_reference_impl_py_files,
+}
+
+# (pattern name, regex with ONE numeric group, quantity, tolerance as a fraction, why that band)
+#
+# Applied to every one of the eleven documents, not to a named few. The tolerance is 10 % on the
+# suite-size figures, matching the row this generalises: they are scale claims made in service of
+# an argument about rigour, and requiring exactness would make an honest paragraph fail on the day
+# somebody adds a test. It is 0 on "files on disk", which is a count, not a scale.
+COUNT_CLAIM_PATTERNS = (
+    ("suite-size-quoted", r'"(\d+) tests pass"', "test functions", 0.10,
+     "a rhetorical scale figure; the original row's band, kept"),
+    ("suite-size-parenthetical", r"suite \((\d+) tests?\) pass(?:es)?", "test functions", 0.10,
+     "same claim, written as an aside instead of a quotation"),
+    ("def-test-function-count", r"(\d+) is the number of def test functions",
+     "test functions", 0.10,
+     "the document names the exact quantity it is quoting, so it binds to the same oracle"),
+    ("py-files-on-disk", r"(\d+) \.py files on disk", "reference-impl .py files", 0.0,
+     "a count of files, with no rhetorical latitude: it is either right or wrong"),
+)
+
+
+def _count_claims(document):
+    """(pattern, quantity, quoted, tolerance) for every count claim a document makes."""
+    text = _normalised(document)
+    found = []
+    for name, pattern, quantity, tolerance, _why in COUNT_CLAIM_PATTERNS:
+        for match in re.finditer(pattern, text):
+            found.append((name, quantity, int(match.group(1)), tolerance))
+    return found
+
+
+# ---- the oracles a document carries with it: its own arithmetic --------------------------
+
+# `19 imported + 12 undrawn operators + 13 scripts = the 44 files on disk`, and `1231 + 6 = 1237`.
+# Words are allowed between a term and the `+` because these are sentences, not expressions.
+_ADDITION = re.compile(
+    r"(?<![\w.])(\d+)"
+    r"((?:\s+[A-Za-z][\w./-]*){0,4}"
+    r"(?:\s*\+\s*\d+(?:\s+[A-Za-z][\w./-]*){0,4})+)"
+    r"\s*=\s*(?:the\s+)?(\d+)")
+
+# `183 nodes / 9 families (Primitive 23, Terrain 14, …)` — an inventory that states its own total
+# and its own group count, then lists the groups.
+_INVENTORY = re.compile(
+    r"(?<![\w.])(~?)(\d+)\s+([A-Za-z][\w]*)\s*/\s*(\d+)\s+([A-Za-z][\w]*)\s*\(([^()]*)\)")
+
+
+def _sum_identities(document):
+    """(kind, description, claimed, actual) for every self-checking arithmetic claim."""
+    text = _normalised(document)
+    identities = []
+    for match in _ADDITION.finditer(text):
+        terms = [int(n) for n in re.findall(r"\d+", match.group(1) + match.group(2))]
+        identities.append(("addition", match.group(0), int(match.group(3)), sum(terms)))
+    for match in _INVENTORY.finditer(text):
+        approx, total, _noun, groups, _gnoun, body = match.groups()
+        items = [part.strip() for part in body.split(",") if part.strip()]
+        identities.append(("group count", match.group(0), int(groups), len(items)))
+        numbers = [int(n) for n in re.findall(r"(?<![\w.])\d+", body)]
+        # An approximate total (`~90`) states no exact identity, and a list with no numbers in it
+        # is a list of names — neither carries a sum to check.
+        if numbers and not approx:
+            identities.append(("inventory total", match.group(0), int(total), sum(numbers)))
+    return identities
+
+
+# ---- the guards --------------------------------------------------------------------------
+
+def test_the_audit_document_domain_is_derived_from_disk_and_declares_its_denominator():
+    """The domain is `glob`, and the denominator is written down so it cannot rot in silence.
+
+    Both halves matter. Deriving from disk is what stops a twelfth document joining the directory
+    unguarded; declaring the count and the names is what stops the derivation quietly returning
+    fewer documents than the file believes it is reading — a glob that matches nothing passes
+    every loop built on it.
+    """
+    names = {p.name for p in AUDIT_DOCUMENTS}
+    assert len(AUDIT_DOCUMENTS) == AUDIT_DOCUMENT_COUNT, (
+        "reference-impl/ holds %d markdown documents, not the %d this guard declares. Adding an "
+        "audit document is a decision: raise AUDIT_DOCUMENT_COUNT and add it to "
+        "AUDIT_DOCUMENT_NAMES, having checked what in it is claimable."
+        % (len(AUDIT_DOCUMENTS), AUDIT_DOCUMENT_COUNT))
+    assert names == AUDIT_DOCUMENT_NAMES, (
+        "the audit document set has changed: on disk but not declared %s; declared but not on "
+        "disk %s" % (sorted(names - AUDIT_DOCUMENT_NAMES), sorted(AUDIT_DOCUMENT_NAMES - names)))
+
+
+def test_every_audit_document_is_read_by_this_guard():
+    """Coverage, measured rather than asserted: all eleven are opened, not five.
+
+    `registers/guard-domains.tsv` records this file at 5 of 11 (45.5 %). This row is the thing
+    that makes the number self-correcting — it re-derives the read set by actually running the
+    scan, so the coverage claim can never be a comment that drifted.
+    """
+    # "read" here means exactly what the scan does: `_normalised` is the read step every claim
+    # extractor goes through, and it is applied to each document by the parametrised rows below.
+    # A document that yields no text yields no claims, which is indistinguishable from not being
+    # in the domain — so an unreadable document must fail here rather than pass quietly.
+    read = {d.name for d in AUDIT_DOCUMENTS if _normalised(d)}
+    assert read == AUDIT_DOCUMENT_NAMES, (
+        "these audit documents are in the domain but are not read: %s"
+        % sorted(AUDIT_DOCUMENT_NAMES - read))
+
+
+def test_a_document_that_names_this_guard_as_its_verifier_is_actually_read():
+    """An OKF header that claims a verifier the verifier does not read is a false provenance line.
+
+    ⚠️ THIS IS HOW THE GAP WAS FOUND. `REVIEW-BRIEF.md` carries
+    `verified: { by: process:test_audit_drift.py, at: 2026-08-24T11:51:35Z }` in its frontmatter,
+    and this file had never opened it. A reader checking whether a document is guarded reads that
+    header; it was a claim about a check that did not exist.
+    """
+    lying = []
+    for document in AUDIT_DOCUMENTS:
+        header = re.search(r"^verified:\s*\{\s*by:\s*process:([^,\s}]+)",
+                           document.read_text(encoding="utf-8"), re.M)
+        if not header or header.group(1) != "test_audit_drift.py":
+            continue
+        # Being READ is necessary and not sufficient: opening a file and checking nothing in it
+        # is the shape of every guard in `registers/guard-domains.tsv` that this wave exists to
+        # correct. So the bar is that the document yields at least one claim this file actually
+        # re-derives — a recountable figure or a stated identity.
+        if not _count_claims(document) and not _sum_identities(document):
+            lying.append(document.name)
+    assert not lying, (
+        "these documents name test_audit_drift.py as their verifier, but this file re-derives no "
+        "claim in them — the provenance line promises a check that does not happen: %s. Either "
+        "the document lost the claim that was being checked (restore or requote it), or the "
+        "header should not name this process." % lying)
+
+
+@pytest.mark.parametrize("document", AUDIT_DOCUMENTS, ids=[d.name for d in AUDIT_DOCUMENTS])
+def test_every_recountable_claim_matches_the_tree(document):
+    """A number a document quotes about THIS tree must survive being recounted from it."""
+    wrong = []
+    for name, quantity, quoted, tolerance in _count_claims(document):
+        actual = RECOUNTABLE[quantity]()
+        if abs(quoted - actual) > tolerance * actual:
+            wrong.append(
+                "%s: quotes %d %s (pattern %r); this tree has %d — %.1f %% off, band is %.0f %%"
+                % (document.name, quoted, quantity, name, actual,
+                   100.0 * abs(quoted - actual) / actual, 100.0 * tolerance))
+    assert not wrong, (
+        "stale numeric claims:\n  " + "\n  ".join(wrong)
+        + "\nRequote the figure against a measured run, or drop the number.")
+
+
+@pytest.mark.parametrize("document", AUDIT_DOCUMENTS, ids=[d.name for d in AUDIT_DOCUMENTS])
+def test_every_stated_sum_identity_holds(document):
+    """Arithmetic a document states about itself must close. No oracle needed; it brought one."""
+    broken = []
+    for kind, description, claimed, actual in _sum_identities(document):
+        if claimed != actual:
+            broken.append("%s: %s — states %d as the %s, but the parts give %d"
+                          % (document.name, description, claimed, kind, actual))
+    assert not broken, "arithmetic that does not close:\n  " + "\n  ".join(broken)
+
+
+def test_the_numeric_claim_scan_is_not_vacuous():
+    """A scan that matches nothing passes forever, which is the defect this whole file is about.
+
+    Two floors and one per-pattern liveness check. The per-pattern half is the important one: a
+    reworded sentence that no longer matches its pattern must FAIL here, loudly, rather than
+    quietly removing a number from the guarded set — which is exactly what "keyed on a literal
+    heading" did to the scorecard rows before `690fba1`.
+    """
+    # Per-pattern liveness first, because it is the diagnostic that names WHICH claim went quiet;
+    # the aggregate floors below only say that something did.
+    dead = []
+    for name, pattern, _quantity, _tolerance, _why in COUNT_CLAIM_PATTERNS:
+        if not any(re.search(pattern, _normalised(d)) for d in AUDIT_DOCUMENTS):
+            dead.append(name)
+    assert not dead, (
+        "these count-claim patterns match nothing in the corpus, so whatever they were guarding "
+        "is now unguarded: %s. Either the sentence was reworded (re-key the pattern) or the claim "
+        "was deleted (delete the pattern deliberately)." % dead)
+
+    claims = [c for d in AUDIT_DOCUMENTS for c in _count_claims(d)]
+    identities = [i for d in AUDIT_DOCUMENTS for i in _sum_identities(d)]
+    assert len(claims) >= 5, "only %d recountable claims matched" % len(claims)
+    assert len(identities) >= 7, "only %d sum identities matched" % len(identities)
+
+    documents_with_claims = {d.name for d in AUDIT_DOCUMENTS if _count_claims(d)}
+    assert len(documents_with_claims) >= 4, (
+        "recountable claims were found in only %d documents (%s); the scan has narrowed"
+        % (len(documents_with_claims), sorted(documents_with_claims)))
+
+
+@pytest.mark.parametrize("text,expected", [
+    # the shapes that are real in this corpus
+    ("19 imported + 12 undrawn operators + 13 scripts = the 44 files on disk", [("addition", 44, 44)]),
+    ("And 1231 + 6 = 1237, not 1236", [("addition", 1237, 1237)]),
+    # the corruption: one term edited, the total left alone
+    ("19 imported + 12 undrawn operators + 9 scripts = the 44 files on disk", [("addition", 44, 40)]),
+    # an inventory states two things and both are checked
+    ("183 nodes / 9 families (Primitive 23, Terrain 14, Modify 146)",
+     [("group count", 9, 3), ("inventory total", 183, 183)]),
+    # an approximate total states no identity, and a list of names carries no sum
+    ("~90 Devices / 9 categories (a, b, c, d, e, f, g, h, i)", [("group count", 9, 9)]),
+    # prose that merely contains numerals is not an identity
+    ("the suite had grown to 530 / 1236 by then", []),
+])
+def test_sum_identity_recogniser_fixtures(text, expected, tmp_path):
+    """Fixtures, not the corpus: this pins the RECOGNISER so narrowing it fails here first."""
+    document = tmp_path / "fixture.md"
+    document.write_text(text, encoding="utf-8")
+    assert [(kind, claimed, actual)
+            for kind, _d, claimed, actual in _sum_identities(document)] == expected
+
+
+@pytest.mark.parametrize("text,expected", [
+    ('So "530 tests pass" is self-consistency.', [("suite-size-quoted", 530)]),
+    ("The whole suite (334 tests) passes; the core is cross-validated",
+     [("suite-size-parenthetical", 334)]),
+    ("**530** is the number of `def test` **functions** across `tests/`",
+     [("def-test-function-count", 530)]),
+    ("against **44 `.py` files on disk** — 25 of which", [("py-files-on-disk", 44)]),
+    # ⚠️ the negative controls. Every one of these quotes a count of an OLDER tree and says so;
+    # a matcher that bound them to today's oracle would fail on true sentences, which is how a
+    # guard gets deleted. They are outside the patterns by shape, not by an exclusion list.
+    ('That figure said 117 for a long time, against a suite that had already grown past 400', []),
+    ('it previously quoted "436 `def test` functions" and a run of "617 passed, 6 skipped"', []),
+    ("`27f6cf7`, whose suite defined **463** functions and collected **713**", []),
+    ("its 10 tests are removed from *collection* entirely", []),
+    ("nothing deselects 90 tests", []),
+])
+def test_count_claim_recogniser_fixtures(text, expected, tmp_path):
+    """The other half: what must match, and what must not."""
+    document = tmp_path / "fixture.md"
+    document.write_text(text, encoding="utf-8")
+    assert [(name, quoted) for name, _q, quoted, _t in _count_claims(document)] == expected

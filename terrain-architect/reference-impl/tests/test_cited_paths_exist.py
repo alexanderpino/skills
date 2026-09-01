@@ -57,8 +57,17 @@ SKILLS = SKILL.parent                              # …/skills  (the sibling-sk
 # The documents that carry citations. Enumerated rather than rglob'd, so a build cache
 # (`reference-impl/.pytest_cache/README.md`) can never quietly join the corpus.
 # `test_no_unscanned_markdown_carries_citations` proves nothing falls outside this set.
-CITING_GLOBS = ("references/*.md", "reference-impl/*.md", "evals/*.md")
-CITING_FILES = ("SKILL.md", "index.md")
+#
+# ⚠️ `registers/*.md` JOINED THIS SET BECAUSE THE GUARD BELOW FIRED, WHICH IS THE GUARD WORKING.
+# `registers/` landed at `23bceef` carrying citations in `OPEN-ITEMS.md` and `README.md`, and
+# `test_no_unscanned_markdown_carries_citations` went red on the next run — an enumerated corpus
+# plus a sweep that proves the enumeration complete is exactly the pair that makes adding a
+# directory a decision rather than an accident.
+CITING_GLOBS = ("references/*.md", "reference-impl/*.md", "evals/*.md", "registers/*.md")
+# `DEFINITION-OF-DONE.md` sits beside them at the skill root and was outside the corpus:
+# it carries no citation today, so nothing was failing, which is precisely how a document
+# joins the tree unscanned and starts citing later.
+CITING_FILES = ("SKILL.md", "index.md", "DEFINITION-OF-DONE.md")
 
 # The extensions that make a slashed token a FILE citation rather than a fraction, a unit, an
 # upstream `owner/repo@sha`, or a cross-skill chapter reference like `terrain-renderer/11`.
@@ -236,6 +245,11 @@ def _roots(citation):
     roots = [citation.source.parent, SKILL, REF]
     if "/" not in citation.path:
         roots.append(REF / "tests")
+        # …and `references/`, for the same reason and under the same restriction: the audit
+        # tables and the registers cite chapters as `09-verification.md:319`, which is the
+        # chapter path written from inside `references/`. Bare filenames only, so a slashed
+        # citation still cannot resolve here by accident.
+        roots.append(SKILL / "references")
     roots.append(SKILLS)
     return tuple(dict.fromkeys(roots))          # de-duplicated, order preserved
 
@@ -245,15 +259,93 @@ def _is_checked_out(skill_name):
     return (SKILLS / skill_name / "SKILL.md").is_file()
 
 
+# --------------------------------------------------------------------------------------
+# THE EXCLUSION TABLE — every reason a recognised citation is not resolved, and why.
+#
+# ⚠️ AN UNWRITTEN EXCLUSION IS THE SAME DEFECT AS AN UNSCANNED FILE. Before this table the
+# reasons a path went unresolved were scattered: `EXTERNAL_ROOTS` and `SIBLING_SKILLS` as two
+# separate `if`s inside `_skip_reason`, an inline `"*" in path` branch buried in
+# `test_every_cited_path_resolves`, and — as this wave found — an absolute host path
+# (`/home/user/skills/gauntlet/backlog.md`) with no handling at all, which simply failed. Nothing
+# said what the complete set was, nothing proved a given exclusion was still needed, and a fourth
+# could be added by writing another `if`.
+#
+# SCOPE, precisely. This table governs citations the RECOGNISER admitted. A URL is excluded one
+# stage earlier, by `_SCHEME` in `_parse`, and that is the right place for it: `https://…` is not
+# a path-shaped token this repo failed to resolve, it is a token that was never ours. The two rows
+# below therefore measure the table against recognised citations, not against every token on the
+# page.
+#
+# So: one table, one reason per row, and two rows below that keep it honest —
+#   * `test_every_exclusion_is_exercised_by_the_corpus` fails on a DEAD exclusion, so a rule
+#     cannot be added "just in case" and then quietly excuse a real defect years later;
+#   * `test_every_citation_is_checked_or_excluded_for_a_stated_reason` fails on a citation that
+#     is neither resolved nor matched by a row here, so nothing can fall between the two.
+#
+# WHAT IS DELIBERATELY *NOT* EXCLUDED, and why, since a missing row is the part nobody reads:
+#   * GLOB PATTERNS (`reference-impl/*.py`) are CHECKED, not excused: the pattern must match at
+#     least one file. A glob that matches nothing is exactly the rot this file exists to find.
+#   * ILLUSTRATIVE / HYPOTHETICAL paths have NO row, because this corpus currently writes none
+#     that the recogniser admits — every path-shaped token in a fence here names a real file. A
+#     row for them would be dead on arrival and the exercised-ness test would say so. If a
+#     chapter one day needs a genuinely hypothetical path, add the row WITH its reason; do not
+#     reach for it pre-emptively.
+#   * A BARE FILENAME in prose ("see flow.py") is not an exclusion either — the recogniser never
+#     admits it as a citation in the first place, because it promises nothing checkable.
+# --------------------------------------------------------------------------------------
+
+# (name, predicate, reason, owned, dormant_reason)
+#
+# `owned` is the difference between "we deliberately do not vouch for this" (dropped from the
+# denominator entirely) and "we would vouch for it but cannot here" (reported, so a reader sees
+# what went unverified instead of a silently smaller number).
+#
+# `dormant_reason` is a callable returning a STATED CONDITION under which the row legitimately
+# matches nothing in this environment, or None if the row must always be exercised. It exists for
+# exactly one row and is not a general escape hatch: without it, "every exclusion is exercised"
+# would be false on a machine that has all the sibling skills checked out, which is the state this
+# rule is *supposed* to produce. With it, the only way a row can match nothing is by declaring the
+# condition, and the condition is itself re-checked from disk.
+_EXCLUSIONS = (
+    ("external-root",
+     lambda c: any(c.path.startswith(root) for root in EXTERNAL_ROOTS),
+     "names the wider harness (agents/, eval-viewer/), which this repo does not ship or vouch for",
+     False,
+     None),
+    ("absolute-host-path",
+     lambda c: c.path.startswith("/") and c.path.lstrip("/").split("/")[0] not in KNOWN_ROOTS,
+     "an absolute filesystem path on the author's machine, not a repo-relative one — resolvable "
+     "only by accident of where this tree happens to be checked out",
+     False,
+     None),
+    ("sibling-not-checked-out",
+     lambda c: (c.path.lstrip("/").split("/")[0] in SIBLING_SKILLS
+                and not _is_checked_out(c.path.lstrip("/").split("/")[0])),
+     "the sibling skill it cites is not present in this checkout — an environment fact, not rot",
+     True,
+     lambda: ("every cited sibling skill is checked out here (%s), so nothing can match"
+              % ", ".join(sorted(SIBLING_SKILLS))
+              if all(_is_checked_out(n) for n in SIBLING_SKILLS) else None)),
+)
+
+
+def _exclusion(citation):
+    """The `(name, reason, owned)` row excusing this citation, or None if it must resolve."""
+    for name, predicate, reason, owned, _dormant in _EXCLUSIONS:
+        if predicate(citation):
+            return name, reason, owned
+    return None
+
+
 def _skip_reason(citation):
     """Why a recognised citation is not resolved. Each entry is a decision, not an oversight."""
-    head = citation.path.lstrip("/").split("/")[0]
-    if any(citation.path.startswith(root) for root in EXTERNAL_ROOTS):
-        return "outside this skill's tree"
-    if head in SIBLING_SKILLS and not _is_checked_out(head):
-        # An absent sibling is an environment fact, not chapter rot.
-        return "sibling skill %r is not checked out here" % head
-    return None
+    matched = _exclusion(citation)
+    if matched is None:
+        return None
+    name, reason, owned = matched
+    if not owned:
+        return "outside this skill's tree"      # the sentinel the resolve row drops entirely
+    return "%s: %s" % (name, reason)
 
 
 def _resolve(citation):
@@ -301,8 +393,9 @@ def _bound_names(target):
 def test_the_scan_still_finds_the_citations():
     """A guard that matches nothing passes forever.
 
-    Floors are set well below the real counts (411 citations over 44 documents at the time of
-    writing) so ordinary editing does not trip them, but a recogniser change that quietly stops
+    Floors are set well below the real counts — 447 citations over 47 documents as measured when
+    `registers/*.md` and `DEFINITION-OF-DONE.md` joined the corpus (it was 411 over 44 before
+    that) — so ordinary editing does not trip them, but a recogniser change that quietly stops
     matching a whole family does. Do not lower these to make the file pass.
     """
     documents = _citing_documents()
@@ -510,6 +603,95 @@ def _quoted_snippets(markdown_line):
             continue                    # a fragment or typeset maths, not quotable Python
         snippets.append(body)
     return snippets
+
+
+def test_a_path_written_as_bare_prose_is_collected_and_checked():
+    """The register's third defect, re-measured — and it is CLOSED at this HEAD.
+
+    `registers/guard-domains.tsv` records this guard as keyed on ``_BACKTICK`` and ``_MD_TARGET``
+    only, so that "a path written as bare prose (`see references/03-flow-routing.md`) is never
+    checked". That was true of the version before `028e900`; it is not true of this one. `_tokens`
+    yields a third `BARE` family — whatever survives once spans and link targets are removed — and
+    `_parse` admits any BARE token that carries a `/` and a known extension.
+
+    This row exists so the property cannot regress silently the way it arrived silently: it pins
+    the behaviour against fixtures AND asserts the corpus really contains bare citations, because
+    a recogniser that admits bare tokens over a corpus that writes none proves nothing.
+    """
+    # the exact sentence the register says is invisible
+    assert [pth for pth, _s, _p, _d in _recognise("see references/03-flow-routing.md for it")] \
+        == ["references/03-flow-routing.md"]
+    # and a broken one, which is the case that must FAIL rather than pass
+    broken, = _recognise("see reference-impl/no_such_module.py for it")
+    assert broken[0] == "reference-impl/no_such_module.py"
+    assert _resolve(Citation(SKILL / "SKILL.md", 1, broken[0], broken[0], None, None, False)) is None
+
+    # the corpus side: bare-prose citations are really written here, so the rule is load-bearing
+    bare = 0
+    for document in _citing_documents():
+        text = document.read_text(encoding="utf-8")
+        for lineno, token, kind in _tokens(text):
+            if kind == BARE and _parse(token, kind) is not None:
+                bare += 1
+    assert bare >= 20, (
+        "only %d bare-prose citations found; either the corpus stopped writing them or the BARE "
+        "family has fallen out of the recogniser again" % bare)
+
+
+def test_every_exclusion_is_exercised_by_the_corpus():
+    """A dead exclusion is a licence nobody is using and everybody inherits.
+
+    Each row of `_EXCLUSIONS` must excuse at least one real citation, or state the condition
+    under which it legitimately matches nothing here — and that condition is re-derived from disk,
+    not asserted. Without this row an exclusion could be added defensively and then, years later,
+    quietly excuse the one citation that had actually rotted.
+    """
+    citations = _all_citations()
+    dead = []
+    for name, predicate, reason, _owned, dormant in _EXCLUSIONS:
+        if any(predicate(c) for c in citations):
+            continue
+        why = dormant() if dormant else None
+        if why:
+            continue                    # legitimately dormant, and it says why
+        dead.append("%s (%s)" % (name, reason))
+    assert not dead, (
+        "these exclusion rows excuse nothing in this corpus and state no condition under which "
+        "they would not: delete them rather than carrying a licence nobody uses:\n  "
+        + "\n  ".join(dead))
+
+
+def test_every_citation_is_checked_or_excluded_for_a_stated_reason():
+    """The partition: no citation may be neither resolved nor excused.
+
+    `test_every_cited_path_resolves` proves the checked half is true; this proves the checked half
+    plus the excused half is the WHOLE half — that nothing falls between the resolver and the
+    exclusion table and out of the guard entirely. The two together are what "100% coverage"
+    should have meant all along; the register's 44/44 counted FILES reached, which a per-token
+    guard can satisfy while leaving individual tokens unexamined.
+    """
+    checked = excused = 0
+    orphans = []
+    for citation in _all_citations():
+        matched = _exclusion(citation)
+        if matched is not None:
+            excused += 1
+            name, reason, _owned = matched
+            assert reason.strip(), "exclusion %r carries no reason" % name
+            continue
+        if "*" in citation.path or "?" in citation.path:
+            checked += 1                # a glob is checked, not excused — see the table comment
+            continue
+        if _resolve(citation) is not None:
+            checked += 1
+            continue
+        orphans.append(repr(citation))
+    assert not orphans, (
+        "citations that neither resolve nor match a reasoned exclusion:\n  " + "\n  ".join(orphans))
+    assert checked + excused == len(_all_citations())
+    assert excused <= 0.05 * checked, (
+        "%d of %d citations are excused rather than checked; the exclusion table has become the "
+        "guard" % (excused, checked + excused))
 
 
 def test_no_unscanned_markdown_carries_citations():

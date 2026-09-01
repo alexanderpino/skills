@@ -53,7 +53,16 @@ def _arrow(dr, x0, y0, x1, y1, fill=INK, w=4):
                 (x1 - 15 * np.cos(ang + 0.4), y1 - 15 * np.sin(ang + 0.4))], fill=fill)
 
 
-def build():
+def build(path="crater_anatomy.png"):
+    """Draw the figure, save it to `path`, and return `(canvas, facts)`.
+
+    ⚠️ IT RETURNS ITS OWN MEASUREMENTS BECAUSE THE FIGURE IS LOAD-BEARING. `VALIDATION.md` rung 4
+    stakes a corrected morphology on this figure — "a grazing crater is deeper UP-RANGE" — and the
+    figure was the only artifact in the tree carrying that claim with no build guard in any
+    environment: it could stop building, or start drawing the deepest point down-range again (the
+    exact defect rung 4 corrected), and nothing would fail. `facts` is what a guard needs to say
+    the picture still shows what the document says it shows, without re-deriving it from pixels.
+    """
     # --- terrain -------------------------------------------------------------------
     D = crater.final_crater(crater.transient_crater_diameter(L, 20000.0, angle=ANGLE))[0]
     cs = D * crater._ellipticity(ANGLE) / (N * 0.60)
@@ -140,9 +149,12 @@ def build():
           "Elevation cross-section along the trajectory  (vertical exaggeration ~6x)",
           sz=15, anchor="ma")
 
-    canvas.save("crater_anatomy.png")
-    print(f"wrote crater_anatomy.png   D={D/1000:.2f} km  ecc={info['ellipticity']:.2f}  "
+    canvas.save(path)
+    print(f"wrote {path}   D={D/1000:.2f} km  ecc={info['ellipticity']:.2f}  "
           f"deepest col={imin} (centre {N//2}) -> {'up-range' if imin < N//2 else 'down-range'}")
+    return canvas, {"deepest_col": int(imin), "centre": N // 2, "diameter_m": float(D),
+                    "ellipticity": float(info["ellipticity"]),
+                    "uprange_rim_col": int(lc), "downrange_rim_col": int(rc)}
 
 
 if __name__ == "__main__":

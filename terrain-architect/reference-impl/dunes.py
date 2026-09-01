@@ -46,8 +46,28 @@ def werner_dunes(sand, iters, seed=0, p_sand=0.6, p_bare=0.4, hop=1, wind=(0, 1)
 
     Grounded constants (Werner 1995; Momiji et al. 2000): `shadow_tan = tan(15°) = 0.268` is the
     lee flow-separation (recirculation) angle; `repose = 2` slabs is the dry-sand angle of repose,
-    tan⁻¹(2/3) = 33.7°, under the standard 1:3 slab aspect ratio (height:width); `hop` is the
-    saltation length (Werner used ~5 cells; a longer hop lengthens the dune wavelength).
+    tan⁻¹(2/3) = 33.7°, under the standard 1:3 slab aspect ratio (height:width).
+
+    ⚠️ `hop` — THE SALTATION LENGTH, IN CELLS — AND THE ONE CONSTANT IN THIS MODULE THAT HAS BEEN
+    STATED FOUR DIFFERENT WAYS. It sets the dune wavelength (a longer hop, a longer wavelength).
+    The four statements, all still in the tree:
+
+      * `05`'s Werner pseudocode block:  `L = saltationHop   # ~5 cells, fixed`   (05:412)
+      * `05`'s runnable-reference note, thirteen lines earlier: "(≈3 cells)"      (05:399)
+      * this docstring, until now: "Werner used ~5 cells"
+      * this signature: `hop=1`
+
+    The chapter therefore contradicts ITSELF before the module is even consulted, so "the module
+    disagrees with the chapter" was never the whole finding. What the MODULE can say truthfully is
+    said here: **`hop=1` is the minimal one-cell transport step, and it is not the setting this
+    model is meant to run at.** Nothing in this repository actually uses it — `capability_grid.py`'s
+    dune panel and every row of `tests/test_dunes.py` that exercises dune formation pass `hop=3`, so
+    the default is only what a caller who names nothing receives. Pass `hop=3..5` for a Werner run;
+    3 is what this repo runs and 5 is what `05`'s pseudocode fixes.
+
+    The chapter-vs-code half is registered, both sides pinned, as `werner-saltation-hop` in
+    `tests/test_pseudocode_drift.py`; correcting `05` so it states ONE value belongs to the wave
+    that owns `references/`.
     """
     sand = np.asarray(sand).astype(np.int64).copy()
     n, m = sand.shape

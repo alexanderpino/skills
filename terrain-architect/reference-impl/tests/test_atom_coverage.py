@@ -4,6 +4,7 @@ SCOPE STATEMENT (`ATOM-COVERAGE.md`). It does NOT prove the atoms are numericall
 per-atom oracle tests (test_noise, test_ops_filters, the solver tests) do that. It proves the *set*
 is consistent: nothing is claimed-but-missing, built-but-undocumented, or deferred-but-secretly-present
 (the class of gap that had let Simplex/Gabor sit in the pseudocode with no implementation)."""
+import ast
 import functools
 import importlib
 import io
@@ -1005,3 +1006,338 @@ def test_an_anchor_that_stops_selecting_one_paragraph_fails_the_row(tmp_path):
         _doc_paragraph(p, "the same anchor", "fixture")
     with pytest.raises(AssertionError, match="matches 0 paragraphs"):
         _doc_paragraph(p, "an anchor that is not there", "fixture")
+
+
+# --------------------------------------------------------------------------- #
+# THE ENUMERATION ITSELF — GLOBBED OFF THE FILESYSTEM, NOT HAND-WRITTEN.
+#
+# Every row above this line is keyed on `IMPLEMENTED`, a hand-maintained dict of 91 atom names
+# across 18 modules, and a hand-written enumeration cannot see what it forgot. `reference-impl/`
+# ships 44 modules; the register above reaches 21 of them (the 18 `IMPLEMENTED` keys, plus
+# `landforms` via `GENERATORS` and `dunes`/`isostasy` via `FAITHFUL`) — 47.7%. The other 23 are
+# outside the guard entirely: a module that is in neither dict is neither required to be documented
+# nor reported as undocumented. Ship a new solver, leave it out of `ATOM-COVERAGE.md`, and every
+# row above stays green. That is the hole this section closes, and it is the SIXTH way a needle
+# goes vacuous, the one the five at the top of this file do not cover: not "the needle matches
+# something it shouldn't" but "there is no needle at all, because the list forgot the file".
+#
+# So the module set is `REF.glob("*.py")`, and every one of the 44 must land in exactly one of
+# three buckets — the classification rule, written down:
+#
+#   DOC_NAMED     DERIVED, not written: the module's own name appears inside an ATOM-COVERAGE.md
+#                 BACKTICK CODE SPAN (`noise.py`, `flow.priority_flood_fill`). Prose does not
+#                 count, for reason (4) at the top of this file. These are the modules the scope
+#                 doc claims, so these are the modules that carry the symbol-level obligation
+#                 below. Nothing hand-written selects them: document a module and it joins.
+#   HARNESS       Infrastructure, figure and demo code — it renders a picture, drives a demo, moves
+#                 bytes on and off disk, or is pytest plumbing. Not a terrain operator, so the atom
+#                 register does not scope it. Explicit allow-list, one reason each.
+#   OUT_OF_SCOPE  Terrain code the atom register deliberately does not scope. ATOM-COVERAGE.md
+#                 opens by saying so: "a **curated core** … deliberately **not exhaustive**".
+#                 Explicit allow-list, one reason each.
+#
+# THE TWO ALLOW-LISTS ARE MATCHED EXACTLY, IN BOTH DIRECTIONS. That is the whole mechanism:
+#   * a NEW module nobody documented belongs to no bucket -> `test_every_module_on_disk_is_classified`
+#     fails, and the only ways to silence it are to document the module or to write down a reason;
+#   * an allow-list entry whose file is gone (renamed, deleted) -> `test_no_module_exemption_is_stale`
+#     fails, because a stale exemption re-opens the hole it was written to keep visible;
+#   * an allow-listed module that LATER gets documented -> `test_no_exempt_module_is_secretly_documented`
+#     fails, because it must move into DOC_NAMED and take the symbol obligation with it.
+
+_MODULE_PATHS = tuple(sorted(REF.glob("*.py"), key=lambda p: p.name))
+MODULES_ON_DISK = tuple(p.stem for p in _MODULE_PATHS)
+
+# The listing names of the scope doc — code spans only, same rule as `_section_names`.
+COVERAGE_LISTED_NAMES = _idents(_code_spans(COVERAGE))
+
+DOC_NAMED = tuple(m for m in MODULES_ON_DISK if m in COVERAGE_LISTED_NAMES)
+
+# Infrastructure / figure / demo / plumbing. One line each, saying what it is instead of an atom.
+HARNESS = {
+    "anisotropy_anatomy": "builds the `09` anisotropy ANATOMY figure; a picture, not an operator",
+    "capability_grid":    "builds the one-image capability grid; a picture, not an operator",
+    "conftest":           "pytest plumbing: puts the package root on sys.path for the test run",
+    "crater_anatomy":     "builds the grazing-impact ANATOMY figure; a picture, not an operator",
+    "crater_demo":        "`crater_demo.py` impact-matrix demo script (size x angle panels)",
+    "empirical_dem":      "VALIDATION rung-5 harness: fetches real DEMs and scores metrics",
+    "flow_anatomy":       "builds the `03` flow-routing ANATOMY figure; a picture, not an operator",
+    "gallery":            "renders GALLERY.md's panels on one shared base; a picture, not an operator",
+    "graph_demo":         "runnable terrain-graph DAG demo (Ctx/Node/Graph wiring the atoms)",
+    "halfar_anatomy":     "builds the Halfar SIA-vs-analytic ANATOMY figure; a picture, not an operator",
+    "heightfield_io":     "heightmap file I/O and SRTM fetch — transport of a field, not a field op",
+    "hero":               "software rasteriser for the 3-D hero view; a picture, not an operator",
+    "hex_anatomy":        "builds the `26` hex-grid ANATOMY figure; a picture, not an operator",
+    "screen_worlds":      "fictional-planet demo compositions (arrakis, hoth, …) for the gallery",
+}
+
+# Terrain code the ATOM register deliberately does not scope — the "curated core" clause.
+OUT_OF_SCOPE = {
+    "analytic":          "closed-form sims (tephra, HSC seafloor, energy-cone runout) used as ORACLES",
+    "archetypes":        "PROVINCE-altitude compositions — macros over macros, above the atom layer",
+    "crater":            "parameterised impact sizing/stamping — a landform generator, not an atom",
+    "dunes":             "Werner slab CA — an illustrative bedform sim; its constants are pinned by FAITHFUL",
+    "hydrology":         "discharge -> water-surface rendering inputs; a presentation layer over `flow`",
+    "isostasy":          "flexure/Airy root fields; its constant is pinned by FAITHFUL, not by the atom list",
+    "runout":            "Voellmy debris runout — a single-process sim, not a composable atom",
+    "scatter":           "object distribution / point placement (07) — a PointSet layer, not a height op",
+    "sims_illustrative": "the deliberately un-oracled illustrative regimes (12, 19) behind the figures",
+}
+
+
+@functools.lru_cache(maxsize=None)
+def _public_symbols(module):
+    """Module-level public `def`/`class` names, read with `ast`.
+
+    PARSED, NOT IMPORTED and NOT REGEXED. Importing would run module-level figure code and would
+    also hand back re-exports (`from x import y`) as if the module owned them; a regex over `^def `
+    would count a nested `def` inside a function body as public surface. `ast.parse` + a walk of
+    `tree.body` only is exactly "what this file declares at module level", which is what "public
+    surface" means here. A leading underscore is the Python convention for "not part of the
+    surface", so it is the boundary — the same one `_public_callables` above uses at runtime.
+    """
+    tree = ast.parse((REF / f"{module}.py").read_text(encoding="utf-8"))
+    return tuple(n.name for n in tree.body
+                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                 and not n.name.startswith("_"))
+
+
+# --------------------------------------------------------------------------- #
+# PUBLIC SYMBOLS IN A DOCUMENTED MODULE THAT ATOM-COVERAGE.md DOES NOT NAME.
+#
+# The scope doc's own guarantee is "the reference module's public surface must not contain an atom
+# missing from this list". Above, that sentence is enforced for exactly TWO modules
+# (`test_noise_surface_has_no_undocumented_atom`, `test_ops_surface_is_fully_accounted_for`). For
+# the other 19 documented modules nothing checked it, and the sentence is in fact false for 58
+# public symbols across 14 of them. Each of those 58 is written down here with the reason it is not
+# an atom — because "58 undocumented public callables" is a fact about this repository that should
+# be visible in the guard, not a fact the guard is unable to see.
+#
+# The list is matched EXACTLY (`test_no_symbol_exemption_is_stale`): delete or rename one of these
+# and the row goes red rather than quietly shrinking, which is how a hand-list normally rots.
+_MACRO = "landform MACRO over the atoms — the scope doc says the generators live in landforms.py"
+_PASS = "diagnostic/visualisation render pass, not one of the colour-production atoms"
+
+SYMBOL_EXEMPT = {
+    "analysis": {
+        "gradient":           "(dz/dx, dz/dy) primitive the documented channels are computed from",
+        "slope":              "steepest-slope primitive consumed by the documented channels",
+        "aspect":             "downslope-direction primitive consumed by the documented channels",
+        "northness":          "aspect projected on north — a derived scalar view, not a channel",
+        "normals":            "unit surface normals for shading; render consumes them",
+        "laplacian":          "cheap convexity primitive behind the documented `curvature`",
+        "smoothstep":         "Hermite smoothstep — a numeric helper, not a terrain operator",
+        "band_select":        "soft band selector — a masking helper, not a terrain operator",
+        "derive_materials":   "material-stack macro over the documented channels (06)",
+        "dominant_material":  "argmax view of a material stack — categorical, not a channel",
+        "derive_substances":  "substance-placement macro over the material stack",
+    },
+    "braided": {
+        "braiding_index":     "measurement OF the solver output (the braiding metric), not a solver",
+    },
+    "diffusion": {
+        "stable_dt":          "CFL timestep helper for `hillslope_diffuse`, not an atom itself",
+    },
+    "erosion_pipe": {
+        "main":               "`python erosion_pipe.py` before/after demo entry point",
+    },
+    "erosion_streampower": {
+        "receivers":          "module-local D8 helper; the documented atom is `flow.d8_receivers`",
+        "drainage_area":      "module-local helper; the documented atom is `flow.d8_accumulation`",
+        "main":               "`python erosion_streampower.py` D-sweep demo entry point",
+    },
+    "erosion_thermal": {
+        "max_slope":          "diagnostic used to pick a timestep, not a terrain operator",
+    },
+    "flow": {
+        "hybrid_accumulation": "composition of the documented `mfd_accumulation` and `d8_accumulation`",
+    },
+    "landforms": {
+        "crater_diameter":    _MACRO + " (pi-scaling sizing formula feeding `impact_crater`)",
+        "impact_crater":      _MACRO,
+        "strat_coord":        _MACRO + " (stratigraphic coordinate for the bedding macros)",
+        "bed_erodibility":    _MACRO + " (bed-table lookup for the bedding macros)",
+        "terrace":            _MACRO,
+        "fold":               _MACRO,
+        "anticline":          _MACRO,
+        "alluvial_fan":       _MACRO + " — guarded as a GENERATOR row above, chapter 16",
+        "karst_sinkholes":    _MACRO,
+        "main":               "`python landforms.py` generator-gallery entry point",
+    },
+    "meander": {
+        "near_bank_velocity": "the Ikeda-Parker-Sawai kernel INSIDE the documented `migrate`",
+        "sinuosity":          "measurement of a centreline, not a solver",
+        "sd_polyline":        "polyline SDF helper over the documented `ops_filters.sd_segment`",
+        "deposit_point_bars": "F-tier depositional companion to the documented `burn_channel`",
+        "seed_wave":          "convenience default centreline for demos",
+        "meander_belt":       "composite meander-belt NODE — a macro over `migrate`/`burn_channel`",
+    },
+    "ops_filters": {
+        "box_filter":         "filter/morphology toolbox entry the scope doc excludes by name",
+        "median":             "filter/morphology toolbox entry the scope doc excludes by name",
+        "tophat":             "filter/morphology toolbox entry the scope doc excludes by name",
+        "bothat":             "filter/morphology toolbox entry the scope doc excludes by name",
+    },
+    "placement": {
+        "coords":             "object-space metre grid shared by the documented primitives",
+        "coverage":           "signed-distance -> mask conversion shared by the documented primitives",
+    },
+    "render": {
+        "greyscale":          _PASS,
+        "hillshade":          _PASS,
+        "slope_shade":        _PASS,
+        "flow_overlay":       _PASS,
+        "hypsometric":        _PASS,
+        "false_colour_clip":  _PASS,
+        "material_rgb":       _PASS,
+        "sun_sky_shade":      _PASS,
+        "photoreal":          _PASS,
+        "scatter_overlay":    _PASS,
+        "write_png":          "minimal stdlib PNG encoder — I/O, not colour production",
+    },
+    "snow": {
+        "wind_redistribute":  "F-tier redistribution companion, not among the listed snow atoms",
+        "dry_snow_attribution": "the chapter-`27` audit diagnostic over a snow field, not an operator",
+    },
+    "winds": {
+        "sample_bilinear":    "bilinear sampling helper for the wind field",
+        "speed":              "|(u, v)| scalar view of the documented wind field",
+        "divergence":         "user-facing diagnostic of the field, not a stage of it",
+        "divergence_spectral": "spectral companion diagnostic to `divergence`",
+    },
+}
+
+# The denominator, asserted in-file so `registers/guard-domains.tsv` cannot go stale silently.
+# BEFORE this section: 21 of 44 modules reached = 47.7% (the register says 23 / 52.3% — wrong; the
+# reached set is the 18 IMPLEMENTED keys + landforms + dunes + isostasy, and 23 is the count of the
+# modules NOT reached).
+# AFTER: all 44 are enumerated and classified = 100.0%, of which the 21 the scope doc claims carry
+# the symbol-level obligation (47.7% of modules at symbol depth, 0% before).
+_TOTAL_MODULES = 44
+_DOC_NAMED_COUNT = 21
+_SYMBOL_EXEMPT_COUNT = 58
+
+
+def test_every_module_on_disk_is_classified():
+    """No `reference-impl/*.py` may sit outside the guard.
+
+    This is the row the hand-written `IMPLEMENTED` dict could not be: it is keyed on the GLOB, so a
+    module that ships tomorrow is in the denominator the moment it lands. Silencing it costs either
+    a line in ATOM-COVERAGE.md (join DOC_NAMED) or a line here with a reason (join an allow-list) —
+    and there is no third option, which is the point.
+    """
+    unclassified = sorted(set(MODULES_ON_DISK) - set(DOC_NAMED) - set(HARNESS) - set(OUT_OF_SCOPE))
+    assert not unclassified, (
+        f"these reference-impl modules are in neither ATOM-COVERAGE.md nor an exemption list: "
+        f"{unclassified}. Either name the module in a BACKTICK code span of ATOM-COVERAGE.md (and "
+        f"document its public atoms), or add it to HARNESS / OUT_OF_SCOPE here WITH A REASON. A "
+        f"module that is in no bucket is a module no test can require to be documented.")
+
+
+def test_no_module_exemption_is_stale():
+    """A stale exemption silently re-opens the hole it was written to keep visible.
+
+    Rename `runout.py` and the entry keeps excusing a file that no longer exists, while the new
+    name walks in unclassified. Both halves must be loud, so this checks the allow-list against
+    disk (the other half is the row above).
+    """
+    on_disk = set(MODULES_ON_DISK)
+    gone = sorted((set(HARNESS) | set(OUT_OF_SCOPE)) - on_disk)
+    assert not gone, (
+        f"these modules are exempted here but no longer exist in reference-impl/: {gone}. Drop the "
+        f"entry (or fix its spelling) — an exemption for a file that is gone excuses nothing and "
+        f"hides the renamed file, which is now unclassified.")
+
+    # Not subject-mutatable (the reasons live in this file, so no edit to a module or to the scope
+    # doc can turn it red) — it pins the CONVENTION that an exemption states a reason, so that a
+    # future entry cannot be a bare name.
+    unreasoned = sorted(name for d in (HARNESS, OUT_OF_SCOPE) for name, why in d.items()
+                        if len(why.split()) < 4)
+    assert not unreasoned, f"exempted without a written reason: {unreasoned}"
+
+
+def test_no_exempt_module_is_secretly_documented():
+    """A module cannot be both exempted here and claimed by the scope doc.
+
+    If ATOM-COVERAGE.md starts naming `gallery.py` as carrying atoms, the exemption is no longer
+    true and, worse, the module would keep its symbol-level obligation waived. Documenting a module
+    must MOVE it into DOC_NAMED, taking the obligation with it.
+    """
+    both = sorted((set(HARNESS) | set(OUT_OF_SCOPE)) & set(DOC_NAMED))
+    assert not both, (
+        f"ATOM-COVERAGE.md names {both} in a code span, but they are on an exemption list here. "
+        f"Delete the exemption so the module joins DOC_NAMED and its public surface is checked — "
+        f"or, if the doc mention is incidental, un-backtick it.")
+
+
+def test_the_denominator_this_guard_claims_is_the_one_on_disk():
+    """The coverage number, asserted in-file, so the register cannot drift from the tree.
+
+    `registers/guard-domains.tsv` records this guard's reach as a number a human counted once. A
+    number a human counted once is a number that goes stale the next time a module lands. Here it
+    is recomputed from the glob and the scope doc every run.
+    """
+    assert len(MODULES_ON_DISK) == _TOTAL_MODULES, (
+        f"reference-impl now ships {len(MODULES_ON_DISK)} modules, not {_TOTAL_MODULES}. Update "
+        f"_TOTAL_MODULES and the guard-domains.tsv row together — the register's denominator is "
+        f"the thing that just went stale.")
+    assert len(DOC_NAMED) == _DOC_NAMED_COUNT, (
+        f"ATOM-COVERAGE.md now claims {len(DOC_NAMED)} modules, not {_DOC_NAMED_COUNT} "
+        f"({sorted(DOC_NAMED)}) — update _DOC_NAMED_COUNT and the register row together.")
+    exempted = sum(len(v) for v in SYMBOL_EXEMPT.values())
+    assert exempted == _SYMBOL_EXEMPT_COUNT, (
+        f"{exempted} public symbols are excused as non-atoms, not {_SYMBOL_EXEMPT_COUNT}. That "
+        f"count is the size of the gap between ATOM-COVERAGE.md's 'the public surface must not "
+        f"contain an atom missing from this list' and the tree; it should be going DOWN.")
+
+    # The two figures this guard replaces guard-domains.tsv's 44/23/52.3 with. 44 of 44 modules
+    # classified = 100.0% enumerated (was 21 of 44 = 47.7% reached, NOT the 23/52.3 recorded — 23
+    # is the size of the complement). Of the 44, the 21 the scope doc claims carry the symbol-level
+    # obligation: 47.7% at symbol depth, where it was 2 modules (noise, ops_filters) before.
+    classified = set(DOC_NAMED) | set(HARNESS) | set(OUT_OF_SCOPE)
+    assert len(classified) == len(MODULES_ON_DISK), (
+        f"{len(classified)} modules classified but {len(MODULES_ON_DISK)} on disk — the buckets "
+        f"overlap or miss; see the two rows above, which say which.")
+    assert round(100.0 * len(DOC_NAMED) / len(MODULES_ON_DISK), 1) == 47.7, (
+        f"symbol-depth coverage is now "
+        f"{round(100.0 * len(DOC_NAMED) / len(MODULES_ON_DISK), 1)}%, not 47.7% — say so in the "
+        f"comment above and in registers/guard-domains.tsv, do not just re-tune the number.")
+
+
+@pytest.mark.parametrize("module", DOC_NAMED)
+def test_documented_module_has_no_undocumented_public_symbol(module):
+    """Reverse drift at SYMBOL level, for every module the scope doc claims — not just noise/ops.
+
+    `test_noise_surface_has_no_undocumented_atom` is this row for one module; this is that row for
+    all 21, derived. A public callable added to a documented module must be named in an
+    ATOM-COVERAGE.md code span, or be written down above with the reason it is not an atom. Adding
+    a PRIVATE helper is free — the underscore is how a module says "not surface" — which is what
+    keeps this from firing on ordinary refactoring.
+    """
+    exempt = SYMBOL_EXEMPT.get(module, {})
+    undocumented = sorted(n for n in _public_symbols(module)
+                          if n not in COVERAGE_LISTED_NAMES and n not in exempt)
+    assert not undocumented, (
+        f"{module}.py exposes {undocumented} publicly, and ATOM-COVERAGE.md names neither — the "
+        f"doc claims 'the reference module's public surface must not contain an atom missing from "
+        f"this list'. Either list it in a backtick code span in the doc, make it private (`_name`), "
+        f"or add it to SYMBOL_EXEMPT[{module!r}] with the reason it is not an atom.")
+
+
+def test_no_symbol_exemption_is_stale():
+    """Every excused symbol must still be a public symbol of a documented module.
+
+    Same failure mode as the module allow-list, one level down: delete `braided.braiding_index` and
+    the entry goes on excusing nothing, so the next public symbol added under that name inherits an
+    excuse nobody wrote for it.
+    """
+    dead = []
+    for module, names in SYMBOL_EXEMPT.items():
+        if module not in DOC_NAMED:
+            dead.append(f"{module} (module is not named in ATOM-COVERAGE.md)")
+            continue
+        surface = set(_public_symbols(module))
+        dead += [f"{module}.{n}" for n in sorted(names) if n not in surface]
+    assert not dead, (
+        f"these symbol exemptions no longer name a public symbol of a documented module: {dead}. "
+        f"Drop the entry — an exemption for a symbol that is gone excuses nothing, and leaves the "
+        f"name pre-excused if anything reclaims it.")

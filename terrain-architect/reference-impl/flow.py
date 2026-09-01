@@ -1,6 +1,9 @@
 """Depression handling and flow routing (03-flow-routing.md).
 
 - priority_flood_fill: Barnes, Lehman & Mulla 2014 priority-flood + epsilon.
+- breach_fill: Lindsay 2016 least-cost breaching under the HYBRID policy `03` calls "the right
+  default for terrain generation" — breach shallow pits (noise artefacts), fill deep ones (real
+  basins, which is where lakes come from).
 - d8_receivers / d8_accumulation: O'Callaghan & Mark 1984 single-receiver routing.
 - mfd_accumulation: Freeman 1991 multiple-flow-direction (p = 1.1).
 - hybrid_accumulation: the hybrid `03` recommends — MFD on the hillslope, D8 once a cell's own
@@ -46,6 +49,119 @@ def priority_flood_fill(dem, eps=1e-5):
                     filled[ni, nj] = h + eps
                 heapq.heappush(heap, (filled[ni, nj], ni, nj))
     return filled
+
+
+def _depressions(dem, spill):
+    """(labels, components) for the 8-connected depression regions — cells the fill would raise."""
+    n, m = dem.shape
+    dep = spill > dem + 1e-12
+    lab = np.full((n, m), -1, dtype=np.int64)
+    comps = []
+    for i in range(n):
+        for j in range(m):
+            if not dep[i, j] or lab[i, j] >= 0:
+                continue
+            k = len(comps)
+            lab[i, j] = k
+            stack, cells = [(i, j)], []
+            while stack:
+                ci, cj = stack.pop()
+                cells.append((ci, cj))
+                for di, dj, _ in _NB:
+                    ni, nj = ci + di, cj + dj
+                    if 0 <= ni < n and 0 <= nj < m and dep[ni, nj] and lab[ni, nj] < 0:
+                        lab[ni, nj] = k
+                        stack.append((ni, nj))
+            comps.append(cells)
+    return lab, comps
+
+
+def _breach_route(dem, pi, pj):
+    """The minimax ("least-cost") escape route from a pit: the path out whose HIGHEST cell is as
+    low as possible, ending at the first cell strictly below the pit. Returns the path from the
+    pit to that outlet, or None when the pit is the lowest reachable ground (nothing to breach to).
+
+    Minimax and not shortest-path on purpose: the bottleneck of that route IS the depression's
+    spill point, so the depth this path has to cut is exactly the depth the fill would have added.
+    That identity is what lets one `max_depth` threshold mean the same thing to both policies.
+    """
+    n, m = dem.shape
+    pit_z = dem[pi, pj]
+    cost = np.full((n, m), np.inf)
+    prev = np.full((n, m, 2), -1, dtype=np.int64)
+    cost[pi, pj] = pit_z
+    heap = [(pit_z, pi, pj)]
+    while heap:
+        c, i, j = heapq.heappop(heap)
+        if c > cost[i, j]:
+            continue
+        if dem[i, j] < pit_z:                       # an outlet: ground the pit can drain onto
+            path = [(i, j)]
+            while (i, j) != (pi, pj):
+                i, j = int(prev[i, j, 0]), int(prev[i, j, 1])
+                path.append((i, j))
+            return path[::-1]
+        for di, dj, _ in _NB:
+            ni, nj = i + di, j + dj
+            if not (0 <= ni < n and 0 <= nj < m):
+                continue
+            nc = max(c, dem[ni, nj])                # cost of a route = its highest cell
+            if nc < cost[ni, nj]:
+                cost[ni, nj] = nc
+                prev[ni, nj] = (i, j)
+                heapq.heappush(heap, (nc, ni, nj))
+    return None
+
+
+def breach_fill(dem, max_depth=10.0, *, eps=1e-5):
+    """Depression handling under the HYBRID policy of `03`: **breach shallow pits, fill deep ones**.
+
+    `03` calls this "the right default for terrain generation", and the reason is a rendering fact
+    rather than a hydrological one: *fill everything and you lose all your lakes* — every basin that
+    should hold water is raised to its rim — while *breach everything* carves absurd canyons out of
+    legitimate craters and calderas. A depression whose spill sits `max_depth` or less above its
+    lowest cell is treated as a noise artefact and CARVED out (Lindsay 2016 least-cost breaching,
+    monotonically descending along the minimax escape route); anything deeper is a real basin and is
+    left for the priority-flood pass, which raises it to its spill level as a lake. `03` suggests
+    `maxDepth = 5-20 m` depending on vertical scale; the default here is the middle of that band.
+
+    Returns a DEM in which every interior cell drains — the same postcondition
+    `priority_flood_fill` gives, which is what flow accumulation requires — so this is a drop-in
+    alternative to it, not a stage that runs before it.
+
+    The two limits are exact and are what the guard rows pin:
+      * `max_depth = 0`   -> nothing is shallow enough to breach; the result is BITWISE
+                            `priority_flood_fill(dem, eps)`.
+      * `max_depth = inf` -> every depression with an outlet is breached, so the only cells left
+                            above the input are the residue the final fill still has to close.
+
+    ⚠️ NO `cellsize`, DELIBERATELY. `max_depth` is a DEPTH in the DEM's own vertical units and
+    every other decision here is a comparison of elevations, so no horizontal length enters. A
+    `cellsize` was written into this signature for symmetry with its neighbours and was caught by
+    the dead-parameter census in `tests/test_render.py` before it shipped — which is what that
+    census is for. `eps` is keyword-only so a stale `breach_fill(dem, cellsize)` cannot put a cell
+    size into `max_depth`.
+    """
+    dem = np.asarray(dem, dtype=np.float64)
+    out = dem.copy()
+    spill = priority_flood_fill(dem, eps=0.0)                  # spill levels, no epsilon tilt
+    _, comps = _depressions(dem, spill)
+    for cells in comps:
+        zs = [dem[c] for c in cells]
+        pi, pj = cells[int(np.argmin(zs))]
+        pit_z = float(dem[pi, pj])
+        if float(spill[pi, pj]) - pit_z > max_depth:      # a real basin -> leave it to become a lake
+            continue
+        path = _breach_route(out, pi, pj)
+        if path is None or len(path) < 2:                 # no lower ground to drain onto: fill it
+            continue
+        exit_z = float(out[path[-1]])
+        steps = len(path) - 1
+        for t, (ci, cj) in enumerate(path[1:], start=1):  # carve, never raise, monotone descending
+            z = pit_z - (pit_z - exit_z) * t / steps
+            if z < out[ci, cj]:
+                out[ci, cj] = z
+    return priority_flood_fill(out, eps=eps)
 
 
 def d8_receivers(dem, cellsize=1.0):

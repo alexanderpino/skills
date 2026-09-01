@@ -219,3 +219,259 @@ def test_material_rgb_has_no_dead_parameters():
     masks[2] = 1.0
     with pytest.raises(TypeError):
         render.material_rgb(masks, 30.0)                   # the old positional cellsize
+
+
+# --------------------------------------------------------------------------------------
+# CRITERION G1 — NO DEAD PUBLIC PARAMETER, AS A CENSUS RATHER THAN AS A STORY ABOUT ONE
+#
+# The two defects above were found by reading `material_rgb`. That does not scale and it does not
+# generalise: the question "is every declared parameter actually read?" is decidable by static
+# analysis over the whole module set, so it is answered that way here, once, for all 44 modules.
+#
+# WHY THIS CLASS IS WORSE THAN IT LOOKS, measured twice on this tree:
+#   * `material_rgb(..., shade=True)` was BIT-IDENTICAL to `shade=False` while the docstring
+#     promised "With `shade`, modulate by hillshade for relief" — and had it ever been implemented
+#     as documented, multiplying by a hillshade in [0,1] would have silenced the over-subscription
+#     detector in `tests/test_mask_partition.py` with nothing failing.
+#   * A dead `cellsize` is not merely inert, it is EVIDENCE-SHAPED. `tests/test_scale_contract.py`
+#     asked `"cellsize" in signature(fn).parameters` and credited that as scale-explicitness, so
+#     four atoms satisfied the scale contract with a parameter no line of their body reads. That
+#     guard now asks this census instead — see `test_scale_contract.test_every_atom_is_scale_explicit`.
+#
+# WHAT "READ" MEANS HERE. A parameter is read if its name appears in a LOAD context anywhere in the
+# function's AST subtree — which covers nested functions, comprehensions, f-strings, decorators and
+# default expressions, and deliberately does NOT count the docstring, a comment, or an assignment
+# to the name. That is the whole point: `shade` was named in the docstring and nowhere else.
+#
+#   DENOMINATOR (recomputed on every run; the file count is pinned, the rest are floors)
+#     modules scanned (reference-impl/*.py) ......... 44
+#     public functions and public methods ........... 314
+#     parameters checked (self/cls excluded) ........ 1320
+#     dead: declared, never read .................... 4, every one of them exempted below
+#     exemptions ....................................  4, each naming the call site that blocks it
+#   IDENTITY: dead == exempted, and every exemption names a live dead parameter -> asserted below.
+#
+# All four survivors are the same parameter, `cellsize`, on four functions where it is genuine
+# scale theatre — and all four are blocked from deletion by a call site in a test file this wave
+# does not own. Removal is an API change, so each exemption records the exact blocking call and
+# the patch, and `registers/OPEN-ITEMS.md` carries them.
+# --------------------------------------------------------------------------------------
+import ast                                                    # noqa: E402
+from pathlib import Path                                      # noqa: E402
+
+REF = Path(__file__).resolve().parents[1]                     # reference-impl/
+
+MODULE_COUNT = 44                # pinned: a new module must be scanned, not silently skipped
+MIN_FUNCTIONS = 300              # floors, not equalities — a signature edit must not turn this red
+MIN_PARAMETERS = 1250
+
+# The dynamic escape hatches. A body that calls any of these can read a parameter without ever
+# naming it, so every parameter of such a function is treated as read — and the function is
+# counted, because an unexplained exemption bucket is how a census stops being one.
+_DYNAMIC = ("locals", "vars", "eval", "exec", "globals")
+
+# (module, qualified function name, parameter) -> why it is still declared.
+# ⚠️ EVERY REASON MUST NAME THE CALL SITE THAT BLOCKS THE DELETION. "It is harmless" is not a
+# reason; the whole finding above is that this class is not harmless.
+DEAD_PARAMETER_EXEMPTIONS = {
+    ("aeolian", "yardang", "cellsize"):
+        "SCALE THEATRE, DELETION BLOCKED BY A NON-OWNED CALL SITE. The abrasion lanes are laid out "
+        "in INDEX space — `freq_along`/`freq_cross` are per-cell frequencies and `floor_reach` "
+        "counts cells — so the one metric quantity, `saltation_h`, is already in metres and there "
+        "is nothing for a cell size to convert. It cannot simply be dropped: "
+        "`tests/test_gallery_doc.py:90` calls `aeolian.yardang(..., cellsize=_CELLSIZE)`, so "
+        "removal is a TypeError in a file this wave does not own. Implementing it instead means "
+        "making the two frequencies per-METRE, which requires re-baselining their defaults (0.018 "
+        "and 0.11 per cell) — a constant change that belongs with chapter 16. "
+        "registers/OPEN-ITEMS.md.",
+    ("tectonics", "fault_weakness", "cellsize"):
+        "SCALE THEATRE, DELETION BLOCKED BY A NON-OWNED CALL SITE. Fault traces are placed and "
+        "feathered in index space and `width` is documented as a Gaussian half-width in CELLS; the "
+        "returned field is a dimensionless erodibility K, so no length enters. "
+        "`tests/test_gallery_doc.py:94` passes `cellsize=_CELLSIZE`, so removal breaks a file this "
+        "wave does not own. Implementing it means `width` in metres, whose 4.0 default would then "
+        "be sub-cell at any realistic resolution and would silently return a uniform K — worse "
+        "than the dead parameter. registers/OPEN-ITEMS.md.",
+    ("analysis", "deposit_fill", "cellsize"):
+        "SCALE THEATRE, AND THE DELETION IS THE `material_rgb` HAZARD EXACTLY. A morphological "
+        "closing minus the surface, over a `radius` its own docstring states is in CELLS: depth "
+        "comes out in the DEM's units and no horizontal length is used. `cellsize` is the SECOND "
+        "POSITIONAL parameter and every caller passes it there — `graph_demo.py`, `archetypes.py`, "
+        "`analysis.texture_base` and `tests/test_archetypes.py:151` — so a bare removal would slide "
+        "a cell size into `radius`. The only safe form is `deposit_fill(h, *, radius=3)`, which "
+        "raises loudly at all four sites; one of them is a test file this wave does not own. "
+        "registers/OPEN-ITEMS.md.",
+    ("hydrology", "water_surface", "cellsize"):
+        "SCALE THEATRE IN A REQUIRED POSITIONAL SLOT — the worst shape in the census. Lake filling "
+        "is decided by comparing elevations, river depth comes out of `depth_coef·(Q/q_channel)^"
+        "depth_exp` in metres, and `smooth` is a filter radius in cells; nothing reads the "
+        "argument the signature DEMANDS. It sits at position 2 of `water_surface(bed, cellsize, "
+        "discharge)` and is forwarded by `water_depth`, so removing it makes `discharge` land in "
+        "its slot at four call sites — `tests/test_hydrology.py:13,28,39` and "
+        "`tests/test_gallery_doc.py:99,100` — in test files this wave does not own. "
+        "registers/OPEN-ITEMS.md.",
+}
+
+
+def _public_functions(tree):
+    """(qualname, node) for every public top-level function and public method of a public class."""
+    def walk(node, qual):
+        for child in node.body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if child.name.startswith("_"):
+                    continue
+                yield qual + child.name, child
+            elif isinstance(child, ast.ClassDef) and not child.name.startswith("_"):
+                yield from walk(child, child.name + ".")
+    yield from walk(tree, "")
+
+
+def _declared_parameters(fn):
+    a = fn.args
+    out = [(p.arg, "posonly") for p in a.posonlyargs]
+    out += [(p.arg, "positional") for p in a.args]
+    if a.vararg:
+        out.append((a.vararg.arg, "vararg"))
+    out += [(p.arg, "kwonly") for p in a.kwonlyargs]
+    if a.kwarg:
+        out.append((a.kwarg.arg, "kwarg"))
+    return [(name, kind) for name, kind in out if name not in ("self", "cls")]
+
+
+def parameter_census(source, module):
+    """(functions, parameters, dead, dynamic) for one module's source.
+
+    `dead` is [(module, qualname, param, kind)] for parameters never read. A body that reaches for
+    `locals()`/`vars()`/`eval`/`exec`/`globals` can read a name it never mentions, so its
+    parameters are all counted as read and the function is listed in `dynamic` instead of being
+    quietly dropped.
+    """
+    tree = ast.parse(source)
+    functions = parameters = 0
+    dead, dynamic = [], []
+    for qual, fn in _public_functions(tree):
+        functions += 1
+        loaded, is_dynamic = set(), False
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                loaded.add(node.id)
+                if node.id in _DYNAMIC:
+                    is_dynamic = True
+        declared = _declared_parameters(fn)
+        parameters += len(declared)
+        if is_dynamic:
+            dynamic.append((module, qual))
+            continue
+        for name, kind in declared:
+            if name not in loaded:
+                dead.append((module, qual, name, kind))
+    return functions, parameters, dead, dynamic
+
+
+def _whole_tree_census():
+    modules = sorted(REF.glob("*.py"))
+    functions = parameters = 0
+    dead, dynamic = [], []
+    for path in modules:
+        f, p, d, dy = parameter_census(path.read_text(encoding="utf-8"), path.stem)
+        functions += f
+        parameters += p
+        dead += d
+        dynamic += dy
+    return modules, functions, parameters, dead, dynamic
+
+
+def test_no_public_function_declares_a_parameter_it_never_reads():
+    """⚠️ THE CENSUS. Every dead parameter in `reference-impl/*.py` is exempted, with a reason."""
+    modules, functions, parameters, dead, dynamic = _whole_tree_census()
+
+    assert len(modules) == MODULE_COUNT, (
+        "reference-impl now has %d modules, not the %d this census is pinned to. A module that "
+        "joins the tree unscanned is exactly the gap this guard exists to close: update "
+        "MODULE_COUNT and the denominator in this file's header together."
+        % (len(modules), MODULE_COUNT))
+    assert functions >= MIN_FUNCTIONS and parameters >= MIN_PARAMETERS, (
+        "the census went thin (%d functions, %d parameters); a scan that stops finding things "
+        "passes for the wrong reason" % (functions, parameters))
+
+    unexplained = [(m, q, p, k) for m, q, p, k in dead
+                   if (m, q, p) not in DEAD_PARAMETER_EXEMPTIONS]
+    assert not unexplained, (
+        "public parameters that are declared and never read:\n  "
+        + "\n  ".join("%s.%s(%s)  [%s]" % r for r in unexplained)
+        + "\nDelete the parameter (and grep the WHOLE repo for call sites first — a positional "
+          "slot that disappears does not raise, it takes the next argument), or implement it, or "
+          "add it to DEAD_PARAMETER_EXEMPTIONS with the call site that blocks the deletion.")
+
+    assert dynamic == [], (
+        "a public function now reaches for locals()/eval()/exec(), so this census cannot see what "
+        "it reads: %s. Either drop the dynamic access or record it in the header's denominator."
+        % dynamic)
+
+
+def test_every_dead_parameter_exemption_is_still_a_live_dead_parameter():
+    """⚠️ THE HALF THAT KEEPS THE ALLOWLIST FROM BECOMING THE ANSWER.
+
+    An exemption table only ever grows unless something prunes it. Fix a parameter — implement it
+    or delete it — and its exemption becomes a lie that would then cover a NEW dead parameter of
+    the same name reintroduced later. So each entry must still name a parameter this census
+    actually reports as dead, and must still carry a reason that names a blocker.
+    """
+    _, _, _, dead, _ = _whole_tree_census()
+    live = {(m, q, p) for m, q, p, _ in dead}
+    stale = sorted(set(DEAD_PARAMETER_EXEMPTIONS) - live)
+    assert not stale, (
+        "these exemptions no longer describe anything — the parameter was fixed or removed. "
+        "Delete the entry: %s" % (stale,))
+    for key, reason in DEAD_PARAMETER_EXEMPTIONS.items():
+        assert len(reason) > 200 and ("tests/" in reason or "OPEN-ITEMS" in reason), (
+            "exemption %s must say which call site blocks the deletion; got %r" % (key, reason))
+
+
+# --------------------------------------------------------------------------------------
+# The analyser's own oracles. A census guard whose analyser is untested is the failure mode
+# `registers/guard-domains.tsv` was built to expose: a scan that cannot see what it claims to
+# read. Each pair below is a mutation the census MUST catch and a decoy it must NOT fire on.
+# --------------------------------------------------------------------------------------
+_MUST_FLAG = [
+    ("plain dead argument", "def f(a, b):\n    return a\n", "b"),
+    ("documented but never implemented — the `shade` case",
+     'def f(a, shade=False):\n    """With `shade`, modulate by hillshade for relief."""\n'
+     "    return a\n", "shade"),
+    ("named in a comment only", "def f(a, b):\n    # b would go here\n    return a\n", "b"),
+    ("assigned, never read", "def f(a, b):\n    b = 1\n    return a\n", "b"),
+    ("dead keyword-only", "def f(a, *, cellsize=1.0):\n    return a\n", "cellsize"),
+    ("dead **kwargs", "def f(a, **kw):\n    return a\n", "kw"),
+]
+
+_MUST_NOT_FLAG = [
+    ("read in a nested closure", "def f(a, b):\n    def g():\n        return b\n    return g() + a\n"),
+    ("read in a comprehension", "def f(a, b):\n    return [b for _ in range(a)]\n"),
+    ("read in an f-string", 'def f(a, b):\n    return f"{a}{b}"\n'),
+    ("read in a lambda default", "def f(a, b):\n    return (lambda x=b: x)() + a\n"),
+    ("**kwargs forwarded", "def f(a, **kw):\n    return g(a, **kw)\n"),
+    ("read only in an except branch",
+     "def f(a, b):\n    try:\n        return a\n    except ValueError:\n        return b\n"),
+    ("private function is out of scope", "def _f(a, b):\n    return a\n"),
+    ("dunder method is out of scope", "class C:\n    def __init__(self, a, b):\n        self.a = a\n"),
+    ("self and cls are never counted", "class C:\n    def m(self):\n        return 1\n"),
+]
+
+
+@pytest.mark.parametrize("why,src,param", _MUST_FLAG, ids=[m[0] for m in _MUST_FLAG])
+def test_the_census_catches_a_dead_parameter(why, src, param):
+    _, _, dead, _ = parameter_census(src, "fixture")
+    assert [d[2] for d in dead] == [param], "%s: expected %r flagged, got %s" % (why, param, dead)
+
+
+@pytest.mark.parametrize("why,src", _MUST_NOT_FLAG, ids=[m[0] for m in _MUST_NOT_FLAG])
+def test_the_census_does_not_fire_on_a_live_parameter(why, src):
+    _, _, dead, _ = parameter_census(src, "fixture")
+    assert dead == [], "%s: false positive %s" % (why, dead)
+
+
+def test_a_dynamic_body_is_reported_rather_than_silently_passed():
+    """`locals()` can read a parameter that is never named, so the census must say so out loud
+    instead of scoring the function clean — a scanner that cannot see must not report zero."""
+    f, p, dead, dynamic = parameter_census("def f(a, b):\n    return locals()\n", "fixture")
+    assert dead == [] and dynamic == [("fixture", "f")] and (f, p) == (1, 2)

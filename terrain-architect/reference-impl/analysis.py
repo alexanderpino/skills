@@ -266,10 +266,15 @@ def wear(h, cellsize=1.0, eps=1e-12):
     return out / hi if hi > eps else np.zeros_like(out)
 
 
-def peaks(h, cellsize=1.0, radius=4, eps=1e-12):
+def peaks(h, *, radius=4, eps=1e-12):
     """Prominence above the local mean — isolates summits and crests from the surrounding relief.
     `h - boxblur(h, radius)`, positive part, normalised. `radius` is in CELLS, so scale it with
-    resolution (08) if you want a fixed prominence footprint in metres. Returns a mask in 0-1."""
+    resolution (08) if you want a fixed prominence footprint in metres. Returns a mask in 0-1.
+
+    ⚠️ NO `cellsize`, AND ITS ABSENCE IS THE HONEST SIGNATURE. One was declared here and read by
+    nothing: a box filter over a CELL radius has no length in it, so the parameter asserted a
+    scale-awareness the function does not have. `radius` and `eps` are keyword-only so that a
+    stale `peaks(h, cellsize)` raises instead of quietly becoming a radius of 30 cells."""
     import ops_filters
     lo = ops_filters.box_filter(np.asarray(h, dtype=np.float64), r=int(radius))
     out = np.maximum(np.asarray(h, dtype=np.float64) - lo, 0.0)

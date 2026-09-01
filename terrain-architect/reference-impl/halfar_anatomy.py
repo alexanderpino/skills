@@ -314,8 +314,15 @@ GRID_COARSE_ANOMALY = (31, 48000.0)
 RATE_PANEL_YLIM = (0.97, 1.03)
 
 
-def sia_at_cfl(h_init, cfl, steps=8, n=N, cellsize=CELLSIZE):
+def sia_at_cfl(h_init, cfl, steps=8, *, cellsize=CELLSIZE):
     """`glacier_sia`'s transport loop, transcribed, with the CFL factor made an argument.
+
+    ⚠️ `n` USED TO SIT BETWEEN `steps` AND `cellsize` AND WAS NEVER READ — the grid size comes
+    from `h_init.shape`, so the argument was decoration. It is deleted rather than implemented,
+    and `cellsize` is KEYWORD-ONLY precisely because of how it was deleted: the one call site
+    passed `sia_at_cfl(h, cfl, steps, n, cellsize)` positionally, so dropping `n` from the
+    signature would have slid `n = 121` into `cellsize = 12000.0` — a 100x error in the length
+    scale of a stability study, silently, with every assertion still passing.
 
     ⚠️ A TRANSCRIPTION, AND THEREFORE A LIABILITY THE GUARD HAS TO CARRY. `glacier_sia`
     hard-codes `0.2 * cellsize^2 / D_max`, so the only way to sweep that factor without editing
@@ -367,7 +374,7 @@ def rate_bias_at_cfl(cfl, steps=8, n=N, cellsize=CELLSIZE):
     anything from the magnitude.
     """
     r, c = radius_field(n, cellsize)
-    h = sia_at_cfl(halfar(r, H0, R0), cfl, steps, n, cellsize)
+    h = sia_at_cfl(halfar(r, H0, R0), cfl, steps, cellsize=cellsize)
     fitted = float(steps) * DT / ((H0 / float(h[c, c])) ** 9.0 - 1.0)
     return float(fitted / t0_analytic() - 1.0)
 
