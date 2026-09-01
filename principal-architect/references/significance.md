@@ -75,3 +75,9 @@ near-duplicate names for different things — note it in the relevant SD or HLD
 have to fix it; recording it stops it from being rediscovered repeatedly and lets
 the team decide deliberately (a "we accept this for now" ADR is a legitimate
 outcome).
+
+To make the noticing systematic rather than incidental, `feng-shui.md` walks the
+same smells as seven placement-and-flow questions (commanding position, clear
+entrance, flow, poison arrows, clutter, backing, balance) you can ask of any
+component you enter — record what it finds in the standard vocabulary above, never
+in the lens's.
