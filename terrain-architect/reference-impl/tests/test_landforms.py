@@ -2,8 +2,15 @@
 (depth/D, rim, r^-3 ejecta, a central peak when complex, and the gravity pi-scaling); strata
 is a periodic material coordinate; terracing quantises to flat treads; folding is a sinusoid;
 karst carves pits only on soluble rock and marks them do-not-fill.
+
+The last section guards something different in kind: the MONTAGE `landforms.main()` composes out of
+these primitives, including the droplet+thermal panel that no primitive test reaches. See the
+section comment there.
 """
+import functools
+
 import numpy as np
+import asserts
 import inputs
 import landforms as L
 
@@ -281,3 +288,156 @@ def test_karst_size_var_gives_a_doline_size_distribution():
     # varied field has a wider spread of pit depths AND digs deeper than the single-radius field
     assert var.min() < uni.min() - 1e-6                    # a lognormal tail -> some doline deeper than uniform
     assert var[var < 0].std() > uni[uni < 0].std()         # depths are genuinely distributed, not one value
+
+
+# --------------------------------------------------------------------------------------------
+# THE MONTAGE `landforms.main()` ACTUALLY DRAWS.
+#
+# Everything above tests a PRIMITIVE in isolation. The figure is a composition of nine panels at
+# n=200 / cell=26 m, and one of them — the bottom-left "REAL hydraulic+thermal pass", i.e.
+# `erosion_thermal.thermal_erosion(erosion_droplet.droplet_erode(mountain(...)))` — was touched by
+# no test at any resolution. `landforms` is also the figure that drifted furthest in CI (145 469 px
+# between two runs on identical dependency versions), and `tools/regen_figures.py` now gates it on
+# "tests/test_landforms.py" instead of on pixels, so those invariants have to be here.
+#
+# WHAT IS GUARDED AND WHAT IS NOT. Every assertion below is a conservation law, a sign, an ordering
+# or an exact geometric identity, because those are the only things that survive numpy dispatching
+# a different SIMD kernel on a different CPU. Nothing pins a relief, a roughness or a pixel value
+# to a remembered number: those are precisely the quantities that moved between the two CI runs.
+#
+# COST AND RESOLUTION. The shipped montage is n=200 (the droplet solver alone is ~12 s there,
+# because `n_droplets = 55*n`). These guards build the SAME composition ONCE at n=64 with the cell
+# size scaled so the PHYSICAL EXTENT is unchanged (64 x 81.25 m == 200 x 26 m == 5.2 km), which
+# keeps `thermal_erosion`'s `repose_slope * cellsize` talus threshold and `volcano`'s
+# `radius = n*0.42*cell` in the metres the figure gives them. Measured at n = 48, 56, 64, 72, 96
+# and the shipped 200, every ordering asserted below holds at every one of them, and the
+# conservation law closes to <= 3.4e-16 relative at all six. The one place the reduction is
+# GENEROUS rather than conservative is the "thermal relaxes below the input" ordering, whose margin
+# is widest at small n (roughness 131.9 -> 77.7 at n=64) and narrowest at the shipped n=200
+# (43.30 -> 39.82, an 8% margin); it still holds there, and it is recorded here so nobody has to
+# rediscover that the guard's headroom is not the figure's.
+_MONTAGE_N = 64
+_MONTAGE_CELL = 200 * 26.0 / _MONTAGE_N            # same 5.2 km extent as the shipped figure
+
+
+@functools.lru_cache(maxsize=1)
+def _montage():
+    """The figure's composition, built once and shared by every guard in this section."""
+    return L._montage(n=_MONTAGE_N, cell=_MONTAGE_CELL)
+
+
+def test_the_montage_erosion_panel_conserves_volume():
+    """THE CONSERVATION LAW OF THE UNGUARDED PANEL. `erosion_droplet.droplet_erode` promises "total
+    volume is conserved (leftover sediment is deposited at end of life)" and
+    `erosion_thermal.thermal_erosion` promises "mass conserved exactly". Composed, they must still
+    close — and composing them is exactly where the promise can be lost, because the droplet pass
+    hands the thermal pass a field it never validated.
+
+    This is the check the primitives' own suites cannot make: `tests/test_droplet.py` and
+    `tests/test_thermal.py` each run their solver on their own input, so a droplet pass that
+    leaked its sediment payload off the grid edge only where the *mountain* primitive puts steep
+    ground would pass both and fail here. Volume is stated in m3 (`sum(h) * cell**2`), the unit the
+    law holds in.
+
+    NOTE the failure mode this is aimed at is a LEAK, not a blow-up: `thermal_erosion`'s own
+    docstring records that a diverging field "stays mass conserved, so the explosion hides from a
+    mass test". That is why the relief and roughness orderings in the next test exist alongside
+    this one; neither check subsumes the other.
+
+    TOLERANCE, DERIVED. Measured |V_out - V_in| / V_in at n = 48, 56, 64, 72, 96, 200: 0.0, 1.68e-16,
+    1.68e-16, 3.36e-16, 1.68e-16, 0.0 — worst 3.4e-16, i.e. one or two float64 ulps on a sum of
+    n**2 heights, which is the floor and not a measurement of the solvers. 1e-9 sits ~6.5 decades
+    above that floor (headroom for a machine that associates the reduction differently) and orders
+    of magnitude below any real leak: a single droplet abandoning its full sediment load is O(1e-6)
+    of the total, and an edge policy that dropped payloads systematically is O(1e-2).
+    """
+    _image, facts = _montage()
+    e = facts["erosion"]
+    asserts.assert_mass_conserved(e["volume_in_m3"], e["volume_hydraulic_m3"], tol=1e-9,
+                                  msg="montage erosion panel: droplet pass")
+    asserts.assert_mass_conserved(e["volume_hydraulic_m3"], e["volume_out_m3"], tol=1e-9,
+                                  msg="montage erosion panel: thermal pass")
+    asserts.assert_mass_conserved(e["volume_in_m3"], e["volume_out_m3"], tol=1e-9,
+                                  msg="montage erosion panel: droplet + thermal composed")
+
+
+def test_the_montage_erosion_panel_incises_then_relaxes():
+    """WHAT THE CAPTION CLAIMS THE PANEL IS: "Mountain(basic) then a REAL hydraulic+thermal pass".
+    Mass conservation alone cannot tell that panel from the uneroded Mountain beside it — an
+    erosion stage wired to a no-op conserves mass perfectly. These are the orderings that say the
+    two passes did their opposite jobs, and none of them needs a tolerance:
+
+      * the HYDRAULIC pass INCISES, so it leaves the field rougher than it found it (droplets cut
+        channels; roughness 131.9 -> 167.8 at n=64, and 43.3 -> 98.8 at the shipped n=200 — the
+        margin grows with resolution, so the guard runs at the harder end);
+      * the THERMAL pass then RELAXES the over-steepened result past where it started, which is
+        what a talus angle does (167.8 -> 77.7 at n=64; 98.8 -> 39.8 at n=200, still below the
+        input's 43.3);
+      * eroded relief is LOWER than uneroded relief — the plainest statement of "this panel has
+        been eroded" (2317 -> 1717 m at n=64; 2384 -> 2227 m at n=200).
+
+    Reversing the composition order, dropping either stage, or setting `factor`/`iters` to a no-op
+    breaks at least one of the three. A change of SIMD kernel breaks none of them: each is a
+    comparison between two numbers computed on the same machine in the same run.
+
+    ⚠️ WHAT THESE THREE DO NOT CATCH, said out loud rather than papered over with a band. A SCALE
+    SLIP in the montage's thermal call — `thermal_erosion(hd, 0.7, 14, cell, ...)` losing its `cell`
+    argument and falling back to `cellsize=1.0`, so the talus threshold becomes 0.7 m instead of
+    0.7 x 81.25 m — conserves mass and makes every ordering above MORE true, not less. Measured:
+    that mutation leaves this whole file green (25 passed). Bounding it needs a roughness BAND, and
+    no band derived from measurement separates it from a legitimate retuning of `factor` or `iters`,
+    so none is invented here. It is recorded as a known gap in
+    `registers/mutation-proofs.wave7-hero.tsv`.
+    """
+    _image, facts = _montage()
+    e = facts["erosion"]
+    assert e["roughness_hydraulic"] > e["roughness_in"], (
+        f"the droplet pass did not incise: roughness {e['roughness_in']:.2f} -> "
+        f"{e['roughness_hydraulic']:.2f}")
+    assert e["roughness_out"] < e["roughness_hydraulic"], (
+        f"the thermal pass did not relax the incised field: {e['roughness_hydraulic']:.2f} -> "
+        f"{e['roughness_out']:.2f}")
+    assert e["roughness_out"] < e["roughness_in"], (
+        f"the composed panel is not smoother than its input: {e['roughness_in']:.2f} -> "
+        f"{e['roughness_out']:.2f}")
+    assert 0.0 < e["relief_out_m"] < e["relief_in_m"], (
+        f"eroded relief {e['relief_out_m']:.0f} m is not below uneroded {e['relief_in_m']:.0f} m")
+
+
+def test_every_montage_panel_is_finite_and_none_is_degenerate():
+    """`render.hillshade` NORMALISES each panel before drawing it, so a field that has gone flat,
+    constant or non-finite still renders as a perfectly plausible grey tile — the check the eye
+    cannot make, which is why `gallery.py` keeps a `_track()` trace and why `_montage()` now
+    returns one. The panel NAMES are asserted too: a panel quietly dropped from the composition
+    would otherwise leave eight guarded fields and a caption still promising nine.
+    """
+    _image, facts = _montage()
+    names = tuple(name for name, _lo, _hi, _ok in facts["panels"])
+    assert names == ("mountain:basic", "mountain:eroded", "mountain:alpine", "mountain:old",
+                     "mountain:strata", "erode", "ridge", "volcano", "canyon")
+    for name, lo, hi, finite in facts["panels"]:
+        assert finite, f"montage panel {name!r} contains NaN or Inf"
+        assert hi > lo, f"montage panel {name!r} is constant ({lo:.6g}) — hillshade would hide it"
+
+
+def test_the_montage_geometry_is_the_layout_the_caption_describes():
+    """The composition's own arithmetic, checked exactly rather than by eye: five tiles over four,
+    5 px of background between neighbours and between the rows, and the short bottom row padded out
+    to the top row's width. Every number here is an identity in `n` and the pad width, so it is
+    machine-independent — and it is the one thing a pixel comparison used to cover that no field
+    invariant does. A panel added, dropped, or hstacked in the wrong order changes the width.
+    """
+    image, facts = _montage()
+    n, pad = facts["resolution"], facts["layout"]["pad"]
+    top_w = facts["layout"]["top"] * n + (facts["layout"]["top"] - 1) * pad
+    bottom_w = facts["layout"]["bottom"] * n + (facts["layout"]["bottom"] - 1) * pad
+    assert image.shape == (2 * n + pad, top_w, 3) and image.dtype == np.uint8
+    bg = facts["background"]
+    assert np.all(image[n:n + pad] == bg), "the row gap is not background"
+    assert np.all(image[n + pad:, bottom_w:] == bg), "the bottom row's filler is not background"
+    for k in range(facts["layout"]["top"] - 1):                      # the inter-tile pads, top row
+        assert np.all(image[:n, k * (n + pad) + n:(k + 1) * (n + pad)] == bg)
+    for k in range(facts["layout"]["top"]):                          # and no tile is a flat fill
+        assert image[:n, k * (n + pad):k * (n + pad) + n].std() > 0.0
+    for k in range(facts["layout"]["bottom"]):
+        assert image[n + pad:, k * (n + pad):k * (n + pad) + n].std() > 0.0

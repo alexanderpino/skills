@@ -170,12 +170,31 @@ def from_graph(n=180, extent_km=48.0, seed=4):
     return g.evaluate(h_out), g.evaluate(a_out), cell
 
 
-def main():
+def scene(n=180, extent_km=48.0, seed=4, iters=1400):
+    """The COMPOSITION `main()` renders — graph terrain -> substances -> snowmelt off the snow mask
+    -> a real mass-conserving shallow-water flow fed by rain + that meltwater -> the water surface
+    and the render surface the rasteriser draws — with everything `main()` reports RETURNED rather
+    than printed. Returns `(fields, facts)`.
+
+    WHY IT IS SPLIT OUT. `main()` computed the shallow-water mass balance and *printed* it, so the
+    identity was stated on stdout and asserted nowhere, while `tests/test_hero.py` exercised only
+    the rasteriser on a hand-built `archetypes.alpine` tile — a completely different path from the
+    one the figure runs. This is the contract `crater_anatomy.build()` and
+    `flow_anatomy.measurements()` already keep: the producer hands a guard its own numbers instead
+    of making the guard re-derive them from the pixels.
+
+    `facts["budget"]` is this figure's one CONSERVATION LAW — rain delivered == water that left the
+    open boundary + water still stored — and it is the strongest check available here precisely
+    because a conservation law does not care what order numpy's runtime-dispatched SIMD kernels
+    associate the reductions in. Relief and peak discharge are reported too but are deliberately
+    NOT pinned to a band by any guard: stream-power is the iterative loop that amplifies a last-bit
+    difference, which is the drift that made pixel identity unsound in the first place.
+    """
     import analysis
     import archetypes as A
     import flow
     import shallow_water
-    h, area, cell = from_graph()                                        # graph output — nothing sculpted
+    h, area, cell = from_graph(n=n, extent_km=extent_km, seed=seed)     # graph output — nothing sculpted
     climate = {"has_water": False, "has_snow": True, "snowline": 0.6, "snow_soft": 0.16, "has_veg": True}
 
     # substances: LAND cover (water is a separate layer). Grab the snow mask for meltwater.
@@ -186,7 +205,7 @@ def main():
     melt = 5e-6 * snow * np.clip(1.0 - (hn - climate["snowline"]) / (1.0 - climate["snowline"]), 0.0, 1.0)
 
     # REAL water: mass-conserving shallow-water flow fed by RAIN + SNOWMELT (water runs from under the snow)
-    sim = shallow_water.simulate(flow.priority_flood_fill(h), cell, rain=4e-6, source_field=melt, iters=1400)
+    sim = shallow_water.simulate(flow.priority_flood_fill(h), cell, rain=4e-6, source_field=melt, iters=iters)
     Q = sim["discharge"]                                                # volumetric flow, m³/s
     w = hydrology.water_surface(h, Q)                                   # channel/lake surface from the discharge
     depth = w - h                                                      # water depth (m), 0 on dry land
@@ -194,13 +213,32 @@ def main():
     col, _, surf = A.substance_color(h, "temperate", cell, climate=climate)   # unshaded LAND material
     render_surf = np.maximum(surf, w)                                  # water fills valleys; snow piles on peaks
     ao = analysis.horizon_ao(render_surf, cell)
-    img = hero(render_surf, cell, col, ao=ao, z_exag=1.0, water_depth=depth)   # translucent water as its own stage
-    render.write_png("hero.png", img)
     b = sim["budget"]
-    print(f"wrote hero.png  ({img.shape[1]}x{img.shape[0]}, {h.shape[0]}² graph mesh, relief {h.max()-h.min():.0f} m)")
-    melt_frac = 100 * melt.sum() / (melt.sum() + 4e-6 * h.size)
-    print(f"  flow: peak discharge {Q.max():.1f} m³/s ({melt_frac:.0f}% from snowmelt); "
+    fields = {"height": h, "cellsize": cell, "colour": col, "land_surface": surf,
+              "water_surface": w, "water_depth": depth, "render_surface": render_surf,
+              "ao": ao, "discharge": Q, "melt": melt, "snow": snow}
+    facts = {"resolution": int(h.shape[0]), "cellsize_m": float(cell), "iters": int(iters),
+             "relief_m": float(h.max() - h.min()),
+             "peak_discharge_m3s": float(Q.max()),
+             # the printed "% from snowmelt": a ratio of SOURCE RATES (m/s), so both terms are
+             # rates and the cell area cancels — the same expression the caption quotes.
+             "melt_fraction_pct": float(100.0 * melt.sum() / (melt.sum() + 4e-6 * h.size)),
+             "budget": {k: float(v) for k, v in b.items()}}
+    return fields, facts
+
+
+def main():
+    f, facts = scene()
+    img = hero(f["render_surface"], f["cellsize"], f["colour"], ao=f["ao"], z_exag=1.0,
+               water_depth=f["water_depth"])                            # translucent water as its own stage
+    render.write_png("hero.png", img)
+    b = facts["budget"]
+    print(f"wrote hero.png  ({img.shape[1]}x{img.shape[0]}, {facts['resolution']}² graph mesh, "
+          f"relief {facts['relief_m']:.0f} m)")
+    print(f"  flow: peak discharge {facts['peak_discharge_m3s']:.1f} m³/s "
+          f"({facts['melt_fraction_pct']:.0f}% from snowmelt); "
           f"mass balance {b['rain_in']:.3e} = {b['out']+b['stored']:.3e} m³")
+    return facts
 
 
 if __name__ == "__main__":

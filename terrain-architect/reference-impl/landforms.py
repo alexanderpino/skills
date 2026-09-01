@@ -535,33 +535,95 @@ def karst_sinkholes(h, soluble_mask, cellsize=1.0, spacing=None, depth=5.0,
     return h, sink_mask
 
 
+def _roughness(f):
+    """Mean absolute first difference in both axes — the montage's own measure of how incised a
+    panel is. Scale-free in the sense that matters here: it is compared only against ITSELF before
+    and after an erosion pass, never against a remembered number."""
+    f = np.asarray(f, dtype=np.float64)
+    return float(np.mean(np.abs(np.diff(f, axis=0))) + np.mean(np.abs(np.diff(f, axis=1))))
+
+
+def _montage(n=200, cell=26.0):
+    """Build the generator gallery and RETURN it with the facts it computed — `(image, facts)`,
+    the contract `crater_anatomy.build()` keeps — so a guard can re-run the composition instead of
+    re-deriving it from pixels.
+
+    WHY IT IS SPLIT OUT OF `main()`. `tests/test_landforms.py` guards the PRIMITIVES thoroughly
+    (crater morphology, terrace treads, mountain relief and the not-a-solid-of-revolution controls,
+    ridge asymmetry, volcano concavity, canyon incision). It guarded the COMPOSITION not at all,
+    and in particular the bottom-left panel — `droplet_erode` then `thermal_erosion` over the basic
+    Mountain — was touched by no test at any resolution. `landforms` is also the figure that
+    drifted furthest in CI (145 469 px between two runs with identical dependency versions), so it
+    is gated on invariants rather than pixels (`tools/regen_figures.py:INVARIANT_GATED`) and those
+    invariants have to exist.
+
+    `facts["panels"]` is the `gallery._track()` trace — (name, min, max, finite) per field — because
+    every panel is NORMALISED by `render.hillshade` before it is drawn, so a numerically degenerate
+    field still renders as a perfectly plausible grey tile. `facts["erosion"]` carries the
+    droplet+thermal pair's mass, relief and roughness before and after; both solvers document exact
+    mass conservation, so the composed panel has a conservation law of its own to be held to."""
+    import erosion_droplet
+    import erosion_thermal
+    import render
+    panels = []
+
+    def track(name, field):
+        a = np.asarray(field, dtype=np.float64)
+        panels.append((name, float(np.nanmin(a)), float(np.nanmax(a)), bool(np.all(np.isfinite(a)))))
+        return field
+
+    pad = np.full((n, 5, 3), 20, np.uint8)
+    styles = ("basic", "eroded", "alpine", "old", "strata")
+    tiles = [render.hillshade(track(f"mountain:{s}",
+                                   mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0, style=s)), cell)
+             for s in styles]
+    top = np.hstack([t for pair in zip(tiles, [pad] * len(tiles)) for t in pair][:-1])
+
+    h = mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0, style="basic")
+    hd = erosion_droplet.droplet_erode(h, n_droplets=55 * n, seed=3, brush_radius=2)
+    he = erosion_thermal.thermal_erosion(hd, 0.7, 14, cell, factor=0.12)
+    rg = ridge((n, n), cell, seed=2, height=1400.0, asymmetry=0.6)
+    vo = volcano((n, n), n / 2, n / 2, radius=n * 0.42 * cell, height=1900.0, cellsize=cell, seed=1, kind="strato")
+    ca = canyon((n, n), cell, seed=3, rim=1200.0, depth=950.0)
+    for name, field in (("erode", he), ("ridge", rg), ("volcano", vo), ("canyon", ca)):
+        track(name, field)
+    bottom_tiles = [render.hillshade(x, cell) for x in (he, rg, vo, ca)]
+    bottom = np.hstack([t for pair in zip(bottom_tiles, [pad] * len(bottom_tiles)) for t in pair][:-1])
+    bottom = np.hstack([bottom, np.full((n, top.shape[1] - bottom.shape[1], 3), 20, np.uint8)])
+    gap = np.full((5, top.shape[1], 3), 20, np.uint8)
+    image = np.vstack([top, gap, bottom])
+    area = cell * cell
+    facts = {
+        "resolution": int(n), "cellsize_m": float(cell), "background": 20,
+        "layout": {"top": len(styles), "bottom": 4, "pad": 5},
+        "panels": tuple(panels),
+        # the droplet + thermal panel, measured at each stage. Volumes in m3 so the conservation
+        # law is stated in the unit it holds in.
+        "erosion": {
+            "volume_in_m3": float(np.sum(h) * area),
+            "volume_hydraulic_m3": float(np.sum(hd) * area),
+            "volume_out_m3": float(np.sum(he) * area),
+            "relief_in_m": float(np.ptp(h)),
+            "relief_out_m": float(np.ptp(he)),
+            "roughness_in": _roughness(h),
+            "roughness_hydraulic": _roughness(hd),
+            "roughness_out": _roughness(he),
+        },
+    }
+    return image, facts
+
+
 def main():
     """A gallery of the placeable landform GENERATORS — the Gaea-style "nodes" an artist drops in.
     Top row: the Mountain node's five styles (basic | eroded | alpine | old | strata) — the
     drainage-organised look is baked into the primitive (modulated Voronoi + distortion). Bottom
     row: Mountain(basic) then a REAL hydraulic+thermal pass | Ridge | Volcano | Canyon. -> landforms.png."""
-    import erosion_droplet
-    import erosion_thermal
     import render
-    n, cell = 200, 26.0
-    pad = np.full((n, 5, 3), 20, np.uint8)
-    tiles = [render.hillshade(mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0, style=s), cell)
-             for s in ("basic", "eroded", "alpine", "old", "strata")]
-    top = np.hstack([t for pair in zip(tiles, [pad] * len(tiles)) for t in pair][:-1])
-
-    h = mountain((n, n), cell, seed=3, n_ridges=3, height=1900.0, style="basic")
-    he = erosion_thermal.thermal_erosion(
-        erosion_droplet.droplet_erode(h, n_droplets=55 * n, seed=3, brush_radius=2), 0.7, 14, cell, factor=0.12)
-    rg = ridge((n, n), cell, seed=2, height=1400.0, asymmetry=0.6)
-    vo = volcano((n, n), n / 2, n / 2, radius=n * 0.42 * cell, height=1900.0, cellsize=cell, seed=1, kind="strato")
-    ca = canyon((n, n), cell, seed=3, rim=1200.0, depth=950.0)
-    bottom_tiles = [render.hillshade(x, cell) for x in (he, rg, vo, ca)]
-    bottom = np.hstack([t for pair in zip(bottom_tiles, [pad] * len(bottom_tiles)) for t in pair][:-1])
-    bottom = np.hstack([bottom, np.full((n, top.shape[1] - bottom.shape[1], 3), 20, np.uint8)])
-    gap = np.full((5, top.shape[1], 3), 20, np.uint8)
-    render.write_png("landforms.png", np.vstack([top, gap, bottom]))
+    image, facts = _montage()
+    render.write_png("landforms.png", image)
     print(f"wrote landforms.png — landform generators: Mountain styles + Erode/Ridge/Volcano/Canyon, "
-          f"eroded relief {np.ptp(he):.0f} m")
+          f"eroded relief {facts['erosion']['relief_out_m']:.0f} m")
+    return facts
 
 
 if __name__ == "__main__":
