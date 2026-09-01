@@ -62,7 +62,8 @@ grid so its footprint widens; only the delta is carried back).
 `dilate`/`erode`/`opening`/`closing`, `twist`, `bend` — treated as filters, not atoms.)
 
 **Solver atoms (iterative, stateful — cannot be composed from static fields):** flow routing
-(`flow.priority_flood_fill`, `d8_receivers`, `d8_accumulation`, `mfd_accumulation`), stream-power
+(`flow.priority_flood_fill`, `breach_fill`, `d8_receivers`, `d8_accumulation`,
+`mfd_accumulation`, `hybrid_accumulation`), stream-power
 incision (`erosion_streampower.stream_power_evolve` — `K` may be a scalar, a field, or a callable
 `K(p,h)` for lithology-driven differential erosion, and `D=` couples the Cordonnier hillslope-diffusion
 companion term in the same loop — the pair sets valley spacing and divide roughness),

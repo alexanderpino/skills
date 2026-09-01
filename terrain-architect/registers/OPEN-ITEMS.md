@@ -443,6 +443,10 @@ directory.
 
 ## 27. `05` states the dune saltation hop as two different numbers, thirteen lines apart
 
+**Supersedes item 11**, which records the same constant as a three-way split. It is a four-way
+split and the fourth statement is inside one chapter; item 11's remedy ("pick the value Werner's
+model actually uses") cannot be carried out until `05` stops giving two of them.
+
 - **What.** The dune `hop` was described to the code wave as a three-way split (`05` says ≈3, the
   `dunes.py` docstring says ~5, the signature ships 1). It is a FOUR-way split, and the fourth is
   inside one chapter: `05:412`'s Werner pseudocode block fixes `L = saltationHop  # ~5 cells,
@@ -520,3 +524,26 @@ directory.
   `_textscan.complete_pattern`/`complete_match`; `_strip_py_comments(src)` ->
   `_textscan.blank_py_prose(src, path)`. Its `test_fenced_reads_pseudocode_only` fixture keeps
   passing as written.
+
+## 30. The wave's own new guard rows pushed three prose test-count claims out of band
+
+- **What.** `test_audit_drift.test_every_recountable_claim_matches_the_tree` recounts the suite size
+  quoted in `README.md`, `VALIDATION.md` and `REVIEW-BRIEF.md` against the tree and allows 10 %
+  drift. Adding guard rows — which is what this wave was for — moved the real count past that band.
+- **Where found.** `reference-impl/tests/test_audit_drift.py:874`; the quoted figures in
+  `reference-impl/README.md`, `reference-impl/VALIDATION.md` (twice) and
+  `reference-impl/REVIEW-BRIEF.md`.
+- **Measurement.** `def test_` functions in `reference-impl/tests/`: **620** now; **566** at the
+  freeze point `23bceef`. 54 were added by this wave, 17 of them by the code lane
+  (`test_render.py`, `test_graph_demo.py`, `test_scale_contract.py`). `README.md` and
+  `VALIDATION.md` quote **530**: 6.8 % off at 566 (green), 14.5 % off at 620 (red) — so those two
+  rows were pushed red BY the wave, jointly, and no single lane's additions account for it.
+  `REVIEW-BRIEF.md` quotes **334**, which was already 41 % off at the freeze point: that row was
+  red before anyone touched anything and is a separate, older staleness.
+- **Why not fixed.** Requoting is a prose edit in three files no code-lane owns, and any number
+  written while other lanes are still adding rows is stale before it lands. The 620 figure is only
+  correct as of this run.
+- **What would fix it.** Once the wave's guard rows are all in, one pass requoting the three
+  documents against a single measured run — and, for `REVIEW-BRIEF.md`, a decision about whether a
+  parenthetical suite size is worth carrying at all, given it has been wrong by 41 % since before
+  the freeze.
