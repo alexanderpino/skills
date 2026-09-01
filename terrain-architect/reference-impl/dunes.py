@@ -75,7 +75,11 @@ def werner_dunes(sand, iters, seed=0, p_sand=0.6, p_bare=0.4, hop=5, wind=(0, 1)
     Why 5 and not the 3 this repo's dune panel happens to pass: 5 is the published constant, and
     `hop` is a physical claim about transport length, not a taste setting. `hop=3` was never
     unanimous here either — `capability_grid.py:317` passes 3, `tests/test_dunes.py` passes 3 and 1,
-    and `gallery.py:166` names nothing and so ran on the old default of 1.
+    and `gallery.py:166` names nothing at all, so it silently ran the old default of 1.
+    ⚠️ CONSEQUENCE OF RAISING THE DEFAULT: that gallery call is the one caller that named nothing,
+    so its committed `gallery.png` no longer reproduces (`tools/regen_figures.py` reports the dunes
+    panel drifting, 7986 px). Either recommit that figure or give the call the `hop=1` it was
+    actually running — both are one line, and both belong to whoever owns `gallery.py` and the PNGs.
 
     Passing a SHORTER hop is legitimate and is a statement about the run, not a correction: on a
     tile narrower than ~64 cells along the wind a 5-cell hop leaves barely a dune or two in the

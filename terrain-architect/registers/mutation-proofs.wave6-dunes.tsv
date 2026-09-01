@@ -1,0 +1,48 @@
+# REGISTER 4 (PARTIAL) - mutation-proofs.wave6-dunes.tsv
+# Wave-6 proofs for the Werner saltation-hop resolution (OPEN-ITEMS #27, which supersedes #11).
+# Guards live in TWO files: reference-impl/tests/test_pseudocode_drift.py (the BLOCK_CONSTANTS row
+# `dunes.hop` that REPLACES the retired `werner-saltation-hop` divergence) and
+# reference-impl/tests/test_dunes.py (the prose-side pin that no fenced-block register can see,
+# plus the two behavioural guards that keep the constant from becoming decorative).
+# Written here and NOT into the shared mutation-proofs.tsv, which other agents are filling in the
+# same wave. Merge target: the test_pseudocode_drift.py and test_dunes.py rows of
+# mutation-proofs.tsv.
+#
+# EVERY CELL BELOW IS FROM EXECUTION, none predicted. The harness for each trial was:
+#   1. read the live SUBJECT file into memory   4. restore the exact original bytes from memory
+#   2. apply the edit                           5. `git diff --stat` after EVERY trial (10 trials;
+#   3. clear every __pycache__ under               every one clean, verified per trial, not once
+#      /home/user/skills, then run the named       at the end)
+#      pytest selection from reference-impl/
+#
+# ⚠️ WHY STEP 3 IS IN THE HARNESS, recorded because it invalidated a trial before it was found:
+# `_module_default` imports `dunes`, and CPython validates a .pyc by (source mtime in WHOLE
+# SECONDS, source size). A mutation and its revert that both change `hop=5` to `hop=3` and back
+# are byte-length-identical and can land in the same second, so the interpreter served the MUTATED
+# bytecode against the REVERTED source: the first run of the decoy in row 1 reported RED on a
+# clean tree. That is a false RED in a proof register - the worst kind - so every trial below
+# clears the caches first and the decoy in row 1 was re-run from scratch. The recorded cell is the
+# re-run.
+#
+# No mutation was ever applied to a guard file. Every subject is dunes.py or
+# references/05-erosion-thermal-aeolian.md - the module and the chapter the guards observe.
+#
+# DENOMINATOR - defect classes proved
+#   distinct defect classes .............................. 5
+#   rows emitted ......................................... 5
+#   rows with a mutation that went GREEN -> RED .......... 5
+#   rows whose decoy stayed GREEN ........................ 5
+#   DECORATIVE assertions (could not be made red) ........ 0
+#
+# THE FOUR STATEMENTS AND WHICH ROW HOLDS EACH ONE. The constant was stated four ways: 05:413's
+# pseudocode block (~5), 05:399's prose note (was ≈3, now ≈5), dunes.py's docstring (~5) and
+# dunes.py's signature (was 1, now 5). Row 1 holds block-vs-signature. Rows 2-3 hold
+# prose-vs-block-vs-signature from both sides. Rows 4-5 hold the MEANING of the number, so that
+# agreement on "5" cannot be preserved while the code stops hopping 5 cells.
+#
+guard_file	test_name	target_defect_class	mutation	expected_observation	observed	decoy	decoy_expected	decoy_observed	verdict
+reference-impl/tests/test_pseudocode_drift.py	test_pseudocode_constant_matches_the_module[dunes.hop]	the chapter's pseudocode block and the shipped default drift apart again (this is the pair that REPLACES the retired `werner-saltation-hop` divergence row; a pin that is deleted rather than replaced leaves the constant unguarded)	SUBJECT reference-impl/dunes.py:22 - `p_bare=0.4, hop=5, wind=(0, 1),` -> `p_bare=0.4, hop=3, wind=(0, 1),` (the value the previous lane recommended, so the trial also asks whether the guard would have caught that recommendation being applied unilaterally)	RED: doc value 5.0 from the fenced block vs module default 3.0	RED. FAILED tests/test_pseudocode_drift.py::test_pseudocode_constant_matches_the_module[dunes.hop] - "AssertionError: 05-erosion-thermal-aeolian.md pseudocode says 5.0 (...); dunes.werner_dunes ships hop=3.0. One of the two must move - a reader implements from the chapter." / assert 5.0 == 3.0	SUBJECT references/05-erosion-thermal-aeolian.md:413 - `# ~5 cells, fixed (Werner 1995)` -> `# ~5 cells, fixed - Werner 1995` (reword the block's citation, number untouched)	GREEN - the row keys on the NUMBER in the block, not on its wording	GREEN. `1 passed in 0.11s` (this is the RE-RUN after the bytecode-cache defect above; the first attempt reported a false RED)	PROVEN
+reference-impl/tests/test_dunes.py	test_chapter_note_quotes_the_shipped_hop	the chapter contradicts ITSELF - 05's prose runnable-reference note and 05's pseudocode block give one constant two values, thirteen lines apart. test_pseudocode_drift.py cannot see this class at all: `_fenced` reads fenced blocks only, and 05:399 is prose. This is the exact historical defect (OPEN-ITEMS #27) and the mutation restores it verbatim	SUBJECT references/05-erosion-thermal-aeolian.md:399 - `Werner's fixed slab hop, **≈5 cells**` -> `Werner's fixed slab hop, **≈3 cells**`	RED: prose 3 vs block 5 vs shipped 5	RED. FAILED tests/test_dunes.py::test_chapter_note_quotes_the_shipped_hop - "AssertionError: 05 states the saltation hop as 3 in its prose note and 5 in its pseudocode block, and dunes.werner_dunes ships hop=5. These must be one number (Werner 1995: l = 5 cells)." / assert 3.0 == 5.0	SUBJECT references/05-erosion-thermal-aeolian.md:399 - the whole sentence rewritten as "`hop` is the saltation length: the fixed slab hop of Werner (1995), **≈5 cells** (the number ..." - different words, same number	GREEN - a chapter must stay free to reword its own prose	GREEN. `1 passed in 0.12s`	PROVEN
+reference-impl/tests/test_dunes.py	test_chapter_note_quotes_the_shipped_hop	the module quietly walks away from the number both halves of the chapter now state - i.e. a return to the shipped `hop=1` that OPEN-ITEMS #27 recorded and that gallery.py:166 was silently running on	SUBJECT reference-impl/dunes.py:22 - `p_bare=0.4, hop=5, wind=(0, 1),` -> `p_bare=0.4, hop=1, wind=(0, 1),` (the historical shipped default, restored)	RED: prose 5 and block 5 vs shipped 1	RED. FAILED tests/test_dunes.py::test_chapter_note_quotes_the_shipped_hop - "AssertionError: 05 states the saltation hop as 5 in its prose note and 5 in its pseudocode block, and dunes.werner_dunes ships hop=1. These must be one number (Werner 1995: l = 5 cells)." / assert 5.0 == 1.0	SUBJECT reference-impl/dunes.py - the erode comment `# erode a slab` -> `# remove one slab from the bed`	GREEN - the module must stay free to reword its own comments	GREEN. `1 passed in 0.13s`	PROVEN
+reference-impl/tests/test_dunes.py	test_a_slab_hops_exactly_hop_cells	the number stays 5 everywhere and the code stops MEANING it: `hop` degrades from "cells per transport step" into an offset, a scale factor or an off-by-one. Three artifacts agreeing on a constant is worth nothing if the transport no longer applies it, which is what makes this the guard against a purely cosmetic resolution	SUBJECT reference-impl/dunes.py:139 - `(cj + int(wj_f[ci, cj]) * hop) % m)` -> `(cj + int(wj_f[ci, cj]) * hop + 1) % m)`	RED: landings leave the multiples-of-hop lattice	RED. FAILED tests/test_dunes.py::test_a_slab_hops_exactly_hop_cells - "AssertionError: slabs landed on columns [0, 2, 6, 10, 12, 16, 18]; with hop=5 every landing must be a multiple of 5 from the source column" / assert {0, 2, 6, 10, 12, 16, ...} <= {0, 5, 10, 15}	SUBJECT reference-impl/dunes.py:138 - the transport comment `# step along the LOCAL wind` -> `# advance along the per-cell wind`	GREEN - the guard reads landing SITES, not source text	GREEN. `1 passed in 0.14s`	PROVEN
+reference-impl/tests/test_dunes.py	test_hop_sets_the_dune_wavelength	the physical claim the constant carries - "a longer hop sets a longer dune wavelength", stated in 05:399, in dunes.py's docstring and in this task's premise - is asserted by three artifacts and demonstrated by none. The mutation makes the transport ignore `hop` entirely, which is the state in which every number in every artifact still reads 5 and the landform no longer depends on it	SUBJECT reference-impl/dunes.py:138-139 - both transport steps `* hop` -> `* 1`	RED: the hop=5 and hop=1 fields become identical, so the wavelength ratio collapses to 1.00	RED. FAILED tests/test_dunes.py::test_hop_sets_the_dune_wavelength - "AssertionError: hop=5 gave a dominant wavelength of 14.7 cells and hop=1 gave 14.7 - the hop is supposed to set the dune wavelength" / assert 14.689592580052649 > (1.35 * 14.689592580052649)	SUBJECT reference-impl/dunes.py - docstring "What is physically set is the mean transport path" -> "What is physically fixed is the mean transport path"	GREEN - the guard measures a spectrum, so no docstring wording can move it	GREEN. `1 passed in 4.17s`	PROVEN

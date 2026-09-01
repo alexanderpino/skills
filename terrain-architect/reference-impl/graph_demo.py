@@ -207,11 +207,58 @@ def _fill_fn(p, ins, ctx):
 
     `"fill"` is Barnes priority-flood: every basin is raised to its rim. `"breach_fill"` is the
     HYBRID policy `03` calls "the right default for terrain generation" — shallow pits are carved
-    out as the noise artefacts they are, deep ones are filled and become lakes. Selectable here
+    out as the noise artefacts they are, deep ones are filled and become lakes. Both are selectable
     because a recommendation nothing in the shipped graph can reach is a recommendation the graph
     does not actually offer; that is the defect `_area_fn` carried for `hybrid_accumulation`.
+
+    ⚠️ THE HYBRID IS THE DEFAULT, AND THAT IS AN ADJUDICATION — `registers/OPEN-ITEMS.md` item 24.
+    SELECTABLE IS NOT DEFAULT. `03:101` does not merely offer the hybrid, it says in bold "Hybrid
+    is the right default for terrain generation", and this node used to ship `method="fill"` three
+    times over: in `build_graph`'s params, in `build_scene_graph`'s params, and in this function's
+    own `p.get` fallback. A demo that is the runnable half of the chapter cannot ship the option
+    the chapter argues against and call the recommendation honoured. Item 24 recorded the
+    disagreement and asked for a decision written down here; this is it.
+
+    THE CHAPTER'S OWN REASON DOES NOT REACH THIS NODE, AND THE FLIP IS STILL RIGHT. `03` argues
+    from the DEM you KEEP: "if you fill everything, you lose all your lakes". Here the filled field
+    is consumed only by `area` and then discarded — the height output of both graphs is `relaxed`,
+    which still holds every basin — so no lake was ever at stake and the chapter's headline reason
+    does not apply. What IS at stake is the drainage network, and there the chapter's PREMISE is
+    checkable rather than assumed. `03` distinguishes pits that are NOISE ARTEFACTS from basins
+    that are real (craters, calderas), and neither graph here MODELS a basin — `build_graph` is
+    noise, fluvial erosion and thermal relaxation, `build_scene_graph` adds fault blocks and
+    terracing, and there is no crater, caldera or lake node in either. So every pit in `relaxed`
+    is fBm noise or the numerical residue of the erosion loop: both of the cases the hybrid is
+    written to carve. Filling one invents a spill point and puts the channel where the terrain
+    does not.
+
+    MEASURED ON THIS GRAPH RATHER THAN IN THE ABSTRACT (96², cellsize 10.4 m, seed 1, droplet
+    backbone — the CLI's own defaults): priority-flood raises 950 of 9216 cells; `breach_fill` at
+    `max_depth=10` raises 710 and carves 264. 1217 drainage-area cells change (13.2%) and 124 of
+    819 channel cells (A > 60 cells) move. Both policies leave the SAME maximum raise (31.27 m)
+    and the same 538 flat cells, which is the measurement that shows the deep basins still fill to
+    lakes: the hybrid moves the artefact pits, not the basins.
+
+    AND THE FIGURE COST WAS MEASURED, NOT ASSUMED — it is ZERO, which is a weaker result than it
+    sounds. `hero.py` is the only committed figure built on this graph, and its settings are the
+    quiet end of the trade: at 180², 266.7 m cells and a streampower backbone, a 10 m breach
+    threshold reaches almost nothing, so the flip moves 16 of 32400 accumulation cells and one
+    channel cell. `tools/regen_figures.py` rebuilds all 14 committed PNGs and reports
+    `hero  ok` — the 16 changed cells sit under the substance thresholds that colour the render, so
+    no pixel moves. Do not read that as "the default does not matter": at the demo's OWN default
+    resolution the same flip moves 13.2% of the drainage field. It means the one figure staked on
+    this graph is staked on the insensitive end of it.
+
+    `max_depth` stays 10.0 m, the middle of `03:101`'s own 5-20 m band.
+
+    ⚠️ `_area_fn`'s `method="d8"` IS DELIBERATELY NOT FLIPPED WITH IT. Item 24 pairs the two, but
+    the chapters do not: `03:247` reads "This costs almost nothing and is what most good terrain
+    tools do" — a description of what other tools do — where `03:101` prescribes, in the word
+    "default", what this one should. The hybrid router is reachable (`method="hybrid"`) and the
+    census row for it certifies exactly that. Re-adjudicating the ROUTER default needs the same
+    measurement this docstring carries for the fill, and it has not been done.
     """
-    method = p.get("method", "fill")
+    method = p.get("method", "breach_fill")
     if method == "fill":
         return flow.priority_flood_fill(ins[0])
     if method == "breach_fill":
@@ -298,9 +345,10 @@ def build_graph(ctx, backbone="droplet", noise_kind="perlin"):
           params={"repose": 0.7, "iters": 30},
           locality="NEIGHBOURHOOD", resolution="RESOLUTION_INVARIANT")
 
-    # 4-5  analysis routing on the FINAL geometry: fill (mandatory) then accumulate
+    # 4-5  analysis routing on the FINAL geometry: depression handling (mandatory) then accumulate.
+    # `breach_fill` is 03:101's hybrid and its stated DEFAULT — see `_fill_fn` for the adjudication.
     g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",),
-          params={"method": "fill", "max_depth": 10.0}, locality="GLOBAL")
+          params={"method": "breach_fill", "max_depth": 10.0}, locality="GLOBAL")
     g.add("area", "flow.accumulation/1", _area_fn, inputs=("filled",),
           params={"method": "d8"}, locality="GLOBAL")
 
@@ -374,7 +422,7 @@ def build_scene_graph(ctx):
     g.add("relaxed", "erosion.thermal/1", _thermal_fn, inputs=("strata",),
           params={"repose": 0.62, "iters": 8}, locality="NEIGHBOURHOOD")     # talus at repose (Musgrave 1989)
     g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",),
-          params={"method": "fill", "max_depth": 10.0}, locality="GLOBAL")
+          params={"method": "breach_fill", "max_depth": 10.0}, locality="GLOBAL")
     g.add("area", "flow.accumulation/1", _area_fn, inputs=("filled",),
           params={"method": "d8"}, locality="GLOBAL")
     g.add("slope", "analysis.slope/1", _slope_fn, inputs=("relaxed",), locality="LOCAL")

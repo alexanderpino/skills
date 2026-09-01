@@ -333,18 +333,20 @@ RECOMMENDED_CAPABILITIES = [
      "with the feature-primitive construction tree as the art-directable alternative"),
 ]
 
-# The one in-scope recommendation with NOTHING behind it. Same staleness rule as
-# `test_pseudocode_drift.KNOWN_DIVERGENCES`: both sides pinned, so implementing it fails this row.
-KNOWN_UNREACHABLE = {
-    "ulichney-ground-cover": (
-        "Ulichney's void-and-cluster tiles are recommended TWICE in 07 (line 149 for ground cover, "
-        "line 175 as the tiling answer, 'Preferred') and are implemented nowhere: `scatter.py` "
-        "ships poisson_disk (Bridson), scatter_by_density, jittered_grid and rule_based, and 07's "
-        "own text calls jittered_grid the fallback that is 'not true blue noise'. So the graph's "
-        "ground-cover story is the option the chapter ranks SECOND. Recorded rather than "
-        "implemented because a void-and-cluster tile generator is a new atom with its own oracle, "
-        "not a wiring fix; logged in registers/OPEN-ITEMS.md."),
-}
+# In-scope recommendations with NOTHING behind them. Same staleness rule as
+# `test_pseudocode_drift.KNOWN_DIVERGENCES`: both sides pinned, so implementing one fails its row.
+#
+# ⚠️ THE TABLE IS EMPTY, AND THAT IS THE FINDING. Its one entry was `ulichney-ground-cover`:
+# `07:149`/`07:175` recommend Ulichney void-and-cluster tiles twice and `scatter.py` shipped
+# nothing that could serve them, so the graph's ground-cover story was the option the chapter ranks
+# SECOND (`jittered_grid`, which `07` itself calls "not true blue noise"). That gap —
+# `registers/OPEN-ITEMS.md` item 22 — is CLOSED: `scatter.py` now ships `void_and_cluster_rank`,
+# `void_and_cluster_mask` and `ulichney_scatter`, guarded in `tests/test_scatter.py`. The row was
+# promoted out of this table into a real reachability row exactly as the retired guard's own
+# failure message demanded, so the census is nine capabilities and nine reachable, with no
+# third state. The table is kept, empty, because the next unimplemented recommendation needs
+# somewhere to be recorded that the staleness half already watches.
+KNOWN_UNREACHABLE: dict = {}
 
 
 @pytest.mark.parametrize("rid,chapter,lineno,phrase,what", RECOMMENDED_CAPABILITIES,
@@ -363,7 +365,7 @@ def test_the_recommendation_is_still_in_the_chapter(rid, chapter, lineno, phrase
 
 
 def test_every_recommended_capability_is_reachable_or_pinned_as_a_known_gap():
-    """The census itself: nine capabilities, eight reachable, one pinned. No third state."""
+    """The census itself: nine capabilities, all nine reachable, none pinned. No third state."""
     ids = [r[0] for r in RECOMMENDED_CAPABILITIES]
     assert len(ids) == len(set(ids)) == 9, ids
     assert set(KNOWN_UNREACHABLE) <= set(ids), (
@@ -425,6 +427,53 @@ def test_an_unknown_depression_method_is_rejected():
             assert repr(bad) in str(e) and "breach_fill" in str(e)
         else:
             raise AssertionError(f"unknown depression method {bad!r} was silently accepted")
+
+
+def test_the_shipped_graphs_default_to_the_hybrid_03_calls_the_default():
+    """⚠️ SELECTABLE IS NOT DEFAULT, AND `03:101` SAYS "DEFAULT". This row is that difference.
+
+    `test_epsilon_fill_and_the_hybrid_breach_fill_policy_are_both_selectable` above certifies that
+    the breach/fill hybrid CAN be selected. That was the whole of the guard while `build_graph`,
+    `build_scene_graph` and `_fill_fn`'s own `p.get` fallback all shipped `method="fill"` — the
+    policy the chapter argues against — so the demo satisfied a reachability census while
+    contradicting the sentence the census anchors. The anchored phrase is literally "Hybrid is the
+    right default"; a guard that checks reachability is measuring the wrong predicate for it.
+    `registers/OPEN-ITEMS.md` item 24 recorded the disagreement; `_fill_fn`'s docstring carries the
+    adjudication and the measurement, and this row is what stops it being silently reverted.
+
+    THE DEFAULT IS PINNED IN ALL THREE PLACES IT LIVES. Each graph's node `params` is what the
+    shipped pipeline runs; `_fill_fn`'s `p.get` fallback is what any OTHER graph built on this node
+    inherits. Pinning one and not the others is how the demo ends up saying two different things
+    about the same recommendation, which is the state item 24 found.
+
+    `max_depth` is asserted into `03:101`'s stated band ("maxDepth = 5-20 m depending on your
+    vertical scale") rather than at a value: the band is the chapter's claim, the value inside it
+    is a tuning choice this guard has no business freezing.
+    """
+    ctx = G.Ctx(cellsize=1000.0 / 32, resolution=32, root_seed=1)
+    for name, (g, _) in (("build_graph", G.build_graph(ctx)),
+                         ("build_scene_graph", G.build_scene_graph(ctx))):
+        params = g.nodes["filled"].params
+        assert params["method"] == "breach_fill", (
+            "%s ships method=%r on its depression node. 03:101 calls the breach/fill hybrid \"the "
+            "right default for terrain generation\"; shipping plain fill makes the demo the "
+            "counter-example to its own chapter. See _fill_fn and OPEN-ITEMS item 24."
+            % (name, params["method"]))
+        assert 5.0 <= params["max_depth"] <= 20.0, (
+            "%s's max_depth=%r is outside 03:101's stated 5-20 m band, so it is no longer the "
+            "threshold the chapter recommends" % (name, params["max_depth"]))
+
+    # the node function's OWN fallback, exercised with no params at all
+    n = 24
+    dem = np.tile(np.linspace(60.0, 0.0, n), (n, 1)).astype(np.float64)
+    dem[12, 12] -= 4.0                       # a 4 m pit: shallow, so the hybrid carves rather than fills
+    fallback = G._fill_fn({}, (dem,), ctx)
+    assert np.array_equal(fallback, flow.breach_fill(dem, max_depth=10.0)), (
+        "_fill_fn's `p.get(\"method\", ...)` fallback is not the hybrid, so a graph that omits the "
+        "parameter still gets the policy 03:101 argues against")
+    assert not np.array_equal(flow.breach_fill(dem, max_depth=10.0),
+                              flow.priority_flood_fill(dem)), (
+        "the fixture no longer separates the two policies, so the assertion above proves nothing")
 
 
 def test_the_area_node_routes_area_and_the_scatter_node_rejects_against_density():
@@ -513,21 +562,54 @@ def test_both_generator_recipes_are_reachable_and_are_different_graphs():
     assert "materials" in emergent.nodes and "materials" in primitive.nodes
 
 
-def test_ulichney_tiles_are_still_recommended_and_still_absent():
-    """⚠️ THE ONE IN-SCOPE RECOMMENDATION WITH NOTHING BEHIND IT, PINNED ON BOTH SIDES.
+def test_ulichney_ground_cover_is_shipped_and_node_wrappable():
+    """⚠️ THE ROW THAT USED TO PIN A GAP, PROMOTED — `07:149`'s tiles now EXIST, so the census owes
+    a reachability check rather than an absence check.
 
-    `07` recommends Ulichney void-and-cluster tiles twice — for ground cover (149) and as the
-    tiling answer (175, "Preferred") — and nothing implements them. This row asserts BOTH halves,
-    so it fails the moment either changes: implement the tiles and the row goes red, which is what
-    makes the gap get promoted into a real reachability row instead of quietly closing.
+    Its predecessor, `test_ulichney_tiles_are_still_recommended_and_still_absent`, asserted both
+    halves of the gap and said in its own failure message what to do when the second half changed:
+    "delete this row and add a real reachability row to RECOMMENDED_CAPABILITIES". `scatter.py`
+    now ships `void_and_cluster_rank` / `void_and_cluster_mask` / `ulichney_scatter`
+    (`registers/OPEN-ITEMS.md` item 22, guarded in `tests/test_scatter.py`), so this is that row.
+    Without the promotion the census would have kept a known-gap entry describing an atom that
+    exists — the exact rot `KNOWN_UNREACHABLE`'s staleness rule was written to prevent.
+
+    REACHABLE HERE MEANS THE SAME AS IT DOES FOR THE FILTER ROW: shipped in the reference
+    implementation AND runnable inside the graph runtime as a node, not necessarily wired as the
+    shipped graph's default. So the tiles are put through an actual `Graph` node and the points
+    that come back are checked to be the tiled, thresholded set the chapter asks for — a row that
+    only asserted `hasattr(scatter, "ulichney_scatter")` would pass on a stub.
     """
     text = (_CHAPTERS / "07-scatter.md").read_text(encoding="utf-8")
     assert "Ulichney tiles for ground cover" in text and "Ulichney tiles**" in text, (
         "07 no longer recommends Ulichney tiles; delete this row and re-adjudicate the census")
     surface = {n for n in vars(scatter_mod) if not n.startswith("_")}
-    assert not [n for n in surface if re.search(r"ulichney|void.?and.?cluster", n, re.I)], (
-        "Ulichney tiles now exist in scatter.py — delete this row and add a real reachability row "
-        "to RECOMMENDED_CAPABILITIES: %s" % KNOWN_UNREACHABLE["ulichney-ground-cover"])
+    assert [n for n in surface if re.search(r"ulichney|void.?and.?cluster", n, re.I)], (
+        "07:149/175's Ulichney tiles are recommended twice and scatter.py implements nothing that "
+        "serves them; this row must go back to KNOWN_UNREACHABLE if the atom is withdrawn")
+
+    ctx = G.Ctx(cellsize=20.0, resolution=32, root_seed=3)
+    extent = ctx.resolution * ctx.cellsize
+    g = G.Graph(ctx)
+    g.add("groundcover", "scatter.ulichney/1",
+          lambda p, ins, c: scatter_mod.ulichney_scatter(
+              extent, extent, c.cellsize, p["density"], seed=c.root_seed, tile=p["tile"]),
+          params={"density": 0.25, "tile": 16},
+          locality="GLOBAL", resolution="RESOLUTION_BOUND")
+    pts = g.evaluate("groundcover")
+    assert pts.ndim == 2 and pts.shape[1] == 2 and len(pts) > 0
+    assert np.all((pts >= 0.0) & (pts <= extent))
+
+    direct = scatter_mod.ulichney_scatter(extent, extent, ctx.cellsize, 0.25,
+                                          seed=ctx.root_seed, tile=16)
+    assert np.array_equal(pts, direct), (
+        "the node no longer routes through scatter.ulichney_scatter, so this row would certify "
+        "07:149 against something else")
+    sparse = scatter_mod.ulichney_scatter(extent, extent, ctx.cellsize, 0.05,
+                                          seed=ctx.root_seed, tile=16)
+    assert len(sparse) < len(pts), (
+        "thresholding the tile against a lower density did not thin the cover, so `density` is "
+        "not the dial 07:139 describes and the tile is not being thresholded at all")
 
 
 def test_an_unknown_noise_kind_is_rejected_before_it_can_mint_a_type_id():

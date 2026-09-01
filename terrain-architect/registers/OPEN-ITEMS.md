@@ -476,11 +476,34 @@ model actually uses") cannot be carried out until `05` stops giving two of them.
   contradicts itself before any module is consulted.
 - **Where found.** `references/05-erosion-thermal-aeolian.md:399` and `:412`.
 - **Measurement.** Four values for one constant: 5 (05:412), 3 (05:399), 5 (dunes.py docstring,
-  now rewritten to enumerate all four), 1 (`werner_dunes`'s default). Every actual call site in the
-  repository passes `hop=3` — `capability_grid.py:317` and the dune-forming rows of
-  `tests/test_dunes.py` — so the shipped default of 1 is used by nothing.
-- **Why not fixed.** `references/` belongs to a later wave, and the shipped default is pinned by
-  `test_pseudocode_drift.KNOWN_DIVERGENCES`'s `werner-saltation-hop` row.
+  now rewritten to enumerate all four), 1 (`werner_dunes`'s default).
+
+  ⚠️ **CLOSED, and this paragraph's own measurement was FALSE.** It said "Every actual call site in
+  the repository passes `hop=3` … so the shipped default of 1 is used by nothing." Checked:
+  `gallery.py:166` calls `werner_dunes(sand, 300, seed=SEED, wind=(0, 1))` and names **no** `hop`,
+  so it ran on the shipped default of 1 — and the committed `gallery.png` was built that way. That
+  one call site is what made the default load-bearing. `tests/test_dunes.py:86` also passes `hop=1`
+  explicitly. Only `capability_grid.py:317` and three rows of `test_dunes.py` pass 3. The
+  recommendation to adopt 3 rested entirely on the false claim, so it was discarded.
+
+  **Resolved as 5**, from the source rather than from local usage. Kok, Parteli, Michaels & Karam
+  2012, *The physics of wind-blown sand and dust*, Rep. Prog. Phys. **75** 106901 §3.2.2, on
+  Werner 1995: *"A sand slab on the surface is chosen at random and moves downwind to a new lattice
+  site l (typically equal to 5) sites away."* `05:412` had been citation-faithful all along; the
+  unsourced `≈3` at `05:399` and the shipped `1` were the outliers. All four statements now read 5,
+  and the wavelength claim is demonstrated rather than asserted: over 3 seeds on a 32×192 domain,
+  mean spectral centroid **28.4 → 37.0 → 44.9 cells** for hop 1 → 3 → 5, with no seed overlap
+  between 1 and 5 (+58 % wavelength, +67 % relief).
+
+  The `werner-saltation-hop` divergence row is **retired and replaced**, not merely deleted: a
+  `BLOCK_CONSTANTS` row pins the chapter's fenced block against the shipped default, a new
+  `test_chapter_note_quotes_the_shipped_hop` pins `05:399`'s **prose** (which the old register could
+  never see — `_fenced()` reads fenced blocks only, which is exactly how the chapter's
+  self-contradiction survived a guard file built to catch drift), and two behavioural guards prove
+  the agreement is not cosmetic.
+
+  **Consequence, open:** `gallery.png` no longer reproduces from its producer, because `gallery.py`
+  was the caller relying on the default. 13 of 14 figures still reproduce.
 - **What would fix it.** `05` must state ONE value. The recommendation from the code side: make
   both places say **~3 cells**, since 3 is what every call site in this repository actually runs and
   what `05:399` already tells a reader; then raise `werner_dunes`'s default from 1 to 3, delete the

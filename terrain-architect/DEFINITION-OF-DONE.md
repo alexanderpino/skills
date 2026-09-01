@@ -75,9 +75,9 @@ file was written — the wave opened more than it closed, which is what an enume
 | C | Pass over the frozen seed list, including the 111-line prose corpus | `registers/falsepositive-seeds.tsv` |
 | D | Pass — 447 citations, 3 excused (0.68%), and the exclusion table must partition | `test_cited_paths_exist.py` |
 | E | Pass — domain is now `REF.glob("*.md")` (11 files, was 4 literals), denominator asserted in-file | `test_audit_drift.py`, 135 passed |
-| F | **Accepted fail.** Chapter-vs-chapter self-consistency is not enforced; `05` still states the Werner hop two ways (`~5` at :412, `≈3` at :399) | `registers/constant-pairs.tsv`; OPEN-ITEMS 27 |
+| F | **Accepted fail, narrowed.** The named instance is CLOSED — `05` now states the Werner hop once (5, from Kok et al. 2012 §3.2.2 quoting Werner 1995), all four statements agree, and the retired divergence row is replaced by a prose pin plus two behavioural guards. What remains open is the general property: 159 chapter-vs-chapter inconsistencies and 81 stated constants matching no module default | `registers/constant-pairs.tsv`; OPEN-ITEMS 9, 10, 27 |
 | G1 | Pass — 44 modules, 314 public functions, 1320 parameters, 2 dead deleted, 4 exempted with removal patches written | `test_render.py` census; OPEN-ITEMS 20 |
-| G2 | **Accepted fail, disclosed.** 8 of 9 reachable; `07`'s Ulichney tiles unimplemented; and the sweep provably misses a member of its own population (`03:247` uses no recommendation word) | `test_graph_demo.py`; OPEN-ITEMS 22, 23 |
+| G2 | **Accepted fail, narrowed.** Ulichney void-and-cluster tiles are now IMPLEMENTED and guarded (`scatter.py`), closing the one unreachable capability — the previous wave's tripwire fired on its own subject to say so. What remains open is structural: the sweep provably misses a member of its own population, because `03:247` uses no recommendation word | `test_graph_demo.py`; OPEN-ITEMS 23 |
 | H | Pass — 14/14 figures reproduce; transcripts and counts requoted from measured runs | `registers/figure-regen.tsv`, `wave5-prose-findings.tsv` |
 | I | Pass — both files exist; this table is the close-out | this file, `registers/OPEN-ITEMS.md` |
 | J | Pass — the slope guard asserts an identity (351 calls, 351 adjudicated, 331 decided without the word) rather than a file count | `registers/guard-domains.tsv` |
