@@ -12,6 +12,28 @@ what would fix it**.
 Every measurement below was taken at HEAD `0cdd5b1` and is reproducible from the registers in this
 directory.
 
+## ⚠️ Status, reconciled against the tree at HEAD `8fe5688`
+
+**This file was itself stale.** Seven items were closed by the guard wave and never marked, which
+is the same defect the file exists to catch: a record that no longer matches what it records.
+Reconciled by running the guards, not by reading the list.
+
+| item | now | evidence |
+|---|---|---|
+| 4 | **CLOSED** | the slope guard is no longer keyed on a substring. `_census()` → 351 trig calls, 351 adjudicated, 331 decided without the word `slope` |
+| 6 | **CLOSED** | `test_audit_drift`'s domain is `REF.glob("*.md")`; `AUDIT_DOCUMENT_COUNT = 11`, was 4 literals |
+| 7 | **CLOSED** | same rewrite; the em-dash heading was also shown to fail LOUDLY (26 failed), not silently |
+| 21 | **CLOSED** | `test_scale_contract` consults the dead-parameter census instead of crediting a declaration |
+| 26 | **CLOSED** | both rows corrected in `guard-domains.tsv`'s AMENDMENT block |
+| 28 | **CLOSED** | the `test_slope_units.py` row is rewritten, with what it replaced written down |
+| 30 | **CLOSED** | the three prose test-count claims are requoted from the disk oracle: 620 functions |
+
+Items **1, 2, 3, 5, 8, 9, 10, 12, 13, 15, 16, 17, 18, 19, 23** remain open and are the substance of
+criteria A and F, which `DEFINITION-OF-DONE.md` records as **accepted fails, not passes**.
+
+Items **11/27, 20, 22, 24, 25, 29** are in scope for the wave now running and are marked per item
+below.
+
 ---
 
 ## 1. The numeric census leaves 35% of its own rows undecided
