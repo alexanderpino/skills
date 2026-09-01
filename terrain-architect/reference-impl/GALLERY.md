@@ -126,8 +126,27 @@ regenerated and all fourteen now reproduce exactly.
 Two things that cost real time and are worth knowing before editing a figure. `capability_grid.py`
 **reads `hero.png` off disk** behind a silent `except: return gray(_terr)`, so the figures have a
 build ORDER — rebuild `hero` first — and a producer run in an empty directory does not fail, it
-quietly draws something else. And reproduction is verified on one container only; whether a
-different machine yields the same pixels is what CI answers.
+quietly draws something else.
+
+⚠️ **And the second thing, which CI has now settled: five of the fourteen do NOT reproduce across
+machines.** Two workflow runs on identical content with identical package versions (numpy 2.4.6,
+pillow 12.3.0, CPython 3.11.16, `ubuntu-latest`) disagreed on `archetypes`, `capability_grid`,
+`halfar_anatomy`, `landforms` and `screen_worlds` — `landforms` by 145 469 pixels. Not encoding
+and not dependency drift: the producers computed different numbers (`canyon + strata` pit-storage
+5.22e+06 vs 4.16e+06 m³). numpy dispatches SIMD kernels at runtime, GitHub's runner fleet is
+heterogeneous, floating-point addition is not associative, and the erosion loops amplify a
+last-bit difference into a different field.
+
+So `tools/regen_figures.py` no longer enforces pixel identity on those five. They are gated on
+**invariants** — assertions on the quantities the producers compute, which survive a change of
+kernel — and each is named in `INVARIANT_GATED` with the test file that took over. The checker
+refuses to accept an entry there whose named guard does not exist, because "invariant-gated"
+must not become a euphemism for ungated.
+
+`halfar_anatomy` has no RNG anywhere in it and still drifted, so *deterministic algorithm* is not
+the dividing line; how much the pipeline amplifies a last-bit difference is, and that is a thing
+to measure. `python tools/regen_figures.py --sample` prints the machine, its dispatched numpy
+kernels and every delta, and always exits 0.
 
 | Figure | Regenerate | Guard | Chapter that uses it |
 |---|---|---|---|

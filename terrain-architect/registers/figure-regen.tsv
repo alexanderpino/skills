@@ -23,7 +23,28 @@
 # runner reproduces these pixels is what the first CI run will answer; if it does not, this
 # register is the record of what was true here.
 #
-# ── CLOSED 2026-09-01. All fourteen reproduce exactly. ────────────────────────────────────
+# ⚠️ ── REOPENED. The "closed" below was measured on ONE machine and CI disproved it. ─────
+# Runs 18/20/21 of .github/workflows/terrain-architect.yml, on identical content:
+#     18  e8cca44  success 14/14
+#     20  bc03bf2  FAILURE -- archetypes, capability_grid, halfar_anatomy, landforms,
+#                  screen_worlds; landforms 145469 px at max |delta| 254
+#     21  c52087c  success 14/14   <- run 20's content, merged
+# Both installed numpy 2.4.6, pillow 12.3.0, pytest 9.1.1, CPython 3.11.16 on ubuntu-latest;
+# the container that generated every committed figure matches. So NOT encoding, NOT versions:
+# the producers printed different NUMBERS (canyon+strata pit-storage 5.22e+06 vs 4.16e+06 m3;
+# Monument Valley relief 259 vs 268 m). numpy 2.x dispatches SIMD at runtime, GitHub's fleet
+# is heterogeneous, FP addition is not associative, and the erosion loops amplify it. The
+# container this was measured on dispatches AVX512_SPR/X86_V4; a runner without AVX-512
+# dispatches X86_V3 and reduces in a different order.
+#
+# halfar_anatomy has NO RNG and still drifted, so "deterministic algorithm" is not the line.
+# The line is how much a pipeline amplifies a last-bit difference -- to be measured, not
+# reasoned about. `python tools/regen_figures.py --sample` prints the machine and every delta
+# and always exits 0; dispatch it repeatedly to accumulate that evidence.
+#
+# The rows below stand as what is true ON ONE MACHINE. They are not a cross-machine claim.
+#
+# ── CLOSED 2026-09-01 (single machine). All fourteen reproduce exactly there. ─────────────
 #     cd terrain-architect/reference-impl && python tools/regen_figures.py
 #     enumeration: 14 committed figure(s), 14 produced, 0 exempt ... 14 figure(s) reproduce exactly.
 #

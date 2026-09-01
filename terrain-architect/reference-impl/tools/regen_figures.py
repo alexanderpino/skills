@@ -85,6 +85,30 @@ def check_enumeration(figures: list[str]) -> list[str]:
             problems.append(f"EXEMPT names {stem}, which git does not track -- stale exemption")
     both = set(PRODUCERS) & set(EXEMPT)
     problems += [f"{s} is both produced and exempt" for s in sorted(both)]
+
+    # A stale INVARIANT_GATED entry silently un-gates a figure: the name stops matching anything,
+    # the figure quietly returns to pixel enforcement (or vanishes), and nobody is told.
+    for stem in INVARIANT_GATED:
+        if stem not in figures:
+            problems.append(
+                f"INVARIANT_GATED names {stem}, which git does not track -- stale entry")
+        elif stem not in PRODUCERS:
+            problems.append(f"INVARIANT_GATED names {stem}, which has no producer")
+
+    # Moving a figure here is only legitimate if something else guards it. Each reason must name
+    # the test file that took over, and that file must exist -- otherwise "invariant-gated" is a
+    # euphemism for ungated, which is exactly how capability_grid came to have no test at all.
+    for stem, reason in INVARIANT_GATED.items():
+        named = [w.strip(" .,") for w in reason.split() if w.startswith("tests/")
+                 or w.endswith("measurements()")]
+        if not named:
+            problems.append(
+                f"INVARIANT_GATED[{stem}] does not name what guards it instead of the pixels")
+            continue
+        for guard in named:
+            if guard.startswith("tests/") and not (REF / guard).exists():
+                problems.append(
+                    f"INVARIANT_GATED[{stem}] names {guard}, which does not exist")
     return problems
 
 
@@ -95,6 +119,54 @@ def check_enumeration(figures: list[str]) -> list[str]:
 # act on. It also means the figures have a BUILD ORDER: capability_grid must be rebuilt after
 # hero, which an alphabetical loop gets wrong.
 READS_FIGURES = {"capability_grid": ("hero",)}
+
+
+# --------------------------------------------------------------------------------------------
+# WHY PIXEL IDENTITY IS NOT ENFORCED FOR EVERY FIGURE.
+#
+# This checker originally failed on any pixel difference, and criterion H was ticked on that
+# basis. CI disproved the premise. Three runs of the same workflow:
+#
+#     run 18  e8cca44  success, 14/14
+#     run 20  bc03bf2  FAILURE -- archetypes, capability_grid, halfar_anatomy, landforms,
+#                      screen_worlds drifted; landforms by 145469 px at max |delta| 254
+#     run 21  c52087c  success, 14/14   <- the SAME CONTENT as run 20, merged to main
+#
+# Both runs installed identical versions (numpy 2.4.6, pillow 12.3.0, pytest 9.1.1,
+# CPython 3.11.16, ubuntu-latest), and the local container matches. So this is neither PNG
+# encoding nor dependency drift: the producers printed DIFFERENT NUMBERS.
+#
+#     canyon + strata pit-storage   5.22e+06 m3   vs   4.16e+06 m3
+#     badlands relief / p99 slope   261 m / 35.3  vs   259 m / 35.2
+#     Monument Valley relief        259 m         vs   268 m
+#
+# numpy 2.x dispatches SIMD kernels at runtime, GitHub's runner fleet is heterogeneous, and
+# floating-point addition is not associative -- so reductions associate differently and the
+# iterative erosion/flow loops amplify a last-bit difference into a visibly different field.
+#
+# halfar_anatomy has NO RNG AT ALL and still drifted (53 px). So "deterministic algorithm" is
+# not the dividing line. The dividing line is how much the pipeline amplifies a last-bit
+# difference, which is a property to be MEASURED, not reasoned about.
+#
+# A gate that is red or green depending on which runner picked up the job is not a weak gate,
+# it is an unsound one: it does not test what it claims. So pixel identity is enforced only
+# where it has been observed to hold, and the rest are gated on INVARIANTS -- assertions on
+# the quantities the producers compute, which survive a change of kernel.
+#
+# ⚠️ THE EVIDENCE FOR THE PIXEL_EXACT SET IS WEAK AND SAYS SO. Nine figures holding across
+# three runs is three samples, not a proof. `--sample` exists to accumulate more, and a figure
+# is moved OUT of this set the first time it is observed to drift -- never back in without
+# evidence.
+INVARIANT_GATED: dict[str, str] = {
+    "archetypes": "drifted run 20; pit-storage moved 20% (5.22e+06 -> 4.16e+06 m3). Guarded by "
+                  "tests/test_archetypes.py on the facts _signature() computes.",
+    "capability_grid": "drifted run 20, 173548 px. Guarded by tests/test_capability_grid.py.",
+    "halfar_anatomy": "drifted run 20, 53 px -- no RNG anywhere in it, pure FP reduction order. "
+                      "Guarded by halfar_anatomy.measurements() and its 25-test suite.",
+    "landforms": "drifted run 20, 145469 px, the largest. Guarded by tests/test_landforms.py.",
+    "screen_worlds": "drifted run 20, 9969 px; Monument Valley relief moved 259 -> 268 m. "
+                     "Guarded by tests/test_screen_worlds.py.",
+}
 
 
 def rebuild(stem: str, workdir: Path) -> Path:
@@ -145,10 +217,67 @@ def pixels_differ(a: Path, b: Path) -> str | None:
             f"first at (x={int(xs[0])}, y={int(ys[0])})")
 
 
+def describe_machine() -> None:
+    """What the pixels are being blamed on, printed so a drift can be correlated with hardware.
+
+    The whole reason this mode exists: two runs with identical package versions disagreed, and
+    without the CPU and the dispatched SIMD path in the log there was no way to test the
+    obvious hypothesis. Print the evidence next to the result, every time.
+    """
+    import platform
+    import numpy as np
+
+    print("== machine " + "=" * 66)
+    print(f"  platform   {platform.platform()}")
+    print(f"  python     {platform.python_version()}  ({platform.machine()})")
+    print(f"  numpy      {np.__version__}")
+    try:
+        from PIL import Image as _I
+        print(f"  pillow     {_I.__version__ if hasattr(_I, '__version__') else 'unknown'}")
+    except Exception:
+        pass
+    # numpy dispatches SIMD kernels at runtime; this names the ones it chose, which is the
+    # hypothesis for why two runners disagree.
+    try:
+        simd = np.lib.introspect.opt_func_info()
+        # {func: {dtype_char: {'current': 'X86_V4', 'available': 'X86_V4 X86_V3 baseline(...)'}}}
+        # `current` is the kernel actually dispatched on THIS cpu -- the thing that differs
+        # between runners and the reason two identical checkouts disagree.
+        current = sorted({v["current"] for f in simd.values() for v in f.values()
+                          if isinstance(v, dict) and "current" in v})
+        avail = sorted({v["available"] for f in simd.values() for v in f.values()
+                        if isinstance(v, dict) and "available" in v})
+        print(f"  numpy dispatching: {', '.join(current) or '(none reported)'}")
+        print(f"  numpy available  : {'; '.join(avail) or '(none reported)'}")
+    except Exception as e:
+        print(f"  numpy SIMD targets unavailable ({type(e).__name__})")
+    try:
+        model = [l.split(":", 1)[1].strip() for l in
+                 Path("/proc/cpuinfo").read_text().splitlines() if l.startswith("model name")]
+        if model:
+            print(f"  cpu        {model[0]}  x{len(model)}")
+        flags = [l for l in Path("/proc/cpuinfo").read_text().splitlines()
+                 if l.startswith("flags")]
+        if flags:
+            interesting = [f for f in ("avx2", "avx512f", "avx512_vnni", "fma", "sse4_2")
+                           if f" {f} " in flags[0] + " "]
+            print(f"  cpu flags  {', '.join(interesting) or '(none of interest)'}")
+    except Exception:
+        pass
+    print("=" * 77)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="+", metavar="STEM")
+    ap.add_argument("--sample", action="store_true",
+                    help="report the machine and every pixel delta, and ALWAYS exit 0. This is "
+                         "evidence gathering, not a gate: run it on many runners to find out "
+                         "which figures actually reproduce across hardware.")
     args = ap.parse_args()
+
+    if args.sample:
+        describe_machine()
 
     figures = committed_figures()
     problems = check_enumeration(figures)
@@ -173,23 +302,48 @@ def main() -> int:
     needed_first = [d for deps in READS_FIGURES.values() for d in deps]
     todo.sort(key=lambda s: (s not in needed_first, s))
 
-    drifted = []
+    drifted, tolerated = [], []
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         for stem in todo:
             produced = rebuild(stem, work)
             delta = pixels_differ(produced, REF / f"{stem}.png")
-            print(f"  {stem:22s} {'ok' if delta is None else 'DRIFT: ' + delta}")
-            if delta is not None:
+            if delta is None:
+                print(f"  {stem:22s} ok")
+            elif stem in INVARIANT_GATED:
+                print(f"  {stem:22s} differs (invariant-gated, not a failure): {delta}")
+                tolerated.append(stem)
+            else:
+                print(f"  {stem:22s} DRIFT: {delta}")
                 drifted.append(stem)
                 produced.rename(work.parent / f"{stem}.rebuilt.png")
+
+    if tolerated:
+        print(f"\n{len(tolerated)} invariant-gated figure(s) differ in pixels: {tolerated}")
+        print("Not a failure HERE -- these are the figures whose pixels are known to depend on "
+              "the machine. What guards them is their invariant tests, which run in the suite.")
+        print("But a difference on the SAME machine that built the PNG is still a real signal: "
+              "if you see this locally after changing a producer, recommit the figure.")
+
+    if args.sample:
+        differing = sorted(set(drifted) | set(tolerated))
+        print(f"\nSAMPLE: {len(differing)} of {len(todo)} differ on this machine: "
+              f"{differing or 'none'}")
+        print("Exit 0 regardless -- this mode gathers evidence, it does not judge. Record the "
+              "machine block above beside the result; a figure that differs on hardware A and "
+              "not on hardware B is the finding.")
+        return 0
 
     if drifted:
         print(f"\n{len(drifted)} figure(s) no longer match their producer: {drifted}")
         print("Either the producer changed and the PNG was not recommitted, or the PNG was "
               "edited by hand. Rerun the producer and commit its output.")
+        print("If this figure has now been observed to drift ACROSS MACHINES rather than "
+              "because of a real change, move it to INVARIANT_GATED with the evidence -- and "
+              "give it an invariant guard first, or the move is a silent loss of coverage.")
         return 1
-    print(f"\n{len(todo)} figure(s) reproduce exactly.")
+    print(f"\n{len(todo) - len(tolerated)} figure(s) reproduce exactly; "
+          f"{len(tolerated)} gated on invariants instead.")
     return 0
 
 

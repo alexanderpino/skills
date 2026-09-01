@@ -41,7 +41,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: terrain-architect/reference-impl/requirements.txt
+          cache-dependency-path: terrain-architect/reference-impl/requirements-lock.txt
 
       # pillow is a hard dependency, not an optional one: heightfield_io.py raises
       # RuntimeError (not ImportError) without it, which pytest.importorskip cannot
@@ -52,8 +52,11 @@ jobs:
       # DECISIVE tier of VALIDATION.md's evidence ladder, the one the file itself calls
       # "genuine evidence of validity, not self-consistency". A CI that installed only
       # requirements.txt would have gone green forever while the strongest tier never ran.
-      - name: Install (including the optional dimensional audit)
-        run: pip install -r requirements.txt -r requirements-validate.txt
+      # requirements-lock.txt pins exact versions so one CI run is comparable to the next.
+      # It does NOT make figure comparison sound across machines -- runs 20 and 21 installed
+      # exactly these versions and still disagreed. See tools/regen_figures.py.
+      - name: Install (locked, including the optional dimensional audit)
+        run: pip install -r requirements-lock.txt -r requirements-validate.txt
 
       - name: Suite
         run: python -m pytest tests/ -q -rs
@@ -84,10 +87,29 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
-          cache-dependency-path: terrain-architect/reference-impl/requirements.txt
+          cache-dependency-path: terrain-architect/reference-impl/requirements-lock.txt
 
-      - name: Install
-        run: pip install -r requirements.txt
+      - name: Install (locked)
+        run: pip install -r requirements-lock.txt
 
       - name: Rebuild every committed figure and diff it pixelwise
         run: python tools/regen_figures.py
+
+  # Evidence gathering, not a gate. Dispatch this repeatedly to land on different runner
+  # hardware and find out which figures actually reproduce across CPUs -- the question that
+  # runs 20 and 21 raised and that no single run can answer. Always exits 0.
+  sample-figures:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terrain-architect/reference-impl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install (locked)
+        run: pip install -r requirements-lock.txt
+      - name: Sample this runner
+        run: python tools/regen_figures.py --sample

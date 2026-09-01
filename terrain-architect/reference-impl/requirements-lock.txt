@@ -1,0 +1,19 @@
+# CI-ONLY LOCK. Not for users of this skill.
+#
+# `requirements.txt` states the FLOORS a reader needs (numpy>=1.24, pillow>=10.0), and that
+# is what the reference implementation actually supports. This file exists so a CI run is
+# comparable to the run before it: with floors alone, two runs weeks apart resolve different
+# wheels and any figure or count difference has two possible causes instead of one.
+#
+# ⚠️ THIS DOES NOT FIX THE CROSS-MACHINE PROBLEM, and must not be read as fixing it.
+# Runs 20 and 21 of the terrain-architect workflow installed EXACTLY these versions and
+# still disagreed — `canyon + strata` pit-storage 5.22e+06 vs 4.16e+06 m³. The cause is
+# numpy's runtime SIMD dispatch differing across runner CPUs, which no pin controls.
+# Pinning removes a variable from the comparison; it does not make the comparison sound.
+#
+# Measured 2026-09-01 on ubuntu-latest / CPython 3.11.16, and identical to the container
+# every figure in this skill was generated on (numpy 2.4.6, pillow 12.3.0, Python 3.11.15).
+numpy==2.4.6
+pillow==12.3.0
+pytest==9.1.1
+pint==0.25.3
