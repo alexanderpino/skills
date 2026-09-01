@@ -33,17 +33,18 @@ fails when the quoted number drifts more than 10 % from it.
 cases expand: `python3 -m pytest -q --collect-only` collects **1649**, and a full run gives
 **1644 passed, 5 skipped** — measured 2026-09-01, with `requirements-validate.txt` installed so
 `test_dimensional.py` actually runs. Without `pint` that module skips at import and the same
-tree reports **⟨UNMEASURED — see registers/wave5-prose-findings.tsv⟩** out of **1639** collected: ten fewer tests, and the
+tree reports **1634 passed, 6 skipped** out of **1639** collected: ten fewer tests, and the
 collected/outcome counts stop agreeing because a module-level skip is an outcome that was
 never a collected test. Neither number is the rigour claim; the point of the sentence is that
 all of them are self-consistency.
 
-⚠️ **1236 is this environment's number too, and the arithmetic below it does not close by
-accident.** `test_dimensional.py`'s `importorskip("pint")` is at MODULE level, so its 10 tests are
-removed from *collection* entirely: the same tree collects 1233 with numpy+pytest alone, 1236 with
-Pillow, and 1246 once pint is installed. And 1231 + 6 = 1237, not 1236 — because five of the six
-skips are function-level and inside the collected count while the sixth happens at collect time and
-is outside it. That reconciliation is stated because this page's own proof technique one paragraph
+⚠️ **The arithmetic above does not close by accident, and which environment you are in decides
+whether it closes at all.** `test_dimensional.py`'s `importorskip("pint")` is at MODULE level, so
+its 10 tests are removed from *collection* entirely: this tree collects **1639** without pint and
+**1649** with it. That is why the two runs reconcile differently. With pint, 1644 + 5 = 1649 and the
+identity holds exactly. Without it, 1634 + 6 = 1640, not 1639 — because five of the six skips are
+function-level and inside the collected count while the sixth happens at collect time and is
+outside it. That reconciliation is stated because this page's own proof technique one paragraph
 down is "617 + 6 = 623 cannot be a run of it"; a reader applying that method here and finding an
 unexplained off-by-one would be right to distrust the page.
 
