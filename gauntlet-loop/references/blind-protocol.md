@@ -108,6 +108,7 @@ measurement as evidence:
 python3 scripts/gauntlet.py log-round --wave 3 --lane imagery --dimension perf \
   --round 5 --mode rubric --winner other --margin clear --score 6 \
   --severity minor --gap "LCP 1.9s against a 1.5s budget" \
+  --closed-when "LCP under 1.5s on the same Lighthouse profile" \
   --evidence gauntlet/bench/w3r5.json
 ```
 

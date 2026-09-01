@@ -47,8 +47,8 @@ sentence, 20–25 words maximum, and no marketing language ("amazing", "leverage
 ## Round log schema
 
 `gauntlet/rounds.jsonl` is append-only and written **only** through
-`gauntlet.py log-round` — the validation (no gap without severity, losers get
-reverted, evidence always) is the point. The workbench renders from it and the
+`gauntlet.py log-round` — the validation (no gap without severity, no gap without
+the target that closes it, losers get reverted, evidence always) is the point. The workbench renders from it and the
 end-of-run report is drafted from it.
 
 Two record shapes share the file, distinguished by `mode`:
@@ -63,6 +63,7 @@ Two record shapes share the file, distinguished by `mode`:
   "score": 7,
   "severity": "minor",
   "gap": "no contact shadow where rock meets ground plane",
+  "closed_when": "a contact shadow at the rock/ground seam, as in bar/ref-cliff.png",
   "evidence": "gauntlet/shots/w3-terrain-r7.png",
   "critic_framing": "domain-specialist"
 }

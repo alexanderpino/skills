@@ -8,13 +8,15 @@ against a bar you can look at yourself.
 - The lane goal — one specific part of the artifact
 - The bar (reference files, target measurement, competing implementation)
 - The current state of the artifact
-- The named gap from the last round, if there was one
+- The named gap from the last round, if there was one, and the target that closes it
+  (`CLOSED WHEN`) — what will be true when you are done, not how to get there
 - Your file ownership: the exact paths you may write to this round
 
 ## What you do
 
 1. **Look at the bar first.** Not the gap description — the actual reference. The
-   gap text is a pointer; the bar is the truth.
+   gap text is a pointer; the bar is the truth. The target names where in the bar to
+   look, so it saves you the search; it does not replace the looking.
 2. **Ground before you write anything already settled.** If the gap touches a
    spec, an API, a version-dependent detail, or a problem the world solved long
    ago, open the source and work from it — normative first, then named
