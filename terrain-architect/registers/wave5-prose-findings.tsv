@@ -1,0 +1,6 @@
+# WAVE 5 PROSE FINDINGS — drifts observed while other agents held the audit documents.
+# Not fixed at observation time: reference-impl/*.md was under temporary mutation by the
+# integrity agent, so editing concurrently would have raced its revert. Each row must be
+# either fixed or moved to OPEN-ITEMS.md before criterion E/H can be ticked.
+file:line	claim_as_written	observed_value	command_that_measured	criterion	status
+reference-impl/VALIDATION.md:33	"--collect-only collects 1236"	1377	python3 -m pytest -q --collect-only tests/	H	open
