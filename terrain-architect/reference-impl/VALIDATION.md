@@ -30,8 +30,12 @@ fails when the quoted number drifts more than 10 % from it.
 
 **Two different counts, so say which.** **620** is the number of `def test` **functions** across
 `tests/` — the quantity `test_audit_drift.py` recomputes. A run reports more, because parametrised
-cases expand: `python3 -m pytest -q --collect-only` collects **1639**, and a full run gives
-**1640 passed, 6 skipped**. Neither number is the rigour claim; the point of the sentence is that
+cases expand: `python3 -m pytest -q --collect-only` collects **1649**, and a full run gives
+**1644 passed, 5 skipped** — measured 2026-09-01, with `requirements-validate.txt` installed so
+`test_dimensional.py` actually runs. Without `pint` that module skips at import and the same
+tree reports **⟨UNMEASURED — see registers/wave5-prose-findings.tsv⟩** out of **1639** collected: ten fewer tests, and the
+collected/outcome counts stop agreeing because a module-level skip is an outcome that was
+never a collected test. Neither number is the rigour claim; the point of the sentence is that
 all of them are self-consistency.
 
 ⚠️ **1236 is this environment's number too, and the arithmetic below it does not close by

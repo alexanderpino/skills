@@ -50,7 +50,7 @@ pytest -q                            # all optional checks now run
 against a suite of 1231.** They are quoted because `VALIDATION.md` holds this file up as the one
 that described the optional-dependency gating correctly — which it did, two lines from a figure
 that was wrong by a factor of nine. Requoted from a measured run; `620` is the number of `def
-test` functions, `1639` the collected count after parametrised expansion, and the three are
+test` functions, `1649` the collected count after parametrised expansion, and the three are
 different quantities.
 
 ⚠️ **Pillow is a real dependency and is now IN `requirements.txt`.** It was not, and the
