@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import os
 import runpy
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -87,8 +88,27 @@ def check_enumeration(figures: list[str]) -> list[str]:
     return problems
 
 
+# Figures that READ another committed figure off disk. capability_grid's hero panel is
+# `Image.open("hero.png")` with a silent `except: return gray(_terr)` fallback, so in a bare
+# scratch directory it does not fail -- it quietly draws SOMETHING ELSE, and this checker would
+# then report an unfixable 200x200 drift forever while CI stayed red for a reason no one could
+# act on. It also means the figures have a BUILD ORDER: capability_grid must be rebuilt after
+# hero, which an alphabetical loop gets wrong.
+READS_FIGURES = {"capability_grid": ("hero",)}
+
+
 def rebuild(stem: str, workdir: Path) -> Path:
-    """Run the producer's __main__ with workdir as CWD, and return the PNG it wrote."""
+    """Run the producer's __main__ with workdir as CWD, and return the PNG it wrote.
+
+    Every committed figure EXCEPT the one being rebuilt is copied in first, so a producer that
+    reads one sees the same input a repo-CWD build would. The one being rebuilt is withheld on
+    purpose: a producer that read its own committed output would reproduce it trivially, and the
+    comparison would prove nothing.
+    """
+    for other in REF.glob("*.png"):
+        if other.stem == stem:
+            continue
+        shutil.copy2(other, workdir / other.name)
     module = PRODUCERS[stem]
     if str(REF) not in sys.path:
         sys.path.insert(0, str(REF))
@@ -146,6 +166,12 @@ def main() -> int:
             print(f"--only names unknown figure(s): {unknown}")
             return 1
         todo = [s for s in todo if s in args.only]
+
+    # Build order: anything read by another figure goes first, so a rebuild never consumes a
+    # stale copy of its input. Alphabetical order put capability_grid before hero and produced
+    # exactly that bug -- a committed figure embedding the previous hero.
+    needed_first = [d for deps in READS_FIGURES.values() for d in deps]
+    todo.sort(key=lambda s: (s not in needed_first, s))
 
     drifted = []
     with tempfile.TemporaryDirectory() as td:

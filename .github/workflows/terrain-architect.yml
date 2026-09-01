@@ -46,11 +46,28 @@ jobs:
       # pillow is a hard dependency, not an optional one: heightfield_io.py raises
       # RuntimeError (not ImportError) without it, which pytest.importorskip cannot
       # catch, so a bare install FAILS the suite rather than skipping it.
-      - name: Install
-        run: pip install -r requirements.txt
+      #
+      # requirements-validate.txt is pint, and pint is what test_dimensional.py imports at
+      # module level. Without it that module SKIPS AT COLLECTION -- all ten of its tests, the
+      # DECISIVE tier of VALIDATION.md's evidence ladder, the one the file itself calls
+      # "genuine evidence of validity, not self-consistency". A CI that installed only
+      # requirements.txt would have gone green forever while the strongest tier never ran.
+      - name: Install (including the optional dimensional audit)
+        run: pip install -r requirements.txt -r requirements-validate.txt
 
       - name: Suite
         run: python -m pytest tests/ -q -rs
+
+      # Proves the point above rather than trusting it: if pint ever stops being installed,
+      # the ten tests go quiet again and only this step notices.
+      - name: The decisive tier actually ran
+        run: |
+          python -m pytest tests/test_dimensional.py -q -rs > dim.txt 2>&1 || true
+          cat dim.txt
+          if grep -qiE 'skipped|no tests ran' dim.txt; then
+            echo "test_dimensional.py did not run -- the dimensional audit is dormant"
+            exit 1
+          fi
 
   regenerate:
     # Criterion H: counts computed, never typed -- and figures REGENERATED, not trusted.

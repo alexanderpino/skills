@@ -21,7 +21,7 @@ verified: { by: process:test_audit_drift.py, at: 2026-08-24T11:51:35Z }
 Each tile is a terrain field or map **generated live in pure NumPy** by a reference implementation of
 a terrain‑generation skill (noise, erosion, hydrology, geology, analysis, rendering). Each caption has
 two parts: **`[chapter] Capability`** and the **oracle/invariant** that the automated test suite uses to
-verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (620 test functions) passes; the
+verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (620 tests) passes; the
 fluvial/tectonic core is cross‑validated against external libraries (RichDEM, Landlab); citations were
 audited against primary sources.
 
