@@ -519,7 +519,7 @@ ON_ERROR = ("raise", "swatch")
 def _check_tile(k, title, tile):
     """The contract every capability thunk owes the montage: an H x W x 3 uint8 RGB image."""
     tile = np.ascontiguousarray(tile)
-    if tile.ndim != 3 or tile.shape[2] != 3 or min(tile.shape[:2]) < 2:
+    if tile.dtype != np.uint8 or tile.ndim != 3 or tile.shape[2] != 3 or min(tile.shape[:2]) < 2:
         raise TypeError(
             f"capability tile {k} {title!r} returned dtype {tile.dtype} shape {tile.shape}; "
             "every tile must be an H x W x 3 uint8 RGB image")
