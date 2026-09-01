@@ -140,7 +140,7 @@ mistaken for the rung having been exercised:
 
 **What the default suite does prove.** On a container with `numpy`, `pytest` and `pillow`
 installed and nothing else. ⚠️ **The `| tail -8` is part of the transcript, not decoration.** `-q`
-prints a progress line per 72 tests whether or not stdout is a terminal, so the real output is 26
+prints a progress line per 72 tests whether or not stdout is a terminal, so the real output is 31
 lines and this is its last 8. An earlier version of this block showed the same 8 lines and called
 them "pasted from the command as it printed" — which was the very defect this paragraph exists to
 record, committed one paragraph below the warning about it. If the elision is not in the command,
@@ -155,7 +155,7 @@ SKIPPED [1] tests/test_crossvalidate.py:44: could not import 'pysheds': No modul
 SKIPPED [1] tests/test_crossvalidate_landlab.py:42: could not import 'landlab': No module named 'landlab'
 SKIPPED [1] tests/test_crossvalidate_landlab.py:79: could not import 'landlab': No module named 'landlab'
 SKIPPED [1] tests/test_crossvalidate_landlab.py:107: could not import 'landlab': No module named 'landlab'
-1231 passed, 6 skipped in 490.35s (0:08:10)
+1634 passed, 6 skipped in 498.55s (0:08:18)
 ```
 
 So: rung 3 — the analytic benchmarks — **did** run. ⚠️ **Rung 5's ESTIMATOR ran; its real-DEM half

@@ -112,8 +112,22 @@ does not evidence, which is the thing a reader needs before trusting it as cover
 Separate from the panel grid above: **diagrams and measured comparisons**, not field renders. The
 gallery answers "what does this operator look like"; these answer "what is the geometry the chapter
 is describing" and "does the shipped solver actually match its benchmark" — for the **four** places
-where the prose was carrying more than prose should. Each regenerates deterministically and each is
-guarded, because a figure that drifts from its text is worse than no figure.
+where the prose was carrying more than prose should.
+
+⚠️ **This section used to say "each regenerates deterministically" and mean these four.** All
+**fourteen** committed figures are now rebuilt and diffed pixelwise by `tools/regen_figures.py`,
+whose enumeration starts from `git ls-files '*.png'` rather than from the table below — a checker
+keyed on this table would have certified four and said nothing about ten. When it was first run,
+**six of the fourteen did not reproduce**: the field renders had been left behind by this branch's
+own repairs to `render.py`, `flow.py`, `analysis.py` and `landforms.py`, and the suite was green
+through all of it, because nothing in it compared a committed PNG against its producer. They are
+regenerated and all fourteen now reproduce exactly.
+
+Two things that cost real time and are worth knowing before editing a figure. `capability_grid.py`
+**reads `hero.png` off disk** behind a silent `except: return gray(_terr)`, so the figures have a
+build ORDER — rebuild `hero` first — and a producer run in an empty directory does not fail, it
+quietly draws something else. And reproduction is verified on one container only; whether a
+different machine yields the same pixels is what CI answers.
 
 | Figure | Regenerate | Guard | Chapter that uses it |
 |---|---|---|---|

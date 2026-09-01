@@ -3,15 +3,15 @@
 # integrity agent, so editing concurrently would have raced its revert. Each row must be
 # either fixed or moved to OPEN-ITEMS.md before criterion E/H can be ticked.
 file:line	claim_as_written	observed_value	command_that_measured	criterion	status
-reference-impl/VALIDATION.md:33	"--collect-only collects 1236"	1377	python3 -m pytest -q --collect-only tests/	H	open
-reference-impl/GALLERY.md:115	"Each regenerates deterministically" (of the four anatomy figures)	true for those four; six of the fourteen committed figures do not reproduce at all	python tools/regen_figures.py	H	open
-reference-impl/GALLERY.md:118-123	regenerate-command table lists 4 figures	14 PNGs are committed; 10 had no documented regenerate command	git ls-files '*.png'	H	open
-reference-impl/VALIDATION.md:23	"530 tests pass"	620 `def test` functions on disk (14.5% off; the row's own band is 10%)	grep -c 'def test' across tests/	E	open
-reference-impl/VALIDATION.md:31	"**530** is the number of `def test` functions"	620 — the spelling that was unguarded	test_audit_drift count-claim oracle	E	open
-reference-impl/README.md:52	same 530 figure, third spelling	620	test_audit_drift count-claim oracle	E	open
-reference-impl/REVIEW-BRIEF.md:24	"The whole suite (334 tests) passes"	1600+ (46.1% off); the document was outside the guard domain entirely	test_audit_drift domain now globs reference-impl/*.md	E	open
-reference-impl/VALIDATION.md:153	"1231 passed, 6 skipped in 490.35s" presented as a run of this environment	the suite now runs 1600+; not machine-checkable from a transcript, so no assertion claims it	manual read	E	open
-reference-impl/ATOM-COVERAGE.md	solver paragraph omits flow.breach_fill and flow.hybrid_accumulation	both are public and shipped; 03-flow-routing.md:101 calls the hybrid 'the right default for terrain generation'	test_atom_coverage symbol-depth row (RED on purpose)	A	open
+reference-impl/VALIDATION.md:33	"--collect-only collects 1236"	1377	python3 -m pytest -q --collect-only tests/	H	closed
+reference-impl/GALLERY.md:115	"Each regenerates deterministically" (of the four anatomy figures)	true for those four; six of the fourteen committed figures do not reproduce at all	python tools/regen_figures.py	H	closed
+reference-impl/GALLERY.md:118-123	regenerate-command table lists 4 figures	14 PNGs are committed; 10 had no documented regenerate command	git ls-files '*.png'	H	closed
+reference-impl/VALIDATION.md:23	"530 tests pass"	620 `def test` functions on disk (14.5% off; the row's own band is 10%)	grep -c 'def test' across tests/	E	closed
+reference-impl/VALIDATION.md:31	"**530** is the number of `def test` functions"	620 — the spelling that was unguarded	test_audit_drift count-claim oracle	E	closed
+reference-impl/README.md:52	same 530 figure, third spelling	620	test_audit_drift count-claim oracle	E	closed
+reference-impl/REVIEW-BRIEF.md:24	"The whole suite (334 tests) passes"	1600+ (46.1% off); the document was outside the guard domain entirely	test_audit_drift domain now globs reference-impl/*.md	E	closed
+reference-impl/VALIDATION.md:153	"1231 passed, 6 skipped in 490.35s" presented as a run of this environment	the suite now runs 1600+; not machine-checkable from a transcript, so no assertion claims it	manual read	E	closed
+reference-impl/ATOM-COVERAGE.md	solver paragraph omits flow.breach_fill and flow.hybrid_accumulation	both are public and shipped; 03-flow-routing.md:101 calls the hybrid 'the right default for terrain generation'	test_atom_coverage symbol-depth row (RED on purpose)	A	closed
 reference-impl/VALIDATION.md:33	"1640 passed, 6 skipped" — WAS a prediction; REPLACED with the measured 1644 passed, 5 skipped / 1649 collected (2026-09-01)	must be requoted from the actual final run before this branch is proposed; a typed count is the exact defect criterion H forbids	python3 -m pytest tests/ -q	H	closed
 reference-impl/VALIDATION.md:36	the no-pint figure — I typed "1634 passed, 6 skipped" as ARITHMETIC (1632 + the 2 then-failing), not a reading	placeholder in the document until the shadowed-import run lands; MEASURED 2026-09-01 with pint blocked at sys.meta_path: 1634 passed, 6 skipped, 1639 collected. The guessed value was right, which is why writing it unmeasured was still wrong. 1634+6=1640 != 1639 -- the off-by-one returns exactly when the module skip does, confirming the diagnosis	PYTHONPATH=<meta_path blocker> python -m pytest tests/ -q	H	closed
 
