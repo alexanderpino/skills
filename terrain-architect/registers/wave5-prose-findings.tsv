@@ -6,3 +6,9 @@ file:line	claim_as_written	observed_value	command_that_measured	criterion	status
 reference-impl/VALIDATION.md:33	"--collect-only collects 1236"	1377	python3 -m pytest -q --collect-only tests/	H	open
 reference-impl/GALLERY.md:115	"Each regenerates deterministically" (of the four anatomy figures)	true for those four; six of the fourteen committed figures do not reproduce at all	python tools/regen_figures.py	H	open
 reference-impl/GALLERY.md:118-123	regenerate-command table lists 4 figures	14 PNGs are committed; 10 had no documented regenerate command	git ls-files '*.png'	H	open
+reference-impl/VALIDATION.md:23	"530 tests pass"	620 `def test` functions on disk (14.5% off; the row's own band is 10%)	grep -c 'def test' across tests/	E	open
+reference-impl/VALIDATION.md:31	"**530** is the number of `def test` functions"	620 — the spelling that was unguarded	test_audit_drift count-claim oracle	E	open
+reference-impl/README.md:52	same 530 figure, third spelling	620	test_audit_drift count-claim oracle	E	open
+reference-impl/REVIEW-BRIEF.md:24	"The whole suite (334 tests) passes"	1600+ (46.1% off); the document was outside the guard domain entirely	test_audit_drift domain now globs reference-impl/*.md	E	open
+reference-impl/VALIDATION.md:153	"1231 passed, 6 skipped in 490.35s" presented as a run of this environment	the suite now runs 1600+; not machine-checkable from a transcript, so no assertion claims it	manual read	E	open
+reference-impl/ATOM-COVERAGE.md	solver paragraph omits flow.breach_fill and flow.hybrid_accumulation	both are public and shipped; 03-flow-routing.md:101 calls the hybrid 'the right default for terrain generation'	test_atom_coverage symbol-depth row (RED on purpose)	A	open

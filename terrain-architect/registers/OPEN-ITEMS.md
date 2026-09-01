@@ -277,3 +277,246 @@ directory.
   a new named HEAD** (not appended to), or the file is declared out of corpus and its four claims
   are checked by hand here. Re-deriving is the honest option if more root-level documents are
   expected; appending is never an option.
+
+## 20. Four dead `cellsize` parameters that only a non-owned test file stops us deleting
+
+- **What.** A public function declares a parameter no line of its body reads. The class is already
+  confirmed twice on this tree (`render.material_rgb`'s `shade` and `cellsize`), and the code wave
+  built the full AST census for it. Six survivors were found; two were fixed; four remain, all of
+  them the same parameter, `cellsize`, and all four blocked by a call site in a test file the code
+  wave does not own.
+- **Where found.** `reference-impl/tests/test_render.py`,
+  `test_no_public_function_declares_a_parameter_it_never_reads` and its
+  `DEAD_PARAMETER_EXEMPTIONS` table, which carries the reason and the blocking call for each.
+- **Measurement.** 44 modules, 314 public functions and public methods, 1320 parameters, 6 dead.
+  Fixed: `halfar_anatomy.sia_at_cfl(n)` (deleted; `cellsize` made keyword-only because the one call
+  site passed `n` positionally in front of it, so a bare deletion would have slid `n = 121` into
+  `cellsize = 12000.0`) and `analysis.peaks(cellsize)` (deleted; `radius` and `eps` made
+  keyword-only). Remaining, with the blocker:
+  - `aeolian.yardang(cellsize)` — `tests/test_gallery_doc.py:90` passes `cellsize=_CELLSIZE`.
+  - `tectonics.fault_weakness(cellsize)` — `tests/test_gallery_doc.py:94` passes it.
+  - `analysis.deposit_fill(cellsize)` — second POSITIONAL slot; `tests/test_archetypes.py:151`
+    passes it positionally, as do `graph_demo.py`, `archetypes.py` and `analysis.texture_base`.
+  - `hydrology.water_surface(cellsize)` — a REQUIRED positional slot; `tests/test_hydrology.py`
+    lines 13, 28, 39 and `tests/test_gallery_doc.py:99,100` all pass it positionally.
+- **Why not fixed.** Deleting a parameter is an API change, and each of these four needs a
+  simultaneous edit to a test file outside the code wave's ownership. For `deposit_fill` and
+  `water_surface` the deletion is also the `material_rgb(masks, cellsize, palette)` hazard exactly:
+  the slot is positional, so a bare removal does not raise, it hands the next argument to the wrong
+  parameter. Implementing them instead is not a free alternative — see item 21.
+- **What would fix it.** One patch per function, deleting the parameter and making everything after
+  it keyword-only so a stale positional call raises instead of landing in the wrong slot, plus the
+  matching one-line edit at each call site listed above:
+  `aeolian.yardang(h, wind, soft_mask, *, ... seed=0)` and `tests/test_gallery_doc.py:90` loses
+  `cellsize=_CELLSIZE`; `tectonics.fault_weakness(shape, *, ... seed=0)` and
+  `tests/test_gallery_doc.py:94` the same; `analysis.deposit_fill(h, *, radius=3)` with the four
+  call sites dropping their second positional argument; `hydrology.water_surface(bed, discharge,
+  *, ...)` and `hydrology.water_depth(bed, discharge, **kw)` with five call sites updated.
+
+## 21. `test_scale_contract` credited a declaration as a fact, and two atoms were passing on it
+
+- **What.** `test_every_atom_is_scale_explicit` asked `"cellsize" in signature(fn).parameters` and
+  treated the answer as evidence the atom is resolution-aware. A parameter that is declared and
+  never read satisfies that exactly, so the `08` scale contract was being met, for two atoms, by an
+  argument nothing reads. This is now fixed — the guard asks the dead-parameter census whether the
+  parameter is READ — but the underlying atoms are not.
+- **Where found.** `reference-impl/tests/test_scale_contract.py`, and the two new entries in
+  `PIXEL_OR_CALLER_SPACE`.
+- **Measurement.** 2 of the atoms in the coverage manifest: `aeolian.yardang` and
+  `tectonics.fault_weakness`. Both are exempted on their real grounds (index-space geometry) rather
+  than on the dead parameter. Mutation-proved: making `erosion_thermal.thermal_erosion` stop
+  reading its `cellsize` now turns the guard red; laundering the same parameter through an alias
+  does not.
+- **Why not fixed.** Making the parameter real is not a wiring change in either case.
+  `yardang`'s lane frequencies `freq_along=0.018` and `freq_cross=0.11` are per-CELL, so a
+  per-metre reading needs both defaults re-baselined — a constant change that belongs with chapter
+  16, not with the module. `fault_weakness`'s `width=4.0` is a Gaussian half-width in cells; read
+  as metres it is sub-cell at any realistic resolution and the function would silently return a
+  uniform `K`, which is worse than the dead parameter.
+- **What would fix it.** A chapter-16 decision on the yardang lane wavelength in metres, and a
+  chapter-02 decision on fault damage-zone width in metres (a few hundred metres is the usual
+  figure), then thread `cellsize` through both and delete the two exemptions.
+
+## 22. `07` recommends Ulichney tiles twice and nothing implements them
+
+- **What.** The one in-scope capability the chapters recommend that has no implementation at all.
+  `07` names Ulichney void-and-cluster tiles as the recommendation for dense ground cover and again
+  as the tiling answer ("Preferred"), and `scatter.py` ships `poisson_disk` (Bridson),
+  `scatter_by_density`, `jittered_grid` and `rule_based` — so the shipped ground-cover story is the
+  option `07` itself ranks second and calls "not true blue noise".
+- **Where found.** `references/07-scatter.md:149` and `:175`; enumerated as
+  `ulichney-ground-cover` in `reference-impl/tests/test_graph_demo.py`'s
+  `RECOMMENDED_CAPABILITIES`, pinned in `KNOWN_UNREACHABLE`.
+- **Measurement.** 9 recommended capabilities enumerated from 38 recommendation-language lines
+  across `references/*.md`; 8 reachable from the shipped graph, 1 not. Both sides of the gap are
+  pinned by `test_ulichney_tiles_are_still_recommended_and_still_absent`, so implementing it turns
+  that row red and forces the census to be re-adjudicated rather than quietly closed.
+- **Why not fixed.** A void-and-cluster tile generator is a new atom with its own oracle (tileable
+  by construction, blue-noise spectrum, deterministic), not a wiring fix, and the atom set is
+  frozen in `test_atom_coverage.IMPLEMENTED`.
+- **What would fix it.** `scatter.ulichney_tile(n, seed)` plus a spectral oracle, a row in
+  `IMPLEMENTED` and in `ATOM-COVERAGE.md`, and promotion of the census row from `KNOWN_UNREACHABLE`
+  to a real reachability row.
+
+## 23. The recommendation sweep cannot find the recommendation it was built for
+
+- **What.** The mechanical population for criterion G2 was extracted by searching `references/*.md`
+  for recommendation language. `03:247` recommends the hybrid MFD/D8 router in the words "this
+  costs almost nothing and is what most good terrain tools do" — no recommendation word anywhere in
+  the sentence — so the extraction rule provably misses the very instance the criterion was written
+  around. The row is carried by hand and labelled as hand-added.
+- **Where found.** `reference-impl/tests/test_graph_demo.py`, the denominator block above
+  `RECOMMENDED_CAPABILITIES`.
+- **Measurement.** 38 lines found mechanically; 29 excluded in eleven counted buckets; 9 in scope;
+  1 added by hand. A rule that misses one known member of its own population has an unknown miss
+  rate on the rest.
+- **Why not fixed.** The honest response to a lossy extraction rule is to report the loss, not to
+  widen the regex until the tests pass — a widened regex would fold in the 29 excluded lines and
+  the census would stop being finite.
+- **What would fix it.** A read of all 30 chapters by a human or a model, marking every sentence
+  that ranks one shipped option above another, and a comparison of that list against these 9.
+
+## 24. `03` recommends breach/fill as the DEFAULT; the shipped graph still defaults to fill
+
+- **What.** `flow.breach_fill` now exists and is selectable from the demo graph, which is what
+  criterion G2 required. But `03:101` does not merely offer it, it calls it "the right default for
+  terrain generation", and `graph_demo`'s fill node still ships `method="fill"` — as `_area_fn`
+  still ships `method="d8"` against `03:247`'s recommended hybrid. Reachable is not the same as
+  default, and two chapters currently recommend a default the demo does not take.
+- **Where found.** `references/03-flow-routing.md:101` and `:247`; `reference-impl/graph_demo.py`,
+  the `filled` and `area` node parameters.
+- **Measurement.** On a 60x60 noisy plain with one 60 m crater, `priority_flood_fill` raises 1029
+  cells above the input and `breach_fill(max_depth=10)` raises 476 — the crater still fills to a
+  lake, the noise pits are carved out. That is the lakes-vs-canyons trade `03` describes, measured.
+- **Why not fixed.** Changing a shipped default changes every downstream figure and every
+  behavioural expectation in the demo's guards; it is a judgement about what the demo is for, not a
+  defect. Recording it is the point.
+- **What would fix it.** A decision, written down in `graph_demo.py`, either flipping both defaults
+  to the chapter's recommendation or stating why the demo deliberately ships the simpler one.
+
+## 25. `crater_anatomy.py` has no build guard, and the guard costs three lines in a non-owned file
+
+- **What.** `VALIDATION.md` rung 4 stakes a corrected morphology on this figure — a grazing crater
+  is deeper UP-RANGE — and the figure was the only artifact in the tree carrying that claim with no
+  build guard in any environment. It could stop building, or start drawing the deepest point
+  down-range again (the exact defect rung 4 corrected), and nothing would fail.
+- **Where found.** `reference-impl/crater_anatomy.py`; `reference-impl/VALIDATION.md:317-318`.
+- **Measurement.** `build()` now takes an output path and returns `(canvas, facts)`; on the shipped
+  parameters it reports `deepest_col=216` against `centre=230`, i.e. up-range, with
+  `ellipticity=2.00` and `diameter_m=1446.6`. `tests/test_anatomy_figures.py` already carries the
+  module-level `pytest.importorskip("PIL")`, so the guard costs one import and two asserts.
+- **Why not fixed.** `tests/test_anatomy_figures.py` is not in the code wave's ownership. The
+  module-side half is done; only the guard row is outstanding.
+- **What would fix it.** Append to `reference-impl/tests/test_anatomy_figures.py`:
+
+  ```python
+  def test_crater_anatomy_builds_and_still_draws_the_uprange_asymmetry(tmp_path):
+      """VALIDATION.md rung 4 stakes a corrected morphology on this figure: a grazing impact is
+      deeper UP-RANGE (first contact / peak energy), not down-range. The figure was the only
+      artifact carrying that claim with no build guard, so it could silently stop building or
+      silently flip back to the skipping-stone intuition rung 4 corrected."""
+      import crater_anatomy
+      img, facts = crater_anatomy.build(str(tmp_path / "crater_anatomy.png"))
+      assert img.size[0] > 900 and img.size[1] > 700
+      assert facts["deepest_col"] < facts["centre"], (
+          "the trajectory cross-section's deepest point is no longer up-range (%d vs centre %d); "
+          "that is the rung-4 defect returning" % (facts["deepest_col"], facts["centre"]))
+      assert facts["ellipticity"] > 1.5    # a grazing cavity is elongated, not circular
+  ```
+
+## 26. Two frozen register rows now describe module text that has moved
+
+- **What.** The code wave was asked to make `glacier.py` and `dunes.py` self-consistent. Both were
+  fixed on the DOCSTRING side, never the shipped value, precisely so that
+  `test_pseudocode_drift.KNOWN_DIVERGENCES` — which pins `K_g=8e-4` and `hop=1,` in the module
+  source under a staleness rule — keeps holding. But `constant-pairs.tsv` also records the
+  docstring side of the dune case, and that text has changed.
+- **Where found.** `registers/constant-pairs.tsv:412`, verdict `chapter_vs_chapter`, recording
+  `docstring:dunes.py hop@49 = 5`.
+- **Measurement.** `dunes.py`'s docstring no longer says "Werner used ~5 cells" as a bare claim; it
+  now enumerates all four statements of `hop` (05:412 says ~5, 05:399 says ≈3, the docstring said
+  5, the signature ships 1) and says which is which. The row's *finding* is unchanged and in fact
+  strengthened; only the quoted text moved.
+- **Why not fixed.** The registers are frozen and this wave may fill verdicts, not edit rows.
+- **What would fix it.** A later wave re-quotes the docstring side of row 412, or notes that the
+  divergence it records is now stated in the module rather than merely implied by it.
+
+## 27. `05` states the dune saltation hop as two different numbers, thirteen lines apart
+
+- **What.** The dune `hop` was described to the code wave as a three-way split (`05` says ≈3, the
+  `dunes.py` docstring says ~5, the signature ships 1). It is a FOUR-way split, and the fourth is
+  inside one chapter: `05:412`'s Werner pseudocode block fixes `L = saltationHop  # ~5 cells,
+  fixed`, while `05:399`'s runnable-reference note says the hop is "≈3 cells". So the chapter
+  contradicts itself before any module is consulted.
+- **Where found.** `references/05-erosion-thermal-aeolian.md:399` and `:412`.
+- **Measurement.** Four values for one constant: 5 (05:412), 3 (05:399), 5 (dunes.py docstring,
+  now rewritten to enumerate all four), 1 (`werner_dunes`'s default). Every actual call site in the
+  repository passes `hop=3` — `capability_grid.py:317` and the dune-forming rows of
+  `tests/test_dunes.py` — so the shipped default of 1 is used by nothing.
+- **Why not fixed.** `references/` belongs to a later wave, and the shipped default is pinned by
+  `test_pseudocode_drift.KNOWN_DIVERGENCES`'s `werner-saltation-hop` row.
+- **What would fix it.** `05` must state ONE value. The recommendation from the code side: make
+  both places say **~3 cells**, since 3 is what every call site in this repository actually runs and
+  what `05:399` already tells a reader; then raise `werner_dunes`'s default from 1 to 3, delete the
+  `werner-saltation-hop` divergence row and add a normal pinned pair in its place. If instead `05`
+  keeps Werner's ~5, the module default should become 5 and `05:399` must be corrected — but the
+  one outcome that must not survive is two numbers in one chapter.
+
+---
+
+## 28. `guard-domains.tsv`'s row for `test_slope_units.py` now describes a guard that no longer exists
+
+- **What.** The frozen row records `keyed_on = identifier containing the SUBSTRING 'slope'`,
+  `population 151 / matched 111 / 73.5%`. That guard has been replaced: the default is inverted,
+  so the key is the trig CALL and every call in the domain is a defect unless its argument is
+  positively shown to be an angle (numeric/degree/π literal, a symbol registered for that file, or
+  an `atan`/`arctan`/`radians` wrapper). The row is frozen and its freeze rule allows a wave to
+  "correct a population/matched figure or sharpen a note", but not to change what the column
+  means, so the correction is recorded here instead of overwritten there.
+- **Where found.** `registers/guard-domains.tsv` line 92; the replacement is
+  `reference-impl/tests/test_slope_units.py`.
+- **Measurement.** New figures, asserted in-file by
+  `test_the_scan_adjudicates_every_trig_call_in_the_domain`: 151 files in the declared domain, 66
+  of them carrying a trig call, 347 trig calls, 347 adjudicated (identity holds — nothing is
+  skipped), and **327 of the 347 (94.2%) decided without the word `slope` appearing anywhere in
+  the argument**, against 0 for the old key. Both guards were loaded side by side from commit
+  `d8dbd8c` and the current tree and called on the same strings: `np.sin(s)`, `np.sin(gradient)`,
+  `np.tan(dzdx)`, `np.sin(repose)`, `np.sin(np.hypot(dzdx, dzdy))`,
+  `np.sin(slope + np.arctan(aspect))`, `np.sin(np.degrees(np.arctan(slope)))`,
+  `np.tan(maxSlope)` in `analysis.py`, and a 497-character argument — old = 0 hits on all nine,
+  new = 1 hit on all nine.
+- **Why not fixed.** The register is frozen and three other agents are writing to this directory in
+  the same wave; rewriting a frozen row's `keyed_on` is not a figure correction.
+- **What would fix it.** In the next wave, replace that row's `keyed_on` with "any trig-family
+  call whose argument is not a numeric/degree/π literal, a symbol in ANGLE_REGISTER for that file,
+  or wrapped in atan/arctan/atan2/radians/deg2rad", and its coverage with the reach denominator
+  above (347/347 adjudicated, 327 word-independent). The full proof set is in
+  `registers/mutation-proofs.partial-slope.tsv`.
+
+---
+
+## 29. `test_atom_coverage.py` still carries its own private text model, which disagrees with the shared one
+
+- **What.** `reference-impl/tests/_textscan.py` now holds the one fence model, the one Python
+  prose model, the identifier pattern and the completeness matcher, and `test_slope_units.py` has
+  adopted it. `test_atom_coverage.py` has not: it keeps `_FENCE = r"^```[^\n]*\n(.*?)^```"`
+  (column 0 only), `_IDENT`, `_pattern`/`_complete` and `_strip_py_comments`.
+- **Where found.** `reference-impl/tests/test_atom_coverage.py:68` (`_IDENT`), `:70` (`_FENCE`), `:140` (`_pattern`), `:194` (`_complete`), `:199` (`_strip_py_comments`).
+- **Measurement.** Over the 44 Markdown documents in the scanned corpus, the shared model and the
+  column-0 model disagree on 31. Four of those are substantive: `03-flow-routing.md` (+67 chars),
+  `12-glacial-coastal.md` (+428), `13-climate-ecosystem.md` (+130), `26-hexagonal-grids.md`
+  (+296) — whole fenced blocks that `test_atom_coverage.py` cannot see because they are indented
+  under a list item (`03:693`, `12:293`, `12:2095`, `13:461`, `26:345`). Its
+  `test_landform_is_documented_as_a_routine` and `test_pseudocode_header_matches` search
+  `_fenced(...)` only, so a routine documented inside one of those blocks reads as undocumented.
+  The other 27 differences are exactly one trailing newline per block (`-1` char × block count)
+  and are not behavioural. The shared model agrees with this file's own previous `lstrip` model on
+  all 44 documents, line for line. `complete_pattern` and `blank_py_prose` were checked to be
+  byte-identical to that file's `_pattern` and `_strip_py_comments` over the corpus.
+- **Why not fixed.** `test_atom_coverage.py` is owned by another agent, running concurrently.
+- **What would fix it.** Four substitutions in that file, no behaviour change except the four
+  chapters: `_fenced(text)` -> `"\n".join(b.text for b in _textscan.fenced_blocks(text))` (or
+  `_textscan.fenced_text(text)`); `_IDENT` -> `_textscan.IDENT`; `_pattern`/`_complete` ->
+  `_textscan.complete_pattern`/`complete_match`; `_strip_py_comments(src)` ->
+  `_textscan.blank_py_prose(src, path)`. Its `test_fenced_reads_pseudocode_only` fixture keeps
+  passing as written.

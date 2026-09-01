@@ -1107,7 +1107,7 @@ def _public_symbols(module):
 # The scope doc's own guarantee is "the reference module's public surface must not contain an atom
 # missing from this list". Above, that sentence is enforced for exactly TWO modules
 # (`test_noise_surface_has_no_undocumented_atom`, `test_ops_surface_is_fully_accounted_for`). For
-# the other 19 documented modules nothing checked it, and the sentence is in fact false for 58
+# the other 19 documented modules nothing checked it, and the sentence is in fact false for 57
 # public symbols across 14 of them. Each of those 58 is written down here with the reason it is not
 # an atom — because "58 undocumented public callables" is a fact about this repository that should
 # be visible in the guard, not a fact the guard is unable to see.
@@ -1148,9 +1148,14 @@ SYMBOL_EXEMPT = {
     "erosion_thermal": {
         "max_slope":          "diagnostic used to pick a timestep, not a terrain operator",
     },
-    "flow": {
-        "hybrid_accumulation": "composition of the documented `mfd_accumulation` and `d8_accumulation`",
-    },
+    # flow: DELIBERATELY EMPTY, and it must stay that way until the doc is fixed. Two public
+    # routing atoms — `breach_fill` (Lindsay 2016 least-cost breaching) and `hybrid_accumulation` —
+    # appear nowhere in ATOM-COVERAGE.md, and chapter `03` calls the hybrid of the two "the right
+    # default for terrain generation" (03-flow-routing.md:101). An exemption reading "a composition
+    # of the documented atoms" was drafted here and then withdrawn: it would have been this guard
+    # papering over the exact defect it was written to expose, on its first run, with prose. The
+    # row below is RED on purpose. The fix is one code span per atom in ATOM-COVERAGE.md's solver
+    # paragraph plus the two names in IMPLEMENTED["flow"] — a doc edit, not a test edit.
     "landforms": {
         "crater_diameter":    _MACRO + " (pi-scaling sizing formula feeding `impact_crater`)",
         "impact_crater":      _MACRO,
@@ -1214,7 +1219,7 @@ SYMBOL_EXEMPT = {
 # the symbol-level obligation (47.7% of modules at symbol depth, 0% before).
 _TOTAL_MODULES = 44
 _DOC_NAMED_COUNT = 21
-_SYMBOL_EXEMPT_COUNT = 58
+_SYMBOL_EXEMPT_COUNT = 57
 
 
 def test_every_module_on_disk_is_classified():

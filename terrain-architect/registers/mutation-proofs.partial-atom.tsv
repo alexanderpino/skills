@@ -17,11 +17,23 @@
 # clean of module changes afterwards. Nothing in `observed` or `decoy_observed` is predicted.
 #
 # STANDING FAILURE, PRESENT IN EVERY RUN BELOW AND FILTERED OUT OF THE OBSERVATIONS.
-# test_documented_module_has_no_undocumented_public_symbol[flow] fails on the UNMUTATED tree: a
-# concurrent agent added flow.breach_fill (Lindsay 2016 least-cost breaching, 109 lines, flow.py:116)
-# and did not add it to ATOM-COVERAGE.md. That is a REAL instance of the defect class this wave
-# exists to close, caught by the new guard on its first run, and it is deliberately NOT exempted.
-# See the report; the fix belongs to whoever owns flow.py / ATOM-COVERAGE.md.
+# test_documented_module_has_no_undocumented_public_symbol[flow] fails on the UNMUTATED tree, on
+# ['breach_fill', 'hybrid_accumulation']. Both are public routing atoms in flow.py; neither appears
+# anywhere in ATOM-COVERAGE.md, and chapter 03 calls the hybrid of the two "the right default for
+# terrain generation" (references/03-flow-routing.md:101). hybrid_accumulation landed in commit
+# d03bf86 on this branch, breach_fill was still uncommitted when this guard first ran. That is a
+# REAL instance of the defect class this wave exists to close, caught on the guard's first run, and
+# it is deliberately NOT exempted.
+#
+# ONE EXEMPTION WAS DRAFTED AND WITHDRAWN, which is worth recording because it is the failure mode
+# this whole register exists to catch. SYMBOL_EXEMPT["flow"]["hybrid_accumulation"] was first
+# written as "composition of the documented mfd_accumulation and d8_accumulation" — plausible
+# prose, and it turned the row green. It was withdrawn on evidence: chapter 03 promotes the hybrid
+# to the recommended default, and the routine's own author recorded it as undocumented. An
+# exemption that makes a guard green on the first real defect it finds is the guard papering over
+# its own subject. SYMBOL_EXEMPT["flow"] is now empty, by comment, and the count fell 58 -> 57.
+# The fix is a doc edit, not a test edit: one code span per atom in ATOM-COVERAGE.md's solver
+# paragraph, plus both names in IMPLEMENTED["flow"].
 #
 # COLUMN CONTRACT
 #   mutation          the exact edit introducing the defect class (subject file, before -> after).

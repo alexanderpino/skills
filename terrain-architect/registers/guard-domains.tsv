@@ -27,7 +27,34 @@
 #
 # WORST COVERAGE: test_scale_contract.py 19.1% (59/309), test_chapter_numbers.py 20.0% (6/30),
 # test_render.py 25.0%, test_noise_pinch.py 40.0%, test_pseudocode_drift.py 40.0%,
-# test_audit_drift.py 45.5%, test_atom_coverage.py 52.3%, test_slope_units.py 73.5%.
+# test_audit_drift.py 45.5%, test_atom_coverage.py 47.7% (was recorded 52.3%, see AMENDMENT),
+# test_slope_units.py 73.5%.
+#
+# ── AMENDMENT, after the guard wave. Three cells in this register were WRONG. ─────────────
+# A frozen enumeration freezes the LIST OF THINGS TO CHECK. It cannot freeze a measurement that
+# was mis-measured, and refusing to correct one would make this file the thing it exists to
+# prevent. What changed, and how each was caught:
+#
+#   1. test_atom_coverage.py: matched 23 / 52.3%  ->  matched 21 / 47.7%.
+#      The two figures were TRANSPOSED: 23 is the size of the COMPLEMENT, the modules the guard
+#      does not reach. Recomputed mechanically off ATOM-COVERAGE.md code spans against
+#      reference-impl/*.py: 44 modules, 21 named, 23 not. Confirmed twice, independently, by the
+#      agent that rewrote the guard and by the wave lead.
+#
+#   2. test_skill_integrity.py keyed_on: the `f"def {node}("` SUBSTRING symbol check does not
+#      exist. It was retired at 028e900 and survives only as a comment at line 84 explaining why.
+#      This register was written from that comment as though it described live code.
+#
+#   3. test_cited_paths_exist.py keyed_on: bare-prose paths ARE collected. The BARE token family
+#      landed at 028e900 (line 101 of the guard at 23bceef). The cell described the recogniser as
+#      it stood before that commit.
+#
+# The common cause is worth more than the three fixes: this file says FROZEN at HEAD 0cdd5b1, but
+# two of its keyed_on cells describe guards that 028e900 had ALREADY repaired. The enumeration was
+# frozen against a reading of the tree that was older than the tree. Briefs written from it sent
+# two agents to fix holes that were already closed — both of them said so with evidence and
+# refused to comply, which is the only reason this is an amendment and not a regression.
+# ─────────────────────────────────────────────────────────────────────────────────────────
 #
 # FREEZE RULE: this row list is final — one row per guard file at this HEAD. Later waves may
 # correct a population/matched figure or sharpen a note, but may not add or remove a guard row.
@@ -41,7 +68,7 @@ test_analytic.py	— none (numeric/behavioural guard: builds arrays, calls the m
 test_anatomy_figures.py	— none (numeric/behavioural guard: builds arrays, calls the module, asserts on values)	0	0	n/a	— not keyed on text or source —	No file is read and no source is introspected, so this guard has no scan domain and cannot carry a keying defect. Row present so the 61-file denominator is complete and no guard sits outside the freeze.
 test_anisotropy.py	— none (numeric/behavioural guard: builds arrays, calls the module, asserts on values)	0	0	n/a	— not keyed on text or source —	No file is read and no source is introspected, so this guard has no scan domain and cannot carry a keying defect. Row present so the 61-file denominator is complete and no guard sits outside the freeze.
 test_archetypes.py	— none (numeric/behavioural guard: builds arrays, calls the module, asserts on values)	0	0	n/a	— not keyed on text or source —	No file is read and no source is introspected, so this guard has no scan domain and cannot carry a keying defect. Row present so the 61-file denominator is complete and no guard sits outside the freeze.
-test_atom_coverage.py	reference-impl/ATOM-COVERAGE.md + reference-impl/*.py	44	23	52.3	a hand-written IMPLEMENTED dict of 91 atom names, matched against ATOM-COVERAGE.md identifiers via _IDENT / _CODE_SPAN / _FENCE	23 of 44 shipped modules are named. An atom that exists in code but is absent from IMPLEMENTED is neither required to be documented nor detected as undocumented — the register defines its own denominator.
+test_atom_coverage.py	reference-impl/ATOM-COVERAGE.md + reference-impl/*.py	44	21	47.7	a hand-written IMPLEMENTED dict of 91 atom names, matched against ATOM-COVERAGE.md identifiers via _IDENT / _CODE_SPAN / _FENCE	23 of 44 shipped modules are named. An atom that exists in code but is absent from IMPLEMENTED is neither required to be documented nor detected as undocumented — the register defines its own denominator.
 test_audit_drift.py	reference-impl/*.md (NODE-PARITY-AUDIT, VALIDATION, SIMULATION-AUDIT, ATOM-COVERAGE, README) + reference-impl/tests/test_*.py + evals/evals.json + evals/README.md	11	5	45.5	literal section headings ('## Part 2 - Per-process simulation scorecard') plus prose regexes _NO_GAP / _CLAIMS_NOTHING / _NEGATION over flattened audit text	5 of 11 reference-impl documents are read; 6 (ARCHETYPES, CANON-COMPARISON, GALLERY, GROUNDING, HYPERREALISM, REVIEW-BRIEF) drift unchecked. Keyed on an exact heading string: renaming the heading makes the scorecard checks vacuous rather than failing. The test-count check globs all 61 test files, so THAT sub-domain is complete.
 test_benchmarks.py	— none (numeric/behavioural guard: builds arrays, calls the module, asserts on values)	0	0	n/a	— not keyed on text or source —	No file is read and no source is introspected, so this guard has no scan domain and cannot carry a keying defect. Row present so the 61-file denominator is complete and no guard sits outside the freeze.
 test_boundaries.py	— none (numeric/behavioural guard: builds arrays, calls the module, asserts on values)	0	0	n/a	— not keyed on text or source —	No file is read and no source is introspected, so this guard has no scan domain and cannot carry a keying defect. Row present so the 61-file denominator is complete and no guard sits outside the freeze.
