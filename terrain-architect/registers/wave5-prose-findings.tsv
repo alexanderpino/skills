@@ -12,3 +12,5 @@ reference-impl/README.md:52	same 530 figure, third spelling	620	test_audit_drift
 reference-impl/REVIEW-BRIEF.md:24	"The whole suite (334 tests) passes"	1600+ (46.1% off); the document was outside the guard domain entirely	test_audit_drift domain now globs reference-impl/*.md	E	open
 reference-impl/VALIDATION.md:153	"1231 passed, 6 skipped in 490.35s" presented as a run of this environment	the suite now runs 1600+; not machine-checkable from a transcript, so no assertion claims it	manual read	E	open
 reference-impl/ATOM-COVERAGE.md	solver paragraph omits flow.breach_fill and flow.hybrid_accumulation	both are public and shipped; 03-flow-routing.md:101 calls the hybrid 'the right default for terrain generation'	test_atom_coverage symbol-depth row (RED on purpose)	A	open
+reference-impl/VALIDATION.md:33	"1640 passed, 6 skipped" — WRITTEN AS A PREDICTION, NOT A MEASUREMENT	must be requoted from the actual final run before this branch is proposed; a typed count is the exact defect criterion H forbids	python3 -m pytest tests/ -q	H	MUST-FIX-BEFORE-PR
+

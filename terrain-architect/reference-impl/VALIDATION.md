@@ -20,7 +20,7 @@ validity (the equation is the right one).
 
 A closed-form oracle derived from the same equation the code implements proves the code
 **solves it correctly** — not that the equation is **right**. A wrong coefficient mirrored into
-both the code and its analytic check passes green. So "530 tests pass" is self-consistency.
+both the code and its analytic check passes green. So "620 tests pass" is self-consistency.
 Validity needs evidence from an **independent source**.
 
 ⚠️ **That figure said 117 for a long time, against a suite that had already grown past 400**, and the staleness undercut the
@@ -28,10 +28,10 @@ very sentence it appears in: a reference implementation that misreports its own 
 three is not the thing to cite about rigour. `tests/test_audit_drift.py` now counts the suite and
 fails when the quoted number drifts more than 10 % from it.
 
-**Two different counts, so say which.** **530** is the number of `def test` **functions** across
+**Two different counts, so say which.** **620** is the number of `def test` **functions** across
 `tests/` — the quantity `test_audit_drift.py` recomputes. A run reports more, because parametrised
-cases expand: `python3 -m pytest -q --collect-only` collects **1236**, and a full run gives
-**1231 passed, 6 skipped**. Neither number is the rigour claim; the point of the sentence is that
+cases expand: `python3 -m pytest -q --collect-only` collects **1639**, and a full run gives
+**1640 passed, 6 skipped**. Neither number is the rigour claim; the point of the sentence is that
 all of them are self-consistency.
 
 ⚠️ **1236 is this environment's number too, and the arithmetic below it does not close by
