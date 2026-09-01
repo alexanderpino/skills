@@ -6,18 +6,20 @@ ground. The whole model is that one asymmetry: p_sand > p_bare makes deposition
 self-reinforcing, and dunes grow out of a flat sheet. p_sand == p_bare -> no instability,
 no dunes. Slabs are conserved exactly.
 
-This is a MINIMAL Werner variant. Two of the chapter's (05) "three ideas that make it work" are
-**not** implemented and would be needed for a faithful full model: (1) the 15-degree lee **shadow-zone**
-capture that sharpens slip faces and drives migration, and (2) per-move **avalanching** (repose
-relaxation) that keeps the crest from growing into a spike. The deposition-probability instability
-alone (p_sand > p_bare) is the verifiable core — Werner's central result and the skill's two dune
-failure modes — so this is honestly-scoped as illustrative, not a faithful implementation of the full
-`05` pseudocode. Slabs are conserved exactly either way.
+All three of the chapter's (05) "three ideas that make it work" ARE implemented and on by
+default: the deposition-probability instability (p_sand > p_bare), the 15-degree lee **shadow-zone**
+capture that sharpens slip faces and drives migration (`shadow=True`), and per-move **avalanching**
+(repose relaxation) that keeps the crest from growing into a spike (`avalanche=True`). Set
+`shadow=False, avalanche=False` for the minimal deposition-only variant, which is what the
+instability test exercises in isolation. The model is invariant-checked, not benchmark-accurate:
+slabs are conserved exactly, and the emergent forms are read as ridge signal, not measured against
+a wind-tunnel dune. (This header claimed the opposite — "two of the three are not implemented" —
+long after `shadow` and `avalanche` had shipped; see `tests/test_dunes.py`, which exercises both.)
 """
 import numpy as np
 
 
-def werner_dunes(sand, iters, seed=0, p_sand=0.6, p_bare=0.4, hop=1, wind=(0, 1),
+def werner_dunes(sand, iters, seed=0, p_sand=0.6, p_bare=0.4, hop=5, wind=(0, 1),
                  shadow=True, shadow_tan=0.268, avalanche=True, repose=2, wind_field=None):
     """Return the slab-count grid after `iters` sweeps (each sweep = n*m slab moves).
     sand: integer slab counts. wind: (di, dj) downwind direction, periodic domain.
@@ -46,8 +48,44 @@ def werner_dunes(sand, iters, seed=0, p_sand=0.6, p_bare=0.4, hop=1, wind=(0, 1)
 
     Grounded constants (Werner 1995; Momiji et al. 2000): `shadow_tan = tan(15°) = 0.268` is the
     lee flow-separation (recirculation) angle; `repose = 2` slabs is the dry-sand angle of repose,
-    tan⁻¹(2/3) = 33.7°, under the standard 1:3 slab aspect ratio (height:width); `hop` is the
-    saltation length (Werner used ~5 cells; a longer hop lengthens the dune wavelength).
+    tan⁻¹(2/3) = 33.7°, under the standard 1:3 slab aspect ratio (height:width).
+
+    ⚠️ `hop` — THE SALTATION LENGTH, IN CELLS. A slab is carried a FIXED number of cells downwind
+    per transport step, and that length sets the emergent dune WAVELENGTH (a longer hop, a longer
+    wavelength — measured, not asserted: see `tests/test_dunes.py`
+    `test_hop_sets_the_dune_wavelength`). **The value is 5**, which is Werner's, and all four places
+    that state it now agree:
+
+      * Werner (1995), as restated by Kok, Parteli, Michaels & Karam 2012 (Rep. Prog. Phys. 75,
+        106901, §3.2.2): a slab "moves downwind to a new lattice site l (typically equal to 5)
+        sites away (Werner 1995)".
+      * `05`'s Werner pseudocode block:  `L = saltationHop   # ~5 cells, fixed`   (05:412)
+      * `05`'s runnable-reference note, thirteen lines above that block: "≈5 cells"  (05:399)
+      * this signature: `hop=5`
+
+    This constant was previously stated FOUR different ways — 05:412 `~5`, 05:399 `≈3`, this
+    docstring `~5`, the signature `1` — i.e. the chapter contradicted itself before the module was
+    consulted. The chapter-vs-code half was registered as `werner-saltation-hop` in
+    `tests/test_pseudocode_drift.py`'s KNOWN_DIVERGENCES. That row is now RETIRED, and the constant
+    is guarded from both sides instead: the 05:412 block and this default are a normal pinned pair
+    in that file's BLOCK_CONSTANTS, and `tests/test_dunes.py::test_chapter_note_quotes_the_shipped_hop`
+    pins 05:399's PROSE (which no fenced-block register can see) against this
+    signature. A fifth value cannot appear quietly.
+
+    Why 5 and not the 3 this repo's dune panel happens to pass: 5 is the published constant, and
+    `hop` is a physical claim about transport length, not a taste setting. `hop=3` was never
+    unanimous here either — `capability_grid.py:317` passes 3, `tests/test_dunes.py` passes 3 and 1,
+    and `gallery.py:166` names nothing at all, so it silently ran the old default of 1.
+    ⚠️ CONSEQUENCE OF RAISING THE DEFAULT: that gallery call is the one caller that named nothing,
+    so its committed `gallery.png` no longer reproduces (`tools/regen_figures.py` reports the dunes
+    panel drifting, 7986 px). Either recommit that figure or give the call the `hop=1` it was
+    actually running — both are one line, and both belong to whoever owns `gallery.py` and the PNGs.
+
+    Passing a SHORTER hop is legitimate and is a statement about the run, not a correction: on a
+    tile narrower than ~64 cells along the wind a 5-cell hop leaves barely a dune or two in the
+    domain, so a small demo tile may want `hop=1..3`. What is physically set is the mean transport
+    path `hop / p_bare` (Nield & Baas 2008; the CA's stand-in for wind strength), so halving `hop`
+    and halving `p_bare` are the same move.
     """
     sand = np.asarray(sand).astype(np.int64).copy()
     n, m = sand.shape

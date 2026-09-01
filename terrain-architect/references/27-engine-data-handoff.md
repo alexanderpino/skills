@@ -1,9 +1,20 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Engine Data Handoff & First-Class Auxiliary Maps"
+description: What the generator hands the renderer, as a registry with units and lifetimes rather than a folder of images.
+tags: [handoff, auxiliary-maps, registry]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-13T16:58:14Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Engine Data Handoff & First-Class Auxiliary Maps
 
 Contents: [Why this chapter exists](#why-this-chapter-exists) ·
 [The First-Class Citizen Rule](#the-first-class-citizen-rule) ·
 [State maps vs derived maps](#state-maps-vs-derived-maps) ·
 [The Masking Doctrine](#the-masking-doctrine--cause-vs-effect) ·
+[The filtered depth copy](#the-filtered-depth-copy--correcting-its-scale) ·
 [The Standard Map Registry](#the-standard-map-registry) ·
 [Climate layer](#climate-layer) · [Geology layer](#geology-layer) ·
 [Hydrology layer](#hydrology-layer) · [Geometry layer](#geometry-layer) ·
@@ -127,13 +138,80 @@ buffers as **masks and drivers**:
 | Biome / foliage spawner | `moisture` (the gatekeeper), `temperature`, `soilDepth`, `insolation`, `wetness` — density functions over raw fields, not a baked biome ID (`07`, `13`) |
 | Dynamic weather & snow | `moisture`, `temperature`, `insolation`, `windVector`, `snowDepth` (initial state) — the Snow Rule, below |
 | Fluid / particle systems | `flowVelocity`, `waterDepth`, `waterSurface` — SPH seeding, flow-map shaders, waterfall emitters (`SKILL.md`, the hydrology handoff) |
-| Engine wave synthesis (ocean/shore) | `waterSurface` (the datum), `waterDepth` (**and a wavelength-scale filtered copy** — raw bathymetry noise dithers the break line), `flowVelocity` (wave–current interaction), shore distance and beach slope — drives shoaling, refraction, breakers and run-up engine-side (`12`) |
+| Engine wave synthesis (ocean/shore) | `waterSurface` (the datum), `waterDepth` (**and a ~~wavelength-scale~~ filtered copy** — raw bathymetry noise dithers the break line; **the scale is corrected below — a wavelength-scale filter deletes breaker bars**), `flowVelocity` (wave–current interaction), shore distance and beach slope — drives shoaling, refraction, breakers and run-up engine-side (`12`) |
 | Wind-driven shaders (foliage sway, particles, cloth) | `windVector` — sampled directly as a flowfield |
 | Audio / footsteps / physics | `soilDepth`, `sandDepth`, `wetness`, `snowDepth` — surface response from state, not from a material enum |
 
 A biome ID map *may* be exported as a convenience product, but it is derived engine-side-esque
 sugar: the contract obliges the raw fields to ship alongside it, so the engine can always
 re-derive and never depends on the tool's classification.
+
+### The filtered depth copy — correcting its scale
+
+**~~a wavelength-scale filtered copy~~ — corrected. The filter is a *grid-noise* filter, and
+naming its scale after the wave is the one choice that guarantees it destroys the bathymetry
+that matters.** The purpose stands: raw one-cell bathymetry noise dithers the break line and the
+engine's foam edge crawls. The *scale* was wrong, and the failure is not cosmetic.
+
+**Where the correction comes from.** A reference implementation of `12`'s surf-zone loop was
+built against these two chapters and took this row literally
+(`water-physics/reference-impl/beach.py`, `smooth_depth()` and `transform(filter_scale=…)`;
+the scene is 500 m of cross-shore profile under `H_0 = 1.5 m`, `T = 9 s`). Measured on the
+barred bed that loop produces:
+
+| filter scale σ | what the transform sees at the bar crest | bar relief surviving |
+|---|---|---|
+| 1.5 cells (1.5 m) — grid noise | 2.27 m of water | 87% |
+| 5 m | 2.65 m | 61% |
+| **`L₀/10` = 12.6 m — "wavelength-scale"** | **3.05 m** | **32%** |
+| `L₀/4` = 31.6 m | 3.29 m | 15% |
+| `L₀` = 126 m | 3.41 m | 7% |
+
+The bar is **11 m wide at half amplitude** and `L₀/10` is **12.6 m**: the smallest scale anyone
+would call "wavelength-scale" is already wider than the feature. The consequence is not a blurred
+break line, it is a *relocated* one — with the filter at `L₀/10` the first break moves from
+**x = 360 m (on the crest) to x = 418 m**, 58 m shoreward, and the dissipation peak goes with it.
+The wave stops breaking on the bar that made it.
+
+**Two rules, and they are not the same rule.**
+
+- **Filtering a depth field consumed as a *break mask* is fine, and wavelength-scale is roughly
+  right for it** — the aim there is one clean, stable foam line, and features narrower than a
+  wavelength genuinely are noise for that purpose.
+- **A depth field consumed by a wave *transform* — anything that computes where the wave breaks,
+  and above all anything inside a morphodynamic loop (`12`) — must not be filtered at the wave's
+  own scale.** In a loop the depth field is a **state variable**: the bed the transform reads is
+  the bed the loop is writing, and filtering it at the wavelength cuts the feedback. Measured, in
+  the same file: running `12`'s loop with the `L₀/10` filter, the bar grows to a crest in
+  **1.065 m** of water against the `H_b/γ = 2.333 m` the chapter predicts — a **raw-bed** ratio of
+  **0.46**, where the shipped grid-noise-scale run gives **0.893** read off the same raw bed —
+  because the growth-limiting feedback never fires. That feedback is: *a growing bar makes the
+  wave break earlier, which moves the flux convergence seaward off the crest, which stops the
+  crest growing.* Filter the bar out of the depth field and the wave never notices it, so nothing
+  ever tells the crest to stop. A wrong constant makes a picture wrong; this silently **disables a
+  physical loop**.
+
+  > ⚠️ **Both ratios in that bullet are *raw-bed* readings, and neither is this relation's current
+  > value. `12` is the source of record for `d_bar ≈ H_b/γ`; requote it, not this page.** This
+  > chapter previously quoted the grid-noise-scale run as **0.89** with no field named. `12`'s
+  > round 2 (its *"`d_bar ≈ H_b/γ` — attacked twice and standing"* section) re-measured the ratio
+  > **within one depth field** and supersedes that figure: on this same base scene
+  > (`H_0 = 1.5 m`, `Δx = 1 m`) it is **0.9734**, and the `0.9734 − 0.8930 = 0.0804` gap is the
+  > filter's own lift `δ·γ/H_b` over an 11 m crest — an artefact of straddling two fields, not
+  > physics. The pair above is kept raw-against-raw because that is the only way the two *filter
+  > scales* compare like for like, and because no same-field number is published for the `L₀/10`
+  > run. The general guard is `12`'s, and it is not a coastal one: **a ratio must name the field
+  > each of its terms came from.**
+
+**So ship two things, or one thing and a rule.** Filter at the **grid-noise scale** (order one to
+two cells — enough to kill single-cell dither, narrow enough to preserve any real bedform) for the
+copy that drives the transform, and let the engine apply its own cosmetic smoothing to the copy
+that drives the foam mask. If only one copy ships, it is the transform's, and the manifest must
+carry its σ in metres so the consumer knows what was removed.
+
+**Tier: `P` for the failure mode** — it follows from the surf-zone loop's own P-tier feedback
+(`12`) and is reproducible by running the file named above. The specific numbers are one scene
+and one implementation, and are quoted as measurements, not as constants.
 
 ## The Standard Map Registry
 

@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Analysis & Masks"
+description: Deriving slope, curvature, aspect and flow-based masks from a heightfield, and the estimator errors each one carries.
+tags: [analysis, masks, curvature]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-29T12:53:41Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Analysis & Masks
 
 Contents: [Ordering rule](#ordering-rule) · [Slope & aspect](#slope--aspect) ·
@@ -42,6 +52,23 @@ by eye. With this convention, `aspectVec(a) = (cos a, sin a)` is the facing dire
 **Keep slope as `tan`, not degrees.** Every comparison downstream (`slope > tan(35°)`) is
 then a cheap float compare, and it composes with the repose-angle table in `05` directly.
 Convert to degrees for UI only.
+
+> **What `slope` is, and what it is NOT.** Throughout this skill `slope` is the **dimensionless
+> gradient magnitude** `|∇h|` — rise over run, already equal to `tan θ`. It is **not** an angle, and
+> it is **not** in degrees or radians. So:
+>
+> - **Never write `sin(slope)`, `tan(slope)`, or `cos(slope)`.** Those apply a trig function to a
+>   ratio and are a units error; `tan(slope)` is `tan(tan θ)`, which is not any quantity.
+> - To recover the angle, use `θ = atan(slope)` — `atan(slope)` is correct and appears in `09`.
+> - To get `sin θ` without leaving the tangent, use the exact identity
+>   `sin θ = slope / sqrt(1 + slope²)` (and `cos θ = 1 / sqrt(1 + slope²)`).
+> - A **threshold** is the other way round: the angle is the literal, so `tan(35°)` is right and
+>   `slope > tan(35°)` compares two tangents. `tan(<a number in degrees>)` = fine;
+>   `tan(<the symbol slope>)` = bug.
+>
+> This is not pedantry. Feeding the tangent into the infinite-slope stability formula in `05`
+> understated the factor of safety by **7.4% / 16.9% / 35.8% at 25° / 35° / 45°**, and moved the
+> dry critical angle off the friction angle by 3.6° — see the measured table in `05`.
 
 The central difference above is fine. Horn's method (the 3×3 Sobel-weighted version used by
 ArcGIS and most GIS tools) is more robust to noise:
@@ -262,15 +289,20 @@ above, and the solar-position formulas are textbook astronomy needing no citatio
 Topographic wetness index — where water lingers.
 
 ```
-TWI = ln( A_specific / tan(slope) )
+TWI = ln( A_specific / slope )                   # `slope` IS tan θ — do not tan() it again
 
 A_specific = A / contourWidth ≈ A / cellSize     # specific catchment area, m²/m
 ```
 
+Beven & Kirkby write this as `ln(a / tan β)` for a slope **angle** `β`. Here `slope` is already
+`tan θ` (the definition above), so the tangent is *already taken* and the division is by `slope`
+itself. Writing `ln(A_specific / tan(slope))` computes `tan(tan θ)` and biases TWI low by 0.08 /
+0.19 / 0.44 nats at 25° / 35° / 45° — a quiet shift that moves every downstream wetness threshold.
+
 ```
 twi(A, slope):
     a = max(A / cellSize, cellSize)              # guard: at least one cell's worth
-    s = max(slope, 0.001)                        # guard: flats → tan → 0 → ln(∞)
+    s = max(slope, 0.001)                        # guard: flats → slope → 0 → ln(∞)
     return log(a / s)
 ```
 
@@ -398,11 +430,90 @@ snow is white because it is a white *substance*, not because "high == white".
   perfect edge, and nothing in nature does. Multiply the threshold by low-amplitude noise:
   `smoothstep(t - w, t + w, slope + noiseAmp * fbm(p))`. This is nearly free and it's the
   difference between "procedural" and "photographed".
-- **Masks must partition.** If your masks sum to 1.3 in places, the splatmap normalisation
-  will silently rescale and your carefully tuned rock will be 30% weaker on steep slopes than
-  you specified. Either build them as an explicit priority stack (snow beats rock beats
-  grass — each subsequent mask multiplied by `(1 − Σ previous)`), or normalise explicitly and
-  know that you did.
+- **Masks must partition — `Σ ≤ 1`, not `Σ = 1`, and the difference is the base material.**
+  Raw coverage masks are independent fields in `[0, 1]`: nothing makes them sum to anything.
+  `Σ > 1` means two producers claim the same ground, which is a real bug. `Σ < 1` is ordinary —
+  **any** shortfall belongs to the bare base. Build them as an explicit priority stack (snow beats
+  rock beats grass, each subsequent mask multiplied by `(1 − Σ previous)`), which yields `Σ ≤ 1`
+  by construction, or normalise explicitly and know that you did.
+
+  **`≤`, and not `<`, because a well-formed stack that names its base as a channel reaches exactly
+  1.** That is the ordinary case, not an edge case: `reference-impl/analysis.py`'s `derive_materials`
+  and `derive_substances` both append `(base, 1 − Σ claimed)` as a final channel, so they hit `1.0`
+  everywhere. The `<` only holds for a stack whose base is left *implicit* — and that is a property
+  of the example, not of the rule. Even without a closing channel, `[1.0, 0.6, 0.6]` stacks to
+  exactly 1: the first mask claims everything and the remainder is genuinely zero.
+
+  **So state it as two assertions at two sites, not one.** At the mask fan-in (`14`), where the
+  masks are raw and the base is implicit, assert `Σ ≤ 1`. At the point where you *close* the stack
+  by emitting the base as its own channel, assert `Σ = 1` — that one is a real check on your closure
+  arithmetic, and it is the assertion `08` needs before the weights reach a shader. Two sites, two
+  statements, both mechanically checkable; the single-number version of this rule is what made the
+  chapters look like they contradicted each other.
+
+  ⚠️ **This bullet used to say "sum to 1.3 and the splatmap normalisation will silently rescale,
+  so your rock ends up 30% weaker".** That is wrong twice over, and both halves are worth
+  correcting because the wrong version is the intuitive one. First, `Σ = 1` is the wrong target
+  here: the very remedy this bullet prescribes, `(1 − Σ previous)`, produces `Σ ≤ 1` — the
+  headline and the fix disagreed. `08`'s "splat weights must sum to 1" is a *different object*,
+  one stage later, after compositing has filled the remainder; a shader computing
+  `Σ wᵢ · materialᵢ` has no base layer to absorb a shortfall, so there `= 1` is a genuine
+  requirement on the data.
+
+  Second — **whether over-subscription leaves a trace depends entirely on which compositor the
+  consumer picked, and that is the actual argument for asserting upstream.** The old bullet said a
+  splatmap "silently rescales"; the correction that replaced it over-reached in the other direction
+  and said there is no artefact *at all*. Both are wrong, because "the compositor" is not one thing.
+  Measured on `reference-impl/render.py` with a realistic pale-terrain palette
+  (`[[205,210,220], [210,216,228], [200,207,221]]`) — a *bright* one, which matters, see below:
+
+  - **Ordered over-composite — `splat_blend`, `out·(1 − m) + colour·m`.** No trace, exactly as
+    claimed. Masks summing to **1.8** still give effective weights summing to **1.0000000000**, the
+    base absorbing `Π(1 − mᵢ)`; at **3.0** the output is still inside the convex hull of its input
+    colours. Nothing rescales, nothing dims, nothing leaves range. **This path cannot report the
+    bug** — the compositing *order* quietly arbitrates a conflict nobody decided to have.
+  - **Base-less weighted sum — `render.material_rgb`, `Σ wᵢ·materialᵢ`.** It *can* leave a trace —
+    it has no base to absorb the excess, so the excess leaves 8-bit range. On the pale palette
+    above: `Σ = 1.00` → unclipped `[205 211 223]`, shipped `[204 211 222]` (float→uint8 truncation,
+    ±1 — a convex combination, inside the palette's hull); `Σ = 1.80` → unclipped `[369 380 401]`,
+    shipped `[255 255 255]`: every channel past 255 and every channel clipped. A rescale, a
+    brightness error and an out-of-range value, all three at once. This is not a hypothetical
+    shader: it ships in the same module as `splat_blend`, `GROUNDING.md` names it the **default**
+    colorizer, and `gallery.py:117` and `graph_demo.py:434` feed `06` masks straight into it with
+    no compositing stage between.
+
+    ⚠️ **But it reports only where the palette has no headroom, and that is a smaller claim than
+    "loudly".** The shipped call sites pass *no* palette, so they get `render._MATERIAL_PALETTE`
+    (or `_SUBSTANCE_PALETTE` for a 7-channel substance stack) — terrain colours, not paper-white.
+    A cell of one material leaves range at `Σ = 255 / max(channel)`, measured:
+
+    | material | snow | sand / sediment | water | scree | grass / vegetation | ground | rock |
+    |---|---|---|---|---|---|---|---|
+    | clips at `Σ` | **1.02** | **1.28** | **1.50** | **1.68** | **1.93** | **2.06** | **2.13** |
+
+    So at `Σ = 1.80`, `rock`, `grass`, `water+grass` and `rock+grass` — **4 of the 15** single- and
+    pair-combinations of the five-material palette — clip *nothing*, and rock is the commonest
+    material `derive_materials` emits. This is reachable from the real producer: give
+    `derive_materials` a closing channel written `1.0` instead of `1 − claimed` (a 2.00× over-
+    subscription *everywhere*) and an ordinary steep hillside exports as `[216 250 188]`, an
+    in-gamut pale sage, **0 of 4096 pixels clipped**. The same bug on a mixed alpine fixture clips
+    ~279 of 4096 — the snow cells, snow being the one material whose threshold (1.02) almost any
+    over-subscription passes. What the detector measures is the *palette under the bug*, not the
+    size of the bug. Note too that only the clip is self-evident: the "brightness error" half is
+    not detectable without a reference image, and nobody exporting a splatmap has one.
+  - **Chained `blend_rgb` in a non-`normal` mode** is worse again — monotone dimming toward black
+    under `multiply` (128 → 84.7 at `Σ = 0.6`, → 27.2 at `Σ = 1.8`) and toward white under `screen`
+    (→ 154.5, → 199.8). That is precisely the "blotchy lighting" tell `08` names.
+
+  So the bug's visibility is a property of the *consumer*, not of the masks — which is the whole
+  reason the assertion belongs at the fan-in (`14`), one place, independent of who consumes it.
+  A producer cannot know which compositor is downstream; one of the three shipping choices reports
+  nothing at all, and the one that does report depends on a palette the producer also cannot see.
+  (`reference-impl/tests/test_mask_partition.py`)
+
+  ⚠️ **And do not "fix" `material_rgb` by making it normalise.** Partial as it is, it is the only
+  thing in the tree that detects a partition bug at all. Normalising it would make the old "no
+  artefact" sentence true by destroying the only signal that exists.
 - **Aspect matters and is cheap.** `northness = dot(aspectVec(aspect), northDir)`. With the
   downslope aspect above and the STANDARD raster convention — row index increases *southward*, so
   row 0 = north and the `y` axis points SOUTH — that is `-sin(aspect)`: +1 facing north, −1 facing

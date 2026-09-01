@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Bibliography
+title: Bibliography
+description: Every source this skill cites, with the tier at which it was read.
+tags: [papers, bibliography]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-05T12:21:21Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Bibliography
 
 Grouped by family. Where a citation is commonly mangled, the correction is noted — those are

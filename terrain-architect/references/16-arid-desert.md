@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Arid & Desert Landforms"
+description: "Inselbergs, alluvial fans, evaporite crusts and wadis: the arid assemblage and what each one requires upstream."
+tags: [arid, desert, fans]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T11:16:00Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Arid & Desert Landforms
 
 Contents: [The arid frame](#the-arid-frame) · [Yardangs](#yardangs-wind-abrasion) ·

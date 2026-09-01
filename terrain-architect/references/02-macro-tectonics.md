@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Macro Terrain & Tectonics"
+description: "Continental form before erosion: plate uplift, fault scarps and the isostatic response that decides what the erosion runs on."
+tags: [tectonics, uplift, isostasy]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-05T18:01:57Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Macro Terrain & Tectonics
 
 Contents: [What tectonics is for](#what-tectonics-is-for) · [Plate simulation](#plate-simulation) ·

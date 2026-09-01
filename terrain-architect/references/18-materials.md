@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Surface Materials
+description: Deriving a material stack from slope, curvature and drainage rather than painting one.
+tags: [materials, splat]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-25T06:11:37Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Surface Materials
 
 Contents: [A material is a property bundle](#a-material-is-a-property-bundle) ·

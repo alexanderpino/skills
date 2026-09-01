@@ -1,0 +1,67 @@
+# REGISTER — mutation-proofs.wave6-graph.tsv     WAVE 6, GRAPH/DEAD-PARAMETER LANE
+#
+# Companion to `mutation-proofs.tsv` (FROZEN at 61 file-level rows) and to
+# `mutation-proofs.partial-code.tsv` (the code wave's 17 row-level proofs). This file does not
+# touch either. It carries the proofs for the guard ROWS this lane added or changed while closing
+# `registers/OPEN-ITEMS.md` items 20 and 24. The unit is the ROW (a test function), not the file.
+#
+# EVERY CELL BELOW WAS RECORDED FROM EXECUTION, NOT PREDICTED. Each mutation was applied to a
+# SUBJECT MODULE in the working tree (never to a test), the single named test id was run, the
+# module was restored, and `git diff -- <module>` was checked empty afterwards. `observed` quotes
+# the pytest status line and the first assertion line pytest printed.
+#
+# WHY EVERY ROW CARRIES A DECOY. A mutation that turns a guard red proves only that the guard is
+# sensitive to something. The decoy is an edit in the SAME neighbourhood that does NOT introduce
+# the defect class — a legitimate retuning, a rename, an equivalent rewrite — and it must stay
+# green. A row with a mutation and no decoy is a claim about a guard, not a measurement of one.
+#
+# WHY ONE ROW IS MARKED DECORATIVE RATHER THAN PROVED.
+# `test_every_dead_parameter_exemption_is_still_a_live_dead_parameter` iterates
+# `DEAD_PARAMETER_EXEMPTIONS`, which item 20 has now emptied. Both of its loops are therefore
+# empty and NO mutation to any module can turn it red — it is a tripwire armed only by a future
+# exemption entry, not a live measurement. It is recorded as DECORATIVE, with the mutation that
+# SHOULD have caught it and the green result that shows it did not, rather than given an invented
+# proof or quietly deleted. The live half is the row above it, which is proved.
+#
+# DENOMINATOR
+#   guard rows added or changed by this lane .......... 6
+#     new     ... test_the_shipped_graphs_default_to_the_hybrid_03_calls_the_default   (test_graph_demo.py)
+#     new     ... test_the_four_removed_cellsize_parameters_stay_removed               (test_render.py)
+#     new     ... test_a_stale_positional_call_into_a_removed_cellsize_slot_raises     (test_render.py)
+#     new     ... test_ulichney_ground_cover_is_shipped_and_node_wrappable             (test_graph_demo.py)
+#     changed ... test_no_public_function_declares_a_parameter_it_never_reads          (test_render.py)
+#     changed ... test_every_dead_parameter_exemption_is_still_a_live_dead_parameter   (test_render.py)
+#   rows mutation-proved .............................. 5 of 6
+#   rows marked DECORATIVE with the failed proof shown . 1 of 6
+#   mutations applied, run and restored ............... 7   (6 + a second, sharper one on the
+#                                                            Ulichney row, kept because the first
+#                                                            fired on emptiness rather than on the
+#                                                            density dial it was written for)
+#   decoys applied, run and restored .................. 6
+#   IDENTITY: 6 rows == 5 proved + 1 decorative -> HOLDS
+#
+# ⚠️ THE SIXTH ROW IS NOT FROM THIS LANE'S BRIEF, AND WHY IT IS HERE IS PART OF THE RECORD. This
+# lane's brief covered OPEN-ITEMS items 24 and 20 only. While it ran, the scatter lane closed item
+# 22 by implementing Ulichney tiles in `scatter.py`, which turned
+# `tests/test_graph_demo.py::test_ulichney_tiles_are_still_recommended_and_still_absent` RED — a
+# tripwire firing correctly, in a file only this lane may write. Its own failure message names the
+# fix ("delete this row and add a real reachability row to RECOMMENDED_CAPABILITIES"), so the row
+# was promoted, `KNOWN_UNREACHABLE` emptied, and the census docstring changed from "eight
+# reachable, one pinned" to "all nine reachable, none pinned". The promotion is guarded and proved
+# below rather than taken on trust.
+#
+# Baseline for every trial below: the named test id GREEN on the unmutated tree.
+# Restores are verified with `cmp` against a byte copy taken immediately before the edit, not with
+# `git diff` — three other lanes were writing this tree at the same time, so a clean `git diff` for
+# a whole file would not have been evidence about this lane's edit.
+#
+# FREEZE RULE: this file may grow only while this lane runs; anything found after it closes goes
+# to OPEN-ITEMS.md like everything else.
+
+guard_file	test_name	target_defect_class	mutation	expected_observation	observed	decoy	decoy_expected	decoy_observed	verdict
+reference-impl/tests/test_graph_demo.py	test_the_shipped_graphs_default_to_the_hybrid_03_calls_the_default	A chapter states a DEFAULT and the shipped graph ships the other option, while the reachability census certifies the recommendation as honoured. Reachable is not default: 03:101 reads "Hybrid is the right default for terrain generation" and build_graph, build_scene_graph and _fill_fn's own p.get fallback all shipped method="fill". OPEN-ITEMS item 24.	graph_demo.py build_graph: the `filled` node's params `"method": "breach_fill"` -> `"method": "fill"` (the pre-adjudication state, one graph only, so the row must also see the half-flip).	RED at the first parametrised graph, naming build_graph and the value it ships.	FAILED tests/test_graph_demo.py::test_the_shipped_graphs_default_to_the_hybrid_03_calls_the_default | E AssertionError: build_graph ships method='fill' on its depression node. 03:101 calls the breach/fill hybrid "the right default for terrain generation"; shipping plain fill makes the demo the counter-example to its own chapter. See _fill_fn and OPEN-ITEMS item 24. | E assert 'fill' == 'breach_fill' | 1 failed in 0.17s	graph_demo.py build_graph: `"max_depth": 10.0` -> `15.0` — a legitimate retuning INSIDE 03:101's stated 5-20 m band, policy unchanged.	GREEN: the row pins the band, not the value, so a tuning choice inside it is not the defect class.	1 passed in 0.14s	PROVEN
+reference-impl/tests/test_render.py	test_the_four_removed_cellsize_parameters_stay_removed	A dead `cellsize` deleted by criterion G1 is re-added for symmetry with its neighbours, so the signature tells a caller the atom is resolution-aware while no line of the body has a horizontal length in it. This is the `material_rgb(shade=...)` class, and it is how test_scale_contract came to credit a declaration as a fact. OPEN-ITEMS item 20.	analysis.py: `def deposit_fill(h, *, radius=3)` -> `def deposit_fill(h, *, cellsize=1.0, radius=3)` (re-added keyword-only, unread).	RED on the analysis.deposit_fill parametrised id only; the other four ids stay green, so the row is per-function and not a single global check.	FAILED tests/test_render.py::test_the_four_removed_cellsize_parameters_stay_removed[analysis.deposit_fill] | E AssertionError: analysis.deposit_fill grew back the dead `cellsize` this wave deleted (['h', 'cellsize', 'radius']). It is not scale-awareness: no line of the body has a horizontal length in it. registers/OPEN-ITEMS.md item 20. | 1 failed, 4 passed in 0.19s	analysis.py: `deposit_fill`'s `radius=3` -> `radius=4` — a retuning of the structuring radius, no new parameter.	GREEN across all five ids: the row is about a named parameter's existence, not about the function's tuning.	6 passed in 0.20s (run together with the stale-positional row)	PROVEN
+reference-impl/tests/test_render.py	test_a_stale_positional_call_into_a_removed_cellsize_slot_raises	The deletion hazard itself: a POSITIONAL slot that disappears does not raise, it silently takes the next argument. `deposit_fill` held cellsize at positional 2 and `water_surface` in a REQUIRED positional slot; the same shape nearly took n=121 into halfar_anatomy.sia_at_cfl's cellsize=12000.0, and did put a cell size where render.material_rgb expected a palette.	analysis.py: `def deposit_fill(h, *, radius=3)` -> `def deposit_fill(h, cellsize=1.0, *, radius=3)`, with `cellsize` READ in the body (`* (cellsize / cellsize)`) so the dead-parameter census stays quiet and only this row can speak.	RED on the `deposit_fill(h, 30.0)` clause: the positional slot is back, so the stale call is accepted instead of raising.	FAILED tests/test_render.py::test_a_stale_positional_call_into_a_removed_cellsize_slot_raises | > with pytest.raises(TypeError): | E Failed: DID NOT RAISE TypeError | tests/test_render.py:464 | 1 failed in 0.14s	analysis.py: `deposit_fill` gains a NEW KEYWORD-ONLY `eps=1e-12` that is read — a legitimate signature extension that adds no positional slot.	GREEN: the row is about positional arity, not about the parameter count.	6 passed in 0.18s (run together with the stay-removed row)	PROVEN
+reference-impl/tests/test_render.py	test_no_public_function_declares_a_parameter_it_never_reads	A public function declares a parameter no line of its body reads. CHANGED BY THIS LANE: DEAD_PARAMETER_EXEMPTIONS went from four entries to {}, so `unexplained` is now the WHOLE dead list and this row is the live measurement for the entire tree (44 modules, 317 public functions, 1331 parameters, 0 dead).	hydrology.py: `water_surface` regrows a keyword-only `cellsize=1.0` that nothing reads.	RED naming the module, function, parameter and kind — and, with the table empty, with nothing to excuse it.	FAILED tests/test_render.py::test_no_public_function_declares_a_parameter_it_never_reads | E AssertionError: public parameters that are declared and never read: | E   hydrology.water_surface(cellsize)  [kwonly] | E assert not [('hydrology', 'water_surface', 'cellsize', 'kwonly')] | 1 failed, 1 passed in 0.59s	hydrology.py: the SAME `cellsize` parameter, but READ (`Q = np.asarray(discharge, ...) * (cellsize / cellsize)`) — a live scale parameter rather than a dead one.	GREEN: the census must separate declared-and-read from declared-and-ignored, or every scale-explicit atom in the manifest false-fails.	2 passed in 0.59s	PROVEN
+reference-impl/tests/test_render.py	test_every_dead_parameter_exemption_is_still_a_live_dead_parameter	The exemption allowlist rots into the answer: an entry outlives the dead parameter it describes and silently covers a later one of the same name. CHANGED BY THIS LANE only in that the table it reads is now empty.	hydrology.py: `water_surface` regrows a keyword-only `cellsize=1.0` that nothing reads — the same mutation that turns the row above RED, and the closest thing to an arming edit this row could have.	RED if the row were live: a new dead parameter appears that no exemption names.	GREEN — `1 failed, 1 passed in 0.59s`, and the ONE that passed is this row. Both of its loops iterate DEAD_PARAMETER_EXEMPTIONS, which is `{}`, so `stale` is empty and the reason loop never runs. No mutation to any module can reach it.	hydrology.py: the same `cellsize`, but READ.	GREEN (it cannot be anything else).	2 passed in 0.59s	DECORATIVE — kept as a tripwire for the first exemption someone adds back, labelled as such in its own docstring, and NOT counted as a guard. The live half is the row above it.
+reference-impl/tests/test_graph_demo.py	test_ulichney_ground_cover_is_shipped_and_node_wrappable	A recommended capability's census row rots when the capability lands: KNOWN_UNREACHABLE keeps describing an atom that now exists, or the promoted row certifies the recommendation against a stub. 07:149/175 recommend Ulichney tiles twice; scatter.py now ships them (OPEN-ITEMS item 22).	scatter.py: `ulichney_scatter`'s `thresh = mask[ii % tn, jj % tn]` -> `thresh = np.full((gh, gw), 0.5)` — the node stops thresholding against the void-and-cluster tile. SECOND, SHARPER MUTATION: `-> np.zeros((gh, gw))`, which keeps every cell whatever the density, isolating the density-dial clause.	RED. The first mutation was expected to fire on the density clause and instead fired on emptiness, so a second was run to reach the clause it was written for; both are recorded.	MUTATION 1: FAILED tests/test_graph_demo.py::test_ulichney_ground_cover_is_shipped_and_node_wrappable | E assert (2 == 2 and 2 == 2 and 0 > 0) ... len(array([], shape=(0, 2))) | 1 failed in 0.17s. MUTATION 2: same test id | E AssertionError: thresholding the tile against a lower density did not thin the cover, so `density` is not the dial 07:139 describes and the tile is not being thresholded at all | E assert 1024 < 1024 | 1 failed in 0.21s	scatter.py: `void_and_cluster_rank`'s `sigma=1.5` -> `sigma=1.8` — a retuning the atom's own docstring says is not load-bearing for the blue-noise property.	GREEN: the row certifies that the graph reaches the Ulichney tile, not which sigma it was built with.	1 passed in 0.18s	PROVEN

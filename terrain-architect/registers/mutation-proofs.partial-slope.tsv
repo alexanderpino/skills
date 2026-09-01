@@ -1,0 +1,53 @@
+# REGISTER 4 (PARTIAL) — mutation-proofs.partial-slope.tsv
+# Wave-2 proofs for ONE guard: reference-impl/tests/test_slope_units.py, plus the shared text
+# model it now depends on, reference-impl/tests/_textscan.py. Written here and NOT into the shared
+# mutation-proofs.tsv, which three other agents are filling at the same time. Merge target: the
+# test_slope_units.py row of mutation-proofs.tsv.
+#
+# EVERY CELL BELOW IS FROM EXECUTION, none predicted. The harness for each trial was:
+#   1. read the live file into memory      4. restore the file from memory
+#   2. apply the edit                      5. `git diff` clean (verified after the last trial)
+#   3. `python3 -m pytest -q reference-impl/tests/test_slope_units.py` from reference-impl/
+# Baseline for every row: 540 passed, 0 failed.
+#
+# DENOMINATOR — defect classes proved
+#   distinct defect classes closed by this change ......... 8
+#   rows emitted ......................................... 8
+#   rows with a mutation that went GREEN -> RED .......... 8  (100%)
+#   rows with a decoy that stayed GREEN .................. 8  (100%)
+#   IDENTITY: 8 classes == 8 rows, each with both halves -> HOLDS
+#   A row without a decoy would prove only that the guard is noisy; a row without a mutation would
+#   prove only that it is quiet. Both halves are required, so both are counted.
+#
+# THE OLD GUARD, MEASURED DIRECTLY (not quoted). The pre-rewrite module was loaded from commit
+# d8dbd8c alongside the new one and both `_hits` were called on the same strings:
+#     np.sin(slope)                          old=1  new=1
+#     np.sin(s)                              old=0  new=1     <- the repo's own idiom
+#     np.sin(gradient)                       old=0  new=1
+#     np.tan(dzdx)                           old=0  new=1
+#     np.sin(repose)                         old=0  new=1
+#     np.sin(np.hypot(dzdx, dzdy))           old=0  new=1     <- the tangent, inlined
+#     np.sin(slope + np.arctan(aspect))      old=0  new=1
+#     np.sin(np.degrees(np.arctan(slope)))   old=0  new=1
+#     np.tan(maxSlope)   in analysis.py      old=0  new=1
+#     np.sin(slope + 0 + 0 ... )  497 chars  old=0  new=1     <- the ARG_LIMIT silent drop
+#   17 of the 18 spellings the register named were invisible; only the one carrying the literal
+#   word was seen.
+#
+# COVERAGE AFTER THE CHANGE, from test_the_scan_adjudicates_every_trig_call_in_the_domain:
+#   files in the declared domain ......... 151
+#   files carrying a trig call ............ 66
+#   trig calls in the domain .............. 347
+#   adjudicated (verdict reached) ......... 347   IDENTITY 347 == 347 -> HOLDS
+#   decided WITHOUT the word `slope` ...... 327   (94.2%; the old key could decide 0 of these)
+#   registry rows now carrying the load: 19 prose + 1 known-unfixed + 100 angle rows (184 pairs)
+
+guard_file	target_defect_class	mutation	decoy	observed	date
+test_slope_units.py	The scan is keyed on the SPELLING of the argument (`"slope" in name.lower()`), so the same units error under any other name ships green — the criterion-J defect recorded in guard-domains.tsv (111/151 files, 12 of the 40 unreachable discussing the same quantity as gradient/dzdx/repose).	reference-impl/analysis.py, in `wear()`, after `    s = slope(h, cellsize)` insert `    out = conv * np.sin(s)` — the injection named in the brief, in the module's own idiom (the tangent is called `s`, never `slope`).	Same anchor, three edits that do NOT introduce the defect: (a) `    _theta = np.arctan(s)` — the correct tangent->angle direction; (b) `    # taking the sine of s would be a units error` — the needle in a comment with no call to find.	MUTATION RED: 3 failed / 537 passed. `test_no_code_applies_trig_to_a_non_angle[reference-impl/analysis.py]` reports `analysis.py:263: sin(...) — symbol 's' is not shown to be an angle`, plus the two end-to-end fixtures that copy the live module. DECOYS GREEN: (a) 540 passed, (b) 540 passed. Same injection against the pre-rewrite guard loaded from d8dbd8c: `_hits` returns 0.	2026-09-01
+test_slope_units.py	The same defect on the CHAPTER surface, which has no AST — a chapter reintroduces the units error spelled `gradient`/`dzdx` instead of `slope`.	references/06-analysis-masks.md, append a fenced block containing `TWI = ln(A_specific / tan(gradient))`; and a second trial appending `sinAlpha = sin(hypot(dzdx, dzdy))`.	Append a fenced block containing the CORRECT form `TWI = ln(A_specific / gradient)` — same neighbourhood, same words, no trig applied to the ratio.	BOTH MUTATIONS RED: 1 failed / 539 passed each, `test_no_code_applies_trig_to_a_non_angle[references/06-analysis-masks.md]`. DECOY GREEN: 540 passed. Against the pre-rewrite guard both mutations return 0 hits.	2026-09-01
+test_slope_units.py	PROSE_REGISTRY hijack: `_registered` matched its substring against ANY line, so the pardon written for a sentence that FORBIDS the bug also covered a sentence added later that PRESCRIBES it.	references/06-analysis-masks.md, append `In practice \`tan(slope)\` is \`tan(tan θ)\`, which is not any quantity. Use it anyway.` — a second line carrying the exact fragment of the row registered for line 61, and prescribing the defect.	Append `Use \`atan(slope)\` to recover the angle itself; that direction is always correct.` — prose in the same file naming `slope` next to a trig-shaped call, but the legitimate direction.	MUTATION RED: 2 failed / 538 passed — `test_the_prose_registry_is_not_stale[06-analysis-masks.md::\`tan(slope)\` is \`tan(tan θ)\`]` reports 2 matched lines where a pardon must name 1, and `test_every_prose_occurrence_is_registered[references/06-analysis-masks.md]` refuses to pardon either. DECOY GREEN: 540 passed.	2026-09-01
+test_slope_units.py	ARG_LIMIT silent drop: a trig call whose parentheses did not close within 400 characters was skipped, i.e. a working line-level exemption inside a tier whose stated contract is that no line-level exemption exists.	reference-impl/analysis.py, after `    s = slope(h, cellsize)` insert `    _x = np.sin(s + 0 + 0 ... )` with 1200 `+ 0` terms (4813 characters inside the parentheses).	Same anchor, the same shape well inside the limit and angle-wrapped: `    _x = np.sin(np.arctan(s + 0 + 0 ... ))` with 10 terms.	MUTATION RED: 12 failed / 528 passed — `_argument` raises `Unparseable` and the failure propagates into every test that scans that file, instead of the call vanishing. DECOY GREEN: 540 passed. Against the pre-rewrite guard the 497-character version returns 0 hits and the suite stays green.	2026-09-01
+test_slope_units.py	ANGLE_CALL was searched against the WHOLE argument, so one `arctan` anywhere inside pardoned every other operand beside it.	reference-impl/analysis.py, after the same anchor insert `    _b = np.sin(s + np.arctan(s))` — an `arctan` applied to a DIFFERENT operand than the bare tangent.	Same anchor, `    _b = np.sin(np.arctan(s))` — the arctan actually wrapping the tangent, which is the endorsed `sin θ` identity.	MUTATION RED: 3 failed / 537 passed, `test_no_code_applies_trig_to_a_non_angle[reference-impl/analysis.py]` naming symbol `s`. DECOY GREEN: 540 passed. Against the pre-rewrite guard the mutation returns 0 hits.	2026-09-01
+test_slope_units.py	A degree-valued argument fed to a radian trig — `np.sin(np.degrees(np.arctan(slope)))` — was dropped entirely, because the whole-argument search found the `arctan` and stopped.	reference-impl/analysis.py, after the same anchor insert `    _b = np.sin(np.degrees(np.arctan(s)))`.	Same anchor, `    _b = np.degrees(np.arctan(s))` — recovering the angle and printing it in degrees, which is what `archetypes.py` ships.	MUTATION RED: 3 failed / 537 passed, reported as `degrees` — a number of degrees is never a valid argument to a trig call. DECOY GREEN: 540 passed. Against the pre-rewrite guard the mutation returns 0 hits.	2026-09-01
+test_slope_units.py	ANGLE_VALUED_SYMBOLS was GLOBAL while its reasons named specific files, so `maxSlope`'s justification (one gate in 07-scatter.md) licensed `tan(maxSlope)` in every file in the tree.	reference-impl/analysis.py, after the same anchor insert `    _t = np.tan(maxSlope)` — a symbol whose angle-ness was only ever checked in a chapter that analysis.py has nothing to do with.	references/07-scatter.md, append a fenced block `if s > tan(maxSlope): reject   # the gate, restated` — the same call in the file whose text justifies the registration.	MUTATION RED: 3 failed / 537 passed, `test_no_code_applies_trig_to_a_non_angle[reference-impl/analysis.py]` naming symbol `maxSlope`. DECOY GREEN: 540 passed. Against the pre-rewrite (global) registry the mutation returns 0 hits.	2026-09-01
+_textscan.py	Fence detection had diverged between two guards reading the same corpus: test_slope_units.py used `line.lstrip().startswith("```")` (any indent) and test_atom_coverage.py used `^```` (column 0), so a block fenced under a list item was zero-tolerance pseudocode to one and registrable prose to the other. Four chapters fence exactly that way (03:693, 12:293+2095, 13:461, 26:345).	references/06-analysis-masks.md, append a list item with an INDENTED fenced block containing `FS = tan(phi) / tan(slope)`.	Append the same indented fenced block containing the legitimate `theta = atan(slope)`.	MUTATION RED: 1 failed / 539 passed, `test_no_code_applies_trig_to_a_non_angle[references/06-analysis-masks.md]` — the indented fence lands in the CODE tier, which has no per-line escape. DECOY GREEN: 540 passed. Under the column-0 model the mutation is prose, i.e. registrable. Model agreement measured over the whole corpus (44 Markdown documents): _textscan's prose_line_numbers is identical to this guard's previous lstrip model on all 44 (0 differing lines), and its fenced text differs from the column-0 model on 31 — +67/+130/+428/+296 characters of newly-seen fenced text in exactly the four chapters with indented fences, and on the other 27 exactly one trailing newline per block, which is not behavioural.	2026-09-01

@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Graph Runtime
+description: "The node graph as an executable object: evaluation order, the resolution pyramid, memory and scheduling."
+tags: [graph, runtime, scheduling]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-30T20:39:48Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Graph Runtime
 
 The substrate layer of a terrain tool: what a node *is*, what a parameter *is*, and how
@@ -160,7 +170,7 @@ that produced it instead of three nodes downstream where it finally manifests.
 | Drainage area (m²) | Finite, `≥ cellArea` — every cell drains at least itself (`03`) |
 | Slope (tan) | Finite, `≥ 0` |
 | `NormalField` | Finite, unit length within tolerance |
-| `MaterialField` / layer weights | Finite, each `[0, 1]`, and **partitioning to 1** (SKILL.md, mask semantics) |
+| `MaterialField` / layer weights | Finite, each `[0, 1]`, and **partitioning to exactly 1** — `= 1`, not `≤ 1`, and the difference from `MaskField` is the point: a `MaterialField` is a *closed* stack that names its base as a channel (`analysis.derive_materials` / `derive_substances` append `(base, 1 − Σ claimed)`, so they hit `1.0` everywhere), whereas a `MaskField` is one raw coverage mask with the base left implicit, asserted `Σ ≤ 1` at the fan-in below. Two assertions, two sites (`06`, `08`'s *Normalisation*) |
 
 The sweep costs a fraction of any node's own evaluation, and it is the difference between "node 7
 emitted a negative depth" and "the export has holes in it".
@@ -311,7 +321,35 @@ Two consequences worth stating because they surprise people:
   tiling contract of its worst upstream, not its own.
 - **It is a fan-in, so it is also the natural place for the partition assertion.** Since every
   coverage mask passes through one node, assert `Σ masks ≤ 1` there once, rather than hoping each
-  consumer checks.
+  consumer checks. **`≤`, not `=`** — these are the raw coverage masks, independent `[0, 1]`
+  fields, and **any** shortfall is the base material's share. `≤` rather than `<` because a
+  well-formed stack that names its base as a channel reaches exactly 1: that is the `MaterialField`
+  contract in the table above, a *second* assertion at a *second* site, and it is `08`'s "splat
+  weights must sum to 1" — a different object one stage later, after compositing has filled the
+  remainder. Two assertions, two sites, no conflict.
+
+  ⚠️ **And the assertion has to live here because whether it is detectable downstream depends on
+  a choice this node cannot see.** If the consumer composites by laying each material over the
+  last — `out·(1 − m) + colour·m`, the shipped `render.splat_blend` — the effective weights sum to
+  exactly 1 no matter what the masks do, the base absorbing `Π(1 − mᵢ)`. Measured, masks summing
+  to **1.8** still give effective weights summing to **1.0000000000**, and at **3.0** the output
+  is still inside the convex hull of its inputs: under *that* operator two simulations claiming
+  the same ground produce no artefact at all, and node insertion order quietly decides which one
+  wins — the same order-dependence rule (1) above exists to forbid. But if the consumer is a
+  base-less weighted sum — `render.material_rgb`, `Σ wᵢ·materialᵢ`, which ships beside
+  `splat_blend` and is the default colorizer — the same masks can drive channels past 255 and clip:
+  `Σ = 1.8` on a pale palette gives an unclipped `[369 380 401]`, shipped as `[255 255 255]`.
+
+  ⚠️ **And even that one reports conditionally**, which strengthens the case for checking here
+  rather than weakening it. Its sensitivity is set by the palette a consumer passes, another thing
+  this node cannot see: on the palette the shipped call sites actually get
+  (`render._MATERIAL_PALETTE`) a material leaves 8-bit range only at `Σ = 255 / max(channel)` —
+  snow 1.02, sand 1.28, water 1.50, grass 1.93, rock 2.13 — so at `Σ = 1.8` a rock-and-grass
+  hillside clips nothing, and a real producer bug doubling every mask can export entirely in gamut
+  (0 of 4096 pixels clipped). So the defect is invisible, or a hard clip, depending on **two**
+  downstream choices the producer cannot make and cannot see. That is exactly why the check belongs
+  here — one place, independent of the consumer — and not in whichever compositor happens to be
+  wired up. (`reference-impl/tests/test_mask_partition.py`)
 
 **Tier.** **F** — an editor-ergonomics pattern, not a result. The correctness rules are not
 discretionary though: they are the purity contract at the top of this chapter applied to a node that

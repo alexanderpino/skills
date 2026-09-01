@@ -148,10 +148,26 @@ class Graph:
 # --------------------------------------------------------------------------- #
 # nodes: thin adapters over the verified reference-impl modules
 # --------------------------------------------------------------------------- #
+_NOISE_KINDS = ("perlin", "value", "ridged", "hybrid", "warp")
+
+
 def _noise_fn(p, ins, ctx):
+    """Base noise by the family named in `noise` — all five the demo advertises (01).
+
+    ⚠️ AN UNRECOGNISED `kind` IS A FAILURE, NOT A DEFAULT, AND THE REASON IS THE CACHE KEY, NOT
+    THE FIELD. This used to fall through to Perlin. The CLI is guarded by `argparse choices`, but
+    `build_graph(noise_kind=...)` is not — and `build_graph` mints the node's `type_id` as
+    `f"noise.{kind}/1"` from the same unvalidated string. So `noise_kind="simplex"` wrote a
+    content-addressed cache entry IDENTIFIED as `noise.simplex/1` whose contents were Perlin: the
+    Merkle key (14) then certifies a field as something it is not, and every downstream cone
+    hashed off that identity inherits the lie. That is worse than a wrong field, because the
+    wrongness is recorded as provenance. `_area_fn` had the identical defect; this matches it.
+    """
     xx, yy = _noise_coords(ctx, p["wavelength"])
     kind, oc, seed = p.get("noise", "perlin"), int(p["octaves"]), ctx.root_seed
-    if kind == "value":
+    if kind == "perlin":                       # the demo default: plain fBm
+        f = noise.fbm(xx, yy, seed, octaves=oc, base=noise.perlin)
+    elif kind == "value":
         f = noise.fbm(xx, yy, seed, octaves=oc, base=noise.value)
     elif kind == "ridged":
         f = noise.ridged_mf(xx, yy, seed, octaves=oc)
@@ -159,8 +175,8 @@ def _noise_fn(p, ins, ctx):
         f = noise.hybrid_mf(xx, yy, seed, octaves=oc)
     elif kind == "warp":
         f, _, _ = noise.domain_warp(xx, yy, seed, warp=p.get("warp", 4.0), octaves=oc)
-    else:                                                      # perlin fBm (default)
-        f = noise.fbm(xx, yy, seed, octaves=oc, base=noise.perlin)
+    else:
+        raise ValueError(f"noise: unknown kind {kind!r}; expected one of {_NOISE_KINDS}")
     f = (f - f.min()) / max(f.max() - f.min(), 1e-9)          # -> [0,1] for the demo
     return f * p["relief"]                                     # -> metres
 
@@ -183,14 +199,91 @@ def _thermal_fn(p, ins, ctx):
         ins[0], repose_slope=p["repose"], iters=int(p["iters"]), cellsize=ctx.cellsize)
 
 
+_FILL_METHODS = ("fill", "breach_fill")
+
+
 def _fill_fn(p, ins, ctx):
-    return flow.priority_flood_fill(ins[0])
+    """Depression handling by the policy named in `method` — both `flow` ships (03).
+
+    `"fill"` is Barnes priority-flood: every basin is raised to its rim. `"breach_fill"` is the
+    HYBRID policy `03` calls "the right default for terrain generation" — shallow pits are carved
+    out as the noise artefacts they are, deep ones are filled and become lakes. Both are selectable
+    because a recommendation nothing in the shipped graph can reach is a recommendation the graph
+    does not actually offer; that is the defect `_area_fn` carried for `hybrid_accumulation`.
+
+    ⚠️ THE HYBRID IS THE DEFAULT, AND THAT IS AN ADJUDICATION — `registers/OPEN-ITEMS.md` item 24.
+    SELECTABLE IS NOT DEFAULT. `03:101` does not merely offer the hybrid, it says in bold "Hybrid
+    is the right default for terrain generation", and this node used to ship `method="fill"` three
+    times over: in `build_graph`'s params, in `build_scene_graph`'s params, and in this function's
+    own `p.get` fallback. A demo that is the runnable half of the chapter cannot ship the option
+    the chapter argues against and call the recommendation honoured. Item 24 recorded the
+    disagreement and asked for a decision written down here; this is it.
+
+    THE CHAPTER'S OWN REASON DOES NOT REACH THIS NODE, AND THE FLIP IS STILL RIGHT. `03` argues
+    from the DEM you KEEP: "if you fill everything, you lose all your lakes". Here the filled field
+    is consumed only by `area` and then discarded — the height output of both graphs is `relaxed`,
+    which still holds every basin — so no lake was ever at stake and the chapter's headline reason
+    does not apply. What IS at stake is the drainage network, and there the chapter's PREMISE is
+    checkable rather than assumed. `03` distinguishes pits that are NOISE ARTEFACTS from basins
+    that are real (craters, calderas), and neither graph here MODELS a basin — `build_graph` is
+    noise, fluvial erosion and thermal relaxation, `build_scene_graph` adds fault blocks and
+    terracing, and there is no crater, caldera or lake node in either. So every pit in `relaxed`
+    is fBm noise or the numerical residue of the erosion loop: both of the cases the hybrid is
+    written to carve. Filling one invents a spill point and puts the channel where the terrain
+    does not.
+
+    MEASURED ON THIS GRAPH RATHER THAN IN THE ABSTRACT (96², cellsize 10.4 m, seed 1, droplet
+    backbone — the CLI's own defaults): priority-flood raises 950 of 9216 cells; `breach_fill` at
+    `max_depth=10` raises 710 and carves 264. 1217 drainage-area cells change (13.2%) and 124 of
+    819 channel cells (A > 60 cells) move. Both policies leave the SAME maximum raise (31.27 m)
+    and the same 538 flat cells, which is the measurement that shows the deep basins still fill to
+    lakes: the hybrid moves the artefact pits, not the basins.
+
+    AND THE FIGURE COST WAS MEASURED, NOT ASSUMED — it is ZERO, which is a weaker result than it
+    sounds. `hero.py` is the only committed figure built on this graph, and its settings are the
+    quiet end of the trade: at 180², 266.7 m cells and a streampower backbone, a 10 m breach
+    threshold reaches almost nothing, so the flip moves 16 of 32400 accumulation cells and one
+    channel cell. `tools/regen_figures.py` rebuilds all 14 committed PNGs and reports
+    `hero  ok` — the 16 changed cells sit under the substance thresholds that colour the render, so
+    no pixel moves. Do not read that as "the default does not matter": at the demo's OWN default
+    resolution the same flip moves 13.2% of the drainage field. It means the one figure staked on
+    this graph is staked on the insensitive end of it.
+
+    `max_depth` stays 10.0 m, the middle of `03:101`'s own 5-20 m band.
+
+    ⚠️ `_area_fn`'s `method="d8"` IS DELIBERATELY NOT FLIPPED WITH IT. Item 24 pairs the two, but
+    the chapters do not: `03:247` reads "This costs almost nothing and is what most good terrain
+    tools do" — a description of what other tools do — where `03:101` prescribes, in the word
+    "default", what this one should. The hybrid router is reachable (`method="hybrid"`) and the
+    census row for it certifies exactly that. Re-adjudicating the ROUTER default needs the same
+    measurement this docstring carries for the fill, and it has not been done.
+    """
+    method = p.get("method", "breach_fill")
+    if method == "fill":
+        return flow.priority_flood_fill(ins[0])
+    if method == "breach_fill":
+        return flow.breach_fill(ins[0], max_depth=p.get("max_depth", 10.0))
+    raise ValueError(f"flow.fill: unknown method {method!r}; expected one of {_FILL_METHODS}")
+
+
+_AREA_METHODS = ("d8", "mfd", "hybrid")
 
 
 def _area_fn(p, ins, ctx):
-    if p.get("method", "d8") == "mfd":
+    """Drainage area by the router named in `method` — all three `flow` ships (03)."""
+    method = p.get("method", "d8")
+    if method == "mfd":                        # dispersive: right for hillslope quantities
         return flow.mfd_accumulation(ins[0], cellsize=ctx.cellsize)
-    return flow.d8_accumulation(ins[0], cellsize=ctx.cellsize)
+    if method == "hybrid":                     # 03's recommendation: MFD hillslope, D8 channel
+        return flow.hybrid_accumulation(ins[0], cellsize=ctx.cellsize,
+                                        channel_cells=p.get("channel_cells", 60.0))
+    if method == "d8":                         # single receiver: converges into channels
+        return flow.d8_accumulation(ins[0], cellsize=ctx.cellsize)
+    # A method this node does not understand is a failure, not a default. It used to fall
+    # through to D8, so a typo ("mdf", "MFD") routed the whole graph with the wrong router and
+    # returned a plausible field — the quiet wrong answer 14 forbids. Fail at dispatch instead.
+    raise ValueError(f"flow.accumulation: unknown method {method!r}; "
+                     f"expected one of {_AREA_METHODS}")
 
 
 def _slope_fn(p, ins, ctx):
@@ -221,6 +314,13 @@ def _scatter_fn(p, ins, ctx):
 def build_graph(ctx, backbone="droplet", noise_kind="perlin"):
     """The sample pipeline, as a DAG in Legal Order. Returns the graph plus the names of
     the two output fields: (height, drainage_area)."""
+    if noise_kind not in _NOISE_KINDS:
+        # ⚠️ VALIDATED HERE AS WELL AS IN `_noise_fn`, BECAUSE THE TYPE_ID IS MINTED HERE. The
+        # node below interpolates `noise_kind` straight into its `type_id`, which is the identity
+        # half of the Merkle cache key (14). Catching the bad kind only at evaluation would still
+        # let a node called `noise.simplex/1` exist and be hashed into every downstream key.
+        raise ValueError(f"build_graph: unknown noise_kind {noise_kind!r}; "
+                         f"expected one of {_NOISE_KINDS}")
     g = Graph(ctx)
 
     # 1-3  base shape: real noise (01) in world coordinates (the initial condition)
@@ -245,8 +345,10 @@ def build_graph(ctx, backbone="droplet", noise_kind="perlin"):
           params={"repose": 0.7, "iters": 30},
           locality="NEIGHBOURHOOD", resolution="RESOLUTION_INVARIANT")
 
-    # 4-5  analysis routing on the FINAL geometry: fill (mandatory) then accumulate
-    g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",), locality="GLOBAL")
+    # 4-5  analysis routing on the FINAL geometry: depression handling (mandatory) then accumulate.
+    # `breach_fill` is 03:101's hybrid and its stated DEFAULT — see `_fill_fn` for the adjudication.
+    g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",),
+          params={"method": "breach_fill", "max_depth": 10.0}, locality="GLOBAL")
     g.add("area", "flow.accumulation/1", _area_fn, inputs=("filled",),
           params={"method": "d8"}, locality="GLOBAL")
 
@@ -319,7 +421,8 @@ def build_scene_graph(ctx):
           params={"levels": 7, "sharpness": 7.0}, locality="LOCAL")
     g.add("relaxed", "erosion.thermal/1", _thermal_fn, inputs=("strata",),
           params={"repose": 0.62, "iters": 8}, locality="NEIGHBOURHOOD")     # talus at repose (Musgrave 1989)
-    g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",), locality="GLOBAL")
+    g.add("filled", "flow.fill/1", _fill_fn, inputs=("relaxed",),
+          params={"method": "breach_fill", "max_depth": 10.0}, locality="GLOBAL")
     g.add("area", "flow.accumulation/1", _area_fn, inputs=("filled",),
           params={"method": "d8"}, locality="GLOBAL")
     g.add("slope", "analysis.slope/1", _slope_fn, inputs=("relaxed",), locality="LOCAL")
@@ -344,7 +447,7 @@ def run_scene(ctx, outdir):
     area = g.evaluate(a_out)
     slope = g.evaluate("slope")
     stack = dict(analysis.derive_substances(height, slope, area, ctx.cellsize, climate=_ARID_BIOME["climate"]))
-    fill = analysis.deposit_fill(height, ctx.cellsize, radius=3)            # sand/dust piles into the washes
+    fill = analysis.deposit_fill(height, radius=3)                          # sand/dust piles into the washes
     surf = height + np.clip(stack["sediment"] + stack["ground"], 0.0, 1.0) * fill
     mat = render.splat_blend(np.zeros(height.shape + (3,)) + np.array(_ARID_BIOME["ground"], float),
                              [(stack["sediment"], _ARID_BIOME["sediment"]), (stack["scree"], _ARID_BIOME["scree"]),
@@ -417,7 +520,7 @@ def render_all(height, area, cellsize, outdir, materials=None, scatter_pts=None,
     emit("05_hypsometric.png", render.hypsometric(height, cellsize))
     emit("06_clip.png", render.false_colour_clip(height))
     if materials is not None:                                  # 11: the splatmap preview
-        emit("07_materials.png", render.material_rgb(materials, cellsize))
+        emit("07_materials.png", render.material_rgb(materials))
     if scatter_pts is not None:                                # 12: boulders over the hillshade
         base = render.hillshade(height, cellsize)
         emit("08_scatter.png", render.scatter_overlay(base, scatter_pts, cellsize,
@@ -456,8 +559,8 @@ def main(argv=None):
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--backbone", choices=("droplet", "streampower"), default="droplet",
                     help="erosion backbone; pick by extent (SKILL.md step 3)")
-    ap.add_argument("--noise", choices=("perlin", "value", "ridged", "hybrid", "warp"),
-                    default="perlin", help="base noise family (01)")
+    ap.add_argument("--noise", choices=_NOISE_KINDS, default="perlin",
+                    help="base noise family (01)")   # choices FROM the dispatcher, not beside it
     ap.add_argument("--size", type=int, default=96, help="cells per side")
     ap.add_argument("--extent-km", type=float, default=None,
                     help="world extent in km (default 1 for droplet, 120 for streampower)")

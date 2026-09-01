@@ -1,6 +1,12 @@
+import inspect
+import re
+from pathlib import Path
+
 import numpy as np
 import asserts
 import dunes
+
+CHAPTER = Path(__file__).resolve().parents[2] / "references" / "05-erosion-thermal-aeolian.md"
 
 
 def _seed_field(n=40, base=4, seed=0):
@@ -85,3 +91,87 @@ def test_slabs_follow_a_steered_wind_and_pile_at_a_convergence():
     near = col[seam - 3:seam + 3].mean()
     far = np.concatenate([col[:seam // 2], col[seam + m // 4:]]).mean()
     assert near > 1.5 * far                           # sand heaps on the convergence line
+
+
+# --------------------------------------------------------------------------- #
+# THE SALTATION HOP. `hop` was, until this wave, stated four different ways: 05:412's Werner
+# pseudocode block said `~5 cells, fixed`, 05:399's runnable-reference note said `≈3 cells`,
+# this module's docstring said `~5`, and the signature shipped `1`. Two of those four are inside
+# ONE chapter, so the chapter contradicted itself before the module was consulted, and
+# test_pseudocode_drift.py could not see it: that register reads FENCED BLOCKS only, and 05:399
+# is prose. It is now 5 in all four places — Werner's published value, "a slab moves downwind to
+# a new lattice site l (typically equal to 5) sites away" (Werner 1995, restated in Kok, Parteli,
+# Michaels & Karam 2012, Rep. Prog. Phys. 75 106901 §3.2.2) — and the two guards below are what
+# hold it there. The `werner-saltation-hop` row of KNOWN_DIVERGENCES was retired against them.
+
+_PROSE_HOP = re.compile(r"`hop` is the saltation length[^\n]*?\*\*≈([0-9.]+) cells\*\*")
+_BLOCK_HOP = re.compile(r"L = saltationHop[^\n]*~([0-9.]+) cells")
+
+
+def test_chapter_note_quotes_the_shipped_hop():
+    """05 must state the saltation hop ONCE. Both of the chapter's statements of it — the prose
+    runnable-reference note at 05:399 and the pseudocode block at 05:412 — and the value this
+    module actually ships must be the same number. This is the guard that replaces the retired
+    `werner-saltation-hop` divergence row on its prose side; `test_pseudocode_drift.py`'s
+    BLOCK_CONSTANTS row `dunes.hop` covers the block side. A reader implements from the chapter,
+    and a chapter that gives one constant two values is worse than one that disagrees with the
+    code, because there is no third artifact to break the tie."""
+    text = CHAPTER.read_text(encoding="utf-8")
+    prose = _PROSE_HOP.findall(text)
+    block = _BLOCK_HOP.findall(text)
+    assert len(prose) == 1, (
+        "05's runnable-reference note no longer states the saltation hop as `**≈N cells**` "
+        "(found %r). Either the note was reworded past this guard or the number is gone; both "
+        "leave the constant unpinned on the prose side." % (prose,))
+    assert len(block) == 1, "05's Werner block no longer states `~N cells` for L (found %r)" % (block,)
+    shipped = inspect.signature(dunes.werner_dunes).parameters["hop"].default
+    assert float(prose[0]) == float(block[0]) == float(shipped), (
+        "05 states the saltation hop as %s in its prose note and %s in its pseudocode block, and "
+        "dunes.werner_dunes ships hop=%s. These must be one number (Werner 1995: l = 5 cells)."
+        % (prose[0], block[0], shipped))
+
+
+def test_a_slab_hops_exactly_hop_cells():
+    """`hop` means CELLS PER TRANSPORT STEP, not a speed or a scale factor. Start every slab on
+    column 0 of a bare periodic field and let it deposit on first landing (p_sand = p_bare = 1,
+    no shadow, no avalanche): every landing site is then exactly one hop downwind of the previous
+    one, so sand can only ever occupy columns that are multiples of `hop` (mod m). Off-lattice
+    sand means the hop was applied as something other than `hop` whole cells."""
+    n, m, hop = 8, 20, 5                                  # m % hop == 0, so the lattice wraps cleanly
+    s0 = np.zeros((n, m), dtype=np.int64)
+    s0[:, 0] = 3
+    out = dunes.werner_dunes(s0.copy(), iters=3, seed=0, p_sand=1.0, p_bare=1.0, hop=hop,
+                             wind=(0, 1), shadow=False, avalanche=False)
+    assert int(out.sum()) == int(s0.sum())
+    occupied = set(np.flatnonzero(out.sum(axis=0)).tolist())
+    assert occupied <= {0, 5, 10, 15}, (
+        "slabs landed on columns %s; with hop=%d every landing must be a multiple of %d from the "
+        "source column" % (sorted(occupied), hop, hop))
+    assert len(occupied) > 1                              # and transport actually happened
+
+
+def test_hop_sets_the_dune_wavelength():
+    """The claim the constant carries — a longer saltation hop makes LONGER dunes — measured, not
+    asserted. Same seed, same sheet, same everything else: the along-wind profile's spectral
+    centroid wavelength is ~1.85x longer at the shipped hop=5 than at hop=1 (measured 1.84-1.98
+    over five seeds; the bar here is a wide 1.35). This is why the constant is not a taste
+    setting: changing it changes the landform, so the four artifacts that state it must agree."""
+    n, m = 16, 96                                         # long along the wind (+j) -> resolvable FFT
+    rng = np.random.default_rng(0)
+    s0 = (rng.random((n, m)) * 3 + 1).astype(np.int64)
+
+    def wavelength(hop):
+        out = dunes.werner_dunes(s0.copy(), iters=40, seed=0, p_sand=0.6, p_bare=0.1,
+                                 wind=(0, 1), hop=hop)
+        assert int(out.sum()) == int(s0.sum())
+        prof = out.mean(axis=0).astype(float)
+        prof -= prof.mean()
+        power = np.abs(np.fft.rfft(prof)) ** 2
+        power[0] = 0.0
+        k = np.arange(len(power))
+        return m / (float(np.sum(power * k)) / float(np.sum(power)))   # spectral centroid
+
+    short, long_ = wavelength(1), wavelength(5)
+    assert long_ > 1.35 * short, (
+        "hop=5 gave a dominant wavelength of %.1f cells and hop=1 gave %.1f — the hop is supposed "
+        "to set the dune wavelength" % (long_, short))

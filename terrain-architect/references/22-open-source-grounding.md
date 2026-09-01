@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Provenance
+title: Open-Source Grounding Ledger
+description: Which open-source implementations each algorithm was checked against, and which remain port targets rather than reimplementations.
+tags: [grounding, open-source]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-20T16:01:56+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Open-Source Grounding Ledger
 
 The pre-computed comparison between this skill's neutral terrain contracts and mature

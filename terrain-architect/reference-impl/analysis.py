@@ -183,9 +183,23 @@ def derive_materials(height, slope_tan, area, cellsize, *, snow_line=None,
                      channel_area=None, rng_seed=0):
     """A partitioned material stack from the analysis fields (06, Masks -> materials). Returns
     an ordered list of (name, MaskField) built as a PRIORITY STACK — each mask multiplied by
-    (1 - sum of the masks above it) — so the masks partition (sum <= 1) and a splatmap won't
-    silently rescale them. Order: water -> snow -> rock -> sand -> grass. Thresholds are world
-    units; snow_line / channel_area default to sensible fractions of the field's own range."""
+    (1 - sum of the masks above it), which gives sum <= 1 by construction. This stack is then
+    CLOSED: "grass" is appended as (1 - claimed), so the returned stack sums to exactly 1.0
+    everywhere and is a MaterialField, not a bag of raw MaskFields (14's field contracts).
+
+    ⚠️ The rationale here used to read "so a splatmap won't silently rescale them". That is
+    false and 06 no longer says it: the shipped over-composite (`render.splat_blend`) rescales
+    nothing whatever the masks sum to — its effective weights always total 1. What DOES go wrong
+    is the base-less weighted sum (`render.material_rgb`, `Σ wᵢ·materialᵢ`): masks summing to 1.8
+    CAN drive channels past 255 and clip — on `render._MATERIAL_PALETTE` only where snow or sand
+    carry weight; a rock/grass hillside over-subscribed 2x ships entirely in gamut, 0/4096 pixels
+    clipped. So the reason to close the stack is that the consumer's
+    behaviour is not knowable from here — which is why 14 asserts `Σ ≤ 1` at the fan-in and 06
+    asserts `Σ = 1` here, at the site where the stack is closed. See
+    `tests/test_mask_partition.py`.
+
+    Order: water -> snow -> rock -> sand -> grass. Thresholds are world units;
+    snow_line / channel_area default to sensible fractions of the field's own range."""
     height = np.asarray(height, dtype=np.float64)
     slope_tan = np.asarray(slope_tan, dtype=np.float64)
     area = np.asarray(area, dtype=np.float64)
@@ -227,13 +241,20 @@ def dominant_material(stack):
     return np.argmax(weights, axis=0)
 
 
-def deposit_fill(h, cellsize=1.0, radius=3):
+def deposit_fill(h, *, radius=3):
     """Depth by which a loose granular deposit PILES UP to fill the crevices/hollows of a surface —
     a greyscale morphological **closing** minus the surface, clamped ≥ 0 (`ops_filters.closing`, 10).
     Closing fills every concavity up to the structuring radius, so this is deep in gullies and hollows
     and zero on ridges and open flats — exactly how snow drifts into couloirs, sand banks into
     interdunes, and scree ramps up a cliff foot. Scale it by a substance's supply mask, then add it to
-    the surface: the deposit surface is smoother than the bedrock beneath. `radius` is in cells."""
+    the surface: the deposit surface is smoother than the bedrock beneath. `radius` is in cells.
+
+    ⚠️ NO `cellsize`, AND ITS ABSENCE IS THE HONEST SIGNATURE. One was declared in the SECOND
+    POSITIONAL slot and read by no line of this body: a morphological closing over a `radius` in
+    CELLS returns a depth in the DEM's own vertical units, so no horizontal length enters. It was
+    the `render.material_rgb(masks, cellsize, palette)` hazard exactly — all four callers passed it
+    positionally — so `radius` is keyword-only and a stale `deposit_fill(h, cellsize)` raises
+    TypeError instead of quietly becoming a structuring radius of 30 cells."""
     import ops_filters
     closed = ops_filters.closing(np.asarray(h, dtype=np.float64), r=int(radius))
     return np.maximum(closed - np.asarray(h, dtype=np.float64), 0.0)
@@ -252,10 +273,15 @@ def wear(h, cellsize=1.0, eps=1e-12):
     return out / hi if hi > eps else np.zeros_like(out)
 
 
-def peaks(h, cellsize=1.0, radius=4, eps=1e-12):
+def peaks(h, *, radius=4, eps=1e-12):
     """Prominence above the local mean — isolates summits and crests from the surrounding relief.
     `h - boxblur(h, radius)`, positive part, normalised. `radius` is in CELLS, so scale it with
-    resolution (08) if you want a fixed prominence footprint in metres. Returns a mask in 0-1."""
+    resolution (08) if you want a fixed prominence footprint in metres. Returns a mask in 0-1.
+
+    ⚠️ NO `cellsize`, AND ITS ABSENCE IS THE HONEST SIGNATURE. One was declared here and read by
+    nothing: a box filter over a CELL radius has no length in it, so the parameter asserted a
+    scale-awareness the function does not have. `radius` and `eps` are keyword-only so that a
+    stale `peaks(h, cellsize)` raises instead of quietly becoming a radius of 30 cells."""
     import ops_filters
     lo = ops_filters.box_filter(np.asarray(h, dtype=np.float64), r=int(radius))
     out = np.maximum(np.asarray(h, dtype=np.float64) - lo, 0.0)
@@ -270,7 +296,7 @@ def texture_base(h, area, cellsize=1.0, *, slope_w=0.5, soil_w=0.3, flow_w=0.2, 
     `render.satmap` as the driver. Weights need not sum to 1 — the result is renormalised."""
     s = slope(h, cellsize)
     s = s / s.max() if s.max() > 0 else s
-    soil = deposit_fill(h, cellsize, radius=radius)
+    soil = deposit_fill(h, radius=radius)
     soil = soil / soil.max() if soil.max() > 0 else soil
     a = np.log1p(np.maximum(np.asarray(area, dtype=np.float64), 0.0))
     a = a / a.max() if a.max() > 0 else a

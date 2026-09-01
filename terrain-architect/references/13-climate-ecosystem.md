@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Climate & Ecosystem"
+description: Insolation, moisture and temperature fields, and the biome assignment that reads them.
+tags: [climate, biome, moisture]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-29T13:07:20Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Climate & Ecosystem
 
 Contents: [Why climate is in the graph](#why-climate-is-in-the-graph) · [Temperature](#temperature) ·

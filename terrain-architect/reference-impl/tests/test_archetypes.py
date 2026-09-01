@@ -148,7 +148,7 @@ def test_substance_colour_is_material_not_elevation():
     # substances PILE UP: the deposit surface only ever rises above bedrock, and it fills crevices
     assert np.all(surf >= hh - 1e-6)
     assert surf.max() > hh.max() - 1e-6 and np.any(surf > hh + 1e-6)  # something actually accumulated
-    fill = A.analysis.deposit_fill(hh, A.CELL, radius=3)
+    fill = A.analysis.deposit_fill(hh, radius=3)
     assert fill.min() >= -1e-9 and fill.max() > 0.0                   # fill is >=0, positive in hollows
 
     # snow (substance) placement: present on the alpine world, absent on the arid desert

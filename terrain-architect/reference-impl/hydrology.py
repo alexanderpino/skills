@@ -24,12 +24,20 @@ def discharge_from_area(area, rain=2.0e-6):
     return np.asarray(area, dtype=np.float64) * rain
 
 
-def water_surface(bed, cellsize, discharge, *, q_channel=None, depth_coef=1.4, depth_exp=0.4,
+def water_surface(bed, discharge, *, q_channel=None, depth_coef=1.4, depth_exp=0.4,
                   max_river_depth=9.0, lakes=True, smooth=1.0):
     """Water-surface elevation `w >= bed` from a DISCHARGE field `Q` (m³/s). River depth follows
     bankfull hydraulic geometry `depth = depth_coef·(Q/q_channel)^depth_exp` (capped), in cells above
     the channel discharge threshold; lakes fill enclosed depressions to spill level. `smooth`
-    gaussian-relaxes the wet surface so it reads calm."""
+    gaussian-relaxes the wet surface so it reads calm.
+
+    ⚠️ NO `cellsize`, AND IT USED TO BE A REQUIRED POSITIONAL SLOT — the worst shape the
+    dead-parameter census in `tests/test_render.py` found. Lake filling is decided by comparing
+    ELEVATIONS, river depth comes out of `depth_coef·(Q/q_channel)^depth_exp` in metres, and
+    `smooth` is a filter radius in cells: no horizontal length enters, yet the signature DEMANDED
+    one and every caller supplied it. Dropping it drops the arity, so a stale
+    `water_surface(bed, cellsize, Q)` is a TypeError rather than a run with the cell size
+    silently standing in for the discharge field."""
     bed = np.asarray(bed, dtype=np.float64)
     Q = np.asarray(discharge, dtype=np.float64)
     w = bed.copy()
@@ -53,9 +61,10 @@ def water_surface(bed, cellsize, discharge, *, q_channel=None, depth_coef=1.4, d
     return w
 
 
-def water_depth(bed, cellsize, discharge, **kw):
-    """Depth of standing/flowing water (surface − bed), 0 on dry land."""
-    return water_surface(bed, cellsize, discharge, **kw) - np.asarray(bed, dtype=np.float64)
+def water_depth(bed, discharge, **kw):
+    """Depth of standing/flowing water (surface − bed), 0 on dry land. No `cellsize` — see
+    `water_surface`, whose dead required positional it forwarded."""
+    return water_surface(bed, discharge, **kw) - np.asarray(bed, dtype=np.float64)
 
 
 def water_colour(depth, max_depth=7.0, shallow=(96, 148, 168), deep=(28, 62, 104), sky=(206, 221, 236)):

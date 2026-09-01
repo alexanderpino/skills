@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Verification
+description: "How each mechanism is checked: the estimator ladder, the controls that make a metric evidence, and the lattice-anisotropy trap that scores a broken operator perfectly."
+tags: [verification, metrics, anisotropy]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-05T12:21:21Z }
+verified: { by: process:test_anatomy_figures.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Verification
 
 Terrain is judged by eye, which makes it uniquely vulnerable to **plausible wrongness**: a
@@ -446,17 +457,27 @@ is not evidence). Measured, on a 4-neighbour max against a disc max of the same 
 
 | θ | Axis-locked operator | Isotropic control (the floor) |
 |---|---|---|
-| 23° | `0.093` | `0.016` |
-| 30° | `0.111` | `0.014` |
-| 45° | `0.128` | `0.020` |
+| 23° | `0.092` | `0.013` |
+| 30° | `0.111` | `0.010` |
+| 45° | `0.127` | `0.018` |
 | **90°** | **`0.000`** | `0.000` |
 
 **The 90° row is the trap.** A quarter turn is a *symmetry of the square lattice*, so it maps the
-grid onto itself and a grossly axis-locked operator comes back exactly equivariant — a perfect
-score for a broken operator. **The test angle must not be a symmetry of the lattice under test**:
-avoid multiples of 90° on a square grid and of 60° on hex. Otherwise the separation is about an
-order of magnitude, which is plenty. Pinned by
-`reference-impl/tests/test_anisotropy.py::test_ninety_degrees_is_a_lattice_symmetry_and_hides_the_defect`.
+grid onto itself and a grossly axis-locked operator commutes with it — the residual drops to the
+floating-point floor, a perfect score for a broken operator. **The test angle must not be a symmetry
+of the lattice under test**: avoid multiples of 90° on a square grid and of 60° on hex. Otherwise the
+separation is about an order of magnitude, which is plenty.
+
+⚠️ *Floor, not exactly zero, and the difference matters when you write the assertion.* The symmetry
+argument is about the **operator**; the number in the table is the operator composed with a bilinear
+rotation, and `cos(90°)` is `6.1e-17` in floating point rather than 0, so that rotation is not a
+bit-exact permutation. On the cone it happens to come back bit-zero — the cone is 4-fold symmetric
+and smooth, so the leftover interpolation weights land on equal neighbours and round away. Run the
+same operator on a random field and the residual is `2.5e-18`: still the floor, no longer zero. So
+the assertion to write is `< 1e-12` against a defect scale of `0.09`–`0.13`, not `== 0`; an equality
+test here would be pinning an arithmetic accident of the test input and calling it a theorem. Pinned
+by `reference-impl/tests/test_anisotropy.py::test_ninety_degrees_is_a_lattice_symmetry_and_hides_the_defect`
+and `reference-impl/tests/test_chapter_numbers.py::test_09_the_ninety_degree_row_is_the_floating_point_floor`.
 
 ![anisotropy anatomy](../reference-impl/anisotropy_anatomy.png)
 
@@ -501,7 +522,7 @@ For reviewing an existing graph. Ordered by expected yield.
 - [ ] Every port range-checked and finiteness-swept at the node that produced it (`14`)?
 - [ ] Each chained sim sub-cycled under its **own** stability limit, with a safety factor — not a shared `Δt` (`14`)?
 - [ ] Guards named with a unit and a reason, clamp events counted, and a rising clamp count treated as a failure (`14`)?
-- [ ] Masks partition to 1?
+- [ ] Masks partition — **`Σ ≤ 1` on the raw coverage masks at the fan-in** (`06`, `14`), and `Σ = 1` at the point the stack is *closed* by emitting the base as its own channel (`06`, `08`)? (two assertions at two sites, not one number: `Σ > 1` at the fan-in means two producers claim the same ground, and whether that leaves a visible trace depends on which compositor the consumer picked — `render.splat_blend` hides it always, and `render.material_rgb` clips only where the palette has no headroom — 4 of its 15 material combinations are silent even at 1.8x)
 - [ ] Every hard threshold noise-perturbed?
 - [ ] Any directional/"anisotropy" control sourced from a **field** (strike, wind, ice flow), not a global angle that will land on the axes? (rotate-the-domain test, at an angle that is *not* a lattice symmetry)
 - [ ] Vertex- vs pixel-centring documented and consistent?

@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Output Contract
+description: "What a generator must export and in what units: the field registry, precision doctrine, and the tiling and seam rules."
+tags: [output, contract, export]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-05T17:55:10Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Output Contract
 
 Contents: [The field contract](#the-field-contract) · [The layer stack](#the-layer-stack) ·
@@ -547,9 +557,53 @@ and terrain wants more.
   index and blend manually, or you'll interpolate between index 3 and index 7 and get material
   5, which is a spectacular bug.
 
-**Normalisation.** Splat weights must sum to 1. Either enforce it in the graph (`06`) or
-normalise in the shader. Doing neither means your material blend brightness varies with the
-mask sum, which reads as inexplicable blotchy lighting.
+**Normalisation.** Splat weights must sum to 1 — **weights**, which is not the same object as
+the coverage masks `06` produces, and conflating the two is why `14` appears to contradict this
+line. A shader computing `Σ wᵢ · materialᵢ` has no base layer to absorb a shortfall, so `Σ = 1`
+is a requirement on the data. Raw coverage masks are independent fields in `[0, 1]` with nothing
+making them sum to anything, so on *those* the assertion is `Σ ≤ 1` (`14`) — a check for two
+simulations claiming the same ground, with **any** remainder belonging to the base material.
+(`≤` and not `<`: a stack that emits its base as a channel reaches exactly 1, which is the
+ordinary case — `06` states these as two assertions at two sites.) Either enforce the weight
+normalisation in the graph (`06`) or normalise in the shader. Doing neither means your material
+blend brightness varies with the mask sum, which reads as inexplicable blotchy lighting.
+
+⚠️ **An ordered over-composite is exempt, and that exemption is a trap — but the exemption is
+the operator's, not the pipeline's.** If you composite by laying each material over the last
+(`out·(1 − m) + colour·m`, which is what `reference-impl/render.py`'s `splat_blend` does) the
+effective weights sum to exactly 1 whatever the masks do — the base absorbs `Π(1 − mᵢ)`.
+Measured: masks summing to **1.8** still give effective weights summing to **1.0000000000**; at
+masks summing to **3.0** the output is still inside the convex hull of its input colours. Under
+*that* operator over-subscription produces no artefact, no dimming and no out-of-range value —
+the compositing *order* silently arbitrates a conflict nobody chose to have, and **that path
+cannot report the bug**.
+
+Under a **base-less weighted sum it can report it**, and the `Σ wᵢ · materialᵢ` shader two
+paragraphs above is not hypothetical — it is `render.material_rgb`, which ships in the same
+module as `splat_blend` and which `GROUNDING.md` names as the **default** colorizer (`gallery.py`
+and `graph_demo.py` feed `06` masks straight into it). Measured on a pale-terrain palette:
+`Σ = 1.00` gives unclipped `[205 211 223]` and shipped `[204 211 222]` — inside the
+palette's hull, ±1 for the float→uint8 truncation; `Σ = 1.80` gives unclipped `[369 380 401]` and
+shipped `[255 255 255]`, every channel over and every channel clipped. That is the rescale, the brightness
+error and the out-of-range value, together. Chained `blend_rgb` in a non-`normal` mode is worse
+still — monotone dimming toward black under `multiply` and toward white under `screen` as `Σ`
+rises, which is exactly the blotchy lighting named above.
+
+⚠️ **"Can" and not "does": the weighted sum only reports where the palette has no headroom.** The
+numbers above are the pale palette, the best case. The shipped call sites pass *no* palette and get
+`render._MATERIAL_PALETTE`, whose materials leave 8-bit range at `Σ = 255 / max(channel)` —
+snow **1.02**, sand **1.28**, water **1.50**, grass **1.93**, rock **2.13** — so at that same
+`Σ = 1.80` four of the fifteen single- and pair-combinations (`rock`, `grass`, `water+grass`,
+`rock+grass`) clip nothing whatever. A real `derive_materials` bug that doubles every mask exports
+an ordinary steep hillside as an in-gamut pale sage `[216 250 188]`, 0 of 4096 pixels clipped,
+while the same bug on snowy ground clips ~7% of the frame. Only the clip is self-evident, too: the
+brightness half is not an error you can see without a reference image.
+
+**So whether the bug is visible depends on which compositor a consumer picked** — and, for the one
+that reports, on which palette it was handed. A producer cannot know either. Which is precisely why
+`14` puts the `Σ ≤ 1` assertion at the fan-in: one place, independent of the consumer, rather than
+relying on a downstream operator that may be the one that stays silent.
+(`reference-impl/tests/test_mask_partition.py`)
 
 **Resolution.** Splatmaps are usually 1/2 or 1/4 the heightmap resolution. They're
 pixel-centred while the heightmap is vertex-centred (see above) — mind the offset.
@@ -804,7 +858,8 @@ by a slope selector (`06`), or blend it in by slope.
 randomised offsets and blends *without* the ghosting naive random tiling causes. Cheaper folklore: two
 octaves of the same tile at different scales, multiplied.
 
-**What the graph owes the shader.** Partitioned splat weights (`06` — must sum to 1), the per-material
+**What the graph owes the shader.** Partitioned splat *weights* (`06` — must sum to 1; the raw
+coverage masks upstream of them are asserted `Σ ≤ 1` instead, see Normalisation above), the per-material
 assignment, and the macro maps baked from **R32F** (precision above). The shader does the blend, but
 the colour map, splatmap, and material blend are three views of *one* material decision — composite
 them from the **same `06` masks** or they drift apart as the camera closes in.

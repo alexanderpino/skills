@@ -20,3 +20,12 @@ out/
 !landforms.png
 !capability_grid.png
 !erosion_streampower.png
+# ⚠️ THESE TWO WERE MISSING FROM THE LIST WHILE THREE DOCUMENTS EMBEDDED
+# THEM. `26-hexagonal-grids.md`, `09-verification.md` and `GALLERY.md` all
+# link to these figures, so every reader of those chapters saw a broken
+# image and no check noticed -- an ignore rule with an allow-list fails
+# silently in exactly this direction, by omission rather than by error.
+!hex_anatomy.png
+!anisotropy_anatomy.png
+!flow_anatomy.png
+!halfar_anatomy.png

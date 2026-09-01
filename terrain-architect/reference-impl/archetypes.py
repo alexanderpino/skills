@@ -347,7 +347,7 @@ def substance_color(h, family, cell=CELL, climate=None):
     area = flow.d8_accumulation(flow.priority_flood_fill(h), cell)
     stack = analysis.derive_substances(h, slope, area, cell, climate=clim, rng_seed=0)
     md = {n: m.copy() for n, m in stack}
-    fill = analysis.deposit_fill(h, cell, radius=3)                          # depth that fills crevices/hollows
+    fill = analysis.deposit_fill(h, radius=3)                                # depth that fills crevices/hollows
     surf = h.astype(np.float64).copy()
 
     # loose ground settles into the lows first (desert sand/dust drifts into hollows; sediment fills)

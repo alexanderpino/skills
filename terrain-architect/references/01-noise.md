@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Noise
+description: "Noise as the base layer: Perlin, value, simplex, Worley and Gabor, the fractal compositions over them, and the lattice pinch points that make lacunarity exactly 2 a defect."
+tags: [noise, fbm, fractal]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-30T15:58:16Z }
+verified: { by: process:test_pseudocode_drift.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Noise
 
 Contents: [Choosing](#choosing) · [Perlin](#perlin-1985--improved-perlin-2002) ·
@@ -285,7 +296,7 @@ the 1982 original, and it's obsolete for a reason". Its one remaining virtue is 
 ## FBM
 
 ```
-fbm(p, octaves, lacunarity=2.0, gain=0.5):
+fbm(p, octaves, lacunarity=2.03, gain=0.5):
     sum = 0;  amp = 1.0;  freq = 1.0;  norm = 0
     for i in 0..octaves-1:
         sum  += amp * noise(p * freq)
@@ -295,8 +306,20 @@ fbm(p, octaves, lacunarity=2.0, gain=0.5):
     return sum / norm          // normalise, else amplitude depends on octave count
 ```
 
-- **Lacunarity** ≈ 2.0. Exactly 2.0 makes octaves align on the lattice, which can produce
-  faint reinforcement artefacts; 1.97 or 2.01 breaks the alignment for free.
+- **Lacunarity** ≈ 2, but **not exactly 2, and the artefact is not faint.** Gradient noise is
+  *identically zero at every lattice point*. At lacunarity exactly 2 every octave's lattice
+  coincides with the coarsest one's, so at those shared points **all octaves are zero at once** and
+  the sum is too. Measured on `reference-impl/noise.py` over 400 shared lattice points: mean `|fbm|`
+  is **0.000000, maximum 0.0e+00** — not small, *exactly* zero — against **0.139** at generic
+  points. That is a grid of hard pinch points, and it prints through anything derived from the
+  height. Detuning to **2.03** lifts the shared points to **0.063** (45% of the generic level); the
+  residual deficit is why the detuning is a mitigation and not a cure.
+  ⚠️ **Two facts worth keeping separate.** The per-octave *seed offset* (below) does **not** fix
+  this — measured identically zero with and without it — because the zeros come from the lattice
+  geometry, not from octave correlation. And this pseudocode carried `lacunarity=2.0` as its
+  default while the bullet beneath it warned against exactly that value: a reader implementing
+  from the block got the artefact, and the caveat sat one paragraph too late to prevent it.
+  Guarded by `tests/test_noise_pinch.py`.
 - **Gain** (persistence) ≈ 0.5. Relates to fractal dimension: `gain = 2^(-H)` where H is the
   Hurst exponent. H=1 (gain 0.5) is the standard "smooth-ish" terrain; H=0.5 (gain ≈0.707)
   is rougher, more like real eroded topography at small scales.
@@ -313,7 +336,7 @@ Musgrave — the 1993 Yale thesis and his *Texturing & Modeling* chapters (`00`;
 paper is the erosion one, not this). The naive version:
 
 ```
-ridged(p, octaves, lacunarity=2.0, gain=0.5):
+ridged(p, octaves, lacunarity=2.03, gain=0.5):
     sum = 0; amp = 0.5; freq = 1.0
     for i in 0..octaves-1:
         n = 1.0 - abs(noise(p * freq))       // fold: creates the ridge crease
@@ -328,7 +351,7 @@ mountains rather than crumpled paper — high previous octaves suppress the next
 detail concentrates on the ridges and valleys stay smooth:
 
 ```
-ridgedMF(p, octaves, lacunarity=2.0, gain=2.0, offset=1.0, H=1.0):
+ridgedMF(p, octaves, lacunarity=2.03, gain=2.0, offset=1.0, H=1.0):
     signal = offset - abs(noise(p))
     signal = signal * signal
     result = signal
@@ -357,7 +380,7 @@ accumulated value so far, so low areas stay smooth (plains) and high areas get r
 (mountains) — the correlation you actually see in real topography.
 
 ```
-hybridMF(p, octaves, lacunarity=2.0, H=0.25, offset=0.7):
+hybridMF(p, octaves, lacunarity=2.03, H=0.25, offset=0.7):
     // exponent array precomputed: exps[i] = pow(lacunarity, -i*H)
     result = (noise(p) + offset) * exps[0]
     weight = result

@@ -175,7 +175,7 @@ def exner_step(bed, wind, *, sand=None, dt=1.0, cellsize=1.0, rho_bed=1600.0, sa
 
 
 def yardang(h, wind, soft_mask, *, iters=10, K_abr=0.6, freq_along=0.018, freq_cross=0.11,
-            saltation_h=6.0, floor_reach=3, octaves=4, cellsize=1.0, seed=0):
+            saltation_h=6.0, floor_reach=3, octaves=4, seed=0):
     """Abrade wind-parallel streamlined ridges (yardangs) into a soft substrate `h`. `wind=(u, v)` in
     (col, row) components — a constant vector OR a pair of fields (`winds.wind_field`) — sets the
     ridge long axis. `soft_mask` (scalar or field in [0,1]) confines abrasion to erodible rock.

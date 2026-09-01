@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Implementation Notes
+title: Archetype compositions
+description: "The archetype compositions: which atoms each named landscape is built from, in order."
+tags: [terrain, archetypes]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-25T06:11:37Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Archetype compositions
 
 ![archetypes](archetypes.png)

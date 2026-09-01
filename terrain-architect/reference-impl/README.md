@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Implementation Notes
+title: Reference implementations
+description: "The reference implementation: what each module owns, how the pieces compose into a generator, and which audit answers which question."
+tags: [terrain, reference-impl, atoms]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-30T14:13:37Z }
+verified: { by: process:test_audit_drift.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Reference implementations
 
 Runnable, **numpy-only, pytest-verified** mirrors of the simulation pseudocode in the
@@ -26,14 +37,26 @@ permission.
 
 ```bash
 cd terrain-architect/reference-impl
-pip install -r requirements.txt      # numpy, pytest
-pytest -q                            # 129 pass; 15 optional checks skip (see below)
+pip install -r requirements.txt      # numpy, pytest, pillow
+pytest -q                            # 1231 pass, 6 skip — the optional checks below
 
 # optional independent checks (validity evidence beyond the numpy-only oracles):
 pip install -r requirements-crossvalidate.txt   # RichDEM/pysheds/Landlab -> 5 cross-validation tests
-pip install -r requirements-validate.txt        # pint -> 10 dimensional-consistency tests
-pytest -q                            # 144 pass; all optional checks now run
+pip install -r requirements-validate.txt        # pint -> the dimensional-consistency rung
+pytest -q                            # all optional checks now run
 ```
+
+⚠️ **The counts here were `129 pass; 15 optional checks skip` and `144 pass` for a long time,
+against a suite of 1231.** They are quoted because `VALIDATION.md` holds this file up as the one
+that described the optional-dependency gating correctly — which it did, two lines from a figure
+that was wrong by a factor of nine. Requoted from a measured run; `620` is the number of `def
+test` functions, `1649` the collected count after parametrised expansion, and the three are
+different quantities.
+
+⚠️ **Pillow is a real dependency and is now IN `requirements.txt`.** It was not, and the
+consequence was worse than the missing figure guards: `heightfield_io.py` raises `RuntimeError`,
+not `ImportError`, on a missing PIL, so `importorskip` cannot catch it and a bare install
+**failed** — `2 failed, 1224 passed, 9 skipped`, exit 1 — rather than skipping quietly.
 
 ## What's here, and how each is verified
 
@@ -179,7 +202,16 @@ scorecard (ours vs Gaea/WM/Houdini vs the academic frontier), the objective real
 you, and the prioritised gaps — see **`SIMULATION-AUDIT.md`**. For every atom judged **side-by-side
 against a canonical online counterpart** — published outputs of the *same algorithm* (Quilez, Werner
 CA repos, LIC, Landlab/Halfar) and real landform imagery (NASA/Commons) — with per-atom verdicts and
-the follow-ups the comparison surfaced, see **`CANON-COMPARISON.md`**.
+the follow-ups the comparison surfaced, see **`CANON-COMPARISON.md`**. For what the three baseline
+tools ship **node by node** and which atomic capabilities are genuinely missing — the inventory
+behind the parity claim — see **`NODE-PARITY-AUDIT.md`**. For the standing brief a reviewer works
+from, see **`REVIEW-BRIEF.md`**.
+
+⚠️ **These two were unreachable from this page until a harness said so.** An audit nobody can
+navigate to is an audit nobody re-runs, and `NODE-PARITY-AUDIT.md` had in fact gone stale while
+out of sight — it named braided rivers as the last open gap for some time after `braided.py`
+closed it. `tests/test_audit_drift.py` now fails if any audit document in this directory is not
+linked from here.
 
 ## Coverage boundary and production paths
 

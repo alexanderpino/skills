@@ -1,0 +1,93 @@
+name: terrain-architect
+
+# Criterion K of terrain-architect/DEFINITION-OF-DONE.md. Criteria A-J are guards that live
+# in the test suite; without something that RUNS them on every push they are a snapshot of one
+# afternoon, not a guard. This skill's own history is the argument: committed, verified work
+# regressed more than once because nothing re-ran it.
+#
+# Scoped to terrain-architect/ deliberately. The other skills in this repo have no suite yet;
+# a workflow that green-ticks them by running nothing would be exactly the vacuous guard the
+# whole checklist exists to prevent.
+
+on:
+  push:
+    paths:
+      - 'terrain-architect/**'
+      - '.github/workflows/terrain-architect.yml'
+  pull_request:
+    paths:
+      - 'terrain-architect/**'
+      - '.github/workflows/terrain-architect.yml'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: terrain-architect/reference-impl
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the version every number in the audit documents was measured on.
+        # 3.12 is here to catch the deprecations before they become breakage, not to
+        # be the reference: a disagreement between the two is a finding, not a flake.
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: terrain-architect/reference-impl/requirements.txt
+
+      # pillow is a hard dependency, not an optional one: heightfield_io.py raises
+      # RuntimeError (not ImportError) without it, which pytest.importorskip cannot
+      # catch, so a bare install FAILS the suite rather than skipping it.
+      #
+      # requirements-validate.txt is pint, and pint is what test_dimensional.py imports at
+      # module level. Without it that module SKIPS AT COLLECTION -- all ten of its tests, the
+      # DECISIVE tier of VALIDATION.md's evidence ladder, the one the file itself calls
+      # "genuine evidence of validity, not self-consistency". A CI that installed only
+      # requirements.txt would have gone green forever while the strongest tier never ran.
+      - name: Install (including the optional dimensional audit)
+        run: pip install -r requirements.txt -r requirements-validate.txt
+
+      - name: Suite
+        run: python -m pytest tests/ -q -rs
+
+      # Proves the point above rather than trusting it: if pint ever stops being installed,
+      # the ten tests go quiet again and only this step notices.
+      - name: The decisive tier actually ran
+        run: |
+          python -m pytest tests/test_dimensional.py -q -rs > dim.txt 2>&1 || true
+          cat dim.txt
+          if grep -qiE 'skipped|no tests ran' dim.txt; then
+            echo "test_dimensional.py did not run -- the dimensional audit is dormant"
+            exit 1
+          fi
+
+  regenerate:
+    # Criterion H: counts computed, never typed -- and figures REGENERATED, not trusted.
+    # The naive version of this job runs the figure tests and then checks `git status`. That
+    # is vacuous: those tests call `build()` and assert on the in-memory image, they never
+    # write a PNG, so the tree is always clean and the step always passes. tools/regen_figures.py
+    # runs each producer's __main__ in a scratch CWD and compares pixels against the committed
+    # file, and fails first if any committed PNG has no producer at all.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: terrain-architect/reference-impl/requirements.txt
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Rebuild every committed figure and diff it pixelwise
+        run: python tools/regen_figures.py

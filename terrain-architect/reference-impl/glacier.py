@@ -23,6 +23,16 @@ smoother profile (carve-only, mass -> moraine), widening the trough toward a U. 
 illustrative-morphological — invariant-checked (mass budget, carve-only-under-ice, differential
 deepening), NOT a certified erosion-rate oracle.
 
+⚠️ THE ABRASION COEFFICIENT ABOVE IS THE PHYSICAL ONE; THE SHIPPED DEFAULT IS NOT. The law is
+quoted with `K_g ≈ 1e-4`, which is chapter 12's value (`12`'s parameter table and its abrasion
+block, grounded on Argudo et al. 2020) and is what a reader implementing 12 should use. The
+signature below defaults to `K_g = 8e-4` — **8x that, a deliberate demo amplification** so a carve
+is visible in the handful of steps a test or a figure can afford. It is not the physical value and
+must not be read as one; pass `K_g=1e-4` for anything meant to be quantitative. Until this note
+existed the module stated one number and shipped another eight times larger with nothing between
+them, which reads as drift rather than as a choice. (The disagreement itself is registered, both
+sides pinned, as `glacier-abrasion-K_g` in `tests/test_pseudocode_drift.py`.)
+
 Units: pass `A` and `dt` in a consistent system. The defaults are in YEARS (`A` in Pa⁻³ yr⁻¹, `dt`
 in yr, `beta` in m/m/yr) so mass balance is well-posed; the transport reduces to
 `sims_illustrative.glacier_sia` for any matched `A·dt` when `K_g=0, beta=0`.
@@ -44,7 +54,9 @@ def glacier_carve(bed, H, steps, *, A=_A_YR, n=3, rho=917.0, g=9.81, dt=60.0, ce
 
     beta, ela      mass balance (accumulate above the ELA, melt below); `beta=0` freezes the ice mass
     f_slide        basal sliding fraction of the depth-averaged velocity (0 where cold-based)
-    K_g, l         abrasion law ė = K_g·|u_b|^l (Argudo 2020; `l≈1`)
+    K_g, l         abrasion law ė = K_g·|u_b|^l (Argudo 2020; `l≈1`). ⚠️ The default `K_g=8e-4`
+                   is an 8x DEMO AMPLIFICATION of chapter 12's `K_g ≈ 1e-4`; see the module
+                   docstring. Use 1e-4 for a physical run.
     H_min          ice thinner than this is cold-based / stagnant and does not erode
     K_pluck, fracture  optional plucking ė_pluck = K_pluck·|u_b|·fracture where the bed is steep
     wall_abrasion  optional F-tier trough-widening: lower oversteepened walls under ice (carve-only)
