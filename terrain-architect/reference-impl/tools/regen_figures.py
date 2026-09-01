@@ -144,6 +144,14 @@ READS_FIGURES = {"capability_grid": ("hero",)}
 # floating-point addition is not associative -- so reductions associate differently and the
 # iterative erosion/flow loops amplify a last-bit difference into a visibly different field.
 #
+# That is CONFIRMED, not inferred. Both CI runs reproduce on ONE machine by toggling one
+# environment variable: canyon pit-storage is 5.2169e6 with AVX512 and 4.1597e6 under
+# NPY_DISABLE_CPU_FEATURES="AVX512_SPR AVX512_ICL X86_V4"; CI reported 5.22e6 and 4.16e6.
+# It is the TRANSCENDENTAL ufuncs that differ -- pow/exp/log1p/tan/arctan by exactly 1 ULP,
+# while add/mul/sqrt/sin/hypot/sum/mean are bit-identical -- and droplet_erode amplifies
+# that by ~1e14 because a steepest-descent step is a discrete choice and a tie flips.
+# Full derivation, and the negative result, in registers/figure-regen.tsv.
+#
 # halfar_anatomy has NO RNG AT ALL and still drifted (53 px). So "deterministic algorithm" is
 # not the dividing line. The dividing line is how much the pipeline amplifies a last-bit
 # difference, which is a property to be MEASURED, not reasoned about.

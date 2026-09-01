@@ -33,9 +33,41 @@
 # the container that generated every committed figure matches. So NOT encoding, NOT versions:
 # the producers printed different NUMBERS (canyon+strata pit-storage 5.22e+06 vs 4.16e+06 m3;
 # Monument Valley relief 259 vs 268 m). numpy 2.x dispatches SIMD at runtime, GitHub's fleet
-# is heterogeneous, FP addition is not associative, and the erosion loops amplify it. The
-# container this was measured on dispatches AVX512_SPR/X86_V4; a runner without AVX-512
-# dispatches X86_V3 and reduces in a different order.
+# is heterogeneous, FP addition is not associative, and the erosion loops amplify it.
+#
+# ── CONFIRMED BY CONTROLLED EXPERIMENT, not left as a hypothesis. ─────────────────────────
+# Both CI runs are reproducible on ONE machine by toggling a single environment variable:
+#
+#   cd terrain-architect/reference-impl
+#   python -c "import archetypes; print(archetypes.signatures(n=96)['canyon + strata'])"
+#   NPY_DISABLE_CPU_FEATURES="AVX512_SPR AVX512_ICL X86_V4" python -c "...same..."
+#
+#                        AVX512 on   AVX512 off   CI run 21   CI run 20
+#     canyon relief       268.99      270.71       269         271
+#     canyon pit-storage  5.2169e6    4.1597e6     5.22e6      4.16e6
+#     badlands relief     260.52      258.63       261         259
+#     badlands p99 slope  35.278      35.236       35.3        35.2
+#
+# Exact match to both runs, run twice independently. numpy dispatches TRANSCENDENTAL ufunc
+# loops by SIMD level: measured over 10007 doubles, pow/exp/log1p/tan/arctan differ by
+# exactly 1 ULP between regimes while add/mul/sqrt/sin/hypot/sum/mean are bit-identical.
+# For canyon the divergence enters at archetypes.py:83 (the ** 1.4 on the trunk profile),
+# and droplet_erode amplifies 1 ULP by ~1e14 because a steepest-descent step is a DISCRETE
+# choice and a tie flips.
+#
+# ⚠️ AND THE NEGATIVE RESULT, which matters more than the bands that were added:
+# none of the 18 quantity-slots that differ between the two regimes is caught by its own
+# band, BY CONSTRUCTION -- a guard must be green on both runners, so it cannot separate
+# them. For the droplet-eroded tiles the cross-machine spread IS the noise floor, and
+# pit-storage cannot be guarded tightly at all: canyon's band admits a 2.0x change,
+# Beggar's Canyon's a 3.6x. That is a property of these figures, not a shortfall in the
+# derivation, and it is the honest limit of what invariant-gating buys here.
+#
+# A trap avoided, worth recording: alpine, appalachian, stratovolcano and Arrakis-relief
+# were BIT-IDENTICAL across the two regimes, but under 1-ULP sampling they move 2-9% in
+# relief and 9-23% in pit-storage. Their agreement was the luck of a two-sample draw.
+# Banding them on the two observed values would have been an invented tolerance that looks
+# like coverage.
 #
 # halfar_anatomy has NO RNG and still drifted, so "deterministic algorithm" is not the line.
 # The line is how much a pipeline amplifies a last-bit difference -- to be measured, not
