@@ -63,9 +63,38 @@ A criterion moved to `OPEN-ITEMS.md` is **a fail that was accepted, not a pass.*
 to turn a tick green is the failure mode this file exists to prevent, so any PR closing out this
 checklist must print the register's line count and diff *beside* the green output, not instead of it.
 
+Closed out 2026-09-01. Suite: **1644 passed, 5 skipped** (with `requirements-validate.txt`
+installed, so `test_dimensional.py`'s ten tests run); **1634 passed, 6 skipped** without it. Figures:
+**14 of 14 reproduce exactly**. `registers/OPEN-ITEMS.md` carries **30** items, up from 19 when this
+file was written — the wave opened more than it closed, which is what an enumeration is for.
+
 | Criterion | Status | Where recorded |
 |---|---|---|
-| _(filled at close-out)_ | | |
+| A | **Accepted fail.** Both directions are not proved. 1794 of 5152 rows (34.8%) are `unclassified`, and 82 rows in `12-glacial-coastal.md` are `derived`+`unreproducible` | `registers/numeric-claims.tsv`; OPEN-ITEMS |
+| B | Pass, with two rows declared `PIN` and one `DECORATIVE` rather than dressed up as proofs | `mutation-proofs.partial-{atom,code,integrity,slope}.tsv`, 230 rows |
+| C | Pass over the frozen seed list, including the 111-line prose corpus | `registers/falsepositive-seeds.tsv` |
+| D | Pass — 447 citations, 3 excused (0.68%), and the exclusion table must partition | `test_cited_paths_exist.py` |
+| E | Pass — domain is now `REF.glob("*.md")` (11 files, was 4 literals), denominator asserted in-file | `test_audit_drift.py`, 135 passed |
+| F | **Accepted fail.** Chapter-vs-chapter self-consistency is not enforced; `05` still states the Werner hop two ways (`~5` at :412, `≈3` at :399) | `registers/constant-pairs.tsv`; OPEN-ITEMS 27 |
+| G1 | Pass — 44 modules, 314 public functions, 1320 parameters, 2 dead deleted, 4 exempted with removal patches written | `test_render.py` census; OPEN-ITEMS 20 |
+| G2 | **Accepted fail, disclosed.** 8 of 9 reachable; `07`'s Ulichney tiles unimplemented; and the sweep provably misses a member of its own population (`03:247` uses no recommendation word) | `test_graph_demo.py`; OPEN-ITEMS 22, 23 |
+| H | Pass — 14/14 figures reproduce; transcripts and counts requoted from measured runs | `registers/figure-regen.tsv`, `wave5-prose-findings.tsv` |
+| I | Pass — both files exist; this table is the close-out | this file, `registers/OPEN-ITEMS.md` |
+| J | Pass — the slope guard asserts an identity (351 calls, 351 adjudicated, 331 decided without the word) rather than a file count | `registers/guard-domains.tsv` |
+| K | Pass — workflow lands, and it installs the optional requirement that had left the decisive tier dormant | `.github/workflows/terrain-architect.yml` |
+
+**Four criteria on this list were built from register cells that were WRONG**, and the agents sent
+to act on them refused with evidence rather than complying: `test_atom_coverage`'s coverage was the
+complement of the real figure (23 vs 21), `test_skill_integrity`'s substring symbol check had been
+retired at `028e900`, `test_cited_paths_exist` already collected bare-prose paths, and
+`test_slope_units` had no fail-open consumer left. This file said FROZEN at `0cdd5b1` while two of
+its cells described guards that `028e900` had already repaired — the enumeration was frozen against
+a reading of the tree older than the tree. That is recorded in the register's AMENDMENT block.
+
+**And the baseline this file was written against was not green.** "1370 passed, 6 skipped at
+`23bceef`" was measured before `23bceef`, the commit that created `registers/` — whose `.md` files
+carry citations that `CITING_GLOBS` did not cover, so `test_no_unscanned_markdown_carries_citations`
+went red the moment they existed.
 
 ## The structural finding this does not fix
 
