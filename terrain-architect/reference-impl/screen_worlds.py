@@ -156,13 +156,23 @@ def _render(h, family, sea, cell=CELL):
     return A._flood(img, h, h < 0.0) if sea else img                         # drowned coast / shoreless sea
 
 
+def signatures(n=TILE, cell=CELL):
+    """Every screen world's `09` signature in one call a test can re-run — the same four facts, from
+    the same `archetypes._signature`, as the archetype montage reports, so the two figures cannot be
+    guarded on different quantities. Defaults to the figure's OWN tile size: `monument_valley` and
+    `arrakis` erode with `k * n` droplets, so a signature at 48² is a different erosion run from the
+    one the PNG shows. Returns {world label: facts dict}; `family` fills the group slot."""
+    return {label: A._signature(label, family, fn(n=n, cell=cell), cell)
+            for label, fn, family, _ in SCREEN}
+
+
 def main():
     tiles = [(label, _render(fn(), family, sea)) for label, fn, family, sea in SCREEN]
     render.write_png("screen_worlds.png", A.labeled_montage(tiles, cols=4))
     print(f"wrote screen_worlds.png ({len(tiles)} screen worlds)")
-    for label, fn, _, _ in SCREEN:
-        h = fn()
-        print(f"  {label:24s} relief={h.max() - h.min():7.0f} m")
+    for label, f in signatures().items():
+        print(f"  {label:24s} relief={f['relief_m']:7.0f} m  99th-slope={f['p99_slope_deg']:4.1f}°  "
+              f"HI={f['hypsometric_integral']:.2f}  pit-storage={f['pit_storage_m3']:.2e} m³")
 
 
 if __name__ == "__main__":

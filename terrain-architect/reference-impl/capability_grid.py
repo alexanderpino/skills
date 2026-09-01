@@ -26,13 +26,31 @@ import winds
 import render
 
 TILE = 200                                                     # px per cell (rendered field is resized to this)
+COLS = 7                                                       # cells per row
+PAD = 6                                                        # gutter between cells and at the border
+CAP_H = 46                                                     # caption strip under each tile
+HEADER = 60                                                    # title band above the grid
+HERO_PNG = "hero.png"                                          # the 09 tile IMPORTS this figure -> see `_hero`
 
 
 # --------------------------------------------------------------------------- #
 # colour helpers
 # --------------------------------------------------------------------------- #
-def _norm(a):
+def _norm(a, where="field"):
+    """[0,1] normalise. A NON-FINITE INPUT IS A FAILURE, NOT A BLACK TILE.
+
+    ⚠️ `(nan - nan) / nan` is nan, and `(nan * 255).astype(np.uint8)` is 0, so a capability that
+    started producing NaN used to arrive here and leave as a UNIFORMLY BLACK 200x200 square --
+    indistinguishable, in a 56-tile montage, from a legitimately dark render. That is the same
+    silent-substitution class as the retired `except: return gray(_terr)` hero fallback: the
+    figure keeps looking built while the capability under the caption is broken.
+    """
     a = np.asarray(a, dtype=np.float64)
+    if not np.isfinite(a).all():
+        bad = int((~np.isfinite(a)).sum())
+        raise FloatingPointError(
+            f"_norm: {where} has {bad} non-finite value(s) of {a.size}; it would colour-map to a "
+            "flat black tile that looks like a render. Fix the producing capability.")
     return (a - a.min()) / (np.ptp(a) + 1e-12)
 
 
@@ -334,9 +352,21 @@ def CELLS():
 
     # ---- HERO / RENDER (08/09) ----
     def _hero():
+        """⚠️ AN UNREADABLE hero.png IS A FAILURE, NOT A SUBSTITUTE IMAGE.
+
+        This tile IMPORTS a sibling figure rather than generating a field, so it is the one tile
+        with an input that can go missing. It used to be `except Exception: return gray(_terr)`,
+        which pastes a grey hillshade of a mountain under the caption "09 Hero 3D raster /
+        z-buffer, back-face cull, translucent water" -- a DIFFERENT picture presented as the
+        capability, with nothing anywhere reporting the substitution. That fallback is exactly how
+        this figure drifted invisibly: `tools/regen_figures.py:88-97` records that a bare scratch
+        directory made the tile "quietly draw SOMETHING ELSE", which surfaced only as an
+        unfixable 200x200 pixel drift that CI could not act on, and forced READS_FIGURES + a
+        build-order rule as a workaround. Loud turns that into a named missing input.
+        """
         from PIL import Image
         try:
-            return np.asarray(Image.open("hero.png").convert("RGB"))
+            return np.asarray(Image.open(HERO_PNG).convert("RGB"))
         except Exception:
             return gray(_terr)
     add("09 Hero 3D raster", "z-buffer, back-face cull, translucent water", _hero)
@@ -462,23 +492,107 @@ def CELLS():
     return C
 
 
-def build():
+# --------------------------------------------------------------------------- #
+# geometry, tile rendering, montage
+# --------------------------------------------------------------------------- #
+def layout(n_cells, cols=COLS):
+    """Grid geometry from this module's own constants: cols, rows, cell box, canvas size.
+
+    Split out of `build` so a guard can assert the published geometry (56 capabilities -> 7x8,
+    1448x2082 px) without paying for 56 live simulations, and so `build` and any guard read the
+    SAME arithmetic instead of two copies that can drift apart.
+    """
+    rows = (n_cells + cols - 1) // cols
+    cw, ch = TILE + PAD, TILE + CAP_H + PAD
+    return {"cols": cols, "rows": rows, "cell_w": cw, "cell_h": ch,
+            "size": (cols * cw + PAD, HEADER + rows * ch + PAD)}
+
+
+ON_ERROR = ("raise", "swatch")
+
+
+def _check_tile(k, title, tile):
+    """The contract every capability thunk owes the montage: an H x W x 3 uint8 RGB image."""
+    tile = np.ascontiguousarray(tile)
+    if tile.dtype != np.uint8 or tile.ndim != 3 or tile.shape[2] != 3 or min(tile.shape[:2]) < 2:
+        raise TypeError(
+            f"capability tile {k} {title!r} returned dtype {tile.dtype} shape {tile.shape}; "
+            "every tile must be an H x W x 3 uint8 RGB image")
+    return tile
+
+
+def render_tiles(cells=None, on_error="raise"):
+    """Run every capability thunk. -> [{title, test, status, rgb, shape, ptp, ncolours}, ...].
+
+    ⚠️ A TILE THAT CANNOT BUILD IS A FAILURE, NOT A SWATCH. `build` used to wrap each thunk in a
+    bare `except Exception` and paste a dark-red "ERR" square where the render should be, so a
+    capability that had STOPPED WORKING still produced a figure that looked rendered, still got
+    saved, and still got committed. The header this figure prints on itself is the whole claim --
+    "every tile generated live in pure numpy" -- and an ERR swatch falsifies that claim while
+    looking like the evidence for it. Same class as `_noise_fn`'s retired `else: perlin` and
+    `_hero`'s retired image fallback: a stand-in for a failure is worse than the failure, because
+    it is recorded as a success.
+
+    `on_error="swatch"` renders the diagnostic grid DELIBERATELY -- the ERR squares really are the
+    fastest way to see which capabilities broke -- so it is opt-in, never the default, and every
+    failure comes back in `status` (and in `build`'s `facts["failed"]`) so no caller can mistake
+    that grid for a clean build.
+    """
+    if on_error not in ON_ERROR:
+        raise ValueError(f"render_tiles: unknown on_error {on_error!r}; expected one of {ON_ERROR}")
+    cells = CELLS() if cells is None else cells
+    out = []
+    for k, (title, test, thunk) in enumerate(cells):
+        try:
+            rgb = _check_tile(k, title, thunk())
+        except Exception as e:
+            if on_error == "raise":
+                raise RuntimeError(
+                    f"capability tile {k} {title!r} ({test}) failed to build: "
+                    f"{type(e).__name__}: {e}. The capability grid asserts that every one of "
+                    "these capabilities works and was generated live, so a tile that cannot "
+                    "build must not be painted as an ERR swatch and shipped as a rendered "
+                    "figure. Pass on_error='swatch' to render the diagnostic grid on purpose."
+                ) from e
+            out.append({"title": title, "test": test, "rgb": None, "shape": None,
+                        "ptp": None, "ncolours": None,
+                        "status": f"{type(e).__name__}: {e}"})
+            continue
+        flat = rgb.reshape(-1, 3)
+        out.append({"title": title, "test": test, "rgb": rgb, "shape": tuple(rgb.shape),
+                    "ptp": int(rgb.max()) - int(rgb.min()),
+                    "ncolours": int(np.unique(flat, axis=0).shape[0]),
+                    "status": "ok"})
+    return out
+
+
+def build(path="capability_grid.png", on_error="raise", tiles=None):
+    """Draw the grid, save it to `path`, and return `(canvas, facts)`.
+
+    ⚠️ IT RETURNS ITS FACTS BECAUSE THE FIGURE IS THE CLAIM (same reason as
+    `crater_anatomy.build`). This used to return None, so the only thing downstream could check
+    was the PNG's pixels -- and `tools/regen_figures.py`'s pixel-exact comparison has been shown
+    unsound across machines (two CI runs, identical numpy/Pillow/CPython, different numbers).
+    Remove the pixel gate and nothing at all was left: 56 capabilities with no test of any kind.
+    `facts` carries per-tile status, shape and spread so a guard can say the picture still shows
+    what it claims without re-deriving anything from pixels.
+
+    `tiles` takes an already-rendered list from `render_tiles`, so a guard can assert on the
+    ARRAYS and on the ASSEMBLED CANVAS without paying twice for 56 live simulations.
+    """
     from PIL import Image, ImageDraw, ImageFont
-    cells = CELLS()
-    cols = 7
-    rows = (len(cells) + cols - 1) // cols
-    cap_h = 46
-    pad = 6
-    cw, ch = TILE + pad, TILE + cap_h + pad
-    header = 60
+    if tiles is None:
+        tiles = render_tiles(on_error=on_error)
+    geom = layout(len(tiles))
+    cw, ch = geom["cell_w"], geom["cell_h"]
     bg = (14, 15, 18)
-    img = Image.new("RGB", (cols * cw + pad, header + rows * ch + pad), bg)
+    img = Image.new("RGB", geom["size"], bg)
     dr = ImageDraw.Draw(img)
     ft_title = ImageFont.load_default(size=12)
     ft_test = ImageFont.load_default(size=10)
     ft_head = ImageFont.load_default(size=22)
 
-    dr.text((pad + 4, 16), "terrain-architect  |  reference-impl capability grid   "
+    dr.text((PAD + 4, 16), "terrain-architect  |  reference-impl capability grid   "
             "(every tile generated live in pure numpy; caption = what it is / how it is verified)",
             font=ft_head, fill=(240, 240, 245))
 
@@ -493,22 +607,32 @@ def build():
             out.append(line)
         return out[:2]
 
-    for k, (title, test, thunk) in enumerate(cells):
-        r, c = divmod(k, cols)
-        x0, y0 = pad + c * cw, header + pad + r * ch
-        try:
-            tile = np.ascontiguousarray(thunk())
-            im = Image.fromarray(tile).resize((TILE, TILE), Image.LANCZOS)
-        except Exception as e:                                          # a failed tile -> visible marker
+    for k, t in enumerate(tiles):
+        r, c = divmod(k, geom["cols"])
+        x0, y0 = PAD + c * cw, HEADER + PAD + r * ch
+        if t["rgb"] is None:                       # only reachable under on_error="swatch"
             im = Image.new("RGB", (TILE, TILE), (60, 20, 20))
-            ImageDraw.Draw(im).text((6, 6), f"ERR\n{type(e).__name__}", font=ft_test, fill=(255, 180, 180))
+            ImageDraw.Draw(im).text((6, 6), "ERR\n" + t["status"].split(":")[0],
+                                    font=ft_test, fill=(255, 180, 180))
+        else:
+            im = Image.fromarray(t["rgb"]).resize((TILE, TILE), Image.LANCZOS)
         img.paste(im, (x0, y0))
-        dr.text((x0 + 2, y0 + TILE + 2), title, font=ft_title, fill=(245, 236, 200))
-        for i, ln in enumerate(wrap(test)):
+        dr.text((x0 + 2, y0 + TILE + 2), t["title"], font=ft_title, fill=(245, 236, 200))
+        for i, ln in enumerate(wrap(t["test"])):
             dr.text((x0 + 2, y0 + TILE + 18 + i * 12), ln, font=ft_test, fill=(170, 178, 190))
 
-    img.save("capability_grid.png")
-    print(f"wrote capability_grid.png — {len(cells)} capabilities, {cols}x{rows} grid, {img.size[0]}x{img.size[1]} px")
+    facts = dict(geom)
+    facts.update({
+        "n_cells": len(tiles), "tile_px": TILE, "path": path, "on_error": on_error,
+        "failed": [t["title"] for t in tiles if t["status"] != "ok"],
+        "tiles": [{k2: v for k2, v in t.items() if k2 != "rgb"} for t in tiles],
+    })
+    if path is not None:
+        img.save(path)
+    print(f"{'wrote ' + str(path) if path else 'built (unsaved)'} — {len(tiles)} capabilities, "
+          f"{geom['cols']}x{geom['rows']} grid, {img.size[0]}x{img.size[1]} px, "
+          f"{len(facts['failed'])} failed")
+    return img, facts
 
 
 if __name__ == "__main__":

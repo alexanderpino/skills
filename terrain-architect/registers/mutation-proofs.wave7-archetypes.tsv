@@ -1,0 +1,79 @@
+# REGISTER 4 (PARTIAL) - mutation-proofs.wave7-archetypes.tsv
+# Wave-7 proofs for the two guard files that replace the retired PIXEL-EXACT figure gate on
+# `archetypes.png` and `screen_worlds.png`: reference-impl/tests/test_archetypes.py and
+# reference-impl/tests/test_screen_worlds.py. `tools/regen_figures.py` already names both files as
+# what guards those figures instead of their pixels (INVARIANT_GATED["archetypes"],
+# INVARIANT_GATED["screen_worlds"]); until this wave neither file asserted the quantities those
+# entries cite. Written here and NOT into the shared mutation-proofs.tsv, which other agents are
+# filling in the same wave. Merge target: the test_archetypes.py and test_screen_worlds.py rows.
+#
+# EVERY CELL BELOW IS FROM EXECUTION, none predicted. The harness for each trial was:
+#   1. read the live SUBJECT file into memory   4. restore the file from memory
+#   2. apply the edit                           5. compare the restored bytes to the copy AND
+#   3. clear every __pycache__ under               re-run `git diff` on the subject, checking its
+#      reference-impl/, then run the named          sha is unchanged from before the trial
+#      pytest selection                          -- after EVERY trial, 23 of 23, never once at the end
+# `__pycache__` is cleared on BOTH sides of every trial because CPython validates a .pyc on
+# (mtime-seconds, size): a byte-length-identical mutation applied and reverted inside one second
+# has produced a false RED in this repo before.
+# No mutation was ever applied to a guard file. Every subject is archetypes.py or screen_worlds.py.
+#
+# DENOMINATOR - defect classes proved
+#   distinct defect classes .............................. 11
+#   rows emitted ......................................... 11
+#   rows with a mutation that went GREEN -> RED .......... 11  (100%)
+#   rows with a decoy that stayed GREEN .................. 11  (100%)
+#   IDENTITY: 11 classes == 11 rows -> HOLDS
+#   DECORATIVE rows ...................................... 0
+#   DECORATIVE clauses inside a PROVEN row ............... 1, named in R11's verdict:
+#     `assert hi - lo < 30.0` in test_monument_valley_relief_is_guarded_narrowly_not_by_a_floor
+#     reads that file's own BANDS table, so no mutation of a SUBJECT module can move it. It is a
+#     freeze on the guard's own tolerance, declared here rather than presented as coverage.
+#   Trials run: 23 (11 mutations + 11 decoys + 1 rejected decoy candidate, row 8 below).
+#   REJECTED DECOY, recorded rather than hidden: `screen_worlds.py:63 talus=0.45 -> 0.47` was
+#     tried first as the Monument Valley decoy and went RED (relief 251.498, band [253.4, 280.6]).
+#     A 4% talus change really does move the guarded quantity, so it is a mutation, not a decoy;
+#     the shipped decoy (the smallest spire, 0.028 -> 0.026) was measured green afterwards.
+#
+# WHY THESE GUARDS EXIST, AND THE MEASUREMENT BEHIND EVERY TOLERANCE
+#   The pixel gate is unsound across machines: two CI runs on identical numpy 2.4.6 / pillow
+#   12.3.0 / CPython 3.11 produced different montages. The mechanism was REPRODUCED here, not
+#   inferred. numpy dispatches its transcendental ufunc loops on the CPU's SIMD level, and the
+#   loops are not bit-identical; measured over 10007 doubles in [0,1] with NPY_DISABLE_CPU_FEATURES:
+#       pow(x,1.4), exp, log1p, tan, arctan  differ, max relative 2.22e-16 = exactly 1 ULP
+#       add, mul, sqrt, sin, hypot, sum, mean  bit-identical
+#   Running this repo with AVX512 enabled vs disabled reproduces BOTH published CI runs EXACTLY:
+#       canyon relief   268.99 / 270.71   (CI reported 269 / 271)
+#       canyon pit    5.2169e6 / 4.1597e6 (CI reported 5.22e6 / 4.16e6)
+#       badlands relief 260.52 / 258.63   (CI reported 261 / 259)
+#       badlands p99     35.278 / 35.236  (CI reported 35.3 / 35.2)
+#       Monument Valley relief 258.60 / 267.64  (CI reported 259 / 268)
+#   For `canyon` the divergence enters at archetypes.py:83, the `** 1.4` on the trunk profile;
+#   erosion_droplet.droplet_erode then amplifies one ULP by ~1e14 because a droplet's steepest-
+#   descent step is a DISCRETE choice and a tie flips.
+#   So each band was SAMPLED, not chosen: 44 Monte-Carlo trials at n=96 that nudge every
+#   noise.fbm/perlin/ridged_mf/worley result and every droplet-erosion input by a random -1/0/+1
+#   ULP, plus the two real dispatch regimes = 46 samples per quantity. The 46-sample envelope
+#   contains both real regime values for all 96 quantities; a 24-sample envelope did NOT, missing
+#   one by 1.9351% of the value. band = [min * 0.98, max * 1.02], rounded outward to 4 significant
+#   figures -- the 2% margin IS that measured 1.9351% residual, rounded up.
+#
+#   ⚠️ WHAT THE BANDS DO NOT CATCH, stated because it is the honest result: a guard must be green
+#   on both runners, so NONE of the 18 quantity-slots that actually differ between the two dispatch
+#   regimes is caught by its own band. canyon pit-storage drifts 22.5% inside a +-33.5% band;
+#   Monument Valley relief drifts 3.43% inside a +-5.09% band. For the seven droplet-eroded tiles
+#   the cross-machine spread IS the noise floor and pit-storage cannot be guarded tightly at all.
+#   The other 71 of 96 slots have a measured envelope of ~1e-13% and close to +-2%. Every mutation
+#   below was chosen to fall OUTSIDE the derived band, never to be merely larger than the drift.
+guard_file	test_name	target_defect_class	mutation	expected_observation	observed	decoy	decoy_expected	decoy_observed	verdict
+reference-impl/tests/test_archetypes.py	test_archetype_signatures_within_measured_bands_at_figure_resolution	an archetype's RELIEF drifts at the montage's own 96² and nothing sees it: the old guards ran at N=56 and bounded relief only by `0.0 < relief < 5e4` (test_archetypes.py:37)	reference-impl/archetypes.py:62 lower the alpine uplift: `* 1200.0` -> `* 1150.0` (-4.2% relief)	RED - alpine relief leaves its measured band	1 failed: "alpine orogen: relief_m = 662.933 is outside its measured band [668.9, 711.7] (-3.96% from band centre)"; assert 668.9 <= 662.9325952406468	reference-impl/archetypes.py:64 one fewer thermal-erosion sweep on the same tile: `thermal_erosion(fl, 0.8, 22, cell, factor=0.15)` -> `(fl, 0.8, 21, cell, factor=0.15)` (a real talus edit, inside the measured +-1 ULP envelope)	GREEN - a physical edit the derived band is meant to tolerate	1 passed	PROVEN
+reference-impl/tests/test_archetypes.py	test_archetype_signatures_within_measured_bands_at_figure_resolution	the SLOPE regime of a tile changes (99th-percentile slope) with relief unmoved, so a relief-only guard cannot see it	reference-impl/archetypes.py:226 raise the coastal-retreat rate: `sims.coastal_retreat(h, 0.0, 8, k_coast=2.0, notch=10.0, ...)` -> `k_coast=3.2` (steeper cliff line)	RED - sea cliffs 99th-percentile slope leaves its band while relief stays inside it	1 failed: "sea cliffs & stacks: p99_slope_deg = 39.0126 is outside its measured band [36.83, 38.34] (+3.80% from band centre)"; assert 39.01262484241234 <= 38.34	reference-impl/archetypes.py:226 a smaller change of the SAME constant: `k_coast=2.0` -> `k_coast=2.6`	GREEN - the band tolerates a retreat-rate change that does not change the slope regime	1 passed	PROVEN
+reference-impl/tests/test_archetypes.py	test_archetype_signatures_within_measured_bands_at_figure_resolution	the HYPSOMETRY of a tile changes (elevation distribution) while relief and slope are unmoved - the `_hi(...) > 0.5` / `< 0.45` one-sided guards at test_archetypes.py:48,55 pass anything on the right side	reference-impl/archetypes.py:235 sharpen the terrace risers: `landforms.terrace(nb, 22, sharpness=9.0, ...)` -> `sharpness=30.0`	RED - ag terraces hypsometric integral leaves its band; relief, slope and pit-storage stay inside theirs	1 failed: "ag terraces: hypsometric_integral = 0.516343 is outside its measured band [0.4885, 0.5086] (+3.57% from band centre)"; assert 0.5163426300580695 <= 0.5086	reference-impl/archetypes.py:235 a smaller change of the SAME constant: `sharpness=9.0` -> `sharpness=14.0`	GREEN - a real riser-sharpness edit inside the measured envelope	1 passed	PROVEN
+reference-impl/tests/test_archetypes.py	test_archetype_signatures_within_measured_bands_at_figure_resolution	PIT-STORAGE changes and nothing in the repository asserts it - the quantity that moved 20% (5.22e+06 -> 4.16e+06 m³) between two CI runners while the whole suite stayed green	reference-impl/archetypes.py:200 raise the caldera floor by 10 m in 300: `floor = 300.0 + ...` -> `floor = 310.0 + ...`	RED - caldera pit-storage leaves its band; relief, slope and hypsometry all stay inside theirs, so ONLY the pit-storage assertion can catch this	1 failed: "caldera lake: pit_storage_m3 = 4.05892e+06 is outside its measured band [4.492e+06, 4.677e+06] (-11.46% from band centre)"; assert 4492000.0 <= 4058917.7524840157	reference-impl/archetypes.py:203 one fewer slump sweep on the same tile: `thermal_erosion(h, 1.3, 4, cell, factor=0.12)` -> `(h, 1.3, 3, cell, factor=0.12)`	GREEN - the scarps slump differently and the enclosed storage stays inside the measured band	1 passed	PROVEN
+reference-impl/tests/test_archetypes.py	test_signature_returns_the_facts_it_computes	`_signature` regresses to returning a formatted STRING - the exact shape of the original defect, in which four computed numbers were printed by main() and asserted by nothing	reference-impl/archetypes.py:433 restore the pre-fix body: return the `[group] name relief=... 99th-slope=... HI=... pit-storage=...` f-string instead of the facts dict	RED - the facts are unassertable again	1 failed: "_signature returned a string again -- the facts are unassertable"; assert False + where False = isinstance('  [C] mesa / tepui         relief=    351 m  99th-slope=78.9°  HI=0.37  pit-storage=4.48e+03 m³', dict)	reference-impl/archetypes.py:447 reword the printed line: `f"pit-storage={f['pit_storage_m3']:.2e} m³")` -> `f"pit_storage={f['pit_storage_m3']:.3e} cubic m")`	GREEN - the guard is on the returned facts, not on the wording of the report	1 passed	PROVEN
+reference-impl/tests/test_archetypes.py	test_signature_bands_cover_every_archetype	an archetype is added to the montage and acquires no band - the coverage hole where a guard's scan domain is a hand-written list that the figure has outgrown	reference-impl/archetypes.py:296 append a 17th entry to `ARCHETYPES`: `("mars relict (south)", "L", mars, "hillshade")`	RED - the denominator no longer balances: 17 archetypes against 16 bands	1 failed: assert [...] == [...]  "At index 12 diff: 'mesa / tepui' != 'mars relict (south)'; Right contains one more item: 'tower karst'"	reference-impl/archetypes.py:295-296 swap the last two entries of `ARCHETYPES` (real edit - it moves both tiles in the montage; same set)	GREEN - the check is on the SET of archetypes, not on their montage order	1 passed	PROVEN
+reference-impl/tests/test_archetypes.py	test_signatures_defaults_to_the_figure_tile_size	the guard silently drops to a resolution the figure never renders at - droplet counts are `k * n`, so the pre-fix N=56 tests were exercising a different erosion run from `archetypes.png`	reference-impl/archetypes.py:26 shrink the montage tile: `TILE, CELL, SEED = 96, 20.0, 0` -> `64, 20.0, 0`	RED - the figure's tile size and the guard's resolution are no longer 96	1 failed: "assert N_FIG == A.TILE == 96"; assert 64 == 96 + where 64 = A.TILE	reference-impl/archetypes.py:456-457 iterate `sorted(ARCHETYPES, key=lambda a: a[0])` in `signatures` (real edit - it changes the returned dict's order)	GREEN - the check is on the default resolution, not on iteration order	1 passed	PROVEN
+reference-impl/tests/test_screen_worlds.py	test_screen_world_signatures_within_measured_bands_at_figure_resolution	a screen world's relief drifts behind a one-sided floor - `assert monument_valley relief > 120.0` (the pre-fix test_screen_worlds.py:29) passed the observed 259 -> 268 m move with 130 m to spare, at N=48 rather than the figure's 96	reference-impl/screen_worlds.py:62 shorten the butte series: `bh = rng.uniform(180.0, 340.0) * (0.7 + 2.4 * frac)` -> `rng.uniform(180.0, 300.0) * ...`	RED - Monument Valley relief leaves its measured band (the old `> 120.0` floor would still have passed at 238 m)	1 failed: "Monument Valley: relief_m = 237.971 is outside its measured band [253.4, 280.6] (-10.87% from band centre)"; assert 253.4 <= 237.9708578793543	reference-impl/screen_worlds.py:59 shrink the smallest spire of the mesa->butte->spire series: `sizes = [..., 0.04, 0.032, 0.028]` -> `[..., 0.04, 0.032, 0.026]`	GREEN - a real remnant-geometry edit inside the measured envelope	1 passed	PROVEN
+reference-impl/tests/test_screen_worlds.py	test_signature_bands_cover_every_screen_world	a world is added to `screen_worlds.png` and acquires no band	reference-impl/screen_worlds.py:132 append a 9th entry to `SCREEN`: `("Miller's world (dusk)", miller, "temperate", True)`	RED - 9 worlds against 8 bands	1 failed: assert [...] == [...]  "At index 4 diff: \"Miller's world (sandur)\" != \"Miller's world (dusk)\"; Right contains one more item: 'Skull Is. (Ha Long)'"	reference-impl/screen_worlds.py:131-132 swap the last two entries of `SCREEN` (real edit - it moves both tiles in the montage)	GREEN - the check is on the SET of worlds, not their order	1 passed	PROVEN
+reference-impl/tests/test_screen_worlds.py	test_signatures_defaults_to_the_figure_tile_size	the screen-world guard drops below the figure's resolution (`arrakis` and `monument_valley` erode with `k * n` droplets, so N=48 is a different run)	reference-impl/screen_worlds.py:21 decouple the guard from the figure: `TILE, CELL = A.TILE, A.CELL` -> `TILE, CELL = 48, A.CELL`	RED - the figure's tile size is no longer 96	1 failed: "assert N_FIG == S.TILE == 96"; assert 48 == 96 + where 48 = S.TILE	reference-impl/screen_worlds.py:21 split the same values onto two statements: `TILE, CELL = A.TILE, A.CELL` -> `TILE = A.TILE` / `CELL = A.CELL`	GREEN - the check is on the value, not on how it is written	1 passed	PROVEN
+reference-impl/tests/test_screen_worlds.py	test_monument_valley_relief_is_guarded_narrowly_not_by_a_floor	the specific figure-gate hole: Monument Valley's relief guarded by a one-sided floor 130 m below the value instead of a two-sided band	reference-impl/screen_worlds.py:62 `bh = rng.uniform(180.0, 340.0) * (0.7 + 2.4 * frac)` -> `rng.uniform(180.0, 300.0) * ...` (same edit as the row above, against the narrower test)	RED - relief outside the two-sided band, where `> 120.0` would have stayed green	1 failed: "Monument Valley relief 238.0 m outside [253.4, 280.6]"; assert 253.4 <= 237.9708578793543	reference-impl/screen_worlds.py:59 `sizes = [..., 0.032, 0.028]` -> `[..., 0.032, 0.026]`	GREEN - a real remnant-geometry edit inside the band	1 passed	PROVEN, with one DECORATIVE clause named in the header: `assert hi - lo < 30.0` reads this file's own BANDS table and no mutation of a SUBJECT module can move it

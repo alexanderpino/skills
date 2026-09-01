@@ -424,12 +424,37 @@ def _render(h, mode, cell=CELL):
 
 
 def _signature(name, group, h, cell=CELL):
+    """The four `09` verification numbers for one tile, RETURNED as facts — the pattern
+    `crater_anatomy.build() -> (canvas, facts)` and `flow_anatomy.measurements()` already use here.
+    Formatting is `_signature_line`'s job, because a number that is only PRINTED is guarded by
+    nothing: pit-storage moved 20% between two CI runners while every assertion in the suite stayed
+    green, and it moved unseen precisely because this function returned a string."""
     slope = analysis.slope(h, cell)
-    p99 = np.degrees(np.arctan(np.percentile(slope, 99)))
-    hi = (h.mean() - h.min()) / max(h.max() - h.min(), 1e-9)
-    pit = float((flow.priority_flood_fill(h) - h).sum()) * cell * cell
-    return (f"  [{group}] {name:20s} relief={h.max() - h.min():7.0f} m  99th-slope={p99:4.1f}°  "
-            f"HI={hi:.2f}  pit-storage={pit:.2e} m³")
+    return {
+        "name": name,
+        "group": group,
+        "relief_m": float(h.max() - h.min()),
+        "p99_slope_deg": float(np.degrees(np.arctan(np.percentile(slope, 99)))),
+        "hypsometric_integral": float((h.mean() - h.min()) / max(h.max() - h.min(), 1e-9)),
+        "pit_storage_m3": float((flow.priority_flood_fill(h) - h).sum()) * cell * cell,
+    }
+
+
+def _signature_line(f):
+    """One `09` signature as the montage prints it (the exact text `_signature` used to return)."""
+    return (f"  [{f['group']}] {f['name']:20s} relief={f['relief_m']:7.0f} m  "
+            f"99th-slope={f['p99_slope_deg']:4.1f}°  HI={f['hypsometric_integral']:.2f}  "
+            f"pit-storage={f['pit_storage_m3']:.2e} m³")
+
+
+def signatures(n=TILE, cell=CELL):
+    """Every archetype's `09` signature in one call a test can re-run — the
+    `flow_anatomy.measurements()` shape ("everything the figure prints, in one call"). Defaults to
+    the montage's OWN tile size, because a guard at a resolution the figure never renders at is not
+    a guard on the figure: droplet counts scale with `n`, so 56² and 96² are different erosion runs.
+    Returns {archetype name: facts dict}."""
+    return {name: _signature(name, group, fn(seed=SEED, n=n, cell=cell), cell)
+            for name, group, fn, _ in ARCHETYPES}
 
 
 def montage(tiles, cols=4, pad=4, bg=20):
@@ -473,7 +498,7 @@ def main():
     print(f"wrote archetypes.png ({len(tiles)} archetypes, {TILE}px tiles, ~{TILE * CELL / 1000:.1f} km each)")
     print("\n09 verification signatures (the tells to check by eye against the montage):")
     for s in sigs:
-        print(s)
+        print(_signature_line(s))
 
 
 if __name__ == "__main__":
