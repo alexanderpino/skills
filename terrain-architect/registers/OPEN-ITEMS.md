@@ -31,8 +31,26 @@ Reconciled by running the guards, not by reading the list.
 Items **1, 2, 3, 5, 8, 9, 10, 12, 13, 15, 16, 17, 18, 19, 23** remain open and are the substance of
 criteria A and F, which `DEFINITION-OF-DONE.md` records as **accepted fails, not passes**.
 
-Items **11/27, 20, 22, 24, 25, 29** are in scope for the wave now running and are marked per item
-below.
+Items **11/27, 20, 22, 24, 25, 29** are **CLOSED** by wave 6. Suite after it: **1665 passed, 5
+skipped**; census **0 dead parameters**; figures **14/14**.
+
+⚠️ **Three of those six items contained a measurement that was FALSE**, and in each case the agent
+sent to act on it refused and checked instead of complying:
+
+* **#24** located the defect at `graph_demo.py:214`'s `p.get("method", "fill")`. That fallback was
+  **unreachable**: `build_graph:303` and `build_scene_graph:377` each passed
+  `params={"method": "fill", …}` explicitly, so fixing the named line would have closed the item
+  while moving no figure, no test and no terrain. Verified against `8fe5688`. All three sites flipped.
+* **#27** claimed "every actual call site passes `hop=3`, so the shipped default of 1 is used by
+  nothing." `gallery.py:166` names no `hop` at all and ran on the default — which is exactly what
+  made the default load-bearing, and what made `gallery.png` drift when it changed.
+* **#20** said only test files blocked the deletions. False for two of four: `deposit_fill` was
+  called positionally from `graph_demo.py:402`, `archetypes.py:350` and `analysis.texture_base`,
+  and `hydrology.water_surface` had an unlisted **non-test** caller at `hero.py:191`, inside the
+  producer of `hero.png`. A **fifth** dead parameter (`hydrology.water_depth`) went uncounted.
+
+That is three waves running where this directory's own measurements, not the code, were the thing
+most in need of checking.
 
 ---
 
