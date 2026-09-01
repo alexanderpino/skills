@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Cluster / Meshlet Virtualized Geometry for Terrain
+description: Cluster and meshlet virtualized geometry applied to terrain, and where the Nanite family stops being the right answer.
+tags: [terrain, nanite, meshlet, clusters]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-30T09:56:09+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Cluster / Meshlet Virtualized Geometry for Terrain
 
 The Nanite family: fixed-size triangle clusters in a simplification DAG, a GPU-selected cut whose

@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Lighting, shadows, and terrain integration
+description: "Lighting, shadows and terrain integration: cascade snapping, the sky illuminant, receiver weights and the azimuth fold about solar noon."
+tags: [terrain, lighting, shadows, cascades, sky]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Lighting, shadows, and terrain integration
 
 This chapter owns getting light onto terrain at kilometer scale: sun shadows across huge ranges,
@@ -11,7 +21,9 @@ Contents: [Historical shadow ladder](#the-historical-shadow-ladder) ·
 [Heightfield-native shadows](#heightfield-native-shadows) ·
 [Virtual shadow maps](#virtual-shadow-maps) · [Self-occlusion, AO, and GI](#self-occlusion-ao-and-gi) ·
 [The normal pipeline across LOD](#the-normal-pipeline-across-lod) ·
-[Atmospheric integration](#atmospheric-integration) · [Time-of-day dynamics](#time-of-day-dynamics) ·
+[Atmospheric integration](#atmospheric-integration) ·
+[Where the sun angles come from](#where-the-sun-angles-come-from) ·
+[Time-of-day dynamics](#time-of-day-dynamics) ·
 [Pitfalls](#pitfalls) · [Sources](#sources--provenance)
 
 ## The historical shadow ladder
@@ -280,6 +292,427 @@ tier against `18`'s stable terrain proxy; they do not remove the far-field requi
   reaches all atmosphere, which becomes visibly wrong somewhere around horizon-curvature
   altitudes.
 
+## Where the sun angles come from
+
+This chapter takes `sunElevation` and `sunAzimuth` as given, and for an invented world they are an
+art decision. The moment a shot has to match a **real place and time** — a plate, a location scan,
+"golden hour on the Algarve" — they stop being a dial and become a **computation**: latitude,
+longitude, date and UTC time through the standard solar-position algorithm (Meeus, *Astronomical
+Algorithms*; NOAA's implementation is the usual reference, well under a degree for any rendering
+purpose). Take the **full-precision** series from a library: Meeus's periodic terms run to hundreds
+of coefficients, a mistyped one is a silent multi-degree error, and nothing in a renderer needs that
+accuracy. What is worth having written down — and is written out
+[below](#computing-the-illuminant-from-a-place-and-a-time) — is the **low-order NOAA form**: a
+truncated equation of centre and a closed-form equation of time, a page long, good to well under a
+tenth of a degree for any date a renderer will be handed. It is written here for two reasons. A
+reader who has to *check* someone else's sun, or reconcile two of them, cannot do it against a
+library call. And the one genuinely dangerous step in the whole computation is in its last three
+lines, where a branch chosen wrongly moves the sun by tens of degrees while leaving the elevation
+exactly right.
+
+It is worth knowing how much rides on those two numbers, because a guessed sun does not look
+"slightly off", it breaks four things at once and only the first is obvious:
+
+| Quantity | Driven by | What a guessed angle costs |
+|---|---|---|
+| Shadow length and direction | elevation, azimuth | the visible mismatch — the one people do check |
+| **Sun colour**, via air mass `≈ 1/sin(elev)` | elevation | a 21° sun runs ~2.8 air masses and is distinctly golden; rendered near-white it reads as a noon sun no matter what the shadows do |
+| Refracted beam angle in water → caustic offset, slant path, the dark band a pool wall throws on its own floor | elevation | `12` |
+| **Glitter reachability** | elevation *and* azimuth | `12` — and this one is unforgiving at low sun, where sparkle can be geometrically impossible rather than merely faint |
+
+Sunrise/sunset from the same algorithm is a free sanity check on the brief: a sun computed 21° up
+at 18:41 local with sunset at 20:33 confirms "high summer, still broad daylight" instead of
+assuming it — and if the two disagree, the timezone or the UTC offset is wrong, which is the
+single most common way this goes silently astray.
+
+### Computing the illuminant from a place and a time
+
+A photograph with a place, a date and a clock time carries a **fully determined illuminant**, and
+recovering it is the first step of any comparison between a render and that photograph — not an
+optional refinement. Until the frame's sun is known, a disagreement in shadow direction, in water
+colour or in the ratio between two surfaces cannot be attributed to the renderer, because the
+illuminant is a free variable soaking up the residual. The chain is short and every step is
+standard: **solar declination** `δ` and the **equation of time** from the Julian century, **hour
+angle** from true solar time, **solar zenith angle** and azimuth from the spherical triangle, then
+Bennett's **refraction** correction and the Kasten–Young **relative optical air mass**.
+
+```
+# --- date to Julian century -------------------------------------------------
+JD  = julian_day(Y, M, D) + (t_local_hours - tz_hours) / 24     # tz in hours east
+T   = (JD - 2451545.0) / 36525.0                                # Julian centuries; TT ~ UT here
+
+# --- the sun's apparent longitude -------------------------------------------
+L0  = (280.46646 + T*(36000.76983 + T*0.0003032)) mod 360       # geometric mean longitude, deg
+M_a =  357.52911 + T*(35999.05029 - 0.0001537*T)                # geometric mean anomaly, deg
+ecc =  0.016708634 - T*(0.000042037 + 0.0000001267*T)
+C   =  sin(M_a)*(1.914602 - T*(0.004817 + 0.000014*T))          # equation of centre, deg
+     + sin(2*M_a)*(0.019993 - 0.000101*T)
+     + sin(3*M_a)*0.000289
+Om  =  125.04 - 1934.136*T                                      # lunar node, for the nutation term
+lam =  L0 + C - 0.00569 - 0.00478*sin(Om)                       # apparent longitude, deg
+
+# --- obliquity and declination ----------------------------------------------
+e0  =  23 + (26 + (21.448 - T*(46.8150 + T*(0.00059 - T*0.001813)))/60)/60
+eps =  e0 + 0.00256*cos(Om)                                     # true obliquity, deg
+decl=  asin( sin(eps) * sin(lam) )                              # solar declination, deg
+
+# --- equation of time, in minutes -------------------------------------------
+y   =  tan(eps/2)^2
+EoT =  4 * degrees( y*sin(2*L0) - 2*ecc*sin(M_a) + 4*ecc*y*sin(M_a)*cos(2*L0)
+                    - 0.5*y*y*sin(4*L0) - 1.25*ecc*ecc*sin(2*M_a) )
+
+# --- true solar time and hour angle -----------------------------------------
+TST = (t_local_minutes + EoT + 4*lon_east_deg - 60*tz_hours) mod 1440
+ha  = TST/4 - 180                                # deg;  ha < 0 morning,  ha > 0 afternoon
+
+# --- the spherical triangle --------------------------------------------------
+cos_zen = sin(lat)*sin(decl) + cos(lat)*cos(decl)*cos(ha)
+zen     = acos(clamp(cos_zen, -1, 1))            # solar zenith angle
+h       = 90 - zen                               # true (geometric) elevation
+
+# azimuth, measured clockwise from north -- USE THIS FORM, see the trap below
+az      = ( degrees( atan2( sin(ha),
+                            cos(ha)*sin(lat) - tan(decl)*cos(lat) ) ) + 180 ) mod 360
+
+# --- refraction, then air mass on the REFRACTED elevation --------------------
+R       = (1/60) * cot( h + 7.31/(h + 4.4) )     # Bennett, degrees
+h_app   = h + R
+m       = 1 / ( sin(h_app) + 0.50572*(h_app + 6.07995)^-1.6364 )   # Kasten-Young
+```
+
+Three notes on the tail, because each is a place a correct-looking implementation quietly goes
+wrong, and they are worth different amounts — the first is negligible and is recorded so that it
+stops being asked, the second is a fraction of a percent, and the third is unbounded.
+Bennett's formula is written for *apparent* altitude; Sæmundsson's `1.02·cot(h + 10.3/(h + 5.11))`
+is its true-altitude twin, and above 20° the two differ by **under 0.001°** — below anything that
+matters, so either is fine as long as one is used (`D`, recomputed here). Kasten–Young is usually
+quoted against zenith angle as `1/(cos ζ + 0.50572·(96.07995 − ζ)^−1.6364)`; the elevation form
+above is the same expression, and it must be fed the **refracted** elevation — the difference is
+0.2% at 21° and negligible at 57°, but the naive `1/sin h` is 0.6% off at 21° and diverges from
+there. And `4·lon_east_deg` means **east-positive** longitude: a western site takes a negative
+number, and getting that sign wrong shifts true solar time by twice the longitude correction while
+leaving everything downstream self-consistent.
+
+Worked on the two suns this skill's water chapter is calibrated against — Aljezur, Portugal
+(37.3167° N, 8.8000° W), WEST = UTC+1 (`D`, recomputed here in full):
+
+| | 2026-08-10, 18:41 | 2026-08-12, 15:28 |
+|---|---|---|
+| declination `δ` | 15.400° | 14.843° |
+| equation of time | −5.35 min | −5.04 min |
+| local solar noon | 13:40.5 | 13:40.2 |
+| hour angle `ha` | **+75.11°** (5.01 h past noon) | **+26.94°** (1.80 h past noon) |
+| solar zenith angle | 69.02° | 32.79° |
+| elevation, true → refracted | 20.975° → **21.02°** | 57.207° → **57.22°** |
+| azimuth (from north) | **273.75°** — due west | **233.96°** — south-west |
+| air mass `m` (Kasten–Young) | **2.771** | **1.189** |
+| shadow bearing, length | 93.75°, 2.60 × height | 53.96°, **0.64 × height** |
+
+Everything a comparison needs follows from those two rows, and the *water* consequences — how much
+of the beam enters the surface, how far it travels to the bed, and which of those differences cancel
+in a ratio and which do not — are worked in
+[`12`](../../water-physics/references/12-water-physics.md#the-illuminant-is-part-of-the-comparison-what-cancels-and-what-does-not).
+
+### The quadrant trap, and why the elevation stays right
+
+The azimuth is the one output of that chain with a **branch in it**, and it is the reason the
+pseudocode above uses `atan2`. The `acos` forms are algebraically correct and ubiquitous, and there
+are two of them measured from **different origins**, each with its own afternoon rule:
+
+```
+FORM N -- measured from NORTH
+    cos A_N = ( sin(decl) - sin(h)*sin(lat) ) / ( cos(h)*cos(lat) )
+    A_N = acos(...) in [0, 180]      morning: az = A_N        afternoon: az = 360 - A_N
+
+FORM S -- measured from SOUTH (the NOAA spreadsheet's form)
+    cos A_S = ( sin(lat)*cos(zen) - sin(decl) ) / ( cos(lat)*sin(zen) )
+    A_S = acos(...) in [0, 180]      morning: az = 180 - A_S  afternoon: az = 180 + A_S
+```
+
+Both give 233.96° for the 15:28 sun above. **Crossing them does not fail; it returns a plausible
+number.** Form S's `A_S = 53.96°` put through Form N's afternoon rule gives `360 − 53.96 =`
+**306.04°** — a north-*west* sun, **72.08° wrong** (`D`, recomputed here), and Form N's `A_N` put
+through Form S's rule lands on the same 306.04° from the other side. The elevation is untouched: it
+comes from `cos ζ`, which has no branch, so every other check a reader is likely to run still
+passes. This exact error placed a mid-afternoon August sun in the northwest during this project's
+own reference work, and it invalidates every shadow in a comparison while looking like a small
+transcription slip.
+
+The mechanism is worth naming, because it is what makes the wrong answer *plausible* rather than
+absurd. Both `acos` forms take the hour angle only through `cos(ha)` — via the elevation, or via the
+zenith — so both are **even functions of it**: each folds about solar noon and neither can, in
+principle, tell morning from afternoon. That is why they need an afternoon rule at all, and why
+crossing the rules returns the mirror of a true azimuth: a real compass bearing, on the wrong side.
+
+![Azimuth across a day by atan2 and by the two acos branches, with the elevation below](figures/azimuth-quadrant-fold.png)
+
+> **Figure 10·3 — an `acos` cannot know the afternoon, and the elevation never tells on it.** `D`.
+> Drawn by [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py) (`fig_azimuth_fold`) by sweeping
+> `reference-impl/atmosphere.py`'s own `solar_position` across 2026-08-12 at Aljezur and feeding the
+> declination and elevation it returns into the two `acos` forms above — one routine, evaluated the
+> chapter's three ways. **Top:** `atan2` rises monotonically through the day and passes 180° at
+> solar noon. Each `acos` branch lies exactly *on* it in its own half of the day and mirrors it in
+> the other; the fold at `ha = 0` is the whole bug. The shaded band is the rise/set bracket
+> (70.5°, 289.5°) — the crossed value **306.05°** is outside it and the correct **233.95°** is
+> inside, which is the cheap guard the section recommends, working. **Bottom:** the elevation over
+> the same day, with the 15:28 sun and its mirror hour marked at the *same* height. There is no
+> `acos` branch in the elevation, so colour, air mass and slant path are all still right at the
+> wrong sun — and every check a reader is likely to run keeps passing.
+
+Three guards, in the order they are worth running:
+
+- **Ship `atan2`.** The two-argument form has no branch and no origin ambiguity; the `acos` forms
+  belong in a cross-check, not in the renderer. Agreement between the two is a real guard rather
+  than a restatement, because what is being tested — the branch — is precisely what they do not
+  share (`11`, [a test and the code it checks must not share a
+  premise](11-verification-failures.md#seven-ways-a-measurement-lies-while-looking-like-one)).
+- **Bracket it with the rise/set azimuths.** Compute `cos A_rise = (sin δ − sin h₀ sin φ)/(cos h₀
+  cos φ)` at the horizon `h₀ = −0.833°`; the azimuth is confined all day to the arc running from
+  `A_rise` to `360 − A_rise` **through the meridian the sun culminates on**. Whenever `|δ| < |φ|`
+  and both are the same sign — every mid-latitude case — that arc contains 180° and the bracket is
+  simply `(A_rise, 360 − A_rise)`: on the date above, **(70.5°, 289.5°)**, which afternoon narrows
+  to (180°, 289.5°). 306.04° is outside it and the check catches it; 233.96° is inside (`D`). In the
+  tropics with `δ > φ` the sun culminates north of the zenith and the arc is the complementary one —
+  state which case you are in rather than hard-coding the mid-latitude bracket.
+- **Check the shadow against the frame.** The bearing is `az − 180`, so a reference photograph
+  containing any vertical object with a visible shadow settles the azimuth to a few degrees for
+  free — 53.96° at 0.64 × height here. This is the only one of the three that tests the *whole*
+  chain, timezone and longitude sign included.
+
+The cost of getting it wrong is set out in the table above: shadows swing 72° across the frame,
+every water-side quantity that depends on azimuth (glitter reachability, the direction the refracted
+beam offsets the caustic net, which wall the sun lands on) moves with them, and the elevation-driven
+quantities — colour, air mass, slant path — stay right, so the render disagrees with the photograph
+in a pattern that reads as a *shading* problem rather than as a wrong sun.
+
+### The sky must be the atmosphere the beam came through
+
+The sun and the sky are not two art assets. They are one atmosphere seen twice — the beam is what
+survived it, the sky is what was scattered out of the beam — and a renderer that authors them
+separately violates conservation in a way that is invisible in a still and structural everywhere
+else. Two rules follow, and both are cheap.
+
+**Adding scattering to the sky without removing it from the beam creates the light twice.** Aerosol
+in particular is tempting to add to the environment because it is what makes a hazy afternoon look
+like one, and it is exactly where a reflection is most sensitive. Priced on a water scene at
+`τ_a(550) = 0.10`: the same frame went to a mean luminance of **245/255 over the far water, 98% of
+it above 200**, with the shadow ratio inverted — a frame shot along the sun's azimuth cannot hold
+both a hazy sky and a legible surface (`D`). And the correction is not local: dimming the beam means
+changing the **sun colour**, which relights every diffuse surface in the frame. So the pair is one
+change or neither, and "just add a little aureole" is not a small edit.
+
+**A sun colour already encodes its own atmosphere — read it back before inventing a sky.** A
+hand-set golden sun is not free data; it is an optical depth and an air mass written down in another
+notation. Worked on one scene: `exp(−m·τ_Rayleigh)` at air mass 2.77 (the value the 21° elevation
+implies), evaluated at the renderer's own band centres and normalised to red, reproduced a hand-set
+sun colour to **one part in 10⁴** (`D`). That single check fixed three things at once — the air mass
+is no longer free, the reddening is physics rather than a colour grade, and the **aerosol optical
+depth that colour was written with is zero**, which then forbids the aureole above. Before building
+a sky for that sun to sit in, invert the colour you already have; if it does not come out as an
+atmosphere, the grade and the physics are already fighting.
+
+The consumer that exposes all of this first is water — see `12`'s
+[sun glitter](../../water-physics/references/12-water-physics.md#sun-glitter-the-sparkle-path), where a sun lobe fitted by eye
+turns small blinding points into a broad pale smear.
+
+### An illuminant is that sky's own cosine integral, and the disc is not in it
+
+Once the sky is the atmosphere the beam came through, the **ambient constant stops being a
+constant**. An illuminant for a diffuse receiver is one number and there is nothing left to choose
+in it:
+
+```
+E(N)/pi  =  (1/pi) INT_hemisphere  L(w) (w . N)+  dw
+```
+
+`L(ω)` is already owned — it is the environment the section above forced to be an atmosphere — so
+the only judgement left is **which lobes of it belong inside the integral**, and that is settled by
+an audit rather than by taste.
+
+**A term may appear in exactly one of {beam, environment}, and the flux identity says which.** A
+sun disc built the way [`12a` §6](../../water-physics/references/12a-water-derivations.md#6-the-sun-as-lobes) builds one carries
+the direct beam *exactly*: its peak, width and flux land on the sun together, so
+`∫_disc L dω = π·SUN_COL` to a part in a thousand. Every diffuse receiver in the frame already gets
+that beam as an explicit `SUN_COL·(N·L)·vis` term. **Integrate the disc as well and the frame has
+two suns.** The aureole is the opposite case and it is easy to get wrong in the other direction: it
+is light scattered *out* of the beam, arriving from directions the beam does not occupy, so it is
+skylight and it belongs in the integral. One rule, two signs — and the failure is silent in both
+directions, because a doubled sun and a missing aureole are both smooth level changes.
+
+**Worked on this project's reference pool, where a hand-written deck illuminant survived the entire
+run.** `SKY_DECK = SKY_AMB × 0.30 + SUN_COL × 0.075` — two hand terms, 1.74 stops written by eye,
+applied to a horizontal deck and to a vertical band alike. Against its own sky's cosine integral:
+
+| deck illuminant `E/π`, the renderer's own sky | red | green | blue |
+|---|---|---|---|
+| the elevation gradient's cosine integral | 0.4478 | 0.6381 | 1.1270 |
+| the Rayleigh aureole, disc excluded | 0.0616 | 0.0928 | 0.1405 |
+| **derived** | **0.5094** | **0.7309** | **1.2675** |
+| what shipped | 0.8127 | 0.8462 | 0.8604 |
+| **shipped / derived** | **1.595** | **1.158** | **0.679** |
+
+(`D`, recomputed here; the two hand terms reproduce the shipped triple to
+`(0.8130, 0.8465, 0.8606)`, i.e. to three decimals, from `SKY_AMB` and `SUN_COL` alone.)
+
+**Two errors of opposite sign that cancelled in green, which is why it survived.** `SKY_AMB × 0.30`
+is **0.42×** the gradient's own integral in green (0.37× in red and blue); `SUN_COL × 0.075` is
+**6.2×** the aureole's in green (10.5× in red, 3.1× in blue). The sum lands 16% high in green and
+wrong in colour in both directions at once. Every green-channel comparison this project made was
+blind to it by construction — which is the general lesson and not a local one: **a hand constant
+built from two terms is a two-parameter fit, and a two-parameter fit passes a one-channel test.**
+The remedy is not more care in choosing it; it is that the integral has no parameters.
+
+### The aureole has a ceiling, and no quadrature is needed to find it
+
+The sharpest thing in the section above needs neither the renderer's sky nor any optical depth.
+Rayleigh's phase function splits into an isotropic part and a forward/backward part:
+
+```
+P(Theta) = (3/4)(1 + cos^2 Theta)        # normalised: INT P dw / 4pi = (3/4)(1 + 1/3) = 1
+           \_____/   \___________/
+           isotropic   the aureole -- ALL of the angular structure a Rayleigh sky has
+```
+
+For **any** receiver, with any weighting `w(ω)` the geometry imposes, the aureole's share of what
+that receiver collects is
+
+```
+share  =  <cos^2 Theta>_w / (1 + <cos^2 Theta>_w)                  # monotone in <cos^2>
+```
+
+and `⟨cos²Θ⟩_w ∈ [0, 1]` because `cos²Θ` is. Three results fall straight out, and all three are
+free of `τ`, of solar elevation, of wavelength and of the beam's normalisation, because `Θ` enters
+the physics *only* through the phase function and the phase function's angular moments are fixed:
+
+- **A pointwise ceiling of ½.** No receiver anywhere, at any optical depth, under any sun, can take
+  more than half of a singly-scattered Rayleigh sky's light from the aureole — that limit needs
+  `cos²Θ = 1` in every direction the receiver sees.
+- **An all-sky value of exactly ¼.** Over the whole sphere `⟨cos²Θ⟩ = ⅓`, so the aureole carries
+  `(3/4)(1/3) = 0.25` of the scattered flux — **exactly**, for any `τ` and any elevation. Higher
+  scattering orders are more isotropic than the first, so the ceiling on the *total* diffuse sky is
+  if anything lower.
+- **Therefore the constant above is not merely wrong, it is impossible.** The derived aureole is
+  **12.7%** of the derived deck illuminant in green (12.1% red, 11.1% blue), which inverts to an
+  effective `⟨cos²Θ⟩_w = 0.145` — an ordinary number for a horizontal face under a 21° sun. The
+  hand constant put the aureole at **68%** of its illuminant, which inverts to `⟨cos²Θ⟩_w = 2.125`.
+  There is no atmosphere, no sun position and no receiver for which that exists (`D`, all four
+  figures recomputed here). And it is not only green: red inverts to **3.846** and blue to
+  **1.021**, so all three shipped bands clear a ceiling that nothing can clear.
+
+![The aureole's share against its own ceiling, and the two hand terms that cancel](figures/aureole-ceiling.png)
+
+> **Figure 10·1 — a ceiling, three points under it, and three points where nothing can be.** `D` on
+> `P` (Rayleigh's phase function and its angular moments). Drawn by
+> [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py) (`fig_aureole_ceiling`) from
+> `reference-impl/atmosphere.py`'s own environment and its own quadrature — `sky(lobes=())` is the
+> gradient, `SKY_DIFFUSE_LOBES` adds the aureole, and `env_irradiance` integrates both against the
+> same horizontal receiver. Nothing is re-integrated in the figure. **Left:** `share = m/(1+m)`
+> against `m = ⟨cos²Θ⟩_w`. The shaded region is the whole of what can exist, because `cos²Θ ∈ [0,1]`
+> forces `m ∈ [0,1]`; the curve simply stops rising at ½. The three derived shares sit at
+> 12.1 / 12.7 / 11.1 %, on the curve and well inside the domain. The three shipped shares sit at
+> 79.4 / 68.0 / 50.5 % — **above the ceiling in every band**, at abscissae the axis only shows
+> because the figure extends it past the point where the physics ends. This is the one claim in the
+> chapter a picture states better than a number: a level says "too big", a bound says "outside".
+> **Right, on a log axis because the terms span 0.37× to 10.5×:** why it survived. `SKY_AMB × 0.30`
+> is 0.37–0.42× the gradient's own integral, `SUN_COL × 0.075` is 3.1–10.5× the aureole's, and their
+> **sum** crosses 1.0 between green and blue — 1.60× red, 1.16× green, 0.68× blue. Two errors of
+> opposite sign, nearly cancelling in the one band a luminance check looks hardest at.
+
+**That is a falsification from the atmosphere, with no photograph in it** — which is the point
+worth carrying past this project. A constant that has resisted every image comparison for a year
+can still be dead on arrival against a moment of the phase function, and moments are cheap: they
+need no quadrature, no scene and no reference frame.
+
+**What this does *not* close, stated so the next reader does not think it did.** The two lobes come
+from the Rayleigh atmosphere; the elevation **gradient** they sit on — a horizon radiance, a zenith
+radiance and an exponent between them — does not, and never did. What the atmosphere can offer it
+is a **lower bound**, computed rather than asserted: single-scattered Rayleigh radiance for a ground
+observer,
+
+```
+L = (F0 P(Theta) / 4pi) * mu_s * (e^{-tau/mu_v} - e^{-tau/mu_s}) / (mu_v - mu_s)
+```
+
+with `F₀ = E_sun·e^{+τ·m}` the top-of-atmosphere beam the scene's own sun colour implies, gives a
+deck illuminant that is **0.55 / 0.58 / 0.49** of the shipped gradient's (`D`, recomputed). That is
+a bound and not a disagreement: it carries no multiple scattering and no ground return, and at
+`τ_R(blue) = 0.202` neither is small. **A named gap is the honest form of an open constant** — the
+missing pieces are orders two and up of the sky's own transfer and the albedo of the ground under
+it — and it is worth strictly more than a `0.30` with nobody's name on it, because a reader handed
+a bound goes and closes it.
+
+### An illuminant is a property of the receiver's orientation, not of the scene
+
+The most expensive habit in the section above is not the constant's value; it is that **one
+illuminant was handed to two receivers pointing in different directions**. A "sky ambient" is not a
+property of the sky. It is a property of the *pair* — sky and receiver normal — and the two
+receivers a terrain frame always has, a horizontal ground plane and a vertical face, weight the sky
+in ways that peak in different places.
+
+Put the sky's radiance as `L(θ)` in zenith angle and integrate the two:
+
+```
+horizontal N:  E/pi = 2 INT_0^{pi/2}  L(th) cos th sin th  dth       # weight peaks at th = 45 deg
+vertical   N:  E/pi = 2 INT_0^{pi/2}  L(th) sin^2 th       dth       # weight peaks at th = 90 deg
+                                                                     #   -- the HORIZON
+```
+
+(The vertical form is the azimuthal integral of `(ω·N)+` over the half the face can see: `∫cos φ dφ`
+over `(−π/2, π/2)` is 2, and the remaining `sin θ · sin θ` is the cosine factor times the Jacobian.)
+
+**For a uniform sky the ratio is exactly ½, and for nothing else.** That is why halving a deck
+illuminant for a wall is so durable a habit — it is right in the one case everybody checks. What it
+costs elsewhere is the difference between a `cos θ sin θ` weight and a `sin² θ` one:
+
+![The two receiver-orientation weights, and the same two weights applied to Fresnel](figures/receiver-orientation-weights.png)
+
+> **Figure 10·2 — same area, nothing else the same.** `P/synthesis` for the weights (the cosine law
+> integrated over each receiver's visible azimuth), `D` for the reflectances. Drawn by
+> [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py) (`fig_receiver_weights`); the exact ½ is
+> checked before any pixel against `atmosphere.env_irradiance`'s own spherical quadrature, which
+> shares no line with the 1-D forms above. **Left:** the two weights normalised to unit area, which
+> is what makes them comparable at all. The horizontal receiver's peaks at 45° and is symmetric
+> about it; the vertical receiver's is **still climbing when it runs out of sky**. They enclose
+> the same area and agree about nothing else — which is exactly why one number can be right for a
+> uniform sky and wrong for every real one. **Right:** the consequence, on the pool's own interface.
+> The vertical weight peaks precisely where Fresnel turns up, so the two integrands' areas are
+> 0.2112 and 0.0667 — **3.17×**, produced entirely by the receiver's orientation, with nothing about
+> the water changed. Both integrands are shown whole, on one scale, so the two shaded areas are the
+> two numbers: the vertical one passes 1.0 before the sky runs out, because a weight normalised to
+> unit area over a finite interval is a *density* and is under no obligation to stay below one.
+
+- **A vertical face weights the horizon and a horizontal face cannot reach it.** Where the sky is
+  brighter near the horizon — which is every real atmosphere in red and green — the vertical face
+  gets **more** than half. On the reference pool's own derived sky a poolward-facing strip collects
+  **1.232 / 1.099 / 0.966** of half the deck illuminant (`D`, recomputed): +23% in red, +10% in
+  green, −3% in blue. The blue figure is the check that the integrator is doing its job — that
+  sky's horizon and zenith radiances are equal in blue, so the blue ratio must return to the
+  uniform-sky answer, and it does to 3%.
+- **The aureole is where a shared illuminant breaks outright, because it has an azimuth.** A
+  horizontal deck sees the aureole wherever the sun is. A vertical face that the sun is *behind*
+  does not: roughly the aureole and the horizon band around the sun are simply unavailable to it.
+  Measured on the same pool, a band facing the sun collects **1.23×** in luminance what the averted
+  band on the opposite wall does (1.20 / 1.24 / 1.23 per channel, `D`) — and **a single halved deck
+  illuminant cannot be both numbers**, whatever value it is given. The tell is a scene in which
+  every wall is equally lit from the sky while the sun is plainly on one side of it.
+- **Below a vertical face there is a second illuminant nobody writes down.** The lower half of a
+  wall's hemisphere is not empty: it is ground, or water. And because the `sin²θ` weight peaks at
+  the horizon, that half is collected at **grazing** incidence, where a water surface's external
+  Fresnel is nothing like its normal-incidence value. The `sin²θ`-weighted mean unpolarised
+  reflectance of a water surface is **0.2112** against the cosine-weighted **0.0667** a horizontal
+  receiver would use and **0.0206** at normal incidence — a factor of **3.17** and **10.3** (`D`,
+  quadratured here at `n = 1.3348`). A wall over water is lit substantially by *sky reflected in
+  that water*, and the constant that governs it is not the one printed next to the surface.
+
+**The general rule, and the cost of ignoring it.** Compute one illuminant per receiver orientation
+that appears in the frame, or state which orientation the single one you have is for and accept the
+error everywhere else. It is a small integral over an environment already in memory, and the
+alternative is a constant that is right for the ground and wrong for every wall standing on it, in a
+direction that changes with the sun's azimuth — which is to say, a constant that will be
+re-tuned every time the time of day changes and will never be right twice. `12` carries the water
+consumer of all three results:
+[an illuminant per receiver, and what it costs a waterline](../../water-physics/references/12-water-physics.md#an-illuminant-per-receiver-and-what-that-costs-at-a-waterline).
+
 ## Time-of-day dynamics
 
 A moving sun converts "bake it" into a caching-and-invalidation problem. Sort every shadow/light
@@ -337,6 +770,26 @@ data structure by what sun motion does to it:
   distance cue.
 - **Horizon-map azimuth banding**: too few baked azimuth bins shows shadow direction stepping as
   the sun sweeps; 16+ bins or angular interpolation with care at the wraparound.
+- **Sky scattering added without dimming the beam**: aerosol or aureole authored into the
+  environment while the directional light keeps its full radiance. The light now exists twice, and
+  it shows up first in reflections and wet surfaces rather than in the sky. The beam and the
+  environment are one atmosphere; change both or neither.
+- **A sun colour that is not any atmosphere**: a warm sun picked by eye that does not invert to an
+  air mass and an optical depth. It will disagree with the sky the moment the sky becomes physical,
+  and the disagreement is diagnosed as a tone-mapping problem for weeks.
+- **The sun's disc integrated into the ambient as well as delivered as a beam.** Two suns, and the
+  symptom is a frame that is uniformly a little hot with shadows that are too shallow — read as
+  exposure for months. The audit is one line: the disc lobe's flux must equal `π·SUN_COL`, and
+  whatever carries the beam may not appear in the environment integral. Its mirror image, dropping
+  the **aureole** from that integral, is equally silent and pushes the other way.
+- **One "sky ambient" handed to receivers of different orientation.** A horizontal face weights the
+  sky by `cos θ sin θ` and a vertical one by `sin² θ`; the two agree at exactly ½ for a uniform sky
+  and nowhere else, and the aureole gives the vertical case an **azimuth** the constant does not
+  have. Presents as walls that are lit identically on the sunny and shaded sides of a building —
+  [an illuminant is a property of the receiver](#an-illuminant-is-a-property-of-the-receivers-orientation-not-of-the-scene).
+- **A two-term hand-fitted ambient checked in one channel.** Two constants are a two-parameter fit
+  and a two-parameter fit passes a single-channel comparison by cancellation. Check the *colour* of
+  an ambient against its own sky's integral, per channel, before checking its level.
 
 ## Sources & provenance
 
@@ -365,3 +818,17 @@ data structure by what sun motion does to it:
 | Normal-band migration across LOD; apron rule for tile-border normals | **F** + **D** (generator output contract) |
 | Lightmaps impractical at terrain scale (texel budget + dynamic sun) | **F** (arithmetic + practice) |
 | Normal-offset bias scaling with cascade texel size as primary anti-acne tool | **F/D** |
+| Rayleigh optical depth `τ ≈ 0.008569·λ⁻⁴` with its two dispersion corrections (Hansen & Travis 1974), used to invert a sun colour to an air mass | **P** (standard form; attribution from model knowledge, not re-verified) |
+| The low-order solar-position algorithm in [Computing the illuminant](#computing-the-illuminant-from-a-place-and-a-time) — truncated equation of centre, closed-form equation of time, hour angle, spherical triangle | **P** (Meeus, *Astronomical Algorithms*, as truncated by NOAA's Solar Calculator; coefficients transcribed from that standard form and **not** re-derived — the check that they are right is the worked table, which reproduces two independently-stated suns) |
+| Bennett (1982) refraction `R = cot(h + 7.31/(h + 4.4))` arcmin, and that its Sæmundsson true-altitude twin `1.02·cot(h + 10.3/(h + 5.11))` differs by <0.001° above 20° elevation | **P** (both formulae standard) + **D** (the agreement recomputed here, 2026-08) |
+| Kasten & Young (1989) relative optical air mass `1/(cos ζ + 0.50572·(96.07995 − ζ)^−1.6364)`, and the elevation-form identity used above | **P** (standard; the algebraic restatement and the 0.2%/0.6% error figures against refracted-vs-true and against `1/sin h` are arithmetic here) |
+| The Aljezur table — δ, EoT, solar noon, hour angle, zenith, elevation, azimuth, air mass and shadow bearing/length for 2026-08-10 18:41 and 2026-08-12 15:28 WEST at 37.3167 N, 8.8000 W | **D** — computed here from the algorithm above; they reproduce the two suns `12`'s reference work was stated with (21.0°/273.75°/2.77 and 57.22°/233.96°/1.189) to the digits those were quoted at |
+| The quadrant trap: two `acos` azimuth forms with different origins, each with its own afternoon branch, and that crossing them returns **306.04°** against a correct **233.96°** — a 72.08° error with the elevation untouched | **D** (recomputed here) + **F** (that it is a *common* error is this skill's experience, including its own; the arithmetic is not in doubt) |
+| That a hand-set sun colour inverted to `exp(−m·τ_Rayleigh)` at air mass 2.77 to one part in 10⁴, and that the aerosol pair at `τ_a(550) = 0.10` drove far water to 245/255 with the shadow ratio inverted | **D** — both measured on `12`'s pool reference implementation against its own constants; the *rule* (one atmosphere, read the sun colour back) is this skill's composition from them |
+| That an illuminant for a diffuse receiver is `(1/π)∫L(ω)(ω·N)⁺dω`, that a disc lobe carrying the beam exactly must therefore be excluded from it, and that the aureole must be included | **P/synthesis** — the integral is the definition; the exclusion rule is this skill's statement of a bookkeeping identity, and the flux test `∫_disc L dω = π·SUN_COL` is `12a` §6's disc construction read as an audit |
+| The derived deck illuminant `(0.5094, 0.7309, 1.2675)` = gradient `(0.4478, 0.6381, 1.1270)` + aureole `(0.0616, 0.0928, 0.1405)`, against a shipped `(0.8127, 0.8462, 0.8604)` at ×1.595 / ×1.158 / ×0.679 | **D** — quadratured on `12`'s reference implementation's own sky; every row re-summed and every ratio recomputed here (2026-08). It prices **that** atmosphere at **that** sun; what transfers is that a two-term hand ambient cancels in one channel |
+| That `SKY_AMB × 0.30` is 0.42× the gradient integral and `SUN_COL × 0.075` is 6.2× the aureole, both in green (0.37×/0.38× and 10.5×/3.1× in red/blue) | **D** — recomputed here from the shipped constants; the shipped triple reproduces from them to three decimals, which is the check that the decomposition is the right one |
+| The Rayleigh aureole ceiling: `share = ⟨cos²Θ⟩_w/(1 + ⟨cos²Θ⟩_w)`, hence **≤ ½ pointwise for any receiver** and **exactly ¼ over the sphere**, independent of optical depth, solar elevation and wavelength | **P** (Rayleigh's phase function and its angular moments) + **D** — the inversion of the two shares (12.7% → `⟨cos²Θ⟩_w = 0.145`; 68% → 2.125, which does not exist) is arithmetic recomputed here. This is the transferable half: a moment of the phase function falsifies a constant with no scene and no photograph |
+| That the single-scattered plane-parallel Rayleigh radiance gives a **lower bound** of 0.55 / 0.58 / 0.49 on the shipped gradient, missing orders ≥ 2 and the ground return | **D** — recomputed here from the form quoted, on that sun's own `F₀`; **`?`** for the gradient itself, which is not derived from anything and is the open constant this entry exists to mark |
+| The receiver-orientation weights `cos θ sin θ` (horizontal, peak at 45°) and `sin² θ` (vertical, peak at the horizon), their exactly-½ ratio under a uniform sky, and the 1.232 / 1.099 / 0.966 and 1.23× azimuth figures | **P/synthesis** — the two weights are the cosine law integrated over each receiver's visible azimuth (derived here, and the ½ verified by quadrature to 10⁻¹¹); the two measured triples are **D** on that pool's sky and that basin's geometry |
+| The `sin²θ`-weighted mean unpolarised water reflectance **0.2112**, against **0.0667** cosine-weighted and **0.0206** at normal incidence, `n = 1.3348` | **D** — quadratured here from the exact Fresnel equations (400 001 samples), not quoted. ⚠️ The reference implementation prints **0.243** for the same quantity because its weighting also carries the sky's own horizon brightening; the purely geometric figure is 0.2112 and the two are not the same number |

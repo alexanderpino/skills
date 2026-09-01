@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Planetary Rendering & Numerical Precision"
+description: "Planetary rendering and numerical precision: the float32 binade staircase, reversed-Z, camera-relative transforms and cube-sphere mappings."
+tags: [terrain, planetary, precision, reversed-z, float32]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Planetary Rendering & Numerical Precision
 
 Planet rendering is two problems wearing one coat: a **numerical precision problem** that starts
@@ -18,16 +28,40 @@ Contents: [Precision doctrine](#precision-doctrine) · [Depth precision](#depth-
 
 ## Precision doctrine
 
-float32 carries a 24-bit significand: ~7 significant decimal digits, and an absolute spacing
-between representable values of `x * 2^-23 ≈ x * 1.2e-7` at magnitude `x`:
+float32 carries a 24-bit significand: ~7 significant decimal digits, and a spacing between
+representable values that is **`2^(floor(log2 x) - 23)`** at magnitude `x` — constant between
+consecutive powers of two, and doubling at each one. The familiar `x * 2^-23 ≈ x * 1.2e-7` is the
+**upper bound** of that step, reached only at the top of each binade; the true spacing is between
+one and two times smaller, depending where `x` falls inside its binade.
 
-| Distance from origin | float32 spacing | Consequence |
-|---|---|---|
-| 1 km | ~0.1 mm | fine |
-| 10 km | ~1 mm | subpixel shimmer starts in close-ups |
-| 100 km | ~1 cm | visible vertex swimming, normal-map crawl |
-| 1000 km | ~12 cm | geometry visibly quantized, physics jitter |
-| 6371 km (Earth R) | ~0.76 m | unusable — vertices snap by strides |
+| Distance from origin | float32 spacing | `x · 2^-23`, the bound | Consequence |
+|---|---|---|---|
+| 1 km | 61 µm | 0.12 mm (1.95×) | fine |
+| 10 km | 0.98 mm | 1.19 mm (1.22×) | subpixel shimmer starts in close-ups |
+| 100 km | 7.8 mm | 1.19 cm (1.53×) | visible vertex swimming, normal-map crawl |
+| 1000 km | 6.25 cm | 11.9 cm (1.91×) | geometry visibly quantized, physics jitter |
+| 6371 km (Earth R) | 0.50 m | 0.76 m (1.52×) | unusable — vertices snap by strides |
+
+Budget against the middle column, not the right one. The distinction is worth a factor of two and
+it is not a rounding: two worlds sized either side of a power of two get different vertex
+precision from the same code, and the bound hides that behind a smooth-looking law.
+
+![The float32 spacing staircase against the rule that bounds it, and the size of the overstatement](figures/float32-binade-staircase.png)
+
+> **Figure 9·1 — the spacing is a staircase, and `x · 2^-23` is its bound.** `D`, and the underlying
+> format is `P` (IEEE-754). Drawn by [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py)
+> (`fig_float_binades`) by asking numpy's own `float32` where the representable values are — the
+> machine is the authority here, so there is no constant in the figure to drift from. The window is
+> 10 km to 10 000 km because eleven binades is few enough that a tread is a tread; over the twelve
+> decades the table spans, the staircase draws as a straight line and says nothing.
+> **Left:** the spacing itself, with `x · 2^-23` running through the top corner of every tread and
+> `x · 2^-24` through the bottom. The rule is the tread's ceiling, and it touches the truth once per
+> binade. **Right:** the ratio between them, which is `x / 2^floor(log2 x)` and therefore a sawtooth
+> confined to `[1, 2)`. The four marked rows are this table's own, and they land at 1.22×, 1.53×,
+> 1.91× and 1.52× — the 1000 km row worst, because `10^6` sits just above `2^19` and so near the
+> floor of its binade. **This figure corrected the table above it:** the pre-figure rows read
+> ~0.1 mm / ~1 mm / ~1 cm / ~12 cm / ~0.76 m, which is the bound column, tabulated as if it were the
+> spacing.
 
 Symptoms (`11` catalogues the tests): **vertex swimming** — geometry wobbles as the camera moves
 because view = big − big cancellation drops low bits; **shadow-map jitter** — shadows crawl even on
@@ -70,9 +104,29 @@ Six orders of magnitude of view distance breaks naive depth too. The stack, in o
   zero. Reversed-Z aligns the two gradients instead of opposing them, yielding near-constant
   relative error across the range. This is free (flip GREATER/LESS, clear to 0) and is the 2026
   default everywhere, not just planets. Requires a floating-point depth buffer; with a 24-bit
-  *fixed* depth buffer reversed-Z gains almost nothing.
+  *fixed* depth buffer reversed-Z gains **nothing at all** — the two conventions come out
+  bit-identical, which figure 9·2 below draws as two curves lying on one another.
 - **Infinite far plane.** With reversed-Z, take the limit far→∞ in the projection: no far clip at
   all, negligible precision cost. A planet renderer should not be tuning a far plane.
+
+![Relative depth resolution for the four combinations of depth convention and buffer format](figures/depth-precision-reversed-z.png)
+
+> **Figure 9·2 — reversed-Z is flat, and in fixed point it buys exactly nothing.** `D`, on `P`
+> (IEEE-754 and the standard projection). Drawn by
+> [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py) (`fig_depth_precision`). **There is not one
+> chosen number in it.** With the infinite far plane above, the projection collapses to `z = near/w`
+> (reversed) or `z = 1 − near/w` (standard), so `|dw/dz| = w²/near` for both and `near` cancels: the
+> x axis is the dimensionless `w/near` and the y axis is the ratio `Δw/w`. The only input left is
+> where the buffer's own representable values are, which is figure 9·1's question asked again.
+> **Left:** reversed-Z with float32 is flat over seven decades — and *exactly* one binade flat, from
+> `2^-24` to `2^-23`, which is the sawtooth of figure 9·1 seen side-on. That is what "near-constant
+> relative error" means, and it means constant to a factor of two and never better. The other three
+> climb linearly and **lie on one another to the last bit**: with standard Z, a float depth buffer
+> is not merely worse than reversed-Z, it is bit-identical to 24-bit fixed point. **Right:** the one
+> window where they differ. Standard Z writes `z = 1 − near/w`, which is inside the binade
+> `[½, 1)` for every `w` past twice the near plane — so past `w = 2·near` the exponent is spent and
+> only the mantissa is left. A float depth buffer under standard Z buys precision solely within
+> twice the near plane, which is the one place nothing needs it.
 - **Logarithmic depth** — the alternative when float depth targets are unavailable or range is
   extreme: write `z = log2(1 + w) / log2(1 + far)`-style depth. Costs, and why reversed-Z won:
   writing depth in the pixel shader **disables early-Z / hierarchical-Z** (unless conservative
@@ -115,11 +169,32 @@ The tiling and its precision discipline in one sketch:
 ```
 
 - **Mapping and distortion.** The naive (gnomonic) cube→sphere mapping varies texel solid angle by
-  ~5.2× between face centre and corner — corners waste resolution and distort features.
-  Tangent-adjusted mappings (`u' = tan(u·π/4)`, applied per axis) cut the variation to roughly
-  1.3–1.4×; equal-area-ish variants (COBE quadrilateralized sphere family) go further at the cost
-  of a more expensive inverse. Pick once, bake it into tile addressing, and use the *same* mapping
-  for geometry and texturing — a mismatch shows as texture swimming toward face corners.
+  **`3√3` = 5.196×** between face centre and corner, and for gnomonic the corner *is* the face
+  minimum, so that one number bounds the whole face — corners waste resolution and distort features.
+  Tangent-adjusted mappings (`u' = tan(u·π/4)`, applied per axis) cut it to **`3√3/4` = 1.299×**
+  centre-to-corner — exactly a quarter — but the corner is no longer where that map is worst: its
+  face minimum is the **edge midpoint**, at exactly `1/√2`, so the variation across a face is
+  **`√2` = 1.414×**. Quote 1.414 when sizing a texel budget and 1.299 only if you mean the corner
+  specifically. Equal-area-ish variants (COBE quadrilateralized sphere family) go further at the
+  cost of a more expensive inverse. Pick once, bake it into tile addressing, and use the *same*
+  mapping for geometry and texturing — a mismatch shows as texture swimming toward face corners.
+
+![Solid-angle density across a cube face for the gnomonic and tangent-adjusted mappings](figures/cube-sphere-distortion.png)
+
+> **Figure 9·3 — the re-derivation this chapter's provenance table asks for.** `D`; the two figures
+> were previously **F** ("widely reproduced numbers, no single canonical citation; re-derive before
+> quoting in print"). Drawn by [`figures/make_figures.py`](../../water-physics/references/figures/make_figures.py)
+> (`fig_cube_sphere`) from the two mappings as this section states them — the Jacobian of
+> `(u, v, 1)` onto the sphere, `(1 + u² + v²)^(−3/2)`, times `du'/du = (π/4)sec²(uπ/4)` per axis for
+> the tangent variant. Every number is computed, none quoted. **Left:** density along the diagonal
+> and along the edge midline, each normalised to its own face centre. For gnomonic the diagonal is
+> the steepest way off the centre, so the corner is the worst point; for tangent-adjusted it is the
+> *shallowest*, and the edge midline overtakes it. **Right, top:** the same two densities as fields
+> over a whole face, each scaled to its own maximum. **Right, bottom:** the face boundary from edge
+> midpoint to corner, and the two maps run in **opposite directions** along it — the corner is
+> gnomonic's worst point and tangent-adjusted's *best* one. That is where the quoted "roughly
+> 1.3–1.4×" comes from: the band's two ends are not an uncertainty, they are two different
+> measurements of two different points.
 - **Per-patch local frames — the precision fix applied structurally.** Each patch stores its
   origin (patch centre on the ellipsoid) in double, and its vertices as float32 offsets in a local
   frame (origin + local east/north/up). The GPU never sees a planet-radius-magnitude coordinate:
@@ -256,7 +331,8 @@ Name the frames or drown in bugs. The minimum set:
   Physics must run in the planet-fixed frame locally (with rotation applied to the frame, not the
   objects), or every parked object drifts. Sun direction must be transformed *into* the planet-
   fixed frame per frame — computing lighting in the inertial frame reintroduces absolute-magnitude
-  precision loss at 1 AU scale (~1.5e11 m: float32 spacing ~18 km — ephemeris math is f64-only).
+  precision loss at 1 AU scale (1.496e11 m: float32 spacing **16.4 km** — ephemeris math is
+  f64-only).
 
 ## Pitfalls
 
@@ -305,7 +381,15 @@ Name the frames or drown in bugs. The minimum set:
 - **T/F** — *Star Citizen*, *No Man's Sky*, *Microsoft Flight Simulator*, *Elite Dangerous*
   planet-tech talks: public GDC/SIGGRAPH talks and posts exist covering 64-bit coordinates, local
   physics grids, and procedural planet streaming; name the technique, not remembered internals.
-- **F** — Gnomonic-vs-tangent-adjusted cube mapping distortion figures (~5.2× vs ~1.3–1.4×):
-  widely reproduced numbers, no single canonical citation; re-derive before quoting in print.
+- **D** — Gnomonic-vs-tangent-adjusted cube mapping distortion. Was **F** ("widely reproduced
+  numbers, no single canonical citation; re-derive before quoting in print"); re-derived here in
+  `figures/make_figures.py` (`fig_cube_sphere`) and now closed-form: gnomonic centre/corner is
+  `3√3` = 5.1962 and is the face minimum; tangent-adjusted centre/corner is `3√3/4` = 1.2990,
+  exactly a quarter of it, but its face minimum is the **edge midpoint** at `1/√2`, giving `√2` =
+  1.4142 across the face. The quoted 1.3–1.4 band is those two points, not an uncertainty.
+- **D** — The float32 spacing table and the 1 AU figure: `2^(floor(log2 x) − 23)`, taken from the
+  machine in `fig_float_binades`, against the `x · 2^-23` bound the table previously carried.
+  Reversed-Z's constancy and the fixed-point equivalence are the same file's `fig_depth_precision`,
+  dimensionless in `w/near`.
 - **F** — Two-partition cockpit/world depth rendering, per-regime near-plane sliding: standard
   flight/space-sim practice, no canonical paper.

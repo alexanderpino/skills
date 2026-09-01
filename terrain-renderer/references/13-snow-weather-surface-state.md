@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Snow, weather, and dynamic surface state
+description: "Snow, weather and dynamic surface state as a runtime state machine: its storage, its writers and its readers."
+tags: [terrain, snow, weather, surface-state]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T21:30:44Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Snow, weather, and dynamic surface state
 
 The generator bakes where snow and moisture *can* exist — terrain-architect `13` computes the
@@ -258,6 +268,14 @@ section is the terrain-scale approximation set that ships.
   pass and by time) drives a ramp: fresh = high roughness, full detail normal, max sparkle;
   packed (trail floors, rims) = mid roughness, flattened normals; ice = low roughness, high F0,
   normal nearly geometric. Trails then read as *material* change, not just holes.
+  ⚠️ **"High F0" is relative to the snow beside it and to nothing else — do not read it as a
+  number.** Ice's `n` is 1.311, so its normal-incidence Fresnel is **0.0181**: *lower* than
+  water's 0.0205 and less than half the 0.04 dielectric default an engine ships with. Raising
+  `F0` above that default to sell "icy" is a change the physics does not support, and it is not
+  where the look comes from — ice reads as ice through **scattering from bubbles and grain
+  boundaries**, on a mechanism that is not water's at all. The numbers, and why a blue tint on
+  water cannot produce ice, are in water-physics'
+  [phase axis](../../water-physics/references/12-water-physics.md#the-phase-axis-ice-is-not-tinted-water-and-the-mechanism-differs-twice).
 - **Overbright pitfall**: fresh snow albedo pushed to 1.0 plus boosted ambient plus sparkle
   clips into bloom and reads emissive under TAA. Cap albedo ~0.9, keep energy in the wrap term,
   and validate against a gray-card exposure test, not against "looks bright enough at noon".

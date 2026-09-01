@@ -3,18 +3,30 @@ name: terrain-renderer
 description: >-
   Principal terrain-rendering authority for real-time worlds, across every
   paradigm: heightfield LOD (clipmaps, CDLOD, CBT), cluster/meshlet virtualized geometry (Nanite
-  family), engine-native terrain (UE Landscape, Nanite Landscape, Mesh Terrain), blocky and
-  smooth voxels (greedy meshing, marching cubes, Transvoxel, dual contouring), heightfield
+  family), engine-native terrain (UE Landscape, Nanite Landscape, Mesh Terrain), blocky/smooth
+  voxels (greedy meshing, marching cubes, Transvoxel, dual contouring), heightfield
   raymarching, tiled streaming, splatmaps and virtual texturing,
-  GPU-driven culling, planetary precision, terrain lighting and shadows, water (Gerstner/FFT,
-  shore breakers, rivers, fullscreen-triangle pass, SPH/PBF fluid sim, buoyancy,
-  whitewater), snow and weather
-  state, auxiliary maps, vegetation and scatter, roads/decals/deformation, physics handoff,
-  and tool viewports. Use when drawing terrain, meshing chunks, fixing LOD seams, texturing at
-  scale, simulating water, or
+  GPU-driven culling, planetary precision, terrain lighting and shadows, water surfaces
+  (Gerstner/FFT, the shore-wave band, rivers, the fullscreen-triangle pass, pass ordering,
+  engine-native water) and real-time fluid sim (SPH/PBF, buoyancy), snow/weather
+  state, auxiliary maps, vegetation/scatter, roads/decals/deformation, physics handoff,
+  tool viewports. Use when drawing terrain, meshing chunks, fixing LOD seams, texturing at
+  scale, putting water on a world, or
   streaming large worlds - even if 'terrain' is never said (heightmap renderer, Minecraft clone,
-  planet renderer). Not for terrain generation (terrain-architect) or BRDF math
-  (physically-based-rendering).
+  planet renderer). Not for terrain generation (terrain-architect), BRDF math
+  (physically-based-rendering), or the measured physics of water - optics, IOPs, glitter,
+  caustics, foam, breaking, diffraction - which is water-physics.
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Skill
+title: Terrain Renderer
+tags: [terrain, rendering, lod, streaming]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T18:35:25Z }
+sources:
+  - id: index
+    resource: /references/00-index.md
+    title: The technique index
+# --- end okf v0.2 ----------------------------------------------------
 ---
 
 # Terrain Renderer
@@ -461,6 +473,56 @@ upgrade a tier to satisfy a question, and never fabricate a citation.** Attribut
 this skill were written from model knowledge and spot-checked for fame, not verified
 page-by-page — for publication-critical use, re-check primary sources and say so.
 
+## The physics lives in `water-physics`, and this skill routes to it
+
+Chapter `12` used to carry both halves of water: the render-side architecture *and* the measured
+physics behind every number in it. The second half is now a sibling skill, **`water-physics`**, and
+the reason is a measurement rather than a preference — it was **54 % of this skill's prose and
+100 % of its code**, one chapter of twenty, so the deepest warrant in the skill sat where terrain
+rendering is thinnest.
+
+| Question | Where |
+|---|---|
+| How do I *draw* water — surface LOD, the fullscreen-triangle pass, the shore-wave tier ladder, pass ordering, what to pre-cook, engine-native water, shoreline integration | **here**, `references/12-water-rendering.md` |
+| What *is* the number — the interface and its two Fresnel constants, IOPs and where a body's colour comes from, glitter, caustics, aerated water, shoaling and breaking, diffraction, the wave-height population | **`water-physics`** `12`, with derivations in its `12a` and provenance in its `12b` |
+
+`12`'s **diagnostic index** and **pitfall catalogue** stay here and stay whole: routing a symptom on
+screen to its mechanism is a renderer's job, and most of those routes now point across. Every number
+this skill quotes is stated with its route, so a reader can act without leaving and verify without
+guessing.
+
+For water numbers, `water-physics` carries three implementations — a pool, an open coast and a
+screen-space pass — arbitrated by **306**, **612** and **200** guarded rows.
+
+## What this skill verifies about itself
+
+Chapter `11` tells the reader to specify debug views and worst-case tests *before* implementation.
+For twenty chapters none of that was applied here, and one of the numbers this skill shipped —
+`06`'s ring-residency column — was wrong by about fifty tiles until somebody added it up.
+
+`reference-impl/` guards the arithmetic, and specifically the claims **whose errors are silent**: a
+screen-space error off by a factor of two still draws a picture, and a case table with one wrong
+entry still meshes 255 configurations correctly.
+
+    python3 reference-impl/validate_terrain.py          # 30 rows, three tiers, seconds
+    python3 reference-impl/validate_terrain.py -v       # every tolerance's justification
+    python3 reference-impl/validate_terrain.py --bugs   # prove the rows can fail
+
+| Module | Guards |
+|---|---|
+| `lod.py` | the projection identity **and its inverse** — the factor-of-two in `tan(fov/2)` that is invisible in a still frame — distance-to-nearest-point against distance-to-centre, the CDLOD morph shortfall `(1−k)·Δh`, the 2:1 crack contract and the T-junction count, skirt depth, the clipmap's whole-texel scroll |
+| `tables.py` | the isosurface case analysis **derived, not transcribed**: the cube group built from signed permutation matrices, its orbits counted, ambiguity enumerated, and the asymptotic decider's half-turn invariance — the property that makes two neighbours agree |
+| `budget.py` | pyramid and ring residency in closed form, the mip chain's exact third, the HiZ `ceil(log2)` rule tested as the property it guarantees rather than as an argument, per-request latency, Morton locality measured against row-major |
+
+⚠️ **What it cannot see, and does not claim.** There is no GPU here: nothing about throughput,
+bandwidth or driver behaviour is testable and none is asserted. The suite answers only questions of
+the form *"does this quantity equal that expression"* — which is most of what a LOD controller, a
+crack contract, a residency budget and a case table are made of.
+
+**Everything else in this skill remains curated practice with a provenance tier**, and
+`00-index.md` marks which is which. Do not present a `T`- or `F`-tier claim with the confidence
+that belongs to a guarded one.
+
 ## Routing table
 
 | Reference | Covers |
@@ -477,7 +539,7 @@ page-by-page — for publication-critical use, re-check primary sources and say 
 | `references/09-planetary-precision.md` | Precision doctrine (camera-relative, rebasing, per-patch frames); reversed-Z/log depth; cube-sphere quadtrees; orbit-to-ground LOD; horizon culling; ECEF/ENU frames; procedural-on-demand planets |
 | `references/10-lighting-shadows.md` | CSM at km scale (splits, snapping, caster culling); heightfield ray-marched and horizon-map shadows; virtual shadow maps; terrain AO/GI; normal pipeline across LOD; aerial perspective, the fullscreen-triangle skybox seam, volumetric-fog boundary, god rays (post-process vs volumetric), volumetric-cloud seams, cloud shadows; time-of-day invalidation |
 | `references/11-verification-failures.md` | **The review chapter.** Failure catalogue (symptom → mechanism → fix → route); metrics and budget assertions; test controls (flat plane, analytic terrain, teleport, flythrough); mandatory debug views; profiling method; regression strategy |
-| `references/12-water-rendering.md` | Water on terrain: surface geometry/LOD (grids, projected grid, **the fullscreen-triangle pass**), Gerstner and FFT ocean synthesis, shoal/shore-aware shallow-water waves (dispersion, shoaling, refraction, breakers, run-up, wave–current interaction; the shore-wave band; wave particles/packets), flow-mapped rivers, interactive GPU sim patches, optics (reflection/refraction/absorption, foam, underwater), shoreline integration, pass ordering; **engine-native water read as architecture** (bounded paged zones, the fused top-down water-info capture, sparse morphing quadtree surfaces, wave data assets with one CPU/GPU evaluator, the single-depth-layer volume pass and its limits) |
+| `references/12-water-rendering.md` | Water on terrain: surface geometry/LOD (grids, projected grid, **the fullscreen-triangle pass**), Gerstner and FFT ocean synthesis, shoal/shore-aware shallow-water waves (dispersion, shoaling, refraction, breakers, run-up, wave–current interaction; the shore-wave band; wave particles/packets), flow-mapped rivers, interactive GPU sim patches, **man-made bodies** (pools, tanks, canals — which bands gate off, and why pool colour is bottom albedo rather than scattering), optics (reflection/refraction/absorption, foam, underwater), **caustics** (the ray-map Jacobian, the fold/cusp structure that indicts the Voronoi fake, the tier ladder and the four-gate masking contract), shoreline integration, pass ordering; **engine-native water read as architecture** (bounded paged zones, the fused top-down water-info capture, sparse morphing quadtree surfaces, wave data assets with one CPU/GPU evaluator, the single-depth-layer volume pass and its limits) **the open coast** (shoaling and refraction over a real bed, the morphodynamic loop that builds the bar, Battjes-Janssen breaking as a *fraction of waves broken* rather than a switch, Sommerfeld diffraction as the fan a curved bay requires, the Rayleigh wave-height population, the foam realisation and its energetics, run-up and swash); and **the distribution/realisation distinction**, which is this chapter's dominant error class -- a slope PDF, a foam coverage, a swash wetness and a wave population are all *ensemble* statements, and painting one where a *draw* belongs is what makes water read as an airbrush. Companions: `12a-water-derivations.md` carries the mathematics and pseudocode (jet, eikonal wake, meniscus, footprint filter, reflected-slope ellipse, sun lobes, gathers, caustic pass, the coastal derivations) with the suite row that guards each; `12b-water-provenance.md` carries the sourcing appendix. The executable form is [`reference-impl/` and `raster-impl/`](#the-physics-lives-in-water-physics-and-this-skill-routes-to-it) -- see that section for which suite arbitrates what. |
 | `references/13-snow-weather-surface-state.md` | Seasons/snow evolution; camera-following state targets; deformable snow/mud/sand (deferred deformation); physical transient depth/compaction/melt lifecycle within the generator's envelope; post-RVT overlay doctrine; wetness/puddles/drying; VFX reaction boundary; persistence |
 | `references/14-auxiliary-maps-runtime.md` | **The aux-map consumer's manual.** Registry table (map → consumers → format → lifecycle); packing/residency/mip rules; derived-vs-shipped; cross-system fan-out and terrain/VFX/PostFX ownership; single-source-of-truth; dynamic writeback discipline |
 | `references/15-vegetation-scatter.md` | Vegetation & scatter evolution: CPU placement → GPU procedural instancing/culling; grass and wind; tree LOD/impostors/HLOD; alpha/overdraw doctrine; mandatory seating on the rendered morphed/displaced surface; weather/atmosphere consistency; budgets |
@@ -490,6 +552,7 @@ page-by-page — for publication-critical use, re-check primary sources and say 
 
 | Need | Route |
 |---|---|
+| **The physics of water**: optics and the interface, IOPs, glitter, caustics, foam, shoaling and breaking, diffraction, the wave-height population — anything where the *number* has to be right | **water-physics** (its `12`; this skill's `12` routes there for every number it quotes) |
 | Generate/modify the terrain data; erosion, biomes, masks; "rivers stop" | terrain-architect (its `08`/`27` define the data this skill consumes) |
 | BRDF math, normal-blend derivations, specular AA theory, scattering | physically-based-rendering |
 | Engine-wide architecture: job systems, allocators, render graphs, asset cooking | game-engine-guru |

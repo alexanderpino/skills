@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Index
+title: Technique Index
+description: "The technique index: every mechanism in this skill, its tier, and the chapter that owns it."
+tags: [terrain, index, routing]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T18:38:25Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Technique Index
 
 The skill's map of its own knowledge. Every row carries a **provenance tier**, because the
@@ -35,6 +45,82 @@ not been checked against the primary sources**; (2) engine-doc links (Epic, Unit
 are version-sensitive and drift. When you verify a further row, upgrading this file is the
 right fix.
 
+## Where the water physics went
+
+`12` used to be three files and an implementation. The physics half is now a **sibling skill**,
+`water-physics`, and the split was decided by measurement: chapter `12`'s family was **54 % of this
+skill's prose and 100 % of its code**, one chapter of twenty, so the strongest warrant in the skill
+sat where terrain rendering itself is thinnest.
+
+| Question | Where |
+|---|---|
+| How to **draw** water: surface LOD, the fullscreen-triangle pass, the shore-wave tier ladder, rivers, distance and filtering, shoreline integration, pass ordering, what to pre-cook, engine-native water | `12-water-rendering.md`, here — including its **diagnostic index** and **pitfall catalogue**, which stay whole because routing a symptom to a mechanism is a renderer's job |
+| What the **number** is: the interface and its two Fresnel constants, IOPs and where a body's colour comes from, glitter, caustics, aerated water, shoaling and breaking, diffraction, the wave-height population, the pool as an optics laboratory | [`water-physics` `12`](../../water-physics/references/12-water-physics.md), with derivations in that skill's `12a` and **all provenance for both chapters** in its [`12b`](../../water-physics/references/12b-water-provenance.md) |
+
+⚠️ **Rows tagged `12`, `12a` or `12b` in the master index below may point at either chapter.** The
+provenance appendix is `water-physics`'s `12b` in every case; read it before citing anything water.
+
+⚠️ **Water numbers are `water-physics`'s**, arbitrated there by suites of **306**, **612** and
+**200** guarded rows. *This* skill now guards its own arithmetic too —
+`reference-impl/validate_terrain.py`, 30 rows over screen-space error, the crack contract, clipmap
+scrolling, the isosurface case analysis and the residency budget — but **only the arithmetic**.
+Everything else here is curated practice with a provenance tier, and the tier table above says what
+each is worth. A `T`- or `F`-tier claim does not carry the confidence of a guarded one.
+
+## Figures, and the chapters that deliberately have none
+
+Every image in `references/` is drawn by one script, which imports the implementation
+**read-only** and writes no physics of its own, so a figure cannot drift from the code that ships.
+Captions live in the markdown beside the image, never in the pixels, where they can be read, diffed
+and corrected.
+
+⚠️ **That script now lives in `water-physics`**, because the implementation it reads went there —
+and it deliberately did **not** split when the skill did. Splitting it would duplicate its
+preflight or leave a stub importing across a skill boundary, and both weaken the invariant it
+exists for. It writes each figure into the directory of the chapter that uses it, so the seven
+below are written back into `terrain-renderer/references/figures/`.
+
+```
+python3 water-physics/references/figures/make_figures.py             # redraw all fourteen, into both skills
+python3 water-physics/references/figures/make_figures.py --selftest  # prove the guard can fail
+```
+
+(The fifteenth, `12a`'s foam pair, is a pair of **rendered crops** rather than a plot and is written
+by `water-physics/reference-impl/foam_evidence.py`, which needs the renderer rather than the plotter.)
+
+| Chapter | Figures | The shape each one carries |
+|---|---|---|
+| `09` | 3 | The float32 spacing **staircase** against the smooth law that bounds it; reversed-Z **flat over seven decades** while three other curves climb as one; the cube-sphere's two mappings, and the direction each is worst in |
+| `10` | 3 | The Rayleigh aureole's **ceiling of ½** with the shipped constant above it; the two receiver weights, **equal in area and nothing else**; an `acos` **folding** about solar noon |
+| `19` | 1 | The Kelvin wedge as a **ratio**, self-similar in `V·t`, and the capillary band where the ratio leaves ½ |
+
+The eight that moved with the physics — two Fresnel constants from one surface; a product that is
+not a mean; a series and its bound; a distribution painted where its realisation belongs, twice;
+Sommerfeld's exact half; a width that is a function; and an integral still climbing where every
+instrument stops — are in
+[`water-physics`](../../water-physics/references/12-water-physics.md) and its `12a`.
+
+**The twenty-chapter gap is deliberate elsewhere, and the reasons are the useful part.** A figure
+earns its place when a claim has a **shape** — a curve that crosses, two factors that diverge, a
+distribution against a realisation, a bound something clears. It does not earn its place when the
+claim is a number, a table or an identity. Recorded so a later round does not re-litigate them:
+
+| Chapter | Considered | Rejected because |
+|---|---|---|
+| `01` | The T-junction sparkle — a vertex exactly on a coarse edge that still leaks | Real, and drawable, but only by putting a **rasterizer inside the generator**. The generator's charter is that it contains no implementation; a figure is not worth breaking it for |
+| `01` | Distance-to-centre vs distance-to-closest-point; the CDLOD morph shortfall | `d_centre/d_nearest` is a ratio of two lengths and the crack from `morphK = 0.98` is `(1 − morphK)·Δh` — both are **identities**, and their pictures are a hyperbola and a straight line |
+| `06` | Ring cut vs whole pyramid resident | A geometric series against a constant one — an identity. Every number in the worked example is a **chosen parameter with no implementation behind it**, so the figure would re-typeset a table. Checking the table instead of drawing it found an arithmetic error the picture would have inherited (the ring column sums to ~205 tiles, not 255) |
+| `07` | The mip halo from independently filtered weights and content | The defect is real and is the same class as `12`'s slope filtering, but showing it needs an **invented weight ramp and two invented layer colours**. "Same mathematics as non-premultiplied alpha halos" already names a known class, which is sharper than a picture of this file's own test case |
+| `08` | The HiZ footprint's mip selection | Suspected the stated rule under-samples straddling rects. **Checked it: the rule is sound** — `ceil(log2 w)` puts the rect at ≤1 texel, so a 2×2 fetch always spans it. No figure, and no correction needed |
+| `08` | LOD/occlusion hysteresis as a loop | "Split at `tau`, merge at `tau·h`" is already the clearest statement; the loop adds a rectangle |
+| `10` | CSM split schemes: uniform vs log vs the `lambda` blend | The **strongest rejection in the set**, and the closest call. It has a genuine shape — texels-per-screen-pixel diverging by orders of magnitude near the camera — but near, far, cascade count and shadow resolution would all be **numbers this file chose**, with nothing shipping behind them. The round's rule is that a figure's numbers come from something that ships |
+| `11` | Anything | Unchanged from the previous round: "a ratio cannot see a common factor" is an algebraic identity, and a picture would illustrate the scene rather than the mechanism |
+| `19` | Particle count scaling with volume | `8×` for a doubled linear size is a cube law stated in four words |
+
+The remaining chapters — `02`–`05`, `13`–`18` — have no implementation behind their quantitative
+claims anywhere in this skill, which is the same reason and the one the project's contract already
+names as its largest unproven region. **An invented number in a figure is worse than no figure.**
+
 ## Master technique index
 
 | Technique / topic | Chapter | Canonical source | Tier | Link |
@@ -49,6 +135,8 @@ right fix.
 | CBT/LEB (GPU subdivision) | `01` | Dupuy, HPG 2020 (PACM CGIT) | P | [onrendering.com PDF](https://onrendering.com/data/papers/cbt/ConcurrentBinaryTrees.pdf) |
 | Skirts / stitching / morph / matched factors (crack taxonomy) | `01` | Folklore, consolidated | F | — |
 | Hex-lattice triangulation (corner-only 2N / center-fan 3N / flat prism) | `01` | terrain-architect `26` catalog, restated render-side | D | — |
+| Neural texture compression (cooperative vectors / SM 6.9) | `07` | NVIDIA RTXNTC and Intel TSNC SDKs; D3D12 Cooperative Vector API | D/T | ⚠️ **frontier, not shipped in games as of 2026-08**; ratios 16:1–32:1 claimed, one vendor demo 6.5 GB → 970 MB. Re-verify before quoting — fastest-moving row in this file |
+| 3D Gaussian splatting as a far representation | `06` | Kerbl et al., SIGGRAPH 2023; engine integrations and `KHR_gaussian_splatting` in flight | P/D | ⚠️ **frontier**; established terrain use is capture/previs, not the authored far world. No streaming LOD comparable to an SSE-driven pyramid, no collision, does not compose with the deferred path |
 | Cluster DAG build (group→simplify→split), monotonic error | `02` | Karis, Stubbe & Wihlidal, "Nanite: A Deep Dive", SIGGRAPH 2021 Advances | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2021/Karis_Nanite_SIGGRAPH_Advances_2021_final.pdf) |
 | Two-phase HiZ occlusion culling | `02` `08` | Nanite talk lineage + community practice | T/F | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2021/Karis_Nanite_SIGGRAPH_Advances_2021_final.pdf) |
 | Software raster of micro-triangles, 64-bit visibility buffer | `02` | Karis, Stubbe & Wihlidal 2021 | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2021/Karis_Nanite_SIGGRAPH_Advances_2021_final.pdf) |
@@ -127,6 +215,13 @@ right fix.
 | Volumetric cloudscapes (terrain seams: depth, one sky state) | `10` | Schneider, "The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn", SIGGRAPH 2015 Advances | T | [advances.realtimerendering.com](https://advances.realtimerendering.com/s2015/The%20Real-time%20Volumetric%20Cloudscapes%20of%20Horizon%20-%20Zero%20Dawn%20-%20ARTR.pdf) |
 | God rays: screen-space post-process form | `10` | Mitchell, "Volumetric Light Scattering as a Post-Process", GPU Gems 3 ch. 13 | P/D | [developer.nvidia.com](https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-13-volumetric-light-scattering-post-process) |
 | Ocean/water shading (Bruneton model family) | `12` | Bruneton, Neyret & Holzschuch, CGF 29(2), 2010 | P | [inria.hal.science](https://inria.hal.science/inria-00443630) |
+| Image-space caustic maps (refract from the light's view, splat receiver positions) | `12` | Shah, Konttinen & Pattanaik, *IEEE TVCG* 13(2), 2007, 272–280; Wyman & Davis, I3D 2006, 153–160 | P | [IEEE Xplore](https://ieeexplore.ieee.org/document/4069236/) |
+| Water caustics, practical/aesthetic build | `12` | Guardado & Sánchez-Crespo, "Rendering Water Caustics", GPU Gems 1 ch. 2 — self-described as aesthetics-driven, not physical | D/F | [developer.nvidia.com](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-2-rendering-water-caustics) |
+| Caustic structure: brightness as inverse ray-map Jacobian; folds and cusps only (the argument against Voronoi caustics) | `12` | Whitney, *Annals of Mathematics* 62 (1955) for the fold/cusp classification; Berry & Upstill, "Catastrophe Optics", *Progress in Optics* 18 (1980), 257–346 for the optics reading | P | [ADS](https://ui.adsabs.harvard.edu/abs/1980PrOpt..18..257B/abstract) |
+| Offline-correct caustics (photon mapping, manifold methods, the `SDS` limit) | `12` → PBR | Routed out: `physically-based-rendering/references/caustics.md` | P | — |
+| Water vocabulary: OpenPBR Surface names the boundary (`transmission_color`/`transmission_depth` as Beer–Lambert, `specular_ior`, `base_color`), ocean optics' inherent/apparent optical properties name the medium (`a`, `b`, `b_b`, `c`, `g`) and what a renderer computes from it (`K_d`, reflectance) | `12` | OpenPBR Surface specification; Preisendorfer's IOP/AOP division as standard ocean-optics usage (attribution to *Hydrologic Optics* not chased, `?`). MaterialX checked and found to name the medium's optics only (`anisotropic_vdf`: `absorption`/`scattering`/`anisotropy`) and no bounded body, depth field or pass vocabulary | P/? | [materialx.org PBR spec](https://materialx.org/assets/MaterialX.v1.38.PBRSpec.pdf) |
+| Man-made water bodies (pools, tanks, canals): which bands gate off; colour as bottom albedo, not scattering | `12` | This skill's composition over the Pope & Fry pure-water absorption already cited in `12`; the body-type extension is authored-side, never classified by terrain-architect `03` | F | — |
+| Driven-basin pool wave field: two-band split (jet-driven long band + wind short band), shelter on the short band only, reverberant wall reflections, submerged-jet footprint and its ±19° downstream wake baked per fitting | `12` | This skill's composition over classical results (Lamb viscous decay, free-shear-jet scaling, capillary–gravity minimum phase speed, wave–current ray theory); no canonical source for the pool application — see the ledger | P/F/? | — |
 | Deferred snow/mud deformation | `13` | Michels & Sikachev, GPU Pro 7 (talk form SIGGRAPH 2015); Barré-Brisebois, GDC 2014 (Batman); Surricchio, GDC 2023 (God of War Ragnarök) | P/T | [gdcvault Batman](https://gdcvault.com/play/1020177/Deformable-Snow-Rendering-in-Batman) |
 | Wet-surface shading (porosity darkening, roughness drop) | `13` | Lagarde, "Water drop" blog series, 2012–2013 | F/D | [seblagarde.wordpress.com](https://seblagarde.wordpress.com/2013/03/19/water-drop-3a-physically-based-wet-surfaces/) |
 | Transient season/weather overlays after RVT | `07` `13` | Cache-coherency doctrine; bounded local invalidation in engine docs, global-state exclusion is practice | D/F | [dev.epicgames.com](https://dev.epicgames.com/documentation/en-us/unreal-engine/runtime-virtual-texturing-in-unreal-engine) |
@@ -201,8 +296,10 @@ title as T/F tier unless a named talk is in hand.
 
 ## Least-confident-claims ledger
 
-Each chapter ends with `## Sources & provenance`; the claims their authors flagged as least
-certain are consolidated here so a reviewer knows where to spend verification effort first.
+Each chapter ends with `## Sources & provenance` — except `12`, whose appendix outgrew the chapter
+and now lives in `12b-water-provenance.md`, with a pointer left at both ends of `12`. The claims
+their authors flagged as least certain are consolidated here so a reviewer knows where to spend
+verification effort first.
 
 - `01`: GPU Zen 2 compute-tessellation attribution — **resolved 2026-07**: confirmed as
   Khoury, Dupuy & Riccio, "Adaptive GPU Tessellation with Compute Shaders", *GPU Zen 2* (2019);
@@ -261,14 +358,49 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   group speed in that chapter's snippet was corrected 2026-08 (`c_g = √(g·d)`; the earlier
   `½√(g·d)` was the deep-water relation). Energy-spectrum sections (sea states / calm / aerated,
   2026-08): Beaufort descriptors are verbatim from NOAA SPC (D-tier, fetched); Douglas/WMO
-  adoption dates conflict across secondary sources and are deliberately not asserted; the capillary
-  minimum (23.1 cm/s @ 1.73 cm) and Kelvin angle were verified against standard references; foam
+  adoption dates conflict across secondary sources and are deliberately not asserted; the Kelvin
+  angle was verified against standard references. **The capillary minimum was recorded here as
+  "verified as a pair" and the pair was not consistent** (corrected 2026-08): 23.1 cm/s implies
+  `σ = 0.07256 N/m` and 1.73 cm implies `σ = 0.07437 N/m`, 2.5% apart. Each half is inside the
+  published spread for clean water, so each survived being checked alone — which is what a
+  pair-check is *for*, and this entry claimed one that had not been made. `12` now **declares one
+  `σ` (0.0728 N/m, `reference-impl/wake.py::SIG`) and derives both halves from it** — 23.12 cm/s at
+  1.712 cm — so the two cannot drift apart again; the constant is `P/?` and the two closed forms
+  are `D`. Nothing downstream moved at the quoted precision: this was a provenance defect, not a
+  numerical one. Foam
   optics are from Dierssen 2019 (fetched; sole author verified); the waterfall
   sheet→ligament→droplet cascade is classical instability theory with no waterfall-specific
   canonical citation; the pure-water RGB absorption triple was corrected 2026-08 to match its
   stated 610/550/450 nm sample points. Glacial-flour turquoise upgraded from synthesis-only to
   P/synthesis — corroborated by glacial-lake reflectance studies (MRD 37(1) 2017; ERL 17 2022),
   the Rayleigh explanation stays refuted.
+- `12` (man-made water — the chapter's most speculative block, and the one to verify first):
+  the **driven-basin** account of a pool's wave field is this skill's composition, not a cited
+  model. Its ingredients are classical (Lamb's `α = 2νk²`, the capillary–gravity minimum phase
+  speed, free-shear-jet spreading and `1/s` decay, wave–current ray theory) but the assembly is
+  not, and three pieces are weaker than the prose density suggests. (1) The **submerged-jet
+  footprint**: the jet scaling is textbook, its numerical constants are model-knowledge, and the
+  surface-deformation link `η ~ C·u'²/g` carries an **O(1) constant that is genuinely unknown**
+  (`C = 1` was used) — which is why the chapter states near-field roughness as a *ratio* to the far
+  field, and why an absolute rms slope must not be quoted from it. (2) The **±19° energy fan** and
+  the crest curvature are outputs of integrating the ray equations through a modelled drift field,
+  reproducible but not measured; the supercritical conclusion (no ring system, no Kelvin wedge)
+  is the durable part and follows with no free parameter. (3) **Inextensible-film damping**
+  `α ≈ 0.35·k·√(νω)`: the Stokes-layer structure is solid, the prefactor could not be confirmed
+  against a primary source, so the 3–9× factor is indicative. Also unmeasured: "tiled walls are
+  near-total reflectors" is an argued approximation, not a figure. The pool-optics worked example
+  is arithmetic done in-chapter over Pope & Fry absorption sampled at the chapter's own RGB points
+  (610/550/450 nm — **not** the 418 nm absolute minimum, which is below a typical blue channel);
+  the liner albedos are representative values, not product data. Two items added 2026-08 and both
+  **open** rather than uncertain: the submerged vertical face's sky share is *located* — the window
+  is 0.199 of a horizontal face at the same depth against the 0.390 the reference implementation
+  hands it — but **not fixed**, because closing it needs the mirror's missing bounces at the same
+  time and moving the sky constant alone runs the wrong way; and the caustic read on a vertical face
+  is corrected to the refracted beam's continuation yet is still a **proxy**, since the bed's map is
+  focused at each texel's own depth and the honest fix is to rasterise those faces into their own
+  caustic map. The artefact figures attached to the second (41% arc rms, stripe rms 1.372 → 0.816,
+  z/arc 0 → 0.941) are the implementation's own printed diagnostics on one frame and were not
+  independently re-derived.
 - `12`, `03` (engine-native water, added 2026-08): every claim in the UE Water sections is D/N-tier
   engine documentation fetched 2026-08 — architecture, quadtree/tile defaults, body types and spline
   metadata, Landmass brush modes and the edit-layers requirement, Single Layer Water's inputs and its
@@ -279,6 +411,51 @@ certain are consolidated here so a reviewer knows where to spend verification ef
   amortization property names, which came from search snippets rather than a fetched page (`?`).
   Community reports of version-specific Water breakage under World Partition are forum-tier and are
   flagged, not asserted. Everything here drifts by engine release; re-verify constants at time of use.
+- `10`, `12`, `12b` (illuminants and the submerged hemisphere, added 2026-08): the **general
+  results are derived and closed** — that an illuminant is a cosine integral of the scene's own sky
+  and is therefore a property of the *receiver's orientation* (weights `cos θ sin θ` and `sin² θ`,
+  equal at exactly ½ only under a uniform sky); that a disc lobe carrying the beam must be excluded
+  from that integral while the aureole must be included; and that the Rayleigh aureole's share of
+  any receiver is `⟨cos²Θ⟩_w/(1 + ⟨cos²Θ⟩_w)`, hence **≤ ½ pointwise and exactly ¼ over the
+  sphere**, for any optical depth and any solar elevation. Those need no verification effort: they
+  are moments of a phase function and an integral of the cosine law. What is **open**: the sky
+  *gradient* the two lobes sit on is not derived from anything — single-scattered Rayleigh gives
+  only a lower bound of 0.55 / 0.58 / 0.49 on it, missing orders ≥ 2 and the ground return (`?`);
+  the reference run's band-irradiance **total** does not equal the sum of its own components
+  (6.7 / 12.0 / 11.5 % apart, not a constant), so one of the two is wrong and this skill does not
+  know which (`?`); and the observation this whole line of work chases — a submerged wall reading
+  *lighter* than the dry band above it, on every side — **still does not emerge** now that both
+  halves of the wall's upper hemisphere have been derived and its source illuminant with them. The
+  render sits at 0.513 where the observation requires > 1. That supersedes the "located but not
+  fixed" note in the block above: the sky share **is** fixed (0.199 in place of 0.390) and the
+  mirror's bounces **are** carried to a fixed point with a measured residual bound, and the
+  remaining factor of ~1.95 belongs to neither. Either something is still missing from both sides,
+  or the observation and this physics disagree — and that is the state to leave it in.
+- `12` (fouling, added 2026-08): **the whole section is a specification and nothing in it has been
+  rendered.** The mechanism (three driver fields; stagnation from one Laplace solve; two unaligned
+  drivers, so an AO-driven grime mask is backwards for one of them; patchiness as a linear
+  instability of the roughness–deposit feedback) is argued and two pieces of it are derived here —
+  the corner exponent `|u| ~ r^(π/α − 1)` and the instability threshold. **Everything chemical and
+  biological is `?`**: which organism dominates where, every rate, and the per-material
+  susceptibility orderings. A weathering *rate* is not renderable input at all, which is the
+  section's own argument for stating susceptibility instead — verify the orderings against a
+  materials source before quoting them, and do not quote numbers, because none are given.
+- `12`, `12b` (the sea reference set, added 2026-08): the transfer table is bookkeeping over results
+  already provenanced, and **`b_b ≈ 0` is the single entry that does not carry from a pool to the
+  sea**. The observational rulings (a backlit wave reading green while the same water reads
+  grey-blue two metres away; reveals-and-stays-put against hides-and-pulses; two clouds separated by
+  lifetime) are readings of owner photographs, reproducible by anyone with a camera and a coast, and
+  none is a calibration. **`?`**: no spectrum was extracted from any frame, so the coastal IOPs
+  remain unmeasured and the CDOM/chlorophyll attribution is an identification; the sediment
+  entrainment law and fall velocity are named for shape only; the multivalued free surface under a
+  plunging lip is stated as a representation change with no route proposed. The reference set has a
+  **named gap** — no frame catches the backwash lifting sand — and filling it by inference from the
+  other eight is exactly the move the gap exists to prevent.
+- `11` (verifying an approximation, added 2026-08): the claim that a photographic bar cannot verify
+  an approximation rests on one episode (four transport faults of 5–25%, every one invisible in
+  frame) plus arithmetic through the sRGB transfer function that is exact but is a property of *that*
+  view transform — recompute it for a filmic curve or for PQ before quoting the levels. The three
+  preconditions are house doctrine (**F**), not a cited methodology.
 - `19`: PCISPH (Solenthaler & Pajarola 2009), IISPH (Ihmsen et al. 2014), DFSPH (Bender & Koschier
   2015) and the Kelvin-wake citation (Thomson 1887) were all **web-verified 2026-08** — the `?`
   flags are cleared. Probe-point buoyancy, the spray/foam/bubble split, domain-fade fractions and

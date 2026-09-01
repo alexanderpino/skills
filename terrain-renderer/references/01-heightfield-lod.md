@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Heightfield LOD: from geomipmapping to CBT"
+description: Heightfield level of detail from geomipmapping to concurrent binary trees, with the screen-space error metric that orders them.
+tags: [terrain, lod, clipmap, cdlod, cbt]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-30T09:56:09+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Heightfield LOD: from geomipmapping to CBT
 
 This chapter owns the LOD machinery for regular-grid heightfield terrain: the screen-space

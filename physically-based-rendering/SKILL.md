@@ -2,18 +2,19 @@
 name: physically-based-rendering
 description: >-
   Expert knowledge of physically based rendering (PBR) and photorealistic image
-  synthesis across both offline path tracing and real-time rasterization. Covers the
+  synthesis across offline path tracing and real-time rasterization. Covers the
   rendering equation, microfacet BRDF theory (GGX, Smith, Fresnel/Schlick/F82),
-  diffuse and sheen models, energy conservation, and production material models
+  diffuse/sheen models, energy conservation, production material models
   (Cook-Torrance, Disney Principled, glTF 2.0 metallic-roughness, Unreal/Unity,
   Autodesk Standard Surface, OpenPBR 1.1.1), plus material/node graphs (MaterialX),
-  shader implementation (HLSL/GLSL), image-based lighting and split-sum, importance
-  sampling, baked LUTs/curve atlases, volumes and subsurface scattering, texture
-  authoring, color management, scene integration, and debugging.
-  Use whenever the task involves PBR, photorealistic or physically based rendering,
-  BRDF/BSDF math, surface shaders, path or ray tracers, material authoring, OpenPBR,
-  Disney Principled, glTF materials, MaterialX or material graphs, IBL, GGX, Fresnel,
-  curve atlases or baked LUTs, roughness or metalness, or subsurface scattering — even
+  shader implementation (HLSL/GLSL), image-based lighting/split-sum, importance
+  sampling, baked LUTs/curve atlases, volumes/subsurface scattering, caustics, texture
+  authoring, color management, scene integration, debugging.
+  Use whenever the task involves PBR, photorealistic/physically based rendering,
+  BRDF/BSDF math, surface shaders, path/ray tracers, material authoring, OpenPBR,
+  Disney Principled, glTF materials, MaterialX/material graphs, IBL, GGX, Fresnel,
+  curve atlases/baked LUTs, roughness/metalness, subsurface scattering, or
+  caustics/photon mapping — even
   if "PBR" is never said.
 ---
 
@@ -153,6 +154,19 @@ The exact precomputed data the OpenPBR reference implementation uses: energy
 compensation LUTs, the LTC fuzz table, their dimensions/axes, and array- vs.
 texture-mode trade-offs (plus what to substitute in real time).
 → **`references/openpbr-luts-and-data.md`**
+
+### 11. Caustics & difficult specular transport
+Why caustics break the standard estimator rather than merely costing more: the ray-map
+Jacobian and its fold/cusp structure, Heckbert path notation, why NEE cannot sample
+through a delta vertex, the `SDS` case that defeats BDPT, photon mapping and its
+progressive forms, manifold methods (manifold exploration, MNEE, specular manifold
+sampling), the production controls (caustic flags, roughness clamping, firefly and
+denoiser handling), dispersion and reflective caustics, and a symptom→cause table.
+→ **`references/caustics.md`**
+*Use for "why are my caustics black/noisy/too soft", picking a caustic-capable
+integrator, or the theory behind a real-time caustic approximation. Real-time **water**
+caustics — caustic maps, depth and shadow gating — belong to `terrain-renderer`'s
+`references/12-water-rendering.md`, which routes its theory here.*
 
 ## General guidance
 

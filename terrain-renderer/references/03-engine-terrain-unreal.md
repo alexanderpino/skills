@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Engine-Native Terrain: Unreal Landscape & Friends"
+description: "Engine-native terrain systems: Unreal Landscape, Nanite Landscape and Mesh Terrain, and what each one fixes the shape of."
+tags: [terrain, unreal, landscape, engine]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T18:38:25Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Engine-Native Terrain: Unreal Landscape & Friends
 
 This chapter owns the engine-native terrain systems — primarily Unreal's Landscape and its UE5
@@ -439,6 +449,29 @@ per tile creates height discontinuities at tile borders; one Z scale for the who
       ceiling — **?** verify current mobile landscape limits per feature level).
 - [ ] Material permutations counted for the mobile feature level separately; VT support on target
       devices confirmed before relying on RVT.
+
+## The version horizon, and why this chapter dates faster than the rest
+
+Everything above is written against **UE 5.8**, the current production release as of 2026-08, and
+every constant in it drifts by release — which is why `00-index.md` marks this whole chapter
+version-sensitive and tells you to re-verify at time of use rather than quoting it.
+
+⚠️ **UE 6 is announced and not shipped.** Epic targets **Early Access at the end of 2027**, with
+Nanite and Lumen successors named. Two consequences worth planning around, and neither is a reason
+to wait:
+
+- **Nothing in this chapter's *contracts* is expected to move.** The import contract, the edit-layer
+  requirement, the LWC/World Partition boundary and the RVT capture discipline are shapes of the
+  problem, not of the release. Code written against them survives.
+- **Every *number* in it should be assumed stale on a major version.** Tile defaults, component
+  sizes, feature maturity flags: re-measure, do not re-quote. The failure mode this chapter attracts
+  is a reader carrying a default from one release into another and debugging the difference for a
+  week.
+
+**The general rule this chapter is an instance of.** A skill that pins itself to an engine version
+has two half-lives: the doctrine's, which is long, and the constants', which is one release. Keep
+them visibly separate — that is what the `D`/`N` tiers are for — and a version bump is a re-check
+rather than a rewrite.
 
 ## Appendix: other engines in brief
 

@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Smooth Voxel Terrain: Isosurface Extraction & LOD"
+description: "Smooth voxel terrain: isosurface extraction, the marching-cubes case count and its ambiguous faces, dual methods, and LOD across chunk seams."
+tags: [terrain, voxel, isosurface, marching-cubes, dual-contouring]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T18:35:25Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Smooth Voxel Terrain: Isosurface Extraction & LOD
 
 You are rendering a scalar field somebody else authored — the density/SDF comes from the
@@ -77,10 +87,39 @@ vertex goes* and *which cells own triangles*.
 **Marching Cubes (Lorensen & Cline 1987).** Primal method: vertices live **on grid edges**,
 triangles live inside cells. Each cell's 8 corner signs form a 256-entry case index, reduced by
 symmetry to 15 base cases; a triangle table maps case → edge triples. Vertex position is linear
-interpolation along the crossing edge: `t = d0 / (d0 - d1)`. The raw 15-case table is
+interpolation along the crossing edge: `t = d0 / (d0 - d1)`.
+
+⚠️ **"Fifteen" is a count under a *specific* symmetry group, and the literature quotes four
+different numbers for this one algorithm.** Computed here by building the cube group from signed
+permutation matrices and counting orbits of the 256 sign masks (`D`,
+[`reference-impl/tables.py`](../reference-impl/tables.py), guarded by `validate_terrain.py`):
+
+| symmetry allowed | classes |
+|---|---|
+| rotation + complement, **no reflection** | **15** — the familiar number |
+| rotation + reflection + complement | **14** — two of the fifteen are mirror images and nothing else |
+| rotation alone | 23 |
+| rotation + reflection | 22 |
+
+This is not pedantry: **an implementer copying a table whose author allowed a different group gets
+a subtly different expansion**, and the symptom is holes in one configuration out of 256 — on some
+meshes, sometimes. Check which group your source assumed before you check its triangles.
+
+⚠️ **And the ambiguity is not a corner case.** Counted by enumeration: **120 of the 256
+configurations carry at least one ambiguous face** — 47% — so "marching cubes sometimes leaves
+holes" is a near-certainty on real data rather than bad luck. The raw table is
 **ambiguous**: cases with diagonal corner pairs (face ambiguity, and the interior ambiguity of
 case 4/13 families) can be triangulated two ways, and adjacent cells choosing inconsistently
-punch holes in the mesh. Production answer: use an extended, consistency-resolved table (the
+punch holes in the mesh.
+
+**Why the asymptotic decider closes the hole, in one property.** On a face, trilinear
+interpolation restricts to a *bilinear* function whose contour is a hyperbola with a saddle at
+`S = (f_a f_c − f_b f_d)/(f_a + f_c − f_b − f_d)`; the sign of `S` says which diagonal pair the
+contour joins. The decisive part is that **`S` is a function of the shared face's four values
+alone, and is invariant under the face's own half-turn** — so two neighbouring cells, which
+enumerate that face starting from different corners, reach the *same* answer and cannot disagree.
+Any per-cell choice, however consistent-looking, disagrees half the time. Both properties are
+guarded rows. Production answer: use an extended, consistency-resolved table (the
 asymptotic-decider / MC33-style corrected tables — resolve the ambiguous face by the sign of the
 bilinear saddle point) or simply take Lengyel's published Transvoxel tables, which are
 hole-free and come with the LOD transition tables you will need anyway (see next section).

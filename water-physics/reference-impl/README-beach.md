@@ -1,0 +1,5316 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Implementation Notes
+title: The beach at Aljezur — bathymetry, the wave transform, and the bar
+description: "The open coast at Aljezur: bathymetry and the morphodynamic loop, the wave transform, diffraction, foam as a realisation, and the camera."
+tags: [water, coast, waves, foam, suite]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
+# The beach at Aljezur — bathymetry, the wave transform, and the bar
+
+A second reference scene, built to the same standard as the pool: the physics is
+computed, every constant is derived beside itself or cited, and the tests check
+it against things that were not written here.
+
+**`beach_render.py --scene` is the entry point.** Everything else in this file is a
+record of how the scene got here, section by section, and each `main_wave*` in
+`beach_render.py` still draws the scene as it stood when the physics that section
+describes was built. Only `--scene` draws it as it stands now.
+
+    python3 beach_render.py --scene   # THE CURRENT SCENE: frames J, K and F, with
+                                      # the reach of each branch counted off the
+                                      # buffer it drew
+    python3 beach_render.py --scene --fast     # the same code path at 180 x 240
+    python3 beach.py             # the loop, and a page of diagnostics
+    python3 validate_beach.py    # the suite; -v prints every tolerance's reason
+    python3 validate_beach.py --bugs          # the deliberate defects, one at a time
+    python3 validate_beach.py --bugs-camera   # the camera defects
+    python3 validate_beach.py --bugs-land     # the land/air defects
+    python3 beach_evidence.py    # the diagnostic figures, into evidence/
+    python3 beach_render.py      # the earliest frame set, kept as its own evidence
+
+| File | Owns |
+|---|---|
+| `beach.py` | The bed, the wave transform, radiation stress, the currents, the sediment flux, Exner and the ray tracer in 1-D; the coastal loop, the plan-view bed, the 2-D wave transform and the 2-D morphodynamic loop; the offshore climate's partitions; the wave-height population. No prints on import; every diagnostic is in `_print_report`. |
+| `beach_plot.py` | Axes, polylines and labels into a PIL image. No physics. |
+| `beach_evidence.py` | The diagnostic figures. Reads `beach.py`, computes nothing of its own. |
+| `beach_optics.py` | The coastal IOPs — the three constituents, the Babin bridge, the suspension balance, the two transports, the cuvette inversion, Cox & Munk's glitter (as a **limit** of the derived spectrum, not an input) and the foam optics. No rendering, no scene, no prints. |
+| `beach_render.py` | The camera, the ray cast, the shading, the frames, and `--scene` with `scene_reach`. Every measurement taken from the scene-linear buffer before the tone map. |
+| `beach_camera.py` | Where the photograph was taken from — the lens table, the horizon dip, the frame projection, the surf-line separation and its closed-form ceiling, and the two frame inferences with their intervals. No scene, no rendering, no prints on import. |
+| `beach_diffract.py` | Sommerfeld's half-plane, Penney & Price's water waves, and the **fan** an embayment requires — reached through `run_bay(diffract=...)`, which makes it the offshore boundary condition rather than a module the suite exercises alone. |
+| `beach_foam.py` | The white: the covering measure both sources add into, Monahan's wind law, the Boolean realisation and its texture. |
+| `wind_spectrum.py` | The wind-wave spectrum the slope statistics are **derived** from, with Cox & Munk recovered as its large-scale limit. |
+| `validate_beach.py` | The suite — a list of guarded **sections** — three tiers, the deliberate-bug harness, and the reach section that asks whether a shipping caller reaches each of them. |
+
+**Nothing here touches the pool.** `optics.py` and `atmosphere.py` are imported
+and never copied; `render.py`, `field.py`, `wake.py` and `validate.py` are not
+sliced and not modified. This scene only ever *adds* files, so `render.py`'s
+seventeen frame hashes cannot have moved, and `validate.py` has been re-run at
+the end of every section below and has never changed its verdict. The one place
+the shared modules would not stretch is written up as a finding (`F6`) rather
+than patched.
+
+⚠️ **The pool's suite has grown since the earliest sections were written, and
+they quote what it read at the time.** Every `285 pass / 0 FAIL / 54 info` below
+is a *contemporaneous* reading, kept because a section that says "unchanged"
+means unchanged *from its own baseline*. The current standing is
+**306 pass / 0 FAIL / 64 info**, and the same is true of the beach's own counts:
+read a number in a section against that section, and read the current standing
+off a run.
+
+The import is load-bearing rather than ceremonial: `atmosphere.solar_position`,
+given the surf frames' own place and clock, returns **27.165° apparent /
+268.310° / air mass 2.182** against the bar's stated 27.17 / 268.31 / 2.182 —
+the pool's ephemeris, checked against a document it has never seen, and three
+rows of this suite. `optics.ABS` shades the plan-view depth figure, so even the
+diagnostic's colour ramp is the pool's water rather than a colormap.
+
+## The evidence
+
+Into `reference-impl/evidence/`, all eighteen regenerated by `beach_evidence.py`, plus the rendered frames from `beach_render.py` — which writes `s6-` only, because `s4-` and `s5-` are the earlier terms of a comparison and overwriting either destroys it:
+
+| figure | what to look at |
+|---|---|
+| `s1-profile-bar.png` | the Dean ramp in, the bar out, with `H_b/γ` drawn across it |
+| `s1-wave-transform.png` | `H(x)` against `γd`, and `H/d` crossing γ at the bar |
+| `s1-flux-convergence.png` | the two fluxes, their crossing, and the Exner rate it produces |
+| `s1-plan-depth.png` | the plan-view depth field, rip channels stamped, contours at 1/2/3/5 m |
+| `s1-refraction-rays.png` | rays over the curved contour — convergent on the bar, divergent over the rip |
+| `s1-shoaling-green.png` | Green's law reached in the limit, and missed on the real beach, with both exponents |
+| `s1-storm-migration.png` | crest depth against `H_b/γ` over five sea states |
+| `s1-evolution.png` | the bar growing out of the monotone ramp, sampled as the loop runs |
+
+Wave 5 added one plot and three frames:
+
+| figure | what to look at |
+|---|---|
+| `s5-surface-shape.png` | **the deliverable**: the surface at three depths against the sinusoid it replaces; the second harmonic asked for against the ceiling allowed; the Ursell number against the Stokes/cnoidal boundary; and the steepest face against 30° and 41.48° |
+| `s5-bay-render.png` | the pair to `s4-bay-render.png` — same camera, bed, optics, sun and phase, one field changed |
+| `s5-face-render.png` | the surf zone close up, linear (left) and nonlinear (right), one camera, `r` zeroed on the left |
+| `s5-glitter-render.png` | section K's frame re-run on the nonlinear surface; unchanged, because the glitter is a statistic of the *unresolved* slopes |
+
+Wave 6 added four, all `s6-`:
+
+| figure | what to look at |
+|---|---|
+| `s6-bay-render.png` | **the deliverable**: the third frame at the `s4-`/`s5-` camera, with bar section C's three mechanisms in place of the foam placeholder. Compare the three side by side — one camera, one bed, one sun, one field changed each time |
+| `s6-entrained-air.png` | the paired control: **left** the entrained-air medium removed, **right** in place. One field changed, and the bed's radiance out of the water measured absolutely in both — section C's own test, answered with a number |
+| `s6-glitter-whitecap.png` | the glitter path and the open-water whitecapping in one frame at one `U₁₀`, both measured back off the scene-linear buffer and both inverted to a wind |
+| `s6-clocks.png` | section E drawn: three decay curves on a **log** axis, with the plume's own spread shaded across the bubble sizes, and Monahan's coverage law beside them |
+
+Wave 7 added two, both `s7-`, and they are the first frames in this project shot at a viewpoint and a framing inferred from an owner photograph rather than chosen:
+
+| figure | what to look at |
+|---|---|
+| `s7-frame-J.png` | **the deliverable**: bar section J's framing — upright, 0.5× ultrawide, from the bed's own cliff brow, at the inferred depression. Read the caption first: the frame is a *gap list*, and the two biggest gaps are that half of it is a declared albedo and that bar J's five-rung colour ladder has three rungs |
+| `s7-frame-K.png` | bar section K's framing — upright, same camera code and same lens, aimed down the sun's own azimuth. The glitter path narrows toward the horizon and spreads toward the observer, which is K1's own prediction; the seam at the sea–sky horizon is the tell K2 warns about, measured at 53% |
+
+Wave 3 added four, all `s3-`:
+
+| figure | what to look at |
+|---|---|
+| `s3-bay-plan.png` | **the deliverable**: the whole embayment in plan — computed depth, the wave crests as contours of the marched phase, the breaking mask — beside the same bed with refraction frozen. Framed to lie next to bar section J |
+| `s3-coastal-loop.png` | the shoreline through the coastal run, the geology beside the retreat it produced, chapter 12's uniform-rock counter-case, and one profile with the cliff and the bench on it |
+| `s3-refraction-oblique.png` | Snell about a **rotated** normal, on a march that has never heard of the rotation — the first refraction test in this project that does not pass by construction |
+| `s3-bar-alongshore.png` | the bar, the surf line and the shore station by station; the crest depth against `H_b/γ` in one field and in two |
+
+Wave 2 added five, all `s2-`:
+
+| figure | what to look at |
+|---|---|
+| `s2-reform-map.png` | the reform boundary in (relief, trough distance), closed form against the marched transform, with the loop's operating point on it |
+| `s2-hd-transect.png` | `H/d` along the transect with the 0.40 line, and the same transform on the same relief spread over 30 m instead of 15, where it **does** reform |
+| `s2-ratio-resolved.png` | `d_bar/(H_b/γ)` across sea states beside the same quantity across grids — the same curve twice |
+| `s2-saturated-gamma.png` | the saturated `H/d` against bed slope: closed form, march, and Raubenheimer et al.'s field band |
+| `s2-forcing-history.png` | the four forcing histories and the relief each produces |
+
+## What the scene is
+
+An exposed Atlantic beach at Aljezur (37.3167 N, 8.8000 W), 500 m of cross-shore
+profile from 8.2 m of water to the waterline, under a stated deep-water swell.
+The **wave field arrives from outside** — `H_0 = 1.5 m`, `T = 9 s`, `20°` off
+shore-normal, given once at the offshore boundary and never adjusted — so
+shoaling, refraction, breaking, the currents and the bar are all outputs.
+
+## The claim, and how to check it in one figure
+
+**The bar was computed, not drawn.** The bed starts as the Dean (1991)
+equilibrium ramp, `h = −A·x^(2/3)`, one monotone curve with one parameter and no
+ridge anywhere in it. The loop is chapter 12's:
+
+    waves (shoal, refract, break) → radiation stress → currents (undertow)
+      → sediment flux (energetics) → Exner → the bed changes → repeat
+
+and a ridge grows where the two sediment fluxes converge. Seaward of the break
+the shoaling wave is skewed and its third velocity moment carries sand shoreward;
+landward of it the wave has broken, the skewness has gone into the bore front and
+the undertow carries the stirred sand back out. The crossing is the break point.
+`reference-impl/evidence/s1-flux-convergence.png` is that sentence as a plot, and
+`s1-profile-bar.png` is the bed it produces.
+
+**Measured, after 6000 steps (500 h of continuous swell):**
+
+| quantity | value |
+|---|---|
+| bar crest | x = 360 m, **2.08 m of water**, 1.42 m above the initial ramp |
+| bar width at half amplitude | 11 m |
+| trough | x = 375 m, 2.98 m of water — 0.90 m of bar-to-trough relief |
+| longshore current, peak on the plane ramp | 0.9 m/s |
+| breaker height / depth at the break | H_b = 1.820 m at d_b = 2.334 m (the crossing, interpolated) |
+| **chapter 12's prediction, d_bar ≈ H_b/γ** | **2.333 m** |
+| ratio, raw bed depth against it | 0.893 — **and see the box below** |
+| **ratio, both sides in the depth the wave broke in** | **0.973** |
+| sand volume gained or lost by the domain | 5 × 10⁻¹³ m² |
+
+and the same loop at `H_0 = 3.0 m` puts the crest **139 m further offshore in
+1.93 m more water** — which is chapter 12's own verification item ("migrates
+seaward when `H_b` is raised") reproduced without touching a constant.
+
+> **The 0.893 was wave 1's, and wave 2 withdraws it.** That wave reported the
+> ratio running **0.81, 0.89, 0.92, 0.95, 0.97** across five sea states and
+> offered the trend as a falsifiable prediction — the crest sitting
+> consistently shallower than `H_b/γ` and converging on it as the waves grow.
+> **It is a measurement artefact and the trend is the grid.** Two independent
+> reads of it:
+>
+> - **The comparison straddles two depth fields.** `H_b` and `d_b` are outputs
+>   of the transform, which reads the wavelength-filtered depth; `cr['d']` is
+>   the raw bed. On an 11 m crest the 1.5 m filter lifts the depth the wave
+>   feels by 0.19 m. Evaluated in **one** field the ratio is **0.973**, and
+>   `beach.crest_depth_ratio(tr, cr, b, field=...)` now owns both forms so the
+>   suite can fire a bug at the wrong one.
+> - **Refine the grid and the raw form climbs to meet it.** Refining space and
+>   time together at `dx` = 2.0 / 1.0 / 0.5 / 0.25 m the raw ratio runs
+>   **0.834 / 0.906 / 0.942 / 0.974** — monotone and still climbing — while the
+>   same-field ratio sits at **0.959 / 0.953 / 0.982 / 0.994** and is already
+>   at its answer on the coarsest grid. The sea-state trend is the same curve
+>   seen along a different axis: a bigger bar is a broader bar, so a fixed
+>   filter takes proportionally less off its crest. `s2-ratio-resolved.png`
+>   puts the two panels side by side.
+>
+> A parallel builder reached the same conclusion this wave from the
+> discretisation alone (0.930 / 0.941 / 0.981 on halving `Δx`, and `Δt` moving
+> it by 1×10⁻⁴), which is a third route. **Chapter 12's `d_bar ≈ H_b/γ` is met
+> to 1–3% and is not asymptotic.** Refine `Δx` without refining `Δt` and the
+> slope term's diffusion, `D_eff ≈ 6.7×10⁻⁴ m²/s`, goes unstable at
+> `Δt > Δx²/(2 D_eff)` — 746 s at 1 m, 47 s at 0.25 m. Every grid row in this
+> file now sets `dt` from that bound and holds the run length in seconds.
+
+## The four closed forms, measured
+
+Reported against literature, not against the render.
+
+| | closed form | measured here |
+|---|---|---|
+| **Shoaling** | Green: `H ∝ h^(−1/4)`, the `kd → 0` asymptote of energy-flux conservation | Pushed to `kd < 0.05` (a 60 s wave on a 1:200 ramp) the transform gives an exponent of **−0.2497** and `H·d^(1/4)` constant to 0.1%. **On this scene** the shallowest unbroken water is `kd ≈ 0.3` and the measured exponent is **−0.207** — the O((kd)²) term, not an error, and reported as the measurement it is (`s1-shoaling-green.png`). |
+| **Refraction** | Snell with `c(h)`: `sin θ / c` invariant; crests turn onto the depth contours | `sin θ/c = 2.4348 × 10⁻²` with a spread of 5.5 × 10⁻¹⁸ along the profile; `θ` falls from **20° offshore to 6.5° at the break**. Independently: a 2-D ray tracer that has no Snell in it reproduces Snell's angle to **1.3 × 10⁻³ rad** over 400 m, and over the barred bed the rays **converge on the bar and spread over the rip channel** (`s1-refraction-rays.png`). |
+| **The breaker index** | `H/h ≈ γ ≈ 0.78` — the shared constant | Imported in meaning, not restated: `GAMMA_B` is defined once and does **both** jobs, breaking the wave in the transform and predicting the crest depth. Measured `H/d` at the interpolated crossing: **0.7796**. Corroborated this wave in a third document that knew nothing of either chapter — REF/DIF 1 v3.0 §2.3.5 uses "a breaking index relation (H > 0.78 h)". **Wave 2 adds the other end of the family:** `γ` is the index at which breaking *starts*, and what a surf zone *settles at* is a different, slope-dependent number, `Γ_eq = γ_s/√(1 + (5/2)(dd/dx)/K)` — 0.477 on this beach's inner slope, against a field range of 0.2–1.0 (`s2-saturated-gamma.png`). |
+| **Run-up** | Hunt (1959): `R ∼ H·ξ`, `ξ = tanβ/√(H/L₀)`, valid `0.1 < ξ < 2.3` | `ξ₀ = 0.332`, `ξ_b = 0.300`, both inside Hunt's stated range; `R ∼ H₀ξ₀ = 0.50 m`. **The constant of proportionality is `?`** — the published relation is a scaling and the coefficient depends on which run-up level and which `H` is meant. Run-up *rendering* is out of scope this wave. |
+
+## Two constants that are not one constant — the factor-of-two family
+
+Chapter 12 warns that the alongshore thrust is `(E₀/4)·sin 2θ₀` in **deep-water**
+quantities and `(E_b/2)·sin 2θ_b` in **breaking-zone** quantities, because the
+`c_g/c` it carries is ½ out there and 1 at breaking. This scene measures both
+forms on its own fields and they agree to 3.7% — which is exactly `1/n_b − 1`
+with `n_b = 0.964`, i.e. the residual is the shallow-water limit not being quite
+reached, and not the code. Pairing the quarter with breaking-zone values is
+**off by exactly 2**, and that is a row rather than a comment.
+
+**And the same trap turned up twice more, unprompted, in the sources read this
+wave:**
+
+- **The Iribarren thresholds.** `ξ < 0.5 / 0.5–3.3 / > 3.3` and
+  `ξ < 0.4 / 0.4–2 / > 2` are both attributed to Battjes (1974). They are not in
+  conflict: the first is in deep-water quantities and the second in local ones.
+  `beach.breaker_class` therefore refuses to carry one table and takes an
+  argument saying which convention it answered in.
+- **Dally's decay coefficient `K`.** Quoted as 0.15 for the energy-flux form and
+  as 0.017 in REF/DIF's amplitude form. This file could not obtain the 1985 paper
+  to settle the conversion, so `K_DALLY` is **marked and bounded instead of
+  cited**: the suite proves the break *onset* — and with it the crest depth — is
+  **independent of `K` to machine precision**, because `K` governs how fast a
+  broken wave decays and not where it starts breaking.
+
+## What is derived, what is cited, and what is marked `?`
+
+**Derived here, beside itself:**
+
+- the undertow `u_u = E_w/(ρ c d)` — from the wave's own mass flux `M = E/c`
+  returned below trough level over depth `d`. Its dimensions are checked by
+  algebra, not by inspection: the suite pushes units through the shipped
+  function and gets m/s, and gets **m/s² when `D_w` is substituted for `E_w`**,
+  which is the standing trap chapter 12 names.
+- the bore dissipation scale `ρgH³/(4Td)`, from the hydraulic-jump analogy, which
+  is what turns a dissipation *rate* into the dimensionless "how broken is this
+  wave".
+- `EPS_SLOPE = 1/tan(32°) = 1.60` — Bailard's slope term carries
+  `tanβ/tanφ`, so the coefficient *is* the reciprocal of the angle of repose.
+- the longshore current's coefficient **`5π/16`**, and it closed a `?` that had
+  been open. Deriving from the depth gradient of `S_yx` alone gives `π/4`; the
+  suite's numerical solve sat 23% above that and 1.25 is not a tolerance one can
+  widen. The missing term is `d(sin θ cos θ)/dx` — in shallow water Snell makes
+  `sin θ ∝ √d`, so alongshore refraction contributes exactly a quarter of the
+  depth term, with the same sign, and `(π/4)·(5/4) = 5π/16 = 0.9817`. That is
+  the Longuet-Higgins (1970) coefficient, **derived rather than cited**, by a
+  test that failed at it.
+
+  > **Correction to how wave 1 filed it.** Its `rounds.jsonl` line listed this
+  > under `overturned`, as if chapter 12 carried a wrong coefficient. The
+  > chapter carries no coefficient at all — it writes `V_long ∝ …` and stops —
+  > so this is an **addition** to the chapter, not a correction of it. Settled
+  > by a parallel builder this wave and recorded here so the next reader does
+  > not inherit a phantom disagreement.
+- the roller lag measured in local wavelengths, because a crest covers one
+  wavelength per period.
+
+**Cited to chapter 12 (`terrain-architect/references/12-glacial-coastal.md`):**
+the loop itself; the Dean ramp as the *far-field* relaxation and explicitly not
+the whole profile; the wave-base gate; the bar as the convergence of the
+skewness and undertow fluxes with the crest near `H_b/γ`; the storm/calm
+breathing; Exner attributed to Exner and not to Paola & Voller; beach states
+after Wright & Short (1984); the rip spacing of O(100 m) and the insistence that
+it is quasi-rhythmic; and the declaration that the full 2DH model is out of scope.
+
+**Cited to documents read this wave** (not to memory): Dally, Dean & Dalrymple's
+stable-energy-flux breaking model, its onset criterion and `Γ = 0.4` — REF/DIF 1
+v3.0 manual §2.3.5; Soulsby's (1997) settling velocity and Zhang & Xie's (1993),
+and Hunt's (1979) explicit dispersion approximation — COHERENS ch. 7, eqs (7.41),
+(7.42), (7.10)–(7.12); the surf-similarity definition, Battjes' thresholds and
+Hunt's (1959) run-up scaling with its validity range — Coastal Wiki, *Surf
+similarity parameter*.
+
+**Derived by wave 2, beside itself, and set out for a chapter above:**
+
+- `Γ_eq = γ_s/√(1 + (5/2)(dd/dx)/K)`, the saturated surf-zone ratio — the fixed
+  point of the Dally march with the shallow-water flux substituted. Three lines
+  of algebra printed in `beach.py` above `saturated_ratio`.
+- `tan β_crit = 2K/5`, the slope above which no saturated state exists — the
+  same expression's denominator vanishing.
+- `G(d) = G_eq + (G_c − G_eq)(d/d_c)^(−a)` with `a = K/m + 5/2`, the integrated
+  form, and with it the reform criterion in (relief, distance).
+- `N = (K/m)·ln(d_t/d_c)`, the e-folding count, which is the currency the
+  shortfall turned out to be denominated in.
+
+**Cited to documents read by wave 2:** Dally, Dean & Dalrymple (1985), *Wave
+height variation across beaches of arbitrary profile*, JGR 90(C6) 11917 — its
+abstract states the model's founding observation, that a breaking wave over a
+region of uniform depth "will reform and stabilize after some distance", and
+reports it reproducing shoaling, breaking and re-forming on a prototype profile
+with two bar-and-trough systems. Raubenheimer, Guza & Elgar (1996), *Wave
+transformation across the inner surf zone*, JGR 101, 25589 — saturated `H/h`
+0.2–1.0, correlated with local slope. Battjes & Janssen (1978) for `Q_b`.
+
+**Marked `?`, and none of them is load-bearing for the bar:**
+
+| `?` | why it is survivable |
+|---|---|
+| the offshore sea state `H_0`, `T`, `θ_0` | a declared sea state; the physics is checked across a factor of three in `H_0` |
+| `D50 = 0.30 mm`, and `w_s`, `Ω` under it | no grain-size survey of Aljezur; only the beach-state label depends on it |
+| `DEAN_A = 0.13` | no profile survey; it is the initial condition the bar is measured *against* |
+| `K_DALLY` | bounded: the crest depth is independent of it (proved, not asserted) |
+| `K_ROLLER = 0.5` | bounded from above by the undertow it implies: the mean over the surf zone is 0.24 m/s against a published 0.1–0.4 m/s, and the suite asserts that band |
+| `ROLLER_LAG = 0.5 L` | swept over a factor of four; the crest depth moves < 0.15 m |
+| `SK_MAX`, `UR_HALF` (the skewness parameterisation) | only the two limits are load-bearing and both are tested |
+| the Kriebel–Kraus–Larson `A(w_s)` fit | **not used** — printed as an INFO and nothing depends on it |
+
+## The second breaking line — wave 2's investigation
+
+Wave 1 left this `OPEN` with a number and a guess at the cause. Wave 2 was sent
+to separate four candidates. **Three of them are dead, the fourth is real and
+was misdescribed, and there is a closed form underneath all of it.**
+
+### The closed form, first, because it decides everything else
+
+Put `H = Γ·d` into the Dally march in shallow water — where `c_g → √(gd)` and
+`cos θ → 1`, so `F = (ρg^{3/2}/8)·Γ²·d^{5/2}` — substitute into
+`dF/dx = −(K/d)(F − F_s)`, and divide out the common `(ρg^{3/2}/8)·d^{3/2}`:
+
+    2 Γ Γ' d  +  (5/2) m Γ²  =  −K (Γ² − γ_s²)          m = dd/dx
+
+Two things fall out of one line of algebra, and neither is in chapter 12.
+
+**1 · The fixed point.** `Γ' = 0` gives
+
+> **`Γ_eq = γ_s / √(1 + (5/2)·(dd/dx)/K)`**
+
+A broken wave on a **shoaling** bed does **not** decay to `γ_s = 0.40`. It
+decays to a ratio strictly *above* it, because the bed takes depth away as fast
+as breaking takes height. On this scene's inner slope that ratio is **0.477**,
+and the wave sits on it from the bar to the shore. Measured `0.4748`, closed
+form `0.4772` — and against the *marched* transform on plane slopes from 1:150
+to 1:60 the two agree to **3%** (`s2-saturated-gamma.png`), which is the
+shallow-water limit's own residual and grows to 9% by 1:30.
+
+That has a **published corroboration neither side was written from**:
+Raubenheimer, Guza & Elgar (1996), *Wave transformation across the inner surf
+zone*, measured the saturated `H/h` on a natural beach at **0.2 to 1.0**, not
+correlated with offshore steepness but **positively correlated with the local
+bed slope**. A field paper from 1996 and a fixed point of a 1985 decay model,
+agreeing in sign, in range and in the claim that γ is not a constant.
+
+**2 · A slope above which no surf zone saturates.** The denominator vanishes at
+`tan β = 2K/5` — **0.060, one in 16.7**, with `K = 0.15`. Steeper than that and
+the shoaling gain outruns the breaking loss, `Γ` grows without bound, and the
+wave surges up the face instead of spilling down it. **That is the reflective
+end of Wright & Short's beach states arriving out of a wave model that has never
+heard of them**, and it lands within a factor of 1.5 of their 1:10–1:15.
+
+**The consequence for section B is immediate: the wave can only un-break where
+the bed *deepens*.** Everywhere else `Γ_eq > γ_s` and the trough minimum is set
+by how far the wave travels down the bar's back before the bed turns.
+
+### Integrate it, and the criterion is a distance
+
+With `m` constant and positive down the back of the bar, change variable from
+`x` to `d` and the equation is linear:
+
+    G(d) = G_eq + (G_c − G_eq)·(d/d_c)^(−a),   a = K/m + 5/2,
+    G = Γ²,   G_eq = K γ_s² / (K + 5m/2)
+
+**The exponent is the whole answer.** `a` carries `K/m`, and `m = relief/L`, so
+`a·ln(d_t/d_c)` is essentially `K·L/d̄` — the decay is paid for in **travel
+distance**, not in depth gained. Doubling the relief over the same 15 m buys far
+less than doubling `L`. `beach.reform_ratio`, `reform_relief`, `_reform_length`
+and `dally_efoldings` are that algebra, and `s2-reform-map.png` is the boundary
+it draws, checked against the marched transform bisected on relief — two routes
+with no arithmetic in common, agreeing in shape with the closed form sitting a
+systematic 0.15–0.25 m low (it assumes a straight back slope and shallow water).
+
+**Measured against it, at `H_0 = 1.5 m`:**
+
+| quantity | value |
+|---|---|
+| crest-to-trough distance `L` | **15 m** |
+| crest-to-trough relief (in the depth the wave sees) | 0.71 m |
+| Dally e-foldings delivered | **0.86** |
+| Dally e-foldings needed | **1.71** |
+| the same, as a length at the loop's own relief | needs a **30 m** back slope, has 15 |
+| the same, as a relief at the loop's own 15 m | needs **1.11 m**, has 0.71 |
+
+### And the bar digs its own trough exactly one e-folding wide
+
+This is the part that makes the shortfall structural rather than a tuning gap.
+The Dally decay length is `d/K`. The trough is scoured by the undertow, the
+undertow is driven by the dissipation, and the dissipation decays over exactly
+`d/K` — so **the morphology inherits the wave model's own length scale.**
+Measured across five sea states:
+
+| `H_0` | 1.0 | 1.5 | 2.0 | 2.5 | 3.0 |
+|---|---|---|---|---|---|
+| `L` (m) | 10 | 15 | 21 | 28 | 34 |
+| `d_crest/K` (m) | 10.6 | 15.1 | 19.3 | 23.5 | 27.5 |
+| **`L·K/d`** | **0.95** | **0.99** | **1.09** | **1.19** | **1.24** |
+
+**A one-bar breakpoint model digs a trough one e-folding wide and the reform
+needs about two.** The gap is `O(1)` by construction, which is why it comes out
+at 14% rather than at an order of magnitude, and why no coefficient in the model
+is free to close it.
+
+### The four candidates, separated
+
+| candidate | verdict | the evidence that separates it |
+|---|---|---|
+| **1 · relief too small** | **live, and misdescribed** | it is a *joint* condition on relief **and** distance, and distance is the binding axis: at `L` = 30 m the loop's own 0.90 m of relief reforms; at `L` = 15 m it would need 1.11 m. `s2-reform-map.png` |
+| **2 · decay too slow** | **the same axis** | the e-folding count is `K·L/d̄`, so `K` and `L` trade exactly. Reform appears at `K ≈ 0.35–0.40` against the flux-form standard 0.15 — more than double, and `K` is a marked constant, not a free one |
+| **3 · no memory** | **dead** | the transform marches the flux and carries `γ_b`/`γ_s` hysteresis. Take the loop's own bed, keep its own 0.90 m of relief, spread it over 30 m instead of 15, and the surf zone becomes **360–388 m and 453–500 m** — two lines, 65 m of calm between them, nothing tuned. `s2-hd-transect.png`, bottom panel. Dally, Dean & Dalrymple's own 1985 abstract says the model reproduces "the shoaling, breaking, and wave re-forming process" on a profile with two bar-and-trough systems |
+| **4 · forcing history** | **dead, and it reverses** | storm/calm cycling (1–3 m over 5 days), a ±1.0 m semidiurnal tide and a ±0.5 m one, and a 3-, 5- and 8-quantile Rayleigh height distribution: **every one lowers the relief.** Steady monochromatic forcing is the most favourable case this model has. `s2-forcing-history.png` |
+| **5 · the grid** *(added by a parallel builder's question)* | **dead** | refining space and time together — `dt` at 0.6 of the slope term's diffusion bound `dx²/(2·6.7×10⁻⁴)` — the trough minimum runs **0.4574 / 0.4607 / 0.4629 / 0.4625** at `dx` = 2.0 / 1.0 / 0.5 / 0.25 m. Converged by 0.5 m and moving **away** from 0.40. The relief converges *downward* (0.620 / 0.519 / 0.481 / 0.436 m), so the well-resolved bar is the slightly worse case |
+
+### What is actually missing, named
+
+The Rayleigh case is the one worth dwelling on, because it is the *physically
+right* mechanism for bar width — a real sea breaks over a band of depths, not at
+a point, which is why real bars are broader than a monochromatic breakpoint
+model builds them — and it works: `L` goes from 15 m to 25 m at three
+quantiles. **And it pays for every metre of width in relief**, 0.90 m down to
+0.53 m, so the minimum `H/d` anywhere shoreward of the crest moves from **0.4296
+only to 0.4172** — and at five and eight quantiles it stops improving (0.4164,
+0.4190). The trade is not a coincidence of one setting.
+
+**Nothing tried in this wave widens the trough without flattening the bar.** The
+product is close enough to conserved that the 14% gap is robust rather than
+marginal, and that is the finding.
+
+**The reform is real at this coast and the model must eventually produce it.**
+Bar section `I1` — a cliff frame supplied during this wave — shows two clearly
+separated lines of whitewater with a calm band between them at Aljezur itself.
+So "this profile does not reform under any forcing" is not an answer; it is the
+gap restated. What the model lacks has to be named, and it is this:
+
+> **A mechanism that scours the trough over a distance longer than the
+> dissipation e-folding.** Everything in a 1-D energetics loop is local: the
+> undertow at `x` is driven by the dissipation at `x`, so the excavation is
+> confined to the band where the wave is losing energy, which is `d/K` wide by
+> construction. Widening it requires a **circulation** — the rip-feeder cell,
+> where water piled behind the bar runs *alongshore* in the trough before
+> escaping seaward, scouring the whole length of the trough rather than the
+> band under the break. That is the 2DH solve chapter 12 declares out of scope,
+> and it is the specific thing whose absence this wave has now measured.
+
+The corollary in the field record agrees: the configuration that most commonly
+shows two lines is a **double-bar system**, not one bar plus a shorebreak (Duck,
+NC — the most-surveyed barred profile there is — usually runs a narrow inner bar
+at 1–2 m and a broad outer bar at 4–5 m), and an inner bar is grown by the same
+circulation. **A missing mechanism, not a missing tolerance**, and the row stays
+`OPEN`.
+
+**Wave 1's decision to file it open rather than widen the threshold is what left
+this askable.** Had 0.456 been rounded into a pass at `γ_s = 0.46`, the suite
+would have been green, the picture would have been wrong in the same way, and
+none of the closed form above would have been looked for.
+
+**One more thing measured and reported rather than used.** The transform is
+monochromatic and a photograph is not: what a camera records as "a breaking
+line" is a large *fraction* of waves breaking. `beach.breaking_fraction_bj`
+computes Battjes & Janssen (1978)'s clipped-Rayleigh `Q_b` on this scene's own
+field, and the contrast section B describes **is** there — **1.00 over the bar
+against 0.07 in the trough**. But `Q_b` stays near 0.07 all the way to the
+shore, so the random-wave reading does not manufacture a second line either. It
+is an `INFO` row, not a pass.
+
+### One assumption this wave used that a new frame puts under notice
+
+`broken_fraction` returns a scalar per cell — *how broken is this wave here* —
+and `roller_fraction` lags that scalar shoreward. **That is one breaking state
+per wave per position**, and a stand-in frame recorded in the bar this wave
+shows one wave carrying **two surface states simultaneously**: a glassy face
+centimetres from an exploding lip. Two different axes of the same objection:
+
+- **Along the wave's own crest.** Alongshore, one crest can be unbroken over the
+  rip channel and fully broken over the bar at the same instant. A 1-D profile
+  has no alongshore axis and cannot express it; a 2DH solve would get it for
+  free. **Recorded, out of scope, not a defect of this file.**
+- **Across the wave-height distribution.** In a random sea a *fraction* of waves
+  is breaking at each `x`. `breaking_fraction_bj` computes exactly that and is
+  already an `INFO` row. It is the honest replacement for the scalar wherever
+  the scalar is being read as "the sea is breaking here".
+
+Neither changes the reform result — `Q_b` was measured and does not produce a
+second line — but a later wave rendering foam should not inherit the scalar
+without knowing it is one.
+
+### A separation the suite needed before any of this could be argued
+
+`break_lines` returns the intervals where `H/d ≥ γ`. That marks where a wave
+**starts** breaking and says nothing about where one stops — a broken wave sits
+well below γ while it is still a bore — so on this profile it returns a single
+1 m interval and *empty space over the entire surf zone*. Reading it as "the
+breaking lines" makes a 140 m band of white water look like no surf zone at all.
+`surf_zone_spans(tr)` reads `tr['brk']`, the transform's own hysteretic state,
+and **that** is the list section B's criterion is about.
+
+### Still not modelled, by scope rather than by failure
+
+Optics, foam, spray, turbidity, rocks, run-up rendering, the swash zone (the
+Exner step is tapered out shallower than 0.35 m), a 2DH solve that *grows* the
+rip rhythm instead of stamping it, and the plunging lip. **The tide is no longer
+on this list** — `evolve_forced` carries it as a moving datum through the whole
+loop, and the result is written up above as a negative.
+
+## The bay, in plan — wave 3
+
+Waves 1 and 2 built one cross-shore profile. Bar section `J` — the owner's first
+upright frame, headland to headland — settles that this coast is an **embayment**,
+and it makes one of the four required closed forms checkable by eye: *the breaking
+lines bend to stay parallel to the shore all the way round the curve*.
+
+That check is worth nothing if the curve was drawn. So this wave computes the
+curve, and then runs the wave transform in two dimensions over it.
+
+### What is computed and what is declared, stated before anything else
+
+| | |
+|---|---|
+| **computed** | the headlands and the embayment (chapter 12's coastal loop); the cliff and the wave-cut bench; the shoreline plan-form; the submarine profile keyed to it; the wave field — shoaling, refraction, breaking, the phase; the bar, at every alongshore station |
+| **declared, marked `?`** | the rock hardness (a band-limited random field, one seed, and chapter 12 says a coast needs *some* variation or it is a straight cliff); the offshore sea state; `DEAN_A`; the coastal loop's rate `K_COAST`, which is a clock and is tested as one |
+| **stamped** | **nothing.** Wave 1's plan figure inserted one profile at every alongshore station and stamped chapter 12's `ripSystem` rhythm through it. This wave removes both. The consequence is honest and visible: **there are no rip channels**, because the 2DH circulation that carves them is still out of scope and still missing |
+
+### The coast: chapter 12's `notch → collapse → deposit`, and two departures
+
+The loop is the chapter's, on the plan grid: a notch at sea level weighted by the
+fetch sweep and divided by hardness; chapter 05's thermal step collapsing the
+undercut face; the eroded rock deposited in the sheltered nearshore. The initial
+coast is a plain rising at 1:12.5 with **no cliff in it** and alongshore-uniform
+to machine precision — a suite row asserts exactly zero spread, because
+`initial_coast` broadcasts one profile.
+
+Two things had to change, and both are findings rather than fixes.
+
+> **1 · Taken literally, `coastalStep` stalls on a heightfield.** `band` is a
+> function of the *cell's own* elevation. The notch cuts the cliff toe down until
+> the toe leaves the band; the thermal step holds the face at repose above it;
+> and every cell that is still intact rock is then out of the band's reach. The
+> coast retreats **16 m and stops dead** — 500 further steps move it by 0.0 m —
+> while the notch goes on planing seabed it has already cut. Widening
+> `notchHeight` restarts the retreat and destroys the bench, which is the
+> chapter's own diagnostic running the other way: **the two things the loop is
+> supposed to produce are in conflict in the pseudocode as written.**
+>
+> What is missing is **undercutting**. A real notch cuts *into* the cliff at the
+> waterline and the overhang falls; a heightfield cannot hold an overhang —
+> chapter 11's representation warning, which chapter 12 already invokes for
+> arches. The heightfield expression of the same statement is that waves attack
+> the **first land cell above the waterline**, whatever its elevation, because
+> that is the cell the water reaches. With that term the loop retreats
+> indefinitely *and* planes a bench, and the chapter's `notchHeight` diagnostic
+> is recovered in full: narrow band, bench; six times the band, no bench. Both
+> directions are suite rows and `--bug no-waterline-attack` is the first one put
+> back.
+
+> **2 · The deposition weight is identically zero over open water.** `beach =
+> (1 - exposure) · nearShore · …` with `exposure` normalised over the domain: in
+> open water every seaward azimuth is unobstructed, so exposure saturates at 1
+> and the weight vanishes. The loop then **loses the rock it eroded** — measured,
+> 116 154 m³ out of a closed domain. And `exposure` is zero on *land*, so taking
+> the weight literally over the whole grid piles the debris onto the highest,
+> driest, most sheltered ground and the shoreline stops retreating (0.4 m in 1500
+> steps). Three corrections, none of which adds a constant: the band is water;
+> the material stays in the row it came from (moving it alongshore *is* longshore
+> drift, which this wave does not solve); and the fill is capacity-limited at the
+> datum, with the excess **exported and reported**. A cliff makes far more debris
+> than a beach can hold — retreating 100 m of a plain at 1:12.5 removes ~750 m²
+> per metre of coast and the nearshore band holds ~120 — so 90% of it leaves, and
+> that is a fact about coasts rather than a leak. The suite closes the book:
+> eroded = deposited + exported, to round-off.
+
+A third mechanism was **added**, and it also removes a free parameter rather than
+adding one:
+
+> **The loop has nothing limiting the width of the bench it planes.** Nothing
+> attenuates the wave as it crosses the platform, so the notch cuts as fast 200 m
+> from the cliff as at its foot: measured, a **235 m bench and still widening** at
+> 1600 steps. The attenuation needs no new constant because the file already owns
+> the relation — the wave that reaches a cell is `H = min(H_0, γ_b·d)` and the
+> work it does goes as its energy `H²`, with `d` the water in front of the cell.
+> A cliff standing behind a wide shallow bench is attacked by a small wave. That
+> is the negative feedback a real shore platform's width is set by, and it is
+> chapter 12's own breaking index doing the work.
+
+**What the loop then produces, measured:**
+
+| quantity | value |
+|---|---|
+| mean cliff retreat over the run | **189 m** |
+| headland-to-bay amplitude of the shoreline | **55 m** |
+| `corr(shoreline position, hardness at the shoreline)` | **−0.95** |
+| the same amplitude with **hardness set to 1 everywhere** | **0.45 m**, against 45.6 m with the geology at the same step count |
+| wave-cut bench, planed level | **−1.90 m**, mean width 72 m, range 0–200 m — the pocketing bar section H1 reads |
+| bench width at six times the notch height | **0 m** — chapter 12's diagnostic, run backwards |
+| rock eroded / deposited / exported | 3.01×10⁶ / 3.01×10⁵ / 2.71×10⁶ m³, closing to 1×10⁻⁸ |
+| the shore normal's swing across the bay | **56°** (−30° to +26°) |
+
+The uniform-hardness row is the one to look at twice: **0.45 m of amplitude
+against 45.6 m**, the same loop, the same steps, the same fetch sweep, hardness
+the only difference. Chapter 12's *"with uniform rock you get a straight cliff
+and nothing else"* is not a stylistic remark, and this is it run as an
+experiment.
+
+### The wave transform in 2-D, derived
+
+Two statements and nothing else. First, the wavenumber vector of a steady wave
+train is irrotational, `k = ∇S`, so `∇×k = 0`:
+
+    ∂k_y/∂x = ∂k_x/∂y ,   k_x = √(k² − k_y²)
+
+    ⟹   ∂k_y/∂x  +  tan θ · ∂k_y/∂y  =  (k/k_x)·∂k/∂y
+
+which is an **advection equation whose characteristics are the rays**, marched
+shoreward with an upwind difference in `y`, stable for `Δx·|tan θ| ≤ Δy`. Two
+things fall out and both are used as tests rather than assumed:
+
+- **On an alongshore-uniform bed `∂k/∂y = 0`, so `k_y` is constant.** But
+  `k_y = k sin θ = ω sin θ/c`, so **`k_y` constant *is* Snell.** The 2-D march
+  contains the straight-coast invariant as its degenerate case and contains it
+  nowhere else; nothing in `transform_2d` computes `sin θ` from `c`.
+- **In a bay `∂k/∂y` is the whole story** — the source term turns the crest toward
+  shallower water, which is the mechanism bar section J photographs.
+
+Second, energy: `∇·(E c_g ŝ) = −(K/d)(E c_g − (E c_g)_s)`, Dally, Dean &
+Dalrymple in divergence form, with the transverse divergence taken upwind and the
+sink integrated exactly over the ray length.
+
+> **And the obliquity in that divergence is not the obliquity in the 1-D form.**
+> Chapter 12's pseudocode — and this file's own `transform()` after it — marches
+> `F = E c_g cos θ` with `dF/dx = −(K/d)(F − F_s)`, i.e. the decay rate is applied
+> per unit **cross-shore** distance. A divergence applies it per unit **ray**
+> distance, `ds = dx/cos θ`. The two are the same statement only at normal
+> incidence. Measured on the same bed: the two transforms agree to **4.4×10⁻¹⁶ m**
+> at `θ₀ = 0`, to **2.6 mm** at 20° and to **8.0 mm** at 40° — 0.14% and 0.47% of
+> `H`. It is small *because refraction is doing its job*: the wave has turned to
+> 6.6° by the time it breaks and `cos 6.6° = 0.9934`. On a coast steep enough to
+> break before it turns, the same term is worth per cent. **Reported, and
+> deliberately not patched into the 1-D file**, which is what waves 1 and 2
+> measured with.
+
+### Do the surf lines follow the curve? Measured four ways
+
+Bar section J says a render whose surf lines stay straight while the shore curves
+"has failed a criterion a layman could catch". The layman's version is
+`s3-bay-plan.png` — the computed bay beside the same bed with the refraction term
+frozen. The instrument's version is four numbers, and each one has the frozen-
+refraction control beside it:
+
+| measurement | refracting | refraction frozen |
+|---|---|---|
+| **crest-to-contour angle at breaking** (`contour_alignment`) | **7.2 °** | 13.4 ° |
+| **crest azimuth regressed on contour azimuth**, slope over `d` = 1–2.4 m | **0.366** (R² 0.67) | 0.000 |
+| **outer surf line against the shoreline**, correlation over 89 stations | **0.939** | — |
+| **bar crest offset from its own local shoreline**, spread | **± 8.2 m** | — |
+
+The shore normal itself swings through **56°** across this bay. A crest that
+ignored the contours would carry the whole of that swing as error, and the frozen
+column is what that looks like.
+
+**The regression slope is the one to read, because it has a closed form.**
+Differentiating Snell about a contour whose normal lies at azimuth `β`,
+
+> **`dθ/dβ = 1 − c(d)/c(d_ref)`**
+
+so a crest is parallel to its contour only in the limit `c → 0`; slope 1 is not
+the target and a model that reached it would be wrong. With `d_ref` the 8 m shelf
+where this bathymetry stops being alongshore-uniform, the bound is **0.513** at
+`d = 1.7 m` and the measured slope is **0.366** — below it, as it must be, because
+the bay's contours turn gradually rather than all at the shelf edge, and far above
+the **0.000** the frozen control gives.
+
+### The first refraction test in this project that does not pass by construction
+
+Wave 1 verified `sin θ/c` invariant to 2.2×10⁻¹⁶ on a straight coast and said in
+the same breath that the test passes by construction — `snell_sin` computes
+`sin θ` *from* `c`, so the ratio is an identity, and bar section B says as much.
+Two tests replace it.
+
+- **Snell about a rotated normal.** A plane beach whose contours run at 10°, 20°
+  and 30° to the grid. The exact answer is Snell taken about the rotated normal;
+  the march integrates irrotationality on the grid axes and is never told the
+  rotation. Worst error **0.186° / 0.310° / 0.277°** at 10 / 20 / 30°, and
+  **0.000°** at zero rotation, where the test becomes an identity again. The
+  error is the first-order upwind difference in `y` and not the physics: it does
+  not fall when the ray step is refined and it does fall with `Δy`.
+  `s3-refraction-oblique.png`.
+
+  > **This row was wrong in the direction that flatters, and it is the fourth
+  > defect the suite found in itself.** It first measured the error in a window
+  > pinned to the **grid centre** — and on a rotated bed the ramp crosses each
+  > alongshore row over a different span of `x`, so a centre window samples less
+  > and less of it as `φ` grows. At 30° the centre row contains **no ramp at
+  > all**, and the 5202 cells the window did hold were the deep end, where the
+  > wave has barely turned. It read **0.030°** and made the test look *easier*
+  > with more rotation, which is backwards. Centred on the row that samples the
+  > ramp most fully it reads **0.277°**. Separately, 60 rows are excluded at
+  > each alongshore edge, where the march's transverse differences go one-sided
+  > and the error reaches **2.71°** — a real boundary artefact of an open
+  > boundary, reported here rather than masked away, and the reason the plan
+  > domain is a window wider than the coast it is asked about.
+- **An independent integrator over the bay's own curved contours.** `trace_ray`
+  steps `dθ/ds = (sin θ·∂c/∂x − cos θ·∂c/∂y)/c` along a path; the march integrates
+  `∂k_y/∂x = ∂k_x/∂y` across a grid. Neither contains Snell. On the straight coast
+  they agree to **1.6×10⁻³ rad**; over the bay to **4.3×10⁻² rad**, and refining
+  the ray step by four does not move it, so it is the 16 m alongshore grid rather
+  than either integrator.
+
+> **And that row found the two-field error again, worth a factor of six.** The
+> march reads the *filtered* depth; `trace_ray` was handed the *raw* bed. The
+> disagreement was **0.270 rad — fifteen degrees of apparent refraction error
+> that was entirely the two fields.** Reading both from one field takes it to
+> 0.043. The straight-coast version of this row could not have shown it, because
+> a filter along `x` alone leaves a plane bed plane. This is the third time the
+> class has bitten this file and the second time it has bitten a *test* rather
+> than the code.
+
+### The bar, at eighty-nine stations
+
+The morphodynamic loop is the same one, in 2-D geometry with cross-shore
+dynamics: `sediment_flux` unchanged — the shipped function, made shape-agnostic
+along the last axis rather than copied, so every wave-1 and wave-2 row still
+guards it — with the flux carried along the **wave direction** and Exner taking a
+real 2-D divergence. There is no alongshore transport in it: no longshore current
+term, no rip feeder, no alongshore pressure gradient. That is deliberate, and it
+is why the geometry of this wave and the circulation of the next are separable.
+
+**It reduces exactly.** On an alongshore-uniform bed the 2-D loop reproduces the
+1-D loop's bar to the last digit — crest position, depth and amplitude identical,
+and the spread across alongshore rows is **exactly zero**.
+
+**Does the bar vary alongshore?** It was measured rather than imposed, and it
+does:
+
+| | |
+|---|---|
+| rows with a bar (relief > 0.5 m) | **89 of 89** |
+| crest depth | 0.62–1.71 m, mean 1.29, sd **0.23 m** |
+| bar offset from its **own local** shoreline | 123 ± 8.2 m, against a shoreline that swings 55 m |
+| `d_bar/(H_b/γ)`, both terms in one field | **0.935 ± 0.028** across the whole embayment |
+| the same, crest read off the raw bed | **0.563** |
+
+The numbers above are the **suite's** grid, `Δx = 4 m`, because `--bugs` has to
+run it eighteen times. `s3-bar-alongshore.png` is the same measurement on the
+**evidence** grid, `Δx = 2 m`: crest depth 0.68–1.92 m with sd **0.30 m**, the
+bar 129 ± 8 m seaward of its own shoreline, and the ratio **0.966 ± 0.017** in
+one field against **0.674** in two. Both grids are reported and a suite row
+compares them at matched duration; the finer one is closer to 1, exactly as
+wave 2's 1-D refinement was.
+
+One offshore sea state, eighty-nine different shorefaces, and chapter 12's
+central prediction holds at every one of them. **And the two-field trap is worse
+in 2-D, not better**: it was worth 0.08 of the ratio in 1-D and it is worth
+0.37 here (0.29 on the finer grid), because the filter is 1.5 cells wide and so
+is the bar, in cells.
+
+### What this wave did *not* do, and did not go looking for
+
+**No 2DH circulation.** No rip solve, no alongshore momentum balance. Section B's
+second breaking line is still `OPEN` with wave 2's closed form behind it, and the
+plan-view field does **not** produce the reform on its own — which is worth saying
+explicitly, because it was the one result that would have overturned wave 2. The
+bay's alongshore variation changes *where* the single surf zone is and how wide,
+and does not split it in two. The missing mechanism is still the one wave 2
+named.
+
+**The number, since it is the point:** across 89 alongshore stations the
+transform's own hysteretic state gives **zero rows** with two or more separated
+surf spans. Not "few" — none. The bay's curvature moves the surf zone and
+changes its width from station to station; it does not split it, and no wave in
+this loop may now claim that a plan view would have.
+
+### Still not modelled, wave 3's additions to the list
+
+The 2DH circulation and everything under it (rips, rip feeders, the alongshore
+momentum balance, the second bar); optics, foam, spray, turbidity and run-up
+rendering, unchanged; the shelf's alongshore straightening — the Dean ramp is
+keyed **rigidly** to the local shoreline, so this bay's contours are parallel
+copies of its plan-form all the way to the shelf break, where a real shelf
+straightens offshore; and the tide, which the 1-D loop carries and the plan loop
+does not.
+
+## For a chapter, not for this file — the theory-level findings
+
+The reference implementation exists to prove and to improve the theory, and a
+finding that stays here is half-delivered. No wave in this loop may edit
+`terrain-architect/references/` (another builder is in it), so the findings
+below are written in the form a chapter can lift: **the claim, the measurement,
+the separating evidence, the tier.** Everything else in this file is
+implementation detail and should stay here.
+
+**Wave 3 adds C5–C9 on the same terms and for the same reason** — it may not
+edit `terrain-architect/references/` either. C5 and C6 are corrections to
+chapter 12's **coastal** loop, which no wave had implemented before this one;
+C7 and C8 are additions to its wave transform; C9 is not about coasts at all
+and is the third appearance of an error class that chapter already carries.
+
+**Wave 5 adds C10–C13, and they are written out in full in the wave-5 chapter
+below** (N1–N8) because each needs its derivation beside it. In lift order:
+
+| | the claim, in one line | where |
+|---|---|---|
+| **C10** | The Ursell number **is** the second harmonic's amplitude ratio, halved: `r = b/a → 2·Ur` in shallow water, because `ursell`'s `3/16` is that constant. A chapter that computes `Ur` for a sediment term already has the surface's shape and does not know it. | N1 |
+| **C11** | Skewness and asymmetry are **one harmonic at two phases**, `Sk² + As²` a function of `r` alone. Breaking *rotates* the third moment, it does not destroy it, so a transport that writes the collapse as `(1 − f_brk)` and carries no asymmetry term is reading half of one quantity — and `cos(πf/2)` vs `(1−f)` differ by 41% at `f = ½`. | N2 |
+| **C12** | **A peaked crest is not a steep face.** At its own validity limit pure skewness buys ×1.299 of maximum face slope and pure asymmetry buys ×2.000 exactly, because the second harmonic's slope contribution vanishes at the primary's steepest point when `ψ = 0`. Any chapter that reaches for "skewness" to steepen a wave has reached for the wrong moment. | N3 |
+| **C13** | **Stokes' 120° corner caps every wave of permanent form at a 30° face**, and that is 11.48° short of the `90° − asin(1/n) = 41.48°` a lengthwise in-water sightline needs. A backlit wave face is therefore *not renderable from a height field at any order of any wave theory* — it is the same representation boundary as the plunging lip, one step earlier. | N7 |
+
+A fifth, smaller, and worth a line in whichever chapter carries the
+parameterisation: **`ur_half = sk_max/(3√2)`** follows from `u = η√(g/d)` making
+the velocity and elevation skewness the same number in shallow water (N8). It is
+a constraint on the *ratio*, not on either constant.
+
+### C1 · The saturated surf-zone ratio is slope-dependent, in closed form
+
+> A broken wave decays to `Γ_eq = γ_s/√(1 + (5/2)·(dd/dx)/K)`, not to `γ_s`.
+> On a shoaling bed `Γ_eq > γ_s` always; `γ_s = 0.40` is the flat-bed limit of a
+> family, not a value any real surf zone sits at.
+
+- **Measurement.** Closed form against the marched Dally transform on plane
+  slopes 1:150 → 1:60: agree to 3%, degrading to 9% by 1:30 as the
+  shallow-water flux assumption fails. On this scene's own inner slope,
+  measured 0.4748 against 0.4772.
+- **Separating evidence.** The two routes share no arithmetic — one is the
+  fixed point of an ODE, the other a cell-by-cell march that has never been
+  told a fixed point exists. `--bug sat-no-slope` (drop the slope term) fails
+  both rows.
+- **Corroboration from outside.** Raubenheimer, Guza & Elgar (1996) measured
+  saturated `H/h` at 0.2–1.0 on a natural beach, positively correlated with
+  local bed slope and *not* with offshore steepness. Field data eleven years
+  after Dally, not derived from it.
+- **Tier: P.** Closed form off a published model, corroborated by a published
+  field measurement.
+
+### C2 · There is a slope above which no saturated surf zone exists
+
+> `tan β_crit = 2K/5` (= 0.060, one in 16.7, at `K = 0.15`). Steeper and the
+> shoaling gain outruns the breaking loss: the ratio grows without bound and
+> the wave surges rather than spills.
+
+- **Measurement.** The closed form's denominator vanishing, confirmed by the
+  march: at 1:20 and 1:18 the transform's `H/d` never settles.
+- **Why it belongs in a coastal chapter.** It lands within a factor of 1.5 of
+  Wright & Short's reflective/intermediate boundary, so **the breaker-type
+  classifier and the wave-decay model are not independent statements** — one
+  falls out of the other. A chapter carrying both should say so.
+- **Tier: P for the derivation, L for the correspondence with Ω** — the
+  numerical agreement with Wright & Short is suggestive, one beach, one `K`.
+
+### C3 · The breakpoint bar's trough sits one wave-decay length behind its crest
+
+> `L ≈ d_crest/K`, measured at `L·K/d` = 0.95 / 0.99 / 1.09 / 1.19 / 1.24 across
+> `H_0` = 1.0 → 3.0 m. The morphology inherits the wave model's length scale
+> because the undertow that digs the trough is driven by a dissipation that
+> decays over exactly `d/K`.
+
+- **Consequence a chapter should carry.** Reform ("break, reform, break") needs
+  the wave to lose a factor `(γ_b/γ_s)²` while the depth grows, which takes
+  about **two** e-foldings. A single-bar breakpoint model supplies **one**. So
+  a 1-D breakpoint-bar loop is structurally short by about a factor of two on
+  the second breaking line, and no coefficient in it is free to close that.
+- **Separating evidence.** The closed-form reform criterion
+  `G(d) = G_eq + (G_c − G_eq)(d/d_c)^(−a)`, `a = K/m + 5/2`, against the marched
+  transform bisected on relief; and the direct demonstration that the *same*
+  relief over *twice* the distance reforms.
+- **Tier: P.** Both sides are derivations; the `L ≈ d/K` identity is an
+  empirical result of this loop and should be marked as such until someone
+  checks it against a survey.
+
+### C4 · `d_bar ≈ H_b/γ` is exact to 1–3%, and "breathing" is not a relief mechanism
+
+> Two corrections to how the bar section reads in practice. First: the crest
+> depth and the breaker depth must be read from **one** depth field, or the
+> relation appears to fail by 10% and to have a spurious dependence on `H_b`.
+> Second: cycling the forcing (storm/calm, tide, or a wave-height distribution)
+> **lowers** the bar's relief in 1-D, because a moving break point smears the
+> flux convergence.
+
+- **Measurement.** Ratio in one field: 0.959 / 0.953 / 0.982 / 0.994 across four
+  grids, against 0.834 / 0.906 / 0.942 / 0.974 for the mixed-field form.
+  Relief under steady / tide / storm-calm / Rayleigh forcing: 1.42 / 0.62 /
+  0.42 / 0.70 m of crest amplitude.
+- **Tier: P for the relation, L for the breathing statement** — the latter is a
+  property of a 1-D loop and may not survive 2DH.
+
+### C5 · Chapter 12's `coastalStep` cannot retreat a coast on a heightfield, and the missing term is undercutting
+
+> `band = exp(−(h − seaLevel)²/(2·notchHeight²))` is a function of the **cell's
+> own** elevation. Once the notch has cut the cliff toe below the band, and the
+> thermal step is holding the face at repose above it, no cell that is still
+> intact rock is inside the band. The coast stops.
+
+- **Measurement.** 1408 m of coast, 4 m grid, the loop exactly as written:
+  retreat **16 m in 1500 steps and 0.0 m in the 500 after that**, while the notch
+  goes on planing seabed it had already cut. Widening `notchHeight` restarts the
+  retreat and removes the bench — so the chapter's own platform diagnostic
+  ("if you're not getting one, `notchHeight` is too large") and its retreat loop
+  are in conflict as written.
+- **The fix, and why it is a physics statement rather than a patch.** A real
+  notch cuts *into* the cliff at the waterline and the overhang falls. A
+  heightfield cannot hold an overhang — chapter 11's representation warning,
+  which chapter 12 already invokes for arches — so undercutting has to be
+  expressed some other way, and the direct expression is that waves attack the
+  **first land cell above the waterline**, whatever its elevation. With that term
+  the loop retreats indefinitely *and* planes a bench, and the `notchHeight`
+  diagnostic works in **both** directions.
+- **Separating evidence.** `--bug no-waterline-attack` restores the literal
+  pseudocode and the embayment, the bench and the retreat rows all fail together.
+- **Tier: P for the mechanism** (undercutting and cliff collapse are not in
+  dispute), **N for the expression** — it is a statement about what a heightfield
+  can represent, and it belongs beside the arch warning rather than beside the
+  erosion law.
+
+### C6 · Nothing in `coastalStep` limits the width of the platform it planes, and the missing feedback costs no new constant
+
+> The notch cuts as fast 200 m from the cliff as it does at its foot, because
+> nothing attenuates the wave crossing the bench. Measured: a **235 m bench,
+> still widening at 1600 steps.**
+
+- **The closed form that fixes it is already in the chapter.** The wave that
+  reaches a cell is depth-limited, `H = min(H_0, γ_b·d)`, and the work it does
+  goes as its energy, `H²`. Weight the notch by `(H/H_0)²` with `d` the water in
+  front of the cell and the platform acquires an equilibrium width: a cliff
+  behind a wide shallow bench is attacked by a small wave. **`γ_b` is the same
+  0.78 the chapter already shares with the renderer's break mask** — no constant
+  is introduced.
+- **Why it belongs in the chapter.** The section already says "don't run
+  cliff-retreat erosion below wave base" — a gate on *depth*. The same argument
+  applied to *distance across the bench* is the one that makes the platform a
+  landform with a scale instead of a monotonically growing flat, and a reader
+  who implements the pseudocode will meet the second problem immediately after
+  solving the first.
+- **Tier: P for the depth-limited breaker, L for the erosion coupling** — the
+  `H²` weighting is the natural energetics choice and is not measured here
+  against a field platform.
+
+### C7 · The Dally decay carries an obliquity, and the 1-D form and the divergence form disagree by `cos θ`
+
+> The chapter marches `F = E c_g cos θ` with `dF/dx = −(K/d)(F − F_s)`, applying
+> the decay **per unit cross-shore distance**. The 2-D conservation law
+> `∇·(E c_g ŝ) = −(K/d)(E c_g − (E c_g)_s)` applies it **per unit ray distance**,
+> `ds = dx/cos θ`. They are the same statement only at normal incidence.
+
+- **Measurement.** Same bed, same sea state, the two transforms compared: they
+  agree to **4.4×10⁻¹⁶ m** at `θ₀ = 0`, **2.6 mm** at 20°, **8.0 mm** at 40° —
+  0.14% and 0.47% of `H`.
+- **Why it is small, and when it will not be.** Refraction has already turned the
+  wave to 6.6° by the time it breaks on this beach, and `cos 6.6° = 0.9934`. On a
+  steep coast, where the wave breaks before it turns, the same term is worth per
+  cent — and a reader implementing the chapter's line in a plan-view model will
+  have written the wrong one without a symptom, which is the same family as the
+  `E₀/4` versus `E_b/2` trap the section already warns about.
+- **Tier: P.** It is a derivation on both sides; only the size of the residual is
+  scene-specific.
+
+### C8 · A refraction test that does not pass by construction, and a closed form for how far a crest turns
+
+> Verifying `sin θ/c` invariant on a straight coast tests nothing when
+> `sin θ` was computed from `c`. Two statements replace it, and both are
+> checkable against any refraction model.
+
+- **The test.** Give the model a plane beach whose contours run at an angle `φ`
+  to the grid. The exact answer is Snell about the **rotated** normal, and no
+  correct model needs to be told `φ`. Measured on a march that integrates
+  `∂k_y/∂x = ∂k_x/∂y` on the grid axes: worst error **0.186° / 0.310° / 0.277°**
+  at `φ` = 10 / 20 / 30°, and 0.000° at `φ = 0`, where it degenerates into the
+  old identity again.
+- **The closed form, and it settles what "crests parallel to the contours" may
+  mean.** Differentiating Snell about a contour at azimuth `β`:
+  **`dθ/dβ = 1 − c(d)/c(d_ref)`.** A crest is parallel to its contour only in the
+  limit `c → 0`. So the honest statement of bar section J's criterion is a
+  regression slope with a *bound*, not an assertion of parallelism: measured
+  **0.366** against a bound of **0.513** in this bay, and **0.000** with the
+  refraction term frozen.
+- **Tier: P.** Both sides are derivations; the numbers are one implementation's.
+
+### C9 · The two-field error class is worse in two dimensions, and it bites tests as readily as code
+
+> Chapter 12 now carries the general finding — *a ratio must name the field each
+> of its terms came from* — and the guard it recommends, an explicit `field=`
+> argument with no default. In 2-D there are more such pairs, not fewer, and
+> **two of the three instances found this wave were in test code rather than in
+> the model.**
+
+- **The crest-depth ratio, again.** In one field `d_bar/(H_b/γ)` = **0.935**
+  across 89 stations; with the crest read off the raw bed, **0.563**. In 1-D the
+  same mistake was worth 0.08 of the ratio; here it is worth **0.37**,
+  because the filter is 1.5 cells and the cells are four metres.
+- **The independent-method row.** A ray tracer and a grid march, checked against
+  each other over a curved bay, disagreed by **0.270 rad — 15° of apparent
+  refraction error.** The tracer had been handed the raw bed and the march reads
+  the filtered depth. One field: **0.043 rad.** The straight-coast version of the
+  same row cannot show it, because a cross-shore filter leaves a plane bed plane.
+- **The crest-to-contour angle.** The wave direction comes out of the filtered
+  field; the contour can be read off either. `contour_alignment(field=…)` and
+  `crest_azimuth_regression` therefore carry the same signature convention, and
+  `--bug alignment-mixed-fields` fires at it.
+- **A second guard the chapter should name beside the first: a masked statistic
+  must state the sign convention its mask enforces.** The crest-to-contour angle
+  is only defined where there *is* a shoaling contour to be parallel to. Behind a
+  bar crest the bed deepens shoreward, `∇d` reverses, and the "shoreward normal"
+  points out to sea; including those cells returned **34° mean with a 173rd
+  percentile** on a field whose surf lines were visibly following the shore. It
+  is the same disease — two populations under one name — and it does not
+  announce itself either.
+- **Tier: P.** It is a statement about measurement, not about coasts, and it is
+  reproducible by anyone who runs the file.
+
+## Where this scene disagrees with a source
+
+Recorded because a wave that overturns something is a good outcome here.
+
+1. **The bar is not the convergence of two fluxes — one is enough.** Chapter 12
+   says the breakpoint bar is where "the two fluxes converge": skewness onshore
+   seaward of the break, undertow offshore landward of it. Switch the undertow
+   off entirely in this model and **a bar still forms, at the same depth** —
+   crest 2.07 m against 2.08 m, amplitude 1.15 m against 1.42 m, 17 m further
+   inshore. The reason is that the onshore flux converges *against zero*:
+   breaking destroys the wave's skewness over a few metres, so `q_on` collapses
+   at the break point whether or not anything is carrying sand the other way.
+   The undertow deepens the trough and adds about a fifth to the bar's
+   amplitude; it is not what puts the bar there. The `--bugs` table found this,
+   by `no-undertow` failing **no rows at all**, and it is recorded rather than
+   patched over.
+
+2. **Chapter 12's runnable core cannot produce the feature its own section is
+   about.** It writes the transform as `H_w = min(shoal(H_0, d), γ·d)`, and
+   `shoal()` is the unbroken flux-conserving height, which keeps growing
+   shoreward. Over a bar–trough profile that expression stays pinned to `γ·d`
+   everywhere landward of the first break, because it has no memory of the energy
+   the break removed: the wave never un-breaks and the trough never reforms. The
+   cap is a **mask**, not a transform. Reform needs a dissipation model with
+   memory — here Dally, Dean & Dalrymple (1985). The suite's
+   `--bug cap-not-dissipation` puts the chapter's line back and shows what it
+   costs.
+
+   > **Wave 2 tested the other half of that sentence and it holds.** Wave 1's
+   > worry was that its *own* transform might be collapsing to the memoryless
+   > form somewhere. It is not: `--bug no-hysteresis` leaves the flux march in
+   > place and removes only the `H ≤ γ_s·d` off-switch, and the probe row above
+   > catches it. Hand the shipped transform a wide enough trough and it
+   > un-breaks and re-breaks. **The chapter's core lacks the memory; this file's
+   > does not; and the reform still fails, for a different reason entirely.**
+
+3. **Wave 1's own `d_bar/(H_b/γ) = 0.893` was a measurement artefact, and its
+   "falsifiable trend" across sea states was the grid.** Withdrawn above, with
+   three independent routes to the withdrawal. Chapter 12's relation is met to
+   1–3%. Recorded here because the ruling this loop runs under says a wave may
+   conclude a previous wave was wrong, and the previous wave was this file.
+
+4. **A broken wave does not decay to `γ_s`, and `γ_s = 0.40` is not the H/d any
+   real surf zone sits at.** `Γ_eq = γ_s/√(1 + (5/2)(dd/dx)/K)`, derived above,
+   makes `γ_s` the *flat-bed limit of a family* whose member is picked by the
+   local slope. Chapter 12 does not carry the Dally model at all — its runnable
+   core is the memoryless cap — so this is an addition rather than a
+   correction; but any chapter that names `γ ≈ 0.78` as "the breaking index"
+   should not let a reader infer a second constant that a surf zone relaxes to.
+
+5. **Chapter 12's "the profile breathes on a storm/calm cycle" does not build a
+   wider bar in 1-D — it builds a lower one.** Measured four ways
+   (`s2-forcing-history.png`). The breathing is real as a statement about bar
+   *migration*; read as a mechanism for bar *relief* it is backwards, because a
+   moving break point smears the flux convergence into a terrace. The
+   distinction is worth a sentence in the chapter, because "storms push the bar
+   seaward; calm swell walks it back" invites exactly the wrong inference.
+
+6. **Chapter 27's "wavelength-scale filtered depth" is wrong for a morphodynamic
+   loop.** Taken literally the filter here would be 13–130 m and the bar is 11 m
+   wide: filtering at that scale does not blur the bar, it **hides the bar from
+   the wave that is supposed to break on it**, so the feedback that limits the
+   bar's growth never fires and the crest grows straight through the depth the
+   chapter predicts for it. The advice is right for a renderer's break *mask*,
+   where the aim is a clean foam line, and wrong where the depth field is a state
+   variable. This file filters at the grid-noise scale and says so.
+
+7. **Chapter 12's `coastalStep` does not retreat a coast, and its two remedies
+   are mutually exclusive as written.** Run literally on a heightfield the loop
+   moves the shoreline 16 m and stops, because `band` reads the cell's own
+   elevation and the intact rock is above it; widening `notchHeight` restarts
+   the retreat and destroys the wave-cut bench the same section names as the
+   loop's signature. Both halves are measured, `--bug no-waterline-attack` and
+   `--bug wide-notch` fire at them separately, and the missing term is
+   undercutting — see C5.
+
+8. **Its deposition step loses the rock it erodes.** `beach = (1 − exposure)·…`
+   is identically zero over open water, where the fetch sweep saturates at 1,
+   and *largest* on the dry plateau, where the sweep returns zero because no
+   fetch reaches a cell behind a cliff. The first two runs of this loop lost
+   116 154 m³ out of a closed domain and then, once the weight was fixed but not
+   gated to water, piled the debris inland and stopped the retreat again. The
+   honest version has three parts and none is a coefficient: the band is water,
+   the material stays in the row it came from, and the fill is capacity-limited
+   at the datum with the excess **exported and reported** — which is what a real
+   cliff does with 90% of its debris.
+
+9. **Nothing in the section limits the platform's width**, so the bench grows
+   without bound (235 m and still widening at 1600 steps). The feedback that
+   stops it is the chapter's own breaking index: the wave reaching a cell is
+   `min(H_0, γ_b·d)` and the work goes as `H²`, so a cliff behind a wide shallow
+   bench is attacked by a small wave. Added at no new constant — see C6.
+
+10. **The Dally decay's obliquity differs between the chapter's 1-D march and
+    the divergence form a plan view needs**, by exactly `cos θ`, because one
+    applies the rate per unit cross-shore distance and the other per unit ray
+    distance. Measured at 4.4×10⁻¹⁶ m, 2.6 mm and 8.0 mm for `θ₀` = 0, 20 and
+    40°. It is small here only because refraction turns the wave before it
+    breaks — see C7. Recorded rather than patched into the 1-D file.
+
+## The suite
+
+Three tiers, the pool's: **closed form / published measurement / independent
+method**, and the pool's hardest-won rule — *two routes to a number must not
+share a source*. Every tier-3 row names where its second route came from, and
+where that route is an equation it came from a document read this wave rather
+than from the module it checks. `--bugs` puts **eighteen** defects back, one at a
+time, and prints which rows caught each; a guard that does not fire on its own
+bug is a comment with a `check()` around it.
+
+**77 pass / 0 FAIL / 0 ERROR / 1 open / 52 info, in about 319 s**
+(wave 2: 54 / 0 / 1 / 33 in 155 s; wave 1: 46 / 0 / 1 / 23 in 77 s). The one
+OPEN row is still section B's second breaking line, with wave 2's closed form
+and separated candidates behind it — **wave 3 did not close it and did not try**,
+and the plan-view field does not produce the reform on its own.
+
+### The harness change wave 3 made, and why it is the harness and not a row
+
+Wave 2 recorded a defect in its own suite: three of the old bugs stopped
+*failing* rows and started *raising*, the `--bugs` driver counted the crash as a
+single catch and stopped, and `cap-not-dissipation` was reported at **1** where
+it should have been **8**. Wave 2 fixed the rows that raised. **That leaves the
+harness able to be lied to by the next such bug**, which is a worse place to
+stand than it looks, because the number that lies is green-adjacent and the
+information lost is silent.
+
+The suite is now a list of **sections**, each called through `guard()`. An
+exception inside one costs that section and nothing after it, prints as
+**ERROR**, and counts against the exit code exactly as a FAIL does. It earned
+its keep on its first run: four sections raised at once — a `NameError` from the
+refactor itself, a missing context key, a broadcast mismatch in a new row and a
+NumPy 2 API change — and the run still reported 58 passing rows and the two real
+FAILs underneath them, instead of stopping at the first line and reporting
+nothing. **A run that ends in ERROR is INCOMPLETE, not merely failing**, and the
+summary says so in those words.
+
+It earned it a second time on the very next run: fixing the oblique-Snell window
+introduced a loop variable named `j`, which is also the row index the rows above
+it use, and the section died on an `IndexError` **after** its own row had passed.
+Without the guard that would have been a suite reporting nothing at all; with
+it, the run printed 71 passing rows, the offending section's ERROR, and the
+measurement that had just been corrected.
+
+Four defects were found *by* the suite while it was being written, and they are
+worth listing because each is a way a green suite can lie:
+
+- **Two rows compared empty arrays.** `d_test > 5*L_0` selected no depths, and
+  `np.all([])` is `True`, so "deep limit k → ω²/g" passed by asserting nothing.
+  `check()` now raises on an empty comparison rather than passing it.
+- **The ray-tracer row was launched from the wrong initial condition** — a ray
+  started at the *deep-water* angle in 8.2 m of water, where Snell has already
+  turned the crest to 12.5°. The tell was that the error did not fall when the
+  step size was quartered: a truncation error halves, an initial-condition error
+  does not.
+- **The longshore closed form was missing a term**, which is how `5π/16` got
+  derived. See above.
+- **One "bug" had nothing to break.** `quarter-at-break` patched a flag that no
+  row read, because the row computed both forms of the alongshore thrust itself
+  — so it was testing the row, not the module. The two forms now live in
+  `beach.alongshore_thrust(tr, where=...)`, which is what the bug patches and
+  what the row reads. A test that owns the quantity it checks proves nothing
+  about the code.
+
+**Four more were found by the suite in wave 3, and three of them were in the
+tests rather than in the model:**
+
+- **A bug that patched nothing, again, and by a mechanism worth knowing.**
+  `wide-notch` first set `mod.NOTCH_HEIGHT`. Python binds a default argument
+  **when the function is defined**, so `coastal_step(notch=NOTCH_HEIGHT)` had
+  already captured the old value and no caller ever saw the new one. It is the
+  same failure as wave 1's `quarter-at-break` with a different cause, and the
+  fix is the same: patch the function, not the constant.
+- **A row asserted the wrong statement in 2-D.** "The energy flux never
+  increases shoreward" is chapter 12's verification item and it is true per cell
+  only in 1-D: refraction focuses one ray tube at its neighbour's expense, so a
+  cell may legitimately gain 0.7% of the peak. The row now checks the flux
+  **summed across the coast**, which is the statement conservation actually
+  makes, and the per-cell rise is an INFO row reporting the focusing.
+- **A row measured its own quantity in the wrong place**, and in the direction
+  that flatters — the oblique-Snell window pinned to the grid centre; see above.
+- **A statistic that averaged two populations.** The crest-to-contour angle came
+  back at 34° mean with a 173rd percentile on a field whose surf lines visibly
+  follow the shore, because behind a bar crest the bed deepens shoreward and the
+  "shoreward normal" points out to sea. The mask, not the physics — and it is
+  the sibling of the two-field rule, so it is written up as one in C9.
+- **The independent-method row compared two depth fields** and reported 15° of
+  refraction error that did not exist. See C9.
+
+### The bug table
+
+`--bugs` reloads the module, patches in one defect, and re-runs everything.
+**It now costs about an hour and a half**, because the suite runs a coastal loop
+and two morphodynamic loops and there are eighteen defects; `--bug NAME` runs
+one of them in the time of a single suite. That cost is a real pressure on the
+next wave and it should be resisted honestly rather than by deleting guards —
+the cheapest lever is the *duration* of the plan-view run, not the number of
+defects fired at it:
+
+| bug reintroduced | wave 1 | **wave 2** |
+|---|---|---|
+| `dw-for-ew` — the undertow built from the dissipation rate | **0** → 1 | **3** |
+| `quarter-at-break` — the deep-water ¼ paired with breaking values | 1 | 1 |
+| `cap-not-dissipation` — chapter 12's `min(shoal, γd)` restored | 4 | **8** |
+| `no-skewness` — the onshore transport term removed | 4 | **9** |
+| `no-undertow` — the offshore transport term removed | **0** → 1 | **4** |
+| `no-refraction` — Snell ignored, the deep-water angle kept | 6 | 6 |
+| `wavelength-filter` — chapter 27's filter scale restored | 1 | **3** |
+| `no-slope-term` — Bailard's slope term removed | 5 | **10** |
+| `no-hysteresis` — the flux march kept, the un-break switch removed | — | **1** |
+| `sat-no-slope` — `Γ_eq = γ_s`, the slope term dropped | — | **3** |
+| `reform-exponent` — the 5/2 removed from `a = K/m + 5/2` | — | **1** |
+| `crest-depth-mixed-fields` — wave 1's raw-vs-filtered comparison restored | — | **1** |
+
+and wave 3 adds six, all against the plan view and the coast:
+
+| bug reintroduced | **wave 3** |
+|---|---|
+| `no-transverse-refraction` — `∂k/∂y` dropped, the crest keeps the direction it entered with | *(pending)* |
+| `uniform-hardness` — chapter 12's own counter-case: the geology switched off | *(pending)* |
+| `wide-notch` — `notchHeight` × 6, the chapter's platform diagnostic | *(pending)* |
+| `no-waterline-attack` — `coastalStep` exactly as written, with no undercutting term | *(pending)* |
+| `alignment-mixed-fields` — the crest measured against a contour from the other depth field | *(pending)* |
+| `flux-not-along-ray` — the plan-view sediment flux carried along the grid's x axis | *(pending)* |
+
+**`no-hysteresis` is the one to read.** It fails **exactly one** row — *the
+transform DOES reform, given the distance* — and nothing else. The memory bug is
+caught by precisely the guard written for it and by no other, which is what a
+guard should look like; and it is what lets this file say that cause 3 is dead
+rather than merely untested.
+
+**All four of wave 2's new bugs fired on their first run**, which is a weaker
+result than wave 1's — its two silent bugs were its most valuable output. But
+the harness still found a defect, and it was in **wave 2's own new rows**:
+
+- **Three of the old bugs stopped failing rows and started raising exceptions.**
+  `cap-not-dissipation`, `no-skewness` and `no-undertow` destroy the bar, and
+  the new reform rows had no guard for a degenerate profile —
+  `_reform_length` returned infinity, `int(round(inf))` raised `OverflowError`,
+  and `th_s` came back `None`. The harness dutifully counted the crash as a
+  catch (*1*), which is exactly how a suite lies with a green-looking number:
+  **the exception truncated the run, so the four to nine rows those bugs used to
+  fail never executed.** The first `--bugs` pass reported `cap-not-dissipation`
+  at **1** where it should have been **8**. A row that explodes is worth less
+  than a row that fails, because it takes every row after it with it. Fixed, and
+  the table above is the re-run.
+
+**Wave 1's two silent bugs, restated because both findings stand:**
+
+- **`dw-for-ew` — the dimension guard is the wrong guard for this bug.** The
+  trap chapter 12 names is a *caller* passing `D_w` where `E_w` belongs, and
+  that leaves the function's own dimensions untouched: the algebra row is a
+  guard on the formula, not on the argument. What catches it is the
+  **magnitude** — the mean surf-zone undertow falls from 0.244 m/s to
+  0.058 m/s — so a row now checks it against the published 0.1–0.4 m/s band
+  with a 50% margin either side. The bug's value is below that band before any
+  margin, and the clean value sits in the middle of it.
+- **`no-undertow` — the bug is not a bug.** See the finding above: the bar
+  survives it. A row was added that detects the undertow being switched off (the
+  same magnitude row), and an INFO row now reports the bar with and without it,
+  because the honest statement is *what the undertow contributes*, not *that the
+  bar needs it*.
+
+  > **Wave 2 sharpens this and it is worth the correction.** `no-undertow` went
+  > from **0** rows in wave 1 to **4** — not because the guards got stricter but
+  > because the new rows measure the *trough*, and the trough is what the
+  > undertow digs. So wave 1's statement is true and incomplete: the undertow is
+  > not what puts the **bar** there, and it is exactly what puts the **trough**
+  > there — and the trough is the whole of section B's second breaking line.
+  > A mechanism can be optional for one feature and load-bearing for the next.
+
+## The sediment flux is exposed, and deliberately not rendered
+
+Section D's turbidity is named in this wave's brief only because the flux it will
+consume is computed here. `sediment_flux(tr)` returns `q`, `q_on`, `q_off`,
+`q_slope`, the stirring velocity `u_orb`, the undertow `u_u`, the skewness `Sk`
+and the broken/roller fractions — all in SI, all scene-linear, none of them drawn.
+Turning a suspended load into an optical `b` is 28-liquids' Babin bridge and a
+later wave's problem.
+
+---
+
+# Wave 4 — first light on the bay
+
+Three waves computed a coast and drew diagnostics of it. This one renders it, and
+the deliverable is not the picture: it is **what the picture had to be measured
+against before it could be believed**. Two new files, three frames, six findings,
+and one criterion the bar asks for that this representation provably cannot meet.
+
+    python3 beach_render.py           # the frames and every number below
+    python3 beach_render.py --fast    # half resolution, no supersampling
+
+| File | Owns |
+|---|---|
+| `beach_optics.py` | The coastal IOPs — chapter 28's three constituents, the Babin bridge, the suspension balance, the two transports, the cuvette inversion, Cox & Munk's glitter, and the foam **placeholder**. No rendering, no scene. |
+| `beach_render.py` | The camera, the ray cast, the shading, the cuvette figure, the tone map — and every measurement, taken from the radiance buffer before the tone map. |
+
+**The pool is still untouched.** `optics.py` and `atmosphere.py` are imported and
+never copied. The coastal absorption enters the pool's own functions through the
+`absorb=` argument the extraction already left open — `rho_water`, `slab_esc`,
+`slab_trap`, `trap_gain` all take it — which is why a second scene with entirely
+different water needed **no fork and no special case**. `render.py`,
+`validate.py`, `field.py` and `wake.py` are not edited.
+
+## The three constituents, and why one slider cannot do this coast
+
+Chapter `28`'s rule is the architecture of `beach_optics.py`: **CDOM darkens,
+sediment brightens, and chlorophyll owns the 550–570 nm window.** They are
+carried as three separate controls, and two of them are absorption coefficients
+rather than concentrations — deliberately, because the chapter's bridge is stated
+for mineral *mass* and says nothing about chlorophyll-specific absorption, so a
+`Chl` in mg/m³ cannot be quoted from this file without importing a number the
+chapter does not carry. It is not quoted.
+
+| | value | where it comes from |
+|---|---|---|
+| `a_ph(440)` | **0.1083 m⁻¹** | **Recovered**, not chosen — see below |
+| `a_CDOM(440)` | 0.0800 m⁻¹ | `?` declared, against chapter 28's own gates (blackwater is 5–19; turquoise needs < 0.5) |
+| `S` | 0.017 nm⁻¹ | midpoint of the chapter's 0.012–0.022 |
+| `b_p(555)/SPM` | 0.5 m²/g | Babin et al. (2003), via chapter 28 |
+| `b_b/b` | **1/51 = 0.01961** | the chapter's own `b_f ≳ 50 b_b`, read at its boundary |
+| `g` | **0.9132** | **derived**: the HG lobe whose backscattered share *is* 1/51 |
+| `SPM` | a **field** | the wave's own bed dissipation — see the balance below |
+
+The recovered water is `a = (0.2824, 0.0835, 0.1577) m⁻¹`, `K_d = (0.328, 0.097,
+0.183)`, Secchi **10.3 m** — a coastal green sea, which is what an upwelling
+Atlantic coast is.
+
+### The chlorophyll amplitude is recovered, and it round-trips
+
+Chapter 28 gives no `a*_ph`, but it gives a Jerlov table, and the entry it labels
+*"coastal green"* is **1C, `K_d(490) = 0.120 m⁻¹`**. Gordon's `K_d ≈ (a + b_b)/μ_d`
+inverts that to an absorption, and everything else at 490 nm is either pure water
+or already declared:
+
+```
+a(490)    = K_d(490) μ_d − b_b(490)
+a_ph(490) = a(490) − a_w(490) − a_CDOM(490)
+a_ph(440) = a_ph(490) / shape(490)          →  0.1083 m⁻¹
+```
+
+Two inputs are not the chapter's and both are marked: `a_w(490) = 0.0150 m⁻¹`
+(Pope & Fry 1997, a **point** value used only here — the render never sees it,
+since 490 nm sits inside the blue band and the band mean is not the quantity
+Gordon's relation is written at), and `μ_d = 0.86`, `?`. The answer is nearly
+linear in `μ_d`, so a 10% error there is 17% here; that is the dominant
+uncertainty and it is reported rather than absorbed. Nothing about this scene
+entered the recovery, and the suite runs it forward again as a round-trip.
+
+### `?` and open
+
+* the wind at the frames' hour — bar section K says so outright. `U10 = 6 m/s` is
+  declared and **every glitter number is reported as a function of it**, together
+  with the inverse map, so a later wave with a wind observation can check the
+  width without re-running anything.
+* `a_NAP`, the absorption of the same mineral particles, is **0 and that is an
+  omission, not a result.** Chapter 28's bridge gives the scattering coefficient
+  only, and this file does not import a mass-specific absorption the chapter does
+  not carry. The consequence is named: the surf zone renders slightly too bright
+  and slightly too neutral, most in the blue.
+* `ε_s = 0.02`, Bagnold's suspension efficiency via Bailard (1981) — the same
+  paper `beach.py` already takes its energetics flux from. The load is **linear**
+  in it; halve it and every SPM below halves and nothing else changes.
+* `Chl` in mg/m³ — not derivable from chapter 28 (see above).
+* the three albedos (`SAND_DRY`, `ROCK_DRY`, `PLAIN_DRY`) are declared. The
+  wet/dry sand pair is **not** a second declaration: bar `H3` records that wet
+  sand darkens by the trapped series this project already derived for the pool's
+  liner, so `SAND_WET` is `optics.wet_albedo(SAND_DRY)` and carries no new number.
+
+## The mineral load is not a slider — it is a balance
+
+Bar section D: `b` is a **field coupled to the wave field**. So the suspension is
+Bagnold's, in Bailard's surf-zone form — the power that holds sand up comes from
+the bed, and the sand falls out at its settling velocity:
+
+```
+i_s w_s = ε_s D_f            D_f = ρ c_f ⟨|u|³⟩,   ⟨|u|³⟩ = (4/3π) u_orb³
+M       = ε_s D_f ρ_s / (g (ρ_s − ρ_w) w_s)        [kg/m²]
+```
+
+Every symbol is already in `beach.py`: `u_orb` from `orbital_velocity`, `w_s`
+from `settling_velocity`, `c_f = 0.006` from `longshore_current`.
+
+> **`D_f` is the BED's dissipation and not the wave's, and the first writing of
+> this file got that wrong by a factor of about fifty.** `tr['D_w']` is a
+> *breaking* loss deposited in a surface roller; the power that works on grains
+> is the wave boundary layer's stream power. Driving the balance from `D_w` gave
+> a depth-averaged load of **3.7 g/L** across the breaking zone, which is a silt
+> river and not a beach, and it would have been reported as a result. What is
+> therefore still missing is named rather than added: breaking turbulence does
+> reach the bed in the inner surf, this balance does not carry it, and the
+> direction of the error is known — **the surf zone's load is understated.**
+
+| | `D_f` W/m² | `M` kg/m² | Rouse layer | SPM in the layer | depth-averaged |
+|---|---|---|---|---|---|
+| breaking zone | 1.50 | 0.117 | 0.11 m | 835 mg/L | 98.5 mg/L |
+| depth 2–4 m | 3.86 | 0.302 | 0.39 m | 841 mg/L | 111.6 mg/L |
+| offshore, `d > 6 m` | 0.90 | 0.070 | 0.67 m | 104 mg/L | 8.9 mg/L |
+
+### F1 · The stratification is what separates a blue sea from a milky one
+
+**The single most consequential finding of this wave, and it is optical rather
+than sedimentological.** The balance fixes the load *per unit area* and says
+nothing about where in the column it sits. Where it sits is the Rouse problem:
+
+```
+ℓ = ε_v / w_s,     ε_v ≈ κ u* d / 6
+```
+
+which is about a metre for 0.30 mm sand under this swell. So in the **surf zone**,
+where `d` is 1–2 m, the load fills the column and the water is opaque; at the
+**8 m offshore boundary** the *same balance* with the *same kind of load* puts it
+in the bottom metre and leaves seven metres of clear water above it.
+
+A depth-averaged SPM cannot tell those two apart. Measured, green channel, deep
+reflectance:
+
+| | two-layer | depth-averaged |
+|---|---|---|
+| offshore, `d = 8 m` | **0.038** | 0.158 |
+| surf, `d = 1.2 m` | 0.231 | 0.286 |
+
+A factor of **four** offshore. A physically correct load, spread the wrong way
+through the column, renders the whole Atlantic as Jerlov 5C. Reflectance is
+dominated by the upper optical depth, so a load hidden under seven metres of clear
+water is nearly invisible while the same load through 1.5 m is the entire colour
+of the pixel. `column_reflectance` is a two-layer composition of the same derived
+single-scattering integral, and the suite checks that it collapses to the
+one-layer form when the two layers agree.
+
+## Section A — the colour is the path, measured three ways
+
+### A1 · The instrument is the transmittance, not the radiance
+
+A green excess `2G/(R+B)` measured on a *radiance* mixes the water's colour with
+the **source's** colour. Dividing every pixel by the zero-path pixel of its own
+panel removes the source exactly — the same cancellation the cuvette runs on — and
+leaves a number that is **1 when there is no water** and departs from 1 only
+through the path.
+
+| path | `2G/(R+B)` of the transmittance |
+|---|---|
+| 0.00 m | **1.0000** |
+| 0.10 m | 1.0132 |
+| 0.40 m | 1.0549 |
+| 1.00 m | 1.1420 |
+| 2.00 m | 1.2987 |
+| 2.90 m | **1.4518** |
+
+**The green vanishes when the path does**, by construction and by physics: at zero
+path the transmitted spectrum *is* the source spectrum. Nothing in these two files
+can tint it — there is no water colour anywhere in them, only `a`, `b` and a
+length.
+
+**The two ratios the bar asks for:**
+
+* **the grade across the wedge**, thick against thin: **1.355**, and it is
+  **1.348 in the front-lit control** — the same, because the grade is the path and
+  *the path does not know where the sun is.*
+* **the face against the body**: the wedge at 2–3 m of path reads `2G/(R+B) =
+  1.382` where the bay's own deep water — the same water, seen as a *body*, with
+  no transmitted path at all — reads **0.961**. Ratio **1.44**. One liquid, two
+  colours, one exposure, and the difference is a length of water.
+
+And the bay shows the same thing **without the cuvette at all**, which is the
+result worth having: bar section J's colour ladder, measured on `s4-bay-render.png`'s
+own scene-linear buffer, is monotone in the path through the column to the bed.
+
+| surface | scene-linear (R, G, B) | `2G/(R+B)` |
+|---|---|---|
+| deep, `d > 5 m` | (0.909, 1.027, 1.227) | **0.961** — grey-blue, sky and backscatter, no path |
+| mid, 2–5 m, unbroken | (0.540, 0.714, 0.869) | 1.014 |
+| shallow, `d < 2.5 m`, unbroken | (0.381, 0.615, 0.707) | **1.130** — teal |
+| surf, breaking | (0.564, 0.725, 0.785) | 1.075 |
+
+**Deep blue offshore → teal over the shallows**, in one exposure, out of one set
+of coefficients, with the ordering set by nothing but the length of water the
+light crossed. Shallow against deep is **1.175**.
+
+What *does* distinguish backlit from front-lit is the **forward glow**, and it is
+the term chapter 28 names when it warns that leaving `g` at zero "kills the
+forward glow through a sunlit wave crest":
+
+| | scattering angle | HG lobe at `g = 0.9132` | glow, share of the pixel |
+|---|---|---|---|
+| backlit | **15.8°** | 0.6215 sr⁻¹ | **5.07%** |
+| front-lit | 180° (the face is unlit) | 0.0019 sr⁻¹ | **0.00%** |
+
+The sun cannot reach the back face at all in the control, so the term is
+identically zero. **The same lobe, the same water, the same exposure; only the
+observer moved.**
+
+### A2 · The wave face is a near-breaking geometry, and this representation cannot reach it
+
+> **This overturns the working assumption of the whole colour pass, and it is
+> geometry rather than optics.**
+
+A ray entering water is confined to the Snell cone: it can be no further than
+`asin(1/n) = 48.5°` from the surface normal. So for a sightline to travel **along**
+a wave — across the crest and out the far side, which is what a backlit face *is* —
+the face's normal must be tilted at least
+
+```
+90° − asin(1/n) = 41.48°
+```
+
+from the vertical. **The face must be steeper than 41.5° or no observer can see
+through it lengthwise, whatever the water is made of.**
+
+This scene's free surface is `η = (H/2)·cos(S)` — a linear wave, whose maximum
+slope is `(H/2)k`. Measured over the whole bay:
+
+| | slope | angle |
+|---|---|---|
+| maximum `|∇η|` | 0.1443 | **8.21°** |
+| 99.9th percentile | 0.1294 | 7.37° |
+| **needed** | 0.8841 | **41.48°** |
+
+Six times too gentle. So bar section A's backlit face **belongs beside bar section
+F's plunging lip**, one step earlier and for the same structural reason: the
+height field is not the obstacle at breaking, it is already the obstacle at
+*steepening*. The missing physics is the wave's nonlinear shape — and `beach.py`
+already computes the skewness `Sk` that describes it, and spends it **only inside
+the sediment transport**, never on the free surface. That is the shortest path to
+closing this and it is named rather than attempted.
+
+The frame that carries section A is therefore **the bar's own instrument**: a
+variable-path cuvette, a wedge of *this scene's water* thinning from 3 m to 0,
+in *this scene's sun*, with `optics.fresnel` on both faces and `optics.refract`
+with its TIR branch. **`s4-cuvette.png` says so in its caption.**
+
+### A3 · The cuvette inverted, term by term — and the forward glow biases it by a quarter
+
+`c(λ) = −ln(T₂/T₁)/(L₂−L₁)`, run on the render's own scene-linear buffer, with the
+terms added one at a time. Each addition is a different way a real frame lies to
+this instrument.
+
+| what is in the signal | `c` red | `c` green | `c` blue | error |
+|---|---|---|---|---|
+| **transmitted only** | 0.28356 | 0.08560 | 0.16191 | **0.00 / 0.00 / 0.00 %** |
+| **+ the forward glow** | 0.26822 | 0.06480 | 0.13630 | −5.4 / **−24.3** / −15.8 % |
+| **+ the front face's own reflection** | 0.26263 | 0.06386 | 0.13367 | −7.4 / −25.4 / −17.4 % |
+| put in (`a + b`) | 0.28356 | 0.08560 | 0.16191 | |
+
+### F2 · The forward glow is not Beer–Lambert
+
+A single-scattering source inside a slab integrates to
+
+```
+L = ∫₀^L b p(Θ) E e^{−c(L−s)} e^{−cs} ds  =  b p(Θ) E · L · e^{−cL}
+```
+
+**linear in `L`, not exponential.** It rises out of zero, peaks at `L = 1/c` and
+falls. So a cuvette run on a scattering-contaminated signal reads
+
+```
+−ln(T₂/T₁)/(L₂−L₁)  =  c  +  ln(L₂/L₁)/(L₂−L₁) · (the glow's share)
+```
+
+— biased **low**, by a term that depends only on the two thicknesses. Five per
+cent of forward-scattered light costs **a quarter of the green coefficient**, and
+green is the band the entire colour argument lives in. A cuvette read off a real
+backlit wave face, where the glow is the *point*, is not measuring what it thinks
+it is measuring unless the glow is separated first.
+
+### A4 · What the cuvette bounded, and what it left open
+
+* **Bounded:** transmission alone gives `a + b` per band, exactly, and nothing
+  more. It cannot separate `a` from `b` and it cannot separate the constituents.
+* **Closed by a second geometry:** the same water's **deep reflectance** gives
+  `f b_b/(a+b_b)`, and the pair is two equations in two unknowns. It inverts
+  exactly, and chapter 28's Babin bridge then returns the load: **500 mg/L put in
+  → 509 mg/L recovered in the green band** (1.8% high — the bridge is stated at
+  555 nm and the green band is centred at 545, so what is recovered is the
+  particulate spectral slope over 10 nm). Red and blue read 461 and 577, off *by
+  exactly that slope*, which is what the chapter's `λ^−0.5…−1` interval costs.
+* **Left open, and named:** the **partition of `a`** among chlorophyll, CDOM and
+  NAP. Three constituents, three bands, and CDOM's and NAP's spectra are too
+  collinear to separate with them. Closing it needs a fourth band or a third
+  geometry. Not attempted.
+
+## Section K — the glitter path is the slope distribution, and nothing else
+
+There is **no spread parameter in these files.** The path's radiance is
+
+```
+L = ρ_F(ω) E_n p(z_x, z_y) / (4 cos⁴β cos θ_v)
+```
+
+with `ρ_F` from `optics.fresnel`, `E_n` from `atmosphere.E_SUN`, `p` the published
+Cox & Munk slope distribution, and the rest a Jacobian derived beside itself:
+`dω_n = cos³β dz`, `dω_v = 4 cos ω dω_n`. Nothing in it is free, which is exactly
+what section K demands.
+
+At **`U10 = 6 m/s`** — `σ_u² = 0.01896`, `σ_c² = 0.01452`, **mss = 0.03348**:
+
+| view elevation | width in azimuth | angular width | peak radiance (green) |
+|---|---|---|---|
+| 25.0° (near field) | **14.96°** | 13.56° | 13.6 |
+| 21.0° (the specular point) | 13.54° | 12.64° | 19.7 |
+| 15.0° | 11.46° | 11.07° | 33.2 |
+| 10.0° | 9.79° | 9.64° | 51.8 |
+| 6.0° | 8.49° | 8.44° | 79.5 |
+| 3.0° | 7.52° | 7.51° | 119.5 |
+| 1.5° | 7.04° | 7.04° | 152.5 |
+| 0.5° | 6.72° | 6.72° | 182.7 |
+| 0.2° (the horizon) | **6.63°** | 6.63° | 193.4 |
+
+**The path narrows toward the horizon by a factor of 2.26 and brightens by a
+factor of 14 doing it.** Bar section K predicted the sign of that trend from the
+geometry alone — "the same slope distribution subtends a different range of
+specular directions at different incidences" — and the geometry agrees. A path of
+uniform width would be wrong, and it would have been the default.
+
+**The width is a readout.** `width / √mss` is constant to **1.7% over a factor of
+five in wind** (53.53, 53.52, 53.75, 54.43 deg per unit RMS slope at `U10` = 3, 6,
+10, 16 m/s). That constancy is what makes the width a *measurement of the wind*
+rather than a look, and it is the one thing a chosen spread parameter cannot
+reproduce. The inverse map is `wind_from_mss` and the suite checks it round-trips.
+
+### F3 · A tenth of the intercepted flux reflects below the horizon
+
+Integrating the radiance this file produces over the upward hemisphere agrees with
+the flux the tilted facets intercept — two routes sharing only the slope pdf —
+**but only after restricting the second to facets whose mirror direction points
+up.** The rest, **10.3%** of what the surface intercepts at this sun and this
+wind, is reflected *into the sea*: facets tilted far enough away from a 21° sun
+send their specular lobe below the horizon, and a single-bounce glitter model
+drops that light entirely. It is exactly the light a multiple-surface-bounce model
+would put back as the faint filling between the glints. Recorded, not modelled.
+
+### F4 · Cox & Munk's own two fits do not agree
+
+The components — `σ_u² = 3.16×10⁻³ U`, `σ_c² = 0.003 + 1.92×10⁻³ U` — sum to
+`0.003 + 5.08×10⁻³ U`. The paper's **separately fitted** combined slope is
+`0.003 + 5.12×10⁻³ U`. **0.8% apart at any wind**, inside their own quoted
+uncertainties (±0.004 and ±0.002). A file that quotes both numbers as if one
+implied the other has misread the source; the suite carries the components against
+their own sum and the total against the published fit as a *range*, and records
+the gap instead of hiding it.
+
+## F5 · Chapter 28's 550–570 nm window is a statement about the water, not the pigment
+
+Chapter 28 says chlorophyll *"leav[es] a transmission window at 550–570 nm"*, which
+reads as a claim about `a_ph`. It is not one, and it cannot be. The minimum of a
+sum of two absorption lines sits **between** them, nearer the broader one's tail;
+for peaks at 440 and 675 that is **590–600 nm**, and this file's declared shape
+lands at **592**. What actually sits at 550–570 is the minimum of `a_ph` **plus
+pure water**, because `a_w` climbs steeply above 570 and pushes the window back
+down the spectrum. The chapter is right about the water and loose about the
+constituent, and the distinction matters to an implementer: fitting a pigment
+spectrum to put *its* minimum at 560 needs widths no pigment has.
+
+The suite carries this as a pair — a row on the chapter's claim about **this
+water** (the total absorption minimises in the band containing 550–570; it does),
+and an INFO row on where `a_ph` alone minimises.
+
+## F6 · What the shared modules would not stretch to
+
+The extraction's own test was *"would a beach need exactly this, unchanged?"* and
+the answer held everywhere except one place, which is recorded here rather than
+patched:
+
+* **`atmosphere.sky()` reads the module-global `SUN_DIR`.** So a second scene
+  cannot supply its own sun without either monkey-patching the module or forking
+  it. `atmosphere.py`'s own comment calls the site-and-shoot block *"the first of
+  the two blocks a second scene replaces"*, and the block is replaceable — but the
+  **function that consumes it is not parameterised**, and the two derived
+  illuminants (`SKY_DECK`, `SKY_SUB_DERIVED`) plus both aureole amplitudes are
+  module-level constants computed at import from that one geometry. Adding an
+  optional `sun=` argument would be a small, non-breaking change; it is not made
+  here because this wave's contract is that no pool pixel moves, and the finding
+  is worth more than the patch.
+* **`optics.rho_water`, `slab_esc`, `slab_trap` and `trap_gain` take a SCALAR
+  depth** (the quadrature broadcasts `_SQM[:, None]` against the band axis). A
+  beach's depth is a field, which is the exact case the extraction's docstring
+  says it was made for. `beach_render.py` works around it with a 48-point depth
+  ladder and interpolates; that is a workaround, not a fix, and the ladder's
+  interpolation error is a suite row rather than an assumption.
+
+Neither of these is a physics error and neither cost this wave a result. Both are
+the kind of interface friction that only a *second* scene can expose, which is the
+argument for having built one.
+
+## Frames, and what each caption has to say
+
+Into `reference-impl/evidence/`:
+
+* **`s4-bay-render.png`** — the bay from the cliff edge, to be laid beside bar
+  section **J**. *Caption:* **the foam is a PLACEHOLDER** — a saturating function
+  of the breaking fraction, put on the crests, with no advection, no decay, no
+  entrained-air medium and no spray, so nothing about foam extent, texture or
+  brightness may be read off this frame (bar section C, and the OPEN row). **The
+  coastal plain's albedo is one flat declared value** standing where a vegetation
+  model would go; bar K2 puts dune vegetation and the village out of scope. **The
+  framing is constrained by the landform, not chosen**: bar J's photograph is
+  taken from a headland with sea on three sides, and wave 3's coastal loop
+  produced 46 m of plan curvature over 1408 m of coast — a nearly straight cliffed
+  shore with a beach strip a few metres wide. There is no headland in this bed to
+  stand on, and an eye 1.7 m above a flat coastal plain sees that plain fill every
+  landward direction to the horizon. **The render is comparable to J in its surf
+  lines and its colour ladder and is not comparable to J in its beach.**
+* **`s4-glitter-render.png`** — the open sea down the sun's own azimuth, for bar
+  section **K**. *Caption:* the widths reported above are measured in **angle**,
+  from the closed form, not off this image — the image places them about 0.20°
+  high because the sea is flat-Earth here and the true horizon dips by
+  `√(2h/R) = 0.203°` at this eye height. The glitter clips: the exposure is a
+  derived white point (the radiance of a white Lambertian card in this sun,
+  5.16 green) and the path is forty times it, which is what a photograph of a
+  glitter path does. **The sea–sky horizon (bar K2) is continuous in the model
+  and is not continuous in the pixels**: measured on the frame's outer columns,
+  15–17° off the path's centre and outside its half-width, the sea just below the
+  horizon is (1.49, 1.38, 1.23) times the sky just above it. There is no seam —
+  no discontinuity in any term — but there is a real step, and its mechanism is
+  named rather than smoothed: at grazing the resolved swell still tilts facets,
+  and a tilted facet near the horizon samples a *brighter* part of the sky than
+  the one it stands in front of, with the glitter's own tail on top. Down the
+  path's centre the same measurement reads 145×, and that number is the glitter,
+  not a seam — which is why the criterion has to be asked off the path.
+* **`s4-cuvette.png`** — the variable-path cuvette, backlit (left) and front-lit
+  (right). *Caption:* **this is a stand-in and the wedge is not a wave.** The face
+  a backlit wave presents is steeper than 41.5° and this scene's linear free
+  surface reaches 8.2°, so the geometry section A describes cannot be rendered
+  from this representation (see A2). Everything **in** the wedge is the scene's:
+  the same IOPs, the same sun, the same Fresnel on both faces, the same
+  Beer–Lambert and the same derived HG lobe. Only the observer moves between the
+  two panels; the sun does not.
+
+**The exposure is derived and identical across all three frames** — a percentile
+of a frame's own histogram is an auto-exposure, and an auto-exposure is exactly
+what bar section A's *"one exposure"* forbids.
+
+## The suite
+
+**135 pass / 0 FAIL / 0 ERROR / 2 open / 58 info**, up from wave 3's 77 / 0 / 0 /
+1. Fifty-eight new rows in one new section, `_sec_optics`, which checks **only**
+the layer this wave added: `validate.py` owns 285 rows on the pool's optics and
+duplicating any of them would be the two-routes-one-source error in its purest
+form.
+
+The pool: **285 pass / 0 FAIL / 54 info**, re-run and unchanged.
+
+The second OPEN row is **foam** — three mechanisms, none of them modelled, with
+the reason recorded (they are three different *representations*, plus section H2's
+two residence times on one surface and section H5's rotational structure).
+
+### The eight new deliberate defects
+
+| bug | what it puts back |
+|---|---|
+| `one-turbidity-slider` | collapses the three constituents into one murkiness control — the failure chapter 28 names by name |
+| `cdom-scatters` | gives CDOM a scattering coefficient, which is what makes blackwater mud |
+| `depth-averaged-spm` | spreads the load through the whole column instead of the Rouse layer (F1) |
+| `dw-for-bed-power` | drives the suspension from the wave's dissipation rather than the bed's — this wave's own first writing |
+| `isotropic-phase` | `g = 0`, which chapter 28 warns kills the forward glow |
+| `glitter-fixed-width` | a spread parameter chosen to look right instead of the slope distribution — the defect section K exists to catch |
+| `glitter-no-jacobian` | drops `1/cos⁴β`: invisible at the specular point, and the whole of the behaviour toward the horizon |
+| `ambient-in-the-tube` | lights the through-path with an ambient term, so the green stops vanishing (bar I2) |
+
+Every one of the eight fires, and the rows they fire are the rows they were
+written for. Run against the optics section alone — which is exact rather than a
+shortcut, since these eight patch `beach_optics` and nothing outside that section
+imports it:
+
+| bug | rows caught | which |
+|---|---|---|
+| `one-turbidity-slider` | 1 | the water mass's absorption does not depend on the mineral load |
+| `cdom-scatters` | 2 | CDOM scatters not at all; CDOM darkens, sediment brightens |
+| `depth-averaged-spm` | 1 | the same stirring reads dark at 8 m and pale at 1.2 m |
+| `dw-for-bed-power` | 2 | the bed stream power closed form; the breaking zone's load against chapter 28's anchors |
+| `isotropic-phase` | 2 | `g` is derived from `b_f ≥ 50 b_b`; the HG lobe is forward-peaked by two orders |
+| `glitter-fixed-width` | 1 | the glitter width goes as the RMS slope |
+| `glitter-no-jacobian` | 2 | the width goes as the RMS slope; the glitter integral returns the intercepted flux |
+| `ambient-in-the-tube` | 3 | Beer–Lambert at L = 0.25, 1.0 and 3.0 m |
+
+**Two of these caught nothing when they were first fired**, and that is recorded
+rather than quietly fixed: `one-turbidity-slider` and `dw-for-bed-power` both
+passed a suite of fifty-three rows. The first slipped through because every row
+that touched `iops` called it at `spm = 0`, so tying the water mass's absorption
+to the mineral load changed nothing any row looked at; the second because both
+rows on the suspension were **ratios** — the `u³` scaling and the two-depth
+comparison — and a ratio cannot see a factor of fifty in front of the whole
+expression. Three rows were added for them, and the general lesson is the one the
+pool's suite already learned twice: *a suite made only of ratios is blind to
+exactly the errors that are constant factors.*
+
+### One defect this wave shipped and the guard that now catches it
+
+**The glitter's branch.** The eye is *opposite* the sun's azimuth, not under it: a
+flat sea reflects a beam arriving from `az` into `az + 180` at the same elevation.
+Written the other way round, the required facet normal lands on the sun instead of
+on the vertical and the whole path evaluates at `exp(−135)`. **A glitter model
+with the wrong branch renders black rather than wrong**, which is the kind of
+defect that survives a look at the picture. The row is *"the path is centred on
+the sun's own azimuth"*.
+
+---
+
+# Wave 5 — the surface stops being a sinusoid
+
+Waves 1–3 built a bed and a wave field; wave 4 put light on it and came back with
+a geometric obstruction: **a backlit wave face needs a slope steeper than 41.48°
+and this scene's free surface reached 8.2°.** Wave 4 named the shortest route out
+and did not take it — *`beach.py` already computes the wave skewness `Sk` from the
+Ursell number and spends it **only** inside the sediment transport, never on the
+free surface.* This wave takes that route.
+
+**What it found is better than what it was sent for.** The steepening is real and
+it is not enough, and the reason it is not enough is a **theorem** rather than a
+property of this bed: no wave of permanent form, at any order of any theory,
+presents a face steeper than 30°.
+
+## The whole of it, before the details
+
+| | |
+|---|---|
+| steepest face, linear (waves 1–4) | **8.23°** |
+| steepest face, nonlinear (wave 5) | **15.78°**, ×1.95 |
+| Stokes' 120° corner — the cap on *any* wave of permanent form | **30.00°** |
+| what a lengthwise in-water sightline needs | **41.48°** |
+| view rays that leave the far side of a crest, linear | **0.0000** |
+| view rays that leave the far side of a crest, nonlinear | **0.0000** |
+
+Section A is **not** rendered, and it is now closed as unreachable rather than
+parked as unreached.
+
+## N1 · The nonlinearity was already in the file, and the constant that hides it is `3/16`
+
+Second-order Stokes writes the surface as a primary plus a **bound** second
+harmonic,
+
+```
+η = a[ cos φ + r cos(2φ + ψ) ],    a = H/2
+r = b/a = (H k / 8) · C(kd),       C(kd) = cosh(kd)(2 + cosh 2kd) / sinh³(kd)
+```
+
+with `C → 2` in deep water (giving the textbook `b/a = ak/2`) and `C → 3/(kd)³`
+in shallow. Substitute the shallow limit:
+
+```
+r → (3/8) H k /(kd)³   and   Ur = (3/16) H k /(kd)³   ⇒   r = 2 · Ur
+```
+
+**exactly.** `beach.ursell`'s `3/16` is not a tidy convention — it is the constant
+that makes the Ursell number *one half of the second harmonic's own amplitude
+ratio*. The shape of the free surface has been computed in this file since wave 1
+and thrown away every time.
+
+Measured on the scene: `r/(2 Ur) = 1.0033` at the shallowest cell, `r/(ak/2) = 1`
+in the deep limit, both as suite rows.
+
+## N2 · One nonlinearity, two moments, and the transport had been reading half of it
+
+The same harmonic with a **phase** carries both third moments of the surface, in
+closed form:
+
+```
+Sk = ⟨η³⟩/σ³   = +(3/4) r cos ψ / ((1+r²)/2)^{3/2}
+As = ⟨H(η)³⟩/σ³ = −(3/4) r sin ψ / ((1+r²)/2)^{3/2}
+```
+
+so **`Sk² + As²` is a function of `r` alone** and `ψ` merely rotates between them.
+`ψ = 0` is the peaked, fore–aft symmetric crest of a shoaling wave; `ψ = −π/2` is
+the pitched-forward sawtooth of a bore.
+
+> **This is the theory finding, and it corrects a statement `beach.py` already
+> makes about itself.** `broken_fraction`'s docstring says a broken wave is a bore
+> whose *"shape energy has gone into a pitched-forward front"* and the transport
+> then multiplies its skewness by `(1 − f_brk)` and carries **no asymmetry term at
+> all.** Breaking does not destroy the wave's third moment. It **turns** it. The
+> file had the disappearance and not the destination.
+
+`cos(π f/2)` against `(1 − f)` agree at both ends and differ by **0.207 at
+`f = ½`** — 41% of the `(1−f)` value — which is what writing a rotation as a
+straight line costs.
+
+`ψ = −(π/2)·f_brk` is the one declared shape in this section. **Both endpoints are
+derived**: a bound harmonic is phase-locked (`ψ = 0`, second-order Stokes) and a
+fully broken wave is a sawtooth (`ψ = −π/2`). Ruessink et al. (2012) publish a
+`ψ(Ur)` that goes the same way; it could not be verified from a source in this
+loop and is therefore **not claimed**.
+
+**And the sign is not free.** `S` increases shoreward, so `ψ = −π/2` puts the
+steep face on the wave's front and `+π/2` puts it on its back. A wave leaning the
+wrong way is a defect *a still frame cannot show*, so there is a suite row that
+reads which side of the crest the steepest slope is on, and a deliberate bug
+(`bore-phase-flipped`) that fires it.
+
+## N3 · A peaked crest is not a steep face — the asymmetry is what steepens
+
+This is the result that decides how much the whole exercise buys, and it is one
+line of algebra:
+
+| shape | at its own validity limit | max face slope, ÷ the sinusoid's |
+|---|---|---|
+| pure **skewness**, `ψ = 0` | `r = 1/4` | **1.299** |
+| pure **asymmetry**, `ψ = −π/2` | `r = 1/2` | **2.000** exactly (`1 + 2r`) |
+
+For `ψ = 0` the second harmonic's contribution to the slope **vanishes at the
+steepest point of the primary** — `sin φ = 1 ⇒ sin 2φ = 0` — so it only enters at
+second order in `r`. For `ψ = −π/2` the two add directly at `φ = π/2`, giving
+`1 + 2r` at first order.
+
+**So "use the skewness" is the right instruction and the wrong mechanism.** The
+quantity is the same second harmonic; what makes a face steep is where its phase
+has been rotated to. A wave that is merely *skewed* is peaked and not steep.
+
+## N4 · Two validity limits, and one of them needs no citation
+
+Stokes' expansion is a series in the steepness and the surf zone is not where it
+lives. **Both limits are computed and both are reported** rather than one being
+assumed.
+
+**The regime boundary, half cited and half derived.** The conventional
+Stokes/cnoidal boundary is `U = H L²/d³ ≈ 32π²/3 = 105.3`. Converting into this
+file's normalisation, `Ur = (3/64π²)·U`, so
+
+```
+U = 32π²/3   ⟺   Ur = 1/2, exactly.
+```
+
+The `32π²/3` is a citation; the arithmetic that makes it a round number here is
+not, and the suite row separates them.
+
+**The secondary-crest limit, derived here.** As `r` grows the surface eventually
+grows a *false crest inside its own trough* — single-valued, and still wrong.
+`dη/dφ = −[sin φ + 2r sin(2φ+ψ)]` gains extra zeros at
+
+* `ψ = 0`: it factorises as `−sin φ (1 + 4r cos φ)`, so the extra root appears at
+  `cos φ = −1/(4r)` — **`r = 1/4`.** And *at* `1/4` the trough is exactly **flat**,
+  which is the "flatter trough" this wave was sent for, reached at the limit of
+  the theory rather than by choosing it.
+* `ψ = −π/2`: the derivative is a quadratic in `sin φ` whose second root leaves
+  `[−1,1]` at **`r = 1/2`** — twice as generous. The pitched shape tolerates twice
+  the harmonic the peaked one does.
+
+Between them there is no closed form; `beach.stokes2_crest_limit` bisects. Its
+answer is **tabulated on a ladder uniform in `√(−ψ)`**, because `r_max` leaves
+`1/4` with *infinite slope* and a ψ-uniform ladder reported 0.2548 where the
+closed form says 0.2500 — a 2% error introduced by an optimisation, in the one
+place the answer is known exactly. That is a suite row now.
+
+## N5 · This scene is not a Stokes scene, and the honest number is 75%
+
+| | |
+|---|---|
+| median Ursell number over the wet bay | **0.545** |
+| the Stokes/cnoidal boundary | 0.5 |
+| fraction of the wet bay past it | **50.2%** |
+| `r` that Stokes-2 *asks for* | median **1.21**, max **75.5** |
+| fraction of the bay where the clamp bites | **74.8%** |
+
+**Second-order Stokes is spent before it starts in this scene.** The regime's own
+form is **cnoidal**, which needs Jacobi elliptic functions; this environment has
+no `scipy`, and hand-rolling an AGM elliptic solver was judged out of scope
+against the standing *prune* ruling — particularly because it would not change
+the conclusion (N7). What is done instead is stated rather than hidden: `r` is
+clamped at the derived secondary-crest limit, the clamped fraction is printed by
+`surface_report`, drawn in `s5-surface-shape.png` and burned into the caption of
+every frame.
+
+**Cnoidal would also have walked into the mixed-field trap one level up.** The
+transform marches `k` from the *linear* dispersion relation, while cnoidal theory
+carries its own wavelength `L = √(16 d³ m / 3H)·K(m)`. Taking `H` and `d` from one
+theory and the phase from another is the same error class wave 3 measured at 0.37
+of a ratio in 2-D, and it would have been invisible in a still frame.
+
+## N6 · What it bought, and what it did not
+
+Measured on one grid with one difference operator and **only `r` changed**:
+
+| | linear | nonlinear |
+|---|---|---|
+| max `\|∇η\|` over the bay | 0.1446 (**8.23°**) | 0.2826 (**15.78°**) |
+| 99.9th percentile | 0.1293 (7.37°) | 0.1914 (10.84°) |
+| view rays leaving the far side of a crest | **0.0000** | **0.0000** |
+
+The face slope nearly doubled. **The optical quantity section A is actually about
+did not move at all**, and that is measured on the render's own instrument rather
+than argued: `through_face` marches the refracted view ray until the free surface
+comes back down to meet it, and in both surfaces it never does. The refracted ray
+dives at `(90 − α) − asin(cos(α+δ)/n)` below the horizontal — **34° at an 8° face
+and 28° at a 16° one** — while the crest it would have to cross falls at 16° at
+most. The ray reaches the deep column before it reaches the far side, at every
+pixel of every frame.
+
+> **A note on the difference operator, because it nearly ate the result.**
+> `surface_slope` differentiates by central difference. A step `ε` reports a
+> sinusoid of wavenumber `q` at `sin(qε)/(qε)` of its true slope. The primary is
+> at `k ≤ 0.29` and lost 1.4% at the `ε = 1 m` waves 1–4 used; **the second
+> harmonic is at `2k` and would have lost 5.4%** — a third of the steepening being
+> measured, silently. `ε` is 0.5 m from this wave and the gain is a suite row, not
+> a comment.
+
+## N7 · The ceiling is Stokes' corner, and it makes section A a closed question
+
+At the crest of the **limiting** wave the fluid is at rest in the frame moving
+with the wave, so the crest is a stagnation point and Bernoulli on the free
+surface, measured downward from it, is `q²/2 + gz = 0` — hence `q ~ (2g|z|)^{1/2}
+~ r^{1/2}`. A potential flow in a wedge of interior angle `2α` has `q ~
+r^{π/2α − 1}`. Matching the exponents:
+
+```
+π/(2α) − 1 = 1/2   ⇒   2α = 2π/3 = 120°
+```
+
+so **the free surface leaves the crest at 30° to the horizontal**, and the result
+carries no depth, no wavelength and no wave height in it: it is the same 120° for
+the limiting deep-water Stokes wave, the limiting cnoidal wave and the limiting
+solitary wave. (Longuet-Higgins & Fox (1977) put the maximum inclination of the
+*almost*-highest wave slightly above this, near 30.4° — cited, not reproduced, and
+it does not move the conclusion.)
+
+```
+30°  <  41.48°  =  90° − asin(1/n)
+```
+
+> **Section A is therefore unreachable from any single-valued free surface of a
+> steady wave, and this replaces wave 4's row rather than extending it.** Wave 4
+> measured *this scene* at 8.2° and inferred that more nonlinearity *might* close
+> the gap. It cannot. The shortfall is a property of the representation, not of
+> this bed, this sea state, this grid or this wave count, and no amount of further
+> effort on the surface will move it.
+>
+> **What that changes about the bar.** Bar section A said the backlit face was
+> *"the strongest single criterion in this set, because it is a falsification and
+> needs no measurement."* It remains a valid falsification of a renderer that
+> **tints** its water — wave 4 discharged that half on the cuvette, and this wave
+> leaves it discharged. What it is **not** is a criterion a height-field renderer
+> can be asked to meet, because meeting it requires the wave to be *within about
+> 11° of overturning*, which is exactly the multivalued instant bar section F puts
+> out of scope. **A and F are one criterion at two moments**, and the eleven
+> degrees between 30° and 41.48° is the width of the gap.
+
+## N8 · `UR_HALF` was `?` for four waves and it is derived — and not adopted
+
+In shallow water `u = η√(g/d)`: a *positive multiple of the surface at every
+phase*, so the **velocity** skewness the sediment transport uses and the
+**elevation** skewness of the surface are the same number. That makes wave 1's
+declared parameterisation checkable against a route it does not share a source
+with:
+
+```
+Sk_surface → (3/4) r · 2^{3/2} = (3√2/2) r   (small r)
+r          → 2 Ur                            (shallow water)
+⇒ Sk       → 3√2 · Ur = 4.2426 Ur
+
+Sk_form = sk_max · Ur/(Ur + ur_half)  has initial slope  sk_max/ur_half
+⇒ ur_half = sk_max/(3√2) = √2/6 = 0.235702
+```
+
+against the **1.0** declared since wave 1 — **4.24× too large**, which makes the
+shoaling wave's skewness 4.24× too weak exactly where the onshore term is supposed
+to be doing its work.
+
+**The cost of adopting it, measured rather than feared:**
+
+| | declared 1.0 | derived √2/6 |
+|---|---|---|
+| bar crest | 360.0 m | **345.0 m** |
+| crest depth | 2.084 m | **1.906 m** |
+| bar amplitude above the ramp | 1.421 m | **1.845 m** (+30%) |
+| bar-to-trough relief | 0.900 m | **1.195 m** (+33%) |
+| break point | 359.4 m | 344.2 m |
+| `d_bar/(H_b/γ)` | 0.9734 | **0.9406** |
+| `Sk` offshore at `d = 6 m` | 0.125 | **0.378** (×3.0) |
+
+**It is not adopted this wave, and the reason is not timidity.** The derivation
+constrains the **slope at the origin**, where `Ur → 0`. The bar sits at `Ur ≈ 1–2`,
+where the saturating form's shape is governed by `sk_max`, which is still `?`.
+Changing one of two coupled shape parameters using a limit that does not reach the
+bar's own regime trades a declared constant for a half-derived one, and it would
+put wave 2's *"`d_bar ≈ H_b/γ` holds to 1–3%"* at 5.9%. **What the derivation does
+close is the ratio `sk_max/ur_half = 3√2`**, and that — not either constant alone
+— is the liftable result. It is carried as an OPEN row with the whole table in it.
+
+### And it was fired at the parked gap, because it should have been
+
+A bar a third deeper is the most plausible thing that could have closed **section
+B's second breaking line**, which has been open since wave 1 and parked since wave
+3. It does not:
+
+| | declared | derived |
+|---|---|---|
+| surf-zone spans | one, 360–500 m | one, **345–500 m** |
+| min `H/d` in the trough | 0.4556 | **0.4571** |
+| needed for the wave to stop breaking | 0.40 | 0.40 |
+
+**Wave 2's verdict survives a constant that made the bar 33% higher**, which is a
+stronger statement of it than wave 2 could make. The missing mechanism is still
+the 2DH rip-feeder circulation, and section B stays parked.
+
+## Frames
+
+* **`s5-bay-render.png`** — the bay from the cliff edge, **the same camera, bed,
+  optics, sun and instant of phase as `s4-bay-render.png`, with one field
+  changed.** The two are shipped as a pair and are meant to be read side by side:
+  the crests narrow and the troughs broaden and flatten between them. *Caption:*
+  the numbers are formatted from the run that drew the frame — wave 4's captions
+  carry literals and two of them were already stale by this wave. The foam is
+  still a **placeholder** and the caption still says so.
+* **`s5-face-render.png`** — the surf zone close up, **linear (left) and nonlinear
+  (right)**, one camera, one instant, `r` zeroed on the left. *Caption:* what
+  changed, what did not, and why. **The eye is at 8 m and that is part of the
+  finding**: at 1.5 m the crests are edge-on — a metre of relief at forty metres is
+  1.4° — and the frame is a set of white bands, so eight metres is what makes the
+  shape legible at all; and the same eight metres tilts the view ray further into
+  the water, because `δ` enters the dive angle with the same sign as the face's
+  shortfall. **The frame that shows the steepening cannot be the frame that shows
+  section A**, and that is not a framing problem.
+* **`s5-surface-shape.png`** — four panels: the shape at three depths against the
+  sinusoid it replaces; the harmonic asked for against the ceiling allowed; the
+  Ursell number against the regime boundary; and the face angle against 30° and
+  41.48°.
+* **`s5-glitter-render.png`** — section K's frame re-run on the nonlinear surface,
+  for continuity. The glitter is a *statistic* of the unresolved slopes and the
+  resolved swell is subtracted from its variance, so the path is unchanged; the
+  frame is here so the pair is complete and not because anything moved.
+* **`s4-cuvette.png` stands.** The cuvette was wave 4's stand-in for a face this
+  representation cannot make, and N7 turns that from a limitation of this scene
+  into a property of every height field. It is now the *only* instrument section A
+  has, and its caption was right.
+
+## What this wave did not do
+
+* **No cnoidal surface.** Named, costed (N5), and declined on scope and on the
+  mixed-field grounds — and it would not change N7.
+* **No overturning lip.** Bar section F's ruling stands and the Fourier surface
+  respects it *by construction*: a sum of harmonics cannot be multivalued. The
+  risk this wave had to guard was the **false crest**, which is single-valued and
+  still wrong, and there is a row that counts turning points on the 400 most
+  nonlinear cells of the bay.
+* **No second-order set-down.** `η = a[cos φ + r cos(2φ+ψ)]` has *exactly zero
+  mean* by construction. The real second-order wave carries a mean-water-level
+  depression under the group, and this file's set-up/set-down, if any, is a
+  separate statement in the transform. Named, not modelled.
+* **No foam.** Unchanged from wave 4 and still the suite's other OPEN row.
+
+## The suite
+
+**173 pass / 0 FAIL / 0 ERROR / 5 open / 59 info**, up from wave 4's 135 / 0 / 0
+/ 2. Thirty-eight new rows in one new section, `_sec_surface`. The pool:
+**285 pass / 0 FAIL / 54 info**, re-run and unchanged; `optics.py` and
+`atmosphere.py` imported and never copied; `render.py` and `validate.py`
+untouched.
+
+The three new OPEN rows are all *measured, understood, not achieved* and two of
+them will never close:
+
+| open row | why it is open |
+|---|---|
+| **bar section A is unreachable from a steady wave's height field** | 30° < 41.48°, and the 30° is Stokes' corner (N7). It is not going to close. |
+| **the steepest face this scene reaches, against 41.48°** | 15.78°, and now bounded above by 30° |
+| **`UR_HALF` derived and not adopted** | the whole cost table is in the row (N8) |
+
+### The six new deliberate defects, and every one fires
+
+| bug | what it puts back | rows | which |
+|---|---|---|---|
+| `sinusoidal-surface` | wave 4's surface — no second harmonic at all. **Draws a frame that has already shipped**, so nothing looks broken. | **6** | the absolute `b`; `r = 2Ur` and its residual; the clamp; the turning-point count |
+| `harmonic-shallow-everywhere` | `C = 3/(kd)³` at every depth. Every *shallow* row still passes, including `r = 2Ur`, which becomes exact. | **2** | the deep limit `C → 2`; the residual's size |
+| `unclamped-stokes` | second-order Stokes past its own validity limit — what a file that does not check the Ursell number does by default. `r` reaches 75. | **3** | the clamp; the turning-point count; the face slope |
+| `bore-phase-flipped` | `ψ = +(π/2)f_brk`. **The waves lean seaward.** Every moment, magnitude and colour measurement is unchanged, because `Sk² + As²` does not know the sign. | **3** | the sawtooth endpoint; which face is steep; the face slope |
+| `skew-without-asymmetry` | `ψ = 0` everywhere — the *tempting* version, "the skewness the file already had" taken literally. Buys ×1.299 instead of ×2.000. | **4** | the sawtooth endpoint; which face is steep; the turning-point count; the face slope |
+| `ur-half-declared` | wave 1's `UR_HALF = 1.0` back inside the derivation | **2** | `√2/6` absolute; the two routes' slope at the origin |
+
+### Four rows that failed on correct code, and one that raised
+
+**Recorded rather than quietly fixed**, because each is a way of writing a test
+that looks right and is not:
+
+1. **An asymptotic identity checked at one point.** `r = 2Ur` was given a
+   tolerance at `kd = 0.02` and no convergence rate — so any tolerance could have
+   been made to pass by choosing `kd`. It now checks two `kd` and asserts the
+   residual **quarters**, and the residual's own size turns out to be a closed
+   form: `C(kd)(kd)³ = 3 + 4(kd)² ⇒ r/Ur = 2(1 + (4/3)(kd)²)`, giving `5.333e−4`
+   against `5.334e−4` measured.
+2. **An extremum count on a non-periodic difference.** Counting sign changes of
+   a forward difference without wrapping loses the turning point straddling
+   `φ = 0` — which is *the crest* at `ψ = 0` — so the row read `[1, 3]` where the
+   truth is `[2, 4]` and **failed on correct code**.
+3. **Two routes compared at one small `Ur`**, where both carry their own `O(Ur)`
+   corrections. The row is now a Richardson extrapolation to the **slope at the
+   origin**, which is the claim; the single-sample version only said the
+   tolerance had been chosen to fit.
+4. **A steepest-face pair guessed rather than measured.** Now the suite bay's own
+   8.81°/16.49°, with the note that the render's finer bay reads 8.23°/15.78° and
+   that the gap between them is the grid.
+
+And **one row raised rather than failed**, found by firing
+`harmonic-shallow-everywhere` at it: that bug makes `r = 2Ur` *exact* at every
+`kd`, so both residuals are zero and the ratio row divided `0/0`. By this
+harness's own wave-3 doctrine an ERROR costs every row after it, so a deliberate
+bug would have been reported as catching one row when it catches two. Guarded —
+and paired with an **absolute** row on the residual's *size*, which is precisely
+what a ratio of two residuals cannot see. That is the third time in this project
+that a ratio-only guard has been blind to a factor, and the second time in two
+waves.
+
+### An optimisation that put a 2% error into an exactly known value
+
+`stokes2_crest_limit` bisects, and bisecting per cell was 7×10⁹ flops on one bay
+— it dominated the whole render. It is now a table. **The first table was uniform
+in `ψ` and reported `0.2548` where the closed form says `0.2500`**, because
+`r_max(ψ)` leaves `1/4` with *infinite slope*: `0.2524` at `ψ = −0.001`. The
+ladder is uniform in `√(−ψ)` and the interpolation error against a direct
+per-phase bisection is `7×10⁻⁷` — as a row, so the next optimisation has to keep
+it.
+
+---
+
+# Wave 6 — the white, and it is three mechanisms
+
+Every render from waves 4 and 5 carries *"the foam is a placeholder"* burned into
+its caption, and by wave 5 that was the largest gap left in the picture. **Bar
+section C was written at intake and untouched for five waves.** This wave builds
+it.
+
+**New file: `beach_foam.py`.** New suite section `_sec_foam`, 53 rows, 8
+deliberate bugs. New frames `s6-bay-render.png` (the same camera as `s4-` and
+`s5-`), `s6-entrained-air.png`, `s6-glitter-whitecap.png`, `s6-clocks.png`.
+
+## The whole of it, before the details
+
+- **The bar's constant is not just imported, it is RECOVERED.** `1 − 1/n² =
+  0.438735` is `optics.TIR_FRAC` and `beach_optics.FOAM_WHITE`, and a
+  geometric-optics ray trace over a bubble's disc — Fresnel from
+  `optics.fresnel` by reciprocity, all forty orders, energy summing to
+  `1 ± 8×10⁻⁷` — returns `0.436378 / 0.438728 / 0.443078` **without ever
+  evaluating the formula**. The constant is *the area of a disc*, and that is
+  exactly why the same number runs the window from below.
+- **And the trace adds a qualifier the bar does not carry.** A ray reflected off
+  a sphere at incidence `θᵢ` leaves deviated by `π − 2θᵢ`, and every totally
+  reflected ray has `θᵢ > θ_c`, so **every one of them deviates by less than
+  82.96°**. The 43.874% is a **reflectance, not a backscatter fraction**: the
+  traced `b_b/b` is **0.0230**, twenty times smaller. A bubble is a *side*
+  scatterer and the white of surf is multiple scattering in a medium of albedo
+  ≈ 1, not one bright bounce. Using the bar's number as a backscatter fraction is
+  now a deliberate bug (`foam-backscatter-is-tir`) and it fires four rows.
+- **The bed does stop being visible, measured in absolute scene-linear units.**
+  At 1.5–3 m depth over 50 713 pixels the bed's radiance out of the water is
+  `3.50×10⁻⁸` with the plume and `3.86×10⁻⁶` without — **a factor of 0.00906**,
+  and the plume's own transmittance factor `T²/(1 − R·R_sub)` is `0.152`.
+- **One wind drives the glitter width and the whitecap coverage, and they
+  agree — but the agreement is not worth much, and THAT is the finding.**
+  Measured back off the buffer: glitter says `U₁₀ = 5.84 m/s`, whitecaps say
+  `6.00 m/s`, **2.7% apart**. But `d(ln width)/dU = 0.0759` per m/s against
+  `d(ln W)/dU = 0.5683` per m/s, so a **1% width measurement fixes the wind to
+  0.13 m/s** while a **factor of three in coverage — inside the literature's own
+  spread — leaves 1.93 m/s**. The width is **15×** the instrument the coverage
+  is. They could not have disagreed informatively.
+- **Section E asked for two timescales; the file produces three, and the middle
+  one is not a number.** `τ(r) = (d_p/2)/w_rise(r)` spans **0.29 s** at a
+  centimetre to **1813 s** at ten microns. The air volume is gone in **0.81 s**;
+  the projected area that scatters light is dominated by the smallest bubbles
+  present and outlives it by three orders of magnitude.
+- **The picture found a defect that no printed number in the run reported**, and
+  it is written up below as W1 because it is the wave's sharpest methodological
+  result.
+
+## W1 · The first plume was a sheet of milk, and only the frame said so
+
+The first size cutoff was *"a bubble whose rise time across the plume is shorter
+than the wave period is gone before the next wave renews it, so it is not part of
+the standing population"* — `w_rise(r_max) = d_p/T`. That is the right idea in
+the wrong shape. It **discarded the large bubbles while keeping the energy they
+were entrained with**, so the surviving small ones inherited a void fraction ten
+times their own:
+
+| | first draft | size-resolved |
+|---|---|---|
+| `⟨τ⟩` for the air | 15.7 s | **0.81 s** |
+| `α` median, breaking band | **0.30, clipped** | 0.071 |
+| clipped fraction of the wet bay | 12.6% | **0.09%** |
+| `r₃₂` | 0.22 mm | 0.73 mm |
+
+Every printed diagnostic in that run was self-consistent. The **frame** was not:
+the bay went uniformly white from the outer bar to the beach, with the green
+water gone. `s6-bay-render.png` is the fix and the pair against `s5-` is the
+evidence.
+
+**The correction has no cutoff at all.** Air is entrained with the Deane & Stokes
+spectrum `n_s(r)` and each size leaves on its own clock, so in steady state the
+standing spectrum is
+
+```
+    tau(r) = (d_p/2) / w_rise(r)          mean rise distance is HALF the plume:
+                                          air is entrained THROUGH the layer,
+                                          not injected at its base
+    n_st(r) = n_s(r) tau(r)               the large end is suppressed smoothly
+```
+
+and the budget reads the **source** while the optics read the **standing**
+population. The two are never mixed. `<tau>_vol = INT n_s r³ tau / INT n_s r³` is
+the air's own clock; `r₃₂ = INT n_st r³ / INT n_st r²` is the optics' own radius.
+
+**This is what the standing ruling on visual evidence is for.** Not decoration
+and not a beauty pass: a picture is a simultaneous assertion about every field in
+the scene, and it caught a factor of nineteen in a timescale that four printed
+tables agreed on.
+
+## W2 · The three mechanisms, and each one's own derivation
+
+### Surface foam — a coverage mask, and it is not on the crest
+
+**Coverage is a Poisson process, so the two sources add as covering measures and
+the coverage saturates by construction.** Crest lines are one wavelength apart
+and move at `c`, so a fixed point is swept once per period `T` and a fraction
+`Q_b` of those crests are breaking — Battjes & Janssen, and
+`beach.breaking_fraction_bj` has computed `Q_b` since wave 2 and spent it only on
+diagnostics. Summing over all past sweeps,
+
+```
+    m(a) = Q_b SUM_j exp(-(a + jT)/tau) = Q_b exp(-a/tau) / (1 - exp(-T/tau))
+    W(a) = 1 - exp(-m(a))
+```
+
+and the phase-mean of `m` is **exactly `Q_b τ/T`** — the steady state of
+`dW/dt = S − W/τ` with `S = Q_b/T`, checked to `10⁻⁸` as a closed form.
+
+**This turns the placeholder's declared `k` into a measured number.** The
+placeholder was `1 − exp(−k f_brk)` with `k = 1`. The form was right and the `k`
+was not: **`k` IS `τ/T`**, and at Monahan & Zietlow's salt-water `3.85 s` against
+this swell's `9 s` it is **0.4278**. The placeholder was running a foam residence
+time of nine seconds, **2.3× too long**.
+
+**The mask FLOATS, and that is a lag rather than an advection solver.** Bar
+section C says the deck "floats, deforms with the flow", so it is *not* on the
+crest: foam is laid down *by* the breaking crest, which then runs away from it at
+`c` while the water it sits on creeps forward at the Stokes drift. Foam of age
+`a` lies `(c − u)a` **behind** the crest — seaward of it, because the crest is
+going shoreward — and the coverage field is an exponential tail of e-folding
+length **17.1 m against a 39.9 m local wavelength**. So the white lies over more
+than a third of the wave and behind its top.
+
+**And the age is free.** The transform already accumulates the phase `S`, so the
+time since the crest passed is `(−phase mod 2π)/ω` with no field added and
+nothing advected. For a wave of permanent form **the phase IS the age, exactly**;
+a Lagrangian foam solver would reproduce this and cost a wave.
+
+### Entrained air — a participating medium, and the test is what it hides
+
+**Lamarre & Melville (1991)**, *Nature* 351, 469: between **30 and 50%** of the
+energy dissipated at breaking is work done against buoyancy entraining air. That
+is the budget, and every symbol on the right of it is the scene's own:
+
+```
+    rho g (d_p/2) Q = eps_LM D_w                  the power       Q in m/s
+    h_air = Q <tau>_vol                           the inventory
+    alpha = h_air/d_p = 2 eps_LM D_w <tau>_vol / (rho g d_p^2)
+```
+
+`D_w` is the transform's breaking dissipation. `d_p = H/2` is the crest's own
+elevation and is the **one length here that is not forced** — marked `P`, with
+`α ∝ d_p⁻²` stated beside it. `ε_LM = 0.40` is the midpoint of a **range that is
+carried and not collapsed**.
+
+**The optics are geometric and the whitening is multiple scattering.** At
+`x = 2πr/λ ≈ 8000` the extinction efficiency is 2, so
+`b = Q_ext · 3α/(4 r₃₂) = 3α/(2 r₃₂)` — `144 m⁻¹` median in the breaking band.
+Air does not absorb, so the slab is conservative, and the similarity scaling is
+the whole of it: `τ' = (1 − g)τ` with the traced `g = 0.688`, then
+`R = τ'/(1 + τ')`, `T = 1/(1 + τ')`, `R + T = 1` **exactly**.
+
+**And it is coupled to the column and the bed by the adding series, which is what
+makes it hide rather than whiten:**
+
+```
+    R_total   = R_p + T_p^2 R_sub / (1 - R_p R_sub)
+    R_bed_seen = T_p^2 R_bed / (1 - R_p R_sub)
+```
+
+A renderer that lerps toward white has `R` and not `T`, and bar section C names
+that exactly: *"If a renderer whitens without hiding what is behind, it has
+modelled the symptom."*
+
+**The plume is phase-structured and that is forced, not chosen.** `⟨τ⟩_vol` is
+0.81 s against a 9 s period, so the air one bore front entrains is gone long
+before the next arrives: the plume belongs to **the front**, not to the surf zone.
+`plume_phase_factor` redistributes the budget's void fraction with a phase-mean of
+**exactly 1** — `11.06×` at the crest — so the energy budget is untouched and only
+its placement changes. A model that spread the time-mean evenly is wrong by that
+factor in both directions at once, which is precisely what W1 was.
+
+**The sphere formula is clipped at its own validity limit and the clip is
+counted.** `3α/(4 r₃₂)` is the projected area of *independent spheres*; above
+about `α = 0.3` the bubbles are polyhedral cells and the scatterers are the films
+between them. The clip now bites on **0.09%** of the wet bay — the very front of
+the bore, where it is honest to say the model has left its domain.
+
+### Airborne spray — DEFERRED, and the frames say so
+
+It is section C's **smallest share of the white**, it is a particle system and
+therefore a **third representation**, and bar section F already defers individual
+droplets beyond a statistical treatment. Every s6 frame's caption says it
+contains none.
+
+## W3 · Two things hide a bed, and a render must not credit one for the other
+
+Bar section D's **suspended sediment** and bar section C's **entrained air** both
+stop the bed being seen, and the confusable pair section D warns about has a
+third member. `bed_visibility` prints them separately:
+
+| depth band | `t_col` (section D, suspension) | `bed_factor` (section C, plume) |
+|---|---|---|
+| 1.5 – 3 m | `2.76×10⁻⁵` | `1.52×10⁻¹` |
+| 3 – 6 m | `1.29×10⁻⁵` | `8.1×10⁻¹` |
+| > 6 m | `1.40×10⁻²` | `8.9×10⁻¹` |
+
+**In this scene the suspension is the stronger of the two by four orders of
+magnitude**, and a render that had only entrained air would still hide the bed —
+for the wrong reason, with the wrong depth dependence, and with the wrong clock.
+They are separated here because they *decay differently*, which is section E's
+own instruction applied to section D's confusable pair.
+
+## W4 · This guard was blind in its first draft, and that is the fourth time
+
+`bed_visibility` originally reported `R_bed_seen / R_bed`. In the breaking band
+the bed term **underflows** — the suspension has already killed it — so the ratio
+divided one near-zero by another and reported **`1.6×10⁻⁴` for a run with the
+plume switched OFF**, where the answer is `1` by construction.
+
+Waves 4 and 5 each found a ratio-only guard blind; the pool loop found two. This
+is the fourth in the project and the first found by *the control frame
+disagreeing with its own definition*. Every row in `bed_visibility` is now
+absolute, and the plume's effect is a **forward** quantity computed from `R` and
+`T` rather than by dividing two measurements.
+
+## W5 · Koepke's 0.22 is not a foam albedo, and using it double-counts the decay
+
+**Koepke (1984)**, *Applied Optics* 23, 1816: whitecap reflectance falls from
+**0.20–0.55 at first breaking** to **0.03–0.10 after ten seconds**, with a
+life-and-area-averaged **effective** value of **0.22**.
+
+Two things follow, and they point in opposite directions:
+
+1. **The bar's constant survives a published bracket.** `1 − 1/n² = 0.4387` sits
+   inside Koepke's fresh-whitecap band. Recorded as *survived*.
+2. **The thick raft does not match 0.22, and it should not.** Two routes — Stokes'
+   pile of plates `Nρ/(1 + (N−1)ρ)` with `ρ` the bar's constant, and a two-stream
+   that never sees that constant — agree to under a per cent at **0.983**. A
+   0.11 m raft is seventy-odd walls of a non-absorbing scatterer; a soap foam is
+   that white and so is fresh surf.
+
+**Koepke's number already contains the decay.** A renderer that models the
+coverage and its decay *explicitly* — as this one now does — and *also* uses 0.22
+as the foam's reflectance has **counted the decay twice**. That is a liftable
+statement about why rendered foam so often reads grey, and it is carried as an
+OPEN row rather than as a match, because closing it needs Koepke's time-resolved
+reflectance against this model's `R(age)` and the paper's own age bins are not in
+hand.
+
+## W6 · One wind, two readouts — and the coverage cannot check the width
+
+Wave 4 established that `width/√mss` is constant to 1.7% over a factor of five in
+wind. Bar section C's open-water white is **whitecapping**, whose coverage is a
+published function of the same wind. So one `U₁₀` must drive both, and
+`s6-glitter-whitecap.png` renders them in one frame and measures both back off
+the scene-linear buffer.
+
+**They agree.** Glitter `5.84 m/s`, whitecaps `6.00 m/s`, **2.7% apart**. The
+glitter width measured off the buffer is `9.671°` against `9.792°` from the closed
+form, `−1.2%`, and the difference is the **resolved swell**, which the closed form
+does not carry and this surface does.
+
+**And the agreement establishes less than it looks like it does.**
+
+| | `d(ln X)/dU` at 6 m/s | what a good measurement buys |
+|---|---|---|
+| glitter path width | `0.0759` per m/s | 1% width → **`dU = 0.13 m/s`** |
+| whitecap coverage | `0.5683` per m/s | factor of 3 → **`dU = 1.93 m/s`** |
+
+**The width is 15× the wind instrument the coverage is.** The two agree in this
+render because one `U₁₀` drives both; what the frame establishes is that they
+**could not have disagreed informatively**. A future wave tempted to calibrate the
+wind off a coverage should read this row first — and the suite has it as a check,
+not as a comment.
+
+**The exponent's spread is real and is carried, not collapsed.**
+Monahan & O'Muircheartaigh (1980) is quoted everywhere as `W = 3.84×10⁻⁶ U^3.41`
+and the same paper's own optimal fit is `2.95×10⁻⁶ U^3.52` — 6% apart at 6 m/s
+and 4% at 16, in opposite directions. Callaghan et al. (2008) is not a power law
+at all: a piecewise fit with an **onset at `U₁₀ = 3.70 m/s`** and branches meeting
+at `10.18 m/s`. `wind_from_whitecap` therefore returns a **band**, `5.67–7.66
+m/s` for this coverage from the exponent alone, and the coefficient's spread
+across the literature is worse.
+
+*This is the same disease `beach_optics` already records for Cox & Munk, an order
+of magnitude worse: a paper that fits its components and its total separately, and
+a reader who quotes one as if it implied the other.*
+
+**And the level is the other half of the finding.** At `U₁₀ = 6 m/s` the whitecap
+coverage is `0.173%` — under a fifth of one per cent of the sea surface. **A
+render with conspicuous open-water foam has a different wind from the one its
+glitter path reports.**
+
+## W7 · Section E's two clocks are three, and the middle one is a spectrum
+
+| | s | law | source |
+|---|---|---|---|
+| surface raft | **3.85** | whitecap area decay, salt water | Monahan & Zietlow (1969) — PUBLISHED |
+| the plume's **air** | **0.81** | `⟨τ⟩_vol`, Schiller & Naumann drag | DERIVED |
+| the suspension | **143** (at the bay's 6.07 m median) | `d/w_s`, Soulsby | DERIVED |
+
+**No two of the three share a source**, which is what makes the separation an
+argument rather than an assertion — the same rule that caught the pool installing
+a wrong constant twice.
+
+**The bar's ordering holds, and it was nearly overturned by a bug.** The first
+draft of `beach_foam.py` used a single rise speed at the Sauter radius, produced
+`τ_air = 15.7 s`, and this README was drafted with a section claiming section C's
+"decays slowly" for the surface deck was wrong. The size-resolved steady state
+gives 0.81 s and **the bar is right**. Recorded, because a claim that survives a
+serious attempt to break it is worth recording as survived — and because the
+attempt was only caught by the picture.
+
+**What the bar does not say is that the plume has no single clock at all.**
+`τ(r)` runs **0.29 s** at `r_max` to **1813 s** at `r_min`. The air volume leaves
+on the fast end; the projected area that scatters light leaves on the slow end,
+because `n_st r² ∝ r^−1.5` in the Stokes regime and the standing cross-section is
+dominated by the smallest bubbles present. **That is why a break on rock leaves a
+cloud**: four seconds on, the surface deck has gone and what remains is a
+*submerged* haze, which is exactly the owner's *"een soort wolk"*.
+
+**The sediment's "minutes" is a depth statement, not a grain statement.** At the
+bay's median 6.07 m this file's own bed `D50 = 300 µm` clears in **143 s** — the
+bar's minutes, met with nothing adjusted. At 2 m it is **47 s**, and minutes there
+would need **158 µm**: the fine tail, which `beach.py` does not carry because
+there is no grain-size survey of this coast. Carried as OPEN, and it is already an
+open item at intake.
+
+## W8 · What is `?` and what could not be closed
+
+- **`R_MAX`, the largest bubble in the plume.** `P` at 1 cm radius. Cutting it to
+  3 mm nearly doubles `⟨τ⟩_vol` and cuts `r₃₂` by a third — **2.7× on the
+  scattering coefficient**. This is the sharpest thing in section C the file
+  cannot close, and it needs a size distribution measured in surf, not a
+  laboratory plunger.
+- **`R_MIN` is NOT harmless, which corrects this file's own first comment.** In
+  the *source* spectrum the cutoff is worth 0.4%. In the *standing* spectrum the
+  projected area diverges as `r_min → 0`, and `r₃₂` runs **0.50 mm at 3 µm to
+  1.20 mm at 100 µm — a factor of 2.4**. The cutoff is physical (Laplace pressure
+  drives a sub-ten-micron bubble into solution in seconds) but its exact place is
+  `P`.
+- **`d_p = H/2`, the plume depth.** `P`, and `α ∝ d_p⁻²`.
+- **`ALPHA_RAFT = 0.95`.** `P`; the raft thickness goes as `1/α_raft` and both
+  reflectance routes saturate above about a centimetre, so it moves nothing.
+- **The path lengthening inside an absorbing plume.** The slab is treated as
+  conservative, so this plume is neutral where a real one is very slightly cyan.
+  Named; small; fresh surf foam photographs neutral.
+- **The wind at the frame's hour** is still `?`, as the bar says. Every number
+  above is reported as a function of it.
+- **Airborne spray**, deferred, with the reason in every caption.
+
+## Frames
+
+| file | what it is |
+|---|---|
+| `s6-bay-render.png` | the bay from the cliff edge, **same camera as `s4-` and `s5-`**, with section C's three mechanisms replacing the placeholder |
+| `s6-entrained-air.png` | the paired control: **left** the plume removed, **right** in place, one field changed, with the bed's radiance measured absolutely in both |
+| `s6-glitter-whitecap.png` | the glitter path and the open-water white in one frame at one `U₁₀`, both measured back off the buffer |
+| `s6-clocks.png` | section E drawn: three decay curves on a log axis, with the plume's own spread shaded, and Monahan's law beside them |
+
+**Every caption is formatted from the run that drew the frame.** Wave 5 found
+wave 4's literals had gone stale; there is no number typed into any caption
+string in this wave.
+
+**The frames are drawn at `--fast`, and that is for comparability rather than
+for time.** `s4-bay-render.png` and `s5-bay-render.png` are 450 px wide; drawing
+s6 at the full 900 would have made the three-frame comparison a comparison of
+resolutions as well as of physics. Every number reported from any of them is
+taken from the float64 radiance buffer before `_save`, so nothing measured here
+depends on the raster size.
+
+**`s4-` and `s5-` are not overwritten, and that is now a two-wave rule.** s4 is
+the linear surface, s5 the nonlinear one with the placeholder, s6 the same camera
+again with the three mechanisms — three frames, one camera, one bed, one sun, one
+field changed each time.
+
+## The suite
+
+**226 pass / 0 FAIL / 0 ERROR / 7 open / 66 info**, up from wave 5's
+`173 / 0 / 0 / 5`. The pool stays `285 pass / 0 FAIL / 54 info`, unchanged.
+
+`53` new rows in `_sec_foam`, `2` new OPEN, `8` deliberate bugs in
+`--bugs-foam`, **all eight caught**:
+
+| bug | rows |
+|---|---|
+| `foam-no-transmittance` — whiten without hiding | 2 |
+| `foam-backscatter-is-tir` — read the bar's 43.9% as `b_b/b` | 4 |
+| `foam-on-the-crest` — age zero everywhere | 1 |
+| `foam-declared-k` — the placeholder's `k = 1` restored | 3 |
+| `foam-percent-for-fraction` — Monahan's per-cent form as a fraction | 2 |
+| `foam-single-rise-speed` — **the defect this wave shipped** | 6 |
+| `foam-stokes-everywhere` — Stokes drag at every bubble size | 14 |
+| `foam-unclipped-spheres` — the dilute formula past its own limit | 1 |
+
+**Every new quantity has at least one absolute row**, including the two that a
+ratio would have hidden: `⟨τ⟩_vol` (which the shipped defect got wrong by 19×
+while every ratio row stayed green) and the void fraction itself.
+
+---
+
+# Wave 7 — the camera at the owner's viewpoints, and the gap list it produces
+
+The reference set carries four hyper-realism criteria and **the first
+one has been unmet by every frame this project has drawn**:
+
+> **Frame to match.** A reference render must be shot from a viewpoint one of
+> the owner's photographs was taken from, at the same framing, so the two can
+> sit side by side. A render at a viewpoint no photograph shares is
+> illustration, not proof.
+
+This wave builds that camera for bar sections **J** (the embayment overview) and
+**K** (open water and the glitter path), renders both, and puts the result
+beside what the bar says those photographs contain.
+
+**The deliverable is the gap list, not the picture.** Everything in it is
+measured on the scene-linear buffer of the frame it describes, and it is ordered
+by what it costs the frame rather than by how interesting it is to fix.
+
+**New file: `beach_camera.py`.** New suite section `_sec_camera`, 36 rows, 6
+deliberate bugs. New frames `s7-frame-J.png` and `s7-frame-K.png`, upright.
+
+## The whole of it, before the details
+
+- **The camera is an INFERENCE and its three parameters come from three
+  different pieces of evidence**, which is why they have independent
+  uncertainties rather than one blur. The field of view is **quantized by the
+  instrument** and is the best determined; the depression is the only one the
+  *picture* measures and is bracketed to **±13°** without the pixels; the eye
+  height is **not measured by the horizon at all**.
+- **The bay's size cancels out of the lens selection.** A chord seen from `p`
+  chords back subtends `2·atan(1/2p)`, so *"the whole embayment from its own
+  rim"* fixes the field of view without a map, a scale or a photograph. And the
+  widest lens on the named phone is **89.9117°** across upright against the
+  **90.00°** that half a chord back needs — so the instrument both selects the
+  0.5× ultrawide **and proves the photographer stood at least 0.50077 chords
+  back**. A bound on where a person was standing, from a spec sheet.
+- **The dip is famous and it is useless here.** `0.123°` at 17 m against
+  `0.278°` at 90 m — a sixth of a degree between a low cliff and a high one,
+  inside the tilt error of a hand-held frame. What *does* measure the eye height
+  is the **resolved separation of the surf lines**, and it has a closed-form
+  ceiling this file derives because no source states it.
+- **The beach is missing from the beach scene.** Bar J's five-rung colour ladder
+  has **three rungs** in this render. Wet sand and dry sand are **0.00% of the
+  frame** — the two surfaces bar J calls *"the most trustworthy comparison of
+  the set"*. Six waves aimed every frame at the water and nobody looked at the
+  land.
+- **Two of the things that sound most like defects cost almost nothing, and
+  saying so is the point of an ordered list.** The missing shadow ray costs
+  **0.0%** of the land in frame under either sun, because the landform has no
+  relief to cast one — two gaps hiding each other. The flat sea plane paints sea
+  over **0.10°** of sky, which is **1.8 pixel rows** here and 3.7 at the phone's
+  own 4032.
+- **And one cheap thing is high on the list**: the sea–sky seam is **53–67% off
+  continuity** in the two frames where grazing Fresnel says it should be 0, and the
+  physics that closes it is one exponential with a coefficient this project has
+  already derived.
+
+## C1 · The three parameters, and which evidence each one comes from
+
+### The field of view is QUANTIZED, and that is the most useful fact available
+
+The bar names the device — iPhone 16 Pro — and a phone has a small fixed set of
+focal lengths. The field of view is therefore **not a continuous unknown to be
+fitted**; it is a choice among four, decided by the horizontal coverage the
+frame's content requires.
+
+`equiv_fov` takes the equivalence on the **diagonal**, because that is what
+makes an "equivalent focal length" an equivalence across two frame shapes, and
+the suite checks the conversion by feeding it a 3:2 target and requiring
+`2·atan(18/f)` back exactly. Held **upright** on a 4:3 still:
+
+| lens | diagonal | up–down | left–right | standoff/chord it needs |
+|---|---|---|---|---|
+| 13 mm, 0.5× | 117.99° | **106.175°** | **89.912°** | **0.5008** |
+| 24 mm, 1× | 84.06° | 71.59° | 56.81° | 0.925 |
+| 48 mm, 2× crop | 48.52° | 39.65° | 30.26° | 1.849 |
+| 120 mm, 5× | 20.44° | 16.41° | 12.35° | 4.623 |
+
+**The chord cancels.** A chord `W` seen from a perpendicular standoff `p`
+subtends `2·atan(W/2p)`, and `p` expressed as a multiple of `W` removes `W`
+entirely: the required field is a function of the **ratio alone**. So the
+inference needs only the fact that the photographer was standing on the bay's
+own rim, which bar J states outright — *"the whole embayment from the cliff"* —
+and it needs neither the bay's size nor a map.
+
+From a viewpoint on a bay's own rim the standoff is a fraction of a chord, not a
+multiple of one, and **the 1× cannot hold it**: 56.8° across needs 0.93 chords
+of standoff, which is off the bay entirely. **The 0.5× ultrawide is the only
+lens on this phone that can take bar J's frame from where bar J says it was
+taken**, and the same argument carries K, which holds a long crescent, a
+headland, a village, foreground dune and the whole open sea.
+
+**And the near-miss is itself evidence.** The 0.5× is 89.912° across and half a
+chord back needs 90.00°. It falls short by 0.088°, so **a standoff under
+0.50077 chords is excluded by the instrument** — a quantitative bound on where a
+person was standing, recovered from the frame's content and a spec sheet.
+
+### The depression is the only parameter the picture measures, and it is bracketed
+
+Two content facts bound it:
+
+- **The horizon must be in frame**, with sky above it. `δ < fov_v/2 − 2° = 51.1°`.
+- **The named foreground must be in frame.** For K, *"dune vegetation in the
+  foreground"*. This gives `δ > atan(h_eye/x_fg) − fov_v/2`, which comes out at
+  **−50.8°** and **never binds** — and that is a result rather than a gap. An
+  upright 106° frame held level *already contains the ground at the
+  photographer's feet*, so "vegetation in the foreground" does not prove the
+  camera was tilted down at all. A content fact that constrains nothing is worth
+  recording, because the next reader will otherwise reach for it again.
+
+What is left is **where the horizon sits in the frame**, and that is a read off
+an image this repository does not have. Carried as an interval, it gives
+
+| | depression | bracket | half-width |
+|---|---|---|---|
+| J | 25.455° | 12.16 – 38.75° | **±13.296°** |
+| K | 27.805° | 15.04 – 40.57° | **±12.761°** |
+
+**The half-width has its own suite row.** The depression is the parameter a
+future wave is most likely to want to move, and a wave that quietly narrowed
+this interval would be claiming evidence it does not have.
+
+**What would tighten it, and by how much.** One measured horizon row. At the
+ultrawide's 106.18° over the phone's own 4032 rows, one row is **0.0263°**, so a
+horizon line read to ±5 rows fixes the depression to **±0.13°** — a factor of a
+hundred, from one number nobody has yet extracted. That single measurement is
+worth more to this criterion than anything else on the list.
+
+### The eye height is NOT measured by the horizon, and the instrument that does measure it has a ceiling
+
+The dip is `acos(R_eff/(R_eff+z))`, and `REFRACTION_K` is **fitted to Bowditch's
+dip table** rather than declared: the geometric dip is `1.9261·√z` arcminutes,
+the tabulated dip is `0.97·√h_ft = 1.757·√z`, and the ratio gives `k = 0.1678`.
+The suite states the fit against the table.
+
+    z = 17.31 m   dip 0.1229°   horizon 16.28 km
+    z = 90 m      dip 0.2778°   horizon 36.31 km
+
+**A sixth of a degree between a low cliff and a high one.** At the phone's own
+raster that is 6 rows, well inside a hand-held tilt error, and the dip's
+sensitivity *falls* as `1/√z`. It cannot be inverted for a cliff height.
+
+**What can.** Bar J records *"three to four separated breaking lines across the
+wider parts"*, and bar I1 *"two clearly separated lines of whitewater with a
+calm band between them"*. Two shore-parallel lines a cross-shore distance `s`
+apart, at range `D` from an eye at height `z`, subtend
+
+```
+    d = atan(z/(D - s)) - atan(z/D) = atan( z s / (D(D - s) + z^2) )
+```
+
+which is **linear in z** on the branch a cliff lives on. And it has a ceiling
+that no source states and that falls out of two lines of calculus:
+
+```
+    d/dz [ z s / (D(D-s) + z^2) ] = 0   ->   z* = sqrt(D(D-s))
+    tan(d_max) = s / (2 sqrt(D(D-s)))
+```
+
+**The best eye height for separating two surf lines is the geometric mean of the
+two ranges.** At `D = 704 m` that is `z* = 682 m`, so a cliff is always on the
+linear branch — a metre of height is worth a metre of height, and the ceiling
+(`1.80°` here) is a hard bound on how separated the lines can be made to look
+from that distance whatever you climb.
+
+Fed this scene's own numbers — a surf zone `150 m` wide (the transform's own
+median) with bar J's "three to four" lines in it, so `s = 42.9 m`, at
+`D = 704 m` — and asking that the gap be resolved at 5–20 px in a 4032-row
+upright frame:
+
+> **bar J's frame needs an eye at 25.0 – 102.1 m. This bed supplies 17.31 m.**
+
+That is an **OPEN** row, and it is a statement about wave 3's coastal loop
+rather than about the camera.
+
+## C2 · Where a camera can stand is part of the landform, again
+
+`viewpoint` replaces `cliff_edge`'s declared 12 m contour with a **slope
+break**: walk seaward from inland and stop at the first cell whose forward slope
+exceeds three times the plateau's own median. Nothing is chosen but the factor
+of three, and that only has to separate `0.08` from `1.24`.
+
+**Seaward-most and not highest**, and the reason is the landform's. Wave 3's
+loop leaves a straight `0.08` ramp behind the cliff. Walking inland on it buys
+8 cm of height per metre of standoff and spends a whole metre of it, so the
+sea's angular extent *shrinks* the whole way; past about 60 m the ramp occludes
+its own brow and the sea disappears entirely.
+
+**Wave 7's first attempt got this wrong in the interesting direction.** It went
+looking for height, because the eye-height inference above says height is what
+the frame wants — and produced a frame **64% coastal plain** from 58 m inland.
+The correction is in the file and the wrong version is recorded here, because
+"stand higher" is exactly what a reader who has just read C1 will try next.
+
+The brow this bed gives is `x = 648 m`, ground `15.71 m`, eye **17.31 m**.
+
+## C3 · THE ORDERED GAP LIST
+
+Bar J and bar K are the frames a whole-scene render must be judged against, and
+this is the disagreement, worst first. **Every share is measured on the frame's
+own scene-linear buffer**; every "cost" is what it does to the frame, not what
+it costs to build.
+
+### 1 · The beach is missing from the beach scene
+
+Bar J's strongest instrument is its **five-rung colour ladder in one exposure**
+— deep blue offshore → teal over the shallows → white surf → saturated brown wet
+sand → pale ochre dry sand — *"with the wet/dry sand pair close in level and
+therefore the most trustworthy comparison of the set"*. Counted in frame J:
+
+| rung | share of frame |
+|---|---|
+| deep water, `d > 5 m` | 2.29% |
+| teal shallows, `d < 2.5 m` | 0.05% |
+| white surf, breaking | 15.86% |
+| **wet sand** | **0.00% — ABSENT** |
+| **dry sand** | **0.00% — ABSENT** |
+
+**Three rungs of five.** The bed's dry beach is `6.0 m` wide (4–10 across the
+domain) with a face slope of `1.000`, which is steep enough that `shade_land`'s
+own classifier calls it rock. There is no subaerial beach face in this scene:
+wave 3's coastal loop produces a cliff that meets the water, and the Dean ramp
+that waves 1–2 built is entirely submarine.
+
+**Why it is first.** It removes the frame's own instrument — the one comparison
+the bar says survives all three camera failures — and it takes sections H2 and
+H3 with it: `optics.wet_albedo` transfers to sand for free, and free is worth
+nothing until there is sand. It is also the reason bar J's *subject* is missing:
+"a curved sand beach" is what the photograph is of.
+
+**What it needs.** The subaerial profile from the same morphodynamic loop as the
+bar — berm build and cut scaled by the run-up `beach.runup_hunt` already
+computes — or deposition at the cliff foot in `coastalStep`. Not a painted
+strip.
+
+### 2 · Forty-six per cent of the hero frame is one declared albedo
+
+`PLAIN_DRY` is a flat Lambertian standing where a vegetation model would go, and
+it is **46.1% of frame J and 44.4% of frame K** — the single largest surface in
+both. It is the clifftop the photographer is standing on, and an upright 106°
+frame from a clifftop unavoidably devotes its lower third to it.
+
+**The tension with the bar is exact and worth stating.** Bar K2 puts dune
+vegetation and the village *out of scope*. Bar K also records dune vegetation as
+being *in the foreground of the frame*. Those two are compatible only if the
+frame does not give half of itself to that surface — which is true of a
+photograph taken on a **headland with sea on three sides** and false of one
+taken on the seaward edge of a coastal plain. So this is not "add plants": it is
+gap 3 wearing a different hat, and the hyper-realism criterion that *"the tell
+is usually not the water"* is pointing straight at it.
+
+### 3 · There is no embayment and there are no headlands
+
+Bar J's subject is *"headland to headland, cliff behind, a curved sand beach"*.
+Wave 3's coastal loop gives **50 m of plan curvature over 1408 m of coast** — a
+nearly straight cliffed shore. There is no headland in this bed to stand on and
+no bay to point at, so the axis is aimed **along** the coast instead
+(azimuth 315.46°, derived: the far shoreline's bearing minus half a frame
+width, which puts the coast at one edge and the sea in the rest).
+
+This was recorded by wave 4 in a caption; it now has a number, and it is the
+reason gaps 2 and 4 exist. **It is also the reason the refraction criterion —
+the cheapest verification in the whole project, "do the surf lines follow the
+curve" — cannot be checked by eye against these frames.** A shore with 50 m of
+curvature in 1408 m has nothing for a crest to turn onto that a layman could
+see.
+
+### 4 · The eye is 17.31 m where the frame demands 25 – 102 m
+
+C1's instrument, above. This bed's brow is 17.31 m and there is nowhere higher
+to stand: the plateau behind it is a straight ramp that occludes its own brow.
+The consequence in the frame is that **the ground within 40 m of the eye takes
+about half of it**, which is what gap 2 is counting.
+
+### 5 · The illuminant is in the wrong half of the sky
+
+Bar J and bar K carry no time — their illuminant is `?`. But **bar J's own
+colour ladder says which class of frame it is**: *deep blue offshore* grading to
+teal is a sea reflecting sky, and therefore a **front-lit** sea. A low sun down
+the view axis does not give a deep blue offshore; it gives a glitter path.
+
+The render is drawn under the pool's sun, `21.02° / 273.75°` — a low **west** sun
+straight out to sea on a west-facing coast. The bar's own two *timed* cliff
+frames are `56.22° / 123.13°`, air mass 1.202, a late-morning south-easterly and
+clean of the eclipse. That is **35.2° lower and 209.4° round**, and the bar's
+own warning is that *"a wrong quadrant leaves the elevation correct and is
+otherwise silent"*.
+
+Measured consequence: **6.55% of frame J clips** the derived white point, on a
+glitter path bar J does not show.
+
+**This is a wave of its own and not a constant.** `atmosphere.py`'s four
+illuminants — disc, aureole, deck, sub-surface — all descend from one geometry,
+and moving the sun means re-deriving all four; doing it in place would move the
+pool's seventeen frame hashes. See `F6` for why the module would not stretch.
+
+### 6 · One surf zone where bar J shows three to four separated lines
+
+`brk` is one continuous band, 150 m wide at the median. Section B is **parked**
+with its mechanism named (2DH rip-feeder circulation, out of chapter 12's
+scope), and this frame is the visual statement of what that parking costs: bar J
+puts three to four discrete lines across the wider parts and the render puts
+one. It also removes the eye-height instrument's own subject, so gaps 4 and 6
+are measuring each other.
+
+
+### 7 · The sea at grazing reads as hard shore-parallel bands
+
+Visible in both frames without a measurement, which is the definition of a tell.
+The free surface carries **only the swell** — `η = (H/2)[cos φ + r cos(2φ + ψ)]`
+from the transform, with nothing added, which is the correct discipline and has
+a stated cost: the resolved field's mean square slope is `0.0013` against the
+`0.0335` Cox & Munk put on a 6 m/s sea. **The missing 96% is carried
+statistically, in the glitter's slope distribution and in nothing else.**
+
+At the near-normal incidences of the s4–s6 cameras that is nearly invisible,
+because the statistical half does the work. At the **grazing** incidences that
+fill the upper half of an upright cliff-top frame it is not: what silhouettes a
+crest against the water behind it is the *resolved* geometry, and the resolved
+geometry is one 90 m swell. So the sea from 200 m out to the horizon reads as a
+set of hard, evenly spaced, shore-parallel bands rather than a texture.
+
+**This is a framing-dependent defect and it is the reason it appears at wave 7
+and not earlier.** It is not a call to add noise — the standing ruling forbids
+that and should. It is a statement that the statistical treatment of the
+unresolved slopes is complete for *radiance* and absent for *silhouette*, and
+that a grazing view is where the difference lives.
+
+### 8 · The sea–sky seam, and it is the cheap one
+
+Bar K2: *"the sea's radiance at grazing must approach the sky's reflected value
+continuously, and any seam there is a tell visible at a glance."* At grazing the
+Fresnel reflectance goes to 1, so the sea just below the horizon is a mirror of
+the sky just above it and the ratio should go to **1**. Measured off the buffer,
+sampled at the columns furthest from the sun:
+
+| frame | sky | sea | ratio | worst |
+|---|---|---|---|---|
+| J (67° off the sun) | `1.0387` G | `1.6183` G | `1.67 / 1.56 / 1.37` | **66.7%** |
+| K (34° off the sun) | `1.2356` G | `1.7494` G | `1.53 / 1.42 / 1.25` | **52.7%** |
+
+**This is the cheapest item high on the list**, and it is why it is written up
+rather than merely listed. The physics that closes it is gap 9: over a path long
+enough, the sea's radiance and the sky's both converge on the same airlight, so
+the seam cannot survive an atmosphere. There are two candidate causes and they
+are not exclusive — the missing air, and the near-grazing water shading — and
+separating them is one paired frame.
+
+**A method note, because the first draft of this measurement was wrong.**
+`horizon_check` samples the frame's outer columns, which is right for frame K
+(aimed down the sun, so the edges are 15–17° off the path) and **wrong for frame
+J**, whose left edge lands within 3° of the sun. It reported the seam as 6188%
+off, which was the glitter. `horizon_seam` chooses its columns by their actual
+azimuth from the sun.
+
+### 9 · There is no air between the camera and the sea
+
+The pool was five metres across; these frames are kilometres deep and their
+farthest water is beyond the visible horizon. `shade_water` and `shade_land`
+return the radiance **leaving** the surface and `trace` hands it straight to the
+film: no extinction along the line of sight, and no airlight scattered into it.
+
+**The Rayleigh half needs no new constant.** `atmosphere.TAU_R` is the zenith
+optical depth this project already derived for the sun's own colour, and over an
+exponential atmosphere of scale height 8.5 km the surface coefficient is
+`β = τ/H_R`. **The aerosol half does need one and it is `?`** — a maritime
+boundary layer runs 20–60 km of meteorological visibility, and Koschmieder's
+`β = 3.912/V` turns that into a coefficient. Both are reported as a bracket:
+
+| | β (green) | T at 119 m | at 1307 m |
+|---|---|---|---|
+| Rayleigh alone | `1.19e-5 /m` | 0.999 | 0.985 |
+| + aerosol, clean 60 km | `7.71e-5 /m` | 0.991 | 0.904 |
+| + aerosol, hazy 20 km | `2.07e-4 /m` | 0.976 | **0.762** |
+
+**Why it is ninth and not third.** Because half of each frame is the ground at
+the photographer's feet: the median range in frame is 3 m and the 90th
+percentile is 119 m, so **0.3% of the frame is beyond one e-folding even in hazy
+air**. The gap is real, the fix is cheap, and its cost *at this framing* is
+concentrated in the thin band near the horizon — which is exactly gap 8. Fix the
+framing (gaps 2–4) and this one climbs.
+
+### 10 · No swash, no wet/dry boundary — and it is BLOCKED by gap 1
+
+Sections H2 and H3, unbuilt. The wet band in frame is **0.00%** — not because
+the run-up is wrong (`beach.runup_hunt` gives `ξ = 0.332`, `R = 0.50 m`) but
+because there is no sand for it to wet. **H3 transfers for free and free buys
+nothing here.** A wave that builds the swash before the beach face will have
+nothing to show for it.
+
+### 11 · No shore platform
+
+Section H1, unbuilt. The 2.1% of frame J that `shade_land` classes as rock is
+the cliff face, not a bench. Bar H1's pockets need spatially varying hardness,
+which chapter 12 is explicit about; the bed has it in the coastal loop and it
+does not reach the subaerial surface.
+
+### 12 · No airborne spray — and at this framing it is nearly free
+
+Deferred by wave 6 with the reason in every `s6-` caption, and **at bar J's and
+bar K's distances it is the smallest item on this list that is still real**. Bar
+J itself says so: *"nothing in it resolves foam texture, spray, the waterline's
+fine structure or the swash… a critic may not credit texture-scale work against
+this image."* The breaking surface is 15.85% of frame J, at ranges over 200 m,
+where a droplet cloud is sub-pixel structure that a coverage already carries in
+the mean.
+
+**This is the surprise worth stating loudly.** The one gap every frame in waves
+4–6 apologised for is, at the two viewpoints the reference set actually requires,
+close to the bottom of the list. It stays a blocker for the *close* frames of
+sections C, D and H2 and for the "no placeholder in a hero frame" criterion —
+but as a thing that breaks *these* frames, it is behind ten other things.
+
+### 13 · There is no shadow ray, and it costs exactly zero
+
+`shade_land` has never had one. Measured by marching from every land hit toward
+the sun:
+
+| sun | land facing it | of that, occluded and lit anyway |
+|---|---|---|
+| the render's, 21.02° / 273.75° | 100.0% | **0.0%** |
+| bar J's own class, 56.22° / 123.13° | 100.0% | **0.0%** |
+
+**Zero under both.** Not because the shading is right but because wave 3's
+landform is a ramp and a cliff face with nothing on it to cast a shadow. **Two
+gaps hiding each other**, and the ordering matters: building the shadow ray
+first would produce no visible change and would be recorded as a wasted wave.
+Build the relief (gaps 1, 3, 11) and this one becomes visible in the same move.
+
+### 14 · The earth is flat, and it is worth two pixel rows
+
+`trace` meets a plane at `z = 0` that runs to 40 km and has no horizon. The true
+horizon from this eye is at **16.28 km**, so **23.7 km of the ocean in frame
+does not exist** — and the whole of it is compressed into
+
+```
+    dip - atan(z/far) = 0.1229 - 0.0258 = 0.0971 deg = 1.76 pixel rows
+```
+
+at this raster, 3.7 rows at the phone's own 4032. **Last on the list, on
+evidence.** It sounds like a serious physical omission and it is the cheapest
+thing in the frame; the reason it is measured at all is so that no future wave
+spends itself there.
+
+## C4 · What surprised me, and where the ordering inverts the intuition
+
+1. **Nobody had looked at the land.** Six waves of increasingly careful water —
+   three constituents, a cuvette inversion, second-order Stokes, a size-resolved
+   bubble plume — and the beach in the beach scene is 6 m wide and classified as
+   rock. Every previous frame was aimed at the water, so nothing in six waves'
+   worth of diagnostics reported it. **The frame found it, exactly as wave 6's
+   W1 found the sheet of milk**, and that is now twice that a picture caught
+   something no printed table did.
+2. **The gap every caption apologised for is near the bottom.** Airborne spray
+   is 12th. At J's and K's distances the bar itself forbids crediting or
+   debiting texture-scale work.
+3. **Two of the most physical-sounding omissions cost nothing here** — the
+   shadow ray (0.0%) and the earth's curvature (1.8 rows) — and one of them
+   costs nothing *because another gap is hiding it*.
+4. **The cheap one that is high on the list is the air.** One exponential with a
+   coefficient already in `atmosphere.py`, plus one `?` for the aerosol, and it
+   closes the sea–sky seam that bar K2 calls a tell visible at a glance — a
+   **53–67%** discontinuity where the physics says zero.
+5. **A defect can be framing-dependent and still be a defect.** The banded sea
+   of gap 7 has been in every frame this project has drawn and is invisible in
+   all of them, because until this wave nothing looked at the water at grazing
+   incidence. Changing the camera found a shading gap.
+6. **The instrument nobody reached for is the surf-line separation.** The dip is
+   the famous horizon measurement and it is useless at cliff heights; the line
+   separation is a strong function of the eye height, has a closed-form ceiling,
+   and is readable off any frame that shows two breaking lines.
+
+## Frames
+
+| file | what it is |
+|---|---|
+| `s7-frame-J.png` | **the deliverable**: bar section J's framing — upright, 0.5× ultrawide, from the bed's own cliff brow, at the inferred depression. Every parameter and every gap number in the caption is formatted from the run that drew the frame |
+| `s7-frame-K.png` | bar section K's framing — upright, same camera code and same lens, aimed down the sun's own azimuth because that is what section K is |
+
+**The s7 pair does not take `--fast`, and that is wave 6's rule applied rather
+than broken.** `s4-`, `s5-` and `s6-` are three terms of one comparison at one
+camera and one raster size, so all three are drawn at 450 px. The s7 pair has no
+earlier term, so its size is free and it is fixed at 720 × 960 with 2 × 2
+supersampling. Nothing measured off it depends on the raster except the far
+range tail, and `aerial_cost` reports that dependence in the same line it
+reports the tail.
+
+**Every caption is formatted from the run that drew the frame.** No number is
+typed into a caption string in this wave.
+
+## C5 · One thing outside the camera: the bubble's Fresnel, per channel
+
+Found by a chapter builder independently verifying wave 6's bubble trace, and
+fixed here because it is one line in `beach_foam.py`.
+
+`_fresnel_internal` evaluated **all three channels at red's refracted cosine**.
+`optics.fresnel` broadcasts a scalar cosine to three channels, so the array
+shape was right; the energy sum still closed, because `R` and `1 − R` were
+consistent with each other *at the wrong angle*. A wrong **angle** per channel is
+invisible to every shape and energy check in the file.
+
+Fixed per channel, the disc-average of the internal reflectance **recovers
+`optics.R_INT` in all three bands to seven digits**:
+
+|  | R | G | B |
+|---|---|---|---|
+| traced, by quadrature over the impact parameter | `0.473713` | `0.476167` | `0.480681` |
+| `optics.R_INT = 1 − (1 − R_EXT)/n²`, by reciprocity | `0.473712` | `0.476166` | `0.480681` |
+
+An impact parameter uniform over the **disc** is a cosine weighting over the
+hemisphere, so the disc-average **is** the diffuse internal reflectance. Two
+routes sharing no code, three numbers, seven digits — the strongest row in the
+foam section, and the shipped version was throwing two thirds of it away.
+
+`b_b/b` moves `0.0230 → 0.0233` in green; wave 6's twenty-fold finding is
+untouched. **Two absolute rows moved with it**, 0.11% each — the plume's `T` and
+`R` at `α = 0.03` — and **every ratio row in the section survived the defect
+unchanged**. Fifth time in this project an absolute row was the only thing that
+could have seen it.
+
+## The suite
+
+**263 pass / 0 FAIL / 0 ERROR / 9 open / 67 info**, up from wave 6's
+`226 / 0 / 0 / 7`. The pool stays `285 pass / 0 FAIL / 54 info`, unchanged —
+wave 7 adds one file and edits `beach_render.py`, `beach_foam.py` and
+`validate_beach.py`, none of which the pool imports.
+
+`_sec_camera` is **36 pass / 0 FAIL / 2 open / 1 info**, and `_sec_foam` gains
+one row for the recovery above.
+
+**Every camera parameter the inference derives has an absolute row**: the
+vertical and horizontal fields of view, the depression, **and the depression's
+own uncertainty**, for both frames. The uncertainty gets a row deliberately —
+without one, a future wave could narrow the interval silently and be claiming
+evidence it does not have.
+
+Two rows are worth naming:
+
+- **`the refracted dip is Bowditch's table, ABSOLUTE`** — `1.757` arcminutes per
+  `√m`, against a published dip table rather than against itself. It is what
+  `REFRACTION_K` is fitted to, and the row is the fit.
+- **`the BUILT camera puts the horizon where the inference says`** — the ray
+  field of the camera actually used against the projection the inference
+  reported, to one pixel row. It is the only row in the section that touches the
+  renderer, and it is the one that catches a vertical field of view passed where
+  a horizontal one belongs — an error every arithmetic row above it is blind to.
+
+Six deliberate defects in `--bugs-camera`, **all six caught**:
+
+| bug | rows |
+|---|---|
+| `fov-on-the-long-side` — the equivalence on the long side, not the diagonal | 11 |
+| `landscape-not-upright` — the same lens held the other way | 12 |
+| `dip-unrefracted` — drop the 7% refraction correction | 7 |
+| `separation-small-angle` — keep `z s/D²` and lose the ceiling | 5 |
+| `hfov-scaled-linearly` — `h = v·W/H` instead of the tangents | 1 |
+| `flat-sea-no-horizon` — report the flat plane as costing nothing | 1 |
+
+and one more in `--bugs-foam`:
+
+| bug | rows |
+|---|---|
+| `bubble-fresnel-one-channel` — every channel at red's refracted cosine | 3 |
+
+# Wave 8 — the land, and the air
+
+Wave 7 put the camera at the owner's viewpoints and produced an ordered gap
+list. **The top of it was not water.** Six waves of increasingly careful sea —
+three constituents, a cuvette inversion, second-order Stokes, a size-resolved
+bubble plume — and the beach in the beach scene was `6.0 m` wide with a face
+slope of `1.000`, which `shade_land`'s own classifier called **rock**.
+
+This wave closes gaps **1, 2, 8, 9 and 13** of that list: a subaerial beach, the
+wet/dry sand pair, the sea–sky seam, the aerial perspective, and the shadow ray
+that gap 1 unblocks. It then **re-orders the list**, which is the second half of
+the deliverable — closing five items changes what is now worst, and the wave
+that does not re-rank has only done half its job.
+
+**New suite section `_sec_land`.** New frames `s8-frame-J.png` (the pair to
+`s7-frame-J.png`, same camera), `s8-air.png` (a triplet: no air, clean, hazy),
+`s8-beach-profile.png`.
+
+## The whole of it, before the details
+
+- **Three numbers make a subaerial beach and every one of them is derived from
+  something this file already owned.** The face slope is the Dean equilibrium
+  profile's own slope where the surf-zone model hands over to the swash,
+  `(2/3)·A^{3/2}/√d = 0.05282` — and **the evolved bed agrees to 0.2%** at its
+  innermost resolved cell, which is a second instrument that could have
+  disagreed. The dry beach's width is `√(H₀L₀) = 13.77 m`, **with the slope
+  divided out of Hunt's run-up**, so it needs no constant at all. The elevations
+  are the swell's run-up limit `0.727 m` and the file's own storm's `1.029 m`.
+- **`optics.wet_albedo` has a specular term inside it and four waves spent it as
+  diffuse.** `a_wet = R_EXT + (1−R_EXT)(1−R_INT)a/(1−a·R_INT)`: the leading
+  `R_EXT` is light that never entered the film. Handing the whole expression to
+  a Lambertian makes wet sand **brighter** and never glossy — bar H3 exactly
+  backwards, twice. Split, wet sand is darker than dry in every channel *and*
+  carries a lobe. **A finding about how this file uses `optics.py`, not a defect
+  inside it**; the module is not touched.
+- **The wet/dry boundary is a distribution and not a line, and the distribution
+  was already in the file.** Run-up heights inherit the incident waves' Rayleigh
+  statistics, so the wetted share is the exceedance `exp(−(z/R)²)`. Nothing is
+  placed. Checked against 400 000 Rayleigh variates from a generator that has
+  never heard of beaches.
+- **The air needed one new number and not two, and it closes the seam by
+  construction.** `β = atmosphere.TAU_R/8.5 km` per channel is not new. The
+  airlight is not a declared colour either: in a horizontally homogeneous
+  atmosphere **an infinitely long horizontal path reaches the horizon sky, by
+  definition**, so at grazing the sea's radiance goes to the sky's identically.
+  Bar K2's continuity criterion is then satisfied whatever `β` and whatever the
+  airlight's colour turn out to be — **nothing was fitted and nothing could
+  have been**.
+- **The shadow ray became worth building, and only because the beach was built
+  first.** Wave 7 measured its cost at exactly 0.0% under both suns and gave the
+  right reason: the landform was a ramp and a cliff face with nothing on it to
+  cast one. There is now a beach at the foot of a 15 m cliff.
+- **Hunt's run-up cannot produce a berm crest, and that contradicts the ordinary
+  picture of a beach.** With one face slope **every run-up limit lies on the
+  same plane** — `R = tan(β)√(HL₀)`, so the swell's limit and the storm's differ
+  only in how far up that one plane they reach. A berm crest is a *break in
+  slope* and needs the swell to **cut** the storm-built profile, which is swash
+  transport this model does not have. What this bed carries is a face, a marked
+  berm *level*, and a flat backshore. **The scarp is `?` and absent, not
+  approximated.**
+- **Gap 2 — 46% of the frame on one albedo — is a missing PROCESS and not a
+  missing constant, and the arithmetic is three orders wide.** See `L6`.
+
+## L1 · The beach face, and the route the file already had does not reach it
+
+`D_MORPH_MIN` has carried this sentence since wave 1:
+
+> the bed inside the swash is shaped by swash, which is not modelled here, so
+> the loop is not allowed to invent an answer for it.
+
+That is a statement about the physics and not only about the numerics, and it is
+what fixes the face slope. **The Dean profile has no shoreline slope**:
+`d = A y^{2/3}` gives `dd/dy = (2/3)A y^{−1/3}`, which diverges at `y = 0`,
+because the profile is derived from uniform energy dissipation **per unit water
+volume** and there is no water volume at the shoreline for the dissipation to be
+uniform in. So a beach face is a separate landform — a straight ramp — and what
+fixes its angle is *where the equilibrium profile stops answering*:
+
+```
+    y_0 = (d/A)^(3/2)          tan(beta) = (2/3) A^(3/2) / sqrt(d)
+```
+
+`0.052819`, **1:18.9**, an ordinary intermediate sandy beach face.
+
+**And it is not only a closed form — the evolved bed agrees.** The 1-D
+morphodynamic loop is run to quasi-steady from a Dean ramp and reshaped all the
+way in by a three-term transport model; it builds a bar that departs from the
+ramp by 0.4 m a hundred metres offshore. Its own slope at the shallowest cell it
+will answer for is **0.0529** against the closed form's **0.0528**. Two
+instruments, one derived and one run, and the second could have disagreed.
+
+**The route this file already had does not work, and saying so matters.**
+`EPS_SLOPE`'s own comment gives the Bailard equilibrium slope as `Sk/ε` — "the
+slope at which gravity balances the skewness drive". Evaluated in the swash it is
+**zero**: the skewness carries a `(1 − f_brk)` factor and the inner surf is fully
+broken, so the model's equilibrium there is a flat terrace. Measured at the six
+innermost resolved cells: `0.148, 0.128, 0.067, 0, 0, 0`. That is the transport
+model saying it has no swash — which is exactly what `D_MORPH_MIN` says — and it
+is why the slope comes from the profile and not from the flux.
+
+**The one soft place, bracketed rather than asserted.** `tan(β)` goes as
+`1/√d`: `0.0988` (1:10) at the transform's own depth floor, `0.0528` (1:19) at
+`D_MORPH_MIN`, `0.0312` (1:32) at 1 m. That factor of `3.162` **is** the observed
+range of sandy beach faces, so the bracket is honest and the middle of it is not
+a coincidence — but a reader should know this is the softest of the three
+numbers.
+
+## L2 · The width has the slope divided out of it, and that is the whole trick
+
+Hunt's `R = ξH` with `ξ = tan(β)/√(H/L₀)` is `R = tan(β)√(HL₀)`. So the
+**horizontal** reach of the swash is
+
+```
+    R / tan(beta) = sqrt(H L_0)
+```
+
+and **the slope cancels**. The width of the dry beach a swell builds is the
+geometric mean of the deep-water height and wavelength: `13.77 m` at this
+scene's swell, `19.47 m` at the file's own storm. Closed form, no constant, and
+it replaces a `6.0 m` leftover.
+
+The suite checks it three ways — against `√(H₀L₀)` directly, against
+`runup_hunt(iribarren(…))/tan β` composed the long way round, and by doubling
+and halving `tan β` and watching the excursion **not move** while the run-up
+limit does. That last pair is what stops the two quantities being confused.
+
+## L3 · Hunt cannot make a berm crest, and this overturns the ordinary picture
+
+A textbook beach profile is *face, berm crest, backshore* with a **break in
+slope** at the crest. This model cannot produce one, and the reason is
+structural rather than a missing coefficient:
+
+> `R = tan(β)·√(H·L₀)` at fixed `β` puts **every** run-up limit on the **same
+> plane**. The swell reaches `0.727 m` and the storm reaches `1.029 m` — but
+> both are points on one straight face at `1:18.9`, `13.77 m` and `19.47 m` from
+> the waterline. There is nothing for a crest to be.
+
+A berm crest is what the *ordinary swell* leaves when it **cuts** the profile the
+storm built, which is a swash-zone transport this file does not have and cannot
+borrow from the surf-zone flux (see `L1`). So what this bed carries is:
+
+| feature | elevation | from |
+|---|---|---|
+| beach face | 0 → 1.029 m over 19.47 m | `tan β` and the storm excursion |
+| the **berm level** at 0.727 m | a marked level *on* the face | the swell's run-up |
+| backshore | flat at 1.029 m, to the cliff foot | the storm's run-up |
+| the berm **scarp** | — | **`?`, absent, not approximated** |
+
+**And the backshore is nearly zero-width on this coast, which is a result and
+not a defect.** The wedge is anchored at the cliff foot — the cell where the
+rock crosses the backshore elevation — and the cliff on this bed comes down at a
+slope of 1.2. So there is no terrace between the beach and the rock. That is
+what a cliffed coast looks like; a wide dry backshore belongs to the embayment
+this bed does not have, which is gap 3.
+
+## L4 · The beach had to be anchored at the cliff foot, and the first attempt had zero capacity
+
+The obvious construction — a wedge built *landward* of the present waterline, up
+to the run-up limit — **produces nothing on this coast**, and measurably so: the
+rock crosses `1.029 m` within `60 cm` of the shoreline, so the capacity is zero
+in every row. A beach on a cliffed coast is a body of sand standing **seaward**
+of the cliff, prograding, and its landward limit is where the rock reaches the
+backshore elevation. That is what is built, and the shoreline moves seaward by
+about 13 m as a consequence.
+
+**The budget is the loop's and it is a check, not a knob.** `coastal_step` now
+reports the beach-grade sand it produced **per row** — the same `ero` the
+deposition already uses, summed on a different axis, so no measurement in
+`_sec_coast` moved by a bit. The wedge needs about `35 m³` per metre of coast
+and the loop delivered about `206`. A factor of six, so **the width is set by
+the profile geometry and not by the supply**, and `supply_limited` is returned
+as a boolean beside the factor so a starved coast cannot reach that state
+silently.
+
+**What is placed, marked.** The fill is applied at **composition time**, in
+`bay_bed`, and not inside `coastal_step`'s iteration. Inside the iteration the
+beach moves the waterline the notch attacks and the cliff stops retreating — a
+real feedback (a beach protects a cliff) and a wave of its own, because it
+changes the plan-form every row in `_sec_coast` is measured on.
+
+**And a dead parameter fell out of it.** `coastal_step` took
+`beach_height=BEACH_HEIGHT` in its signature and **never read it** for seven
+waves; the deposition band was the literal `sea_level − 3.0`, an undeclared
+number, and the chapter's own subaerial limit was quietly not implemented. That
+is *why* the scene had no beach. The dead parameter is gone; the literal is now
+named `toe_depth` and **its value is unchanged**, because naming it and changing
+it in one move would have made every `_sec_coast` measurement incomparable with
+wave 7's. Its physical meaning is the closure depth, and Hallermeier's relation
+puts that at `3.2 m` for this sea state — 7% from the literal somebody wrote.
+
+## L5 · `wet_albedo` contains a specular term, and four waves spent it as diffuse
+
+Bar H3 is one of the cleanest transfers in this project:
+
+> Wet sand darkens because a thin film traps light between the surface and the
+> substrate — the trapped series, which this project derived for the liner as
+> `wet_albedo`… **It applies to sand unchanged.** The wet band also goes
+> *specular* where the dry sand is matte, so `base_color` and
+> `specular_roughness` move together.
+
+`shade_land` had `SAND_WET = optics.wet_albedo(SAND_DRY)` since wave 4 and put
+the whole of it in a Lambertian lobe. But
+
+```
+    a_wet = R_EXT  +  (1 - R_EXT)(1 - R_INT) a / (1 - a R_INT)
+            \____/    \______________________________________/
+           the film's        the trapped series: what actually
+           own surface       comes back OUT of the substrate
+           reflection
+```
+
+and the first term is light that **never entered the film**. Handing it to the
+diffuse lobe makes wet sand *uniformly brighter* and *never glossy* — which is
+bar H3 backwards twice over, because the thing it calls "one of the strongest
+tonal edges in these frames" is wet sand going **darker and shinier at once**.
+
+The split needs nothing new:
+
+| | goes to | value |
+|---|---|---|
+| `a_wet − R_EXT` | the diffuse lobe | strictly darker than dry sand |
+| `fresnel(θ_v)` | a specular lobe | the directional form of the same term |
+
+`R_EXT` is the hemispherical-average external reflectance, which is the right
+thing to *remove* from an albedo lit by a hemisphere; what is *added back* is
+`fresnel(θ_v)` at the view angle, which is the right thing for a lobe. They are
+the same physics integrated over different variables, and the swap is stated
+rather than hidden. **`optics.py` is not touched** — this is a finding about how
+this file used the module.
+
+**The lobe's sky half needs no roughness at all.** A smooth film mirrors a
+smooth sky, so `fresnel(θ_v)·env_diffuse(mirror)` is exact in the smooth-film
+limit and a rough film moves it by nothing measurable. Only the **sun's** glint
+needs a slope distribution, and that is `SIGMA_WET`, **the one new unknown this
+wave adds**: declared `0.20`, bracketed `0.10–0.40`, `?`, and it moves nothing
+but the glint.
+
+**`beach_optics.glitter_radiance` is not called, and the reason is a finding
+about it.** It assumes the mean surface is **horizontal** — it builds the
+required normal from `s + r` and reads its `z` as `cos β`. A beach face is 3.0°
+off horizontal and a wet rock face is not, so the half-vector has to be taken
+against the **local** normal. Reported, not patched.
+
+## L6 · The plateau's flatness is a missing PROCESS, and the arithmetic is three orders wide
+
+Gap 2 asked for "at minimum, the same treatment any other surface gets: an
+albedo with a stated source, a normal, and shadowing". Two of the three are
+there and one is not, and the interesting result is *why* the third is hard.
+
+Differential subaerial weathering keyed to the hardness field this file already
+owns would lower soft rock faster than hard and produce relief. The rate is a
+fraction of the marine erosion rate, and published denudation rates for a
+coastal plateau (0.01–0.1 mm/yr) sit against cliff-retreat rates of
+0.05–0.5 m/yr — **a ratio near `1e-3` to `1e-4`**. This coast retreated `182 m`
+over the loop's clock, so the plateau lowered somewhere between **2 cm and
+18 cm**, and the relief is the *contrast* times that: a few centimetres over
+correlation lengths of hundreds of metres. **Slopes of `1e-4`.** Invisible, and
+invisible under **any** coefficient in the bracket.
+
+So gap 2 is not "declare a weathering rate". The relief on a real coastal plain
+is **drainage** — fluvial incision, a different process on a different clock,
+and out of chapter 12's scope entirely. That is why this wave measures it and
+does not build it, and it is why gap 2 moves *down* the re-ordered list rather
+than up: it is expensive, not cheap, and wave 7 ranked it second on its **share
+of the frame** rather than on what it would take to close.
+
+The albedo stays `?`. What is now stated is what it would take to close it: a
+reflectance measurement or a vegetation model, neither of which the bar licenses
+being read off a photograph.
+
+## L7 · The air, and why the seam closes by construction
+
+Bar K2 makes the sea–sky seam a criterion — "any seam there is a tell visible at
+a glance" — and wave 7 measured it at **53–67% off continuity** where grazing
+Fresnel says the difference should be zero.
+
+```
+    L(r) = L_surface * exp(-beta r)  +  L_airlight * (1 - exp(-beta r))
+```
+
+**The Rayleigh coefficient is not a new constant.** `atmosphere.TAU_R` is the
+zenith optical depth this project derived four waves ago for the sun's own
+colour; over an exponential atmosphere of scale height `H` the surface
+coefficient is `β = τ/H` by the definition of the integral. Per channel, so the
+airlight's colour is right without anything being declared:
+`1.1943e-5 /m` in green.
+
+**The aerosol coefficient is the one `?`.** Koschmieder's `β = 3.912/V` and a
+maritime boundary layer runs 20–60 km. The **clean end is shipped** — it is the
+conservative choice for a gap being closed, since it understates rather than
+overstates what the new term does — and the hazy end is **rendered beside it**
+in `s8-air.png` rather than described. It is *not* read off bar J or bar K: the
+standing ruling forbids reading a level off them, and horizon sharpness is a
+level.
+
+**The airlight is not a declared colour, and this is the part worth reading.**
+In a horizontally homogeneous atmosphere, a horizontal path of *infinite* length
+reaches exactly the radiance of the sky at the horizon in that azimuth — **that
+is what the horizon sky is**. So the airlight is `sky_radiance` evaluated on the
+ray flattened to the horizontal. It costs nothing, it carries the azimuthal
+structure (bright toward the sun, dark away from it), it needs no new number,
+and:
+
+> at grazing the sea's range goes to infinity, its transmittance to zero, and
+> its radiance to the airlight — **which is the sky just above the horizon**.
+> Bar K2's criterion is satisfied *identically*, whatever `β` and whatever the
+> airlight's colour turn out to be. **Nothing was fitted and nothing could have
+> been.**
+
+The suite carries that as a row: `aerial` at `r = 1e9` must return
+`sky_radiance` of the flattened ray to `1e-12`. Take the airlight in the **view**
+direction instead — which looks more physical, because the light does come from
+where you are looking — and the row fires and the seam reopens.
+
+**Two approximations, both marked, and both vanish at the seam.** A slant path
+is shorter through the atmosphere than a horizontal one, so the airlight on a
+steeply downward ray is over-stated — and a steeply downward ray is looking at
+the ground under the camera, where `1 − T` is `0.0002`, so the error is where
+the term is not. And the aerosol's airlight is given the Rayleigh sky's colour,
+which over-blues the haze; the aerosol phase function is forward and nearly grey
+and a proper source function needs a model this file does not have.
+
+## L8 · The shadow ray, and the ordering wave 7 argued for was right
+
+Wave 7 measured the missing shadow ray at **exactly 0.0% under both suns** and
+said why: "not because the shading is right but because wave 3's landform is a
+ramp and a cliff face with nothing on it to cast one. **Two gaps hiding each
+other**, and the ordering matters: building the shadow ray first would produce
+no visible change and would be recorded as a wasted wave."
+
+That was correct and this wave is the test of it. The ray is a hard one and the
+softness it is missing is stated rather than faked: the sun's disc is 0.53°
+across, so a real shadow edge is penumbral over about 1/100 of the distance to
+the caster — **0.4 m at the foot of this cliff**, under a pixel at bar J's range.
+
+**The reach is the landform's own and not a declared distance.** Nothing can
+cast a shadow further than its height divided by the tangent of the sun's
+elevation, so the march stops at `h_max/tan(el)` — 42 m at the render's 21° sun
+and 12 m at bar J's 56° one. Wave 7's `shadow_cost` marched a fixed 600 m for the
+same answer.
+
+The suite checks it on a **synthetic bed with one wall on it**, so the answer is
+arithmetic rather than a picture: a 10 m wall under a 30° sun shadows 17.32 m
+and the edge is checked in metres.
+
+
+## L9 · One more finding, in the water path, reported and not patched
+
+`Water.__init__` builds its bed-reflectance ladder as
+
+    OPT.rho_water(SAND_WET, ..., absorb=...)
+
+and `SAND_WET` is `optics.wet_albedo(SAND_DRY)`. But `rho_water`'s own docstring
+says what it expects: *"the share of the beam falling on the SURFACE that comes
+back out of it, EXCLUDING the surface's own reflection"* — it already carries
+`(1 - fresnel)` on the way in and `slab_esc` on the way out. So the `R_EXT` term
+at the head of `wet_albedo` is **a specular reflection off the top of a film
+that does not exist under three metres of water**, and the `(1 - R_EXT)(1 -
+R_INT)` pair with it is a second in-and-out transmission through an interface
+already counted.
+
+The bed of a bay *is* wet — its grains sit in pore water and the trapped series
+between grain and water is real — so the right argument is the **diffuse** half,
+which is exactly `SAND_WET_DIFF`, the quantity `L5` above had to construct
+anyway:
+
+| | R | G | B |
+|---|---|---|---|
+| dry sand | 0.4500 | 0.3900 | 0.3000 |
+| `wet_albedo`, as passed | 0.3473 | 0.3008 | 0.2373 |
+| the diffuse half, which is what belongs there | 0.2811 | 0.2342 | 0.1698 |
+| **over-bright by** | **1.236×** | **1.285×** | **1.398×** |
+
+**Reported and not patched, deliberately.** It is in the water path, and
+changing it moves every colour measurement waves 4–7 published, the `s4/s5/s6`
+three-frame comparison, and the bar-J ladder's first three rungs — a wave's
+worth of re-measurement, not a line. It is recorded here, in the gap list, and
+in `rounds.jsonl`, and it is the **sixth** time in this project that the same
+class of error — a shared closed form used one interface off — has been found.
+
+## L11 · The suite
+
+**`_sec_land` is 38 pass / 0 FAIL / 5 open**, and the beach suite goes
+`263 → 301 pass / 0 FAIL / 0 ERROR / 14 open`. The pool stays
+**285 pass / 0 FAIL / 54 info** — wave 8 edits three beach files and none of
+the pool's.
+
+Every new quantity has at least one absolute row, and where a second instrument
+existed it is used:
+
+| quantity | checked against |
+|---|---|
+| the face slope | a finite difference on `dean_bed`, written in wave 1 for the submarine bed |
+| | the evolved 1-D loop's own slope at its innermost cell — **0.24% apart** |
+| the swash excursion | `runup_hunt(iribarren(…))/tan β` composed the long way, and `tan β` doubled and halved |
+| `swash_wetness` | **400 000 Rayleigh variates** from `numpy`'s generator |
+| the albedo split | `diffuse + R_EXT = wet_albedo` to `1e-15` |
+| the slope pdf | integrated over the slope plane to `1` — *the function the shader calls* |
+| the sun lobe | the closed form at exact specular, per channel |
+| the airlight | `sky_radiance` of the flattened ray, on a near-horizontal **and** a 50° ray |
+| the shadow | a synthetic bed with one wall: `h/tan(el)` in metres |
+
+Seven deliberate defects in `--bugs-land`:
+
+| bug | rows |
+|---|---|
+| `face-slope-at-break` — the slope 100 m offshore, which is what waves 4–7 fed to Hunt | 8 |
+| `swash-linear-band` — the wet/dry boundary as a ramp, which is what `shade_land` carried | 4 |
+| `wet-albedo-all-diffuse` — the whole trapped series in the Lambertian lobe | 1 |
+| `beta-no-scale-height` — `τ` used as if it were `β` | 1 |
+| `shadow-reach-one-cell` — the march stopped at one cell | 1 |
+| `airlight-view-direction` — the airlight where you are looking, not at the horizon | — |
+| `specular-no-jacobian` — the slope density used as a radiance | — |
+
+**Two of the seven caught nothing in their first draft, and that is recorded
+rather than quietly fixed**, because both failures were failures of the *rows*:
+
+- `airlight-view-direction` was invisible because the row's test ray was
+  **near-horizontal**, where the view direction and the horizon *are* the same
+  direction. A ray at 50° of depression was added, and it is the row that
+  matters.
+- `specular-no-jacobian` was invisible because the normalisation row **rebuilt
+  the slope density beside itself** instead of calling the shader's. A row that
+  rebuilds the thing it is testing tests the row. The density and the Jacobian
+  are now their own functions, `wet_slope_pdf` and `sun_jacobian`, the row
+  integrates the one the shader calls, and a second row checks the whole lobe at
+  exact specular where every factor is known.
+
+That is the same disease the harness has now caught in itself three times — a
+guard pinned to the one place in its own domain where the wrong answer cannot be
+told from the right one.
+
+## L10 · THE RE-ORDERED GAP LIST
+
+Wave 7's list is superseded. Five of its fourteen items are closed or
+substantially closed, **two of its rankings were wrong for reasons this wave
+measured**, and four new items enter. The ordering is still by *what it costs
+the frame*, not by how interesting it is to fix.
+
+### Closed by wave 8
+
+| wave 7 | item | what closed it |
+|---|---|---|
+| **1** | the beach is missing | a face, a berm level and a backshore, all three derived; the ladder goes **3 rungs → 5** |
+| **8** | the sea–sky seam, 66.7% off | the air. **66.7% → 18.1%** at 60 km, and the remainder is gap 14 below |
+| **9** | no air at all over a 38 km frame | one exponential, no new constant except the aerosol `?` |
+| **10** (half) | no wet/dry boundary | the Rayleigh exceedance and the specular split; **wet sand is 3.07% of the frame and dry 0.55%**, both from 0.00 |
+| **13** | no shadow ray | built — **and it is still worth nothing, for a new reason**. See #10 below. |
+
+### The list now
+
+**1 · There is no embayment and there are no headlands.** *(was 3)*
+It rises to the top because everything above it that could be fixed has been,
+and because wave 8 added a fifth thing that it blocks. It is bar J's **subject**
+— "headland to headland, cliff behind, a curved sand beach" — and this bed has
+50 m of plan curvature in 1408 m. It is why the coastal plain is half the frame
+(old gap 2), why the eye is 17.31 m where the frame demands 25–102 m (old gap
+4), why the refraction criterion — **the cheapest verification in the whole
+project, "do the surf lines follow the curve"** — cannot be checked by eye, and
+now also **why the dry beach rung is thin**: a wide dry backshore belongs to a
+bay beach, and on a cliffed coast the talus takes the top of the wedge (`L3`).
+One gap feeds five.
+
+**2 · The illuminant is in the wrong half of the sky.** *(was 5, and it rises
+for a reason wave 8 measured rather than argued)*
+Wave 7 ranked this fifth on the strength of a clipped-pixel count. Wave 8 gives
+it a sharper instrument: **the wet/dry sand pair is now in the frame, and under
+this sun it reads backwards.** Diffusely wet sand is darker than dry in every
+channel, which is bar H3's direction; *in total* it is 1.57–1.64× **brighter**,
+because a 21° sun straight out to sea backlights the wet band and its new
+specular lobe glints down the lens. Bar J's own class of frame is front-lit.
+**The one comparison bar J calls "the most trustworthy of the set" is present
+and lit wrong**, which is a far stronger statement than "6.55% of the frame
+clips". Still a wave of its own: `atmosphere.py`'s four illuminants descend from
+one geometry and moving the sun moves the pool's seventeen frame hashes.
+
+**3 · One surf zone where bar J shows three to four separated lines.** *(was 6)*
+Unchanged in substance and up by three places because the things above it went.
+Section B is parked with its mechanism named (2DH rip-feeder circulation, out of
+chapter 12's scope). It is the largest remaining **water** disagreement and it
+removes the eye-height instrument's own subject, so it and #1 measure each
+other.
+
+**4 · The eye is 17.31 m where the frame demands 25–102 m.** *(was 4)*
+Coupled to #1 and not fixable without it.
+
+**5 · The sea at grazing reads as hard shore-parallel bands.** *(was 7)*
+The air has softened it — the far sea is now 90% airlight in clean 60 km
+visibility — but the resolved field's mean square slope is still `0.0013`
+against Cox & Munk's `0.0335`, and the missing 96% is carried statistically for
+**radiance** and not at all for **silhouette**. Not a call to add noise.
+
+**6 · Forty-six per cent of the frame is one declared albedo.** *(was 2 — and it
+falls, on measurement)*
+Wave 7 ranked it second on its **share of the frame**. Wave 8 ranks it sixth on
+what it would **take**, which is the ordering the list claims to use. It now has
+a normal (median tilt 12.55°, spread 3.72°) and a shadow ray. What it does not
+have is relief, and `L6` shows the relief a weathering model could produce is
+**slopes of 1e-4** — three orders below visible, under *any* coefficient in the
+published bracket. The relief on a real coastal plain is **drainage**, a
+different process on a different clock and out of chapter 12 entirely. So this
+is expensive, not cheap, and its share of the frame is mostly #1 wearing a hat.
+
+**7 · The bed under the water is 1.24–1.40× too bright.** *(NEW — `L9`)*
+`optics.rho_water` is handed `wet_albedo(SAND_DRY)` as its bed reflectance, and
+`rho_water` already carries the air–water interface. The `R_EXT` at the head of
+`wet_albedo` is a specular reflection off the top of a film that does not exist
+under three metres of water. It touches the teal rung and the surf, which are
+12.3% and 2.3% of frame J. **Reported and not patched** — changing it moves
+every colour measurement waves 4–7 published and the `s4/s5/s6` comparison.
+
+**8 · No swash: the moving waterline and the laden backwash.** *(was 10, half
+closed)*
+The wet/dry boundary is built. What is not is bar H2's **swash proper** — a
+wetting/drying bed with a moving shoreline, sediment in the retreating sheet,
+and foam stranded as lace with a different residence time from the water that
+left it. A close frame, not this one.
+
+**9 · The berm scarp.** *(NEW — `L3`)*
+Hunt's run-up with one face slope puts **every** run-up limit on the same plane,
+so this model cannot produce a break in slope at the berm crest. It is a
+structural limit rather than a missing constant, and it needs the swash
+transport #8 needs.
+
+**10 · The shadow ray costs 0.0%, and wave 7's reason for that is now wrong.**
+*(was 13)*
+Wave 7 said the ray was free "because the landform has no relief to cast one".
+It has relief now — a 15 m cliff over a 12 m beach — and the ray is still worth
+almost nothing, for a **different and geometric** reason: **both illuminants
+this project owns are on the seaward side of a west-facing coast**, and a cliff
+shadows its own beach only when the sun is landward *and* low. The render's is
+21° in the west; bar J's own class is 56° in the south-east, which is landward
+but high. Under a **20° morning sun at azimuth 110°** it is not free at all, and
+that counterfactual is the only measurement that could tell the two explanations
+apart. **A wave that had built the shadow ray without building the beach would
+have concluded the ray was worthless. It would have been right by accident.**
+
+**11 · No shore platform.** *(was 11)* Section H1, unbuilt. The bed has spatially
+varying hardness in the coastal loop and it does not reach the subaerial
+surface.
+
+**12 · The beach's feedback on the cliff is not closed.** *(NEW — `L4`)*
+The wedge is laid at composition time, not inside `coastal_step`'s iteration.
+Inside it, the beach moves the waterline the notch attacks and the cliff stops
+retreating — a real feedback that changes the plan-form every row of
+`_sec_coast` is measured on.
+
+**13 · No airborne spray.** *(was 12)* At bar J's and bar K's distances the bar
+itself forbids crediting or debiting texture-scale work. Still a blocker for the
+close frames of sections C, D and H2.
+
+**14 · The earth is flat, and it is now worth slightly more than it was.**
+*(was 14)*
+Still 1.76 pixel rows of over-painted sky. But it has acquired a second job:
+**the residual 18.1% of the sea–sky seam is the flat plane's finite range.** The
+sea at the horizon row is at 36 km, not infinity, so its transmittance is 0.062
+rather than 0 and 6% of the surface radiance survives to the film. In hazy 20 km
+air the same row is fully extinguished and the seam closes further. Two gaps
+that were independent in wave 7 are now coupled, and the coupling is measurable.
+
+**15 · `SIGMA_WET` and the aerosol visibility.** *(NEW, both `?`)*
+The wet film's residual rms slope (0.20, bracket 0.10–0.40) and the maritime
+visibility (60 km shipped, bracket 20–60 km). Both are rendered across their
+brackets rather than described.
+
+## What surprised me
+
+1. **Nobody had looked at the land, and the reason the beach was missing was a
+   dead function parameter.** `coastal_step` took `beach_height` and never read
+   it; the deposition band was an undeclared literal that stopped at the datum.
+   Seven waves, and the chapter's own subaerial limit was simply not
+   implemented.
+2. **The width of a beach needs no constant, and I did not expect that.**
+   `R/tan β = √(H₀L₀)` — Hunt's run-up is linear in the slope, so the horizontal
+   excursion has the slope divided out of it. A landform dimension in closed
+   form from a deep-water sea state.
+3. **Hunt cannot make a berm.** Every run-up limit on one plane. The most
+   recognisable feature of a beach profile is out of reach of the most-quoted
+   run-up formula, and saying so is worth more than approximating it.
+4. **`wet_albedo` had a specular term in it and four waves spent it as
+   diffuse** — and the effect was to make wet sand *brighter*, which is the one
+   thing bar H3 says it must not be.
+5. **The shadow ray is still free, and wave 7's reason was wrong.** The relief
+   arrived and the ray stayed at zero. It is the sun's quadrant, not the
+   landform, and it took a third counterfactual illuminant to see that.
+6. **The seam does not close all the way, and what stops it is the flat Earth**
+   — the item wave 7 measured and put last on purpose. It is still last, and it
+   is now coupled to the item it was measured to be independent of.
+7. **The one instrument bar J licenses is now present and lit wrong.** Building
+   the beach did not make the wet/dry comparison usable; it made the illuminant
+   gap *measurable*, which is a better outcome than it sounds.
+
+---
+
+# WAVE 9 · THE EMBAYMENT
+
+Gap 1 of the re-ordered list. **The theory is in the skill**
+(`references/12-water-rendering.md`, "The shoreline is part of the wave field";
+`12a-water-derivations.md` §11; `12b-water-provenance.md`; and the gap reported
+into `terrain-architect/references/12-glacial-coastal.md`). What is here is the
+implementation's own account.
+
+## M1 · The bed had 55 m of shoreline range and it was not a bay
+
+Waves 1–8 measured `plan_curvature` = 50 m and read it as an embayment. It is
+not one. Fit a straight line to the coastal loop's shoreline and the residual is
+**roughness at the hardness field's 380 m correlation length** — a jagged coast,
+alternating seaward and landward every two or three rows, with no single curve
+in it. The bay-scale component (the same profile smoothed over a fifth of the
+frame) is a few metres. `_sec_embay` carries that as a row, because "there is 50
+m of range" and "there is a bay" are different claims and only the first was
+ever measured.
+
+## M2 · What was built, and what has no freedom in it
+
+`beach.equilibrium_plan()` returns a logarithmic spiral
+`R(φ) = R_a·exp((φ−φ_a)·cot α)` with:
+
+| quantity | where it comes from |
+|---|---|
+| `α = 90° − θ_b = 83.4415°` | **derived** from `θ_b = 6.5585°`, the residual breaking obliquity the 1-D transform **outputs** for the stated offshore spectrum |
+| the two anchors `A1, A2` | the seaward-most shoreline in the outer quarter of each end of **the coastal loop's own** plan-form — geology, not placement |
+| the pole `D = (−772.83, −154.80)` m | solves **two** conditions to `5×10⁻¹⁴`: the spiral passes through both anchors, and its tangent at the downcoast control point is ⟂ the deep-water wave vector (Hsu & Evans' definition of that point) |
+| the indentation, **122.79 m over 1409 m** | an **output**. Nothing set it. |
+
+Two branches exist. A pole at infinity is always a root — a spiral with an
+infinitely distant pole is a straight line — and that branch *is* the rotated
+straight coast of `zero_transport_plan`. The bay is the **nearest** root, and
+the selection rule has a physical statement behind it: the pole is the
+sheltering headland's diffraction point, and a pole 79 km offshore is not a
+headland. Both are reported.
+
+`δ`, the residual obliquity that fixes `α`, is **`?`**. Only `δ = 0` is derived
+(shore normal to a radial orthogonal is a *circle*, exactly). The circle is
+computed beside the spiral every run: its indentation is 121.68 m, **0.9 %**
+away, which is why the `?` is reported rather than chased.
+
+**The parabolic bay-shape equation is deliberately not implemented.** Fifteen
+fitted quartic coefficients, no internal consistency check that would catch a
+wrong digit, and nothing in this container holds the paper. Writing them from
+memory would manufacture a citation.
+
+## M3 · The measurement, and the row that had to come first
+
+Four shorelines, **one** offshore spectrum, one ramp, one transform, one CERC
+closure — the only thing that differs is the array `x_s(y)`:
+
+| shoreline | mean \|θ_loc\| | `Q` rms, m³/s | |
+|---|---|---|---|
+| straight, plane crest | 6.469° | 9.233×10⁻² | the control the bar asks for |
+| **the closed-form zero-transport coast** | **0.202°** | **5.127×10⁻³** | **the meter's floor, 18× down** |
+| the bay, plane crest | 5.595° | 1.875×10⁻¹ | **2× UP** |
+| the bay, under the fan its own pole implies | 2.801° | 7.921×10⁻² | 3.5× down over the spiral span |
+
+**The second row is the one that makes the others mean anything.** A near-zero
+reading is worthless until zero has been shown to be reachable — the fourteenth
+way a measurement lies, with the sign flipped.
+
+**And building that row found a defect eight waves of surf work had not.**
+`transform_2d`'s offshore boundary conserved the wavenumber component along the
+**grid's** y axis. The Snell invariant is the component along the **contour**.
+Exact for a coast whose contours are the grid's rows, which every scene here had
+been until the shore curved. On the closed-form zero-transport coast — which
+must break at exactly `θ = 0` — the grid-axis boundary left **4.89°** and 76 %
+of the straight coast's transport. `contour0 = None` is bit-identical to waves
+1–8.
+
+## M4 · The honest answer to "is it zero"
+
+**No.** `2.65×10⁻²` m³/s over the spiral span against a floor of `1.78×10⁻³` —
+**about 15× the floor**. Small, not zero, and attributable:
+
+- **0.71° — the ramp is not concentric with the curve it is keyed to.**
+  `d = A(x_s(y)−x)^(2/3)` makes contours that are *x*-translates of the
+  shoreline, and translates of a concave curve **converge**. Rebuilding the same
+  circular bay with the depth a function of distance from the **pole**
+  (`plan_ramp_polar`) removes exactly this much.
+- **1.46° — the march meeting curvature.** On straight contours at the same 20°
+  obliquity the identical march leaves 0.20°; on concentric contours with
+  radial incidence it leaves 1.66°.
+
+## M5 · What did NOT reproduce
+
+- **A guard was green on the broken bed.** `_crest_swing` first measured the
+  *raw* alongshore swing of the breaking crest azimuth: **19.5°** on the
+  un-embayed bed against **17.0°** on the embayed one — the bed with no bay in
+  it scored *better*. The raw number is the hardness field's roughness wiggling
+  the local shore normal cell by cell; roughness turns crests locally and
+  averages to nothing, a bay turns them one way across the whole frame.
+  Smoothed over a fifth of the frame: **6.06** against **13.57**.
+- **`cerc-sin-not-double` was caught by one row, and by a threshold.** Replacing
+  `sin(2θ)` with `sin(θ)` leaves the equilibrium untouched (both vanish at
+  θ = 0), so no ratio row and no K-doubling row can see it. It fell below a
+  magnitude threshold by luck until a row written from chapter 12's own sentence
+  — "peaks near 45° approach" — was added: `sin θ` peaks at 90°, and that
+  separates them with no coefficient in the comparison.
+- **The first pole solve went to the wrong branch** and reported a 1.37 m
+  indentation with a residual of 5×10⁻³, i.e. it had not converged and the
+  number looked plausible anyway. Multi-start with an explicit selection rule.
+
+## M6 · THE RE-ORDERED GAP LIST
+
+### Closed or substantially closed by wave 9
+
+| wave 8 | item | what closed it |
+|---|---|---|
+| **1** | no embayment, no headlands | a logarithmic spiral with no free parameter; 122.8 m of indentation against 52 m of roughness; contours curve with it and the crest azimuth swing more than doubles |
+| **3** (sharpened) | one surf zone where bar J shows three to four | unchanged as a defect, but the refraction criterion it blocked is now **checkable**, which was most of its cost |
+
+### The list now
+
+**1 · The illuminant is in the wrong half of the sky.** *(was 2)* Unchanged and
+now top. The wet/dry pair is in frame and lit backwards; bar J's own class is
+front-lit. A wave of its own — moving the sun moves the pool's frame hashes.
+
+**2 · One surf zone where bar J shows three to four separated lines.** *(was 3)*
+Section B, parked, mechanism named (2DH rip-feeder circulation).
+
+**3 · The wave field has no diffraction, and the bay needs it.** *(NEW — M3)*
+This is gap 1's residue and it is a *physics* gap rather than a geometry one. The
+fan the bay requires — **39.6°** of alongshore swing in the orthogonal — is
+supplied here as a stated per-row offshore direction from the bay's own pole. A
+Sommerfeld / Penney–Price edge stamped at the headland tip would make it an
+**output**, and it is the same term `12`'s diffraction section prices for the
+isolated-rock case. **The largest single unbuilt piece of water physics in this
+project.**
+
+**4 · The eye is 17.31 m where the frame demands 25–102 m.** *(was 4)* Wave 8
+said this was "coupled to #1 and not fixable without it". **It is not fixed by
+it**: the bay moved the shoreline, not the cliff brow. On the embayed bed the
+brow the camera stands on reads **15.71 m** against wave 8's 17.31 m — it went
+the *wrong way*, because the bay's landward limb pushes the shoreline inland and
+the cliff foot with it. Recorded as a prediction that failed, and it failed in
+the direction the coupling argument did not allow for.
+
+**5 · The ramp is keyed cross-shore, not concentrically.** *(NEW — M4)* Worth
+0.71° of residual obliquity and it is a two-line change with a large blast
+radius (`bay_bed`'s whole composition). Named, priced, not taken.
+
+**6 · The sea at grazing reads as hard shore-parallel bands.** *(was 5)*
+
+**7 · Forty-six per cent of the frame is one declared albedo.** *(was 6)* Still
+expensive; the bay took some of its share and none of its cause.
+
+**8 · The bed under the water is 1.24–1.40× too bright.** *(was 7)* Reported,
+not patched.
+
+**9 · No swash.** *(was 8)* **10 · The berm scarp.** *(was 9)* **11 · The shadow
+ray costs 0.0 %.** *(was 10)* **12 · No shore platform.** *(was 11)* **13 · The
+beach's feedback on the cliff.** *(was 12)* **14 · No airborne spray.**
+**15 · The flat Earth at the seam.** All unchanged.
+
+## M7 · The seven things worth carrying out of this wave
+
+1. **A static-equilibrium bay is not a property of a shoreline.** It is a
+   property of a shoreline *and* the headland that shelters it. Plane crests
+   admit exactly one zero-transport plan-form and it is a straight line.
+2. **terrain-architect chapter 12's "until the coast straightens" is a
+   theorem**, not a simplification — and that is precisely why the chapter
+   cannot produce the commonest sandy-coast plan-form there is.
+3. **The log spiral is derived, not fitted.** A constant residual obliquity
+   forces a constant tangent-to-radius angle, and that is the logarithmic
+   spiral and nothing else. Only the *circle* is derivable end to end.
+4. **Calibrate the meter before you read it.** The zero-transport control cost
+   one line and it is what turned "the bay reads small" into a number.
+5. **The Snell invariant is along the contour, not along the grid.** Eight waves
+   shipped the grid version and nothing could see it until a coast rotated.
+6. **The indentation is 2.46× the photograph's and stays that way.** The
+   inversion — what offshore obliquity *would* give 50 m over 1408 m, namely
+   8.45° against the declared 20° — is a measurement of the spectrum from a
+   plan-form and a calibration refused.
+7. **A guard that measures a rough quantity can be green on the broken bed.**
+   The raw crest swing preferred the coast with no bay in it.
+
+# WAVE 10 · THE WAVE-FIELD LANE — DIFFRACTION
+
+Gap 3, and it was the largest single unbuilt piece of water physics in the
+project. **The theory is in the skill**
+(`references/12-water-rendering.md`, "K_d is half the solution…", "A
+shore-attached headland does not shelter its own bay", "The fan is an OUTPUT";
+`12a-water-derivations.md` §12; `12b-water-provenance.md`). What is here is the
+implementation's own account and the two things it overturned.
+
+## W1 · What was built, in one paragraph
+
+`beach_diffract.py` — Sommerfeld's exact half-plane solution (1896) in the form
+Penney & Price (1952) applied to water waves, with a rigid (Neumann) screen.
+Fresnel integrals from **three** routes, because there is no scipy in this
+container and a single route would be a single point of failure under
+everything else: a power series, 96-point Gauss–Legendre on the defining
+integral, and an asymptotic series from repeated integration by parts, which is
+the only one that works where the physics is (`kr ~ 10³`, so the Fresnel
+argument reaches 30). One `Edge` class; two places this scene stands it.
+
+**And the part chapter 12 did not carry: the direction.** `K_d` is an amplitude,
+and a bay is held by an angle. `k_vec = grad(arg u) = Im(∇u/u)` is the local
+wave orthogonal, computed on the complex field rather than on the wrapped phase.
+
+## W2 · The bug that a picture could not have found
+
+The reflected term's argument is `2π − φ − φ₀`, **not** `φ + φ₀`. Both give the
+same reflected plane wave; they switch it on in **complementary** regions.
+`φ + φ₀` stands the reflected wave at full strength *inside* the geometric
+shadow — and the lee it draws is completely convincing. What caught it was
+`K_d` on the geometric shadow boundary reading **1.106 / 0.615 / 1.323 / 1.411**
+where the answer is a half.
+
+`U` is 4π-periodic, so `2π − ψ` is the *other sheet* of the same function. With
+the sheet right, the boundary condition holds identically rather than
+approximately: the two arguments coincide at `φ = ±π` while their derivatives
+are equal and opposite, so `∂u/∂φ = 0` exactly for the rigid screen and `u = 0`
+exactly for the pressure-release one.
+
+## W3 · Gap 3's own prescription fails, and it fails before any wave theory
+
+Gap 3 said: *a Sommerfeld / Penney–Price edge stamped at the **headland tip**
+would make the fan an output.* Stamped there, it does not.
+
+An edge modifies the field where it **blocks** something. Cast the straight ray
+from each shoreline station back along the incident direction and ask whether it
+meets land:
+
+| edge at | shoreline stations in its geometric shadow | of the bay's 66 |
+|---|---|---|
+| the true headland tip `A1` | **5 of 89** | **1** |
+| the plan-form's own pole `D` | 68 of 89 | 55 |
+
+The five are all on the **headland's own updrift face**. The reach of a
+shore-attached headland's shadow is `protrusion / tan θ₀`, and here that is
+`91 m / tan 20° = 250 m` against 1409 m of coast — **18 %**. At this coast's
+obliquity the headland shelters essentially none of its own bay.
+
+**And that is the 2.46× indentation over-prediction seen from the other end.**
+The closed form builds a bay that needs a shelter this coast does not have. Wave
+9 reported the over-prediction and inverted it into an offshore obliquity; this
+wave says *why* — not that the spiral is wrong, but that the frame is not one
+whole bay between one diffraction point and one control point.
+
+## W4 · So the edge goes where the construction already says it is
+
+`12a` §11 defines the pole as *"the diffraction point, or more generally the
+virtual source the fan converges on"*, and `spiral_pole`'s selection rule is
+that *"a pole 79 km offshore is not a headland"*. The construction therefore
+already **asserts** an edge at `D`. Standing a real Sommerfeld edge there turns
+the assertion into a measurement, and the measurement has three parts wave 9's
+hand-stated fan did not: an amplitude field, a finite transition across the
+shadow boundary, and a lit region where the field is the *incident* direction
+and knows nothing about the tip.
+
+`D` is 773 m seaward of the domain's offshore boundary, so the edge is applied
+at the boundary and the transform refracts it in. **The standing ruling holds**:
+one stated offshore spectrum, and everything shoreward of the boundary is an
+output.
+
+## W5 · THE TABLE
+
+Six fields, one offshore spectrum (`H₀ = 1.5 m, T = 9 s, θ₀ = 20°`), one ramp,
+one transform, one CERC closure. The first four rows are wave 9's, **recomputed
+here rather than quoted**, and they reproduce to four decimals.
+
+| shoreline and field | mean \|θ_loc\| | `Q` rms over the spiral span | rms `sin(2θ_loc)` |
+|---|---|---|---|
+| straight, plane crest | 6.469° | 9.233×10⁻² | 2.239×10⁻¹ |
+| **the closed-form zero-transport coast — THE FLOOR** | **0.202°** | **1.780×10⁻³** | **4.101×10⁻³** |
+| the bay, plane crest | 5.595° | 1.333×10⁻¹ | 2.311×10⁻¹ |
+| the bay, wave 9's hand-stated fan | 2.801° | 2.650×10⁻² | 8.907×10⁻² |
+| the bay, **diffracted direction only**, `H₀` uniform | 3.081° | 2.104×10⁻² | 7.941×10⁻² |
+| **the bay, DIFFRACTED direction AND `K_d`** | **1.875°** | **3.935×10⁻³** | **5.549×10⁻²** |
+
+**Read the third column, and read it before the second.** `Q ∝ H_b^{5/2}`, so a
+shadow that halves the height cuts the transport by 5.7× whether or not the
+shoreline is an equilibrium; `sin(2θ_loc)` is the same closure with its height
+and its coefficient divided out.
+
+**The two meters disagree by an order, and that is the honest answer.** `Q`
+reaches **2.2×** the floor. `sin(2θ)` is still **13.5×** it. `K_d` falls to
+**0.073** at the sheltered end, so the updrift limb carries an 0.11 m wave and
+its transport is near zero for a reason that has nothing to do with the
+shoreline. **The bay is smaller, not zero, and part of the fall in `Q` is bought
+by the shelter rather than by the plan-form.**
+
+On the bathymetry lane's normal-keyed ramp (`plan_ramp_normal`, this same wave)
+the diffracted row reads **1.767°** and `Q` = **1.809×10⁻³** against a floor of
+1.675×10⁻³ — **1.08× the floor**, and the height-free meter still 13×. The two
+lanes compose; the caveat does not go away.
+
+## W6 · THE OVERTURN — wave 9's residual decomposition is not a floor
+
+Wave 9 attributed its 2.801° to **0.71°** of "the ramp is not concentric with
+the curve it is keyed to" and **1.46°** of "the march meeting curvature", and
+the brief for this wave said diffraction should not touch either, so the honest
+target was the unattributed remainder. **It went under both.**
+
+Those two were measured with **exactly radial** incidence on the circular bay,
+which puts the attributed floor at **2.371°**. One shoreline, one bed, one
+transform, and only the incidence changes:
+
+| incidence on the circular bay | cartesian ramp | concentric ramp |
+|---|---|---|
+| exactly radial from the pole | 2.371° | 1.661° |
+| **Sommerfeld's diffracted field from the same pole** | **1.278°** | **0.998°** |
+
+It survives grid refinement — at `dx` = 8 / 4 / 2 / 1 m the first pair reads
+2.475/1.403, 2.371/1.278, 2.320/1.219, **2.295/1.190**, both converging and the
+gap not closing — so it is not the column march's discretisation. And the
+diffracted field's mean offshore |θ₀| is **19.25°** against radial's 13.59°, so
+it is not "less oblique and therefore easier on the march" either.
+
+**The mechanism.** A stated radial fan is radial *at the shoreline station of
+the row*; the physical field is radial *at the point it is evaluated at*. On
+concentric contours the second is normal to every contour it crosses and the
+first is not. Wave 9's `fan_theta0` docstring insists the radius must be taken
+to the shoreline point — *"the difference is the whole thing"* — and cites 4.9°
+of residual on a straight coast as the evidence. **4.89° is also exactly the
+number wave 9 reports for the `grid-snell` contour defect**, and a radial fan on
+a straight coast is not a test of the convention at all. The two contributions
+are not independent of the incidence and must not be quoted as an additive
+floor.
+
+## W7 · The independent checks, and which ones can fail
+
+A transport residual is one instrument. Diffraction has textbook signatures and
+they are cheap:
+
+| check | reads | verdict |
+|---|---|---|
+| **Cornu spiral limits** `C(±∞) = S(±∞) = ±½` | 0.4999999974 at `x = 10⁶`, and `\|F − (1+i)/2\|·πx → 1.000` | the residual is the `1/(πx)` tail, not error |
+| **`K_d = ½` on the geometric shadow boundary** | 0.529 / 0.514 / 0.507 / 0.504 at `kr` = 25 / 99 / 398 / 1591 | and `(K_d−½)√(kr)` is **constant to 0.005** — the departure is the *reflected* term |
+| the incident term alone, on the boundary | **0.5000000000000000** at every `kr` | `X = 0` and `F(0) = 0`, exactly |
+| **Helmholtz** `(∇²+k²)u = 0`, 4th-order stencil | 1.4×10⁻⁶, falling **5.056 / 5.060** against the stencil's 5.0625 | pure truncation |
+| **Neumann** `∂u/∂n = 0` on both screen faces | 3.8×10⁻⁴ at `ε = 10⁻⁵`, → 0 with `ε` | and Dirichlet gives `u = 0` to 8×10⁻⁸ |
+| **energy** across two downwave lines | equal to 3×10⁻⁴ | and the **gain** in the geometric shadow is **0.98** of the **deficit** on the lit side |
+| chapter 12's `K_d(v)` | 0.50000 / 0.30783 / 0.20267 / 0.11103 | against its 0.5000 / 0.31 / 0.20 / 0.11 |
+| chapter 12's lee centre-line table | 0.1995 0.3053 0.4053 0.5126 0.6157 0.7061 0.8008 | against 0.20 0.31 0.41 0.51 0.62 0.71 0.80, **all seven** |
+| deep-shadow direction | radial from the tip to **0.10°**, `\|k_vec\|/k = 1.0007` | the fan is a *result* |
+
+**Reproducing the lee table established a convention the chapter had not
+stated.** An obstacle has two edges; on the centre line they are equidistant, so
+the two half-plane fields arrive in phase and add — `2·K_d(v)` with
+`v = (W/2)√(2/(λr))`. A Fresnel–Kirchhoff integral over the *aperture* on the
+same geometry gives **0.431** where the table gives 0.51, so a reader
+reconstructing the table from the words alone would have got it wrong. Written
+into `12` and marked `D`.
+
+## W8 · What did NOT reproduce — three blind guards and one survived claim
+
+Seven deliberate defects, all seven fire. What matters is the columns that
+stayed empty:
+
+- **The Helmholtz row is blind to five of the seven.** It is the row written as
+  "checks everything at once", and the reason it is not is one sentence: **a sum
+  of solutions is a solution.** Reading the Cornu limit as `(1+i)` instead of
+  `(1+i)/2` adds a constant multiple of a plane wave and the result still solves
+  the PDE exactly; so do dropping the reflected term, putting it on the wrong
+  sheet, and both scene-level defects. The PDE constrains nothing about the
+  boundary conditions. It caught only `diff-series-everywhere`, which broke the
+  arithmetic.
+- **Chapter 12's own imported numbers are blind to every half-plane defect.**
+  `K_d(v)` and the lee table exercise the Fresnel layer and nothing above it.
+  Importing a chapter's numbers checks the import, not the model.
+- **The transport rows cannot separate the exact diffracted direction from a
+  pure radial fan stamped at the same point.** Reinstalling wave 9's ansatz as
+  `diff-direction-is-radial` fails no transport row — in the shadow the two
+  agree to **1.07° rms**, and the shadow is most of the bay. They guard the
+  *presence* of a fan, not its exactness; what guards exactness is the lit-region
+  row, where the diffracted field is the incident direction and a radial fan is
+  50° away.
+- **A survived claim.** Neumann against Dirichlet moves the Neumann row, the
+  lit-region row and the screen-bearing sensitivity — and **nothing** in the
+  deep-shadow direction field or in any transport row. The module claimed that
+  in a comment; it survived a serious attempt to break it.
+
+**And one defect was a no-op before it was a defect.** The first
+`diff-dirichlet-screen` set `mod.NEUMANN = mod.DIRICHLET`, but `Edge.__init__`'s
+`screen=NEUMANN` default is bound at class-definition time, so the flip reached
+nothing and the table printed an empty column **indistinguishable from a blind
+guard**. A defect that does not reach the code it names is worse than no defect.
+Recorded in its own docstring.
+
+## W9 · What the answer does not depend on
+
+The one free parameter in the construction is the **screen bearing at the pole**,
+and it is free because `D` is a *virtual* source with no barrier at it. It is
+priced rather than hidden:
+
+- **80° of rotation moves the measurement by 0.051°** out of 1.90°. Beyond about
+  +60° the screen turns to face the swell and reflects into the domain, which is
+  a different problem and is excluded rather than tolerated.
+- **The wavenumber the edge diffracts at moves it by 0.034°** across 4 m, 8 m and
+  deep water — because the deep-shadow direction is radial whatever `k` is. `k`
+  sets the width of the transition and the spacing of the Fresnel ripples, not
+  the fan.
+
+A constant chosen to make the picture right does not behave like that.
+
+## W10 · Frames
+
+- `s10-wavefield-diffraction.png` — `K_d` and the direction field in plan for
+  both edges, the geometric shadow boundary drawn, the ½ annotated where the
+  field crosses it and plotted against range, and `K_d(v)` against chapter 12's
+  own four numbers.
+- `s10-wavefield-transport.png` — the six rows on three meters, the four fans
+  per alongshore row, and the `K_d` the boundary is handed.
+- `s10-wavefield-frame-J.png` — bar section J's framing, the pair to
+  `s9-frame-J.png`: same viewpoint, optics, beach, air, sun and plan-form, and
+  one input changed. Bay-scale swing of the breaking crest azimuth **25.89°**
+  against wave 9's 13.57°. A diagnostic, and labelled one.
+
+## W11 · THE RE-ORDERED GAP LIST
+
+### Closed or substantially closed by wave 10
+
+| wave 9 | item | what closed it |
+|---|---|---|
+| **3** | the wave field has no diffraction | an exact half-plane solution; the fan is `grad(arg u)`; residual obliquity 2.801° → **1.875°**, `Q` 2.650×10⁻² → **3.935×10⁻³**, 2.2× the meter's floor |
+
+**Closed with a correction to its own statement:** the edge does *not* go at the
+headland tip on this coast, and the criterion that says so —
+`protrusion / tan θ₀` against the bay's length — is now in the chapter.
+
+### The list now
+
+**1 · The illuminant is in the wrong half of the sky.** Unchanged, and now top
+for a third wave. A wave of its own.
+
+**2 · One surf zone where bar J shows three to four separated lines.** Section
+B, parked, mechanism named (2DH rip-feeder circulation).
+
+**3 · The frame is asserted to be ONE WHOLE BAY, and the geometry says it is
+not.** *(NEW — W3)* The closed form puts the whole 1409 m frame between one
+diffraction point and one control point, which is what makes the indentation
+2.46× the photograph's; and the coast's own headland shadows 250 m of it. The
+honest fix is a scene with **two** control points inside the frame, or an
+offshore obstacle of the kind bar section J actually photographs — not a
+recalibrated `θ₀`. Named and priced, not taken.
+
+**4 · The screen bearing at the pole is `?`.** *(NEW — W9)* Worth 0.051° over
+80° of rotation, so it is reported rather than chased. It becomes real the day
+the scene grows an obstacle a Sommerfeld edge can sit on for a physical reason.
+
+**5 · Combined refraction–diffraction inside the domain.** *(NEW)* The edge is
+applied at the offshore boundary and refracted in, which is defensible for a tip
+773 m seaward of it. An obstacle **inside** the domain — bar section L's
+isolated rock, at `W/λ ≈ 1`, the worst case — needs a mild-slope or
+parabolic-equation solve, and this file does not have one. Chapter 12's
+isolated-rock test is therefore still unmet by the implementation even though
+its term is now built.
+
+**6 · The eye is 17.31 m where the frame demands 25–102 m.** Unchanged.
+
+**7 · The sea at grazing reads as hard shore-parallel bands.** Unchanged.
+
+**8 · Forty-six per cent of the frame is one declared albedo.** Unchanged.
+
+**9 · No swash. 10 · The berm scarp. 11 · The shadow ray costs 0.0 %.
+12 · No shore platform. 13 · The beach's feedback on the cliff. 14 · No
+airborne spray. 15 · The flat Earth at the seam.** Unchanged.
+
+## W12 · The seven things worth carrying out of this wave
+
+1. **`K_d` is half the solution, and it is the half a renderer least needs.**
+   Every chart, every table and this project's own chapter priced diffraction as
+   an amplitude. The same solution carries a **direction**, it is `grad(arg u)`,
+   and it is what turns crests.
+2. **"The orthogonals radiate from the diffraction point" is a theorem, not an
+   ansatz** — but only *inside the geometric shadow*, and the shadow boundary is
+   exactly what an assumed radial fan cannot have.
+3. **Ask whether the obstacle blocks anything before computing what it
+   diffracts.** `protrusion / tan θ₀` against the feature's length. It is one
+   line, it needs no wave model, and on this coast it invalidated the
+   prescription this wave was given.
+4. **A sum of solutions is a solution**, so satisfying the governing equation
+   proves almost nothing about a boundary-value problem. The Helmholtz residual
+   is the most impressive-looking row in the section and the least
+   discriminating.
+5. **A decomposition measured under one boundary condition is not a floor under
+   another.** Wave 9's 0.71° and 1.46° were real measurements and they do not
+   add to a limit; changing the incidence alone got 1.09° under their sum.
+6. **When a shadow makes the waves smaller, the transport meter flatters you.**
+   `Q ∝ H_b^{5/2}`. Divide the height out — `rms sin(2θ_loc)` — and the same
+   result reads 13.5× the floor where `Q` reads 2.2×.
+7. **A deliberate defect that does not reach its target prints the same empty
+   column as a blind guard.** Read the defect, not just the table.
+
+---
+
+# WAVE 10 · THE RAMP KEYING
+
+Gap 5 of the re-ordered list, named and priced by wave 9 and not taken.
+**The theory is in the skills** — the authoring rule in
+`terrain-architect/references/12-glacial-coastal.md` (next to the Dean-profile
+bullet whose own sentence is the underspecified one), the derivation in
+`terrain-renderer/references/12a-water-derivations.md` §11, the reviewer-facing
+statement and the transport table in `12-water-rendering.md`, and the
+correction in `12b-water-provenance.md`. What is here is the implementation's
+own account.
+
+## K1 · The verdict first: the prediction UNDER-DELIVERS, by 16×
+
+Wave 9 priced the concentric ramp at **0.71°** of the bay's 2.801° residual
+obliquity. It reproduces **exactly** — 0.7103° — on the δ = 0 circle at radial
+incidence where it was measured. Applied to the bay it was written against
+(rock headland, log spiral, straight tangential beach, under the fan its pole
+implies) it removes **0.041°** of the whole-domain mean and **0.252°** over the
+spiral span. Six per cent of the price on the whole domain.
+
+The number was right. The **attribution** was wrong, and that is the finding.
+
+## K2 · The table, wave 9's rows re-run and wave 10's added
+
+One offshore spectrum (`H₀ = 1.5 m, T = 9 s, θ₀ = 20°`), one Dean coefficient,
+one 2-D march, one CERC closure. `mean|θ|` over the whole domain, `Q` rms over
+the spiral span, exactly as wave 9 quoted them.
+
+| shoreline | mean \|θ_loc\| | `Q` rms, m³/s (spiral span) |
+|---|---|---|
+| straight, plane crest | 6.469° | 9.233×10⁻² |
+| **the closed-form zero-transport coast — THE FLOOR** | **0.202°** | **1.780×10⁻³** |
+| the bay, plane crest | 5.595° | 1.333×10⁻¹ |
+| the bay, hand-stated fan (wave 9's bed) | 2.801° | 2.650×10⁻² |
+| **the bay, CONCENTRIC ramp (the gap as written)** | **2.759°** | **3.189×10⁻²** |
+| **the bay, NORMAL-OFFSET ramp (what shipped)** | **2.448°** | **2.454×10⁻²** |
+| the floor again, under the new keying | 0.203° | 1.675×10⁻³ |
+
+The floor is in the table twice on purpose: ruling 14 is wave 9's own, and a
+keying change that moved the meter would have made every row above it a
+statement about the meter. It does not move — the zero-transport coast is
+*straight*, so both keyings give it the same contour **directions** and differ
+only in the depth they assign (3.17 m at the widest).
+
+**Note the concentric ramp lowers the angle and RAISES the transport.**
+`Q ∝ H_b^{5/2}`, and a differently-shaped bed shoals differently. One statistic
+was never going to be enough.
+
+## K3 · What "cross-shore distance" means, and terrain-architect's silence
+
+Chapter 12 says *"depth ∝ distance^⅔ … a graded ramp from shoreline to shelf
+break"*. **It does not say what the distance is measured along**, and asking it
+was the whole of this wave. `x_s(y) − x` is an offset along the grid's axis and
+generates the family of **translates** of the shoreline; the distance to the
+shoreline generates the family of **normal offsets**. They coincide iff
+`φ_s ≡ atan(dx_s/dy) ≡ 0` — every scene waves 1–8 rendered.
+
+Wave 9's word for the mechanism was "translates of a concave curve converge",
+and that is not quite it: translates are *congruent*, and nothing about them
+converges. The exact statement is that **a normal offset shares its normal
+lines with the curve it offsets** and a translate does not. So a ray launched
+normal to the shore stays normal to every normal-offset contour it crosses —
+Snell is the identity along it — while on the translate family, after
+travelling `s`, it meets the contour belonging to station `y + s·sin φ_s`,
+whose normal has turned by
+
+    Δθ(s) = −(dφ_s/dy)·s·sin(φ_s) + O(s²)
+
+Measured off the bed's own gradient at the 2 m contour, on a refined grid over
+the analytic spiral: **0.397°** axis-keyed, **0.0008°** normal-keyed, against
+**0.397°** from the formula. Derived and measured to three figures.
+
+And the translate family's *perpendicular* contour spacing goes as `cos φ_s`,
+so it crowds by **5.4 %** across this bay where the Dean offset is a constant
+253.2 m. **Rotate the grid and the bathymetry changes.** That is a terrain
+defect before it is a water one, which is why the authoring rule was routed to
+terrain-architect rather than kept here.
+
+## K4 · The concentric ramp is a special case, and the general one is what shipped
+
+Concentric arcs about a pole *are* the normal offsets of a circular shore. The
+normal offset is the same statement with no pole in it, and that matters here
+because only the middle third of this coast is an arc about anything: the
+concentric ramp makes the headland and tangent rows **worse** (4.895° → 5.475°)
+while the normal offset improves them (→ 4.564°). `plan_ramp_normal` is exactly
+`plan_ramp` on a shore parallel to the grid (0.000e+00 m) and the concentric
+ramp on a circle about the pole (0.037 m rms over the sea, 0.44 % of the shelf
+cap).
+
+**The one limit is the medial axis**, where normal offsets fold and `min` puts
+a crease in the bed: **0 %** of ramp cells on the analytic plan-form, **0.25 %**
+on the coastal loop's own rock line, whose 380 m-correlation roughness gives it
+a 90 m minimum radius of curvature inside a 483 m ramp. So `bay_bed` keys
+normally wherever a plan-form is **stated** and the un-embayed bed keeps the
+axis keying. That is a prune with a measured reason, and it also keeps waves
+1–9 bit-identical instead of re-basing 300 rows under them.
+
+## K5 · Are the two attributed terms independent? NO — and the statistic is why
+
+Wave 9 attributed 0.71° to the keying and 1.46° to the march meeting curvature,
+and assumed they add. **Both mechanisms are real and they do add — in the
+signed mean. They do not add in `mean|θ|`, which is what every M4 number is
+quoted in.**
+
+The keying error is **antisymmetric about the bay's apex**, because `sin φ_s`
+changes sign there. It is 0.710° of alongshore **scatter** and 0.05° of
+**drift**. `mean|·|` of a zero-mean term does not add to `mean|·|` of a biased
+one, and the moment the bay carries the +1.40° drift its own declared δ implies,
+the scatter stops showing up.
+
+The clean demonstration holds the geometry EXACTLY fixed — the same circle, the
+same two beds — and sweeps only the incidence obliquity, which is the *other*
+term's variable:
+
+| incidence off the shore normal | 0° | 6.56° | 20° |
+|---|---|---|---|
+| the ramp term in `mean\|θ\|` | 0.710° | 0.641° | 0.111° |
+| the same term, **signed** | −0.007° | −0.010° | +0.050° |
+
+A factor of 6.4 in one statistic and flat in the other. At 20° the circle's
+`mean|θ|` and `|mean θ|` agree to 0.004° — the distribution has stopped
+straddling zero and `mean|·|` has gone blind.
+
+And the four signed terms, each measured one at a time on the circle:
+
+| term | signed mean `θ_loc` |
+|---|---|
+| the meter's floor | −0.117° |
+| the march meets curvature | +0.100° |
+| **the declared δ = θ_b** | **+1.400°** |
+| the ramp keying | −0.007° |
+| sum | **+1.375°** |
+| measured on the built bay, spiral span | **+1.420°** |
+
+3 %. **The term that dominates the built bay is the declared δ, and neither of
+wave 9's two mechanisms named it.** The spiral is *built* to hold a constant
+residual obliquity at every station; a spiral bay therefore cannot read zero and
+only the circle can. Wave 9 marked δ `?` and did not connect it to the residual
+it was measuring.
+
+## K6 · What did NOT reproduce
+
+Five deliberate defects, all caught. What they did **not** move is the report.
+
+- **`keying-axis` — this entire wave reverted — moves only 2 of 14 rows**, and
+  both are the two taken on the COMPOSED bed. The twelve rows that carry the
+  wave's actual finding build their beds from `plan_ramp*` directly and are
+  green on a `bay_bed` that ignores the fix completely. That is wave 9's
+  `bay-bed-ignores-plan` shape repeating one wave later: **a section that
+  measures a mechanism on an isolated instrument cannot tell you whether the
+  mechanism reached the scene.** The composed-bed rows were added because of
+  this, not before it.
+- **`offset-unsigned` moves no transport row at all.** A bed whose whole coastal
+  plain is a mirrored Dean ramp passes every wave-field row in the section,
+  because the wave field never touches land. Caught only by the straight-coast
+  identity and by the fold detector.
+- **`offset-no-subdivide` is caught by exactly one row**, and it is the one that
+  compares against the *other* closed form. Without the circle row a 0.36 m
+  bathymetry error from chord sagitta would have been invisible.
+- **The two `openq` rows cannot fail under any defect.** That is the harness's
+  design and not a surprise, but it means the fold measurement and the
+  ruling-14 restatement are reported quantities and not guards.
+
+## K7 · The gap list
+
+**5 · The ramp is keyed cross-shore, not concentrically** — CLOSED, and the
+price was wrong. Everything else on wave 9's list is unchanged. One item is
+sharpened:
+
+**`δ` is no longer a cosmetic `?`.** It is the largest single term in the built
+bay's residual obliquity (+1.40° of +1.42°). Wave 9 bracketed it by the circle
+in *indentation* (0.9 %) and that bracket says nothing about the transport,
+where δ = 0 and δ = θ_b are a factor of fourteen apart. Either the spiral is
+adopted knowing it is a constant-non-zero-transport form, or the circle is —
+and that is a decision, not a `?`.
+
+## The suite
+
+`386 pass / 0 FAIL / 0 ERROR / 24 open / 82 info`, 626.4 s, one run, on the
+tree as it stood with two sibling lanes' sections in it. `_sec_bathy` is 14
+rows. `validate.py` (the pool) is `306 pass / 0 FAIL / 64 info` — the pool did
+not disappear. Wave 9's own eight defects all still fire under the changed bed
+(`--bugs-embay`).
+
+## Frames
+
+- `s10-bathy-contours.png` — the two contour families in plan, the convergence
+  as the perpendicular gap between the 2 m and 6 m contours, and the cost as
+  the contour normal a shore-normal ray actually meets, measured against the
+  derived first-order line.
+- `s10-bathy-residual.png` — the residual decomposed in both statistics, the
+  obliquity sweep that shows the terms are not independent in `mean|·|`, and
+  the table.
+- `s10-bathy-frame.png` — bar J's framing, one field changed from
+  `s9-frame-J.png`. On the composed bed at the render's own resolution,
+  `mean|θ_loc|` 2.7704° → 2.4562° and `Q` rms 2.6229×10⁻² → 2.4919×10⁻² m³/s
+  against a floor of 5.6910×10⁻⁴ that did not move.
+
+---
+
+# WAVE 10 · THE OPTICS LANE — WHICH SIDE OF THE INTERFACE AN ALBEDO LIVES ON
+
+Gap 8 of the wave-9 list: *"the bed under the water is 1.24–1.40× too bright.
+Reported, not patched."* It was recorded there as the **sixth** instance of one
+error class — *a shared closed form used one interface off*. This section is the
+implementation's account. The theory is in
+`references/12a-water-derivations.md` §10 ("Which side of the interface the
+argument lives on") and the error class is in `references/11-verification-
+failures.md`, the tenth way, fourth shape.
+
+## O1 · The factor is confirmed as arithmetic and refuted as a finding
+
+`L9` compared `wet_albedo(SAND_DRY)` with its own diffuse half and got
+1.236 / 1.285 / 1.398. Measured here in **scene-linear off the radiance buffer**
+of bar J, on the bed term alone, the same ratio comes back as
+**1.250 / 1.317 / 1.424** — reproduced to three digits through the whole
+transport rather than as an albedo triple.
+
+**And it is the ratio between two AIR-SIDE quantities.** Both of `L9`'s
+candidates have already crossed the air/water interface; neither is what
+`rho_water` wants. Against the substrate's own reflectance the shipped bed is
+**too DARK by 1.320 / 1.341 / 1.287**, which is the same size and the opposite
+direction.
+
+| bed argument handed to `optics.rho_water` | R | G | B | what it is |
+|---|---|---|---|---|
+| `SAND_DRY` = (0.45, 0.39, 0.30) | **0.02339** | **0.09958** | **0.04106** | correct — one crossing in, one out |
+| `SAND_WET` = `wet_albedo(SAND_DRY)` — waves 4–9 | 0.01802 | 0.07572 | 0.03234 | four crossings, series twice |
+| `SAND_WET_DIFF` — what `L9` proposed | 0.01456 | 0.05831 | 0.02303 | three crossings, series twice |
+
+(apparent albedo of the column at 3 m of this coast's own water, sun at 21°.)
+
+## O2 · The defect, and the identity that proves it is the defect
+
+`rho_water` crosses the interface **twice inside itself** — `(1 − fresnel)`
+going in and `slab_esc` coming out — and `rho_bed` sits **between** the
+crossings. So `rho_bed` is a **water-side** reflectance. `wet_albedo(a)` is the
+**air-side** apparent albedo of the same substrate, and its own argument `a` is
+the water-side one. Set the column to zero and the two are literally the same
+expression:
+
+```
+wet_albedo(a) - R_EXT  ==  (1 - R_EXT) * a * slab_esc(0) * trap_gain(a, 0)
+```
+
+exact, checked in both suites at four interior albedos, agreeing to `3×10⁻⁵` —
+which is the spread between a 512-point midpoint rule and two 2000-node
+Gauss–Legendre quadratures, the only two things the two sides share.
+
+**`wet_albedo` IS `rho_water` with the water taken out of it.** Passing one to
+the other composes the closed form with itself.
+
+`L9`'s argument that the bed of a bay is *wet* is right and does not cost a
+second interface: a submerged grain pack sits in bulk water with **no
+refractive-index step** between its pore water and the column above it. No
+film, no critical angle, no trapped series down there. The trapping happens at
+the surface, and `slab_esc`/`trap_gain` are already carrying it.
+
+**The fix is one line and one code path.** `beach_optics.submerged_bed_rho`
+holds the derivation and puts the interface side in the parameter's **name**
+(`bed_rho_in_water`), which is the only guard found so far that travels to the
+call site. `optics.py` is untouched except for docstrings — its AST is identical
+modulo docstrings, so **the pool's frames are bit-identical by construction**,
+and `render.py` was never wrong here: it passes the liner's bare albedo.
+
+## O3 · The separating measurement, and it is spectral rather than metric
+
+Both candidate corrections are ≈1.3×. **A magnitude row cannot tell them
+apart.** Their **per-band order** can, and it contains no coefficient:
+
+- `L9`'s ratio is `wet_albedo/(wet_albedo − R_EXT)`, largest where `R_EXT` is
+  the largest *share* of a dark band → peaks in **BLUE** (1.424).
+- The real correction is the doubled trapped series `1/(1 − a·R_INT)` carried
+  through the column, largest where the bed is brightest *and* the water most
+  transparent → peaks in **GREEN** (1.341).
+
+`_sec_bed` carries that as a row on `argmax`, with no number in the comparison.
+
+## O4 · THE OTHER HALF OF THE VERDICT: the bed is not in the frame
+
+The region this measurement was supposed to use — *"water pixels where the bed
+is at least half of what you are looking at"* — **is empty**. In bar J the
+bed's own light never exceeds **0.77%** of a water pixel; in the close surf
+frame F it never exceeds **0.02%**. Below half a metre the **suspension's**
+volume reflectance is over 95% of what leaves the column.
+
+So the region actually used is **derived from the bathymetry and identical
+under both hypotheses**: water shallower than 1 m, 4.6% of frame J, drawn on
+the evidence figure. There the bed term moves by the tabulated factors and
+**the frame moves by 0.014–0.026%** — 0.0017 W m⁻² sr⁻¹ against water at 4.24.
+
+**Wave 8 priced this gap at "the teal rung and the surf, 12.3% and 2.3% of
+frame J". That is the AREA of those rungs, not the bed's SHARE of them. The
+teal rung is the suspension.** The correction is right, derivable and worth
+nothing in this frame, and those are three separate findings.
+
+**The control makes the near-zero meaningful** (standing ruling 14). Sediment,
+entrained air and foam switched off — three fields zeroed, nothing else touched
+— and the bed reaches **71%** of a pixel; the same correction is then worth
+**0.69 / 1.47 / 0.85%** of the pixel. Zero is reachable, and the fix does move
+a frame when there is a bed in it.
+
+## O5 · The degeneracy every existing interface row was sitting inside
+
+Six repeats meant the guards could not see this shape, and the reason is exact
+rather than cultural.
+
+`wet_albedo` is a **Möbius map** of the bed albedo, and every structural
+property the suites check is **closed under composition**: monotone stays
+monotone, `[0,1]` stays `[0,1]`, energy conservation stays energy conservation.
+That alone would make it hard. What makes it invisible is sharper:
+
+```
+wet_albedo(1) = 1        and        wet_albedo(0) - R_EXT = 0
+```
+
+**0 and 1 are the FIXED POINTS of the spuriously inserted map — and 0 and 1 are
+where every energy guard in this project is written.** `validate.py`'s
+strongest interface row, the LOSSLESS WHITE POOL (`R(sun) + rho_water(1, …) =
+1`, which reads **1.73** with the `1/n²` divisor removed), is blind **by
+algebra**: `rho_water(wet_albedo(1))` *is* `rho_water(1)`.
+
+| `rho_bed` | correct chain | with the spurious `wet_albedo` | ratio |
+|---|---|---|---|
+| **1.000** — where every energy row sits | 0.563872 | **0.563872** | **1.000000000000** |
+| 0.681 | 0.332328 | 0.259670 | 1.280 |
+| 0.450 | 0.200103 | 0.148277 | **1.350** |
+| 0.300 | 0.126130 | 0.097771 | 1.290 |
+
+Twelve significant figures at the chosen point, 35% one step off it. **Any one
+row at any interior albedo, in any of nine waves, would have caught it.** None
+was written, because 0 and 1 are the two arguments where a closed form is
+*self-checking* — and a self-checking argument is exactly the one an inserted
+operator fixes.
+
+Both suites now carry rows strictly inside `(0, 1)`, plus a row that states the
+blindness itself so it cannot be re-derived by accident.
+
+## O6 · The suite, and what did NOT reproduce
+
+`_sec_bed` is **19 pass / 0 FAIL / 1 open**. The beach suite goes to
+**386 pass / 0 FAIL / 0 ERROR / 24 open / 82 info** and the pool to
+**306 pass / 0 FAIL / 64 info** (was 298/0/64; +8 rows, no frame moves).
+
+Three deliberate defects in `--bugs-bed`, each fired at every new row:
+
+| bug | rows caught |
+|---|---|
+| `bed-albedo-air-side` — what waves 4–9 shipped | 5 |
+| `bed-albedo-diffuse-half` — what `L9` proposed | 5 |
+| `bed-no-double-series` — the series twice with the interface right | 5 |
+
+**And three of those rows were GREEN on all three defects in their first
+writing**, which is recorded rather than quietly fixed. They compared
+`submerged_bed_rho` with `submerged_bed_rho`, so both sides went through the
+patched function. That is the **fourth** time this project has caught a row
+that rebuilds the thing it is testing. The reference is now composed from
+`optics.rho_water` directly, and a fifth row reads the render's own
+`Water.rho_lut` object rather than any function.
+
+**A promise four waves old, kept and immediately interesting.** `Water.__init__`
+has said since wave 4 that the depth ladder's interpolation error "is a row in
+the suite rather than a claim here", and no such row existed. Written: in
+**relative** terms the 48-node ladder is **41% wrong in red at 19 m** — linear
+interpolation of an exponential on a geometric grid — which reads like a defect.
+In **absolute** terms its worst miss anywhere is **2.4×10⁻⁴** of apparent
+albedo, because where the relative error is large the quantity is `1e-9`. The
+row is therefore absolute; a relative one would have failed on correct code and
+sent a later wave to refine a ladder that costs nothing.
+
+## O7 · A second defect in the same expression, named and parked
+
+`shade_water` forms `R_bed = rho_lut * t_col`. `rho_lut` is
+`rho_water(…, absorb = the CLEAR water's a + b_b)`, which already attenuates
+the beam down the slant and the diffuse return up the column;
+`column_reflectance`'s `t_col` is the **whole** column's round trip, clear water
+included. The stated intent was that `t_col` carry only the suspension layer's
+**extra** opacity. So the clear column is attenuated **twice** —
+`exp(−c_clear(1/μ_d + 1/μ_u)d)`, which is 0.65 in green at 1.6 m.
+
+It is the **same error class in the composition rather than the argument**: a
+closed form that already carries a leg, multiplied by that leg again. It makes
+the bed darker — the same direction as the defect this wave fixed — and it is
+invisible in the frame for the same reason. Carried as an `openq` row with its
+size, not chased (ruling 11).
+
+## O8 · The six things worth carrying out of this wave
+
+1. **A reported factor can be arithmetically right and have the wrong
+   reference.** `L9`'s 1.24–1.40× reproduces exactly and compares two air-side
+   quantities to each other. The sign of the correction is the opposite of the
+   one reported.
+2. **`wet_albedo` IS `rho_water` with the water taken out of it**, and nobody
+   had written that identity down in ten waves of using both.
+3. **The fixed points of an operator are where a suite is blind to that
+   operator.** A boundary condition is where a formula proves itself and
+   therefore where a second copy of it is invisible.
+4. **Put the interface side in the parameter's name.** It is the only guard so
+   far that travels to the call site, which is where the mistake is made.
+5. **A correction can be right, derivable, and worth nothing in the frame.**
+   The bed is at most 0.77% of a water pixel here; the gap list priced the
+   AREA of the rungs it touches instead of its SHARE of them, and was out by
+   about a hundred.
+6. **The measurement region is still the largest lever.** The region this wave
+   was told to use is empty, and finding that out was worth more than the
+   factor it was meant to measure.
+
+## W13 · The suite
+
+**One run, foreground: `386 pass / 0 FAIL / 0 ERROR / 24 open / 82 info`,
+302.3 s** — the whole beach suite, this lane's 28 new rows among the optics and
+bathymetry lanes' of the same wave. `_sec_diffract` alone is 8.3 s and reads
+`28 pass / 0 FAIL / 2 open / 5 info`.
+
+**The pool did not disappear: `306 pass, 0 FAIL, 64 info`** on `validate.py`,
+foreground, after this lane's changes. Nothing in `beach_diffract.py` is
+imported by the pool and `beach.py` is untouched by this lane, which is why.
+
+`python3 validate_beach.py --bugs-diffract` prints the seven-defect table; the
+empty and near-empty columns in it are W8 and they are the deliverable, not the
+full ones.
+
+---
+
+# WAVE 19 · THE BATHYMETRY LANE — HOW MANY TIMES DOES THE WAVE BREAK
+
+## M0 · The verdict first
+
+A visual critic, measuring pixels: *"The bed produces one surf zone where bar
+section J photographs three to four separated lines; the cause is bathymetric,
+since a Dean monotone ramp plus one Exner bar has one breakpoint."*
+
+**The second clause is right. The first does not follow from it, and this wave's
+main deliverable is the measurement that separates them.**
+
+A bare Dean ramp — no bar on it at all — carries **two** breakpoints under this
+scene's own sea, because the sea is not one wave. What the bed buys is not the
+*count*; it is the **separation** between the lines, and the two bars.
+
+| | before | after |
+|---|---|---|
+| `H/d` crossings of `γ_b` across the profile | **1** | **2** |
+| bars in the bed (anomaly > 0.10 m) | **1** | **2** |
+| separation of the two breaking lines | — | **94.1 m** (48.5 m on the bare ramp) |
+| `surf_zone_spans` — lines with calm between them | **1** | **1** *(unchanged, and it is the residual)* |
+
+## M1 · What was actually missing, and it was not in the bed
+
+Waves 1–18 forced `evolve` with **one deep-water height at one period**. A
+breakpoint model driven by one train has one breakpoint, and no morphodynamics
+can make a second out of it: `sediment_flux` converges where `broken_fraction`
+collapses, and one train collapses once. The missing piece was in the **boundary
+condition**, which ruling 5 says arrives from outside — and what arrives at an
+exposed swell coast is at least two simultaneous wave systems:
+
+- **remote swell**, generated by a distant storm, long-period, arriving whatever
+  the local wind is doing. That is `H0_SWELL`/`T_SWELL`, already declared.
+- **local wind sea**, generated by the wind blowing over the scene now. That wind
+  is **already declared too**: `U10_SCENE = 6 m/s`, the same number
+  `beach_optics.U10` gives the glitter path its width and Monahan gives the
+  whitecap coverage from — and the suite already fails if the two files disagree.
+
+`wind_sea_pm` is the **fourth readout of one wind**. Its form is forced by
+dimensional analysis — a fully developed sea has only `U` and `g` in it, so
+`H_s = c_H·U²/g` and `T_p = c_T·U/g` and there is nothing else it could be — and
+the two coefficients are Pierson–Moskowitz's, marked `?` and **recalled rather
+than opened**. At 6 m/s: `H_s = 0.886 m`, `T_p = 4.38 s`.
+
+**Both breaker depths are outputs.** On the untouched Dean ramp the swell breaks
+in **2.333 m** at x = 424.0 m and the wind sea in **1.183 m** at x = 472.5 m — a
+factor of 1.97, out of `transform` marching the same flux equation on the same
+bed. Nothing was set.
+
+## M2 · The criterion is a length, and it is derived
+
+Two convergences leave two ridges only if they do not overlap. The band over
+which a partition's onshore flux collapses is the **Dally length `d_b/K`** — the
+exponent in the transform's own march, `F₊ = F_s + (F − F_s)·exp(−K·Δx/d)`, and
+nothing else. So:
+
+> **`|x_b1 − x_b2| > (d_b1 + d_b2) / (2K)`**
+
+Every quantity is an output and `K` is `K_DALLY`. On the ramp: **48.5 m against
+11.7 m needed, a ratio of 4.15**. `beach.mode_separation` is that line.
+
+**Swept, because the two PM coefficients are `?`.** Across `H_s × 0.5…1.5` and
+`T_p × 0.7…1.4` — twelve wind seas — the worst ratio is **1.60**. At `H_s × 2.0`
+it fails, and it fails for the right reason: the "wind sea" is then 1.77 m
+against the swell's 1.5 m and breaks in 2.05–2.36 m against the swell's 2.333, so
+the two partitions **are** the same wave and there is nothing to separate. The
+ratio falls monotonically the whole way in — 6.46 / 5.24 / 4.15 / 2.23 / 0.57
+across `H_s × 0.5 … 2.0` at `T_p × 1.0` — which is what a criterion on
+breaker-depth separation must do.
+
+## M3 · The bed, as an output
+
+`evolve_climate` is `evolve` with the flux summed over the partitions at every
+step. **The sum is the physics and not a convenience**: a swell and a wind sea
+are on the water *at the same time*, so the sand at `x` feels both within one
+group. Averaging over a *sequence* of sea states the bed is fast enough to
+follow would be a different and wrong statement, and that is what `evolve_forced`
+is for.
+
+500 hours from the bare ramp, with `w_sea = 0.5`:
+
+| | crest x | crest depth | anomaly | that partition's `H_b/γ` | ratio |
+|---|---|---|---|---|---|
+| swell, 1.5 m / 9 s | 374 m | 2.10 m | 1.17 m | 2.335 m | **0.90** |
+| wind sea, 0.886 m / 4.38 s | 468 m | 1.11 m | 0.20 m | 1.182 m | **0.94** |
+
+**Both bars land where chapter 12 predicts, and the single-bar loop reads 0.893
+on the same prediction** — so the second bar is not a different kind of object.
+(The suite's row reads the crest depth out of the transform's own filtered field,
+by wave 2's two-field rule, and reports 0.973 as the tighter of the two.)
+
+**The weight sets amplitude, the partition sets depth.** Tripling the wind sea's
+share of the transport moment (0.25 → 0.75) moves the inner crest's depth by
+under 0.20 m while its amplitude climbs. A bar whose depth followed the weight
+would be a bar the weight was building.
+
+## M4 · The critic's premise, tested rather than accepted
+
+`climate_breakpoints` on the **bare Dean ramp** returns **2**, at x = 424 and
+472.5 m. So the count is the boundary condition's. What the bed owns, measured on
+the same climate and two beds:
+
+| | breakpoint separation |
+|---|---|
+| bare Dean ramp | 48.5 m |
+| the bed the loop builds | **94.1 m** — ×1.94 |
+
+The bars push the lines apart because each shallows its own partition's water
+early and deepens the water behind it. **That is the half of the critic's reading
+that survives, and it is now a measurement rather than a premise.**
+
+## M5 · What did NOT reproduce — four candidates, three dead
+
+| candidate | verdict | evidence |
+|---|---|---|
+| **the tide** | **dead, and it reverses** | a semidiurnal tide at amplitude 1.0 / 1.5 / 2.0 m translates the breakpoint smoothly and **smears** the bar: crest anomaly 1.42 m → 0.59 / 0.45 / 0.26 m. Never two bars at any water level. Confirms wave 2 in a metric wave 2 did not use |
+| **a storm/calm transient** | **dead** | nine storm-then-calm combinations (300 / 800 / 2000 storm steps × 300 / 1000 / 3000 calm) — the ONE bar translates from x = 418 back to x = 361 and never splits. The storm erases the calm bar before it builds its own |
+| **a threshold of motion** *(which would preserve a relict storm bar)* | **dead by an order of magnitude** | `orbital_velocity` under this 9 s swell is **1.19 m/s at 4 m depth** and 0.87 m/s at 6 m. A threshold able to freeze a relict outer bar would have to sit above 1.2 m/s, several times any published critical orbital velocity for 0.3 mm sand. A long-period swell reaches the bed everywhere in this domain, so no threshold buys a relict bar here |
+| **a second spectral mode** | **live, and it is the answer** | above |
+
+## M6 · Wave 2 corrected, which is ruling 8 working
+
+Wave 2 tested a Rayleigh height distribution and reported *"it widens the bar and
+lowers its relief without ever splitting it"*. **That is what `bar_crest` says,
+and `bar_crest` returns the largest anomaly.** Counted instead:
+
+| quantiles | bars (anomaly > 0.10 m) | breakpoints |
+|---|---|---|
+| 5 | **4** | 5 |
+| 13 | **14** (spacing 5–11 m) | 8 |
+
+**The count follows the SAMPLE count.** A continuous Rayleigh has no modes and
+cannot put a bar anywhere in particular; what the quantiles produce is the comb
+`smooth_depth`'s own docstring warns the loop grows from bed noise, re-seeded by
+the quadrature. So the correction to wave 2 is not "a distribution does make
+bars" — it is **"wave 2's reader could not have seen it either way"**.
+
+**And that bounds this round, which is why it is here and not buried.** Two bars
+mean something only because the swell and the wind sea are **two physically
+separate wave systems with a real gap between their spectral peaks**, not two
+samples of one continuum. A round claiming N bars from N samples of a smooth
+distribution would be reporting its own quadrature.
+
+## M7 · The residual, stated (ruling 17.3)
+
+**Closed by derivation:** the second breakpoint, the second bar, both crest
+depths, the separation criterion, and the 1.94× the bed contributes to the line
+spacing. Nothing in that chain is declared: the wind sea comes out of a wind that
+was already declared for three other jobs, and both breaker depths come out of
+the transform.
+
+**Not closed, and each with its number:**
+
+1. **The wave still never un-breaks.** `H/d` bottoms out at **0.4389** behind
+   the outer breakpoint against the **0.40** cessation needs, so `surf_zone_spans`
+   still returns exactly one entry. The two-bar bed does not help, because the bed
+   *between* the bars still shallows shoreward and wave 2's
+   `Γ_eq = γ_s/√(1 + (5/2)m/K)` stays above `γ_s` the whole way. What is delivered
+   is **two breaking onsets with a dimmer band between them**; what is not
+   delivered is white water that stops. The mechanism is unchanged since wave 2
+   and chapter 12: **the rip-feeder circulation of a 2DH solve**, still out of
+   scope.
+2. **Three-to-four is not reached.** Two partitions give two lines. A
+   three-partition climate (2.5 m/13 s + the scene swell + the wind sea) *does*
+   return three breakpoints, at x = 241 / 384 / 472 m — so the rule "one line per
+   mode" is tested to three — but the third bar comes out at **0.08 m** of relief,
+   under the floor this lane counts at. **The relief runs out, not the mechanism**,
+   and the third partition is a scene declaration this wave declined to make.
+3. **The partitions' cross terms are dropped and NOT measured.** The energetics
+   moment of the combined near-bed velocity is `⟨|u|²u⟩` with `u = u_swell + u_sea`,
+   which is not the sum of the two partitions' moments. `evolve_climate` sums them
+   — the standard first approximation, and every row above rests on it. Its size
+   was not computed. It is an `OPEN` rather than a tolerance because the honest
+   answer is that nobody here knows it.
+
+## M8 · The sibling lane, and what this assumes of it
+
+The wave-field lane measured that the drawn surface has **no wave-height
+distribution at all** — crest-to-crest CV `3.7e-16` against `0.5227` for a
+Rayleigh sea — and is building the population. **The two lanes are one picture and
+they meet at the same physical statement from opposite ends:**
+
+- this lane supplies the **morphological-time** distribution of the offshore sea:
+  two systems, two breaker depths, two bars;
+- that lane supplies the **instantaneous** distribution within one of them: many
+  heights, so the crests of one train do not all break at the same depth.
+
+**What this lane delivered without them:** two bars and two breaking onsets — two
+*parallel* lines, each still monochromatic along its own crest.
+**What it assumed of them:** nothing, and that is deliberate — `CLIMATE_SCENE`
+enters through `transform`, not through the realisation, so neither lane's rows
+move if the other's land or do not. **What the two together should buy** is the
+one thing neither has alone: with a population *and* two bars, the seaward line
+breaks where the big waves of the swell find the outer bar while the small ones
+carry past it, which is the only route in sight to lines that are **broken
+alongshore** rather than merely doubled.
+
+## M9 · The chapter, checked rather than relayed (ruling 9)
+
+`terrain-architect/references/12-glacial-coastal.md`, surf-zone morphodynamics,
+was read first. It is in good shape — five defects in its `profileStep` block
+have already been found and corrected in place by earlier rounds, and the
+corrections are right. Two things this wave has to say about it:
+
+**One prescription in it is still un-followed, and it is not this lane's.** The
+chapter measures that `sediment_flux` writes the onshore term as
+`Sk(Ur)·(1 − f_brk)·u_orb³` with **no asymmetry term at all**, that `(1 − f_brk)`
+is a straight line standing in for `cos ψ` and reads **29.3% low at half
+breaking**, and that the moment which leaves the skewness arrives in the
+*asymmetry* and has a published transport consequence (Hoefel & Elgar 2003) this
+loop does not carry. `grep` confirms it: `beach.surface_moments` computes `As`, **nothing in
+`sediment_flux` reads it**, and outside `beach.py` the symbol appears only in
+the suite -- never in the render and never in the transport. That is ruling 18's error class in
+the sediment transport, it is recorded in the chapter and not in the code, and
+this wave did not close it — it would change every bar depth in the file and it
+is a lane of its own.
+
+**What this wave adds to the chapter.** The section's loop diagram carries one
+`H_0` into `profileStep`, and its own reform argument is written entirely for a
+single train. The measurement above says the count of breaking lines is a
+property of that boundary condition and not of the bed, which is worth a
+paragraph the chapter does not have.
+
+## M10 · The camera did not move, and it was checked rather than assumed
+
+Wave 18 repaired `beach_render.viewpoint` and the camera now stands on the cliff
+brow with water at 16.2% of frame. A bed change that moves the brow moves the
+camera, so this was measured on both beds rather than argued from where the
+change was supposed to be:
+
+| | brow x | brow height | standoff |
+|---|---|---|---|
+| single-partition bay | 640.0000 m | 14.9352 m | 618.1966 |
+| two-partition bay | **640.0000 m** | **14.9352 m** | **618.1966** |
+
+Identical to every printed digit, and the highest ground in the domain agrees to
+six decimals (43.883729 m both). The reason is structural rather than lucky:
+`exner_step_2d` tapers the flux out below `D_MORPH_MIN = 0.35 m`, so the only
+land the loop can touch is the cell or two immediately above the waterline —
+measured, the three largest above-sea-level differences are **0.214 m at
+h = 0.01 m**, 0.210 m at h = 0.01 m and 0.190 m at h = 0.09 m, all of them
+15 m below and 20 m seaward of the brow.
+
+**And the shipping frames are byte-identical anyway**, because `climate`
+defaults to `None` in `evolve_2d` and `run_bay` — the third time this file has
+taken that decision, after wave 9's `embay` and wave 16's `stands`, and for the
+same reason: a wave that changes the boundary condition under 562 published rows
+makes all of them incomparable in one move.
+
+## M11 · Wave 9's transport control, re-measured
+
+Ruling 14 says a near-zero measurement is worthless until zero has been shown
+reachable, and wave 9's three-number transport table is this project's standing
+instance of it. Re-run this wave on the same `_sec_embay` section:
+
+| | wave 9 | this wave |
+|---|---|---|
+| straight coast under the oblique swell | 6.469° | **6.4694°** |
+| the closed-form zero-transport coast (the meter's floor) | 0.202° | **0.20154°** |
+| the bay under a plane crest, `Q` rms | 1.875e-01 | **1.8746e-01** |
+| the bay under the fan its own pole implies, `Q` rms | — | 2.6504e-02, ×3.48 down |
+| the meter's floor, same units | — | 1.7795e-03, so the bay is 14.9× the floor |
+
+**Every one of them reproduces to the printed digit.** They cannot move, and the
+reason is structural rather than lucky:
+`equilibrium_plan`, `plan_field`, `plan_transport` and `zero_transport_plan` are
+all reached from `run_coast()`/`equilibrium_plan()`, none of which this lane
+touched, and `run_bay`'s default is byte-identical. A difference in any of them would have been a `FAIL`, not a
+note — the first two rows are `check`s with no slack, and ruling 14's control
+(*a straight coast under this swell carries transport, so the zero is reachable*)
+is the row directly above them.
+
+## M12 · The suite, from ONE run, and what else was running
+
+**`599 pass / 1 FAIL / 0 ERROR / 34 open / 108 info`, 1903.1 s**, one run of
+`validate_beach.py -v`, foreground.
+
+**What else was running (ruling 13's surviving half).** `nproc` is 4 and this
+total is not comparable with a quiet-machine one. Live for most of it: a sibling
+builder's full `validate_beach.py` in worktree `agent-ac5ff9345c87cfd1c`, and a
+second sibling's `tsec.py` / `calm2.py`. Three to five Python processes at
+100–120 % CPU each on four cores throughout. The same two sections that took
+**124 s and 173 s alone** took the same work under contention at 219 s and 254 s,
+so the honest reading of the 1903 s is **"about 1.5–1.8× a quiet-machine
+number"** and it should not be diffed against wave 13's 302 s for any purpose
+except noticing that the file has grown.
+
+**The pool did not disappear (ruling 6): `306 pass, 0 FAIL, 64 info`, 132.9 s.**
+Unchanged.
+
+### The one FAIL is not this lane's, and it is attributed rather than asserted
+
+> `2  the plan-weighted mean radiance is CONSERVED by the partition   1   0.927941   FAIL`
+
+in `_sec_glitter_field` — wave 18's glitter lane. Three measurements settle it:
+
+1. **It reproduces standalone**, at the identical 0.927941, so it is not a
+   cross-section interaction with anything this lane added.
+2. **It is a property of the SURFACE, not of the bed.** Re-run with
+   `beach_render.SPECTRAL_ON = False` — the shipping path of waves 5 through 18,
+   one flag, nothing else — and the same row reads **0.969062 PASS**. The wave
+   population that landed at `4481c11` is what moves it, and that commit's own
+   author records that it *"built the wave population and pushed no guard for
+   it"*.
+3. **Neither line this lane wrote is on that path.** `climate` defaults to `None`
+   in `evolve_2d` and `run_bay`, so `bay['tr_parts']` is `None` for every bay the
+   glitter section builds and `Water`'s new branch is skipped; `DECK_UNION` is
+   inert without it; and `evolve_2d`'s `climate is None` arm is the wave-18 code
+   verbatim.
+
+The row's own text says the 6 % window is *"the sampling error of one realisation
+over 15703 water pixels whose per-pixel CV is order 1"* — so the population's
+realisation has widened that sampling error past the window, and whether the
+right answer is a wider window or a defect in the new surface is the
+**wave-field lane's** call, not this one's. Handed over with both numbers.
+
+---
+
+# WAVE 19 · THE WAVE POPULATION LANE
+
+## P0 · The verdict first
+
+**Through wave 18 the drawn sea had no wave-height distribution at all.**
+Sampling the shipping `free_surface` at ten surf-zone points over twenty
+periods, the crest-to-crest coefficient of variation is **3.1e-08** — machine
+zero — against **0.5227** for a Rayleigh sea, which is `sqrt(4/π − 1)` and
+contains no wind, no depth and no beach. Every wave at a point was exactly the
+same height, because `eta = (H/2)cos(φ)` reads one `H` field.
+
+That is the answer to the owner's *"je ziet in werkelijkheid nooit 1 lange golf
+langs de kust"*. With one amplitude every crest breaks at the same depth, so
+the breaking line is a **line** no matter how many bars sit under it and no
+matter how short the crests are. The shipping path now reads **0.4237**.
+
+`4481c11` built the fix — `beach.spectral_transform_2d`, which transports every
+component of the offshore realisation across the bed — and pushed no guard for
+it. `git log` on `validate_beach.py` had no wave-19 entry. This lane's first
+commit is `_sec_population`, 26 rows and seven deliberate defects, and it
+landed before anything else this round touched. That is ruling 16, applied to
+its own inversion.
+
+## P1 · Why the crest CV is 0.4237 and not 0.5227, and it is arithmetic
+
+`beach.spectral_components(n_f=8, n_th=32)` draws **256 components** — but only
+**eight distinct frequencies**. At a *fixed point* the 32 components sharing a
+frequency hold their relative phase for all time: they collapse into one
+quasi-monochromatic contribution whose amplitude is the modulus of their
+coherent sum. **A record at a point is a sum of 8, not of 256.** The `n_th`
+axis buys crest length in *space* and buys nothing in *time*.
+
+`_nf_ladder_cv` measures that with no beach in it — 256 components and 256
+random phases at every rung, only the split changing, 64 realisations of a
+400-period record each:
+
+| split | crest CV |
+|---|---|
+| `n_f=1` × 256 dirs | **0.0000** |
+| `n_f=2` × 128 | 0.1959 |
+| `n_f=8` × 32 | **0.4568 ± 0.1454** |
+| `n_f=32` × 8 | 0.5183 |
+| `n_f=256` × 1 | 0.5434 |
+
+The drawn 0.4237 sits **a quarter of a standard deviation** from its own rung,
+and the per-point range on the render (0.31–0.65) is that rung's own spread.
+So the shortfall is *derived*, not tolerated, and the bracket in the headline
+row is the ladder's rung rather than a fitted window.
+
+**This also kills the brief this round arrived with.** Short-crestedness alone
+could never have broken up a surf line: `n_f=1` × 256 directions is a
+short-crested realisation with a crest CV of exactly zero. That is a row
+(`lad(32)/lad(2) > 2`), not a remark.
+
+**The fix is one integer and its price is measured.** `n_f=32` in
+`beach_render._FAR` takes the ladder to 0.5183; `spectral_transform_2d` runs
+one conservative march per component, so at the shipping `n_th=32` that is 1024
+marches instead of 256 — about 140 s and 550 MB against 35 s and 137 MB. It is
+**left OPEN**, because `_FAR` is *also* the offshore closed-form field and
+`free_surface`'s seam argument depends on both sides being one realisation, so
+the two cannot move independently and every existing row on `_FAR` moves with
+them.
+
+**And the meter's own ceiling is stated so the residual is not overstated.** At
+256 frequencies the ladder reads 0.5434, 4.0 % above the closed form: crests
+are read at sampled instants rather than interpolated, so every crest is caught
+slightly below its true peak.
+
+## P2 · The reach — ruling 18, and the honest number was zero
+
+Frame K at 240 × 320, rendered **twice** with one flag, because a reach quoted
+against a remembered "before" is not a measurement. The surf zone is the
+transform's own statement, `q_b > 0.01`, not a depth guess.
+
+| | water samples | surf zone | surf pixels with a height distribution | whole frame |
+|---|---|---|---|---|
+| waves 5–18 | 15 689 | 12 782 | **0 / 12 782** | 485 / 15 689 (3.1 %) |
+| wave 19 | 15 703 | 12 817 | **12 817 / 12 817** | 15 244 / 15 703 (97.1 %) |
+
+"Carries a height distribution" is the same statistic as the headline: the
+drawn surface's crest CV above 0.05, a tenth of the Rayleigh value and 5×10⁷
+times the monochromatic floor. The 459 water pixels that miss are the far
+horizon, where the footprint band limit has correctly removed every component
+that could vary — a frame reaching 100 % there would be aliasing.
+
+## P3 · Breaking draws a realisation, and the mean survives it
+
+`Q_b` is the *fraction* of waves breaking at a depth. Through wave 18 the
+render drew that expectation as a smooth field. It now draws which waves broke,
+and the expectation is preserved rather than replaced:
+
+- **E[realised breaking] vs the closed form.** Over 20 instants on 17 477
+  surf-zone grid cells the drawn indicator reads **0.8259 ± 0.0074** against
+  `rayleigh_exceedance`'s **0.8095** — 2.0 % high, and the sign is P1's
+  residual arriving here (eight frequencies is not "many", so the envelope is
+  only approximately Rayleigh). Taken on the grid because the same ratio off
+  one frame reads 8.6 %: the frame weights near pixels by perspective and
+  band-limits the envelope while `p_chi` is unfiltered.
+- **The breaking front's alongshore sd.** 18.75 m for `brk`, 18.70 m for
+  `q_b > 0.05` — both deterministic in `(d, H)`, so that 18 m is the **bed's**
+  variation, not the sea's — against **49.2–60.8 m** for the realised
+  indicator, which also *moves between instants* while the other two cannot.
+- **No energy was added.** The drawn `H_rms` is the transform's own `H` cell by
+  cell to **1.1e-07** relative, which is float32 storage and nothing else.
+
+## P4 · The fade was load-bearing, and it stays
+
+The brief asked for its removal. `Water.sample` **clamps** at the grid edge, so
+the largest phase step over 5 m samples seaward of `x[0]` is **exactly 0.0**
+against 1.32 rad inside the domain: without the blend one value of `S` covers
+the whole open ocean and the swell draws as **infinite stripes to the horizon**.
+That is wave 13's boundary condition one field down and it is still true of the
+bundle.
+
+What changed is the blend's *meaning* — two evaluations of one component list
+rather than a swap between a realisation and a carrier — and it now reaches
+**0 % of the surf zone** instead of all of it. The seam step is amplitude only,
+0.973, of which `sqrt(0.918)` — the shoreward flux fraction — is most.
+
+## P5 · The calm sea, and a claim that survived a serious attempt to break it
+
+The owner: *"Soms zijn er geen hoge golven, dan lijkt de zee net een meer. Maar
+dan zie je zeker niet van die witte 'koppen'."* Two whites, two drivers, and
+the render already knows the difference.
+
+- **Structurally separate.** `surface_foam` is
+  `covering_measure_break(q_b, T, age) + covering_measure_wind(u10)`, two
+  covering measures that add because coverages do not. The first reads no wind;
+  the second reads no depth.
+- **The depth term really vanishes offshore.** At this bed's boundary — 8.0 m
+  of water — `Q_b` is 6.8e-09 and the surface deck is **exactly 0.0**. Battjes
+  & Janssen's bisection bottoms out at its 1e-12 floor once
+  `H_rms/(γ_b d) < 0.16`, so it is a hard zero and not an asymptote.
+- **The reach row is an integer and it is zero.** Frame K rendered a *third*
+  time with `beach_optics.U10 = 0`: of 2 886 samples seaward of the surf zone,
+  the number carrying **any** drawn foam is **0**. At 6 m/s it is 2 886.
+- **And the shore still breaks**, which is what stops that row passing on an
+  empty frame: swinging the wind from 6 m/s to nothing moves the surf zone's
+  foam count from 3 272 to 3 268, **0.12 %**.
+- **The calm sea is protected twice.** The population branch multiplies the
+  break term by the realised indicator `chi`, which is identically 0 in 8 m of
+  water. A defect that opens only one gate cannot reach the picture — measured:
+  `calm-break-reaches-deep` had to open both before a single open-water pixel
+  went white.
+
+**Power law or threshold: it is a power law, and the difference is sized.**
+`whitecap_coverage` is `a·U^3.41`, so `W(0) = 0` **exactly** — the owner's limit
+is met — but it is merely small, never identically zero, below any finite wind.
+Callaghan et al. (2008) is piecewise with an onset at `U₁₀ = 3.70 m/s`, and
+this file already carries that number as `CALLAGHAN_U0`, **marked published and
+never used**. At 3.69 m/s the two forms disagree by 3.30e-04 in coverage, which
+over this frame's 2 886 open-water samples is **0.95 pixels expected**.
+
+It is **not taken**, and the reason is the standing rule rather than the size:
+answer-key G11 marks Callaghan `P` — an attribution — and the paper is not in
+this container, so the branch point and the two branch exponents cannot be
+read. Installing a piecewise law from a cited onset alone would be transcribing
+a shape. Logged OPEN and attribution-only.
+
+Answer-key **G12** already asked for exactly this count and had no row in the
+suite. It has one now.
+
+## P6 · What did NOT reproduce
+
+**The critic's foam-white finding, as stated.** Scoring the frames, an
+independent critic measured the top 30 % of surf-band pixels at mean 252.5 DN,
+**sd 0.31**, 100 % at or above 250, and concluded *"the coverage is sampled and
+the radiance is not."* Re-measured on this branch:
+
+| | scene-linear, foam-dominated pixels (`cov > 0.9`) | top-30 % surf band, DN |
+|---|---|---|
+| waves 5–18 | 3.4004 ± 0.2427 (**7.1 %**) | — |
+| wave 19 | 3.4307 ± 0.4765 (**13.9 %**) | 248.5 ± 7.7, 53 % ≥ 250 |
+
+So the radiance **does** vary, the population work roughly **doubled** the
+variation as a consequence rather than a target — waves breaking at different
+depths cover different amounts of different pixels — and the DN statistic is
+7.7, not 0.31, with half the pixels below 250 rather than none.
+
+**The part that is true is one level up, and it is named rather than
+half-built.** `shade_water` draws foam as `R_raft · E/π` with `R_raft` floored
+at a single `FOAM_WHITE` from a single bubble-pile depth — a deterministic
+function of `(d, H)` like everything else this project has had to un-average. A
+realised population *should* carry realised air: a wave breaking in 2.4 m
+entrains more over a longer bore than one breaking in 0.9 m, and the indicator
+now knows which is which. That is the mechanism and this wave did not build it.
+Two facts for whoever takes it: the display curve does much of the flattening
+(`WHITE` is 3.483 and the foam sits at 3.528, so most of the scene-linear
+spread lies inside the last few DN before the clip), and the measurement must
+be taken scene-linear off `L`, never off a PNG.
+
+## P7 · The one FAIL on the merged tree, settled by measurement
+
+`_sec_glitter_field`'s conservation row read **0.927941** against a 6 % window.
+Wave 19's surface is what moved it — with `SPECTRAL_ON = False` the same row
+reads 0.9691 and passes. Three measurements separate a leak from a reference
+frame, and all three say reference frame:
+
+1. **Not a leak.** The exact budget-closure row at the top of the same section
+   — swell + carried = Cox & Munk — still passes to **1e-12**. Nothing is
+   leaving.
+2. **Not sampling error**, which is what the row's own text claimed its window
+   was: *"the sampling error of one realisation over N water pixels whose
+   per-pixel CV is order 1"*. **Eight seeds** of `subgrid_realisation` give
+   0.9275–0.9291, sd **0.0005 — 0.06 %**, a hundred times smaller than the
+   window it was meant to justify. The window never measured what its sentence
+   said. (The carrier surface: 0.9693 ± 0.0005, equally tight.)
+3. **It is the denominator.** `m_off` renders with `subgrid_on = False`, which
+   puts the *full* Cox & Munk density on top of a geometry that already carries
+   the resolved slope — the smooth frame is rough twice by exactly the resolved
+   share. Holding the wave-19 surface fixed and changing **only** the mss the
+   partition subtracts:
+
+   | resolved share of Cox & Munk | `m_on/m_off` |
+   |---|---|
+   | 0.0 % | **1.0008** |
+   | 7.7 % (the carrier) | 0.9680 |
+   | 15.8 % (the bundle) | 0.9279 |
+   | 31.6 % (twice the bundle) | 0.8262 |
+
+   Monotone, and it goes to **one** as the resolved share goes to zero — which
+   is the conservation the row asserts, holding exactly in the only limit where
+   its denominator is not double-counting. Wave 19 doubled the resolved swell
+   slope, 0.002615 → 0.005384 against Cox & Munk's 0.034125, and the same
+   structural departure doubled with it.
+
+The row is now **OPEN** carrying all three measurements, **not** a wider
+window: sizing a tolerance to admit the number you measured is how a suite
+stops meaning anything. The invariant is guarded by the exact budget row; what
+this one needs is a denominator that carves the resolved slope out of the
+density too, which is a change to the smooth render path.
+
+## P7b · The suite
+
+**604 pass / 0 FAIL / 0 ERROR / 36 open / 108 info**, one run, **1748.6 s**,
+with nothing else on the box — the sibling builders' worktrees were idle by
+then, which matters because the standing ruling is that there is no background
+CPU throttle but there *is* contention on four cores. The suite was 1399.7 s
+and **1 FAIL** at the start of this lane's round.
+
+`_sec_population` is **26 pass / 0 FAIL / 3 open / 3 info** in **~360 s**, and
+it is now the most expensive section in the file: it builds a `Water` (256
+conservative marches, ~35 s) and renders frame K **three** times — the bundle,
+the carrier, and the calm sea — because every one of its reach rows is a pair
+and a pair quoted against a remembered "before" is not a measurement.
+
+**One cost this lane owes the file and did not hide.** `Water.__init__` now
+transports the bundle, and the suite constructs eight `Water` objects, so wave
+19 added roughly 280 s to the suite outside its own section. A cache keyed on
+the bay was considered and **rejected**: `--bugs-population` reuses one bay
+across all seven defects, and a bundle cached on that bay would survive the
+patch and make `pop-monochromatic-bundle` and `pop-carrier-denominator`
+invisible — which is precisely the trap `beach._BAY_CACHE` has already sprung
+on three other bug families in this file.
+
+`--bugs-population` fires all seven defects; the bed is built **once** and
+reused, so the runs differ by the defect and by nothing else:
+
+| defect | rows caught |
+|---|---|
+| `pop-no-bundle` | 6 |
+| `calm-break-reaches-deep` | 4 |
+| `pop-monochromatic-bundle` | 3 |
+| `pop-expectation-foam` | 2 |
+| `calm-whitecap-floor` | 2 |
+| `pop-envelope-is-abs-eta` | 1 |
+| `pop-carrier-denominator` | 1 (a **raise**, see below) |
+
+Three of these did not fire on the first attempt and the fixes are the
+interesting part. `pop-monochromatic-bundle` collapsed onto the list's *median*
+frequency, and `free_surface` adds the bound second harmonic at twice the
+**carrier's** — so the record was still two-tone, it beat, and it passed the row
+it was written for; collapsing onto `2π/T_SWELL` makes it genuinely
+monochromatic. `calm-break-reaches-deep` caught nothing until it opened **both**
+gates (see P5). And `pop-carrier-denominator` never gets as far as a row:
+`g_carrier/g` reaches 1.9×10⁴ at the `D_MIN` floor, the drawn slope variance
+goes to (1.60e+12, 5.63e+12), and `beach_optics.subgrid_realisation` **refuses
+to build the scene** — *"there is nothing left for the wind sea and the budget
+is the thing that is wrong"*. A physics guard declining the picture is stronger
+evidence than a statistic failing on it, and it is an independent confirmation
+of `4481c11`'s choice of denominator from a module that knows nothing about
+spectra.
+
+## P8 · The chapter, checked rather than relayed (ruling 9)
+
+`terrain-architect/references/12-glacial-coastal.md` mentions a Rayleigh height
+distribution exactly once, in its dead-candidate list: forcing the
+morphodynamic loop with one **lowers** the relief, so steady monochromatic
+forcing is that model's most favourable case. That is a statement about the
+**bed**, and it is right.
+
+**What the chapter has nothing to say about is one level up.** The same file's
+surf-zone section — and every renderer built from it — carries the wave field
+as a single `H(x, y)`, and the question *does the drawn sea have a height
+distribution at all* is never asked. It is a different question from the
+chapter's, it has a different answer, and it is the one that decides whether a
+frame shows one breaking line or many: `Q_b` is an expectation, and drawing an
+expectation gives a band whose edge follows a depth contour however the bed is
+shaped. Worth the paragraph the chapter does not have.
+
+**And the two lanes only meet here.** The bathymetry lane's two bars give
+`H/d` bottoming at 0.4389 against the 0.40 needed, so there is no calm water
+between its lines — two *parallel* lines, not three or four. A population
+without two bars breaks at scattered depths on one bar; two bars without a
+population break every wave at the same two depths. With both, the big waves of
+the swell find the outer bar while the small ones carry past it. Neither lane
+reaches the owner's *"golven zijn geen lange lijnen"* alone, and this is the
+first round in which both halves exist.
