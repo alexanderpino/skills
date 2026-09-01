@@ -188,6 +188,13 @@ def rebuild(stem: str, workdir: Path) -> Path:
     for other in REF.glob("*.png"):
         if other.stem == stem:
             continue
+        if (workdir / other.name).exists():
+            # Already rebuilt in THIS run -- keep it. Copying the committed copy over the top is
+            # what made the build order inert: rebuild() ran per figure and re-copied every
+            # committed PNG each time, so the fresh hero.png written moments earlier was
+            # overwritten before capability_grid could read it. The sort in main() therefore had
+            # no effect on the single case it exists for, while its comment claimed otherwise.
+            continue
         shutil.copy2(other, workdir / other.name)
     module = PRODUCERS[stem]
     if str(REF) not in sys.path:
