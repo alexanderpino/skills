@@ -41,6 +41,20 @@
 # container. The first CI run of the `regenerate` job is what answers that, and if it disagrees
 # this file is the record of what was true here.
 # ─────────────────────────────────────────────────────────────────────────────────────────
+#
+# ── RE-VERIFIED after wave 6 (OPEN-ITEMS 20, 22, 24, 25, 27, 29). 14/14 reproduce. ────────
+# One figure drifted during that wave and it is worth recording HOW it was attributed, because
+# two lanes changed shipped behaviour at once. gallery.png drifted 7986 px; the graph lane ran
+# regen_figures BEFORE and AFTER flipping the breach/fill default and the drift was BYTE-IDENTICAL
+# across both, so its own change could not be the cause. It was the dunes lane raising
+# werner_dunes' default hop from 1 to 5: gallery.py:166 is the one caller that names no hop, which
+# is exactly what had made the old default load-bearing and what falsified OPEN-ITEMS 27's claim
+# that "the shipped default of 1 is used by nothing".
+#
+# hero.png did NOT drift despite being the only committed figure built on the flipped graph. That
+# is a weaker result than it looks and is recorded as such: hero renders at 266.7 m cells where a
+# 10 m breach threshold reaches almost nothing, while the demo's own default resolution moves 13.2%
+# of the drainage field. A figure that does not move is not evidence that a change is small.
 figure	producer	verdict	pixels_differing	max_abs_delta	first_diff_xy	deterministic_here	likely_cause	action
 anisotropy_anatomy.png	anisotropy_anatomy.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	-	closed
 crater_anatomy.png	crater_anatomy.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	-	closed
