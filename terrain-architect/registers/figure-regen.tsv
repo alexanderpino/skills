@@ -22,18 +22,37 @@
 # Cross-machine determinism is UNPROVEN. Everything here is one container. Whether a GitHub
 # runner reproduces these pixels is what the first CI run will answer; if it does not, this
 # register is the record of what was true here.
+#
+# ── CLOSED 2026-09-01. All fourteen reproduce exactly. ────────────────────────────────────
+#     cd terrain-architect/reference-impl && python tools/regen_figures.py
+#     enumeration: 14 committed figure(s), 14 produced, 0 exempt ... 14 figure(s) reproduce exactly.
+#
+# Six were stale because the field renders had been left behind by the module repairs on this
+# branch. Rebuilding them was the easy half. The hard half was a defect in THIS TOOL:
+# capability_grid.py:339 reads hero.png off disk behind a silent `except: return gray(_terr)`,
+# so running producers in a bare scratch CWD did not make that panel fail -- it made it quietly
+# draw something else, and the checker would have reported an unfixable 200x200 drift forever
+# while CI stayed red for a reason no one could act on. Fixed by copying every committed figure
+# EXCEPT the target into the scratch dir (the target is withheld: a producer reading its own
+# output would reproduce it trivially) and by building in dependency order, since alphabetical
+# order put capability_grid before hero and produced a figure embedding the previous hero.
+#
+# What this register does NOT certify: cross-machine reproduction. Every number here is one
+# container. The first CI run of the `regenerate` job is what answers that, and if it disagrees
+# this file is the record of what was true here.
+# ─────────────────────────────────────────────────────────────────────────────────────────
 figure	producer	verdict	pixels_differing	max_abs_delta	first_diff_xy	deterministic_here	likely_cause	action
-anisotropy_anatomy.png	anisotropy_anatomy.py	reproduces	0	0	-	yes (byte-identical)	-	none
-crater_anatomy.png	crater_anatomy.py	reproduces	0	0	-	untested	-	none
-crater_matrix.png	crater_demo.py	reproduces	0	0	-	untested	-	none
-erosion_pipe.png	erosion_pipe.py	reproduces	0	0	-	untested	-	none
-erosion_streampower.png	erosion_streampower.py	reproduces	0	0	-	untested	-	none
-flow_anatomy.png	flow_anatomy.py	reproduces	0	0	-	untested	-	none
-halfar_anatomy.png	halfar_anatomy.py	reproduces	0	0	-	untested	-	none
-hex_anatomy.png	hex_anatomy.py	reproduces	0	0	-	yes (byte-identical)	-	none
-archetypes.png	archetypes.py	STALE	17821	180	34,4	yes (run1==run2, both != committed)	last built at 33d45cc; render.py 93b6c33, flow.py e2667b0/1d44fb1/d03bf86, analysis.py 6cdb63f/b11238b, dunes.py, landforms.py all changed after	regenerate after the code wave lands
-capability_grid.png	capability_grid.py	STALE	40015	241	624,1578	pending clean-tree rerun	first diff is deep inside the grid, not a header; graph_demo/flow e2667b0 changed the selectable capability set, which is exactly what this figure draws -- so the committed figure may still assert the PRE-FIX set	regenerate after the code wave lands, then read the changed rows against the graph
-gallery.png	gallery.py	STALE	60583	250	402,201	pending clean-tree rerun	field render over render.py/flow.py/analysis.py, all changed since	regenerate after the code wave lands
-hero.png	hero.py	STALE	229293	141	555,140	pending clean-tree rerun	field render; largest drift of the six	regenerate after the code wave lands
-landforms.png	landforms.py	STALE	52360	253	205,205	pending clean-tree rerun	landforms.py itself changed at 0f695b2 (hillslope diffusion coupled into stream power)	regenerate after the code wave lands
-screen_worlds.png	screen_worlds.py	STALE	16825	142	4,4	pending clean-tree rerun	field render over the changed render/flow/analysis stack	regenerate after the code wave lands
+anisotropy_anatomy.png	anisotropy_anatomy.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	-	closed
+crater_anatomy.png	crater_anatomy.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	-	closed
+crater_matrix.png	crater_demo.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	-	closed
+erosion_pipe.png	erosion_pipe.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	-	closed
+erosion_streampower.png	erosion_streampower.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	-	closed
+flow_anatomy.png	flow_anatomy.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	-	closed
+halfar_anatomy.png	halfar_anatomy.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	-	closed
+hex_anatomy.png	hex_anatomy.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	-	closed
+archetypes.png	archetypes.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	last built at 33d45cc; render.py 93b6c33, flow.py e2667b0/1d44fb1/d03bf86, analysis.py 6cdb63f/b11238b, dunes.py, landforms.py all changed after	closed
+capability_grid.png	capability_grid.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	first diff is deep inside the grid, not a header; graph_demo/flow e2667b0 changed the selectable capability set, which is exactly what this figure draws -- so the committed figure may still assert the PRE-FIX set	closed
+gallery.png	gallery.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	field render over render.py/flow.py/analysis.py, all changed since	closed
+hero.png	hero.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	field render; largest drift of the six	closed
+landforms.png	landforms.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	landforms.py itself changed at 0f695b2 (hillslope diffusion coupled into stream power)	closed
+screen_worlds.png	screen_worlds.py	reproduces	0	0	-	yes (rebuilt in a scratch CWD, pixel-exact)	field render over the changed render/flow/analysis stack	closed
