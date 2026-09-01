@@ -4,3 +4,5 @@
 # either fixed or moved to OPEN-ITEMS.md before criterion E/H can be ticked.
 file:line	claim_as_written	observed_value	command_that_measured	criterion	status
 reference-impl/VALIDATION.md:33	"--collect-only collects 1236"	1377	python3 -m pytest -q --collect-only tests/	H	open
+reference-impl/GALLERY.md:115	"Each regenerates deterministically" (of the four anatomy figures)	true for those four; six of the fourteen committed figures do not reproduce at all	python tools/regen_figures.py	H	open
+reference-impl/GALLERY.md:118-123	regenerate-command table lists 4 figures	14 PNGs are committed; 10 had no documented regenerate command	git ls-files '*.png'	H	open
