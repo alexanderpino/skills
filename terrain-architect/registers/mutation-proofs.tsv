@@ -1,0 +1,94 @@
+# REGISTER 4 — mutation-proofs.tsv   STUBS ONLY, FROZEN at HEAD 0cdd5b1
+# One row per guard file in reference-impl/tests/. mutation, decoy and observed are DELIBERATELY
+# EMPTY: wave 2 fills them BY EXECUTION. date is filled when the proof is run.
+#
+# DENOMINATOR
+#   guard files in reference-impl/tests/ ... 61
+#   rows emitted ........................... 61
+#   rows with target_defect_class filled ... 61  (100%)
+#   rows with mutation/decoy/observed filled  0  (by design — wave 2's job)
+#   IDENTITY: 61 rows == 61 guard files -> HOLDS
+#   Excluded from the population, counted: tests/asserts.py and tests/inputs.py (shared helpers in
+#   the tests directory), plus reference-impl/conftest.py (one level up). 3 files, none of which
+#   contains a test_* function, so none is a guard.
+#
+# HOW target_defect_class WAS WRITTEN, and the trap it avoids
+#   It states what the guard EXISTS FOR — taken from the guard's own module docstring where it
+#   has one (50 of 61), and from its test-function names where the docstring is empty (11 of 61).
+#   It is NOT 'any defect this guard happens to catch'. A mutation chosen from the second list
+#   proves only that the guard is not vacuous; a mutation chosen from the first proves the guard
+#   does the job it was written to do. Wave 2 must mutate against THIS column, not against
+#   whatever the guard turns out to be sensitive to.
+#
+# COLUMN CONTRACT for wave 2
+#   mutation  the exact edit that introduces the target defect class (file, line, before -> after).
+#   decoy     an edit in the same neighbourhood that does NOT introduce the defect and MUST NOT
+#             be flagged. Without a decoy a red result proves only that the guard is noisy.
+#   observed  what actually happened when both were run: which tests failed on the mutation and
+#             that none failed on the decoy. Recorded from execution, never predicted.
+#
+# FREEZE RULE: the row list is final — 61 rows, one per guard. Wave 2 fills cells; it does not
+# add rows. A guard added after this HEAD goes to OPEN-ITEMS.md.
+
+guard_file	target_defect_class	mutation	decoy	observed	date
+test_aeolian.py	A wind-transport law that is stated as arithmetic (Bagnold threshold, cubic flux) silently stops being that arithmetic — exactness lost to a refactor.				
+test_alluvial_fan.py	The fan generator removes material or stamps outside the debouch, i.e. a depositional landform behaving erosively.				
+test_analysis.py	An analysis operator (slope/curvature/aspect/Laplacian) stops matching its closed-form answer on a terrain whose analytic value is known.				
+test_analytic.py	An analytic closed-form law (tephra log-linear thinning, sqrt-age depth, GDH1, energy-cone runout, PDC inundation, superelevation) drifts off its own formula.				
+test_anatomy_figures.py	A labelled anatomy diagram stops building, or its printed labels stop matching what the code computes.				
+test_anisotropy.py	LATTICE anisotropy and FIELD anisotropy get conflated, so a lattice artefact is read as physical directionality (or vice versa).				
+test_archetypes.py	An archetype composition stops satisfying the `09` verification signature its blueprint in 20-archetypes.md advertises.				
+test_atom_coverage.py	Chapter pseudocode, the executable reference impl, and ATOM-COVERAGE.md's scope statement drift apart — an atom documented but not shipped, or shipped but out of scope.				
+test_audit_drift.py	An audit document (NODE-PARITY-AUDIT, VALIDATION, SIMULATION-AUDIT) claims a gap that is already built, or quotes a test count / scorecard cell that no longer matches the tree.				
+test_benchmarks.py	An emergent result agrees only with an oracle re-derived from our own code, not with an independent analytic continuum solution.				
+test_boundaries.py	The domain edge silently changes behaviour — an open perimeter printing an edge-pit fringe into a simulation.				
+test_braided.py	The braided-river cellular model stops reproducing the STATISTICS of braiding (it is pinned on statistics, not on a photoreal image).				
+test_chapter_numbers.py	A number a chapter quotes stops matching what the module actually computes — the chapter-prose-versus-code numeric drift class.				
+test_cited_paths_exist.py	A path-shaped citation in prose names a file that does not exist (or a symbol/line that does not exist inside it).				
+test_colour_scale.py	SatMap/CLUT compositing or a 2-D biome LUT stops behaving as a channel-driven lookup that combines rather than replaces.				
+test_crater.py	Impact SIZE physics drifts off the Collins/Melosh/Marcus pi-scaling exponents and the 1/g transition; obliquity SHAPE stops being morphologically right.				
+test_crossvalidate.py	Our result is self-consistent with 09's oracles but disagrees with a mature independent library (RichDEM / pysheds).				
+test_crossvalidate_landlab.py	Three further node families agree with our oracles but disagree with Landlab.				
+test_diffusion.py	The diffusion solver stops decaying a single Fourier mode at the exact analytic rate, stops conserving mass, or blows up on a spike.				
+test_dimensional.py	A load-bearing equation becomes dimensionally inconsistent — machine-checked with pint.				
+test_droplet.py	The droplet eroder stops being deterministic, stops conserving mass, or acquires a SYSTEMATIC (not random) grid bias.				
+test_dunes.py	The Werner slab model stops conserving slabs exactly, stops requiring p_sand > p_bare for the deposition instability, or stops organising transverse dunes from shadow+avalanche.				
+test_empirical.py	Generated terrain's emergent statistics (Hack's exponent, Horton ratios) fall outside the range measured on real landscapes.				
+test_empirical_dem.py	empirical_dem.py — the ENTIRE evidence for VALIDATION.md's top rung — ships untested and its real-DEM comparison silently rots.				
+test_flow.py	Depression filling leaves interior pits, spill levels are wrong, or flow accumulation stops conserving contributing area / stops being less grid-biased under MFD than D8.				
+test_flow_anatomy.py	The 03 D8-versus-MFD figure stops building, or the CLAIMS it prints stop holding.				
+test_gallery.py	A gallery panel looks fine but holds numerically insane relief — the stream-power-at-the-wrong-scale explosion class.				
+test_gallery_doc.py	GALLERY.md's undrawn-modules table names modules or functions that no longer exist or no longer have that signature.				
+test_glacier.py	Glacial erosion stops matching the Halfar-validated SIA transport, or bed erosion stops being a monotone function of ice flux.				
+test_graph_demo.py	The demo harness stops obeying the same invariants the algorithms obey — legal wiring order and a valid rendered output.				
+test_halfar_anatomy.py	The SIA figure's analytic exponents get hard-coded into the solver (a LEAK of the answer into the thing being tested) rather than emerging.				
+test_heightfield_io.py	A heightfield save/load round-trip stops returning what was written, to the format's quantisation, for some interchange format.				
+test_hero.py	The 3D hero renderer stops producing a finite camera solve and a valid non-blank RGB image.				
+test_hex_grid.py	Chapter 26's measured hex numbers (16.8% wrong-cell rounding rate, 30.5-degree naive-normal error, sqrt(3) two-axis anisotropy) stop being reproduced by hex_grid.py.				
+test_hydrology.py	The water surface sits below the bed, lakes stop filling enclosed depressions, or rivers carry depth where there is no channel.				
+test_isostasy.py	Airy root, erosional rebound ratio, or flexure stops matching its exact single-mode / line-load analytic solution.				
+test_landforms.py	A geological landform stops hitting its published numbers (Pike/Melosh depth/D, rim, r^-3 ejecta, central-peak onset, gravity pi-scaling) or strata stops being a periodic material coordinate.				
+test_lithology.py	The lithology -> spatial-K stream-power coupling stops producing differential erosion at steady state when K is a field or callable.				
+test_mask_partition.py	The 'Sum <= 1' and 'Sum = 1' mask rules get applied to the wrong object, so a reader implementing the assertion writes the wrong one.				
+test_meander.py	Lateral migration loses the Ikeda-Parker-Sawai UPSTREAM LAG — near-bank velocity computed local instead of exponentially lagged.				
+test_noise.py	Gradient noise stops being 0 on the lattice, one-octave fBm stops equalling the base noise, curl noise stops being divergence-free, or a fractal sum stops being bounded.				
+test_noise_pinch.py	The lattice pinch-point artefact at lacunarity exactly 2 reappears, or 01's lacunarity claim stops matching the generator.				
+test_numerics.py	Individually-correct nodes combine into garbage — isolated spikes or a field that has lost its numerical contract.				
+test_ops_filters.py	A papers-free toolbox node loses the single property that makes it correct (SDF exactness, smin below the hard min, edge preservation).				
+test_pipe.py	Virtual-pipe water goes negative or non-finite on steep terrain, stops conserving water in a closed basin, or pipe_erode stops conserving bed mass.				
+test_placement.py	A placement authored in METRES lands in a different world position at a different resolution, or a mask leaves [0,1].				
+test_pseudocode_drift.py	A NUMBER inside a chapter's pseudocode block stops matching the shipped module's default or constant.				
+test_render.py	render.material_rgb lies about itself — the documented default pairing not being the actual default, and a positional parameter that should be keyword-only.				
+test_runout.py	Runout stops matching the angle of reach, stops shortening under higher friction, or fails to stop on a flat from an initial velocity.				
+test_scale_contract.py	An atom parameter is silently in CELL units, so the atom changes meaning when resolution changes.				
+test_scatter.py	Bridson's minimum-distance guarantee is violated, density-following is lost, jitter stops being deterministic/tileable, or rule gates stop rejecting.				
+test_screen_worlds.py	A screen-world composition blows up or loses the couple of invariants that make it a re-dressed Earth archetype.				
+test_shallow_water.py	The virtual-pipe shallow-water solver stops conserving mass or lets depth go negative.				
+test_sims_illustrative.py	An illustrative sim becomes grossly broken — these have no decisive oracle, so only gross-breakage invariants are asserted.				
+test_skill_integrity.py	SKILL.md's frontmatter contract breaks, an eval loses integrity, a reference chapter stops being routed from SKILL.md, or a cross-validation/clean-room claim stops matching its dependencies.				
+test_slope_units.py	A trig function is applied to `slope`, which is already a TANGENT — tan(tan theta), sin of a tangent: a units error that is not any physical quantity.				
+test_snow.py	The snowpack stops accumulating where cold / melting where warm, stops stripping steep ground, or the avalanche stops relaxing to repose.				
+test_streampower.py	Steady-state slope-area scaling breaks, the channel network stops being concave, or the diffusion default stops being bit-for-bit the pure fluvial solver.				
+test_tectonics.py	fault_scarp stops being the displacement fractal, or fault_weakness stops coupling an erodibility contrast to the fault.				
+test_thermal.py	Thermal erosion stops converging below repose, stops conserving mass, stops being resolution-independent in its repose angle, or loses the distance correction that removes grid bias.				
+test_winds.py	The terrain-adjusted wind field loses Jackson-Hunt crest speed-up or lee separation — speed and direction stop responding to terrain.				

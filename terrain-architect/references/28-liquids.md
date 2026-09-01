@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Liquids: Optical & Rheological Identity"
+description: "Per-body water identity from its causes: CDOM darkens and sediment brightens, and the constants a renderer needs follow from the catchment."
+tags: [liquids, optics, cdom]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-14T08:04:02Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Liquids: Optical & Rheological Identity
 
 The property-bundle chapter for **fluids**, the sibling of `18`'s bundle for solids. `18` answers
@@ -124,13 +134,69 @@ b(λ) = b_w(λ) + b_p(λ)
 
 | Constituent | Optical effect | Reads as |
 |---|---|---|
-| **Phytoplankton / chlorophyll** | Absorbs blue (~440 nm) **and** red (~675 nm), leaving a transmission window at 550–570 nm | **Green.** Productive lakes, blooms; opaque pea-soup at high load |
+| **Phytoplankton / chlorophyll** | Absorbs blue (~440 nm) **and** red (~675 nm); ~~leaving a transmission window at 550–570 nm~~ — **corrected below: the 550–570 window belongs to `a_ph` *plus water*, not to the pigment** | **Green.** Productive lakes, blooms; opaque pea-soup at high load |
 | **CDOM / gelbstoff / tannins** | `a(λ) = a₄₄₀·exp[−S(λ−440)]`, `S ≈ 0.012–0.022 nm⁻¹`; rises steeply into the blue. **Scatters not at all** | **Transparent but dark.** Tea/amber shallow, near-black deep |
 | **Suspended mineral sediment** | Scattering, near spectrally **flat** (`b_b ∝ λ^−0.5…−1`, vs λ^−4.3 for water molecules) | **Brightens.** Turquoise → green → ochre as load climbs |
 
 **The rule that prevents most mistakes: CDOM darkens, sediment brightens.** They are opposite
 controls. Blackwater is *transparent and dark*; turbid water is *opaque and pale*. Reaching for a
 turbidity slider to make a tannin-stained river gives you mud.
+
+> **Correction — the 550–570 nm window is a property of the *water*, not of the pigment, and the
+> row above had it attached to the wrong term.** The chlorophyll row read as a claim about
+> `a_ph(λ)`: absorb at 440 and at 675, and a window is left between them at 550–570. It cannot be
+> one. **The minimum of a sum of two absorption lines sits between them, nearer the broader one's
+> tail** — for peaks at 440 and 675 that is around 590 nm, not 560.
+>
+> **Measured** (an implementation of this chapter's own three-constituent split,
+> `water-physics/reference-impl/beach_optics.py`; every figure below recomputed here rather than
+> relayed). Its declared `a_ph` shape — two Gaussians on a floor, peaks pinned at the chapter's 440
+> and 675, every other parameter `?` — minimises at **591.5 nm**. Swept across 400 variants of the
+> declared widths (25–60 nm blue, 15–40 nm red), the red/blue amplitude ratio (0.3–1.2) and the
+> packaged-pigment floor (0–0.5), the minimum runs **532–627 nm, median 584, and lands above
+> 570 nm in 69% of them and inside 550–570 in only 18%.** So the window's position is **not**
+> pinned by the two peak wavelengths, and where it is pinned it is not at 560.
+>
+> **What actually puts a minimum at 550–570 is the sum with pure water**, whose absorption climbs
+> steeply above 570 — this chapter's own numbers say so: `a_w` runs 0.0044 → 0.0150 → 0.0565 →
+> 0.62 m⁻¹ at 418 / 490 / 550 / 700 nm. The water's rising red wall pushes the joint minimum back
+> down the spectrum off the pigment's own 590.
+>
+> **And the joint minimum moves with how much pigment there is, which is the part worth authoring
+> from.** `argmin_λ (a_ph + a_w)`, with the shape above:
+>
+> | `a_ph(440)` | 0.02 | 0.05 | **0.108** | 0.2 | 0.5 | 1.0 | 2.0 | 5.0 m⁻¹ |
+> |---|---|---|---|---|---|---|---|---|
+> | window sits at | 420 | 507 | **521** | 531 | 543 | **557** | **565** | 575 nm |
+>
+> (Stable to ±2 nm across three different interpolations of `a_w` through this chapter's anchors.)
+> **550–570 nm is the window of a genuinely productive water — `a_ph(440)` of order 1 m⁻¹.** A
+> coastal green sea an order of magnitude below that, like the reference implementation's own
+> recovered `a_ph(440) = 0.108 m⁻¹`, has its window at **521 nm**: blue-green, not yellow-green.
+>
+> **The consequence in the "Reads as" column is unchanged, and that is the point of correcting the
+> mechanism rather than the outcome.** Chlorophyll still makes water read green, by exactly the
+> route the Secchi paragraph above already states — *"which wavelength that minimum sits at is the
+> water's hue"*. Adding pigment walks the joint minimum monotonically from water's own 418 nm
+> toward and through the green, 420 → 521 → 557 → 575 nm. **Chlorophyll owns the window's
+> *motion*; water owns its *floor*.** That sentence is the one to implement against.
+>
+> **Why it matters to an implementer, in one line:** fitting a pigment spectrum so that **its own**
+> minimum lands at 560 nm needs line widths no pigment has, and anyone who tries will end up
+> widening the 675 band until the red absorption is wrong. Fit `a_ph` to its two peaks, add water,
+> and read the window off the sum.
+>
+> ⚠️ **And a band-mean check cannot see this.** A three-band renderer whose green channel spans
+> 502.5–582.5 nm reports "the total absorption minimises in the band containing 550–570 nm" as a
+> pass whether the true minimum is at 521 nm or 565 nm — the band is 80 nm wide and the claim is
+> about a 20 nm window inside it. Verify this one **spectrally or not at all**.
+>
+> **Tier.** The correction is **P/D** — the two peak positions are this chapter's and remain P
+> (Pope & Fry supplies `a_w`, also P); the argument that a two-line minimum sits between the lines
+> is arithmetic, and every number above is `D`, recomputed here on a declared shape whose widths
+> are `?`. What is robust to those `?` is the **direction** (the pigment's own minimum is red of
+> 570, the joint minimum is blue of it and moves with load); the specific wavelengths are as good
+> as the shape.
 
 **Concentration → optics bridge** (Babin et al. 2003): mineral-dominated suspended matter
 contributes `b_p(555)/SPM ≈ 0.5 m²/g` — and since 1 mg/L = 1 g/m³, **each mg/L of mineral load
@@ -311,6 +377,13 @@ liquid_body:
   bodyType                    # sea | lake | pond | river | stream | estuary | wetland (03)
                               #   the HYDROLOGICAL type — selects the engine's surface/animation
                               #   model: lake = wind waves only, river = flow, sea = swell+tide
+                              #   This enum is exhaustive for GENERATED water and deliberately so:
+                              #   it is classified from the fill mask and flow accumulation (03),
+                              #   and no classifier will ever emit a swimming pool, a tank or a
+                              #   canal. Man-made bodies are AUTHORED render-side, where the enum
+                              #   extends (pool | basin | tank | canal | reservoir) and most of
+                              #   the natural bands gate off — terrain-renderer 12, "Man-made
+                              #   water". Do not add them here; nothing upstream can produce them.
   fetchField                  # per-shoreline wave-exposure (12 sweep); the wind-wave driver for
                               #   lakes and enclosed water — NOT a flow field
   # causal state
@@ -348,6 +421,11 @@ producer gap named at the top of this file; register the fields in `08` and `27`
 - **Confluence contrast.** A blackwater tributary meeting a silty main stem must produce a visible
   mixing line (`03`).
 - **Secchi round-trip.** `1/min_λ K_d` must reproduce the authored Secchi depth.
+- **The green window is the sum's, and it moves.** Plot `a_ph(λ)` alone and `a_ph + a_w`
+  separately: the first must minimise **red of 570 nm** (~590 for peaks at 440/675) and the second
+  **blue of it**, and raising the chlorophyll amplitude must walk the joint minimum *toward* the
+  red. A model in which `a_ph` alone minimises at 560 has been fitted to the wrong claim. Do this
+  spectrally — an 80 nm band mean cannot distinguish 521 nm from 565 nm.
 - **Yield stress does what it claims.** A `τ_y > 0` liquid on a slope must arrest at
   `h_c = τ_y/(ρ g sinθ)` and grow levées; if it spreads to level, the yield term is not being
   applied (`09`).
@@ -420,5 +498,14 @@ producer gap named at the top of this file; register the fields in `08` and `27`
 - **D** — That engine water shaders take **absorption, scattering and a phase `g` as three separate
   inputs**: Epic's Single Layer Water shading-model documentation (fetched 2026-08) — the reason
   this chapter exports them unsummed. See terrain-renderer `12`.
+- **P/D** — **The 550–570 nm window belongs to `a_ph + a_w`, not to `a_ph`.** The correction in the
+  three-constituents section: the two peak positions are this chapter's (P) and Pope & Fry supplies
+  `a_w` (P); that the minimum of two absorption lines sits between them is arithmetic. The
+  wavelengths — 591.5 nm for one declared shape, 532–627 nm over 400 variants of its `?` widths, and
+  the 420 → 521 → 557 → 575 nm walk of `argmin(a_ph + a_w)` with pigment load — are **D**,
+  recomputed here (2026-08) on `water-physics/reference-impl/beach_optics.py`'s declared shape
+  and on this chapter's own `a_w` anchors. Robust to those `?` is the **direction**, not the
+  wavelengths. Found by an implementation writing the pigment's line shape down, which is the thing
+  a chapter stating a mechanism in prose never has to do.
 - **L** — The driver→constituent table, the seven doctrine rules, the archetype presets and the
   export schema are this skill's composition over the P-tier relations above.

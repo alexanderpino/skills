@@ -3,6 +3,17 @@
 The contract these pin: a placement is authored in METRES and must land in the same world position
 at any resolution (08), masks are smooth-edged coverage in [0,1], and masking an effect is an exact
 interpolation between "not applied" and "applied everywhere".
+
+⚠️ AND ONE LESSON ABOUT MEASURING, WHICH COST THIS FILE A WRONG CAUSE IN `10`. The raster-vs-
+coordinate experiment at the bottom is also a sampling experiment, and its window-to-window spread
+turned out to depend on SAMPLE-GRID COMMENSURABILITY — whether `n / (scale * lacunarity**(octaves-1))`
+lands on exactly 2 sample pixels per cell of the finest octave — and not, as `10` asserted for
+several revisions, on the lacunarity-2 pinch lattice. Every number in the wrong version was correct;
+only the mechanism was invented, and no row that checks a number can catch that. The rows that can
+are `test_the_window_spread_tracks_px_per_cell_not_the_lacunarity` and
+`test_the_spread_follows_px_per_cell_at_other_resolutions`, which vary the supposed cause
+independently of the effect. When a measurement is explained here, that is the shape the guard has
+to have.
 """
 import numpy as np
 import pytest
@@ -270,6 +281,164 @@ def _detail(f):
                         - f[:-2, 1:-1] - f[2:, 1:-1]).mean())
 
 
+# --------------------------------------------------------------------------- #
+# THE EXPERIMENT, DEFINED ONCE
+#
+# ⚠️ THIS BLOCK IS THE SINGLE SOURCE OF THE SETUP. `tests/test_chapter_numbers.py` re-runs the same
+# experiment to check what `10` prints about it, and it IMPORTS these names rather than restating
+# them. It used to carry its own copy of `n`, `scale`, `seed`, `lacunarity` and the offsets, which
+# meant this file could be retuned while the chapter rows went on measuring the abandoned setup and
+# passing — a duplicated constant is a guard that silently stops guarding.
+# --------------------------------------------------------------------------- #
+N = 192
+SCALE = 3.0                     # base-noise cells across the grid
+SEED = 7
+OCTAVES = 6
+LACUNARITY = 2.03               # the shipped detuned value (`01`, tests/test_noise_pinch.py)
+GAIN = 0.5
+SHIFT_FRAC = (0.037, 0.023)     # fractions of N — deliberately non-integer: the worst case
+WINDOW_COUNT = 40
+WINDOW_RNG_SEED = 3
+WINDOW_SPAN = 400.0             # window offsets drawn uniformly from ±WINDOW_SPAN/2 cells
+
+# `scale_for_px_per_cell(2.0)` to six significant figures — the retuned setting `10` tabulates as
+# the falsifying cell: detuned lacunarity, finest octave back on exactly 2 sample px per cell.
+SCALE_AT_TWO_PX = 2.78478
+
+
+def px_per_cell(n=N, scale=SCALE, lacunarity=LACUNARITY, octaves=OCTAVES):
+    """Sample pixels per lattice cell of the FINEST octave.
+
+    The finest octave runs at `lacunarity**(octaves-1)` times the base frequency and the grid spans
+    `scale` base cells in `n` pixels, so it is `n / (scale * lacunarity**(octaves-1))`. This, not
+    the lacunarity, is what the window-to-window spread below tracks — see
+    `test_the_window_spread_tracks_px_per_cell_not_the_lacunarity`.
+    """
+    return n / (scale * lacunarity ** (octaves - 1))
+
+
+def scale_for_px_per_cell(target, n=N, lacunarity=LACUNARITY, octaves=OCTAVES):
+    """Inverse of `px_per_cell`: the `scale` that puts the finest octave at `target` px/cell."""
+    return n / (target * lacunarity ** (octaves - 1))
+
+
+def experiment_grid(n=N):
+    yy, xx = np.mgrid[0:n, 0:n].astype(float)
+    return xx, yy
+
+
+def experiment_build(n=N, scale=SCALE, lacunarity=LACUNARITY):
+    """The field under test: `OCTAVES`-octave fBm on an n² grid spanning `scale` base cells."""
+    return lambda gx, gy: noise.fbm(gx / n * scale, gy / n * scale, seed=SEED,
+                                    octaves=OCTAVES, lacunarity=lacunarity, gain=GAIN)
+
+
+_RATIO_CACHE = {}
+
+
+def window_ratios(n=N, scale=SCALE, lacunarity=LACUNARITY,
+                  nwin=WINDOW_COUNT, rng_seed=WINDOW_RNG_SEED):
+    """Detail energy of `nwin` random windows of the same fBm, each as a ratio to the base window.
+
+    Cached because the chapter-number harness asks for the same keys this file does, and each call
+    is `nwin` six-octave evaluations.
+    """
+    key = (n, scale, lacunarity, nwin, rng_seed)
+    if key not in _RATIO_CACHE:
+        xx, yy = experiment_grid(n)
+        build = experiment_build(n, scale, lacunarity)
+        base = _detail(build(xx, yy))
+        rng = np.random.RandomState(rng_seed)
+        _RATIO_CACHE[key] = np.array(
+            [_detail(build(xx + ox, yy + oy)) / base
+             for ox, oy in rng.rand(nwin, 2) * WINDOW_SPAN - WINDOW_SPAN / 2.0])
+    return _RATIO_CACHE[key]
+
+
+def window_spread(**kw):
+    """Window-to-window spread of detail energy, as the STANDARD DEVIATION of those ratios.
+
+    ⚠️ std, and not `max |r-1|`, on purpose. The max is an extreme-value statistic: it grows with
+    the sample count by construction (measured 0.40 / 0.54 / 0.79 % at 5 / 40 / 320 windows on the
+    shipped setup) and it swings 2:1 across the RNG seed (0.49-0.97% over `RandomState(0..24)`,
+    median 0.62%; the seed this file draws is the 3rd lowest of those 25, so quoting it prints an
+    unrepresentatively small number). A figure that moves that much with how many samples you drew
+    and which seed drew them is a property of the draw, not of the terrain. `std` converges instead
+    — 0.17 / 0.22 / 0.25 % at the same three window counts — so it is what `10` prints.
+    """
+    return float(window_ratios(**kw).std())
+
+
+def test_the_experiment_is_not_sample_grid_commensurate():
+    """⚠️ THE GUARD ON THE HEADLINE FIX: reverting `LACUNARITY` to 2.0 must not pass silently.
+
+    Every other row here happens to survive that revert — the raster losses barely move, and the
+    coordinate-placement ratios stay positive. What does not survive is this: at `lacunarity=2.0`
+    with `SCALE=3.0` and `OCTAVES=6`, `px_per_cell` is exactly 2.0000, the sample grid lands on the
+    finest octave's lattice, and the whole measurement degenerates (2.31% window spread against
+    0.22%). Guarding the constant rather than only its consequences is the point: a value this file
+    was deliberately moved off must not be reachable by a one-character edit that nothing notices.
+    """
+    px = px_per_cell()
+    assert abs(px - 2.0) > 0.1, (
+        "the finest octave is at %.4f px/cell — on or beside the degenerate 2.0 commensurability "
+        "this experiment exists to avoid" % px)
+    assert abs(px - 1.0) > 0.1, (
+        "the finest octave is at %.4f px/cell, on the 1.0 (fully aliased) point" % px)
+
+
+def test_the_window_spread_tracks_px_per_cell_not_the_lacunarity():
+    """⚠️ THE ROW THAT PINS THE CAUSE RATHER THAN THE NUMBER.
+
+    `10` used to explain the old build's large window-to-window spread as the lacunarity-2 PINCH
+    LATTICE — the un-shifted base window sitting where every octave is zero at once and so being
+    systematically flatter. That was false, and no amount of pinning the numbers could have caught
+    it: the numbers were right and the mechanism was wrong.
+
+    The falsification is a 2x2. Lacunarity 2 is neither necessary (detune it and retune `scale` so
+    the finest octave is back at 2 px/cell — the spread returns in full) nor sufficient (keep
+    lacunarity at exactly 2 and move `scale` so it is not — the spread vanishes). What the spread
+    follows, in all four cells, is `px_per_cell`. Restore the old story and this row fails, because
+    the old story predicts the two lacunarity-2 cells to be the large ones.
+    """
+    assert abs(px_per_cell(scale=SCALE_AT_TWO_PX, lacunarity=2.03) - 2.0) < 1e-4, (
+        "SCALE_AT_TWO_PX no longer puts the finest octave at 2 px/cell")
+    commensurate = {
+        "lacunarity 2.03, scale retuned to 2 px/cell":
+            window_spread(scale=SCALE_AT_TWO_PX, lacunarity=2.03),
+        "lacunarity 2.00, scale 3.0 (2 px/cell)":
+            window_spread(scale=3.0, lacunarity=2.0),
+    }
+    incommensurate = {
+        "lacunarity 2.03, scale 3.0 (shipped, 1.86 px/cell)":
+            window_spread(),
+        "lacunarity 2.00, scale 3.1 (1.94 px/cell)":
+            window_spread(scale=3.1, lacunarity=2.0),
+    }
+    assert min(commensurate.values()) > 0.01, (
+        "2 px/cell must produce the large spread at EITHER lacunarity: %s" % commensurate)
+    assert max(incommensurate.values()) < 0.01, (
+        "off 2 px/cell the spread must collapse at EITHER lacunarity: %s" % incommensurate)
+    assert min(commensurate.values()) > 5.0 * max(incommensurate.values()), (
+        "commensurability must separate these cleanly: %s vs %s" % (commensurate, incommensurate))
+
+
+@pytest.mark.parametrize("n", [128, 256])
+def test_the_spread_follows_px_per_cell_at_other_resolutions(n):
+    """The control that rules out `n = 192` itself being the special thing.
+
+    Hold lacunarity at 2.0 and vary only the window size: the spread appears wherever `scale` puts
+    the finest octave at 2 px/cell and is absent wherever it does not, at 128 and at 256 exactly as
+    at 192. It is a property of the sampling ratio, not of the resolution.
+    """
+    at_two = window_spread(n=n, scale=scale_for_px_per_cell(2.0, n=n, lacunarity=2.0),
+                           lacunarity=2.0, nwin=12)
+    off_two = window_spread(n=n, scale=3.0, lacunarity=2.0, nwin=12)
+    assert at_two > 0.015, "no spread at 2 px/cell, n=%d: %.5f" % (n, at_two)
+    assert off_two < 0.01, "spread survived off 2 px/cell, n=%d: %.5f" % (n, off_two)
+    assert at_two > 3.0 * off_two, "n=%d: %.5f vs %.5f" % (n, at_two, off_two)
+
+
 def test_raster_transform_loses_detail_that_placement_keeps():
     """WHY placement transforms coordinates instead of rasters, as a number rather than an assertion.
 
@@ -278,14 +447,25 @@ def test_raster_transform_loses_detail_that_placement_keeps():
     so it costs nothing however many times you move it. The percentages quoted in `placement.py` and
     references/10 are pinned here; they are metric-dependent (mean |laplacian|) and meaningless
     without that qualifier, which is the point of measuring rather than asserting.
+
+    LACUNARITY. This measured at `lacunarity=2.0` until it was the last working use of that value
+    left in the repo — the degenerate case `01` and `test_noise_pinch.py` exist to warn about, where
+    every octave's zero set coincides and the base window sits on a grid of exact pinch points. It
+    now uses `noise.fbm`'s shipped `2.03`, so the terrain under test is terrain the skill would
+    actually recommend generating. The numbers moved when it changed; `10` was re-measured with it.
+
+    ⚠️ The detuning also, incidentally, moved the finest octave off exactly 2 sample pixels per
+    lattice cell — which is what actually fixed the window-ratio spread below, and is guarded
+    separately by `test_the_experiment_is_not_sample_grid_commensurate` and
+    `test_the_window_spread_tracks_px_per_cell_not_the_lacunarity`. The window tolerance here is set
+    tight enough that reverting `LACUNARITY` to 2.0 fails this row too: the ratios go from a
+    measured max |r-1| of 0.0030 to 0.0910.
     """
-    n = 192
-    yy, xx = np.mgrid[0:n, 0:n].astype(float)
-    build = lambda gx, gy: noise.fbm(gx / n * 3.0, gy / n * 3.0, seed=7,
-                                     octaves=6, lacunarity=2.0, gain=0.5)
+    xx, yy = experiment_grid()
+    build = experiment_build()
     h = build(xx, yy)
     base = _detail(h)
-    dx, dy = 0.037 * n, 0.023 * n                 # deliberately non-integer: the worst case
+    dx, dy = SHIFT_FRAC[0] * N, SHIFT_FRAC[1] * N
 
     raster, losses, placed_ratios = h, [], []
     for k in range(1, 5):
@@ -300,11 +480,13 @@ def test_raster_transform_loses_detail_that_placement_keeps():
 
     # Placement lands on a DIFFERENT WINDOW of the same fBm, and detail energy genuinely varies
     # between windows — so the invariant is "no systematic decline", not "identical". Reading that
-    # window variance as a loss would be the measurement failing, not the code.
-    assert max(abs(r - 1.0) for r in placed_ratios) < 0.15, placed_ratios
-    assert placed_ratios[-1] > placed_ratios[0] - 0.15, (
+    # window variance as a loss would be the measurement failing, not the code. 0.02 is ~6x the
+    # measured 0.0030 and ~4x below the 0.0910 the commensurate build produces; the old 0.15 was a
+    # 50x margin that could not tell the two regimes apart.
+    assert max(abs(r - 1.0) for r in placed_ratios) < 0.02, placed_ratios
+    assert placed_ratios[-1] > placed_ratios[0] - 0.02, (
         f"coordinate placement must not degrade with depth, got {placed_ratios}")
 
-    assert 0.15 < losses[0] < 0.35, f"one raster move lost {losses[0]:.1%}, expected ~24%"
-    assert 0.45 < losses[3] < 0.65, f"four raster moves lost {losses[3]:.1%}, expected ~53%"
+    assert 0.15 < losses[0] < 0.35, f"one raster move lost {losses[0]:.1%}, expected ~29%"
+    assert 0.45 < losses[3] < 0.65, f"four raster moves lost {losses[3]:.1%}, expected ~57%"
     assert losses == sorted(losses), f"raster loss must compound with each move, got {losses}"

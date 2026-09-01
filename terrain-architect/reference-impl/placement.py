@@ -125,9 +125,16 @@ def place_coords(xx, yy, shape, cellsize=1.0, center=None, rotation=0.0, scale=1
     somewhere else. Transforming the generator's raster afterwards instead resamples it, and
     bilinear resampling is a low-pass filter. Measured on fBm as mean |laplacian| (see
     `test_raster_transform_loses_detail_that_placement_keeps`), one non-integer raster move loses
-    ~24% of the fine detail and four chained moves ~53%; this loses none, at any depth. Quote the
-    metric with the number — the same experiment scored on high-frequency band energy reads ~9% and
-    ~26%, so a bare percentage here means nothing.
+    ~29% of the fine detail and four chained moves ~57%; this loses none, at any depth. Quote the
+    metric with the number — the same experiment scored on high-frequency band energy reads ~9.8%
+    and ~27.2%, so a bare percentage here means nothing.
+
+    ⚠️ THOSE FOUR NUMBERS MOVED, AND THE OLD ONES WERE MEASURED ON DEGENERATE TERRAIN. They read
+    24 / 53 / 9 / 26 while the experiment built at `lacunarity=2.0` — the value at which gradient
+    noise is identically zero at every lattice point, so every octave's zero set coincides. The
+    test now builds at `noise.fbm`'s shipped 2.03, which is the terrain this skill actually tells
+    you to generate. `10` carries the same figures and `tests/test_chapter_numbers.py` binds both
+    to this experiment, so the three can no longer drift apart silently.
 
     Use a raster transform (`ops_filters.resample`, a Transform node) only for fields you cannot
     re-evaluate — an imported DEM, or the output of an erosion sim.

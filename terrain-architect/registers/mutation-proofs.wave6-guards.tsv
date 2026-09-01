@@ -1,0 +1,67 @@
+# REGISTER 4 (PARTIAL) - mutation-proofs.wave6-guards.tsv
+# Wave-6 proofs for TWO guard files: reference-impl/tests/test_anatomy_figures.py (the
+# crater_anatomy build guard, OPEN-ITEMS #25) and reference-impl/tests/test_atom_coverage.py
+# (adoption of the shared text model _textscan, OPEN-ITEMS #29). Written here and NOT into the
+# shared mutation-proofs.tsv, which other agents are filling in the same wave. Merge target: the
+# test_anatomy_figures.py and test_atom_coverage.py rows of mutation-proofs.tsv.
+#
+# EVERY CELL BELOW IS FROM EXECUTION, none predicted. The harness for each trial was:
+#   1. read the live SUBJECT file into memory   4. restore the file from memory
+#   2. apply the edit                           5. `git diff --quiet -- <subject>` after EVERY
+#   3. run the named pytest selection from         trial (21 recorded trials + 5 repeat runs to
+#      reference-impl/                             capture messages; every one clean, verified
+#                                                  per trial, not once at the end)
+# No mutation was ever applied to a guard file. Every subject is a module, a chapter, or the
+# shared text model - never the test that observes it.
+#
+# DENOMINATOR - defect classes proved
+#   distinct defect classes .............................. 11
+#   rows emitted ......................................... 11
+#   rows with a mutation that went GREEN -> RED .......... 10  (of the 10 that have one)
+#   rows with a decoy that stayed GREEN .................. 11  (100%)
+#   IDENTITY: 11 classes == 11 rows -> HOLDS
+#   DECORATIVE rows ...................................... 0
+#   ROWS WITH ONE HALF ONLY .............................. 1, and it is named as such (R6). Its
+#     defect class is OVERFITTING - "the guard pins the observed column 216 instead of the side of
+#     centre" - and a class whose defect is the guard FIRING can only be proved by a trial that
+#     does not fire. It is a decoy with no mutation by construction, not a missing mutation.
+#
+# THE REACH THE SHARED FENCE MODEL ADDED, MEASURED DIRECTLY (not quoted). Both models were run
+# over the same corpus of 44 Markdown documents this skill ships (references/*.md 30 +
+# reference-impl/*.md 11 + SKILL.md + index.md + DEFINITION-OF-DONE.md):
+#   they disagree on ............................. 31 documents  (reproduces OPEN-ITEMS #29)
+#   of which SUBSTANTIVE (a whole block invisible to the column-0 model this file carried):
+#     references/03-flow-routing.md ....... +67 chars   (indented fence at :693)
+#     references/12-glacial-coastal.md ... +428 chars   (indented fences at :293 and :2095)
+#     references/13-climate-ecosystem.md . +130 chars   (indented fence at :461)
+#     references/26-hexagonal-grids.md ... +296 chars   (indented fence at :345)
+#   the other 27 differ by exactly one trailing newline per block and are not behavioural.
+# NONE of those five blocks holds a routine that a row currently names, so adopting the shared
+# model surfaced NO new drift - the reach gain is real but latent today. Row R8's decoy measures
+# it directly: nest 11-geological.md's routine block under a list item and, under the column-0
+# model, 4 of that chapter's 5 generator header rows go red on a chapter that still documents
+# every one of them.
+#
+# THE OTHER THREE ADOPTIONS ARE BYTE-IDENTICAL SUBSTITUTIONS, verified rather than assumed:
+#   _IDENT vs _textscan.IDENT ............ same .pattern string
+#   _pattern vs complete_pattern ......... same compiled .pattern on 37 probes (every code_lit
+#                                          and doc_str in FAITHFUL, plus the 8 boundary cases
+#                                          the file's own comments name)
+#   _strip_py_comments vs blank_py_prose . byte-identical output on all 108 Python files
+#                                          (44 reference modules + 64 test modules)
+# They are still given mutation rows (R9, R10, R11) because "identical to what was there" only
+# proves the swap was safe, not that what was there could fail.
+#
+
+guard_file	test_name	target_defect_class	mutation	expected_observation	observed	decoy	decoy_expected	decoy_observed	verdict
+reference-impl/tests/test_anatomy_figures.py	test_crater_anatomy_builds_and_still_draws_the_uprange_asymmetry	the figure silently redraws the rung-4 defect: a grazing crater deepest DOWN-range (the skipping-stone intuition) while VALIDATION.md:317-323 still claims the correction	reference-impl/crater_demo.py:93 flip the plow floor tilt: `0.45 * (0.5 - 0.5 * along)` -> `0.45 * (0.5 + 0.5 * along)` (deepen down-range)	RED - deepest_col moves to the down-range side of centre	1 failed: "deepest point is no longer up-range (col 246 vs centre 230): that is the rung-4 defect returning"; assert 246 < 230	reference-impl/crater_demo.py:95 halve the transverse rim levees: `graze * 0.35 * depth * flank` -> `graze * 0.20 * depth * flank` (a real morphology edit in the SAME block, off the along-track axis)	GREEN - the along-track floor tilt is untouched	1 passed	PROVEN
+reference-impl/tests/test_anatomy_figures.py	test_crater_anatomy_builds_and_still_draws_the_uprange_asymmetry	the cross-section's minimum stops being the crater FLOOR, so the 'deepest = UP-RANGE' leader labels a notch in the ejecta instead	reference-impl/crater_anatomy.py:143 make the up-range rim crest search the DOWN-range half: `lc = int(np.argmax(prof[:N // 2]))` -> `lc = N // 2 + int(np.argmax(prof[N // 2:]))`	RED - deepest_col no longer lies between the two rim crests	1 failed: "the deepest column (216) is outside the rim crests (370..370), so the cross-section's minimum is not the crater floor"	reference-impl/crater_anatomy.py:121 widen the plot margins: `x0, x1 = 70, W - 70` -> `50, W - 50`	GREEN - a drawing-frame change, not a morphology change	1 passed	PROVEN
+reference-impl/tests/test_anatomy_figures.py	test_crater_anatomy_builds_and_still_draws_the_uprange_asymmetry	the grazing cavity is drawn circular, so the map panel's 'broken ellipse' and its up-range / down-range leaders describe a shape that is not there	reference-impl/crater.py:58 flatten the elongation: `1.0 + 1.2 * np.clip((12.0 - angle) / 12.0, 0, 1)` -> `1.0 + 0.2 * ...` (ellipticity 2.00 -> 1.17)	RED - ellipticity falls below 1.5	1 failed: "a grazing cavity is elongated along the track, not circular (ellipticity 1.17)"	reference-impl/crater.py:58 move the elongation THRESHOLD 12 deg -> 14 deg (ellipticity 2.00 -> 2.03 at the figure's 2 deg)	GREEN - still elongated; the row pins the claim, not the calibration	1 passed	PROVEN
+reference-impl/tests/test_anatomy_figures.py	test_crater_anatomy_builds_and_still_draws_the_uprange_asymmetry	the figure stops reaching disk - crater_anatomy.py advertises `Writes crater_anatomy.png` and README.md:118 and GALLERY cite the file	reference-impl/crater_anatomy.py:152 disable the write: `canvas.save(path)` -> `pass  # canvas.save(path)`	RED - the named output file does not exist	1 failed: "the figure did not reach disk"	reference-impl/crater_anatomy.py:78 recolour the canvas ground `(247, 245, 240)` -> `(255, 255, 255)`	GREEN - the file is still written	1 passed	PROVEN
+reference-impl/tests/test_anatomy_figures.py	test_crater_anatomy_builds_and_still_draws_the_uprange_asymmetry	the figure builds but collapses to a size the labels no longer fit in (the two panels are laid out in absolute pixels)	reference-impl/crater_anatomy.py:76 `W = 1000` -> `W = 800`	RED - canvas width drops below the asserted 900	1 failed: assert (800 > 900)	reference-impl/crater_anatomy.py:77 give the cross-section panel 40px more height: `map_h, xs_h = 500, 340` -> `500, 380`	GREEN - a bigger canvas is still a canvas	1 passed	PROVEN
+reference-impl/tests/test_anatomy_figures.py	test_crater_anatomy_builds_and_still_draws_the_uprange_asymmetry	OVERFITTING CHECK (decoy-only class): the guard pins the observed column 216 rather than the SIDE of centre, and goes red on any legitimate re-parameterisation of the figure	n/a - this class is proved by the absence of a firing, so the trial is the decoy	n/a	n/a	reference-impl/crater_anatomy.py:28 redraw the figure on a different noise draw: `ANGLE, L, SEED = 2.0, 200.0, 5` -> `..., 11` (deepest_col moves 216 -> 219, rims 84/370 -> 89/375)	GREEN - the morphology claim survives a different random draw	1 passed	PROVEN (decoy half only, by construction)
+reference-impl/tests/test_atom_coverage.py	test_fenced_sees_a_block_indented_under_a_list_item	the shared fence model is narrowed back to column 0 - the exact divergence _textscan was built to end, and the one that made a routine documented under a list item read as undocumented here	reference-impl/tests/_textscan.py:80 drop the indent tolerance: `_FENCE_LINE = re.compile(r"^[ \t]*(?P<marker>`{3,}|~{3,})...")` -> `r"^(?P<marker>...")`	RED - an indented fence is no longer seen as a fence	1 failed: "an indented fence is still a fence"; assert 'ridge(shape' in ''	reference-impl/tests/_textscan.py:80 narrow it to CommonMark's own rule instead: `^[ \t]*` -> `^[ ]{0,3}`	GREEN - still indent-tolerant; the row pins the behaviour, not the character class	1 passed	PROVEN
+reference-impl/tests/test_atom_coverage.py	test_generator_pseudocode_names_are_declared_headers[ridge] + test_landform_generators_are_documented[ridge]	a landform generator's routine header is deleted or renamed in its chapter, leaving landforms.ridge documented by prose only	references/11-geological.md:275 delete the chapter's only real routine header: `ridge(shape, asymmetry):` -> `# (the ridge primitive)`	RED - both halves of the pair fire (no `ridge(...)` call and no `ridge(...)` HEADER in a fenced block)	2 failed, 10 passed: "references/11-geological.md has no `ridge(...)` routine HEADER in a fenced block" and "landforms.ridge not documented as a routine ... prose naming it does not count"	references/11-geological.md:244-326 nest that whole fenced block under a list item (indent markers and body by two spaces) - the chapter still documents every routine in it	GREEN - an indented fence is still pseudocode	12 passed. UNDER THE COLUMN-0 MODEL THIS FILE CARRIED, the same decoy turns 4 of the chapter's 5 header rows RED (mountain, ridge, canyon, fault_block_butte invisible; volcano survives only by the inverted fence parity). That difference IS the adoption.	PROVEN
+reference-impl/tests/test_atom_coverage.py	test_key_constant_agrees_between_chapter_and_code[glacier.py:n=3]	a module stops USING a constant but goes on TALKING about it, and the comment is accepted as evidence (the hole `_strip_py_comments`, now `_textscan.blank_py_prose`, exists to close)	reference-impl/glacier.py:48 move the shipped default and leave the old value in a comment: `*, A=_A_YR, n=3, rho=917.0,` -> `*, A=_A_YR, n=4, rho=917.0,   # was n=3 (Glen)`	RED - the literal survives only in prose, which is not code	1 failed: "Glen flow-law exponent n = 3: code literal 'n=3' missing from reference-impl/glacier.py"	reference-impl/glacier.py:48 respell the same default with PEP8 spacing: `n=3` -> `n = 3`	GREEN - spacing is not meaning	1 passed	PROVEN
+reference-impl/tests/test_atom_coverage.py	test_key_constant_agrees_between_chapter_and_code[glacier.py:n=3]	a chapter widens a fixed constant into a RANGE and the doc side still matches it as a prefix (the lopsided-boundary hole: `n = 3` satisfied by Cuffey's `n = 3-4`)	references/12-glacial-coastal.md:66 `with n = 3, A` -> `with n = 3-4, A`	RED - a prefix is not a match and neither is a suffix	1 failed: "Glen flow-law exponent n = 3: 'n = 3' missing from the 'e-dot = A . tau^n' paragraph of references/12-glacial-coastal.md" (the section name is written in the file with the real symbols, transliterated here to keep the cell ASCII)	references/12-glacial-coastal.md:66 re-wrap the same statement across a line break: `with n = 3, A` -> `with n =\n3, A`	GREEN - the chapter is flattened before matching, so a re-wrap cannot break a row	1 passed	PROVEN
+reference-impl/tests/test_atom_coverage.py	test_deferred_atoms_are_discussed_but_absent[Wavelet-references/01-noise.md]	a DEFERRED atom stops being discussed under its own name in its chapter, so 'deferred' quietly becomes 'unmentioned' (the identifier-scan side, `_IDENT` -> `_textscan.IDENT`)	references/01-noise.md:237,239,241 rename it out of existence: all three `Wavelet` -> `Band-limited`	RED - the atom is no longer discussed under the name the register uses	1 failed: "Wavelet not discussed in references/01-noise.md"	references/01-noise.md:241 hyphenate the prose next to it: `Wavelet noise constructs a genuinely` -> `Wavelet-noise construction is genuinely`	GREEN - `-` is not an identifier character, so the whole identifier is still there	1 passed	PROVEN

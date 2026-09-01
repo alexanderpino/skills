@@ -13,6 +13,20 @@ description: >-
   fit (CPU/GPU scheduling, streaming, determinism, serialisation). Do not use for generic
   geology teaching, standalone GIS plotting, hiking, real-world erosion control, non-terrain
   texturing, or generic fluid simulation.
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Skill
+title: Terrain Architect
+tags: [terrain, generation, procedural, heightfield]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-23T08:47:50Z }
+sources:
+  - id: index
+    resource: /references/00-index.md
+    title: The algorithm index
+  - id: validation
+    resource: /reference-impl/VALIDATION.md
+    title: The validity evidence ledger
+# --- end okf v0.2 ----------------------------------------------------
 ---
 
 # Terrain Architect
@@ -796,6 +810,7 @@ crosses the line, take the generation half here and route the rest.
 | Draw the terrain: LOD, meshing, streaming, virtual texturing, GPU-driven culling, shadows, tool viewports | **terrain-renderer** (it consumes this skill's `08` Output Contract and `27` engine handoff) |
 | Anything that **moves at runtime**: ocean waves (Gerstner/FFT), shore breakers, foam and spray, flowing river surfaces, waterfalls as drawn water, interactive ripples | **terrain-renderer** `12` — the "engine owns motion" boundary above |
 | Real-time **fluid simulation** — SPH/PBF particle water, FLIP/APIC, MPM, two-way rigid-body coupling, buoyancy, splash | **terrain-renderer** (its fluid-simulation chapter). Explicitly *not* this skill's `15`, which is about running *this generator* on the GPU |
+| The **measured physics of water** — the air/water interface, IOPs and where a body's colour comes from, glitter, caustics, foam, shoaling and depth-limited breaking, diffraction, the wave-height population | **water-physics** (its `12`, with three running reference implementations and their suites behind it). This skill's `12` supplies the *bed* those waves break on; that one supplies the numbers |
 | Runtime **surface state**: snow accumulation and deformation, wetness and puddling, craters and tracks | **terrain-renderer** `13`/`17` — this skill ships the causes (snow potential, wetness, flow), the engine evolves the state |
 | BRDF math, normal-blend derivations, specular antialiasing theory, scattering | **physically-based-rendering** |
 | Engine-wide architecture: job systems, allocators, render graphs, asset cooking | **game-engine-guru** |

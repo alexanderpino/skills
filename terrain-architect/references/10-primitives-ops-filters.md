@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Primitives, Operators, Filters & Warps"
+description: The SDF and gradient primitives, the combiners, and the three distinct roles a curve plays — the distinction that costs the most rebuilds when missed.
+tags: [primitives, sdf, filters, warp]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-05T18:35:04Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Primitives, Operators, Filters & Warps
 
 The "boring" nodes. They have no papers, which is exactly why they ship broken — nobody
@@ -586,22 +596,83 @@ argument that applies it. Placing at the native centre is the identity; placing 
 crest at exactly the requested offset.
 
 **Raster transform (after sampling).** Moving the *output* resamples it, and bilinear resampling is a
-low-pass filter. Measured on 6-octave fBm with a non-integer offset, scored as **mean |laplacian|**:
-**one move loses ~24% of the fine detail, four chained moves ~53%** — the losses compound, because
+low-pass filter. Measured on 6-octave fBm (`lacunarity 2.03`, the shipped detuned value — `01`) with a
+non-integer offset, scored as **mean |laplacian|**:
+**one move loses ~29% of the fine detail, four chained moves ~57%** — the losses compound, because
 each hop filters the already-filtered result. Coordinate placement loses none of it at any depth. Use
 a raster transform only for fields you cannot re-evaluate — an imported DEM, or the output of an
 erosion simulation — which is exactly what a Transform node is for.
 
 **Always quote the metric with the number.** The same experiment scored on high-frequency band energy
-(field minus a σ=2 gaussian) reads ~9% and ~26% instead. Neither is wrong; a bare percentage is.
+(field minus a σ=2 gaussian) reads ~9.8% and ~27.2% instead. Neither is wrong; a bare percentage is.
 `tests/test_placement.py::test_raster_transform_loses_detail_that_placement_keeps` pins these so the
-prose cannot drift from the code, and the Terrain Studio's independent JS implementation measures
-24.7% / 53.8% on the same metric — two implementations, one number.
+prose cannot drift from the code. ⚠️ A cross-implementation check once quoted here — the Terrain
+Studio's independent JS measuring 24.7% / 53.8% "on the same metric" — **has no provenance in this
+repo**: no such implementation ships here, nothing here can re-derive the figure, and no record
+anywhere in the repo says what build it was taken against. An earlier revision of this paragraph
+asserted it had been measured against this experiment's old `lacunarity 2.0` build. That was
+invented, and it is also checkable: re-running this experiment at `lacunarity 2.0` measures
+**24.1% / 53.0%**, not 24.7 / 53.8, so it was never agreement at the precision quoted — on that
+build or on any other this repo can produce. It stays recorded as a stale figure rather than
+restated as agreement.
 
-A second measurement trap sits inside this one: coordinate placement lands on a *different window* of
-the same fBm, and detail energy genuinely varies window to window (±6% at 192²). Read that variance as
-"placement lost detail too" and you have measured your own sampling noise. The invariant that survives
-is **no systematic decline with depth**, not equality.
+### The window-variance trap, and a cause this chapter got wrong
+
+A second measurement trap sits inside the one above: coordinate placement lands on a *different
+window* of the same fBm, and detail energy varies window to window. Quote that spread as **one
+statistic with its draw named** — the standard deviation of the per-window detail ratio, over
+**40 windows** drawn from `numpy.random.RandomState(3)` at 192². Not `max |r−1|`: an extreme-value
+statistic grows with the sample count by construction and swings 2:1 across the RNG seed, so it
+prints whatever the draw happened to hand you rather than a property of the terrain. And the pairing
+this replaces — "±6%" against "±0.5%" — was worse than either: those were a *mean* deviation and a
+*max* deviation, two different statistics set side by side and read as one comparison. Switching
+statistic mid-sentence is the same failure as quoting a bare percentage, one paragraph after the
+rule against it.
+
+⚠️ **The cause recorded here was wrong, and this is the correction.** This paragraph used to say the
+old build's much larger spread was not window variance at all but the lacunarity-2 **pinch lattice**:
+that the un-shifted base window sits where every octave is zero at once (`01`) and is therefore
+systematically flatter than any shifted one, so every ratio comes back high. The observation is
+right; the cause is false. Re-run the same experiment at four settings:
+
+| lacunarity | scale | finest octave, px/cell | std of window ratios |
+|---|---|---|---|
+| 2.00 | 3.00 | **`2.0000`** | **`2.31%`** |
+| 2.00 | 3.10 | `1.9355` | `0.28%` |
+| 2.03 | 2.78478 | **`2.0000`** | **`2.26%`** |
+| 2.03 | 3.00 *(shipped)* | `1.8565` | `0.22%` |
+
+Lacunarity 2 is neither **necessary** (row 3 — detuned, and the effect returns at full strength) nor
+**sufficient** (row 2 — lacunarity exactly 2, and it is gone). What tracks it in every row is
+**sample-grid commensurability**: `n / (scale · lacunarity^(octaves−1))`, the sample pixels per
+lattice cell of the *finest* octave. At exactly 2 px/cell every sample column lands on phase 0 or 0.5
+of that octave — **100%** of columns, against **8.3%** at the shipped setting — so the un-shifted
+window reads the finest octave at one degenerate phase and any shift moves it to a generic one. Mean
+|laplacian| is dominated by the finest octave, so that phase is most of the statistic. Nor is 192²
+special: hold px/cell at 2.0 and the spread is the same at n = 128, 256 and 384, while at scale 3.0
+n = 192 is the only one of those sizes that shows it — because it is the only one that lands on 2.0.
+
+**And the pinch lattice could not have produced it**, for the reason `tests/test_noise_pinch.py`
+states as its own headline lesson: the artefact "is invisible to any measure that does not evaluate
+ON the shared lattice", and a whole-window mean |laplacian| is exactly such a measure. In the old
+build **14** of the 36864 pixels are exact zeros, **9** of them inside the laplacian's interior, and
+deleting every one of them moves mean |laplacian| by **0.0135%**. It is two orders of magnitude too
+small to move the spread in the table's first row, whichever direction it moved it.
+
+Keep the detuning — `01` and `test_noise_pinch.py` justify it on grounds this correction does not
+touch — but stop crediting it with this. Moving lacunarity 2.0 → 2.03 also moved the finest octave
+off 2 px/cell (the table's first and last rows), and *that* side effect is what collapsed the spread
+— an accident, not the fix it was written up as. The trap itself is still real, because different
+windows are different terrain; the invariant that survives either way is **no systematic decline
+with depth**, not equality.
+
+The lesson generalises past this chapter. A number can be reproducible, stable and correctly
+measured while the mechanism written beside it is invented, and pinning the number does nothing
+about that — every figure in the wrong version was right. Only an experiment that varies the
+supposed cause independently of the effect can say so, which is why the four rows above are an
+experiment rather than a table, and why
+`tests/test_placement.py::test_the_window_spread_tracks_px_per_cell_not_the_lacunarity` asserts the
+2×2 and not the numbers: it fails if the pinch-lattice story is ever restored.
 
 One honest caveat: a generator that normalises by its **own** extremes is not perfectly
 translation-invariant, because moving it changes what is in frame. Measured on `ridge`, that shows up
@@ -626,4 +697,5 @@ Two things the matrix form buys: **non-uniform scale and shear**, which the deco
 cannot express, and **composition** — `compose(A, B, C)` collapses a chain into one transform. For a
 generator that is merely tidier (sampling is exact either way), but for a **raster** it is a real
 quality win: each extra resample is another low-pass filter, so collapsing four moves into one avoids
-the ~53% detail loss measured above.
+the compounded four-move detail loss measured above. (Referred to, not restated: a second copy of a
+measured percentage is a second thing to keep in sync, and only the first copy was ever guarded.)

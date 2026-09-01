@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Flow Routing
+description: Depression filling and the routing family — D8, D-infinity, MFD and the hybrid — with the concentration statistic that separates them and reverses at low relief.
+tags: [flow, d8, mfd, drainage]
+status: stable
+generated: { by: process:claude-code, at: 2026-08-30T14:39:04Z }
+verified: { by: process:test_flow_anatomy.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Flow Routing
 
 Contents: [Order of operations](#order-of-operations) · [Depression handling](#depression-handling-mandatory) ·
@@ -234,6 +245,68 @@ weight*, not a substitute for the exponent, and without it diagonals are over-we
 diffuse and rivers look like broad damp smears rather than lines. The standard fix is a
 **hybrid**: MFD where `A` is small (hillslope), D8 or D∞ where `A` exceeds a channelisation
 threshold. This costs almost nothing and is what most good terrain tools do.
+
+![D8, MFD and the hybrid accumulation on one DEM, and the concentration statistic against relief](../reference-impl/flow_anatomy.png)
+
+> **The two failures, side by side and measured.** `D`, drawn by
+> [`reference-impl/flow_anatomy.py`](../reference-impl/flow_anatomy.py) from `flow.py`'s own
+> `d8_accumulation`, `mfd_accumulation` and `hybrid_accumulation` — the shipped routers, not a
+> restatement — and guarded
+> by `tests/test_flow_anatomy.py`. **a–c:** the same 160×160 DEM routed three ways, log-compressed
+> because drainage area spans four decades and a linear ramp would show the trunk and nothing else.
+> **The statistic is the share of cells needed to carry half the total drainage**, which has no
+> threshold to tune: D8 needs **1.5%** and MFD **7.1%** — 4.8× as many.
+>
+> ⚠️ **It takes two statistics to see a hybrid, and the first one alone says "no difference".**
+> The concentration number is dominated by the trunk, because that is where the water is — and
+> the trunk is exactly where the hybrid runs D8. So it scores the hybrid at **1.5%**, against
+> D8's 1.5%: indistinguishable, and it would be a mistake to read that as the hybrid doing
+> nothing. The difference is on the hillslope, and a second statistic finds it — the share of
+> cells receiving *any* water from upslope is **99.6%** under the hybrid and **99.7%** under
+> MFD, against only **76.0%** under D8. A quarter of the domain is bone dry under D8 and wet
+> under both of the others. Answering *"is it D8?"* yes and *"is it MFD?"* yes is not a
+> contradiction — it is what a hybrid **is**, and one number could not have shown it.
+>
+> ⚠️ **Both of those readings belong to the 28 m ramp drawn here, and both invert below about
+> 8 m.** The concentration number is dominated by the *trunk*, so "the hybrid scores as D8"
+> holds only while there is a trunk to dominate it: swept down the same ramp family, at 8 m of
+> relief D8 needs 22.2% of cells for half the drainage, MFD 23.9%, and the hybrid **6.1%** —
+> several times *more* concentrated than either parent, because D8's stripes never merge while
+> the hybrid's MFD hillslope still gathers one. The wetting number goes the same way: D8 wets
+> 98.7% of cells at 8 m and 99.2% at 4 m, so there is no dry quarter left to find. That is the
+> same relief as **d**'s order-reversal below, and the same cause — which is the point of
+> having **d** at all. Quote either statistic without its relief and it misleads.
+>
+> ⚠️ **The hybrid must be one pass, and this figure used to get that wrong.** Panel c originally
+> drew `where(A > threshold, d8, mfd)` — both routers run to completion, then a per-cell pick.
+> That is compositing, not routing: accumulation is *cumulative*, so choosing between two
+> finished totals invents water at every boundary where the chosen field is larger, and the
+> splice summed to **1.58×** the domain's drainage. `flow.hybrid_accumulation` decides *during*
+> the single accumulation pass, from the area gathered so far, and sums to 1.018.
+>
+> ⚠️ **That 1.018 is not water leaving the domain, and this caption used to say it was.** "MFD's
+> dispersion off the domain edge" has the sign backwards: none leaves — the routers only look at
+> in-bounds neighbours, so an edge cell with nothing lower beside it is an outlet and keeps its
+> water — and water leaving early would make MFD's total *lower*, not higher. `acc.sum()` is not
+> a water budget at all: each cell's area is counted once in **every** cell downstream of it, so
+> a router that splits its flow visits more cells on the way down and each visit is another
+> count. That is why a dispersive router totals higher (MFD 1.109) with exactly the same water.
+> The budget that *is* conserved is the outlet sum — accumulation totalled over the cells with
+> no lower neighbour, which must equal the domain area. D8, MFD and the hybrid all return
+> **1.000000000000** of it; the splice returns 1.039. That invariant is exact and needs no fitted
+> bound, which the row guarding it used to have — `hybrid.sum()/d8.sum() < 1.15`, fitted to this
+> DEM and false-failing a correct hybrid at 1.196 on a plane tilted to a corner.
+>
+> **d** is the part the prose above misses. Sweeping the relief on the ramp, the order **reverses**
+> below about 8 m of texture: with almost nothing to steer them, D8's paths run as parallel stripes
+> at the lattice angles and never merge, so the router that is supposed to converge stops
+> converging. ⚠️ **The stripe artefact and the concentration statistic are the same phenomenon seen
+> twice** — which means a generator working at low relief gets the worst of D8 without the one
+> thing D8 is chosen for.
+>
+> ⚠️ The figure deliberately does **not** draw Quinn's contour-length weighting from the block
+> above: `flow.py` ships Freeman's `slope^p`, so that panel would illustrate pseudocode this skill
+> does not run. A figure here is drawn from the implementation or not at all.
 
 ## D6 (hexagonal grids)
 

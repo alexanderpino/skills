@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Object Distribution
+description: Blue-noise and density-driven scatter, layer interactions, and why variable density is the hard case.
+tags: [scatter, poisson, placement]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-29T13:19:50+02:00 }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Object Distribution
 
 Contents: [Bridson](#poisson-disk-bridson-2007) · [Variable density](#variable-density--the-terrain-case) ·

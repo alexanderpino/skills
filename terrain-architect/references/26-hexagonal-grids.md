@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Hexagonal Grids
+description: "The hexagonal working grid: two vertex classes, the rhombille tiling, the three meshes over one field, and what corner-only sampling costs."
+tags: [hex, grid, tiling]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T21:24:36Z }
+verified: { by: process:test_anatomy_figures.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Hexagonal Grids
 
 The **other planar grid**. Every other chapter assumes the working grid is a square raster; this one

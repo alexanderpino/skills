@@ -53,7 +53,7 @@ def fault_scarp(h, *, n_faults=6, displacement=40.0, width=6.0, decay=0.75, cell
     return h
 
 
-def fault_weakness(shape, *, n_faults=6, k_rock=1.0, k_fault=6.0, width=4.0, cellsize=1.0, seed=0):
+def fault_weakness(shape, *, n_faults=6, k_rock=1.0, k_fault=6.0, width=4.0, seed=0):
     """Emit an erodibility field `K(x,y)` with the N fault traces set MORE erodible (`k_fault > k_rock`)
     than the surrounding rock (02: the geologically-correct coupling). A fault is a zone of fractured,
     weak rock, so erosion cuts it fastest — feed this to `stream_power_evolve` as its `K` and the

@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Coverage Register
+title: "Atomic-base coverage & scope"
+description: Which atomic bases are implemented, which are documented but deliberately deferred, and the harness that keeps the list honest against the modules.
+tags: [terrain, atoms, scope]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T20:51:26Z }
+verified: { by: process:test_atom_coverage.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Atomic-base coverage & scope
 
 **What this is.** The reference implementation is a **curated core** of the atomic bases — the
@@ -51,7 +62,8 @@ grid so its footprint widens; only the delta is carried back).
 `dilate`/`erode`/`opening`/`closing`, `twist`, `bend` — treated as filters, not atoms.)
 
 **Solver atoms (iterative, stateful — cannot be composed from static fields):** flow routing
-(`flow.priority_flood_fill`, `d8_receivers`, `d8_accumulation`, `mfd_accumulation`), stream-power
+(`flow.priority_flood_fill`, `breach_fill`, `d8_receivers`, `d8_accumulation`,
+`mfd_accumulation`, `hybrid_accumulation`), stream-power
 incision (`erosion_streampower.stream_power_evolve` — `K` may be a scalar, a field, or a callable
 `K(p,h)` for lithology-driven differential erosion, and `D=` couples the Cordonnier hillslope-diffusion
 companion term in the same loop — the pair sets valley spacing and divide roughness),
@@ -96,6 +108,19 @@ the hex-native forms of chapter `26`'s *What does not port* section; the chapter
 (the 16.8% wrong-cell rate, the 30.5° naive-normal error, the √3 separable-blur anisotropy, the H/3
 corner-mean plateau, the 1.5× un-renormalised Laplacian) are pinned by
 `tests/test_hex_grid.py`.
+
+**Ground-cover scatter (chapter `07`) — outside the atom register's scope, listed here because
+the chapter names it in six places.** Point placement is a PointSet layer, not a height op, so the
+module is not one of the atoms above; but `07` names Ulichney (1993) void-and-cluster tiles at
+`:139`, `:149` ("Recommendation for terrain"), `:175` ("Preferred"), `:189` (the hex crossref),
+`:300` and `:311` — five of them recommendations — and until now nothing implemented them. `void_and_cluster_rank` builds the dither array — an exact
+permutation of `0..n²−1`, all of its Gaussian density arithmetic minimum-image (toroidal), which
+is what makes it *tileable by construction* rather than tileable-after-a-fix; `void_and_cluster_mask`
+is that rank over `n²`, the threshold matrix; `ulichney_scatter` thresholds it against a density map
+with a modulo, so a cell's answer depends on nothing but its own integer coordinate — O(1) per cell,
+no state, no seam. Its oracles (`tests/test_scatter.py`) are written against the two things a broken
+implementation degenerates into: they are shown FAILING on white noise and on a regular lattice, with
+the measured numbers recorded in the file.
 
 ## Documented but NOT implemented (deferred)
 

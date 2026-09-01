@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Periglacial & Permafrost Landforms"
+description: "Patterned ground, thermokarst and pingos, on the Kessler & Werner sorting model."
+tags: [periglacial, permafrost]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T21:14:16Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Periglacial & Permafrost Landforms
 
 Contents: [The periglacial frame](#the-periglacial-frame) ·
@@ -51,10 +61,19 @@ Reviews 55) compiles rates and shows they scale with frost penetration, moisture
 
 ```
 solifluction(h, soilMoisture, frostCycles):
-    flux = K_soli * frostCycles * soilMoisture * sin(slope)     # cm/yr
+    # `slope` is the dimensionless gradient |∇h| = tan θ (06) — NOT an angle, so no sin()/tan()
+    flux = K_soli * frostCycles * soilMoisture * slope          # cm/yr, linear in the gradient
     h = diffuse downslope with this flux                        # like thermal (05), frost-gated
     # depth-dependent: fastest at the surface, zero at depth → tongue-shaped LOBES, not uniform lowering
 ```
+
+**Linear in the gradient, and that is deliberate.** This is a hillslope *diffusion* law, the same
+shape as thermal creep in `05` (which ships `repose_slope = tan θ` for exactly this reason), so the
+flux is proportional to `|∇h|` directly. Writing `sin(slope)` would apply a sine to a quantity that
+is already a tangent — a units error (`06`). If you prefer the literal `sin θ` of the field
+literature, get it exactly with `slope / sqrt(1 + slope²)` rather than `sin(slope)`; over the gentle
+angles solifluction actually occupies the distinction is small — `tan θ` exceeds `sin θ` by 0.4% at
+5°, 1.5% at 10° and 6.4% at 20° — and is absorbed into `K_soli`, which is an empirical fit anyway.
 
 Same *shape* as thermal creep (`05`) — a slope-driven diffusion — but gated by **freeze–thaw
 cycles and moisture**, so it runs only where it is cold and wet, and it builds **lobes**

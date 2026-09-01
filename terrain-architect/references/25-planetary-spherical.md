@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Planetary & Spherical Worlds"
+description: Cube-sphere and geodesic parameterisations, their distortion, and what changes when the domain has no edges.
+tags: [planetary, sphere, projection]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T13:10:16Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Planetary & Spherical Worlds
 
 The **whole-globe altitude**. The skill already has one-landform (`00`), one-province (`20`),

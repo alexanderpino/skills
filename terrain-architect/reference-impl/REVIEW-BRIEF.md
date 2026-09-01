@@ -1,3 +1,14 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Review Brief
+title: Capability‑Grid Review Brief (for an external AI reviewer, e.g. Gemini)
+description: The standing brief an external reviewer works from, and the capability grid it refers to.
+tags: [terrain, review]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-25T06:11:37Z }
+verified: { by: process:test_audit_drift.py, at: 2026-08-24T11:51:35Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Capability‑Grid Review Brief (for an external AI reviewer, e.g. Gemini)
 
 **Companion image:** `capability_grid.png` — a 7‑column grid, 54 tiles, one per capability of the
@@ -10,7 +21,7 @@
 Each tile is a terrain field or map **generated live in pure NumPy** by a reference implementation of
 a terrain‑generation skill (noise, erosion, hydrology, geology, analysis, rendering). Each caption has
 two parts: **`[chapter] Capability`** and the **oracle/invariant** that the automated test suite uses to
-verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (334 tests) passes; the
+verify it (e.g. "slope‑area exponent = −0.5 vs Landlab"). The whole suite (620 tests) passes; the
 fluvial/tectonic core is cross‑validated against external libraries (RichDEM, Landlab); citations were
 audited against primary sources.
 

@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: Geological Formation
+description: "Strata, lithology contrast, karst, duricrust and relief inversion: structure the erosion inherits rather than invents."
+tags: [geology, strata, karst]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T13:10:16Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Geological Formation
 
 Contents: [The central claim](#the-central-claim) · [Strata](#strata) · [Terracing](#terracing) ·

@@ -1,3 +1,13 @@
+---
+# --- okf v0.2, written by tools/okf_apply.py -----------------------
+type: Reference
+title: "Lava: Generation & Simulation"
+description: "Lava as a Bingham fluid: the driving stress, the yield behaviour, and the flow-length limit that follows."
+tags: [lava, volcanic, rheology]
+status: stable
+generated: { by: process:claude-code, at: 2026-07-28T20:51:26Z }
+# --- end okf v0.2 ----------------------------------------------------
+---
 # Lava: Generation & Simulation
 
 The technique file for lava — rheology, the implementable simulations, cooling, and verification.

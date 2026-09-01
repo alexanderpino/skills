@@ -114,7 +114,7 @@ def panels():
     out.append(("TWI", render.greyscale(analysis.twi(area, slope, CELLSIZE))))
     out.append(("flow overlay", render.flow_overlay(eroded, area, CELLSIZE)))
     stack = analysis.derive_materials(eroded, slope, area, CELLSIZE, rng_seed=SEED)
-    out.append(("materials", render.material_rgb(np.stack([m for _, m in stack]), CELLSIZE)))
+    out.append(("materials", render.material_rgb(np.stack([m for _, m in stack]))))
     dens = analysis.smoothstep(np.tan(np.radians(18)), np.tan(np.radians(35)), slope)
     pts = scatter.scatter_by_density(TILE * CELLSIZE, TILE * CELLSIZE,
                                      lambda p: float(scatter.sample_field(dens, [p], CELLSIZE)[0]),
