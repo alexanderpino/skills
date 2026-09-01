@@ -92,6 +92,12 @@ BLOCK_CONSTANTS = [
      "Werner deposition probability over sand — p_sand > p_bare IS the instability"),
     ("05-erosion-thermal-aeolian.md", r"p_bare ≈ ([0-9.]+)", "dunes", "werner_dunes", "p_bare",
      "Werner deposition probability over bare ground"),
+    ("05-erosion-thermal-aeolian.md", r"L = saltationHop[^\n]*~([0-9.]+) cells", "dunes",
+     "werner_dunes", "hop",
+     "Werner's fixed saltation length, l ≈ 5 cells — the hop that sets the emergent dune "
+     "wavelength. THIS ROW REPLACES the retired `werner-saltation-hop` divergence (see the note "
+     "at the head of KNOWN_DIVERGENCES): the constant used to be stated four ways and now reads 5 "
+     "in all of them, so it is guarded here as an agreeing pair rather than recorded as a finding"),
     ("06-analysis-masks.md", r"stepGrowth[^\n]*~([0-9.]+)", "analysis", "horizon_ao",
      "step_growth", "exponential march ratio in the horizon sweep"),
     ("12-glacial-coastal.md", r"with n = ([0-9]+), A ≈", "glacier", "glacier_carve", "n",
@@ -211,6 +217,16 @@ def test_the_register_still_points_at_things_that_exist():
 # here only when a human has looked at both sides and judged that neither can be moved right now.
 #
 # (id, chapter, fenced-block regex, chapter value, module, code literal, code value, verdict)
+# RETIRED — `werner-saltation-hop` (05's Werner block ~5 cells vs `dunes.werner_dunes(hop=1)`).
+# It was never a two-way disagreement: 05:412's block said ~5, 05:399's prose said ≈3, the
+# docstring said ~5 and the signature shipped 1, so the CHAPTER contradicted itself before the
+# module was consulted. Resolved at Werner's published value: a slab "moves downwind to a new
+# lattice site l (typically equal to 5) sites away" (Werner 1995, as restated in Kok, Parteli,
+# Michaels & Karam 2012, Rep. Prog. Phys. 75 106901 §3.2.2). 05:399 now reads ≈5 and the default
+# is hop=5. The pin did not simply vanish: the block-vs-default half is a normal pinned pair in
+# BLOCK_CONSTANTS above (`dunes.hop`), and the PROSE half — which no fenced-block register can
+# see — is pinned by tests/test_dunes.py::test_chapter_note_quotes_the_shipped_hop. Both go red
+# if either side moves again.
 KNOWN_DIVERGENCES = [
     ("glacier-abrasion-K_g", "12-glacial-coastal.md", r"K_g ≈ ([0-9.e+-]+)", 1e-4,
      "glacier", "K_g=8e-4", 8e-4,
@@ -228,13 +244,6 @@ KNOWN_DIVERGENCES = [
      "implementations subcycle at 0.2, i.e. an unstated 0.8 safety factor. The CODE is right to "
      "be conservative (0.25 is the limit, not a safe step); the chapter should say so, since a "
      "reader who implements 0.25 literally is stepping at the edge of stability."),
-    ("werner-saltation-hop", "05-erosion-thermal-aeolian.md", r"L = saltationHop[^\n]*~([0-9.]+) cells",
-     5.0, "dunes", "hop=1,", 1.0,          # the trailing comma matters: `hop=1` also matches hop=10
-     "05's Werner block fixes the saltation hop at ~5 cells; dunes.werner_dunes defaults hop=1, "
-     "and 05's own runnable-reference note a few lines above says '(≈3 cells)'. THREE values for "
-     "one constant, and the note is simply wrong about the shipped default. The chapter is right "
-     "about Werner (the hop sets the dune wavelength); the note must be corrected to hop=1 and "
-     "the default raised, or the difference explained — it changes the emergent wavelength."),
     ("crater-complex-transition", "11-geological.md", r"Dc = ([0-9.]+)·\(9\.81/g\)", 3200.0,
      "landforms", "complex_D=3000.0", 3000.0,
      "11's finalCrater block puts the simple→complex transition at 3200 m on Earth, and "

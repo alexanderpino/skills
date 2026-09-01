@@ -241,13 +241,20 @@ def dominant_material(stack):
     return np.argmax(weights, axis=0)
 
 
-def deposit_fill(h, cellsize=1.0, radius=3):
+def deposit_fill(h, *, radius=3):
     """Depth by which a loose granular deposit PILES UP to fill the crevices/hollows of a surface —
     a greyscale morphological **closing** minus the surface, clamped ≥ 0 (`ops_filters.closing`, 10).
     Closing fills every concavity up to the structuring radius, so this is deep in gullies and hollows
     and zero on ridges and open flats — exactly how snow drifts into couloirs, sand banks into
     interdunes, and scree ramps up a cliff foot. Scale it by a substance's supply mask, then add it to
-    the surface: the deposit surface is smoother than the bedrock beneath. `radius` is in cells."""
+    the surface: the deposit surface is smoother than the bedrock beneath. `radius` is in cells.
+
+    ⚠️ NO `cellsize`, AND ITS ABSENCE IS THE HONEST SIGNATURE. One was declared in the SECOND
+    POSITIONAL slot and read by no line of this body: a morphological closing over a `radius` in
+    CELLS returns a depth in the DEM's own vertical units, so no horizontal length enters. It was
+    the `render.material_rgb(masks, cellsize, palette)` hazard exactly — all four callers passed it
+    positionally — so `radius` is keyword-only and a stale `deposit_fill(h, cellsize)` raises
+    TypeError instead of quietly becoming a structuring radius of 30 cells."""
     import ops_filters
     closed = ops_filters.closing(np.asarray(h, dtype=np.float64), r=int(radius))
     return np.maximum(closed - np.asarray(h, dtype=np.float64), 0.0)
@@ -289,7 +296,7 @@ def texture_base(h, area, cellsize=1.0, *, slope_w=0.5, soil_w=0.3, flow_w=0.2, 
     `render.satmap` as the driver. Weights need not sum to 1 — the result is renormalised."""
     s = slope(h, cellsize)
     s = s / s.max() if s.max() > 0 else s
-    soil = deposit_fill(h, cellsize, radius=radius)
+    soil = deposit_fill(h, radius=radius)
     soil = soil / soil.max() if soil.max() > 0 else soil
     a = np.log1p(np.maximum(np.asarray(area, dtype=np.float64), 0.0))
     a = a / a.max() if a.max() > 0 else a

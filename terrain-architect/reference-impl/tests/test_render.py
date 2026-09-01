@@ -245,16 +245,25 @@ def test_material_rgb_has_no_dead_parameters():
 #
 #   DENOMINATOR (recomputed on every run; the file count is pinned, the rest are floors)
 #     modules scanned (reference-impl/*.py) ......... 44
-#     public functions and public methods ........... 314
-#     parameters checked (self/cls excluded) ........ 1320
-#     dead: declared, never read .................... 4, every one of them exempted below
-#     exemptions ....................................  4, each naming the call site that blocks it
+#     public functions and public methods ........... 317
+#     parameters checked (self/cls excluded) ........ 1331
+#     dead: declared, never read .................... 0
+#     exemptions ....................................  0  -- the table below is EMPTY
 #   IDENTITY: dead == exempted, and every exemption names a live dead parameter -> asserted below.
 #
-# All four survivors are the same parameter, `cellsize`, on four functions where it is genuine
-# scale theatre — and all four are blocked from deletion by a call site in a test file this wave
-# does not own. Removal is an API change, so each exemption records the exact blocking call and
-# the patch, and `registers/OPEN-ITEMS.md` carries them.
+# ⚠️ THE EXEMPTION TABLE IS EMPTY, AND THAT IS THE FINDING, NOT AN OMISSION. It used to carry four
+# entries, all of them the same parameter — a dead `cellsize` on `aeolian.yardang`,
+# `tectonics.fault_weakness`, `analysis.deposit_fill` and `hydrology.water_surface` — each exempted
+# on the ground that a call site in a test file the code wave did not own blocked the deletion.
+# `registers/OPEN-ITEMS.md` item 20 carried the removal patches. All four are now DELETED, together
+# with every call site, and the census reports zero dead parameters in the tree.
+#
+# ⚠️ AND THE OPEN-ITEMS PATCH WAS INCOMPLETE, WHICH IS WHY THE DELETION IS GUARDED BELOW RATHER
+# THAN JUST DONE. Item 20 named five call sites for `water_surface` and four for `deposit_fill`;
+# `hero.py:191` (`hydrology.water_surface(h, cell, Q)`) appeared in neither list and is not a test
+# file. Both removals drop the ARITY of a positional slot, so every stale call raises TypeError
+# rather than sliding the next argument into the empty slot — the `material_rgb(masks, cellsize,
+# palette)` hazard. `test_the_four_removed_cellsize_parameters_stay_removed` pins both halves.
 # --------------------------------------------------------------------------------------
 import ast                                                    # noqa: E402
 from pathlib import Path                                      # noqa: E402
@@ -272,45 +281,13 @@ _DYNAMIC = ("locals", "vars", "eval", "exec", "globals")
 
 # (module, qualified function name, parameter) -> why it is still declared.
 # ⚠️ EVERY REASON MUST NAME THE CALL SITE THAT BLOCKS THE DELETION. "It is harmless" is not a
-# reason; the whole finding above is that this class is not harmless.
-DEAD_PARAMETER_EXEMPTIONS = {
-    ("aeolian", "yardang", "cellsize"):
-        "SCALE THEATRE, DELETION BLOCKED BY A NON-OWNED CALL SITE. The abrasion lanes are laid out "
-        "in INDEX space — `freq_along`/`freq_cross` are per-cell frequencies and `floor_reach` "
-        "counts cells — so the one metric quantity, `saltation_h`, is already in metres and there "
-        "is nothing for a cell size to convert. It cannot simply be dropped: "
-        "`tests/test_gallery_doc.py:90` calls `aeolian.yardang(..., cellsize=_CELLSIZE)`, so "
-        "removal is a TypeError in a file this wave does not own. Implementing it instead means "
-        "making the two frequencies per-METRE, which requires re-baselining their defaults (0.018 "
-        "and 0.11 per cell) — a constant change that belongs with chapter 16. "
-        "registers/OPEN-ITEMS.md.",
-    ("tectonics", "fault_weakness", "cellsize"):
-        "SCALE THEATRE, DELETION BLOCKED BY A NON-OWNED CALL SITE. Fault traces are placed and "
-        "feathered in index space and `width` is documented as a Gaussian half-width in CELLS; the "
-        "returned field is a dimensionless erodibility K, so no length enters. "
-        "`tests/test_gallery_doc.py:94` passes `cellsize=_CELLSIZE`, so removal breaks a file this "
-        "wave does not own. Implementing it means `width` in metres, whose 4.0 default would then "
-        "be sub-cell at any realistic resolution and would silently return a uniform K — worse "
-        "than the dead parameter. registers/OPEN-ITEMS.md.",
-    ("analysis", "deposit_fill", "cellsize"):
-        "SCALE THEATRE, AND THE DELETION IS THE `material_rgb` HAZARD EXACTLY. A morphological "
-        "closing minus the surface, over a `radius` its own docstring states is in CELLS: depth "
-        "comes out in the DEM's units and no horizontal length is used. `cellsize` is the SECOND "
-        "POSITIONAL parameter and every caller passes it there — `graph_demo.py`, `archetypes.py`, "
-        "`analysis.texture_base` and `tests/test_archetypes.py:151` — so a bare removal would slide "
-        "a cell size into `radius`. The only safe form is `deposit_fill(h, *, radius=3)`, which "
-        "raises loudly at all four sites; one of them is a test file this wave does not own. "
-        "registers/OPEN-ITEMS.md.",
-    ("hydrology", "water_surface", "cellsize"):
-        "SCALE THEATRE IN A REQUIRED POSITIONAL SLOT — the worst shape in the census. Lake filling "
-        "is decided by comparing elevations, river depth comes out of `depth_coef·(Q/q_channel)^"
-        "depth_exp` in metres, and `smooth` is a filter radius in cells; nothing reads the "
-        "argument the signature DEMANDS. It sits at position 2 of `water_surface(bed, cellsize, "
-        "discharge)` and is forwarded by `water_depth`, so removing it makes `discharge` land in "
-        "its slot at four call sites — `tests/test_hydrology.py:13,28,39` and "
-        "`tests/test_gallery_doc.py:99,100` — in test files this wave does not own. "
-        "registers/OPEN-ITEMS.md.",
-}
+# reason; the whole finding above is that this class is not harmless. The table is EMPTY and the
+# intended steady state is that it stays empty: an entry here is a dead parameter shipping, not a
+# dead parameter excused. It is kept, rather than deleted with its last row, because
+# `test_no_public_function_declares_a_parameter_it_never_reads` needs somewhere for a genuinely
+# blocked deletion to be recorded, and because a table that has to be re-invented is a table the
+# next wave will re-invent without the staleness half.
+DEAD_PARAMETER_EXEMPTIONS: dict = {}
 
 
 def _public_functions(tree):
@@ -416,6 +393,15 @@ def test_every_dead_parameter_exemption_is_still_a_live_dead_parameter():
     or delete it — and its exemption becomes a lie that would then cover a NEW dead parameter of
     the same name reintroduced later. So each entry must still name a parameter this census
     actually reports as dead, and must still carry a reason that names a blocker.
+
+    ⚠️ WITH THE TABLE EMPTY THIS ROW IS VACUOUS, AND SAYING SO IS THE POINT. Both loops run over
+    `DEAD_PARAMETER_EXEMPTIONS`, so no mutation to any MODULE can turn it red today — it is a
+    tripwire armed only by a future entry, not a live measurement, and it is recorded as
+    DECORATIVE in `registers/mutation-proofs.wave6-graph.tsv` rather than given an invented proof.
+    The live measurement is `test_no_public_function_declares_a_parameter_it_never_reads` above:
+    with the table empty, its `unexplained` list IS the whole dead list, so it fails on the first
+    dead parameter anywhere in the tree. This row is kept so that the first entry someone adds
+    back cannot be a permanent one.
     """
     _, _, _, dead, _ = _whole_tree_census()
     live = {(m, q, p) for m, q, p, _ in dead}
@@ -426,6 +412,66 @@ def test_every_dead_parameter_exemption_is_still_a_live_dead_parameter():
     for key, reason in DEAD_PARAMETER_EXEMPTIONS.items():
         assert len(reason) > 200 and ("tests/" in reason or "OPEN-ITEMS" in reason), (
             "exemption %s must say which call site blocks the deletion; got %r" % (key, reason))
+
+
+# (module, function, the callable) for the four parameters criterion G1 removed. The tuple is the
+# worklist `registers/OPEN-ITEMS.md` item 20 wrote out, executed.
+_REMOVED_CELLSIZE = [
+    ("aeolian", "yardang"),
+    ("tectonics", "fault_weakness"),
+    ("analysis", "deposit_fill"),
+    ("hydrology", "water_surface"),
+    ("hydrology", "water_depth"),          # forwarded water_surface's, so it carried one too
+]
+
+
+@pytest.mark.parametrize("module,fname", _REMOVED_CELLSIZE,
+                         ids=["%s.%s" % r for r in _REMOVED_CELLSIZE])
+def test_the_four_removed_cellsize_parameters_stay_removed(module, fname):
+    """⚠️ THE FOUR DEAD `cellsize` PARAMETERS ARE GONE, AND THIS ROW IS WHAT KEEPS THEM GONE.
+
+    The census above would catch a dead parameter coming back, but only while it stays dead. This
+    row is the narrower claim the removal actually made: these five signatures do not take a cell
+    size AT ALL, because none of them has a horizontal length in it — index-space abrasion lanes
+    (`yardang`), index-space fault feathering returning a dimensionless K (`fault_weakness`), a
+    morphological closing over a radius in cells (`deposit_fill`), and elevation comparisons plus a
+    metres-valued depth law (`water_surface`/`water_depth`).
+
+    ⚠️ AND IT PINS THE HAZARD HALF, WHICH IS THE REASON THE REMOVAL WAS DEFERRED FOR A WHOLE WAVE.
+    `deposit_fill` took `cellsize` in the SECOND POSITIONAL slot and `water_surface` in a REQUIRED
+    one, so a bare deletion would not have raised — it would have handed `radius` a cell size and
+    `discharge` a scalar, the `render.material_rgb(masks, cellsize, palette)` defect exactly, and
+    the same shape that nearly took `n=121` into `halfar_anatomy.sia_at_cfl`'s `cellsize=12000.0`.
+    Every stale positional call must therefore be a TypeError, which is what the second half
+    checks. If someone re-adds the parameter for symmetry, both halves go red here before the
+    census gets a chance to call it merely dead.
+    """
+    import importlib
+    fn = getattr(importlib.import_module(module), fname)
+    params = inspect.signature(fn).parameters
+    assert "cellsize" not in params, (
+        "%s.%s grew back the dead `cellsize` this wave deleted (%s). It is not scale-awareness: no "
+        "line of the body has a horizontal length in it. registers/OPEN-ITEMS.md item 20."
+        % (module, fname, list(params)))
+
+
+def test_a_stale_positional_call_into_a_removed_cellsize_slot_raises():
+    """The other half of the removal: the two positional slots must be a TypeError, not a slide."""
+    import analysis
+    import hydrology
+
+    h = np.zeros((5, 5))
+    with pytest.raises(TypeError):
+        analysis.deposit_fill(h, 30.0)                     # the old positional cellsize -> radius
+    with pytest.raises(TypeError):
+        hydrology.water_surface(h, 30.0, h)                # the old (bed, cellsize, discharge)
+    with pytest.raises(TypeError):
+        hydrology.water_depth(h, 30.0, h)                  # ... and the wrapper that forwarded it
+
+    # the surviving keyword-only parameters must still be reachable BY KEYWORD, or the guard above
+    # would pass on a function that had simply been broken
+    assert analysis.deposit_fill(h, radius=2).shape == (5, 5)
+    assert hydrology.water_surface(h, h, smooth=0.0).shape == (5, 5)
 
 
 # --------------------------------------------------------------------------------------

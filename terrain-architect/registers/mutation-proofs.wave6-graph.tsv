@@ -1,0 +1,42 @@
+# REGISTER — mutation-proofs.wave6-graph.tsv     WAVE 6, GRAPH/DEAD-PARAMETER LANE
+#
+# Companion to `mutation-proofs.tsv` (FROZEN at 61 file-level rows) and to
+# `mutation-proofs.partial-code.tsv` (the code wave's 17 row-level proofs). This file does not
+# touch either. It carries the proofs for the guard ROWS this lane added or changed while closing
+# `registers/OPEN-ITEMS.md` items 20 and 24. The unit is the ROW (a test function), not the file.
+#
+# EVERY CELL BELOW WAS RECORDED FROM EXECUTION, NOT PREDICTED. Each mutation was applied to a
+# SUBJECT MODULE in the working tree (never to a test), the single named test id was run, the
+# module was restored, and `git diff -- <module>` was checked empty afterwards. `observed` quotes
+# the pytest status line and the first assertion line pytest printed.
+#
+# WHY EVERY ROW CARRIES A DECOY. A mutation that turns a guard red proves only that the guard is
+# sensitive to something. The decoy is an edit in the SAME neighbourhood that does NOT introduce
+# the defect class — a legitimate retuning, a rename, an equivalent rewrite — and it must stay
+# green. A row with a mutation and no decoy is a claim about a guard, not a measurement of one.
+#
+# WHY ONE ROW IS MARKED DECORATIVE RATHER THAN PROVED.
+# `test_every_dead_parameter_exemption_is_still_a_live_dead_parameter` iterates
+# `DEAD_PARAMETER_EXEMPTIONS`, which item 20 has now emptied. Both of its loops are therefore
+# empty and NO mutation to any module can turn it red — it is a tripwire armed only by a future
+# exemption entry, not a live measurement. It is recorded as DECORATIVE, with the mutation that
+# SHOULD have caught it and the green result that shows it did not, rather than given an invented
+# proof or quietly deleted. The live half is the row above it, which is proved.
+#
+# DENOMINATOR
+#   guard rows added or changed by this lane .......... 5
+#     new     ... test_the_shipped_graphs_default_to_the_hybrid_03_calls_the_default   (test_graph_demo.py)
+#     new     ... test_the_four_removed_cellsize_parameters_stay_removed               (test_render.py)
+#     new     ... test_a_stale_positional_call_into_a_removed_cellsize_slot_raises     (test_render.py)
+#     changed ... test_no_public_function_declares_a_parameter_it_never_reads          (test_render.py)
+#     changed ... test_every_dead_parameter_exemption_is_still_a_live_dead_parameter   (test_render.py)
+#   rows mutation-proved .............................. 4 of 5
+#   rows marked DECORATIVE with the failed proof shown . 1 of 5
+#   mutations applied, run and restored ............... 5
+#   decoys applied, run and restored .................. 5
+#   IDENTITY: 5 rows == 4 proved + 1 decorative -> HOLDS
+#
+# FREEZE RULE: this file may grow only while this lane runs; anything found after it closes goes
+# to OPEN-ITEMS.md like everything else.
+
+guard_file	test_name	target_defect_class	mutation	expected_observation	observed	decoy	decoy_expected	decoy_observed	verdict

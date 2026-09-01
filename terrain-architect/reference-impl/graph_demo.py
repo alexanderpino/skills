@@ -399,7 +399,7 @@ def run_scene(ctx, outdir):
     area = g.evaluate(a_out)
     slope = g.evaluate("slope")
     stack = dict(analysis.derive_substances(height, slope, area, ctx.cellsize, climate=_ARID_BIOME["climate"]))
-    fill = analysis.deposit_fill(height, ctx.cellsize, radius=3)            # sand/dust piles into the washes
+    fill = analysis.deposit_fill(height, radius=3)                          # sand/dust piles into the washes
     surf = height + np.clip(stack["sediment"] + stack["ground"], 0.0, 1.0) * fill
     mat = render.splat_blend(np.zeros(height.shape + (3,)) + np.array(_ARID_BIOME["ground"], float),
                              [(stack["sediment"], _ARID_BIOME["sediment"]), (stack["scree"], _ARID_BIOME["scree"]),

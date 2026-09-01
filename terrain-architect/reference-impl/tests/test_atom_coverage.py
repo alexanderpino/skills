@@ -7,12 +7,18 @@ is consistent: nothing is claimed-but-missing, built-but-undocumented, or deferr
 import ast
 import functools
 import importlib
-import io
 import re
-import tokenize
 from pathlib import Path
 
 import pytest
+
+# THE TEXT MODEL IS SHARED, NOT PRIVATE. This file used to carry its own fence regex, identifier
+# pattern, completeness matcher and Python-prose stripper. `test_slope_units.py` carried its own
+# too, and the two disagreed about the most consequential thing either of them decides — whether a
+# line is code or prose. `_textscan` is the one model both now import; see its module docstring for
+# what is deliberate about each part. The fixtures at the bottom of THIS file are unchanged: they
+# are what pins the behaviour, and they now pin the shared model.
+from _textscan import IDENT, blank_py_prose, complete_match, complete_pattern, fenced_text
 
 REF = Path(__file__).resolve().parents[1]                 # reference-impl/
 SKILL_ROOT = REF.parent                                    # terrain-architect/
@@ -20,7 +26,7 @@ SKILL_ROOT = REF.parent                                    # terrain-architect/
 # --------------------------------------------------------------------------- #
 # HOW EVERY ROW BELOW IS SEARCHED — AND WHY THE TWO SIDES SHARE ONE MATCHER.
 #
-# A needle that cannot miss is not a check. Four ways a needle goes vacuous, all of which had
+# A needle that cannot miss is not a check. Five ways a needle goes vacuous, all of which had
 # actually happened in this file:
 #
 #   1. FRONTMATTER. Every chapter opens with an OKF header written by `tools/okf_apply.py`, and
@@ -40,7 +46,8 @@ SKILL_ROOT = REF.parent                                    # terrain-architect/
 #      `p = 1.1-1.5`), while a code literal `n=3` matched `def carve(H, n=3-1)`, which is 2. Worse,
 #      an edge that was neither numeric nor wordish emitted NO tail at all, so `r⁻³` was satisfied
 #      by `r⁻³·⁵`. A boundary on one side only is not a boundary: the two edges are now built from
-#      ONE character set (`_NUM_EDGE`/`_WORD_EDGE`/`_MATH_EDGE`) so they cannot drift apart again.
+#      ONE character set (`_NUM_EDGE`/`_WORD_EDGE`/`_MATH_EDGE`, which now live in `_textscan`)
+#      so they cannot drift apart again — nor, now, drift apart between guards.
 #   4. A NAME FOUND IN PROSE RATHER THAN IN A LISTING. `hex_grid.ring` was satisfied by the
 #      hyphenated English "one-ring" (the identifier scan does not treat `-` as part of a token)
 #      and `noise.value` by "pure value maps". Listings in `ATOM-COVERAGE.md` live in backtick
@@ -65,9 +72,8 @@ SKILL_ROOT = REF.parent                                    # terrain-architect/
 # is closed by `----`, would have its whole first section (and every constant in it) DELETED
 # before the search, and a document with two blocks would leak the boilerplate back.
 _OKF_HEADER = re.compile(r"\A---\r?\n(?:[^\n]+\r?\n)*?# --- end okf v[0-9.]+ -+\r?\n---\r?\n")
-_IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_IDENT = IDENT                      # shared: byte-for-byte the pattern this file used to carry
 _CODE_SPAN = re.compile(r"`([^`]+)`")
-_FENCE = re.compile(r"^```[^\n]*\n(.*?)^```", re.S | re.M)
 
 
 def _body(path):
@@ -88,8 +94,19 @@ def _flat(text):
 
 
 def _fenced(text):
-    """Only the contents of ``` fenced blocks — i.e. the PSEUDOCODE, not the prose around it."""
-    return "\n".join(_FENCE.findall(text))
+    """Only the contents of fenced blocks — i.e. the PSEUDOCODE, not the prose around it.
+
+    THIS IS THE SHARED FENCE MODEL (`_textscan.fenced_text`), and adopting it changed what this
+    file can SEE. The private regex it replaces was anchored at column 0 (`^```...`), so a block
+    fenced UNDER A LIST ITEM — which Markdown indents — was invisible: the searches below read
+    those documents as if that pseudocode were not there, and a routine documented inside one
+    counted as undocumented. Five blocks in this corpus are indented that way
+    (`references/03-flow-routing.md:693`, `12-glacial-coastal.md:293` and `:2095`,
+    `13-climate-ecosystem.md:461`, `26-hexagonal-grids.md:345`). The shared model also closes a
+    fence only on the SAME marker character, at least as long, so a ``` line inside a ~~~ block
+    stays content instead of inverting the parity of every fence after it.
+    """
+    return fenced_text(text)
 
 
 def _code_spans(text):
@@ -105,98 +122,27 @@ def _idents(text):
 # --------------------------------------------------------------------------- #
 # ONE completeness matcher, used by BOTH the code side and the doc side of a faithfulness row.
 
-_WORDISH = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_."
-_NUMERIC = "0123456789."
-_TOKEN = re.compile(r"[A-Za-z0-9_.]+|\s+|[^\sA-Za-z0-9_.]+")
+# The matcher, and the EDGE CHARACTER SETS it is built from (`_NUM_EDGE`/`_WORD_EDGE`/`_MATH_EDGE`),
+# now live in `_textscan`. The two edges are still cut from one set, and now they cannot drift apart
+# ACROSS guards either — which is the same failure one level up. They keep this file's local names
+# because its comments, its failure messages and its fixtures all speak of them.
 
-# THE CHARACTERS AN EDGE MAY NOT TOUCH — one set per kind of edge, used on BOTH sides of the
-# literal. A lead-only exclusion is not a boundary: excluding a sign before the number while
-# allowing one after it is what let `n = 3` match Cuffey's `n = 3-4` and a code literal `n=3` match
-# `n=3-1`. Each set is therefore named once and spent twice, in `lead` and in `tail`.
-#
-# `_SIGNS` carries the ASCII sign, the six Unicode dashes U+2010..U+2015 (chapters write ranges with
-# an EN DASH: `n = 3–4`) and the true MINUS SIGN U+2212 (the chapters use it: `g^(−0.22)`).
-# `_SUPSUB` is the superscript/subscript block, which is how a chapter continues an exponent:
-# `r⁻³` -> `r⁻³·⁵`, `D` -> `D₂`. `·` (U+00B7) is the DECIMAL POINT inside such a superscript, so it
-# closes a `³`/`°`/`)` edge — but it is NOT in `_NUM_EDGE`, because next to an ordinary digit the
-# same character is the chapters' MULTIPLICATION sign (`0.04·D`, `1.2·clip(...)`), and a constant
-# that is multiplied by something is still that constant.
-_SIGNS = "+\\-‐-―−"
-_SUPSUB = "⁰-₟"
-_NUM_EDGE = "0-9._" + _SIGNS + "°" + _SUPSUB          # `°`: `50` is not `50°`
-_WORD_EDGE = "A-Za-z0-9_" + _SUPSUB
-_MATH_EDGE = _SUPSUB + "·"                            # for an edge that is already punctuation
+# WHY THOSE SETS CONTAIN WHAT THEY CONTAIN, kept here because it was written here and `_textscan`
+# states the rule without the corpus evidence behind it. `_SIGNS` carries the ASCII sign, the six
+# Unicode dashes U+2010..U+2015 (these chapters write ranges with an EN DASH: `n = 3–4`) and the
+# true MINUS SIGN U+2212 (`g^(−0.22)`). `_SUPSUB` is the superscript/subscript block, which is how
+# a chapter continues an exponent: `r⁻³` -> `r⁻³·⁵`, `D` -> `D₂`. `·` (U+00B7) is the DECIMAL POINT
+# inside such a superscript, so it closes a `³`/`°`/`)` edge — but it is deliberately NOT in
+# `_NUM_EDGE`, because next to an ordinary digit the same character is these chapters'
+# MULTIPLICATION sign (`0.04·D`, `1.2·clip(...)`), and a constant that is multiplied by something
+# is still that constant. `°` is in `_NUM_EDGE` for the mirror reason: `50` is not `50°`.
+# Every one of those cases is a fixture in `_DOC_ACCEPT`/`_DOC_REJECT` below.
+
+_pattern = complete_pattern     # a literal -> a regex matching it as a COMPLETE claim
+_complete = complete_match      # True if `literal` occurs in `text` as a complete claim
 
 
-def _wordish(ch):
-    return bool(ch) and ch in _WORDISH
-
-
-def _numeric(ch):
-    return bool(ch) and ch in _NUMERIC
-
-
-@functools.lru_cache(maxsize=None)
-def _pattern(literal):
-    """Compile `literal` into a regex that matches it as a COMPLETE claim.
-
-    Two jobs, and both sides of a faithfulness row need both:
-
-    SPACING IS NOT MEANING. `n = 3` (PEP8), `n=3` and `KARMAN  =  0.4` (aligned) state the same
-    constant, and a guard that rejects the spelling the author actually used turns the suite red
-    with a message pointing at the wrong file. So each run of whitespace inside the literal becomes
-    `\\s*` — or `\\s+` where dropping it would fuse two words ("MORE erodible").
-
-    A PREFIX IS NOT A MATCH — AND NEITHER IS A SUFFIX. `n=3` must not be satisfied by `n=3.5`,
-    `n=30`, `n=3e5` or `n=3_000`; `0.2 * D` must not be satisfied by the SIGN-FLIPPED `-0.2 * D`,
-    and `n = 3` must not be satisfied by the RANGE `n = 3-4` or `n = 3–4` (Cuffey & Paterson quote
-    Glen's exponent as 3-4; the code hardcodes 3, so a chapter widening it to a range is exactly
-    the drift this row exists to catch). So the literal is bracketed by boundaries chosen from its
-    own first and last characters, and the two edges use the SAME character set:
-
-      * a numeric edge (`_NUM_EDGE`) may not touch another numeric char, an underscore/exponent/
-        imaginary continuation, a sign or dash, a degree sign, or a superscript;
-      * an identifier edge (`_WORD_EDGE`) may not touch another identifier char or a subscript;
-      * an edge that is already punctuation (`(-3.0)`, `^2.2`, `r⁻³`, `33.7°`) carries most of its
-        own boundary, so it gets only `_MATH_EDGE` — enough to stop a superscript being EXTENDED
-        (`r⁻³` -> `r⁻³·⁵`), and no more, which is what lets the register keep literals that embed
-        an operator without the sign rule fighting them.
-    """
-    toks = [t for t in _TOKEN.findall(literal) if t]
-    parts, prev, gap = [], "", False
-    for t in toks:
-        if t.isspace():
-            gap = True
-            continue
-        if parts:
-            parts.append(r"\s+" if (gap and _wordish(prev[-1]) and _wordish(t[0])) else r"\s*")
-        parts.append(re.escape(t))
-        prev, gap = t, False
-    if not parts:
-        raise ValueError("empty literal")
-
-    first, last = literal.strip()[0], literal.strip()[-1]
-    if _numeric(first):
-        lead = "(?<![A-Za-z" + _NUM_EDGE + "])"
-    elif _wordish(first):                       # identifier start; `.` is allowed (`self.n=3`)
-        lead = "(?<![" + _WORD_EDGE + "])"
-    else:
-        lead = "(?<![" + _MATH_EDGE + "])"
-    if _numeric(last):
-        tail = "(?![eEjJ" + _NUM_EDGE + "])"
-    elif _wordish(last):
-        tail = "(?![" + _WORD_EDGE + "])"
-    else:
-        tail = "(?![" + _MATH_EDGE + "])"
-    return re.compile(lead + "".join(parts) + tail)
-
-
-def _complete(text, literal):
-    """True if `literal` occurs in `text` as a complete claim, not as a prefix of a longer one."""
-    return _pattern(literal).search(text) is not None
-
-
-def _strip_py_comments(src):
+def _strip_py_comments(src, path=None):
     """Source with comments and string literals blanked out (line/column layout preserved).
 
     A constant that appears only in a `#` comment or a docstring is prose, not code: the code side
@@ -209,36 +155,16 @@ def _strip_py_comments(src):
     as searchable evidence, i.e. it disables exactly the thing this function exists to do, and the
     two `_CODE_REJECT` fixtures that pin it ("comment only", "docstring only") would stop holding
     without turning anything red. A reference module that does not parse is a defect in its own
-    right, so it is raised — the same direction `test_slope_units.py` chose for the same call.
+    right, so it is raised on — which is now `_textscan.blank_py_prose`'s stated contract, shared
+    with `test_slope_units.py`, rather than a rule this file kept to itself. `path` only decorates
+    the message, so a failure names the module instead of `<source>`.
     """
-    starts, off = [], 0
-    for line in src.splitlines(keepends=True):
-        starts.append(off)
-        off += len(line)
-    chars = list(src)
-
-    def blank(a, b):
-        for i in range(a, min(b, len(chars))):
-            if chars[i] != "\n":
-                chars[i] = " "
-
-    try:
-        for tok in tokenize.generate_tokens(io.StringIO(src).readline):
-            name = tokenize.tok_name.get(tok.type, "")
-            if name in ("COMMENT", "STRING") or name.startswith("FSTRING_MIDDLE"):
-                (r1, c1), (r2, c2) = tok.start, tok.end
-                blank(starts[r1 - 1] + c1, starts[r2 - 1] + c2)
-    except (tokenize.TokenError, IndentationError, SyntaxError) as exc:
-        raise AssertionError(
-            f"source does not tokenise, so comments and docstrings cannot be stripped from it: "
-            f"{exc}. Returning it unchanged would make prose searchable evidence again, which is "
-            f"the hole this function exists to close — fix the module (or the fixture)") from exc
-    return "".join(chars)
+    return blank_py_prose(src, path)
 
 
-def _code_mentions(src, literal):
+def _code_mentions(src, literal, path=None):
     """True if `literal` appears in module source as a COMPLETE literal, in CODE (not a comment)."""
-    return _complete(_strip_py_comments(src), literal)
+    return _complete(_strip_py_comments(src, path), literal)
 
 
 def _doc_states(chap, doc_str):
@@ -669,7 +595,7 @@ def test_key_constant_agrees_between_chapter_and_code(module, code_lit, doc, doc
     paragraph about a demo script — both rows survived deleting the claim they guard.
     """
     src = (REF / module).read_text(encoding="utf-8")
-    assert _code_mentions(src, code_lit), \
+    assert _code_mentions(src, code_lit, REF / module), \
         f"{what}: code literal {code_lit!r} missing from reference-impl/{module} " \
         f"(the code constant changed — update the code, or fix this manifest AND the chapter)"
     para = _doc_paragraph(SKILL_ROOT / doc, section, f"{module}:{code_lit}")
@@ -934,6 +860,40 @@ def test_fenced_reads_pseudocode_only():
     call = r"(?<![A-Za-z0-9_])ridge\("
     assert re.search(call, _flat(blocks))
     assert not re.search(call, _flat("A freshly stripped ridge (thin soil) produces talus."))
+
+
+def test_fenced_sees_a_block_indented_under_a_list_item():
+    """The reach the shared fence model added, pinned so it cannot be quietly handed back.
+
+    The regex this file used to carry — `^```[^\\n]*\\n(.*?)^``` ` — was anchored at COLUMN 0.
+    Markdown indents a fence opened inside a list item, so every such block was invisible HERE
+    while `test_slope_units.py`, which recognised a fence at any indentation, read the same lines
+    as pseudocode. The two generator rows above search `_fenced(...)` only, so a routine documented
+    inside an indented block read as UNDOCUMENTED: the row would fail pointing at a chapter that
+    says exactly what it should.
+
+    Five blocks in the live corpus are fenced that way — `references/03-flow-routing.md:693`,
+    `12-glacial-coastal.md:293` and `:2095`, `13-climate-ecosystem.md:461`,
+    `26-hexagonal-grids.md:345` (measured: adopting the shared model adds 428, 296, 130 and 67
+    characters of previously-unseen pseudocode to those four chapters). None of them holds a
+    routine any row currently names, which is precisely why this is pinned by FIXTURE: the hazard
+    is live and the corpus is one edit away from it, so the check must not depend on a chapter
+    happening to move a block under a bullet.
+    """
+    doc = ("1. Build the base, then carve the crest:\n\n"
+           "   ```\n"
+           "   ridge(shape, asymmetry):\n"
+           "       z = smin(p_scarp, p_dip)\n"
+           "   ```\n\n"
+           "prose about a ridge (really).\n")
+    blocks = _fenced(doc)
+    assert "ridge(shape" in blocks, "an indented fence is still a fence"
+    assert "really" not in blocks, "and it still ends where it ends"
+    # both generator rows must be able to fire on it: the CALL form and the HEADER form
+    assert re.search(r"(?<![A-Za-z0-9_])ridge\(", _flat(blocks))
+    assert re.search(r"^[ \t]*ridge\(", blocks, re.M)
+    # ...and the column-0 model this file used to carry sees none of it, which is the whole point
+    assert not re.compile(r"^```[^\n]*\n(.*?)^```", re.S | re.M).findall(doc)
 
 
 def test_norm_name_sees_through_the_casing_a_deferred_atom_could_ship_under():

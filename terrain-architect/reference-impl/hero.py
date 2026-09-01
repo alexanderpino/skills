@@ -188,7 +188,7 @@ def main():
     # REAL water: mass-conserving shallow-water flow fed by RAIN + SNOWMELT (water runs from under the snow)
     sim = shallow_water.simulate(flow.priority_flood_fill(h), cell, rain=4e-6, source_field=melt, iters=1400)
     Q = sim["discharge"]                                                # volumetric flow, m³/s
-    w = hydrology.water_surface(h, cell, Q)                             # channel/lake surface from the discharge
+    w = hydrology.water_surface(h, Q)                                   # channel/lake surface from the discharge
     depth = w - h                                                      # water depth (m), 0 on dry land
 
     col, _, surf = A.substance_color(h, "temperate", cell, climate=climate)   # unshaded LAND material

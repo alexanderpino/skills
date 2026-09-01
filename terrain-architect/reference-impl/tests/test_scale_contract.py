@@ -17,7 +17,16 @@ in the coverage manifest (`aeolian.yardang`, `tectonics.fault_weakness`). So for
 scale contract was being met by an argument no line of their body reads, which is worse than not
 declaring one: the signature tells a caller the atom is resolution-aware, the exemption list stays
 short, and nothing anywhere is checking. The guard now asks the census whether the parameter is
-READ, and the two atoms are moved into the exemption table below with the reason they belong there.
+READ, and the two atoms sit in the exemption table below with the reason they belong there.
+
+⚠️ AND BOTH DEAD PARAMETERS ARE NOW DELETED, WHICH CHANGES WHAT THE EXEMPTIONS REST ON.
+`aeolian.yardang` and `tectonics.fault_weakness` no longer declare a `cellsize` at all
+(`registers/OPEN-ITEMS.md` item 20 — the census in `test_render.py` now reports ZERO dead
+parameters in the tree and its exemption table is empty). Their entries below therefore rest on
+their own ground, index-space geometry, and on nothing else. Making either parameter REAL is
+still open and is a constant decision rather than a wiring fix: chapter 16 must fix the yardang
+lane wavelength in metres and chapter 02 the fault damage-zone width, or the defaults silently
+change meaning. That is item 21, and it is not closed by this deletion.
 """
 import importlib
 import inspect
@@ -76,11 +85,12 @@ PIXEL_OR_CALLER_SPACE = {
     **{("aeolian", f): _SI_POINTWISE for f in
        ("shear_velocity", "threshold_shear", "saltation_flux", "transport_field")},
     ("flow", "priority_flood_fill"): _SCALE_FREE,
-    # ⚠️ THE TWO ATOMS THAT USED TO PASS ON A DEAD `cellsize`. They still DECLARE one — it cannot
-    # be deleted while `tests/test_gallery_doc.py` passes it, which is a file this wave does not
-    # own — but it is read by nothing, so they are exempted on their real grounds instead of
-    # credited for a parameter that does nothing. Both are recorded in registers/OPEN-ITEMS.md
-    # with the exact removal patch, and in test_render.DEAD_PARAMETER_EXEMPTIONS.
+    # ⚠️ THE TWO ATOMS THAT USED TO PASS ON A DEAD `cellsize`. The parameter is now DELETED from
+    # both signatures, together with the `tests/test_gallery_doc.py` call site that used to block
+    # the removal, so they take no cell size AT ALL and are exempted purely on their real grounds:
+    # index-space geometry. Threading a real, metres-valued length through either is a constant
+    # decision (chapter 16's lane wavelength, chapter 02's damage-zone width) and is still open in
+    # registers/OPEN-ITEMS.md item 21.
     ("aeolian", "yardang"):
         "abrasion lanes are laid out in INDEX space: `freq_along`/`freq_cross` are per-cell "
         "frequencies and `floor_reach` counts cells, while the one metric quantity `saltation_h` "
@@ -191,10 +201,11 @@ def test_a_declared_but_unread_cellsize_does_not_satisfy_the_scale_contract():
     Before the census was wired in, an atom could satisfy `test_every_atom_is_scale_explicit` by
     writing `cellsize` into its signature and never using it. The two fixtures below are the same
     atom with and without the one division that makes the parameter real, and the guard's input
-    must separate them. Beneath it, the two atoms this actually caught: they still declare a dead
-    `cellsize` (deletion is blocked by a call site this wave does not own), so they now sit in the
-    exemption table on their real grounds — index-space geometry — rather than passing on a
-    parameter no line of their body reads.
+    must separate them. Beneath it, the two atoms this actually caught: their dead `cellsize` has
+    since been DELETED from both signatures, so they sit in the exemption table on their real
+    grounds — index-space geometry — rather than passing on a parameter no line of their body
+    reads. The membership assert below is what stops the exemption being quietly dropped now
+    that there is no dead parameter left for it to point at.
     """
     dead_atom = "def atom(h, cellsize=1.0, radius=3):\n    return h * radius\n"
     _, _, dead, _ = parameter_census(dead_atom, "fixture")
@@ -208,6 +219,6 @@ def test_a_declared_but_unread_cellsize_does_not_satisfy_the_scale_contract():
 
     for atom in (("aeolian", "yardang"), ("tectonics", "fault_weakness")):
         assert atom in PIXEL_OR_CALLER_SPACE, (
-            "%s used to satisfy the scale contract with a dead `cellsize`; if it now reads one, "
-            "delete its exemption — do not leave both" % (atom,))
+            "%s used to satisfy the scale contract with a dead `cellsize`, now deleted; if it "
+            "ever takes one and READS it, delete its exemption — do not leave both" % (atom,))
         assert atom in {(m, n) for m, n, _ in _atoms()}

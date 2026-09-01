@@ -396,7 +396,8 @@ nothing at all** (`09`).*
 (all three ideas below): slabs conserved exactly; the `p_sand > p_bare` instability sweeps ground
 bare (shown on the minimal variant, `shadow=False, avalanche=False`); the lee **shadow zone** +
 **avalanching** organise **transverse dunes** (ridge signal ≫ the minimal variant); deterministic
-(`09`). `hop` is the saltation length (≈3 cells); a longer hop sets a longer dune wavelength.
+(`09`). `hop` is the saltation length — Werner's fixed slab hop, **≈5 cells** (the value the
+block below states and the `werner_dunes` default); a longer hop sets a longer dune wavelength.
 `wind_field=(u, v)` swaps the constant direction for the per-cell field of `13`, so each slab is
 transported along the **local** wind and each shadow test walks the **local** upwind — the transport
 path bends through the steered flow, which is what makes a valley dune field trend with the valley
@@ -409,7 +410,7 @@ transverse dunes, linear dunes and star dunes purely from the wind regime — no
 
 ```
 werner(h, windDir, iterations):
-    L = saltationHop                             # ~5 cells, fixed
+    L = saltationHop                             # ~5 cells, fixed (Werner 1995)
     for it in 0..iterations:
         # 1. Pick a random cell with sand
         c = randomCellWithSand()

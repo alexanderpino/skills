@@ -109,6 +109,19 @@ the hex-native forms of chapter `26`'s *What does not port* section; the chapter
 corner-mean plateau, the 1.5× un-renormalised Laplacian) are pinned by
 `tests/test_hex_grid.py`.
 
+**Ground-cover scatter (chapter `07`) — outside the atom register's scope, listed here because
+the chapter names it in six places.** Point placement is a PointSet layer, not a height op, so the
+module is not one of the atoms above; but `07` names Ulichney (1993) void-and-cluster tiles at
+`:139`, `:149` ("Recommendation for terrain"), `:175` ("Preferred"), `:189` (the hex crossref),
+`:300` and `:311` — five of them recommendations — and until now nothing implemented them. `void_and_cluster_rank` builds the dither array — an exact
+permutation of `0..n²−1`, all of its Gaussian density arithmetic minimum-image (toroidal), which
+is what makes it *tileable by construction* rather than tileable-after-a-fix; `void_and_cluster_mask`
+is that rank over `n²`, the threshold matrix; `ulichney_scatter` thresholds it against a density map
+with a modulo, so a cell's answer depends on nothing but its own integer coordinate — O(1) per cell,
+no state, no seam. Its oracles (`tests/test_scatter.py`) are written against the two things a broken
+implementation degenerates into: they are shown FAILING on white noise and on a regular lattice, with
+the measured numbers recorded in the file.
+
 ## Documented but NOT implemented (deferred)
 
 These are discussed in the chapter pseudocode / grounding but are **not** in the reference impl — the

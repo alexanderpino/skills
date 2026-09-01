@@ -10,7 +10,7 @@ def test_surface_never_below_bed():
     rng = np.random.default_rng(0)
     bed = rng.normal(100.0, 20.0, (32, 32))
     Q = np.abs(rng.normal(0.0, 5.0, (32, 32)))                          # discharge, m³/s
-    w = hydrology.water_surface(bed, 10.0, Q)
+    w = hydrology.water_surface(bed, Q)
     assert np.all(w >= bed - 1e-6)
 
 
@@ -25,7 +25,7 @@ def test_lake_fills_a_depression():
     yy, xx = np.mgrid[0:n, 0:n].astype(float)
     bed = ((xx - n / 2) ** 2 + (yy - n / 2) ** 2) / 12.0                 # a bowl, lowest at the centre
     Q = np.zeros((n, n))
-    w = hydrology.water_surface(bed, 10.0, Q, q_channel=1e18)            # lakes only, no rivers
+    w = hydrology.water_surface(bed, Q, q_channel=1e18)                      # lakes only, no rivers
     depth = w - bed
     assert depth[n // 2, n // 2] > 0.0                                   # the bowl holds water
     assert depth[0, 0] < 1e-6                                            # the high corner is dry
@@ -36,7 +36,7 @@ def test_river_depth_only_in_channels():
     bed = np.tile(np.linspace(100.0, 0.0, n), (n, 1))                    # a planar slope, no pits
     Q = np.zeros((n, n))
     Q[:, n // 2] = 50.0                                                  # one channel down the middle
-    w = hydrology.water_surface(bed, 10.0, Q, lakes=False, q_channel=10.0, smooth=0.0)
+    w = hydrology.water_surface(bed, Q, lakes=False, q_channel=10.0, smooth=0.0)
     depth = w - bed
     assert depth[:, n // 2].max() > 0.0                                 # water flows in the channel
     assert depth[:, 0].max() < 1e-6                                     # dry off-channel
