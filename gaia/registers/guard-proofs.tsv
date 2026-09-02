@@ -48,3 +48,40 @@ NOT PROVEN	duplication / merge-candidate check (check.py check_duplication)	-	no
 NOT PROVEN	`verified:` staleness via sources_digest	-	the mechanism is new and untested by mutation; a human has not yet stamped any document, so there is nothing to invalidate	OPEN
 NOT PROVEN	locator QUALITY (check.py locator_quality)	-	reported as a metric, never enforced: 24/133 (18%) of locators name a section, equation or page; the rest are topic paraphrases like "the fill algorithm", which is an entire paper. A reader cannot follow those, and the guard cannot tell them from "eq. 7". Enforcing today would redden ~109 citations at once and teach everyone to ignore the guard, so it is a visible ratio that has to go up.	OPEN
 NOT PROVEN	cross-skill path resolution	-	four documents pointed at water-physics/... which does not exist on this branch. check.py resolves citation IDS, not filesystem paths outside gaia/, so a dangling provenance pointer is invisible to it. Being fixed in prose; the guard gap remains.	OPEN
+#
+# ── RE-EXECUTION, 2026-09-02, AFTER THE REVIEW WAVE ─────────────────────────────────────────
+#
+# The rows above were proven against a tree that has since changed substantially: four critic
+# reviews and four fix agents rewrote parts of every document, and a guard proven against an
+# old tree is not known to bite against the current one. Eight mutations were re-applied to a
+# full copy of the skill under /tmp (never to the working tree, never to the guard itself),
+# each reverted before the next:
+#
+#   M1  citation key in a body marker changed to a non-existent id
+#         -> RED, and BIDIRECTIONALLY: "body cites [guardado2005], which exists in NO
+#            bibliography" AND "`sources:` declares `guardado2004`, never cited in the body"
+#   M2  every body marker for a declared source deleted (orphaning it)
+#         -> RED: "`sources:` declares `bornwolf_optics`, never cited in the body"
+#   M3  a locator emptied to ""
+#         -> RED: "`shah2007` has no usable `locator`". This is the assertion an earlier
+#            version of this register got WRONG -- it proved only that a KEY was present.
+#   M4  400 filler lines appended
+#         -> RED: "958 lines, over the 450 cap -- it is two topics"
+#   M5  the generated index hand-edited (one heading)
+#         -> RED via `index.py --check`, exit 1
+#   M6  a `covered` topic re-pointed at a document that does not exist
+#         -> RED, and BIDIRECTIONALLY: the dangling arrow AND the now-unclaimed document
+#   M7  `status: finished`, not in the legal set
+#         -> RED: "status `finished` is not one of ['deprecated', 'draft', 'stable']"
+#   M8  `okf_version` added to a document that is not the bundle root
+#         -> RED: "`okf_version` belongs in the bundle root only"
+#
+#   DECOY  prose reworded throughout one document, no citation touched (a heading rewritten
+#          and every occurrence of "the bed" changed to "the pool floor")
+#         -> GREEN, as required. A guard that fires on rewording would be untrustworthy in the
+#            opposite direction, and this corpus is being reworded constantly.
+#
+# Eight of eight bite; the decoy does not. The OPEN rows above are unchanged -- in particular
+# locator QUALITY (27/135 sharp) is still reported and not enforced, and M3 proves only that an
+# EMPTY locator is caught, not that a topic-paraphrase locator is. Those are different claims
+# and this register does not conflate them.
