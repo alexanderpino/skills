@@ -56,11 +56,13 @@ DEFAULT_RECOMMENDED = {
 SIGNALS = {
     "actor": [
         r"\bas an? \w+", r"\bals (een )?\w+ wil\b", r"\b(user|users|customer|customers|admin|"
-        r"operator|developer|finance|support|tenant|merchant|partner|agent)s?\b",
+        r"operator|developer|maintainer|implementer|implementor|reviewer|contributor|engineer|"
+        r"finance|support|tenant|merchant|partner|agent)s?\b",
         r"\b(gebruiker|klant|beheerder|medewerker|partner|afdeling)s?\b", r"\bfor (the )?\w+ team\b",
     ],
     "outcome": [
-        r"\bso that\b", r"\bzodat\b", r"\b(i|we|they) (want|need|don'?t want|should be able)\b",
+        r"\bso that\b", r"\bso (a|an|the|we|they|you|i|nobody|no one)\b", r"\bzodat\b",
+        r"\b(i|we|they) (want|need|don'?t want|should be able)\b",
         r"\b(wil|willen|moet|moeten|kan|kunnen)\b", r"\bshould (not )?\b", r"\bable to\b",
         r"\bno longer\b", r"\bniet meer\b", r"\binstead of\b", r"\bin plaats van\b",
     ],
@@ -419,7 +421,17 @@ def print_report(rep):
         print("\nScoutable: run Phase 2 to sharpen the questions above, then stop and ask. "
               "Do not decompose.")
     elif rep["verdict"] == "insufficient":
-        print("\nInsufficient: ask first. There is nothing to scan for.")
+        # Say which of the three reasons it is; "nothing to scan for" when the real
+        # cause is an unreachable repo sends the reader to fix the wrong thing.
+        if any(f.startswith("mechanism-only") for f in rep["flags"]):
+            why = "a mechanism is named with no outcome - ask what it is for before scanning"
+        elif not rep["anchors"]:
+            why = "there is nothing to scan for"
+        elif not rep["repos_reachable"]:
+            why = "there are anchors but no configured repo is reachable, so Phase 2 cannot run"
+        else:
+            why = "required dimensions are missing"
+        print("\nInsufficient: ask first - %s." % why)
 
 
 def write_into_bundle(path, rep):

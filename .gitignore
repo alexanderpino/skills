@@ -3,3 +3,4 @@ __pycache__/
 *.py[cod]
 gauntlet/.gates.lock
 gauntlet-loop-workspace/
+.refinery/

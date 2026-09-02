@@ -1,0 +1,300 @@
+# story-refinery configuration. Copy to the repo root as `refinery.yaml`.
+#
+# Every key is marked with who acts on it:
+#   [script]  enforced mechanically by validate.py / emit.py / evidence.py
+#   [claude]  read by Claude while following SKILL.md; no script checks it
+# Nothing here is decorative. If a key is neither, it should be deleted.
+#
+# Parsed by a minimal built-in YAML reader (scripts/_yaml.py) - stick to the subset
+# used here: nested maps, lists of scalars, lists of flat maps, and scalars. No
+# anchors, no multi-line block scalars, no flow style. Save as .json for anything more.
+version: 1
+
+# ------------------------------------------------------------------- tailoring
+# [script] TLR gates. Which team-tailoring skill owns this file. Users load such a
+# skill alongside story-refinery; it holds everything true of one team and false of
+# everyone else - owners, house conventions, tracker reality, language - and it
+# ships this config. See references/tailoring.md for the contract, and
+# assets/templates/team-tailoring-skill.md for a skeleton. Leave source empty when
+# the refinement is untailored; say so at handover either way.
+tailoring:
+  source: ""   # [script] TLR001, must match bundle.tailoring.source
+  version: "3.2"                    # [claude] bump when the house rules change
+  skill: .claude/skills/team-billing-refinement   # [claude] where it lives, for a reader
+
+# ---------------------------------------------------------------- decomposition
+# [claude] vertical-slice | layered | workflow-phase | bugfix | research |
+#          expand-contract | custom
+profile: vertical-slice
+
+decomposition:
+  one_repo_per_subtask: true      # [script] SUB015
+  one_pr_per_subtask: true        # [claude] a review convention, not checkable here
+  title_pattern: "[{repo}] {verb} {object}"   # [claude]
+  # [claude] Subtasks added automatically when their condition holds.
+  # when: always | never | public_contract_changed | schema_changed | flag_introduced
+  mandatory:
+    - kind: test
+      when: always
+    - kind: docs
+      when: public_contract_changed
+    - kind: migration
+      when: schema_changed
+    - kind: rollout
+      when: flag_introduced
+  # [script] SUB019. The kind vocabulary is closed: feature, test, docs, migration,
+  # rollout, spike, enabling. A kind is a switch (which DoD applies, whether it must
+  # cover a criterion, which gates exempt it), so an unrecognised one silently skips
+  # every gate that keys on it. Add a house kind here on purpose, never by typo.
+  extra_subtask_kinds: []
+  spike_when_unresolved: true     # [claude] enforced indirectly by DEC004/DEC006
+  spike_timebox_days: 0.5         # [script] SPK002 - the price of the option, not an estimate
+
+# --------------------------------------------------------------------- budgets
+# All [script].
+budgets:
+  story_summary_words: 120        # BUD001
+  technical_notes_words: 200      # BUD001
+  subtask_words: 80               # SUB008
+  max_subtasks: 12                # SUB001
+  max_files_per_subtask: 8        # BRF004 - what one subtask may write
+  # BRF015 - read_first + entry_points + change_surface together. Days bound what a
+  # person can hold; an agent is bound by what fits in one fresh context window, and
+  # that is the reading, not the writing.
+  max_context_entries: 12
+  max_subtask_days: 1.0           # SUB011
+  # SUB017/SUB018 - the floor. Every other budget here is a ceiling, so without this
+  # the whole config leans one way and you get a plan of slivers. A subtask earns its
+  # overhead by being separately reviewable; below this it is a commit inside another.
+  min_subtask_days: 0.25
+  min_acceptance_criteria: 2      # AC001
+  max_acceptance_criteria: 7      # AC002
+
+# --------------------------------------------------------------------- tracker
+tracker:
+  adapter: markdown                   # [script] emit.py capability table
+  project: SKL                    # [script] copied into payloads
+  markup: markdown                     # [claude] the adapter converts at push time
+  story_issue_type: Story         # [script] payload issue_type
+  subtask_issue_type: Sub-task    # [script] payload issue_type
+  parent_field: parent            # [claude] used when you actually push
+  max_description_chars: 65536    # [script] triggers per-subtask sink degradation
+  labels_prefix: "refinery:"      # [script]
+  agent_brief:
+    # [script] description_tail | comment | attachment | repo_file | custom_field
+    sink: description_tail
+    fallback:                     # [script] tried in order; reorder when you change the adapter
+      - comment
+      - description_tail
+      - repo_file
+    filename: agent-brief.json    # [script]
+    repo_file_dir: .refinery/briefs   # [script]
+    custom_field: ""              # [script] required before the custom_field sink is usable
+    marker_begin: "<!-- AGENT-BRIEF v1 BEGIN -->"   # [script]
+    marker_end: "<!-- AGENT-BRIEF v1 END -->"       # [script]
+
+# -------------------------------------------------------------------- evidence
+evidence:
+  sources:
+    # 1. [script] Reuse an index another tool already built.
+    - type: provided_index
+      path: .cartographer/index.json
+      adapter: code-cartographer
+    # 2. [script] Our own sha-keyed manifests.
+    - type: cached_manifest
+      dir: .refinery/manifests
+      ttl_days: 14                # [script] rebuild manifests older than this, even at the same sha
+    # 3. [script] Budgeted, hypothesis-driven search for this story only.
+    - type: targeted_scan
+      budget_files: 400
+      budget_seconds: 60
+  repos:                          # [script] detected by `init`
+    - name: skills
+      path: .
+  contract_globs:                 # [script]
+    - "**/openapi*.yaml"
+    - "**/openapi*.yml"
+    - "**/swagger*.json"
+    - "**/*.proto"
+    - "**/*.graphql"
+    - "**/schema.sql"
+    - "**/migrations/**"
+  split_thresholds:               # [script] SPL001, compared against blast_radius
+    repos: 3
+    files: 25
+    breaking_contracts: 1
+    owner_teams: 2
+
+# ---------------------------------------------------------------------- triage
+# [script] triage.py + validate.py TRI gates. What the ticket already says about
+# itself. A label is a decision somebody made before you opened the item; refining
+# the description while ignoring it produces a plan that is correct and
+# inapplicable. Capture the metadata verbatim into story.tracker_meta, never invent
+# a label, and keep this policy honest - a label with no rule and no ignore entry
+# is reported (TRI007) precisely so nobody has to remember what 'ops-2' meant.
+triage:
+  # [claude] Which tracker fields to copy into story.tracker_meta.
+  capture: [labels, components, issue_type, priority, status, reporter, links, environment]
+  # [script] TRI007 reports any *label* that no rule below and no pattern here
+  # covers, so an unrecognised marker cannot pass unnoticed. Components are not
+  # reported (they are routing taxonomy, always populated) but rules may match them.
+  # Labels that carry no refinement consequence - team routing, board hygiene:
+  ignore: ["^team-", "^board-", "^sprint-", "^documentation$"]
+  # [script] First rule that sets a scalar (kind, profile, route) wins, so order is
+  # precedence. Lists from every matching rule are merged.
+  # field: any (labels + components, the default) | all | labels | components |
+  #        issue_type | priority | status
+  labels:
+    - id: incident
+      match: "sev-?[12]|^incident$|outage|p1-live"
+      route: incident              # refinement is not the instrument; stabilise first
+    - id: production-issue
+      match: "production-(issue|finding|bug)|prod-bug|escaped-defect"
+      kind: bug
+      profile: bugfix
+      require_dimensions: [first_seen, frequency, impact_scope, workaround]
+      mandatory_subtask_kinds: [test]
+      must_answer_nfr: [failure, observability]
+      add_critics: [operator]
+      ask: ["Is it still happening now, and is there a workaround in place?", "How many customers or orders are affected, and since which release?", "Was anything already changed in production to contain it?"]
+    - id: security
+      match: "security|vulnerability|pentest|cve"
+      mandatory_subtask_kinds: [test]
+      must_answer_nfr: [security]
+      add_critics: [security]
+      ask: ["Is this already public or reported externally, and is there a disclosure deadline?"]
+    - id: compliance
+      match: "compliance|audit|gdpr|dpia|sox"
+      must_answer_nfr: [data, security]
+      add_critics: [stakeholder]
+      ask: ["Who signs this off, and do they need evidence retained beyond the code change?"]
+    - id: customer-escalation
+      match: "escalation|churn-risk|vip"
+      add_critics: [stakeholder]
+      ask: ["What was promised to the customer, by whom, and by when?"]
+    - id: tech-debt
+      match: "tech-?debt|refactor|cleanup"
+      require_dimensions: [outcome]
+      ask: ["What breaks, slows down or stays risky if we do not do this now?"]
+    - id: enabler
+      match: "^enabler$|^platform$|^infra(structure)?$|^tooling$|^upgrade$|^dependencies$|^chore$"
+      kind: enabling
+      require_dimensions: [unlocks, cost_of_delay]
+      ask: ["Which story or team is waiting on this - can you name the ticket?", "What breaks, slows down or stays risky for every sprint this is not done?"]
+    - id: discovery
+      match: "^spike$|discovery|research|onderzoek"
+      kind: spike                    # the feature questionnaire asks this item the wrong things
+      profile: research
+      require_dimensions: [question, decision, timebox]
+      mandatory_subtask_kinds: [spike]
+      ask: ["Which decision is waiting on this answer, and who makes it?", "How long are we willing to spend before we decide with what we have?", "What does the answer look like when it arrives - a number, a prototype, a recommendation?"]
+
+# ---------------------------------------------------------------------- intake
+# [script] intake.py + validate.py INT gates. Which dimensions must be present
+# (or explicitly assumed / answered) before the item may be decomposed.
+intake:
+  feature_required: [actor, outcome, trigger]
+  feature_recommended: [success_signal, scope]
+  bug_required: [repro, expected, actual, environment]
+  bug_recommended: [impact]
+  # A research item is not a feature with unknowns. It has no actor and no outcome
+  # yet - establishing them may be the whole point - so it gets its own questionnaire:
+  # a question narrow enough to come back answered, a decision waiting on the answer,
+  # and the price we will pay before deciding with what we have.
+  spike_required: [question, decision, timebox]
+  spike_recommended: [answer_shape]
+  # An enabler - upgrade, tooling, platform - has no customer either. "As a developer
+  # I want" hides that. It must name what it unlocks (else it is gold-plating) and
+  # what it costs to keep not doing it (else it loses every prioritisation).
+  enabling_required: [unlocks, cost_of_delay]
+  enabling_recommended: [success_signal, scope]
+  min_anchors: 1                  # code anchors needed for a "scoutable" verdict
+
+# ----------------------------------------------------------------------- gates
+gates:
+  design_decisions: multiple-choice   # [claude] multiple-choice | narrative | off
+  push: manual                        # [claude] manual | auto-on-green
+  adversarial_review: on              # [script] REV001. on | off - off ships unreviewed
+
+# ---------------------------------------------------------------------- review
+# The critique of the refinement itself, before anyone implements it. Critics are
+# blind: they see the artefact and their mandate, never the reasoning behind it.
+review:
+  # [claude] critics | rubber-duck | both. 'critics' is the panel; 'rubber-duck' is
+  # the solo fallback for small stories or sessions that cannot spawn sub-agents.
+  method: critics
+  panel:                          # [claude] ids from references/critique.md
+    - implementer                 #   executes the brief literally
+    - tester                      #   tries to write a failing test per criterion
+    - archaeologist               #   re-opens every citation
+    - sequencer                   #   attacks the graph, waves and sizing
+    # - stakeholder               #   source text vs the plan; add when scope may have drifted
+  min_critics: 3                  # [script] REV006
+  rubber_duck_max_subtasks: 3     # [script] REV008 - above this, a duck is not enough
+  require_fresh_context: true     # [claude] a critic who has read your reasoning grades it
+
+# ------------------------------------------------------------------ validation
+validation:
+  fail_on:                        # [script] error | warn
+    - error
+  require_intake: true            # [script] INT001 - a bundle without an intake block is not ready
+  require_command_done_when: true # [script] BRF006
+  require_coverage_matrix: true   # [script] COV001
+  # [script] Which non-functional categories must be addressed. Extend per house;
+  # 'unchanged' is a valid answer, blank is not.
+  non_functional_keys:
+    - performance
+    - concurrency
+    - failure
+    - data
+    - security
+    - observability
+    - compatibility
+  # [script] NFR002. The subset above where prose is not an answer: a quality
+  # attribute scenario ends in a response measure, so these need a number or
+  # 'unchanged'. The others (security, compatibility, observability) are categorical.
+  measured_non_functional_keys:
+    - performance
+    - concurrency
+    - failure
+  # [script] DOD001. The house Definition of Done, expressed as commands a subtask
+  # must be able to run. This is what stops "done" meaning "the code looks right".
+  definition_of_done:
+    - id: dod-tests
+      applies_to_kinds: [feature, migration, test]
+      expect_command_matching: "test|pytest|jest|vitest|go test|cargo test"
+      severity: error
+  # [script] AC007 (error) and BUD002 (warning).
+  # The lexicon is LANGUAGE SPECIFIC. A Dutch-language ticket passes every English
+  # term below. Add your team's language or the check is decorative - the Dutch
+  # additions are included as a worked example.
+  vagueness_lexicon:
+    - "etc."
+    - "and so on"
+    - "as needed"
+    - "appropriately"
+    - "properly"
+    - "handle gracefully"
+    - "should probably"
+    - "if necessary"
+    - "where applicable"
+    - "user-friendly"
+    - "robust"
+    - "various"
+    - "improve performance"
+    # Dutch additions - remove if your tickets are English-only
+    - "enzovoort"
+    - "en zo verder"
+    - "indien nodig"
+    - "waar nodig"
+    - "netjes afhandelen"
+    - "netjes afgehandeld"
+    - "goed afhandelen"
+    - "goed afgehandeld"
+    - "correct afgehandeld"
+    - "op de juiste manier"
+    - "gebruiksvriendelijk"
+    - "diverse"
+    - "eventueel"
+    - "waarschijnlijk"
+    - "sneller maken"
