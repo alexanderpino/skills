@@ -38,6 +38,8 @@
         "key": {"type": "string"},
         "title": {"type": "string"},
         "source_text": {"type": "string", "description": "The original ask, verbatim. Scope creep is detected against this."},
+        "tracker_meta": {"$ref": "#/$defs/tracker_meta"},
+        "triage": {"$ref": "#/$defs/triage"},
         "intake": {"$ref": "#/$defs/intake"},
         "summary_human": {"type": "string", "description": "Why and what. Word-budgeted."},
         "technical_notes_human": {"type": "string", "description": "What changes, where, what was decided. Every path cited."},
@@ -51,6 +53,46 @@
           "description": "Give a number or the word 'unchanged'. Never leave a key blank.",
           "additionalProperties": {"type": "string"}
         }
+      }
+    },
+    "tracker_meta": {
+      "type": "object",
+      "description": "Phase 1. What the tracker already says about this item, copied verbatim before refining: labels, components, type, priority, status, reporter, links. Never invented, and never edited to make a triage rule match. Also what stops a push from deleting the labels somebody set (emit.py carries them through).",
+      "properties": {
+        "issue_type": {"type": "string"},
+        "status": {"type": "string"},
+        "priority": {"type": "string"},
+        "labels": {"type": "array", "items": {"type": "string"}},
+        "components": {"type": "array", "items": {"type": "string"}},
+        "reporter": {"type": "string"},
+        "environment": {"type": "string"},
+        "links": {
+          "type": "array",
+          "items": {"type": "object", "properties": {"type": {"type": "string"},
+                                                     "key": {"type": "string"}}}
+        }
+      }
+    },
+    "triage": {
+      "type": "object",
+      "description": "Phase 1. What those labels change about the refinement. Written by `triage.py apply --write` from the triage.labels policy; enforced by validate.py TRI gates.",
+      "properties": {
+        "matched": {
+          "type": "array",
+          "items": {"type": "object", "required": ["id"],
+                    "properties": {"id": {"type": "string"},
+                                   "matched_on": {"type": "array", "items": {"type": "string"}}}}
+        },
+        "route": {"enum": ["refine", "incident"],
+                  "description": "incident: the labels say refinement is the wrong instrument right now (TRI002). Stabilise, then refine what is left."},
+        "kind": {"type": "string", "description": "feature | bug, when the labels settle it."},
+        "profile": {"type": "string", "description": "Decomposition profile the labels imply, e.g. bugfix for a production finding (TRI005)."},
+        "require_dimensions": {"type": "array", "items": {"type": "string"}, "description": "Extra intake dimensions these labels demand (TRI004)."},
+        "mandatory_subtask_kinds": {"type": "array", "items": {"type": "string"}, "description": "Subtask kinds that must exist, e.g. a reproducing test (TRI003)."},
+        "must_answer_nfr": {"type": "array", "items": {"type": "string"}, "description": "Quality attributes that cannot be blank or 'unchanged' here (TRI006)."},
+        "add_critics": {"type": "array", "items": {"type": "string"}, "description": "Critics the labels add to the Phase 8 panel, e.g. operator, security (TRI008)."},
+        "ask": {"type": "array", "items": {"type": "string"}, "description": "Questions these labels raise; written into open_questions with source 'triage'."},
+        "unknown_labels": {"type": "array", "items": {"type": "string"}, "description": "Labels no rule and no ignore pattern covers (TRI007) - nobody decided whether they matter."}
       }
     },
     "criterion": {

@@ -18,6 +18,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _yaml import get, load_config  # noqa: E402
 from review import SEVERITIES, STATUSES, content_digest, resolve_locator  # noqa: E402
+from triage import policy_for as triage_policy  # noqa: E402
 
 DEFAULT_LEXICON = [
     "etc.", "and so on", "as needed", "appropriately", "properly",
@@ -47,7 +48,7 @@ MAX_TABLE_COMBINATIONS = 512
 # leftover, and is reported rather than silently ignored.
 CONFIG_SPEC = {
     "": {"version", "profile", "decomposition", "budgets", "tracker", "evidence",
-         "intake", "gates", "review", "validation"},
+         "intake", "triage", "gates", "review", "validation"},
     "decomposition": {"one_repo_per_subtask", "one_pr_per_subtask", "title_pattern",
                       "mandatory", "spike_when_unresolved", "spike_timebox_days"},
     "decomposition.mandatory[]": {"kind", "when"},
@@ -64,6 +65,10 @@ CONFIG_SPEC = {
     "evidence.repos[]": {"name", "path"},
     "evidence.split_thresholds": {"repos", "files", "breaking_contracts", "owner_teams"},
     "gates": {"design_decisions", "push", "adversarial_review"},
+    "triage": {"capture", "ignore", "labels"},
+    "triage.labels[]": {"id", "match", "field", "kind", "profile", "route",
+                        "require_dimensions", "mandatory_subtask_kinds", "add_critics",
+                        "must_answer_nfr", "ask"},
     "review": {"method", "panel", "min_critics", "rubber_duck_max_subtasks",
                "require_fresh_context"},
     "intake": {"feature_required", "feature_recommended", "bug_required", "bug_recommended",
@@ -750,6 +755,10 @@ def check_intake(b, cfg, rep):
     required = set(get(cfg, "intake.%s_required" % kind,
                        {"feature": ["actor", "outcome", "trigger"],
                         "bug": ["repro", "expected", "actual", "environment"]}[kind]) or [])
+    # The ticket's own labels can demand more: a production finding needs to say
+    # since when and how often before anyone knows what to reproduce.
+    _, policy, _ = triage_policy(story.get("tracker_meta") or {}, cfg)
+    required |= set(policy.get("require_dimensions") or [])
     seen = set()
     for d in intake.get("dimensions") or []:
         did = d.get("id") or "?"
@@ -803,6 +812,81 @@ def check_intake(b, cfg, rep):
     if kind == "bug" and (b.get("profile") or "") not in ("bugfix", ""):
         rep.warn("INT011", "profile", "intake says this is a bug but profile is %r - "
                  "the bugfix profile puts the failing test first" % b.get("profile"))
+
+
+def check_triage(b, cfg, rep):
+    """What the tracker already said about this item, and whether the refinement
+    listened. A label is a decision somebody made before you opened the ticket."""
+    story = b.get("story") or {}
+    meta = story.get("tracker_meta")
+    subs = b.get("subtasks") or []
+    if not meta:
+        if subs:
+            rep.warn("TRI001", "story.tracker_meta", "the ticket's own labels, components, "
+                     "priority and links were never read - run `triage.py apply`; "
+                     "'production-issue' or 'security' changes what this refinement is")
+        return
+    if not get(cfg, "triage.labels", None):
+        return
+
+    matched, policy, unknown = triage_policy(meta, cfg)
+    recorded = story.get("triage") or {}
+    if recorded:
+        was = {m.get("id") for m in recorded.get("matched") or []}
+        now = {m["id"] for m in matched}
+        if was != now:
+            rep.warn("TRI009", "story.triage", "the labels no longer produce the triage on "
+                     "record (was %s, now %s) - somebody re-labelled the ticket; re-run "
+                     "`triage.py apply`" % (", ".join(sorted(was)) or "none",
+                                            ", ".join(sorted(now)) or "none"))
+
+    if policy.get("route") == "incident" and subs:
+        rep.error("TRI002", "story.triage", "the labels put this in incident handling and "
+                  "the bundle decomposes it anyway - stabilise first, then refine what is "
+                  "left (matched: %s)" % ", ".join(m["id"] for m in matched))
+
+    kinds = {s.get("kind") for s in subs}
+    for kind in policy.get("mandatory_subtask_kinds") or []:
+        if subs and kind not in kinds:
+            rep.error("TRI003", "subtasks", "the labels require a %r subtask and there is "
+                      "none - %s" % (kind, ", ".join(m["id"] for m in matched)))
+
+    assessed = {d.get("id") for d in (story.get("intake") or {}).get("dimensions") or []}
+    for dim in policy.get("require_dimensions") or []:
+        if dim not in assessed:
+            rep.error("TRI004", "story.intake", "the labels require the %r dimension and "
+                      "intake never assessed it - a production finding without %s is a "
+                      "guess about what to reproduce" % (dim, dim))
+
+    wanted_profile = policy.get("profile")
+    if wanted_profile and b.get("profile") and b["profile"] != wanted_profile:
+        rep.warn("TRI005", "profile", "labels imply the %r profile, bundle uses %r - switch "
+                 "it or say why the labels are wrong" % (wanted_profile, b["profile"]))
+    wanted_kind = policy.get("kind")
+    got_kind = (story.get("intake") or {}).get("kind")
+    if wanted_kind and got_kind and got_kind != wanted_kind:
+        rep.warn("TRI005", "story.intake.kind", "labels imply kind %r, intake recorded %r"
+                 % (wanted_kind, got_kind))
+
+    nf = story.get("non_functional") or {}
+    for key in policy.get("must_answer_nfr") or []:
+        answer = nf.get(key)
+        if not answer or UNCHANGED_RX.search(str(answer)):
+            rep.warn("TRI006", "story.non_functional.%s" % key, "the labels make this one "
+                     "concrete: %r cannot be blank or 'unchanged' on an item labelled %s"
+                     % (key, ", ".join(m["id"] for m in matched)))
+
+    critics = {c.get("id") for c in (b.get("review") or {}).get("critics") or []}
+    if b.get("review"):
+        for critic in policy.get("add_critics") or []:
+            if critic not in critics:
+                rep.warn("TRI008", "review.critics", "the labels call for the %r critic and "
+                         "the panel did not include one" % critic)
+
+    if unknown:
+        rep.warn("TRI007", "story.tracker_meta", "no policy and no ignore rule covers %s - "
+                 "decide whether they change the refinement, then record the decision in "
+                 "triage.labels or triage.ignore" % ", ".join(unknown))
 
 
 def check_review(b, cfg, rep):
@@ -921,6 +1005,7 @@ def validate(bundle, cfg):
     rep = Report()
     check_config(cfg, rep)
     check_structure(bundle, rep)
+    check_triage(bundle, cfg, rep)
     check_intake(bundle, cfg, rep)
     check_questions_and_decisions(bundle, rep)
     check_acceptance_criteria(bundle, cfg, rep)

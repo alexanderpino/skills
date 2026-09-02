@@ -5,6 +5,12 @@ mechanical tell so you can catch it in your own work.
 
 ## Content smells
 
+**Refining past the label.** The description was refined and the ticket's own
+metadata ignored: a `production-issue` planned as a feature, a `sev1`
+decomposed into a sprint. *Tell:* `TRI001`, `TRI002`, or a `tracker_meta` block
+that nobody filled in. *Fix:* `references/triage.md` - the labels are newer
+information than the description, and usually truer.
+
 **Refining on fumes.** Evidence gathered and subtasks written for an item whose
 intake verdict was never `sufficient`. *Tell:* `INT003`, or an intake block whose
 `present` dimensions still say `heuristic: true`. *Fix:* go back to the

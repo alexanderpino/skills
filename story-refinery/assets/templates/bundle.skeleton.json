@@ -7,6 +7,23 @@
     "key": "",
     "title": "",
     "source_text": "PHASE 1: the original ask, verbatim. Scope creep is detected against this.",
+    "tracker_meta": {
+      "_howto": "PHASE 1, first: copy what the tracker already says, verbatim. Labels are decisions somebody made before you opened this - 'production-issue' means it escaped to customers, 'sev1' means refinement is the wrong instrument right now. Never invent a label, and never edit one to make a rule match. This is also what stops a push from deleting the labels somebody set.",
+      "issue_type": "",
+      "status": "",
+      "priority": "",
+      "labels": [],
+      "components": [],
+      "reporter": "",
+      "links": [],
+      "environment": ""
+    },
+    "triage": {
+      "_howto": "PHASE 1: written by `triage.py apply --bundle bundle.json --write`. Do not hand-write it; if the labels are wrong, fix the ticket, and if the policy is wrong, fix triage.labels in refinery.yaml.",
+      "matched": [],
+      "unknown_labels": [],
+      "route": "refine"
+    },
     "intake": {
       "_howto": "PHASE 1: run `intake.py assess --bundle bundle.json --write`, then read source_text and set heuristic:false on every dimension you confirm. Statuses: present (quote it) | missing (blocking question) | assumed (assumption + non-blocking question) | answered (answer + answered_by).",
       "kind": "feature",

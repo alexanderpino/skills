@@ -28,6 +28,7 @@ bundle is the single source of truth. Everything else is a projection of it.
 ## Quickstart
 
 ```bash
+python scripts/triage.py apply --bundle bundle.json --config refinery.yaml --write  # labels first
 python scripts/evidence.py init --config refinery.yaml   # or copy the example by hand
 python scripts/evidence.py manifest --config refinery.yaml
 python scripts/evidence.py scan --config refinery.yaml -q "<domain noun>" -q "<symbol>"
@@ -102,12 +103,50 @@ settings that change the shape of everything downstream: decomposition `profile`
 `tracker.agent_brief.sink`. Do not silently guess a tracker; detect it from the
 ticket key format or ask.
 
-### Phase 1 - Intake
+### Phase 1 - Triage and intake
 
-Normalize the source item into the bundle's `story` object regardless of origin
-(Jira description, GitHub issue body, Slack paste, verbal request). Capture the
-original text verbatim in `story.source_text` before rewriting anything - later
-phases must be able to check what was actually asked for.
+**Read what the ticket already says about itself, first.** Read
+`references/triage.md`.
+
+An existing item carries labels, components, a priority, an issue type, links and
+a reporter. Each is a decision somebody made before you opened it, and refining
+the description while ignoring them produces a plan that is internally correct
+and inapplicable. Copy the metadata verbatim into `story.tracker_meta` - never
+invent a label, and never edit one to make a rule match; a mislabelled ticket is
+a finding to report, not something to quietly correct.
+
+```bash
+python scripts/triage.py apply --bundle bundle.json --config refinery.yaml --write
+```
+
+It maps the metadata through `triage.labels` and records what changes:
+
+- **`production-issue` / escaped defect** → it is a bug on the `bugfix` profile,
+  intake needs `first_seen`, `frequency`, `impact_scope` and `workaround` before
+  anyone knows what to reproduce, a reproducing test subtask is mandatory, and
+  the `operator` critic joins the Phase 8 panel. If it escaped, something failed
+  to detect it - that gap is a risk with its own detection signal.
+- **`sev1` / `incident` / `outage`** → route `incident`, exit code 4. Refinement
+  is the wrong instrument; stabilise first and refine the follow-up afterwards.
+  `TRI002` fails a bundle that decomposes one anyway.
+- **`security`**, **`compliance`** → the matching quality attributes stop being
+  answerable with "unchanged", a test is required, and the `security` or
+  `stakeholder` critic joins the panel.
+- **`tech-debt`** → the missing dimension is the outcome: what breaks, slows or
+  stays risky if we do not do this.
+- **links** → `blocks` / `is blocked by` order work across teams, and neither the
+  dependency graph nor the wave plan knows about them. Say in the human text
+  which external ticket the plan assumes.
+
+A label with no rule and no ignore pattern is reported (`TRI007`) so nobody has
+to remember what `ops-2` meant, and `TRI009` catches a ticket re-labelled after
+it was triaged. Capturing the metadata also stops the push from deleting it:
+`emit.py` carries existing labels into the parent payload.
+
+Then normalize the source item into the bundle's `story` object regardless of
+origin (Jira description, GitHub issue body, Slack paste, verbal request).
+Capture the original text verbatim in `story.source_text` before rewriting
+anything - later phases must be able to check what was actually asked for.
 
 State the story in the 3 C's frame `[P: Jeffries, 2001]`: Card (the intent),
 Conversation (what still has to be discussed), Confirmation (how we will know).
@@ -378,6 +417,8 @@ Hand each packet to a separate sub-agent in **fresh context**. The default panel
 | `archaeologist` | re-opens every citation: which claim is not in the file? |
 | `sequencer` | attacks the graph: which subtask cannot start when the plan says? |
 | `stakeholder` | source text vs the plan: what is missing, what is uninvited? |
+| `operator` | carries the pager: could I see it, stop it and undo it at 03:00? |
+| `security` | reads the change surface as an attacker: what does this expose? |
 
 Critics are hostile by assignment. "Looks good" is not a verdict: a critic returns
 findings, or records what they tried to break and why it held. Every finding
@@ -468,6 +509,7 @@ when questions remain open.
 
 | File | Read when |
 |------|-----------|
+| `references/triage.md` | Phase 1 - the ticket's own labels, links and what they change |
 | `references/intake.md` | Phase 1 - is there enough information; verdicts, statuses, asking well |
 | `references/evidence.md` | Phase 2 - multi-repo scanning, manifests, contract detection |
 | `references/acceptance-criteria.md` | Phase 3 - example mapping, AC forms, testability |
@@ -488,6 +530,8 @@ front costs context you will need for the actual code. The exception is
 
 All stdlib-only Python 3, no dependencies, no network.
 
+- `scripts/triage.py` - the ticket's own metadata through the label policy; exit 4
+  when the labels say do not refine yet
 - `scripts/intake.py` - sufficiency detection; exit 0 / 3 / 4 for sufficient / scoutable / insufficient
 - `scripts/evidence.py` - `init` | `manifest` | `index` | `scan` | `contracts`
 - `scripts/validate.py` - the readiness gate
@@ -514,5 +558,5 @@ All stdlib-only Python 3, no dependencies, no network.
 - `assets/examples/example-bundle.json` - a complete, validating two-repo example
 - `evals/trigger-eval.json` - queries that should and should not trigger this
   skill, in the format skill-creator's description optimiser expects
-- `evals/evals.json` - ten behavioural evals with verifiable expectations, for
+- `evals/evals.json` - twelve behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

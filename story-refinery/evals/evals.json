@@ -120,6 +120,32 @@
         "The migration's non-functional answers carry numbers rather than prose",
         "Nothing was locked by assumption to avoid leaving a decision open"
       ]
+    },
+    {
+      "id": 11,
+      "prompt": "Refine ABC-455. It is labelled production-issue and customer-escalation, priority Highest, and the description says 'orders from the partner API sometimes get a duplicate confirmation email'. Repo ../api.",
+      "expected_output": "A triage-led refinement: a bug on the bugfix profile, with the four production-finding dimensions asked for before anything is decomposed.",
+      "expectations": [
+        "The labels were read and recorded in story.tracker_meta before the description was refined",
+        "The item is treated as a bug on the bugfix profile because the label says so, not because the text sounded like one",
+        "Intake asked when it started, how often it happens, how many customers are affected and whether there is a workaround",
+        "'sometimes' was challenged rather than refined - a frequency nobody has measured is not a reproduction",
+        "A reproducing test is a mandatory subtask and lands first",
+        "The escalation label produced a question about what was promised to the customer, with an owner",
+        "The detection gap was addressed: if it escaped, something failed to notice it"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Refine ABC-901 for the next sprint. It is labelled sev1 and the incident channel is still open.",
+      "expected_output": "A refusal to decompose, with the reason, and an offer to prepare the follow-up item instead.",
+      "expectations": [
+        "triage.py reported route incident and the response stopped there",
+        "No subtasks were written",
+        "The response said plainly that refinement is the wrong instrument during an incident",
+        "It offered the useful alternative: refine the follow-up after stabilisation, and capture what the incident is teaching now",
+        "It did not invent incident facts or propose a fix"
+      ]
     }
   ]
 }

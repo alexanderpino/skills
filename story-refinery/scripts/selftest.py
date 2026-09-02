@@ -3,14 +3,15 @@
 
   python selftest.py
 
-Seven suites:
+Eight suites:
   1. Validator gates  - mutate the golden bundle, assert each gate fires
   2. Config parsing   - the YAML subset, including the cases that bit us
   3. Markup           - wiki / ADF / HTML / plaintext conversion
   4. Pipeline         - evidence -> validate -> emit -> emit --previous, end to end
   5. Intake detection - sufficiency verdicts, English and Dutch
-  6. Adversarial review - digests, locators, and that a critic packet really is blind
-  7. Docs consistency - SKILL.md against the scripts and validator codes it cites
+  6. Triage           - the label policy, its precedence, and what it reports
+  7. Adversarial review - digests, locators, and that a critic packet really is blind
+  8. Docs consistency - SKILL.md against the scripts and validator codes it cites
 
 A validator nobody has tried to break is a validator nobody should trust, and the
 same goes for the config reader that decides which gates run at all.
@@ -118,6 +119,18 @@ MUTATIONS = [
     ("DOD001", mut(lambda b: b["subtasks"][1]["agent_brief"].update(
         {"done_when": [{"type": "command", "cmd": "echo hello", "expect": "exit 0"},
                        {"type": "assertion", "text": "the flag gates the new branch"}]}))),
+    # Triage: what the ticket already said about itself.
+    ("TRI001", mut(lambda b: b["story"].pop("tracker_meta"))),
+    ("TRI002", mut(lambda b: b["story"]["tracker_meta"]["labels"].append("sev1"))),
+    ("TRI003", mut(lambda b: (b["story"]["tracker_meta"]["labels"].append("production-issue"),
+                              b["subtasks"].pop(3)))),               # S3 is the test subtask
+    ("TRI004", mut(lambda b: b["story"]["tracker_meta"]["labels"].append("production-issue"))),
+    ("TRI005", mut(lambda b: b["story"]["tracker_meta"]["labels"].append("prod-bug"))),
+    ("TRI006", mut(lambda b: (b["story"]["tracker_meta"]["labels"].append("security"),
+                              b["story"]["non_functional"].update({"security": "unchanged"})))),
+    ("TRI007", mut(lambda b: b["story"]["tracker_meta"]["labels"].append("ops-2"))),
+    ("TRI008", mut(lambda b: b["story"]["tracker_meta"]["labels"].append("vulnerability"))),
+    ("TRI009", mut(lambda b: b["story"]["triage"].update({"matched": []}))),
     # Example design: partitions, boundaries and the decision table.
     ("AC008", mut(lambda b: b["story"]["acceptance_criteria"][1].update(
         {"examples": [{"case": "DE business, VAT field empty", "expect": "19.00"}]}))),
@@ -381,6 +394,14 @@ def suite_pipeline():
         check("emit: a held option shows what it waits for and when it expires",
               "stays open until:" in md_preview and "Expires" in md_preview)
         check("emit: the impact goal heads the ticket", "**Goal**:" in md_preview)
+        check("emit: triage says which labels changed the refinement",
+              "## Triage" in md_preview and "**compliance**" in md_preview
+              and "blocks ABC-131" in md_preview)
+        parent = json.load(open(os.path.join(ws, "out_jira", "payloads",
+                                             "ABC-123-story.json")))
+        check("emit: a push does not delete the labels somebody set",
+              all(x in parent["labels"] for x in ("compliance", "team-billing"))
+              and "refinery:story" in parent["labels"], parent["labels"])
         check("emit: unfixed findings are what the approver sees",
               "These findings were not fixed" in md_preview)
 
@@ -429,7 +450,7 @@ def suite_pipeline():
 def suite_docs():
     """SKILL.md is the interface. A flag that no longer exists, or a reference file
     that was renamed, breaks the skill just as thoroughly as a bad regex."""
-    print("\n-- 7. docs consistency --")
+    print("\n-- 8. docs consistency --")
     import re
     with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
         skill = fh.read()
@@ -575,10 +596,66 @@ def suite_intake():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def suite_triage():
+    """A label is a decision somebody already made. These check that the policy
+    reads it the way the config says, and that a push cannot delete it."""
+    print("\n-- 6. triage --")
+    from triage import policy_for
+    cfg = load_config(CONFIG)
+
+    cases = [
+        ("compliance label", {"labels": ["compliance"]},
+         lambda m, p, u: p.get("add_critics") == ["stakeholder"] and not u),
+        ("production finding routes to bugfix", {"labels": ["production-issue"]},
+         lambda m, p, u: p.get("profile") == "bugfix" and p.get("kind") == "bug"
+         and "first_seen" in p["require_dimensions"] and "operator" in p["add_critics"]),
+        ("sev1 stops refinement", {"labels": ["sev-1"]},
+         lambda m, p, u: p.get("route") == "incident"),
+        ("incident wins over production-issue regardless of label order",
+         {"labels": ["production-issue", "sev2"]},
+         lambda m, p, u: p.get("route") == "incident" and p.get("profile") == "bugfix"),
+        ("ignored labels are not reported", {"labels": ["team-billing", "sprint-42"]},
+         lambda m, p, u: not m and not u),
+        ("an unrecognised label is reported", {"labels": ["ops-2"]},
+         lambda m, p, u: u == ["ops-2"]),
+        ("components can match a rule but are not reported unknown",
+         {"labels": [], "components": ["security"]},
+         lambda m, p, u: "security" in p["must_answer_nfr"] and not u),
+        ("no metadata, no consequences", {},
+         lambda m, p, u: not m and not u and p.get("route") == "refine"),
+        ("lists from several rules merge",
+         {"labels": ["security", "compliance", "customer-escalation"]},
+         lambda m, p, u: len(m) == 3 and set(p["add_critics"]) == {"security", "stakeholder"}),
+    ]
+    for name, meta, ok in cases:
+        matched, policy, unknown = policy_for(meta, cfg)
+        try:
+            check("triage: %s" % name, ok(matched, policy, unknown),
+                  (matched, {k: v for k, v in policy.items() if v}, unknown))
+        except Exception as exc:  # noqa: BLE001
+            check("triage: %s" % name, False, exc)
+
+    check("triage: every critic a shipped rule adds actually exists",
+          all(c in __import__("review").CRITICS
+              for rule in (cfg.get("triage") or {}).get("labels") or []
+              for c in rule.get("add_critics") or []),
+          [c for rule in (cfg.get("triage") or {}).get("labels") or []
+           for c in rule.get("add_critics") or []])
+
+    with open(GOLDEN, encoding="utf-8") as fh:
+        golden = json.load(fh)
+    recorded = golden["story"]["triage"]
+    _, policy, _ = policy_for(golden["story"]["tracker_meta"], cfg)
+    check("triage: the shipped example's triage is what its labels produce",
+          {m["id"] for m in recorded["matched"]} ==
+          {m["id"] for m in policy_for(golden["story"]["tracker_meta"], cfg)[0]}
+          and recorded.get("must_answer_nfr") == policy.get("must_answer_nfr"))
+
+
 def suite_review():
     """The critic packets are the only mechanical guarantee of blindness in the
     skill. If the reasoning leaks into one, the panel is grading the reasoning."""
-    print("\n-- 6. adversarial review --")
+    print("\n-- 7. adversarial review --")
     from review import (CRITICS, DEFAULT_PANEL, cmd_check, content_digest,
                         render_brief, resolve_locator)
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -665,6 +742,7 @@ def main():
     suite_markup()
     suite_pipeline()
     suite_intake()
+    suite_triage()
     suite_review()
     suite_docs()
     print("\n%s  %d failure(s)" % ("PASS" if not FAILURES else "FAIL", len(FAILURES)))

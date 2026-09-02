@@ -101,6 +101,61 @@ evidence:
     breaking_contracts: 1
     owner_teams: 2
 
+# ---------------------------------------------------------------------- triage
+# [script] triage.py + validate.py TRI gates. What the ticket already says about
+# itself. A label is a decision somebody made before you opened the item; refining
+# the description while ignoring it produces a plan that is correct and
+# inapplicable. Capture the metadata verbatim into story.tracker_meta, never invent
+# a label, and keep this policy honest - a label with no rule and no ignore entry
+# is reported (TRI007) precisely so nobody has to remember what 'ops-2' meant.
+triage:
+  # [claude] Which tracker fields to copy into story.tracker_meta.
+  capture: [labels, components, issue_type, priority, status, reporter, links, environment]
+  # [script] TRI007 reports any *label* that no rule below and no pattern here
+  # covers, so an unrecognised marker cannot pass unnoticed. Components are not
+  # reported (they are routing taxonomy, always populated) but rules may match them.
+  # Labels that carry no refinement consequence - team routing, board hygiene:
+  ignore: ["^team-", "^board-", "^sprint-", "^billing$", "^eu-vat$"]
+  # [script] First rule that sets a scalar (kind, profile, route) wins, so order is
+  # precedence. Lists from every matching rule are merged.
+  # field: any (labels + components, the default) | all | labels | components |
+  #        issue_type | priority | status
+  labels:
+    - id: incident
+      match: "sev-?[12]|^incident$|outage|p1-live"
+      route: incident              # refinement is not the instrument; stabilise first
+    - id: production-issue
+      match: "production-(issue|finding|bug)|prod-bug|escaped-defect"
+      kind: bug
+      profile: bugfix
+      require_dimensions: [first_seen, frequency, impact_scope, workaround]
+      mandatory_subtask_kinds: [test]
+      must_answer_nfr: [failure, observability]
+      add_critics: [operator]
+      ask: ["Is it still happening now, and is there a workaround in place?", "How many customers or orders are affected, and since which release?", "Was anything already changed in production to contain it?"]
+    - id: security
+      match: "security|vulnerability|pentest|cve"
+      mandatory_subtask_kinds: [test]
+      must_answer_nfr: [security]
+      add_critics: [security]
+      ask: ["Is this already public or reported externally, and is there a disclosure deadline?"]
+    - id: compliance
+      match: "compliance|audit|gdpr|dpia|sox"
+      must_answer_nfr: [data, security]
+      add_critics: [stakeholder]
+      ask: ["Who signs this off, and do they need evidence retained beyond the code change?"]
+    - id: customer-escalation
+      match: "escalation|churn-risk|vip"
+      add_critics: [stakeholder]
+      ask: ["What was promised to the customer, by whom, and by when?"]
+    - id: tech-debt
+      match: "tech-?debt|refactor|cleanup"
+      require_dimensions: [outcome]
+      ask: ["What breaks, slows down or stays risky if we do not do this now?"]
+    - id: discovery
+      match: "^spike$|discovery|research"
+      mandatory_subtask_kinds: [spike]
+
 # ---------------------------------------------------------------------- intake
 # [script] intake.py + validate.py INT gates. Which dimensions must be present
 # (or explicitly assumed / answered) before the item may be decomposed.

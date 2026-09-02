@@ -190,11 +190,16 @@ def payloads_for(bundle, cfg, adapter, caps, sinks, default_sink):
     story = bundle["story"]
     project = get(cfg, "tracker.project", "")
     prefix = get(cfg, "tracker.labels_prefix", "refinery:")
+    # The item's own labels are somebody's decision - triage routing, an escalation,
+    # a compliance marker. A push that sends only our labels silently deletes them.
+    meta = story.get("tracker_meta") or {}
+    existing = [str(x) for x in (meta.get("labels") or []) if x]
     items = [{
         "role": "parent", "id": story.get("key"), "title": story.get("title"),
-        "issue_type": get(cfg, "tracker.story_issue_type", "Story"),
+        "issue_type": meta.get("issue_type") or get(cfg, "tracker.story_issue_type", "Story"),
         "project": project, "body": render_story(bundle),
-        "labels": ["%sstory" % prefix],
+        "labels": existing + ["%sstory" % prefix],
+        "labels_preexisting": existing,
     }]
     subtask_type = get(cfg, "tracker.subtask_issue_type", "Sub-task")
     for st in bundle.get("subtasks") or []:
@@ -263,6 +268,43 @@ def resolve_per_subtask_sinks(bundle, cfg, caps, default_sink, warnings):
                                 "human text" % (sid, limit))
         sinks[sid] = sink
     return sinks
+
+
+def triage_section(bundle):
+    """What the ticket already said about itself, and what that changed. Whoever
+    approves the push is usually the person who put those labels there."""
+    story = bundle.get("story") or {}
+    meta, triage = story.get("tracker_meta") or {}, story.get("triage") or {}
+    if not meta:
+        return []
+    out = ["## Triage", "",
+           "Labels: %s · components: %s · type: %s · priority: %s"
+           % (", ".join(meta.get("labels") or []) or "none",
+              ", ".join(meta.get("components") or []) or "none",
+              meta.get("issue_type") or "?", meta.get("priority") or "?"), ""]
+    if meta.get("links"):
+        out += ["Linked: %s" % ", ".join(
+            "%s %s" % (l.get("type", "relates to"), l.get("key", "?"))
+            for l in meta["links"]), ""]
+    matched = triage.get("matched") or []
+    if matched:
+        out += ["These labels changed the refinement:", ""]
+        for m in matched:
+            out.append("- **%s** (from %s)" % (m.get("id"), ", ".join(m.get("matched_on") or [])))
+        consequences = [(k, triage[k]) for k in
+                        ("route", "kind", "profile", "require_dimensions",
+                         "mandatory_subtask_kinds", "must_answer_nfr", "add_critics")
+                        if triage.get(k)]
+        for key, value in consequences:
+            out.append("  - %s: %s" % (key.replace("_", " "),
+                                       ", ".join(value) if isinstance(value, list) else value))
+        out.append("")
+    elif triage:
+        out += ["No label on this item changes the refinement.", ""]
+    if triage.get("unknown_labels"):
+        out += ["> Unclassified labels: %s. Nobody has decided whether these matter."
+                % ", ".join(triage["unknown_labels"]), ""]
+    return out
 
 
 def review_section(bundle):
@@ -445,7 +487,7 @@ def main(argv=None):
     for w in plan_waves:
         preview.append("- **Wave %d**: %s%s" % (w["wave"], ", ".join(w["subtasks"]),
                                                 " — %s" % w["note"] if w.get("note") else ""))
-    preview += [""] + review_section(bundle)
+    preview += [""] + triage_section(bundle) + review_section(bundle)
     preview += ["", "_Field names and issue types below are unverified `[?]` until probed "
                 "against the live tracker._", "", "---", ""]
     for item in items:

@@ -59,7 +59,7 @@ Score each 0-3. A dimension at 0 or 1 means say so rather than shipping quietly.
 
 | | |
 |---|---|
-| 3 | Intake verdict recorded and every gap classified as missing, assumed or answered. Assumptions labelled. Unverified tracker details marked `[?]`. Scope added beyond the original ask is called out. The weakest part of the refinement is named. Not-ready is reported as not-ready. |
+| 3 | The item's own labels, links and priority were read and their consequences applied or explicitly overruled. Intake verdict recorded and every gap classified as missing, assumed or answered. Assumptions labelled. Unverified tracker details marked `[?]`. Scope added beyond the original ask is called out. The weakest part of the refinement is named. Not-ready is reported as not-ready. |
 | 2 | Mostly candid, a couple of soft claims. |
 | 1 | Uncertainty smoothed over. |
 | 0 | Readiness theatre: gates ticked with questions still open. |

@@ -6,6 +6,31 @@
     "key": "ABC-123",
     "title": "Apply EU reverse-charge VAT at checkout",
     "source_text": "As a B2B customer in the EU I don't want to be charged Dutch VAT. Finance keeps refunding these manually.",
+    "tracker_meta": {
+      "_note": "Copied verbatim from the tracker before refining. Never invented, and never edited to make a rule match.",
+      "issue_type": "Story",
+      "status": "Refinement",
+      "priority": "High",
+      "labels": ["billing", "eu-vat", "compliance", "team-billing"],
+      "components": ["checkout", "tax"],
+      "reporter": "Marieke (Finance)",
+      "links": [
+        {"type": "blocks", "key": "ABC-131"},
+        {"type": "relates to", "key": "ABC-098"}
+      ],
+      "environment": ""
+    },
+    "triage": {
+      "matched": [
+        {"id": "compliance", "matched_on": ["labels=compliance"]}
+      ],
+      "unknown_labels": [],
+      "must_answer_nfr": ["data", "security"],
+      "add_critics": ["stakeholder"],
+      "ask": ["Who signs this off, and do they need evidence retained beyond the code change?"],
+      "route": "refine",
+      "_note": "Written by `triage.py apply --write`. The compliance label is why security and data carry real answers rather than 'unchanged', and why the panel includes the stakeholder critic. ABC-131 is a blocks link: the non-EU follow-up cannot start before this ships."
+    },
     "summary_human": "EU business customers with a valid VAT number registered outside the Netherlands are charged Dutch VAT they do not owe, and Finance refunds it by hand — around 40 orders a month. This story applies the EU reverse-charge rule at checkout: qualifying orders are charged zero VAT with a reason code, and the order summary explains why. Domestic orders and consumer orders keep their current behaviour. Rollout is behind a flag, Netherlands market first.",
     "impact": {
       "goal": "Manual reverse-charge refunds fall from around 40 a month to 0 within 30 days of the NL rollout",
@@ -189,7 +214,8 @@
     {"id": "Q1", "text": "Does Finance need the reverse-charge reason on the invoice PDF this quarter?", "owner": "Marieke (Finance)", "blocking": false},
     {"id": "Q2", "text": "Which locales must ship with the new string on day one?", "owner": "Product", "blocking": false},
     {"id": "Q3", "text": "Confirm the success signal: manual reverse-charge refunds for qualifying orders reach zero within a month of the NL rollout.", "owner": "Marieke (Finance)", "blocking": false, "dimension": "success_signal"},
-    {"id": "Q4", "text": "Confirm scope: non-EU B2B customers and orders placed before go-live are excluded (follow-up ABC-131).", "owner": "Sanne (Product)", "blocking": false, "dimension": "scope"}
+    {"id": "Q4", "text": "Confirm scope: non-EU B2B customers and orders placed before go-live are excluded (follow-up ABC-131).", "owner": "Sanne (Product)", "blocking": false, "dimension": "scope"},
+    {"id": "Q5", "text": "Who signs this off, and do they need evidence retained beyond the code change?", "owner": "Marieke (Finance)", "blocking": false, "source": "triage"}
   ],
   "evidence": {
     "generated_at": "2026-09-02T10:02:00Z",
@@ -567,7 +593,7 @@
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:4176e317064ef321d48aacb5a6e319f2a2c0c7072261edcea500b2f89cdf56d9",
+    "bundle_digest": "sha256:259087e4ca6d09a9712865565c0d417cfd934c7f84fa54d975a0363037584c9d",
     "critics": [
       {"id": "implementer", "context": "fresh"},
       {"id": "tester", "context": "fresh"},

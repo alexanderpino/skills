@@ -162,6 +162,59 @@ CRITICS = {
             "blast_radius": b.get("blast_radius"),
         },
     },
+    "operator": {
+        "title": "The Operator",
+        "voice": "the engineer who carries the pager for this service tonight",
+        "mandate": "Assume this ships and misbehaves at 03:00. Judge whether the plan "
+                   "leaves you able to see it, stop it and undo it.",
+        "hunt": [
+            "a change with no way back: a migration with no reversal, a flag with no kill switch",
+            "a risk with a mitigation and no detection - you find out from a customer",
+            "a done_when that passes in CI and says nothing about production",
+            "a new failure mode with no alert, or an alert with no threshold",
+            "data written that a rollback would strand or corrupt",
+            "a subtask that must be deployed in a particular order, where nothing says so",
+        ],
+        "slice": lambda b: {
+            "risks": (b.get("story") or {}).get("risks"),
+            "non_functional": (b.get("story") or {}).get("non_functional"),
+            "tracker_meta": (b.get("story") or {}).get("tracker_meta"),
+            "subtasks": [{"id": s.get("id"), "title": s.get("title"), "kind": s.get("kind"),
+                          "depends_on": s.get("depends_on"),
+                          "rollback": (s.get("agent_brief") or {}).get("rollback"),
+                          "done_when": (s.get("agent_brief") or {}).get("done_when")}
+                         for s in b.get("subtasks") or []],
+        },
+    },
+    "security": {
+        "title": "The Security Reviewer",
+        "voice": "someone whose job is to find what this lets an attacker do",
+        "mandate": "Read the change surface as an attacker and as an auditor. Anything "
+                   "new that is reachable, stored, logged or returned is yours to "
+                   "question.",
+        "hunt": [
+            "a new field or endpoint whose authorisation nobody stated",
+            "data that becomes visible to a caller who could not see it before",
+            "identifiers or payloads written to logs, traces or error messages",
+            "input that reaches a query, a template, a file path or a shell",
+            "a secret, token or key that has to exist for this to work, with no home named",
+            "a criterion that specifies the happy path of a permission check and not the denial",
+        ],
+        "slice": lambda b: {
+            "change_surface": (b.get("evidence") or {}).get("change_surface"),
+            "contracts": (b.get("evidence") or {}).get("contracts"),
+            "non_functional": {k: v for k, v in
+                               ((b.get("story") or {}).get("non_functional") or {}).items()
+                               if k in ("security", "data", "compatibility")},
+            "acceptance_criteria": (b.get("story") or {}).get("acceptance_criteria"),
+            "tracker_meta": (b.get("story") or {}).get("tracker_meta"),
+            "briefs": [{"subtask": s.get("id"),
+                        "objective": (s.get("agent_brief") or {}).get("objective"),
+                        "change_surface": (s.get("agent_brief") or {}).get("change_surface"),
+                        "done_when": (s.get("agent_brief") or {}).get("done_when")}
+                       for s in b.get("subtasks") or []],
+        },
+    },
     "stakeholder": {
         "title": "The Stakeholder",
         "voice": "the person who wrote the original ask and has not seen the refinement",
