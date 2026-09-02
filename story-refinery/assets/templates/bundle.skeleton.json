@@ -1,0 +1,220 @@
+{
+  "_howto": "This is what you author. Everything else - ticket text, agent briefs, tracker payloads - is rendered from it by emit.py. Fill it in phase order, delete this key, then run validate.py. See assets/examples/example-bundle.json for a complete one.",
+  "schema_version": "1.0",
+  "generated_at": "",
+  "profile": "vertical-slice",
+  "story": {
+    "key": "",
+    "title": "",
+    "source_text": "PHASE 1: the original ask, verbatim. Scope creep is detected against this.",
+    "intake": {
+      "_howto": "PHASE 1: run `intake.py assess --bundle bundle.json --write`, then read source_text and set heuristic:false on every dimension you confirm. Statuses: present (quote it) | missing (blocking question) | assumed (assumption + non-blocking question) | answered (answer + answered_by).",
+      "kind": "feature",
+      "verdict": "sufficient",
+      "dimensions": [],
+      "anchors": [],
+      "repos_reachable": [],
+      "flags": []
+    },
+    "summary_human": "PHASE 6: why and what, within the word budget.",
+    "technical_notes_human": "PHASE 6: what changes, where, what was decided. Every path cited.",
+    "acceptance_criteria": [
+      {
+        "id": "AC1",
+        "rule": "PHASE 3: one blue card.",
+        "examples": [
+          {
+            "case": "",
+            "expect": ""
+          },
+          {
+            "case": "boundary",
+            "expect": ""
+          }
+        ]
+      }
+    ],
+    "non_goals": [
+      "PHASE 3: what this story is not, with follow-up ticket ids."
+    ],
+    "risks": [
+      {
+        "id": "R1",
+        "desc": "",
+        "mitigation": "",
+        "severity": "medium"
+      }
+    ],
+    "non_functional": {
+      "performance": "number or 'unchanged'",
+      "concurrency": "",
+      "failure": "",
+      "data": "",
+      "security": "",
+      "observability": "",
+      "compatibility": ""
+    }
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "question": "PHASE 4: an open technical fork.",
+      "options": [
+        {
+          "label": "",
+          "tradeoff": ""
+        },
+        {
+          "label": "",
+          "tradeoff": ""
+        }
+      ],
+      "chosen": "",
+      "rationale": "",
+      "status": "locked"
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q1",
+      "text": "PHASE 3: a red card.",
+      "owner": "",
+      "blocking": false
+    }
+  ],
+  "evidence": {
+    "generated_at": "",
+    "sources": [
+      "PHASE 2: which of index / manifest / scan produced this"
+    ],
+    "repos": [
+      {
+        "name": "",
+        "rev": "",
+        "root": "",
+        "test_cmd": ""
+      }
+    ],
+    "change_surface": [
+      {
+        "repo": "",
+        "path": "",
+        "symbol": "",
+        "line": 0,
+        "role": "modify",
+        "note": ""
+      }
+    ],
+    "contracts": [
+      {
+        "id": "C1",
+        "repo": "",
+        "path": "",
+        "kind": "openapi",
+        "producers": [],
+        "consumers": [],
+        "note": ""
+      }
+    ],
+    "conventions": [
+      {
+        "rule": "",
+        "evidence": "path:line"
+      }
+    ],
+    "owners": [
+      {
+        "glob": "",
+        "owner": ""
+      }
+    ]
+  },
+  "blast_radius": {
+    "repos": 0,
+    "files_primary": 0,
+    "files_secondary": 0,
+    "contracts": 0,
+    "breaking_contracts": 0,
+    "owner_teams": 0
+  },
+  "subtasks": [
+    {
+      "id": "S1",
+      "title": "[repo] Verb object",
+      "repo": "",
+      "kind": "feature",
+      "human": "PHASE 6: within the word budget, assumes shared context.",
+      "covers": [
+        "AC1"
+      ],
+      "depends_on": [],
+      "estimate_days": 0.5,
+      "produces_contracts": [],
+      "consumes_contracts": [],
+      "needs_coordination": false,
+      "agent_brief": {
+        "objective": "The post-condition, not the activity.",
+        "repo": "",
+        "branch_hint": "",
+        "read_first": [
+          {
+            "path": "",
+            "why": ""
+          }
+        ],
+        "entry_points": [
+          {
+            "path": "",
+            "line": 0,
+            "symbol": "",
+            "why": ""
+          }
+        ],
+        "change_surface": [
+          {
+            "path": "",
+            "role": "modify"
+          }
+        ],
+        "contracts_must_not_break": [
+          {
+            "path": "",
+            "note": ""
+          }
+        ],
+        "conventions": [
+          {
+            "rule": "",
+            "evidence": "path:line"
+          }
+        ],
+        "done_when": [
+          {
+            "type": "command",
+            "cmd": "",
+            "expect": "exit 0"
+          },
+          {
+            "type": "assertion",
+            "text": ""
+          }
+        ],
+        "forbidden": [
+          "Do not edit files another subtask owns."
+        ],
+        "out_of_scope": [],
+        "rollback": {
+          "flag": "",
+          "note": ""
+        },
+        "context_budget_hint": "read_first only; do not index the repo",
+        "provenance": []
+      }
+    }
+  ],
+  "coverage": {
+    "AC1": [
+      "S1"
+    ]
+  }
+}

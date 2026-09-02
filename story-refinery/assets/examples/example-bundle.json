@@ -1,0 +1,527 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-02T10:14:00Z",
+  "profile": "vertical-slice",
+  "story": {
+    "key": "ABC-123",
+    "title": "Apply EU reverse-charge VAT at checkout",
+    "source_text": "As a B2B customer in the EU I don't want to be charged Dutch VAT. Finance keeps refunding these manually.",
+    "summary_human": "EU business customers with a valid VAT number registered outside the Netherlands are charged Dutch VAT they do not owe, and Finance refunds it by hand — around 40 orders a month. This story applies the EU reverse-charge rule at checkout: qualifying orders are charged zero VAT with a reason code, and the order summary explains why. Domestic orders and consumer orders keep their current behaviour. Rollout is behind a flag, Netherlands market first.",
+    "acceptance_criteria": [
+      {
+        "id": "AC1",
+        "rule": "An order from a business customer with a valid EU VAT number registered outside the Netherlands is charged zero VAT.",
+        "examples": [
+          {"case": "DE business, VAT DE811907980, 100 EUR order", "expect": "tax.total = 0.00, tax.reason = reverse-charge"},
+          {"case": "NL business, VAT NL001234567B01, 100 EUR order", "expect": "tax.total = 21.00, tax.reason = standard-rate"},
+          {"case": "DE business, VAT DE811907980, 0 EUR order (boundary)", "expect": "tax.total = 0.00, tax.reason = reverse-charge"}
+        ]
+      },
+      {
+        "id": "AC2",
+        "rule": "A missing, malformed or unverifiable VAT number falls back to the destination country standard rate.",
+        "examples": [
+          {"case": "DE business, VAT field empty", "expect": "tax.total = 19.00 (DE rate), tax.reason = standard-rate"},
+          {"case": "DE business, VAT DE000000000 rejected by VIES", "expect": "tax.total = 19.00, tax.reason = standard-rate"},
+          {"case": "VIES times out after 3 seconds", "expect": "tax.total = 19.00, tax.reason = standard-rate, warning logged"}
+        ]
+      },
+      {
+        "id": "AC3",
+        "rule": "Every order response carries a tax object with total, rate and reason, additive to the existing shape.",
+        "examples": [
+          {"given": "an existing consumer order in the Netherlands", "when": "GET /orders/{id} is called by web@1.4", "then": "the response keeps all current fields and adds tax.total = 21.00, tax.rate = 0.21, tax.reason = standard-rate"}
+        ]
+      },
+      {
+        "id": "AC4",
+        "rule": "The order summary shows the reverse-charge reason to the customer in their locale.",
+        "examples": [
+          {"case": "DE business order, locale de-DE", "expect": "summary line reads the German reverse-charge string, no VAT amount shown"},
+          {"case": "NL consumer order, locale nl-NL", "expect": "summary is unchanged from today"}
+        ]
+      }
+    ],
+    "non_goals": [
+      "Non-EU B2B orders — follow-up ABC-131",
+      "Recalculating VAT on orders placed before this ships",
+      "Replacing the rate table with a tax provider — separate discovery",
+      "Invoice PDF layout changes — Finance owns that template"
+    ],
+    "technical_notes_human": "`TaxCalculator.rate_for` in api/src/billing/tax.py:88 already resolves rates from the rate table; the reverse-charge branch belongs there. VAT validation landed last sprint in api/src/billing/vat.py:12 and is reused unchanged. The order response is assembled in api/src/api/orders/serializers.py:31 — the new tax object is additive, so web@1.4 keeps working through the deploy window. api/openapi.yaml is edited by S2 only. Money is Decimal throughout (api/src/billing/money.py:17); no floats. Web reads the serialized response and renders in web/src/features/orders/OrderSummary.tsx:64. Flag billing.reverse_charge defaults off; S6 enables it for NL after a week of monitoring zero-VAT order volume.",
+    "risks": [
+      {"id": "R1", "desc": "VIES availability is outside our control and it does go down", "mitigation": "3s timeout, fall back to standard rate, log and alert on fallback volume", "severity": "medium"},
+      {"id": "R2", "desc": "Charging zero VAT to a customer who does not qualify is a tax exposure", "mitigation": "flag off by default, NL-only first week, Finance reconciles the first 50 zero-VAT orders", "severity": "high"}
+    ],
+    "intake": {
+      "assessed_at": "2026-09-01T14:20:00Z",
+      "kind": "feature",
+      "lang": "en",
+      "verdict": "sufficient",
+      "dimensions": [
+        {
+          "id": "actor",
+          "required": true,
+          "status": "present",
+          "evidence": "As a B2B customer in the EU",
+          "heuristic": false
+        },
+        {
+          "id": "outcome",
+          "required": true,
+          "status": "present",
+          "evidence": "I don't want to be charged Dutch VAT",
+          "heuristic": false
+        },
+        {
+          "id": "trigger",
+          "required": true,
+          "status": "answered",
+          "answer": "At checkout, whenever the account carries a validated non-NL EU VAT number.",
+          "answered_by": "Sanne (Product), refinement session 2026-09-01"
+        },
+        {
+          "id": "success_signal",
+          "required": false,
+          "status": "assumed",
+          "assumption": "Finance's manual reverse-charge refunds for qualifying orders drop to zero within a month of the NL rollout.",
+          "question_id": "Q3"
+        },
+        {
+          "id": "scope",
+          "required": false,
+          "status": "assumed",
+          "assumption": "Non-EU B2B customers and orders placed before go-live are out of scope.",
+          "question_id": "Q4"
+        }
+      ],
+      "anchors": [
+        {
+          "value": "Dutch",
+          "kind": "domain noun"
+        }
+      ],
+      "repos_reachable": [
+        "api",
+        "web"
+      ],
+      "flags": []
+    },
+    "non_functional": {
+      "performance": "checkout p95 unchanged; VIES lookup is cached for 24h per VAT number",
+      "concurrency": "unchanged — calculation is per-request and stateless",
+      "failure": "VIES timeout 3s, no retry, falls back to standard rate",
+      "data": "no migration; tax_reason is derived, not stored on existing rows",
+      "security": "VAT numbers are business identifiers, not PII; safe to log at info",
+      "observability": "counter billing.tax.reverse_charge{result} and a VIES fallback rate alert",
+      "compatibility": "response is additive only; web@1.4 and mobile@2.2 keep working",
+      "i18n": "one new string key per supported locale, owned by S4"
+    }
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "question": "Where does the reverse-charge rule live?",
+      "options": [
+        {"label": "In TaxCalculator alongside the rate table", "tradeoff": "one place for all rate logic; TaxCalculator grows"},
+        {"label": "A separate ReverseChargeRule strategy", "tradeoff": "cleaner boundary; a second place to look for rate behaviour"}
+      ],
+      "chosen": "In TaxCalculator alongside the rate table",
+      "rationale": "All other rate exceptions already live there; a second location would split the same concern across two files.",
+      "status": "locked"
+    },
+    {
+      "id": "D2",
+      "question": "Do we cache VIES results, and for how long?",
+      "options": [
+        {"label": "No cache", "tradeoff": "always current; a VIES outage blocks every B2B checkout"},
+        {"label": "24h cache per VAT number", "tradeoff": "survives short outages; a revoked VAT number stays valid for a day"},
+        {"label": "30d cache with nightly revalidation", "tradeoff": "cheapest; needs a new scheduled job"}
+      ],
+      "chosen": "",
+      "rationale": "",
+      "status": "deferred",
+      "spike": "S0"
+    }
+  ],
+  "open_questions": [
+    {"id": "Q1", "text": "Does Finance need the reverse-charge reason on the invoice PDF this quarter?", "owner": "Marieke (Finance)", "blocking": false},
+    {"id": "Q2", "text": "Which locales must ship with the new string on day one?", "owner": "Product", "blocking": false},
+    {"id": "Q3", "text": "Confirm the success signal: manual reverse-charge refunds for qualifying orders reach zero within a month of the NL rollout.", "owner": "Marieke (Finance)", "blocking": false, "dimension": "success_signal"},
+    {"id": "Q4", "text": "Confirm scope: non-EU B2B customers and orders placed before go-live are excluded (follow-up ABC-131).", "owner": "Sanne (Product)", "blocking": false, "dimension": "scope"}
+  ],
+  "evidence": {
+    "generated_at": "2026-09-02T10:02:00Z",
+    "sources": ["cached_manifest api@9f2c1ab", "cached_manifest web@41ba77c", "targeted_scan 6 queries"],
+    "repos": [
+      {"name": "api", "rev": "9f2c1ab", "root": "../api", "test_cmd": "pytest -q"},
+      {"name": "web", "rev": "41ba77c", "root": "../web", "test_cmd": "npm run test"}
+    ],
+    "change_surface": [
+      {"repo": "api", "path": "src/billing/tax.py", "symbol": "TaxCalculator.rate_for", "line": 88, "role": "modify", "note": "reverse-charge branch"},
+      {"repo": "api", "path": "src/billing/vat.py", "symbol": "VatNumber.is_valid", "line": 12, "role": "read", "note": "reused unchanged"},
+      {"repo": "api", "path": "src/billing/money.py", "symbol": "round_half_up", "line": 17, "role": "read", "note": "rounding convention"},
+      {"repo": "api", "path": "src/api/orders/serializers.py", "symbol": "OrderSerializer.to_representation", "line": 31, "role": "modify", "note": "additive tax object"},
+      {"repo": "api", "path": "openapi.yaml", "symbol": "components.schemas.Order", "line": 214, "role": "modify", "note": "S2 owns this file"},
+      {"repo": "api", "path": "src/billing/flags.py", "symbol": "enabled", "line": 23, "role": "modify", "note": "register billing.reverse_charge"},
+      {"repo": "api", "path": "src/billing/handlers.py", "symbol": "handle_order", "line": 44, "role": "read", "note": "error handling convention"},
+      {"repo": "api", "path": "tests/billing/test_tax.py", "symbol": "test_rate_for", "line": 1, "role": "read", "note": "test style to match"},
+      {"repo": "api", "path": "tests/billing/test_reverse_charge.py", "role": "create", "note": "S1"},
+      {"repo": "api", "path": "tests/api/orders/test_serializers.py", "symbol": "test_to_representation", "line": 1, "role": "modify", "note": "S2"},
+      {"repo": "api", "path": "tests/contract/test_orders_contract.py", "symbol": "test_orders_contract", "line": 1, "role": "modify", "note": "S3"},
+      {"repo": "api", "path": "tests/contract/fixtures/order_reverse_charge.json", "role": "create", "note": "S3"},
+      {"repo": "api", "path": "docs/api/CHANGELOG.md", "line": 7, "role": "modify", "note": "S5"},
+      {"repo": "api", "path": "docs/api/reason-codes.md", "line": 1, "role": "modify", "note": "S5"},
+      {"repo": "api", "path": "docs/adr/0031-vies-cache-ttl.md", "role": "create", "note": "S0"},
+      {"repo": "api", "path": "config/flags/production.yaml", "symbol": "billing", "line": 40, "role": "modify", "note": "S6"},
+      {"repo": "api", "path": "ops/dashboards/billing.json", "line": 1, "role": "modify", "note": "S6"},
+      {"repo": "api", "path": "ops/alerts/billing_vies_fallback.yaml", "role": "create", "note": "S6"},
+      {"repo": "web", "path": "src/features/orders/OrderSummary.tsx", "symbol": "OrderSummary", "line": 64, "role": "modify", "note": "tax line rendering"},
+      {"repo": "web", "path": "src/features/orders/OrderSummary.test.tsx", "symbol": "OrderSummary", "line": 1, "role": "modify", "note": "S4"},
+      {"repo": "web", "path": "src/i18n/locales/nl.json", "line": 1, "role": "modify", "note": "S4"},
+      {"repo": "web", "path": "src/i18n/locales/de.json", "line": 1, "role": "modify", "note": "S4"},
+      {"repo": "web", "path": "src/i18n/catalogue.ts", "symbol": "catalogue", "line": 9, "role": "read", "note": "string registration convention"}
+    ],
+    "contracts": [
+      {"id": "C1", "repo": "api", "path": "openapi.yaml", "kind": "openapi", "producers": ["api"], "consumers": ["web"], "note": "additive only during the deploy window"}
+    ],
+    "conventions": [
+      {"rule": "Money is Decimal; round with money.round_half_up, never float arithmetic.", "evidence": "api/src/billing/money.py:17"},
+      {"rule": "Domain errors subclass BillingError and are returned, not raised.", "evidence": "api/src/billing/handlers.py:44"},
+      {"rule": "Serializer tests live beside the serializer under tests/api/orders/.", "evidence": "api/tests/api/orders/test_serializers.py:1"},
+      {"rule": "User-facing strings come from the i18n catalogue, never inline literals.", "evidence": "web/src/i18n/catalogue.ts:9"}
+    ],
+    "owners": [
+      {"glob": "api/src/billing/**", "owner": "@team-billing"},
+      {"glob": "web/src/features/orders/**", "owner": "@team-storefront"}
+    ]
+  },
+  "blast_radius": {"repos": 2, "files_primary": 17, "files_secondary": 6, "contracts": 1, "breaking_contracts": 0, "owner_teams": 2},
+  "subtasks": [
+    {
+      "id": "S0",
+      "title": "[api] Spike VIES caching window",
+      "repo": "api",
+      "kind": "spike",
+      "human": "Timeboxed to half a day. Answer one question: how long may we cache a VIES result before a revoked VAT number becomes a tax exposure? Output is a note on D2 plus the cache TTL number that S1 uses. No production code.",
+      "covers": [],
+      "depends_on": [],
+      "estimate_days": 0.5,
+      "produces_contracts": [],
+      "consumes_contracts": [],
+      "agent_brief": {
+        "objective": "A recorded answer to D2: the VIES cache TTL, with the tax-exposure reasoning behind it.",
+        "repo": "api",
+        "branch_hint": "spike/ABC-123-vies-cache",
+        "read_first": [
+          {"path": "src/billing/vat.py", "why": "current VIES call site and timeout handling"},
+          {"path": "docs/adr/", "why": "where the answer is written down"}
+        ],
+        "entry_points": [{"path": "src/billing/vat.py", "line": 12, "symbol": "VatNumber.is_valid", "why": "the call whose result would be cached"}],
+        "change_surface": [{"path": "docs/adr/0031-vies-cache-ttl.md", "role": "create"}],
+        "contracts_must_not_break": [],
+        "conventions": [{"rule": "ADRs use the Nygard template and are numbered sequentially.", "evidence": "api/docs/adr/0030-rate-table-source.md:1"}],
+        "done_when": [
+          {"type": "command", "cmd": "test -f docs/adr/0031-vies-cache-ttl.md", "expect": "exit 0"},
+          {"type": "assertion", "text": "The ADR states a TTL in hours and names the tax exposure accepted at that TTL"}
+        ],
+        "forbidden": ["Do not change production code in this subtask.", "Do not add a caching library."],
+        "out_of_scope": ["Implementing the cache — S1 does that with the chosen TTL"],
+        "rollback": {"flag": "", "note": "documentation only"},
+        "context_budget_hint": "read_first only; do not index the repo",
+        "provenance": ["api@9f2c1ab"]
+      }
+    },
+    {
+      "id": "S1",
+      "title": "[api] Add reverse-charge branch to TaxCalculator",
+      "repo": "api",
+      "kind": "feature",
+      "human": "Extend rate_for with the EU B2B branch: valid VAT number outside NL returns zero with reason reverse-charge, everything else keeps the destination rate. VAT validation exists already — reuse it. Cache TTL comes from S0. Behind billing.reverse_charge, default off. Do not touch the serializer or openapi.yaml; S2 owns those.",
+      "covers": ["AC1", "AC2"],
+      "depends_on": ["S0"],
+      "estimate_days": 0.5,
+      "produces_contracts": [],
+      "consumes_contracts": [],
+      "needs_coordination": false,
+      "agent_brief": {
+        "objective": "TaxCalculator returns zero VAT with reason reverse-charge for valid non-NL EU business customers, and the destination standard rate for everyone else.",
+        "repo": "api",
+        "branch_hint": "feat/ABC-123-reverse-charge-rule",
+        "read_first": [
+          {"path": "src/billing/tax.py", "why": "the calculator being extended"},
+          {"path": "src/billing/vat.py", "why": "VAT validation you reuse, including its timeout behaviour"},
+          {"path": "src/billing/money.py", "why": "the Decimal and rounding convention"},
+          {"path": "tests/billing/test_tax.py", "why": "the test style and fixture names to match"}
+        ],
+        "entry_points": [{"path": "src/billing/tax.py", "line": 88, "symbol": "TaxCalculator.rate_for", "why": "insert the branch here, before the rate table lookup"}],
+        "change_surface": [
+          {"path": "src/billing/tax.py", "role": "modify"},
+          {"path": "tests/billing/test_reverse_charge.py", "role": "create"},
+          {"path": "src/billing/flags.py", "role": "modify"}
+        ],
+        "contracts_must_not_break": [
+          {"path": "openapi.yaml", "note": "not edited here; the calculator return shape stays internal"}
+        ],
+        "conventions": [
+          {"rule": "Money is Decimal; round with money.round_half_up, never float arithmetic.", "evidence": "src/billing/money.py:17"},
+          {"rule": "Domain errors subclass BillingError and are returned, not raised.", "evidence": "src/billing/handlers.py:44"},
+          {"rule": "Feature flags are read through flags.enabled and default to off.", "evidence": "src/billing/flags.py:23"}
+        ],
+        "done_when": [
+          {"type": "command", "cmd": "pytest tests/billing -q", "expect": "exit 0"},
+          {"type": "command", "cmd": "ruff check src/billing", "expect": "exit 0"},
+          {"type": "assertion", "text": "A DE business order with VAT DE811907980 returns total 0.00 with reason reverse-charge while the flag is on"},
+          {"type": "assertion", "text": "The same order with the flag off returns the DE standard rate of 19 percent"}
+        ],
+        "forbidden": [
+          "Do not modify openapi.yaml — S2 owns it.",
+          "Do not modify src/api/orders/serializers.py — S2 owns it.",
+          "Do not reformat files you did not otherwise change.",
+          "Do not add or upgrade dependencies."
+        ],
+        "out_of_scope": [
+          "Serializing the tax object into the API response (S2)",
+          "Non-EU B2B handling (ABC-131)"
+        ],
+        "rollback": {"flag": "billing.reverse_charge", "note": "default off; no data migration, no backfill"},
+        "context_budget_hint": "read_first only; do not index the repo",
+        "provenance": ["api@9f2c1ab", "manifest 2026-09-02"]
+      }
+    },
+    {
+      "id": "S2",
+      "title": "[api] Expose tax breakdown on the order response",
+      "repo": "api",
+      "kind": "feature",
+      "human": "Add the additive tax object (total, rate, reason) to the order serializer and to openapi.yaml. Additive only — web@1.4 and mobile@2.2 must keep parsing the response through the deploy window. This subtask is the sole owner of openapi.yaml for this story.",
+      "covers": ["AC3"],
+      "depends_on": ["S1"],
+      "estimate_days": 0.5,
+      "produces_contracts": ["C1"],
+      "consumes_contracts": [],
+      "needs_coordination": false,
+      "agent_brief": {
+        "objective": "GET /orders/{id} returns a tax object with total, rate and reason, with every existing field unchanged.",
+        "repo": "api",
+        "branch_hint": "feat/ABC-123-tax-breakdown-response",
+        "read_first": [
+          {"path": "src/api/orders/serializers.py", "why": "where the response is assembled"},
+          {"path": "openapi.yaml", "why": "the Order schema you extend"},
+          {"path": "tests/api/orders/test_serializers.py", "why": "existing serializer test style"}
+        ],
+        "entry_points": [{"path": "src/api/orders/serializers.py", "line": 31, "symbol": "OrderSerializer.to_representation", "why": "add the tax object here"}],
+        "change_surface": [
+          {"path": "src/api/orders/serializers.py", "role": "modify"},
+          {"path": "openapi.yaml", "role": "modify"},
+          {"path": "tests/api/orders/test_serializers.py", "role": "modify"}
+        ],
+        "contracts_must_not_break": [
+          {"path": "openapi.yaml", "note": "additive only — no field renamed, no field removed, no type narrowed; web@1.4 and mobile@2.2 are live consumers"}
+        ],
+        "conventions": [
+          {"rule": "Serializer tests live beside the serializer under tests/api/orders/.", "evidence": "tests/api/orders/test_serializers.py:1"},
+          {"rule": "Money is serialized as a string with two decimals, never a float.", "evidence": "src/api/orders/serializers.py:58"}
+        ],
+        "done_when": [
+          {"type": "command", "cmd": "pytest tests/api/orders -q", "expect": "exit 0"},
+          {"type": "command", "cmd": "python -m tools.openapi_diff --base origin/main --fail-on breaking", "expect": "exit 0"},
+          {"type": "command", "cmd": "ruff check src/api/orders", "expect": "exit 0"},
+          {"type": "assertion", "text": "An existing NL consumer order response keeps every field it had before and gains a tax object"}
+        ],
+        "forbidden": [
+          "Do not change TaxCalculator — S1 owns it.",
+          "Do not rename or remove any existing response field.",
+          "Do not bump the API version."
+        ],
+        "out_of_scope": ["Rendering the tax line in the storefront (S4)"],
+        "rollback": {"flag": "billing.reverse_charge", "note": "tax object is present regardless of flag; only its reason value changes"},
+        "context_budget_hint": "read_first only; do not index the repo",
+        "provenance": ["api@9f2c1ab"]
+      }
+    },
+    {
+      "id": "S3",
+      "title": "[api] Add contract tests for the tax object",
+      "repo": "api",
+      "kind": "test",
+      "human": "Pin the additive contract so a later change cannot quietly break web. One test per AC3 example plus a golden response fixture for an existing consumer order. Uses the pact fixtures already in tests/contract/.",
+      "covers": ["AC3"],
+      "depends_on": ["S2"],
+      "estimate_days": 0.25,
+      "produces_contracts": [],
+      "consumes_contracts": ["C1"],
+      "needs_coordination": false,
+      "agent_brief": {
+        "objective": "The order response contract is covered by tests that fail if any existing field is renamed, removed or retyped.",
+        "repo": "api",
+        "branch_hint": "test/ABC-123-tax-contract",
+        "read_first": [
+          {"path": "tests/contract/test_orders_contract.py", "why": "existing contract test structure"},
+          {"path": "tests/contract/fixtures/order_v1.json", "why": "the golden fixture format"}
+        ],
+        "entry_points": [{"path": "tests/contract/test_orders_contract.py", "line": 1, "symbol": "test_orders_contract", "why": "add the tax cases in this module"}],
+        "change_surface": [
+          {"path": "tests/contract/test_orders_contract.py", "role": "modify"},
+          {"path": "tests/contract/fixtures/order_reverse_charge.json", "role": "create"}
+        ],
+        "contracts_must_not_break": [{"path": "openapi.yaml", "note": "read only in this subtask"}],
+        "conventions": [
+          {"rule": "Contract fixtures are committed JSON, regenerated by a marked helper rather than hand-edited.", "evidence": "tests/contract/conftest.py:14"}
+        ],
+        "done_when": [
+          {"type": "command", "cmd": "pytest tests/contract -q", "expect": "exit 0"},
+          {"type": "command", "cmd": "ruff check tests/contract", "expect": "exit 0"},
+          {"type": "assertion", "text": "Removing the tax field from the serializer makes at least one contract test fail"}
+        ],
+        "forbidden": ["Do not edit openapi.yaml.", "Do not weaken an existing assertion to make a new test pass."],
+        "out_of_scope": ["End-to-end browser tests"],
+        "rollback": {"flag": "", "note": "tests only"},
+        "context_budget_hint": "read_first only; do not index the repo",
+        "provenance": ["api@9f2c1ab"]
+      }
+    },
+    {
+      "id": "S4",
+      "title": "[web] Render the tax line in the order summary",
+      "repo": "web",
+      "kind": "feature",
+      "human": "Read tax.reason from the response and show either the amount or the localised reverse-charge line. Consumer orders look exactly as they do today. Strings come from the i18n catalogue; ask Product which locales ship first (Q2) before adding more than nl and de.",
+      "covers": ["AC4"],
+      "depends_on": ["S2"],
+      "estimate_days": 0.5,
+      "produces_contracts": [],
+      "consumes_contracts": ["C1"],
+      "needs_coordination": true,
+      "coordination_with": "@team-storefront",
+      "agent_brief": {
+        "objective": "The order summary shows a localised reverse-charge line instead of a VAT amount when tax.reason is reverse-charge.",
+        "repo": "web",
+        "branch_hint": "feat/ABC-123-order-summary-tax-line",
+        "read_first": [
+          {"path": "src/features/orders/OrderSummary.tsx", "why": "the component being changed"},
+          {"path": "src/i18n/catalogue.ts", "why": "how strings are registered"},
+          {"path": "src/features/orders/OrderSummary.test.tsx", "why": "existing test style"}
+        ],
+        "entry_points": [{"path": "src/features/orders/OrderSummary.tsx", "line": 64, "symbol": "OrderSummary", "why": "the VAT row is rendered here"}],
+        "change_surface": [
+          {"path": "src/features/orders/OrderSummary.tsx", "role": "modify"},
+          {"path": "src/features/orders/OrderSummary.test.tsx", "role": "modify"},
+          {"path": "src/i18n/locales/nl.json", "role": "modify"},
+          {"path": "src/i18n/locales/de.json", "role": "modify"}
+        ],
+        "contracts_must_not_break": [
+          {"repo": "api", "path": "openapi.yaml", "note": "treat tax as optional so the component works against a pre-S2 backend"}
+        ],
+        "conventions": [
+          {"rule": "User-facing strings come from the i18n catalogue, never inline literals.", "evidence": "src/i18n/catalogue.ts:9"},
+          {"rule": "Components read from props; no data fetching inside presentational components.", "evidence": "src/features/orders/OrderSummary.tsx:12"}
+        ],
+        "done_when": [
+          {"type": "command", "cmd": "npm run test -- OrderSummary", "expect": "exit 0"},
+          {"type": "command", "cmd": "npm run lint", "expect": "exit 0"},
+          {"type": "assertion", "text": "With tax.reason reverse-charge the summary shows the localised line and no VAT amount"},
+          {"type": "assertion", "text": "With tax absent from the response the summary renders exactly as it does today"}
+        ],
+        "forbidden": [
+          "Do not change anything in the api repo.",
+          "Do not add locales beyond nl and de until Q2 is answered.",
+          "Do not restyle the summary beyond the tax row."
+        ],
+        "out_of_scope": ["Invoice PDF layout", "Checkout page tax preview"],
+        "rollback": {"flag": "billing.reverse_charge", "note": "server-driven; the component degrades to today's behaviour when tax is absent"},
+        "context_budget_hint": "read_first only; do not index the repo",
+        "provenance": ["web@41ba77c"]
+      }
+    },
+    {
+      "id": "S5",
+      "title": "[api] Document the tax object for API consumers",
+      "repo": "api",
+      "kind": "docs",
+      "human": "One section in the public API changelog and the reason-code table, so mobile and partner teams find it before they hit it. Copy the reason values from openapi.yaml rather than restating them.",
+      "covers": ["AC3"],
+      "depends_on": ["S2"],
+      "estimate_days": 0.25,
+      "produces_contracts": [],
+      "consumes_contracts": ["C1"],
+      "needs_coordination": false,
+      "agent_brief": {
+        "objective": "The public API changelog documents the additive tax object and lists every reason value with its meaning.",
+        "repo": "api",
+        "branch_hint": "docs/ABC-123-tax-object",
+        "read_first": [
+          {"path": "docs/api/CHANGELOG.md", "why": "the changelog format and dating convention"},
+          {"path": "openapi.yaml", "why": "the authoritative list of reason values"}
+        ],
+        "entry_points": [{"path": "docs/api/CHANGELOG.md", "line": 1, "symbol": "unreleased", "why": "new entry goes at the top"}],
+        "change_surface": [
+          {"path": "docs/api/CHANGELOG.md", "role": "modify"},
+          {"path": "docs/api/reason-codes.md", "role": "modify"}
+        ],
+        "contracts_must_not_break": [],
+        "conventions": [
+          {"rule": "Changelog entries state whether a change is additive or breaking in the first line.", "evidence": "docs/api/CHANGELOG.md:7"}
+        ],
+        "done_when": [
+          {"type": "command", "cmd": "python -m tools.docs_lint docs/api", "expect": "exit 0"},
+          {"type": "assertion", "text": "Every reason value present in openapi.yaml appears in the reason code table"}
+        ],
+        "forbidden": ["Do not edit openapi.yaml.", "Do not document behaviour that is not yet merged."],
+        "out_of_scope": ["Partner migration guide"],
+        "rollback": {"flag": "", "note": "documentation only"},
+        "context_budget_hint": "read_first only; do not index the repo",
+        "provenance": ["api@9f2c1ab"]
+      }
+    },
+    {
+      "id": "S6",
+      "title": "[api] Roll out billing.reverse_charge to the NL market",
+      "repo": "api",
+      "kind": "rollout",
+      "human": "Flag on for NL only, then a week of watching the zero-VAT counter and the VIES fallback rate with Finance reconciling the first 50 orders. Includes the removal ticket so the flag does not become permanent.",
+      "covers": [],
+      "depends_on": ["S4"],
+      "estimate_days": 0.25,
+      "produces_contracts": [],
+      "consumes_contracts": [],
+      "needs_coordination": true,
+      "coordination_with": "Finance (Marieke)",
+      "agent_brief": {
+        "objective": "billing.reverse_charge is enabled for the NL market with a dashboard and an alert that would catch an incorrect zero-VAT charge.",
+        "repo": "api",
+        "branch_hint": "chore/ABC-123-rollout",
+        "read_first": [
+          {"path": "config/flags/production.yaml", "why": "how market scoping is expressed"},
+          {"path": "ops/dashboards/billing.json", "why": "where the counter is graphed"}
+        ],
+        "entry_points": [{"path": "config/flags/production.yaml", "line": 40, "symbol": "billing", "why": "the flag block"}],
+        "change_surface": [
+          {"path": "config/flags/production.yaml", "role": "modify"},
+          {"path": "ops/dashboards/billing.json", "role": "modify"},
+          {"path": "ops/alerts/billing_vies_fallback.yaml", "role": "create"}
+        ],
+        "contracts_must_not_break": [],
+        "conventions": [
+          {"rule": "Every flag entry carries an owner and a removal date.", "evidence": "config/flags/production.yaml:12"}
+        ],
+        "done_when": [
+          {"type": "command", "cmd": "python -m tools.flag_lint config/flags/production.yaml", "expect": "exit 0"},
+          {"type": "assertion", "text": "The alert fires when the VIES fallback rate exceeds 5 percent over 15 minutes"},
+          {"type": "assertion", "text": "A follow-up ticket exists to remove the flag with a named owner"}
+        ],
+        "forbidden": ["Do not enable the flag outside NL.", "Do not add a flag entry without a removal date."],
+        "out_of_scope": ["Enabling other markets — separate ticket after the first week"],
+        "rollback": {"flag": "billing.reverse_charge", "note": "set to off; no data written that depends on it"},
+        "context_budget_hint": "read_first only; do not index the repo",
+        "provenance": ["api@9f2c1ab"]
+      }
+    }
+  ],
+  "coverage": {
+    "AC1": ["S1"],
+    "AC2": ["S1"],
+    "AC3": ["S2", "S3", "S5"],
+    "AC4": ["S4"]
+  }
+}

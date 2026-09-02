@@ -1,0 +1,267 @@
+# Decomposition: profiles, splitting, sizing, ordering
+
+## Contents
+
+1. Story splitting vs subtask decomposition
+2. Splitting patterns (story level)
+3. Decomposition profiles (subtask level)
+4. Sizing rules
+5. Ordering and dependencies
+6. Mandatory subtasks
+7. Naming
+
+---
+
+## 1. Two different operations
+
+Do not confuse them.
+
+**Splitting** produces more *stories*, each independently valuable and
+releasable. Trigger it when the story is too big to refine: >7 rules, >3 repos,
+>25 files, multiple user outcomes.
+
+**Decomposition** produces *subtasks* inside one story. Subtasks are not
+independently valuable; they are units of work and review. Only the parent story
+delivers value.
+
+This skill decomposes by default. It *recommends* splitting when blast-radius
+thresholds trip, and shows the proposed split, but does not restructure someone's
+backlog unasked.
+
+---
+
+## 2. Splitting patterns (story level)
+
+When recommending a split, name the pattern used.
+
+**SPIDR** `[P: Mike Cohn]`:
+- **S**pike - carve out the unknown; the spike answers a question, the rest
+  builds with the answer
+- **P**aths - split by workflow path (happy path first, then alternates)
+- **I**nterfaces - split by client/platform/entry point (API first, then UI)
+- **D**ata - split by data variety or source (one currency, then all)
+- **R**ules - split by business rule (basic rules now, edge rules later)
+
+Additional patterns `[P: Lawrence & Green, "Patterns for Splitting User
+Stories"]`: by operation (CRUD), by acceptance criteria, by effort, by
+simple-vs-complex, and "defer performance" - build it correct first, then make
+it fast as a second story with an explicit number.
+
+Anti-pattern: splitting horizontally into "backend story" and "frontend story".
+Neither is releasable; you have created a dependency pair with coordination cost
+and no earlier feedback `[F]`.
+
+---
+
+## 3. Decomposition profiles
+
+Set via `profile:` in config. Profiles change subtask shape, not the rest of the
+pipeline.
+
+### `vertical-slice` (default)
+
+Each subtask is a thin end-to-end path that leaves the system working
+`[P: Cockburn, walking skeleton]`. Subtask 1 is the narrowest possible version
+of the feature that is genuinely usable; later subtasks widen it.
+
+```
+S1 [api] Persist and return a fixed 0% tax line on checkout   (AC1)
+S2 [api] Compute tax from the rate table for NL orders        (AC1, AC2)
+S3 [api] Apply reverse-charge rule for EU B2B                 (AC3)
+S4 [web] Render the tax line in the order summary             (AC4)
+```
+
+Use when: the team merges to trunk frequently, and partial feature states can be
+hidden behind a flag. Best default for AI implementors - each subtask is
+independently verifiable end-to-end.
+
+### `layered`
+
+Subtasks follow architectural layer or discipline: schema, backend, API,
+frontend, tests, docs. Common in enterprises with separate specialists or
+handover-based teams.
+
+```
+S1 [api] Add tax_rate table + migration
+S2 [api] TaxCalculator domain service + unit tests
+S3 [api] Extend POST /orders response with tax breakdown
+S4 [web] Order summary tax line
+S5 [api] Contract tests for the new response shape
+```
+
+Use when: the house convention demands it, or ownership genuinely splits by
+layer. Accept the cost - nothing is demonstrable until the last subtask lands,
+so put a demonstrable integration point in the plan explicitly.
+
+### `workflow-phase`
+
+Subtasks follow the delivery process: design/spike, implement, test, review,
+release/rollout. Common where the process is audited or where a design artefact
+must be approved before build.
+
+```
+S1 Design note + ADR for tax rounding strategy   (spike, 0.5d)
+S2 Implement per the ADR
+S3 Test: unit + contract + one e2e path
+S4 Rollout: flag on for NL, monitor, flag on globally
+```
+
+Use when: governance requires phase evidence. Combine with `vertical-slice`
+inside S2 if the implement phase exceeds one day.
+
+### `bugfix`
+
+Bugs refine differently from features and the other profiles handle them badly.
+A bug's acceptance criteria are not "the feature works" but "the reported case
+produces X, and the class it belongs to produces X too".
+
+```
+S1 [api] Reproduce the double-charge in a failing test   (test, covers AC1)
+S2 [api] Fix at the root cause identified in D1          (feature, covers AC1, AC2)
+S3 [api] Guard the adjacent case surfaced by the repro   (feature, covers AC2)
+```
+
+Rules `[L]`:
+
+- **The failing test lands first**, in its own subtask, and is the thing that
+  proves the bug exists. If you cannot write it, you have not reproduced the bug
+  and the story is not ready - that is a red card, not a detail for the
+  implementer.
+- **The root cause is a decision**, recorded with its evidence, not a sentence in
+  the technical notes. "Why did this happen" and "why here" are challengeable
+  claims and belong in `decisions` where someone can disagree.
+- **Fixing the symptom is an explicit choice**, not a default. If the root cause
+  is out of reach this sprint, record that as a locked decision with the reason
+  and a follow-up ticket. Do not let it look like the root cause was fixed.
+- **The regression test is the AC coverage.** A bugfix subtask whose `done_when`
+  contains no command that fails before the fix has not been verified.
+- Intake needs steps to reproduce, expected behaviour, actual behaviour, and
+  which environment and version. Missing any of the four is a blocking question.
+
+Use when: the item is a defect. Do not force a bug into `vertical-slice` - there
+is no valuable thin slice of "stop being wrong".
+
+### `custom`
+
+Supply an ordered list of subtask kinds with conditions in config. The engine
+just applies them; all other rules still hold.
+
+---
+
+## 4. Sizing rules
+
+- **≤ 1 day of work per subtask.** The Scrum Guide 2020 describes this as what
+  Developers "often" do when decomposing Sprint work `[P]`; treating it as a hard
+  cap is this skill's choice `[L]`, because one day is also the size at which a
+  single PR stays reviewable. If it does not fit, it is not decomposed yet.
+- **≤ 8 files touched** (configurable) `[L]`. Above that, review quality drops
+  and agent implementors lose the plot.
+- **One repo per subtask** `[L]`. A subtask that spans repos is at least two
+  subtasks, because it is at least two PRs, two CI runs and possibly two
+  reviewers.
+- **One PR per subtask** `[L]`. This is what makes the subtask reviewable and
+  makes `done_when` meaningful.
+- **≤ 12 subtasks per story** (configurable) `[L]`. More is a split signal.
+
+SMART for tasks `[P: Bill Wake, "INVEST in Good Stories, and SMART Tasks",
+2003]`: Specific, Measurable, Achievable, Relevant, Time-boxed. INVEST applies to
+the parent story; SMART applies to the subtasks. Do not apply INVEST to subtasks
+- "independent" and "valuable" are not properties subtasks are supposed to have.
+
+### Estimating in days
+
+`estimate_days` exists for sizing, not for planning or velocity. It answers one
+question: is this small enough to be one reviewable unit? Treat anything above
+the configured cap as a decomposition failure rather than a large task.
+
+How to arrive at a number `[F]`:
+
+1. **Reference class first.** Find a subtask in the recent history of this repo
+   that touched a similar number of files in the same area, and start from what
+   that actually took. A remembered comparable beats a felt estimate.
+2. **Count the unknowns, not the lines.** Effort concentrates in the parts you
+   had to mark `ASSUMPTION` in Phase 2. A five-file change through code you read
+   is smaller than a two-file change through code you did not.
+3. **Price the seams.** A subtask that crosses a team boundary
+   (`needs_coordination: true`) carries waiting time that is not in the coding
+   estimate. Note it in the human text rather than inflating the number.
+4. **Round to 0.25 / 0.5 / 1.** Finer granularity is false precision at this
+   size, and invites the number to be read as a commitment.
+
+If the honest answer is "more than a day", say so and split, rather than writing
+`1.0` to satisfy the gate. `validate.py` cannot tell the difference; a reviewer
+can, and the subtask will be the one that stalls the sprint.
+
+---
+
+## 5. Ordering and dependencies
+
+`depends_on` holds subtask ids. The graph must be acyclic.
+
+Ordering rules, in precedence order `[L]`:
+
+1. **Contract producers before consumers.** If S2 consumes a contract S1
+   produces, S2 depends on S1. `validate.py` enforces this from the
+   `produces_contracts` / `consumes_contracts` fields.
+2. **Spikes before what they inform.** A deferred decision's spike blocks every
+   subtask whose shape that decision determines.
+3. **Migrations before code that reads the new shape**, and expand-then-contract
+   for anything with a deploy window: add new column → dual-write → backfill →
+   read new → drop old. The contract step usually belongs to a later story.
+4. **Riskiest slice first** where 1-3 allow it. Front-load the thing most likely
+   to invalidate the plan `[F]`.
+
+Record cross-team dependencies explicitly. If a subtask's CODEOWNERS differ from
+the story's owning team, mark `needs_coordination: true` and name the team - this
+is the most common cause of a story stalling mid-sprint in a multi-repo estate.
+
+### File ownership
+
+Exactly one subtask owns each file `[L]`. `validate.py` fails a bundle where two
+subtasks with no dependency between them write the same path (`PAR001`), and
+warns where two ordered subtasks do (`PAR002`, a rebase rather than a conflict).
+
+Write the ownership into the briefs, not just the graph: subtask A's `forbidden`
+should say "do not edit `openapi.yaml` — S2 owns it". A dependency edge tells a
+scheduler; a `forbidden` line tells the implementor, human or agent, who is
+otherwise looking at a file that obviously needs changing.
+
+### Waves
+
+`emit.py` derives topological waves from `depends_on`. Everything in one wave is
+schedulable in parallel and, by the ownership rule, touches disjoint files.
+
+Read the wave list as a decomposition review: a five-subtask story that comes out
+as five waves of one is almost always over-serialised. Ask of each edge whether B
+truly cannot start without A's output, or whether A was simply written first.
+
+---
+
+## 6. Mandatory subtasks
+
+Configured under `decomposition.mandatory`. Defaults `[L]`:
+
+| Kind | Condition | Why |
+|---|---|---|
+| `test` | always | prevents "tests later"; may be folded into slices if the house does TDD - set `when: never` then |
+| `docs` | a public contract changed | consumers need the change documented before they hit it |
+| `migration` | schema changed | migrations have their own review and rollback path |
+| `rollout` | a feature flag is introduced | flags without a removal plan become permanent |
+
+A mandatory subtask that would be empty should be removed, not padded. Record
+why in the story's technical notes.
+
+---
+
+## 7. Naming
+
+Pattern from config, default `"[{repo}] {verb} {object}"` `[L]`.
+
+- Start with an imperative verb: Add, Extend, Replace, Remove, Migrate, Wire,
+  Expose, Guard, Backfill, Spike.
+- Name the object in domain language, not file names.
+- No conjunctions. A title containing "and" is two subtasks.
+- ≤ 70 characters, because trackers truncate.
+
+Good: `[api] Add reverse-charge rule to TaxCalculator`
+Bad: `[api] Tax stuff` · `Backend work for tax and update the frontend too`

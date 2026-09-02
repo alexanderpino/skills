@@ -1,0 +1,74 @@
+{
+  "skill_name": "story-refinery",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Refine this ticket: 'As a finance user I want to export invoices so I can reconcile them.' The repos are ../api (Python/FastAPI) and ../web (React). Produce subtasks.",
+      "expected_output": "A validating bundle.json plus rendered payloads, with questions raised rather than assumptions made.",
+      "expectations": [
+        "Evidence was gathered from the repos before any subtask was written",
+        "Every technical claim in the technical notes cites a path, or is marked as an assumption",
+        "At least one open question or design decision was surfaced",
+        "Each subtask names exactly one repo and has at least one runnable done_when command",
+        "validate.py was run and its result reported",
+        "No implementation code was written"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "This story is vague: 'Make the dashboard faster.' Is it ready?",
+      "expected_output": "A not-ready finding with specific questions and owners, not an invented specification.",
+      "expectations": [
+        "intake.py was run and reported the item as insufficient before any code was scanned",
+        "The response reports the story as not ready",
+        "Specific questions are listed rather than answered by assumption",
+        "A performance number is requested rather than invented",
+        "No subtasks were fabricated to make the story look ready"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Bug: uploading a file over 10MB returns a 500 instead of a clear error. Refine it.",
+      "expected_output": "A bugfix-profile refinement: reproduction subtask first, root cause as a recorded decision.",
+      "expectations": [
+        "The bugfix profile was used rather than vertical-slice",
+        "A failing-test or reproduction subtask comes before the fix subtask",
+        "Missing reproduction details (environment, version, exact steps) were asked for",
+        "The root cause appears as a decision with a rationale, not as an unsupported claim"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Here's a refined story from last week and an updated one. Push the changes to Jira.",
+      "expected_output": "An update plan showing creates, updates and orphans, presented for approval before any push.",
+      "expectations": [
+        "emit.py was run with --previous to produce an update plan",
+        "Orphaned subtasks were reported rather than deleted",
+        "The preview was shown and approval requested before pushing",
+        "Tracker field names and issue types were treated as unverified until confirmed"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "This epic covers billing, notifications and reporting. Refine it into subtasks.",
+      "expected_output": "A split recommendation into stories, then one story refined properly.",
+      "expectations": [
+        "The epic was not decomposed directly into subtasks",
+        "A split into stories was proposed with the splitting pattern named",
+        "One story was refined properly rather than all three shallowly",
+        "The choice of which story to refine was explained"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Refine: 'Add a Redis cache in front of the reporting API.' Repos are ../api and ../web.",
+      "expected_output": "A stop-and-ask: the ticket names a mechanism with no outcome, so the purpose is asked for before any evidence is gathered.",
+      "expectations": [
+        "The intake gate flagged the ticket as mechanism-only and the verdict was insufficient",
+        "The response asked what problem the cache is meant to solve, with a best guess attached",
+        "No repo scan was run and no subtasks were written",
+        "The answer did not design the cache"
+      ]
+    }
+  ]
+}

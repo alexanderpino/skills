@@ -1,0 +1,180 @@
+# story-refinery configuration. Copy to the repo root as `refinery.yaml`.
+#
+# Every key is marked with who acts on it:
+#   [script]  enforced mechanically by validate.py / emit.py / evidence.py
+#   [claude]  read by Claude while following SKILL.md; no script checks it
+# Nothing here is decorative. If a key is neither, it should be deleted.
+#
+# Parsed by a minimal built-in YAML reader (scripts/_yaml.py) - stick to the subset
+# used here: nested maps, lists of scalars, lists of flat maps, and scalars. No
+# anchors, no multi-line block scalars, no flow style. Save as .json for anything more.
+version: 1
+
+# ---------------------------------------------------------------- decomposition
+# [claude] vertical-slice | layered | workflow-phase | bugfix | custom
+profile: vertical-slice
+
+decomposition:
+  one_repo_per_subtask: true      # [script] SUB015
+  one_pr_per_subtask: true        # [claude] a review convention, not checkable here
+  title_pattern: "[{repo}] {verb} {object}"   # [claude]
+  # [claude] Subtasks added automatically when their condition holds.
+  # when: always | never | public_contract_changed | schema_changed | flag_introduced
+  mandatory:
+    - kind: test
+      when: always
+    - kind: docs
+      when: public_contract_changed
+    - kind: migration
+      when: schema_changed
+    - kind: rollout
+      when: flag_introduced
+  spike_when_unresolved: true     # [claude] enforced indirectly by DEC004/DEC006
+  spike_timebox_days: 0.5         # [claude]
+
+# --------------------------------------------------------------------- budgets
+# All [script].
+budgets:
+  story_summary_words: 120        # BUD001
+  technical_notes_words: 200      # BUD001
+  subtask_words: 80               # SUB008
+  max_subtasks: 12                # SUB001
+  max_files_per_subtask: 8        # BRF004
+  max_subtask_days: 1.0           # SUB011
+  min_acceptance_criteria: 2      # AC001
+  max_acceptance_criteria: 7      # AC002
+
+# --------------------------------------------------------------------- tracker
+tracker:
+  adapter: jira                   # [script] emit.py capability table
+  project: ABC                    # [script] copied into payloads
+  markup: adf                     # [claude] the adapter converts at push time
+  story_issue_type: Story         # [script] payload issue_type
+  subtask_issue_type: Sub-task    # [script] payload issue_type
+  parent_field: parent            # [claude] used when you actually push
+  max_description_chars: 32767    # [script] triggers per-subtask sink degradation
+  labels_prefix: "refinery:"      # [script]
+  agent_brief:
+    # [script] description_tail | comment | attachment | repo_file | custom_field
+    sink: attachment
+    fallback:                     # [script] tried in order; reorder when you change the adapter
+      - comment
+      - description_tail
+      - repo_file
+    filename: agent-brief.json    # [script]
+    repo_file_dir: .refinery/briefs   # [script]
+    custom_field: ""              # [script] required before the custom_field sink is usable
+    marker_begin: "<!-- AGENT-BRIEF v1 BEGIN -->"   # [script]
+    marker_end: "<!-- AGENT-BRIEF v1 END -->"       # [script]
+
+# -------------------------------------------------------------------- evidence
+evidence:
+  sources:
+    # 1. [script] Reuse an index another tool already built.
+    - type: provided_index
+      path: .cartographer/index.json
+      adapter: code-cartographer
+    # 2. [script] Our own sha-keyed manifests.
+    - type: cached_manifest
+      dir: .refinery/manifests
+      ttl_days: 14                # [script] rebuild manifests older than this, even at the same sha
+    # 3. [script] Budgeted, hypothesis-driven search for this story only.
+    - type: targeted_scan
+      budget_files: 400
+      budget_seconds: 60
+  repos:                          # [script]
+    - name: api
+      path: ../api
+    - name: web
+      path: ../web
+  contract_globs:                 # [script]
+    - "**/openapi*.yaml"
+    - "**/openapi*.yml"
+    - "**/swagger*.json"
+    - "**/*.proto"
+    - "**/*.graphql"
+    - "**/schema.sql"
+    - "**/migrations/**"
+  split_thresholds:               # [script] SPL001, compared against blast_radius
+    repos: 3
+    files: 25
+    breaking_contracts: 1
+    owner_teams: 2
+
+# ---------------------------------------------------------------------- intake
+# [script] intake.py + validate.py INT gates. Which dimensions must be present
+# (or explicitly assumed / answered) before the item may be decomposed.
+intake:
+  feature_required: [actor, outcome, trigger]
+  feature_recommended: [success_signal, scope]
+  bug_required: [repro, expected, actual, environment]
+  bug_recommended: [impact]
+  min_anchors: 1                  # code anchors needed for a "scoutable" verdict
+
+# ----------------------------------------------------------------------- gates
+gates:
+  design_decisions: multiple-choice   # [claude] multiple-choice | narrative | off
+  push: manual                        # [claude] manual | auto-on-green
+
+# ------------------------------------------------------------------ validation
+validation:
+  fail_on:                        # [script] error | warn
+    - error
+  require_intake: true            # [script] INT001 - a bundle without an intake block is not ready
+  require_command_done_when: true # [script] BRF006
+  require_coverage_matrix: true   # [script] COV001
+  # [script] Which non-functional categories must be addressed. Extend per house;
+  # 'unchanged' is a valid answer, blank is not.
+  non_functional_keys:
+    - performance
+    - concurrency
+    - failure
+    - data
+    - security
+    - observability
+    - compatibility
+  # [script] DOD001. The house Definition of Done, expressed as commands a subtask
+  # must be able to run. This is what stops "done" meaning "the code looks right".
+  definition_of_done:
+    - id: dod-tests
+      applies_to_kinds: [feature, migration, test]
+      expect_command_matching: "test|pytest|jest|vitest|go test|cargo test"
+      severity: error
+    - id: dod-lint
+      applies_to_kinds: [feature, test, migration]
+      expect_command_matching: "lint|ruff|eslint|clippy|flake8|golangci"
+      severity: warn
+  # [script] AC007 (error) and BUD002 (warning).
+  # The lexicon is LANGUAGE SPECIFIC. A Dutch-language ticket passes every English
+  # term below. Add your team's language or the check is decorative - the Dutch
+  # additions are included as a worked example.
+  vagueness_lexicon:
+    - "etc."
+    - "and so on"
+    - "as needed"
+    - "appropriately"
+    - "properly"
+    - "handle gracefully"
+    - "should probably"
+    - "if necessary"
+    - "where applicable"
+    - "user-friendly"
+    - "robust"
+    - "various"
+    - "improve performance"
+    # Dutch additions - remove if your tickets are English-only
+    - "enzovoort"
+    - "en zo verder"
+    - "indien nodig"
+    - "waar nodig"
+    - "netjes afhandelen"
+    - "netjes afgehandeld"
+    - "goed afhandelen"
+    - "goed afgehandeld"
+    - "correct afgehandeld"
+    - "op de juiste manier"
+    - "gebruiksvriendelijk"
+    - "diverse"
+    - "eventueel"
+    - "waarschijnlijk"
+    - "sneller maken"

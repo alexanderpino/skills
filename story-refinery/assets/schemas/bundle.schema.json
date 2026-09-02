@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/story-refinery/bundle.schema.json",
+  "title": "story-refinery bundle",
+  "description": "Single source of truth for one refined backlog item. Tracker payloads and agent briefs are projections of this document, never hand-edited independently. NOTE: nothing in this skill runs a JSON Schema validator - scripts/validate.py is the enforcer and checks more than this file can express (dependency cycles, contract ordering, file ownership, coverage). This schema exists for editor completion and for other tools that consume the bundle.",
+  "type": "object",
+  "required": ["schema_version", "story", "subtasks"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["vertical-slice", "layered", "workflow-phase", "bugfix", "custom"]},
+    "story": {"$ref": "#/$defs/story"},
+    "decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}},
+    "open_questions": {"type": "array", "items": {"$ref": "#/$defs/question"}},
+    "evidence": {"$ref": "#/$defs/evidence"},
+    "blast_radius": {
+      "type": "object",
+      "properties": {
+        "repos": {"type": "integer"}, "files_primary": {"type": "integer"},
+        "files_secondary": {"type": "integer"}, "contracts": {"type": "integer"},
+        "breaking_contracts": {"type": "integer"},
+        "owner_teams": {"type": "integer"}
+      }
+    },
+    "subtasks": {"type": "array", "items": {"$ref": "#/$defs/subtask"}},
+    "coverage": {
+      "type": "object",
+      "description": "criterion id -> subtask ids. Derived; validate.py recomputes it.",
+      "additionalProperties": {"type": "array", "items": {"type": "string"}}
+    }
+  },
+  "$defs": {
+    "story": {
+      "type": "object",
+      "required": ["key", "title", "summary_human", "acceptance_criteria"],
+      "properties": {
+        "key": {"type": "string"},
+        "title": {"type": "string"},
+        "source_text": {"type": "string", "description": "The original ask, verbatim. Scope creep is detected against this."},
+        "intake": {"$ref": "#/$defs/intake"},
+        "summary_human": {"type": "string", "description": "Why and what. Word-budgeted."},
+        "technical_notes_human": {"type": "string", "description": "What changes, where, what was decided. Every path cited."},
+        "acceptance_criteria": {"type": "array", "items": {"$ref": "#/$defs/criterion"}},
+        "non_goals": {"type": "array", "items": {"type": "string"}},
+        "risks": {"type": "array", "items": {"$ref": "#/$defs/risk"}},
+        "non_functional": {
+          "type": "object",
+          "description": "Give a number or the word 'unchanged'. Never leave a key blank.",
+          "additionalProperties": {"type": "string"}
+        }
+      }
+    },
+    "criterion": {
+      "type": "object",
+      "required": ["id", "rule", "examples"],
+      "properties": {
+        "id": {"type": "string"},
+        "rule": {"type": "string"},
+        "examples": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "oneOf": [
+              {"type": "string"},
+              {"type": "object", "required": ["case", "expect"],
+               "properties": {"case": {"type": "string"}, "expect": {"type": "string"}}},
+              {"type": "object", "required": ["given", "when", "then"],
+               "properties": {"given": {"type": "string"}, "when": {"type": "string"},
+                              "then": {"type": "string"}}}
+            ]
+          }
+        }
+      }
+    },
+    "risk": {
+      "type": "object", "required": ["id", "desc", "mitigation"],
+      "properties": {
+        "id": {"type": "string"}, "desc": {"type": "string"},
+        "mitigation": {"type": "string"},
+        "severity": {"enum": ["low", "medium", "high"]}
+      }
+    },
+    "decision": {
+      "type": "object", "required": ["id", "question", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "question": {"type": "string"},
+        "options": {
+          "type": "array",
+          "items": {"type": "object", "required": ["label"],
+                    "properties": {"label": {"type": "string"},
+                                   "tradeoff": {"type": "string"}}}
+        },
+        "chosen": {"type": "string"},
+        "rationale": {"type": "string"},
+        "rationale_source": {"type": "string"},
+        "status": {"enum": ["locked", "deferred"]},
+        "spike": {"type": "string", "description": "Subtask id. Required when status is deferred."}
+      }
+    },
+    "question": {
+      "type": "object", "required": ["id", "text"],
+      "properties": {
+        "id": {"type": "string"}, "text": {"type": "string"},
+        "owner": {"type": "string"}, "blocking": {"type": "boolean"},
+        "dimension": {"type": "string", "description": "Intake dimension this question resolves, if any."}
+      }
+    },
+    "intake": {
+      "type": "object",
+      "description": "Was there enough information to refine? Written by intake.py, confirmed by the reader, enforced by validate.py INT gates.",
+      "required": ["kind", "verdict", "dimensions"],
+      "properties": {
+        "assessed_at": {"type": "string"},
+        "kind": {"enum": ["feature", "bug"]},
+        "lang": {"type": "string"},
+        "verdict": {"enum": ["sufficient", "scoutable", "insufficient"]},
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["id", "status"],
+            "properties": {
+              "id": {"type": "string"},
+              "required": {"type": "boolean"},
+              "status": {"enum": ["present", "missing", "assumed", "answered"]},
+              "evidence": {"type": "string", "description": "present: a verbatim quote from source_text"},
+              "heuristic": {"type": "boolean", "description": "true until a reader confirms the matched snippet"},
+              "question_id": {"type": "string", "description": "missing: a blocking question; assumed: a non-blocking one"},
+              "assumption": {"type": "string"},
+              "answer": {"type": "string"},
+              "answered_by": {"type": "string"}
+            }
+          }
+        },
+        "anchors": {"type": "array", "items": {"type": "object",
+                    "properties": {"value": {"type": "string"}, "kind": {"type": "string"}}}},
+        "repos_reachable": {"type": "array", "items": {"type": "string"}},
+        "flags": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "generated_at": {"type": "string"},
+        "sources": {"type": "array", "items": {"type": "string"}},
+        "repos": {
+          "type": "array",
+          "items": {"type": "object", "required": ["name"],
+                    "properties": {"name": {"type": "string"}, "rev": {"type": "string"},
+                                   "root": {"type": "string"}, "test_cmd": {"type": "string"}}}
+        },
+        "change_surface": {
+          "type": "array",
+          "items": {"type": "object", "required": ["repo", "path"],
+                    "properties": {"repo": {"type": "string"}, "path": {"type": "string"},
+                                   "symbol": {"type": "string"}, "line": {"type": "integer"},
+                                   "role": {"enum": ["touch", "read", "create", "modify", "delete"]},
+                                   "note": {"type": "string"}}}
+        },
+        "contracts": {
+          "type": "array",
+          "items": {"type": "object", "required": ["id", "repo", "path"],
+                    "properties": {"id": {"type": "string"}, "repo": {"type": "string"},
+                                   "path": {"type": "string"}, "kind": {"type": "string"},
+                                   "producers": {"type": "array", "items": {"type": "string"}},
+                                   "consumers": {"type": "array", "items": {"type": "string"}},
+                                   "note": {"type": "string"}}}
+        },
+        "conventions": {"type": "array", "items": {"$ref": "#/$defs/convention"}},
+        "owners": {"type": "array", "items": {"type": "object",
+                   "properties": {"glob": {"type": "string"}, "owner": {"type": "string"}}}}
+      }
+    },
+    "convention": {
+      "type": "object", "required": ["rule", "evidence"],
+      "properties": {
+        "rule": {"type": "string"},
+        "evidence": {"type": "string", "pattern": ".+:.+",
+                     "description": "path:line. An uncited convention is a training prior, not a house rule."}
+      }
+    },
+    "subtask": {
+      "type": "object",
+      "required": ["id", "title", "repo", "kind", "human", "agent_brief"],
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string", "maxLength": 70},
+        "repo": {"type": "string"},
+        "kind": {"enum": ["feature", "test", "docs", "migration", "spike", "enabling", "rollout"]},
+        "human": {"type": "string"},
+        "covers": {"type": "array", "items": {"type": "string"}},
+        "depends_on": {"type": "array", "items": {"type": "string"}},
+        "estimate_days": {"type": "number", "exclusiveMinimum": 0},
+        "produces_contracts": {"type": "array", "items": {"type": "string"}},
+        "consumes_contracts": {"type": "array", "items": {"type": "string"}},
+        "needs_coordination": {"type": "boolean"},
+        "coordination_with": {"type": "string"},
+        "agent_brief": {"$ref": "#/$defs/agent_brief"}
+      }
+    },
+    "agent_brief": {
+      "type": "object",
+      "required": ["objective", "repo", "read_first", "change_surface", "done_when"],
+      "properties": {
+        "objective": {"type": "string", "description": "The post-condition, not the activity."},
+        "repo": {"type": "string"},
+        "branch_hint": {"type": "string"},
+        "read_first": {
+          "type": "array", "minItems": 1,
+          "items": {"type": "object", "required": ["path", "why"],
+                    "properties": {"path": {"type": "string"}, "why": {"type": "string"}}}
+        },
+        "entry_points": {
+          "type": "array",
+          "items": {"type": "object", "required": ["path"],
+                    "properties": {"path": {"type": "string"}, "line": {"type": "integer"},
+                                   "symbol": {"type": "string"}, "why": {"type": "string"}}}
+        },
+        "change_surface": {
+          "type": "array", "minItems": 1,
+          "items": {"type": "object", "required": ["path", "role"],
+                    "properties": {"path": {"type": "string"},
+                                   "role": {"enum": ["create", "modify", "delete"]},
+                                   "note": {"type": "string"}}}
+        },
+        "contracts_must_not_break": {
+          "type": "array",
+          "items": {"type": "object", "properties": {"path": {"type": "string"},
+                                                     "repo": {"type": "string", "description": "Only when the contract lives in another repo than the brief's own."},
+                                                     "note": {"type": "string"}}}
+        },
+        "conventions": {"type": "array", "items": {"$ref": "#/$defs/convention"}},
+        "done_when": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "oneOf": [
+              {"type": "object", "required": ["type", "cmd"],
+               "properties": {"type": {"const": "command"}, "cmd": {"type": "string"},
+                              "expect": {"type": "string"}}},
+              {"type": "object", "required": ["type", "text"],
+               "properties": {"type": {"const": "assertion"}, "text": {"type": "string"}}}
+            ]
+          }
+        },
+        "forbidden": {"type": "array", "items": {"type": "string"}},
+        "out_of_scope": {"type": "array", "items": {"type": "string"}},
+        "rollback": {"type": "object", "properties": {"flag": {"type": "string"},
+                                                      "note": {"type": "string"}}},
+        "context_budget_hint": {"type": "string"},
+        "provenance": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

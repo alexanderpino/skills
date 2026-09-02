@@ -1,0 +1,686 @@
+#!/usr/bin/env python3
+"""Mechanical readiness gate for a story-refinery bundle. Stdlib only.
+
+  python validate.py bundle.json --config refinery.yaml [--json] [--strict]
+
+Exit codes: 0 ready, 1 errors found, 2 usage/parse error.
+Readiness is decided here, not in a meeting. A failing bundle is a finding:
+report the specific questions, do not delete them to pass the gate.
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _yaml import get, load_config  # noqa: E402
+
+DEFAULT_LEXICON = [
+    "etc.", "and so on", "as needed", "appropriately", "properly",
+    "handle gracefully", "should probably", "if necessary", "where applicable",
+    "user-friendly", "robust", "various", "improve performance",
+]
+UNCOVERED_OK_KINDS = {"enabling", "spike", "rollout"}
+PATH_RX = re.compile(r"\b[\w.-]+(?:/[\w.-]+)+\.[A-Za-z0-9]{1,6}\b")
+DEFAULT_NFR_KEYS = ["performance", "concurrency", "failure", "data", "security",
+                    "observability", "compatibility"]
+
+# Every key the scripts actually read. Anything else in refinery.yaml is a typo or a
+# leftover, and is reported rather than silently ignored.
+CONFIG_SPEC = {
+    "": {"version", "profile", "decomposition", "budgets", "tracker", "evidence",
+         "intake", "gates", "validation"},
+    "decomposition": {"one_repo_per_subtask", "one_pr_per_subtask", "title_pattern",
+                      "mandatory", "spike_when_unresolved", "spike_timebox_days"},
+    "decomposition.mandatory[]": {"kind", "when"},
+    "budgets": {"story_summary_words", "technical_notes_words", "subtask_words",
+                "max_subtasks", "max_files_per_subtask", "max_subtask_days",
+                "min_acceptance_criteria", "max_acceptance_criteria"},
+    "tracker": {"adapter", "project", "markup", "story_issue_type", "subtask_issue_type",
+                "parent_field", "max_description_chars", "labels_prefix", "agent_brief"},
+    "tracker.agent_brief": {"sink", "fallback", "filename", "repo_file_dir", "custom_field",
+                            "marker_begin", "marker_end"},
+    "evidence": {"sources", "repos", "contract_globs", "split_thresholds"},
+    "evidence.sources[]": {"type", "path", "adapter", "dir", "ttl_days",
+                           "budget_files", "budget_seconds"},
+    "evidence.repos[]": {"name", "path"},
+    "evidence.split_thresholds": {"repos", "files", "breaking_contracts", "owner_teams"},
+    "gates": {"design_decisions", "push"},
+    "intake": {"feature_required", "feature_recommended", "bug_required", "bug_recommended",
+               "min_anchors"},
+    "validation": {"fail_on", "require_command_done_when", "require_coverage_matrix",
+                   "vagueness_lexicon", "non_functional_keys", "definition_of_done",
+                   "require_intake"},
+    "validation.definition_of_done[]": {"id", "applies_to_kinds",
+                                        "expect_command_matching", "severity"},
+}
+
+
+class Report:
+    def __init__(self):
+        self.items = []
+
+    def add(self, severity, code, where, message):
+        self.items.append({"severity": severity, "code": code, "where": where,
+                           "message": message})
+
+    error = lambda self, c, w, m: self.add("ERROR", c, w, m)   # noqa: E731
+    warn = lambda self, c, w, m: self.add("WARN", c, w, m)     # noqa: E731
+
+    def count(self, severity):
+        return sum(1 for i in self.items if i["severity"] == severity)
+
+
+def words(text):
+    return len((text or "").split())
+
+
+def find_vague(text, lexicon):
+    low = (text or "").lower()
+    return [term for term in lexicon if term in low]
+
+
+# ------------------------------------------------------------------ validators
+
+def check_structure(b, rep):
+    for key in ("schema_version", "story", "subtasks"):
+        if key not in b:
+            rep.error("STRUCT001", "$", "missing top-level key %r" % key)
+    story = b.get("story") or {}
+    for key in ("key", "title", "summary_human", "acceptance_criteria"):
+        if not story.get(key):
+            rep.error("STRUCT002", "story", "missing or empty %r" % key)
+    if not b.get("subtasks"):
+        rep.error("STRUCT003", "subtasks", "no subtasks - nothing was decomposed")
+
+
+def check_questions_and_decisions(b, rep):
+    for q in b.get("open_questions") or []:
+        where = "open_questions.%s" % q.get("id", "?")
+        if q.get("blocking"):
+            rep.error("READY001", where,
+                      "blocking question unresolved: %s (owner: %s)"
+                      % (q.get("text", "?"), q.get("owner") or "UNASSIGNED"))
+        if not q.get("owner"):
+            rep.warn("READY002", where, "question has no owner - it will not get answered")
+
+    by_id = {s.get("id"): s for s in b.get("subtasks") or []}
+    ids = set(by_id)
+    for d in b.get("decisions") or []:
+        where = "decisions.%s" % d.get("id", "?")
+        status = d.get("status")
+        if status not in ("locked", "deferred"):
+            rep.error("DEC001", where, "status must be 'locked' or 'deferred', got %r" % status)
+        if status == "locked":
+            if not d.get("chosen"):
+                rep.error("DEC002", where, "locked decision has no 'chosen' option")
+            if not d.get("rationale"):
+                rep.error("DEC003", where, "locked decision has no rationale - it cannot be challenged later")
+        if status == "deferred":
+            spike = d.get("spike")
+            if not spike:
+                rep.error("DEC004", where, "deferred decision has no spike subtask")
+            elif spike not in ids:
+                rep.error("DEC005", where, "spike %r is not a subtask in this bundle" % spike)
+            elif by_id[spike].get("kind") != "spike":
+                rep.error("DEC006", where, "subtask %s is kind %r, not 'spike' - a deferred "
+                          "decision needs a timeboxed question, not ordinary work"
+                          % (spike, by_id[spike].get("kind")))
+
+
+def check_acceptance_criteria(b, cfg, rep):
+    lexicon = get(cfg, "validation.vagueness_lexicon", DEFAULT_LEXICON) or DEFAULT_LEXICON
+    lo = get(cfg, "budgets.min_acceptance_criteria", 2)
+    hi = get(cfg, "budgets.max_acceptance_criteria", 7)
+    acs = (b.get("story") or {}).get("acceptance_criteria") or []
+    if len(acs) < lo:
+        rep.error("AC001", "story.acceptance_criteria",
+                  "%d criteria, minimum %d" % (len(acs), lo))
+    if len(acs) > hi:
+        rep.warn("AC002", "story.acceptance_criteria",
+                 "%d criteria (>%d) - this reads like a story that should be split" % (len(acs), hi))
+    seen = set()
+    for ac in acs:
+        where = "AC %s" % ac.get("id", "?")
+        if not ac.get("id"):
+            rep.error("AC003", where, "criterion has no id")
+        elif ac["id"] in seen:
+            rep.error("AC004", where, "duplicate criterion id")
+        else:
+            seen.add(ac["id"])
+        if not ac.get("rule"):
+            rep.error("AC005", where, "criterion has no rule text")
+        if not ac.get("examples"):
+            rep.error("AC006", where, "rule has no concrete example - it is not understood yet")
+        vague = find_vague(ac.get("rule", ""), lexicon)
+        if vague:
+            rep.error("AC007", where, "vague terms in an acceptance criterion: %s"
+                      % ", ".join(vague))
+
+
+def check_budgets(b, cfg, rep):
+    lexicon = get(cfg, "validation.vagueness_lexicon", DEFAULT_LEXICON) or DEFAULT_LEXICON
+    story = b.get("story") or {}
+    limits = [
+        ("summary_human", get(cfg, "budgets.story_summary_words", 120)),
+        ("technical_notes_human", get(cfg, "budgets.technical_notes_words", 200)),
+    ]
+    for field, limit in limits:
+        n = words(story.get(field))
+        if limit and n > limit:
+            rep.warn("BUD001", "story.%s" % field,
+                     "%d words (budget %d) - cut what a colleague already knows" % (n, limit))
+        vague = find_vague(story.get(field), lexicon)
+        if vague:
+            rep.warn("BUD002", "story.%s" % field, "vague terms: %s" % ", ".join(vague))
+    if not story.get("technical_notes_human"):
+        rep.error("BUD003", "story.technical_notes_human",
+                  "empty - a refinement with no technical notes is a reworded ticket")
+    if not story.get("non_goals"):
+        rep.warn("BUD004", "story.non_goals",
+                 "no non-goals - cheapest scope control available, and the most useful "
+                 "single field for an agent implementor")
+    if not story.get("source_text"):
+        rep.warn("BUD005", "story.source_text",
+                 "the original ask was not recorded - scope creep cannot be checked "
+                 "against anything")
+
+
+def check_evidence(b, rep):
+    ev = b.get("evidence") or {}
+    surface = ev.get("change_surface") or []
+    if not surface:
+        rep.error("EVI001", "evidence.change_surface",
+                  "empty - Phase 2 was skipped; go read the code")
+    for i, entry in enumerate(surface):
+        where = "evidence.change_surface[%d]" % i
+        if not entry.get("repo") or not entry.get("path"):
+            rep.error("EVI002", where, "entry needs both repo and path")
+        if entry.get("role") not in ("touch", "read", "create", "modify", "delete", None):
+            rep.warn("EVI003", where, "unusual role %r" % entry.get("role"))
+    if not ev.get("repos"):
+        rep.warn("EVI004", "evidence.repos", "no repos recorded - provenance is unverifiable")
+
+    known = {"%s/%s" % (e.get("repo"), e.get("path")) for e in surface}
+    known |= {e.get("path") for e in surface}
+    notes = (b.get("story") or {}).get("technical_notes_human") or ""
+    for path in set(PATH_RX.findall(notes)):
+        if not any(path in k for k in known if k):
+            rep.warn("EVI005", "story.technical_notes_human",
+                     "path %r cited in notes but absent from change_surface - verify it exists" % path)
+
+    br = b.get("blast_radius") or {}
+    if br.get("repos", 0) > 1 and not (ev.get("contracts") or []):
+        rep.error("EVI006", "evidence.contracts",
+                  "%d repos change but no contract recorded - find the seam and order across it"
+                  % br.get("repos"))
+
+
+def check_subtasks(b, cfg, rep):
+    max_days = get(cfg, "budgets.max_subtask_days", 1.0)
+    max_files = get(cfg, "budgets.max_files_per_subtask", 8)
+    max_subtasks = get(cfg, "budgets.max_subtasks", 12)
+    word_budget = get(cfg, "budgets.subtask_words", 80)
+    require_cmd = get(cfg, "validation.require_command_done_when", True)
+
+    subs = b.get("subtasks") or []
+    if len(subs) > max_subtasks:
+        rep.warn("SUB001", "subtasks", "%d subtasks (>%d) - merge to reviewable units or split "
+                                       "the story" % (len(subs), max_subtasks))
+    ids, titles = set(), set()
+    ac_ids = {a.get("id") for a in (b.get("story") or {}).get("acceptance_criteria") or []}
+
+    for s in subs:
+        sid = s.get("id") or "?"
+        where = "subtask %s" % sid
+        if sid in ids:
+            rep.error("SUB002", where, "duplicate subtask id")
+        ids.add(sid)
+        title = (s.get("title") or "").strip()
+        if not title:
+            rep.error("SUB003", where, "subtask has no title")
+        if title.lower() in titles:
+            rep.error("SUB004", where, "duplicate subtask title")
+        titles.add(title.lower())
+        if len(title) > 70:
+            rep.warn("SUB005", where, "title is %d chars - trackers truncate at ~70" % len(title))
+        if re.search(r"\band\b|\s&\s", title, re.I):
+            rep.warn("SUB006", where, "title contains a conjunction - probably two subtasks")
+        if not s.get("repo"):
+            rep.error("SUB007", where, "subtask has no repo - one subtask = one repo = one PR")
+        if words(s.get("human")) > word_budget:
+            rep.warn("SUB008", where, "human text %d words (budget %d)"
+                     % (words(s.get("human")), word_budget))
+        if not s.get("human"):
+            rep.error("SUB009", where, "no human-facing text")
+        est = s.get("estimate_days")
+        if est is None:
+            rep.warn("SUB010", where, "no estimate_days - sizing cannot be checked")
+        elif max_days and est > max_days:
+            rep.error("SUB011", where, "estimate %.2fd exceeds %.2fd - not decomposed yet"
+                      % (est, max_days))
+
+        covers = s.get("covers") or []
+        for cid in covers:
+            if cid not in ac_ids:
+                rep.error("SUB012", where, "covers unknown criterion %r" % cid)
+        if not covers and s.get("kind") not in UNCOVERED_OK_KINDS:
+            rep.error("SUB013", where,
+                      "covers no acceptance criterion and kind %r is not enabling/spike/rollout"
+                      % s.get("kind"))
+
+        _check_brief(s, where, max_files, require_cmd, rep)
+
+    for s in subs:
+        for dep in s.get("depends_on") or []:
+            if dep not in ids:
+                rep.error("SUB014", "subtask %s" % s.get("id"),
+                          "depends_on unknown subtask %r" % dep)
+    return subs, ids
+
+
+def _check_brief(s, where, max_files, require_cmd, rep):
+    brief = s.get("agent_brief")
+    if not brief:
+        rep.error("BRF001", where, "no agent_brief")
+        return
+    for key in ("objective", "repo", "read_first", "change_surface", "done_when"):
+        if not brief.get(key):
+            rep.error("BRF002", where, "agent_brief missing %r" % key)
+    if brief.get("repo") and s.get("repo") and brief["repo"] != s["repo"]:
+        rep.error("BRF003", where, "agent_brief.repo %r != subtask.repo %r"
+                  % (brief["repo"], s["repo"]))
+    surface = brief.get("change_surface") or []
+    if max_files and len(surface) > max_files:
+        rep.error("BRF004", where, "%d files in change_surface (max %d) - split the subtask"
+                  % (len(surface), max_files))
+    for entry in surface:
+        if entry.get("role") not in ("create", "modify", "delete"):
+            rep.warn("BRF005", where, "change_surface role should be create/modify/delete, got %r"
+                     % entry.get("role"))
+    dw = brief.get("done_when") or []
+    if require_cmd and not any(d.get("type") == "command" for d in dw):
+        rep.error("BRF006", where, "no runnable command in done_when - there is no mechanical gate")
+    for d in dw:
+        if d.get("type") == "command" and not d.get("cmd"):
+            rep.error("BRF007", where, "command done_when with no cmd")
+        if d.get("type") == "assertion" and words(d.get("text")) < 5:
+            rep.warn("BRF008", where, "assertion too vague to write a test from: %r" % d.get("text"))
+    for conv in brief.get("conventions") or []:
+        if ":" not in (conv.get("evidence") or ""):
+            rep.error("BRF009", where,
+                      "convention without path:line evidence - that is a training prior, "
+                      "not a house rule: %r" % conv.get("rule"))
+    if not brief.get("forbidden"):
+        rep.warn("BRF010", where, "no 'forbidden' entries - nothing stops scope creep")
+    if not brief.get("out_of_scope"):
+        rep.warn("BRF011", where, "no 'out_of_scope' entries")
+    blob = json.dumps(brief)
+    if "```" in blob or re.search(r"\bdef \w+\(|\bfunction \w+\(|=>\s*\{", blob):
+        rep.warn("BRF012", where,
+                 "agent_brief looks like it contains implementation - refinement stops at the seam")
+
+
+def transitive_deps(subs):
+    """id -> set of ids it depends on, directly or transitively. Cycle-safe."""
+    graph = {s.get("id"): [d for d in (s.get("depends_on") or [])] for s in subs}
+    memo = {}
+
+    def walk(node, stack):
+        if node in memo:
+            return memo[node]
+        if node in stack:
+            return set()
+        acc = set()
+        for dep in graph.get(node, []):
+            if dep in graph:
+                acc.add(dep)
+                acc |= walk(dep, stack | {node})
+        memo[node] = acc
+        return acc
+
+    return {n: walk(n, frozenset()) for n in graph}, graph
+
+
+def check_graph(subs, reach, graph, rep):
+    state = {}
+
+    def visit(node, stack):
+        if state.get(node) == "done":
+            return
+        if state.get(node) == "open":
+            rep.error("DAG001", "subtasks", "dependency cycle: %s" % " -> ".join(stack + [node]))
+            return
+        state[node] = "open"
+        for dep in graph.get(node, []):
+            if dep in graph:
+                visit(dep, stack + [node])
+        state[node] = "done"
+
+    for node in graph:
+        visit(node, [])
+
+    producers = {}
+    for s in subs:
+        for c in s.get("produces_contracts") or []:
+            producers.setdefault(c, []).append(s.get("id"))
+    for s in subs:
+        for c in s.get("consumes_contracts") or []:
+            for prod in producers.get(c, []):
+                if prod == s.get("id"):
+                    continue
+                if prod not in reach.get(s.get("id"), set()):
+                    rep.error("DAG002", "subtask %s" % s.get("id"),
+                              "consumes contract %r produced by %s but does not depend on it - "
+                              "producers ship first" % (c, prod))
+
+
+def check_file_collisions(subs, reach, rep):
+    """Two subtasks writing the same file is a merge conflict, and with parallel
+    agent implementors it is two agents fighting over one buffer."""
+    owners = {}
+    for s in subs:
+        for entry in (s.get("agent_brief") or {}).get("change_surface") or []:
+            if entry.get("role") not in ("create", "modify", "delete"):
+                continue
+            owners.setdefault((s.get("repo"), entry.get("path")), []).append(s.get("id"))
+    for (repo, path), ids in sorted(owners.items()):
+        if len(ids) < 2:
+            continue
+        ordered = all(a in reach.get(b, set()) or b in reach.get(a, set())
+                      for i, a in enumerate(ids) for b in ids[i + 1:])
+        where = "%s/%s" % (repo, path)
+        if ordered:
+            rep.warn("PAR002", where, "written by %s in sequence - the later subtask rebases"
+                     % ", ".join(ids))
+        else:
+            rep.error("PAR001", where,
+                      "written by concurrent subtasks %s - add a dependency between them or give "
+                      "the file to one subtask" % ", ".join(ids))
+
+
+def check_contract_ids(bundle, subs, rep):
+    known = {c.get("id") for c in (bundle.get("evidence") or {}).get("contracts") or []}
+    for s in subs:
+        for field in ("produces_contracts", "consumes_contracts"):
+            for cid in s.get(field) or []:
+                if cid not in known:
+                    rep.error("CON001", "subtask %s" % s.get("id"),
+                              "%s references %r which is not in evidence.contracts" % (field, cid))
+
+
+def check_brief_surface(bundle, subs, rep):
+    """A brief that edits a file the evidence never found is a path the agent will trust
+    and may not exist. Created files are exempt - they cannot be evidenced."""
+    known = {(e.get("repo"), e.get("path"))
+             for e in (bundle.get("evidence") or {}).get("change_surface") or []}
+    for s in subs:
+        for entry in (s.get("agent_brief") or {}).get("change_surface") or []:
+            if entry.get("role") in ("modify", "delete") and \
+                    (s.get("repo"), entry.get("path")) not in known:
+                rep.warn("EVI007", "subtask %s" % s.get("id"),
+                         "brief edits %r but evidence.change_surface never recorded it - verify "
+                         "the path exists before an agent trusts it" % entry.get("path"))
+
+
+def check_split_thresholds(bundle, cfg, rep):
+    th = get(cfg, "evidence.split_thresholds", {}) or {}
+    br = bundle.get("blast_radius") or {}
+    total_files = (br.get("files_primary") or 0) + (br.get("files_secondary") or 0)
+    for key, value, label in (("repos", br.get("repos"), "repos"),
+                              ("files", total_files, "files in the blast radius"),
+                              ("owner_teams", br.get("owner_teams"), "owning teams"),
+                              ("breaking_contracts", br.get("breaking_contracts"),
+                               "breaking contract changes")):
+        limit = th.get(key)
+        if limit and value and value > limit:
+            rep.warn("SPL001", "blast_radius",
+                     "%s %s exceeds the split threshold of %s - recommend splitting the story "
+                     "(report it, do not restructure the backlog unasked)" % (value, label, limit))
+
+
+def check_one_repo_rule(cfg, subs, rep):
+    if not get(cfg, "decomposition.one_repo_per_subtask", True):
+        return
+    for s in subs:
+        repos = {s.get("repo")} | {e.get("repo") for e in
+                                   (s.get("agent_brief") or {}).get("change_surface") or []
+                                   if e.get("repo")}
+        repos.discard(None)
+        if len(repos) > 1:
+            rep.error("SUB015", "subtask %s" % s.get("id"),
+                      "spans repos %s - one subtask is one repo, one PR, one reviewable unit"
+                      % ", ".join(sorted(repos)))
+
+
+def check_coverage(b, subs, cfg, rep):
+    if not get(cfg, "validation.require_coverage_matrix", True):
+        return
+    acs = (b.get("story") or {}).get("acceptance_criteria") or []
+    computed = {}
+    for s in subs:
+        for cid in s.get("covers") or []:
+            computed.setdefault(cid, []).append(s.get("id"))
+    for ac in acs:
+        if ac.get("id") and ac["id"] not in computed:
+            rep.error("COV001", "AC %s" % ac["id"], "no subtask covers this criterion")
+    declared = b.get("coverage")
+    if declared is not None:
+        norm = lambda m: {k: sorted(v or []) for k, v in m.items()}  # noqa: E731
+        if norm(declared) != norm(computed):
+            rep.warn("COV002", "coverage",
+                     "declared coverage map disagrees with the subtasks - it is derived, "
+                     "regenerate it rather than maintaining it by hand")
+
+
+def check_nonfunctional(b, cfg, rep):
+    expected = get(cfg, "validation.non_functional_keys", DEFAULT_NFR_KEYS) or DEFAULT_NFR_KEYS
+    nf = (b.get("story") or {}).get("non_functional") or {}
+    missing = [k for k in expected if not nf.get(k)]
+    if missing:
+        rep.warn("NFR001", "story.non_functional",
+                 "unaddressed: %s (write 'unchanged' if that is the answer)" % ", ".join(missing))
+
+
+def check_definition_of_done(cfg, subs, rep):
+    """The house DoD, expressed as commands a subtask must be able to run."""
+    for rule in get(cfg, "validation.definition_of_done", []) or []:
+        raw_kinds = rule.get("applies_to_kinds")
+        if isinstance(raw_kinds, str):
+            rep.error("DOD003", "config", "definition_of_done %r has applies_to_kinds as a "
+                      "string (%r) - it must be a list, or the rule silently matches nothing"
+                      % (rule.get("id"), raw_kinds))
+            continue
+        kinds = set(raw_kinds or [])
+        try:
+            rx = re.compile(rule.get("expect_command_matching") or ".", re.I)
+        except re.error as exc:
+            rep.error("DOD002", "config", "definition_of_done %r has a bad regex: %s"
+                      % (rule.get("id"), exc))
+            continue
+        severity = str(rule.get("severity") or "error").lower()
+        for s in subs:
+            if kinds and s.get("kind") not in kinds:
+                continue
+            cmds = [d.get("cmd") or "" for d in (s.get("agent_brief") or {}).get("done_when") or []
+                    if d.get("type") == "command"]
+            if not any(rx.search(c) for c in cmds):
+                report = rep.error if severity == "error" else rep.warn
+                report("DOD001", "subtask %s" % s.get("id"),
+                       "no done_when command satisfies definition of done %r (expects a command "
+                       "matching /%s/)" % (rule.get("id"), rx.pattern))
+
+
+def _norm(text):
+    return re.sub(r"\s+", " ", (text or "")).strip().lower()
+
+
+def check_intake(b, cfg, rep):
+    """Was there enough information, and did anyone check? The intake block is the
+    recorded answer; these gates hold the rest of the bundle to it."""
+    if not get(cfg, "validation.require_intake", True):
+        return
+    story = b.get("story") or {}
+    intake = story.get("intake")
+    if not intake:
+        rep.error("INT001", "story.intake", "no intake assessment - run "
+                  "`intake.py assess --bundle bundle.json --write` before anything else")
+        return
+    verdict = intake.get("verdict")
+    if verdict not in ("sufficient", "scoutable", "insufficient"):
+        rep.error("INT002", "story.intake", "verdict must be sufficient | scoutable | "
+                  "insufficient, got %r" % verdict)
+        return
+    if verdict != "sufficient" and b.get("subtasks"):
+        rep.error("INT003", "story.intake", "verdict is %r but the bundle has %d subtask(s) - "
+                  "the item was decomposed although the intake said to stop and ask"
+                  % (verdict, len(b["subtasks"])))
+    questions = {q.get("id"): q for q in b.get("open_questions") or []}
+    source = _norm(story.get("source_text"))
+    kind = intake.get("kind") or "feature"
+    required = set(get(cfg, "intake.%s_required" % kind,
+                       {"feature": ["actor", "outcome", "trigger"],
+                        "bug": ["repro", "expected", "actual", "environment"]}[kind]) or [])
+    seen = set()
+    for d in intake.get("dimensions") or []:
+        did = d.get("id") or "?"
+        seen.add(did)
+        where = "intake.%s" % did
+        status = d.get("status")
+        is_required = d.get("required", did in required)
+        if status == "present":
+            ev = _norm(d.get("evidence"))
+            if not ev:
+                rep.error("INT007", where, "marked present with no evidence quote")
+            elif ev not in source:
+                rep.error("INT007", where, "evidence %r does not occur in story.source_text - "
+                          "a dimension is present only if the source text says so"
+                          % (d.get("evidence") or "")[:60])
+            if d.get("heuristic"):
+                rep.warn("INT009", where, "still flagged heuristic - nobody confirmed the "
+                         "matched snippet actually answers the question")
+        elif status == "missing":
+            if is_required:
+                q = questions.get(d.get("question_id"))
+                if not q:
+                    rep.error("INT004", where, "required dimension missing with no linked "
+                              "question - set question_id to a blocking open question")
+                elif not q.get("blocking"):
+                    rep.error("INT004", where, "required dimension missing but %s is not "
+                              "blocking" % d.get("question_id"))
+                if verdict == "sufficient":
+                    rep.error("INT008", where, "verdict is 'sufficient' while a required "
+                              "dimension is missing")
+        elif status == "assumed":
+            if not d.get("assumption"):
+                rep.error("INT005", where, "marked assumed with no assumption text - an "
+                          "unstated assumption cannot be corrected")
+            q = questions.get(d.get("question_id"))
+            if not q:
+                rep.warn("INT006", where, "assumed without a linked question - the assumption "
+                         "can never be confirmed or refuted")
+            elif q.get("blocking"):
+                rep.warn("INT006", where, "assumed but its question %s is blocking - either it "
+                         "is missing, or the question should not block" % d.get("question_id"))
+        elif status == "answered":
+            if not d.get("answer") or not d.get("answered_by"):
+                rep.error("INT010", where, "marked answered without both 'answer' and "
+                          "'answered_by' - an answer with no source is an assumption")
+        else:
+            rep.error("INT002", where, "status must be present | missing | assumed | answered, "
+                      "got %r" % status)
+    for did in sorted(required - seen):
+        rep.error("INT004", "intake.%s" % did, "required dimension not assessed at all")
+    if kind == "bug" and (b.get("profile") or "") not in ("bugfix", ""):
+        rep.warn("INT011", "profile", "intake says this is a bug but profile is %r - "
+                 "the bugfix profile puts the failing test first" % b.get("profile"))
+
+
+def check_config(cfg, rep):
+    """A typo'd config key is silently ignored, which is how a setting you think is
+    enforced turns out not to be. Name them."""
+    def walk(node, path):
+        if isinstance(node, dict):
+            spec = CONFIG_SPEC.get(path)
+            for key in node:
+                where = "%s.%s" % (path, key) if path else key
+                if spec is not None and key not in spec:
+                    rep.warn("CFG001", "config", "unknown key %r - it is being ignored" % where)
+                walk(node[key], where)
+        elif isinstance(node, list):
+            for item in node:
+                if isinstance(item, dict):
+                    walk(item, path + "[]")
+
+    walk(cfg, "")
+
+
+# ------------------------------------------------------------------------ main
+
+def validate(bundle, cfg):
+    rep = Report()
+    check_config(cfg, rep)
+    check_structure(bundle, rep)
+    check_intake(bundle, cfg, rep)
+    check_questions_and_decisions(bundle, rep)
+    check_acceptance_criteria(bundle, cfg, rep)
+    check_budgets(bundle, cfg, rep)
+    check_evidence(bundle, rep)
+    subs, _ = check_subtasks(bundle, cfg, rep)
+    reach, graph = transitive_deps(subs)
+    check_graph(subs, reach, graph, rep)
+    check_file_collisions(subs, reach, rep)
+    check_contract_ids(bundle, subs, rep)
+    check_brief_surface(bundle, subs, rep)
+    check_one_repo_rule(cfg, subs, rep)
+    check_definition_of_done(cfg, subs, rep)
+    check_coverage(bundle, subs, cfg, rep)
+    check_split_thresholds(bundle, cfg, rep)
+    check_nonfunctional(bundle, cfg, rep)
+    return rep
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("bundle")
+    ap.add_argument("--config", default="refinery.yaml")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--strict", action="store_true", help="treat warnings as errors")
+    args = ap.parse_args(argv)
+
+    try:
+        with open(args.bundle, "r", encoding="utf-8") as fh:
+            bundle = json.load(fh)
+    except (OSError, ValueError) as exc:
+        print("cannot read bundle: %s" % exc, file=sys.stderr)
+        return 2
+
+    cfg = load_config(args.config) if os.path.exists(args.config) else {}
+    rep = validate(bundle, cfg)
+    errors, warns = rep.count("ERROR"), rep.count("WARN")
+    fail_on = {str(s).lower() for s in (get(cfg, "validation.fail_on", ["error"]) or ["error"])}
+    if args.strict:
+        fail_on.add("warn")
+    ready = not (("error" in fail_on and errors) or
+                 ({"warn", "warning"} & fail_on and warns))
+
+    if args.json:
+        print(json.dumps({"ready": ready, "errors": errors, "warnings": warns,
+                          "findings": rep.items}, indent=2))
+    else:
+        for severity in ("ERROR", "WARN"):
+            for item in [i for i in rep.items if i["severity"] == severity]:
+                print("%-5s %-9s %-28s %s" % (severity, item["code"], item["where"],
+                                              item["message"]))
+        print("\n%s  %d error(s), %d warning(s)"
+              % ("READY" if ready else "NOT READY", errors, warns))
+        if errors:
+            print("Report the findings. Do not delete open questions to pass the gate.")
+    return 0 if ready else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
