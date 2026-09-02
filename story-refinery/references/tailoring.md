@@ -66,9 +66,21 @@ gate that should have caught something does not `[N]`.
 | how we phrase things, what our reviewers care about | the tailoring skill's prose | judgement |
 | a repo, tracker, sink, or field name | `refinery.yaml` | `emit.py` and `evidence.py` need it |
 
-So: **the tailoring skill owns `refinery.yaml`.** Shipping the config with the
-skill is what keeps the mechanical half and the judgement half in one place and
-one version.
+**Tailoring arrives mostly as instructions**, and that is the expected shape: a
+skill that steers this one by saying what is true here - owners, conventions,
+tracker reality, language, what to skip and why. Shipping a `refinery.yaml` is
+the *optional* half, for teams whose mechanical rules are stable enough to keep
+in a file.
+
+The bridge between the two is a rule of Phase 0, not a preference: **an
+instruction that is mechanical is written into `refinery.yaml` before anything
+else runs** - a number, a bound, a DoD command, a label rule - generated from the
+instruction when the skill ships no config (`evidence.py init` writes the
+annotated example; set the keys the instructions name), and recorded in
+`bundle.tailoring.applied` with `mechanism: config` and the key. Judgement stays
+`mechanism: prompt`. `TLR006` is the gate on the bridge: a `prompt`-mechanism
+rule that contains a quantity, a bound or a command is reported, because the
+gates will never see it where it is.
 
 `CFG001` already reports config keys no script reads, so a typo cannot pose as a
 setting. `TLR002` is the other half: an applied rule that *claims* to be
@@ -107,10 +119,14 @@ reader six weeks later can tell which rules came from where:
 
 ## What a tailoring skill should contain
 
-In order of value:
+In order of value. Everything below is an instruction to this skill; the config
+is the one item that is optional, because Phase 0 generates it from the
+instructions when it is absent:
 
-1. **`refinery.yaml`** - the whole mechanical half: repos, tracker, DoD, budgets,
-   label policy, NFR keys, vagueness lexicon in your language.
+1. **The mechanical rules, as instructions**: budgets, the DoD command, which
+   labels mean what, the tracker and its field names, the language. Ship them as
+   `refinery.yaml` if you like; if you ship prose, Phase 0 writes the config from
+   it and `TLR006` checks that nothing mechanical stayed prose.
 2. **Owners.** Who answers which kind of question, by name and role. This is the
    single most useful thing a team skill can add, because `READY002` (a question
    with no owner) is otherwise answered with "the team".

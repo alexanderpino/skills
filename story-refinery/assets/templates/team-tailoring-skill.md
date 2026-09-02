@@ -49,14 +49,28 @@ tell whoever maintains this file:
 
 We may switch any gate off in config. We may not switch off saying that we did.
 
-## What we ship
+## What we say, and what we ship
 
-`refinery.yaml`, in this directory. It is the mechanical half of these house
-rules and the scripts read it directly. **Anything that is a number, a list, a
-pattern or a mapping belongs there and nowhere else** — a rule written only in
-this file reads as enforced and is not (`TLR002`).
+This skill is instructions. story-refinery reads them and steers by them. The
+one rule about form: **anything that is a number, a list, a pattern, a command
+or a mapping is config**, because the scripts cannot read prose. Either ship it
+as `refinery.yaml` in this directory, or state it here and let story-refinery's
+Phase 0 write it into a generated `refinery.yaml` before anything else runs -
+it records each such rule with `mechanism: config`, and `TLR006` reports any
+mechanical instruction that stayed prose.
 
-Current version: `<3.2>`. Bump it here and in `tailoring.version` together.
+<Delete one of these two lines:>
+- We ship `refinery.yaml` here. Current version: `<3.2>`; bump it and
+  `tailoring.version` together.
+- We ship no config; the mechanical rules below are generated into one at Phase 0.
+
+Mechanical rules stated here (each becomes a config key):
+
+- <Subtasks are at most `0.5` days> → `budgets.max_subtask_days`
+- <Done means `make test` passes for feature and migration subtasks> →
+  `validation.definition_of_done`
+- <`prod-issue` means an escaped defect; refine on the bugfix profile> →
+  `triage.labels`
 
 ## Owners
 

@@ -64,6 +64,15 @@ THRESHOLD_RX = re.compile(
     re.I)
 BOUNDARY_RX = re.compile(r"boundary|grens|edge case|randgeval", re.I)
 CYNEFIN_DOMAINS = ("clear", "complicated", "complex", "chaotic")
+# An instruction that is really config: a quantity with a unit, a bound, a command in
+# backticks, or a label pattern. Owners, tone and escalation never match this.
+MECHANICAL_RULE_RX = re.compile(
+    r"\d+(\.\d+)?\s*(day|days|hour|hours|file|files|subtask|subtasks|word|words|criteria|"
+    r"dag|dagen|uur|bestand|bestanden|subtaken|woorden|%)\b|"
+    r"\b(at most|at least|no more than|maximum|minimum|max\.?|min\.?|hoogstens|minimaal|"
+    r"maximaal|ten hoogste)\s+(a |an |een |half |halve )?\d*\s*\w+|"
+    r"`[^`\s]+\s[^`]+`|"                                   # a command with an argument
+    r"\blabel(s|led)?\b.*\b(means?|=>|->|→|betekent)\b", re.I)
 # What a team-tailoring skill may never relax. Each exists to stop the output being
 # confidently wrong; see references/tailoring.md. Every gate in this skill can be
 # switched off in config - `disclosure` is what keeps that legitimate.
@@ -153,6 +162,7 @@ CODES = {
     "STRUCT003": ("error", "the bundle has no subtasks, so nothing was decomposed"),
     "TLR001": ("warn", "config names a tailoring source the bundle does not record"),
     "TLR002": ("error", "an applied tailoring rule carries no text a reader can check"),
+    "TLR006": ("warn", "a mechanical tailoring instruction is recorded as prompt, invisible to every gate"),
     "TLR003": ("error", "a tailoring override relaxes an invariant no tailoring may relax"),
     "TLR004": ("error", "a tailoring override records no reason and no person"),
     "TLR005": ("warn", "a gate is switched off and the bundle never says so"),
@@ -1620,6 +1630,17 @@ def check_tailoring(b, cfg, rep):
         if mechanism not in ("config", "prompt", "gate", None):
             rep.error("TLR002", where, "mechanism must be config | prompt | gate, got %r"
                       % mechanism)
+        # Tailoring arrives mostly as instructions. An instruction that is really a
+        # number, a command or a pattern is invisible to every gate while it stays
+        # prose - so the rule is: write it into refinery.yaml (generated from the
+        # instruction is fine) and record it as config. This is the mechanical half of
+        # "prose that thinks it is a gate".
+        if mechanism == "prompt" and MECHANICAL_RULE_RX.search(entry.get("rule") or ""):
+            rep.warn("TLR006", where, "this instruction is mechanical (%r) and is recorded as "
+                     "prompt, so no gate will ever see it - write it into refinery.yaml, "
+                     "generated from the instruction if the tailoring skill ships no config, "
+                     "and record it with mechanism: config and the key"
+                     % (entry.get("rule") or "")[:60])
         if mechanism == "config":
             key = entry.get("key")
             if not key:

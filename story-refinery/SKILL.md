@@ -125,8 +125,14 @@ Read `references/tailoring.md` when one is present;
 the tailoring skill and the `refinery.yaml` it ships → this skill's `[L]`
 defaults → `[F]`/`[P]` guidance. Nothing is overridden invisibly.
 
-**The tailoring skill owns `refinery.yaml`**: anything mechanical lives there or
-it does not exist (`TLR002`); judgement lives in the skill's own text.
+**The tailoring skill steers this one with instructions.** That is the expected
+shape - owners, conventions, tracker reality, language, what to skip and why -
+and it may or may not ship a `refinery.yaml`. The one rule of form: an
+instruction that is mechanical (a number, a bound, a DoD command, a label rule)
+is written into `refinery.yaml` in Phase 0 - generated from the instruction if
+none is shipped - and recorded with `mechanism: config`, because the gates
+cannot read prose (`TLR006`). Judgement stays prose and is recorded with
+`mechanism: prompt`.
 
 **Invariants.** A tailoring skill may change almost anything about how a
 refinement is produced. It may not relax these:
@@ -160,11 +166,17 @@ settings that change the shape of everything downstream: decomposition `profile`
 `tracker.agent_brief.sink`. Do not silently guess a tracker; detect it from the
 ticket key format or ask.
 
-If `tailoring.source` is set, a team-tailoring skill owns this config - load it,
-apply it, and record what you applied in `bundle.tailoring` (`TLR001`). If it is
-set and no such skill is present in the session, say so: you are refining with
-half the house rules. If it is empty, the refinement is untailored, which is
-fine and is also worth one sentence at handover.
+If a team-tailoring skill is loaded, its instructions steer this run. Before
+anything else: take every instruction that is mechanical - a budget, a DoD
+command, a label rule, a tracker field, the language - and set it in
+`refinery.yaml`, generating the file from `evidence.py init` when the skill ships
+none; record each in `bundle.tailoring.applied` with `mechanism: config` and its
+key, and set `tailoring.source` to the skill's name so `TLR001` can hold later
+bundles to it. Judgement - owners, tone, escalation - is recorded with
+`mechanism: prompt`. `TLR006` reports a mechanical instruction that stayed prose.
+If the config names a `tailoring.source` and no such skill is present, say so:
+you are refining with half the house rules. If nothing is loaded, the refinement
+is untailored, which is fine and is also worth one sentence at handover.
 
 ### Phase 1 - Triage and intake
 

@@ -1268,6 +1268,28 @@ def suite_story_shapes():
     check("briefs: a command that greps for a def is not implementation",
           ("BRF012", "subtask S1") not in {(i["code"], i["where"]) for i in rep.items})
 
+    # Tailoring arrives as instructions; a mechanical one that stays prose is invisible
+    # to every gate, and TLR006 is the bridge that says so.
+    from validate import check_tailoring
+    def tlr(rules):
+        t = copy.deepcopy(golden)
+        t["tailoring"]["applied"] = [{"rule": r, "mechanism": "prompt"} for r in rules]
+        rep = Report()
+        check_tailoring(t, cfg, rep)
+        return [i["where"] for i in rep.items if i["code"] == "TLR006"]
+    check("tailoring: an owner rule as prompt is fine",
+          not tlr(["Money questions go to Finance (Marieke), scope questions to Product (Sanne)."]))
+    check("tailoring: a budget stated as prompt is reported",
+          tlr(["Subtasks are at most 0.5 days."]) == ["tailoring.applied[0]"])
+    check("tailoring: a DoD command stated as prompt is reported",
+          bool(tlr(["Done means `make test` passes for every feature subtask."])))
+    check("tailoring: a label meaning stated as prompt is reported",
+          bool(tlr(["The label prod-issue means an escaped defect."])))
+    check("tailoring: the same rule recorded as config is not reported",
+          not [i for i in (lambda t: (check_tailoring(t, cfg, Report()), []) [1])(golden)])
+    check("tailoring: the golden's own prompt rules are judgement, not config",
+          not tlr([e["rule"] for e in golden["tailoring"]["applied"] if e.get("mechanism") == "prompt"]))
+
 
 def suite_manifest_cwd():
     """SKL-2, S1: the reproduction. A CI command lifted out of its working directory
