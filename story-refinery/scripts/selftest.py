@@ -1307,6 +1307,7 @@ def suite_manifest_cwd():
 def suite_complexity_and_greenfield():
     """A size you can take apart, and a story for a project that does not exist yet."""
     print("\n-- 11c. complexity card and greenfield --")
+    import re
     import complexity as CX
     import intake as I
     from validate import check_greenfield, check_complexity, Report
@@ -1358,6 +1359,11 @@ def suite_complexity_and_greenfield():
     check("greenfield: an ordinary story is untouched", not grn(golden))
     g = copy.deepcopy(golden)
     g["evidence"]["greenfield"] = {"target": "svc-invoicing", "reason": "no service owns numbering"}
+    # The golden's own ruled_out entries mention 'existing'; strip those so the gate
+    # is tested on a bundle that genuinely rules nothing out about reuse.
+    g["evidence"]["ruled_out"] = [r for r in g["evidence"]["ruled_out"]
+                                  if not re.search(r"reuse|extend|existing|already",
+                                                   r.get("claim", "") + r.get("conclusion", ""), re.I)]
     f = grn(g)
     check("greenfield: nothing ruled out about reuse is reported", ("GRN002", "evidence.ruled_out") in f)
     check("greenfield: no walking skeleton is reported", ("GRN004", "subtasks") in f)

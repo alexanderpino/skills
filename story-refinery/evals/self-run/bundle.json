@@ -277,7 +277,7 @@
         "domain": 1
       },
       "method": "highest-level-wins; XL when three metrics are high, or two under a complex domain",
-      "computed_at": "2026-09-02T18:32:25+00:00"
+      "computed_at": "2026-09-02T18:34:32+00:00"
     }
   },
   "decisions": [
@@ -927,7 +927,7 @@
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:26c36f1678b95101e8f2ae1402e0c16b4926b39334499ce1b9c0a79fa5f30e26",
+    "bundle_digest": "sha256:3f1fbabe0192220fd57dcd013868273ce62a2df455046dd96934e4faab61e70a",
     "critics": [
       {
         "id": "implementer",

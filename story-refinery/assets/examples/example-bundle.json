@@ -341,9 +341,16 @@
       "i18n": "one new string key per supported locale, owned by S4"
     },
     "complexity": {
-      "band": "L",
+      "band": "M",
       "drivers": [
-        "critical_path"
+        "code_paths",
+        "critical_path",
+        "deferred",
+        "files_written",
+        "owner_teams",
+        "read_set",
+        "repos",
+        "rule_space"
       ],
       "metrics": {
         "repos": 2,
@@ -373,11 +380,11 @@
         "deferred": 2,
         "unknowns": 0,
         "irreversible": 0,
-        "critical_path": 3,
+        "critical_path": 2,
         "domain": 1
       },
       "method": "highest-level-wins; XL when three metrics are high, or two under a complex domain",
-      "computed_at": "2026-09-02T18:32:25+00:00"
+      "computed_at": "2026-09-02T18:34:32+00:00"
     }
   },
   "decisions": [
@@ -1649,7 +1656,7 @@
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:0869c72238714575a367d78cbffaaa0bd16c97e763ff21d29182b3cbf378b35f",
+    "bundle_digest": "sha256:27879676b7a4e872f08253776af44fa93ccf1406f553cb9943256dac39d1f834",
     "critics": [
       {
         "id": "implementer",
