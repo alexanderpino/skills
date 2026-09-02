@@ -1218,18 +1218,27 @@ def check_graph(subs, reach, graph, rep):
 def check_file_collisions(subs, reach, rep):
     """Two subtasks writing the same file is a merge conflict, and with parallel
     agent implementors it is two agents fighting over one buffer."""
-    owners = {}
+    owners, creators = {}, {}
     for s in subs:
         for entry in (s.get("agent_brief") or {}).get("change_surface") or []:
             if entry.get("role") not in ("create", "modify", "delete"):
                 continue
-            owners.setdefault((s.get("repo"), entry.get("path")), []).append(s.get("id"))
+            key = (s.get("repo"), entry.get("path"))
+            owners.setdefault(key, []).append(s.get("id"))
+            if entry.get("role") == "create" and s.get("kind") == "enabling":
+                creators[key] = s.get("id")
     for (repo, path), ids in sorted(owners.items()):
         if len(ids) < 2:
             continue
         ordered = all(a in reach.get(b, set()) or b in reach.get(a, set())
                       for i, a in enumerate(ids) for b in ids[i + 1:])
         where = "%s/%s" % (repo, path)
+        # A walking skeleton creates the files every later slice fills in. That is the
+        # shape, not a rebase to warn about - provided the slices depend on it.
+        if ordered and creators.get((repo, path)) in ids and all(
+                creators[(repo, path)] in reach.get(other, set())
+                for other in ids if other != creators[(repo, path)]):
+            continue
         if ordered:
             rep.warn("PAR002", where, "written by %s in sequence - the later subtask rebases"
                      % ", ".join(ids))

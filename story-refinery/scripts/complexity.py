@@ -262,4 +262,7 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except BrokenPipeError:        # `| head` closed the pipe; that is not an error here
+        sys.exit(0)
