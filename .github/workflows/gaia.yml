@@ -1,0 +1,168 @@
+name: gaia
+
+# Gaia's guards are `scripts/check.py` (attribution well-formedness, coverage both ways, the
+# per-file line cap) and `scripts/index.py --check` (the generated index has not been hand
+# edited). Without something that RUNS them on every push they are a snapshot of one
+# afternoon -- the same argument the terrain-architect workflow opens with, and the same
+# history: this corpus has already had assertions that were defined and never called.
+#
+# The `bites` job below is the part that matters. A workflow that only runs a PASSING guard
+# cannot tell you the guard still works; check.py once had two assertions that were defined
+# and never invoked, and it stayed green throughout. So CI also applies mutations and requires
+# the guard to go RED, plus a decoy it must stay GREEN on. That is the repo's standing rule --
+# a guard never seen to fail is not known to be a guard -- executed on every push rather than
+# recorded in a register once.
+
+on:
+  push:
+    paths:
+      - 'gaia/**'
+      - '.github/workflows/gaia.yml'
+  pull_request:
+    paths:
+      - 'gaia/**'
+      - '.github/workflows/gaia.yml'
+  workflow_dispatch:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # No dependencies on purpose. Gaia ships no reference implementation and its scripts are
+      # stdlib-only; if that ever stops being true, this step failing is the right alarm.
+      - name: Guard must be green
+        run: python3 gaia/scripts/check.py
+
+      - name: Generated index must be current
+        run: python3 gaia/scripts/index.py --check
+
+      - name: Evals must be valid JSON with the shape the runner expects
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          ev = json.load(open('gaia/evals/evals.json'))
+          tr = json.load(open('gaia/evals/trigger-evals.json'))
+          assert ev['skill_name'] == 'gaia', ev.get('skill_name')
+          ids = [e['id'] for e in ev['evals']]
+          assert ids == sorted(set(ids)) == list(range(1, len(ids) + 1)), f'bad ids: {ids}'
+          for e in ev['evals']:
+              for k in ('id', 'axis', 'prompt', 'expected_output', 'expectations'):
+                  assert k in e, f"eval {e.get('id')} missing {k}"
+              assert e['expectations'], f"eval {e['id']} has no expectations"
+          assert all(isinstance(q['should_trigger'], bool) and q['query'] for q in tr), 'bad trigger row'
+          pos = sum(q['should_trigger'] for q in tr)
+          # Negatives are what make a trigger suite mean anything; a suite of positives only
+          # proves the description is broad, which is the failure mode, not the goal.
+          assert pos and len(tr) - pos, f'{pos} positive, {len(tr) - pos} negative -- need both'
+          print(f"{len(ev['evals'])} evals, {len(tr)} trigger queries "
+                f"({pos} positive, {len(tr) - pos} negative)")
+          PY
+
+  bites:
+    # Proves the guard still fails on things it is supposed to fail on. Runs against a COPY so
+    # a mutation can never be left behind in the tree, and mutates only SUBJECTS (documents,
+    # the coverage map, the index) -- never the guard itself, which would prove nothing.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Mutations must turn the guard red, and the decoy must not
+        run: |
+          set -u
+          cp -r gaia /tmp/g && cd /tmp/g
+          fails=0
+
+          expect_red() {   # $1 = label
+            if python3 scripts/check.py >/tmp/out 2>&1; then
+              echo "::error::guard stayed GREEN on mutation '$1' -- it does not bite"
+              fails=$((fails + 1))
+            else
+              echo "  red as required: $1  -- $(grep -m1 FAIL /tmp/out | cut -c1-100)"
+            fi
+          }
+
+          SUBJ=references/caustics.md
+
+          # Written in Python, not sed, and it ASSERTS the mutation applied. A sed range that
+          # silently matches nothing turns this whole job into a vacuous pass -- which is
+          # exactly what happened to the first draft of this step, caught only by running it.
+          cat > /tmp/mut1.py <<'PY'
+          import re, sys, pathlib
+          p = pathlib.Path(sys.argv[1]); s = p.read_text(encoding="utf-8")
+          ids = re.findall(r"\{\s*id:\s*([A-Za-z0-9_]+)", s)
+          assert ids, "no source ids in " + str(p) + " -- mutation would pass vacuously"
+          for i in ids:
+              if f"[{i}]" in s:
+                  p.write_text(s.replace(f"[{i}]", f"[{i}_broken]"), encoding="utf-8")
+                  print("broke", i); break
+          else:
+              raise SystemExit("no declared id appears as a body marker")
+          PY
+
+          cp $SUBJ /tmp/bk
+          python3 /tmp/mut1.py $SUBJ
+          expect_red "citation key points at nothing"
+          cp /tmp/bk $SUBJ
+
+          cp $SUBJ /tmp/bk
+          sed -i '0,/locator: "/s/locator: "[^"]*"/locator: ""/' $SUBJ
+          expect_red "locator emptied"
+          cp /tmp/bk $SUBJ
+
+          cp $SUBJ /tmp/bk
+          python3 -c "p='$SUBJ';open(p,'a').write('\nfiller\n'*400)"
+          expect_red "line cap exceeded"
+          cp /tmp/bk $SUBJ
+
+          cp $SUBJ /tmp/bk
+          sed -i 's/^status: draft/status: finished/' $SUBJ
+          expect_red "illegal status value"
+          cp /tmp/bk $SUBJ
+
+          cp $SUBJ /tmp/bk
+          sed -i 's/^status: draft/status: draft\nokf_version: "0.2"/' $SUBJ
+          expect_red "okf_version outside the bundle root"
+          cp /tmp/bk $SUBJ
+
+          cp references/coverage.md /tmp/bk
+          sed -i 's/→ caustics.md/→ caustics-nonexistent.md/' references/coverage.md
+          expect_red "coverage points at a document that does not exist"
+          cp /tmp/bk references/coverage.md
+
+          cp references/index.md /tmp/bk
+          sed -i 's/^# Gaia index/# Gaia index EDITED/' references/index.md
+          if python3 scripts/index.py --check >/dev/null 2>&1; then
+            echo "::error::index --check stayed GREEN on a hand edit"
+            fails=$((fails + 1))
+          else
+            echo "  red as required: generated index hand-edited"
+          fi
+          cp /tmp/bk references/index.md
+
+          # The decoy. A guard that fires on rewording gets ignored within a week, and this
+          # corpus is reworded constantly -- so staying green here is a requirement, not a nicety.
+          cp $SUBJ /tmp/bk
+          sed -i 's/\bthe bed\b/the pool floor/g' $SUBJ
+          if python3 scripts/check.py >/dev/null 2>&1; then
+            echo "  green as required: prose reworded, no citation touched"
+          else
+            echo "::error::guard fired on a pure rewording -- it is too eager to be trusted"
+            fails=$((fails + 1))
+          fi
+          cp /tmp/bk $SUBJ
+
+          python3 scripts/check.py >/dev/null || { echo "::error::copy not restored"; fails=$((fails+1)); }
+          echo
+          [ "$fails" -eq 0 ] && echo "all mutations bite; decoy clean" || { echo "$fails problem(s)"; exit 1; }
