@@ -1,6 +1,18 @@
 ---
 name: story-refinery
-description: Refine a backlog item into an implementation-ready package - multi-repo code evidence with file:line citations, locked design decisions, testable acceptance criteria, a condensed human-facing description, a machine-readable agent brief, and subtasks decomposed per a configurable house profile. Use this skill whenever the user wants to refine, groom, break down, split, size, or "make ready" a story, ticket, issue, epic, or feature; write or fix acceptance criteria; create subtasks; assess blast radius or impact across repositories; prepare work for an AI implementer; or run a Definition of Ready check. Tracker-agnostic - works with Jira, GitHub, GitLab, Linear, Azure DevOps, or plain markdown. Use it even when the user does not say the word "refinement" but is clearly turning a vague request into engineering work.
+description: >-
+  User-invoked only - reachable exclusively when the user types /story-refinery or names
+  this skill. Do NOT load or act on it because a request looks like refinement, because
+  the user mentions a story, ticket, issue, epic, backlog, acceptance criteria, subtasks,
+  blast radius or a Definition of Ready, or because a vague request would benefit from
+  being refined first. Those are not invocations - answer the request directly instead.
+  When it IS invoked: refines a backlog item into an implementation-ready package -
+  multi-repo code evidence with file:line citations, locked design decisions, testable
+  acceptance criteria, a condensed human-facing description, a machine-readable agent
+  brief, and subtasks decomposed per a configurable house profile. Tracker-agnostic -
+  works with Jira, GitHub, GitLab, Linear, Azure DevOps, or plain markdown.
+metadata:
+  invocation: user
 ---
 
 # Story Refinery
