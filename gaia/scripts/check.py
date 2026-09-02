@@ -52,7 +52,7 @@ _ENTRY = re.compile(r"^- \*\*(?P<id>[a-z][a-z0-9_]*)\*\*\s+`(?P<tier>[PFLN?])`\s
 _ID_OPENER = re.compile(r"^- \*\*[a-z][a-z0-9_]*\*\*")
 _TOPIC = re.compile(r"^- \*\*(?P<id>[a-z][a-z0-9-]*)\*\*\s+`(?P<state>covered|planned|out-of-scope)`"
                     r"\s+—\s+(?P<rest>.+?)\s*$")
-_MARKER = re.compile(r"(?<!\])\[(?P<id>[a-z][a-z0-9_]*)\](?!\()")
+_MARKER = re.compile(r"(?<!\])\[(?P<id>[a-z][a-z0-9_]{3,})\](?!\()")
 
 
 def bibliography() -> tuple[dict[str, dict], list[str]]:
@@ -135,15 +135,31 @@ def sources_digest(fm: dict) -> str:
 
 
 def _unfenced(body: str) -> str:
-    """Body with fenced blocks blanked. `arr[freeman1991]` in a code sample is indexing, not a
-    citation; the bibliography scanner already skipped fences and this one did not."""
+    """Body with code blanked, so indexing is never read as a citation.
+
+    Markdown has TWO code-block forms and handling only fences was not enough: `receivers[i]`
+    and `A[i]` in an INDENTED block were reported as fabricated citations to `i`. Both forms
+    are blanked here.
+
+    A citation id is also required to be at least four characters. Every real id in this
+    corpus is six or more; `i`, `r`, `n`, `xy` are loop variables. The cost is that a
+    fabricated three-letter citation would slip -- stated rather than hidden, and cheap
+    against the alternative of a guard that cries wolf on every code sample until someone
+    switches it off.
+    """
     out, fence = [], False
     for line in body.split("\n"):
         if line.lstrip().startswith("```"):
             fence = not fence
             out.append("")
             continue
-        out.append("" if fence else line)
+        if fence or (line[:4] == "    " and line.strip()):
+            out.append("")
+            continue
+        # Inline code spans too. `max(h[i], h[r])` in prose is indexing, and this is where the
+        # last false positives came from after both block forms were handled -- three places
+        # markdown can hold code, and a guard that knows about two of them cries wolf.
+        out.append(re.sub(r"`[^`]*`", "", line))
     return "\n".join(out)
 
 

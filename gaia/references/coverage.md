@@ -64,14 +64,14 @@ and that sentence is what stops the same topic being proposed every six months.
 
 ## Rendering
 
-- **heightfield-lod** `planned` — How do you get a heightfield on screen at distance without cracks between tiles or popping between levels?
-- **tiled-streaming** `planned` — How do you page terrain that does not fit in memory, without a hitch when the camera moves?
-- **virtual-texturing** `planned` — How do you give terrain material detail at a resolution no single atlas can hold?
-- **gpu-driven-culling** `planned` — How do you decide what to draw without a CPU round trip per object?
-- **planetary-precision** `planned` — Where does float precision break at planetary scale, and what do you do about it?
-- **water-rendering** `planned` — How do you draw the surface: reflection, refraction, depth colour, foam and the shoreline?
-- **caustics** `planned` — How do you get focused light through a water surface, at each budget tier?
-- **heightfield-raymarching** `planned` — How do you draw a heightfield by marching rays, for the near-real-time ray-traced tier?
+- **heightfield-lod** `covered` — How do you get a heightfield on screen at distance without cracks between tiles or popping between levels? → heightfield-lod.md
+- **tiled-streaming** `covered` — How do you page terrain that does not fit in memory, without a hitch when the camera moves? → tiled-streaming.md
+- **virtual-texturing** `covered` — How do you give terrain material detail at a resolution no single atlas can hold? → virtual-texturing.md
+- **gpu-driven-culling** `covered` — How do you decide what to draw without a CPU round trip per object? → gpu-driven-culling.md
+- **planetary-precision** `covered` — Where does float precision break at planetary scale, and what do you do about it? → planetary-precision.md
+- **water-rendering** `covered` — How do you draw the surface: reflection, refraction, depth colour, foam and the shoreline? → water-rendering.md
+- **caustics** `covered` — How do you get focused light through a water surface, at each budget tier? → caustics.md
+- **heightfield-raymarching** `covered` — How do you draw a heightfield by marching rays, for the near-real-time ray-traced tier? → heightfield-raymarching.md
 - **lighting-and-shadows** `planned` — What is different about shadowing terrain specifically, including large-scale occlusion?
 - **brdf-theory** `out-of-scope` — Microfacet models and the rendering equation belong to the `physically-based-rendering` skill; Gaia cites it rather than restating it.
 
