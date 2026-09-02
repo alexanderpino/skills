@@ -40,14 +40,31 @@ level = coarsestMip; t = tEnter
 while (t < tExit) {
   node      = texelAt(rayPos(t), level)
   tExitNode = exitDistance(node, ray)               // DDA to the node boundary
-  tCross    = tWhereRayHeightEquals(node.maxH, ray) // where the ray dips below the node max
-  if (tCross < tExitNode) {                         // a hit is possible inside this node
-    if (level == 0) return refine(tCross)           // binary or secant refine, 5-8 iterations
-    level--; t = max(t, tCross)                     // descend
+  // The predicate stated above, written directly: is the ray at or below node.maxH
+  // ANYWHERE in [t, tExitNode]? Ray height is linear in t, so the endpoints decide it.
+  if (min(rayHeight(t), rayHeight(tExitNode)) < node.maxH) {   // a hit is possible here
+    if (level == 0) return refine(t, tExitNode)     // binary or secant refine, 5-8 iterations
+    if (rayDir.y < 0) {                             // only a DESCENDING ray may advance
+      tCross = tWhereRayHeightEquals(node.maxH, ray)
+      t = max(t, tCross)                            // the span before tCross is provably clear
+    }
+    level--                                         // descend
   } else { t = tExitNode; level = min(level+1, coarsestMip) }   // safe skip, pop up
 }
 return miss
 ```
+
+⚠️ **Test the predicate, not the crossing.** The form of this loop that circulates most widely asks
+"does the ray cross `node.maxH` before it leaves the node?" and descends only then. That is correct
+*only for a descending ray*. A ray whose height **increases** with `t` — a shadow ray toward the
+sun, a long-range occlusion ray, an upward line-of-sight query, which is to say precisely the
+consumers the shared kernel below is sold on — can sit below `node.maxH` across the node's whole
+span with no crossing inside it at all. `tCross` then lands beyond `tExitNode`, the skip branch
+fires, and the traversal **skips a node that can contain a hit**. That is a *missed* hit, not a
+conservative one: shadows leak through ridges and a line-of-sight query reports clear sight through
+a mountain. The interval test above has no such asymmetry, and the crossing is used only for what
+it is actually good for — advancing a falling ray past the part of the span that is provably above
+the node. Ascending and horizontal rays simply enter the candidate span at `t`.
 
 **Build it once and share it.** The same kernel — parameterized by start bias, max distance, mip
 clamp, and whether refinement runs — serves primary marching, sun shadows, long-range occlusion,
@@ -163,7 +180,8 @@ baseline.
 | Concentric contour steps on slopes | The march found the crossing one step late | Binary or secant refinement, then per-pixel first-step jitter, then a temporal resolve. Raising the raw step count is the expensive non-fix |
 | Frame rate collapses only on the mountaintop horizon shot | Grazing rays take max steps and diverge within the wave | Budget from the worst-case capture; cap steps with a graceful miss; prefer pyramid traversal, whose step count degrades logarithmically |
 | Normals dissolve into noise at silhouettes | Screen-space derivatives of the hit position across a silhouette | Analytic central differences at a footprint-matched mip |
-| Shadows leak through ridges, or objects vanish behind them | One pyramid shared by the marcher and the occlusion proxy | Max-reduce for the ray pyramid, min-reduce for the occluder proxy — opposite conservative directions, two pyramids |
+| Shadows leak through ridges, or objects vanish behind them | One pyramid shared by the marcher and the occlusion proxy | Max-**height** reduce for the ray pyramid, min-**height** reduce for the occluder proxy — opposite conservative directions, two pyramids. (Both are reductions over *height*; the HiZ depth pyramid's min/max is over *depth* and is a separate choice — see `gpu-driven-culling.md`) |
+| Shadows leak through ridges while the primary march is pixel-perfect | The traversal descends on `tCross < tExitNode`, which is true only for descending rays; the ascending shadow ray skips nodes that hold the occluder | Descend on the interval test `min(rayHeight(t), rayHeight(tExitNode)) < node.maxH`; advance to `tCross` only when the ray is falling |
 | Self-shadow acne, or shadows detached from contact | Shadow rays launched from the undisplaced surface against the displaced field | Start at the displaced hit; bias along the light by a bound tied to the local texel size |
 | Shadows disagree with the rendered silhouette | Two copies of the traversal with different texel-centre or filtering conventions | One kernel, one written convention, an analytic-field conformance test on both sides |
 | Ghosting and smearing under a temporal upscaler | The pass rasterizes nothing, so no motion vectors were written | Derive velocity analytically from the hit's world position |

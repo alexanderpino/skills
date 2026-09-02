@@ -6,7 +6,7 @@ tags: [generation, erosion, hydraulic, droplet, pipe, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: mei2007, tier: P, locator: "the eight-step pipe formulation; the outflow scaling factor K in the flux step" }
+  - { id: mei2007, tier: P, locator: "§3, the five-stage pipe formulation (water increment, flow, erosion-deposition, sediment transport, evaporation); the outflow scaling factor K in the flow stage" }
   - { id: stava2008, tier: P, locator: "sediment slippage, the material-layer stack, and the lmax shallow-water capacity ramp" }
   - { id: obrien1995, tier: P, locator: "the height-column fluid surface coupled by pipes on the head difference" }
   - { id: beyer2015, tier: F, locator: "the per-droplet transport-capacity formulation, and the erosion-brush radius" }
@@ -33,13 +33,25 @@ easiest to get looking good on a small map.
 persist** — lakes, ponding, deltas, standing water of any kind. Droplet erosion has no water; it
 has droplets, and they leave.
 
-## The crossover, which is extent and standing water
+## The crossover, which is cells, standing water and simulated time
 
-| Map extent | Backbone | Because |
-|---|---|---|
-| < ~2 km | **Droplet** | A droplet's lifetime covers a few hundred metres. That is a valley here and a scratch on a 100 km map. |
-| ~2–50 km | **Pipe** | Standing water, deltas, lakes; GPU-native by design [mei2007]. |
-| > ~50 km | Stream power | The only one stable over geological time; see `stream-power.md`. |
+⚠️ **The governing quantity is cells, not kilometres.** A droplet's life is a fixed number of
+steps — ~30–60 in the usual implementations — each advancing about one cell, so its reach is
+`lifetime × cellSize`: **30–60 cells, at every extent**. Kilometre thresholds only work once you
+say what a cell measures. At 1024 cells across 2 km (≈2 m/cell) that reach is 60–120 m — a small
+valley. On the same grid across 100 km (≈100 m/cell) it is 3–6 km, which sounds large and is not:
+it is still 3–6% of a domain whose trunk network spans the whole thing, so the droplet scratches
+rather than carves.
+
+The km bands below assume **1024–4096 cells across the domain** — ≈0.5–2 m/cell at the small end,
+≈12–100 m/cell at the crossover. Re-derive them if your cell size is elsewhere; the cell column is
+the one that transfers.
+
+| Droplet reach vs domain | Map extent at 1024–4096 cells | Backbone | Because |
+|---|---|---|---|
+| Reach is valley-scale — tens of metres of terrain per droplet | < ~2 km | **Droplet** | The feature a droplet cuts is the feature you want at this cell size. |
+| Reach still cuts real features, but water has to persist | ~2–50 km | **Pipe** | Standing water, deltas, lakes; GPU-native by design [mei2007]. |
+| Reach is a few percent of a network spanning thousands of cells | > ~50 km | Stream power | The only one stable over geological time; see `stream-power.md`. |
 
 The failure mode of choosing wrong is diagnostic, not subtle: droplet erosion on a large map
 produces **scratches instead of valleys**, and stream power on a 500 m map produces **nothing**,
@@ -78,17 +90,19 @@ speed = sqrt(max(0, speed*speed + (-Δh) * gravity))
 ## Pipe: the four details, one of which is the NaN
 
 ```
-Δh_D = (b + d1) - (b_D + d1_D)                      # 2. head difference per pipe
+Δh_D = (b + d1) - (b_D + d1_D)                      # flow stage: head difference per pipe
 f_D  = max(0, f_D + Δt * A * g * Δh_D / l)
-K    = min(1, (d1 * lx * ly) / ((fL + fR + fT + fB) * Δt))   # 3. THE scaling step
+K    = min(1, (d1 * lx * ly) / ((fL + fR + fT + fB) * Δt))   # flow stage: THE scaling step
 f_D *= K
-C    = Kc * sin(max(α, α_min)) * |v| * lmax(d1)     # 6. transport capacity
+C    = Kc * sin(max(α, α_min)) * |v| * lmax(d1)     # erosion-deposition: transport capacity
 ```
 
-- **Step 3 is not optional.** Without the scaling factor `K` a cell can output more water than it
-  contains in one step; depth goes negative, the velocity term divides by it, and the sim explodes
-  within about twenty iterations [mei2007]. Every report of "my pipe erosion produces NaN spikes"
-  is this.
+- **The outflow scaling is not optional.** Without the factor `K` a cell can output more water
+  than it contains in one step; depth goes negative and the velocity term divides by it, so the
+  field is NaN within a few steps of the first offending cell. [mei2007] motivates `K` as a
+  positivity requirement and reports no failure-iteration count — the "about twenty iterations"
+  figure that circulates (and that this document used to carry) is folklore, so do not plan a test
+  around it. Every report of "my pipe erosion produces NaN spikes" is this.
 - **`lmax(d1)`**, Šťava's soft ramp on shallow water, scales capacity down in a thin film
   [stava2008]. Without it a millimetre of water on a steep slope carves like a river. Mei's
   original omits it and it shows.
@@ -106,7 +120,9 @@ C    = Kc * sin(max(α, α_min)) * |v| * lmax(d1)     # 6. transport capacity
 **Šťava's three additions over Mei, in value order** [stava2008]: sediment slippage — a thermal
 pass restricted to the deposited layer (`thermal-and-aeolian-erosion.md`), which is the single
 biggest visual improvement, because plain Mei builds vertical sediment walls no material would
-support; **material layers**, bedrock under regolith with different `K`, which buys the
+support; **material layers**, bedrock under regolith with different **erodibility** `Ke` — spelled out
+because `K` in the pipe code above is Mei's outflow clamp, a different quantity entirely, and
+`K` elsewhere in this skill is stream power's erodibility — which buys the
 rock-outcrop-above-scree look for free; and **explicit per-cell boundary conditions** instead of
 Mei's implicit wall.
 
@@ -133,7 +149,7 @@ wasted work.
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| NaN spikes within ~20 iterations | Pipe outflow exceeds the water in the cell; depth goes negative | The step-3 scaling factor `K` [mei2007] |
+| NaN spikes a few steps into the run | Pipe outflow exceeds the water in the cell; depth goes negative | The outflow scaling factor `K` in the flow stage [mei2007] |
 | One-pixel scratches instead of valleys | Droplet erosion applied per-cell instead of through a brush | Erode through a disc of 2–4 cells |
 | Rivers silted into mush | Deposition spread through a brush | Deposit bilinearly, 4 cells |
 | The terrain grows tumours on the uphill side | Sign error in the speed update; droplets accelerate uphill | `speed² += (-Δh)·gravity` |
@@ -144,5 +160,5 @@ wasted work.
 | Channels drifting toward the grid axes | 4-pipe cardinal-only stencil | 8 pipes with per-pipe length |
 | Different result with threading enabled | In-place neighbour updates | Double-buffer |
 | Deposits missing on GPU, non-repeatably | Droplet brush footprints racing | Accumulate with atomics, apply in a second pass |
-| Scratches instead of valleys on a large map | Droplet lifetime covers a fraction of the domain | Change backbone: pipe, or stream power |
+| Scratches instead of valleys on a large map | A droplet reaches 30–60 cells whatever the cell measures; the network spans thousands | Change backbone: pipe, or stream power |
 | The brief mentions lakes and there are none | Droplet erosion has no standing water | Pipe model |

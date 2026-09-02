@@ -14,15 +14,24 @@ sources:
 # Planetary precision — big coordinates in small floats
 
 **Tier: real-time rasteriser, and it starts long before planetary scale.** float32 has a 24-bit
-significand: the gap between representable values at magnitude `x` is about `x · 1.2e-7`.
+significand, so the gap between representable values is `2^(floor(log2 x) - 23)`: a step function
+of the exponent, constant across each power-of-two band and doubling at the next. The column below
+is the **exact** spacing at each listed magnitude, not the `x · 1.2e-7` upper bound — that bound is
+the spacing just under a power of two and runs up to 2× high everywhere else, which is enough to
+make two documents in this corpus quote different numbers for the same distance.
 
-| Distance from origin | float32 spacing | Consequence |
+| Distance from origin | float32 spacing (exact ULP) | Consequence |
 |---|---|---|
-| 1 km | ~0.1 mm | fine |
-| 10 km | ~1 mm | sub-pixel shimmer in close-ups |
-| 100 km | ~1 cm | visible vertex swimming, normal-map crawl |
-| 1 000 km | ~12 cm | geometry visibly quantized, physics jitter |
-| 6 371 km | ~0.76 m | unusable — vertices snap by strides |
+| 1 km | 0.061 mm | fine |
+| 10 km | 0.98 mm | sub-pixel shimmer in close-ups |
+| 100 km | 7.8 mm | visible vertex swimming, normal-map crawl |
+| 1 000 km | 6.25 cm | geometry visibly quantized, physics jitter |
+| 6 371 km | 0.5 m | unusable — vertices snap by strides |
+
+Read each row as "the spacing at *this* magnitude", not as a bound over the decade: at 900 km the
+spacing is still 6.25 cm, and it doubles to 12.5 cm the moment `x` crosses 2^20 m ≈ 1 049 km.
+`noise-and-warping.md` quotes the same 7.8 mm at 100 km; if a third document ever disagrees, it is
+quoting the bound rather than the ULP.
 
 An open-world game hits this on a flat map without ever leaving the ground. Half of what gets
 reported as "planet renderer bugs" is this table with scenery attached.

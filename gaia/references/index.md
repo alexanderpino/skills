@@ -5,7 +5,7 @@ description: "Every Gaia document, its axis, and whether a human has checked its
 tags: [index, routing]
 status: draft
 okf_version: "0.2"
-generated: { by: process:gaia-index, at: 2026-09-02T06:17:59Z }
+generated: { by: process:gaia-index, at: 2026-09-02T06:23:52Z }
 ---
 # Gaia index
 
@@ -33,7 +33,7 @@ work says what the document claims. That distinction is the whole point of the
 
 | Document | What it answers | Status |
 |---|---|---|
-| [`shallow-water.md`](shallow-water.md) | The virtual-pipe discretisation of the shallow-water equations: why it is the default for a pool, a flood or a ripple patch, and the five places it stops being the right model. | draft |
+| [`shallow-water.md`](shallow-water.md) | The virtual-pipe discretisation of the shallow-water equations: why it is the default for a pool, a flood or a ripple patch, and the six places it stops being the right model. | draft |
 | [`simulation-time-budget.md`](simulation-time-budget.md) | One solver, two schedulers: how the time budget decides the timestep, the substep policy, and what happens when the budget runs out. | draft |
 | [`water-closed-vs-open.md`](water-closed-vs-open.md) | Classify the body before you write a line of water code: fetch and boundary decide the wave model, the sim edge, the budget and half the defaults. | draft |
 | [`water-optics.md`](water-optics.md) | The physical quantities that make water look like water: per-channel absorption with depth, the two attenuation coefficients, and the interface read from both of its sides. | draft |
@@ -50,7 +50,7 @@ work says what the document claims. That distinction is the whole point of the
 | [`planetary-precision.md`](planetary-precision.md) | Camera-relative rendering, reversed-Z depth, and cube-sphere patch frames: the numerical architecture any world past ten kilometres already needs. | draft |
 | [`tiled-streaming.md`](tiled-streaming.md) | Streaming a terrain tile pyramid: the residency state machine, the priority function, and the invariant that separates a shippable streamer from a demo. | draft |
 | [`virtual-texturing.md`](virtual-texturing.md) | Decoupling terrain texture address space from residency: which of the two virtual-texture problems you actually have, and the cache boundary that keeps it correct. | draft |
-| [`water-rendering.md`](water-rendering.md) | Surface geometry, reflection, refraction, depth colour and foam compositing for water on terrain, spined on the slope-variance transition from geometry to BRDF. | draft |
+| [`water-rendering.md`](water-rendering.md) | Surface geometry, reflection, refraction, depth colour, foam compositing and the underwater view for water on terrain, spined on the slope-variance transition from geometry to BRDF. | draft |
 
 ## Provenance
 

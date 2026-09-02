@@ -8,7 +8,7 @@ generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: cordonnier2016, tier: P, locator: "the tectonic-uplift term coupled to fluvial erosion, and the lake-graph handling of local minima" }
   - { id: cortial2019, tier: P, locator: "the plate-motion model on a sphere: subduction and collision under user-controlled plate velocities" }
-  - { id: turcotte2014, tier: P, locator: "the Airy root r = pc*h/(pm-pc), and the thin-elastic-plate equation D grad^4 w + delta-rho*g*w = q with D = E*Te^3/12(1-v^2)" }
+  - { id: turcotte2014, tier: F, locator: "the Airy root r = pc*h/(pm-pc), and the thin-elastic-plate equation D grad^4 w + delta-rho*g*w = q with D = E*Te^3/12(1-v^2)" }
   - { id: molnar1990, tier: P, locator: "erosional unloading: summits rise by ~pc/pm of the mean thickness stripped" }
 ---
 # Tectonic uplift — the field erosion runs against
@@ -69,7 +69,8 @@ classification:
    oceanic side); two oceanic plates give a narrow arc; divergence gives a rift; shear dominance
    gives lateral offset with little uplift.
 5. **Diffuse the boundary uplift inland** over the orogen width — real orogens are 100–300 km
-   wide, not one cell.
+   wide, not one cell. That range is an order-of-magnitude calibration figure of the same kind as
+   the uplift rates above, not a constant read out of a cited source.
 6. Optionally iterate: move the centres, re-partition, accumulate. Three to eight iterations give
    old inactive ranges beside young active ones, which reads far better than one snapshot.
 
@@ -101,15 +102,27 @@ output; set sea level after the erosion run and the estuaries land where the dra
 
 Uplift adds load; erosion strips it; the crust floats. Leave isostasy out and a range only ever
 erodes downward. Put it in and **summits rise while mean elevation falls** — the real long-term
-behaviour, and it reshapes the whole profile [molnar1990]. Erosion removes mean load, so the range
-rebounds by roughly `ρc/ρm ≈ 0.8` of the mean thickness stripped; measured peak uplift is
-therefore not by itself evidence of tectonic uplift.
+behaviour, and it reshapes the whole profile [molnar1990].
 
-**Airy** is one multiply per cell — a load of height `h` presses a root `r = ρc·h/(ρm − ρc)`, about
-5–6·h [turcotte2014]. It is wrong at short wavelengths, because the plate has strength.
+**Fix the two densities once and derive everything from them.** Take `ρc = 2800`, `ρm = 3300`
+kg/m³ — the usual pair, chosen here as calibration rather than quoted from a table. Then:
+
+- erosion removes mean load, so the range rebounds by `ρc/ρm ≈ 0.85` of the mean thickness
+  stripped, and measured peak uplift is not by itself evidence of tectonic uplift;
+- **Airy** is one multiply per cell — a load of height `h` presses a root
+  `r = ρc·h/(ρm − ρc) = 2800/500 = 5.6·h`.
+
+Both numbers move together with the pair: at `ρc/ρm = 0.8` the rebound is 0.8 and the root is
+`4.0·h`, not 5–6. Quoting a rebound from one pair and a root from another, as this document once
+did, is exactly the inconsistency the rest of it insists on catching.
+
+Airy is wrong at short wavelengths, because the plate has strength — the standard geodynamics
+text [turcotte2014] carries both it and the thin-plate equation below (a textbook, not a paper;
+there is no canonical paper for either, and standard practice is to take the textbook derivation
+whole).
 
 **Flexural** is the one to implement, and over a heightfield the practical solve is spectral,
-because `∇⁴` is a multiply in Fourier space [turcotte2014]:
+because `∇⁴` is a multiply in Fourier space:
 
 ```
 q = ρc · g · h ;  Q = FFT2(q)
@@ -144,6 +157,6 @@ needs tectonics needs a baked `U` and a baked heightfield.
 | An unerodible plateau | `U × time` far above it, or `K` too low | Same calculation, other direction |
 | A smooth wall where a range was drawn | The curve was extruded into height instead of into `U` | Feed the curve to uplift and let erosion cut it |
 | A fault step that vanishes after the next erosion pass | The fault was written into height | Write it into `K` instead |
-| Peaks sink as valleys incise, through a long run | No isostatic rebound | Couple erosional unloading, ~`ρc/ρm` of mean stripped thickness [molnar1990] |
+| Peaks sink as valleys incise, through a long run | No isostatic rebound | Couple erosional unloading, `ρc/ρm ≈ 0.85` of mean stripped thickness [molnar1990] |
 | Flexural deflection wraps or ripples across the domain | `k` built from a `linspace` ramp, or a domain smaller than a few `α` | `fftfreq` in rad/m; enlarge the domain or raise `Te` |
 | Rivers meet the sea at arbitrary points, with no estuaries | Coastline authored by thresholding noise before erosion | Set sea level after erosion |

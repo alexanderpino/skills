@@ -22,8 +22,12 @@ heterogeneity; terrain gets the win almost for free.
 
 ## Use this
 
-**A persistent GPU scene, culled in compute, submitted indirectly, with two-phase HiZ occlusion**
-[haar2015]. The division of labour has not changed since it was formulated:
+**A persistent GPU scene, culled in compute, submitted indirectly, with two-phase HiZ occlusion.**
+There is no canonical paper for this architecture; standard practice is the formulation given in
+the *GPU-driven rendering pipelines* SIGGRAPH course talk [haar2015] — a conference talk about a
+shipped title, not peer review, and the tier reflects that. What follows is the division of labour
+as that talk laid it out, which every subsequent public description of a GPU-driven pipeline has
+restated rather than replaced:
 
 - **The CPU owns policy.** Camera, budgets, streaming decisions, what exists in the world. It
   uploads *deltas* into a persistent structured buffer of chunk records — bounds, LOD links,
@@ -79,17 +83,23 @@ Phase 2: test ALL candidates against HiZ
          -> write this frame's visibility bits
 ```
 
-Phase 1's set is almost always a superset of true visibility under camera coherence, so its depth
-is a nearly complete occluder set. No reprojection, no artist-placed occluder proxies, no one-frame
+Phase 1's set is **not** a superset of true visibility — it is last frame's answer, so it is
+missing exactly this frame's disocclusions, which is why phase 2 exists. What camera coherence buys
+is narrower and sufficient: the objects that occluded the view last frame are almost all still
+occluding it, so phase 1's depth is a **nearly complete occluder set** even though it is an
+incomplete visible set. No reprojection, no artist-placed occluder proxies, no one-frame
 lag. It costs two culling rounds, two submission rounds, and a visibility-bit buffer keyed by
 **stable IDs** — streaming must not recycle an ID mid-frame, or a recycled slot inherits a dead
 chunk's visibility and phase 1 draws the wrong thing.
 
 Three HiZ build details, in the order they bite:
 
-1. **Reduction convention.** Standard depth (near = 0) needs the *farthest* depth in the
-   footprint → **max**-reduce. Reversed-Z needs **min**-reduce. Backwards gives *false occlusion*:
-   geometry near silhouettes disappears for a frame under motion.
+1. **Reduction convention — and say which quantity you are reducing.** This document uses two
+   different reductions and they are not the same word: a HiZ pyramid min/max-reduces **depth**, a
+   terrain occluder proxy min/max-reduces **height**. Write the quantity every time. For the HiZ:
+   standard depth (near = 0) needs the *farthest* depth in the footprint → **max-depth** reduce;
+   reversed-Z needs **min-depth** reduce. Backwards gives *false occlusion*: geometry near
+   silhouettes disappears for a frame under motion.
 2. **Odd dimensions.** A naive 2×2 reduction of an odd-sized mip drops the last row and column, so
    those depths never propagate and the pyramid claims occlusion where sky was. Gather 3×2 / 2×3 /
    3×3 at the edges, or pad with the *non-occluding* extreme for your convention.
@@ -123,10 +133,13 @@ caster AABBs free from per-chunk height bounds — but casters must be tested ag
 frustum, never the camera's HiZ, since a caster invisible to the camera still casts into view. And
 **the heightfield is the best long-range occluder in the scene**: rasterize a coarse terrain proxy
 into the phase-1 depth before building HiZ and the standard test culls whole cities behind
-ridgelines. The proxy must use **min**-reduce — conservatively *below* true terrain — or it culls
-visible objects along the ridge. Note this is the opposite conservative direction from the max-mip
-pyramid used for ray marching; see `heightfield-raymarching.md`. Same source texture, two
-pyramids, and sharing one silently breaks whichever consumer got the wrong sign.
+ridgelines. The proxy's heightfield must be built with a **min-height** reduce — conservatively
+*below* true terrain — or it culls visible objects along the ridge. (That is a reduction over
+height, not the **min-depth** reduce of the reversed-Z HiZ above; the two are independent choices,
+and the shared word is how a sign gets copied to the wrong place.) It is also the opposite
+conservative direction from the **max-height** pyramid used for ray marching; see
+`heightfield-raymarching.md`. Same source texture, two pyramids, and sharing one silently breaks
+whichever consumer got the wrong sign.
 
 ## Feedback, and the rule with no exceptions
 
@@ -148,9 +161,9 @@ selection) is pure overhead. Decide on measured triangle size, not fashion.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | Geometry pops in at the screen edge while panning | Bounds not inflated for displacement, skirts or geomorph excursion | Conservative bounds with a named inflation term per contributor |
-| One-frame disappearances at silhouettes under motion | HiZ reduce op wrong for the depth convention, or NPOT edge texels dropped | Reversed-Z → min-reduce; gather the odd row and column |
+| One-frame disappearances at silhouettes under motion | HiZ reduce op wrong for the depth convention, or NPOT edge texels dropped | Reversed-Z → min-**depth** reduce; gather the odd row and column |
 | Occlusion culling "works" but saves nothing | Footprint mip chosen one level too fine — silent under-sampling | Compute the mip from the rect's larger dimension, ceil the log2 |
-| Objects flicker in and out behind ridges | The terrain occluder proxy used max-reduce and sits above true terrain | Min-reduce for the occluder proxy; keep it separate from the ray-marching pyramid |
+| Objects flicker in and out behind ridges | The terrain occluder proxy used max-**height** reduce and sits above true terrain | Min-**height** reduce for the occluder proxy; keep it separate from the max-**height** ray-marching pyramid |
 | A chunk draws the wrong thing for one frame after streaming | Visibility bits keyed by array slot; streaming compacted the scene | Key history by persistent chunk ID; clear on recycle; no slot reuse between phases |
 | Shadows missing from objects the camera cannot see | Casters culled against the camera frustum or the camera's HiZ | Cull each cascade against its own light frustum, extruded along the light |
 | GPU idle bubbles correlated with streaming | The CPU maps a buffer the GPU wrote this frame | N-deep readback ring, consumed N frames late; grep for synchronous maps |

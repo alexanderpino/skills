@@ -10,7 +10,7 @@ sources:
   - { id: horn1981, tier: P, locator: "the Sobel-weighted 3x3 slope and aspect estimator" }
   - { id: beven1979, tier: P, locator: "the topographic index ln(a / tan beta)" }
   - { id: timonen2010, tier: P, locator: "the per-azimuth sweep with an incremental convex hull, O(1) per cell" }
-  - { id: bavoil2008, tier: P, locator: "the sin(h) - sin(t) horizon weighting" }
+  - { id: bavoil2008, tier: F, locator: "the sin(h) - sin(t) horizon weighting" }
   - { id: weiss2001, tier: F, locator: "the topographic position index at multiple radii" }
   - { id: he2010, tier: P, locator: "the local linear model with a, b from box filters; eps as the variance threshold" }
   - { id: tomasi1998, tier: P, locator: "the product of spatial and range Gaussian weights" }
@@ -93,9 +93,10 @@ visibility = (1/N) Σ cos²(θᵢ)          # cosine-weighted hemisphere, up nor
 ```
 
 which is the correct integral for a **baked terrain AO map with an up normal**, and gives 1 for
-fully open ground. [bavoil2008] uses `sin h − sin t` instead; that is a screen-space weighting
-derived for a real per-pixel normal, and substituting it into a baked terrain map is a different
-quantity.
+fully open ground. HBAO [bavoil2008] — a SIGGRAPH talk rather than a peer-reviewed paper, graded
+`F` like every other talk in this bibliography — uses `sin h − sin t` instead; that is a
+screen-space weighting derived for a real per-pixel normal, and substituting it into a baked
+terrain map is a different quantity.
 
 **`maxDist` is the parameter that matters.** A small radius gives a crevice map that reads as dirt;
 a large radius darkens valleys and lets mountains catch light, which is what actually sells

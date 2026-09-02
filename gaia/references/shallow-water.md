@@ -1,7 +1,7 @@
 ---
 type: Technique
 title: Shallow water — the solver for bounded, interactive bodies
-description: "The virtual-pipe discretisation of the shallow-water equations: why it is the default for a pool, a flood or a ripple patch, and the five places it stops being the right model."
+description: "The virtual-pipe discretisation of the shallow-water equations: why it is the default for a pool, a flood or a ripple patch, and the six places it stops being the right model."
 tags: [simulation, water, shallow-water, solver, runtime, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
@@ -36,7 +36,14 @@ d h / d t + div(h * u)                 = 0        # mass;     h = column height,
 d u / d t + (u . grad) u + g grad(h+b) = 0        # momentum; b = bed elevation
 ```
 
-The pipe form [obrien1995] discretises this as flux between neighbouring columns through virtual
+⚠️ **The pipe form does not discretise the second equation as written — it drops `(u.grad)u`.**
+Each pipe is accelerated by the head difference alone, there is no momentum advection anywhere in
+the loop, and velocity is not a state variable at all but a quantity *reconstructed* from the
+fluxes afterwards. What the pipe model actually solves is the **linearised long-wave** system: mass
+conservation exactly, momentum only in its gravity-driven part. Limit 6 below is that sentence's
+consequence, and it is the one most often discovered late.
+
+With that stated, the pipe form [obrien1995] is flux between neighbouring columns through virtual
 pipes, driven by the **hydraulic head** difference `H = b + h`:
 
 ```
@@ -70,18 +77,34 @@ state under uniform rain it accumulates downstream as roughly `rain × upstream 
 same loop with extra fields [stava2008] — Mei and Št'ava are one family, not two, and the frequent
 claim that one is a particle method is wrong about both.
 
-**The stability limit** is the gravity-wave CFL condition [courant1928]:
+**The stability limit** is the CFL condition on the *fastest signal in the system* [courant1928].
+The characteristic speeds of the shallow-water equations are `u ± sqrt(g*h)`, so **both terms are
+in the bound**:
 
 ```
-dt <= C * dx / sqrt(g * h_max)          # C ~ 0.2 in shipped code, not 1.0
+dt <= C * dx / (max|u| + sqrt(g * h_max))      # C ~ 0.2 in shipped code, not 1.0
 ```
 
-Celerity rises with depth, so **a filling pool gets progressively more expensive**. Recompute the
-limit from the current state every step; do not compute it once at initialisation.
+⚠️ **The gravity term alone is not the stability limit.** `dt <= C*dx/sqrt(g*h_max)` is the form
+that circulates, and it is only adequate in the subcritical case `|u| << sqrt(g*h)` — a settled
+pool. Every case this document is aimed at is the other one. At 1 mm depth `sqrt(g*h)` is
+**0.099 m/s** while a flood front, a dam break or a sheet running over terrain moves at metres per
+second, so the gravity-only bound is an order of magnitude too large — in the direction that
+explodes. The Froude number `Fr = |u| / sqrt(g*h)` is the diagnostic: at `Fr ≳ 1` the advective
+half *dominates* the limit and the gravity-only version is simply wrong.
+
+This holds even though the pipe form carries no momentum advection, because it still **transports
+mass** at `u`: the advective half binds exactly as `hydraulic-erosion.md` states it for the pipe
+and droplet passes (`Δt·|v| < cellSize`). Those are not two conditions to remember separately —
+they are one bound, and this is the document that owns it.
+
+Celerity rises with depth, so **a filling pool gets progressively more expensive**; velocity rises
+as a front steepens, so **a dam break gets more expensive as it runs**. Recompute the limit from
+the current state every step, from *both* terms; do not compute it once at initialisation.
 
 ## Where it stops being the right model
 
-Five limits. The first three are structural — no resolution, tuning or budget reaches them.
+Six limits. The first three are structural — no resolution, tuning or budget reaches them.
 
 **1. The surface cannot overturn.** One height per column means breaking waves, splashes, droplets,
 pouring, and anything that separates from the bulk are *unrepresentable* — not expensive,
@@ -105,9 +128,43 @@ looking at. Note the boundary contract flips with the body type — an open-wate
 contribution to zero over the outer ~15% so the edge is never visible; a pool's edge is a real wall
 and must reflect.
 
+**6. No momentum advection, so no shocks and no hydraulic jump.** The update drops `(u.grad)u`, so
+the model cannot steepen a front into a discontinuity, cannot form a hydraulic jump where
+supercritical flow meets subcritical, and **carries no momentum around a bend** — water rounding a
+corner does not run up the outside wall, because there is no inertia in the loop to carry it there.
+A dam break, named in this document's opening line as a target case, is exactly where this shows:
+you get a spreading, diffuse fill, not a bore with a front. Unlike the first three this one is not
+structural — it is a *different solver*, not a resolution problem, and the crossover is next.
+
+## When a propagating front is the shot, change solver
+
+If the front *itself* is what the camera is on — a dam break, a bore running down a channel, a
+hydraulic jump at the foot of a spillway — the pipe model is the wrong family and no amount of
+resolution reaches it, because the missing term is in the equations, not in the grid. Use **full
+nonlinear shallow water with a shock-capturing (Riemann/Godunov-type) flux**: it keeps the
+advective term, resolves discontinuities as discontinuities, and puts front speeds and jump
+locations in the right place.
+
+Budget its costs rather than discovering them: a per-cell wave-speed estimate feeding the flux, an
+explicit **wetting/drying** treatment (a naive Riemann solver produces negative depths at a wet–dry
+front — the same failure the pipe model's clamp `K` exists to prevent, now yours to solve), and a
+smaller `dt` under the same `max|u| + sqrt(g*h)` bound, with a `max|u|` that is now genuinely
+large.
+
+**Everything else keeps the pipe model.** Where the front is scenery rather than the shot —
+flooding a basement, filling a pool, rain finding a channel — the diffuse fill does not read as an
+error, and unconditional positivity plus a fixed per-cell cost are worth more than shock fidelity.
+
 ## Authority: which half of the water is real
 
-A simulated body is exactly one of two things and there is no middle [fluid_authority]:
+⚠️ **This section is doctrine, not physics.** `fluid_authority` has **no external source**: it is
+a convention this repository recommends, carried from terrain-renderer's `19-fluid-simulation.md`.
+It is an engineering preference about ownership, replication and persistence, not a fact about
+water, and it is written as a rule only because a project that leaves it implicit discovers it at
+the worst possible moment.
+
+With that said: a simulated body should be **exactly one of two things, with no middle**
+[fluid_authority]:
 
 - **Cosmetic GPU state** — ripples, splash response, wakes, puddle response. GPU-only,
   camera-local, non-authoritative. Physics, navigation and the server ignore it; it may be dropped
@@ -121,10 +178,10 @@ cosmetic water authoritative. "Can the player flood the basement?" is an archite
 asked at design time, with a budget and a replication story — not a shader question. Water that
 changes the navigable world also invalidates collision and navmesh.
 
-**What it beats.** *Full nonlinear shallow water with a Riemann solver* — correct shocks and
-hydraulic jumps, and it needs a wetting/drying treatment and a per-cell wave-speed limit; reach for
-it when a dam break is the shot. *An implicit heightfield solve* [kass1990] — unconditionally
-stable, and each step is a global solve, so it buys a bigger `dt` you do not need in a frame.
+**What it beats.** (*Full nonlinear shallow water with a shock-capturing solver* is deliberately
+**not** in this list — it is the crossover above, not a dismissal.) *An implicit heightfield solve*
+[kass1990] — unconditionally stable, and each step is a global solve, so it buys a bigger `dt` you
+do not need in a frame.
 *A wave-equation or convolution ripple patch* — cheapest of all, and it carries no mass: it cannot
 flood, drain, or make a river. *Particles (SPH, position-based)* — necessary exactly when the
 surface must overturn, and they make the free surface your problem to reconstruct. *Hybrid
@@ -140,6 +197,8 @@ no solver at all.
 | Depth goes negative, then NaN | The outflow scaling factor is missing | Clamp outflow to the water held [mei2007] |
 | Checkerboard sloshing that never damps, no NaN | `dt` above the CFL limit while the clamp holds positivity | Positivity is not stability — lower `dt` [courant1928] |
 | Stable until the pool fills, then explodes | `sqrt(g*h)` grew with depth; `dt` computed once | Recompute the limit each step from the current state |
+| Stable while still, explodes as soon as anything moves fast | Advective speed left out of the CFL bound | Bound on `max\|u\| + sqrt(g*h)`, never on `sqrt(g*h)` alone [courant1928] |
+| A thin supercritical sheet explodes at a "correct" gravity-wave `dt` | At `Fr ≳ 1` the advective half dominates; at 1 mm depth `sqrt(g*h)` is 0.099 m/s and `\|u\|` is metres per second | Recompute both halves every step from the current state |
 | Water piles up along the domain border | Closed boundary where an open one was meant | Ghost cells at a very low elevation drain the edge |
 | A basin never fills | Open boundary where a wall was meant | Reflect at real walls; fade only where a patch ends inside a larger body |
 | Water flows uphill or sits on a slope | Flux driven by bed slope instead of hydraulic head | Drive it by `b + h`, not `b` |
@@ -147,5 +206,7 @@ no solver at all.
 | Rivers one cell wide and shimmering | Channel narrower than a cell | Carry *discharge* as the physical truth and derive a channel from it |
 | The sea built on this has no swell or groups | Shallow-water has no dispersion, by construction | Use a spectral or trochoidal field for open water |
 | Splashes never form no matter the resolution | A heightfield cannot represent an overturning surface | Layer particles for the splash; keep the heightfield for the bulk |
+| A dam break spreads as a diffuse fill with no front; no hydraulic jump ever forms | The pipe form drops `(u.grad)u`, so nothing steepens a front | Shock-capturing shallow water if the front is the shot; otherwise accept it and stop tuning |
+| Water rounds a bend without running up the outside wall | Same cause — no momentum is carried through the turn | Same crossover; a heightfield with no inertia term cannot bank |
 | Flood drowns the player but not the AI | Cosmetic water treated as gameplay state on one side | Declare authority; collision and navmesh follow the authoritative field [fluid_authority] |
 | Different results on a different machine or frame rate | Step count tied to frames | Fixed step, accumulate the remainder |

@@ -24,7 +24,10 @@ is `heightfield-lod.md`.
 ## Use this
 
 **A quadtree of constant-size tiles, each carrying its own baked geometric error, held resident by
-a priority-aware LRU cache under one hard invariant: never show a hole** [cozzi2011].
+a priority-aware LRU cache under one hard invariant: never show a hole.** No peer-reviewed paper
+defines this architecture; standard practice is the treatment in *3D Engine Design for Virtual
+Globes* [cozzi2011] — a textbook, and `F` for that reason however canonical it is — converging with
+what shipped globe and open-world streamers arrived at independently.
 
 Three parts, none optional:
 

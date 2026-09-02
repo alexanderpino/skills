@@ -79,9 +79,12 @@ axis is sent, so they are restated:
   Tectonic Planets.* Computer Graphics Forum 38(2) (Eurographics 2019). — Whole-planet terrain
   from approximated plate subduction and collision under user-controlled plate motion. The
   graphics anchor for spherical tectonics.
-- **turcotte2014** `P` — Turcotte, D.L. & Schubert, G. (2014). *Geodynamics* (3rd ed.).
-  Cambridge University Press. — The standard text for Airy isostasy and thin-elastic-plate
-  flexure, including flexural rigidity and the flexural parameter.
+- **turcotte2014** `F` — Turcotte, D.L. & Schubert, G. (2014). *Geodynamics* (3rd ed.).
+  Cambridge University Press. — A **textbook, not peer review**, and graded on the same rule
+  that makes every book in this bibliography `F`. It is nonetheless the standard reference for
+  Airy isostasy and thin-elastic-plate flexure, including flexural rigidity and the flexural
+  parameter; there is no canonical paper for either, and standard practice is to take the
+  textbook derivation whole.
 - **molnar1990** `P` — Molnar, P. & England, P. (1990). *Late Cenozoic uplift of mountain ranges
   and global climate change: chicken or egg?* Nature 346(6279), 29–34. — Erosional isostasy:
   incision unloads a range and the summits rebound, so peak uplift is not by itself proof of
@@ -98,8 +101,10 @@ axis is sent, so they are restated:
   paper; the lineage runs O'Brien & Hodgins → Mei → Šťava.
 - **mei2007** `P` — Mei, X., Decaudin, P. & Hu, B.-G. (2007). *Fast Hydraulic Erosion
   Simulation and Visualization on GPU.* Pacific Graphics 2007, 47–56. — The virtual pipe model
-  applied to erosion. Grid-based, **not** particle-based; the eight-step formulation with the
-  outflow scaling factor.
+  applied to erosion. Grid-based, **not** particle-based. §3 enumerates **five** stages — water
+  increment, flow, erosion–deposition, sediment transport, evaporation — including the outflow
+  scaling factor in the flow stage. The "eight-step" enumeration that circulates is a community
+  re-split of the flow stage and is not a locator anyone can follow into the paper.
 - **stava2008** `P` — Šťava, O., Beneš, B., Brisbin, M. & Křivánek, J. (2008). *Interactive
   Terrain Modeling Using Hydraulic Erosion.* SCA 2008, 201–210. — Extends Mei with sediment
   slippage, material layers, boundary conditions, and the `lmax` shallow-water capacity ramp.
@@ -125,8 +130,10 @@ axis is sent, so they are restated:
 - **corominas1996** `P` — Corominas, J. (1996). *The angle of reach as a mobility index for
   small and large landslides.* Canadian Geotechnical Journal 33(2), 260–271. — The runout stop
   rule `L = H/tan(α)`, with the reach angle shrinking as volume grows, across 204 landslides.
-- **bagnold1941** `P` — Bagnold, R.A. (1941). *The Physics of Blown Sand and Desert Dunes.*
-  Methuen, London. — The threshold friction velocity and the `u*³` saltation law. Cite it for
+- **bagnold1941** `F` — Bagnold, R.A. (1941). *The Physics of Blown Sand and Desert Dunes.*
+  Methuen, London. — A **monograph, not a peer-reviewed paper**; `F` on the same rule as every
+  other book here, and the demotion costs nothing because the physics is canonical either way.
+  The origin of the threshold friction velocity and the `u*³` saltation law. Cite it for
   *why*, not *how*: the saltation-cloud physics is not a heightfield operation, but those two
   results are one expression each per cell.
 - **sauermann2001** `P` — Sauermann, G., Kroy, K. & Herrmann, H.J. (2001). *A continuum
@@ -139,8 +146,12 @@ axis is sent, so they are restated:
   star dunes from wind regime alone. Under-cited relative to its usefulness.
 - **momiji2000** `P` — Momiji, H., Carretero-González, R., Bishop, S.R. & Warren, A. (2000).
   *Simulation of the effect of wind speedup in the formation of transverse dune fields.* Earth
-  Surface Processes and Landforms 25, 905–918. — Refines Werner: no erosion inside the lee
-  shadow zone, which sharpens slip faces and drives migration.
+  Surface Processes and Landforms 25, 905–918. — Refines Werner with a **height-dependent
+  saltation length**: wind speeds up over a dune's windward profile, so a slab launched from
+  high on the dune is carried further than one launched from the flat. That is what bounds
+  runaway growth in the slab model. It is **not** the source for shadow-zone non-erosion —
+  that rule is Werner's own (slabs in shadow are not eroded and deposit with probability 1),
+  and crediting it here sent the reader to the wrong paper.
 
 ## Landscape evolution
 
@@ -171,9 +182,10 @@ axis is sent, so they are restated:
   Self-Shadowing.* Computer Graphics Forum 29(2) (Eurographics 2010), 723–731. — O(1)-per-cell
   horizon computation by sweep plus incremental convex hull. The one to use for large-radius
   terrain occlusion.
-- **bavoil2008** `P` — Bavoil, L., Sainz, M. & Dimitrov, R. (2008). *Image-space horizon-based
-  ambient occlusion.* SIGGRAPH '08 talks. — HBAO. Its `sin h − sin t` form is a screen-space
-  weighting, not the cosine-weighted hemisphere integral a baked terrain map needs.
+- **bavoil2008** `F` — Bavoil, L., Sainz, M. & Dimitrov, R. (2008). *Image-space horizon-based
+  ambient occlusion.* SIGGRAPH '08 talks. — HBAO. A **talk, not a paper**, and graded like every
+  other talk in this bibliography. Its `sin h − sin t` form is a screen-space weighting, not the
+  cosine-weighted hemisphere integral a baked terrain map needs.
 - **weiss2001** `F` — Weiss, A. (2001). *Topographic Position and Landforms Analysis.* Poster,
   ESRI User Conference, San Diego. — The topographic position index. Widely used, **not
   peer-reviewed**; an F-tier convenience, cited as such.

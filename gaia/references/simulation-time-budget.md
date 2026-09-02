@@ -181,8 +181,15 @@ micro-optimisation — it is why real-time water exists:
 
 - **An ambient ocean is not a simulation.** A Gerstner sum or an inverse-FFT of a spectrum is
   evaluated at time `t` from parameters. There is no state, no timestep, no CFL, and no way for it
-  to explode; it is also why an ocean can be evaluated identically on the CPU for physics and the
-  GPU for rendering. Simulate the sea only where the sea must respond to something.
+  to explode. Simulate the sea only where the sea must respond to something.
+  ⚠️ **"The same field evaluated on the CPU for physics and the GPU for rendering" is true per
+  model, not in general.** A **Gerstner** sum has a genuine per-point evaluator and can be queried
+  on any thread. An **FFT cascade cannot be**: the inverse transform yields a whole tile or nothing,
+  so a CPU query costs either the entire transform run again CPU-side or a texture **readback** — a
+  stall, and physics reading last frame's sea. Budget a cheap CPU proxy fitted to the same spectrum
+  instead. And with choppiness on the result is a *displacement* field, not a height field, so "the
+  height above `(x, z)`" requires iteratively inverting the horizontal displacement before it means
+  anything at all. See `wave-models.md`.
 - **Steady-state discharge** under uniform rain is `rain * upstream contributing area` — what a
   mass-conserving water solver converges to, available directly from flow accumulation with no
   time-stepping.

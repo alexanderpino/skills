@@ -26,17 +26,25 @@ it illuminates on the bed is a smooth but **non-area-preserving** transformation
 bed scales as the reciprocal of that map's Jacobian determinant: where neighbouring rays converge,
 the Jacobian shrinks and the bed brightens. The bright *filaments* are where it passes through
 zero — the fold set of the projection — which is why real caustics are sharp cusped lines rather
-than soft blobs, and why they sharpen as the bed gets closer to the surface. Everything below is an
-approximation to that one statement, and the approximations are graded by which part of it they
-keep.
+than soft blobs. Everything below is an approximation to that one statement, and the approximations
+are graded by which part of it they keep.
+
+⚠️ **Depth does not simply sharpen them; there is a band, with nothing at either end.** At zero
+separation the refracted map is the identity, `J = 1` everywhere, and there is no caustic at all —
+a bed touching the surface is evenly lit. Contrast builds with separation as neighbouring rays get
+room to converge, and then the water's own scattering erases the fold structure over a few metres
+of path. A renderer that brightens the pattern monotonically as the bed rises has the near end of
+that band inverted.
 
 Three consequences worth fixing in mind before choosing a technique:
 
 - **Caustics redistribute light; they do not add it.** Averaged over the bed, the caustic pattern
   must integrate back to the transmitted irradiance. A caustic layer added on top of an already
   fully-lit bed double-counts, and the bed reads washed out and flat-bright between the filaments.
-- **They exist only where the bed is close and the water is clear.** Scattering destroys the fold
-  structure over a few metres of path; deep or turbid water has no caustics, only a diffuse column.
+- **They exist only inside that depth band, and only where the water is clear.** Scattering
+  destroys the fold structure over a few metres of path, so deep or turbid water has no caustics,
+  only a diffuse column — and water shallow enough that the refracted map is near the identity has
+  none either.
 - **They require unshadowed direct sun.** Bed in shadow, no caustics. This is the cheapest
   correctness win available and it is skipped constantly.
 
@@ -60,7 +68,9 @@ lands, splat into a light-space texture, and project that texture onto the recei
 The whole thing is one extra light-space pass at modest resolution, and its cost is independent of
 screen resolution and of how much bed is visible. It is the cheapest thing that is genuinely a
 caustic: it moves with the waves because it is *computed from* the waves, it converges and diverges
-correctly with depth, and it produces cusps because the splat density is the Jacobian.
+correctly with depth, and it produces cusps because the splat density is the **reciprocal** of the
+Jacobian — the same quantity the irradiance statement above is written in. Getting that the wrong
+way up inverts the image: the folds come out as dark seams and the flat regions as the bright ones.
 
 **Near-real-time / ray-traced tier: solve the specular chain rather than sampling toward it.** Path
 tracing finds a light→water→bed→eye path only by chance, and the chance is essentially zero for a
@@ -95,6 +105,11 @@ from a spectrum or a simulation.
 | A path tracer, and caustics are part of the shot | **Caustic photon map** [jensen1996] | Robust, handles any surface, blurs the fold |
 | A path tracer, and the filaments are the shot | **Specular manifold sampling** [zeltner2020] | Keeps the high-frequency structure photon gathering smooths away |
 | Real-time ray tracing, terrain as a proxy | Caustic map still, projected in the raster pass | The ray budget is spent on shadows and reflections; see `heightfield-raymarching.md` for the proxy contract |
+
+⚠️ **One of those rows rests on an `F` source.** There is no peer-reviewed paper behind the
+stylized projected-texture tier; the standard exposition is a GPU Gems book chapter
+[guardado2004], and it is listed here as the honest name for what the industry actually ships, not
+as a result. Every other row above cites a peer-reviewed paper.
 
 The crossover is not "how much GPU do I have" but **whether the surface is available as a field the
 light pass can rasterize**. If it is, the caustic map is nearly free relative to what it buys. If

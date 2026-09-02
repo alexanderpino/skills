@@ -80,7 +80,12 @@ The choice is decided by what consumes the result, and this is the crossover:
 | You want | Use | Because |
 |---|---|---|
 | A **network** — river masks, channel carving, anything you will threshold | **D8** | Single-receiver routing concentrates flow into one-cell-wide lines. That is what a river mask needs, and it is why D8 survives despite being the crudest rule. |
-| A **field** — wetness, moisture, vegetation density, erosion weighting | **MFD** | Multi-receiver routing spreads flow across hillslopes, which is what actually happens. D8 gives a field full of parallel one-cell stripes and dry cells between them. |
+| A **field** — wetness, moisture, vegetation density, erosion *mask* weighting | **MFD** | Multi-receiver routing spreads flow across hillslopes, which is what actually happens. D8 gives a field full of parallel one-cell stripes and dry cells between them. |
+
+⚠️ "Erosion weighting" above means a **mask** — where to soften, where to let a pass bite. It is
+not the routing an erosion *solver* runs on: stream power builds its stack from a single-receiver
+array and keys incision on single-receiver accumulation, so it needs D8 (or D∞ collapsed to one
+neighbour) and cannot consume an MFD field at all (`stream-power.md`).
 
 Thresholding an MFD field to get a network produces a smeared, braided mask; smoothing a D8
 field to get a wetness map produces stripes. Route twice if you need both — it is cheaper than

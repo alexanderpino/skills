@@ -80,14 +80,41 @@ result is a regular grid of hard pinch points that prints through every field de
 height. Detuning to 2.03 lifts those points to roughly half the generic level; it is a mitigation,
 not a cure, and it costs nothing.
 
-⚠️ The per-octave offset is a **different** fix for a **different** problem (octave correlation).
-It does not touch the pinch grid, because those zeros come from lattice geometry. Apply both.
+⚠️ **Per-octave offsets fix this too — and the recommended fBm above already has them.** The
+offset was introduced for a different problem (octave correlation), but with a non-lattice `O_i`
+octave *i* is evaluated off-lattice and is generically non-zero at the coarse lattice points, so
+only octave 0 still vanishes there. Measured on an 8-octave improved-Perlin stack — mean |value|
+at lattice points over mean |value| at generic points, a measurement of an implementation and not
+a cited result:
 
-**Gain** ≈ 0.5, and `gain = 2^(-H)` ties it to the Hurst exponent: H = 1 is the standard
-smooth-ish terrain, H = 0.5 (gain ≈ 0.707) is closer to real eroded topography at small scales.
+| configuration | lattice / generic |
+|---|---|
+| lacunarity 2, no offsets | 0.00 |
+| lacunarity 2, **with** per-octave offsets (`O_0 = 0`) | 0.44 |
+| lacunarity 2.03, no offsets | 0.44 |
 
-**Octave count** is not a taste parameter: stop when an octave's wavelength falls below ~2 cells,
-i.e. `octaves = log2(resolution / baseWavelengthInCells)`. Octaves past the Nyquist limit add
+Offsets recover the pinch grid at least as well as detuning does, and the residual — 0.44 in both
+columns, and around half the generic level in every stack measured — is **octave 0's own zeros**,
+which neither fix removes. A mitigation, not a cure. Apply both
+anyway: only the offsets decorrelate the octaves. And do not expect a detune to visibly change a
+stack that already offsets; it will not, and reading that as "the detune worked" is the trap this
+note exists to close.
+
+**Gain** ≈ 0.5. Tying it to a Hurst exponent — `gain = lacunarity^(−H)`, i.e. `2^(-H)` at
+lacunarity 2 — is the standard fBm parameterisation and is stated here as common practice, with
+no source in this bibliography cited for the identity: H = 1 is the standard smooth-ish terrain,
+H = 0.5 (gain ≈ 0.707) is closer to real eroded topography at small scales.
+
+**Octave count** is not a taste parameter: stop when an octave's wavelength falls below ~2 cells.
+With base wavelength `W` cells and lacunarity 2, octave *k* has wavelength `W / 2^k`, so
+requiring it to stay above ~2 cells gives
+
+    octaves ≈ log2(baseWavelengthInCells) − 1
+
+and the grid's resolution does not enter it — the cutoff is a property of the base wavelength and
+the cell, not of the domain's extent. (`log2(resolution / baseWavelengthInCells)`, which
+circulates widely, is a different quantity: at 4096 cells with `W = 1024` it returns 2 where this
+returns 9, discarding seven octaves of legitimate detail.) Octaves past the Nyquist limit add
 aliasing that shimmers under LOD, not detail.
 
 ## Ridged and hybrid multifractal
@@ -156,7 +183,7 @@ octaves it cannot resolve anyway, and dropping them is also the poor-man's band-
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| A regular grid of pinch points in the height, and in everything derived from it | Lacunarity exactly 2; all octaves zero at the shared lattice points | Detune to 2.03; add per-octave offsets as well, for the other artefact |
+| A regular grid of pinch points in the height, and in everything derived from it | Lacunarity exactly 2 *and* no per-octave offsets; all octaves zero at the shared lattice points | Either fix lifts them equally — detune to 2.03, add offsets, or both; octave 0's own zeros remain either way |
 | Faint creases along the grid axes under lighting or curvature masks | The 1985 cubic fade, whose second derivative is non-zero at lattice points | Quintic fade [perlin2002] |
 | Diagonal banding in a field sampled from 3D noise on a flat plane | The simplex lattice has a face parallel to the sampling plane | A lattice-rotated variant [opensimplex2] |
 | A mask thresholded near zero outlines the lattice grid | Gradient noise is identically zero at lattice points | Threshold fBm output, or offset the threshold away from 0 |
@@ -165,5 +192,5 @@ octaves it cannot resolve anyway, and dropping them is also the poor-man's band-
 | Terracing far from the world origin | fp32 has ~8 mm of resolution at 100 km; high-frequency octaves compute on garbage low bits | Subtract a per-region offset that is an exact multiple of the noise period, or transform in double |
 | Seams at tile boundaries | `noise(uv)` per tile | `noise(worldPos * frequency)`, always |
 | A remap curve does nothing to the tails and everything to the middle | The distribution is Gaussian, not uniform, so the knee lands elsewhere | Histogram-match, or apply the curve to the measured range |
-| Shimmering under LOD | Octaves below ~2 cells' wavelength | Cut the octave count to `log2(res / baseWavelengthInCells)` |
+| Shimmering under LOD | Octaves below ~2 cells' wavelength | Cut the octave count to `log2(baseWavelengthInCells) − 1` — resolution does not enter it |
 | Rivers run uphill after a warp node | The warp moved geometry the drainage was solved on | Move every warp upstream of routing |

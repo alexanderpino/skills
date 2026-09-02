@@ -72,7 +72,7 @@ and that sentence is what stops the same topic being proposed every six months.
 - **virtual-texturing** `covered` — How do you give terrain material detail at a resolution no single atlas can hold? → virtual-texturing.md
 - **gpu-driven-culling** `covered` — How do you decide what to draw without a CPU round trip per object? → gpu-driven-culling.md
 - **planetary-precision** `covered` — Where does float precision break at planetary scale, and what do you do about it? → planetary-precision.md
-- **water-rendering** `covered` — How do you draw the surface: reflection, refraction, depth colour, foam and the shoreline? → water-rendering.md
+- **water-rendering** `covered` — How do you draw the water surface from both of its sides: reflection, refraction, depth colour, foam, the shoreline, and the view from underwater? → water-rendering.md
 - **caustics** `covered` — How do you get focused light through a water surface, at each budget tier? → caustics.md
 - **heightfield-raymarching** `covered` — How do you draw a heightfield by marching rays, for the near-real-time ray-traced tier? → heightfield-raymarching.md
 - **lighting-and-shadows** `planned` — What is different about shadowing terrain specifically, including large-scale occlusion?

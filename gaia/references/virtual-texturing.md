@@ -23,7 +23,13 @@ adopted for the wrong reason.
 ## Use this
 
 **Runtime virtual texturing: cache the terrain's stable material composite into pages, and sample
-the cache** [epicrvt]. The splat or ID resolve, the macro colour, the static roads and persistent
+the cache.** No canonical paper describes this architecture either; standard practice is the
+branded instance documented for Unreal Engine [epicrvt] — engine documentation, `F`, and flagged in
+the bibliography as needing re-verification per release because it has changed shape between
+versions. The page-table and feedback plumbing underneath it is older and far better written up,
+though still in course and conference talks rather than review [mittring2008] [barrett2008].
+
+The splat or ID resolve, the macro colour, the static roads and persistent
 decals are composited once per page, on demand, and every subsequent frame is one indirection plus
 one filtered fetch instead of `active layers × maps × projections` samples.
 

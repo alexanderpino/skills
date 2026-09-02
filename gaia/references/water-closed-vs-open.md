@@ -84,16 +84,26 @@ player in a lake has both: reflecting shore, fading offshore edge.
 
 ## The wave field in a closed body is a driven basin
 
+⚠️ **"Driven basin" is a phrase this family of skills coined; it is not a term of art**, and
+`bodytype_doctrine` has **no external source** [bodytype_doctrine] — it is a convention this
+repository recommends, not a finding. The construction under the name is borrowed from room
+acoustics (a point source, early reflections, a diffuse tail) and the physics inside it is the
+ordinary capillary–gravity kind; the *name* and the *packaging* are ours. Use it as a mental model;
+never cite it as literature.
+
 A directional wind spectrum on a sheltered pool is plausible and wrong in a way a photograph
 exposes immediately. Pool water is organised by the plumbing and the walls
 [bodytype_doctrine]:
 
 - **The source is a fixed point** — the filtration return jets, injecting a narrow band of gravity
   waves of order 10–30 cm whenever the pump runs, with swimmer transients on top.
-- **The walls send it all back.** The result is a reverberant response: the field is **not
-  statistically homogeneous**, the pattern is **stationary in the basin frame** (the same structure
-  sits in the same place every day), and a train can be traced from the inlet to the far wall and
-  back. A spectral ocean model is homogeneous and stationary in *time*; it is the wrong statistics.
+- **The walls send it all back.** ⚠️ That a tiled wall is a near-total reflector at these
+  wavelengths is *argued from the physics*: **no reflection coefficient has been measured**, here or
+  in the doctrine this comes from, and the reverberant picture rests on that unmeasured assumption.
+  Granting it, the result is a reverberant response: the field is **not statistically homogeneous**,
+  the pattern is **stationary in the basin frame** (the same structure sits in the same place every
+  day), and a train can be traced from the inlet to the far wall and back. A spectral ocean model is
+  homogeneous and stationary in *time*; it is the wrong statistics.
 - **Damping sorts the surface into two bands, and forcing sorts it the same way.** Deep-water
   viscous decay goes as `k^2` [lamb_damping], so the e-folding distance against group speed is
   order 90 m at 16.5 cm — eleven lengths of an 8 m pool — but only about 2 m at 3 cm, which dies
@@ -117,7 +127,11 @@ out-slopes a much taller long wave.
 
 ## The gate table
 
-Every row is a default that flips [bodytype_doctrine].
+Every row is a default that flips [bodytype_doctrine]. ⚠️ **The table is doctrine, and doctrine with
+no external source**: it is a set of engineering defaults this repository recommends, reasoned from
+fetch and boundary, not a measured or published classification. The two questions it descends from
+are physics; the enum, the rows, and the decision to gate on an *authored* type rather than on
+geometry are a convention, and should be argued with rather than cited.
 
 | Machinery | Open body | Closed body |
 |---|---|---|
@@ -176,5 +190,5 @@ with no place to write down why.
 | Long waves stop dead at the edge of a wind shadow | A lee mask multiplied into the whole field | Modulate the short band only |
 | Dead-calm water reads as patent leather or a black void with one searing highlight | Slope variance driven to zero | Clamp the variance to the solar-disc scale; spend the freed budget on reflection fidelity |
 | Foam on a mirror-calm sea, or a gale with a pinpoint sun | Wind wired separately into each consumer | One wind, every consumer |
-| Fine ripple octaves added to "sharpen" calm water, and it aliases | Detail below `lam_min`, which the physics damps out | Cut the spectrum at the capillary minimum [capillary_gravity] |
+| Fine ripple octaves added to "sharpen" calm water, and it aliases | Sub-pixel detail past the aliasing budget; those wavelengths also die within centimetres to viscous damping | Cut on damping or on footprint — `lam_min` is where phase speed is slowest, not a shortest wave [lamb_damping] |
 | The pool's bed looks flat and cheap while the surface is lavish | Open-water budget applied to a closed body | Invert it — the bed is the show |

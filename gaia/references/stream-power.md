@@ -11,6 +11,7 @@ sources:
   - { id: whipple1999, tier: P, locator: "the stream-power incision model: the roles of m, n, and knickpoint behaviour" }
   - { id: crosby2006, tier: P, locator: "knickpoint distribution across a network: 236 waterfalls in the Waipaoa" }
   - { id: culling1960, tier: P, locator: "hillslope transport as diffusion, the D grad^2 h term" }
+  - { id: explicit_diffusion_limit, tier: F, locator: "the explicit FTCS bound, dt <= dx^2 / (4D) in two dimensions" }
 ---
 # Stream power — the erosion backbone at map scale
 
@@ -18,6 +19,13 @@ Past roughly 50 km of extent, this is the only erosion model that is stable over
 and the only one that produces correct large-scale drainage. Everything it needs comes from
 elsewhere: `U` from `tectonic-uplift.md`, drainage area `A` and the receiver array from
 `flow-routing.md`, and `K` from lithology.
+
+⚠️ **It needs single-receiver routing.** The stack is built from a receiver *array* — one
+receiver per cell — so [braun2013] requires **D8** (or D∞ collapsed to its steeper neighbour),
+and `A` must be the accumulation computed on those same single receivers. An MFD field cannot
+build the stack: there is no unique `receivers[i]` to order it by, and an MFD `A` disperses the
+area the incision law is keyed on. MFD's place in this pipeline is masks and wetness fields
+(`flow-routing.md`), not the erosion solve.
 
 ## Use this
 
@@ -75,15 +83,24 @@ belongs inside the same solver rather than bolted on as a separate pass. Raising
 spacing; raising `K` tightens it. Past some `D`, diffusion erases the network rather than
 coarsening it.
 
-⚠️ **Sub-cycle strictly, not exactly.** The explicit Laplacian is stable for `D·dt/Δx² ≤ 0.25`, so
-`ceil(D·dt / (0.25·Δx²))` lands *exactly* on 0.25 whenever it divides evenly — and at exactly 0.25
-the checkerboard mode's amplification is −1, so it flips sign forever and never damps. The field
-stays finite and mass stays conserved while the pass **roughens** the terrain. Keep a 0.9 safety
-factor (`c = 0.225`) and assert the *direction* of the effect, not merely that the output is
-finite.
+⚠️ **Sub-cycle strictly, not exactly.** The explicit Laplacian is stable for `D·dt/Δx² ≤ 0.25`
+[explicit_diffusion_limit] — no canonical paper; it is the von Neumann bound on the FTCS
+discretisation, `Δt ≤ Δx²/(4D)` in two dimensions, standard in any numerical-methods text — so
+`ceil(D·dt / (0.25·Δx²))` lands *exactly* on 0.25 whenever it divides evenly. At exactly 0.25 the
+checkerboard mode's amplification factor is `1 − 8c = −1`: it flips sign every step and its
+amplitude is **preserved, never amplified**. The field stays finite and mass stays conserved,
+every other mode damps, and grid noise is the one thing left standing — so the pass reads as
+though it roughened the terrain when what it did was smooth everything except the artefact. Keep
+a 0.9 safety factor (`c = 0.225`) and assert the *direction* of the effect, not merely that the
+output is finite.
 
-A thermal-erosion pass (`thermal-and-aeolian-erosion.md`) substitutes for the diffusion term, is
-cheaper, and gives repose-angle behaviour as well.
+⚠️ **A thermal pass is not a substitute for `D·∇²h`.** Slope-limited relaxation
+(`thermal-and-aeolian-erosion.md`) is cheaper and gives repose-angle behaviour the Laplacian
+cannot, and it will take the knife-edge off an interfluve — but that is the *visual symptom*,
+not the mechanism. It does nothing at all below the talus angle, it drives faces to planar
+repose where diffusion makes hilltops convex, and it carries no `D`, so it cannot participate in
+the `D`-versus-`K` competition that selects valley spacing. Run both if you want repose faces;
+if valley spacing is a parameter you are tuning, `D·∇²h` stays.
 
 ## Knickpoints are outputs, not stamps
 
@@ -103,8 +120,10 @@ waterfall, put a **hard bed across the channel**; to get a migrating one, **drop
 and let it run. Carving a vertical cliff into the heightfield with uniform `K` gives a step
 nothing pins, and the next pass relaxes it into a rapid.
 
-**What it beats.** *Droplet erosion at map scale* — a droplet's lifetime covers a few hundred
-metres, so a 100 km map gets scratches, not valleys. *Pipe erosion at map scale* — bounded by CFL
+**What it beats.** *Droplet erosion at map scale* — a droplet's path is a fixed number of steps
+(~30–60), each about one cell, so its reach is `lifetime × cellSize`: a few tens of cells,
+whatever they measure. On a grid whose drainage network spans thousands of cells that is a
+scratch, not a valley (`hydraulic-erosion.md`). *Pipe erosion at map scale* — bounded by CFL
 on a timestep measured in seconds, when the process being modelled takes 10⁶ years. *The explicit
 stream-power solver* — same equation, timestep set by the largest drainage area, so millions of
 steps and it still explodes. *Stream power on a 500 m map* — produces nothing, because there is no
@@ -127,8 +146,8 @@ that look fine in a hillshade.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | The solve explodes, or needs millions of steps | Explicit discretisation; `Δt` bounded by the largest `A^m` | The implicit stack solve [braun2013] |
-| Knife-edge interfluves between channels | The diffusion term omitted | Add `D·∇²h`, or a thermal pass |
-| The diffusion pass roughens instead of smoothing | Sub-cycling landing exactly on `D·dt/Δx² = 0.25`; the checkerboard mode never damps | `c = 0.225` |
+| Knife-edge interfluves between channels | The diffusion term omitted | Add `D·∇²h`; a thermal pass hides the symptom but does not restore the `D`/`K` valley-spacing control |
+| Everything smooths except a persistent checkerboard | Sub-cycling landing exactly on `D·dt/Δx² = 0.25`; the checkerboard's factor is exactly −1, so it is preserved | `c = 0.225` |
 | The network is erased rather than coarsened | `D` too high relative to `K` | Lower `D`; measure valley spacing, not channel count |
 | Cells sinking below their receivers; pits reappearing | Erosion recreating depressions mid-run | The `max(h[i], h[r])` guard, and in-loop lake handling [cordonnier2016] |
 | Each step costs O(n log n) and the run crawls | A full depression fill re-run every step | Lake graph inside the loop [cordonnier2016] |

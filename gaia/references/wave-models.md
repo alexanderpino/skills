@@ -1,6 +1,6 @@
 ---
 type: Technique
-title: Wave models — spectra, trochoids, and what dispersion forbids
+title: Wave models — spectra, trochoids, and what dispersion actually settles
 description: "Which wave field to synthesise for open water, which for a stylised or gameplay sea, and what the dispersion relation constrains in every one of them."
 tags: [simulation, water, waves, spectra, runtime]
 status: draft
@@ -9,6 +9,7 @@ sources:
   - { id: tessendorf_ocean, tier: F, locator: "the spectrum sampling and inverse-FFT displacement construction" }
   - { id: gerstner_trochoid, tier: F, locator: "the per-wave trochoid with horizontal and vertical displacement" }
   - { id: capillary_gravity, tier: F, locator: "the capillary-gravity dispersion relation and its minimum phase speed" }
+  - { id: lamb_damping, tier: F, locator: "the deep-water viscous decay rate for a free-surface wave" }
   - { id: airy_coastal, tier: F, locator: "the linear dispersion relation, Green's law, the breaker index and the surf-similarity parameter" }
   - { id: coxmunk1954, tier: P, locator: "the wind-speed regressions for the sea-surface slope variance" }
   - { id: bruneton2010, tier: P, locator: "the slope-variance treatment of wave detail below the geometry band, and the solar-disc variance clamp" }
@@ -16,15 +17,18 @@ sources:
   - { id: monahan1980, tier: P, locator: "the whitecap-coverage power law in wind speed at 10 m" }
   - { id: yuksel2007, tier: P, locator: "the wave-particle carrier and its subdivision rule" }
 ---
-# Wave models — spectra, trochoids, and what dispersion forbids
+# Wave models — spectra, trochoids, and what dispersion actually settles
 
 A wave field is not a simulation. It is a **closed form evaluated at time `t`**, which is why an
-ocean fits in a frame when a fluid solver does not, and why the same evaluator can run on the CPU
-for physics and the GPU for rendering. Choosing which closed form is most of the work.
+ocean fits in a frame when a fluid solver does not. Choosing which closed form is most of the work
+— and part of that choice is whether physics can ask the field a question cheaply, which is **not**
+the same answer for every model here; see [querying the
+field](#querying-the-field-is-a-per-model-question).
 
-This document owns the *field*: what it is, what it may contain, and what motion it produces. How
-it is shaded, filtered and drawn is the rendering axis; where a body is closed rather than open,
-read the taxonomy first.
+This document owns the *field*: what it is, what it may contain, what motion it produces, and the
+**spectrum and slope statistics** that describe it. How those statistics are consumed — the
+variance tensor, the roughness-aware Fresnel fit, prefiltering, the glitter BRDF — is the rendering
+axis; where a body is closed rather than open, read the taxonomy first.
 
 ## Use this
 
@@ -35,11 +39,40 @@ the only family that is statistically ocean-like across the whole band.
 
 **Stylised, hero, gameplay-authored or tight-budget: a Gerstner (trochoidal) sum**
 [gerstner_trochoid]. 4–16 analytic waves, each with horizontal and vertical displacement, sharp
-tunable crests, direct per-wave authoring, and an analytic normal.
+tunable crests, direct per-wave authoring, and an analytic normal. It is also the only family here
+with a genuine **per-point evaluator**, which is what makes gameplay and physics queries cheap —
+again, see [querying the field](#querying-the-field-is-a-per-model-question) before assuming the
+spectral option gives you that too.
 
 **Surf zone: neither.** Both above are *deep-water* models — they assume the bottom is infinitely
 far away. The moment the depth field says otherwise, a separate shore-wave band owns the water; see
 [the shore](#the-shore-is-a-different-field-not-a-modulation).
+
+## Querying the field is a per-model question
+
+"A wave field can be evaluated identically on the CPU for physics and on the GPU for rendering" is
+true of one family here and **false of the one this document recommends**. The difference decides
+how boats float, so it is a selection criterion, not an implementation detail.
+
+- **Gerstner** [gerstner_trochoid] is a closed form with a per-point evaluator: sum 4–16 waves at
+  any `(x, z, t)`, on any thread, with no GPU involved. This is the model the claim is true of.
+- **A spectral FFT cascade** [tessendorf_ocean] has **no per-point evaluator at all.** The inverse
+  FFT produces a whole tile or nothing. A single CPU query therefore costs either the entire
+  transform run again CPU-side (the work the GPU was doing to avoid it) or a **readback** of the
+  displacement texture — a pipeline stall, and at least a frame of latency, so physics is querying
+  last frame's sea. Neither is "the same evaluator on both sides". Budget the usual shipped answer
+  instead: a **cheap CPU proxy** — the largest cascade alone, or a few Gerstner waves fitted to the
+  same spectrum — driving buoyancy and gameplay, with the understanding that physics and pixels
+  agree only down to the proxy's band.
+
+⚠️ **With choppiness on, a displacement field is not a height field.** The field displaces
+horizontally as well as vertically, so the surface point that ends up above world `(x, z)` did not
+start there: sampling the displacement at `(x, z)` returns the motion of the particle whose *rest*
+position is `(x, z)`, which is now somewhere else. Getting the height above a given world point
+requires **inverting the horizontal displacement** — two or three fixed-point iterations of
+`p <- (x,z) - D_xy(p)` is the standard fix, cheap and usually sufficient — and it must happen on
+whichever side asks the question. Skipping it is the boat that floats a metre beside its own wave,
+worst exactly where choppiness is strongest, at the crests, where it is most visible.
 
 ## What the dispersion relation actually constrains
 
@@ -51,18 +84,40 @@ omega^2 = ( g*k + (sigma/rho)*k^3 ) * tanh(k*h)      # k = 2*pi/lambda, h = dept
 
 It is not decoration. Four hard constraints fall out of it, and each one is a bug if you ignore it.
 
-**1. There is a smallest possible wave.** The `k^3` term means phase speed *rises* again for very
-short waves, so `c(k)` has a minimum:
+**1. There is a slowest possible wave.** The `k^3` term means phase speed *rises* again for very
+short waves, so `c(k)` has a **minimum**. `lam_min` is the wavelength at which that minimum occurs
+— not a floor on wavelength:
 
 ```
 c_min   = (4 g sigma / rho)^(1/4)    = 0.2312 m/s      # sigma = 0.0728 N/m
 lam_min = 2 pi sqrt(sigma/(rho g))   = 0.01712 m       # 1.712 cm
 ```
 
-Below `lam_min` ripples are damped rather than supported. **A renderer that keeps adding finer
-normal-map octaves to "sharpen" calm water is fabricating detail the physics forbids**, and will
-alias for it. Cut the spectrum there. (⚠️ Derive both numbers from one `sigma`; the widely-quoted
-pair `23.1 cm/s at 1.73 cm` implies two surface tensions 2.5% apart.)
+⚠️ **The dispersion relation forbids no wavelength.** `omega^2 = (g k + (sigma/rho) k^3) tanh(k h)`
+is positive for *every* `k`, so a real wave with a real frequency exists at every wavelength;
+shorter than `lam_min` you are simply on the **capillary branch**, where `c` climbs again as the
+wave shortens. Those waves are real, wind makes them, and they are the cat's-paw sparkle this skill
+elsewhere asks a renderer to reproduce. What `c_min` gates is **forcing**: wind cannot raise a wave
+until it can push past the slowest phase speed the surface offers, which is why a light breeze
+gives patches of ripple on otherwise glassy water rather than uniform texture.
+
+What actually removes sub-centimetre ripples is **viscous damping** — a different mechanism, at a
+different scale. Deep-water amplitude decays at `alpha = 2 nu k^2` [lamb_damping] (`nu ≈ 1e-6 m²/s`),
+so both the lifetime and the e-folding distance against the group speed collapse as the wavelength
+falls:
+
+```
+lam = 16.5 cm  ->  e-folds over ~90 m,   ~345 s     # rings an 8 m basin many times over
+lam =  3   cm  ->  ~2.1 m,               ~11 s
+lam =  5   mm  ->  ~0.14 m,              ~0.3 s     # gone within centimetres of whatever forced it
+```
+
+So **cut the spectrum where viscous damping or your own aliasing budget says to, and say which one
+you used.** A renderer stacking ever-finer normal-map octaves onto calm water is not fabricating
+detail the physics forbids — it is adding sub-pixel detail that will alias, and that in the real
+surface would have died centimetres from its source. Both are good reasons to stop; the dispersion
+relation is not one of them. (⚠️ Derive `c_min` and `lam_min` from a single declared `sigma`; the
+widely-quoted pair `23.1 cm/s at 1.73 cm` implies two surface tensions 2.5% apart.)
 
 **2. Long waves outrun short ones, so a sea has groups.** In deep water `c = sqrt(g/k)`, so period
 is the ordering parameter and energy travels at half the phase speed. A single period reads as a
@@ -86,19 +141,50 @@ fully developed sea, **JONSWAP** for a fetch-limited one with a sharpened peak, 
 [tessendorf_ocean]. Drive them from wind speed and fetch, not from an amplitude dial, so every
 consumer of the sea state agrees.
 
-⚠️ **Elfouhaily et al. (1997)** is the unified wind- *and* fetch-parameterised spectrum spanning
-gravity and capillary wavenumbers continuously, and it is the right target if you need one curve
-across the whole band. Gaia does not cite it: the fullest treatment in this repo
-(`water-physics/references/12b-water-provenance.md`) records that the paper is paywalled and **was
-not read**, and that its equations there are an agreed intersection of four independent
-restatements. Use it, and take the provenance from that file rather than from here.
+⚠️ **Elfouhaily et al. (1997)**, *A unified directional spectrum for long and short wind-driven
+waves* (J. Geophys. Res. 102(C7), 15781–15796; DOI 10.1029/97JC00467), is the wind- *and*
+fetch-parameterised spectrum spanning gravity and capillary wavenumbers continuously, and it is the
+right target if you need one curve across the whole band. **Gaia does not cite it, deliberately.**
+The fullest treatment of it in this family of skills records that **the paper is paywalled and was
+not read**, and that the equations reproduced there are not taken from the paper but assembled as
+the agreed **intersection of four independent restatements** — Mobley's *Ocean Optics Web Book*
+(which carries the paper's own equation numbers), Wang et al. 2025 (AMT 18, 6329, open access),
+Zhang et al. (PMC6111991, open access), and Hwang & Fois (arXiv:2204.11591). Under Gaia's tier
+rules an unread source cannot be graded `P`, so it is named in prose and graded nowhere.
+
+⚠️ **That treatment lives in `water-physics/references/12b-water-provenance.md`, which is not in
+this repository.** It exists only on the unmerged branch
+`origin/claude/swimming-pool-voronoi-render-m22g6r` — not on `main`, and not on this branch. The
+substance is restated in full above for exactly that reason: a provenance chain that depends on an
+unmerged branch is not a provenance chain, so nothing here is lost if that branch never lands.
 
 **The field's slope statistics are the part the renderer actually reads.** Below the wavelength a
 displacement grid can resolve, waves stop being geometry and become **variance** — and the crossover
 must be handled deliberately or far water turns to plastic [bruneton2010]. Cox & Munk's photographic
-regressions are the ground truth for how much slope a given wind produces [coxmunk1954]. Two limits
-on quoting them: wind speed is referenced at **12.5 m**, not the 10 m of standard wind data, and the
-fit is calibrated only over **1–14 m/s** — do not extrapolate to storm winds.
+regressions are the ground truth for how much slope a given wind produces [coxmunk1954]: for a clean
+sea, mean-square slope rises **linearly** in wind speed and is **anisotropic**, rougher along the
+wind than across it.
+
+```
+sigma_up^2    = 0.000 + 3.16e-3 * U        # along wind
+sigma_cross^2 = 0.003 + 1.92e-3 * U        # across wind
+sigma_total^2 = 0.003 + 5.12e-3 * U        # U in m/s
+```
+
+(The two components do not sum exactly to the total — `5.08e-3` against `5.12e-3` — because the
+three regressions are fitted separately in the paper. Quote whichever you need; do not derive one
+from the other two and expect the published number.)
+
+Two limits on quoting them: wind speed is referenced at **12.5 m**, not the 10 m of standard wind
+data, and the fit is calibrated only over **1–14 m/s** — do not extrapolate to storm winds. A third
+is worth knowing because it is usually implemented as the wrong mechanism: a **surfactant film damps
+the short waves that carry most of the slope**, and slicked water measures a factor of 2–3 lower
+total mean-square slope [coxmunk1954] — so an oil slick, a wind shadow or a convergence line is a
+*local reduction of this variance*, not a dark decal.
+
+That is where this document's job ends and the rendering axis begins: the variance tensor, the
+solar-disc clamp on it, and the roughness-aware Fresnel fit that consumes it are how a shader spends
+these numbers [bruneton2010], not what they are.
 
 ## The Jacobian is a free product; use it
 
@@ -108,15 +194,19 @@ A displacement field carries horizontal motion, so it has a Jacobian:
 J = (1 + dDx/dx) * (1 + dDy/dy) - (dDx/dy) * (dDy/dx)
 ```
 
-`J <= 0` means the surface has folded through itself — a breaking crest. Threshold slightly above
-zero (practice: 0.5–0.9) for a whitecap mask, accumulated with decay so foam persists behind the
-crest. **This is *the* whitecap signal**; painting whitecaps any other way fights the displacement
-that produced them. The prefilterable form — coverage as a statistical function of the Jacobian's
+`J <= 0` means the surface has folded through itself — a breaking crest. Foam is masked from a
+threshold on `J` **well before** the fold, not at it: shipped values sit around **0.5–0.9**, i.e.
+foam appears where the surface has compressed to roughly half to nine-tenths of its rest area, long
+before `J` reaches zero. ⚠️ Do not read that as "a hair above zero" and dial in 0.05 — that
+thresholds only true folds, and gives a sea with almost no foam on it. Accumulate the mask with
+decay so foam persists behind the crest. **This is *the* whitecap signal**; painting whitecaps any
+other way fights the displacement that produced them. The prefilterable form — coverage as a statistical function of the Jacobian's
 mean and variance over a footprint — is what keeps it stable at distance [dupuy2012].
 
 Two checks that the coverage is physical rather than tuned. Whitecap coverage from wind follows a
-power law with **no offset** [monahan1980], so at zero wind the sea must carry exactly zero foam
-pixels; and that law puts coverage near zero around 5 m/s and conspicuous by 15 m/s, which agrees
+power law with **no offset** — `W = 3.84e-6 * U^3.41`, with `U` at 10 m [monahan1980] — so at zero
+wind the sea must carry exactly zero foam pixels; and that law puts coverage near zero around
+5 m/s and conspicuous by 15 m/s, which agrees
 with the Beaufort observation that whitecaps begin at Force 3. An empirical formula and a
 19th-century observational scale agreeing on where foam starts is a strong argument for driving foam
 from wind rather than from a constant.
@@ -180,7 +270,9 @@ isolated obstacle a wavelength across in the scene and look behind it.
 | Crests shimmer and self-intersect | Choppiness past ~1.0 driving `J` negative over large areas | Clamp choppiness; keep folding rare and foamed |
 | Foam on a dead-calm sea | Coverage not driven by wind, or driven by a law with an offset | The power law has no offset [monahan1980] |
 | Far water turns to plastic | Wave detail below the geometry band dropped instead of becoming variance | Carry it as slope variance [bruneton2010] |
-| Fine ripple octaves alias and never sharpen | Detail below `lam_min`, which the physics damps out | Cut the spectrum at the capillary minimum [capillary_gravity] |
+| Fine ripple octaves alias and never sharpen | Sub-pixel detail added past the aliasing budget — and at those wavelengths the real surface damps within centimetres | Cut on viscous damping or on footprint, not on `lam_min`: it is a phase-speed minimum, not a shortest wave [lamb_damping] |
+| A boat, buoy or splash sits a metre beside the wave it should be riding | Displacement field sampled as if it were a height field, with choppiness on | Invert the horizontal displacement — two or three iterations of `p <- (x,z) - D_xy(p)` |
+| CPU physics disagrees with the rendered sea, or a readback stalls the frame | An FFT cascade queried per point; it has no per-point evaluator | A cheap CPU proxy fitted to the same spectrum, and state the band where they agree |
 | The sea reads as a metronome | One period | Superpose 2–3 periods with a slow group envelope |
 | Slope variance too high at storm wind | Cox & Munk extrapolated past 14 m/s, or fed 10 m wind | Respect the calibration range and the 12.5 m reference [coxmunk1954] |
 | A crisp wave shadow behind an isolated rock | Ray model with no diffraction term | State the limit; a shadow at `W/lambda ≈ 1` is wrong across its whole extent |
