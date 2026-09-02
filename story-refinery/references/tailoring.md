@@ -153,12 +153,13 @@ none of its sections is required. What this skill does with it, in order:
    of each artefact. `preview.md` is for the person; `handback.json` is the
    caller's return value.
 
-The one thing the caller cannot do from its own text is *load* this skill when
-`disable-model-invocation` is set: that flag means only the user can invoke it.
-A caller then instructs the user to run the command above; clearing the flag
-lets the caller invoke it directly, at the cost of the skill being loadable by
-the model on its own judgement. Which is wanted is a decision for whoever owns
-both skills, and it is recorded in this skill's frontmatter, nowhere else.
+This skill is model-invocable on purpose, so a caller can load it from its own
+text. The cost is that the model may also load it on its own judgement; the
+description is written to trigger on refinement-shaped requests and a `--wishes`
+hand-off, and not on implementation requests - `evals/invocation-eval.json`
+holds both sets of cases. Setting `disable-model-invocation: true` would make it
+user-only again and break the calling contract; that choice lives in this
+skill's frontmatter and nowhere else.
 
 ## What a tailoring skill should contain
 

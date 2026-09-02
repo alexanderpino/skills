@@ -8,13 +8,12 @@ description: >-
   house profile. Reads the ticket's own labels first - a production finding refines
   differently from a feature - keeps the investigation for whoever implements it, and puts
   the result past blind critics before handover. Tracker-agnostic: Jira, GitHub, GitLab,
-  Linear, Azure DevOps, or plain markdown. Type /story-refinery to run it.
-# Claude Code blocks an automatic load and will not preload this skill into a subagent,
-# so the description says what the skill does rather than arguing against being loaded.
-disable-model-invocation: true
+  Linear, Azure DevOps, or plain markdown. Use when a backlog item, ticket, epic or
+  bug must be made ready before anyone implements it, or when a calling skill passes an
+  item with --wishes. It refines; it never writes the implementation.
 argument-hint: <ticket key or item> [--wishes <refinement.md from the calling skill>]
 metadata:
-  invocation: user
+  invocation: auto
 ---
 
 # Story Refinery
@@ -835,9 +834,9 @@ All stdlib-only Python 3, no dependencies, no network.
 - `assets/templates/refinement-wishes.md` - the shape of the wishes a calling
   skill passes with `--wishes`; every section optional
 - `assets/examples/example-bundle.json` - a complete, validating two-repo example
-- `evals/invocation-eval.json` - what to do when the skill is invoked on a request
-  that does not fit, and what to do when a refinement-shaped request arrives with no
-  invocation at all. Not a trigger eval: with `disable-model-invocation` set, "would
-  Claude load this on its own" is no longer a question with an answer
+- `evals/invocation-eval.json` - when to load this skill on its own (a refinement-
+  shaped request, a calling skill passing `--wishes`), when not to (an implementation
+  request, a general question about agile), and what to do once invoked on a request
+  that does not fit
 - `evals/evals.json` - twenty-five behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

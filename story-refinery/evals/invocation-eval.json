@@ -1,111 +1,149 @@
 {
   "skill_name": "story-refinery",
-  "invocation": "user-only: disable-model-invocation is true, so Claude Code blocks an automatic load and will not preload the skill into a sub-agent",
-  "_howto": "This is not a trigger eval. The skill cannot be model-invoked, so 'would Claude load this on its own' is not a question with an answer any more. What is still worth testing is the two things a user-only skill can get wrong: acting on a request nobody invoked it for, and stretching to cover a request it was invoked on but does not fit. `invoked` says whether the user typed /story-refinery or named the skill; `expect` is the behaviour that is correct given that.",
+  "invocation": "model-invocable: the user runs /story-refinery, or a calling skill loads it and passes --wishes; the description decides when the model loads it on its own",
+  "_howto": "Two halves. Trigger cases (`invoked`: null) ask whether Claude should load the skill on its own for this request - refinement-shaped requests and a --wishes hand-off from a calling skill: yes; implementation requests, general questions about agile, and anything the description does not name: no. The rest are the two things a skill can get wrong once loaded: acting on a request it was not invoked for, and stretching to cover a request it was invoked on but does not fit. `invoked` says whether the user typed /story-refinery, a caller loaded it, or nobody did. Grade against `expectations`.",
   "expectations": {
     "answer directly": "Handle the request as an ordinary question. Do not run the phases, do not produce a bundle, and do not paraphrase the method as if it had been invoked.",
     "refine": "In scope. Run the phases in order and stop at the first gate the item genuinely fails, reporting that as the finding.",
     "decline, not refinement": "Invoked, but there is no backlog item here. Say so in a sentence and answer the underlying question if it has one.",
     "stop and ask": "Invoked and in scope, but the item does not carry enough to refine. Put the questions to the user with your best guess attached; do not decompose.",
     "propose a split, refine one story": "Invoked on an epic. Map it, propose the split, refine one story properly.",
-    "refuse to decompose": "Invoked, but the item's own labels say refinement is the wrong instrument right now."
+    "refuse to decompose": "Invoked, but the item's own labels say refinement is the wrong instrument right now.",
+    "load": "Load the skill and run it as if the user had invoked it; a --wishes hand-off from a calling skill counts as an invocation with that skill as tailoring.source.",
+    "do not load": "Do not load the skill. Answer the request as an ordinary question or task; do not paraphrase the method."
   },
   "cases": [
     {
+      "request": "[from skill dev-workflow] Refine DEV-88 with --wishes .claude/skills/dev-workflow/refinement.md, then hand back handback.json.",
+      "invoked": null,
+      "expect": "load",
+      "why": "a calling skill passing wishes is the calling contract; tailoring.source is dev-workflow and the wishes file gets stamped"
+    },
+    {
+      "request": "We have a ticket 'export invoices as CSV for finance'; before anyone picks it up, can you make it ready - criteria, subtasks, the lot?",
+      "invoked": null,
+      "expect": "load",
+      "why": "refinement-shaped: make an item ready before implementation is exactly the description"
+    },
+    {
+      "request": "Implement CSV export for invoices in the api repo.",
+      "invoked": null,
+      "expect": "do not load",
+      "why": "an implementation request; the skill refines and never writes the implementation"
+    },
+    {
+      "request": "What is the difference between a spike and a story in Scrum?",
+      "invoked": null,
+      "expect": "do not load",
+      "why": "a general question; nothing to refine"
+    },
+    {
+      "request": "Write me a user story for password reset.",
+      "invoked": null,
+      "expect": "do not load",
+      "why": "authoring a story from nothing is not refining one - there is no item, no repo and no evidence; answer directly and mention the skill at most once"
+    },
+    {
+      "request": "Review this bundle.json and tell me if it is ready.",
+      "invoked": null,
+      "expect": "load",
+      "why": "a bundle is this skill's artefact; readiness is validate.py's job"
+    },
+    {
       "request": "Can you refine ABC-412 for me? It's about adding SSO to the admin portal.",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Break this story down into subtasks: users should be able to export their invoices as CSV",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Kun je deze story verfijnen en opsplitsen in subtaken?",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "This ticket says 'improve checkout performance'. Turn it into something a developer can actually pick up.",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Write acceptance criteria for the password reset flow, with edge cases",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "We need to change the pricing model across the api, web and mobile repos. What's the blast radius and how would you sequence the work?",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Prepare this issue so an AI agent can implement it without asking me questions",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Is this story ready for sprint planning? Run a definition of ready check.",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Is there enough in this ticket to start on it, or do I need to go back to the PO first?",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Grooming session prep: here are four tickets, which one is actually ready and what's missing from the others?",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Maak subtaken aan in Jira voor deze user story, inclusief acceptatiecriteria",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Bug: refunds above 100 EUR are silently dropped. Turn this into a ticket the team can work.",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "This epic is too big. How would you split it into stories?",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Estimate and decompose: migrate the session store from Redis to Postgres",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Take this Slack thread and turn it into a properly specified backlog item with subtasks",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "Our tickets keep coming back from dev with questions. Can you set up a repeatable way to prepare them?",
       "invoked": false,
-      "expect": "answer directly",
-      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+      "expect": "load",
+      "why": "refinement-shaped and nobody typed the command - the skill is model-invocable now, so load it and refine; say once that you are doing so"
     },
     {
       "request": "/story-refinery Can you refine ABC-412 for me? It's about adding SSO to the admin portal.",
