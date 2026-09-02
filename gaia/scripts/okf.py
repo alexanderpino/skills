@@ -152,6 +152,8 @@ def parse_front_matter(path: Path) -> tuple[dict, str]:
                 raise Unparseable(f"{where}: indented line that is not a `- ` list item")
             if key is None:
                 raise Unparseable(f"{where}: list item before any key")
+            if key is None:
+                raise Unparseable(f"{where}: list item before any key")
             item = stripped[2:].strip()
             fm.setdefault(key, [])
             if not isinstance(fm[key], list):
@@ -169,6 +171,22 @@ def parse_front_matter(path: Path) -> tuple[dict, str]:
         # complete. Removing evidence is the worst thing this parser could do quietly.
         if key in fm:
             raise Unparseable(f"{where}: duplicate key `{key}`; the first would be discarded")
+        if raw in (">", ">-", "|", "|-"):
+            # YAML block scalars. Excluded at first, which meant this parser could not read
+            # Gaia's own SKILL.md -- every skill in this repo writes its `description` this
+            # way, so the "strict subset" was strict against the one format it had to accept.
+            # Folded (`>`) joins lines with spaces; literal (`|`) keeps the breaks.
+            block, j = [], i + 1
+            while j < close and (not lines[j].strip() or lines[j].startswith((" ", "\t"))):
+                block.append(lines[j].strip() if raw[0] == ">" else lines[j])
+                j += 1
+            if not block:
+                raise Unparseable(f"{where}: `{key}: {raw}` with no indented block beneath it")
+            joined = (" ".join(b for b in block if b) if raw[0] == ">"
+                      else "\n".join(block).rstrip())
+            fm[key] = joined.strip() if raw.endswith("-") else joined
+            i = j
+            continue
         if not raw:
             fm[key] = []                       # a block list follows, or the key is empty
         elif raw.startswith("{"):
