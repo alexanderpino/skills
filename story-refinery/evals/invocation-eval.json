@@ -1,0 +1,243 @@
+{
+  "skill_name": "story-refinery",
+  "invocation": "user-only: disable-model-invocation is true, so Claude Code blocks an automatic load and will not preload the skill into a sub-agent",
+  "_howto": "This is not a trigger eval. The skill cannot be model-invoked, so 'would Claude load this on its own' is not a question with an answer any more. What is still worth testing is the two things a user-only skill can get wrong: acting on a request nobody invoked it for, and stretching to cover a request it was invoked on but does not fit. `invoked` says whether the user typed /story-refinery or named the skill; `expect` is the behaviour that is correct given that.",
+  "expectations": {
+    "answer directly": "Handle the request as an ordinary question. Do not run the phases, do not produce a bundle, and do not paraphrase the method as if it had been invoked.",
+    "refine": "In scope. Run the phases in order and stop at the first gate the item genuinely fails, reporting that as the finding.",
+    "decline, not refinement": "Invoked, but there is no backlog item here. Say so in a sentence and answer the underlying question if it has one.",
+    "stop and ask": "Invoked and in scope, but the item does not carry enough to refine. Put the questions to the user with your best guess attached; do not decompose.",
+    "propose a split, refine one story": "Invoked on an epic. Map it, propose the split, refine one story properly.",
+    "refuse to decompose": "Invoked, but the item's own labels say refinement is the wrong instrument right now."
+  },
+  "cases": [
+    {
+      "request": "Can you refine ABC-412 for me? It's about adding SSO to the admin portal.",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Break this story down into subtasks: users should be able to export their invoices as CSV",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Kun je deze story verfijnen en opsplitsen in subtaken?",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "This ticket says 'improve checkout performance'. Turn it into something a developer can actually pick up.",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Write acceptance criteria for the password reset flow, with edge cases",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "We need to change the pricing model across the api, web and mobile repos. What's the blast radius and how would you sequence the work?",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Prepare this issue so an AI agent can implement it without asking me questions",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Is this story ready for sprint planning? Run a definition of ready check.",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Is there enough in this ticket to start on it, or do I need to go back to the PO first?",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Grooming session prep: here are four tickets, which one is actually ready and what's missing from the others?",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Maak subtaken aan in Jira voor deze user story, inclusief acceptatiecriteria",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Bug: refunds above 100 EUR are silently dropped. Turn this into a ticket the team can work.",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "This epic is too big. How would you split it into stories?",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Estimate and decompose: migrate the session store from Redis to Postgres",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Take this Slack thread and turn it into a properly specified backlog item with subtasks",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "Our tickets keep coming back from dev with questions. Can you set up a repeatable way to prepare them?",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "refinement-shaped, but nobody invoked the skill - answer the request directly. Mentioning that /story-refinery exists is optional and at most once"
+    },
+    {
+      "request": "/story-refinery Can you refine ABC-412 for me? It's about adding SSO to the admin portal.",
+      "invoked": true,
+      "expect": "refine",
+      "why": "in scope: run the phases, and stop at whichever gate the item actually fails"
+    },
+    {
+      "request": "/story-refinery Kun je deze story verfijnen en opsplitsen in subtaken?",
+      "invoked": true,
+      "expect": "refine",
+      "why": "in scope: run the phases, and stop at whichever gate the item actually fails"
+    },
+    {
+      "request": "/story-refinery This ticket says 'improve checkout performance'. Turn it into something a developer can actually pick up.",
+      "invoked": true,
+      "expect": "refine",
+      "why": "in scope: run the phases, and stop at whichever gate the item actually fails"
+    },
+    {
+      "request": "/story-refinery We need to change the pricing model across the api, web and mobile repos. What's the blast radius and how would you sequence the work?",
+      "invoked": true,
+      "expect": "refine",
+      "why": "in scope: run the phases, and stop at whichever gate the item actually fails"
+    },
+    {
+      "request": "/story-refinery Prepare this issue so an AI agent can implement it without asking me questions",
+      "invoked": true,
+      "expect": "refine",
+      "why": "in scope: run the phases, and stop at whichever gate the item actually fails"
+    },
+    {
+      "request": "/story-refinery What's the difference between a definition of ready and a definition of done?",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery Write me a Python function that parses an ISO 8601 timestamp",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery Implement the reverse charge VAT rule in TaxCalculator",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery Review this pull request for bugs",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery Summarise what we discussed in yesterday's retro",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery How do I configure a Jira webhook?",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery Explain how OAuth device flow works",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery Refactor this class to remove the duplicated validation logic",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery Draft a release note for version 2.4",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery What should our sprint length be?",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery Fix the failing CI job on main",
+      "invoked": true,
+      "expect": "decline, not refinement",
+      "why": "say plainly it is not a backlog item to refine and answer the question directly if it has an answer - do not produce a bundle for it"
+    },
+    {
+      "request": "/story-refinery ABC-500 - this epic covers the whole billing migration",
+      "invoked": true,
+      "expect": "propose a split, refine one story",
+      "why": "an epic is not decomposed into subtasks: surface the rules and questions, map it, and refine one story from above the release line"
+    },
+    {
+      "request": "/story-refinery ABC-901, labelled sev1, incident channel still open",
+      "invoked": true,
+      "expect": "refuse to decompose",
+      "why": "triage routes it to incident: refinement is the wrong instrument until it is stabilised (TRI002)"
+    },
+    {
+      "request": "/story-refinery 'make the dashboard faster'",
+      "invoked": true,
+      "expect": "stop and ask",
+      "why": "intake is insufficient - there is nothing to scan for, and asking is the deliverable"
+    },
+    {
+      "request": "/story-refinery add a Redis cache in front of the reporting API",
+      "invoked": true,
+      "expect": "stop and ask",
+      "why": "mechanism with no outcome: ask what it is for before scanning for how to build it"
+    },
+    {
+      "request": "Should I use /story-refinery for this bug report?",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "a question about the skill, not an invocation - say what it would do and let the user decide"
+    },
+    {
+      "request": "Refine every ticket in the sprint backlog for me",
+      "invoked": false,
+      "expect": "answer directly",
+      "why": "not invoked; and if it were, refining a whole backlog just-in-case is what the skill argues against"
+    }
+  ]
+}

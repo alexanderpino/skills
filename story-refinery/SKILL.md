@@ -706,7 +706,9 @@ All stdlib-only Python 3, no dependencies, no network.
 - `assets/templates/team-tailoring-skill.md` - the skeleton a team copies to write
   the skill that layers over this one
 - `assets/examples/example-bundle.json` - a complete, validating two-repo example
-- `evals/trigger-eval.json` - queries that should and should not trigger this
-  skill, in the format skill-creator's description optimiser expects
+- `evals/invocation-eval.json` - what to do when the skill is invoked on a request
+  that does not fit, and what to do when a refinement-shaped request arrives with no
+  invocation at all. Not a trigger eval: with `disable-model-invocation` set, "would
+  Claude load this on its own" is no longer a question with an answer
 - `evals/evals.json` - nineteen behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop
