@@ -1041,6 +1041,39 @@ def suite_research():
     check("research: a spike a decision does defer to is left alone",
           ("SPK003", "subtask S0") not in findings(golden))
 
+    # Enablers: the customer is the team, and the story form hides it.
+    from validate import check_enabler
+    check("enabler: not asked for an actor or an outcome",
+          not ({"actor", "outcome", "trigger"} & set(I.DEFAULT_REQUIRED["enabling"])))
+    for text, want in (("Upgrade Django from 3.2 to 5.0 - 3.2 is end-of-life in April.", "enabling"),
+                       ("As a developer I want a CI pipeline so we stop deploying by hand.", "enabling"),
+                       ("Zet een build pipeline op; nu deployen we handmatig elke sprint.", "enabling"),
+                       ("The sales pipeline report shows stale numbers for the platform team.", "feature"),
+                       ("Upgrade the client library to fix the crash; it fails with a 500 error.", "bug")):
+        check("enabler: %r detected as %s" % (text[:38], want), I.detect_kind(text) == want)
+
+    def enb(bundle):
+        rep = Report()
+        check_enabler(bundle, rep)
+        return {(i["code"], i["where"]) for i in rep.items}
+
+    en = copy.deepcopy(golden)
+    en["story"]["intake"]["kind"] = "enabling"
+    en["story"]["intake"]["dimensions"] = [
+        {"id": "unlocks", "required": True, "status": "answered",
+         "answer": "ABC-210 needs async views", "answered_by": "m.dijkstra 2026-09-02"},
+        {"id": "cost_of_delay", "required": True, "status": "answered",
+         "answer": "3.2 is EOL in April", "answered_by": "m.dijkstra 2026-09-02"}]
+    en["story"]["links"] = []
+    check("enabler: unlocks a ticket nothing links - reported",
+          ("ENB001", "story.intake.unlocks") in enb(en))
+    en["story"]["links"] = [{"type": "relates", "key": "ABC-210"}]
+    check("enabler: linked but not as 'blocks' - reported, the order is the point",
+          ("ENB001", "story.intake.unlocks") in enb(en))
+    en["story"]["links"] = [{"type": "blocks", "key": "ABC-210"}]
+    check("enabler: a 'blocks' link satisfies it", not enb(en))
+    check("enabler: a feature story is left alone by the enabler gate", not enb(golden))
+
 
 def suite_story_shapes():
     """Story shapes whose defining question no other gate asks: one that moves a

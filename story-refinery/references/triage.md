@@ -112,6 +112,12 @@ being answerable with "unchanged", and the stakeholder critic joins the panel.
 *outcome*: what breaks, slows or stays risky if we do not do this. Without it the
 item cannot be prioritised against anything and will lose every time.
 
+**`enabler` / `platform` / `infra` / `upgrade` / `chore`.** The customer is the
+team, and "as a developer I want" hides that it has no outcome of its own. The
+rule sets `kind: enabling`, whose questionnaire asks what this *unlocks* (a named
+ticket, which `ENB001` expects to see as a `blocks` link) and what it *costs to
+keep not doing* - the two things that decide whether it survives prioritisation.
+
 **`spike` / `discovery`.** The deliverable is information. The rule sets
 `kind: spike` and `profile: research`, which swaps the intake questionnaire -
 question, decision, timebox instead of actor, outcome, trigger - and requires a

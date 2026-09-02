@@ -178,6 +178,11 @@ triage:
       match: "tech-?debt|refactor|cleanup"
       require_dimensions: [outcome]
       ask: ["What breaks, slows down or stays risky if we do not do this now?"]
+    - id: enabler
+      match: "^enabler$|^platform$|^infra(structure)?$|^tooling$|^upgrade$|^dependencies$|^chore$"
+      kind: enabling
+      require_dimensions: [unlocks, cost_of_delay]
+      ask: ["Which story or team is waiting on this - can you name the ticket?", "What breaks, slows down or stays risky for every sprint this is not done?"]
     - id: discovery
       match: "^spike$|discovery|research|onderzoek"
       kind: spike                    # the feature questionnaire asks this item the wrong things
@@ -200,6 +205,11 @@ intake:
   # and the price we will pay before deciding with what we have.
   spike_required: [question, decision, timebox]
   spike_recommended: [answer_shape]
+  # An enabler - upgrade, tooling, platform - has no customer either. "As a developer
+  # I want" hides that. It must name what it unlocks (else it is gold-plating) and
+  # what it costs to keep not doing it (else it loses every prioritisation).
+  enabling_required: [unlocks, cost_of_delay]
+  enabling_recommended: [success_signal, scope]
   min_anchors: 1                  # code anchors needed for a "scoutable" verdict
 
 # ----------------------------------------------------------------------- gates

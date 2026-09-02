@@ -145,7 +145,7 @@
         },
         "route": {"enum": ["refine", "incident"],
                   "description": "incident: the labels say refinement is the wrong instrument right now (TRI002). Stabilise, then refine what is left."},
-        "kind": {"type": "string", "description": "feature | bug | spike, when the labels settle it."},
+        "kind": {"type": "string", "description": "feature | bug | spike | enabling, when the labels settle it."},
         "profile": {"type": "string", "description": "Decomposition profile the labels imply, e.g. bugfix for a production finding (TRI005)."},
         "require_dimensions": {"type": "array", "items": {"type": "string"}, "description": "Extra intake dimensions these labels demand (TRI004)."},
         "mandatory_subtask_kinds": {"type": "array", "items": {"type": "string"}, "description": "Subtask kinds that must exist, e.g. a reproducing test (TRI003)."},
@@ -259,7 +259,7 @@
       "required": ["kind", "verdict", "dimensions"],
       "properties": {
         "assessed_at": {"type": "string"},
-        "kind": {"enum": ["feature", "bug", "spike"]},
+        "kind": {"enum": ["feature", "bug", "spike", "enabling"]},
         "lang": {"type": "string"},
         "verdict": {"enum": ["sufficient", "scoutable", "insufficient"]},
         "domain": {"enum": ["clear", "complicated", "complex", "chaotic"],

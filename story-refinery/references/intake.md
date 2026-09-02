@@ -139,8 +139,8 @@ either half alone.
   because the others handle that shape badly: vertical-slice on a defect produces
   a plan with no reproduction, and a delivery profile on a research item plans
   the build the item exists to inform.
-- **unknown kind** - `INT012`. Only `feature`, `bug` and `spike` have a
-  questionnaire. Anything else would silently fall back to the feature one, which
+- **unknown kind** - `INT012`. Only `feature`, `bug`, `spike` and `enabling`
+  have a questionnaire. Anything else would silently fall back to the feature one, which
   is worse than failing: the item comes back assessed, with three dimensions
   answered that nobody asked about.
 
@@ -195,6 +195,26 @@ nobody has established is worth doing.
 The plan that follows is in `references/decomposition.md` §3 under `research`.
 The one thing it must not contain is the build: a research item that already
 plans `feature` work has assumed the answer, and `SPK004` says so.
+
+### When the customer is the team
+
+An enabler - an upgrade, a pipeline, tooling, infrastructure `[P: SAFe,
+"enabler stories"]` - has no customer-facing outcome either, and the story form
+hides that with "as a developer I want". It gets `intake.kind: enabling`, set by
+the `enabler` labels or detected from the text, and two required dimensions
+that the feature questionnaire would never ask:
+
+| Dimension | The question | Why it blocks |
+|---|---|---|
+| **unlocks** | Which story, team or capability is waiting on this? Name it | Nothing waiting means gold-plating. A named ticket becomes a `blocks` link (`ENB001`), which is what keeps the enabler from being scheduled *after* the story it exists for, by someone who read neither |
+| **cost_of_delay** | What breaks, slows down or stays risky for every sprint this is not done? `[P: Reinertsen, cost of delay]` | An enabler with no cost of delay loses every prioritisation it enters - and usually should |
+
+`success_signal` and `scope` are recommended: "the build is green on 5.0" is a
+better done-signal than "upgraded". No decomposition profile is forced - an
+upgrade is usually `expand-contract`, a pipeline is usually `layered` - so choose
+one on purpose. Detection is deliberately narrow: "platform" and "pipeline" are
+domain nouns in half the businesses this will meet and are not enough alone;
+"as a developer", "upgrade", "end-of-life", "set up" are.
 
 ## 8. Impact mapping the answer
 

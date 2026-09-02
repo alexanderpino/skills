@@ -74,6 +74,17 @@ verification and no dry run. *Tell:* `IRR001`, `IRR002`, `IRR003`. *Fix:*
 `references/decomposition.md` §6. Being unable to undo it is an acceptable
 answer; not having asked is not.
 
+**"As a developer I want."** An enabler wearing the story form so nobody asks
+what it is for. *Tell:* `intake.kind` is `feature` on an upgrade or a pipeline;
+an `actor` dimension satisfied by "developer". *Fix:* `intake.kind: enabling` -
+the questions are what it unlocks and what it costs to keep not doing it. An
+enabler that unlocks nothing nameable is gold-plating, and one with no cost of
+delay will lose every prioritisation it enters, usually correctly.
+
+**The enabler scheduled after its story.** It unlocks ABC-210 and nothing in the
+tracker says so. *Tell:* `ENB001`. *Fix:* a `blocks` link. The person who orders
+the sprint reads the links, not the intake block.
+
 **Research refined as delivery.** An investigation arrives, gets the feature
 questionnaire, and comes out as a story with an actor and an outcome nobody has
 established yet. *Tell:* `INT011`, or an intake whose `actor` was answered by

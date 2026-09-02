@@ -40,6 +40,7 @@ DEFAULT_REQUIRED_DIMENSIONS = {
     "feature": ["actor", "outcome", "trigger"],
     "bug": ["repro", "expected", "actual", "environment"],
     "spike": ["question", "decision", "timebox"],
+    "enabling": ["unlocks", "cost_of_delay"],
 }
 INTAKE_KINDS = tuple(DEFAULT_REQUIRED_DIMENSIONS)
 # intake.kind -> the profile that kind implies (INT011). Refining a bug without
@@ -77,7 +78,7 @@ PHASE_OF = {
     "AC": "3 criteria", "DT": "3 criteria", "NFR": "3 criteria", "BUD": "3 criteria",
     "DEC": "4 decisions", "RSK": "4 decisions", "READY": "4 decisions",
     "SUB": "5 decompose", "DAG": "5 decompose", "PAR": "5 decompose", "SPK": "5 decompose",
-    "IRR": "5 decompose", "BAS": "3 criteria",
+    "IRR": "5 decompose", "BAS": "3 criteria", "ENB": "1 intake",
     "COV": "5 decompose", "CON": "5 decompose", "SPL": "5 decompose",
     "BRF": "6 briefs", "DOD": "6 briefs",
     "REV": "8 review", "LNK": "9 emit", "STRUCT": "0 configure",
@@ -121,7 +122,8 @@ CONFIG_SPEC = {
     "review": {"method", "panel", "min_critics", "rubber_duck_max_subtasks",
                "require_fresh_context"},
     "intake": {"feature_required", "feature_recommended", "bug_required", "bug_recommended",
-               "spike_required", "spike_recommended", "min_anchors"},
+               "spike_required", "spike_recommended", "enabling_required",
+               "enabling_recommended", "min_anchors"},
     "validation": {"fail_on", "require_command_done_when", "require_coverage_matrix",
                    "vagueness_lexicon", "non_functional_keys", "definition_of_done",
                    "require_intake", "measured_non_functional_keys"},
@@ -857,6 +859,32 @@ def check_irreversible(b, cfg, subs, rep):
                      "will be the production one, on data that has no second copy")
 
 
+def check_enabler(b, rep):
+    """An enabler's whole justification is the work it unlocks. If that work has a
+    ticket, the tracker should say so - the link is what stops the enabler being
+    deprioritised past the story that needed it, by someone who never read either."""
+    story = b.get("story") or {}
+    intake = story.get("intake") or {}
+    if intake.get("kind") != "enabling":
+        return
+    links = _known_links(story)
+    for d in intake.get("dimensions") or []:
+        if d.get("id") != "unlocks":
+            continue
+        text = " ".join(str(d.get(k) or "") for k in ("evidence", "answer", "assumption"))
+        for key in sorted(set(TICKET_RX.findall(text))):
+            if key == story.get("key"):
+                continue
+            if key not in links:
+                rep.warn("ENB001", "story.intake.unlocks", "says this unlocks %s and no link "
+                         "records it - add a 'blocks' link, or the enabler gets scheduled after "
+                         "the story it exists for, by someone who read neither" % key)
+            elif "blocks" not in links[key]:
+                rep.warn("ENB001", "story.intake.unlocks", "linked to %s as %s, not 'blocks' - "
+                         "the order is the point of the link"
+                         % (key, "/".join(sorted(links[key])) or "?"))
+
+
 def check_research(b, cfg, subs, rep):
     """A research item delivers information, and nothing else.
 
@@ -1584,6 +1612,7 @@ def validate(bundle, cfg):
     check_graph(subs, reach, graph, rep)
     check_clutter(bundle, cfg, subs, rep)
     check_research(bundle, cfg, subs, rep)
+    check_enabler(bundle, rep)
     check_irreversible(bundle, cfg, subs, rep)
     check_baseline(bundle, cfg, rep)
     check_file_collisions(subs, reach, rep)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Is there enough information to refine this item? Stdlib only, no network.
 
-  python intake.py assess --text ticket.txt [--kind feature|bug|spike|auto] [--lang en|nl|auto]
+  python intake.py assess --text ticket.txt [--kind feature|bug|spike|enabling|auto] [--lang en|nl|auto]
   python intake.py assess --bundle bundle.json --write     # fills story.intake + questions
 
 The script finds LEXICAL SIGNALS, not meaning. It can tell that the words
@@ -37,11 +37,18 @@ DEFAULT_REQUIRED = {
     # it must have is a question narrow enough to answer, a decision waiting on the
     # answer, and a price we are willing to pay for it.
     "spike": ["question", "decision", "timebox"],
+    # An enabler - upgrade, platform, tooling, infrastructure - has no customer-facing
+    # outcome either, and "as a developer I want" is the fudge that hides it. What it
+    # must name is the work it unlocks and what it costs to keep not doing it
+    # [P: SAFe enablers; Reinertsen, cost of delay]. Without the first it is
+    # gold-plating; without the second it loses every prioritisation it enters.
+    "enabling": ["unlocks", "cost_of_delay"],
 }
 DEFAULT_RECOMMENDED = {
     "feature": ["success_signal", "scope"],
     "bug": ["impact"],
     "spike": ["answer_shape"],
+    "enabling": ["success_signal", "scope"],
 }
 
 # Each dimension: list of regexes. Case-insensitive. English and Dutch side by side,
@@ -105,6 +112,18 @@ SIGNALS = {
     "timebox": [r"\btimebox\w*\b", r"\b\d+(\.\d+)?\s?(day|days|hour|hours|dag|dagen|uur)\b",
                 r"\bno (more|longer) than\b", r"\bniet (meer|langer) dan\b", r"\bmax(imum|imaal)?\b",
                 r"\bhalf a day\b", r"\bhalve dag\b"],
+    # Enabler dimensions. "unlocks" wants a named consumer of this work; "cost_of_delay"
+    # wants the thing that breaks, slows or stays risky while it is not done.
+    "unlocks": [r"\b(unlocks?|unblocks?|enables?|prerequisite for|needed (for|by|before)|"
+                r"so that we can|before we can|makes? \w+ possible)\b",
+                r"\b(ontgrendelt|maakt \w+ mogelijk|nodig (voor|om)|voorwaarde voor|"
+                r"zodat we|voordat we)\b", r"\b[A-Z][A-Z0-9]{1,9}-\d+\b"],
+    "cost_of_delay": [r"\b(end.of.life|eol|deprecat\w+|unsupported|no longer (supported|maintained)|"
+                      r"security (patch|fix|advisory)|cve-\d+|blocks?|blocked|slows?|"
+                      r"every (sprint|week|release)|each time|manual(ly)?|toil|"
+                      r"if we (don'?t|do not)|until we|otherwise)\b",
+                      r"\b(niet meer ondersteund|verouderd|blokkeert|vertraagt|handmatig|"
+                      r"elke (sprint|week|release)|als we (dit )?niet|zolang we|anders)\b"],
     "answer_shape": [r"\b(spike|proof of concept|poc|prototype|benchmark|measurement|comparison)\b",
                      r"\b(prototype|meting|vergelijking|onderzoeksnotitie)\b",
                      r"\b(adr|design note|write-?up|recommendation|advies|notitie)\b",
@@ -151,6 +170,16 @@ RESEARCH_WORDS = [r"\b(spike|proof of concept|feasibility|investigate|investigat
                   r"haalbaarheidsonderzoek|verkennen|verkenning|vooronderzoek|"
                   r"opties vergelijken|we weten (nog )?niet)\b"]
 
+# Work whose customer is the team. Narrow on purpose: "platform" and "pipeline" are
+# domain nouns in half the businesses this will meet, so they are not here alone.
+ENABLER_WORDS = [r"\b(as an? (developer|engineer|team|ops|sre|devops)\b|upgrade|bump|"
+                 r"set ?up|introduce (a|the|an)|ci/cd|ci pipeline|build pipeline|"
+                 r"infrastructure|tooling|dev(eloper)? experience|dependency (update|upgrade)|"
+                 r"end.of.life|eol|deprecat\w+|enabler|tech(nical)? enabler|scaffold\w*)\b",
+                 r"\b(als (een )?(developer|ontwikkelaar|engineer|team)\b|upgraden|opzetten|"
+                 r"inrichten|infrastructuur|tooling|afhankelijkheid (bijwerken|upgraden)|"
+                 r"verouderd|niet meer ondersteund|enabler)\b"]
+
 DUTCH_STOPWORDS = (r"\b(de|het|een|en|niet|wordt|worden|moet|moeten|zodat|wanneer|gebruiker|"
                    r"gebruikers|klant|klanten|als|maar|voor|bij|op|je|dat|ook|naar|zijn|sinds|"
                    r"altijd|alle|graag|krijg|krijgt|geeft|stappen|verwacht|werkelijk)\b")
@@ -171,6 +200,8 @@ QUESTIONS = {
         "decision": "Which decision is waiting on the answer, and who makes it? (If none, this is reading, not a ticket.)",
         "timebox": "How long are we willing to spend before we decide with what we have?",
         "answer_shape": "What does the answer look like when it arrives - a number, a working prototype, a recommendation?",
+        "unlocks": "Which story, team or capability is waiting on this? Name it. (If nothing is, this is gold-plating.)",
+        "cost_of_delay": "What breaks, slows down or stays risky for every sprint this is not done?",
     },
     "nl": {
         "actor": "Voor wie is dit? (vermoeden: {guess})",
@@ -187,6 +218,8 @@ QUESTIONS = {
         "decision": "Welk besluit wacht op het antwoord, en wie neemt het? (Is er geen, dan is dit lezen en geen ticket.)",
         "timebox": "Hoeveel tijd willen we eraan besteden voordat we beslissen met wat we hebben?",
         "answer_shape": "Hoe ziet het antwoord eruit als het er is - een getal, een werkend prototype, een advies?",
+        "unlocks": "Welke story, welk team of welke capability wacht hierop? Noem het. (Wacht er niets, dan is dit vergulden.)",
+        "cost_of_delay": "Wat breekt, vertraagt of blijft risicovol voor elke sprint dat dit niet gedaan is?",
     },
 }
 
@@ -199,11 +232,15 @@ def detect_kind(text):
     """Research first: a research item often talks about a bug or a feature, because
     that is what it is research *about*. Assessing it as one asks for an actor and a
     repro that will never exist, and 'insufficient' then looks like a bad ticket
-    rather than the wrong questionnaire."""
+    rather than the wrong questionnaire. Bug before enabler, because "upgrade the
+    library to stop the crash" is a bug with a proposed fix, not an enabler."""
     if sum(len(re.findall(p, text, re.I)) for p in RESEARCH_WORDS) >= 1:
         return "spike"
-    hits = sum(len(re.findall(p, text, re.I)) for p in BUG_WORDS)
-    return "bug" if hits >= 2 else "feature"
+    if sum(len(re.findall(p, text, re.I)) for p in BUG_WORDS) >= 2:
+        return "bug"
+    if sum(len(re.findall(p, text, re.I)) for p in ENABLER_WORDS) >= 1:
+        return "enabling"
+    return "feature"
 
 
 # Enough English function words that a ticket in a third language cannot pass as one.
@@ -418,7 +455,7 @@ def main(argv=None):
     p.add_argument("--config", default="refinery.yaml")
     p.add_argument("--text", help="file with the raw ticket text; '-' for stdin")
     p.add_argument("--bundle", help="bundle.json; reads story.source_text")
-    p.add_argument("--kind", choices=["feature", "bug", "spike", "auto"], default="auto")
+    p.add_argument("--kind", choices=["feature", "bug", "spike", "enabling", "auto"], default="auto")
     p.add_argument("--lang", choices=["en", "nl", "auto"], default="auto")
     p.add_argument("--write", action="store_true",
                    help="with --bundle: write story.intake and add questions for missing dimensions")

@@ -208,6 +208,12 @@ It maps the metadata through `triage.labels` and records what changes:
   know*, *which decision waits on the answer*, and *for how long*. Refining a
   research item as a feature is the failure to watch for - it produces a
   convincing plan for work nobody has established is worth doing.
+- **`enabler` / `platform` / `upgrade` / `chore`** → the customer is the team, and
+  "as a developer I want" hides that it has no outcome of its own. `kind:
+  enabling` asks the two questions that decide whether it survives
+  prioritisation: what it *unlocks* - a named ticket, which `ENB001` expects as
+  a `blocks` link so the enabler is not scheduled after the story it exists for -
+  and what it *costs to keep not doing*.
 - **`tech-debt`** → the missing dimension is the outcome: what breaks, slows or
   stays risky if we do not do this.
 - **links** → `blocks` / `is blocked by` order work across teams, and neither the
