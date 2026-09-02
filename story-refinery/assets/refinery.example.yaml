@@ -70,6 +70,27 @@ budgets:
   min_acceptance_criteria: 2      # AC001
   max_acceptance_criteria: 7      # AC002
 
+# ------------------------------------------------------------------ complexity
+# [script] complexity.py; CPX gates. Every metric is derived from the bundle, and the
+# band is the highest level any metric reaches - no weighted sum, so the card can
+# always be taken apart. Three thresholds per metric: value >= t -> low, medium, high.
+# Override only the ones your house sizes differently; see references/complexity.md.
+complexity:
+  thresholds:
+    repos: [1, 2, 3]                # projects touched
+    code_paths: [1, 5, 12]          # distinct entry points changed
+    files_written: [1, 8, 20]
+    read_set: [1, 12, 30]           # files an implementer must hold in context
+    contracts: [1, 2, 3]
+    breaking_contracts: [1, 1, 2]
+    owner_teams: [1, 2, 3]
+    rule_space: [1, 8, 32]          # decision-table combinations
+    forks: [1, 3, 6]                # design decisions recorded
+    deferred: [1, 1, 3]
+    unknowns: [1, 2, 4]             # blocking questions + pending code + external blockers
+    irreversible: [1, 1, 2]
+    critical_path: [1, 4, 7]        # subtasks deep
+
 # --------------------------------------------------------------------- tracker
 tracker:
   adapter: jira                   # [script] emit.py capability table

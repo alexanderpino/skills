@@ -182,6 +182,14 @@ ENABLER_WORDS = [r"\b(as an? (developer|engineer|team|ops|sre|devops)\b|upgrade|
                  r"inrichten|infrastructuur|tooling|afhankelijkheid (bijwerken|upgraden)|"
                  r"verouderd|niet meer ondersteund|enabler)\b"]
 
+# A project that does not exist yet. Only the act of starting one counts - "new
+# feature" and "new endpoint" are ordinary stories inside something that exists.
+GREENFIELD_WORDS = [r"\b(greenfield|from scratch|new (project|service|repo|repository|skill|"
+                    r"application|app|package|library|module)\b|brand.new|does not exist yet|"
+                    r"set up a new|bootstrap(ping)? a)\b",
+                    r"\b(nieuw (project|systeem|repo|skill|pakket|onderdeel)|vanaf nul|"
+                    r"bestaat nog niet|opzetten van een nieuw)\b"]
+
 DUTCH_STOPWORDS = (r"\b(de|het|een|en|niet|wordt|worden|moet|moeten|zodat|wanneer|gebruiker|"
                    r"gebruikers|klant|klanten|als|maar|voor|bij|op|je|dat|ook|naar|zijn|sinds|"
                    r"altijd|alle|graag|krijg|krijgt|geeft|stappen|verwacht|werkelijk)\b")
@@ -345,6 +353,11 @@ def assess(text, cfg, kind="auto", lang="auto"):
 
     missing_required = [d["id"] for d in dims if d["required"] and d["status"] == "missing"]
     mechanism_only = mechanism and not outcome_present
+    # A story for a project that does not exist yet has nothing to scan. That is not
+    # a missing anchor, it is a different Phase 2: reuse is what gets ruled out, and the
+    # first subtask is a walking skeleton. Flag it so the reader confirms it in
+    # evidence.greenfield rather than the gates demanding citations into thin air.
+    greenfield = any(re.search(p, text, re.I) for p in GREENFIELD_WORDS)
     if not missing_required:
         verdict = "sufficient"
     elif mechanism_only:
@@ -365,6 +378,11 @@ def assess(text, cfg, kind="auto", lang="auto"):
     if mechanism_only:
         flags.append("mechanism-only: a solution is named but no outcome - ask what it is for "
                      "before scanning for how to build it")
+    if greenfield:
+        flags.append("greenfield-candidate: the text describes a project that does not exist "
+                     "yet. If so, set evidence.greenfield (target, reason), rule out reuse "
+                     "instead of scanning, and plan a walking skeleton first - see "
+                     "references/evidence.md")
     if len(text.split()) < 12:
         flags.append("very short: %d words" % len(text.split()))
     if not reachable and (get(cfg, "evidence.repos") or []):

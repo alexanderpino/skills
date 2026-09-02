@@ -324,6 +324,17 @@ and draw the line where the carrier changes process, team or deployment. That
 crossing is the contract. Two or three named events mapped to real files is the
 whole output - skip it entirely on a single-repo story.
 
+**A story for a project that does not exist yet** has no code to scan, and every
+`path:line` gate would either block it or teach you to invent citations. Neither
+happens: `intake.py` flags `greenfield-candidate`, you confirm it in
+`evidence.greenfield`, and the evidence rule turns around rather than off - reuse
+is what gets ruled out (`GRN002`), conventions cite a declared source
+(`standard:`, `adr:`, `template:`), nothing cites a line into a file that will be
+created (`GRN003`), the decomposition is a walking skeleton (`GRN004`), and the
+archaeologist re-opens assumptions instead of files. Read `references/evidence.md`
+§6a. A new feature inside an existing project is not greenfield, however new it
+feels.
+
 ### Phase 3 - Example mapping
 
 Run Example Mapping `[P: Wynne, 2015]` over the story: **rules** (blue),
@@ -388,7 +399,8 @@ python scripts/summary.py --bundle a.json b.json c.json     # a whole batch
 ```
 
 One screen, meant to be read out loud: why, the size (work versus end-to-end on
-the critical path), the steps in the order they happen, what it hinges on, who
+the critical path), the complexity band and what drives it, the steps in the
+order they happen, what it hinges on, who
 owes an answer and which questions have not been put yet, the high risks, what it
 waits on that does not exist, what it leaves behind, and one line on whether it is
 ready. It deliberately works on an unfinished bundle - the moment you most want to
@@ -442,8 +454,9 @@ slice that leaves the system working `[P: Cockburn, walking skeleton]`. The
 shape of the work picks the alternative: `bugfix` for a defect (failing test
 first, root cause as a decision), `research` for a research item (one spike, no
 build - `SPK004`), `expand-contract` for a wide mechanical migration (the
-contract step is the one teams skip - `SUB016`), `layered`, `workflow-phase`,
-`custom`. A `migration` subtask is the one kind a revert does not undo, and
+contract step is the one teams skip - `SUB016`), `walking-skeleton` for a
+project that does not exist yet (the skeleton first and alone - `GRN004`),
+`layered`, `workflow-phase`, `custom`. A `migration` subtask is the one kind a revert does not undo, and
 `IRR001`-`IRR003` ask the three questions that make it safe while there is still
 someone to ask.
 
@@ -482,6 +495,21 @@ Hard rules, enforced by `validate.py`:
   file is a merge conflict with humans and two agents fighting over one buffer
   with agent implementors. If a file genuinely needs two passes, add a
   dependency so they are ordered, and say so in both `forbidden` lists.
+
+**Then size it in a way that can be argued with.** Read `references/complexity.md`.
+
+```bash
+python scripts/complexity.py assess --bundle bundle.json --config refinery.yaml --write
+```
+
+Every metric is derived from the bundle - projects touched, code paths changed,
+files to hold in context, contracts crossed, decision-table combinations,
+deferred decisions, blocking unknowns, irreversible steps, critical path, the
+Cynefin domain, greenfield - and the band (S/M/L/XL) is the highest level any
+metric reaches, with those metrics named as the drivers. No weighted sum: a
+number nobody can take apart is an opinion with decimals, and a driver you can
+remove is a plan. `CPX001` asks for the card on a decomposed story; `CPX002`
+reports one that no longer matches the bundle.
 
 `emit.py` derives **execution waves** from the dependency graph. Everything in a
 wave can run in parallel, which is what a fan-out runner consumes and what makes
@@ -730,6 +758,7 @@ when questions remain open.
 | `references/critique.md` | Phase 8 - the critic panel, blindness, findings, rubber-ducking |
 | `references/trackers.md` | Phase 0/9 - adapter capabilities, sinks, per-tracker notes |
 | `references/antipatterns.md` | Any time output feels thin - refinement smells and fixes |
+| `references/complexity.md` | Phase 5 - the complexity card: which metrics, why those, how to read the drivers |
 | `references/codes.md` | Any time `validate.py` names a code you do not know - every code, its phase, severity and meaning; generated, and selftest fails when it is stale |
 | `references/rubric.md` | Phase 7 - score the refinement before handing it over |
 
@@ -757,6 +786,8 @@ All stdlib-only Python 3, no dependencies, no network.
   meaning the same thing across re-refinements
 - `scripts/summary.py` - one screen to discuss, for one story or a batch; works on
   an unfinished bundle
+- `scripts/complexity.py` - `assess`; the complexity card, every metric derived
+  from the bundle, the band explainable by construction
 - `scripts/ingest.py` - read a rendered ticket back into a bundle when the stored
   one is gone; verifies each brief's hash
 - `scripts/progress.py` - `set` | `from` | `show`; what has landed, so a

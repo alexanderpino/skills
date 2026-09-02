@@ -33,6 +33,14 @@ when the requester is not in the room. The `archaeologist` is never optional on 
 bundle with citations - fabricated evidence is the most damaging failure this
 skill has, and it is the only one a downstream reader cannot detect.
 
+On a greenfield story there are no files to open, so the archaeologist's mandate
+turns around: it re-opens every *assumption* - the standard or ADR a convention
+cites, the reuse search that `ruled_out` claims came back empty, the walking
+skeleton that is supposed to go all the way through. Its packet carries
+`evidence.greenfield` and `ruled_out` for that reason. The sequencer's packet
+carries the complexity card, because a plan whose card says L and whose waves
+look like a weekend is a finding.
+
 ## Blindness
 
 A critic who can see why you chose something reviews the reasoning instead of the

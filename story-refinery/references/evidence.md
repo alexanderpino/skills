@@ -223,6 +223,47 @@ than the diagram.
 Do not run this on a single-repo story. It costs an hour and tells you what you
 already knew.
 
+## 6a. When nothing exists yet (greenfield)
+
+A story for a new project - a service, a repo, a skill, a package - has no code
+to scan, and every gate in this skill that asks for `path:line` would either
+block it or teach you to invent citations. Neither is acceptable, so the
+evidence rule turns around rather than off. `intake.py` flags
+`greenfield-candidate` from the text; you confirm it:
+
+```json
+"greenfield": {"target": "svc-invoicing (new repo under org/)",
+               "reason": "no service owns invoice numbering; billing-api rules it out (see ruled_out)"}
+```
+
+Then:
+
+- **Rule out reuse, with the search** (`GRN002`). "There is no existing project
+  to extend" is the one negative result a new project must record, and the one
+  most often wrong: most new services are a module somebody did not find.
+  `looked_in` names the org search, the repos opened, the owners asked.
+- **Cite declared sources, not files.** A convention in a brief cites
+  `standard:`, `adr:`, `template:`, `decision:` or `reference:` - the house
+  Python template, the ADR that chose the queue, the twelve-factor rule - and
+  `BRF009` accepts those only under `greenfield`. A convention you cannot source
+  that way is a decision waiting to be made, and goes in `decisions`, not in a
+  brief.
+- **No line numbers on files that will be created** (`GRN003`). A `change_surface`
+  entry for a new project is a plan: `role: create`, no `line`.
+- **The change surface is still real.** It lists the files the skeleton and the
+  first slices will create, so `EVI001` still applies; `EVI004` (no repos) does
+  not, because the repo is the deliverable.
+- **Decompose as a walking skeleton** (`references/decomposition.md`,
+  `walking-skeleton`): first subtask `enabling`, alone, the thinnest end-to-end
+  path deployed; everything else lands on it (`GRN004`).
+- **The archaeologist changes mandate.** With nothing to open, it re-opens
+  assumptions: the standard that does not say what it is claimed to, the reuse
+  search that returns a different answer when repeated, the skeleton that does
+  not go all the way through.
+
+A new feature inside an existing project is not greenfield, however new it
+feels: the skeleton exists, the conventions exist, and the ordinary rules hold.
+
 ## 7. Honesty rules
 
 - A `path:line` you did not read is a fabrication. Read before citing.

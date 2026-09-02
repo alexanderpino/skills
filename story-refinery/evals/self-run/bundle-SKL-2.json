@@ -218,6 +218,43 @@
       },
       "updated_at": "2026-09-02T18:24:43+00:00",
       "source": "implemented in this commit"
+    },
+    "complexity": {
+      "band": "S",
+      "drivers": [],
+      "metrics": {
+        "repos": 1,
+        "code_paths": 3,
+        "files_written": 2,
+        "read_set": 3,
+        "contracts": 0,
+        "breaking_contracts": 0,
+        "owner_teams": 1,
+        "rule_space": 0,
+        "forks": 2,
+        "deferred": 0,
+        "unknowns": 1,
+        "irreversible": 0,
+        "critical_path": 2
+      },
+      "levels": {
+        "repos": 1,
+        "code_paths": 1,
+        "files_written": 1,
+        "read_set": 1,
+        "contracts": 0,
+        "breaking_contracts": 0,
+        "owner_teams": 1,
+        "rule_space": 0,
+        "forks": 1,
+        "deferred": 0,
+        "unknowns": 1,
+        "irreversible": 0,
+        "critical_path": 1,
+        "domain": 0
+      },
+      "method": "highest-level-wins; XL when three metrics are high, or two under a complex domain",
+      "computed_at": "2026-09-02T18:32:25+00:00"
     }
   },
   "decisions": [
@@ -613,7 +650,7 @@
   },
   "review": {
     "method": "rubber-duck",
-    "bundle_digest": "sha256:e61e45f1ca2fa10827a94d77c5e1cbccac0c3d597738f2ed5de642b8ebc4be38",
+    "bundle_digest": "sha256:d969a22dfd2dbc67b66bea41a9813600844430b8332441945b2d4f753565f129",
     "critics": [
       {
         "id": "rubber-duck",

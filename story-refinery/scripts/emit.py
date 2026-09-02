@@ -97,6 +97,12 @@ def render_story(bundle):
     goal = (s.get("impact") or {}).get("goal")
     if goal:
         out += ["**Goal**: %s" % goal, ""]
+    if s.get("complexity"):
+        c = s["complexity"]
+        import complexity as CX
+        out += ["**Complexity**: %s - %s" % (c.get("band"), ", ".join(
+            "%s %s" % (c.get("metrics", {}).get(d), CX.NAMES.get(d, d)) if d in (c.get("metrics") or {})
+            else CX.NAMES.get(d, d) for d in c.get("drivers") or []) or "nothing reaches medium"), ""]
     out += render_prerequisites(bundle)
     out += ["## Acceptance criteria", ""]
     for ac in s.get("acceptance_criteria") or []:

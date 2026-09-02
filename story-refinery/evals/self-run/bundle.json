@@ -239,6 +239,45 @@
       },
       "updated_at": "2026-09-02T18:21:51+00:00",
       "source": "implemented in 6eb0a28"
+    },
+    "complexity": {
+      "band": "L",
+      "drivers": [
+        "forks"
+      ],
+      "metrics": {
+        "repos": 1,
+        "code_paths": 3,
+        "files_written": 6,
+        "read_set": 6,
+        "contracts": 0,
+        "breaking_contracts": 0,
+        "owner_teams": 1,
+        "rule_space": 0,
+        "forks": 6,
+        "deferred": 0,
+        "unknowns": 0,
+        "irreversible": 0,
+        "critical_path": 2
+      },
+      "levels": {
+        "repos": 1,
+        "code_paths": 1,
+        "files_written": 1,
+        "read_set": 1,
+        "contracts": 0,
+        "breaking_contracts": 0,
+        "owner_teams": 1,
+        "rule_space": 0,
+        "forks": 3,
+        "deferred": 0,
+        "unknowns": 0,
+        "irreversible": 0,
+        "critical_path": 1,
+        "domain": 1
+      },
+      "method": "highest-level-wins; XL when three metrics are high, or two under a complex domain",
+      "computed_at": "2026-09-02T18:32:25+00:00"
     }
   },
   "decisions": [
@@ -888,7 +927,7 @@
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:b0d00a95b385564ef9ea3452396995566d9c1f35b51ab4788cbf4b6c8ce1719f",
+    "bundle_digest": "sha256:26c36f1678b95101e8f2ae1402e0c16b4926b39334499ce1b9c0a79fa5f30e26",
     "critics": [
       {
         "id": "implementer",

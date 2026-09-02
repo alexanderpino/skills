@@ -102,6 +102,8 @@ def one_story(bundle, cfg, heading="#"):
                 "end if run in parallel (%s) · widest wave %d."
                 % (s["subtasks"], " and ".join(s["repos"]) or "one repo", s["total_days"],
                    s["critical_days"], " → ".join(s["critical_path"]), s["widest"]), ""]
+        import complexity as CX
+        out += ["**Complexity.** %s." % CX.one_line(CX.assess(bundle, cfg)), ""]
         out += ["**In order.**", ""]
         by_id = {t.get("id"): t for t in bundle.get("subtasks") or []}
         for w in s["waves"]:

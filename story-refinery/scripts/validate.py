@@ -84,7 +84,7 @@ PHASE_OF = {
     "COV": "5 decompose", "CON": "5 decompose", "SPL": "5 decompose",
     "BRF": "6 briefs", "DOD": "6 briefs",
     "REV": "8 review", "LNK": "9 emit", "STRUCT": "0 configure",
-    "BAT": "9 batch",
+    "BAT": "9 batch", "GRN": "2 evidence", "CPX": "5 decompose",
 }
 
 
@@ -98,7 +98,11 @@ def phase_of(code):
 # leftover, and is reported rather than silently ignored.
 CONFIG_SPEC = {
     "": {"version", "profile", "tailoring", "decomposition", "budgets", "tracker",
-         "evidence", "intake", "triage", "gates", "review", "validation"},
+         "evidence", "intake", "triage", "gates", "review", "validation", "complexity"},
+    "complexity": {"thresholds"},
+    "complexity.thresholds": {"repos", "code_paths", "files_written", "read_set", "contracts",
+                              "breaking_contracts", "owner_teams", "rule_space", "forks",
+                              "deferred", "unknowns", "irreversible", "critical_path"},
     "decomposition": {"one_repo_per_subtask", "one_pr_per_subtask", "title_pattern",
                       "mandatory", "spike_when_unresolved", "spike_timebox_days",
                       "extra_subtask_kinds"},
@@ -182,6 +186,10 @@ CODES = {
     "TRI008": ("warn", "labels call for a critic the review panel lacks"),
     "TRI009": ("warn", "the triage block no longer matches the ticket's current labels"),
     # 2 evidence
+    "GRN001": ("error", "greenfield is declared without a target or a reason"),
+    "GRN002": ("error", "a greenfield story rules nothing out about reuse"),
+    "GRN003": ("warn", "a line number is cited on a file that does not exist yet"),
+    "GRN004": ("error | warn", "a greenfield story has no walking skeleton, or subtasks start beside it"),
     "EVI001": ("error", "the change surface is empty, so Phase 2 was skipped"),
     "EVI002": ("error", "a change-surface entry lacks its repo or its path"),
     "EVI003": ("warn", "a change-surface entry carries a role outside create, modify, delete, read"),
@@ -239,6 +247,8 @@ CODES = {
     "RSK002": ("warn", "a high risk records no detection signal that would reveal it"),
     "RSK003": ("warn", "a change across repos records no risks at all"),
     # 5 decompose
+    "CPX001": ("warn", "no complexity card is recorded for a decomposed story"),
+    "CPX002": ("warn", "the recorded complexity card no longer matches the bundle"),
     "CON001": ("error", "a subtask references a contract id the evidence never recorded"),
     "COV001": ("error", "an acceptance criterion is covered by no subtask"),
     "COV002": ("warn", "the declared coverage map disagrees with the subtasks' covers lists"),
@@ -682,7 +692,7 @@ def check_evidence(b, rep):
             rep.error("EVI002", where, "entry needs both repo and path")
         if entry.get("role") not in ("touch", "read", "create", "modify", "delete", None):
             rep.warn("EVI003", where, "unusual role %r" % entry.get("role"))
-    if not ev.get("repos"):
+    if not ev.get("repos") and not ev.get("greenfield"):
         rep.warn("EVI004", "evidence.repos", "no repos recorded - provenance is unverifiable")
 
     known = {"%s/%s" % (e.get("repo"), e.get("path")) for e in surface}
@@ -779,7 +789,8 @@ def check_subtasks(b, cfg, rep):
                       % s.get("kind"))
 
         _check_brief(s, where, max_files, require_cmd, rep,
-                     get(cfg, "budgets.max_context_entries", 12))
+                     get(cfg, "budgets.max_context_entries", 12),
+                     greenfield=bool((b.get("evidence") or {}).get("greenfield")))
 
     for s in subs:
         for dep in s.get("depends_on") or []:
@@ -789,7 +800,7 @@ def check_subtasks(b, cfg, rep):
     return subs, ids
 
 
-def _check_brief(s, where, max_files, require_cmd, rep, max_reading=12):
+def _check_brief(s, where, max_files, require_cmd, rep, max_reading=12, greenfield=False):
     brief = s.get("agent_brief")
     if not brief:
         rep.error("BRF001", where, "no agent_brief")
@@ -817,7 +828,10 @@ def _check_brief(s, where, max_files, require_cmd, rep, max_reading=12):
         if d.get("type") == "assertion" and words(d.get("text")) < 5:
             rep.warn("BRF008", where, "assertion too vague to write a test from: %r" % d.get("text"))
     for conv in brief.get("conventions") or []:
-        if ":" not in (conv.get("evidence") or ""):
+        evidence = conv.get("evidence") or ""
+        if greenfield and re.match(r"^(standard|adr|template|decision|reference):", evidence):
+            continue        # nothing exists to cite yet; a declared source is the citation
+        if ":" not in evidence:
             rep.error("BRF009", where,
                       "convention without path:line evidence - that is a training prior, "
                       "not a house rule: %r" % conv.get("rule"))
@@ -1063,6 +1077,61 @@ def check_enabler(b, rep):
                 rep.warn("ENB001", "story.intake.unlocks", "linked to %s as %s, not 'blocks' - "
                          "the order is the point of the link"
                          % (key, "/".join(sorted(links[key])) or "?"))
+
+
+def check_greenfield(b, subs, rep):
+    """A story for a project that does not exist yet. There is nothing to cite, so the
+    evidence rule turns around: what gets ruled out is reuse, what gets cited is a
+    declared source, and the first thing built is a walking skeleton - the thinnest
+    end-to-end path, deployed - so every later subtask lands on something that runs
+    [P: Cockburn, walking skeleton]."""
+    ev = b.get("evidence") or {}
+    g = ev.get("greenfield")
+    if not g:
+        return
+    if not isinstance(g, dict) or not g.get("target") or not g.get("reason"):
+        rep.error("GRN001", "evidence.greenfield", "greenfield needs a target (the repo or "
+                  "project that will exist) and a reason it is new rather than an extension "
+                  "of something that exists")
+    reuse = [r for r in ev.get("ruled_out") or []
+             if re.search(r"\b(reuse|extend|existing|already|bestaand|hergebruik)\b",
+                          (r.get("claim") or "") + " " + (r.get("conclusion") or ""), re.I)]
+    if not reuse:
+        rep.error("GRN002", "evidence.ruled_out", "greenfield and nothing rules out reuse - "
+                  "'there is no existing project to extend' is the one search a new project "
+                  "must record, with where it looked")
+    for i, entry in enumerate(ev.get("change_surface") or []):
+        if entry.get("line") and entry.get("role") == "create":
+            rep.warn("GRN003", "evidence.change_surface[%d]" % i, "a line number on a file "
+                     "that will be created - a citation into code that does not exist")
+    if subs:
+        roots = [s for s in subs if not (s.get("depends_on") or [])]
+        skeleton = [s for s in roots if s.get("kind") == "enabling"]
+        if not skeleton:
+            rep.error("GRN004", "subtasks", "greenfield with no walking skeleton - the first "
+                      "subtask is kind 'enabling', depends on nothing, and puts the thinnest "
+                      "end-to-end path through a deployable project; everything else lands "
+                      "on it")
+        elif len(roots) > len(skeleton):
+            others = [s.get("id") for s in roots if s.get("kind") != "enabling"]
+            rep.warn("GRN004", "subtasks", "%s start alongside the skeleton instead of on it "
+                     "- on a project that does not exist yet, what do they build into?"
+                     % ", ".join(str(o) for o in others))
+
+
+def check_complexity(b, cfg, subs, rep):
+    """The card is derived, so a recorded one either matches the bundle or is stale."""
+    if not subs:
+        return
+    import complexity as CX
+    rec = (b.get("story") or {}).get("complexity")
+    if not rec:
+        rep.warn("CPX001", "story.complexity", "no complexity card - run `complexity.py assess "
+                 "--bundle <bundle> --write`; a story handed over without one is sized by "
+                 "feel")
+    elif not CX.is_current(b, cfg):
+        rep.warn("CPX002", "story.complexity", "the recorded card no longer matches the bundle "
+                 "- it is derived, regenerate it rather than maintaining it by hand")
 
 
 def check_research(b, cfg, subs, rep):
@@ -1792,6 +1861,8 @@ def validate(bundle, cfg):
     check_graph(subs, reach, graph, rep)
     check_clutter(bundle, cfg, subs, rep)
     check_research(bundle, cfg, subs, rep)
+    check_greenfield(bundle, subs, rep)
+    check_complexity(bundle, cfg, subs, rep)
     check_enabler(bundle, rep)
     check_irreversible(bundle, cfg, subs, rep)
     check_baseline(bundle, cfg, rep)

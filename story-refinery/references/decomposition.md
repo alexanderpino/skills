@@ -258,6 +258,42 @@ Use when: `intake.kind` is `spike` - the discovery labels set both (`TRI005` if
 the profile disagrees). Do not use it to park a story that is merely vague: the
 fix for an unclear story is the intake questions, not a spike.
 
+### `walking-skeleton` (greenfield)
+
+The story is a project that does not exist yet: a new service, repo, skill or
+package. Nothing can be cited, so the evidence rule turns around
+(`references/evidence.md`, "When nothing exists yet"), and the decomposition has
+one fixed shape `[P: Cockburn, walking skeleton]`:
+
+```
+S0 [new-svc] Walking skeleton: repo, CI, deploy, one thin path end to end  (enabling)
+S1 [new-svc] First real slice on the skeleton                              (feature, covers AC1)
+S2 [new-svc] Second slice                                                   (feature, covers AC2)
+```
+
+Rules `[L]`:
+
+- **The skeleton is first, alone, and everything depends on it** (`GRN004`). It
+  is the thinnest path that goes all the way through - a request in, a response
+  out, deployed, observed - implemented badly rather than half of it well. It
+  covers no criterion; its `done_when` is that the path runs where the project
+  will live.
+- **Every convention is a decision.** There is no house style to cite, so each
+  `conventions` entry cites a declared source - `standard:`, `adr:`, `template:`,
+  `decision:` - and `BRF009` accepts those only under `evidence.greenfield`.
+  What is not decided is not a convention, it is a `stop_and_ask`.
+- **Reuse is the negative result.** `GRN002` requires a `ruled_out` entry saying
+  there is no existing project to extend, with where you looked. Most new
+  projects are a module somebody did not find.
+- **No line numbers on files that will be created** (`GRN003`).
+- **Complexity starts at medium.** `complexity.py` treats greenfield as a driver
+  on its own: nothing to cite means every convention, contract and deployment is
+  an open fork until the skeleton lands.
+
+Use when: `intake.py` flags `greenfield-candidate` and you confirm it in
+`evidence.greenfield`. Not for a new feature inside an existing project - that is
+a slice, and the skeleton already exists.
+
 ### `custom`
 
 Supply an ordered list of subtask kinds with conditions in config. The engine

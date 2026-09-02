@@ -1304,6 +1304,80 @@ def suite_manifest_cwd():
     check("manifest: summary names the source", "(.github/workflows/ci.yml)" in text, text)
 
 
+def suite_complexity_and_greenfield():
+    """A size you can take apart, and a story for a project that does not exist yet."""
+    print("\n-- 11c. complexity card and greenfield --")
+    import complexity as CX
+    import intake as I
+    from validate import check_greenfield, check_complexity, Report
+    cfg = load_config(CONFIG)
+    with open(GOLDEN, encoding="utf-8") as fh:
+        golden = json.load(fh)
+
+    a = CX.assess(golden, cfg)
+    check("complexity: every metric on the card is a number", all(isinstance(v, int) for v in a["metrics"].values()))
+    check("complexity: the band is the highest level any metric reaches",
+          a["band"] == {0: "S", 1: "S", 2: "M", 3: "L"}[max(a["levels"].values())]
+          or (a["band"] == "XL" and max(a["levels"].values()) == 3), a)
+    check("complexity: every driver sits at the top level",
+          all(a["levels"][d] == max(a["levels"].values()) for d in a["drivers"]), a["drivers"])
+    check("complexity: the golden bundle spans two repos and one contract",
+          a["metrics"]["repos"] == 2 and a["metrics"]["contracts"] == 1, a["metrics"])
+    check("complexity: the recorded card in the golden is current", CX.is_current(golden, cfg))
+    same = CX.assess(copy.deepcopy(golden), cfg)
+    check("complexity: deterministic - two runs agree", same == a)
+    big = copy.deepcopy(golden)
+    big["story"]["decision_table"] = {"conditions": [{"id": "a", "values": list("123456")},
+                                                     {"id": "b", "values": list("123456")}],
+                                      "rules": [], "impossible": []}
+    big["decisions"] = [dict(d, status="deferred", spike="S0", waiting_for="x", expires="y")
+                        for d in big["decisions"]] * 2
+    big["evidence"]["pending"] = [{"claim": "x", "provided_by": {"ticket": "ABC-1"}}] * 4
+    b = CX.assess(big, cfg)
+    check("complexity: three high metrics make it XL, and each is named",
+          b["band"] == "XL" and {"rule_space", "deferred", "unknowns"} <= set(b["drivers"]), b)
+    check("complexity: a stale card is reported",
+          ("CPX002", "story.complexity") in {(i["code"], i["where"]) for i in
+                                             (lambda r: (check_complexity(big, cfg, big["subtasks"], r), r.items)[1])(Report())})
+    check("complexity: one line names the drivers with their values",
+          CX.one_line(a).startswith(a["band"] + " - "), CX.one_line(a))
+
+    # Greenfield: nothing to cite, so the rule turns around rather than off.
+    for text, want in (("Set up a new service for invoice numbering from scratch.", True),
+                       ("Nieuw project: een skill die bundles als bord rendert; bestaat nog niet.", True),
+                       ("Add a new endpoint to the billing API for invoice export.", False)):
+        rep = I.assess(text, cfg)
+        check("greenfield: %r flagged=%s" % (text[:40], want),
+              any(f.startswith("greenfield-candidate") for f in rep["flags"]) == want, rep["flags"])
+
+    def grn(bundle):
+        rep = Report()
+        check_greenfield(bundle, bundle.get("subtasks") or [], rep)
+        return {(i["code"], i["where"]) for i in rep.items}
+
+    check("greenfield: an ordinary story is untouched", not grn(golden))
+    g = copy.deepcopy(golden)
+    g["evidence"]["greenfield"] = {"target": "svc-invoicing", "reason": "no service owns numbering"}
+    f = grn(g)
+    check("greenfield: nothing ruled out about reuse is reported", ("GRN002", "evidence.ruled_out") in f)
+    check("greenfield: no walking skeleton is reported", ("GRN004", "subtasks") in f)
+    g["evidence"]["ruled_out"].append({"claim": "There is no existing service to extend for invoice numbering",
+                                       "looked_in": ["org search 'invoice'", "billing-api owners asked"],
+                                       "conclusion": "new repo"})
+    g["subtasks"][0]["kind"] = "enabling"
+    for s in g["subtasks"][1:]:
+        if not s.get("depends_on"):
+            s["depends_on"] = ["S0"]
+    check("greenfield: reuse ruled out and a skeleton first is clean",
+          not {c for c, _ in grn(g)} & {"GRN002", "GRN004"}, grn(g))
+    g["evidence"]["change_surface"][0]["role"] = "create"
+    g["evidence"]["change_surface"][0]["line"] = 12
+    check("greenfield: a line number on a file to be created is reported",
+          ("GRN003", "evidence.change_surface[0]") in grn(g))
+    check("greenfield: it is a medium driver on its own",
+          CX.assess(g, cfg)["levels"].get("greenfield") == 2)
+
+
 def suite_summary():
     """The artefact people actually talk from. It has to work before the bundle is
     finished, and it has to say the unwelcome part."""
@@ -1617,6 +1691,7 @@ def main():
     suite_research()
     suite_story_shapes()
     suite_manifest_cwd()
+    suite_complexity_and_greenfield()
     suite_summary()
     suite_roundtrip()
     suite_batch()

@@ -114,6 +114,13 @@ CRITICS = {
                    "that does not exist, a line that does not say what it is claimed to "
                    "say, or a convention asserted without a citation is a finding - "
                    "severity blocking, because everything downstream trusts these.",
+        "greenfield_mandate": "This project does not exist yet, so there is nothing to open. "
+                              "Re-open every assumption instead: a convention citing a "
+                              "standard, ADR or template that does not say what it is claimed "
+                              "to say; a ruled-out reuse whose search you can repeat and get a "
+                              "different answer; a walking skeleton that does not go all the "
+                              "way through. Severity blocking - the first implementer builds "
+                              "on these with no code to contradict them.",
         "hunt": [
             "a path:line citation that cannot be re-opened",
             "a symbol named in the notes that the file does not contain",
@@ -123,6 +130,8 @@ CRITICS = {
         ],
         "slice": lambda b: {
             "repos": (b.get("evidence") or {}).get("repos"),
+            "greenfield": (b.get("evidence") or {}).get("greenfield"),
+            "ruled_out": (b.get("evidence") or {}).get("ruled_out"),
             "change_surface": (b.get("evidence") or {}).get("change_surface"),
             "contracts": (b.get("evidence") or {}).get("contracts"),
             "conventions": (b.get("evidence") or {}).get("conventions"),
@@ -148,6 +157,7 @@ CRITICS = {
             "two subtasks in one wave that will both write the same file",
         ],
         "slice": lambda b: {
+            "complexity": (b.get("story") or {}).get("complexity"),
             "profile": b.get("profile"),
             "subtasks": [{"id": s.get("id"), "title": s.get("title"), "repo": s.get("repo"),
                           "kind": s.get("kind"), "estimate_days": s.get("estimate_days"),
@@ -304,7 +314,8 @@ def render_brief(bundle, critic_id):
         "",
         "## Your mandate",
         "",
-        spec["mandate"],
+        (spec.get("greenfield_mandate") if (bundle.get("evidence") or {}).get("greenfield")
+         and spec.get("greenfield_mandate") else spec["mandate"]),
         "",
         "## What to hunt for",
         "",

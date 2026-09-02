@@ -52,6 +52,12 @@
           "description": "Codes of deleted criteria. They stay retired and are never reused (AC011): every reference to a code still resolves, so a reused one resolves to something else."
         },
         "non_goals": {"type": "array", "items": {"type": "string"}},
+        "complexity": {
+          "type": "object",
+          "description": "Derived by complexity.py --write, never authored: band (S/M/L/XL), the driving metrics, and every metric with its level. CPX002 reports a card that no longer matches the bundle.",
+          "properties": {"band": {"enum": ["S", "M", "L", "XL"]}, "drivers": {"type": "array", "items": {"type": "string"}},
+                         "metrics": {"type": "object"}, "levels": {"type": "object"}, "method": {"type": "string"}, "computed_at": {"type": "string"}}
+        },
         "baseline": {
           "type": "array",
           "description": "What the thing this story changes measures TODAY. Required in spirit by two whole classes of story: one that promises to move a number (BAS001) and one that promises to preserve behaviour (BAS002). Neither claim can be demonstrated or falsified without it, and it is the cheapest thing in a refinement to capture.",
@@ -294,6 +300,12 @@
     "evidence": {
       "type": "object",
       "properties": {
+        "greenfield": {
+          "type": "object",
+          "description": "Set when the story is a project that does not exist yet. The evidence rule turns around: reuse is ruled out (GRN002), conventions cite declared sources, nothing cites a line into a file that will be created (GRN003), and the decomposition is a walking skeleton (GRN004).",
+          "required": ["target", "reason"],
+          "properties": {"target": {"type": "string"}, "reason": {"type": "string"}}
+        },
         "generated_at": {"type": "string"},
         "sources": {"type": "array", "items": {"type": "string"}},
         "repos": {
