@@ -64,10 +64,21 @@ The decomposition is the useful part. A runtime is **a scheduler crossed with a 
 *whether a node needs to run at all*. They are independent, and almost every argument about
 terrain graph performance is really an argument about one of the two with the other left implicit.
 
-[alacarte] §2.5 Table 1 classifies four real systems on exactly the axes that matter here —
-scheduler, dynamic dependencies, minimality, early cutoff, and whether the cache can be shared.
-Make gets none of the last three. Excel is not even minimal. Shake is minimal with cutoff but not
-shared. Bazel is shared with cutoff but not minimal.
+[alacarte] §2.5 Table 1 classifies four real systems on exactly the axes that matter here, and
+the useful fact is that **no widely used system has all of them**:
+
+| | Scheduler | Dependencies | Minimal | Cutoff | Cloud |
+|---|---|---|---|---|---|
+| Make | Topological | Static | Yes | No | No |
+| Excel | Restarting | Dynamic | No | No | No |
+| Shake | Suspending | Dynamic | Yes | Yes | No |
+| Bazel | Restarting | Dynamic\* | No | Yes | Yes |
+
+\* [alacarte]'s footnote: user-defined Bazel rules cannot have dynamic dependencies.
+
+Make is minimal but static and has no cutoff. Excel is not even minimal. Shake gets minimality and
+cutoff but cannot share. Bazel shares and cuts off but is not minimal. The empty cell in every row
+is what a terrain tool is trying to fill.
 
 ## The scheduler: three options, and the terrain answer
 
