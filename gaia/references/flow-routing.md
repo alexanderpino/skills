@@ -10,7 +10,7 @@ sources:
   - { id: freeman1991, tier: P, locator: "eq. 2, exponent p = 1.1" }
   - { id: quinn1991, tier: P, locator: "eq. 4, contour-length weighting" }
   - { id: tarboton1997, tier: P, locator: "§3, the 8-facet construction" }
-  - { id: barnes2014, tier: P, locator: "priority-flood; the epsilon variant; complexity analysis" }
+  - { id: barnes2014, tier: P, locator: "§3 Algorithm 1 the base Priority-Flood and Algorithm 2 the Improved form that adds a plain queue; Algorithm 3 Priority-Flood+epsilon, whose line 1 requires a priority queue WITH TOTAL ORDER; §4 Ordering for why; §5 Analysis for the O(m log2 m), m <= n float bound" }
   - { id: lindsay2016, tier: P, locator: "hybrid breach/fill with a depth limit; DEM-modification comparison" }
   - { id: planchon2002, tier: P, locator: "the fill algorithm" }
   - { id: montgomery1992, tier: P, locator: "the area-slope channel-initiation threshold, A*S^2 = const" }
@@ -36,10 +36,13 @@ A raw heightfield is full of pits. Noise makes them by construction, and an eros
 more. Until they are dealt with, flow accumulation is meaningless: water reaches a pit and
 stops, so downstream contributing area is wrong everywhere below it.
 
-- **Fill** [barnes2014] raises every basin to its rim. With a priority queue on
-  floating-point elevations it is **O(n log n)**; the O(n) result in that paper needs the
-  integer variant with a bucket/radix queue, and terrain heightfields are float — so assume
-  O(n log n) unless you have quantised. The epsilon variant leaves a tiny gradient across the
+- **Fill** [barnes2014] raises every basin to its rim. The base algorithm pushes every cell
+  through the priority queue, so on floating-point elevations it is **O(n log n)**. The paper's
+  *Improved* form (its Algorithm 2) adds a plain FIFO queue for the interior of a depression
+  once its rim is known, so only **m ≤ n** cells ever reach the priority queue and the bound
+  falls to **O(m log₂ m)** — same result, strictly less queue traffic. O(1)-per-operation
+  queues need integer elevations and a hierarchical/bucket queue, and terrain heightfields are
+  float, so assume a comparison queue unless you have quantised. The epsilon variant leaves a tiny gradient across the
   filled surface so routing still has a direction. Its cost is that it *invents a spill
   point*: a noise pit becomes a lake with an outlet the terrain never had.
 - **Breach** [lindsay2016] cuts a channel from the pit to lower ground instead. It removes the
@@ -76,7 +79,10 @@ section.
 ```
 priorityFlood(z, useEpsilon):                  # z is the ROUTING COPY, never the render heightfield
     closed[:] = false
-    open = min-priority-queue keyed on elevation
+    open = min-priority-queue keyed on elevation, TOTAL ORDER
+                                               # ties MUST break by insertion order -- see below.
+                                               # A bare binary heap does not do this; push a
+                                               # monotonic counter alongside the elevation.
     for each boundary cell b:  closed[b] = true;  open.push(b, z[b])
     while open not empty:
         c = open.pop()                         # the lowest elevation still queued
@@ -88,8 +94,27 @@ priorityFlood(z, useEpsilon):                  # z is the ROUTING COPY, never th
             open.push(j, z[j])
 ```
 
-That is [barnes2014]'s priority-flood. Every cell is pushed once and popped once, which is the
-O(n log n) with a comparison queue on floats — the caveat above, not a different algorithm.
+That is [barnes2014]'s Algorithm 1 with the epsilon lift folded in. Every cell is pushed once
+and popped once, which is the O(n log n) above — the caveat, not a different algorithm. The
+paper's own epsilon variant (Algorithm 3) is built on the *Improved* Algorithm 2 instead, and
+if you want the `m ≤ n` bound that is the one to transcribe; the fill it produces is the same.
+
+⚠️ **The tie-breaking is part of the algorithm, and a bare heap gets it wrong.** Algorithm 3's
+first line is "Let `Open` be a priority queue **with total order**", and §4 Ordering says why:
+with `ε = 0` a total and a strict weak ordering "produce the same results", but once `ε ≠ 0` a
+total order is what guarantees each cell a shortest path to its flooding source, and therefore
+that a depression with several equally-low outlets drains through the nearest one. `heapq`,
+`std::priority_queue` and every other plain binary heap have a **strict weak** ordering: equal
+elevations come out in whatever order the heap's internal swaps produced. Push a monotonic
+counter as a second key.
+
+**Measured, because the failure is invisible where you would look for it.** A flat basin with
+two outlets at exactly equal elevation, epsilon fill, tie order randomised over six seeds: the
+**filled surface is bit-identical every time** — so nothing that checks elevations catches
+this. What moves is the drainage. Up to **13 of 361** interior cells change which outlet they
+flood from, and the basin's split wanders from 181/180 to 187/174 between seeds. The fill looks
+perfect and the flow directions are non-deterministic, which is the worst possible arrangement
+for a bug: it survives every test of the thing it damages least.
 
 **Route on the epsilon variant, not on the plain fill.** Transcribed and run on a 60×60 bowl
 carrying 380 pits: both fills leave zero pits, the plain fill agrees to **0.0** with an

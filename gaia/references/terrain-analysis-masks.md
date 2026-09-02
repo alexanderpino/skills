@@ -13,7 +13,7 @@ sources:
   - { id: bavoil2008, tier: F, locator: "the sin(h) - sin(t) horizon weighting" }
   - { id: weiss2001, tier: F, locator: "the topographic position index at multiple radii" }
   - { id: he2010, tier: P, locator: "the local linear model with a, b from box filters; eps as the variance threshold" }
-  - { id: tomasi1998, tier: P, locator: "the product of spatial and range Gaussian weights" }
+  - { id: tomasi1998, tier: P, locator: "§2.1 Example: the Gaussian Case — the product of the CLOSENESS function c(xi,x) and the SIMILARITY function s(phi,f), both Gaussian. Note the paper's own words: searching it for 'spatial' and 'range' will not find this" }
 ---
 # Terrain analysis and masks — deriving fields from height
 
