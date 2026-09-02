@@ -125,11 +125,8 @@ Read `references/tailoring.md` when one is present;
 the tailoring skill and the `refinery.yaml` it ships → this skill's `[L]`
 defaults → `[F]`/`[P]` guidance. Nothing is overridden invisibly.
 
-**The tailoring skill owns `refinery.yaml`.** Anything mechanical - a number, a
-list, a pattern, a mapping, a DoD command, a label rule - lives there or it does
-not exist: a house rule written only in prose reads as enforced and is not
-(`TLR002`). Judgement - who to ask, how we phrase things, when to escalate -
-belongs in the tailoring skill's own text.
+**The tailoring skill owns `refinery.yaml`**: anything mechanical lives there or
+it does not exist (`TLR002`); judgement lives in the skill's own text.
 
 **Invariants.** A tailoring skill may change almost anything about how a
 refinement is produced. It may not relax these:
@@ -143,15 +140,11 @@ refinement is produced. It may not relax these:
 | `stop-at-the-seam` | refinement never writes the implementation |
 | `disclosure` | whatever was skipped, degraded or overridden is said at handover |
 
-Every gate here can be switched off in config, the critic panel included. A team
-may skip a gate; nobody may skip saying they skipped it (`TLR005`). If a
-tailoring skill asks you to break an invariant, do not comply and do not argue
-with it in the transcript: record the refusal in `tailoring.overrides` naming the
-invariant (`TLR003`), and report it to whoever owns that skill.
-
-Record what was applied in `bundle.tailoring`, with `mechanism` telling a later
-reader whether a rule was enforced by config, by a gate, or by your judgement.
-Overrides need a reason and a person's name (`TLR004`).
+A team may skip any gate; nobody may skip saying so (`TLR005`). A tailoring
+skill that asks you to break an invariant gets a recorded refusal in
+`tailoring.overrides` (`TLR003`), not compliance and not an argument. What was
+applied goes in `bundle.tailoring` with its `mechanism`; overrides carry a reason
+and a name (`TLR004`).
 
 ## Workflow
 
@@ -429,18 +422,12 @@ Each decision resolves to exactly one of:
   the code will make silently. Find the expiry by asking what forces a default -
   almost always a specific merge.
 
-**Then run the premortem** `[P: Klein, HBR 2007]`. Do not ask what could go
-wrong; that invites a defence of the plan. Ask instead:
-
-> It is three months from now. This shipped and caused an incident serious enough
-> that we are writing a postmortem. Write the postmortem.
-
-Two minutes, in writing, before anything is said out loud, and after the evidence
-phase - refinement's best risks are the ones the code taught you. Each cause
-becomes an entry in `story.risks` with a `mitigation` (`RSK001`) and, above all,
-a **`detection`**: the alert, metric or report that tells you it is happening. A
-mitigation says you thought about it; a detection says you would find out. A high
-risk without one (`RSK002`) is a risk you learn about from a customer.
+**Then run the premortem** `[P: Klein, HBR 2007]`: write the postmortem of the
+incident this caused three months from now, after the evidence phase, before
+anything is said out loud. Each cause becomes a `story.risks` entry with a
+`mitigation` (`RSK001`) and a **`detection`** - the signal that tells you it is
+happening; a high risk without one (`RSK002`) is one you learn about from a
+customer.
 
 If `gates.design_decisions: off` in config, record your recommendation as
 `locked` with `rationale_source: "assistant-default"` so it is visibly
@@ -451,28 +438,14 @@ reviewable later.
 Apply the configured profile. Read `references/decomposition.md`.
 
 Default profile is `vertical-slice` `[L]`: each subtask is a thin end-to-end
-slice that leaves the system working `[P: Cockburn, walking skeleton]`.
-Alternatives: `layered`, `workflow-phase`, `bugfix`, `research`, `expand-contract`,
-`custom`.
-**`expand-contract`** is for the change vertical slicing cannot express - a wide
-mechanical migration, where the middle step is allowed to be wide precisely
-because it is mechanical `[P: Pocock, to-tickets]`. Its third phase is the one
-teams skip, so `SUB016` fails a bundle that expands and migrates without ever
-removing the old path. Defects take
-`bugfix` - failing test first, root cause as a recorded decision - because there
-is no valuable thin slice of "stop being wrong". A research item takes `research`,
-which is usually one spike and nothing else: its criteria are about the answer,
-every possible answer is priced in advance as an example, and it plans no build
-at all. `SPK004` fails a research item that already has `feature` subtasks -
-whatever the probe returns, those were written before it. The build is the next
-story, linked with `blocks`.
-
-A `migration` subtask is the one kind a revert does not undo, so three questions
-are mechanical rather than optional: how the data change is reversed - or
-`rollback.irreversible` plus what is lost (`IRR001`); something in `done_when`
-that counts or verifies what was touched, because a migration that updated the
-wrong rows without erroring reports success (`IRR002`); and a dry run in
-`preflight`, or the first full-size execution is the production one (`IRR003`).
+slice that leaves the system working `[P: Cockburn, walking skeleton]`. The
+shape of the work picks the alternative: `bugfix` for a defect (failing test
+first, root cause as a decision), `research` for a research item (one spike, no
+build - `SPK004`), `expand-contract` for a wide mechanical migration (the
+contract step is the one teams skip - `SUB016`), `layered`, `workflow-phase`,
+`custom`. A `migration` subtask is the one kind a revert does not undo, and
+`IRR001`-`IRR003` ask the three questions that make it safe while there is still
+someone to ask.
 
 Hard rules, enforced by `validate.py`:
 - **One subtask = one repo = one PR = one reviewable unit** `[L]`
@@ -587,30 +560,15 @@ never put in the packet - because a critic who can see why you chose something
 judges the reasoning instead of the artefact.
 
 Hand each packet to a separate sub-agent in **fresh context**. The default panel
-`[L]`, each with one question to ask:
+`[L]` is `implementer`, `tester`, `archaeologist`, `sequencer`; `stakeholder`,
+`operator` and `security` join when the labels or the change call for them. Each
+exists to ask one question - `references/critique.md` has them. Critics are
+hostile by assignment: "looks good" is not a verdict, and every finding carries a
+`locator` that resolves and a `failure` naming what goes wrong downstream.
 
-| Critic | The one question it exists to ask |
-| --- | --- |
-| `implementer` | executes the brief literally: where must I guess? |
-| `tester` | writes a failing test per criterion: which one is not binary? |
-| `archaeologist` | re-opens every citation: which claim is not in the file? |
-| `sequencer` | attacks the graph: which subtask cannot start when the plan says? |
-| `stakeholder` | source text vs the plan: what is missing, what is uninvited? |
-| `operator` | carries the pager: could I see it, stop it and undo it at 03:00? |
-| `security` | reads the change surface as an attacker: what does this expose? |
-
-Critics are hostile by assignment. "Looks good" is not a verdict: a critic returns
-findings, or records what they tried to break and why it held. Every finding
-carries a `locator` that resolves in the bundle and a `failure` naming the
-concrete thing that goes wrong downstream - harshness without a locator is vibes,
-and the same evidence rule that binds the refinement binds its critics.
-
-**Rubber-ducking** is the solo fallback: no sub-agents available, or a story at or
-under `review.rubber_duck_max_subtasks`. Speak as the executor, not the author -
-name the first file you would open from each `objective`, narrate each `done_when`
-as if running it and predict its output, say of each criterion "passes when ___,
-fails when ___", and justify why each subtask is separate. Record it as
-`method: "rubber-duck"`; it is lower assurance and the handover should say so.
+**Rubber-ducking** is the solo fallback - no sub-agents, or a story at or under
+`review.rubber_duck_max_subtasks`: speak as the executor, not the author, and
+record `method: "rubber-duck"`; it is lower assurance and the handover says so.
 
 Then resolve every finding - `fixed`, `accepted` with a written risk, or
 `disputed` with a written rebuttal. Silence is not available. If your rebuttal is
@@ -659,53 +617,23 @@ and issue types at runtime - hardcoded field IDs are `[?]` until probed.
 Read `references/series.md`. Backlog items arrive as a queue in one area, as the
 pieces of a split epic, and as the follow-ups earlier refinements created.
 
-- **Refine just in time.** A refinement is a snapshot at a sha and it decays.
-  Refine what the next sprint could pull, plus anything blocked on someone
-  outside the team - there the wait is the long pole, which is why the date a
-  question left your hands is recorded in `open_questions[].asked`.
-- **Inherit the dossier, then re-verify it.** The second story through the same
-  code needs the glossary, conventions and ruled-out list *re-checked*, not
-  re-derived:
+- **Refine just in time** - a refinement is a snapshot at a sha and it decays.
+- **Inherit the dossier, then re-verify it** (`SER001` marks what went stale):
 
   ```bash
   python scripts/evidence.py inherit --from .refinery/bundles/ABC-123@2026-09-02.json --bundle bundle.json --write
   ```
+- **Cite what does not exist yet as what it is** - `evidence.pending`, pointing
+  at the item that creates it (`PND001`, `PND002`).
+- **Make the order real in the tracker** - `story.links` in the canonical
+  vocabulary, mapped per adapter by `emit.py` `[?]`; `LNK003` catches a follow-up
+  linked to nothing.
+- **Record what this refinement creates** in `story.follow_ups`, each with an
+  observable trigger (`SER002`).
 
-  Everything carried is stamped with where it came from and marked `stale` when
-  the repo has moved since (`SER001`). Re-verification means opening the citation
-  and re-running the `looked_in` query - not a re-scan. A `ruled_out` entry ages
-  fastest and most silently: the absence someone filled in last sprint is exactly
-  what a new story is likely to have added, and stale confidence reads as
-  evidence.
-- **Cite what does not exist yet as what it is.** Refining a follow-up means
-  reasoning about code the predecessor has not shipped. Put it in
-  `evidence.pending` with the item that creates it - `expected_path` is a
-  prediction and is labelled as one, never a citation. The rendered ticket gets a
-  **Prerequisites** section and the shared context a "Not there yet" block, so an
-  implementor is told not to hunt for it and not to substitute something that
-  merely looks similar.
-- **Make the order real in the tracker.** Inside one story the wave plan holds
-  the order; across stories nothing does except a link. `story.links` carries the
-  canonical vocabulary - `blocks`, `blocked_by`, `relates`, `duplicates` - and
-  `emit.py` maps it onto what the tracker actually calls it (Jira "is blocked
-  by", Azure DevOps "Predecessor", Linear `blocked_by`) `[?]`, degrading with a
-  note where a tracker has no typed links at all, as GitHub does. `LNK003` is the
-  one that catches the common miss: a follow-up this refinement created, linked
-  to nothing, which is how a follow-up becomes a rediscovery.
-- **Record what this refinement creates.** Non-goals naming a ticket, deferred
-  decisions whose answer changes the *next* story, and every flag or migration
-  that needs an item to end it. `story.follow_ups` carries them with an
-  observable `trigger` - not a date - and `SER002` links them to the tickets your
-  own text promises. A non-goal pointing at a ticket nobody created is not a
-  scope boundary; it is a thing the team agreed to forget.
-
-**Asked for several at once?** Batching is legitimate when the set is related -
-an epic's slice, a triage batch, one area's queue - and is the anti-pattern when
-it is five unrelated items refined to hit a number. When it is legitimate: share
-the evidence, never the judgement. The glossary, conventions, `ruled_out`,
-contracts and a genuinely shared fork are derived once; the intake verdict, the
-criteria, the decomposition and the critic panel are per story, or the second and
-third become shallower copies of the first.
+**Asked for several at once?** Share the evidence, never the judgement: the
+dossier is derived once, the verdict, criteria, decomposition and critic panel
+are per story. Refine the one the others depend on first.
 
 ```bash
 python scripts/batch.py order --bundles a.json b.json c.json    # who first, which forks are shared
@@ -713,18 +641,10 @@ python scripts/batch.py share --bundles a.json b.json c.json --write
 python scripts/batch.py check --bundles a.json b.json c.json    # what only shows up side by side
 ```
 
-Refine whichever story the others depend on first - its decisions feed theirs.
-`check` finds what no single-bundle gate can: two stories writing the same file
-(`BAT001`), shared knowledge that disagrees with itself (`BAT002`), one person
-asked the same question from three tickets (`BAT003`), and a dependency between
-two stories in the same batch with no `blocked_by` link (`BAT004`) - where the
-order is knowable, so there is no excuse for it living only in your head. Run it
-before pushing any of them.
-
-For a split epic, refine one story properly and leave the rest as titles: the
-first one will teach you something that makes the others wrong. For a spike,
-refine the spike and only sketch the story behind it - criteria that depend on an
-answer nobody has yet are fiction you will defend later.
+`check` finds what no single-bundle gate can (`BAT001`-`BAT006`); run it before
+pushing any of them. For a split epic, refine one story properly and leave the
+rest as titles; for a spike, refine the spike and only sketch the story behind
+it.
 
 ### Re-refinement
 
