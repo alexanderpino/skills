@@ -3,7 +3,7 @@
 
   python selftest.py
 
-Nine suites:
+Ten suites:
   1. Validator gates  - mutate the golden bundle, assert each gate fires
   2. Config parsing   - the YAML subset, including the cases that bit us
   3. Markup           - wiki / ADF / HTML / plaintext conversion
@@ -11,15 +11,18 @@ Nine suites:
   5. Intake detection - sufficiency verdicts, English and Dutch
   6. Tailoring seam   - what a team skill may change, and what it may never relax
   7. Triage           - the label policy, its precedence, and what it reports
-  8. Adversarial review - digests, locators, and that a critic packet really is blind
-  9. Docs consistency - SKILL.md against the scripts and validator codes it cites
+  8. Batch            - what only shows up when several bundles are read together
+  9. Adversarial review - digests, locators, and that a critic packet really is blind
+ 10. Docs consistency - SKILL.md against the scripts and validator codes it cites
 
 A validator nobody has tried to break is a validator nobody should trust, and the
 same goes for the config reader that decides which gates run at all.
 Exit 0 if everything passes.
 """
 
+import contextlib
 import copy
+import io
 import json
 import os
 import shutil
@@ -576,7 +579,7 @@ def suite_pipeline():
 def suite_docs():
     """SKILL.md is the interface. A flag that no longer exists, or a reference file
     that was renamed, breaks the skill just as thoroughly as a bad regex."""
-    print("\n-- 9. docs consistency --")
+    print("\n-- 10. docs consistency --")
     import re
     with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
         skill = fh.read()
@@ -616,9 +619,11 @@ def suite_docs():
         if subs and first and not first.startswith("-"):
             check("subcommand valid: %s %s" % (script, first), first in subs, sorted(subs))
 
-    # Every validator code mentioned in a reference must exist in validate.py.
-    with open(os.path.join(HERE, "validate.py"), encoding="utf-8") as fh:
-        vsrc = fh.read()
+    # Every code mentioned in a reference must exist in a script that can emit it.
+    vsrc = ""
+    for name in ("validate.py", "batch.py"):
+        with open(os.path.join(HERE, name), encoding="utf-8") as fh:
+            vsrc += fh.read()
     real = set(re.findall(r'"([A-Z]{3,6}\d{3})"', vsrc))
     docs = ""
     for name in os.listdir(os.path.join(ROOT, "references")):
@@ -829,10 +834,90 @@ def suite_triage():
           and recorded.get("must_answer_nfr") == policy.get("must_answer_nfr"))
 
 
+def suite_batch():
+    """Several related stories in one run. These are the findings that do not exist
+    for one bundle: they only appear when the bundles are read side by side."""
+    print("\n-- 8. batch --")
+    import batch as B
+
+    with open(GOLDEN, encoding="utf-8") as fh:
+        first = json.load(fh)
+    second = copy.deepcopy(first)
+    second["story"]["key"] = "ABC-131"
+    second["evidence"]["pending"] = [{"claim": "tax.reason on the order response",
+                                      "provided_by": {"ticket": "ABC-123", "subtask": "S2"}}]
+    second["story"]["links"] = []
+    second["evidence"]["glossary"][0]["means"] = "A discount for business customers"
+    first["evidence"]["ruled_out"].append({
+        "claim": "There is no rate table for non-EU destinations",
+        "looked_in": ["api/src/billing/rates/**"],
+        "conclusion": "Adding one is new work, not a lookup."})
+    pair = [("a.json", first), ("b.json", second)]
+
+    tmp = tempfile.mkdtemp(prefix="refinery-batch-")
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = B.cmd_check(pair)
+        text = out.getvalue()
+        check("batch: a contradiction between bundles is an error", "BAT002" in text and code == 1)
+        check("batch: a dependency inside the batch with no link is an error", "BAT004" in text)
+        check("batch: two stories writing one file is reported once, not once per file",
+              text.count("BAT001") == 1 and "18 file(s)" in text, text)
+        check("batch: one person asked the same thing twice is a batching problem",
+              "BAT003" in text)
+        check("batch: near-identical change surfaces are questioned", "BAT006" in text)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            order = B.cmd_order(pair)
+        text = out.getvalue()
+        check("batch: the story others depend on is refined first",
+              text.index("ABC-123") < text.index("ABC-131") and order == 0, text)
+        check("batch: a fork open in several bundles is named once",
+              text.count("fork(s) are open") == 1, text)
+
+        # share must not spread a definition the batch already disagrees about.
+        paths = []
+        for name, bundle in pair:
+            path = os.path.join(tmp, name)
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(bundle, fh)
+            paths.append(path)
+        loaded = B.load(paths)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = B.cmd_share(loaded, write=True)
+        check("batch: a conflicting definition is reported, not shared",
+              "CONFLICT" in out.getvalue() and code == 1)
+        merged = json.load(open(paths[1], encoding="utf-8"))
+        means = [g["means"] for g in merged["evidence"]["glossary"]
+                 if g["term"] == "reverse charge"]
+        check("batch: the conflicting term keeps one meaning per bundle", len(means) == 1, means)
+        carried = [e for e in merged["evidence"]["ruled_out"] if e.get("inherited_from")]
+        check("batch: what is shared says which story it came from",
+              carried and "same refinement run" in carried[0]["inherited_from"])
+
+        clean = copy.deepcopy(second)
+        clean["evidence"]["glossary"][0]["means"] = first["evidence"]["glossary"][0]["means"]
+        clean["story"]["links"] = [{"type": "blocked_by", "key": "ABC-123", "why": "the tax "
+                                    "object it reads does not exist yet"}]
+        clean["subtasks"] = []
+        clean["open_questions"] = []
+        clean["evidence"]["change_surface"] = []
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = B.cmd_check([("a.json", first), ("b.json", clean)])
+        check("batch: a linked, non-overlapping, agreeing pair is clean",
+              code == 0 and "CLEAN" in out.getvalue(), out.getvalue())
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def suite_review():
     """The critic packets are the only mechanical guarantee of blindness in the
     skill. If the reasoning leaks into one, the panel is grading the reasoning."""
-    print("\n-- 8. adversarial review --")
+    print("\n-- 9. adversarial review --")
     from review import (CRITICS, DEFAULT_PANEL, cmd_check, content_digest,
                         render_brief, resolve_locator)
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -921,6 +1006,7 @@ def main():
     suite_intake()
     suite_tailoring()
     suite_triage()
+    suite_batch()
     suite_review()
     suite_docs()
     print("\n%s  %d failure(s)" % ("PASS" if not FAILURES else "FAIL", len(FAILURES)))

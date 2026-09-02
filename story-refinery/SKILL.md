@@ -606,6 +606,28 @@ pieces of a split epic, and as the follow-ups earlier refinements created.
   own text promises. A non-goal pointing at a ticket nobody created is not a
   scope boundary; it is a thing the team agreed to forget.
 
+**Asked for several at once?** Batching is legitimate when the set is related -
+an epic's slice, a triage batch, one area's queue - and is the anti-pattern when
+it is five unrelated items refined to hit a number. When it is legitimate: share
+the evidence, never the judgement. The glossary, conventions, `ruled_out`,
+contracts and a genuinely shared fork are derived once; the intake verdict, the
+criteria, the decomposition and the critic panel are per story, or the second and
+third become shallower copies of the first.
+
+```bash
+python scripts/batch.py order --bundles a.json b.json c.json    # who first, which forks are shared
+python scripts/batch.py share --bundles a.json b.json c.json --write
+python scripts/batch.py check --bundles a.json b.json c.json    # what only shows up side by side
+```
+
+Refine whichever story the others depend on first - its decisions feed theirs.
+`check` finds what no single-bundle gate can: two stories writing the same file
+(`BAT001`), shared knowledge that disagrees with itself (`BAT002`), one person
+asked the same question from three tickets (`BAT003`), and a dependency between
+two stories in the same batch with no `blocked_by` link (`BAT004`) - where the
+order is knowable, so there is no excuse for it living only in your head. Run it
+before pushing any of them.
+
 For a split epic, refine one story properly and leave the rest as titles: the
 first one will teach you something that makes the others wrong. For a spike,
 refine the spike and only sketch the story behind it - criteria that depend on an
@@ -685,6 +707,8 @@ All stdlib-only Python 3, no dependencies, no network.
 - `scripts/validate.py` - the readiness gate
 - `scripts/review.py` - `brief` | `digest` | `check`; sealed critic packets and the
   REV gates' stamp
+- `scripts/batch.py` - `order` | `share` | `check`; several related stories in one
+  run, and the contradictions that only appear when the bundles are read together
 - `scripts/emit.py` - render payloads and a push plan; `--previous` for updates
 - `scripts/markup.py` - markdown to wiki / ADF / HTML / plaintext
 - `scripts/selftest.py` - six suites: validator gates, config parsing, markup
@@ -710,5 +734,5 @@ All stdlib-only Python 3, no dependencies, no network.
   that does not fit, and what to do when a refinement-shaped request arrives with no
   invocation at all. Not a trigger eval: with `disable-model-invocation` set, "would
   Claude load this on its own" is no longer a question with an answer
-- `evals/evals.json` - nineteen behavioural evals with verifiable expectations, for
+- `evals/evals.json` - twenty behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

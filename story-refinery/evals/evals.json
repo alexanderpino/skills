@@ -239,6 +239,20 @@
         "The shared context tells an implementor not to hunt for the file and not to substitute something similar",
         "expected_path is presented as a prediction rather than as a citation"
       ]
+    },
+    {
+      "id": 20,
+      "prompt": "Refine these four for the next sprint: ABC-210, ABC-211, ABC-212 and ABC-213. They are all in the checkout area.",
+      "expected_output": "A batch where the evidence is derived once and the judgement is not, refined in dependency order, checked side by side before anything is pushed.",
+      "expectations": [
+        "The area was scanned once, not four times, and the glossary and conventions were derived once",
+        "Each story still got its own intake verdict, criteria, decomposition and critics - none inherited from a sibling",
+        "The story the others depend on was refined first, and shared forks were decided once rather than per story",
+        "batch.py check was run before any push, and reported cross-story file collisions, contradictions and unlinked dependencies",
+        "Questions repeated across stories were put to their owner once, naming the stories they affect",
+        "Where two stories turned out to overlap almost entirely, that was raised rather than refined twice",
+        "Any story that was not ready was reported as not ready rather than smoothed over to keep the batch uniform"
+      ]
     }
   ]
 }

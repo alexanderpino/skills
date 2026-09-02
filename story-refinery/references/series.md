@@ -118,6 +118,59 @@ so a developer sees what has to land first; the **shared context** gets a "Not
 there yet" block so an implementor does not go looking for a file, and - the
 expensive case - does not substitute something that merely looks similar.
 
+## Several at once
+
+Sometimes the request is not one story but five: an epic's slice, a triage batch,
+everything queued in one area. Batching is legitimate when the set is *related* -
+and only then. Five unrelated items refined to have "enough refined" is the
+anti-pattern at the bottom of this file wearing a schedule.
+
+When it is legitimate, the rule is one line: **share the evidence, never the
+judgement.**
+
+| Shared across the batch | Never shared |
+|---|---|
+| glossary, house conventions, `ruled_out` | the intake verdict |
+| contracts and the repo manifests | the acceptance criteria |
+| a fork that genuinely affects several stories - decided once | the decomposition |
+| the questions, asked once per owner | the critic panel: critics judge one artefact |
+
+The second column is what makes a batch dangerous. Reuse is efficient for facts
+and corrosive for judgement: the second and third stories drift into shallower
+copies of the first, because the shape is already there and filling it in feels
+like refining `[N]`.
+
+```bash
+python scripts/batch.py order --bundles a.json b.json c.json    # who first, which forks are shared
+python scripts/batch.py share --bundles a.json b.json c.json --write
+python scripts/batch.py check --bundles a.json b.json c.json    # what only shows up side by side
+```
+
+**Order matters.** Refine the story the others depend on first: its decisions and
+its evidence are inputs to theirs, and re-deciding a fork per story is how one
+batch produces three incompatible answers. `order` derives that from the
+cross-story `blocked_by` links and `evidence.pending`, and names the forks that
+are open in more than one bundle.
+
+**Bundles stay self-contained.** Each is pushed and read alone, so shared
+knowledge is *copied* into every bundle rather than referenced - marked with
+which story it came from. `share` refuses to spread a definition that two bundles
+already disagree about, because sharing it would spread whichever one is wrong.
+
+**`check` is the part that only works side by side**, and it finds what no
+single-bundle gate can:
+
+| | |
+|---|---|
+| `BAT001` | two stories whose subtasks write the same file. Inside a story the wave plan stops this; across stories nothing does |
+| `BAT002` | shared knowledge that disagrees with itself - worse than none, because each story still looks internally consistent |
+| `BAT003` | the same question put to the same person from three tickets. Ask once, name the stories it affects |
+| `BAT004` | one story waits on another *in the same batch* with no `blocked_by` link. Here the order is knowable, so there is no excuse for it living only in your head |
+| `BAT006` | two stories touching mostly the same files - check they are two stories and not one split by wording |
+
+Run `check` before pushing any of them. A batch pushed one ticket at a time is a
+batch whose contradictions arrive in production one sprint at a time.
+
 ## Sequences
 
 **A split epic.** Map it, draw the release line, then refine **one** story
