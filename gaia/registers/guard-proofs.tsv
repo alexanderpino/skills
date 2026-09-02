@@ -116,3 +116,35 @@ NOT PROVEN	cross-skill path resolution	-	four documents pointed at water-physics
 #
 # All three run in CI on every push (.github/workflows/gaia.yml, the `bites` job), so this is
 # a standing check rather than a one-afternoon proof like the rows above it were.
+#
+# ── A REPORTED METRIC THAT WAS ITSELF WRONG, 2026-09-02 ─────────────────────────────────────
+#
+# locator_quality() is REPORTED, not enforced, and it had no mutation row because there is no
+# pass/fail to mutate. That is exactly how it went unchecked. Its pattern matched the BARE
+# WORDS "equation", "section", "algorithm", "table", "figure", "page" and "chapter" -- so
+# "the fill algorithm" and "the thin-elastic-plate equation", both pure topic paraphrases,
+# counted as sharp. The metric measured vocabulary, not followability, and it was inflated by
+# precisely the locators it existed to find.
+#
+# Found by an agent doing the locator work, not by this register: it noticed that a locator it
+# had deliberately declined to sharpen was already being scored as sharp.
+#
+# The pattern now requires a designator -- a number after the word, or a section mark. A bare
+# § still counts when it introduces a NAME ("§Computation of Fn(x)"), because a named section
+# is followable where an English word is not. Checked both ways on a fixture set:
+#
+#   vague  "the fill algorithm"                            (was: SHARP)
+#   vague  "the thin-elastic-plate equation"               (was: SHARP)
+#   vague  "the area-slope channel-initiation threshold"
+#   SHARP  "eq. 2, exponent p = 1.1"
+#   SHARP  "§3, the 8-neighbour steepest-descent rule"
+#   SHARP  "§Computation of Fn(x)"
+#   SHARP  "p. 682"        SHARP  "Figure 2, p. 30"        SHARP  "§2.3 eq. 6"
+#
+# Reported ratio before the fix: 70/137 (51%). After: 62/137 (45%). The earlier 27/135 figure
+# quoted throughout this register's history was overstated for the same reason.
+#
+# THE GENERAL LESSON, which is why this is written down rather than quietly patched: a metric
+# that only ever prints a number is never seen to fail, so nothing forces it to be right. The
+# enforced assertions above all have mutation rows because failing is what they do. Any future
+# REPORTED number needs a fixture set like the one above, or it is decoration.

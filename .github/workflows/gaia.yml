@@ -39,6 +39,14 @@ jobs:
 
       # No dependencies on purpose. Gaia ships no reference implementation and its scripts are
       # stdlib-only; if that ever stops being true, this step failing is the right alarm.
+      # Runs BEFORE the guard. A reported metric never fails, so nothing forces it to be
+      # right -- and locator_quality was wrong for weeks, scoring "the fill algorithm" as a
+      # precise locator because it matched the bare word "algorithm". Enforced assertions get
+      # mutation rows in the bites job because failing is what they do; a reported number
+      # needs a fixture set instead, or it is decoration.
+      - name: Reported metrics must classify their fixtures correctly
+        run: python3 gaia/scripts/check.py --selftest
+
       - name: Guard must be green
         run: python3 gaia/scripts/check.py
 

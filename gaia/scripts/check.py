@@ -260,6 +260,54 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
     return problems, used
 
 
+LOCATOR_PRECISE = re.compile(r"""
+          §\s*\S                                  # numbered or named section mark
+        | \bsec\.\s*\d       | \bsection\s+\d
+        | \beq\.\s*\(?\d     | \bequation\s+\(?\d
+        | \bpp?\.\s*\d       | \bpages?\s+\d
+        | \bfig\.\s*\d       | \bfigure\s+\d
+        | \bch\.\s*\d        | \bchapter\s+\d
+        | \btable\s+\d       | \balgorithm\s+\d
+        | \blisting\s+\d     | \bslide\s+\d
+    """, re.I | re.X)
+
+# The fixture set for LOCATOR_PRECISE, asserted by `--selftest` and run in CI.
+# A REPORTED metric never fails, so nothing forces it to be right -- and this one was
+# wrong for weeks, counting "the fill algorithm" as a precise locator because it matched
+# the bare word "algorithm". Enforced assertions get mutation rows because failing is
+# what they do; a reported number needs a fixture set instead, or it is decoration.
+LOCATOR_FIXTURES = [
+    ("the fill algorithm", False),
+    ("the thin-elastic-plate equation", False),
+    ("the area-slope channel-initiation threshold, A*S^2 = const", False),
+    ("priority-flood; the epsilon variant; complexity analysis", False),
+    ("the 8-facet construction", False),
+    ("eq. 2, exponent p = 1.1", True),
+    ("\u00a73, the 8-neighbour steepest-descent rule", True),
+    ("\u00a7Computation of Fn(x)", True),
+    ("p. 682", True),
+    ("Figure 2, p. 30", True),
+    ("\u00a72.3 eq. 6", True),
+    ("ch. 2, the GPU-resident form", True),
+    ("Table 1", True),
+]
+
+
+def selftest() -> int:
+    """Assert the locator pattern classifies known-good and known-bad locators."""
+    bad = [(t, want) for t, want in LOCATOR_FIXTURES
+           if bool(LOCATOR_PRECISE.search(t)) != want]
+    for t, want in bad:
+        print(f"  FAIL  locator fixture: {t!r} should be "
+              f"{'SHARP' if want else 'vague'}")
+    if bad:
+        print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures misclassified.")
+        return 1
+    print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} "
+          "fixtures classified correctly.")
+    return 0
+
+
 def locator_quality() -> tuple[int, int, list[str]]:
     """How many citations can a reader actually follow?
 
@@ -280,16 +328,7 @@ def locator_quality() -> tuple[int, int, list[str]]:
     # find. A designator is now required: a number after the word, or a section mark. `§` on
     # its own is allowed to introduce a NAME ("§Computation of Fn(x)") because a named section
     # is genuinely followable; the English words are not, because they occur in ordinary prose.
-    precise = re.compile(r"""
-          §\s*\S                                  # numbered or named section mark
-        | \bsec\.\s*\d       | \bsection\s+\d
-        | \beq\.\s*\(?\d     | \bequation\s+\(?\d
-        | \bpp?\.\s*\d       | \bpages?\s+\d
-        | \bfig\.\s*\d       | \bfigure\s+\d
-        | \bch\.\s*\d        | \bchapter\s+\d
-        | \btable\s+\d       | \balgorithm\s+\d
-        | \blisting\s+\d     | \bslide\s+\d
-    """, re.I | re.X)
+    precise = LOCATOR_PRECISE
     skip = set(paper_files()) | {INDEX, COVERAGE}
     total = sharp = 0
     vague: list[str] = []
@@ -469,7 +508,11 @@ def check_index() -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true", help="what is checked, and what is not")
+    ap.add_argument("--selftest", action="store_true",
+                    help="assert the reported metrics classify their fixture sets correctly")
     args = ap.parse_args()
+    if args.selftest:
+        return selftest()
     if args.list:
         print(__doc__)
         return 0
