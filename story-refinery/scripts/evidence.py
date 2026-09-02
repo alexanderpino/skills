@@ -104,11 +104,36 @@ def detect_commands(root, files):
         if low.startswith((".github/workflows/", ".gitlab-ci")) or low in ("azure-pipelines.yml",):
             try:
                 with open(os.path.join(root, rel), "r", encoding="utf-8", errors="ignore") as fh:
+                    # A `run:` executes in the workflow's `defaults.run.working-directory`, or
+                    # in a step's own `working-directory:`; lifted without it, a sub-package's
+                    # command becomes the repo's and fails at the root. Same line-regex style
+                    # as the rest of this loop - there is no YAML parser here on purpose.
+                    default_cwd, step_cwd, in_defaults = "", "", False
                     for line in fh:
+                        stripped = line.strip()
+                        if re.match(r"^defaults:\s*$", stripped):
+                            in_defaults = True
+                        elif in_defaults and re.match(r"^[A-Za-z_-]+:\s*$", stripped) \
+                                and not line.startswith((" ", "\t")):
+                            in_defaults = False
+                        wd = re.match(r"^\s*(?:-\s*)?working-directory:\s*(.+)$", line)
+                        if wd:
+                            if in_defaults:
+                                default_cwd = wd.group(1).strip().strip("'\"")
+                            else:
+                                step_cwd = wd.group(1).strip().strip("'\"")
+                            continue
+                        if re.match(r"^\s*-\s", line) and "run:" not in line:
+                            step_cwd = ""          # a new step; its own cwd, if any, follows
                         m = re.search(r"^\s*(?:-\s*)?(?:run:|script:)\s*(.+)$", line)
                         if not m:
                             continue
                         c = m.group(1).strip().strip("'\"")
+                        if in_defaults or not c:
+                            continue
+                        cwd = step_cwd or default_cwd
+                        if cwd:
+                            c = "cd %s && %s" % (cwd, c)
                         if re.search(r"\b(test|pytest|jest|vitest|go test|cargo test)\b", c):
                             put("test", c, rel)
                         elif re.search(r"\b(lint|ruff|eslint|clippy|flake8)\b", c):
@@ -145,6 +170,15 @@ def detect_commands(root, files):
         put("test", "cargo test", "Cargo.toml")
         put("build", "cargo build", "Cargo.toml")
     return cmds, sources
+
+
+def manifest_line(m):
+    """One summary line per repo. The source file is shown next to the test command
+    because a command lifted from CI is only as trustworthy as where it came from."""
+    cmd = (m.get("commands") or {}).get("test", "-")
+    src = (m.get("command_sources") or {}).get("test")
+    return "  %-12s sha=%-10s test=%s%s" % (m.get("name"), m.get("sha"), cmd,
+                                            "  (%s)" % src if src and cmd != "-" else "")
 
 
 def detect_owners(root, files):
@@ -396,7 +430,7 @@ def cmd_manifest(args, cfg):
         deps["internal"] = sorted({d.split("/")[-1] for d in deps.get("external", [])
                                    if d.split("/")[-1] in names and d.split("/")[-1] != m["name"]})
     for m in manifests:
-        print("  %-12s sha=%-10s test=%s" % (m["name"], m["sha"], m["commands"].get("test", "-")))
+        print(manifest_line(m))
     if args.json:
         print(json.dumps(manifests, indent=2))
     return 0

@@ -210,7 +210,15 @@
         "current": "python -m pytest tests/ -q -rs, source .github/workflows/terrain-architect.yml; fails at the root with 'no tests ran'",
         "source": ".refinery/manifests/skills@a837f43.json, and the repro on 2026-09-02"
       }
-    ]
+    ],
+    "progress": {
+      "subtasks": {
+        "S1": "done",
+        "S2": "done"
+      },
+      "updated_at": "2026-09-02T18:24:43+00:00",
+      "source": "implemented in this commit"
+    }
   },
   "decisions": [
     {
