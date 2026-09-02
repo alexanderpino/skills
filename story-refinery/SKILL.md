@@ -131,6 +131,22 @@ dimension. Exit code is the verdict:
 | 3 | `scoutable` | run Phase 2 **only** to sharpen the questions, then stop and ask |
 | 4 | `insufficient` | stop and ask; there is nothing to scan for |
 
+**Is it knowable?** Sufficiency is about information; it says nothing about
+whether the answer can be known in advance. Classify the problem in
+`story.intake.domain` `[P: Snowden & Boone, 2007]`: `clear`, `complicated`
+(refine - the skill's home ground), `complex`, or `chaotic`. In a complex domain
+the honest output is a **probe**, not a plan: a spike with a hypothesis and a
+measure, and `validate.py` refuses a complex story decomposed without one
+(`CYN001`). The tell is whether you can write the acceptance criteria without
+guessing at what will work.
+
+When the ticket names a mechanism with no outcome, the gate stops and asks. Record
+the answer as a chain, not prose: **goal → actors → impacts → deliverables** in
+`story.impact` `[P: Adzic, 2012]`. The goal carries a number and a date, because
+it is what tells you afterwards whether this worked. Read it right to left to
+test the ticket's deliverable, left to right to find a cheaper impact on the same
+goal - proposing one is the highest-value thing refinement does.
+
 The detector matches words, not meaning. Read the source text yourself, set
 `heuristic: false` on every dimension you confirm, and record what you did
 about each gap: `missing` (blocking question), `assumed` (stated assumption plus
@@ -175,6 +191,13 @@ python scripts/evidence.py contracts --config refinery.yaml  # cross-repo edges;
 order the subtasks in Phase 5. Where it says the direction is guessed, confirm
 which repo owns the file before you rely on it.
 
+It finds seams that already exist. When the story is about to *create* one and
+the boundary is unclear, event-storm it first `[P: Brandolini]`: write the domain
+events in past tense and time order, name what triggers each and what it carries,
+and draw the line where the carrier changes process, team or deployment. That
+crossing is the contract. Two or three named events mapped to real files is the
+whole output - skip it entirely on a single-repo story.
+
 ### Phase 3 - Example mapping
 
 Run Example Mapping `[P: Wynne, 2015]` over the story: **rules** (blue),
@@ -189,7 +212,32 @@ Run Example Mapping `[P: Wynne, 2015]` over the story: **rules** (blue),
   make the bundle not-ready. This is the correct outcome - report it, do not
   invent an answer to clear the gate.
 
-### Phase 4 - Decision gate
+Example mapping says *that* each rule needs examples. It does not say which, so
+generate them rather than recalling them. Read `references/example-design.md`.
+
+- **Partition the inputs** and write one example per class `[P: Myers, 1979]`.
+  A rule naming three alternatives with two examples has a branch nobody has
+  thought about (`AC008`).
+- **Stand on every boundary** - on the line, one below, one above. The example
+  *on* the line is what settles `<` versus `<=`, and it is the one nobody writes
+  (`AC009`).
+- **Tabulate when conditions interact.** For rule-heavy domains - pricing, tax,
+  permissions, eligibility - fill in `story.decision_table`: the conditions, every
+  value each can take, and one rule per combination (`*` for any). `validate.py`
+  enumerates the product and names every combination that neither a rule nor an
+  explicit `impossible` entry covers (`DT001`). It is the only form here whose
+  completeness is checkable rather than felt.
+- **Map the states** when behaviour depends on history: cancel-after-ship,
+  pay-twice, retry-after-timeout. The unspecified transitions are where incidents
+  live.
+
+Non-functional criteria end in a measure `[P: Bass, Clements & Kazman]`.
+`performance`, `concurrency` and `failure` need a number or the word `unchanged`
+(`NFR002`); prose there is a category, not an answer.
+
+### Phase 4 - Decision gate and premortem
+
+Read `references/risk-and-options.md`.
 
 List the genuinely open technical forks that the evidence exposed (storage
 choice, sync vs async, where validation lives, migration strategy, feature flag
@@ -202,7 +250,26 @@ decomposition with unlocked decisions - the decomposition depends on them.
 Each decision resolves to exactly one of:
 - `locked` - chosen, with a one-line rationale recorded
 - `deferred` - converted into a spike subtask with a timebox and a named
-  question it must answer
+  question it must answer, plus `waiting_for` (the information that would decide
+  it, `DEC008`) and `expires` (the event after which deferring costs more than
+  deciding, `DEC007`). Options have value, options expire, and you never commit
+  early unless you know why `[P: Maassen & Matts, 2013]`. Without an expiry it is
+  not a held option, it is an unmade decision that the first implementer to touch
+  the code will make silently. Find the expiry by asking what forces a default -
+  almost always a specific merge.
+
+**Then run the premortem** `[P: Klein, HBR 2007]`. Do not ask what could go
+wrong; that invites a defence of the plan. Ask instead:
+
+> It is three months from now. This shipped and caused an incident serious enough
+> that we are writing a postmortem. Write the postmortem.
+
+Two minutes, in writing, before anything is said out loud, and after the evidence
+phase - refinement's best risks are the ones the code taught you. Each cause
+becomes an entry in `story.risks` with a `mitigation` (`RSK001`) and, above all,
+a **`detection`**: the alert, metric or report that tells you it is happening. A
+mitigation says you thought about it; a detection says you would find out. A high
+risk without one (`RSK002`) is a risk you learn about from a customer.
 
 If `gates.design_decisions: off` in config, record your recommendation as
 `locked` with `rationale_source: "assistant-default"` so it is visibly
@@ -379,9 +446,15 @@ the tracker. Show the difference and ask; do not silently overwrite.
 
 Do not decompose an epic into subtasks. Run Phases 1-3 to surface the rules and
 questions, then propose a **split into stories**, naming the pattern used
-(SPIDR, paths, data, rules - see `references/decomposition.md`). Refine one
-story properly rather than all of them shallowly, and say which one you chose
-and why.
+(SPIDR, paths, data, rules - see `references/decomposition.md`). Map it before
+you cut it `[P: Patton, 2014]`: lay out the backbone of activities in the order a
+user goes through them, put the variations underneath, and draw a line across the
+whole map - everything above it is the first release, the thinnest path that
+completes the whole journey badly rather than half of it well. The steps nobody
+mentioned show up as gaps in the backbone, and the scope argument becomes "where
+does the line go" instead of "which stories". Refine one story from above the
+line properly rather than all of them shallowly, and say which one you chose and
+why.
 
 ## Anti-goals
 
@@ -398,6 +471,8 @@ when questions remain open.
 | `references/intake.md` | Phase 1 - is there enough information; verdicts, statuses, asking well |
 | `references/evidence.md` | Phase 2 - multi-repo scanning, manifests, contract detection |
 | `references/acceptance-criteria.md` | Phase 3 - example mapping, AC forms, testability |
+| `references/example-design.md` | Phase 3 - partitions, boundaries, decision tables, state transitions |
+| `references/risk-and-options.md` | Phase 4 - the premortem, risk fields, deferring on purpose |
 | `references/decomposition.md` | Phase 5 - profiles, splitting patterns, sizing, ordering |
 | `references/agent-brief.md` | Phase 6 - agent brief schema, field-by-field guidance |
 | `references/critique.md` | Phase 8 - the critic panel, blindness, findings, rubber-ducking |
@@ -439,5 +514,5 @@ All stdlib-only Python 3, no dependencies, no network.
 - `assets/examples/example-bundle.json` - a complete, validating two-repo example
 - `evals/trigger-eval.json` - queries that should and should not trigger this
   skill, in the format skill-creator's description optimiser expects
-- `evals/evals.json` - eight behavioural evals with verifiable expectations, for
+- `evals/evals.json` - ten behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

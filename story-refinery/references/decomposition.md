@@ -51,6 +51,32 @@ Anti-pattern: splitting horizontally into "backend story" and "frontend story".
 Neither is releasable; you have created a dependency pair with coordination cost
 and no earlier feedback `[F]`.
 
+### Splitting an epic: map it before you cut it
+
+SPIDR tells you *how* to cut one story. For an epic it answers the wrong
+question, because the hard part is not the cut, it is knowing which slice is
+first. Lay it out as a story map before proposing a split `[P: Patton, User Story
+Mapping, 2014]`:
+
+1. **The backbone**, left to right: the steps a user actually goes through, in
+   the order they go through them. Not features - activities.
+2. **Under each step**, the variations and details, most essential at the top.
+3. **Cut a horizontal line** across the whole map. Everything above it is the
+   first release: the thinnest path that lets someone complete the whole journey
+   badly rather than half the journey well.
+
+That line is the walking skeleton, and it is what makes the first story's value
+arguable instead of asserted. A vertical column ("everything about payment") is
+usually not a release; a thin horizontal slice through every column usually is.
+
+Two things the map gives you that a split list does not: the steps nobody
+mentioned in the ticket become visible as gaps in the backbone, and the argument
+about scope moves from "which stories" to "where the line goes", which is a
+conversation people can actually have.
+
+Refine one story from above the line properly, and say which one you chose and
+why - that is more useful than seven shallow refinements.
+
 ---
 
 ## 3. Decomposition profiles
@@ -130,6 +156,14 @@ Rules `[L]`:
 - **The root cause is a decision**, recorded with its evidence, not a sentence in
   the technical notes. "Why did this happen" and "why here" are challengeable
   claims and belong in `decisions` where someone can disagree.
+- **Get to it by asking why until the answers stop being about code** `[F: five
+  whys, Toyota]`. "The response was 500" → "the handler raised" → "the file was
+  over the limit" → "nothing validates size before the read" → "the limit lives
+  in the client and was never enforced server-side". Each step must be evidenced
+  like any other claim (`path:line`), or the chain is a story you told yourself.
+  Stop at the first cause you can actually fix and own; record the ones past it
+  as risks or follow-ups rather than widening this ticket. Two chains from the
+  same symptom is a signal that there are two bugs.
 - **Fixing the symptom is an explicit choice**, not a default. If the root cause
   is out of reach this sprint, record that as a locked decision with the reason
   and a follow-up ticket. Do not let it look like the root cause was fixed.

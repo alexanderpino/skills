@@ -151,6 +151,13 @@ validation:
     - security
     - observability
     - compatibility
+  # [script] NFR002. The subset above where prose is not an answer: a quality
+  # attribute scenario ends in a response measure, so these need a number or
+  # 'unchanged'. The others (security, compatibility, observability) are categorical.
+  measured_non_functional_keys:
+    - performance
+    - concurrency
+    - failure
   # [script] DOD001. The house Definition of Done, expressed as commands a subtask
   # must be able to run. This is what stops "done" meaning "the code looks right".
   definition_of_done:

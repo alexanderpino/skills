@@ -23,7 +23,7 @@ Score each 0-3. A dimension at 0 or 1 means say so rather than shipping quietly.
 
 | | |
 |---|---|
-| 3 | Every rule observable, binary, bounded and falsifiable today. Every rule has a boundary example. Non-functional table answered with numbers or an explicit "unchanged". |
+| 3 | Every rule observable, binary, bounded and falsifiable today. Inputs partitioned, with one example per class and one standing on every boundary. Where conditions interact, a decision table whose combinations are all covered or explicitly impossible. Non-functional answered with numbers or an explicit "unchanged". |
 | 2 | Rules testable, boundary cases thin, some NFR categories blank. |
 | 1 | Criteria restate the title in more words. |
 | 0 | Criteria specify a mechanism instead of an outcome. |
@@ -32,7 +32,7 @@ Score each 0-3. A dimension at 0 or 1 means say so rather than shipping quietly.
 
 | | |
 |---|---|
-| 3 | Every fork surfaced with options and trade-offs. Locked decisions carry a rationale someone could argue with. Deferred decisions have a timeboxed spike. Questions have named owners. |
+| 3 | Every fork surfaced with options and trade-offs. Locked decisions carry a rationale someone could argue with. Deferred decisions are held options: a timeboxed spike, what they wait for, and the event at which they expire. Risks come from a premortem and each carries a detection signal. Questions have named owners. |
 | 2 | Decisions recorded, one or two rationales thin. |
 | 1 | Decisions stated as facts, no options shown. |
 | 0 | Zero questions on a non-trivial story - the gaps were filled by assumption. |

@@ -196,7 +196,34 @@ Report the recommendation; do not unilaterally split someone's story.
 
 ---
 
-## 6. Honesty rules
+## 6. When the seam is not in the code yet
+
+`contracts` finds the seams that already exist - the OpenAPI file, the proto, the
+migration. It cannot find the seam a story is about to create, and on a change
+that spans services that is the expensive one to get wrong.
+
+When the boundary is genuinely unclear, run a short event storm before writing
+subtasks `[P: Brandolini, EventStorming]`. The cheap version, alone or with one
+other person, is enough here:
+
+1. Write the **domain events** the story causes, past tense, in time order:
+   *VAT number submitted, VAT number verified, tax calculated, order priced,
+   order confirmed*.
+2. For each, name **who or what triggers it** and **what data it carries**.
+3. Draw the line where the *carrier* changes - where an event has to cross a
+   process, a team or a deployment boundary. That crossing is the contract, and
+   it is what `evidence.contracts` should record and what orders the subtasks.
+
+The output is not a diagram to keep. It is two or three named events, each mapped
+to a repo and a file, added to the change surface with the same citation
+discipline as everything else. If a step in the sequence has no code behind it,
+you have found either the new component or a missing question - both worth more
+than the diagram.
+
+Do not run this on a single-repo story. It costs an hour and tells you what you
+already knew.
+
+## 7. Honesty rules
 
 - A `path:line` you did not read is a fabrication. Read before citing.
 - Line numbers drift. Cite a symbol name alongside the line so the anchor

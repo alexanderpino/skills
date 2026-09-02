@@ -11,10 +11,19 @@
       "_howto": "PHASE 1: run `intake.py assess --bundle bundle.json --write`, then read source_text and set heuristic:false on every dimension you confirm. Statuses: present (quote it) | missing (blocking question) | assumed (assumption + non-blocking question) | answered (answer + answered_by).",
       "kind": "feature",
       "verdict": "sufficient",
+      "domain": "complicated",
+      "domain_rationale": "PHASE 1: Cynefin. clear (known practice) | complicated (knowable, needs expertise) | complex (only knowable by probing - the output is a spike, not a plan) | chaotic (act first, refine later). Say why in one arguable sentence.",
       "dimensions": [],
       "anchors": [],
       "repos_reachable": [],
       "flags": []
+    },
+    "impact": {
+      "_howto": "PHASE 1, when the ask names a mechanism with no outcome, or whenever the goal is worth stating: goal -> actor -> impact -> deliverable. Fill it right to left if you have to, but the goal is what tells you afterwards whether this worked.",
+      "goal": "measurable, with a number and a date",
+      "actors": [],
+      "impacts": [],
+      "deliverables": []
     },
     "summary_human": "PHASE 6: why and what, within the word budget.",
     "technical_notes_human": "PHASE 6: what changes, where, what was decided. Every path cited.",
@@ -34,19 +43,33 @@
         ]
       }
     ],
+    "decision_table": {
+      "_howto": "PHASE 3, for rule-heavy stories. List the conditions and every value each can take; write one rule per combination, using \"*\" for any. Anything the system cannot reach goes in 'impossible' with a reason. validate.py enumerates the product and names what neither covers (DT001) - that is the hole an implementer would otherwise fill by guessing. Delete this block for stories that are not rule-driven.",
+      "conditions": [
+        {"id": "", "values": ["", ""]}
+      ],
+      "rules": [
+        {"when": {}, "then": "", "ac": "AC1"}
+      ],
+      "impossible": []
+    },
     "non_goals": [
       "PHASE 3: what this story is not, with follow-up ticket ids."
     ],
     "risks": [
       {
+        "_howto": "PHASE 4: from the premortem. It is three months later, this shipped and caused an incident - write the postmortem, then record each cause here. 'detection' is the alert, metric or report that tells you it is happening; a high risk without one is a risk you hear about from a customer.",
         "id": "R1",
         "desc": "",
         "mitigation": "",
-        "severity": "medium"
+        "detection": "",
+        "severity": "medium",
+        "source": "premortem"
       }
     ],
     "non_functional": {
-      "performance": "number or 'unchanged'",
+      "_howto": "PHASE 3: a quality attribute scenario ends in a response measure. performance, concurrency and failure need a number or the word 'unchanged' (NFR002); the rest may be categorical, but never blank.",
+      "performance": "e.g. checkout p95 stays under 400ms at 500 rps, or 'unchanged'",
       "concurrency": "",
       "failure": "",
       "data": "",
@@ -71,7 +94,10 @@
       ],
       "chosen": "",
       "rationale": "",
-      "status": "locked"
+      "status": "locked",
+      "_howto_deferred": "PHASE 4: when status is 'deferred', add 'waiting_for' (the information that would decide it) and 'expires' (the event or date after which deferring costs more than deciding - the last responsible moment). Real Options: an option without an expiry is not a held option, it is an unmade decision.",
+      "waiting_for": "",
+      "expires": ""
     }
   ],
   "open_questions": [

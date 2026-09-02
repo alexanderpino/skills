@@ -55,9 +55,37 @@ def fence(brief, key, cfg):
 
 # ------------------------------------------------------------------- rendering
 
+def render_decision_table(table):
+    """The table is the part of a refinement a tester reads first, so it goes in the
+    ticket as a table and not as a JSON blob."""
+    conditions = [c for c in table.get("conditions") or [] if c.get("id")]
+    rules = table.get("rules") or []
+    if not conditions or not rules:
+        return []
+    header = [c["id"] for c in conditions]
+    out = ["**Decision table**", "",
+           "| " + " | ".join(header + ["Outcome", "AC"]) + " |",
+           "|" + "|".join("---" for _ in range(len(header) + 2)) + "|"]
+    for rule in rules:
+        when = rule.get("when") or {}
+        cells = [str(when.get(cid, "*")) for cid in header]
+        out.append("| " + " | ".join(cells + [str(rule.get("then", "")),
+                                              rule.get("ac") or "—"]) + " |")
+    for imp in table.get("impossible") or []:
+        cells = [str(imp.get(cid, "*")) for cid in header]
+        out.append("| " + " | ".join(cells + ["_cannot occur_", "—"]) + " |")
+    if table.get("note"):
+        out += ["", "_%s_" % table["note"]]
+    return out + [""]
+
+
 def render_story(bundle):
     s = bundle["story"]
-    out = ["## Why / What", "", s.get("summary_human", "").strip(), "", "## Acceptance criteria", ""]
+    out = ["## Why / What", "", s.get("summary_human", "").strip(), ""]
+    goal = (s.get("impact") or {}).get("goal")
+    if goal:
+        out += ["**Goal**: %s" % goal, ""]
+    out += ["## Acceptance criteria", ""]
     for ac in s.get("acceptance_criteria") or []:
         out.append("**%s — %s**" % (ac.get("id"), ac.get("rule")))
         for ex in ac.get("examples") or []:
@@ -69,6 +97,8 @@ def render_story(bundle):
             else:
                 out.append("- %s" % ex)
         out.append("")
+    if s.get("decision_table"):
+        out += render_decision_table(s["decision_table"])
     if s.get("non_goals"):
         out += ["## Non-goals", ""] + ["- %s" % g for g in s["non_goals"]] + [""]
     out += ["## Technical notes", "", s.get("technical_notes_human", "").strip(), ""]
@@ -82,9 +112,17 @@ def render_story(bundle):
                 out.append("- %s %s → deferred to spike %s." % (d.get("id"), d.get("question"),
                                                                 d.get("spike")))
         out.append("")
+    if bundle.get("decisions"):
+        for d in bundle["decisions"]:
+            if d.get("status") == "deferred" and d.get("expires"):
+                out.append("- %s stays open until: %s. Expires %s."
+                           % (d.get("id"), d.get("waiting_for") or "?", d["expires"]))
+        out.append("")
     if s.get("risks"):
         out.append("**Risks**")
-        out += ["- %s %s → %s" % (r.get("id"), r.get("desc"), r.get("mitigation"))
+        out += ["- %s %s → %s%s" % (r.get("id"), r.get("desc"), r.get("mitigation"),
+                                    " _(detected by: %s)_" % r["detection"]
+                                    if r.get("detection") else "")
                 for r in s["risks"]]
         out.append("")
     if bundle.get("open_questions"):

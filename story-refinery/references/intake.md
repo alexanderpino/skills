@@ -137,3 +137,58 @@ either half alone.
 - **kind mismatch** - the text reads as a bug (`INT011`) but the profile is not
   `bugfix`. The bugfix profile puts the failing test first; using vertical-slice
   on a defect produces a plan with no reproduction.
+
+---
+
+## 7. Is it knowable? (Cynefin)
+
+The sufficiency gate measures whether the *information* is there. It cannot tell
+you whether the *answer* is knowable in advance, and those are different
+failures. A story can have an actor, an outcome and a trigger, pass every gate,
+and still be unrefinable because nobody yet knows what will work.
+
+Classify the problem and record it as `story.intake.domain` with a one-sentence
+rationale `[P: Snowden & Boone, "A Leader's Framework for Decision Making",
+HBR 2007]`:
+
+| Domain | What it means here | Correct output |
+|---|---|---|
+| **clear** | known practice; the team has done this exact thing | refine, briefly - do not ceremony a two-line change |
+| **complicated** | knowable, but needs expertise to work out | refine fully; this is the skill's home ground |
+| **complex** | only knowable by trying; cause and effect are visible afterwards | a probe: a spike whose output is information, not a plan (`CYN001`) |
+| **chaotic** | live incident, nothing stable to plan against | act to stabilise; refine what is left (`CYN002`) |
+
+Most backlog items are complicated. The ones that are complex usually look
+complicated - "improve the recommendation quality", "make onboarding feel
+faster", "reduce churn on the trial plan" - because the *mechanism* is
+unknowable even though the goal is clear. Decomposing one into seven confident
+subtasks is the most expensive mistake this skill can make: everything downstream
+runs correctly against an assumption nobody tested.
+
+The tell is whether you can state the acceptance criteria without guessing at
+what will work. If the honest AC is "we learn whether X moves Y", the output is a
+probe with a hypothesis and a measure, not a decomposition.
+
+## 8. Impact mapping the answer
+
+The `mechanism-only` flag catches a ticket that names a solution with no outcome,
+and stops to ask. When the answer comes back, record it as a chain rather than
+prose `[P: Adzic, Impact Mapping, 2012]`:
+
+**goal** → **actors** → **impacts** → **deliverables**
+
+- **goal** - measurable, with a number and a date. "Manual reverse-charge refunds
+  fall from around 40 a month to 0 within 30 days of the NL rollout." This is the
+  field that tells you afterwards whether it worked (`IMP002`).
+- **actors** - who has to behave differently. Include the ones who are not users:
+  finance, support, the on-call engineer.
+- **impacts** - the behaviour change in each actor that moves the goal. This is
+  the column that gets skipped, and it is where alternatives live.
+- **deliverables** - what we build to cause the impact. The least important
+  column, and the one the ticket usually arrived as.
+
+Read right to left to check the ticket: does this deliverable cause an impact
+that moves the goal? A deliverable that does not is scope, however reasonable it
+sounds. Read left to right to find cheaper options: another impact on the same
+goal is often a tenth of the work, and proposing one is the highest-value thing
+refinement can do.

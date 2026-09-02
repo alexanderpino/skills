@@ -118,6 +118,38 @@ MUTATIONS = [
     ("DOD001", mut(lambda b: b["subtasks"][1]["agent_brief"].update(
         {"done_when": [{"type": "command", "cmd": "echo hello", "expect": "exit 0"},
                        {"type": "assertion", "text": "the flag gates the new branch"}]}))),
+    # Example design: partitions, boundaries and the decision table.
+    ("AC008", mut(lambda b: b["story"]["acceptance_criteria"][1].update(
+        {"examples": [{"case": "DE business, VAT field empty", "expect": "19.00"}]}))),
+    ("AC009", mut(lambda b: b["story"]["acceptance_criteria"][0].update(
+        {"rule": "Orders above 100 EUR from a business customer are charged zero VAT.",
+         "examples": [{"case": "DE business, 150 EUR", "expect": "0.00"}]}))),
+    ("DT001", mut(lambda b: b["story"]["decision_table"].update(
+        {"rules": b["story"]["decision_table"]["rules"][:-1]}))),          # consumers uncovered
+    ("DT002", mut(lambda b: b["story"]["decision_table"]["rules"][0]["when"].update(
+        {"vat_number": "perhaps"}))),
+    ("DT003", mut(lambda b: b["story"]["decision_table"]["rules"].append(
+        {"when": {"customer": "business", "vat_number": "valid", "destination": "eu_other"},
+         "then": "destination standard rate"}))),
+    ("DT004", mut(lambda b: b["story"]["decision_table"]["conditions"].append(
+        {"id": "market", "values": ["m%d" % i for i in range(40)]}))),
+    # Cynefin: enough information is not the same as enough knowledge.
+    ("CYN001", mut(lambda b: (b["story"]["intake"].update({"domain": "complex"}),
+                              b["subtasks"].pop(0)))),                     # S0 is the spike
+    ("CYN002", mut(lambda b: b["story"]["intake"].update({"domain": "chaotic"}))),
+    ("CYN003", mut(lambda b: b["story"]["intake"].update({"domain": "tricky"}))),
+    # Impact map and premortem.
+    ("IMP001", mut(lambda b: (b["story"].pop("impact"),
+                              b["story"]["intake"]["flags"].append("mechanism-only")))),
+    ("IMP002", mut(lambda b: b["story"]["impact"].update({"goal": "fewer manual refunds"}))),
+    ("RSK001", mut(lambda b: b["story"]["risks"][0].pop("mitigation"))),
+    ("RSK002", mut(lambda b: b["story"]["risks"][1].pop("detection"))),
+    ("RSK003", mut(lambda b: b["story"].update({"risks": []}))),
+    # Real Options: a deferred decision with no expiry is an unmade decision.
+    ("DEC007", mut(lambda b: b["decisions"][1].pop("expires"))),
+    ("DEC008", mut(lambda b: b["decisions"][1].pop("waiting_for"))),
+    ("NFR002", mut(lambda b: b["story"]["non_functional"].update(
+        {"performance": "should feel snappy"}))),
     # Adversarial review: the panel, and the ways a review can be theatre.
     ("REV001", mut(lambda b: b.pop("review"))),
     ("REV001-method", mut(lambda b: b["review"].update({"method": "vibes"}))),
@@ -341,6 +373,16 @@ def suite_pipeline():
               and payload["body_rendered"].get("type") == "doc")
         gh = json.load(open(os.path.join(ws, "out_github", "payloads", "ABC-123-S1.json")))
         check("emit: github body stays markdown", isinstance(gh["body_rendered"], str))
+        with open(os.path.join(ws, "out_markdown", "preview.md"), encoding="utf-8") as fh:
+            md_preview = fh.read()
+        check("emit: the decision table reaches the ticket as a table",
+              "**Decision table**" in md_preview and "| customer | vat_number |" in md_preview)
+        check("emit: risks carry their detection signal", "_(detected by:" in md_preview)
+        check("emit: a held option shows what it waits for and when it expires",
+              "stays open until:" in md_preview and "Expires" in md_preview)
+        check("emit: the impact goal heads the ticket", "**Goal**:" in md_preview)
+        check("emit: unfixed findings are what the approver sees",
+              "These findings were not fixed" in md_preview)
 
         tiny = os.path.join(ws, "tiny.yaml")
         with open(CONFIG, encoding="utf-8") as fh:

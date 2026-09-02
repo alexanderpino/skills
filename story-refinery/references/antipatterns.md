@@ -23,6 +23,26 @@ skill, because downstream everyone trusts it.
 `open_questions` is empty on a non-trivial story. *Fix:* re-read the AC and ask
 what a tester would ask about boundaries, failure, and concurrency.
 
+**Prose combinatorics.** A rule with "and", "unless" and "except" in one
+sentence, so nobody can say how many cases it has. *Tell:* `AC008`, or examples
+that all pass through the same code path. *Fix:* it is a decision table - see
+`references/example-design.md`, which also covers partitions and boundaries.
+
+**Risks nobody would notice.** Mitigations recorded, detection blank. *Tell:*
+`RSK002`, or `story.risks` empty on a multi-repo change (`RSK003`). *Fix:* run
+the premortem in `references/risk-and-options.md`; a mitigation says you thought
+about it, a detection says you would find out.
+
+**The eternal option.** A decision parked as deferred with nothing that would
+decide it and no point at which it stops being deferrable. *Tell:* `DEC007` /
+`DEC008`. *Fix:* an option without an expiry is not held, it is unmade - and the
+first implementer to touch that code makes it silently.
+
+**Planning the unknowable.** Seven confident subtasks for a story whose mechanism
+nobody has tested. *Tell:* `CYN001`, or acceptance criteria you cannot write
+without guessing at what will work. *Fix:* the output is a probe with a
+hypothesis and a measure, and a decomposition of whatever it returns.
+
 **Decision laundering.** A hard choice appears as a statement of fact with no
 rationale, so nobody can challenge it. *Tell:* technical notes contain "we will
 use X" with no `decisions` entry. *Fix:* promote it to a decision with options

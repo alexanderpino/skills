@@ -9,6 +9,7 @@ report the specific questions, do not delete them to pass the gate.
 """
 
 import argparse
+import itertools
 import json
 import os
 import re
@@ -27,6 +28,20 @@ UNCOVERED_OK_KINDS = {"enabling", "spike", "rollout"}
 PATH_RX = re.compile(r"\b[\w.-]+(?:/[\w.-]+)+\.[A-Za-z0-9]{1,6}\b")
 DEFAULT_NFR_KEYS = ["performance", "concurrency", "failure", "data", "security",
                     "observability", "compatibility"]
+# Quality attributes where an answer without a number is not an answer. The rest
+# (security, compatibility, observability) are answered categorically.
+DEFAULT_MEASURED_NFR_KEYS = ["performance", "concurrency", "failure"]
+UNCHANGED_RX = re.compile(r"\bunchanged\b|\bongewijzigd\b|\bn\.?v\.?t\.?\b|\bnone\b|\bgeen\b", re.I)
+# Threshold language: a rule that draws a line needs an example standing on it.
+THRESHOLD_RX = re.compile(
+    r"\d|\bmore than\b|\bless than\b|\bat least\b|\bat most\b|\bexceed\w*\b|\babove\b|"
+    r"\bbelow\b|\bover\b|\bunder\b|\blimit\b|\bmaximum\b|\bminimum\b|\bolder than\b|"
+    r"\bmeer dan\b|\bminder dan\b|\bminimaal\b|\bmaximaal\b|\blimiet\b|\bboven\b|\bouder dan\b",
+    re.I)
+BOUNDARY_RX = re.compile(r"boundary|grens|edge case|randgeval", re.I)
+CYNEFIN_DOMAINS = ("clear", "complicated", "complex", "chaotic")
+# Beyond this, the table is telling you the story is too big to refine as one.
+MAX_TABLE_COMBINATIONS = 512
 
 # Every key the scripts actually read. Anything else in refinery.yaml is a typo or a
 # leftover, and is reported rather than silently ignored.
@@ -55,7 +70,7 @@ CONFIG_SPEC = {
                "min_anchors"},
     "validation": {"fail_on", "require_command_done_when", "require_coverage_matrix",
                    "vagueness_lexicon", "non_functional_keys", "definition_of_done",
-                   "require_intake"},
+                   "require_intake", "measured_non_functional_keys"},
     "validation.definition_of_done[]": {"id", "applies_to_kinds",
                                         "expect_command_matching", "severity"},
 }
@@ -131,6 +146,16 @@ def check_questions_and_decisions(b, rep):
                 rep.error("DEC006", where, "subtask %s is kind %r, not 'spike' - a deferred "
                           "decision needs a timeboxed question, not ordinary work"
                           % (spike, by_id[spike].get("kind")))
+            # Real Options [P: Maassen & Matts, Commitment, 2013]: an option has value
+            # only while it is open, and every option expires. Deferring without an
+            # expiry is not keeping your choices open, it is forgetting to choose.
+            if not d.get("expires"):
+                rep.error("DEC007", where, "deferred with no expiry - name the event or date "
+                          "after which deferring costs more than deciding, or this is not a "
+                          "held option, it is an unmade decision")
+            if not d.get("waiting_for"):
+                rep.error("DEC008", where, "deferred without naming what it is waiting for - "
+                          "an option nobody can tell has matured never gets exercised")
 
 
 def check_acceptance_criteria(b, cfg, rep):
@@ -161,6 +186,172 @@ def check_acceptance_criteria(b, cfg, rep):
         if vague:
             rep.error("AC007", where, "vague terms in an acceptance criterion: %s"
                       % ", ".join(vague))
+
+
+def check_example_coverage(b, rep):
+    """Examples are not illustrations, they are the test cases. A rule that names
+    three inputs and shows one has two branches nobody has thought about, and a rule
+    that draws a line with no example standing on it will be implemented off by one.
+    `[P: Myers, equivalence partitioning and boundary value analysis, 1979]`"""
+    lang = ((b.get("story") or {}).get("intake") or {}).get("lang")
+    connector = r"\bof\b" if lang == "nl" else r"\bor\b"
+    for ac in (b.get("story") or {}).get("acceptance_criteria") or []:
+        where = "AC %s" % ac.get("id", "?")
+        rule, examples = ac.get("rule") or "", ac.get("examples") or []
+        alternatives = len(re.findall(connector, rule, re.I)) + 1
+        if alternatives > 1 and len(examples) < alternatives:
+            rep.warn("AC008", where, "the rule names %d alternatives but carries %d "
+                     "example(s) - partition the inputs and show one per class"
+                     % (alternatives, len(examples)))
+        if THRESHOLD_RX.search(rule) and not any(
+                BOUNDARY_RX.search(str(e.get("case", ""))) for e in examples):
+            rep.warn("AC009", where, "the rule draws a line but no example stands on it - "
+                     "add the value exactly at the threshold, or it will be implemented "
+                     "off by one")
+
+
+def check_decision_table(b, rep):
+    """A decision table is the only form that can be proved complete: every
+    combination of conditions is a rule, an impossibility, or a hole `[F]`."""
+    table = (b.get("story") or {}).get("decision_table")
+    if not table:
+        return
+    conditions = table.get("conditions") or []
+    if not conditions:
+        rep.error("DT002", "story.decision_table", "table with no conditions")
+        return
+    values = {}
+    for cond in conditions:
+        cid, vals = cond.get("id"), cond.get("values") or []
+        if not cid or not vals:
+            rep.error("DT002", "story.decision_table",
+                      "condition %r has no id or no values" % cid)
+            continue
+        values[cid] = [str(v) for v in vals]
+    if not values:
+        return
+
+    ac_ids = {a.get("id") for a in (b.get("story") or {}).get("acceptance_criteria") or []}
+    rules = table.get("rules") or []
+    for i, rule in enumerate(rules):
+        where = "story.decision_table.rules[%d]" % i
+        for cid, val in (rule.get("when") or {}).items():
+            if cid not in values:
+                rep.error("DT002", where, "unknown condition %r" % cid)
+            elif str(val) != "*" and str(val) not in values[cid]:
+                rep.error("DT002", where, "condition %r has no value %r (known: %s)"
+                          % (cid, val, ", ".join(values[cid])))
+        if not rule.get("then"):
+            rep.error("DT002", where, "rule has no outcome")
+        if rule.get("ac") and rule["ac"] not in ac_ids:
+            rep.error("DT002", where, "cites unknown criterion %r" % rule["ac"])
+
+    total = 1
+    for vals in values.values():
+        total *= len(vals)
+    if total > MAX_TABLE_COMBINATIONS:
+        rep.warn("DT004", "story.decision_table", "%d combinations - a table this wide is "
+                 "a story that should be split, not a story that should be refined" % total)
+        return
+
+    def matches(spec, combo):
+        for cid, val in (spec or {}).items():
+            if str(val) == "*":
+                continue
+            if combo.get(cid) != str(val):
+                return False
+        return True
+
+    ordered = sorted(values)
+    uncovered = []
+    for point in itertools.product(*(values[c] for c in ordered)):
+        combo = dict(zip(ordered, point))
+        hits = [r for r in rules if matches(r.get("when"), combo)]
+        if not hits:
+            if not any(matches(imp, combo) for imp in table.get("impossible") or []):
+                uncovered.append(combo)
+            continue
+        outcomes = {str(r.get("then")) for r in hits}
+        if len(outcomes) > 1:
+            rep.error("DT003", "story.decision_table",
+                      "%s matches %d rules with different outcomes - the table contradicts "
+                      "itself" % (", ".join("%s=%s" % kv for kv in sorted(combo.items())),
+                                  len(hits)))
+    for combo in uncovered[:5]:
+        rep.error("DT001", "story.decision_table",
+                  "no rule and no impossibility for %s - a branch nobody wrote is a branch "
+                  "nobody implements" % ", ".join("%s=%s" % kv for kv in sorted(combo.items())))
+    if len(uncovered) > 5:
+        rep.error("DT001", "story.decision_table",
+                  "%d further uncovered combinations" % (len(uncovered) - 5))
+
+
+def check_risks(b, rep):
+    """A premortem that produced no risks was not a premortem `[P: Klein, 2007]`.
+    A risk you cannot detect is a risk you will hear about from a customer."""
+    risks = (b.get("story") or {}).get("risks") or []
+    subs = b.get("subtasks") or []
+    exposed = ((b.get("blast_radius") or {}).get("repos") or 0) > 1 or \
+        any(s.get("kind") in ("rollout", "migration") for s in subs)
+    if not risks and exposed and subs:
+        rep.warn("RSK003", "story.risks", "no risks recorded on a change that crosses repos "
+                 "or ships behind a rollout - run the premortem: it is three months later "
+                 "and this caused an incident, write the postmortem")
+    for r in risks:
+        where = "risk %s" % r.get("id", "?")
+        if not r.get("mitigation"):
+            rep.error("RSK001", where, "risk with no mitigation - it is a worry, not a plan")
+        if str(r.get("severity", "")).lower() == "high" and not r.get("detection"):
+            rep.warn("RSK002", where, "high risk with no detection signal - name the alert, "
+                     "metric or report that tells you it is happening")
+
+
+def check_domain(b, rep):
+    """Cynefin `[P: Snowden & Boone, 2007]`. Enough information is not the same as
+    enough knowledge: in a complex domain the honest output is a probe, not a plan."""
+    intake = (b.get("story") or {}).get("intake") or {}
+    if not intake:
+        return
+    domain = intake.get("domain")
+    subs = b.get("subtasks") or []
+    if domain is None:
+        if subs:
+            rep.warn("CYN003", "story.intake.domain", "nobody said whether this problem is "
+                     "knowable up front - classify it %s" % " | ".join(CYNEFIN_DOMAINS))
+        return
+    if domain not in CYNEFIN_DOMAINS:
+        rep.error("CYN003", "story.intake.domain", "domain must be %s, got %r"
+                  % (" | ".join(CYNEFIN_DOMAINS), domain))
+        return
+    if domain == "complex" and subs and not any(s.get("kind") == "spike" for s in subs):
+        rep.error("CYN001", "story.intake.domain", "domain is 'complex' and the bundle plans "
+                  "%d subtask(s) with no spike - in a complex domain the answer is not "
+                  "knowable in advance; probe first and decompose what the probe returns"
+                  % len(subs))
+    if domain == "chaotic" and subs:
+        rep.warn("CYN002", "story.intake.domain", "domain is 'chaotic' - refinement is the "
+                 "wrong instrument; act to stabilise, then refine what is left")
+
+
+def check_impact(b, rep):
+    """The intake gate catches a mechanism with no outcome. This is the other half:
+    once someone answers, the answer is recorded as a chain, not as prose
+    `[P: Adzic, Impact Mapping, 2012]`."""
+    intake = (b.get("story") or {}).get("intake") or {}
+    flags = [str(f) for f in intake.get("flags") or []]
+    impact = (b.get("story") or {}).get("impact")
+    if any("mechanism" in f for f in flags) and not impact:
+        rep.warn("IMP001", "story.impact", "intake flagged this as a mechanism with no stated "
+                 "outcome - record goal, actor, impact and deliverable so the mechanism can "
+                 "be argued with")
+    if not impact:
+        return
+    if not (impact.get("goal") or "").strip():
+        rep.error("IMP002", "story.impact", "no goal - an impact map without a measurable "
+                  "goal is a feature list")
+    if not THRESHOLD_RX.search(impact.get("goal") or ""):
+        rep.warn("IMP002", "story.impact", "the goal carries no number - 'fewer manual "
+                 "refunds' cannot tell you afterwards whether this worked")
 
 
 def check_budgets(b, cfg, rep):
@@ -485,6 +676,19 @@ def check_nonfunctional(b, cfg, rep):
     if missing:
         rep.warn("NFR001", "story.non_functional",
                  "unaddressed: %s (write 'unchanged' if that is the answer)" % ", ".join(missing))
+    # A quality attribute scenario ends in a response measure [P: Bass, Clements &
+    # Kazman]. For the attributes that are measurable, prose is not an answer.
+    measured = get(cfg, "validation.measured_non_functional_keys",
+                   DEFAULT_MEASURED_NFR_KEYS) or DEFAULT_MEASURED_NFR_KEYS
+    for key in measured:
+        answer = nf.get(key)
+        text = answer if isinstance(answer, str) else json.dumps(answer or "")
+        if not answer:
+            continue
+        if not re.search(r"\d", text) and not UNCHANGED_RX.search(text):
+            rep.warn("NFR002", "story.non_functional.%s" % key,
+                     "answered without a measure - give the stimulus and the number it must "
+                     "stay under, or say 'unchanged'")
 
 
 def check_definition_of_done(cfg, subs, rep):
@@ -720,6 +924,11 @@ def validate(bundle, cfg):
     check_intake(bundle, cfg, rep)
     check_questions_and_decisions(bundle, rep)
     check_acceptance_criteria(bundle, cfg, rep)
+    check_example_coverage(bundle, rep)
+    check_decision_table(bundle, rep)
+    check_domain(bundle, rep)
+    check_impact(bundle, rep)
+    check_risks(bundle, rep)
     check_budgets(bundle, cfg, rep)
     check_evidence(bundle, rep)
     subs, _ = check_subtasks(bundle, cfg, rep)

@@ -42,6 +42,8 @@
         "summary_human": {"type": "string", "description": "Why and what. Word-budgeted."},
         "technical_notes_human": {"type": "string", "description": "What changes, where, what was decided. Every path cited."},
         "acceptance_criteria": {"type": "array", "items": {"$ref": "#/$defs/criterion"}},
+        "decision_table": {"$ref": "#/$defs/decision_table"},
+        "impact": {"$ref": "#/$defs/impact"},
         "non_goals": {"type": "array", "items": {"type": "string"}},
         "risks": {"type": "array", "items": {"$ref": "#/$defs/risk"}},
         "non_functional": {
@@ -76,8 +78,49 @@
       "type": "object", "required": ["id", "desc", "mitigation"],
       "properties": {
         "id": {"type": "string"}, "desc": {"type": "string"},
-        "mitigation": {"type": "string"},
-        "severity": {"enum": ["low", "medium", "high"]}
+        "mitigation": {"type": "string", "description": "What reduces it. A risk without one is a worry (RSK001)."},
+        "detection": {"type": "string", "description": "The alert, metric or report that tells you it is happening. Required in practice for high severity (RSK002) - otherwise you hear it from a customer."},
+        "severity": {"enum": ["low", "medium", "high"]},
+        "source": {"type": "string", "description": "Where the risk came from, e.g. premortem, critic finding F3, incident history."}
+      }
+    },
+    "decision_table": {
+      "type": "object",
+      "description": "Phase 3. The only form of criteria that can be proved complete: every combination of condition values is a rule, an impossibility, or a hole validate.py names (DT001).",
+      "required": ["conditions", "rules"],
+      "properties": {
+        "conditions": {
+          "type": "array",
+          "items": {"type": "object", "required": ["id", "values"],
+                    "properties": {"id": {"type": "string"},
+                                   "values": {"type": "array", "items": {"type": "string"}, "minItems": 2}}}
+        },
+        "rules": {
+          "type": "array",
+          "items": {"type": "object", "required": ["when", "then"],
+                    "properties": {
+                      "when": {"type": "object", "description": "condition id -> value, or \"*\" for any.",
+                               "additionalProperties": {"type": "string"}},
+                      "then": {"type": "string", "description": "The expected outcome for this combination."},
+                      "ac": {"type": "string", "description": "Criterion this row belongs to."}}}
+        },
+        "impossible": {
+          "type": "array",
+          "description": "Combinations that cannot occur. Same shape as a rule's 'when'. Use it rather than inventing an outcome for a state the system cannot reach.",
+          "items": {"type": "object", "additionalProperties": {"type": "string"}}
+        },
+        "note": {"type": "string"}
+      }
+    },
+    "impact": {
+      "type": "object",
+      "description": "Phase 1. Goal -> actor -> impact -> deliverable [P: Adzic, Impact Mapping, 2012]. The answer to a ticket that named a mechanism without an outcome, recorded as a chain rather than prose.",
+      "required": ["goal"],
+      "properties": {
+        "goal": {"type": "string", "description": "Measurable, with a number and a date (IMP002). It is what tells you afterwards whether this worked."},
+        "actors": {"type": "array", "items": {"type": "string"}},
+        "impacts": {"type": "array", "items": {"type": "string"}, "description": "The behaviour change in each actor that moves the goal."},
+        "deliverables": {"type": "array", "items": {"type": "string"}, "description": "What we build to cause the impact. The least important column, and the one tickets usually start from."}
       }
     },
     "decision": {
@@ -95,7 +138,9 @@
         "rationale": {"type": "string"},
         "rationale_source": {"type": "string"},
         "status": {"enum": ["locked", "deferred"]},
-        "spike": {"type": "string", "description": "Subtask id. Required when status is deferred."}
+        "spike": {"type": "string", "description": "Subtask id. Required when status is deferred."},
+        "waiting_for": {"type": "string", "description": "deferred: the information that would decide this. An option nobody can tell has matured never gets exercised (DEC008)."},
+        "expires": {"type": "string", "description": "deferred: the event or date after which deferring costs more than deciding - the last responsible moment [P: Maassen & Matts, Commitment, 2013]. Required (DEC007): an option without an expiry is not a held option, it is an unmade decision."}
       }
     },
     "question": {
@@ -115,6 +160,9 @@
         "kind": {"enum": ["feature", "bug"]},
         "lang": {"type": "string"},
         "verdict": {"enum": ["sufficient", "scoutable", "insufficient"]},
+        "domain": {"enum": ["clear", "complicated", "complex", "chaotic"],
+                   "description": "Cynefin [P: Snowden & Boone, 2007]. Enough information is not enough knowledge: in a complex domain the honest output is a probe, not a plan (CYN001)."},
+        "domain_rationale": {"type": "string", "description": "Why that domain. One sentence, arguable."},
         "dimensions": {
           "type": "array",
           "items": {

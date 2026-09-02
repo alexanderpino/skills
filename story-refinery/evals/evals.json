@@ -94,6 +94,32 @@
         "The failing test comes first, per the bugfix profile",
         "No claim that the story was independently reviewed"
       ]
+    },
+    {
+      "id": 9,
+      "prompt": "Refine ABC-770: 'discount codes should apply to the basket'. There are percentage codes, fixed-amount codes and free-shipping codes; some stack, some do not; some have a minimum order value and some expire. Repos: ../api and ../web.",
+      "expected_output": "A refinement whose criteria are backed by a complete decision table, with the combinations nobody mentioned surfaced as questions rather than filled in.",
+      "expectations": [
+        "The interacting conditions were tabulated rather than described in prose",
+        "story.decision_table lists every value each condition can take, and validate.py reports no uncovered combination",
+        "Combinations that cannot occur are in 'impossible' with a reason, not silently absent",
+        "At least one combination nobody had considered became an open question or a locked decision, not an invented outcome",
+        "Each criterion with a threshold (minimum order value, expiry) has an example standing exactly on the boundary",
+        "The table reaches the rendered ticket as a table, not as JSON"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Refine ABC-812: 'move session storage from Redis to Postgres'. One repo (../api), and we are not sure yet whether we keep a read-through cache.",
+      "expected_output": "A refinement that treats the cache question as a held option with an expiry, and whose risks come from a premortem with detection signals.",
+      "expectations": [
+        "The cache fork is a decision, not a sentence in the technical notes",
+        "Deferring it records what it is waiting for and the event at which it expires, and the spike is ordered before that event",
+        "A premortem was run after the evidence phase and its causes are in story.risks",
+        "Every risk carries a mitigation, and every high risk names the signal that would reveal it",
+        "The migration's non-functional answers carry numbers rather than prose",
+        "Nothing was locked by assumption to avoid leaving a decision open"
+      ]
     }
   ]
 }

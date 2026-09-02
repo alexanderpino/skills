@@ -7,6 +7,19 @@
     "title": "Apply EU reverse-charge VAT at checkout",
     "source_text": "As a B2B customer in the EU I don't want to be charged Dutch VAT. Finance keeps refunding these manually.",
     "summary_human": "EU business customers with a valid VAT number registered outside the Netherlands are charged Dutch VAT they do not owe, and Finance refunds it by hand — around 40 orders a month. This story applies the EU reverse-charge rule at checkout: qualifying orders are charged zero VAT with a reason code, and the order summary explains why. Domestic orders and consumer orders keep their current behaviour. Rollout is behind a flag, Netherlands market first.",
+    "impact": {
+      "goal": "Manual reverse-charge refunds fall from around 40 a month to 0 within 30 days of the NL rollout",
+      "actors": ["EU business customers at checkout", "Finance, who issues the refunds today"],
+      "impacts": [
+        "Business customers are charged correctly the first time, so they stop asking for a refund",
+        "Finance stops reconciling manual corrections for qualifying orders"
+      ],
+      "deliverables": [
+        "Reverse-charge branch in the rate calculation",
+        "A tax object on the order response carrying the reason",
+        "A reverse-charge line in the order summary"
+      ]
+    },
     "acceptance_criteria": [
       {
         "id": "AC1",
@@ -42,6 +55,29 @@
         ]
       }
     ],
+    "decision_table": {
+      "conditions": [
+        {"id": "customer", "values": ["business", "consumer"]},
+        {"id": "vat_number", "values": ["valid", "invalid", "absent", "unverifiable"]},
+        {"id": "destination", "values": ["nl", "eu_other"]}
+      ],
+      "rules": [
+        {"when": {"customer": "business", "vat_number": "valid", "destination": "eu_other"},
+         "then": "zero VAT, reason reverse-charge", "ac": "AC1"},
+        {"when": {"customer": "business", "vat_number": "valid", "destination": "nl"},
+         "then": "NL standard rate, reason domestic — a Dutch business buying in NL owes Dutch VAT"},
+        {"when": {"customer": "business", "vat_number": "invalid", "destination": "*"},
+         "then": "destination standard rate, reason standard-rate", "ac": "AC2"},
+        {"when": {"customer": "business", "vat_number": "absent", "destination": "*"},
+         "then": "destination standard rate, reason standard-rate", "ac": "AC2"},
+        {"when": {"customer": "business", "vat_number": "unverifiable", "destination": "*"},
+         "then": "destination standard rate, reason standard-rate, VIES fallback counter incremented", "ac": "AC2"},
+        {"when": {"customer": "consumer", "vat_number": "*", "destination": "*"},
+         "then": "destination standard rate, reason standard-rate — unchanged from today"}
+      ],
+      "impossible": [],
+      "note": "Non-EU destinations are a non-goal (ABC-131), so they are not a column value. Adding them re-opens this table rather than adding a branch to the code."
+    },
     "non_goals": [
       "Non-EU B2B orders — follow-up ABC-131",
       "Recalculating VAT on orders placed before this ships",
@@ -50,14 +86,17 @@
     ],
     "technical_notes_human": "`TaxCalculator.rate_for` in api/src/billing/tax.py:88 already resolves rates from the rate table; the reverse-charge branch belongs there. VAT validation landed last sprint in api/src/billing/vat.py:12 and is reused unchanged. The order response is assembled in api/src/api/orders/serializers.py:31 — the new tax object is additive, so web@1.4 keeps working through the deploy window. api/openapi.yaml is edited by S2 only. Money is Decimal throughout (api/src/billing/money.py:17); no floats. Web reads the serialized response and renders in web/src/features/orders/OrderSummary.tsx:64. Flag billing.reverse_charge defaults off; S6 enables it for NL after a week of monitoring zero-VAT order volume.",
     "risks": [
-      {"id": "R1", "desc": "VIES availability is outside our control and it does go down", "mitigation": "3s timeout, fall back to standard rate, log and alert on fallback volume", "severity": "medium"},
-      {"id": "R2", "desc": "Charging zero VAT to a customer who does not qualify is a tax exposure", "mitigation": "flag off by default, NL-only first week, Finance reconciles the first 50 zero-VAT orders", "severity": "high"}
+      {"id": "R1", "desc": "VIES availability is outside our control and it does go down", "mitigation": "3s timeout, fall back to standard rate, log and alert on fallback volume", "detection": "alert on billing.tax.vies_fallback_rate above 5% over 15 minutes", "severity": "medium", "source": "premortem"},
+      {"id": "R2", "desc": "Charging zero VAT to a customer who does not qualify is a tax exposure", "mitigation": "flag off by default, NL-only first week, Finance reconciles the first 50 zero-VAT orders", "detection": "daily zero-VAT order count per market, reviewed by Finance for the first week; a jump outside NL means the flag leaked", "severity": "high", "source": "premortem"},
+      {"id": "R3", "desc": "A revoked VAT number stays valid for the length of the cache window, so we keep zero-rating a customer who no longer qualifies", "mitigation": "the TTL is D2's open decision; S0 must price this exposure before a value is chosen", "detection": "monthly reconciliation against VIES for every VAT number that zero-rated an order", "severity": "medium", "source": "premortem"}
     ],
     "intake": {
       "assessed_at": "2026-09-01T14:20:00Z",
       "kind": "feature",
       "lang": "en",
       "verdict": "sufficient",
+      "domain": "complicated",
+      "domain_rationale": "The EU reverse-charge rule is written down and Finance knows it. Expertise is needed to apply it, but there is a right answer and it is knowable before we build — complicated, not complex. The one genuinely unknowable part, the cache TTL, is D2 and gets a probe.",
       "dimensions": [
         {
           "id": "actor",
@@ -141,7 +180,9 @@
       "chosen": "",
       "rationale": "",
       "status": "deferred",
-      "spike": "S0"
+      "spike": "S0",
+      "waiting_for": "S0's measurement of VIES latency and revocation frequency against a week of real order volume",
+      "expires": "before S1 merges — the branch reads the cache, so shipping it forces a default TTL whether or not anyone chose one"
     }
   ],
   "open_questions": [
@@ -526,7 +567,7 @@
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:148fa7bd67117344c4ff96a0d0e8c72543dcf2966ec20b024559fe59390e0ec1",
+    "bundle_digest": "sha256:4176e317064ef321d48aacb5a6e319f2a2c0c7072261edcea500b2f89cdf56d9",
     "critics": [
       {"id": "implementer", "context": "fresh"},
       {"id": "tester", "context": "fresh"},
@@ -576,6 +617,16 @@
         "failure": "Enabling billing.reverse_charge for NL without S4 shows business customers a zero-VAT total with no explanation of why — the support load this story exists to remove.",
         "status": "fixed",
         "resolution": "S6 now depends on S4, which transitively orders it behind S1 and S2."
+      },
+      {
+        "id": "F6",
+        "critic": "tester",
+        "severity": "major",
+        "locator": "story.decision_table",
+        "claim": "The criteria described four VAT-number states and two customer types in prose, so nobody could tell whether every combination had an expected outcome.",
+        "failure": "A consumer with an unverifiable VAT number is a combination no criterion mentions; the implementer picks a behaviour, and whichever they pick, no test disagrees with them.",
+        "status": "fixed",
+        "resolution": "Added story.decision_table. All 16 combinations are now covered by a rule, and DT001 fails the bundle if a future edit opens a hole."
       },
       {
         "id": "F5",
