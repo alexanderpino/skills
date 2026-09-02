@@ -54,7 +54,12 @@ def key_of(bundle):
 def writes_of(bundle):
     """(repo, path) -> [subtask ids], for files this story's subtasks will write."""
     owned = {}
+    done = (((bundle.get("story") or {}).get("progress") or {}).get("subtasks") or {})
     for st in bundle.get("subtasks") or []:
+        # A subtask that has landed no longer writes anything: two stories sharing a file
+        # across a boundary that implementation already crossed is not a collision.
+        if done.get(st.get("id")) == "done":
+            continue
         for entry in (st.get("agent_brief") or {}).get("change_surface") or []:
             if entry.get("role") in ("create", "modify", "delete"):
                 owned.setdefault((st.get("repo"), entry.get("path")), []).append(st.get("id"))

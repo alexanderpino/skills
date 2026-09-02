@@ -47,7 +47,9 @@ INTAKE_KINDS = tuple(DEFAULT_REQUIRED_DIMENSIONS)
 # putting the failing test first, or a research item with a delivery profile, is
 # refining the wrong shape of work.
 PROFILE_FOR_KIND = {"bug": "bugfix", "spike": "research"}
-PATH_RX = re.compile(r"\b[\w.-]+(?:/[\w.-]+)+\.[A-Za-z0-9]{1,6}\b")
+# A leading dot is part of the path: `.github/workflows/x.yml` cited in the notes must
+# compare equal to the same path in the change surface, not to `github/...`.
+PATH_RX = re.compile(r"(?<![\w/])\.?[\w.-]+(?:/[\w.-]+)+\.[A-Za-z0-9]{1,6}\b")
 DEFAULT_NFR_KEYS = ["performance", "concurrency", "failure", "data", "security",
                     "observability", "compatibility"]
 # Quality attributes where an answer without a number is not an answer. The rest
@@ -844,7 +846,10 @@ def _check_brief(s, where, max_files, require_cmd, rep, max_reading=12):
         rep.warn("BRF014", where, "no 'stop_and_ask' - 'forbidden' says what not to touch, "
                  "this says when not to decide; without it an agent that finds reality "
                  "different from the brief improvises")
-    blob = json.dumps(brief)
+    # Commands are allowed to name code - `grep -n '^def check('` is a preflight, not an
+    # implementation - so only the prose fields are read for the smell.
+    prose = {k: v for k, v in brief.items() if k not in ("preflight", "done_when")}
+    blob = json.dumps(prose)
     if "```" in blob or re.search(r"\bdef \w+\(|\bfunction \w+\(|=>\s*\{", blob):
         rep.warn("BRF012", where,
                  "agent_brief looks like it contains implementation - refinement stops at the seam")

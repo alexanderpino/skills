@@ -231,6 +231,14 @@
       "flags": [],
       "domain": "complicated",
       "domain_rationale": "Every fact needed is in two files and the selftest; it takes reading, not probing. Nothing here is knowable only by trying."
+    },
+    "progress": {
+      "subtasks": {
+        "S1": "done",
+        "S2": "done"
+      },
+      "updated_at": "2026-09-02T18:21:51+00:00",
+      "source": "implemented in 6eb0a28"
     }
   },
   "decisions": [

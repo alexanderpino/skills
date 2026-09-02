@@ -1243,6 +1243,66 @@ def suite_story_shapes():
     check("re-assess: no duplicate questions for dimensions already asked about",
           len(again["open_questions"]) == len(golden["open_questions"]))
 
+    # Four defects the second self-run (SKL-2) surfaced, each pinned here.
+    from validate import PATH_RX, check_evidence
+    check("paths: a leading dot is part of a cited path",
+          PATH_RX.search("see `.github/workflows/ci.yml` for the shape").group(0)
+          == ".github/workflows/ci.yml")
+    import review as R
+    stamped = copy.deepcopy(golden)
+    before = R.content_digest(stamped)
+    stamped["story"]["progress"] = {"subtasks": {"S0": "done"}, "updated_at": "x", "source": "standup"}
+    check("review: recording progress does not invalidate the stamp",
+          R.content_digest(stamped) == before)
+    import batch as Bt
+    landed = copy.deepcopy(golden)
+    landed["story"]["progress"] = {"subtasks": {s["id"]: "done" for s in landed["subtasks"]}}
+    check("batch: a story whose subtasks have landed writes nothing", not Bt.writes_of(landed))
+    check("batch: an unlanded story still claims its files", bool(Bt.writes_of(golden)))
+    cmd = copy.deepcopy(golden)
+    cmd["subtasks"][1]["agent_brief"]["preflight"].append(
+        {"type": "command", "cmd": "grep -n '^def check(' scripts/selftest.py", "expect": "one hit"})
+    rep = Report()
+    from validate import check_subtasks as _cs
+    _cs(cmd, cfg, rep)
+    check("briefs: a command that greps for a def is not implementation",
+          ("BRF012", "subtask S1") not in {(i["code"], i["where"]) for i in rep.items})
+
+
+def suite_manifest_cwd():
+    """SKL-2, S1: the reproduction. A CI command lifted out of its working directory
+    is presented as the repo's; these fail on the unfixed scanner by design."""
+    print("\n-- 11b. manifest working directory (SKL-2) --")
+    import tempfile
+    import evidence as E
+
+    def repo_with(workflow):
+        d = tempfile.mkdtemp()
+        os.makedirs(os.path.join(d, ".github", "workflows"))
+        with open(os.path.join(d, ".github", "workflows", "ci.yml"), "w", encoding="utf-8") as fh:
+            fh.write(workflow)
+        return d, [".github/workflows/ci.yml"]
+
+    d, files = repo_with("name: ci\ndefaults:\n  run:\n    working-directory: pkg\njobs:\n"
+                         "  t:\n    steps:\n      - run: python -m pytest tests/ -q\n")
+    cmds, sources = E.detect_commands(d, files)
+    check("manifest: workflow default cwd", cmds.get("test") == "cd pkg && python -m pytest tests/ -q",
+          cmds.get("test"))
+    d, files = repo_with("name: ci\ndefaults:\n  run:\n    working-directory: pkg-a\njobs:\n"
+                         "  t:\n    steps:\n      - working-directory: pkg-b\n"
+                         "        run: python -m pytest tests/ -q\n")
+    cmds, _ = E.detect_commands(d, files)
+    check("manifest: step cwd overrides", cmds.get("test") == "cd pkg-b && python -m pytest tests/ -q",
+          cmds.get("test"))
+    d, files = repo_with("name: ci\njobs:\n  t:\n    steps:\n      - run: python -m pytest -q\n")
+    cmds, _ = E.detect_commands(d, files)
+    check("manifest: no working directory leaves the command alone",
+          cmds.get("test") == "python -m pytest -q", cmds.get("test"))
+    line = getattr(E, "manifest_line", None)
+    text = line({"name": "x", "sha": "abc1234", "commands": {"test": "cd pkg && pytest -q"},
+                 "command_sources": {"test": ".github/workflows/ci.yml"}}) if line else ""
+    check("manifest: summary names the source", "(.github/workflows/ci.yml)" in text, text)
+
 
 def suite_summary():
     """The artefact people actually talk from. It has to work before the bundle is
@@ -1556,6 +1616,7 @@ def main():
     suite_declutter()
     suite_research()
     suite_story_shapes()
+    suite_manifest_cwd()
     suite_summary()
     suite_roundtrip()
     suite_batch()

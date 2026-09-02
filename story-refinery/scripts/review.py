@@ -248,6 +248,10 @@ def content_digest(bundle):
     """Hash of everything the review is about. Canonical JSON, so key order and
     whitespace cannot change it - only content can."""
     body = {k: v for k, v in bundle.items() if k not in DIGEST_EXCLUDE}
+    # What has landed is bookkeeping about the plan, not the plan: recording that S1 is
+    # done must not turn the review of the plan into a review of an earlier draft.
+    if isinstance(body.get("story"), dict) and "progress" in body["story"]:
+        body["story"] = {k: v for k, v in body["story"].items() if k != "progress"}
     blob = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return "sha256:" + hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
