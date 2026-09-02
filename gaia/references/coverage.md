@@ -80,6 +80,6 @@ and that sentence is what stops the same topic being proposed every six months.
 
 ## Architecture
 
-- **node-graph-runtime** `planned` — How is a node graph executed, cached, invalidated and kept resolution-independent? The core architecture of a Gaea/World-Machine-class tool.
+- **node-graph-runtime** `covered` — How is a node graph executed, cached, invalidated and kept resolution-independent? → node-graph-runtime.md
 - **verification-failures** `planned` — What does each characteristic failure look like, and what is the minimal fix? One catalogue across all three axes.
 - **output-contracts** `planned` — What does a terrain pipeline hand downstream, and what contract stops a heightfield meaning different things in two places?
