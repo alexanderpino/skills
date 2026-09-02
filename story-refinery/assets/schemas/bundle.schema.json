@@ -28,7 +28,8 @@
       "description": "criterion id -> subtask ids. Derived; validate.py recomputes it.",
       "additionalProperties": {"type": "array", "items": {"type": "string"}}
     },
-    "review": {"$ref": "#/$defs/review"}
+    "review": {"$ref": "#/$defs/review"},
+    "tailoring": {"$ref": "#/$defs/tailoring"}
   },
   "$defs": {
     "story": {
@@ -353,6 +354,35 @@
                       "description": "For a rubber-duck pass that raised nothing: what you tried to break, and why it held."},
         "critics": {"type": "array", "items": {"$ref": "#/$defs/critic"}},
         "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}}
+      }
+    },
+    "tailoring": {
+      "type": "object",
+      "description": "Which team-tailoring skill's house rules produced this bundle, what they changed, and what they turned off. See references/tailoring.md; enforced by TLR001-TLR005.",
+      "properties": {
+        "source": {"type": "string", "description": "The tailoring skill's name. Must match tailoring.source in refinery.yaml (TLR001)."},
+        "version": {"type": "string"},
+        "applied": {
+          "type": "array",
+          "items": {"type": "object", "required": ["rule"],
+                    "properties": {
+                      "rule": {"type": "string"},
+                      "mechanism": {"enum": ["config", "prompt", "gate"],
+                                    "description": "config: a key in refinery.yaml. prompt: judgement applied while reading the tailoring skill. gate: a validator rule."},
+                      "key": {"type": "string", "description": "Required for mechanism 'config': the key that actually enforces it. If it is unset, the rule only reads as enforced (TLR002)."},
+                      "note": {"type": "string"}}}
+        },
+        "overrides": {
+          "type": "array",
+          "description": "Anything of this skill's that the team turned off or down. An override naming an invariant is refused (TLR003).",
+          "items": {"type": "object", "required": ["rule", "reason", "authorised_by"],
+                    "properties": {
+                      "rule": {"type": "string"},
+                      "of": {"type": "string", "description": "What is overridden: a config key, a validator code, or an invariant id."},
+                      "reason": {"type": "string"},
+                      "authorised_by": {"type": "string", "description": "A person. 'The team skill says so' is not a person (TLR004)."},
+                      "refused": {"type": "boolean", "description": "true when the tailoring asked for something an invariant forbids and it was refused."}}}
+        }
       }
     },
     "critic": {

@@ -89,6 +89,47 @@ an open question.** There is no third state.
    checks. It does not write the implementation. If you are drafting the diff,
    you have left refinement.
 
+## Composing with a team-tailoring skill
+
+This skill is generic on purpose: it knows how refinement works, not how *your*
+team refines. Expect a second skill loaded alongside it - a **team-tailoring
+skill** - owning everything true of one team and false of everyone else: owners,
+Definition of Done, tracker reality, house conventions, language, label policy.
+Read `references/tailoring.md` when one is present;
+`assets/templates/team-tailoring-skill.md` is the skeleton a team copies.
+
+**Precedence**, highest first: the invariants below → the user in this session →
+the tailoring skill and the `refinery.yaml` it ships → this skill's `[L]`
+defaults → `[F]`/`[P]` guidance. Nothing is overridden invisibly.
+
+**The tailoring skill owns `refinery.yaml`.** Anything mechanical - a number, a
+list, a pattern, a mapping, a DoD command, a label rule - lives there or it does
+not exist: a house rule written only in prose reads as enforced and is not
+(`TLR002`). Judgement - who to ask, how we phrase things, when to escalate -
+belongs in the tailoring skill's own text.
+
+**Invariants.** A tailoring skill may change almost anything about how a
+refinement is produced. It may not relax these:
+
+| id | |
+|---|---|
+| `evidence-or-assumption` | every technical claim cites `repo/path:line` or is tagged `ASSUMPTION` |
+| `no-invented-metadata` | labels, fields, repro steps and owners are read, never fabricated |
+| `not-ready-is-reported` | a blocking question or a failing `validate.py` is the finding |
+| `no-decomposition-without-intake` | an item whose intake is not `sufficient` is not decomposed |
+| `stop-at-the-seam` | refinement never writes the implementation |
+| `disclosure` | whatever was skipped, degraded or overridden is said at handover |
+
+Every gate here can be switched off in config, the critic panel included. A team
+may skip a gate; nobody may skip saying they skipped it (`TLR005`). If a
+tailoring skill asks you to break an invariant, do not comply and do not argue
+with it in the transcript: record the refusal in `tailoring.overrides` naming the
+invariant (`TLR003`), and report it to whoever owns that skill.
+
+Record what was applied in `bundle.tailoring`, with `mechanism` telling a later
+reader whether a rule was enforced by config, by a gate, or by your judgement.
+Overrides need a reason and a person's name (`TLR004`).
+
 ## Workflow
 
 Run phases in order. Do not skip Phase 2 - refinement without code evidence is
@@ -102,6 +143,12 @@ example with the sibling repos it can detect filled in), then confirm the three
 settings that change the shape of everything downstream: decomposition `profile`, `tracker.adapter`, and
 `tracker.agent_brief.sink`. Do not silently guess a tracker; detect it from the
 ticket key format or ask.
+
+If `tailoring.source` is set, a team-tailoring skill owns this config - load it,
+apply it, and record what you applied in `bundle.tailoring` (`TLR001`). If it is
+set and no such skill is present in the session, say so: you are refining with
+half the house rules. If it is empty, the refinement is untailored, which is
+fine and is also worth one sentence at handover.
 
 ### Phase 1 - Triage and intake
 
@@ -509,6 +556,7 @@ when questions remain open.
 
 | File | Read when |
 |------|-----------|
+| `references/tailoring.md` | Phase 0 - layering a team-tailoring skill: precedence, invariants, the seam |
 | `references/triage.md` | Phase 1 - the ticket's own labels, links and what they change |
 | `references/intake.md` | Phase 1 - is there enough information; verdicts, statuses, asking well |
 | `references/evidence.md` | Phase 2 - multi-repo scanning, manifests, contract detection |
@@ -555,8 +603,10 @@ All stdlib-only Python 3, no dependencies, no network.
 - `assets/templates/bundle.skeleton.json` - what you author
 - `assets/templates/story.md`, `assets/templates/subtask.md` - the rendered view,
   for sessions that cannot run the scripts
+- `assets/templates/team-tailoring-skill.md` - the skeleton a team copies to write
+  the skill that layers over this one
 - `assets/examples/example-bundle.json` - a complete, validating two-repo example
 - `evals/trigger-eval.json` - queries that should and should not trigger this
   skill, in the format skill-creator's description optimiser expects
-- `evals/evals.json` - twelve behavioural evals with verifiable expectations, for
+- `evals/evals.json` - fourteen behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

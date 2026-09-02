@@ -469,6 +469,20 @@ def main(argv=None):
     preview = ["# Push preview — %s %s" % (key, bundle["story"].get("title", "")), "",
                "Adapter: **%s** · markup: %s · subtasks: %s · agent brief sink: **%s**"
                % (adapter, caps["markup"], caps["subtasks"], sink), ""]
+    tailoring = bundle.get("tailoring") or {}
+    if tailoring.get("source"):
+        line = "Refined under **%s**%s." % (tailoring["source"],
+                                            " v%s" % tailoring["version"]
+                                            if tailoring.get("version") else "")
+        overrides = tailoring.get("overrides") or []
+        if overrides:
+            line += " Overrides in force: " + "; ".join(
+                "%s (%s — %s)" % (o.get("rule", "?"), o.get("reason", "no reason"),
+                                  o.get("authorised_by", "unauthorised"))
+                for o in overrides)
+        preview += [line, ""]
+    elif bundle.get("tailoring") is not None or get(cfg, "tailoring.source", ""):
+        preview += ["_Untailored: no team house rules were applied to this refinement._", ""]
     if warnings:
         preview += ["> Notes:"] + ["> - %s" % w for w in warnings] + [""]
     if delta:

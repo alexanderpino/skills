@@ -41,14 +41,19 @@ THRESHOLD_RX = re.compile(
     re.I)
 BOUNDARY_RX = re.compile(r"boundary|grens|edge case|randgeval", re.I)
 CYNEFIN_DOMAINS = ("clear", "complicated", "complex", "chaotic")
+# What a team-tailoring skill may never relax. Each exists to stop the output being
+# confidently wrong; see references/tailoring.md. Every gate in this skill can be
+# switched off in config - `disclosure` is what keeps that legitimate.
+INVARIANTS = ("evidence-or-assumption", "no-invented-metadata", "not-ready-is-reported",
+              "no-decomposition-without-intake", "stop-at-the-seam", "disclosure")
 # Beyond this, the table is telling you the story is too big to refine as one.
 MAX_TABLE_COMBINATIONS = 512
 
 # Every key the scripts actually read. Anything else in refinery.yaml is a typo or a
 # leftover, and is reported rather than silently ignored.
 CONFIG_SPEC = {
-    "": {"version", "profile", "decomposition", "budgets", "tracker", "evidence",
-         "intake", "triage", "gates", "review", "validation"},
+    "": {"version", "profile", "tailoring", "decomposition", "budgets", "tracker",
+         "evidence", "intake", "triage", "gates", "review", "validation"},
     "decomposition": {"one_repo_per_subtask", "one_pr_per_subtask", "title_pattern",
                       "mandatory", "spike_when_unresolved", "spike_timebox_days"},
     "decomposition.mandatory[]": {"kind", "when"},
@@ -65,6 +70,7 @@ CONFIG_SPEC = {
     "evidence.repos[]": {"name", "path"},
     "evidence.split_thresholds": {"repos", "files", "breaking_contracts", "owner_teams"},
     "gates": {"design_decisions", "push", "adversarial_review"},
+    "tailoring": {"source", "version", "skill"},
     "triage": {"capture", "ignore", "labels"},
     "triage.labels[]": {"id", "match", "field", "kind", "profile", "route",
                         "require_dimensions", "mandatory_subtask_kinds", "add_critics",
@@ -814,6 +820,69 @@ def check_intake(b, cfg, rep):
                  "the bugfix profile puts the failing test first" % b.get("profile"))
 
 
+def check_tailoring(b, cfg, rep):
+    """Users layer a team-tailoring skill over this one. These gates keep the seam
+    honest: what the team changed is recorded, what it claims is mechanical really
+    is, what it turned off is disclosed, and the invariants are not negotiable."""
+    declared = get(cfg, "tailoring.source", "") or ""
+    tailoring = b.get("tailoring") or {}
+    applied_source = tailoring.get("source") or ""
+
+    if declared and not applied_source:
+        rep.warn("TLR001", "tailoring", "config declares the %r tailoring but the bundle "
+                 "records none - either the team skill was never loaded in this session, or "
+                 "its rules were applied without being recorded" % declared)
+    elif declared and applied_source != declared:
+        rep.warn("TLR001", "tailoring", "config declares %r, bundle records %r"
+                 % (declared, applied_source))
+
+    for i, entry in enumerate(tailoring.get("applied") or []):
+        where = "tailoring.applied[%d]" % i
+        if not entry.get("rule"):
+            rep.error("TLR002", where, "applied rule with no text")
+        mechanism = entry.get("mechanism")
+        if mechanism not in ("config", "prompt", "gate", None):
+            rep.error("TLR002", where, "mechanism must be config | prompt | gate, got %r"
+                      % mechanism)
+        if mechanism == "config":
+            key = entry.get("key")
+            if not key:
+                rep.error("TLR002", where, "claims to be enforced by config but names no key")
+            elif get(cfg, key, None) is None:
+                rep.error("TLR002", where, "claims config key %r enforces it, and that key is "
+                          "not set - the rule reads as enforced and is not" % key)
+
+    for i, entry in enumerate(tailoring.get("overrides") or []):
+        where = "tailoring.overrides[%d]" % i
+        target = entry.get("of") or ""
+        if target in INVARIANTS:
+            rep.error("TLR003", where, "overrides the %r invariant, which no tailoring may "
+                      "relax - refuse it, record the refusal, and tell whoever owns the "
+                      "tailoring skill" % target)
+        if not entry.get("reason"):
+            rep.error("TLR004", where, "override with no reason")
+        if not entry.get("authorised_by"):
+            rep.error("TLR004", where, "override with nobody's name on it - 'the team skill "
+                      "says so' is not a person")
+
+    # disclosure: a gate switched off is a legitimate choice that has to be visible.
+    disclosed = " ".join(json.dumps(x) for x in
+                         (tailoring.get("overrides") or []) + (tailoring.get("applied") or []))
+    off = []
+    if str(get(cfg, "gates.adversarial_review", "on")).lower() == "off":
+        off.append("gates.adversarial_review")
+    if get(cfg, "validation.require_intake", True) is False:
+        off.append("validation.require_intake")
+    fail_on = {str(s).lower() for s in (get(cfg, "validation.fail_on", ["error"]) or [])}
+    if "error" not in fail_on:
+        off.append("validation.fail_on")
+    for key in off:
+        if key not in disclosed:
+            rep.warn("TLR005", "tailoring", "%s is switched off and nothing in the bundle "
+                     "says so - a team may skip a gate, but a reader who cannot tell it was "
+                     "skipped is being misled" % key)
+
+
 def check_triage(b, cfg, rep):
     """What the tracker already said about this item, and whether the refinement
     listened. A label is a decision somebody made before you opened the ticket."""
@@ -1005,6 +1074,7 @@ def validate(bundle, cfg):
     rep = Report()
     check_config(cfg, rep)
     check_structure(bundle, rep)
+    check_tailoring(bundle, cfg, rep)
     check_triage(bundle, cfg, rep)
     check_intake(bundle, cfg, rep)
     check_questions_and_decisions(bundle, rep)

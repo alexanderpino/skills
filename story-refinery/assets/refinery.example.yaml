@@ -10,6 +10,18 @@
 # anchors, no multi-line block scalars, no flow style. Save as .json for anything more.
 version: 1
 
+# ------------------------------------------------------------------- tailoring
+# [script] TLR gates. Which team-tailoring skill owns this file. Users load such a
+# skill alongside story-refinery; it holds everything true of one team and false of
+# everyone else - owners, house conventions, tracker reality, language - and it
+# ships this config. See references/tailoring.md for the contract, and
+# assets/templates/team-tailoring-skill.md for a skeleton. Leave source empty when
+# the refinement is untailored; say so at handover either way.
+tailoring:
+  source: team-billing-refinement   # [script] TLR001, must match bundle.tailoring.source
+  version: "3.2"                    # [claude] bump when the house rules change
+  skill: .claude/skills/team-billing-refinement   # [claude] where it lives, for a reader
+
 # ---------------------------------------------------------------- decomposition
 # [claude] vertical-slice | layered | workflow-phase | bugfix | custom
 profile: vertical-slice

@@ -3,15 +3,16 @@
 
   python selftest.py
 
-Eight suites:
+Nine suites:
   1. Validator gates  - mutate the golden bundle, assert each gate fires
   2. Config parsing   - the YAML subset, including the cases that bit us
   3. Markup           - wiki / ADF / HTML / plaintext conversion
   4. Pipeline         - evidence -> validate -> emit -> emit --previous, end to end
   5. Intake detection - sufficiency verdicts, English and Dutch
-  6. Triage           - the label policy, its precedence, and what it reports
-  7. Adversarial review - digests, locators, and that a critic packet really is blind
-  8. Docs consistency - SKILL.md against the scripts and validator codes it cites
+  6. Tailoring seam   - what a team skill may change, and what it may never relax
+  7. Triage           - the label policy, its precedence, and what it reports
+  8. Adversarial review - digests, locators, and that a critic packet really is blind
+  9. Docs consistency - SKILL.md against the scripts and validator codes it cites
 
 A validator nobody has tried to break is a validator nobody should trust, and the
 same goes for the config reader that decides which gates run at all.
@@ -119,6 +120,18 @@ MUTATIONS = [
     ("DOD001", mut(lambda b: b["subtasks"][1]["agent_brief"].update(
         {"done_when": [{"type": "command", "cmd": "echo hello", "expect": "exit 0"},
                        {"type": "assertion", "text": "the flag gates the new branch"}]}))),
+    # Tailoring: the seam a team-tailoring skill layers onto.
+    ("TLR001", mut(lambda b: b.pop("tailoring"))),
+    ("TLR002", mut(lambda b: b["tailoring"]["applied"][0].update(
+        {"key": "budgets.subtask_hours"}))),                # a key no config sets
+    ("TLR002-prose", mut(lambda b: b["tailoring"]["applied"].append(
+        {"rule": "Subtasks are at most half a day", "mechanism": "config"}))),
+    ("TLR003", mut(lambda b: b["tailoring"]["overrides"].append(
+        {"rule": "Citations are optional, our code moves too fast",
+         "of": "evidence-or-assumption", "reason": "speed",
+         "authorised_by": "the team skill"}))),
+    ("TLR004", mut(lambda b: b["tailoring"]["overrides"].append(
+        {"rule": "No panel on small stories", "of": "gates.adversarial_review"}))),
     # Triage: what the ticket already said about itself.
     ("TRI001", mut(lambda b: b["story"].pop("tracker_meta"))),
     ("TRI002", mut(lambda b: b["story"]["tracker_meta"]["labels"].append("sev1"))),
@@ -450,7 +463,7 @@ def suite_pipeline():
 def suite_docs():
     """SKILL.md is the interface. A flag that no longer exists, or a reference file
     that was renamed, breaks the skill just as thoroughly as a bad regex."""
-    print("\n-- 8. docs consistency --")
+    print("\n-- 9. docs consistency --")
     import re
     with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
         skill = fh.read()
@@ -596,10 +609,61 @@ def suite_intake():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def suite_tailoring():
+    """Users layer a team skill over this one. The seam has to hold: a gate a team
+    switches off stays visible, and an invariant stays refused."""
+    print("\n-- 6. tailoring seam --")
+    from validate import INVARIANTS
+    cfg = load_config(CONFIG)
+    with open(GOLDEN, encoding="utf-8") as fh:
+        golden = json.load(fh)
+
+    check("tailoring: the shipped config declares a source",
+          bool((cfg.get("tailoring") or {}).get("source")))
+    check("tailoring: the example records the tailoring its config declares",
+          golden["tailoring"]["source"] == cfg["tailoring"]["source"])
+    check("tailoring: every 'config' rule in the example names a key that is really set",
+          all(_yaml.get(cfg, e["key"], None) is not None
+              for e in golden["tailoring"]["applied"] if e.get("mechanism") == "config"))
+
+    # A team may switch the panel off. It may not do so invisibly.
+    off_cfg = copy.deepcopy(cfg)
+    off_cfg["gates"]["adversarial_review"] = "off"
+    silent = copy.deepcopy(golden)
+    silent.pop("review")
+    codes = {i["code"] for i in validate(copy.deepcopy(silent), off_cfg).items}
+    check("tailoring: skipping the panel silently is reported", "TLR005" in codes, sorted(codes))
+    disclosed = copy.deepcopy(silent)
+    disclosed["tailoring"]["overrides"].append(
+        {"rule": "No blind panel on stories under three subtasks",
+         "of": "gates.adversarial_review", "reason": "agreed with Product for maintenance work",
+         "authorised_by": "Sanne (Product)"})
+    codes = {i["code"] for i in validate(disclosed, off_cfg).items}
+    check("tailoring: disclosing it clears the warning, and REV001 stays off",
+          "TLR005" not in codes and "REV001" not in codes, sorted(codes))
+
+    # The invariants are not negotiable, whatever the team skill says.
+    for invariant in INVARIANTS:
+        b = copy.deepcopy(golden)
+        b["tailoring"]["overrides"] = [{"rule": "house rule", "of": invariant,
+                                        "reason": "we are fast", "authorised_by": "A. Person"}]
+        codes = {i["code"] for i in validate(b, cfg).items}
+        check("tailoring: %s cannot be overridden" % invariant, "TLR003" in codes)
+
+    check("tailoring: the copyable team skill exists and states the invariants",
+          all(inv in open(os.path.join(ROOT, "assets", "templates",
+                                       "team-tailoring-skill.md"), encoding="utf-8").read()
+              for inv in INVARIANTS))
+    with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
+        skill = fh.read()
+    check("tailoring: SKILL.md carries the invariants, not only the reference",
+          all(inv in skill for inv in INVARIANTS))
+
+
 def suite_triage():
     """A label is a decision somebody already made. These check that the policy
     reads it the way the config says, and that a push cannot delete it."""
-    print("\n-- 6. triage --")
+    print("\n-- 7. triage --")
     from triage import policy_for
     cfg = load_config(CONFIG)
 
@@ -655,7 +719,7 @@ def suite_triage():
 def suite_review():
     """The critic packets are the only mechanical guarantee of blindness in the
     skill. If the reasoning leaks into one, the panel is grading the reasoning."""
-    print("\n-- 7. adversarial review --")
+    print("\n-- 8. adversarial review --")
     from review import (CRITICS, DEFAULT_PANEL, cmd_check, content_digest,
                         render_brief, resolve_locator)
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -742,6 +806,7 @@ def main():
     suite_markup()
     suite_pipeline()
     suite_intake()
+    suite_tailoring()
     suite_triage()
     suite_review()
     suite_docs()

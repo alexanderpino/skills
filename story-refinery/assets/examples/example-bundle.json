@@ -591,9 +591,25 @@
     "AC3": ["S2", "S3", "S5"],
     "AC4": ["S4"]
   },
+  "tailoring": {
+    "source": "team-billing-refinement",
+    "version": "3.2",
+    "applied": [
+      {"rule": "Every feature and migration subtask runs the contract suite before it counts as done",
+       "mechanism": "config", "key": "validation.definition_of_done"},
+      {"rule": "Money questions go to Finance (Marieke), scope questions to Product (Sanne)",
+       "mechanism": "prompt",
+       "note": "Why Q1/Q3 and Q4 have the owners they have. story-refinery only knows a question needs an owner, not who."},
+      {"rule": "Tax and VAT wording is checked by Finance before a customer-facing string ships",
+       "mechanism": "prompt", "note": "Why Q2 exists rather than an assumed locale set."},
+      {"rule": "The vagueness lexicon includes our Dutch terms - our tickets arrive in both languages",
+       "mechanism": "config", "key": "validation.vagueness_lexicon"}
+    ],
+    "overrides": []
+  },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:259087e4ca6d09a9712865565c0d417cfd934c7f84fa54d975a0363037584c9d",
+    "bundle_digest": "sha256:e34a85dfb1c765179dc00328acb017d0afc70ade2b65cbef40ddcab70cfa35ec",
     "critics": [
       {"id": "implementer", "context": "fresh"},
       {"id": "tester", "context": "fresh"},

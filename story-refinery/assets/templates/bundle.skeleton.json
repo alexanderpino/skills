@@ -260,6 +260,13 @@
       "S1"
     ]
   },
+  "tailoring": {
+    "_howto": "PHASE 0: when a team-tailoring skill is loaded alongside this one, record which of its rules you applied and anything of this skill's it turned off. mechanism: config (name the refinery.yaml key that really enforces it) | prompt (judgement) | gate. An override needs a reason and a person's name. An override of an invariant is refused - see references/tailoring.md. Delete this block when the refinement is untailored, and say so at handover.",
+    "source": "",
+    "version": "",
+    "applied": [],
+    "overrides": []
+  },
   "review": {
     "_howto": "PHASE 8: once validate.py is green, run `review.py brief --bundle bundle.json --out reviews/` and hand each sealed packet to a separate critic in fresh context. Record what they found here, resolve every finding, re-validate, then `review.py digest --bundle bundle.json --stamp`.",
     "method": "critics",

@@ -5,6 +5,16 @@ mechanical tell so you can catch it in your own work.
 
 ## Content smells
 
+**House rules that only look enforced.** The team skill states a cap, a
+convention or a DoD in prose and the config never got it. *Tell:* `TLR002`, or a
+tailoring rule applied with `mechanism: prompt` that is plainly a number. *Fix:*
+`references/tailoring.md` - anything mechanical lives in `refinery.yaml` or it
+does not exist.
+
+**The silent override.** A gate the team switched off, and a handover that reads
+as though everything ran. *Tell:* `TLR005`. *Fix:* one sentence. Skipping a gate
+deliberately is fine; a reader who cannot tell is being misled.
+
 **Refining past the label.** The description was refined and the ticket's own
 metadata ignored: a `production-issue` planned as a feature, a `sev1`
 decomposed into a sprint. *Tell:* `TRI001`, `TRI002`, or a `tracker_meta` block

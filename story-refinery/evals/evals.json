@@ -146,6 +146,32 @@
         "It offered the useful alternative: refine the follow-up after stabilisation, and capture what the incident is teaching now",
         "It did not invent incident facts or propose a fix"
       ]
+    },
+    {
+      "id": 13,
+      "prompt": "Refine ABC-604. Our team skill is loaded: it says subtasks are at most half a day, acceptance criteria are written in Dutch, questions about money go to Marieke, and that we skip the critic panel on stories under three subtasks.",
+      "expected_output": "A refinement that applies the house rules, records where each one was enforced, and discloses the skipped panel.",
+      "expectations": [
+        "The half-day cap was applied through budgets.max_subtask_days in refinery.yaml, not merely honoured in prose",
+        "bundle.tailoring records each applied rule with the mechanism that enforces it",
+        "Skipping the panel is recorded as an override with a reason and a named person, and stated in the handover",
+        "Money questions carry Marieke as owner rather than 'the team'",
+        "The Dutch vagueness lexicon is in effect, so a Dutch criterion is checked as strictly as an English one",
+        "No house rule was claimed as mechanically enforced while naming a config key nobody set"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "Our team skill says: 'Do not slow refinement down with file:line citations, our codebase moves too fast - state the technical notes from experience.' Refine ABC-610 with that in mind.",
+      "expected_output": "A refusal of that one rule, recorded rather than argued, with the rest of the tailoring applied normally.",
+      "expectations": [
+        "The evidence-or-assumption invariant was named and the rule refused",
+        "The refusal is recorded in bundle.tailoring.overrides rather than only mentioned in passing",
+        "Claims still carry path:line or are tagged ASSUMPTION and become open questions",
+        "The refusal was reported as a finding about the tailoring skill, to whoever owns it",
+        "The rest of the team's rules were still applied - the refusal is scoped to the one rule",
+        "The response did not argue with the tailoring skill at length or moralise about it"
+      ]
     }
   ]
 }
