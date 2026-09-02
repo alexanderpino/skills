@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-09-02T18:10:00Z",
+  "generated_at": "2026-09-02T19:00:00Z",
   "profile": "vertical-slice",
   "story": {
     "key": "SKL-1",
@@ -20,30 +20,38 @@
       "links": [],
       "environment": ""
     },
-    "summary_human": "A finding like BRF009 is currently a dead end unless you open validate.py: 55 of 153 codes are documented nowhere. This adds an explicit registry of every code with a one-line meaning, a `--codes` flag that prints it, a generated `references/codes.md`, and two selftest checks that fail the moment a code is emitted without an entry or the file goes stale. Two subtasks, one repo, half a day each.",
-    "technical_notes_human": "Codes are string literals at the call site (`validate.py:158`, `batch.py:188`); none is built dynamically (ruled out). D1: an explicit per-module `CODES` dict beats regex-extracting message templates - the messages are %-format prose spread over lines, and only an explicit set lets selftest check both directions. D2: `codes.md` is committed and selftest asserts it equals `--codes --markdown`, so it is readable without running anything and cannot rot. D3: BAT codes get a `PHASE_OF` entry so they do not fall into '9 other'. `--codes` makes the bundle positional optional (`validate.py:1634`). The docs suite at `selftest.py:640` already checks docs -> code; S2 adds code -> docs. The manifest guessed `pytest tests/`; there is no tests/ - the test command is selftest.py.",
+    "summary_human": "A finding like BRF009 is currently a dead end unless you open validate.py: 56 of 160 codes are documented nowhere. This adds an explicit registry of every code with a one-line meaning, a `--codes` flag (plain, JSON, markdown), a generated `references/codes.md`, a row for it in SKILL.md, and four selftest checks: emitted equals registered both ways, severity matches the call sites, the file is current, and each meaning is a meaning. Two subtasks, one repo, one day and a half.",
+    "technical_notes_human": "Emitters are validate.py, batch.py and criteria.py (AC012 is criteria's alone, `criteria.py:106`); summary.py and selftest.py contain code literals as consumers, not emitters. 'Emitted' is mechanical: a code literal as first argument of error/warn/report/add or as a `(\"ERROR\"|\"WARN\", \"CODE\", ...)` tuple in criteria.py - which is how DOD001, emitted via an alias at `validate.py:1129`, is counted. D1: explicit per-module `CODES` dicts, `\"CODE\": (severity, meaning)`; dict-key syntax is what keeps the dead-entry check from matching the registry itself. D2: codes.md committed, selftest asserts LF-normalised equality. D3: `PHASE_OF[\"BAT\"] = \"9 batch\"`. D5: output sorted by phase label then code, like main()'s own grouping. D6: --codes dispatches before the bundle is opened; --json under --codes emits a list. The existing docs regex `[A-Z]{3,6}` skips AC/DT - S2 widens it to `{2,6}`. SKILL.md:843 still says 'six suites'; S2 fixes it with the reference-table row.",
     "acceptance_criteria": [
       {
         "id": "AC1",
-        "rule": "`validate.py --codes` prints every code validate.py and batch.py can emit - one per line with its phase, severity and a one-line meaning - and needs no bundle argument.",
+        "rule": "`validate.py --codes` prints one line per code the three emitting scripts (validate.py, batch.py, criteria.py) can produce - `CODE<TAB>phase<TAB>severity<TAB>meaning`, sorted by phase label then code - and runs before any bundle is opened.",
         "examples": [
           {
-            "case": "`validate.py --codes` with no other argument",
-            "expect": "exit 0; the BRF009 line carries phase '6 briefs'; a BAT004 line is present"
+            "case": "`validate.py --codes` alone",
+            "expect": "exit 0; a line `BRF009\\t6 briefs\\t...`; a line for BAT004 under `9 batch`; a line for AC012"
           },
           {
-            "case": "DOD001, emitted as error or warn depending on the rule's severity",
-            "expect": "listed exactly once, severity 'error | warn'"
+            "case": "`validate.py nope.json --codes` (bundle path does not exist)",
+            "expect": "the code list, exit 0 - --codes dispatches before the bundle is read"
           },
           {
-            "case": "`validate.py bundle.json --codes` (a bundle given as well)",
-            "expect": "the code list, the bundle is not validated, exit 0"
+            "case": "`validate.py --codes --json`",
+            "expect": "a JSON list of {code, phase, severity, meaning}; --strict, --flat and --config are ignored under --codes"
+          },
+          {
+            "case": "`validate.py --markdown` without --codes, or no bundle and no --codes (boundary)",
+            "expect": "argparse usage error, exit 2 - the documented usage error for a missing bundle is unchanged"
+          },
+          {
+            "case": "READY003, emitted as warn at two call sites and error at none",
+            "expect": "severity 'warn'; BAS003 (both) 'error | warn'; DOD001 (severity from the DoD rule) 'config'"
           }
         ]
       },
       {
         "id": "AC2",
-        "rule": "references/codes.md is byte-identical to the output of `validate.py --codes --markdown`, grouped by phase in PHASE_OF order.",
+        "rule": "references/codes.md equals `validate.py --codes --markdown` after normalising line endings: one `## <phase>` heading per phase label in sorted order, a table of code | severity | meaning under each.",
         "examples": [
           {
             "case": "regenerate, then diff against the committed file",
@@ -51,29 +59,55 @@
           },
           {
             "case": "one meaning hand-edited in codes.md",
-            "expect": "selftest fails: 'references/codes.md is stale - regenerate it'"
+            "expect": "selftest fails 'codes: references/codes.md is current' with 'regenerate with validate.py --codes --markdown' in the detail"
+          },
+          {
+            "case": "codes.md checked out with CRLF (boundary)",
+            "expect": "the check passes - comparison is on LF-normalised text"
           },
           {
             "case": "codes.md absent (boundary)",
-            "expect": "selftest fails with the same message, does not crash"
+            "expect": "the same check fails, selftest does not crash"
           }
         ]
       },
       {
         "id": "AC3",
-        "rule": "selftest fails when the set of codes the scripts emit and the set the registry declares differ in either direction.",
+        "rule": "selftest fails when the set of codes the three scripts emit and the set the registries declare differ in either direction, and when a registered severity disagrees with the call sites.",
         "examples": [
           {
-            "case": "a new rep.error(\"ZZZ999\", ...) call with no registry entry",
-            "expect": "selftest fails naming ZZZ999 as unregistered"
+            "case": "a new rep.error(\"ZZZ999\", ...) with no registry entry",
+            "expect": "'codes: every emitted code is registered' fails naming ZZZ999"
           },
           {
-            "case": "a registry entry QQQ001 that no script emits",
-            "expect": "selftest fails naming QQQ001 as a dead entry"
+            "case": "a registry entry QQQ001 no call site emits",
+            "expect": "'codes: no registered code is dead' fails naming QQQ001 - registry literals are dict keys (`\"QQQ001\": (`), which the call-site regex does not match"
           },
           {
-            "case": "the two sets are equal (boundary)",
-            "expect": "both checks pass and appear in the assertion count"
+            "case": "READY003 registered as 'error' while both call sites are rep.warn",
+            "expect": "'codes: severity matches the call sites' fails naming READY003"
+          },
+          {
+            "case": "the sets and severities agree (boundary)",
+            "expect": "all four `codes:` checks print ok"
+          }
+        ]
+      },
+      {
+        "id": "AC4",
+        "rule": "Every registered meaning is a meaning: at least six words, not the code itself, and not a placeholder.",
+        "examples": [
+          {
+            "case": "\"BRF009\": (\"error\", \"BRF009\")",
+            "expect": "'codes: every meaning is a meaning' fails naming BRF009"
+          },
+          {
+            "case": "a meaning containing TODO or TBD",
+            "expect": "the same check fails"
+          },
+          {
+            "case": "a six-word meaning stating the condition (boundary)",
+            "expect": "passes"
           }
         ]
       }
@@ -81,13 +115,13 @@
     "baseline": [
       {
         "metric": "undocumented codes",
-        "current": "55 of 153 emitted codes appear in no reference, SKILL.md, config or schema",
-        "source": "audit grep over scripts/*.py vs references/*.md, session 2026-09-02"
+        "current": "56 of 160 distinct codes (validate.py, batch.py, criteria.py) appear in no reference, SKILL.md or config",
+        "source": "regex over call sites `(error|warn|report|add)(\"CODE\"` and criteria.py's `(\"ERROR\"|\"WARN\", \"CODE\"` tuples in the three scripts vs references/*.md + SKILL.md + refinery.example.yaml, at skills@37ae4ae"
       }
     ],
     "non_goals": [
       "Rewording any finding message - the registry carries a meaning, the call site keeps its message.",
-      "Adding the codes.md row to SKILL.md's reference table: pending Q1; SKILL.md is not in the change surface."
+      "Changing what validate.py prints for a bundle - the phase grouping in main() is untouched; BAT's new PHASE_OF entry is never reached by a validation run because only batch.py emits BAT codes."
     ],
     "links": [],
     "follow_ups": [],
@@ -131,8 +165,8 @@
       "failure": "unchanged - --codes cannot fail on bundle content; a registry gap fails selftest, never a validation run",
       "data": "none",
       "security": "none - no new input is parsed",
-      "observability": "the two new selftest assertions are named and counted in its output",
-      "compatibility": "the positional bundle argument and every existing flag keep their behaviour; --codes is additive"
+      "observability": "four selftest checks named `codes: ...` print ok/FAIL by name; there is no assertion count in selftest output",
+      "compatibility": "the positional bundle and every existing flag behave as today, including the usage error when the bundle is missing; --codes/--markdown are additive and dispatch before the bundle is opened"
     },
     "triage": {
       "matched": [],
@@ -169,11 +203,9 @@
         {
           "id": "success_signal",
           "required": false,
-          "status": "assumed",
-          "evidence": "",
-          "heuristic": false,
-          "assumption": "Zero undocumented codes, and selftest is what asserts it - not merely a generated file.",
-          "question_id": "Q2"
+          "status": "present",
+          "evidence": "make selftest's docs-consistency suite fail when a code can be emitted that codes.md does not list",
+          "heuristic": false
         },
         {
           "id": "scope",
@@ -216,7 +248,7 @@
         }
       ],
       "chosen": "An explicit CODES dict per module with a one-line meaning",
-      "rationale": "A reader wants the condition, not the message; and the both-ways check in AC3 is only possible against an explicit set.",
+      "rationale": "A reader wants the condition, not the message; and the both-ways check in AC3 needs a set whose literals are syntactically distinct from call sites - dict keys are.",
       "status": "locked"
     },
     {
@@ -238,7 +270,7 @@
     },
     {
       "id": "D3",
-      "question": "Where do batch.py's BAT codes sit in the phase grouping?",
+      "question": "Where do batch.py's BAT codes sit in the phase grouping, and with which label?",
       "options": [
         {
           "label": "Leave them; phase_of returns '9 other'",
@@ -250,55 +282,69 @@
         }
       ],
       "chosen": "Add BAT to PHASE_OF as its own group",
-      "rationale": "'other' is where meaning goes to die; the group costs one line.",
+      "rationale": "'other' is where meaning goes to die. Label '9 batch': the batch check runs before the push, alongside emit. A validation run never emits BAT, so main()'s grouped output is unchanged.",
+      "status": "locked"
+    },
+    {
+      "id": "D4",
+      "question": "Which scripts count as emitters, and how does --codes reach their registries?",
+      "options": [
+        {
+          "label": "validate.py and batch.py only",
+          "tradeoff": "misses AC012, which criteria.py alone emits - a code --codes would call invented"
+        },
+        {
+          "label": "validate.py, batch.py, criteria.py; --codes imports the other two lazily",
+          "tradeoff": "one lazy import inside the handler; neither module imports validate, so no cycle"
+        }
+      ],
+      "chosen": "validate.py, batch.py, criteria.py; --codes imports the other two lazily",
+      "rationale": "criteria.py:106 emits through a findings list; the archaeologist re-opened it. Consumers (summary.py, selftest.py) are excluded by the mechanical definition of 'emitted'.",
+      "status": "locked"
+    },
+    {
+      "id": "D5",
+      "question": "What does --codes print, and in which order?",
+      "options": [
+        {
+          "label": "Reuse main()'s grouped print loop (phase header, indented items)",
+          "tradeoff": "no new format; but a header per phase and indented lines make grep-by-code impossible and the byte gate fragile"
+        },
+        {
+          "label": "One TSV line per code, sorted by (phase label, code); --markdown groups under headings in the same order; --json a list",
+          "tradeoff": "a second output style; but one line per code is what a lookup and a diff both want"
+        }
+      ],
+      "chosen": "One TSV line per code, sorted by (phase label, code); --markdown groups under headings in the same order; --json a list",
+      "rationale": "PHASE_OF insertion order is not phase order (ENB, BAS sit after IRR); sorting by label is the ordering main() already uses, and it is the only one two implementers would reproduce identically.",
+      "status": "locked"
+    },
+    {
+      "id": "D6",
+      "question": "Where is the severity column from, given ten codes emitted at both severities and DOD001 whose severity a config rule decides?",
+      "options": [
+        {
+          "label": "Authored in the registry, unchecked",
+          "tradeoff": "a wrong 'error' on a warn-only code is published and never caught"
+        },
+        {
+          "label": "Authored in the registry, and selftest compares it to the call sites: error | warn | 'error | warn' | 'config' for an aliased emitter",
+          "tradeoff": "one more check; the column is then trustworthy"
+        }
+      ],
+      "chosen": "Authored in the registry, and selftest compares it to the call sites: error | warn | 'error | warn' | 'config' for an aliased emitter",
+      "rationale": "The tester found the column would be wrong for ten codes with nothing able to fail. Codes are never split - REV009 and PND001 are cited in existing findings.",
       "status": "locked"
     }
   ],
-  "open_questions": [
-    {
-      "id": "Q1",
-      "text": "Should references/codes.md also get a row in SKILL.md's reference table, or is the Scripts bullet enough?",
-      "owner": "alexander.pino",
-      "blocking": false,
-      "asked": {
-        "to": "alexander.pino",
-        "when": "alexander.pino",
-        "channel": "alexander.pino"
-      },
-      "guess": "Yes, one row: 'Any time validate.py names a code you do not know'. Left out of this story so the table edit is not made while the answer is open."
-    },
-    {
-      "id": "Q2",
-      "text": "Is the success signal 'zero undocumented codes, enforced by selftest' - or is a generated index without the gate enough?",
-      "owner": "alexander.pino",
-      "blocking": false,
-      "asked": {
-        "to": "alexander.pino",
-        "when": "alexander.pino",
-        "channel": "alexander.pino"
-      },
-      "guess": "Enforced. An index without the gate is the state we are in now, one release later."
-    },
-    {
-      "id": "Q3",
-      "text": "Severity column: is 'error | warn' acceptable for a code emitted at both severities (DOD001, BAS003), or should such codes be split?",
-      "owner": "alexander.pino",
-      "blocking": false,
-      "asked": {
-        "to": "alexander.pino",
-        "when": "alexander.pino",
-        "channel": "alexander.pino"
-      },
-      "guess": "Keep one code with 'error | warn'; splitting renames codes people may already cite."
-    }
-  ],
+  "open_questions": [],
   "evidence": {
     "generated_at": "2026-09-02T18:05:00Z",
     "sources": [
       {
         "type": "cached_manifest",
         "repo": "skills",
-        "sha": "a837f43"
+        "sha": "37ae4ae"
       },
       {
         "type": "targeted_scan",
@@ -315,7 +361,7 @@
     "repos": [
       {
         "name": "skills",
-        "sha": "a837f43",
+        "sha": "37ae4ae",
         "path": "."
       }
     ],
@@ -325,21 +371,28 @@
         "path": "story-refinery/scripts/validate.py",
         "role": "modify",
         "line": 135,
-        "why": "Report class; CODES registry lives beside it, --codes in main()"
+        "why": "CODES beside Report; --codes/--markdown/--json dispatch at the top of main() (l.1631); PHASE_OF gains BAT"
       },
       {
         "repo": "skills",
         "path": "story-refinery/scripts/batch.py",
         "role": "modify",
         "line": 188,
-        "why": "five BAT codes; its own CODES dict"
+        "why": "CODES for the five BAT codes"
+      },
+      {
+        "repo": "skills",
+        "path": "story-refinery/scripts/criteria.py",
+        "role": "modify",
+        "line": 106,
+        "why": "CODES for AC012, the one code it alone emits"
       },
       {
         "repo": "skills",
         "path": "story-refinery/scripts/selftest.py",
         "role": "modify",
         "line": 640,
-        "why": "docs-consistency suite; add code -> docs and codes.md equality"
+        "why": "docs-consistency suite: four `codes:` checks; widen the code regex to {2,6}"
       },
       {
         "repo": "skills",
@@ -350,31 +403,35 @@
       {
         "repo": "skills",
         "path": "story-refinery/SKILL.md",
-        "role": "read",
-        "line": 828,
-        "why": "Scripts bullet for validate.py - not edited in this story (Q1)"
+        "role": "modify",
+        "line": 796,
+        "why": "reference-table row for codes.md (selftest.py:609 requires every reference file to be mentioned); Scripts bullet gains --codes; l.843 'six suites' corrected"
       }
     ],
     "contracts": [],
     "conventions": [
       {
-        "rule": "Every code is a string literal as the first argument of rep.error(...) / rep.warn(...).",
-        "evidence": "skills/story-refinery/scripts/validate.py:158"
+        "rule": "A code is a string literal as the first argument of rep.error(...)/rep.warn(...), or of a local alias of them (report(...) at l.1129).",
+        "evidence": "skills/story-refinery/scripts/validate.py:164"
       },
       {
         "rule": "batch.py reports through local error()/warn() closures, same literal-first shape.",
         "evidence": "skills/story-refinery/scripts/batch.py:188"
       },
       {
-        "rule": "Phase grouping is the PHASE_OF prefix map; phase_of() picks the longest matching prefix.",
+        "rule": "criteria.py reports through a findings list of (\"ERROR\"|\"WARN\", \"CODE\", message) tuples.",
+        "evidence": "skills/story-refinery/scripts/criteria.py:106"
+      },
+      {
+        "rule": "Phase grouping is the PHASE_OF prefix map; phase_of() picks the longest matching prefix; main() prints groups in sorted(phase) order.",
         "evidence": "skills/story-refinery/scripts/validate.py:74"
       },
       {
-        "rule": "Scripts are stdlib-only, no network; selftest prints the assertion count rather than docs claiming one.",
+        "rule": "Scripts are stdlib-only, no network (SKILL.md:821); selftest prints ok/FAIL per named check and a failure total, never an assertion count (selftest.py:51, :1516).",
         "evidence": "skills/story-refinery/SKILL.md:821"
       },
       {
-        "rule": "The docs suite already verifies docs -> code with a regex over references and config; extend it, do not add a second suite.",
+        "rule": "The docs suite verifies docs -> code with a regex over references, config and SKILL.md; extend it, do not add a second suite.",
         "evidence": "skills/story-refinery/scripts/selftest.py:640"
       }
     ],
@@ -382,11 +439,19 @@
       {
         "claim": "No code is built dynamically (format, concatenation, %-substitution into the code itself)",
         "looked_in": [
-          "rg '\"[A-Z]{3,6}%' story-refinery/scripts/",
-          "rg '\\.format\\(' story-refinery/scripts/validate.py story-refinery/scripts/batch.py",
-          "rg 'code=' story-refinery/scripts/validate.py"
+          "rg '\"[A-Z]{2,6}%' story-refinery/scripts/",
+          "rg '\\.format\\(' story-refinery/scripts/validate.py story-refinery/scripts/batch.py story-refinery/scripts/criteria.py",
+          "every first argument of error/warn/report/add in the three files (archaeologist re-ran it: 191 + 5 literals)"
         ],
         "conclusion": "A registry keyed by the literal is complete; do not add runtime discovery of codes."
+      },
+      {
+        "claim": "summary.py and selftest.py contain code literals but emit nothing - they are consumers",
+        "looked_in": [
+          "rg '\"[A-Z]{2,6}[0-9]{3}\"' story-refinery/scripts/summary.py story-refinery/scripts/selftest.py",
+          "the call-site regex in D4 against both files: 0 emitting calls"
+        ],
+        "conclusion": "Not emitters. Do not register their literals and do not stop on them."
       },
       {
         "claim": "There is no linter configuration in this repository",
@@ -431,8 +496,8 @@
   },
   "blast_radius": {
     "repos": 1,
-    "files_primary": 4,
-    "files_secondary": 1,
+    "files_primary": 6,
+    "files_secondary": 0,
     "contracts": 0,
     "breaking_contracts": 0,
     "owner_teams": 1
@@ -443,30 +508,34 @@
       "title": "[skills] Register every code behind validate.py --codes",
       "repo": "skills",
       "kind": "feature",
-      "human": "Every code validate.py and batch.py can emit gets an entry in a CODES dict with a one-line meaning (D1). `validate.py --codes` prints them grouped by PHASE_OF, with severity, and needs no bundle - make the positional optional. BAT joins PHASE_OF (D3). Do not touch selftest or references; S2 owns those.",
+      "human": "Every code validate.py, batch.py and criteria.py can emit gets an entry in a per-module CODES dict - `\"CODE\": (severity, meaning)` (D1, D4, D6). `validate.py --codes` prints one TSV line per code sorted by phase label then code; `--markdown` groups under headings; `--json` a list (D5); all dispatch before any bundle is opened. `PHASE_OF[\"BAT\"] = \"9 batch\"` (D3). No selftest, references or SKILL.md edits - S2.",
       "covers": [
         "AC1"
       ],
       "depends_on": [],
-      "estimate_days": 0.5,
+      "estimate_days": 1.0,
       "produces_contracts": [],
       "consumes_contracts": [],
       "agent_brief": {
-        "objective": "A CODES registry in validate.py and batch.py covering every emitted code, and a --codes flag (plain and --markdown) that prints it grouped by phase with severity and meaning, runnable without a bundle.",
+        "objective": "Per-module CODES registries (validate.py, batch.py, criteria.py) covering every emitted code with severity and a one-line meaning, and a --codes flag with --markdown and --json variants, printed in (phase label, code) order, dispatching before the bundle is read.",
         "repo": "skills",
         "branch_hint": "skl-1-code-registry",
         "read_first": [
           {
             "path": "story-refinery/scripts/validate.py",
-            "why": "Report (l.135), PHASE_OF/phase_of (l.74-93), main() argparse (l.1631)"
+            "why": "Report (l.135), PHASE_OF/phase_of (l.74-93), the DOD001 alias (l.1129), main() (l.1631)"
           },
           {
             "path": "story-refinery/scripts/batch.py",
-            "why": "the five BAT emitters (l.188-243) and main() (l.258)"
+            "why": "the five BAT emitters (l.188-243)"
+          },
+          {
+            "path": "story-refinery/scripts/criteria.py",
+            "why": "the findings-list emitter (l.106) and AC012"
           },
           {
             "path": "story-refinery/scripts/selftest.py",
-            "why": "read only: the docs suite (l.640) that will consume the registry in S2"
+            "why": "read only: the docs suite (l.640) that S2 will extend; how check() prints (l.51)"
           }
         ],
         "entry_points": [
@@ -474,13 +543,13 @@
             "path": "story-refinery/scripts/validate.py",
             "line": 1631,
             "symbol": "main",
-            "why": "where --codes is parsed and short-circuits before validate()"
+            "why": "--codes is parsed and returns before the bundle is opened"
           },
           {
             "path": "story-refinery/scripts/validate.py",
             "line": 88,
             "symbol": "phase_of",
-            "why": "grouping for the listing"
+            "why": "the phase label per code"
           }
         ],
         "change_surface": [
@@ -491,72 +560,106 @@
           {
             "path": "story-refinery/scripts/batch.py",
             "role": "modify"
+          },
+          {
+            "path": "story-refinery/scripts/criteria.py",
+            "role": "modify"
           }
         ],
         "contracts_must_not_break": [],
         "conventions": [
           {
-            "rule": "Every code is a string literal as the first argument of rep.error(...) / rep.warn(...).",
-            "evidence": "skills/story-refinery/scripts/validate.py:158"
+            "rule": "A code is a string literal as the first argument of rep.error(...)/rep.warn(...), or of a local alias of them (report(...) at l.1129).",
+            "evidence": "skills/story-refinery/scripts/validate.py:164"
           },
           {
             "rule": "batch.py reports through local error()/warn() closures, same literal-first shape.",
             "evidence": "skills/story-refinery/scripts/batch.py:188"
           },
           {
-            "rule": "Phase grouping is the PHASE_OF prefix map; phase_of() picks the longest matching prefix.",
+            "rule": "criteria.py reports through a findings list of (\"ERROR\"|\"WARN\", \"CODE\", message) tuples.",
+            "evidence": "skills/story-refinery/scripts/criteria.py:106"
+          },
+          {
+            "rule": "Phase grouping is the PHASE_OF prefix map; phase_of() picks the longest matching prefix; main() prints groups in sorted(phase) order.",
             "evidence": "skills/story-refinery/scripts/validate.py:74"
           },
           {
-            "rule": "Scripts are stdlib-only, no network; selftest prints the assertion count rather than docs claiming one.",
+            "rule": "Scripts are stdlib-only, no network (SKILL.md:821); selftest prints ok/FAIL per named check and a failure total, never an assertion count (selftest.py:51, :1516).",
             "evidence": "skills/story-refinery/SKILL.md:821"
           }
         ],
         "done_when": [
           {
             "type": "command",
-            "cmd": "python3 story-refinery/scripts/validate.py --codes | grep -E '^BRF009\\b'",
-            "expect": "one line, containing '6 briefs'"
-          },
-          {
-            "type": "command",
-            "cmd": "python3 story-refinery/scripts/validate.py --codes | grep -E '^BAT004\\b'",
+            "cmd": "python3 story-refinery/scripts/validate.py --codes | grep -P '^BRF009\\t6 briefs\\t'",
             "expect": "one line"
           },
           {
             "type": "command",
-            "cmd": "python3 story-refinery/scripts/validate.py --codes | grep -cE '^DOD001\\b'",
-            "expect": "1"
+            "cmd": "python3 story-refinery/scripts/validate.py --codes | grep -P '^BAT004\\t9 batch\\t'",
+            "expect": "one line"
           },
           {
             "type": "command",
-            "cmd": "python3 story-refinery/scripts/validate.py --codes --markdown | head -3",
-            "expect": "a markdown heading, exit 0"
+            "cmd": "python3 story-refinery/scripts/validate.py --codes | grep -cP '^(AC012|DOD001)\\t'",
+            "expect": "2"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/validate.py --codes | grep -P '^READY003\\t[^\\t]+\\twarn\\t'",
+            "expect": "one line - severity derived from two rep.warn call sites"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/validate.py --codes | wc -l",
+            "expect": "160"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/validate.py nope.json --codes >/dev/null; echo $?",
+            "expect": "0 - dispatch happens before the bundle is read"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/validate.py --codes --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d), sorted(d[0]))'",
+            "expect": "160 ['code', 'meaning', 'phase', 'severity']"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/validate.py --markdown >/dev/null 2>&1; echo $?",
+            "expect": "2 - --markdown needs --codes"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/validate.py >/dev/null 2>&1; echo $?",
+            "expect": "2 - the documented usage error for a missing bundle is unchanged"
           },
           {
             "type": "command",
             "cmd": "python3 story-refinery/scripts/validate.py story-refinery/assets/examples/example-bundle.json --config story-refinery/assets/refinery.example.yaml",
-            "expect": "READY  0 error(s), 0 warning(s) - the positional form still works"
+            "expect": "READY  0 error(s), 0 warning(s)"
           },
           {
             "type": "command",
             "cmd": "python3 story-refinery/scripts/selftest.py",
-            "expect": "PASS  0 failure(s)"
+            "expect": "PASS  0 failure(s) - S2's checks are not in yet; the existing suites must stay green"
           },
           {
             "type": "assertion",
-            "text": "len(CODES) in validate.py plus len(CODES) in batch.py equals the number of distinct code literals in rep.error/rep.warn/error/warn calls across both files"
+            "text": "The union of CODES keys across the three modules equals the set of literals matched by the regex (?:\\b(?:error|warn|report|add)\\(\\s*|\"code\"\\s*:\\s*|\\(\\s*\"(?:ERROR|WARN)\"\\s*,\\s*)\"([A-Z]{2,6}\\d{3})\" over the same three files - 160 codes - and no key appears in two modules"
           }
         ],
         "forbidden": [
-          "Do not change any message text, code, severity or call site - the registry is beside the emitters, not in them.",
-          "Do not edit selftest.py or anything under references/ - S2 owns them.",
+          "Do not change any message text, code, severity or call site - the registry sits beside the emitters, not in them.",
+          "Do not edit selftest.py, anything under references/, or SKILL.md - S2 owns them.",
+          "Do not change what main() prints for a bundle; the BAT entry in PHASE_OF is unreachable from a validation run.",
+          "Do not split a dual-severity code into two codes.",
           "Do not add a dependency; stdlib only."
         ],
         "out_of_scope": [
-          "Generating references/codes.md (S2)",
-          "The selftest gates (S2)",
-          "Any SKILL.md edit (Q1 open)"
+          "Generating references/codes.md and the selftest gates (S2)",
+          "The SKILL.md row and the 'six suites' correction (S2)"
         ],
         "rollback": {
           "flag": "",
@@ -566,7 +669,7 @@
           {
             "type": "command",
             "cmd": "grep -n '^class Report' story-refinery/scripts/validate.py",
-            "expect": "one hit at line 135"
+            "expect": "one hit, line 135"
           },
           {
             "type": "command",
@@ -575,18 +678,24 @@
           },
           {
             "type": "command",
-            "cmd": "grep -c 'rep\\.\\(error\\|warn\\)(\"' story-refinery/scripts/validate.py",
-            "expect": "191 - the emitter count the registry must cover"
+            "cmd": "grep -n 'report = rep.error if' story-refinery/scripts/validate.py",
+            "expect": "one hit, line 1129 - the aliased DOD001 emitter"
           },
           {
             "type": "command",
-            "cmd": "grep -c '^ *\\(error\\|warn\\)(\"BAT' story-refinery/scripts/batch.py",
-            "expect": "5"
+            "cmd": "grep -c 'rep\\.\\(error\\|warn\\)(\"' story-refinery/scripts/validate.py",
+            "expect": "191 call-site lines; NOT the registry size, which is the distinct-code count in done_when"
+          },
+          {
+            "type": "command",
+            "cmd": "grep -n '\"AC012\"' story-refinery/scripts/criteria.py",
+            "expect": "at least one hit"
           }
         ],
         "stop_and_ask": [
-          "A code is emitted at more than one severity (DOD001 by rule severity, BAS003) - register it once as 'error | warn'; do not split it into two codes.",
-          "A code literal appears in a script other than validate.py or batch.py - stop; the story scoped the registry to those two."
+          "A *call* passing a code literal (error/warn/report/add, or a \"code\": value) exists in a script other than validate.py, batch.py or criteria.py - stop; the story scoped emitters to those three. Literals in summary.py and selftest.py are consumers and are expected.",
+          "A code is emitted at both severities at different call sites - register it once as 'error | warn'. DOD001, whose severity a DoD rule decides, is 'config'. Do not split codes.",
+          "The distinct-code count differs from 160 - the story was refined at 37ae4ae; report the difference rather than adjusting the assertion."
         ],
         "context_budget_hint": "read_first only; the two scripts and the one suite are the whole surface",
         "provenance": [
@@ -599,10 +708,11 @@
       "title": "[skills] Gate references/codes.md in selftest",
       "repo": "skills",
       "kind": "test",
-      "human": "Commit `references/codes.md` as the output of `validate.py --codes --markdown` (D2). Extend the docs suite: emitted codes == registered codes both ways, and codes.md byte-equal to the generator, with a message that says how to regenerate. Depends on S1. Do not hand-edit codes.md.",
+      "human": "Commit `references/codes.md` as `validate.py --codes --markdown` output (D2) and add its row to SKILL.md's reference table - the docs suite requires every reference file be mentioned (selftest.py:609) - plus the `--codes` mention in the Scripts bullet and the 'six suites' fix at l.843. Extend the docs suite with four `codes:` checks and widen its code regex to `{2,6}`. Depends on S1. Never hand-edit codes.md.",
       "covers": [
         "AC2",
-        "AC3"
+        "AC3",
+        "AC4"
       ],
       "depends_on": [
         "S1"
@@ -611,21 +721,21 @@
       "produces_contracts": [],
       "consumes_contracts": [],
       "agent_brief": {
-        "objective": "references/codes.md committed and two selftest checks that fail on a registry gap in either direction or a stale file.",
+        "objective": "references/codes.md committed with its SKILL.md row, and four named selftest checks - `codes: every emitted code is registered`, `codes: no registered code is dead`, `codes: severity matches the call sites`, `codes: references/codes.md is current` - plus `codes: every meaning is a meaning`, all in the existing docs suite, with the suite's code regex widened from {3,6} to {2,6} so AC/DT codes are covered.",
         "repo": "skills",
         "branch_hint": "skl-1-codes-index",
         "read_first": [
           {
             "path": "story-refinery/scripts/selftest.py",
-            "why": "the docs suite at l.640 - extend it, no new suite"
+            "why": "the docs suite (l.597-653): its regex at l.645/652 skips two-letter prefixes; check() at l.51 prints 'ok <name>'"
           },
           {
             "path": "story-refinery/scripts/validate.py",
-            "why": "read only: CODES and --codes --markdown as landed by S1"
+            "why": "read only: CODES, --codes --markdown, and the call-site regex from S1's assertion"
           },
           {
-            "path": "story-refinery/scripts/batch.py",
-            "why": "read only: its CODES"
+            "path": "story-refinery/SKILL.md",
+            "why": "the reference table (l.796-813), the Scripts bullet (l.828), 'six suites' (l.843)"
           }
         ],
         "entry_points": [
@@ -633,7 +743,7 @@
             "path": "story-refinery/scripts/selftest.py",
             "line": 640,
             "symbol": "docs consistency suite",
-            "why": "where the new checks go"
+            "why": "where the five checks go"
           }
         ],
         "change_surface": [
@@ -644,29 +754,33 @@
           {
             "path": "story-refinery/references/codes.md",
             "role": "create"
+          },
+          {
+            "path": "story-refinery/SKILL.md",
+            "role": "modify"
           }
         ],
         "contracts_must_not_break": [],
         "conventions": [
           {
-            "rule": "Scripts are stdlib-only, no network; selftest prints the assertion count rather than docs claiming one.",
+            "rule": "Scripts are stdlib-only, no network (SKILL.md:821); selftest prints ok/FAIL per named check and a failure total, never an assertion count (selftest.py:51, :1516).",
             "evidence": "skills/story-refinery/SKILL.md:821"
           },
           {
-            "rule": "The docs suite already verifies docs -> code with a regex over references and config; extend it, do not add a second suite.",
+            "rule": "The docs suite verifies docs -> code with a regex over references, config and SKILL.md; extend it, do not add a second suite.",
             "evidence": "skills/story-refinery/scripts/selftest.py:640"
           }
         ],
         "done_when": [
           {
             "type": "command",
-            "cmd": "python3 story-refinery/scripts/validate.py --codes --markdown | diff - story-refinery/references/codes.md",
+            "cmd": "python3 story-refinery/scripts/validate.py --codes --markdown | diff <(tr -d '\\r') <(tr -d '\\r' < story-refinery/references/codes.md)",
             "expect": "no output, exit 0"
           },
           {
             "type": "command",
-            "cmd": "python3 story-refinery/scripts/selftest.py | grep -E 'registered|stale|codes.md'",
-            "expect": "the new checks, each 'ok'"
+            "cmd": "python3 story-refinery/scripts/selftest.py | grep -cE '^ok +codes: '",
+            "expect": "5"
           },
           {
             "type": "command",
@@ -674,22 +788,38 @@
             "expect": "PASS  0 failure(s)"
           },
           {
-            "type": "assertion",
-            "text": "Temporarily appending rep.error(\"ZZZ999\", \"x\", \"x\") to a check in validate.py makes selftest fail naming ZZZ999; reverting restores PASS"
+            "type": "command",
+            "cmd": "grep -c 'references/codes.md' story-refinery/SKILL.md",
+            "expect": "at least 1"
+          },
+          {
+            "type": "command",
+            "cmd": "grep -c 'six suites' story-refinery/SKILL.md",
+            "expect": "0"
           },
           {
             "type": "assertion",
-            "text": "Editing one character in codes.md makes selftest fail with a message containing 'regenerate'; regenerating restores PASS"
+            "text": "Temporarily appending rep.error(\"ZZZ999\", \"x\", \"x\") inside a check in validate.py makes 'codes: every emitted code is registered' FAIL naming ZZZ999; reverting restores PASS"
+          },
+          {
+            "type": "assertion",
+            "text": "Temporarily adding \"QQQ001\": (\"error\", \"a dead entry nothing emits at all\") to CODES makes 'codes: no registered code is dead' FAIL naming QQQ001"
+          },
+          {
+            "type": "assertion",
+            "text": "Editing one character in codes.md makes 'codes: references/codes.md is current' FAIL with 'regenerate' in the detail; regenerating restores PASS"
           }
         ],
         "forbidden": [
           "Do not hand-edit references/codes.md - regenerate it.",
-          "Do not modify validate.py or batch.py - S1 owns them; if the generator output is wrong, that is a finding on S1.",
-          "Do not add a new suite; extend the docs-consistency suite."
+          "Do not modify validate.py, batch.py or criteria.py - S1 owns them; if --codes output is wrong, that is a finding on S1.",
+          "Do not add a new suite; extend the docs-consistency suite.",
+          "Do not weaken or special-case 'SKILL.md mentions every reference file' - add the row instead.",
+          "In SKILL.md touch only the reference-table row, the validate.py Scripts bullet and the 'six suites' sentence."
         ],
         "out_of_scope": [
-          "Any SKILL.md edit (Q1 open)",
-          "Changing what --codes prints (S1)"
+          "Changing what --codes prints (S1)",
+          "Any other SKILL.md edit"
         ],
         "rollback": {
           "flag": "",
@@ -698,17 +828,28 @@
         "preflight": [
           {
             "type": "command",
-            "cmd": "python3 story-refinery/scripts/validate.py --codes >/dev/null",
-            "expect": "exit 0 - S1 has landed"
+            "cmd": "python3 story-refinery/scripts/validate.py --codes >/dev/null; echo $?",
+            "expect": "0 - S1 has landed"
           },
           {
             "type": "command",
             "cmd": "grep -n 'no invented validator codes' story-refinery/scripts/selftest.py",
             "expect": "one hit"
+          },
+          {
+            "type": "command",
+            "cmd": "grep -n 'SKILL.md mentions every reference file' story-refinery/scripts/selftest.py",
+            "expect": "one hit - the check that requires the SKILL.md row"
+          },
+          {
+            "type": "command",
+            "cmd": "grep -n 'six suites' story-refinery/SKILL.md",
+            "expect": "one hit, line 843"
           }
         ],
         "stop_and_ask": [
-          "`--codes --markdown` output is not deterministic between runs (ordering) - stop; determinism is S1's to fix, not something to sort around here."
+          "`--codes --markdown` output differs between two runs - determinism is S1's to fix; do not sort around it here.",
+          "The widened regex {2,6} surfaces a code cited in docs that no script emits - that is a real docs bug; report it, do not narrow the regex back."
         ],
         "context_budget_hint": "read_first only; the two scripts and the one suite are the whole surface",
         "provenance": [
@@ -726,6 +867,9 @@
     ],
     "AC3": [
       "S2"
+    ],
+    "AC4": [
+      "S2"
     ]
   },
   "tailoring": {
@@ -733,5 +877,423 @@
     "version": "",
     "applied": [],
     "overrides": []
+  },
+  "review": {
+    "method": "critics",
+    "bundle_digest": "sha256:8f5232cd98866e497f9ab9ed1503d10cb23d7f8fe046a432865d014642978114",
+    "critics": [
+      {
+        "id": "implementer",
+        "context": "fresh",
+        "attempted": "Verified every preflight and the positional-form done_when at 37ae4ae; found no same-edit collision between S1 and S2."
+      },
+      {
+        "id": "tester",
+        "context": "fresh",
+        "attempted": "Ran the positional form and selftest as baselines; enumerated literals and call sites; listed dual-severity codes; confirmed no import cycle and that argparse can accept an optional positional without breaking the flag check."
+      },
+      {
+        "id": "archaeologist",
+        "context": "fresh",
+        "attempted": "Re-opened every path:line; re-ran the ruled-out search for dynamic codes with a multi-line scan (191 + 5 literals, none dynamic); counted BAT codes; confirmed no tests/ and the manifest's wrong guess."
+      },
+      {
+        "id": "stakeholder",
+        "context": "fresh",
+        "attempted": "Read the source text against the criteria and the subtask titles."
+      }
+    ],
+    "findings": [
+      {
+        "id": "ARC-F1",
+        "critic": "archaeologist",
+        "severity": "blocking",
+        "locator": "evidence.change_surface[4]",
+        "claim": "codes.md trips 'SKILL.md mentions every reference file' with SKILL.md out of scope",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "fixed: SKILL.md joins S2's change surface (row, Scripts bullet, 'six suites'); Q1 withdrawn - the gate at selftest.py:609 answers it."
+      },
+      {
+        "id": "ARC-F2",
+        "critic": "archaeologist",
+        "severity": "major",
+        "locator": "evidence.conventions[5]",
+        "claim": "docs-suite regex {3,6} never matches AC/DT codes",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "S2 widens it to {2,6}; AC3 example and stop_and_ask cover what that surfaces. A pre-existing bug the critic found."
+      },
+      {
+        "id": "ARC-F3",
+        "critic": "archaeologist",
+        "severity": "major",
+        "locator": "story.technical_notes_human",
+        "claim": "reusing the `real` regex makes the dead-entry check tautological once CODES lands",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D1 amended: registry entries are dict keys, `\"CODE\": (`; 'emitted' is defined as call-site syntax (D4). The two are syntactically disjoint, and AC3's dead-entry example says so."
+      },
+      {
+        "id": "ARC-F4",
+        "critic": "archaeologist",
+        "severity": "major",
+        "locator": "story.technical_notes_human",
+        "claim": "criteria.py emits AC003/AC010/AC011/AC012; AC012 nowhere else",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D4: criteria.py is an emitter with its own CODES; its line is cited; AC1 requires the AC012 line."
+      },
+      {
+        "id": "ARC-F5",
+        "critic": "archaeologist",
+        "severity": "major",
+        "locator": "evidence.conventions[0]",
+        "claim": "validate.py:158 is a blank line",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "cited line corrected to 164 (first rep.error); the alias at 1129 added to the convention."
+      },
+      {
+        "id": "ARC-F6",
+        "critic": "archaeologist",
+        "severity": "minor",
+        "locator": "evidence.conventions[3]",
+        "claim": "SKILL.md:821 only half of the claim; 843 says 'six suites' while there are sixteen",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "convention split into its two citations; the 'six suites' sentence is in S2's SKILL.md edit."
+      },
+      {
+        "id": "ARC-F7",
+        "critic": "archaeologist",
+        "severity": "minor",
+        "locator": "evidence.repos[0].sha",
+        "claim": "evidence pinned to a837f43 while intake.py was dirty",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "the intake.py change is committed as 37ae4ae; evidence re-pinned there. No cited line moved."
+      },
+      {
+        "id": "IMP-F1",
+        "critic": "implementer",
+        "severity": "blocking",
+        "locator": "subtasks[1].agent_brief.done_when[2]",
+        "claim": "selftest PASS unattainable while SKILL.md is forbidden",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "fixed: SKILL.md joins S2's change surface (row, Scripts bullet, 'six suites'); Q1 withdrawn - the gate at selftest.py:609 answers it."
+      },
+      {
+        "id": "IMP-F2",
+        "critic": "implementer",
+        "severity": "blocking",
+        "locator": "subtasks[0].agent_brief.stop_and_ask[1]",
+        "claim": "stop condition already true at HEAD (summary.py, selftest.py hold literals)",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "reworded to *calls* passing a literal; consumers named as expected; ruled_out entry added."
+      },
+      {
+        "id": "IMP-F3",
+        "critic": "implementer",
+        "severity": "major",
+        "locator": "subtasks[0].agent_brief.done_when[6]",
+        "claim": "DOD001 emitted through an alias, missed by the counting assertion",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "'emitted' defined mechanically to include report(/add( and \"code\": values; count recomputed (160); DOD001 severity is 'config' (D6)."
+      },
+      {
+        "id": "IMP-F4",
+        "critic": "implementer",
+        "severity": "major",
+        "locator": "subtasks[0].agent_brief.preflight[2]",
+        "claim": "191 conflated with registry size",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "expect text now says 191 call-site lines, not the registry size; the distinct count lives in done_when."
+      },
+      {
+        "id": "IMP-F5",
+        "critic": "implementer",
+        "severity": "major",
+        "locator": "subtasks[0].agent_brief.done_when[0]",
+        "claim": "grouped output style contradicts '^CODE' greps; line format never stated",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D5 fixes the format: one TSV line per code; greps updated to match it."
+      },
+      {
+        "id": "IMP-F6",
+        "critic": "implementer",
+        "severity": "major",
+        "locator": "subtasks[0].human",
+        "claim": "BAT's phase label withheld",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D3 now states '9 batch'; done_when asserts it."
+      },
+      {
+        "id": "IMP-F7",
+        "critic": "implementer",
+        "severity": "major",
+        "locator": "subtasks[1].agent_brief.done_when[1]",
+        "claim": "grep words for the new checks never fixed",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "the five check names are given verbatim in the objective; done_when counts `^ok +codes: `."
+      },
+      {
+        "id": "IMP-F8",
+        "critic": "implementer",
+        "severity": "major",
+        "locator": "subtasks[1].agent_brief.objective",
+        "claim": "no computable definition of 'emitted' for S2",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D4's regex is the definition, shared by S1's assertion and S2's check."
+      },
+      {
+        "id": "IMP-F9",
+        "critic": "implementer",
+        "severity": "minor",
+        "locator": "subtasks[0].agent_brief.objective",
+        "claim": "how validate.py reaches batch.py's CODES",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D4: lazy import inside the --codes handler; neither module imports validate (verified: batch imports argparse/json/sys; criteria argparse/difflib/json/re/sys)."
+      },
+      {
+        "id": "IMP-F10",
+        "critic": "implementer",
+        "severity": "minor",
+        "locator": "subtasks[0].agent_brief.conventions[0]",
+        "claim": "line 158 blank; 'skills/' prefix",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "line corrected to 164. The prefix stays: citations are `repo/path:line` (SKILL.md:68) and the repo is named `skills` with path `.` - disputed on that half."
+      },
+      {
+        "id": "IMP-F11",
+        "critic": "implementer",
+        "severity": "minor",
+        "locator": "subtasks[0].human",
+        "claim": "behaviour with neither bundle nor --codes, and --markdown alone, unspecified",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "AC1 boundary example: both are argparse usage errors, exit 2; done_when checks each."
+      },
+      {
+        "id": "TES-F1",
+        "critic": "tester",
+        "severity": "blocking",
+        "locator": "story.non_goals[1]",
+        "claim": "SKILL.md non-goal makes PASS unattainable",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "fixed: SKILL.md joins S2's change surface (row, Scripts bullet, 'six suites'); Q1 withdrawn - the gate at selftest.py:609 answers it."
+      },
+      {
+        "id": "TES-F2",
+        "critic": "tester",
+        "severity": "major",
+        "locator": "story.acceptance_criteria[0].examples[1]",
+        "claim": "ten dual-severity codes, not one; a wrong severity column is never caught",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D6: severity authored and checked against call sites; AC3 gains the severity example; AC1's example now uses READY003/BAS003/DOD001."
+      },
+      {
+        "id": "TES-F3",
+        "critic": "tester",
+        "severity": "major",
+        "locator": "story.acceptance_criteria[0].examples[0]",
+        "claim": "BAT phase unspecified; adding it may change validator output",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D3 states '9 batch' and why main()'s output cannot change (no validation run emits BAT); non_goal[1] records it."
+      },
+      {
+        "id": "TES-F4",
+        "critic": "tester",
+        "severity": "major",
+        "locator": "story.acceptance_criteria[1]",
+        "claim": "'PHASE_OF order' has two readings; the byte gate would oscillate",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D5: sorted by (phase label, code), the ordering main() already uses."
+      },
+      {
+        "id": "TES-F5",
+        "critic": "tester",
+        "severity": "major",
+        "locator": "subtasks[0].agent_brief.done_when[6]",
+        "claim": "call-site count 153 vs distinct 154",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "same as IMP-F3."
+      },
+      {
+        "id": "TES-F6",
+        "critic": "tester",
+        "severity": "major",
+        "locator": "story.acceptance_criteria[2].examples[2]",
+        "claim": "'assertion count' does not exist in selftest output",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "example now 'all four codes: checks print ok'; observability row corrected."
+      },
+      {
+        "id": "TES-F7",
+        "critic": "tester",
+        "severity": "major",
+        "locator": "story.acceptance_criteria[0]",
+        "claim": "--codes with --json/--strict/--flat, and --markdown alone, unspecified",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "AC1 examples: --json emits a list; --strict/--flat/--config ignored; --markdown alone is a usage error."
+      },
+      {
+        "id": "TES-F8",
+        "critic": "tester",
+        "severity": "minor",
+        "locator": "subtasks[1].agent_brief.done_when[1]",
+        "claim": "grep pattern already matches existing ok lines",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "pattern is now `^ok +codes: ` with an exact count of 5."
+      },
+      {
+        "id": "TES-F9",
+        "critic": "tester",
+        "severity": "minor",
+        "locator": "story.acceptance_criteria[1].examples[0]",
+        "claim": "CRLF checkouts fail a byte-identical gate",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "AC2 compares LF-normalised text; example added; done_when strips \\r on both sides."
+      },
+      {
+        "id": "TES-F10",
+        "critic": "tester",
+        "severity": "minor",
+        "locator": "story.non_functional.failure",
+        "claim": "'cannot fail on bundle content' untested; main() opens the bundle first",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D6: dispatch before the bundle is read; AC1 example `nope.json --codes` exits 0."
+      },
+      {
+        "id": "STA-F1",
+        "critic": "stakeholder",
+        "severity": "blocking",
+        "locator": "story.non_goals[1]",
+        "claim": "SKILL.md out of scope makes the story unshippable",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "fixed: SKILL.md joins S2's change surface (row, Scripts bullet, 'six suites'); Q1 withdrawn - the gate at selftest.py:609 answers it."
+      },
+      {
+        "id": "STA-F2",
+        "critic": "stakeholder",
+        "severity": "blocking",
+        "locator": "open_questions",
+        "claim": "asked.when/channel fabricated as 'alexander.pino'",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "the invented `asked` values removed. Q1-Q3 are withdrawn - each turned out to be answered by evidence (the gate, the source text, D6) - so nothing is recorded as asked. The refinement itself broke `no-invented-metadata`; the critic caught it."
+      },
+      {
+        "id": "STA-F3",
+        "critic": "stakeholder",
+        "severity": "major",
+        "locator": "story.intake.dimensions[3]",
+        "claim": "Q2 asks what the source text already requires",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "Q2 withdrawn; success_signal is `present` with the source quote."
+      },
+      {
+        "id": "STA-F4",
+        "critic": "stakeholder",
+        "severity": "major",
+        "locator": "story.acceptance_criteria[1].rule",
+        "claim": "ordering ambiguous; BAT phase undecided",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D3 + D5."
+      },
+      {
+        "id": "STA-F5",
+        "critic": "stakeholder",
+        "severity": "major",
+        "locator": "story.acceptance_criteria[2].examples[1]",
+        "claim": "'no script emits' undefined; the check could never fail",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "D4's mechanical definition; registry keys are dict syntax the call-site regex cannot match."
+      },
+      {
+        "id": "STA-F6",
+        "critic": "stakeholder",
+        "severity": "major",
+        "locator": "story.acceptance_criteria[0].rule",
+        "claim": "a stub meaning satisfies every criterion",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "AC4 added: six words minimum, not the code, no placeholder; a fifth selftest check."
+      },
+      {
+        "id": "STA-F7",
+        "critic": "stakeholder",
+        "severity": "major",
+        "locator": "story.acceptance_criteria[0].examples[2]",
+        "claim": "'nothing changes for today's users' had no criterion",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "AC1 boundary examples pin the usage error, and done_when runs the documented positional form; non_goal[1] pins main()'s output."
+      },
+      {
+        "id": "STA-F8",
+        "critic": "stakeholder",
+        "severity": "minor",
+        "locator": "decisions[5]",
+        "claim": "Q3 misstates the dual-severity set and DOD001's mechanism",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "Q3 withdrawn; D6 records the ten codes and DOD001's config-driven severity."
+      },
+      {
+        "id": "STA-F9",
+        "critic": "stakeholder",
+        "severity": "minor",
+        "locator": "subtasks[0].title",
+        "claim": "--markdown owned by no subtask",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "S1's objective and human text own --markdown and --json explicitly."
+      },
+      {
+        "id": "STA-F10",
+        "critic": "stakeholder",
+        "severity": "minor",
+        "locator": "story.summary_human",
+        "claim": "55 of 153 unchecked; half a day for ~150 meanings",
+        "failure": "see critic packet result, recorded verbatim in evals/self-run/reviews/results.json",
+        "status": "fixed",
+        "resolution": "recounted mechanically: 56 of 160; S1 raised to 1.0d."
+      },
+      {
+        "id": "ARC-F4b",
+        "critic": "archaeologist",
+        "severity": "major",
+        "locator": "decisions[3]",
+        "claim": "Follow-up from ARC-F4 during resolution: criteria.py emits (\"WARN\", \"AC012\", ...) tuples, so the first mechanical definition of 'emitted' (call-first-argument or a \"code\" key) still counted criteria.py as zero.",
+        "failure": "AC012 would again be the code --codes calls invented, with a green gate behind it.",
+        "status": "fixed",
+        "resolution": "the definition gained criteria.py's tuple shape; count is 160, and the AC1 example for AC012 now has teeth."
+      }
+    ]
   }
 }

@@ -1,0 +1,48 @@
+{
+ "archaeologist": [
+  "change_surface[4] SKILL.md read-only while codes.md trips 'SKILL.md mentions every reference file' (blocking)",
+  "conventions[4] docs regex {3,6} skips AC/DT (major)",
+  "technical_notes reusing `real` makes the dead-entry check tautological (major)",
+  "criteria.py emits AC003/AC010/AC011/AC012 (major)",
+  "conventions[0] validate.py:158 is blank (major)",
+  "conventions[3] SKILL.md:821 half-claim; :843 'six suites' stale (minor)",
+  "repos[0].sha dirty tree (minor)"
+ ],
+ "implementer": [
+  "done_when[2] PASS unattainable with SKILL.md forbidden (blocking)",
+  "stop_and_ask[1] already true at HEAD (blocking)",
+  "done_when[6] DOD001 alias missed (major)",
+  "preflight[2] 191 vs registry size (major)",
+  "done_when[0] grouped style vs ^CODE greps (major)",
+  "human BAT label withheld (major)",
+  "S2 done_when[1] grep words unfixed (major)",
+  "S2 objective 'emitted' undefined (major)",
+  "how validate reaches batch CODES (minor)",
+  "conventions[0] line 158 / 'skills/' prefix (minor)",
+  "no-bundle / --markdown-alone unspecified (minor)"
+ ],
+ "tester": [
+  "non_goals[1] PASS unattainable (blocking)",
+  "AC1 ex[1] ten dual-severity codes, column uncheckable (major)",
+  "AC1 ex[0] BAT phase unspecified (major)",
+  "AC2 two orderings, gate oscillates (major)",
+  "done_when[6] 153 vs 154 (major)",
+  "AC3 ex[2] no assertion count exists (major)",
+  "AC1 flag combinations unspecified (major)",
+  "S2 done_when[1] grep matches existing lines (minor)",
+  "AC2 CRLF (minor)",
+  "nfr.failure untested, bundle opened first (minor)"
+ ],
+ "stakeholder": [
+  "non_goals[1] unshippable (blocking)",
+  "open_questions[*].asked fabricated (blocking)",
+  "Q2 already answered by the source (major)",
+  "AC2 ordering ambiguous (major)",
+  "AC3 'no script emits' undefined (major)",
+  "AC1 stub meanings pass (major)",
+  "'nothing changes' has no criterion (major)",
+  "Q3 misstates dual-severity set (minor)",
+  "--markdown unowned (minor)",
+  "55/153 and 0.5d unchecked (minor)"
+ ]
+}
