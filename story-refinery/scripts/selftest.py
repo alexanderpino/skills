@@ -3,7 +3,7 @@
 
   python selftest.py
 
-Twelve suites:
+Thirteen suites:
   1. Validator gates  - mutate the golden bundle, assert each gate fires
   2. Config parsing   - the YAML subset, including the cases that bit us
   3. Markup           - wiki / ADF / HTML / plaintext conversion
@@ -13,9 +13,10 @@ Twelve suites:
   7. Triage           - the label policy, its precedence, and what it reports
   8. Criterion codes  - assigning them, and them still meaning the same thing later
   9. Discussion summary - the one screen a refiner talks from
- 10. Batch            - what only shows up when several bundles are read together
- 11. Adversarial review - digests, locators, and that a critic packet really is blind
- 12. Docs consistency - SKILL.md against the scripts and validator codes it cites
+ 10. Round trip       - a ticket read back into a bundle, and what shipped
+ 11. Batch            - what only shows up when several bundles are read together
+ 12. Adversarial review - digests, locators, and that a critic packet really is blind
+ 13. Docs consistency - SKILL.md against the scripts and validator codes it cites
 
 A validator nobody has tried to break is a validator nobody should trust, and the
 same goes for the config reader that decides which gates run at all.
@@ -581,7 +582,7 @@ def suite_pipeline():
 def suite_docs():
     """SKILL.md is the interface. A flag that no longer exists, or a reference file
     that was renamed, breaks the skill just as thoroughly as a bad regex."""
-    print("\n-- 12. docs consistency --")
+    print("\n-- 13. docs consistency --")
     import re
     with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
         skill = fh.read()
@@ -929,10 +930,89 @@ def suite_summary():
     check("summary: an empty bundle has no critical path", S.critical_path([]) == (0.0, []))
 
 
+def suite_roundtrip():
+    """A ticket has to be readable back into a bundle, because in a real team the
+    stored bundle is on somebody else's laptop. And progress has to be recordable,
+    because a plan that never learns what shipped keeps deleting work that exists."""
+    print("\n-- 10. round trip and progress --")
+    import ingest as I
+    import progress as P
+
+    with open(GOLDEN, encoding="utf-8") as fh:
+        golden = json.load(fh)
+    tmp = tempfile.mkdtemp(prefix="refinery-rt-")
+    try:
+        emit = os.path.join(HERE, "emit.py")
+        code, out = run([emit, GOLDEN, "--config", CONFIG, "--adapter", "markdown",
+                         "--out", "out"], tmp)
+        text = open(os.path.join(tmp, "out", "preview.md"), encoding="utf-8").read()
+        back, edited = I.ingest(text)
+
+        check("ingest: the criterion codes come back attached to their rules",
+              [(c["id"], c["rule"]) for c in back["story"]["acceptance_criteria"]]
+              == [(c["id"], c["rule"]) for c in golden["story"]["acceptance_criteria"]])
+        check("ingest: the subtask table round-trips, dependencies and estimates included",
+              [(s["id"], s["repo"], tuple(s["depends_on"]), s["estimate_days"])
+               for s in back["subtasks"]]
+              == [(s["id"], s["repo"], tuple(s.get("depends_on") or []), s["estimate_days"])
+                  for s in golden["subtasks"]])
+        check("ingest: every agent brief is recovered from its markers",
+              sum(1 for s in back["subtasks"] if s.get("agent_brief")) == 7)
+        check("ingest: the decision table survives the trip",
+              len(back["story"]["decision_table"]["rules"]) == 6)
+        check("ingest: questions keep their owner and whether they block",
+              len(back["open_questions"]) == 5
+              and back["open_questions"][0]["owner"] == "Marieke (Finance)")
+        check("ingest: nothing was edited, so nothing is reported", not edited)
+        check("ingest: it does not invent the evidence it cannot see",
+              not back.get("evidence") and "intake" not in back["story"])
+        codes = {i["code"] for i in validate(back, load_config(CONFIG)).items}
+        check("ingest: an imported bundle is honestly not ready until re-derived",
+              "INT001" in codes and "EVI001" in codes, sorted(codes)[:6])
+
+        tampered = text.replace('"Do not change anything in the api repo."',
+                                '"Feel free to touch the api repo too."', 1)
+        _, edited = I.ingest(tampered)
+        check("ingest: a brief edited in the tracker is caught by its own hash",
+              len(edited) == 1 and edited[0][0] == "web", edited)
+
+        moved = copy.deepcopy(golden)
+        P.apply_states(moved, {"S0": "done", "S1": "done", "S2": "started"}, "standup")
+        _, counted, done_days, total = P.summarise(moved)
+        check("progress: what shipped is recorded with its source",
+              counted["done"] == ["S0", "S1"] and counted["started"] == ["S2"]
+              and (moved["story"]["progress"]["source"] == "standup"))
+        check("progress: days done are counted against the total",
+              abs(done_days - 1.0) < 0.01 and abs(total - 2.75) < 0.01, (done_days, total))
+        check("progress: an unknown subtask id is refused, not recorded",
+              P.apply_states(moved, {"S99": "done"}, "x") == ["S99"]
+              and "S99" not in moved["story"]["progress"]["subtasks"])
+
+        # Dropping a subtask that already shipped must not read like a plan change.
+        prior = os.path.join(tmp, "prior.json")
+        nxt = os.path.join(tmp, "next.json")
+        with open(prior, "w", encoding="utf-8") as fh:
+            json.dump(moved, fh)
+        shrunk = copy.deepcopy(moved)
+        shrunk["subtasks"] = [s for s in shrunk["subtasks"] if s["id"] not in ("S1", "S5")]
+        shrunk["coverage"] = {"AC1": ["S2"], "AC2": ["S2"], "AC3": ["S2", "S3"], "AC4": ["S4"]}
+        with open(nxt, "w", encoding="utf-8") as fh:
+            json.dump(shrunk, fh)
+        code, out = run([emit, nxt, "--config", CONFIG, "--previous", prior,
+                         "--out", "out_upd3", "--allow-not-ready"], tmp)
+        plan = json.load(open(os.path.join(tmp, "out_upd3", "push-plan.json")))
+        check("progress: an orphan that already shipped is separated from one that did not",
+              plan["orphans_already_underway"] == ["S1"] and set(plan["orphans"]) == {"S1", "S5"},
+              plan["orphans_already_underway"])
+        check("progress: and it is said out loud", "deleting work that exists" in out, out[-300:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def suite_batch():
     """Several related stories in one run. These are the findings that do not exist
     for one bundle: they only appear when the bundles are read side by side."""
-    print("\n-- 10. batch --")
+    print("\n-- 11. batch --")
     import batch as B
 
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -1012,7 +1092,7 @@ def suite_batch():
 def suite_review():
     """The critic packets are the only mechanical guarantee of blindness in the
     skill. If the reasoning leaks into one, the panel is grading the reasoning."""
-    print("\n-- 11. adversarial review --")
+    print("\n-- 12. adversarial review --")
     from review import (CRITICS, DEFAULT_PANEL, cmd_check, content_digest,
                         render_brief, resolve_locator)
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -1103,6 +1183,7 @@ def main():
     suite_triage()
     suite_criteria()
     suite_summary()
+    suite_roundtrip()
     suite_batch()
     suite_review()
     suite_docs()

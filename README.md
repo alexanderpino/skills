@@ -105,7 +105,7 @@ skills/
 │   ├── SKILL.md                       # router + the refinement phases
 │   ├── references/                    # load-on-demand deep dives (intake, evidence, AC, example
 │   │                                  #   design, risk & options, decomposition, critique…)
-│   ├── scripts/                       # bundle tooling (triage/evidence/intake/criteria/validate/review/summary/batch/emit)
+│   ├── scripts/                       # bundle tooling (triage/evidence/intake/criteria/validate/review/summary/batch/emit/ingest/progress)
 │   ├── assets/                        # bundle schema, skeleton, worked example, ticket templates
 │   └── evals/                         # trigger + behaviour evals
 ├── terrain-architect/                # unpacked, reviewable skill

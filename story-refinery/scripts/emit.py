@@ -23,6 +23,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _yaml import get, load_config  # noqa: E402
 from markup import render_markup  # noqa: E402
+from validate import validate  # noqa: E402
 
 SINKS = ("description_tail", "comment", "attachment", "repo_file", "custom_field")
 CAPABILITIES = {
@@ -576,6 +577,9 @@ def main(argv=None):
     ap.add_argument("--adapter", help="override tracker.adapter")
     ap.add_argument("--markup", choices=["markdown", "wiki", "adf", "html", "plaintext"],
                     help="override the output markup; defaults to the adapter's own")
+    ap.add_argument("--allow-not-ready", action="store_true",
+                    help="render a bundle that does not validate. The preview stays useful for "
+                         "discussion; the push plan is stamped not-ready either way")
     ap.add_argument("--previous", help="a previous bundle.json - emit an update plan "
                                        "instead of a create plan")
     args = ap.parse_args(argv)
@@ -636,12 +640,22 @@ def main(argv=None):
 
     links = plan_links(bundle, caps, warnings)
     plan_waves = waves(bundle.get("subtasks") or [])
-    delta = None
+    delta, prior_progress = None, None
     if args.previous:
         with open(args.previous, "r", encoding="utf-8") as fh:
-            delta = diff_bundles(json.load(fh), bundle)
+            prior = json.load(fh)
+        prior_progress = (prior.get("story") or {}).get("progress") or {}
+        delta = diff_bundles(prior, bundle)
 
-    preview = ["# Push preview — %s %s" % (key, bundle["story"].get("title", "")), "",
+    report = validate(json.loads(json.dumps(bundle)), cfg)
+    blocking = [i for i in report.items if i["severity"] == "ERROR"]
+    preview = ["# Push preview — %s %s" % (key, bundle["story"].get("title", "")), ""]
+    if blocking:
+        preview += ["> **This story is not ready.** %d finding(s) block it, starting with "
+                    "`%s` %s. Everything below is real and worth discussing; none of it is "
+                    "worth pushing yet."
+                    % (len(blocking), blocking[0]["code"], blocking[0]["message"]), ""]
+    preview += ["",
                "Adapter: **%s** · markup: %s · subtasks: %s · agent brief sink: **%s**"
                % (adapter, caps["markup"], caps["subtasks"], sink), ""]
     tailoring = bundle.get("tailoring") or {}
@@ -699,7 +713,16 @@ def main(argv=None):
     with open(os.path.join(args.out, "preview.md"), "w", encoding="utf-8") as fh:
         fh.write("\n".join(preview))
 
+    # A push plan for a bundle that does not validate must not look pushable. It is
+    # still rendered - a preview is how you discuss a story that is not ready yet -
+    # but nothing downstream gets to mistake it for a green one.
+    report = validate(json.loads(json.dumps(bundle)), cfg)
+    blocking = [i for i in report.items if i["severity"] == "ERROR"]
+
     plan = {
+        "ready": not blocking,
+        "blocking": [{"code": i["code"], "where": i["where"], "message": i["message"]}
+                     for i in blocking[:10]],
         "adapter": adapter, "project": get(cfg, "tracker.project", ""),
         "capabilities": {k: v for k, v in caps.items() if not k.startswith("_")},
         "agent_brief_sink": sink,
@@ -716,6 +739,11 @@ def main(argv=None):
                    + [i["id"] for i in items if delta and i["role"] == "subtask"
                       and i["id"] in delta["subtasks_changed"]],
         "orphans": delta["subtasks_removed"] if delta else [],
+        # An orphan nobody has touched is a plan change. An orphan that shipped is a
+        # deletion of work that exists, and the two must not read the same.
+        "orphans_already_underway": sorted(
+            sid for sid in (delta["subtasks_removed"] if delta else [])
+            if ((prior_progress or {}).get("subtasks") or {}).get(sid) in ("done", "started")),
         "waves": plan_waves,
         "shared_context": "context/%s" % ctx_name,
         "links": links,
@@ -727,12 +755,21 @@ def main(argv=None):
 
     print("wrote %s/preview.md, push-plan.json, context/%s, %d payload(s), default sink=%s, "
           "%d wave(s)" % (args.out, ctx_name, len(items), sink, len(plan_waves)))
+    if delta and plan["orphans_already_underway"]:
+        print("  ! %s were dropped from the plan and are already done or in progress. That is "
+              "not a plan change, it is deleting work that exists - say so before pushing."
+              % ", ".join(plan["orphans_already_underway"]))
     if delta:
         print("  mode=update: +%d subtask(s), ~%d changed, -%d orphaned"
               % (len(delta["subtasks_added"]), len(delta["subtasks_changed"]),
                  len(delta["subtasks_removed"])))
     for w in warnings:
         print("  note: %s" % w)
+    if blocking:
+        print("NOT READY  %d blocking finding(s); push-plan.json is stamped ready=false."
+              % len(blocking))
+        print("Show preview.md and the findings. Do not push. Run validate.py for the list.")
+        return 0 if args.allow_not_ready else 1
     print("Show preview.md to the user. Do not push until they approve.")
     return 0
 

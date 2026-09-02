@@ -48,6 +48,26 @@ INVARIANTS = ("evidence-or-assumption", "no-invented-metadata", "not-ready-is-re
               "no-decomposition-without-intake", "stop-at-the-seam", "disclosure")
 # Beyond this, the table is telling you the story is too big to refine as one.
 MAX_TABLE_COMBINATIONS = 512
+# Which phase a finding belongs to, so a half-written bundle reports "these four are
+# yours right now" instead of thirty-three findings in one flat list.
+PHASE_OF = {
+    "CFG": "0 configure", "TLR": "0 configure",
+    "TRI": "1 triage", "INT": "1 intake", "CYN": "1 intake", "IMP": "1 intake",
+    "EVI": "2 evidence", "PND": "2 evidence", "SER": "2 evidence",
+    "AC": "3 criteria", "DT": "3 criteria", "NFR": "3 criteria", "BUD": "3 criteria",
+    "DEC": "4 decisions", "RSK": "4 decisions", "READY": "4 decisions",
+    "SUB": "5 decompose", "DAG": "5 decompose", "PAR": "5 decompose",
+    "COV": "5 decompose", "CON": "5 decompose", "SPL": "5 decompose",
+    "BRF": "6 briefs", "DOD": "6 briefs",
+    "REV": "8 review", "LNK": "9 emit", "STRUCT": "0 configure",
+}
+
+
+def phase_of(code):
+    for prefix in sorted(PHASE_OF, key=len, reverse=True):
+        if code.startswith(prefix):
+            return PHASE_OF[prefix]
+    return "9 other"
 
 # Every key the scripts actually read. Anything else in refinery.yaml is a typo or a
 # leftover, and is reported rather than silently ignored.
@@ -1270,6 +1290,8 @@ def main(argv=None):
     ap.add_argument("--config", default="refinery.yaml")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--strict", action="store_true", help="treat warnings as errors")
+    ap.add_argument("--flat", action="store_true",
+                    help="one finding per line, ungrouped - the pre-phase output")
     args = ap.parse_args(argv)
 
     try:
@@ -1292,10 +1314,22 @@ def main(argv=None):
         print(json.dumps({"ready": ready, "errors": errors, "warnings": warns,
                           "findings": rep.items}, indent=2))
     else:
-        for severity in ("ERROR", "WARN"):
-            for item in [i for i in rep.items if i["severity"] == severity]:
-                print("%-5s %-9s %-28s %s" % (severity, item["code"], item["where"],
-                                              item["message"]))
+        if args.flat:
+            for severity in ("ERROR", "WARN"):
+                for item in [i for i in rep.items if i["severity"] == severity]:
+                    print("%-5s %-9s %-28s %s" % (severity, item["code"], item["where"],
+                                                  item["message"]))
+        else:
+            grouped = {}
+            for item in rep.items:
+                grouped.setdefault(phase_of(item["code"]), []).append(item)
+            for phase in sorted(grouped):
+                print("\n-- phase %s --" % phase)
+                for severity in ("ERROR", "WARN"):
+                    for item in [i for i in grouped[phase] if i["severity"] == severity]:
+                        print("  %-5s %-9s %-26s %s" % (severity, item["code"], item["where"],
+                                                        item["message"]))
+            print("")
         print("\n%s  %d error(s), %d warning(s)"
               % ("READY" if ready else "NOT READY", errors, warns))
         if errors:

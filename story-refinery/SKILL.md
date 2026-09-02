@@ -38,7 +38,7 @@ python scripts/evidence.py manifest --config refinery.yaml
 python scripts/evidence.py scan --config refinery.yaml -q "<domain noun>" -q "<symbol>"
 cp assets/templates/bundle.skeleton.json bundle.json    # author this, phase by phase
 python scripts/intake.py assess --bundle bundle.json --write   # enough information? stop if not
-python scripts/validate.py bundle.json --config refinery.yaml
+python scripts/validate.py bundle.json --config refinery.yaml   # findings grouped by phase
 python scripts/review.py brief --bundle bundle.json --out reviews/   # blind critics tear it apart
 python scripts/review.py digest --bundle bundle.json --stamp        # after you fix what they found
 python scripts/emit.py bundle.json --config refinery.yaml --out out/
@@ -671,6 +671,34 @@ answer nobody has yet are fiction you will defend later.
 Stories get refined more than once. The second pass must update the existing
 tree, not build a parallel one:
 
+**When the stored bundle is gone** - a different person, a different machine, or
+it was never kept - read the ticket back rather than starting from its text:
+
+```bash
+python scripts/ingest.py ticket --file description.md --key ABC-123 --out prior.json
+```
+
+It recovers the projections: the criteria with their codes, the subtask table,
+the decision table, the questions, and every agent brief still in its markers,
+each checked against its embedded hash - which is how you find out somebody
+edited a brief in the tracker. It recovers no evidence, because none of it was
+ever in the ticket, and it says so rather than guessing: `evidence`, `intake`,
+`tracker_meta`, `triage`, `review` and `tailoring` are re-derived. An imported
+bundle does not validate until you do, which is correct. The codes came back; the
+evidence did not.
+
+**Record what has landed**, or the second pass keeps deleting work that exists:
+
+```bash
+python scripts/progress.py set --bundle bundle.json --done S1 S2 --source "standup" --write
+```
+
+This skill never calls a tracker, so the state is handed to it - typed in, or as
+a status file the session fetched (`progress.py from --statuses`). What it buys:
+`emit --previous` separates an orphan nobody touched, which is a plan change,
+from one that is already done or in progress, which is deleting work that exists
+and is said out loud before anyone pushes.
+
 ```bash
 python scripts/emit.py bundle.json --config refinery.yaml --previous prior-bundle.json
 ```
@@ -746,6 +774,10 @@ All stdlib-only Python 3, no dependencies, no network.
   meaning the same thing across re-refinements
 - `scripts/summary.py` - one screen to discuss, for one story or a batch; works on
   an unfinished bundle
+- `scripts/ingest.py` - read a rendered ticket back into a bundle when the stored
+  one is gone; verifies each brief's hash
+- `scripts/progress.py` - `set` | `from` | `show`; what has landed, so a
+  re-refinement stops treating shipped work as a plan change
 - `scripts/emit.py` - render payloads and a push plan; `--previous` for updates
 - `scripts/markup.py` - markdown to wiki / ADF / HTML / plaintext
 - `scripts/selftest.py` - six suites: validator gates, config parsing, markup
@@ -771,5 +803,5 @@ All stdlib-only Python 3, no dependencies, no network.
   that does not fit, and what to do when a refinement-shaped request arrives with no
   invocation at all. Not a trigger eval: with `disable-model-invocation` set, "would
   Claude load this on its own" is no longer a question with an answer
-- `evals/evals.json` - twenty-two behavioural evals with verifiable expectations, for
+- `evals/evals.json` - twenty-three behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

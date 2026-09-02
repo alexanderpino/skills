@@ -280,6 +280,19 @@
         "If the story is not ready it says so in the summary rather than after it",
         "Nothing was invented to make the summary read better"
       ]
+    },
+    {
+      "id": 23,
+      "prompt": "ABC-123 was refined by Joost three weeks ago and he has left. The Jira ticket is all we have. Finance now wants a fifth criterion. Re-refine it.",
+      "expected_output": "The ticket read back into a bundle, the evidence re-derived rather than assumed, and the existing criterion codes preserved.",
+      "expectations": [
+        "ingest.py was used to recover the ticket rather than re-typing it from the description",
+        "The recovered criterion codes were kept, and the new criterion took the next free one",
+        "The evidence, intake and review were re-derived, and the response said they had to be rather than treating the import as complete",
+        "Each recovered agent brief's hash was checked, and any tracker-side edit was surfaced instead of overwritten",
+        "The re-refinement used emit --previous against the recovered bundle so the existing tree is updated",
+        "Nothing about the codebase was carried over from the ticket text as if it were evidence"
+      ]
     }
   ]
 }

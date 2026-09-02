@@ -71,6 +71,17 @@
                       "owner": {"type": "string"},
                       "note": {"type": "string"}}}
         },
+        "progress": {
+          "type": "object",
+          "description": "What has actually landed. Handed to the skill (progress.py), never fetched - this skill makes no network calls. A status nobody can date is one nobody should act on, so it carries both.",
+          "properties": {
+            "subtasks": {"type": "object", "additionalProperties": {"enum": ["todo", "started", "done"]}},
+            "updated_at": {"type": "string"},
+            "source": {"type": "string", "description": "Who said so, e.g. 'standup 2026-09-09' or the status file it came from."},
+            "shipped_tickets": {"type": "array", "items": {"type": "string"},
+                                "description": "Other items that have shipped - a pending claim whose provider is here is no longer pending."}
+          }
+        },
         "series": {
           "type": "object",
           "description": "Where this story sits in a stream. Predecessors are the bundles its dossier was inherited from - see references/series.md and `evidence.py inherit`.",

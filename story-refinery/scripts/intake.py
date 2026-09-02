@@ -161,8 +161,31 @@ def detect_kind(text):
     return "bug" if hits >= 2 else "feature"
 
 
+# Enough English function words that a ticket in a third language cannot pass as one.
+ENGLISH_STOPWORDS = r"\b(the|and|that|with|for|from|when|should|would|this|there|which|"\
+                    r"have|has|are|was|were|will|not|but|they|their|user|users)\b"
+
+
+def _stopword_score(text, pattern):
+    """Distinct stopwords, not occurrences. Counting occurrences means four 'de's in a
+    French sentence score as Dutch, after which the whole assessment runs in the wrong
+    language and every check quietly passes."""
+    return len({m.lower() for m in re.findall(pattern, text, re.I)})
+
+
 def detect_lang(text):
-    return "nl" if len(re.findall(DUTCH_STOPWORDS, text, re.I)) >= 4 else "en"
+    return "nl" if _stopword_score(text, DUTCH_STOPWORDS) >= 4 else "en"
+
+
+def language_is_supported(text, lang):
+    """The dimension patterns and the vagueness lexicon are English and Dutch only. A
+    ticket in a third language scores near zero against both, is then assessed as if it
+    were one of them, and passes every check without any of them having looked."""
+    if len(text.split()) < 12:
+        return True                      # too short to judge; 'very short' already flags it
+    best = max(_stopword_score(text, DUTCH_STOPWORDS),
+               _stopword_score(text, ENGLISH_STOPWORDS))
+    return best >= 4
 
 
 def find_signal(text, dimension):
@@ -249,6 +272,11 @@ def assess(text, cfg, kind="auto", lang="auto"):
         verdict = "insufficient"
 
     flags = []
+    if not language_is_supported(text, lang):
+        flags.append("language not recognised as English or Dutch: the dimension patterns and "
+                     "the vagueness lexicon are en/nl only, so this assessment looked at "
+                     "almost nothing. Translate the item, or extend SIGNALS and "
+                     "validation.vagueness_lexicon for your language before trusting it")
     if mechanism_only:
         flags.append("mechanism-only: a solution is named but no outcome - ask what it is for "
                      "before scanning for how to build it")
