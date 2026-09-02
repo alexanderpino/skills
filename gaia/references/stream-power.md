@@ -1,0 +1,139 @@
+---
+type: Technique
+title: Stream power — the erosion backbone at map scale
+description: "The one-line incision law, the O(N) implicit solver that makes it tractable, the companion diffusion term, and the slope-area check that proves it."
+tags: [generation, erosion, stream-power, landscape-evolution, authoring-time]
+status: draft
+generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
+sources:
+  - { id: braun2013, tier: P, locator: "the O(N) stack ordering and the unconditionally stable implicit discretisation" }
+  - { id: cordonnier2016, tier: P, locator: "uplift coupling, the lake-graph handling of local minima inside the loop, and the hillslope-diffusion companion term" }
+  - { id: whipple1999, tier: P, locator: "the stream-power incision model: the roles of m, n, and knickpoint behaviour" }
+  - { id: crosby2006, tier: P, locator: "knickpoint distribution across a network: 236 waterfalls in the Waipaoa" }
+  - { id: culling1960, tier: P, locator: "hillslope transport as diffusion, the D grad^2 h term" }
+---
+# Stream power — the erosion backbone at map scale
+
+Past roughly 50 km of extent, this is the only erosion model that is stable over geological time
+and the only one that produces correct large-scale drainage. Everything it needs comes from
+elsewhere: `U` from `tectonic-uplift.md`, drainage area `A` and the receiver array from
+`flow-routing.md`, and `K` from lithology.
+
+## Use this
+
+**`∂h/∂t = U − K·A^m·S^n + D·∇²h`, solved with the O(N) implicit stack method** [braun2013],
+with depressions handled **inside** the loop [cordonnier2016] and the diffusion term always on
+[culling1960].
+
+`m ≈ 0.5`, `n = 1`. The concavity ratio `m/n ≈ 0.5` is the well-constrained part [whipple1999]:
+it is what makes river long profiles concave and it matches measured rivers. Use `n = 1` unless
+you have a reason; `n` in 1–2 is defensible and the visual difference is subtle.
+
+## Why the solver is the whole difficulty
+
+The equation is one line. The explicit form is unstable under a CFL-like condition that scales
+with `A^m`, and `A` spans six orders of magnitude across a map, so the timestep is dictated by the
+largest river and you need millions of steps. This is why naive implementations either explode or
+take hours.
+
+[braun2013] discretises it implicitly. For `n = 1` the result is linear and closed-form, and the
+receiver has already been updated when you reach a cell, because the stack is ordered base-levels
+first:
+
+```
+stack = buildStack(receivers)               # base levels first — see flow-routing.md
+for i in stack:                             # FORWARD order
+    if receivers[i] == i:                   # base level
+        h[i] += U[i] * Δt;  continue
+    r = receivers[i]
+    f = K * Δt * pow(A[i], m) / dist[i]
+    h[i] = (h[i] + U[i] * Δt + f * h[r]) / (1 + f)
+    h[i] = max(h[i], h[r])                  # never fall below your receiver
+```
+
+Three lines, unconditionally stable, O(N), and it dissects a flat plate under constant uplift into
+a proper dendritic network. `Δt` can be 1000 years or more; a 4k map reaches equilibrium in a few
+hundred steps.
+
+For `n ≠ 1` the implicit equation is nonlinear — guarded Newton–Raphson or bracketed root finding,
+converging in a handful of iterations, and restricted to single-flow routing in mature
+implementations.
+
+**The depression guard belongs inside the solver, not only before it.** Filling before routing is
+not sufficient, because erosion recreates pits as it runs. Never update a cell below its
+already-updated receiver or into a flooded node — the `max(h[i], h[r])` line above is that guard —
+and expose the correction count as a diagnostic that must not grow without bound. Re-running a
+full depression fill every step is O(n log n) per step and dominates the run; [cordonnier2016]
+handles minima with a lake graph inside the loop instead, and that is the version to implement.
+
+## The diffusion term is not optional
+
+Stream power carves channels and leaves the interfluves as unweathered plateaux. `D·∇²h`
+[culling1960] is what gives them hillslopes, and `D` competes with `K` to select **valley
+spacing** — which is the one landscape property the pair exists to set, and the reason the term
+belongs inside the same solver rather than bolted on as a separate pass. Raising `D` widens valley
+spacing; raising `K` tightens it. Past some `D`, diffusion erases the network rather than
+coarsening it.
+
+⚠️ **Sub-cycle strictly, not exactly.** The explicit Laplacian is stable for `D·dt/Δx² ≤ 0.25`, so
+`ceil(D·dt / (0.25·Δx²))` lands *exactly* on 0.25 whenever it divides evenly — and at exactly 0.25
+the checkerboard mode's amplification is −1, so it flips sign forever and never damps. The field
+stays finite and mass stays conserved while the pass **roughens** the terrain. Keep a 0.9 safety
+factor (`c = 0.225`) and assert the *direction* of the effect, not merely that the output is
+finite.
+
+A thermal-erosion pass (`thermal-and-aeolian-erosion.md`) substitutes for the diffusion term, is
+cheaper, and gives repose-angle behaviour as well.
+
+## Knickpoints are outputs, not stamps
+
+A waterfall is a **knickpoint** — a step where the long profile departs from its concave
+equilibrium. There is no waterfall algorithm. With `n = 1` the incision equation is a kinematic
+wave, so a step migrates *upstream* at a celerity set by discharge, preserving its height rather
+than diffusing away [whipple1999]:
+
+```
+C_kp(A) = K * pow(A, m)      # m/yr upstream — larger rivers consume knickpoints faster
+```
+
+Which is why trunk streams have rapids and small tributaries keep their falls — [crosby2006]
+mapped 236 of them doing exactly that. The solver above already *produces* knickpoints wherever
+`K` jumps, and the `max(h[i], h[r])` guard is what preserves the step. So: to get a durable
+waterfall, put a **hard bed across the channel**; to get a migrating one, **drop the base level**
+and let it run. Carving a vertical cliff into the heightfield with uniform `K` gives a step
+nothing pins, and the next pass relaxes it into a rapid.
+
+**What it beats.** *Droplet erosion at map scale* — a droplet's lifetime covers a few hundred
+metres, so a 100 km map gets scratches, not valleys. *Pipe erosion at map scale* — bounded by CFL
+on a timestep measured in seconds, when the process being modelled takes 10⁶ years. *The explicit
+stream-power solver* — same equation, timestep set by the largest drainage area, so millions of
+steps and it still explodes. *Stream power on a 500 m map* — produces nothing, because there is no
+drainage area worth speaking of; use `hydraulic-erosion.md`. *A terrace node for strata steps* —
+quantises absolute elevation, so the steps cut across valleys instead of following bed geometry.
+
+**Time budget.** Strictly authoring-time, and it is the cheapest of the three erosion backbones per
+unit of simulated time precisely because `Δt` is unbounded: push it to 100–5000 years and take
+hundreds of steps rather than millions. What costs is the per-step routing — receivers, stack,
+accumulation — which is why the in-loop depression handling matters more than the erosion
+arithmetic. Nothing here runs per frame; a runtime consumes the baked result.
+
+**Verify it, because eyeballing will not.** Plot the main channel's long profile: it must be
+concave. Plot `log(S)` against `log(A)` for channel cells: it must be a straight line of slope
+`−m/n ≈ −0.5`. That check is direct, cheap and quantitative, and it catches implementation errors
+that look fine in a hillshade.
+
+## How this fails, and what it looks like
+
+| Symptom | Mechanism | Fix |
+|---|---|---|
+| The solve explodes, or needs millions of steps | Explicit discretisation; `Δt` bounded by the largest `A^m` | The implicit stack solve [braun2013] |
+| Knife-edge interfluves between channels | The diffusion term omitted | Add `D·∇²h`, or a thermal pass |
+| The diffusion pass roughens instead of smoothing | Sub-cycling landing exactly on `D·dt/Δx² = 0.25`; the checkerboard mode never damps | `c = 0.225` |
+| The network is erased rather than coarsened | `D` too high relative to `K` | Lower `D`; measure valley spacing, not channel count |
+| Cells sinking below their receivers; pits reappearing | Erosion recreating depressions mid-run | The `max(h[i], h[r])` guard, and in-loop lake handling [cordonnier2016] |
+| Each step costs O(n log n) and the run crawls | A full depression fill re-run every step | Lake graph inside the loop [cordonnier2016] |
+| `log S` vs `log A` is not a straight line of slope −m/n | Wrong drainage area, wrong receiver distances, or an unhandled depression | Fix routing before touching the erosion |
+| A convex long profile | `U` and `K` mis-scaled, or the run stopped far from equilibrium | Check `U × time` against the relief you want |
+| A carved waterfall relaxes into a rapid | Uniform `K`, so nothing pins the step | A hard bed across the channel, then let the solver run |
+| Waterfalls everywhere, including on trunk rivers | Knickpoints stamped rather than produced | Author the cause — a `K` jump or a base-level fall |
+| A flat, featureless result on a small map | No drainage area at this extent | Wrong backbone; use droplet or pipe |

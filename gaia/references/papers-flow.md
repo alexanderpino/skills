@@ -63,12 +63,12 @@ implementer to the wrong paper.
 
 ## Flow routing
 
-- **ocallaghan1984** `P` — O'Callaghan, J.F. & Mark, D.M. (1984). *The extraction of drainage networks from digital elevation data.* Computer Vision, Graphics and Image Processing 28(3), 328–344. — D8.
+- **ocallaghan1984** `P` — O'Callaghan, J.F. & Mark, D.M. (1984). *The extraction of drainage networks from digital elevation data.* Computer Vision, Graphics and Image Processing 28(3), 323–344. — D8.
 - **freeman1991** `P` — Freeman, T.G. (1991). *Calculating catchment area with divergent flow based on a regular grid.* Computers & Geosciences 17(3), 413–422. — MFD with the calibrated exponent p = 1.1.
 - **quinn1991** `P` — Quinn, P., Beven, K., Chevallier, P. & Planchon, O. (1991). *The prediction of hillslope flow paths for distributed hydrological modelling using digital terrain models.* Hydrological Processes 5(1), 59–79. — The sibling MFD variant, p = 1 with contour-length weighting. Not the same method as Freeman.
 - **tarboton1997** `P` — Tarboton, D.G. (1997). *A new method for the determination of flow directions and upslope areas in grid digital elevation models.* Water Resources Research 33(2), 309–319. — D∞, the 8-facet construction.
 - **barnes2014** `P` — Barnes, R., Lehman, C. & Mulla, D. (2014). *Priority-Flood: an optimal depression-filling and watershed-labeling algorithm for digital elevation models.* Computers & Geosciences 62, 117–127. — Depression filling, including the epsilon variant that preserves a gradient across filled basins.
 - **lindsay2016** `P` — Lindsay, J.B. (2016). *Efficient hybrid breaching-filling sink removal methods for flow path enforcement in digital elevation models.* Hydrological Processes 30(6), 846–857. — Breaching, and the hybrid breach/fill policy.
-- **planchon2002** `P` — Planchon, O. & Darboux, F. (2002). *A fast, simple and versatile algorithm to fill the depressions of digital elevation models.* Catena 46(2–3), 159–176. — The other standard fill. [background]
+- **planchon2002** `P` — Planchon, O. & Darboux, F. (2002). *A fast, simple and versatile algorithm to fill the depressions of digital elevation models.* Catena 46(2–3), 159–176. — The other standard fill.
 - **montgomery1992** `P` — Montgomery, D.R. & Dietrich, W.E. (1992). *Channel initiation and the problem of landscape scale.* Science 255(5046), 826–830. — The channel-head threshold in contributing area × slope: where hillslope becomes channel.
 - **braun2013** `P` — Braun, J. & Willett, S.D. (2013). *A very efficient O(n), implicit and parallel method to solve the stream power equation governing fluvial incision and landscape evolution.* Geomorphology 180–181, 170–179. — The O(N) implicit solver. [background]

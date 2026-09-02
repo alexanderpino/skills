@@ -98,7 +98,21 @@ def _split_commas(body: str, where: str) -> list[str]:
 
 
 def _inline_list(raw: str, where: str) -> list:
-    body = raw.strip()[1:-1].strip()
+    """`[a, b, c]` -- one level, closed, no nesting.
+
+    This function originally had NONE of the guards `_inline_map` has, so it carried the exact
+    bug that one was fixed for: `[a, [b, c]]` yielded `['a', '[b', 'c]']`, and `[a, b` (never
+    closed) silently DROPPED the last element. Tags decide a document's routing axis, so a
+    mangled or dropped tag quietly refiles it. Fixing one function and not its sibling is how
+    that survived; they now share the same three rules.
+    """
+    s = raw.strip()
+    if not (s.startswith("[") and s.endswith("]")):
+        raise Unparseable(f"{where}: `{s}` is not a closed inline list")
+    body = s[1:-1].strip()
+    if any(ch in body for ch in "{}[]"):
+        raise Unparseable(f"{where}: nested list or map inside an inline list is outside "
+                          "the subset")
     if not body:
         return []
     return [_scalar(p) for p in _split_commas(body, where)]
@@ -107,7 +121,15 @@ def _inline_list(raw: str, where: str) -> list:
 def parse_front_matter(path: Path) -> tuple[dict, str]:
     """Return (front matter, body). Raises Unparseable rather than guessing."""
     text = path.read_text(encoding="utf-8")
-    lines = text.splitlines()
+    # str.splitlines() breaks on U+2028, U+2029, U+000B, U+000C and U+0085 -- none of which a
+    # reader or a diff sees as a line break. A quoted value containing one could therefore
+    # inject a front-matter key, overwrite `type`, or close the front matter early. Split on
+    # real newlines only, and reject the separators outright so nothing depends on subtlety.
+    for bad in ("\u2028", "\u2029", "\u0085", "\x0b", "\x0c"):
+        if bad in text.split("---")[0] + (text.split("---")[1] if "---" in text[3:] else ""):
+            raise Unparseable(f"{path}: front matter contains U+{ord(bad):04X}, a separator "
+                              "that is invisible in a diff but splits lines")
+    lines = text.replace("\r\n", "\n").split("\n")
     if not lines or lines[0].strip() != _FENCE:
         raise Unparseable(f"{path}: no OKF front matter (first line is not `---`)")
     try:
@@ -142,6 +164,11 @@ def parse_front_matter(path: Path) -> tuple[dict, str]:
             raise Unparseable(f"{where}: `{line.strip()}` is not `key: value`")
         key, raw = line.split(":", 1)
         key, raw = key.strip(), raw.strip()
+        # A repeated key silently overwrote the first. With `sources:` that REMOVES attribution
+        # -- half a document's citations vanish and the guard reports the remainder as
+        # complete. Removing evidence is the worst thing this parser could do quietly.
+        if key in fm:
+            raise Unparseable(f"{where}: duplicate key `{key}`; the first would be discarded")
         if not raw:
             fm[key] = []                       # a block list follows, or the key is empty
         elif raw.startswith("{"):
