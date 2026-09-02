@@ -329,6 +329,42 @@ def check_duplication(threshold: float = 0.7) -> list[str]:
     return out
 
 
+def check_recommendation() -> tuple[list[str], int, int]:
+    """Every content document must NAME AN APPROACH TO IMPLEMENT, in a `## Use this` section.
+
+    This is the one item on the plan's verification list that was never implemented. The plan
+    wanted it checked by shape -- "flag any document where a named alternative gets its own
+    heading" -- and that version is unbuildable without false positives: a real time-budget
+    crossover legitimately gives alternatives their own space, and a guard that cries wolf on
+    the corpus's best documents gets ignored within a week.
+
+    What IS checkable without ambiguity is the other half of the same doctrine: the
+    recommendation has to exist, and it has to be findable. A document with no `## Use this`
+    is a survey, and this skill's whole claim over a literature review is that it recommends.
+
+    Whether that section comes FIRST is reported, not enforced. `caustics.md` legitimately
+    defines the phenomenon before recommending a tier, and hard-failing it would be the guard
+    dictating prose order. But a corpus quietly drifting toward explain-then-maybe-recommend
+    is the slide into a survey, so the count is visible.
+    """
+    problems: list[str] = []
+    skip = set(paper_files()) | {INDEX, COVERAGE}
+    total = first = 0
+    for path in documents(ROOT):
+        if path in skip:
+            continue
+        body = path.read_text(encoding="utf-8")
+        heads = [ln.strip() for ln in body.splitlines() if ln.startswith("## ")]
+        if not any(h.lower().startswith("## use this") for h in heads):
+            problems.append(f"{path.relative_to(ROOT)}: no `## Use this` section -- it "
+                            "surveys rather than recommends, or the recommendation is buried")
+            continue
+        total += 1
+        if heads and heads[0].lower().startswith("## use this"):
+            first += 1
+    return problems, first, total
+
+
 def check_coverage() -> list[str]:
     """Completeness, checked both ways.
 
@@ -426,8 +462,9 @@ def main() -> int:
 
     bib, problems = bibliography()
     doc_problems, used = check_documents(bib)
+    rec_problems, rec_first, rec_total = check_recommendation()
     problems += (doc_problems + check_orphans(bib, used) + check_duplication()
-                 + check_coverage() + check_index())
+                 + check_coverage() + check_index() + rec_problems)
 
     docs = [p for p in documents(ROOT)
             if p not in paper_files() and p not in (INDEX, COVERAGE)]
@@ -435,6 +472,10 @@ def main() -> int:
           f"background {sum(1 for e in bib.values() if e['background'])}")
     if (summary := coverage_summary()):
         print(summary)
+    if rec_total:
+        print(f"recommendation {rec_total}/{rec_total} documents name an approach to "
+              f"implement; {rec_first} state it first, before any explanation.")
+
     sharp, tot, _vague = locator_quality()
     if tot:
         print(f"locators {sharp}/{tot} ({100 * sharp / tot:.0f}%) name a section, equation or "

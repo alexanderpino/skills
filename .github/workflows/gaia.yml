@@ -141,6 +141,11 @@ jobs:
           expect_red "coverage points at a document that does not exist"
           cp /tmp/bk references/coverage.md
 
+          cp references/tiled-streaming.md /tmp/bk
+          sed -i 's/^## Use this/## Some notes/' references/tiled-streaming.md
+          expect_red "document surveys instead of recommending"
+          cp /tmp/bk references/tiled-streaming.md
+
           cp references/index.md /tmp/bk
           sed -i 's/^# Gaia index/# Gaia index EDITED/' references/index.md
           if python3 scripts/index.py --check >/dev/null 2>&1; then
@@ -151,17 +156,26 @@ jobs:
           fi
           cp /tmp/bk references/index.md
 
-          # The decoy. A guard that fires on rewording gets ignored within a week, and this
+          # The decoys. A guard that fires on rewording gets ignored within a week, and this
           # corpus is reworded constantly -- so staying green here is a requirement, not a nicety.
+          expect_green() {   # $1 = label
+            if python3 scripts/check.py >/dev/null 2>&1; then
+              echo "  green as required: $1"
+            else
+              echo "::error::guard fired on '$1' -- it is too eager to be trusted"
+              fails=$((fails + 1))
+            fi
+          }
+
           cp $SUBJ /tmp/bk
           sed -i 's/\bthe bed\b/the pool floor/g' $SUBJ
-          if python3 scripts/check.py >/dev/null 2>&1; then
-            echo "  green as required: prose reworded, no citation touched"
-          else
-            echo "::error::guard fired on a pure rewording -- it is too eager to be trusted"
-            fails=$((fails + 1))
-          fi
+          expect_green "prose reworded, no citation touched"
           cp /tmp/bk $SUBJ
+
+          cp references/tiled-streaming.md /tmp/bk
+          sed -i 's/^## How this fails.*/## Failure modes/' references/tiled-streaming.md
+          expect_green "a heading that is not the recommendation renamed"
+          cp /tmp/bk references/tiled-streaming.md
 
           python3 scripts/check.py >/dev/null || { echo "::error::copy not restored"; fails=$((fails+1)); }
           echo

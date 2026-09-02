@@ -85,3 +85,34 @@ NOT PROVEN	cross-skill path resolution	-	four documents pointed at water-physics
 # locator QUALITY (27/135 sharp) is still reported and not enforced, and M3 proves only that an
 # EMPTY locator is caught, not that a topic-paraphrase locator is. Those are different claims
 # and this register does not conflate them.
+#
+# ── NEW ASSERTION, 2026-09-02: check_recommendation() ───────────────────────────────────────
+#
+# This closes the last unimplemented item on the approved plan's verification list. The plan
+# asked for it checked BY SHAPE -- "flag any document where a named alternative gets its own
+# heading" -- and that version is unbuildable without false positives, because a real
+# time-budget crossover legitimately gives alternatives their own space. A guard that cries
+# wolf on the corpus's best documents is trained out of usefulness in a week, so it was not
+# built that way, and this note records the refusal rather than leaving the item looking done.
+#
+# What is enforced is the other half of the same doctrine, which is unambiguous: a content
+# document must NAME AN APPROACH TO IMPLEMENT, in a `## Use this` section. A document without
+# one is a survey, and this skill's entire claim over a literature review is that it
+# recommends.
+#
+#   MUTATION  `## Use this` renamed to `## Some notes` in tiled-streaming.md
+#     -> RED: "no `## Use this` section -- it surveys rather than recommends, or the
+#        recommendation is buried"
+#   DECOY 1   a DIFFERENT heading renamed ("## How this fails..." -> "## Failure modes")
+#     -> GREEN, as required
+#   DECOY 2   the `## Use this` section MOVED to sit after a later section
+#     -> GREEN, and the reported count fell 19 -> 18
+#
+# Decoy 2 is the deliberate design. Whether the recommendation comes FIRST is REPORTED, not
+# enforced: caustics.md legitimately defines the phenomenon before recommending a tier, and
+# hard-failing it would be the guard dictating prose order. But a corpus drifting toward
+# explain-then-maybe-recommend is the slide into a survey, so the number is visible and has to
+# be argued for rather than sliding quietly. Currently 19 of 20 state it first.
+#
+# All three run in CI on every push (.github/workflows/gaia.yml, the `bites` job), so this is
+# a standing check rather than a one-afternoon proof like the rows above it were.
