@@ -163,6 +163,8 @@ CODES = {
     "TLR001": ("warn", "config names a tailoring source the bundle does not record"),
     "TLR002": ("error", "an applied tailoring rule carries no text a reader can check"),
     "TLR006": ("warn", "a mechanical tailoring instruction is recorded as prompt, invisible to every gate"),
+    "TLR007": ("warn", "a tailoring source is recorded and no wishes file is stamped"),
+    "TLR008": ("warn", "the stamped wishes file is missing or changed since this refinement"),
     "TLR003": ("error", "a tailoring override relaxes an invariant no tailoring may relax"),
     "TLR004": ("error", "a tailoring override records no reason and no person"),
     "TLR005": ("warn", "a gate is switched off and the bundle never says so"),
@@ -1613,6 +1615,20 @@ def check_tailoring(b, cfg, rep):
     declared = get(cfg, "tailoring.source", "") or ""
     tailoring = b.get("tailoring") or {}
     applied_source = tailoring.get("source") or ""
+
+    # A calling skill steers this run with a wishes file. Which file, and whether it is
+    # still the same file, is what a later reader needs to reproduce the refinement.
+    wishes = tailoring.get("wishes")
+    if applied_source and not wishes:
+        rep.warn("TLR007", "tailoring.wishes", "%r steered this run and no wishes file is "
+                 "stamped - run `wishes.py stamp --file <refinement.md> --source %s --write` "
+                 "so a later reader can re-read what steered it" % (applied_source, applied_source))
+    elif wishes:
+        import wishes as W
+        why = W.drift(wishes)
+        if why:
+            rep.warn("TLR008", "tailoring.wishes", why + " - re-read it and re-stamp, or say "
+                     "at handover that the refinement predates the change")
 
     if declared and not applied_source:
         rep.warn("TLR001", "tailoring", "config declares the %r tailoring but the bundle "

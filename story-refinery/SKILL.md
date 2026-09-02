@@ -12,7 +12,7 @@ description: >-
 # Claude Code blocks an automatic load and will not preload this skill into a subagent,
 # so the description says what the skill does rather than arguing against being loaded.
 disable-model-invocation: true
-argument-hint: <ticket key or the item to refine>
+argument-hint: <ticket key or item> [--wishes <refinement.md from the calling skill>]
 metadata:
   invocation: user
 ---
@@ -125,14 +125,18 @@ Read `references/tailoring.md` when one is present;
 the tailoring skill and the `refinery.yaml` it ships → this skill's `[L]`
 defaults → `[F]`/`[P]` guidance. Nothing is overridden invisibly.
 
-**The tailoring skill steers this one with instructions.** That is the expected
-shape - owners, conventions, tracker reality, language, what to skip and why -
-and it may or may not ship a `refinery.yaml`. The one rule of form: an
-instruction that is mechanical (a number, a bound, a DoD command, a label rule)
-is written into `refinery.yaml` in Phase 0 - generated from the instruction if
-none is shipped - and recorded with `mechanism: config`, because the gates
-cannot read prose (`TLR006`). Judgement stays prose and is recorded with
-`mechanism: prompt`.
+**A calling skill steers this one with wishes.** The common case is a developer
+skill that calls `/story-refinery <item> --wishes <its refinement.md>` - owners,
+conventions, tracker reality, language, budgets, what to skip and why
+(`assets/templates/refinement-wishes.md` is the shape). Every wish is applied
+under the precedence above and recorded; a mechanical one (a number, a bound, a
+DoD command, a label rule) is written into `refinery.yaml` in Phase 0, generated
+if the caller ships none, and recorded with `mechanism: config`, because the
+gates cannot read prose (`TLR006`); judgement is recorded with
+`mechanism: prompt`. The wishes file is stamped into the bundle (`wishes.py`,
+`TLR007`/`TLR008`) and the caller gets `out/handback.json` back: ready or not,
+why not, the size, what its wishes did, and where every artefact is. Read
+`references/tailoring.md`, "The calling contract".
 
 **Invariants.** A tailoring skill may change almost anything about how a
 refinement is produced. It may not relax these:
@@ -800,6 +804,8 @@ All stdlib-only Python 3, no dependencies, no network.
   an unfinished bundle
 - `scripts/complexity.py` - `assess`; the complexity card, every metric derived
   from the bundle, the band explainable by construction
+- `scripts/wishes.py` - `stamp` | `check`; pins the calling skill's wishes file
+  (path, hash, headings) to the bundle, and reports when it has changed since
 - `scripts/ingest.py` - read a rendered ticket back into a bundle when the stored
   one is gone; verifies each brief's hash
 - `scripts/progress.py` - `set` | `from` | `show`; what has landed, so a
@@ -826,6 +832,8 @@ All stdlib-only Python 3, no dependencies, no network.
   for sessions that cannot run the scripts
 - `assets/templates/team-tailoring-skill.md` - the skeleton a team copies to write
   the skill that layers over this one
+- `assets/templates/refinement-wishes.md` - the shape of the wishes a calling
+  skill passes with `--wishes`; every section optional
 - `assets/examples/example-bundle.json` - a complete, validating two-repo example
 - `evals/invocation-eval.json` - what to do when the skill is invoked on a request
   that does not fit, and what to do when a refinement-shaped request arrives with no

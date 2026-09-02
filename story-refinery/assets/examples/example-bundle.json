@@ -1652,11 +1652,27 @@
         "key": "validation.vagueness_lexicon"
       }
     ],
-    "overrides": []
+    "overrides": [],
+    "wishes": {
+      "path": "assets/examples/team-billing-refinement.wishes.md",
+      "digest": "sha256:2abe1d6475b1f46557607b2b0e485f52ae295016f83c90c638377f9a48c7d9e7",
+      "headings": [
+        "Refinement wishes - team billing",
+        "Who we are",
+        "Owners",
+        "Mechanical rules",
+        "What to skip, and why",
+        "Always ask",
+        "House conventions not in the code",
+        "Escalate rather than assume when"
+      ],
+      "source": "team-billing-refinement",
+      "stamped_at": "2026-09-02T19:00:24+00:00"
+    }
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:27879676b7a4e872f08253776af44fa93ccf1406f553cb9943256dac39d1f834",
+    "bundle_digest": "sha256:2308eb3484f62486f823621b46e3a14c69f7516c4f51c8ae683c7b99c43c5928",
     "critics": [
       {
         "id": "implementer",

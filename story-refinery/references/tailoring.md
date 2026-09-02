@@ -117,6 +117,49 @@ reader six weeks later can tell which rules came from where:
   says nobody applied the team's rules - which is usually a session that never
   loaded the second skill.
 
+## The calling contract
+
+The common case is not a skill loaded *alongside* this one but a skill that
+**calls** it - a developer skill with a `refinement.md` reference file - and
+passes its wishes with the item:
+
+```
+/story-refinery ABC-123 --wishes path/to/refinement.md
+```
+
+`assets/templates/refinement-wishes.md` is the shape a wishes file can take;
+none of its sections is required. What this skill does with it, in order:
+
+1. **Reads every wish and applies it under the precedence above.** A wish that
+   would relax an invariant is refused and recorded (`TLR003`); a wish the user
+   in the session contradicts loses to the user, and both are recorded.
+2. **Writes the mechanical wishes into `refinery.yaml` first** - budgets, the DoD
+   command, labels, tracker, repos, language - generating the file when the caller
+   ships none, and records each with `mechanism: config` (`TLR006` catches one
+   that stayed prose). Judgement wishes are recorded with `mechanism: prompt`.
+3. **Stamps the wishes file** into `bundle.tailoring.wishes` - path, content
+   hash, headings - with `tailoring.source` set to the caller's name:
+
+   ```bash
+   python scripts/wishes.py stamp --file path/to/refinement.md --bundle bundle.json --source <caller> --write
+   ```
+
+   `TLR007` asks for the stamp whenever a source is recorded; `TLR008` reports a
+   wishes file that has changed or vanished since, because the instructions that
+   steered a refinement are part of its provenance.
+4. **Hands back `out/handback.json`** from `emit.py`: ready or not and the
+   blocking findings, the complexity band and drivers, the subtasks, the open
+   questions with owners, every wish applied and every wish refused, and the path
+   of each artefact. `preview.md` is for the person; `handback.json` is the
+   caller's return value.
+
+The one thing the caller cannot do from its own text is *load* this skill when
+`disable-model-invocation` is set: that flag means only the user can invoke it.
+A caller then instructs the user to run the command above; clearing the flag
+lets the caller invoke it directly, at the cost of the skill being loadable by
+the model on its own judgement. Which is wanted is a decision for whoever owns
+both skills, and it is recorded in this skill's frontmatter, nowhere else.
+
 ## What a tailoring skill should contain
 
 In order of value. Everything below is an instruction to this skill; the config

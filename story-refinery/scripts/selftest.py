@@ -1290,6 +1290,51 @@ def suite_story_shapes():
     check("tailoring: the golden's own prompt rules are judgement, not config",
           not tlr([e["rule"] for e in golden["tailoring"]["applied"] if e.get("mechanism") == "prompt"]))
 
+    # The calling contract: the wishes file is pinned, drift is reported, and the
+    # caller gets a structured answer back.
+    import wishes as Wz
+    import tempfile
+    wf = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8")
+    wf.write("# Refinement wishes\n\n## Owners\n\nMarieke.\n\n## Mechanical rules\n\n- at most 0.5 days\n"); wf.close()
+    rec = Wz.stamp(wf.name, "dev-skill")
+    check("wishes: the stamp carries path, digest and headings",
+          rec["path"] == wf.name and rec["digest"].startswith("sha256:")
+          and rec["headings"] == ["Refinement wishes", "Owners", "Mechanical rules"], rec)
+    check("wishes: an unchanged file has no drift", Wz.drift(rec) is None)
+    with open(wf.name, "a", encoding="utf-8") as fh:
+        fh.write("\n## Always ask\n\n- which flag?\n")
+    d = Wz.drift(rec)
+    check("wishes: a changed file is reported with the new heading", d and "Always ask" in d, d)
+    os.unlink(wf.name)
+    check("wishes: a missing file is reported", "not on disk" in (Wz.drift(rec) or ""))
+
+    def tlr_codes(t):
+        rep = Report()
+        check_tailoring(t, cfg, rep)
+        return {i["code"] for i in rep.items}
+    unstamped = copy.deepcopy(golden)
+    unstamped["tailoring"].pop("wishes", None)
+    check("wishes: a tailoring source with no stamp is reported", "TLR007" in tlr_codes(unstamped))
+    check("wishes: the golden is stamped and its wishes file is on disk and unchanged",
+          not {"TLR007", "TLR008"} & tlr_codes(golden), tlr_codes(golden))
+    drifted = copy.deepcopy(golden)
+    drifted["tailoring"]["wishes"] = dict(drifted["tailoring"]["wishes"], digest="sha256:0")
+    check("wishes: a stale stamp is reported", "TLR008" in tlr_codes(drifted))
+
+    # handback.json: the caller's return value, written by emit.
+    import subprocess
+    out = tempfile.mkdtemp()
+    subprocess.run([sys.executable, os.path.join(HERE, "emit.py"), GOLDEN, "--config", CONFIG,
+                    "--out", out], capture_output=True, text=True, check=False)
+    with open(os.path.join(out, "handback.json"), encoding="utf-8") as fh:
+        hb = json.load(fh)
+    check("handback: says ready, the key, the band and the subtasks",
+          hb.get("ready") is True and hb.get("key") == golden["story"]["key"]
+          and hb["complexity"].get("band") and len(hb["subtasks"]) == len(golden["subtasks"]), hb)
+    check("handback: carries what the wishes did and where the artefacts are",
+          hb["wishes"]["source"] == golden["tailoring"]["source"] and hb["wishes"]["applied"]
+          and os.path.exists(hb["artefacts"]["preview"]), hb["wishes"])
+
 
 def suite_manifest_cwd():
     """SKL-2, S1: the reproduction. A CI command lifted out of its working directory

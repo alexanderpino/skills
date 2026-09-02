@@ -759,6 +759,33 @@ def main(argv=None):
     with open(os.path.join(args.out, "push-plan.json"), "w", encoding="utf-8") as fh:
         json.dump(plan, fh, indent=2)
 
+    # The structured answer for a skill that called this one: ready or not, why not,
+    # how big, what its wishes did, and where every artefact is. preview.md is for the
+    # person; this is for the caller.
+    story = bundle.get("story") or {}
+    tl = bundle.get("tailoring") or {}
+    handback = {
+        "key": story.get("key"), "title": story.get("title"),
+        "ready": not blocking,
+        "blocking": [{"code": f.get("code"), "where": f.get("where"), "message": f.get("message")}
+                     for f in blocking] if isinstance(blocking, list) else [],
+        "complexity": {k: (story.get("complexity") or {}).get(k) for k in ("band", "drivers")},
+        "subtasks": [{"id": s.get("id"), "title": s.get("title"), "kind": s.get("kind"),
+                      "estimate_days": s.get("estimate_days")} for s in bundle.get("subtasks") or []],
+        "open_questions": [{"id": q.get("id"), "text": q.get("text"), "owner": q.get("owner"),
+                            "blocking": bool(q.get("blocking"))} for q in bundle.get("open_questions") or []],
+        "wishes": {"source": tl.get("source"), "file": (tl.get("wishes") or {}).get("path"),
+                   "digest": (tl.get("wishes") or {}).get("digest"),
+                   "applied": [{"rule": a.get("rule"), "mechanism": a.get("mechanism"), "key": a.get("key")}
+                               for a in tl.get("applied") or []],
+                   "refused": [{"rule": o.get("rule"), "invariant": o.get("invariant"), "reason": o.get("reason")}
+                               for o in tl.get("overrides") or [] if o.get("invariant")]},
+        "artefacts": {"bundle": os.path.abspath(args.bundle), "preview": os.path.join(args.out, "preview.md"),
+                      "push_plan": os.path.join(args.out, "push-plan.json"),
+                      "context": os.path.join(args.out, "context")},
+    }
+    with open(os.path.join(args.out, "handback.json"), "w", encoding="utf-8") as fh:
+        json.dump(handback, fh, indent=2, ensure_ascii=False)
     print("wrote %s/preview.md, push-plan.json, context/%s, %d payload(s), default sink=%s, "
           "%d wave(s)" % (args.out, ctx_name, len(items), sink, len(plan_waves)))
     if delta and plan["orphans_already_underway"]:
