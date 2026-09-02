@@ -40,7 +40,7 @@ merged.
 
 ## Heightfield water solvers
 
-- **kass1990** `P` — Kass, M. & Miller, G. (1990). *Rapid, Stable Fluid Dynamics for Computer Graphics.* SIGGRAPH '90, Computer Graphics 24(4), 49–57. — The founding heightfield water paper: the linearised shallow-water equations integrated implicitly with alternating tridiagonal sweeps. Unconditionally stable, and a global solve per step.
+- **kass1990** `P` — Kass, M. & Miller, G. (1990). *Rapid, Stable Fluid Dynamics for Computer Graphics.* SIGGRAPH '90, Computer Graphics 24(4), 49–57. — The founding heightfield water paper: the linearised shallow-water equations integrated implicitly with alternating tridiagonal sweeps. A global solve per step — that half is exact. It does **not** claim unconditional stability: it derives stability from implicitness, then *freezes the depth `d` within a step*, which it says "virtually ensures that the iteration will not diverge". That is a weaker and more honest claim than the one this entry used to make, and the frozen-depth linearisation is the reason for it.
 - **steadystate_discharge** `F` — No canonical graphics paper. Under uniform runoff a mass-conserving surface-water solver converges to `Q = rain × upstream contributing area` — the rational method of engineering hydrology. Stated, implemented and tested as `discharge_from_area` in terrain-architect's `reference-impl/hydrology.py`, which is the checkable form.
 - **fluid_authority** `F` — No external source. The contract that every fluid effect is either cosmetic GPU state or authoritative gameplay liquid state, with no automatic promotion between them, is terrain-renderer `19-fluid-simulation.md`'s doctrine.
 

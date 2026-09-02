@@ -46,6 +46,24 @@ it*. `check.py` cannot establish that — it checks that the citation is well-fo
 The `verified:` key in a document's front matter is where a human records having done the
 reading; until it is there, the document stays `draft`.
 
+⚠️ **A wrong locator is worse than a vague one, and the metric rewards the wrong direction.**
+`check.py` reports how many locators name a section, equation or page, and that number is
+meant to go up. But it counts *shape*, not correctness — so `§3` scores as sharp whether or
+not the thing is in §3. A topic paraphrase advertises its own weakness and a reader who
+follows it just searches the paper. A **wrong section number reads as more verified than
+either**, sends the reader to the wrong page, and when they find nothing there the natural
+conclusion is that they misread the claim, not that the citation is wrong.
+
+This is not hypothetical. `water-optics.md` cited Bruneton's roughness-aware mean-Fresnel fit
+to **§3**, which is "Our ocean model"; the fit is **eq. 26 in §5.2**. It had been sharp, and
+wrong, and it looked better than the paraphrase it replaced.
+
+So: **sharpen a locator only from the source in front of you.** If the paper is unreachable,
+leave the paraphrase and say so — that is a correct outcome, not a failure to hit a number.
+The one thing never to do is transplant a section number from a different edition, a
+reproduction, or another document's entry: the corpus already carries one such locator that
+nobody has been able to verify, and it is recorded as outstanding rather than trusted.
+
 ## Attribution corrections
 
 These errors circulate widely in terrain-generation reference tables, including in tables
