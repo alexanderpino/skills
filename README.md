@@ -100,7 +100,7 @@ skills/
 │   ├── SKILL.md                       # router + the loop (slice → brief → build → critique → fold)
 │   ├── references/                    # load-on-demand deep dives (incremental review, prompt caching)
 │   ├── scripts/                       # run-state CLI (init/plan/seal/check/snapshot/scope/gate/status)
-│   └── commands/                      # /fan-out slash command — copy to .claude/commands/
+│   └── commands/                      # optional /fan-out wrapper; the skill provides the command itself
 ├── story-refinery/                   # unpacked, reviewable skill
 │   ├── SKILL.md                       # router + the refinement phases
 │   ├── references/                    # load-on-demand deep dives (intake, evidence, AC, example

@@ -10,6 +10,11 @@ description: >-
   against a single sealed brief, has independent critics judge each candidate against a
   rubric written before the work started, verifies fixes against the delta only so approved
   work is never re-reviewed, and folds one result with an evidence trail.
+# The enforced half of "user-invoked only": Claude Code blocks an automatic load and will
+# not preload this skill into a sub-agent. The description above is the prompt-level half;
+# metadata is free-form data for other tooling, which Claude Code does not act on.
+disable-model-invocation: true
+argument-hint: <task>
 metadata:
   invocation: user
 ---
@@ -36,9 +41,13 @@ Two consequences that follow from being user-invoked:
 - **Never nest.** A builder or critic spawned by this skill must not invoke `/fan-out`, or
   any other user-invoked skill. Model-invoked skills are fine and often useful — pass the
   relevant ones through in the shared block so every agent gets the same discipline.
-- **The slash command is required.** `commands/fan-out.md` must be copied to
-  `.claude/commands/`. Claude Code only reads commands from there, so while it sits in the
-  skill folder there is no way to invoke this at all.
+- **`/fan-out` exists as soon as the skill is installed.** Custom commands and skills are
+  the same mechanism now, so a skill directory provides its own slash command; the
+  `disable-model-invocation: true` in the frontmatter is what makes the restriction real
+  rather than a request, and Claude Code blocks an automatic load. `commands/fan-out.md`
+  is an optional wrapper: copy it to `.claude/commands/` if you want its pre-flight
+  checklist (partition vs compete, plan, seal) in front of every run. Both spellings
+  produce `/fan-out`, so install one, not both.
 
 ## Orientation
 
@@ -739,8 +748,9 @@ step.
 
 ## Reference
 
-- `commands/fan-out.md` — the `/fan-out` slash command; the only entry point. Copy it to
-  `.claude/commands/` (see Invocation above).
+- `commands/fan-out.md` — an optional wrapper around the `/fan-out` the skill already
+  provides, adding the pre-flight checklist. Copy it to `.claude/commands/` only if you
+  want that (see Invocation above); do not install both spellings.
 - `references/prompt-caching.md` — what actually caches, what silently doesn't, the
   ordering rules, and why the pathfinder goes first. Read before changing prompt shapes or
   the spawn sequence.
