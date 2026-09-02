@@ -6,12 +6,12 @@ tags: [simulation, water, time-budget, stability, authoring-time, runtime]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: courant1928, tier: P, locator: "the hyperbolic case — the domain-of-dependence requirement on the difference scheme" }
-  - { id: kass1990, tier: P, locator: "the implicit alternating-direction solution of the linearised shallow-water system" }
-  - { id: stam1999, tier: P, locator: "the semi-Lagrangian advection step and its unconditional-stability claim" }
-  - { id: mei2007, tier: P, locator: "the outflow scaling factor K, which clamps a cell's total outflow to the water it holds" }
+  - { id: courant1928, tier: P, locator: "Kap. II 'Der hyperbolische Fall', §2 'Ueber den Einfluss der Wahl des Gitters. Die Abhaengigkeitsgebiete bei Differenzen- und Differentialgleichung', pp. 61-62 with Fig. 7 — with time mesh h and space mesh kappa*h, the difference scheme converges only for kappa greater than 1" }
+  - { id: kass1990, tier: P, locator: "sections are unnamed by number: 'Integration', eq. 9-16, the first-order implicit step and its symmetric tridiagonal system; 'Three Dimensions', eq. 18-20, the alternating-direction split that keeps each sub-iteration tridiagonal" }
+  - { id: stam1999, tier: P, locator: "§2.2 'Method of Solution' — the advection step by the method of characteristics and its unconditional-stability claim, with the derivation in Appendix A, and the diffusion and projection steps that follow it as sparse global solves; the numerical-dissipation admission is in §1" }
+  - { id: mei2007, tier: P, locator: "§3.2.1 'Outflow Flux Computation', eq. 4 defines K = min of 1 and d1*lX*lY over the summed outflow times dt, and eq. 5 applies it to all four fluxes" }
   - { id: braun2013, tier: P, locator: "the implicit stream-power update over the receiver-tree stack ordering" }
-  - { id: fiedler_timestep, tier: F, locator: "the accumulator loop" }
+  - { id: fiedler_timestep, tier: F, locator: "§'Free the physics' — the accumulator loop that consumes produced time in fixed dt steps; the leftover-remainder interpolation is the section after it, §'The final touch'. The post numbers no sections" }
   - { id: explicit_diffusion_limit, tier: F, locator: "the explicit FTCS bound, dt <= dx^2 / (4D) in two dimensions" }
 ---
 # Simulation time budget — minutes offline, milliseconds in a frame
@@ -106,13 +106,19 @@ you cannot spend.
 
 And the payment is usually a **global data dependency**, which is the harder cost:
 
-- [kass1990] integrates heightfield water implicitly with alternating tridiagonal sweeps. It is
-  unconditionally stable and it was the right call for offline film water. Each step is a solve
-  across the whole grid: it cannot be tiled, cannot be evaluated for one streamed region, cannot be
-  stopped halfway and shown.
-- [stam1999] is unconditional in the *advection* term only, by tracing characteristics backwards.
-  The pressure projection that follows is still a global Poisson solve, and the method pays in
-  numerical dissipation — the reason PIC-family water reads as syrup.
+- [kass1990] integrates heightfield water implicitly with alternating tridiagonal sweeps, and it
+  was the right call for offline film water. ⚠️ It is routinely called **unconditionally** stable —
+  this repository's own bibliography entry says so — and **the paper does not claim that.** It
+  claims implicitness buys a frame-sized step, and it then freezes the wave speed inside a step by
+  holding `d` constant, which it says "virtually ensures that the iteration will not diverge". A
+  strong practical guarantee, not an unconditional one. What is unarguable is the *shape* of the
+  step: a solve across the whole grid, which cannot be tiled, cannot be evaluated for one streamed
+  region, and cannot be stopped halfway and shown.
+- [stam1999] gets its unconditional stability in the *advection* term by tracing characteristics
+  backwards. That is the half everyone quotes; the expensive half is in the same section — "both
+  the projection and the viscosity steps involve the solution of a large sparse system of
+  equations". **Two** global solves per step, not one. And the method pays in numerical dissipation
+  — the reason PIC-family water reads as syrup.
 - [braun2013] solves the fluvial-incision equation implicitly in O(n), which is as good as this
   gets, and it still needs a global topological ordering of the drainage tree before it can take a
   step. That ordering is serial, and it is why landscape evolution is a bake and not a frame.
@@ -122,7 +128,8 @@ global dependency is an authoring-time step no matter how stable it is.
 
 **What it beats.** *Implicit heightfield water* [kass1990] — a big `dt` at the price of a global
 solve per step; correct offline, pointless in a frame that needs 16 ms of physics. *Semi-Lagrangian
-advection* [stam1999] — unconditional in one term, dissipative, still Poisson-bound. *Implicit
+advection* [stam1999] — unconditional in one term, dissipative, and still carrying two
+global sparse solves per step. *Implicit
 fluvial incision* [braun2013] — the right offline answer, and its stack ordering is the
 baked-versus-amortised boundary made concrete. *Position-based / constraint-projected fluids* —
 genuinely large steps with no CFL, but the state becomes particles and your height field is no

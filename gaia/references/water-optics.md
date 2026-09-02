@@ -7,12 +7,12 @@ status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: popefry1997, tier: P, locator: "the tabulated pure-water absorption spectrum, 380-700 nm, and its minimum at 417.5 nm" }
-  - { id: braun1993, tier: P, locator: "the identification of visible water absorption as O-H vibrational overtones" }
+  - { id: braun1993, tier: P, locator: "Fig. 1, the H2O against D2O spectra in the same 10 cm cell, and Table I, the gas- and liquid-phase overtone assignments that put v1+3*v3 at 698 nm; the claim that this is the only colour in nature of vibrational origin is the second paragraph, p. 612" }
   - { id: lee2015, tier: P, locator: "the replacement Secchi relation, Z_SD as the reciprocal of the minimum diffuse attenuation" }
   - { id: nicodemus1963, tier: P, locator: "the invariance of L over n-squared along a ray and across a smooth boundary" }
   - { id: solonenko2015, tier: P, locator: "the inherent optical properties tabulated per Jerlov water type" }
   - { id: schlick1994, tier: P, locator: "the Fresnel approximation and its stated accuracy for common dielectrics" }
-  - { id: bruneton2010, tier: P, locator: "§3, the roughness-aware mean-Fresnel fit whose exponent carries the view-direction slope variance" }
+  - { id: bruneton2010, tier: P, locator: "§5.2 'Sky light', sub-head 'Average Fresnel reflectance' — eq. 26 is the roughness-aware mean-Fresnel fit, plotted against the exact integral in Fig. 7; the view-direction slope variance it takes is eq. 25. Not §3, which is the ocean model" }
   - { id: bornwolf_optics, tier: F, locator: "the exact unpolarised Fresnel reflectance for a dielectric interface" }
   - { id: iop_split, tier: F, locator: "the beam-versus-diffuse attenuation split" }
 ---
@@ -214,16 +214,21 @@ differ by more than a tint.
 ⚠️ **The real-time tier is sanctioned to use a different approximation, and it is not Schlick.**
 Bruneton, Neyret and Holzschuch fit a **roughness-aware** mean Fresnel [bruneton2010] that replaces
 the fixed fifth power with `pow(1 - cos(theta_v), 5*exp(-2.69*sigma_v)) / (1 + 22.7*sigma_v^1.5)`,
-where `sigma_v` is the surface's slope variance toward the viewer. This document sanctions it at the
-rendering tier, and the reason is that it is calibrated **as a unit** against the slope distribution
+where `sigma_v` is the surface's slope variance toward the viewer. ⚠️ **The paper is not
+self-consistent about whether that symbol carries the square**, and the two readings differ by a
+square root: its eq. 25 defines `sigma_v^2` as the view-direction variance, its eq. 26 then writes
+`sigma_v`, and the caption of Fig. 7 labels the fitted axis `sigma_v^2` again. Whichever you feed
+it, feed it deliberately and write down which — `water-rendering.md` owns the shader form and the
+transcription trap in it.
+
+This document sanctions the fit at the rendering tier, and the reason is that it is calibrated **as a unit** against the slope distribution
 rather than against a single smooth facet: at any roughness a real sea carries, the roughness term
 dominates the Fresnel term at exactly the grazing angles where an exact evaluation would otherwise
 be fed a mean normal that no longer describes the surface. The error it accepts, stated: it returns
 a *rough-surface average*, so it is not the exact curve for any individual facet; it degenerates to
 Schlick — with all of Schlick's errors above — as `sigma_v` goes to zero; and it is only as good as
 the `R` handed to it, so feed it `F0` from the body's own `ior` and never 0.04. Offline, reference,
-and single-facet work still take the exact unpolarised form. `water-rendering.md` owns the shader
-form and the transcription trap in it.
+and single-facet work still take the exact unpolarised form.
 
 ## What actually moves water off pure blue
 

@@ -6,16 +6,18 @@ tags: [rendering, rasterizer, precision, planetary, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: cozzi2011, tier: F, locator: "the precision, depth and horizon-culling chapters" }
-  - { id: upchurch2012, tier: P, locator: "the depth-transform error analysis" }
-  - { id: reed2015, tier: F, locator: "the float-depth/reversed-Z interaction walkthrough" }
-  - { id: epiclwc, tier: F, locator: "Large World Coordinates — the shader-side limits section" }
+  - { id: cozzi2011, tier: F, locator: "ch. 5 Vertex Transform Precision — §5.3 rendering relative to eye on the CPU, §5.4 the GPU double-single form, §5.5 recommendations — and ch. 6 Depth Buffer Precision, §6.3 complementary depth buffering, §6.4 logarithmic depth" }
+  - { id: upchurch2012, tier: P, locator: "§3.2 Infinite Projection and §4.1 Two-Step Transform, the paper two recommendations; §2 for the first-order roundoff method. §6 states complementary reversed Z suffers the same 2ε arithmetic loss as 1/Z, so the paper does not support reversed Z" }
+  - { id: reed2015, tier: F, locator: "the section The Effects of Roundoff Error — the simulated indistinguishable-and-swap error table, whose reversed-Z float32 row is the zero-error one" }
+  - { id: epiclwc, tier: F, locator: "the Rendering → Shaders section — the new HLSL types in LargeWorldCoordinates.ush and the linked LWC Rendering doc; Niagara and Chaos are separately sectioned below it" }
 ---
 # Planetary precision — big coordinates in small floats
 
 **Tier: real-time rasteriser, and it starts long before planetary scale.** float32 has a 24-bit
 significand, so the gap between representable values is `2^(floor(log2 x) - 23)`: a step function
-of the exponent, constant across each power-of-two band and doubling at the next. The column below
+of the exponent, constant across each power-of-two band and doubling at the next. That expression
+is read straight off IEEE 754 binary32 — it is the definition of the format's ULP, not a result
+borrowed from any source below, and nothing here cites a paper for it. The column below
 is the **exact** spacing at each listed magnitude, not the `x · 1.2e-7` upper bound — that bound is
 the spacing just under a power of two and runs up to 2× high everywhere else, which is enough to
 make two documents in this corpus quote different numbers for the same distance.
@@ -50,13 +52,23 @@ frame. Per draw, upload `float32(patchOrigin_f64 - cameraPos_f64)` and add in th
 then never sees a planet-radius coordinate — which is why a correctly built planet renderer needs
 no fp64 on the GPU at all.
 
-**And reversed-Z into a float depth buffer, with an infinite far plane** [upchurch2012]. Map near
-to 1 and far to 0. A standard projection piles depth resolution near the near plane hyperbolically
-while float32 piles representable values near zero; reversing aligns the two gradients instead of
-opposing them, giving near-constant relative error across the whole range [reed2015]. It is free —
-flip the comparison, clear to zero — and it is the 2026 default everywhere, not a planetary
-special case. With reversed-Z, taking the far plane to infinity costs essentially nothing; a
-planet renderer should not be tuning a far plane.
+**And reversed-Z into a float depth buffer, with an infinite far plane.** Map near to 1 and far to
+0. A standard projection piles depth resolution near the near plane hyperbolically while float32
+piles representable values near zero; reversing aligns the two gradients instead of opposing them,
+giving near-constant relative error across the whole range. It is free — flip the comparison,
+clear to zero — and it is the 2026 default everywhere, not a planetary special case. With
+reversed-Z, taking the far plane to infinity costs essentially nothing; a planet renderer should
+not be tuning a far plane.
+
+⚠️ **The two halves of that recommendation come from different places, and this document used to
+credit both to one paper.** The *infinite far plane* is Upchurch & Desbrun, §3.2, alongside their
+second recommendation — keep the projection matrix out of the composed view matrix and apply it
+separately in the vertex shader, §4.1 [upchurch2012]. *Reversed-Z* is not theirs: their §6 says
+complementary Z "will suffer the same arithmetic precision loss of 2ε as 1/Z", i.e. it does
+nothing for the transform arithmetic they analyse. Its win is in the **storage**, and the evidence
+for it is Reed's direct simulation, where reversed-Z with a float depth buffer is the only
+zero-error row and erases the finite-versus-infinite far plane distinction entirely [reed2015].
+The two fixes are orthogonal; take both.
 
 ⚠️ Reversed-Z buys almost nothing on a **fixed-point** 24-bit depth buffer. The gain comes from the
 float exponent, not the flip.

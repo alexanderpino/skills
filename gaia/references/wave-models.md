@@ -6,16 +6,16 @@ tags: [simulation, water, waves, spectra, runtime]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: tessendorf_ocean, tier: F, locator: "the spectrum sampling and inverse-FFT displacement construction" }
-  - { id: gerstner_trochoid, tier: F, locator: "the per-wave trochoid with horizontal and vertical displacement" }
+  - { id: tessendorf_ocean, tier: F, locator: "2004 course notes, §4.3 eq. 40 the Phillips spectrum and §4.4 eq. 42-43 the Fourier amplitudes inverse-FFT'd to a height field; §4.6 eq. 44 the choppy horizontal displacement and eq. 45 the folding Jacobian" }
+  - { id: gerstner_trochoid, tier: F, locator: "Finch, GPU Gems ch. 1 §1.2.3 'Geometric Waves', sub-head 'Gerstner Waves' — eq. 9 is the trochoid with lateral displacement, eq. 10-12 the analytic tangent-space basis" }
   - { id: capillary_gravity, tier: F, locator: "the capillary-gravity dispersion relation and its minimum phase speed" }
-  - { id: lamb_damping, tier: F, locator: "the deep-water viscous decay rate for a free-surface wave" }
+  - { id: lamb_damping, tier: F, locator: "6th ed. 1932, ch. XI Viscosity, Art. 348, pp. 623-624 — eq. 7 da/dt = -2*nu*k^2*a, eq. 8 its exponential decay, eq. 9 the decay modulus tau = 1/2*nu*k^2 = lambda^2/8*pi^2*nu" }
   - { id: airy_coastal, tier: F, locator: "the linear dispersion relation, Green's law, the breaker index and the surf-similarity parameter" }
-  - { id: coxmunk1954, tier: P, locator: "the wind-speed regressions for the sea-surface slope variance" }
-  - { id: bruneton2010, tier: P, locator: "the slope-variance treatment of wave detail below the geometry band, and the solar-disc variance clamp" }
+  - { id: coxmunk1954, tier: P, locator: "§6.3 'Mean Square Slopes', p. 847 — the clean- and slick-surface least-squares regressions, with W recorded at 41 ft, i.e. 12.5 m; the 1-14 m/s range and the factor two-or-three slick reduction are in the abstract, p. 838" }
+  - { id: bruneton2010, tier: P, locator: "§3.2 'Model hierarchy' eq. 4, the slope variance summed over the trochoids filtered out of the geometry; §5.1 'Sun light', which clamps sigma_x^2 and sigma_y^2 to a minimum in eq. 15 so the Sun keeps a finite disc" }
   - { id: dupuy2012, tier: P, locator: "the statistical whitecap coverage from the Jacobian's footprint mean and variance" }
-  - { id: monahan1980, tier: P, locator: "the whitecap-coverage power law in wind speed at 10 m" }
-  - { id: yuksel2007, tier: P, locator: "the wave-particle carrier and its subdivision rule" }
+  - { id: monahan1980, tier: P, locator: "§5 'Conclusions', p. 2097 eq. 5 — the robust-biweight fit W = 3.84e-6 U^3.41 of Table 3, combined data set; the paper's ordinary-least-squares fit is eq. 4, W = 2.95e-6 U^3.52. U at 10 m in both" }
+  - { id: yuksel2007, tier: P, locator: "§3.2 'Wave Particles' — eq. 7, the radial local deviation function, and the subdivision rule that splits one particle into three when neighbour spacing exceeds half the particle radius" }
 ---
 # Wave models — spectra, trochoids, and what dispersion actually settles
 
@@ -35,7 +35,10 @@ axis; where a body is closed rather than open, read the taxonomy first.
 **Open sea: a spectral FFT field in 2–4 cascades** [tessendorf_ocean]. Sample an oceanographic
 spectrum into a frequency grid, inverse-FFT to a displacement map per frame, sum cascades at
 different world-space patch sizes (order 400 m / 60 m / 10 m). It is the AAA default because it is
-the only family that is statistically ocean-like across the whole band.
+the only family that is statistically ocean-like across the whole band. (The spectrum, the
+transform and the choppy displacement are the cited notes. **The cascade stack is not**: the notes
+describe one patch, 10 m to 2 km on a side, and warn that tiling it makes the field periodic.
+Layering several patch sizes is later production practice, and is credited here to nobody.)
 
 **Stylised, hero, gameplay-authored or tight-budget: a Gerstner (trochoidal) sum**
 [gerstner_trochoid]. 4–16 analytic waves, each with horizontal and vertical displacement, sharp
@@ -175,8 +178,9 @@ sigma_total^2 = 0.003 + 5.12e-3 * U        # U in m/s
 three regressions are fitted separately in the paper. Quote whichever you need; do not derive one
 from the other two and expect the published number.)
 
-Two limits on quoting them: wind speed is referenced at **12.5 m**, not the 10 m of standard wind
-data, and the fit is calibrated only over **1–14 m/s** — do not extrapolate to storm winds. A third
+Two limits on quoting them: wind speed is referenced at **12.5 m** — the paper says 41 feet — not
+the 10 m of standard wind data, and the fit is calibrated only over **1–14 m/s** — do not
+extrapolate to storm winds. A third
 is worth knowing because it is usually implemented as the wrong mechanism: a **surfactant film damps
 the short waves that carry most of the slope**, and slicked water measures a factor of 2–3 lower
 total mean-square slope [coxmunk1954] — so an oil slick, a wind shadow or a convergence line is a
@@ -188,7 +192,7 @@ these numbers [bruneton2010], not what they are.
 
 ## The Jacobian is a free product; use it
 
-A displacement field carries horizontal motion, so it has a Jacobian:
+A displacement field carries horizontal motion, so it has a Jacobian [tessendorf_ocean]:
 
 ```
 J = (1 + dDx/dx) * (1 + dDy/dy) - (dDx/dy) * (dDy/dx)
@@ -210,6 +214,12 @@ wind the sea must carry exactly zero foam pixels; and that law puts coverage nea
 with the Beaufort observation that whitecaps begin at Force 3. An empirical formula and a
 19th-century observational scale agreeing on where foam starts is a strong argument for driving foam
 from wind rather than from a constant.
+
+⚠️ **That paper publishes two fits and they are not the same curve.** `3.84e-6 * U^3.41` is its
+**robust-biweight** fit; its **ordinary-least-squares** fit is `2.95e-6 * U^3.52`. They cross near
+11 m/s, so whichever you did not pick is the one your foam reads wrong against at the other end of
+the wind range. Name the fit beside the constant, exactly as this skill asks absorption to be
+quoted beside its sample wavelengths.
 
 ⚠️ **Choppiness is the horizontal-displacement scale, and past about 1.0 it drives `J` negative over
 large areas** — which reads as geometry self-intersection shimmer rather than as foam. Clamp it so
@@ -243,18 +253,29 @@ isolated obstacle a wavelength across in the scene and look behind it.
 
 ## What it beats
 
-- **Gerstner for the open sea** [gerstner_trochoid] — its loop artefact (the whole surface visibly
-  repeating its motion) is inherent; irrational frequency ratios and per-wave phase mitigate, never
-  remove.
+- **Gerstner for the open sea** [gerstner_trochoid] — a finite sum of sinusoids repeats, so the
+  whole surface visibly cycles through its motion; that is inherent, and irrational frequency
+  ratios and per-wave phase mitigate it, never remove it. ⚠️ Do not confuse this with the *loops*
+  the cited chapter names: those are vertex loops that form over a crest once the steepness sum
+  `Q_i*w_i*A_i` passes 1, they are avoidable, and the chapter says how. The temporal repeat is
+  not.
 - **A single FFT tile** [tessendorf_ocean] — visibly repeats from any altitude; cascades at
   near-co-prime sizes push the repeat beyond notice, but verify from maximum gameplay altitude,
   because tiling *returns* at height as the small cascades mip away.
 - **Shallow-water simulation as an ocean** — no dispersion, so no groups, no swell and no correct
   deep-water motion. It is the right tool for a bounded interactive body and the wrong one for a sea.
-- **Wave particles and packets** [yuksel2007] — Lagrangian carriers of wave energy advected over the
-  bathymetry and rasterised into a displacement field. Refraction, dispersion and shoaling emerge
-  instead of being painted; the cost is research-grade machinery and tens of thousands of carriers,
-  so in production it is *targeted* (a wake, a hero cove) while the tiers above still carry the sea.
+- **Wave particles** [yuksel2007] — Lagrangian carriers of wave energy, each holding a radial
+  deviation function that is rasterised into a height field and subdivides into three as its
+  wavefront spreads. Its real strength is *interaction*: waves raised by floating objects, and
+  forces returned to them.
+  ⚠️ **Do not credit this paper with refraction, dispersion or shoaling.** It solves the plain
+  second-order wave equation at a **constant** wave speed, so it contains no dispersion at all —
+  the "dispersion angle" a particle carries is wavefront-spreading geometry, not frequency
+  dispersion. It has no bathymetry; its boundaries are container walls that reflect, and it names
+  diffraction as future work. Nor is it research-grade in cost: it reports 170 fps at 100 000
+  particles on 2007 hardware and says fewer than 10 000 give nearly identical results. Emergent
+  refraction and shoaling over a varying bed belong to the later **wave-packet** line, which Gaia
+  has not read and therefore does not cite.
 - **A depth-modulated ambient field as the whole shore solution** — acceptable only where the camera
   never lingers on a beach: phases stay wind-aligned, so diagonal surf marching through knee-deep
   water survives, and nothing breaks.

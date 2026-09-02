@@ -7,10 +7,10 @@ status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: shah2007, tier: P, locator: "the light-space receiver estimation loop against a depth map" }
-  - { id: wyman2006, tier: P, locator: "photon emission per texel of the light-space surface image, and the image-space gather" }
-  - { id: guardado2004, tier: F, locator: "the projected-texture and per-vertex intensity forms" }
-  - { id: jensen1996, tier: P, locator: "§4, the separate caustic photon map along specular paths" }
-  - { id: zeltner2020, tier: P, locator: "§4, the manifold walk that solves for specular chains" }
+  - { id: wyman2006, tier: P, locator: "§3.1 Photon Emission — one photon per texel of a light-space image of the refractor; §3.2 Photon Gathering, with §3.2.1 and §3.2.2 the two gather forms and §3.2.3 the noise filter" }
+  - { id: guardado2004, tier: F, locator: "§2.3 Our Approach — the per-vertex backward ray trace and the 0.53° sun-disc angle — and §2.4 for the OpenGL pass structure. The projected caustic texture is §2.2, where the chapter credits it to Stam 1996 rather than presenting it" }
+  - { id: jensen1996, tier: P, locator: "§3 Pass 1: Constructing the Photon Maps — the caustics photon map is built by emitting photons towards the specular objects; §4.3 Caustics is where that map is used at render time, and §5 the radiance estimate" }
+  - { id: zeltner2020, tier: P, locator: "§4.1 Finding all solutions — seeded Newton walks and the convergence-basin probability — and §4.2 Unbiased SMS; the manifold walk itself is set up in §3.1" }
 ---
 # Caustics — light focused by the water surface
 
@@ -101,15 +101,18 @@ from a spectrum or a simulation.
 | You have | Use | Because |
 |---|---|---|
 | A rasterizer, a real bathymetry field, sun-lit shallows | **Caustic map** with depth-map receiver estimation [shah2007] | One light-space pass, cost independent of screen coverage; correct response to wave state and depth |
-| A rasterizer, stylized art direction, no bathymetry | Projected animated texture [guardado2004] | Cheap and legible — label it as an effect, not as light |
+| A rasterizer, stylized art direction, no bathymetry | Projected animated texture — nearest published relative [guardado2004] | Cheap and legible — label it as an effect, not as light |
 | A path tracer, and caustics are part of the shot | **Caustic photon map** [jensen1996] | Robust, handles any surface, blurs the fold |
 | A path tracer, and the filaments are the shot | **Specular manifold sampling** [zeltner2020] | Keeps the high-frequency structure photon gathering smooths away |
 | Real-time ray tracing, terrain as a proxy | Caustic map still, projected in the raster pass | The ray budget is spent on shadows and reflections; see `heightfield-raymarching.md` for the proxy contract |
 
-⚠️ **One of those rows rests on an `F` source.** There is no peer-reviewed paper behind the
-stylized projected-texture tier; the standard exposition is a GPU Gems book chapter
-[guardado2004], and it is listed here as the honest name for what the industry actually ships, not
-as a result. Every other row above cites a peer-reviewed paper.
+⚠️ **One of those rows rests on an `F` source, and thinly.** There is no peer-reviewed paper
+behind the stylized projected-texture tier — and, checked against the source, there is no book
+chapter either. The GPU Gems chapter usually cited for it [guardado2004] raises the projected
+caustic texture in §2.2 only to attribute it to Stam 1996 and then replace it: the chapter's own
+method, §2.3–2.4, is the per-vertex backward ray trace this document credits it with above. The
+row is listed as the honest name for what the industry actually ships, not as a result. Every
+other row above cites a peer-reviewed paper.
 
 The crossover is not "how much GPU do I have" but **whether the surface is available as a field the
 light pass can rasterize**. If it is, the caustic map is nearly free relative to what it buys. If

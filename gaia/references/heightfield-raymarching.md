@@ -6,13 +6,13 @@ tags: [rendering, ray-traced, raymarching, heightfield, near-real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: tevs2008, tier: P, locator: "§4, the maximum-mipmap pyramid and its hierarchical traversal" }
-  - { id: drobot2010, tier: F, locator: "the quadtree displacement traversal, applied to material displacement" }
+  - { id: tevs2008, tier: P, locator: "§3.1 Data Structure for the max-reduce mipmap and its build cost table; §3.2 Intersection Algorithm for the hierarchical traversal loop; §3.3 for level of detail. §4 is Comparison, not the method" }
+  - { id: drobot2010, tier: F, locator: "GDC 2010 deck: slide 24 builds the quadtree by mipmapping with a min operator, slides 26–27 and 44 give the traversal and the cell-boundary intersection test, slides 45–49 the refinement, iteration cap and LOD; height blending is slides 81–84 and 91–92" }
   - { id: dummer2006, tier: F, locator: "the per-texel cone opening and the relaxed variant" }
   - { id: tatarchuk2006, tier: P, locator: "§4, view-angle-adaptive step counts and refinement" }
   - { id: policarpo2005, tier: P, locator: "§3, linear search plus binary refinement" }
-  - { id: smacke, tier: F, locator: "the y-buffer column loop in the reference implementation" }
-  - { id: dxrspec, tier: F, locator: "intersection shaders for procedural AABB geometry; BLAS refit vs rebuild" }
+  - { id: smacke, tier: F, locator: "the front-to-back bullet in README.md and the Python listing under it, where ybuffer holds the highest drawn y per screen column and DrawVerticalLine clips against it" }
+  - { id: dxrspec, tier: F, locator: "the Intersection shaders - procedural primitive geometry section; Acceleration structure updates with Bottom-level acceleration structure updates and Acceleration structure update constraints; Opacity micromaps for what those do and do not classify" }
 ---
 # Heightfield ray marching — one traversal kernel, many consumers
 

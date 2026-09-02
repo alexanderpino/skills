@@ -7,7 +7,7 @@ status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: epicrvt, tier: F, locator: "Runtime Virtual Texture — page composition and invalidation" }
-  - { id: mittring2008, tier: F, locator: "page tables, feedback pass, page borders" }
+  - { id: mittring2008, tier: F, locator: "§2.3.2.1 The Indirection Texture and §2.3.2.7 its update — the page table; §2.3.2.2 Efficient Filtering Through Borders; §2.3.6 Computing the Local LOD, where §2.3.6.4 is the feedback pre-pass and credits it to Barrett, and §2.3.6.5 is the texture-space alternative Mittring prefers" }
   - { id: barrett2008, tier: F, locator: "the software page-table indirection and feedback loop" }
   - { id: tanner1998, tier: P, locator: "§2, the nested toroidal clipmap stack" }
   - { id: mishkinis2013, tier: F, locator: "the height-based blend with a contrast term" }

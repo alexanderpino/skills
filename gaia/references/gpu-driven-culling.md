@@ -6,11 +6,11 @@ tags: [rendering, rasterizer, culling, gpu-driven, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: haar2015, tier: F, locator: "the persistent GPU scene and the two-phase occlusion structure" }
-  - { id: karis2021, tier: F, locator: "the two-pass occlusion culling restatement" }
+  - { id: haar2015, tier: F, locator: "pp. 13–21 of the combined course PDF — the pipeline overview, per-instance GPU data persistent for static instances, cluster chunk expansion, index compaction, multi-draw; pp. 51–52 for two-phase occlusion culling against last frame depth pyramid" }
+  - { id: karis2021, tier: F, locator: "slide 19 states the two-pass rule, slides 75–77 are Nanite own version and the culling dataflow" }
   - { id: wihlidal2016, tier: F, locator: "compute backface-cone and small-primitive culling" }
-  - { id: burns2013, tier: P, locator: "§3, the ID-and-depth raster and deferred attribute fetch" }
-  - { id: d3d12indirect, tier: F, locator: "ExecuteIndirect count-buffer semantics" }
+  - { id: burns2013, tier: P, locator: "§2 The Visibility Buffer — a four-byte triangle id plus instance id per sample; §3.2 The Visibility Buffer Pipeline for the three phases that defer attribute fetch to shading" }
+  - { id: d3d12indirect, tier: F, locator: "the ExecuteIndirect reference page — the MaxCommandCount parameter description and the Remarks pseudo-code, CommandCount = min of the count buffer value and MaxCommandCount" }
 ---
 # GPU-driven culling — the CPU stops counting chunks
 

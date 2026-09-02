@@ -6,13 +6,13 @@ tags: [rendering, rasterizer, water, shading, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: bruneton2010, tier: P, locator: "§3-4, the slope-variance tensor and the roughness-aware Fresnel fit" }
-  - { id: coxmunk1954, tier: P, locator: "the slicked-water mean-square-slope reduction, and the along-wind anisotropy of the slope distribution" }
+  - { id: bruneton2010, tier: P, locator: "§3.2 eq. 4 for the slope variances, derived in Appendix A; §5.2 eq. 26 for the roughness-aware Fresnel, where exp of −2.69σv sits inside the Schlick exponent over 1 + 22.7σv^1.5" }
+  - { id: coxmunk1954, tier: P, locator: "§6.3 Mean Square Slopes — the clean-surface and slick-surface regressions on wind at 41 ft, about 12.5 m; the along-wind and crosswind principal axes are §6.1" }
   - { id: ross2005, tier: P, locator: "the Gaussian-slope BRDF with Smith masking" }
   - { id: dupuy2012, tier: P, locator: "the erf-form whitecap coverage over the Jacobian footprint statistics" }
   - { id: deliot2023, tier: P, locator: "the binomial-law glint counting on anisotropic grids" }
-  - { id: johanson2004, tier: F, locator: "the projected-grid construction and its horizon behaviour" }
-  - { id: vlachos2010, tier: F, locator: "the dual phase-offset flow-map sampling with triangle-wave blend" }
+  - { id: johanson2004, tier: F, locator: "§2.4, the seven-step projected-grid construction; §2.4.1 aiming the projector to avoid backfiring; §2.5 for the near-surface horizon case, where the distance dynamic range collapses projector-space detail" }
+  - { id: vlachos2010, tier: F, locator: "slide 23 for the one-third-of-UV-space distortion limit, slide 24 for the two layers offset half a phase, slide 46 and slide 47 for the blend interval shape. The deck never uses the phrase triangle wave" }
   - { id: unrealwater, tier: F, locator: "the water mesh quadtree and the single-layer-water shading interface" }
 ---
 # Water rendering — drawing the surface, not simulating it

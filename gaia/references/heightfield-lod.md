@@ -6,12 +6,12 @@ tags: [rendering, rasterizer, lod, heightfield, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: strugar2009, tier: F, locator: "the morph-factor derivation and the per-level morph constants" }
+  - { id: strugar2009, tier: F, locator: "the Morph implementation section — morphK and the morphVertex HLSL that this document reproduces — and LOD distances and morph areas, where ranges double per level and the morph area is the last 15 to 30 per cent of each. Headings are unnumbered; the whitepaper gives no closed-form derivation of morphK" }
   - { id: ulrich2002, tier: F, locator: "the screen-space error projection, and the skirt discussion" }
-  - { id: deboer2000, tier: F, locator: "§ the per-chunk mip chain and edge stitching" }
-  - { id: losasso2004, tier: P, locator: "§3 nested rings and toroidal array access; §6.2–6.3 the transition region and zero-area-triangle T-junction removal" }
+  - { id: deboer2000, tier: F, locator: "§2.3 The Texture Mipmap Analogy for the per-block GeoMipMap chain; §2.3.2 Solving geometry-gaps for the index-buffer edge fix, which omits the finer edge vertices from the connectivity" }
+  - { id: losasso2004, tier: P, locator: "§3 nested rings and toroidal 2-D wraparound access; §5 for the newly exposed L-shaped fill; §6.2 for both the transition region and the T-junction removal paragraph that closes it, rendering zero-area triangles along the render region boundaries. §6.3 is Texture mapping, not stitching" }
   - { id: asirvatham2005, tier: F, locator: "§2.3.5 and §2.4, heights read from a vertex texture and the clipmap updated GPU-side" }
-  - { id: dupuy2020, tier: P, locator: "§4, split/merge on the concurrent binary tree" }
+  - { id: dupuy2020, tier: P, locator: "§5.2 Dedicated LEB Algorithms for CBTs — split and merge with the same-depth neighbour heap-index maps; §5.3 for the GPU terrain renderer feeding an indirect draw; §4.2 for the parallel update pipeline" }
   - { id: duchaineau1997, tier: P, locator: "§4, the split/merge priority queues" }
 ---
 # Heightfield LOD — spending triangles where the error shows
@@ -108,8 +108,9 @@ height   = sampleHeight(gridPos);                                    // re-sampl
 - **Normals morph too.** Geometry morphing under un-morphed normals still pops; lighting
   discontinuity reads louder than a silhouette change.
 
-Restrict morphing to the outer band of each range — commonly the last quarter to third — so most
-vertices render un-morphed and the per-frame morph delta stays sub-pixel at real camera speeds.
+Restrict morphing to the outer band of each range — the CDLOD whitepaper puts the morph area at
+"the last 15%-30% of every LOD range", and that is the figure to start from — so most vertices
+render un-morphed and the per-frame morph delta stays sub-pixel at real camera speeds.
 And make the morph factor a pure function of (vertex, camera): never wall-clock blending after
 "the LOD changed", which desynchronises across the shadow and depth passes the moment the camera
 teleports or streaming hitches.

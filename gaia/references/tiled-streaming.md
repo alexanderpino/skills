@@ -6,12 +6,12 @@ tags: [rendering, rasterizer, streaming, residency, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: cozzi2011, tier: F, locator: "the tile-pyramid and out-of-core residency chapters" }
+  - { id: cozzi2011, tier: F, locator: "ch. 12 Massive-Terrain Rendering — §12.1 level of detail, §12.2 preprocessing, §12.3 out-of-core rendering, §12.4 culling" }
   - { id: ulrich2002, tier: F, locator: "per-chunk geometric error stored with the chunk" }
-  - { id: strugar2009, tier: F, locator: "the morph band, applied at tile boundaries" }
-  - { id: losasso2004, tier: P, locator: "§3, the ring-shaped resident cut" }
-  - { id: directstorage, tier: F, locator: "GPU decompression and queue-depth guidance" }
-  - { id: andersson2007, tier: F, locator: "the geometry/material pipeline split" }
+  - { id: strugar2009, tier: F, locator: "the LOD distances and morph areas section — the morph area covers the last 15 to 30 per cent of every LOD range. The whitepaper section headings are unnumbered" }
+  - { id: losasso2004, tier: P, locator: "§3 Clipmap regions — the render region is the hollowed frame between active_region of l and of l+1" }
+  - { id: directstorage, tier: F, locator: "the Queue depth section of the GDK DirectStorage overview, its Decompression section, and Best Practices → Queue management — submit every outstanding request, and size the queue at four times the per-frame request count" }
+  - { id: andersson2007, tier: F, locator: "§5.2.4 Static Sparse Mask Textures — material masks in their own sparse quadtree with an indirection texture and atlas — against §5.4.1 Geometry LOD" }
 ---
 # Tiled streaming — residency without holes
 
@@ -130,8 +130,8 @@ not fall through the world.
 Tile boundaries re-create the crack problem at pyramid scale, and the contracts are those of
 `heightfield-lod.md` restated per tile: adjacent same-level tiles must generate bit-identical edge
 vertices, cross-level edges constrain the fine tile to the coarse neighbour's edge function, and
-morph regions over the outer 10–25% of a tile remove the *pop* at replacement as well as the crack
-[strugar2009]. Morphing needs the parent's height at the child's vertices, which is one more
+morph regions over the outer band of a tile remove the *pop* at replacement as well as the crack —
+the CDLOD whitepaper sizes that band at the last 15–30% of each LOD range [strugar2009]. Morphing needs the parent's height at the child's vertices, which is one more
 reason parents stay resident.
 
 ⚠️ **Attribute continuity is not a renderer problem.** Normals, AO and material weights baked

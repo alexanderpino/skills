@@ -8,8 +8,8 @@ generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: bodytype_doctrine, tier: F, locator: "the man-made-water gate table and the driven-basin section" }
   - { id: capillary_gravity, tier: F, locator: "the minimum phase speed and the wavelength at which it occurs" }
-  - { id: lamb_damping, tier: F, locator: "the deep-water viscous decay rate for a free-surface wave" }
-  - { id: beaufort, tier: F, locator: "the sea-state descriptors at Force 3, 5 and 7" }
+  - { id: lamb_damping, tier: F, locator: "6th ed. 1932, ch. XI Viscosity, Art. 348, pp. 623-624 — eq. 7 da/dt = -2*nu*k^2*a and eq. 9 the decay modulus tau = 1/2*nu*k^2 = lambda^2/8*pi^2*nu, from which the e-folding distance follows against the group speed" }
+  - { id: beaufort, tier: F, locator: "NOAA Storm Prediction Center Beaufort Wind Scale table, §'Appearance of Wind Effects - On the Water', rows Force 3, Force 5 and Force 7. The table numbers nothing but the force" }
 ---
 # Closed water and open water are two different problems
 
