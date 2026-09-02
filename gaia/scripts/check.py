@@ -26,8 +26,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from okf import Unparseable, documents, parse_front_matter  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-PAPERS = ROOT / "references" / "papers.md"
 INDEX = ROOT / "references" / "index.md"
+
+
+def paper_files() -> list[Path]:
+    """The bibliography, split by family across `papers*.md`.
+
+    One file would serialise every author onto one merge point; families are how 99-papers.md
+    already organises itself, and splitting lets documents and their sources land together.
+    Globbed from disk, never listed by hand -- a hand-kept list is the thing that goes stale.
+    """
+    return sorted((ROOT / "references").glob("papers*.md"))
 
 MAX_LINES = 450          # per the plan: a document at the cap is two topics wanting a split
 TIERS = {"P", "F", "L", "N", "?"}
@@ -44,10 +53,19 @@ _MARKER = re.compile(r"(?<!\])\[(?P<id>[a-z][a-z0-9_]*)\](?!\()")
 def bibliography() -> tuple[dict[str, dict], list[str]]:
     """id -> {tier, ref, background}. Problems are returned, never printed and swallowed."""
     problems: list[str] = []
-    if not PAPERS.exists():
-        return {}, [f"{PAPERS.relative_to(ROOT)} does not exist"]
+    files = paper_files()
+    if not files:
+        return {}, ["references/papers*.md: no bibliography file exists"]
     entries: dict[str, dict] = {}
-    _, body = parse_front_matter(PAPERS)
+    for papers in files:
+        _, body = parse_front_matter(papers)
+        in_fence = False
+        _scan(papers, body, entries, problems)
+    return entries, problems
+
+
+def _scan(papers: Path, body: str, entries: dict, problems: list) -> None:
+    stem = papers.name
     in_fence = False
     for n, line in enumerate(body.splitlines(), 1):
         # Skip fenced blocks. This file documents its OWN entry format inside a fence, and
@@ -67,14 +85,14 @@ def bibliography() -> tuple[dict[str, dict], list[str]]:
             continue
         m = _ENTRY.match(line.rstrip())
         if not m:
-            problems.append(f"papers.md:{n}: entry does not match "
+            problems.append(f"{stem}:{n}: entry does not match "
                             f"`- **id** `T` -- Reference.`  ->  {line.strip()[:60]}")
             continue
         if m["id"] in entries:
-            problems.append(f"papers.md:{n}: duplicate id `{m['id']}`")
+            problems.append(f"{stem}:{n}: duplicate id `{m['id']}` "
+                            f"(already defined in {entries[m['id']]['file']})")
         entries[m["id"]] = {"tier": m["tier"], "ref": m["ref"].strip(),
-                            "background": bool(m["background"])}
-    return entries, problems
+                            "background": bool(m["background"]), "file": stem}
 
 
 def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
@@ -109,7 +127,7 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
 
         # --- size ------------------------------------------------------------------------
         n = len(path.read_text(encoding="utf-8").splitlines())
-        if n > MAX_LINES and path not in (PAPERS, INDEX):
+        if n > MAX_LINES and path not in paper_files() and path != INDEX:
             problems.append(f"{rel}: {n} lines, over the {MAX_LINES} cap -- it is two topics")
 
         # --- citations, both directions --------------------------------------------------
@@ -142,7 +160,7 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
 
 def check_orphans(bib: dict[str, dict], used: set[str]) -> list[str]:
     """The other direction. 216 of terrain-architect's 326 entries were cited by nothing."""
-    return [f"papers.md: `{i}` is cited by no document and is not marked [background]"
+    return [f"{bib[i]['file']}: `{i}` is cited by no document and is not marked [background]"
             for i in sorted(set(bib) - used) if not bib[i]["background"]]
 
 
@@ -150,7 +168,7 @@ def check_duplication(threshold: float = 0.7) -> list[str]:
     """Once the corpus is large, overlap is the failure mode, not size."""
     docs = []
     for path in documents(ROOT):
-        if path in (PAPERS, INDEX):
+        if path in paper_files() or path == INDEX:
             continue
         try:
             fm, _ = parse_front_matter(path)
@@ -183,7 +201,7 @@ def main() -> int:
     doc_problems, used = check_documents(bib)
     problems += doc_problems + check_orphans(bib, used) + check_duplication()
 
-    docs = [p for p in documents(ROOT) if p not in (PAPERS, INDEX)]
+    docs = [p for p in documents(ROOT) if p not in paper_files() and p != INDEX]
     print(f"documents {len(docs)}   bibliography {len(bib)}   cited {len(used)}   "
           f"background {sum(1 for e in bib.values() if e['background'])}")
 

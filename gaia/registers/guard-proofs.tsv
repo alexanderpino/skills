@@ -20,3 +20,6 @@ front matter subset is enforced	nested inline map { a: { b: c } }	raise Unparsea
 DECOY reword prose	"Every drainage network" -> "Practically every drainage network"	green: prose edits that touch no citation	exit 0	GREEN
 DECOY background entry	append an entry marked [background]	green: background entries are exempt from the orphan check by design	exit 0	GREEN
 DECOY reorder sources	swap two rows in sources:	green: order carries no meaning	exit 0	GREEN
+index.md is generated, not written	change "2 document(s)" to "9 document(s)" by hand in index.md	red: a hand edit shows as a diff	index.md is out of date. Run `python3 gaia/scripts/index.py`. (exit 1)	PROVEN
+index --check tolerates its own timestamp	re-run index.py, then --check	green: the `generated:` line changes every run and must not be compared	index.md is current (2 documents)	GREEN
+duplicate id across bibliography files	add a second `barnes2014` entry in a new papers-dup.md	red: named in BOTH files so the collision is findable	FAIL papers-flow.md:62: duplicate id `barnes2014` (already defined in papers-dup.md)	PROVEN
