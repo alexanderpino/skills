@@ -262,13 +262,13 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
 
 LOCATOR_PRECISE = re.compile(r"""
           §\s*\S                                  # numbered or named section mark
-        | \bsec\.\s*\d       | \bsection\s+\d
-        | \beq\.\s*\(?\d     | \bequation\s+\(?\d
+        | \bsecs?\.\s*\d     | \bsections?\s+\d
+        | \beqs?\.\s*\(?\d   | \bequations?\s+\(?\d
         | \bpp?\.\s*\d       | \bpages?\s+\d
-        | \bfig\.\s*\d       | \bfigure\s+\d
-        | \bch\.\s*\d        | \bchapter\s+\d
-        | \btable\s+\d       | \balgorithm\s+\d
-        | \blisting\s+\d     | \bslide\s+\d
+        | \bfigs?\.\s*\d     | \bfigures?\s+\d
+        | \bchs?\.\s*\d      | \bchapters?\s+\d
+        | \btables?\s+\d     | \balgorithms?\s+\d
+        | \blistings?\s+\d   | \bslides?\s+\d
     """, re.I | re.X)
 
 # The fixture set for LOCATOR_PRECISE, asserted by `--selftest` and run in CI.
@@ -290,6 +290,17 @@ LOCATOR_FIXTURES = [
     ("\u00a72.3 eq. 6", True),
     ("ch. 2, the GPU-resident form", True),
     ("Table 1", True),
+    # Plurals. These are perfectly followable and scored vague until a rendering agent hit
+    # them: it had to write "slide 19" singular to get credit for "slides 75-77".
+    ("slides 75-77", True),
+    ("sections 3-4", True),
+    ("Figures 2 and 3", True),
+    ("chapters 5 and 6", True),
+    # Paraphrases that merely CONTAIN a marker word. All three are real locators from
+    # virtual-texturing.md that the original bare-word pattern scored as sharp.
+    ("Runtime Virtual Texture -- page composition and invalidation", False),
+    ("page tables, the feedback pass, page borders", False),
+    ("the software page-table indirection and feedback loop", False),
 ]
 
 
