@@ -82,6 +82,7 @@ PHASE_OF = {
     "COV": "5 decompose", "CON": "5 decompose", "SPL": "5 decompose",
     "BRF": "6 briefs", "DOD": "6 briefs",
     "REV": "8 review", "LNK": "9 emit", "STRUCT": "0 configure",
+    "BAT": "9 batch",
 }
 
 
@@ -129,6 +130,180 @@ CONFIG_SPEC = {
                    "require_intake", "measured_non_functional_keys"},
     "validation.definition_of_done[]": {"id", "applies_to_kinds",
                                         "expect_command_matching", "severity"},
+}
+
+
+# Every code this module can emit, with the severity its call sites use and a one-line
+# meaning: the condition that trips the gate, not the advice. `--codes` prints the
+# union of these registries; selftest holds each to its call sites both ways, so a
+# code cannot be emitted unregistered and an entry cannot outlive its emitter.
+# "error | warn" is a code with call sites at both severities; "config" is one whose
+# severity a rule in refinery.yaml decides.
+CODES = {
+    # 0 configure
+    "CFG001": ("warn", "refinery.yaml carries a key that no script reads"),
+    "STRUCT001": ("error", "a required top-level key of the bundle is missing"),
+    "STRUCT002": ("error", "story is missing its key, title, summary or criteria"),
+    "STRUCT003": ("error", "the bundle has no subtasks, so nothing was decomposed"),
+    "TLR001": ("warn", "config names a tailoring source the bundle does not record"),
+    "TLR002": ("error", "an applied tailoring rule carries no text a reader can check"),
+    "TLR003": ("error", "a tailoring override relaxes an invariant no tailoring may relax"),
+    "TLR004": ("error", "a tailoring override records no reason and no person"),
+    "TLR005": ("warn", "a gate is switched off and the bundle never says so"),
+    # 1 intake
+    "CYN001": ("error", "the domain is complex and the plan contains no probe"),
+    "CYN002": ("warn", "the domain is chaotic, so refinement is the wrong instrument now"),
+    "CYN003": ("error | warn", "nobody classified whether this problem is knowable up front"),
+    "ENB001": ("warn", "an enabler names what it unlocks and no blocks link records it"),
+    "IMP001": ("warn", "intake flagged a mechanism with no outcome and no impact map answers it"),
+    "IMP002": ("error | warn", "the impact map has no goal, or its goal carries no number"),
+    "INT001": ("error", "the bundle carries no intake assessment at all"),
+    "INT002": ("error", "an intake verdict or dimension status is outside the vocabulary"),
+    "INT003": ("error", "the item was decomposed although its verdict was not sufficient"),
+    "INT004": ("error", "a required intake dimension is missing with no blocking question"),
+    "INT005": ("error", "a dimension is marked assumed with no assumption written down"),
+    "INT006": ("warn", "an assumption has no question that could ever confirm it"),
+    "INT007": ("error", "a dimension marked present quotes nothing found in the source text"),
+    "INT008": ("error", "the verdict says sufficient while a required dimension is missing"),
+    "INT009": ("warn", "a present dimension is still flagged heuristic, unconfirmed by anyone"),
+    "INT010": ("error", "a dimension marked answered lacks the answer or who gave it"),
+    "INT011": ("warn", "the intake kind and the decomposition profile disagree"),
+    "INT012": ("error", "the intake kind is outside the vocabulary and has no questionnaire"),
+    # 1 triage
+    "TRI001": ("warn", "the ticket's own metadata was never captured into tracker_meta"),
+    "TRI002": ("error", "labels route this to incident handling yet it was decomposed"),
+    "TRI003": ("error", "labels require a subtask kind the decomposition does not contain"),
+    "TRI004": ("error", "labels require an intake dimension nobody assessed"),
+    "TRI005": ("warn", "labels imply a profile or kind the bundle does not use"),
+    "TRI006": ("warn", "labels make a quality attribute mandatory and it reads unchanged"),
+    "TRI007": ("warn", "a label matches no policy rule and no ignore pattern"),
+    "TRI008": ("warn", "labels call for a critic the review panel lacks"),
+    "TRI009": ("warn", "the triage block no longer matches the ticket's current labels"),
+    # 2 evidence
+    "EVI001": ("error", "the change surface is empty, so Phase 2 was skipped"),
+    "EVI002": ("error", "a change-surface entry lacks its repo or its path"),
+    "EVI003": ("warn", "a change-surface entry carries a role outside create, modify, delete, read"),
+    "EVI004": ("warn", "evidence records no repos, so provenance cannot be verified"),
+    "EVI005": ("warn", "the notes cite a path the change surface never recorded"),
+    "EVI006": ("error", "several repos change and no contract between them is recorded"),
+    "EVI007": ("warn", "a brief edits a file the evidence never recorded touching"),
+    "EVI008": ("warn", "a change across repos rules nothing out, so near-misses go unnamed"),
+    "EVI009": ("error", "a negative result records nowhere it looked or no conclusion"),
+    "PND001": ("error | warn", "a pending claim names nothing that will create the code it cites"),
+    "PND002": ("error | warn", "the story depends on another item and no link records it"),
+    "SER001": ("warn", "entries inherited from an earlier bundle are stale and unverified"),
+    "SER002": ("warn", "the text promises a follow-up ticket that follow_ups does not list"),
+    # 3 criteria
+    "AC001": ("error", "fewer acceptance criteria than the configured minimum"),
+    "AC002": ("warn", "more acceptance criteria than the configured maximum, so split the story"),
+    "AC003": ("error", "an acceptance criterion carries no code at all"),
+    "AC004": ("error", "two acceptance criteria share the same code"),
+    "AC005": ("error", "an acceptance criterion has no rule text at all"),
+    "AC006": ("error", "a rule has no concrete example, so it is not understood yet"),
+    "AC007": ("error", "an acceptance criterion contains a term from the vagueness lexicon"),
+    "AC008": ("warn", "the rule names more alternatives than it carries examples"),
+    "AC009": ("warn", "the rule draws a threshold and no example stands exactly on it"),
+    "AC010": ("warn", "the criteria mix two code schemes in one story"),
+    "AC011": ("error", "a retired criterion code is in use again"),
+    "BAS001": ("warn", "a target is stated relative to today and no baseline records today"),
+    "BAS002": ("error", "a criterion claims behaviour is preserved and nothing captured the behaviour"),
+    "BAS003": ("error | warn", "a baseline entry lacks its metric, its value or its source"),
+    "BUD001": ("warn", "a human-facing text exceeds its word budget"),
+    "BUD002": ("warn", "a human-facing text contains a term from the vagueness lexicon"),
+    "BUD003": ("error", "the technical notes are empty, so this is a reworded ticket"),
+    "BUD004": ("warn", "no non-goals are recorded, the cheapest scope control there is"),
+    "BUD005": ("warn", "the original ask was not recorded, so scope creep cannot be checked"),
+    "DT001": ("error", "a decision-table combination has neither a rule nor an impossibility"),
+    "DT002": ("error", "the decision table is malformed: unknown condition, value or criterion"),
+    "DT003": ("error", "one combination matches several rules with different outcomes"),
+    "DT004": ("warn", "the decision table is wider than one story can be"),
+    "NFR001": ("warn", "a required quality attribute was never addressed, not even as unchanged"),
+    "NFR002": ("warn", "a measured quality attribute is answered in prose with no number"),
+    # 4 decisions
+    "DEC001": ("error", "a decision status is neither locked nor deferred"),
+    "DEC002": ("error", "a locked decision names no chosen option"),
+    "DEC003": ("error", "a locked decision carries no rationale anyone could challenge"),
+    "DEC004": ("error", "a deferred decision has no spike subtask to resolve it"),
+    "DEC005": ("error", "a deferred decision points at a spike that is not in the bundle"),
+    "DEC006": ("error", "a deferred decision points at a subtask that is not a spike"),
+    "DEC007": ("error", "a deferred decision has no expiry, so it is an unmade decision"),
+    "DEC008": ("error", "a deferred decision never says what information would decide it"),
+    "READY001": ("error", "a blocking question is still unresolved in the bundle"),
+    "READY002": ("warn", "a question has no owner, so nobody will answer it"),
+    "READY003": ("error | warn", "a question was recorded but never put to anyone"),
+    "READY004": ("error | warn", "a question waits on something that is not a question, or carries no guess"),
+    "READY005": ("warn", "a question was asked while it still waits on an earlier answer"),
+    "RSK001": ("error", "a risk records no mitigation, so it is a worry, not a plan"),
+    "RSK002": ("warn", "a high risk records no detection signal that would reveal it"),
+    "RSK003": ("warn", "a change across repos records no risks at all"),
+    # 5 decompose
+    "CON001": ("error", "a subtask references a contract id the evidence never recorded"),
+    "COV001": ("error", "an acceptance criterion is covered by no subtask"),
+    "COV002": ("warn", "the declared coverage map disagrees with the subtasks' covers lists"),
+    "DAG001": ("error", "the subtask dependency graph contains a cycle"),
+    "DAG002": ("error", "a subtask consumes a contract without depending on its producer"),
+    "IRR001": ("error", "a migration subtask records neither a rollback nor an irreversibility note"),
+    "IRR002": ("warn", "a migration subtask's done_when counts or verifies nothing it touched"),
+    "IRR003": ("warn", "a migration subtask has no dry run in its preflight"),
+    "PAR001": ("error", "one file is written by subtasks that could run concurrently"),
+    "PAR002": ("warn", "one file is written by two subtasks in sequence, so the later one rebases"),
+    "SPK001": ("error", "a research item plans no spike subtask"),
+    "SPK002": ("error", "a spike exceeds the configured timebox in days"),
+    "SPK003": ("warn", "a spike on a delivery story that no decision defers to"),
+    "SPK004": ("error", "a research item already plans the build it exists to inform"),
+    "SPL001": ("warn", "the blast radius exceeds a split threshold, so the story should split"),
+    "SUB001": ("warn", "more subtasks than the configured maximum allows"),
+    "SUB002": ("error", "two subtasks in the bundle share one id"),
+    "SUB003": ("error", "a subtask has no title at all"),
+    "SUB004": ("error", "two subtasks in the bundle share one title"),
+    "SUB005": ("warn", "a subtask title is longer than trackers display"),
+    "SUB006": ("warn", "a subtask title contains a conjunction, so it is probably two subtasks"),
+    "SUB007": ("error", "a subtask names no repo it belongs to"),
+    "SUB008": ("warn", "a subtask's human text exceeds its word budget"),
+    "SUB009": ("error", "a subtask has no human-facing text at all"),
+    "SUB010": ("warn", "a subtask has no estimate, so sizing cannot be checked"),
+    "SUB011": ("error", "a subtask estimate exceeds the configured maximum days"),
+    "SUB012": ("error", "a subtask covers a criterion code that does not exist"),
+    "SUB013": ("error", "a subtask covers no criterion and its kind is not exempt"),
+    "SUB014": ("error", "a subtask depends on a subtask id that does not exist"),
+    "SUB015": ("error", "a subtask spans more than one repo at once"),
+    "SUB016": ("error | warn", "the profile is expand-contract and nothing contracts"),
+    "SUB017": ("warn", "a subtask is below the floor and touches one file, a commit not a ticket"),
+    "SUB018": ("warn", "two chained subtasks in one repo on one criterion fit inside every cap together"),
+    "SUB019": ("error", "a subtask kind is outside the closed vocabulary and skips every kind-keyed gate"),
+    # 6 briefs
+    "BRF001": ("error", "a subtask has no agent brief at all"),
+    "BRF002": ("error", "an agent brief lacks a required field"),
+    "BRF003": ("error", "an agent brief names a different repo than its subtask"),
+    "BRF004": ("error", "a brief's change surface exceeds the file budget"),
+    "BRF005": ("warn", "a change-surface role is outside create, modify, delete"),
+    "BRF006": ("error", "done_when contains no runnable command, so there is no mechanical gate"),
+    "BRF007": ("error", "a command entry in done_when has no command"),
+    "BRF008": ("warn", "a done_when assertion is too vague to write a test from"),
+    "BRF009": ("error", "a convention cites no path:line evidence, so it is a training prior"),
+    "BRF010": ("warn", "a brief has no forbidden entries, so nothing stops scope creep"),
+    "BRF011": ("warn", "a brief has no out_of_scope entries at all"),
+    "BRF012": ("warn", "a brief contains what looks like implementation code"),
+    "BRF013": ("warn", "entry points carry line numbers and no preflight verifies them"),
+    "BRF014": ("warn", "a brief has no stop_and_ask, so an unknown gets improvised past"),
+    "BRF015": ("warn", "a brief's read and touch set exceeds one context window's budget"),
+    "DOD001": ("config", "no done_when command satisfies a Definition of Done rule for this kind"),
+    "DOD002": ("error", "a Definition of Done rule carries an invalid regular expression"),
+    "DOD003": ("error", "a Definition of Done rule lists its kinds as a string, matching nothing"),
+    # 8 review
+    "REV001": ("error", "no adversarial review has read the bundle"),
+    "REV002": ("error", "a blocking review finding is still open"),
+    "REV003": ("error | warn", "a review finding carries no resolution, or an invalid status"),
+    "REV004": ("warn", "a critic found nothing and recorded nothing it attempted"),
+    "REV005": ("error", "a finding's locator resolves to nothing in the bundle"),
+    "REV006": ("error", "fewer critics than the configured minimum"),
+    "REV007": ("error", "the review stamp is missing or the bundle changed since it"),
+    "REV008": ("warn", "rubber-ducking alone on more subtasks than the configured limit"),
+    "REV009": ("error | warn", "a finding's severity or a critic's id is outside the vocabulary"),
+    # 9 emit
+    "LNK001": ("error", "a link names no target ticket at all"),
+    "LNK002": ("warn", "a link records no reason for existing"),
+    "LNK003": ("warn", "a follow-up this refinement created is linked to nothing"),
 }
 
 
@@ -1628,16 +1803,65 @@ def validate(bundle, cfg):
     return rep
 
 
+def all_codes():
+    """The union of every emitting module's registry, sorted by (phase label, code) -
+    the same ordering main() groups findings in. batch.py and criteria.py import
+    nothing from here, so the lazy imports cannot cycle."""
+    import batch  # noqa: E402
+    import criteria  # noqa: E402
+    merged = {}
+    for module in (sys.modules[__name__], batch, criteria):
+        for code, (severity, meaning) in module.CODES.items():
+            merged[code] = (severity, meaning)
+    rows = [{"code": c, "phase": phase_of(c), "severity": s, "meaning": m}
+            for c, (s, m) in merged.items()]
+    return sorted(rows, key=lambda r: (r["phase"], r["code"]))
+
+
+def render_codes(fmt):
+    rows = all_codes()
+    if fmt == "json":
+        return json.dumps(rows, indent=2)
+    if fmt == "markdown":
+        out = ["# Validator codes", "",
+               "Generated by `python scripts/validate.py --codes --markdown`; selftest fails when "
+               "this file is stale. A code is the stable identifier of a finding. Severity is what "
+               "the call sites use: `error | warn` has call sites at both, `config` is decided by "
+               "a rule in `refinery.yaml`.", ""]
+        phase = None
+        for r in rows:
+            if r["phase"] != phase:
+                phase = r["phase"]
+                out += ["## %s" % phase, "", "| Code | Severity | Meaning |", "|---|---|---|"]
+            out.append("| `%s` | %s | %s |" % (r["code"], r["severity"], r["meaning"]))
+        return "\n".join(out)
+    return "\n".join("%s\t%s\t%s\t%s" % (r["code"], r["phase"], r["severity"], r["meaning"])
+                     for r in rows)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("bundle")
+    ap.add_argument("bundle", nargs="?")
     ap.add_argument("--config", default="refinery.yaml")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--codes", action="store_true",
+                    help="list every code the validator, batch.py and criteria.py can emit, "
+                         "and exit; needs no bundle")
+    ap.add_argument("--markdown", action="store_true",
+                    help="with --codes: render the list as references/codes.md")
     ap.add_argument("--strict", action="store_true", help="treat warnings as errors")
     ap.add_argument("--flat", action="store_true",
                     help="one finding per line, ungrouped - the pre-phase output")
     args = ap.parse_args(argv)
+    if args.markdown and not args.codes:
+        ap.error("--markdown only applies with --codes")
+    if args.codes:
+        # Dispatched before any bundle is opened: a listing must not depend on one.
+        print(render_codes("json" if args.json else "markdown" if args.markdown else "tsv"))
+        return 0
+    if not args.bundle:
+        ap.error("the following arguments are required: bundle")
 
     try:
         with open(args.bundle, "r", encoding="utf-8") as fh:

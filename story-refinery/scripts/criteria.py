@@ -29,6 +29,12 @@ SAME_CRITERION = 0.82
 SCHEME_RX = re.compile(r"^([A-Za-z][A-Za-z._-]*?)(\d+)$")
 
 
+# The one code only this module emits; AC003/AC010/AC011 are validate.py's.
+CODES = {
+    # 3 criteria
+    "AC012": ("warn", "a criterion vanished on re-refinement and its code stays retired"),
+}
+
 def normalise(text):
     return re.sub(r"[^\w\s]", "", re.sub(r"\s+", " ", (text or ""))).strip().lower()
 

@@ -29,6 +29,16 @@ IDENTITY = {"glossary": "term", "conventions": "rule", "ruled_out": "claim"}
 BODY = {"glossary": "means", "conventions": "evidence", "ruled_out": "conclusion"}
 
 
+# The codes only this module emits; see validate.CODES for the shape and the checks.
+CODES = {
+    # 9 other
+    "BAT001": ("error", "two stories in the batch write the same file"),
+    "BAT002": ("error", "shared knowledge says different things in different bundles"),
+    "BAT003": ("warn", "one person is asked the same question from several stories"),
+    "BAT004": ("error", "a story waits on another in the batch with no blocked_by link"),
+    "BAT006": ("warn", "two stories in the batch touch mostly the same files"),
+}
+
 def load(paths):
     out = []
     for path in paths:

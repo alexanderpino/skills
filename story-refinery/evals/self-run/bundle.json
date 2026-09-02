@@ -44,8 +44,8 @@
             "expect": "argparse usage error, exit 2 - the documented usage error for a missing bundle is unchanged"
           },
           {
-            "case": "READY003, emitted as warn at two call sites and error at none",
-            "expect": "severity 'warn'; BAS003 (both) 'error | warn'; DOD001 (severity from the DoD rule) 'config'"
+            "case": "ENB001, emitted as warn at its only call sites; BAS003 at both; DOD001 whose severity a DoD rule decides",
+            "expect": "severity 'warn'; 'error | warn'; 'config'"
           }
         ]
       },
@@ -607,8 +607,8 @@
           },
           {
             "type": "command",
-            "cmd": "python3 story-refinery/scripts/validate.py --codes | grep -P '^READY003\\t[^\\t]+\\twarn\\t'",
-            "expect": "one line - severity derived from two rep.warn call sites"
+            "cmd": "python3 story-refinery/scripts/validate.py --codes | grep -P '^ENB001\\t[^\\t]+\\twarn\\t'",
+            "expect": "one line - severity derived from warn-only call sites"
           },
           {
             "type": "command",
@@ -880,7 +880,7 @@
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:8f5232cd98866e497f9ab9ed1503d10cb23d7f8fe046a432865d014642978114",
+    "bundle_digest": "sha256:b0d00a95b385564ef9ea3452396995566d9c1f35b51ab4788cbf4b6c8ce1719f",
     "critics": [
       {
         "id": "implementer",
@@ -1293,6 +1293,16 @@
         "failure": "AC012 would again be the code --codes calls invented, with a green gate behind it.",
         "status": "fixed",
         "resolution": "the definition gained criteria.py's tuple shape; count is 160, and the AC1 example for AC012 now has teeth."
+      },
+      {
+        "id": "IMPL-RUN-1",
+        "critic": "implementer",
+        "severity": "minor",
+        "locator": "subtasks[0].agent_brief.done_when[3]",
+        "claim": "Found by running S1's done_when literally after implementation: the example used READY003 as a warn-only code, but READY003 has call sites at both severities (the tester's TES-F2 had listed it). The command could never pass.",
+        "failure": "An implementer who trusts the brief marks S1 blocked on a false failure, or edits the registry to say 'warn' and the severity check then fails.",
+        "status": "fixed",
+        "resolution": "the example and the command use ENB001, which is warn-only; recorded here rather than silently edited, because the review was stamped before it."
       }
     ]
   }

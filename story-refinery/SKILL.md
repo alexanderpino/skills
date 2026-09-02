@@ -810,6 +810,7 @@ when questions remain open.
 | `references/critique.md` | Phase 8 - the critic panel, blindness, findings, rubber-ducking |
 | `references/trackers.md` | Phase 0/9 - adapter capabilities, sinks, per-tracker notes |
 | `references/antipatterns.md` | Any time output feels thin - refinement smells and fixes |
+| `references/codes.md` | Any time `validate.py` names a code you do not know - every code, its phase, severity and meaning; generated, and selftest fails when it is stale |
 | `references/rubric.md` | Phase 7 - score the refinement before handing it over |
 
 Read one reference per phase, when you reach that phase. Loading them all up
@@ -825,7 +826,9 @@ All stdlib-only Python 3, no dependencies, no network.
 - `scripts/intake.py` - sufficiency detection; exit 0 / 3 / 4 for sufficient / scoutable / insufficient
 - `scripts/evidence.py` - `init` | `manifest` | `index` | `scan` | `contracts` |
   `inherit` (carry a prior bundle's dossier forward, marked stale where the repo moved)
-- `scripts/validate.py` - the readiness gate
+- `scripts/validate.py` - the readiness gate; `--codes` lists every code it,
+  `batch.py` and `criteria.py` can emit (`--markdown` renders
+  `references/codes.md`, `--json` a list) and needs no bundle
 - `scripts/review.py` - `brief` | `digest` | `check`; sealed critic packets and the
   REV gates' stamp
 - `scripts/batch.py` - `order` | `share` | `check`; several related stories in one
@@ -840,11 +843,13 @@ All stdlib-only Python 3, no dependencies, no network.
   re-refinement stops treating shipped work as a plan change
 - `scripts/emit.py` - render payloads and a push plan; `--previous` for updates
 - `scripts/markup.py` - markdown to wiki / ADF / HTML / plaintext
-- `scripts/selftest.py` - six suites: validator gates, config parsing, markup
-  conversion, the pipeline end to end, intake detection, and SKILL.md-to-script
-  consistency. Run
-  it after editing anything in `scripts/` or `SKILL.md`; it prints the assertion
-  count rather than this file claiming one.
+- `scripts/selftest.py` - sixteen suites, from the validator gates and config
+  parsing through the pipeline end to end, intake detection, triage, criterion
+  codes, de-cluttering, story shapes, batch, adversarial review, and docs
+  consistency (paths, flags and codes cited in SKILL.md and the references must
+  exist; every emitted code must be registered and `references/codes.md`
+  current). Run it after editing anything in `scripts/` or `SKILL.md`; it names
+  each check and prints the failure count rather than this file claiming one.
 
 ## Assets
 

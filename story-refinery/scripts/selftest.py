@@ -639,18 +639,66 @@ def suite_docs():
 
     # Every code mentioned in a reference must exist in a script that can emit it.
     vsrc = ""
-    for name in ("validate.py", "batch.py"):
+    for name in ("validate.py", "batch.py", "criteria.py"):
         with open(os.path.join(HERE, name), encoding="utf-8") as fh:
             vsrc += fh.read()
-    real = set(re.findall(r'"([A-Z]{3,6}\d{3})"', vsrc))
+    # {2,6}: AC and DT are two-letter prefixes; {3,6} silently skipped them for months.
+    real = set(re.findall(r'"([A-Z]{2,6}\d{3})"', vsrc))
     docs = ""
     for name in os.listdir(os.path.join(ROOT, "references")):
         with open(os.path.join(ROOT, "references", name), encoding="utf-8") as fh:
             docs += fh.read()
     with open(CONFIG, encoding="utf-8") as fh:
         docs += fh.read()
-    cited = set(re.findall(r"\b([A-Z]{3,6}\d{3})\b", docs + skill))
+    cited = set(re.findall(r"\b([A-Z]{2,6}\d{3})\b", docs + skill))
     check("no invented validator codes in docs", cited <= real, sorted(cited - real))
+
+    # code -> docs: the registries against the call sites, both ways, and the generated
+    # index against the generator. 'Emitted' is syntactic - a literal as the first
+    # argument of an error/warn/report/add call, or criteria.py's ("WARN", "CODE", ...)
+    # tuple - so a registry key (`"CODE": (`) can never count as its own emitter.
+    import validate as V
+    emit_rx = re.compile(r'(?:\b(?:error|warn|report|add)\(\s*|\(\s*"(?:ERROR|WARN)"\s*,\s*)'
+                         r'"([A-Z]{2,6}\d{3})"')
+    site_rx = re.compile(r'\b(rep\.error|rep\.warn|error|warn|report|add)\(\s*"([A-Z]{2,6}\d{3})"'
+                         r'|\(\s*"(ERROR|WARN)"\s*,\s*"([A-Z]{2,6}\d{3})"')
+    emitted, sites = set(), {}
+    for name in ("validate.py", "batch.py", "criteria.py"):
+        with open(os.path.join(HERE, name), encoding="utf-8") as fh:
+            src = fh.read()
+        emitted |= set(emit_rx.findall(src))
+        for m in site_rx.finditer(src):
+            callee, code = (m.group(1), m.group(2)) if m.group(2) else (m.group(3), m.group(4))
+            sites.setdefault(code, set()).add(
+                {"rep.error": "error", "error": "error", "ERROR": "error",
+                 "rep.warn": "warn", "warn": "warn", "WARN": "warn"}.get(callee, "config"))
+    registered = {r["code"]: r for r in V.all_codes()}
+    check("codes: every emitted code is registered", emitted <= set(registered),
+          sorted(emitted - set(registered)))
+    check("codes: no registered code is dead", set(registered) <= emitted,
+          sorted(set(registered) - emitted))
+    wrong = []
+    for code, r in registered.items():
+        s = sites.get(code, set())
+        want = "config" if "config" in s else "error | warn" if s >= {"error", "warn"} \
+            else (next(iter(s)) if s else "?")
+        if r["severity"] != want:
+            wrong.append("%s registered %r, call sites say %r" % (code, r["severity"], want))
+    check("codes: severity matches the call sites", not wrong, wrong)
+    weak = [c for c, r in registered.items()
+            if len(r["meaning"].split()) < 6 or r["meaning"].strip() == c
+            or re.search(r"\bTODO\b|\bTBD\b|\|", r["meaning"])]
+    check("codes: every meaning is a meaning", not weak, weak)
+    index = os.path.join(ROOT, "references", "codes.md")
+    try:
+        with open(index, encoding="utf-8") as fh:
+            committed = fh.read().replace("\r\n", "\n")
+    except OSError:
+        committed = None
+    check("codes: references/codes.md is current",
+          committed is not None
+          and committed.rstrip("\n") == V.render_codes("markdown").rstrip("\n"),
+          "regenerate with `python scripts/validate.py --codes --markdown > references/codes.md`")
 
 
 INTAKE_TEXTS = {
