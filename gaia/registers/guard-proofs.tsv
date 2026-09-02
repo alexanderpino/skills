@@ -148,3 +148,37 @@ NOT PROVEN	cross-skill path resolution	-	four documents pointed at water-physics
 # that only ever prints a number is never seen to fail, so nothing forces it to be right. The
 # enforced assertions above all have mutation rows because failing is what they do. Any future
 # REPORTED number needs a fixture set like the one above, or it is decoration.
+#
+# ── NEW ASSERTION, 2026-09-02: check_no_artefact() ──────────────────────────────────────────
+#
+# The locator metric now has three categories, not two. Nine citations rest on classical
+# results, standard analysis, or a convention this repository recommends -- things with no
+# citable artefact at all (airy_coastal, bodytype_doctrine, capillary_gravity,
+# explicit_diffusion_limit, fluid_authority, iop_split, steadystate_discharge). Their locators
+# can NEVER become precise, so counting them in the denominator made the metric look
+# permanently unfinished and quietly implied 100% was the target. It is not: with every
+# reachable source read, the honest ceiling is 128/137.
+#
+# Those locators now declare it themselves, opening `no artefact:`, and are excluded from the
+# ratio. THE AUTHOR declares it; no script infers it from bibliography prose.
+#
+# WHY THIS NEEDED A GUARD OF ITS OWN. An exclusion is a way to make a gap disappear. Paste
+# `no artefact:` onto a real paper's locator and the denominator shrinks and the percentage
+# RISES -- this is the only mutation in the suite that IMPROVES a reported number, which is
+# precisely what makes it dangerous. So the claim is checked against the bibliography, where a
+# source's nature is already recorded: the marker is only accepted if the entry itself says the
+# source has no canonical, citable or external artefact. Two independent places must agree.
+#
+#   MUTATION  `no artefact:` prepended to braun2013's locator in stream-power.md
+#     -> RED: "`braun2013` is marked `no artefact:`, which excludes it from the locator ratio,
+#        but its bibliography entry does not say it lacks a canonical source. Either the marker
+#        is wrong, or the entry needs to say so -- do not shrink the denominator by assertion"
+#     -> and the number it was trying to buy: 68/128 (53%) became 68/127 (54%), with the
+#        no-artefact count going 9 to 10. The guard is what stands between that and a green run.
+#
+# Seven fixtures were added to --selftest for the marker itself, including three that must NOT
+# be swallowed by it -- two real locators that merely mention the word "artefact" in passing,
+# and the bare paraphrase form the marker replaces. Letting any of those through would delete a
+# genuine gap from the denominator silently. 20/20 locator fixtures and 7/7 marker fixtures.
+#
+# Runs in CI (.github/workflows/gaia.yml, `bites`).

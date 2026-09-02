@@ -7,11 +7,11 @@ status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: braun2013, tier: P, locator: "the O(N) stack ordering and the unconditionally stable implicit discretisation" }
-  - { id: cordonnier2016, tier: P, locator: "uplift coupling, the lake-graph handling of local minima inside the loop, and the hillslope-diffusion companion term" }
+  - { id: cordonnier2016, tier: P, locator: "§3.1 eq. 1 — dh(p)/dt = u(p) - k*A(p)^m*s(p)^n, the uplift coupling, with the paper taking m = 0.5, n = 1; §4.3 Lake Overflow for the lake super-graph that handles local minima inside the loop. NOT the diffusion term: eq. 1 carries none, that is culling1960" }
   - { id: whipple1999, tier: P, locator: "the stream-power incision model: the roles of m, n, and knickpoint behaviour" }
   - { id: crosby2006, tier: P, locator: "knickpoint distribution across a network: 236 waterfalls in the Waipaoa" }
   - { id: culling1960, tier: P, locator: "hillslope transport as diffusion, the D grad^2 h term" }
-  - { id: explicit_diffusion_limit, tier: F, locator: "the explicit FTCS bound, dt <= dx^2 / (4D) in two dimensions" }
+  - { id: explicit_diffusion_limit, tier: F, locator: "no artefact: the explicit FTCS bound, dt <= dx^2 / (4D) in two dimensions. Von Neumann analysis, standard and unpublished as such" }
 ---
 # Stream power — the erosion backbone at map scale
 

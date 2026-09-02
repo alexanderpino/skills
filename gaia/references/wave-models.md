@@ -8,9 +8,9 @@ generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: tessendorf_ocean, tier: F, locator: "2004 course notes, §4.3 eq. 40 the Phillips spectrum and §4.4 eq. 42-43 the Fourier amplitudes inverse-FFT'd to a height field; §4.6 eq. 44 the choppy horizontal displacement and eq. 45 the folding Jacobian" }
   - { id: gerstner_trochoid, tier: F, locator: "Finch, GPU Gems ch. 1 §1.2.3 'Geometric Waves', sub-head 'Gerstner Waves' — eq. 9 is the trochoid with lateral displacement, eq. 10-12 the analytic tangent-space basis" }
-  - { id: capillary_gravity, tier: F, locator: "the capillary-gravity dispersion relation and its minimum phase speed" }
+  - { id: capillary_gravity, tier: F, locator: "no artefact: the capillary-gravity dispersion relation and its minimum phase speed. Classical fluid mechanics with no single canonical paper" }
   - { id: lamb_damping, tier: F, locator: "6th ed. 1932, ch. XI Viscosity, Art. 348, pp. 623-624 — eq. 7 da/dt = -2*nu*k^2*a, eq. 8 its exponential decay, eq. 9 the decay modulus tau = 1/2*nu*k^2 = lambda^2/8*pi^2*nu" }
-  - { id: airy_coastal, tier: F, locator: "the linear dispersion relation, Green's law, the breaker index and the surf-similarity parameter" }
+  - { id: airy_coastal, tier: F, locator: "no artefact: the linear (Airy) dispersion relation, Green's law, the breaker index and the surf-similarity parameter. Coastal-engineering canon with no single citable paper for the set" }
   - { id: coxmunk1954, tier: P, locator: "§6.3 'Mean Square Slopes', p. 847 — the clean- and slick-surface least-squares regressions, with W recorded at 41 ft, i.e. 12.5 m; the 1-14 m/s range and the factor two-or-three slick reduction are in the abstract, p. 838" }
   - { id: bruneton2010, tier: P, locator: "§3.2 'Model hierarchy' eq. 4, the slope variance summed over the trochoids filtered out of the geometry; §5.1 'Sun light', which clamps sigma_x^2 and sigma_y^2 to a minimum in eq. 15 so the Sun keeps a finite disc" }
   - { id: dupuy2012, tier: P, locator: "the statistical whitecap coverage from the Jacobian's footprint mean and variance" }

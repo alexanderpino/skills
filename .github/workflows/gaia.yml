@@ -154,6 +154,15 @@ jobs:
           expect_red "document surveys instead of recommending"
           cp /tmp/bk references/tiled-streaming.md
 
+          # The `no artefact:` marker excludes a citation from the locator ratio. Pasting it
+          # onto a real paper makes a gap disappear and the percentage RISE -- 53% to 54% when
+          # this was written. That is the one mutation here that improves a reported number,
+          # which is exactly why it needs a guard.
+          cp references/stream-power.md /tmp/bk
+          sed -i '0,/id: braun2013/s/locator: "/locator: "no artefact: /' references/stream-power.md
+          expect_red "a real paper marked as having no artefact"
+          cp /tmp/bk references/stream-power.md
+
           cp references/index.md /tmp/bk
           sed -i 's/^# Gaia index/# Gaia index EDITED/' references/index.md
           if python3 scripts/index.py --check >/dev/null 2>&1; then

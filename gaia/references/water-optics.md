@@ -14,7 +14,7 @@ sources:
   - { id: schlick1994, tier: P, locator: "the Fresnel approximation and its stated accuracy for common dielectrics" }
   - { id: bruneton2010, tier: P, locator: "§5.2 'Sky light', sub-head 'Average Fresnel reflectance' — eq. 26 is the roughness-aware mean-Fresnel fit, plotted against the exact integral in Fig. 7; the view-direction slope variance it takes is eq. 25. Not §3, which is the ocean model" }
   - { id: bornwolf_optics, tier: F, locator: "the exact unpolarised Fresnel reflectance for a dielectric interface" }
-  - { id: iop_split, tier: F, locator: "the beam-versus-diffuse attenuation split" }
+  - { id: iop_split, tier: F, locator: "no artefact: the beam-versus-diffuse attenuation split, c = a + b against K_d. Ocean-optics canon with no single canonical source" }
 ---
 # Water optics — absorption, refraction, and the two-sided interface
 

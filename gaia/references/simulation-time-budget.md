@@ -12,7 +12,7 @@ sources:
   - { id: mei2007, tier: P, locator: "§3.2.1 'Outflow Flux Computation', eq. 4 defines K = min of 1 and d1*lX*lY over the summed outflow times dt, and eq. 5 applies it to all four fluxes" }
   - { id: braun2013, tier: P, locator: "the implicit stream-power update over the receiver-tree stack ordering" }
   - { id: fiedler_timestep, tier: F, locator: "§'Free the physics' — the accumulator loop that consumes produced time in fixed dt steps; the leftover-remainder interpolation is the section after it, §'The final touch'. The post numbers no sections" }
-  - { id: explicit_diffusion_limit, tier: F, locator: "the explicit FTCS bound, dt <= dx^2 / (4D) in two dimensions" }
+  - { id: explicit_diffusion_limit, tier: F, locator: "no artefact: the explicit FTCS bound, dt <= dx^2 / (4D) in two dimensions. Von Neumann analysis, standard and unpublished as such" }
 ---
 # Simulation time budget — minutes offline, milliseconds in a frame
 

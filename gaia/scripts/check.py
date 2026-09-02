@@ -271,6 +271,14 @@ LOCATOR_PRECISE = re.compile(r"""
         | \blistings?\s+\d   | \bslides?\s+\d
     """, re.I | re.X)
 
+# A locator that opens with this marker declares there is NOTHING TO OPEN: the claim rests on
+# classical results, standard analysis, or a convention this repository recommends, none of
+# which has a citable artefact. Those cannot ever become precise, so counting them in the
+# denominator makes the metric look permanently unfinished and quietly implies 100% is the
+# target. They are reported as their own category, and the author has to declare it in the
+# locator rather than a script inferring it from bibliography prose.
+LOCATOR_NO_ARTEFACT = "no artefact:"
+
 # The fixture set for LOCATOR_PRECISE, asserted by `--selftest` and run in CI.
 # A REPORTED metric never fails, so nothing forces it to be right -- and this one was
 # wrong for weeks, counting "the fill algorithm" as a precise locator because it matched
@@ -304,6 +312,20 @@ LOCATOR_FIXTURES = [
 ]
 
 
+NO_ARTEFACT_FIXTURES = [
+    ("no artefact: the explicit FTCS bound, dt <= dx^2 / (4D) in two dimensions", True),
+    ("no artefact: the beam-versus-diffuse attenuation split, c = a + b against K_d", True),
+    ("No Artefact: a convention this repository recommends", True),   # case-insensitive
+    ("  no artefact: leading whitespace is tolerated", True),
+    # These must NOT be swallowed by the marker. The first two are real, followable locators
+    # that merely mention absence; the third is the paraphrase form the marker replaces, and
+    # letting it through would quietly delete a genuine gap from the denominator.
+    ("§4 Ordering, which notes no artefact is required for the eps = 0 case", False),
+    ("eq. 26 — the fit has no artefact-free derivation", False),
+    ("the fill algorithm", False),
+]
+
+
 def selftest() -> int:
     """Assert the locator pattern classifies known-good and known-bad locators."""
     bad = [(t, want) for t, want in LOCATOR_FIXTURES
@@ -311,15 +333,21 @@ def selftest() -> int:
     for t, want in bad:
         print(f"  FAIL  locator fixture: {t!r} should be "
               f"{'SHARP' if want else 'vague'}")
-    if bad:
-        print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures misclassified.")
+    nbad = [(t, want) for t, want in NO_ARTEFACT_FIXTURES
+            if t.strip().lower().startswith(LOCATOR_NO_ARTEFACT) != want]
+    for t, want in nbad:
+        print(f"  FAIL  no-artefact fixture: {t!r} should be "
+              f"{'EXCLUDED' if want else 'counted'}")
+    if bad or nbad:
+        print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures and "
+              f"{len(nbad)} of {len(NO_ARTEFACT_FIXTURES)} no-artefact fixtures misclassified.")
         return 1
-    print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} "
-          "fixtures classified correctly.")
+    print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
+          f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct.")
     return 0
 
 
-def locator_quality() -> tuple[int, int, list[str]]:
+def locator_quality() -> tuple[int, int, int, list[str]]:
     """How many citations can a reader actually follow?
 
     The guard requires a `locator` and rejects an empty one, which is a floor, not a
@@ -341,7 +369,7 @@ def locator_quality() -> tuple[int, int, list[str]]:
     # is genuinely followable; the English words are not, because they occur in ordinary prose.
     precise = LOCATOR_PRECISE
     skip = set(paper_files()) | {INDEX, COVERAGE}
-    total = sharp = 0
+    total = sharp = noart = 0
     vague: list[str] = []
     for path in documents(ROOT):
         if path in skip:
@@ -354,12 +382,15 @@ def locator_quality() -> tuple[int, int, list[str]]:
             if not isinstance(s, dict):
                 continue
             loc = str(s.get("locator", ""))
+            if loc.strip().lower().startswith(LOCATOR_NO_ARTEFACT):
+                noart += 1
+                continue
             total += 1
             if precise.search(loc):
                 sharp += 1
             else:
                 vague.append(f"{path.name}:{s.get('id')} -> {loc[:44]}")
-    return sharp, total, vague
+    return sharp, total, noart, vague
 
 
 def check_orphans(bib: dict[str, dict], used: set[str]) -> list[str]:
@@ -391,6 +422,44 @@ def check_duplication(threshold: float = 0.7) -> list[str]:
                 out.append(f"{a} and {b} share {j:.0%} of their sources and overlapping tags "
                            "-- merge candidates")
     return out
+
+
+def check_no_artefact(bib: dict[str, dict]) -> list[str]:
+    """A `no artefact:` locator is excluded from the locator ratio, so it must be EARNED.
+
+    Without this, the marker is a way to make a gap disappear: paste it onto a real paper's
+    locator and the denominator shrinks and the percentage rises. That is precisely the move
+    this skill exists to prevent, and it would be invisible -- the guard stays green and the
+    number gets better.
+
+    So the claim is checked against the bibliography, which is where a source's nature is
+    already recorded: an entry may only be marked `no artefact:` if its own entry says it has
+    no canonical, citable or external source. Two independent places have to agree.
+    """
+    declares_none = re.compile(r"no (single )?(canonical|citable|external)", re.I)
+    problems: list[str] = []
+    skip = set(paper_files()) | {INDEX, COVERAGE}
+    for path in documents(ROOT):
+        if path in skip:
+            continue
+        try:
+            fm, _ = parse_front_matter(path)
+        except Unparseable:
+            continue
+        for s in fm.get("sources", []):
+            if not isinstance(s, dict):
+                continue
+            if not str(s.get("locator", "")).strip().lower().startswith(LOCATOR_NO_ARTEFACT):
+                continue
+            sid = s.get("id")
+            ref = (bib.get(sid) or {}).get("ref", "")
+            if not declares_none.search(ref):
+                problems.append(
+                    f"{path.relative_to(ROOT)}: `{sid}` is marked `no artefact:`, which "
+                    f"excludes it from the locator ratio, but its bibliography entry does not "
+                    f"say it lacks a canonical source. Either the marker is wrong, or the "
+                    f"entry needs to say so -- do not shrink the denominator by assertion")
+    return problems
 
 
 def check_recommendation() -> tuple[list[str], int, int]:
@@ -532,7 +601,8 @@ def main() -> int:
     doc_problems, used = check_documents(bib)
     rec_problems, rec_first, rec_total = check_recommendation()
     problems += (doc_problems + check_orphans(bib, used) + check_duplication()
-                 + check_coverage() + check_index() + rec_problems)
+                 + check_coverage() + check_index() + rec_problems
+                 + check_no_artefact(bib))
 
     docs = [p for p in documents(ROOT)
             if p not in paper_files() and p not in (INDEX, COVERAGE)]
@@ -544,11 +614,13 @@ def main() -> int:
         print(f"recommendation {rec_total}/{rec_total} documents name an approach to "
               f"implement; {rec_first} state it first, before any explanation.")
 
-    sharp, tot, _vague = locator_quality()
+    sharp, tot, noart, _vague = locator_quality()
     if tot:
-        print(f"locators {sharp}/{tot} ({100 * sharp / tot:.0f}%) name a section, equation or "
-              f"page — the rest are topic paraphrases a reader cannot follow. Reported, not "
-              f"enforced; see registers/guard-proofs.tsv.")
+        print(f"locators {sharp}/{tot} ({100 * sharp / tot:.0f}%) of the FOLLOWABLE citations "
+              f"name a section, equation or page; the rest are topic paraphrases a reader "
+              f"cannot follow. A further {noart} cite doctrine or classical results with no "
+              f"artefact to open — declared in the locator, and excluded from the ratio rather "
+              f"than held against it. Reported, not enforced; see registers/guard-proofs.tsv.")
 
     if problems:
         for p in problems:

@@ -11,8 +11,8 @@ sources:
   - { id: stava2008, tier: P, locator: "§4 eq. (1), the pipe cross-section fixed at C = l² and the outflow scale-down written as a guarded branch rather than a min; §5 the sediment-slippage and material-layer extensions" }
   - { id: kass1990, tier: P, locator: "the linearised shallow-water heightfield and its implicit integration" }
   - { id: courant1928, tier: P, locator: "the hyperbolic case — the domain-of-dependence requirement on the difference scheme" }
-  - { id: steadystate_discharge, tier: F, locator: "the steady-state identity Q = runoff times upstream contributing area" }
-  - { id: fluid_authority, tier: F, locator: "the cosmetic-versus-gameplay liquid state contract" }
+  - { id: steadystate_discharge, tier: F, locator: "no artefact: the steady-state identity Q = runoff times upstream contributing area. Derived, not published -- there is no canonical graphics paper to open" }
+  - { id: fluid_authority, tier: F, locator: "no artefact: the cosmetic-versus-gameplay liquid state contract. A convention this repository recommends, with no external source" }
 ---
 # Shallow water — the solver for bounded, interactive bodies
 
