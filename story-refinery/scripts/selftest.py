@@ -1169,6 +1169,32 @@ def suite_story_shapes():
     check("shapes: 'irreversible' with no explanation is still reported",
           ("IRR001", "subtask S1") in findings(silent, check_irreversible))
 
+    # Re-assessing a refined bundle used to reset it: answered dimensions back to
+    # missing, the domain dropped, the verdict flipped, and the same three questions
+    # appended again for people who had already answered them.
+    import intake as I
+    import tempfile
+    tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+    json.dump(golden, tmp); tmp.close()
+    rep = I.assess(golden["story"]["source_text"], cfg)
+    I.write_into_bundle(tmp.name, rep)
+    with open(tmp.name, encoding="utf-8") as fh:
+        again = json.load(fh)
+    os.unlink(tmp.name)
+    before = {d["id"]: d for d in golden["story"]["intake"]["dimensions"]}
+    after = {d["id"]: d for d in again["story"]["intake"]["dimensions"]}
+    check("re-assess: an answered dimension stays answered, with its provenance",
+          after["trigger"]["status"] == "answered"
+          and after["trigger"].get("answered_by") == before["trigger"].get("answered_by"))
+    check("re-assess: an assumed dimension stays assumed",
+          all(after[k]["status"] == "assumed" for k in ("success_signal", "scope")))
+    check("re-assess: the domain classification survives",
+          again["story"]["intake"].get("domain") == golden["story"]["intake"].get("domain"))
+    check("re-assess: the verdict does not flip to insufficient on settled dimensions",
+          again["story"]["intake"]["verdict"] == "sufficient")
+    check("re-assess: no duplicate questions for dimensions already asked about",
+          len(again["open_questions"]) == len(golden["open_questions"]))
+
 
 def suite_summary():
     """The artefact people actually talk from. It has to work before the bundle is

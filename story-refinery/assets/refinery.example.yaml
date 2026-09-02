@@ -48,7 +48,7 @@ decomposition:
   # every gate that keys on it. Add a house kind here on purpose, never by typo.
   extra_subtask_kinds: []
   spike_when_unresolved: true     # [claude] enforced indirectly by DEC004/DEC006
-  spike_timebox_days: 0.5         # [claude]
+  spike_timebox_days: 0.5         # [script] SPK002 - the price of the option, not an estimate
 
 # --------------------------------------------------------------------- budgets
 # All [script].

@@ -428,19 +428,41 @@ def write_into_bundle(path, rep):
     story = bundle.setdefault("story", {})
     existing_q = bundle.setdefault("open_questions", [])
     used = {q.get("id") for q in existing_q}
+    # A re-assessment is a re-scan of the text, not a reset of the conversation. A
+    # dimension somebody answered or assumed - with a name and a date on it - is newer
+    # information than the text, and the question that produced it is already asked.
+    # Overwriting those turned every re-refinement into a second interrogation of the
+    # same people, and dropped the domain classification on the floor with them.
+    previous = story.get("intake") or {}
+    settled = {d.get("id"): d for d in previous.get("dimensions") or []
+               if d.get("status") in ("answered", "assumed")}
+    asked = {q.get("dimension") for q in existing_q if q.get("dimension")}
+    dims = []
+    for d in rep["dimensions"]:
+        dims.append(settled.get(d["id"], d))
     n = 1
     for q in rep["questions"]:
+        if q["dimension"] in settled or q["dimension"] in asked:
+            continue
         while "Q%d" % n in used:
             n += 1
         qid = "Q%d" % n
         used.add(qid)
         existing_q.append({"id": qid, "text": q["text"], "owner": "",
                            "blocking": q["blocking"], "dimension": q["dimension"]})
-        for d in rep["dimensions"]:
+        for d in dims:
             if d["id"] == q["dimension"]:
                 d["question_id"] = qid
-    story["intake"] = {k: rep[k] for k in ("assessed_at", "kind", "lang", "verdict",
-                                            "dimensions", "anchors", "repos_reachable", "flags")}
+    rep = dict(rep, dimensions=dims)
+    still_missing = [d for d in dims if d.get("required") and d.get("status") == "missing"]
+    if rep["verdict"] != "sufficient" and not still_missing:
+        rep["verdict"] = "sufficient"
+    fresh = {k: rep[k] for k in ("assessed_at", "kind", "lang", "verdict",
+                                 "dimensions", "anchors", "repos_reachable", "flags")}
+    for k in ("domain", "domain_rationale"):
+        if previous.get(k):
+            fresh[k] = previous[k]
+    story["intake"] = fresh
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(bundle, fh, indent=2, ensure_ascii=False)
         fh.write("\n")
