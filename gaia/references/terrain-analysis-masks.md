@@ -64,7 +64,28 @@ threshold, or it will not transfer.
 ## Curvature, and what each one selects
 
 The quartic fit over the 3×3 window [zevenbergen1987] gives both curvatures from the same five
-coefficients:
+coefficients. Label the window `Z1 Z2 Z3 / Z4 Z5 Z6 / Z7 Z8 Z9`, rows north to south, `L` the cell
+size:
+
+```
+D = ((Z4 + Z6)/2 - Z5) / L²        # = Zxx / 2      G = (Z6 - Z4) / (2L)     # = dz/dx
+E = ((Z2 + Z8)/2 - Z5) / L²        # = Zyy / 2      H = (Z2 - Z8) / (2L)     # = dz/dy, +y NORTH
+F = (Z3 + Z7 - Z1 - Z9) / (4L²)    # = Zxy
+
+p = G² + H²                                    # squared slope
+profile = 2*(D*G² + F*G*H + E*H²) / p          # d²z/ds² along steepest descent
+plan    = 2*(D*H² - F*G*H + E*G²) / p          # contour curvature × |grad z|
+```
+
+The fit has nine coefficients; the other four (the `x²y²`, `x²y`, `xy²` terms, and the constant
+`Z5`) cancel out of both curvatures — which is what "the same five" means. `G` and `H` are the
+first derivatives, so the guard below is a guard on slope.
+
+**Both expressions are checkable in closed form, and worth checking.** They are exact to twelve
+digits on any quadratic surface, and second-order on anything else: on a Gaussian hill, halving `L`
+quarters the error against the analytic `f''(r)` and `f'(r)/r`. The sharpest single test is that
+`plan / sqrt(p)` is the contour's own curvature — on a radially symmetric hill it reproduces `1/r`
+to seven digits at every radius, so a wrong sign or a dropped `L` shows up immediately.
 
 - **Profile** (along steepest descent) — negative where the slope steepens downhill (ridges, cliff
   lips), positive where it flattens (valley floors, slope bases). This is the erosion/deposition
@@ -74,11 +95,14 @@ coefficients:
 - **Laplacian**, `(Z2 + Z4 + Z6 + Z8 − 4·Z5)/L²` — one op, not slope-normalised, and usually what
   people actually want from a "convexity" node. If the mask feeds a blend, use this.
 
-Guard `p = G² + H² < eps`: curvature is undefined on a flat.
+Guard `p < eps`: curvature is undefined on a flat. `p` is a *squared slope*, so like every slope
+threshold in this document the value moves with the resolution — it is not a length.
 
-⚠️ **Sign conventions differ between tools** — the paper, ArcGIS, GRASS and Houdini do not all
-agree on the sign of profile curvature. Render it once over a known ridge with a diverging ramp and
-write the convention into the node.
+⚠️ **Sign conventions differ between tools** — ArcGIS, GRASS and Houdini do not all agree on the
+sign of profile curvature, and neither the block above nor any of them is canonical. The signs
+printed above are the ones that match the bullets above them, verified on parabolic ridge and
+valley surfaces: profile −0.0027 and plan −0.037 on the ridge, exactly the opposites in the valley.
+Render it once over a known ridge with a diverging ramp and write the convention into the node.
 
 **Curvature is a second derivative, so it amplifies quantisation brutally.** On an R16 field it is
 a picture of the staircase. Compute it on R32F before export, and pre-smooth with σ ≈ 1 cell if the

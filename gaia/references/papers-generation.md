@@ -107,8 +107,14 @@ axis is sent, so they are restated:
   re-split of the flow stage and is not a locator anyone can follow into the paper.
 - **stava2008** `P` — Šťava, O., Beneš, B., Brisbin, M. & Křivánek, J. (2008). *Interactive
   Terrain Modeling Using Hydraulic Erosion.* SCA 2008, 201–210. — Extends Mei with sediment
-  slippage, material layers, boundary conditions, and the `lmax` shallow-water capacity ramp.
-  Also a pipe model.
+  slippage, material layers and ghost-cell boundaries. Also a pipe model. §4 fixes the pipe
+  cross-section at `C = l²`, **constant**, and writes the outflow scale-down as a guarded
+  branch rather than Mei's `min`. It does **not** contain the `lmax` depth ramp often
+  attributed to it — that is `jako2011`; its capacity (eq. 2) is `|v|·C_k·sin α`, unramped.
+- **jako2011** `P` — Jákó, B. & Tóth, B. (2011). *Fast Hydraulic and Thermal Erosion on the
+  GPU.* Eurographics 2011 Short Papers. — Adds the `lmax(d)` depth ramp on transport capacity
+  to the Mei pipe model, plus a thermal pass. Eq. (10) and the ramp definition were read in
+  Jákó's CESCG 2011 copy of the same work (old.cescg.org), not in the Eurographics printing.
 - **beyer2015** `F` — Beyer, H.T. (2015). *Implementation of a Method for Hydraulic Erosion.*
   Bachelor thesis, Technische Universität München. — A thesis, not peer review. There is no
   canonical droplet-erosion paper; this is the modern formulation, borrowing Mei's transport

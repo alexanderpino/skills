@@ -5,7 +5,7 @@ description: "Every Gaia document, its axis, and whether a human has checked its
 tags: [index, routing]
 status: draft
 okf_version: "0.2"
-generated: { by: process:gaia-index, at: 2026-09-02T06:23:52Z }
+generated: { by: process:gaia-index, at: 2026-09-02T06:45:42Z }
 ---
 # Gaia index
 
@@ -22,7 +22,7 @@ work says what the document claims. That distinction is the whole point of the
 | Document | What it answers | Status |
 |---|---|---|
 | [`flow-routing.md`](flow-routing.md) | Routing flow over a heightfield: which receiver rule to use, and how to handle depressions. | draft |
-| [`hydraulic-erosion.md`](hydraulic-erosion.md) | The two detail-scale water models: which one to run, the four details that decide whether each works, and the standing-water crossover between them. | draft |
+| [`hydraulic-erosion.md`](hydraulic-erosion.md) | The two detail-scale water models: which one to run, the transcription details that decide whether each works, and the standing-water crossover between them. | draft |
 | [`noise-and-warping.md`](noise-and-warping.md) | The base layer erosion runs on: which gradient noise, which fractal composition, and the warp that costs three evaluations. | draft |
 | [`stream-power.md`](stream-power.md) | The one-line incision law, the O(N) implicit solver that makes it tractable, the companion diffusion term, and the slope-area check that proves it. | draft |
 | [`tectonic-uplift.md`](tectonic-uplift.md) | Uplift is an input to erosion, not terrain: how to author U, when a plate simulation earns its cost, and the isostatic response that makes peaks rise as valleys cut. | draft |

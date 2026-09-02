@@ -24,8 +24,9 @@ result stop looking like a hydraulic result.
 ## Use this
 
 **Thermal: slope-limited relaxation to the angle of repose, run after hydraulic erosion**
-[musgrave1989], with a per-neighbour distance-correct limit and double buffering. It converges,
-so you can run it to a fixed point.
+[musgrave1989], with a per-neighbour distance-correct limit and double buffering. Its fixed point is
+exactly *no pair over its limit*, and there the pass is the identity — but nothing here proves that
+point is reached, so stop on a measured over-steep count and not on a pass count.
 
 **Aeolian: Werner's slab automaton** [werner1995] when you want dune *forms* — barchan, transverse,
 linear, star — to emerge from a wind regime. Switch to the **continuum flux/Exner chain**
@@ -39,37 +40,84 @@ the brief has landslide scars. Thermal alone is the slow process and can never m
 ## Thermal, and the distance bug hiding in the volume term
 
 ```
+Δ = 0                                                    # second buffer, zeroed once per pass
 for each cell i:
-    for n in 8 neighbours:
-        d      = h[i] - h[n]
-        dist   = (n is diagonal) ? cellSize * SQRT2 : cellSize
-        dLimit = tan(talusAngle) * dist                  # PER NEIGHBOUR
-        if d > dLimit: steep.append(n); dTotal += d; maxExcess = max(maxExcess, d - dLimit)
+    steep     = []                                       # all three reset for every i; let them
+    dTotal    = 0                                        #   carry across cells and they accumulate
+    maxExcess = 0                                        #   over the whole grid — pass means nothing
+    for n in the 8 neighbours of i:
+        d[n]      = h[i] - h[n]                          # arrays over n, not scalars: the
+        dist[n]   = (n is diagonal) ? cellSize*SQRT2 : cellSize   #   transfer loop reads them
+        dLimit[n] = tan(talusAngle) * dist[n]            #   again, PER NEIGHBOUR
+        if d[n] > dLimit[n]:
+            steep.append(n)
+            dTotal    += d[n]
+            maxExcess  = max(maxExcess, d[n] - dLimit[n])
+    if steep is empty: continue                          # nothing over the limit here
     moved = c * maxExcess / 2                            # c in 0.3..0.7 (tuning, see below)
     for n in steep:
         give = min(moved * d[n] / dTotal, (d[n] - dLimit[n]) / 2)
-        Δ[i] -= give;  Δ[n] += give
-h += Δ                                                   # double-buffered
+        Δ[i] -= give;  Δ[n] += give                      # both writes land in Δ; h is read-only
+h += Δ                                                   # one apply, after the whole grid
 ```
 
-- **Compute `dLimit` per neighbour.** A single talus value for all eight holds diagonals to a slope
-  √2 times too steep, so material collapses preferentially along the cardinals and every cone grows
-  a plus-shaped artefact. The same bug hides a second time in the volume term if the excess is
+`h` is never written during the sweep and `Δ` is never read during it. That *is* the double buffer,
+and it is the only reason the result does not depend on visit order.
+
+- **Compute `dLimit` per neighbour.** The shared form is `dLimit = tan(talus)·cellSize` for all
+  eight, and it is applied across a diagonal whose real run is `cellSize·√2`, so it holds diagonals
+  to `tan(talus)/√2` — √2 too **shallow**, not too steep. Diagonal pairs therefore stay over that
+  wrong limit longest and material collapses preferentially along the **diagonals**: the cone
+  spreads toward the corners into a **diamond**. Measured, 3:1 cone relaxed at 35° to a fixed point
+  (81² grid, c = 0.5): shared limit → diagonals settle at slope `0.4951 = tan(35°)/√2` against
+  cardinals at `0.6992`, footprint reaching 11.31 cells along the diagonal against 9.00 along the
+  cardinal, apex 5.92; per-neighbour limit → both classes settle at `0.7002 = tan 35°`, footprint
+  9.90 / 9.00, apex 6.86. The same bug hides a second time in the volume term if the excess is
   measured as `d − talus` against a cardinal limit.
-- **`c·maxExcess/2`.** The `/2` is what stops the surface oscillating; without it the step
-  overshoots the excess. `c` in 0.3..0.7 is a **tuning range from practice, not a cited
-  result** — no canonical source fixes it; lower converges more slowly, higher approaches the
-  oscillation the `/2` exists to prevent.
-- **The per-pair clamp** `min(share, (d − dLimit)/2)` makes each transfer individually
-  non-inverting, so the step converges no matter how many neighbours are over-steep. Sizing the
-  move from the single steepest neighbour and splitting it by `d/dTotal` is a fast abstraction
-  [olsen2004], not physics, and on rough surfaces it micro-oscillates without the clamp.
+- **`c·maxExcess/2`.** The `/2` is a **stability margin, not an oscillation cure**, and the
+  difference is measurable. Unclamped, varying the effective coefficient in
+  `moved = c_eff·maxExcess/2`: `c_eff` = 0.5, 1.0, 1.4 and **2.0** — that last is the `/2`
+  dropped entirely at `c = 1.0` — all converge to the same fixed point at max slope 0.70021,
+  with zero sign-flips over the last 300 passes. The failure past the margin is **divergence,
+  not bounded oscillation**, and it begins at `c_eff ≥ 3`, so `c` in 0.3..0.7 with the `/2`
+  kept leaves a 4–10× margin. `c` itself is a **tuning range from practice, not a cited
+  result** — no canonical source fixes it, and lower simply converges more slowly.
+- **The per-pair clamp** `min(share, (d − dLimit)/2)` bounds one transfer *in isolation*: that
+  transfer alone leaves the pair at `dLimit`, so it cannot invert it. It is **not** a convergence
+  guarantee. A cell issues up to eight outgoing transfers and accumulates its neighbours' incoming
+  ones into the same `Δ` before anything is applied, so the net pass inverts pairs freely — counting
+  pairs with `h[i] > h[n]` before a pass and `h[i] < h[n]` after, 25² noisy cone, c = 0.7, 60
+  passes: **2192 with the clamp, 1861 without**. The clamp slightly *increases* them. Nothing is
+  monotone per pass either: on a tilted noisy plane (25², c = 0.5, 1500 passes) the total over-steep
+  excess *rose* on 17 passes, by up to 0.60, and the max slope rose on 153. What is true is weaker
+  and sufficient: each transfer debits `i` and credits `n` by the same amount, so **volume is
+  conserved exactly** (measured drift 0 over 60 passes), and the fixed point is exactly *no pair
+  over its limit*, where the pass is the identity (measured `|h_next − h|_∞ = 0`). Every
+  configuration tried reached it; that is evidence, not a proof, which is why the stopping rule
+  below is a measurement. Sizing the move from the single steepest neighbour and splitting it by
+  `d/dTotal` is a fast abstraction [olsen2004], not physics.
+- **The clamp earns very little, and the claim it prevents micro-oscillation did not reproduce.** It
+  binds on 10.7% of transfers; clamped and unclamped runs from the same 25² noisy cone end within
+  0.027 of each other on 39.6 of relief, both at max slope `0.70021 ≈ tan 35°`, and the unclamped
+  one gets there marginally *sooner* (1605 passes against 1612). Neither jitters: after the last
+  over-steep pair clears, both are at a fixed point and the pass is the identity. Keep the clamp for
+  what it does do — it caps any single transfer at half the pair's excess, which is cheap insurance
+  on a rough surface — and not for a convergence argument it cannot support.
 - **Double-buffer.** In-place updates are order-dependent; this is the source of "my thermal
   erosion changes when I enable multithreading".
-- 20–100 passes, and then it is done — running longer changes nothing once every slope is at or
-  under repose. That range is **practitioner folklore, not a bound anyone derived**; the
-  defensible stopping rule is the one the convergence gives you — iterate until the count of
-  over-steep pairs stops falling, and report it.
+- **The pass count goes as the square of the feature, and "20–100 passes" is off by one to two
+  orders of magnitude.** This is a diffusion-like relaxation: material moves one cell per pass, so
+  the cost is set by how far it has to travel. Measured, c = 0.5, 3:1 cone relaxed to 35°, stopping
+  when the max slope is within 1% of `tan 35°`: **155 passes at 17², 338 at 25², 590 at 33², 1306 at
+  49², 2304 at 65²** — that is `0.54·n²`. And it is the *feature* that costs, not the grid: a
+  radius-8 cone takes 283 passes whether the grid is 41², 65² or 97², while radius 16 / 24 / 32 in
+  the same grid take 1155 / 2611 / 4346. So halving the cell size quadruples the passes for the same
+  landform, and a map-scale over-steepening on a 4k grid is thousands. Raising `c` buys a constant
+  factor only (c = 0.7: 110 / 239 / 419 / 929 for the same four sizes), not a better exponent.
+  Running longer than the fixed point changes nothing — the pass is then the identity — but the
+  fixed point is much further away than the folklore range says. The defensible stopping rule is a
+  measurement: iterate until the count of over-steep pairs (or the total excess) stops falling, and
+  report the count you used.
 
 **Use real repose angles, and vary them by material.** Dry sand 30–35°, gravel and scree 35–40°,
 soil 30–45°, fractured bedrock 45–55°, competent rock up to vertical. **No source in this
@@ -100,6 +148,22 @@ wet  = min(1, K_w * A_specific / sinθ)       # wetness from contributing area
 FS   = (1 - wet * ρw/ρs) * tan(φ) / slope    # fails where FS < 1
 L    = H / tan(α)                            # runout: reach angle, shrinking with volume
 ```
+
+Every symbol, because five of them used to be undefined here:
+
+| Symbol | What it is |
+|---|---|
+| `slope` | `‖∇h‖`, already a tangent (see the warning below) |
+| `A_specific` | contributing area **per unit contour width**, m²/m — the `a` of TWI, computed with multi-receiver routing (`terrain-analysis-masks.md`, `flow-routing.md`) |
+| `K_w` | the wetness scale: steady recharge over soil transmissivity, `R/T`, in 1/m. One knob for how wet the whole map is; raising it floods more hollows into failure |
+| `wet` | the saturated fraction of the soil column, 0..1, hence the `min(1, …)` |
+| `φ` | the soil's angle of internal friction — an **angle**, so `tan(φ)` is correct here; 30–40° for most soils, and `FS = 1` lands on it exactly when `wet = 0` |
+| `ρw/ρs` | water density over **saturated bulk** density of the soil, ≈ 1000/1800 ≈ 0.55; it is the buoyancy term, and it is why full saturation removes about half the friction |
+| `α`, `H`, `L` | the reach angle of the runout — the line from the scar crown to the toe of the deposit — with `H` the drop along that line and `L` the horizontal distance it reaches |
+
+The numbers in that table are conventional working values, not read out of [montgomery1994] or
+[corominas1996]; the two papers are cited for the *form* of the wetness-coupled factor of safety and
+of the reach-angle stop rule.
 
 [montgomery1994] is the susceptibility model; failures concentrate in **steep, convergent, wet
 hollows**, which is why the mask needs contributing area and not slope alone. [corominas1996] gives
@@ -144,14 +208,44 @@ multidirectional gives star dunes. Gate everything on a sand-availability mask �
 infinite sheet — and keep dunes in a separate `sandDepth` field added to `h` at the end, so the
 material mask is free and a later wet phase can strip them.
 
-**The continuum chain** is four expressions and consumes a wind field directly:
+**The continuum chain** is five expressions and consumes a wind field directly. It is five and not
+four because the flux does not reach saturation instantly, and everything the prose below asks of
+this model lives in that one extra line:
 
 ```
-u* = speed · κ / ln(z/z₀)                                  # law of the wall
-q  = (u* > u*_t) ? C·√(d/D)·(ρ_a/g)·u*³ : 0                # threshold-gated, CUBIC
-q⃗  = q · normalize(wind)
-bed −= dt · ∇·q⃗ / ρ_bed                                    # Exner
+u*    = speed · κ / ln(z/z₀)                                # law of the wall
+q_sat = (u* > u*_t) ? C·√(grain/grainRef)·(ρ_a/g)·u*³ : 0   # threshold-gated, CUBIC
+q     = q_sat + (q_up − q_sat) · exp(−ds/L_sat)             # dq/ds = (q_sat − q)/L_sat, integrated
+                                                            #   along the streamline: q_up is q
+                                                            #   one step ds upwind; exact step
+                                                            #   for q_sat constant over ds
+q⃗     = q · normalize(wind)
+bed  −= dt · ∇·q⃗ / ρ_bed                                    # Exner
 ```
+
+`q_up` is what makes this a **sweep, not a per-cell kernel**: cells have to be visited in upwind
+order (sort by `wind·position`, or march streamlines), with `q = 0` where sand enters the domain.
+That ordering is the whole cost of the saturation length, and skipping it — setting `q = q_sat`
+everywhere — is the same as `L_sat = 0`.
+
+The symbols, all of them, with the values that make the expressions run:
+
+| Symbol | What it is |
+|---|---|
+| `speed`, `wind` | per-cell wind at reference height `z`: magnitude in m/s and direction |
+| `z`, `z₀` | the height the wind field is quoted at, and the surface's aerodynamic roughness length, both in m. Only the ratio matters; `z₀ ≈ grain/30` for loose sand, ~1e-5 m at 250 µm, so a 10 m/s wind at `z = 10` m gives `u* ≈ 0.29` m/s |
+| `κ` | von Kármán constant, 0.41 |
+| `u*`, `u*_t` | friction velocity and its threshold, m/s. `u*_t ≈ 0.23` for 250 µm quartz sand in air, from [bagnold1941]'s `u*_t = A·√((ρ_s−ρ_a)/ρ_a · g · grain)` with `A ≈ 0.1` |
+| `grain`, `grainRef` | grain diameter and Bagnold's 0.25 mm reference grain, both in m; the ratio is there only to keep `C` dimensionless. **Renamed from `d` and `D`** — `D` is the hillslope diffusivity of `D·∇²h` two sections up and `d` is the height drop in the thermal block |
+| `C` | dimensionless sorting coefficient: ≈1.5 well-sorted dune sand, ≈2.8 poorly sorted |
+| `g` | gravitational acceleration, 9.81 m/s²; `ρ_a/g` is what turns a cubed velocity into a mass flux |
+| `ρ_a`, `ρ_s`, `ρ_bed` | air density 1.2 kg/m³, quartz grain density 2650 kg/m³, and the **bulk** density of the deposited bed ≈1600 kg/m³ (2650 at ~40% porosity) |
+| `q` | mass flux per unit width, kg/(m·s) — at `C = 1.8`, `u* = 0.4` that is 0.014, about 1.2 t per metre of width per day. `∇·q⃗ / ρ_bed` is then m/s, which is what `bed` wants |
+| `L_sat`, `ds` | saturation length and the march step, m. `L_sat` is order `(ρ_s/ρ_a)·grain ≈ 0.5` m for 250 µm sand; on the grid it must span **several cells** or the relaxation is invisible and you are back to `q = q_sat` |
+
+Those values are conventional working numbers, not read out of the cited locators: [bagnold1941] is
+`F` here and is cited for the *form* of the threshold and the cubic law, [sauermann2001] for the
+form of the relaxation.
 
 **`∇·q⃗` changes the bed, not `q`.** Divergence deflates, convergence deposits. Feed it a
 **constant** wind vector and `∇·q⃗ ≡ 0` — nothing happens, ever, at any wind speed. That is both the
@@ -159,10 +253,20 @@ sharpest argument for a wind field and the first thing to check when an aeolian 
 [bagnold1941] gives the threshold and the cubic law: transport scales with the *cube* of shear
 velocity, so doubling the wind moves eight times the sand, and the threshold is a hard gate —
 averaging or smoothing a wind field destroys the effect, and a wind *rose* of a few strong events
-moves far more than its mean suggests. [sauermann2001] adds the **saturation length**: flux relaxes
-toward saturation over `L_sat`, which is why a bump shorter than `L_sat` cannot grow (dunes have a
-minimum size instead of roughening into noise) and why the deposition maximum sits downwind of the
-crest. Clamp deflation to the sand that is there; wind does not excavate bedrock.
+moves far more than its mean suggests. [sauermann2001] adds the **saturation length**, and it is a
+first-order low-pass along the streamline: integrating `dq/ds = (q_sat − q)/L_sat` past a bed
+perturbation of wavelength `λ` passes it through with amplitude `1/√(1 + (2πL_sat/λ)²)` and lags it
+by `atan(2πL_sat/λ)`. Measured on that integration: `λ = L_sat` → amplitude 0.157, lag 81°;
+`λ = 10·L_sat` → 0.847, lag 32°; `λ = L_sat/4` → 0.040, lag 87°. The lag is why the deposition
+maximum sits downwind of the crest. The attenuation is why short bumps do not run away: with
+`q = q_sat` there is no filter and `‖∇·q⃗‖` grows as `1/λ` without bound, so the *shortest*
+wavelength on the grid drives the strongest bed change (1.26 at `λ = L_sat/4` against 0.006 at
+`λ = 50·L_sat`, for a 0.1-amplitude perturbation), which is exactly the roughening the failure
+table blames on a missing `L_sat`; with the relaxation it saturates at `amplitude/L_sat ≈ 0.05` for
+every `λ` at or below `L_sat`. Short bumps are damped rather than amplified — the full
+minimum-dune-size result also needs the upwind shift of the shear stress over the bump, which these
+five lines do not carry, so read this as the *mechanism* for a minimum size and not as a prediction
+of what it is. Clamp deflation to the sand that is there; wind does not excavate bedrock.
 
 **What it beats.** *Gaussian blur as a talus pass* — smooths ridges and cliffs, the features you
 wanted, and leaves the noise. *Perona–Malik anisotropic diffusion* — the same object as thermal
@@ -171,22 +275,26 @@ with a different conductivity function; if you already run thermal you are alrea
 *Authoring dune types directly* — the CA gives all four from the wind regime, and an authored
 barchan field will not migrate or interact.
 
-**Time budget.** Thermal is a handful of full-grid passes and is cheap enough to run inside an
-erosion loop; the sweep form [olsen2004] converges in fewer iterations and is the one to use if it
-sits in an inner loop, unnecessary as a one-off post-process. Werner is the expensive one — one
-slab per iteration means of order 10⁷ iterations for a 1k map before every cell has been touched
-a handful of times — arithmetic on the cell count, not a measurement — so it is authoring-time
-only; batch source
-cells with non-overlapping paths, or accumulate with atomics as with droplets. The continuum chain
-is four full-grid expressions per step and is the one that fits a budget, but it needs a wind field
-computed first.
+**Time budget.** Thermal is cheap **per pass** — eight neighbour reads, one add — and expensive to
+**converge**: pass count goes as the square of the over-steep feature's width in cells (155 → 1306
+passes for a 3:1 cone from 17² to 49², measured above). Inside an erosion loop that is fine, and it
+is the argument for putting it there rather than at the end: hydraulic re-steepens a little each
+step, a handful of passes take that back, and nothing ever relaxes a whole map from scratch. As a
+one-off post-process on a map that is over-steep everywhere it is thousands of full-grid passes, and
+that is where the sweep form [olsen2004] is worth reaching for — it is reported to converge in fewer
+iterations, `F`-tier and not measured here. Werner is the expensive one — one slab per iteration
+means of order 10⁷ iterations for a 1k map before every cell has been touched a handful of times —
+arithmetic on the cell count, not a measurement — so it is authoring-time only; batch source cells
+with non-overlapping paths, or accumulate with atomics as with droplets. The continuum chain is five
+expressions per step — four full-grid, plus one upwind sweep for the `L_sat` relaxation — and is the
+one that fits a budget, but it needs a wind field computed first.
 
 ## How this fails, and what it looks like
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| A plus-shaped collapse pattern on every cone | One talus limit shared by cardinals and diagonals | `dLimit = tan(talus)·dist` per neighbour |
-| Thermal never quite settles, micro-oscillating | Move sized from the steepest neighbour and split without a clamp | `min(share, (d − dLimit)/2)` per pair |
+| Cones spreading into a diamond, too flat toward the corners | One talus limit shared by cardinals and diagonals caps diagonals at `tan(talus)/√2` | `dLimit = tan(talus)·dist` per neighbour |
+| Thermal stopped after its pass budget with the ridges still knife-edged | A fixed pass count: the real one grows as the square of the feature's width in cells, so folklore ranges undershoot badly | Iterate until the over-steep pair count stops falling, and report the count |
 | Result changes when threading is enabled | In-place neighbour updates | Double-buffer |
 | Thermal ran and the terrain is still over-steepened | It ran *before* hydraulic, which re-steepened it | Hydraulic first, thermal after |
 | Cliffs with no scree at their base | Thermal relaxes; it has no source | Add material at the cliff base, then relax |

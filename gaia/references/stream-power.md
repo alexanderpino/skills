@@ -49,7 +49,7 @@ receiver has already been updated when you reach a cell, because the stack is or
 first:
 
 ```
-stack = buildStack(receivers)               # base levels first — see flow-routing.md
+stack = buildStack(receivers)               # flow-routing.md, "Accumulation, and the three arrays"
 for i in stack:                             # FORWARD order
     if receivers[i] == i:                   # base level
         h[i] += U[i] * Δt;  continue
@@ -62,6 +62,24 @@ for i in stack:                             # FORWARD order
 Three lines, unconditionally stable, O(N), and it dissects a flat plate under constant uplift into
 a proper dendritic network. `Δt` can be 1000 years or more; a 4k map reaches equilibrium in a few
 hundred steps.
+
+⚠️ **`receivers[i] == i` covers two different things, and the uplift line is not optional for one
+of them.** The *domain edge* is a base level you declared: it is where water leaves, it must be
+pinned, and `U` there must be zero. Every other self-receiving cell is an *interior local minimum*
+the receiver rule produced this step — and for those, `h[i] += U[i]*Δt` is the only thing that
+lifts a pit back out. It is not bookkeeping for cells that happen to have no receiver; it is the
+mechanism, and skipping it is a plausible misreading of the word "base level". Measured on a
+100×100 plate, 500 steps, `U = 5e-4 m/yr`, `Δt = 1000 yr`, `K = 3e-5`, `m = 0.5`, `n = 1`:
+
+| base-level handling | after 500 steps |
+|---|---|
+| `continue` without the uplift | **1027** interior self-receiving pits, the largest draining 19 cells |
+| the printed line applied to the edge as well | **632** pits; edge and interior both at 250 m, so no relief at all — the whole plate rose |
+| uplift on interior minima, edge pinned at `h = 0` with `U = 0` | **0** pits; `log S` vs `log A` slope −0.498 |
+
+So: pin the edge outside this loop (or keep it out of the stack), and let the printed line run on
+everything else. A reader who treats the edge as an ordinary base level raises the plate uniformly
+and erodes nothing.
 
 For `n ≠ 1` the implicit equation is nonlinear — guarded Newton–Raphson or bracketed root finding,
 converging in a handful of iterations, and restricted to single-flow routing in mature

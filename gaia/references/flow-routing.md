@@ -14,6 +14,7 @@ sources:
   - { id: lindsay2016, tier: P, locator: "hybrid breach/fill with a depth limit; DEM-modification comparison" }
   - { id: planchon2002, tier: P, locator: "the fill algorithm" }
   - { id: montgomery1992, tier: P, locator: "the area-slope channel-initiation threshold, A*S^2 = const" }
+  - { id: braun2013, tier: P, locator: "the O(N) stack ordering: base levels first, every cell after its receiver" }
 ---
 # Flow routing — where the water goes
 
@@ -53,7 +54,10 @@ stops, so downstream contributing area is wrong everywhere below it.
 
 **Why it wins**: measured as total elevation change to the input, the hybrid modifies less than
 either pure policy [lindsay2016] — fill-everything raises every basin, breach-everything
-trenches through real ones.
+trenches through real ones. That is an aggregate result over test DEMs, not a per-basin
+guarantee: on the single deep basin measured below, breaching everything moves **11.9** units of
+elevation against the hybrid's **680** — and drains the basin doing it. Less modification is the
+argument for the policy, not a property of every depression it meets.
 
 **What it beats.** *Fill alone* [barnes2014] — simpler, and correct if you have no lakes to
 lose. *Breach alone* [lindsay2016] — correct only if every depression in your input is an
@@ -63,6 +67,96 @@ priority-flood.
 ⚠️ A common trap: applying the filled surface as the terrain. **Fill the copy you route on,
 not the heightmap you render.** The filled surface exists to give the router a downhill path;
 if it reaches the renderer, every basin in the world has been quietly levelled.
+
+### The fill, and the epsilon that makes it routable
+
+`neighbours8(c)` below is the in-bounds subset of the eight `NB` offsets tabulated in the next
+section.
+
+```
+priorityFlood(z, useEpsilon):                  # z is the ROUTING COPY, never the render heightfield
+    closed[:] = false
+    open = min-priority-queue keyed on elevation
+    for each boundary cell b:  closed[b] = true;  open.push(b, z[b])
+    while open not empty:
+        c = open.pop()                         # the lowest elevation still queued
+        for j in neighbours8(c):
+            if closed[j]: continue
+            closed[j] = true
+            lift = useEpsilon ? nextafter(z[c], +INF) : z[c]
+            z[j] = max(z[j], lift)
+            open.push(j, z[j])
+```
+
+That is [barnes2014]'s priority-flood. Every cell is pushed once and popped once, which is the
+O(n log n) with a comparison queue on floats — the caveat above, not a different algorithm.
+
+**Route on the epsilon variant, not on the plain fill.** Transcribed and run on a 60×60 bowl
+carrying 380 pits: both fills leave zero pits, the plain fill agrees to **0.0** with an
+independent Planchon–Darboux fill [planchon2002] and the epsilon fill to 7e-15, and outside the
+filled basins both are bit-identical to the input. But the plain fill leaves **1353 interior cells with no strictly lower neighbour** — the
+flat lake surfaces — and D8 makes every one of them a self-receiving sink. Accumulate on that and
+**3224 of 3600** cell-areas strand on the flats; **376** reach the domain edge. With `nextafter`,
+nothing strands and every interior cell's receiver chain reaches the edge.
+
+⚠️ **The epsilon has to be big enough to change the number.** `z + eps == z` is a flat, not a
+gradient. On R32F the ulp is 6.1e-5 at 1000 m and 4.9e-4 at 8000 m, so a literal `eps = 1e-5` is
+silently swallowed above ~100 m of elevation and `1e-4` is swallowed on a Himalaya. `nextafter`
+is the increment that cannot be swallowed, and it costs one ulp per cell of flat.
+
+### The hybrid, and the depth limit it is named for
+
+```
+# One pit, lowest first. Returns true if this pit was carved.
+breachPit(z, p, maxCut, eps):
+    cost[:] = +INF;  cost[p] = 0;  prev[p] = p;  settled = {}
+    open = min-priority-queue;  open.push(p, 0);  outlet = none
+    while open not empty:
+        c = open.pop()
+        if c in settled: continue
+        settled.add(c)
+        if z[c] < z[p]:  outlet = c;  break                  # lower ground reached
+        for j in neighbours8(c):
+            d = cost[c] + max(0, z[j] - z[p])                # excess to remove at the pit's level
+            if d < cost[j]:  cost[j] = d;  prev[j] = c;  open.push(j, d)
+    if outlet == none: return false                          # nothing lower anywhere: fill it
+    path = [outlet]
+    while last(path) != p:  path.append(prev[last(path)])
+    reverse(path)                                            # p first, outlet last
+    target[k] = z[p] - k * eps                               # a channel descending eps per step
+    requiredCut = max over k of (z[path[k]] - target[k])
+    if requiredCut > maxCut: return false                    # too deep: leave it for the fill
+    for k: z[path[k]] = min(z[path[k]], target[k])
+    return true
+```
+```
+for p in pits(z), z ascending:  breachPit(z, p, maxCut, eps)
+priorityFlood(z, useEpsilon = true)            # everything that refused a breach
+```
+
+**`requiredCut` versus `maxCut` is the depth limit**, and it is the only place the recommendation
+becomes an instruction. Transcribed and run on a 41×41 ramp carrying a one-cell artefact pit inside
+a 0.6-high rim and a bowl ringed by a ridge 10 units above its floor, the search reports a
+required cut of **0.999** for the artefact and **10.0** for the bowl (two incidental pits on the
+ramp report ~0) — the two populations the policy separates, with the limit between them:
+
+| `maxCut` | breached | outcome |
+|---|---|---|
+| 0 | 0 | identical to fill-only (both modify 680.26) |
+| 1 | 3 | artefact carved, ridge **intact**, bowl filled to a lake at 13 |
+| ∞ | 4 | ridge notched, bowl drained to 3.0 — the trenching the limit exists to prevent |
+
+All three leave zero interior sinks after the closing epsilon fill.
+
+⚠️ The path is least-**cost**, not least-**depth**. Dijkstra here minimises summed excess, so
+`requiredCut` measures the path you were handed, not the shallowest one that exists; a pit can be
+filled that a better search would have breached. Constrained breaching [lindsay2016] is this
+shape — a limit on the cut, and a fall back to filling when the limit is exceeded.
+
+⚠️ **`pits(z)` = "no strictly lower neighbour" does not see a flat-floored depression**, because
+every cell of the floor has an equal neighbour. On a 69-cell flat basin that test found exactly one
+cell, and it was a rim accident. Take the depression cells from the fill instead: `filled > z`
+marked all 72 of them.
 
 ## Receivers, and the one crossover that matters
 
@@ -74,6 +168,48 @@ neighbours bracketing the steepest downslope facet direction — a middle course
 grid-direction bias without MFD's full dispersion. It is the right answer when the artefact you
 are fighting is specifically the eight-direction staircase; for the network/field split below,
 D8 and MFD remain the two ends worth reaching for first.
+
+```
+NB   = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1,-1), (0,-1), (1,-1)]   # dx, dy
+DIST = [     1, sqrt(2),      1, sqrt(2),       1, sqrt(2),      1, sqrt(2)] # × cellSize
+index(x, y) = y * width + x                # N = width * height cells, row-major
+
+# D8 [ocallaghan1984], run on the epsilon-filled routing copy.
+for each cell i at (x, y):
+    receivers[i] = i;  dist[i] = 0             # self-receiving = base level
+    if i is on the domain edge, or is sea: continue      # a DECLARED base level; stays self-receiving
+    best = 0
+    for k in 0..7:                             # i is interior, so every offset is in bounds
+        j = index(x + NB[k].dx, y + NB[k].dy)
+        s = (z[i] - z[j]) / (DIST[k] * cellSize)         # drop per unit LENGTH
+        if s > best:  best = s;  receivers[i] = j;  dist[i] = DIST[k] * cellSize
+```
+
+**The `sqrt(2)` is the convention the rest of this corpus is built on.** A diagonal neighbour is
+1.414 cellSize away, so dividing the drop by a cell *count* instead of a *distance* overstates
+every diagonal slope by 41% and bends D8 towards the diagonals — the staircase D∞ exists to
+remove. `dist[]` is the array `stream-power.md` divides by; get it wrong and the incision
+coefficient is wrong with it. Because `s > best` starts at zero and the comparison is strict,
+`receivers[i]` is always *strictly* lower, so a receiver cycle cannot form.
+
+```
+# MFD [freeman1991]: p = 1.1, and the normalisation the exponent exists for.
+mfdWeights(i at (x, y), p):                     # i interior, as above
+    total = 0
+    for k in 0..7:
+        nbr[k] = index(x + NB[k].dx, y + NB[k].dy)
+        s[k]   = max(0, (z[i] - z[nbr[k]]) / (DIST[k] * cellSize))
+        total += pow(s[k], p)
+    if total == 0: return {}                   # nothing downslope: a pit, or a flat
+    return { (nbr[k], pow(s[k], p) / total)  for every k with s[k] > 0 }
+                                               # Σ w = 1 BY CONSTRUCTION — the missing half
+```
+
+Dividing by `total` is what conserves water; the exponent only sets how sharply the split
+concentrates on the steepest neighbour. `p = 1.1` is [freeman1991]'s calibrated value, `p → ∞`
+degenerates to D8, and `p = 1` weighted by contour length rather than bare slope is
+[quinn1991] — a different method, not a tuning of this one. Measured over 3600 cells, the
+weights sum to 1 within 4e-16.
 
 The choice is decided by what consumes the result, and this is the crossover:
 
@@ -102,6 +238,52 @@ millisecond figure would be a `?` wearing a P's confidence. What holds regardles
 is not changing per frame, so route once and cache. If it *is* changing per frame you have a
 simulation problem, not a routing one, and `shallow-water.md` is the document you want.
 
+## Accumulation, and the three arrays every downstream document consumes
+
+`receivers[]`, `dist[]` and `A[]` are this document's output contract. `stream-power.md`,
+`terrain-analysis-masks.md` and `hydraulic-erosion.md` all read them, and all three assume the
+conventions above: `receivers[i] == i` means base level, `dist[]` is in world units with the
+diagonal at `sqrt(2)·cellSize`, and `A` was accumulated on the *same* receivers.
+
+```
+buildStack(receivers):                         # [braun2013] — O(N), no sort, no recursion
+    donors[:] = empty lists
+    for i: if receivers[i] != i: donors[receivers[i]].append(i)
+    stack = [];  work = every i with receivers[i] == i        # the base levels
+    while work not empty:
+        c = work.pop();  stack.append(c);  work.extend(donors[c])
+    assert length(stack) == N               # N = cell count; see the D8 block
+    return stack                               # every cell appears AFTER its receiver
+```
+```
+A[:] = cellArea                                # or any per-cell input: rainfall, mm/step
+for i in REVERSE(stack):                       # donors before receivers
+    if receivers[i] != i:  A[receivers[i]] += A[i]
+```
+
+The stack is [braun2013]'s: base levels first, every cell after its receiver. The reverse pass
+over it is D8 accumulation; the **forward** pass over the same stack is the order
+`stream-power.md`'s solver walks. Both rules need this traversal — it is what the budget
+note above means by "topological".
+
+MFD has no single-receiver stack to build, so it orders by elevation instead, which is why it
+needs a depression-free surface and not merely a receiver array:
+
+```
+A[:] = cellArea
+for i in cells sorted by z DESCENDING:
+    for (j, w) in mfdWeights(i, 1.1):  A[j] += w * A[i]
+```
+
+Verified on the 60×60 field above: `buildStack` returns all 3600 cells with every receiver ahead
+of its donors; D8 accumulation lands exactly 3600 of 3600 cell-areas on base levels, and
+reproduces the sum of a random per-cell input field to nine decimals; MFD accumulation delivers
+exactly 3600 to the domain edge.
+
+⚠️ `assert length(stack) == N` costs nothing under the strict receiver rule above, which cannot
+produce a cycle. Keep it anyway: the moment someone routes across ties to escape a flat, it can,
+and the symptom of a cycle is silently missing area rather than a crash.
+
 ## Where the network starts
 
 Flow accumulation gives contributing area for every cell, including hilltops. A river does not
@@ -116,6 +298,11 @@ steepness, which draws rivers straight over ridges in steep terrain.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | Drainage stops mid-slope, area jumps to zero | An unhandled depression upstream | Handle depressions before accumulating |
+| Area vanishes on flat lake surfaces; only a fraction reaches the outlet | Plain fill, not the epsilon variant — D8 makes every flat cell self-receiving | Fill with `nextafter`, on the routing copy |
+| The epsilon fill still leaves flats | `eps` smaller than the ulp at that elevation on R32F | `nextafter`, never a literal |
+| Diagonal channels preferred; slopes read 41% high | Drop divided by a cell count instead of `sqrt(2)·cellSize` | The `DIST` table |
+| A flat-floored basin is never breached or reported | `pits()` tested for a strictly lower neighbour | Take depression cells from `filled > z` |
+| Area silently missing, no crash | A receiver cycle from routing across ties | `assert length(stack) == N` |
 | Rivers one cell wide, parallel, with dry gaps between | D8 used where a field was wanted | Route MFD for the field |
 | River mask smeared and braided | MFD thresholded to make a network | Route D8 for the network |
 | Every lake basin has flattened | The filled surface was written back to the heightfield | Fill the routing copy only |
