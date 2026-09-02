@@ -73,6 +73,20 @@
     "non_goals": [
       "PHASE 3: what this story is not, with follow-up ticket ids."
     ],
+    "follow_ups": [
+      {
+        "_howto": "What this refinement creates for later: every non-goal that names a ticket, every deferred decision whose answer changes the NEXT story, and every flag or migration that needs an item to end it. The trigger is an observable condition, never a date - a backlog date is a wish, and a flag with no trigger becomes load-bearing.",
+        "ticket": "",
+        "trigger": "",
+        "owner": "",
+        "note": ""
+      }
+    ],
+    "series": {
+      "_howto": "Set when this is not the first story through this code. `evidence.py inherit --from <prior bundle> --write` fills predecessors and carries the glossary, conventions and ruled_out across, marking them stale when the repo has moved. Re-verify before relying on them: an inherited absence is the first thing to stop being true.",
+      "epic": "",
+      "predecessors": []
+    },
     "risks": [
       {
         "_howto": "PHASE 4: from the premortem. It is three months later, this shipped and caused an incident - write the postmortem, then record each cause here. 'detection' is the alert, metric or report that tells you it is happening; a high risk without one is a risk you hear about from a customer.",

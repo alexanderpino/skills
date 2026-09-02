@@ -103,6 +103,12 @@
       "impossible": [],
       "note": "Non-EU destinations are a non-goal (ABC-131), so they are not a column value. Adding them re-opens this table rather than adding a branch to the code."
     },
+    "follow_ups": [
+      {"ticket": "ABC-131", "trigger": "this story ships to NL", "owner": "Sanne (Product)",
+       "note": "Non-EU B2B. Re-opens the decision table with a third destination value rather than adding a branch - see story.decision_table.note."},
+      {"ticket": "ABC-140", "trigger": "billing.reverse_charge has been on for every market for two weeks", "owner": "@team-billing",
+       "note": "Remove the flag and its branch. Created by S6; without it the flag is permanent."}
+    ],
     "non_goals": [
       "Non-EU B2B orders — follow-up ABC-131",
       "Recalculating VAT on orders placed before this ships",
@@ -211,11 +217,11 @@
     }
   ],
   "open_questions": [
-    {"id": "Q1", "text": "Does Finance need the reverse-charge reason on the invoice PDF this quarter?", "owner": "Marieke (Finance)", "blocking": false},
-    {"id": "Q2", "text": "Which locales must ship with the new string on day one?", "owner": "Product", "blocking": false},
-    {"id": "Q3", "text": "Confirm the success signal: manual reverse-charge refunds for qualifying orders reach zero within a month of the NL rollout.", "owner": "Marieke (Finance)", "blocking": false, "dimension": "success_signal"},
-    {"id": "Q4", "text": "Confirm scope: non-EU B2B customers and orders placed before go-live are excluded (follow-up ABC-131).", "owner": "Sanne (Product)", "blocking": false, "dimension": "scope"},
-    {"id": "Q5", "text": "Who signs this off, and do they need evidence retained beyond the code change?", "owner": "Marieke (Finance)", "blocking": false, "source": "triage"}
+    {"id": "Q1", "text": "Does Finance need the reverse-charge reason on the invoice PDF this quarter?", "owner": "Marieke (Finance)", "blocking": false, "asked": {"to": "Marieke (Finance)", "when": "2026-09-02", "channel": "refinement session"}},
+    {"id": "Q2", "text": "Which locales must ship with the new string on day one?", "owner": "Product", "blocking": false, "asked": {"to": "Sanne (Product)", "when": "2026-09-02", "channel": "refinement session"}},
+    {"id": "Q3", "text": "Confirm the success signal: manual reverse-charge refunds for qualifying orders reach zero within a month of the NL rollout.", "owner": "Marieke (Finance)", "blocking": false, "dimension": "success_signal", "asked": {"to": "Marieke (Finance)", "when": "2026-09-02", "channel": "refinement session"}},
+    {"id": "Q4", "text": "Confirm scope: non-EU B2B customers and orders placed before go-live are excluded (follow-up ABC-131).", "owner": "Sanne (Product)", "blocking": false, "dimension": "scope", "asked": {"to": "Sanne (Product)", "when": "2026-09-02", "channel": "refinement session"}},
+    {"id": "Q5", "text": "Who signs this off, and do they need evidence retained beyond the code change?", "owner": "Marieke (Finance)", "blocking": false, "source": "triage", "asked": {"to": "Marieke (Finance)", "when": "2026-09-02", "channel": "refinement session"}}
   ],
   "evidence": {
     "generated_at": "2026-09-02T10:02:00Z",
@@ -692,7 +698,7 @@
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:ef8377c94dd4bf9d6cc9cc23542d6e93b4a6dd8bffbde1159d144c22ab59cb44",
+    "bundle_digest": "sha256:8c93277e5fcaf1894d702775de3378a36dcc93d895fe80c573a048ac938ad35d",
     "critics": [
       {"id": "implementer", "context": "fresh"},
       {"id": "tester", "context": "fresh"},

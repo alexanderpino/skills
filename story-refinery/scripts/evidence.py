@@ -521,6 +521,89 @@ def cmd_init(args, cfg):
     return 0
 
 
+INHERITABLE = ("glossary", "conventions", "ruled_out")
+
+
+def cmd_inherit(args, cfg):
+    """Carry a previous refinement's dossier into the next story in the same area.
+
+    In a sprint stream the second story through the same code does not need its
+    glossary, its house conventions or its negative results re-derived - it needs
+    them re-checked. Everything comes across marked with where it came from and
+    whether the repo has moved since; a stale entry is a re-read, not a deletion."""
+    try:
+        with open(args.source, "r", encoding="utf-8") as fh:
+            prior = json.load(fh)
+    except (OSError, ValueError) as exc:
+        print("cannot read %s: %s" % (args.source, exc), file=sys.stderr)
+        return 2
+
+    prior_key = (prior.get("story") or {}).get("key", "?")
+    prior_ev = prior.get("evidence") or {}
+    heads = {name: repo_sha(root) for name, root in repos_from_config(cfg)}
+    prior_shas = {}
+    for st in prior.get("subtasks") or []:
+        for p in (st.get("agent_brief") or {}).get("provenance") or []:
+            if "@" in p:
+                repo, sha = p.split("@", 1)
+                prior_shas[repo.strip()] = sha.strip()
+
+    stale_repos = sorted(r for r, sha in prior_shas.items()
+                         if heads.get(r) and sha and heads[r] != sha)
+    carried, total = {}, 0
+    for field in INHERITABLE:
+        items = []
+        for entry in prior_ev.get(field) or []:
+            item = dict(entry)
+            item["inherited_from"] = "%s (%s)" % (prior_key, os.path.basename(args.source))
+            item["verified_at"] = prior_shas
+            if stale_repos:
+                item["stale"] = True
+            items.append(item)
+        if items:
+            carried[field] = items
+            total += len(items)
+
+    print("from %s: %d entr(ies) across %s" % (prior_key, total, ", ".join(carried) or "nothing"))
+    for repo, sha in sorted(prior_shas.items()):
+        head = heads.get(repo)
+        print("  %-8s reviewed at %s, HEAD now %s%s"
+              % (repo, sha, head or "unknown", "  <- re-verify" if head and head != sha else ""))
+    if stale_repos:
+        print("Everything carried is marked stale: %s moved since. Re-read before you rely on "
+              "it - especially the ruled_out entries, because an absence is the thing most "
+              "likely to have stopped being true." % ", ".join(stale_repos))
+
+    if args.write:
+        try:
+            with open(args.bundle, "r", encoding="utf-8") as fh:
+                target = json.load(fh)
+        except (OSError, ValueError) as exc:
+            print("cannot read %s: %s" % (args.bundle, exc), file=sys.stderr)
+            return 2
+        ev = target.setdefault("evidence", {})
+        for field, items in carried.items():
+            existing = ev.setdefault(field, [])
+            keys = {json.dumps({k: v for k, v in e.items()
+                                if k not in ("inherited_from", "verified_at", "stale")},
+                               sort_keys=True) for e in existing}
+            for item in items:
+                probe = json.dumps({k: v for k, v in item.items()
+                                    if k not in ("inherited_from", "verified_at", "stale")},
+                                   sort_keys=True)
+                if probe not in keys:
+                    existing.append(item)
+        series = target.setdefault("story", {}).setdefault("series", {})
+        preds = series.setdefault("predecessors", [])
+        if not any(p.get("key") == prior_key for p in preds):
+            preds.append({"key": prior_key, "bundle": args.source, "relation": "same area"})
+        with open(args.bundle, "w", encoding="utf-8") as fh:
+            json.dump(target, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+        print("merged into %s; nothing was overwritten" % args.bundle)
+    return 0
+
+
 def main(argv=None):
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--config", default="refinery.yaml")
@@ -540,11 +623,18 @@ def main(argv=None):
     p = sub.add_parser("init", parents=[common])
     p.add_argument("--root", default="..", help="directory holding the sibling repos")
     p.add_argument("--force", action="store_true")
+    p = sub.add_parser("inherit", parents=[common])
+    p.add_argument("--from", dest="source", required=True,
+                   help="a prior bundle, e.g. .refinery/bundles/ABC-123@2026-09-02.json")
+    p.add_argument("--bundle", default="bundle.json")
+    p.add_argument("--write", action="store_true",
+                   help="merge the carried entries into --bundle and record the predecessor")
 
     args = ap.parse_args(argv)
     cfg = load_config(args.config) if os.path.exists(args.config) else {}
     return {"manifest": cmd_manifest, "index": cmd_index, "scan": cmd_scan,
-            "contracts": cmd_contracts, "init": cmd_init}[args.cmd](args, cfg)
+            "contracts": cmd_contracts, "init": cmd_init,
+            "inherit": cmd_inherit}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":

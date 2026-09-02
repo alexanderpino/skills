@@ -48,6 +48,31 @@
         "decision_table": {"$ref": "#/$defs/decision_table"},
         "impact": {"$ref": "#/$defs/impact"},
         "non_goals": {"type": "array", "items": {"type": "string"}},
+        "follow_ups": {
+          "type": "array",
+          "description": "Work this refinement creates for later: non-goals with a ticket, decisions whose answer changes the next story, and every flag or migration that needs an item to end it. SER002 links these to the tickets the text itself promises.",
+          "items": {"type": "object", "required": ["ticket", "trigger"],
+                    "properties": {
+                      "ticket": {"type": "string"},
+                      "trigger": {"type": "string", "description": "An observable condition, not a date. Dates in a backlog are wishes."},
+                      "owner": {"type": "string"},
+                      "note": {"type": "string"}}}
+        },
+        "series": {
+          "type": "object",
+          "description": "Where this story sits in a stream. Predecessors are the bundles its dossier was inherited from - see references/series.md and `evidence.py inherit`.",
+          "properties": {
+            "epic": {"type": "string"},
+            "position": {"type": "string"},
+            "predecessors": {
+              "type": "array",
+              "items": {"type": "object", "required": ["key"],
+                        "properties": {"key": {"type": "string"},
+                                       "bundle": {"type": "string"},
+                                       "relation": {"type": "string"}}}
+            }
+          }
+        },
         "risks": {"type": "array", "items": {"$ref": "#/$defs/risk"}},
         "non_functional": {
           "type": "object",

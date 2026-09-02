@@ -11,6 +11,10 @@ description: >-
   acceptance criteria, a condensed human-facing description, a machine-readable agent
   brief, and subtasks decomposed per a configurable house profile. Tracker-agnostic -
   works with Jira, GitHub, GitLab, Linear, Azure DevOps, or plain markdown.
+# The enforced half of "user-invoked only": Claude Code blocks an automatic load and
+# will not preload this skill into a subagent. The description above is the prompt-level
+# half; metadata is read by other tooling, not by Claude Code.
+disable-model-invocation: true
 metadata:
   invocation: user
 ---
@@ -72,8 +76,14 @@ an open question.** There is no third state.
 2. **Two audiences, one truth.** The human text is short because context is
    shared. The agent brief is long because it is not. They never disagree; the
    agent brief is the human text plus everything a newcomer would have to ask.
-3. **Questions are the product.** A refinement that surfaces zero questions did
-   not refine anything. Unknowns are the highest-value output.
+3. **Questions are the product, and they are asked, not filed.** A refinement
+   that surfaces zero questions did not refine anything. The moment a question
+   arises, put it to the user - in this session, with your best guess attached,
+   using the session's question mechanism if it has one. A question recorded in
+   a bundle nobody has read is a note to yourself: `READY003` fails a blocking
+   question that was never actually asked. Batch them at the phase gates rather
+   than interrupting per question, and never let an unanswered one become an
+   assumption that the next phase quietly builds on.
 4. **Decisions are locked, not suggested.** Open technical forks go to an
    explicit gate. An unresolved fork becomes a spike subtask - never
    "the implementer decides."
@@ -542,6 +552,41 @@ explicit approval, via whatever adapter is available in the session (MCP
 connector, `jira` CLI, `gh` CLI, REST). Confirm the tracker's actual field names
 and issue types at runtime - hardcoded field IDs are `[?]` until probed.
 
+### Stories in a stream
+
+Read `references/series.md`. Backlog items arrive as a queue in one area, as the
+pieces of a split epic, and as the follow-ups earlier refinements created.
+
+- **Refine just in time.** A refinement is a snapshot at a sha and it decays.
+  Refine what the next sprint could pull, plus anything blocked on someone
+  outside the team - there the wait is the long pole, which is why the date a
+  question left your hands is recorded in `open_questions[].asked`.
+- **Inherit the dossier, then re-verify it.** The second story through the same
+  code needs the glossary, conventions and ruled-out list *re-checked*, not
+  re-derived:
+
+  ```bash
+  python scripts/evidence.py inherit --from .refinery/bundles/ABC-123@2026-09-02.json --bundle bundle.json --write
+  ```
+
+  Everything carried is stamped with where it came from and marked `stale` when
+  the repo has moved since (`SER001`). Re-verification means opening the citation
+  and re-running the `looked_in` query - not a re-scan. A `ruled_out` entry ages
+  fastest and most silently: the absence someone filled in last sprint is exactly
+  what a new story is likely to have added, and stale confidence reads as
+  evidence.
+- **Record what this refinement creates.** Non-goals naming a ticket, deferred
+  decisions whose answer changes the *next* story, and every flag or migration
+  that needs an item to end it. `story.follow_ups` carries them with an
+  observable `trigger` - not a date - and `SER002` links them to the tickets your
+  own text promises. A non-goal pointing at a ticket nobody created is not a
+  scope boundary; it is a thing the team agreed to forget.
+
+For a split epic, refine one story properly and leave the rest as titles: the
+first one will teach you something that makes the others wrong. For a spike,
+refine the spike and only sketch the story behind it - criteria that depend on an
+answer nobody has yet are fiction you will defend later.
+
 ### Re-refinement
 
 Stories get refined more than once. The second pass must update the existing
@@ -593,6 +638,7 @@ when questions remain open.
 | `references/example-design.md` | Phase 3 - partitions, boundaries, decision tables, state transitions |
 | `references/risk-and-options.md` | Phase 4 - the premortem, risk fields, deferring on purpose |
 | `references/decomposition.md` | Phase 5 - profiles, splitting patterns, sizing, ordering |
+| `references/series.md` | Successive stories - just-in-time refining, inheriting a dossier, follow-ups |
 | `references/agent-brief.md` | Phase 6 - agent brief schema, field-by-field guidance |
 | `references/critique.md` | Phase 8 - the critic panel, blindness, findings, rubber-ducking |
 | `references/trackers.md` | Phase 0/9 - adapter capabilities, sinks, per-tracker notes |
@@ -610,7 +656,8 @@ All stdlib-only Python 3, no dependencies, no network.
 - `scripts/triage.py` - the ticket's own metadata through the label policy; exit 4
   when the labels say do not refine yet
 - `scripts/intake.py` - sufficiency detection; exit 0 / 3 / 4 for sufficient / scoutable / insufficient
-- `scripts/evidence.py` - `init` | `manifest` | `index` | `scan` | `contracts`
+- `scripts/evidence.py` - `init` | `manifest` | `index` | `scan` | `contracts` |
+  `inherit` (carry a prior bundle's dossier forward, marked stale where the repo moved)
 - `scripts/validate.py` - the readiness gate
 - `scripts/review.py` - `brief` | `digest` | `check`; sealed critic packets and the
   REV gates' stamp
@@ -637,5 +684,5 @@ All stdlib-only Python 3, no dependencies, no network.
 - `assets/examples/example-bundle.json` - a complete, validating two-repo example
 - `evals/trigger-eval.json` - queries that should and should not trigger this
   skill, in the format skill-creator's description optimiser expects
-- `evals/evals.json` - sixteen behavioural evals with verifiable expectations, for
+- `evals/evals.json` - eighteen behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

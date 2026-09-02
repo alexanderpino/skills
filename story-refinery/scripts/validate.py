@@ -134,6 +134,16 @@ def check_questions_and_decisions(b, rep):
                       % (q.get("text", "?"), q.get("owner") or "UNASSIGNED"))
         if not q.get("owner"):
             rep.warn("READY002", where, "question has no owner - it will not get answered")
+        # A question filed in a bundle nobody has read is a note to yourself. The
+        # asking is the deliverable; the record is only proof it happened.
+        if not q.get("asked") and not q.get("answer"):
+            if q.get("blocking"):
+                rep.error("READY003", where, "blocking question that was never put to anyone - "
+                          "ask it now, with your best guess attached, rather than filing it "
+                          "and continuing")
+            else:
+                rep.warn("READY003", where, "recorded but never asked - put it to someone "
+                         "while you still have their attention, or say why it can wait")
 
     by_id = {s.get("id"): s for s in b.get("subtasks") or []}
     ids = set(by_id)
@@ -848,6 +858,44 @@ def check_intake(b, cfg, rep):
                  "the bugfix profile puts the failing test first" % b.get("profile"))
 
 
+TICKET_RX = re.compile(r"\b[A-Z][A-Z0-9]{1,9}-\d+\b")
+
+
+def check_series(b, rep):
+    """Stories arrive in streams, not one at a time. Two things leak between them:
+    evidence carried forward and never re-read, and the follow-ups a refinement
+    creates and nobody records."""
+    story = b.get("story") or {}
+    ev = b.get("evidence") or {}
+    stale = [(field, e) for field in ("glossary", "conventions", "ruled_out")
+             for e in ev.get(field) or [] if e.get("stale")]
+    if stale:
+        rep.warn("SER001", "evidence", "%d entr(ies) carried from an earlier bundle are marked "
+                 "stale and were never re-verified: %s. An inherited absence is the first thing "
+                 "to stop being true - re-read it or drop it"
+                 % (len(stale), ", ".join(sorted({f for f, _ in stale}))))
+
+    follow_ups = {f.get("ticket") for f in story.get("follow_ups") or []}
+    own_key = story.get("key")
+    promised = set()
+    for text in (story.get("non_goals") or []):
+        promised |= set(TICKET_RX.findall(text or ""))
+    for d in b.get("decisions") or []:
+        if d.get("status") == "deferred":
+            promised |= set(TICKET_RX.findall(d.get("expires") or ""))
+    promised.discard(own_key)
+    missing = sorted(t for t in promised if t not in follow_ups)
+    if missing:
+        rep.warn("SER002", "story.follow_ups", "the text points at %s and story.follow_ups does "
+                 "not list them - the next refinement in this area will not find them, and a "
+                 "non-goal with a ticket nobody tracks is a promise, not a scope boundary"
+                 % ", ".join(missing))
+    for f in story.get("follow_ups") or []:
+        if not f.get("trigger"):
+            rep.warn("SER002", "story.follow_ups", "follow-up %s with no trigger - say what "
+                     "makes it start, or it sits in the backlog unread" % f.get("ticket", "?"))
+
+
 def check_tailoring(b, cfg, rep):
     """Users layer a team-tailoring skill over this one. These gates keep the seam
     honest: what the team changed is recorded, what it claims is mechanical really
@@ -1103,6 +1151,7 @@ def validate(bundle, cfg):
     check_config(cfg, rep)
     check_structure(bundle, rep)
     check_tailoring(bundle, cfg, rep)
+    check_series(bundle, rep)
     check_triage(bundle, cfg, rep)
     check_intake(bundle, cfg, rep)
     check_questions_and_decisions(bundle, rep)

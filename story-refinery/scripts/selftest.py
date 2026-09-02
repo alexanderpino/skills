@@ -120,6 +120,15 @@ MUTATIONS = [
     ("DOD001", mut(lambda b: b["subtasks"][1]["agent_brief"].update(
         {"done_when": [{"type": "command", "cmd": "echo hello", "expect": "exit 0"},
                        {"type": "assertion", "text": "the flag gates the new branch"}]}))),
+    # Relentless questioning: a question filed and never asked is a note to yourself.
+    ("READY003", mut(lambda b: b["open_questions"][0].pop("asked"))),
+    ("READY003-blocking", mut(lambda b: b["open_questions"].append(
+        {"id": "Q9", "text": "which tax provider", "owner": "x", "blocking": True}))),
+    # Successive stories: inherited evidence and the follow-ups a refinement creates.
+    ("SER001", mut(lambda b: b["evidence"]["ruled_out"][0].update(
+        {"inherited_from": "ABC-100", "stale": True}))),
+    ("SER002", mut(lambda b: b["story"].update({"follow_ups": []}))),
+    ("SER002-trigger", mut(lambda b: b["story"]["follow_ups"][0].pop("trigger"))),
     # The dossier: what refinement learned that the ticket does not say.
     ("EVI008", mut(lambda b: b["evidence"].update({"ruled_out": []}))),
     ("EVI009", mut(lambda b: b["evidence"]["ruled_out"][0].pop("looked_in"))),
@@ -372,6 +381,34 @@ def suite_pipeline():
         code, out = run([ev, "manifest", "--config", "refinery.yaml"], ws)
         check("evidence: expired manifest is rebuilt", "expired" in out and
               os.path.getmtime(stale) > 1, out)
+        # inherit: the next story in the same area re-checks the dossier, it does
+        # not re-derive it - and nothing carried is trusted while the repo has moved.
+        nextb = os.path.join(ws, "next-story.json")
+        with open(nextb, "w", encoding="utf-8") as fh:
+            json.dump({"schema_version": "1.0", "story": {"key": "ABC-200"}, "subtasks": []}, fh)
+        code, out = run([ev, "inherit", "--from", GOLDEN, "--bundle", nextb, "--write",
+                         "--config", "refinery.yaml"], ws)
+        carried = json.load(open(nextb, encoding="utf-8"))
+        ev_block = carried.get("evidence") or {}
+        check("inherit: the dossier comes across", code == 0
+              and len(ev_block.get("ruled_out") or []) == 4
+              and len(ev_block.get("glossary") or []) == 4, out)
+        check("inherit: every carried entry says where it came from",
+              all(e.get("inherited_from", "").startswith("ABC-123")
+                  for f in ("ruled_out", "glossary", "conventions") for e in ev_block.get(f) or []))
+        check("inherit: a moved repo marks everything stale rather than trusting it",
+              all(e.get("stale") for e in ev_block["ruled_out"]), out)
+        check("inherit: the predecessor is recorded",
+              carried["story"]["series"]["predecessors"][0]["key"] == "ABC-123")
+        run([ev, "inherit", "--from", GOLDEN, "--bundle", nextb, "--write",
+             "--config", "refinery.yaml"], ws)
+        again = json.load(open(nextb, encoding="utf-8"))
+        check("inherit: running it twice does not duplicate the dossier",
+              len(again["evidence"]["ruled_out"]) == 4
+              and len(again["story"]["series"]["predecessors"]) == 1)
+        codes = {i["code"] for i in validate(again, load_config(CONFIG)).items}
+        check("inherit: carried-but-unverified evidence keeps saying so", "SER001" in codes)
+
         code, out = run([ev, "init", "--config", "init.yaml", "--root", ".."], ws)
         check("evidence: init scaffolds a config",
               code == 0 and os.path.exists(os.path.join(ws, "init.yaml")), out)

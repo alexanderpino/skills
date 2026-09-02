@@ -199,6 +199,32 @@
         "The bundle was re-validated and the review re-stamped",
         "Nothing was decomposed further than the correction required"
       ]
+    },
+    {
+      "id": 17,
+      "prompt": "Next sprint we pick up ABC-131, the non-EU B2B follow-up of the reverse-charge story we refined three weeks ago. Refine it.",
+      "expected_output": "A refinement that inherits the earlier dossier, re-verifies it against the code as it is now, and does not re-derive what is still true.",
+      "expectations": [
+        "The prior bundle was located and inherited from rather than starting from the ticket text",
+        "Carried glossary, conventions and ruled_out entries say which bundle they came from",
+        "Everything carried was re-checked against the current HEAD, and stale entries were re-read or dropped rather than shipped marked stale",
+        "The ruled_out entries got particular attention - an absence is the first thing to stop being true",
+        "The decision table was re-opened for the third destination value, as the prior bundle's note said it would have to be",
+        "Nothing that changed in the codebase since was carried forward silently"
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "Refine ABC-880: 'let account owners delegate approval rights to a colleague'. I'm here now if you need anything.",
+      "expected_output": "Questions put to the user during the session, with guesses attached, rather than assumptions recorded and a plan built on them.",
+      "expectations": [
+        "Questions were actually asked in the session rather than only written into open_questions",
+        "Each question carried a best guess, so a correction is cheap to give",
+        "Questions were batched at the phase gates rather than asked one at a time",
+        "No unanswered question silently became an assumption a later phase built on",
+        "open_questions records who each question was put to and when",
+        "Where the user could not answer, the question got a named owner and stayed blocking rather than being resolved by the assistant"
+      ]
     }
   ]
 }
