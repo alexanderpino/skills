@@ -80,7 +80,7 @@ CONFIG_SPEC = {
     "budgets": {"story_summary_words", "technical_notes_words", "subtask_words",
                 "max_subtasks", "max_files_per_subtask", "max_subtask_days",
                 "min_acceptance_criteria", "max_acceptance_criteria",
-                "max_context_entries"},
+                "max_context_entries", "min_subtask_days"},
     "tracker": {"adapter", "project", "markup", "story_issue_type", "subtask_issue_type",
                 "parent_field", "max_description_chars", "labels_prefix", "agent_brief"},
     "tracker.agent_brief": {"sink", "fallback", "filename", "repo_file_dir", "custom_field",
@@ -662,6 +662,68 @@ def transitive_deps(subs):
         return acc
 
     return {n: walk(n, frozenset()) for n in graph}, graph
+
+
+def check_clutter(b, cfg, subs, rep):
+    """Every budget in this skill is an upper bound, so the whole thing leans towards
+    smaller. Nothing leaned back, and the result is a plan of slivers.
+
+    A subtask exists to be *separately reviewable*. Two pieces of work that will be
+    read together, reviewed together and merged together are one subtask, and each
+    extra one is not free: a ticket, a brief, a review, a CI run, a handoff - and,
+    for an agent implementor, another full load of the shared context. Three slivers
+    pay for the dossier three times to deliver one PR."""
+    floor = get(cfg, "budgets.min_subtask_days", 0.25)
+    max_days = get(cfg, "budgets.max_subtask_days", 1.0)
+    max_files = get(cfg, "budgets.max_files_per_subtask", 8)
+    # Kinds the house asks for separately are chosen ceremony, not accidental clutter.
+    mandated = {r.get("kind") for r in get(cfg, "decomposition.mandatory", []) or []}
+    by_id = {s.get("id"): s for s in subs}
+    dependents = {}
+    for s in subs:
+        for dep in s.get("depends_on") or []:
+            dependents.setdefault(dep, []).append(s.get("id"))
+
+    def writes(s):
+        return [e for e in (s.get("agent_brief") or {}).get("change_surface") or []
+                if e.get("role") in ("create", "modify", "delete")]
+
+    for s in subs:
+        est = s.get("estimate_days")
+        if est is not None and floor and est < floor and len(writes(s)) <= 1 \
+                and s.get("kind") not in mandated and s.get("kind") != "spike":
+            rep.warn("SUB017", "subtask %s" % s.get("id"), "%.2gd and one file - below the "
+                     "floor of %.2gd. A subtask earns its overhead by being separately "
+                     "reviewable; this one is a commit inside another subtask"
+                     % (est, floor))
+
+    for s in subs:
+        deps = [d for d in s.get("depends_on") or [] if d in by_id]
+        if len(deps) != 1:
+            continue
+        parent = by_id[deps[0]]
+        # Only a straight chain of two: the parent feeds nothing else, and this one
+        # waits on nothing else. Anything wider is a real fan-out.
+        if len(dependents.get(parent.get("id"), [])) != 1:
+            continue
+        if parent.get("repo") != s.get("repo"):
+            continue
+        # A spike holds a deferred decision (DEC004) and a rollout happens days later.
+        # Both are separate for a structural reason, not by accident.
+        if {s.get("kind"), parent.get("kind")} & (mandated | {"spike", "rollout"}):
+            continue
+        covers, pcovers = set(s.get("covers") or []), set(parent.get("covers") or [])
+        if covers and pcovers and not covers & pcovers:
+            continue
+        days = (s.get("estimate_days") or 0) + (parent.get("estimate_days") or 0)
+        files = len({e.get("path") for e in writes(s) + writes(parent)})
+        if (max_days and days > max_days) or (max_files and files > max_files):
+            continue
+        rep.warn("SUB018", "subtask %s" % s.get("id"), "%s and %s are one repo, one criterion "
+                 "and a chain of two, and together they are still %.2gd over %d file(s) - "
+                 "inside every cap. Merging them removes a handoff, a review and one more "
+                 "load of the shared context; keep them apart only if they are genuinely "
+                 "reviewed by different people" % (parent.get("id"), s.get("id"), days, files))
 
 
 def check_graph(subs, reach, graph, rep):
@@ -1332,6 +1394,7 @@ def validate(bundle, cfg):
     subs, _ = check_subtasks(bundle, cfg, rep)
     reach, graph = transitive_deps(subs)
     check_graph(subs, reach, graph, rep)
+    check_clutter(bundle, cfg, subs, rep)
     check_file_collisions(subs, reach, rep)
     check_contract_ids(bundle, subs, rep)
     check_brief_surface(bundle, subs, rep)

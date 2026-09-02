@@ -237,6 +237,44 @@ SMART for tasks `[P: Bill Wake, "INVEST in Good Stories, and SMART Tasks",
 the parent story; SMART applies to the subtasks. Do not apply INVEST to subtasks
 - "independent" and "valuable" are not properties subtasks are supposed to have.
 
+### The floor, and why one is needed
+
+Every other budget here is a ceiling: at most a day, at most eight files, at most
+twelve to read, at most twelve subtasks. A config that only has ceilings leans one
+way, and the plan it produces is a drift of slivers - each one defensible, the set
+of them exhausting `[N]`.
+
+So there is a floor. **A subtask earns its overhead by being separately
+reviewable.** Two pieces of work that will be read together, reviewed together and
+merged together are one subtask, however tidy the split looks on the board.
+
+The overhead is not rhetorical. Each subtask costs a ticket, a brief, a review, a
+CI run and a handoff - and since the shared context exists, each one costs one
+more full load of the dossier: the glossary, the conventions, the ruled-out list.
+Three slivers pay for that three times to deliver one pull request's worth of
+work. For an agent implementor that is the dominant cost, and it buys nothing.
+
+Two gates hold the floor:
+
+- `SUB017` - under `min_subtask_days` (default 0.25) and touching one file. That
+  is a commit inside another subtask, not a subtask.
+- `SUB018` - two subtasks in one repo, on the same criterion, in a straight chain
+  of two, whose combined size is still inside every cap. Merging removes a
+  handoff; the gate says so and leaves the decision to you, because the one good
+  reason to keep them apart is that different people review them.
+
+Deliberately exempt, because they are separate for a structural reason rather
+than by accident: a `spike` (it holds a deferred decision, `DEC004`), a `rollout`
+(it happens days later), and any kind your `decomposition.mandatory` policy asks
+for separately.
+
+That last exemption is worth reading twice. **A mandatory-subtask policy is a
+clutter generator, and a deliberate one.** `test: always` means a one-line change
+gets a second ticket; `docs: public_contract_changed` means a field rename gets a
+third. That may be exactly what your house wants - an audit trail, separate
+reviewers - but it is a choice about ceremony, made in config, and it is the first
+place to look when a plan feels bureaucratic rather than decomposed.
+
 ### Estimating in days
 
 `estimate_days` exists for sizing, not for planning or velocity. It answers one

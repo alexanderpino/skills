@@ -447,6 +447,15 @@ Hard rules, enforced by `validate.py`:
 - **≤ 1 day of work** - the Scrum Guide 2020 describes Developers decomposing
   Sprint work "often to units of one day or less" `[P]`; making it a hard cap is
   this skill's choice `[L]`
+- **≥ 0.25 days, and separately reviewable** `[L]`. Every other budget here is a
+  ceiling, so without a floor the plan drifts into slivers: each defensible, the
+  set of them exhausting. Two pieces of work read, reviewed and merged together
+  are one subtask (`SUB017`, `SUB018`) - and each extra subtask costs a ticket, a
+  brief, a review, a CI run, a handoff, and one more full load of the shared
+  context, which for an agent implementor is the dominant cost. Spikes, rollouts
+  and the kinds your `decomposition.mandatory` policy asks for are exempt: they
+  are separate for a reason. That policy is itself a clutter generator, and a
+  deliberate one - the first place to look when a plan feels bureaucratic.
 - **≤ 8 files touched** (configurable) `[L]`, and separately **≤ 12 files to read
   and touch** - `read_first` + `entry_points` + `change_surface` (`BRF015`). Days
   and files bound what a person can hold; an agent is bound by what fits in one

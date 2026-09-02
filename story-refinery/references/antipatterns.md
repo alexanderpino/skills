@@ -80,9 +80,12 @@ demonstrable until both land. *Tell:* subtask titles name layers, under a
 `vertical-slice` profile. *Fix:* re-slice, or switch profile deliberately and
 add an explicit integration point.
 
-**Subtask soup.** Fourteen 2-hour subtasks. *Tell:* subtask count above the
-config max. *Fix:* the tracker is not a task list; merge to reviewable units, or
-split the story.
+**Subtask soup.** Fourteen 2-hour subtasks. *Tell:* `SUB001` for the count,
+`SUB017` for the slivers, `SUB018` for the pairs that are one PR. *Fix:* the
+tracker is not a task list; merge to reviewable units, or split the story. Check
+`decomposition.mandatory` before blaming the decomposition - a policy of
+"test always, docs on any contract change" manufactures two extra tickets per
+story whether or not they are worth reviewing separately.
 
 **The catch-all.** A subtask called "Testing" or "Integration" or "Misc".
 *Tell:* a title with no object, or with "and". *Fix:* those are the real work

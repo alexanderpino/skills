@@ -3,7 +3,7 @@
 
   python selftest.py
 
-Thirteen suites:
+Fourteen suites:
   1. Validator gates  - mutate the golden bundle, assert each gate fires
   2. Config parsing   - the YAML subset, including the cases that bit us
   3. Markup           - wiki / ADF / HTML / plaintext conversion
@@ -12,11 +12,12 @@ Thirteen suites:
   6. Tailoring seam   - what a team skill may change, and what it may never relax
   7. Triage           - the label policy, its precedence, and what it reports
   8. Criterion codes  - assigning them, and them still meaning the same thing later
-  9. Discussion summary - the one screen a refiner talks from
- 10. Round trip       - a ticket read back into a bundle, and what shipped
- 11. Batch            - what only shows up when several bundles are read together
- 12. Adversarial review - digests, locators, and that a critic packet really is blind
- 13. Docs consistency - SKILL.md against the scripts and validator codes it cites
+  9. De-cluttering    - the floor, and the pairs that are really one subtask
+ 10. Discussion summary - the one screen a refiner talks from
+ 11. Round trip       - a ticket read back into a bundle, and what shipped
+ 12. Batch            - what only shows up when several bundles are read together
+ 13. Adversarial review - digests, locators, and that a critic packet really is blind
+ 14. Docs consistency - SKILL.md against the scripts and validator codes it cites
 
 A validator nobody has tried to break is a validator nobody should trust, and the
 same goes for the config reader that decides which gates run at all.
@@ -130,6 +131,12 @@ MUTATIONS = [
     ("READY003", mut(lambda b: b["open_questions"][0].pop("asked"))),
     ("READY003-blocking", mut(lambda b: b["open_questions"].append(
         {"id": "Q9", "text": "which tax provider", "owner": "x", "blocking": True}))),
+    # De-cluttering: the floor that the ceilings alone do not provide.
+    ("SUB017", mut(lambda b: b["subtasks"].insert(2, dict(
+        b["subtasks"][1], id="S1b", title="[api] Wire the flag in", estimate_days=0.2,
+        depends_on=["S1"], agent_brief=dict(b["subtasks"][1]["agent_brief"],
+                                            change_surface=[{"path": "src/billing/flags.py",
+                                                             "role": "modify"}]))))),
     # The frontier, the context-window budget, and the profile for wide refactors.
     ("READY004", mut(lambda b: b["open_questions"][0].pop("guess"))),
     ("READY004-unknown", mut(lambda b: b["open_questions"][0].update(
@@ -590,7 +597,7 @@ def suite_pipeline():
 def suite_docs():
     """SKILL.md is the interface. A flag that no longer exists, or a reference file
     that was renamed, breaks the skill just as thoroughly as a bad regex."""
-    print("\n-- 13. docs consistency --")
+    print("\n-- 14. docs consistency --")
     import re
     with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
         skill = fh.read()
@@ -900,10 +907,67 @@ def suite_criteria():
                                                       load_config(CONFIG)).items})
 
 
+def suite_declutter():
+    """Every other budget is a ceiling. Without a floor the plan drifts into slivers,
+    and each extra subtask costs another load of the shared context for nothing."""
+    print("\n-- 9. de-cluttering --")
+    from validate import check_clutter, Report
+    cfg = load_config(CONFIG)
+    with open(GOLDEN, encoding="utf-8") as fh:
+        golden = json.load(fh)
+
+    def findings(bundle):
+        rep = Report()
+        check_clutter(bundle, cfg, bundle.get("subtasks") or [], rep)
+        return {(i["code"], i["where"]) for i in rep.items}
+
+    check("declutter: a plan of real subtasks is left alone", not findings(golden))
+
+    sliver = copy.deepcopy(golden)
+    s1 = sliver["subtasks"][1]
+    sliver["subtasks"].insert(2, dict(
+        s1, id="S1b", estimate_days=0.2, depends_on=["S1"],
+        agent_brief=dict(s1["agent_brief"],
+                         change_surface=[{"path": "src/billing/flags.py", "role": "modify"}])))
+    check("declutter: a 0.2d one-file subtask is a commit, and is named as one",
+          ("SUB017", "subtask S1b") in findings(sliver))
+
+    chain = copy.deepcopy(golden)
+    s2 = chain["subtasks"][2]
+    half = dict(s2, id="S2b", estimate_days=0.25, depends_on=["S2"], covers=["AC3"],
+                agent_brief=dict(s2["agent_brief"],
+                                 change_surface=[{"path": "src/api/orders/serializers.py",
+                                                  "role": "modify"}]))
+    chain["subtasks"].insert(3, half)
+    for s in chain["subtasks"]:
+        if "S2" in (s.get("depends_on") or []) and s["id"] != "S2b":
+            s["depends_on"] = ["S2b"]
+    check("declutter: two halves of one PR in a straight chain are a merge candidate",
+          ("SUB018", "subtask S2b") in findings(chain))
+
+    fanned = copy.deepcopy(chain)
+    fanned["subtasks"][4]["depends_on"] = ["S2"]        # the parent now feeds two
+    check("declutter: a parent that feeds two children is a fan-out, not clutter",
+          ("SUB018", "subtask S2b") not in findings(fanned))
+
+    big = copy.deepcopy(chain)
+    big["subtasks"][3]["estimate_days"] = 0.75          # merging would breach the cap
+    check("declutter: it never proposes a merge that would breach a ceiling",
+          ("SUB018", "subtask S2b") not in findings(big))
+
+    # A spike holds a deferred decision; a rollout happens days later; and whatever
+    # decomposition.mandatory asks for was asked for on purpose.
+    for kind in ("spike", "rollout", "test", "docs"):
+        exempt = copy.deepcopy(chain)
+        exempt["subtasks"][3]["kind"] = kind
+        check("declutter: %s stays separate, it is not accidental clutter" % kind,
+              ("SUB018", "subtask S2b") not in findings(exempt))
+
+
 def suite_summary():
     """The artefact people actually talk from. It has to work before the bundle is
     finished, and it has to say the unwelcome part."""
-    print("\n-- 9. discussion summary --")
+    print("\n-- 10. discussion summary --")
     import re
     import summary as S
     cfg = load_config(CONFIG)
@@ -961,7 +1025,7 @@ def suite_roundtrip():
     """A ticket has to be readable back into a bundle, because in a real team the
     stored bundle is on somebody else's laptop. And progress has to be recordable,
     because a plan that never learns what shipped keeps deleting work that exists."""
-    print("\n-- 10. round trip and progress --")
+    print("\n-- 11. round trip and progress --")
     import ingest as I
     import progress as P
 
@@ -1039,7 +1103,7 @@ def suite_roundtrip():
 def suite_batch():
     """Several related stories in one run. These are the findings that do not exist
     for one bundle: they only appear when the bundles are read side by side."""
-    print("\n-- 11. batch --")
+    print("\n-- 12. batch --")
     import batch as B
 
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -1119,7 +1183,7 @@ def suite_batch():
 def suite_review():
     """The critic packets are the only mechanical guarantee of blindness in the
     skill. If the reasoning leaks into one, the panel is grading the reasoning."""
-    print("\n-- 12. adversarial review --")
+    print("\n-- 13. adversarial review --")
     from review import (CRITICS, DEFAULT_PANEL, cmd_check, content_digest,
                         render_brief, resolve_locator)
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -1209,6 +1273,7 @@ def main():
     suite_tailoring()
     suite_triage()
     suite_criteria()
+    suite_declutter()
     suite_summary()
     suite_roundtrip()
     suite_batch()

@@ -57,6 +57,10 @@ budgets:
   # that is the reading, not the writing.
   max_context_entries: 12
   max_subtask_days: 1.0           # SUB011
+  # SUB017/SUB018 - the floor. Every other budget here is a ceiling, so without this
+  # the whole config leans one way and you get a plan of slivers. A subtask earns its
+  # overhead by being separately reviewable; below this it is a commit inside another.
+  min_subtask_days: 0.25
   min_acceptance_criteria: 2      # AC001
   max_acceptance_criteria: 7      # AC002
 
