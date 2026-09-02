@@ -59,6 +59,21 @@ nobody has tested. *Tell:* `CYN001`, or acceptance criteria you cannot write
 without guessing at what will work. *Fix:* the output is a probe with a
 hypothesis and a measure, and a decomposition of whatever it returns.
 
+**The target with no starting point.** "Reduce p95 to 200ms", and nobody wrote
+down what it is now. *Tell:* `BAS001`. *Fix:* measure it, with a source someone
+can re-derive. Memories of latency are wrong, and a target you cannot compare
+against is a story that can never be finished or abandoned.
+
+**"Unchanged" with nothing to be unchanged from.** A refactor whose criterion is
+that behaviour is preserved, and no capture of that behaviour exists. *Tell:*
+`BAS002`. *Fix:* a characterisation test or a recorded corpus, made *before* the
+change. Written afterwards it faithfully captures the bug you just introduced.
+
+**The migration nobody can take back.** A data change with no rollback note, no
+verification and no dry run. *Tell:* `IRR001`, `IRR002`, `IRR003`. *Fix:*
+`references/decomposition.md` §6. Being unable to undo it is an acceptable
+answer; not having asked is not.
+
 **Research refined as delivery.** An investigation arrives, gets the feature
 questionnaire, and comes out as a story with an actor and an outcome nobody has
 established yet. *Tell:* `INT011`, or an intake whose `actor` was answered by

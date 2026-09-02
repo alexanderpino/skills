@@ -176,6 +176,38 @@ Which categories are mandatory is configurable: `validation.non_functional_keys`
 drives the `NFR001` check. The default is the seven that most often go wrong;
 add accessibility and i18n if your product needs them checked every time.
 
+### 4a. The baseline: what it is today
+
+Two kinds of story make a claim about a *before* that nobody wrote down.
+
+- **"p95 under 200ms."** Under what? If it is 180ms today the story is finished
+  before anyone pulls it. If it is four seconds, this is not a story. The target
+  is unfalsifiable either way, and at refinement time everybody in the room is
+  certain they know the number.
+- **"Behaviour is unchanged."** The whole promise of a refactor, and it can only
+  be demonstrated against a capture made *before* the change - a characterisation
+  test, a recorded corpus, a saved query result. Written afterwards it captures
+  the bug you just introduced.
+
+So `story.baseline` records what is true today, per metric:
+
+```json
+{"metric": "performance", "current": "p95 340ms",
+ "source": "grafana checkout-p95, 7d window to 2026-08-30"}
+```
+
+`BAS001` (warning) asks for one whenever a non-functional entry states a target
+*relative to today* - "under", "within", "reduce to", "faster". A bare number is
+a design statement ("VIES timeout 3s") and is left alone; nothing is being moved.
+`BAS002` (error) requires one for any criterion claiming preservation, because
+that criterion can otherwise be neither met nor failed. `BAS003` holds the entry
+itself honest: a metric with an empty value is worse than no entry, because it
+looks like somebody measured.
+
+"n/a - new endpoint, nothing to compare against" is a perfectly good `current`.
+The gate is not asking for rigour, it is asking for five seconds of thought about
+whether a before exists. Silence is what it will not accept.
+
 ---
 
 ## 5. Non-goals

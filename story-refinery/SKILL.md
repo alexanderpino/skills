@@ -347,6 +347,13 @@ Run Example Mapping `[P: Wynne, 2015]` over the story: **rules** (blue),
 - Each red question goes into `open_questions` with an owner. Blocking questions
   make the bundle not-ready. This is the correct outcome - report it, do not
   invent an answer to clear the gate.
+- **If the story promises to move a number or to preserve behaviour, record what
+  it is today** in `story.baseline`. "p95 under 200ms" is unfalsifiable without
+  it - already 180ms and the story is done before it is pulled; four seconds and
+  it is a different project. "Behaviour is unchanged" is worse: it can only be
+  shown against a capture made *before* the change, and one written afterwards
+  faithfully records the bug you just introduced. `BAS001` asks, `BAS002`
+  insists. "n/a - new endpoint" is a fine answer; silence is not.
 
 Example mapping says *that* each rule needs examples. It does not say which, so
 generate them rather than recalling them. Read `references/example-design.md`.
@@ -454,8 +461,20 @@ at all. `SPK004` fails a research item that already has `feature` subtasks -
 whatever the probe returns, those were written before it. The build is the next
 story, linked with `blocks`.
 
+A `migration` subtask is the one kind a revert does not undo, so three questions
+are mechanical rather than optional: how the data change is reversed - or
+`rollback.irreversible` plus what is lost (`IRR001`); something in `done_when`
+that counts or verifies what was touched, because a migration that updated the
+wrong rows without erroring reports success (`IRR002`); and a dry run in
+`preflight`, or the first full-size execution is the production one (`IRR003`).
+
 Hard rules, enforced by `validate.py`:
 - **One subtask = one repo = one PR = one reviewable unit** `[L]`
+- **The kind vocabulary is closed** - `feature`, `test`, `docs`, `migration`,
+  `rollout`, `spike`, `enabling`, plus anything in
+  `decomposition.extra_subtask_kinds`. A kind selects which Definition of Done
+  applies and which gates exempt the subtask, so an unrecognised one skips all of
+  them silently (`SUB019`)
 - **≤ 1 day of work** - the Scrum Guide 2020 describes Developers decomposing
   Sprint work "often to units of one day or less" `[P]`; making it a hard cap is
   this skill's choice `[L]`

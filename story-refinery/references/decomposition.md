@@ -406,6 +406,37 @@ Configured under `decomposition.mandatory`. Defaults `[L]`:
 A mandatory subtask that would be empty should be removed, not padded. Record
 why in the story's technical notes.
 
+`SUB019` closes the vocabulary. A kind is a switch, not a caption: it selects the
+Definition of Done that applies, whether the subtask must cover a criterion,
+whether the de-clutter gates leave it alone, and whether it is build work a
+research item may not plan. A kind nothing recognises matches none of those, so a
+one-letter typo silently exempts the subtask from every gate in the file. Houses
+that need another kind add it to `decomposition.extra_subtask_kinds` deliberately.
+
+### `migration` is the kind that cannot be taken back
+
+Everything else here assumes a bad change is a revert away - that is what flags,
+rollback notes and wave ordering are for. Data does not work like that: the old
+value is gone. So the questions that make a migration safe have to be asked while
+there is still someone to ask, and three of them are mechanical:
+
+- **`IRR001`** - say how the data change is reversed, or set
+  `rollback.irreversible` with a note saying what is lost and what it would be
+  restored from. Both are acceptable answers; only silence is not. Whether to
+  accept an irreversible step is the story owner's decision, and they can only
+  make it if the refinement said so out loud.
+- **`IRR002`** - `done_when` has to count or verify something. A migration that
+  ran without error and updated the wrong rows reports success, and the report is
+  the only thing anyone reads.
+- **`IRR003`** - a dry run belongs in `preflight`. Otherwise the first full-size
+  execution is the production one, against data with no second copy.
+
+The related story-level questions - volume, duration, whether it can be re-run
+safely, whether it holds a lock - belong in the `data` non-functional entry
+(`references/acceptance-criteria.md` §4). Idempotency is worth an acceptance
+criterion of its own: "run it twice, the second run changes nothing" is the
+cheapest criterion in this document and the one most often assumed.
+
 ---
 
 ## 7. Naming

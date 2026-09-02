@@ -26,6 +26,13 @@ DEFAULT_LEXICON = [
     "user-friendly", "robust", "various", "improve performance",
 ]
 UNCOVERED_OK_KINDS = {"enabling", "spike", "rollout"}
+# A subtask's kind is a switch, not a caption: it decides which Definition of Done
+# applies (DOD001), whether the subtask must cover a criterion (SUB013), whether the
+# de-clutter gates leave it alone, and whether it is the build a research item may
+# not plan (SPK004). A kind nobody recognises matches none of those and quietly
+# exempts the subtask from all of them - so the vocabulary is closed, and a house
+# that needs another one adds it to decomposition.extra_subtask_kinds on purpose.
+SUBTASK_KINDS = {"feature", "test", "docs", "migration", "rollout", "spike", "enabling"}
 # What the item is, which decides which questions must be answered before it can be
 # planned at all. A research item is not a feature with unknowns: asking it for an
 # actor and an outcome gets you a plausible answer to the wrong question.
@@ -70,6 +77,7 @@ PHASE_OF = {
     "AC": "3 criteria", "DT": "3 criteria", "NFR": "3 criteria", "BUD": "3 criteria",
     "DEC": "4 decisions", "RSK": "4 decisions", "READY": "4 decisions",
     "SUB": "5 decompose", "DAG": "5 decompose", "PAR": "5 decompose", "SPK": "5 decompose",
+    "IRR": "5 decompose", "BAS": "3 criteria",
     "COV": "5 decompose", "CON": "5 decompose", "SPL": "5 decompose",
     "BRF": "6 briefs", "DOD": "6 briefs",
     "REV": "8 review", "LNK": "9 emit", "STRUCT": "0 configure",
@@ -88,7 +96,8 @@ CONFIG_SPEC = {
     "": {"version", "profile", "tailoring", "decomposition", "budgets", "tracker",
          "evidence", "intake", "triage", "gates", "review", "validation"},
     "decomposition": {"one_repo_per_subtask", "one_pr_per_subtask", "title_pattern",
-                      "mandatory", "spike_when_unresolved", "spike_timebox_days"},
+                      "mandatory", "spike_when_unresolved", "spike_timebox_days",
+                      "extra_subtask_kinds"},
     "decomposition.mandatory[]": {"kind", "when"},
     "budgets": {"story_summary_words", "technical_notes_words", "subtask_words",
                 "max_subtasks", "max_files_per_subtask", "max_subtask_days",
@@ -542,6 +551,7 @@ def check_subtasks(b, cfg, rep):
                                        "the story" % (len(subs), max_subtasks))
     ids, titles = set(), set()
     ac_ids = {a.get("id") for a in (b.get("story") or {}).get("acceptance_criteria") or []}
+    known_kinds = SUBTASK_KINDS | set(get(cfg, "decomposition.extra_subtask_kinds", []) or [])
 
     for s in subs:
         sid = s.get("id") or "?"
@@ -572,6 +582,13 @@ def check_subtasks(b, cfg, rep):
         elif max_days and est > max_days:
             rep.error("SUB011", where, "estimate %.2fd exceeds %.2fd - not decomposed yet"
                       % (est, max_days))
+
+        if s.get("kind") not in known_kinds:
+            rep.error("SUB019", where, "unknown kind %r - a kind nothing recognises matches no "
+                      "Definition of Done, no mandatory-subtask rule and no exemption, so the "
+                      "subtask silently skips every one of them. Use %s, or add it to "
+                      "decomposition.extra_subtask_kinds"
+                      % (s.get("kind"), " | ".join(sorted(known_kinds))))
 
         covers = s.get("covers") or []
         for cid in covers:
@@ -737,6 +754,107 @@ def check_clutter(b, cfg, subs, rep):
                  "inside every cap. Merging them removes a handoff, a review and one more "
                  "load of the shared context; keep them apart only if they are genuinely "
                  "reviewed by different people" % (parent.get("id"), s.get("id"), days, files))
+
+
+# A claim measured against today, as opposed to one that merely contains a number.
+IMPROVEMENT_RX = re.compile(
+    r"\bunder\b|\bbelow\b|\bless than\b|\bno more than\b|\bat most\b|\bwithin\b|\bfaster\b|"
+    r"\breduc\w+\b|\bdown to\b|\bfrom \d[\w.]*\s*(to|->|→)\s*\d|\bimprov\w+\b|\bspeed\w* up\b|"
+    r"\bonder\b|\bminder dan\b|\bhoogstens\b|\bbinnen\b|\bsneller\b|\bterugbrengen\b|"
+    r"\bverbeter\w+\b|\bmaximaal\b", re.I)
+PRESERVATION_RX = re.compile(
+    r"\bunchanged\b|\bidentical\b|\bexactly (what|as)\b|\bsame as (before|today|now)\b|"
+    r"\bno (observable|behavioural|functional) change\b|\bbyte-identical\b|"
+    r"\bongewijzigd\b|\bidentiek\b|\bhetzelfde als (nu|voorheen)\b|\bprecies wat\b", re.I)
+
+
+def check_baseline(b, cfg, rep):
+    """Two whole classes of story claim something about a 'before' that nobody wrote down.
+
+    A performance story says 'p95 under 200ms' - from what? If it is already 180ms the
+    story is finished before it starts, and if it is four seconds this is a different
+    project. A refactor says 'behaviour is unchanged' - unchanged from what? Neither
+    claim can be demonstrated, or falsified, without a recorded starting point. It is
+    the cheapest thing in the whole refinement to capture and the easiest to skip,
+    because at refinement time everyone in the room believes they know the number."""
+    story = b.get("story") or {}
+    baselines = story.get("baseline") or []
+    have = {}
+    for i, entry in enumerate(baselines):
+        metric = (entry.get("metric") or "").strip().lower()
+        if not metric or not str(entry.get("current") or "").strip():
+            rep.error("BAS003", "story.baseline[%d]" % i, "a baseline entry needs both the "
+                      "metric and its current value - an empty one is worse than none, it "
+                      "looks like somebody measured")
+            continue
+        if not entry.get("source"):
+            rep.warn("BAS003", "story.baseline[%d]" % i, "%r = %r with no source - a number "
+                     "nobody can re-derive is a memory, and memories of latency are wrong"
+                     % (entry.get("metric"), entry.get("current")))
+        have[metric] = entry
+
+    measured = get(cfg, "validation.measured_non_functional_keys", DEFAULT_MEASURED_NFR_KEYS) or []
+    nfr = story.get("non_functional") or {}
+    for key in measured:
+        text = str(nfr.get(key) or "")
+        # A number alone is a design statement ("VIES timeout 3s"), and nothing is being
+        # moved. Only a claim relative to today needs a today to be relative to.
+        if not text or UNCHANGED_RX.search(text) or not IMPROVEMENT_RX.search(text):
+            continue
+        if key not in have:
+            rep.warn("BAS001", "story.non_functional.%s" % key, "states a target (%r) and no "
+                     "baseline records what it is today - a target without a starting point "
+                     "cannot be verified, and nobody can tell whether this story is worth "
+                     "pulling" % text[:60])
+
+    for ac in story.get("acceptance_criteria") or []:
+        rule = ac.get("rule") or ""
+        if not PRESERVATION_RX.search(rule):
+            continue
+        if not baselines:
+            rep.error("BAS002", "AC %s" % ac.get("id"), "claims behaviour is preserved, and "
+                      "nothing recorded what it was. 'Unchanged' is only demonstrable against "
+                      "a capture made before the change - name it in story.baseline (a "
+                      "characterisation test, a recorded corpus, a saved query result), or "
+                      "this criterion cannot be met or failed")
+
+
+def check_irreversible(b, cfg, subs, rep):
+    """A migration is the one subtask kind where being wrong is not a revert away.
+
+    Everything else in this skill assumes a bad change can be backed out: flags,
+    rollback notes, wave ordering. Data does not work that way - the old value is
+    gone - so the questions that make a migration safe have to be asked at refinement
+    time, when there is still someone to ask."""
+    for s in subs:
+        if s.get("kind") != "migration":
+            continue
+        where = "subtask %s" % s.get("id")
+        brief = s.get("agent_brief") or {}
+        rollback = brief.get("rollback") or {}
+        note = (rollback.get("note") or "").strip()
+        if not note and not rollback.get("irreversible"):
+            rep.error("IRR001", where, "a migration with no rollback note. Either say how the "
+                      "data change is reversed, or set rollback.irreversible with the reason - "
+                      "'we cannot undo this' is a fact the story owner has to know before it "
+                      "is pulled, not one the implementer discovers")
+        elif rollback.get("irreversible") and not note:
+            rep.error("IRR001", where, "marked irreversible with no note - say what is lost "
+                      "and what would have to be restored from, so somebody can decide whether "
+                      "to accept it")
+
+        cmds = " ".join((d.get("cmd") or "") + " " + (d.get("text") or "")
+                        for d in brief.get("done_when") or [])
+        if not re.search(r"\bcount\b|\bselect\b|\brows?\b|\bverif|\breconcil|\baantal\b", cmds, re.I):
+            rep.warn("IRR002", where, "nothing in done_when counts or verifies what the "
+                     "migration touched. A migration that ran without error and changed the "
+                     "wrong rows reports success")
+
+        pre = " ".join((d.get("cmd") or "") + " " + (d.get("text") or "")
+                       for d in brief.get("preflight") or [])
+        if not re.search(r"dry.?run|--dry|rehearse|proefdraai|staging|shadow", pre, re.I):
+            rep.warn("IRR003", where, "no dry run in preflight - the first full-size execution "
+                     "will be the production one, on data that has no second copy")
 
 
 def check_research(b, cfg, subs, rep):
@@ -1466,6 +1584,8 @@ def validate(bundle, cfg):
     check_graph(subs, reach, graph, rep)
     check_clutter(bundle, cfg, subs, rep)
     check_research(bundle, cfg, subs, rep)
+    check_irreversible(bundle, cfg, subs, rep)
+    check_baseline(bundle, cfg, rep)
     check_file_collisions(subs, reach, rep)
     check_contract_ids(bundle, subs, rep)
     check_brief_surface(bundle, subs, rep)

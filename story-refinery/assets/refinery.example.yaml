@@ -42,6 +42,11 @@ decomposition:
       when: schema_changed
     - kind: rollout
       when: flag_introduced
+  # [script] SUB019. The kind vocabulary is closed: feature, test, docs, migration,
+  # rollout, spike, enabling. A kind is a switch (which DoD applies, whether it must
+  # cover a criterion, which gates exempt it), so an unrecognised one silently skips
+  # every gate that keys on it. Add a house kind here on purpose, never by typo.
+  extra_subtask_kinds: []
   spike_when_unresolved: true     # [claude] enforced indirectly by DEC004/DEC006
   spike_timebox_days: 0.5         # [claude]
 

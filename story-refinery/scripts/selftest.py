@@ -597,7 +597,7 @@ def suite_pipeline():
 def suite_docs():
     """SKILL.md is the interface. A flag that no longer exists, or a reference file
     that was renamed, breaks the skill just as thoroughly as a bad regex."""
-    print("\n-- 15. docs consistency --")
+    print("\n-- 16. docs consistency --")
     import re
     with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
         skill = fh.read()
@@ -1042,10 +1042,105 @@ def suite_research():
           ("SPK003", "subtask S0") not in findings(golden))
 
 
+def suite_story_shapes():
+    """Story shapes whose defining question no other gate asks: one that moves a
+    number, one that promises to preserve behaviour, and one that cannot be undone."""
+    print("\n-- 11. story shapes --")
+    from validate import (check_baseline, check_irreversible, check_subtasks,
+                          Report, SUBTASK_KINDS)
+    cfg = load_config(CONFIG)
+    with open(GOLDEN, encoding="utf-8") as fh:
+        golden = json.load(fh)
+
+    def findings(bundle, fn):
+        rep = Report()
+        if fn is check_baseline:
+            fn(bundle, cfg, rep)
+        elif fn is check_subtasks:
+            fn(bundle, cfg, rep)
+        else:
+            fn(bundle, cfg, bundle.get("subtasks") or [], rep)
+        return {(i["code"], i["where"]) for i in rep.items}
+
+    # A kind is a switch. An unrecognised one used to match no DoD rule, no mandatory
+    # rule and no exemption - so a typo turned every gate off for that subtask.
+    check("shapes: the golden bundle uses only known kinds",
+          all(s["kind"] in SUBTASK_KINDS for s in golden["subtasks"]))
+    typo = copy.deepcopy(golden)
+    typo["subtasks"][1]["kind"] = "faeture"
+    check("shapes: a typo'd subtask kind is reported, not silently exempted",
+          ("SUB019", "subtask S1") in findings(typo, check_subtasks))
+    housed = copy.deepcopy(cfg)
+    housed.setdefault("decomposition", {})["extra_subtask_kinds"] = ["faeture"]
+    rep = Report()
+    check_subtasks(typo, housed, rep)
+    check("shapes: a house kind declared in config is accepted",
+          ("SUB019", "subtask S1") not in {(i["code"], i["where"]) for i in rep.items})
+
+    # Moving a number needs a number to move from.
+    check("shapes: the golden bundle needs no baseline", not findings(golden, check_baseline))
+    target = copy.deepcopy(golden)
+    target["story"]["non_functional"]["performance"] = "p95 under 200ms"
+    check("shapes: a target relative to today with no baseline is reported",
+          ("BAS001", "story.non_functional.performance") in findings(target, check_baseline))
+    design = copy.deepcopy(golden)
+    design["story"]["non_functional"]["performance"] = "adds one indexed lookup, 4ms"
+    check("shapes: a bare number is a design statement, not a target",
+          ("BAS001", "story.non_functional.performance") not in findings(design, check_baseline))
+    fixed = copy.deepcopy(target)
+    fixed["story"]["baseline"] = [{"metric": "performance", "current": "p95 340ms",
+                                   "source": "grafana checkout-p95, 7d to 2026-08-30"}]
+    check("shapes: a baseline satisfies it", not findings(fixed, check_baseline))
+    hollow = copy.deepcopy(target)
+    hollow["story"]["baseline"] = [{"metric": "performance", "current": "", "source": "grafana"}]
+    check("shapes: an empty baseline value is worse than none, and is reported",
+          ("BAS003", "story.baseline[0]") in findings(hollow, check_baseline))
+
+    # "Unchanged" is only demonstrable against a capture made before the change.
+    keep = copy.deepcopy(golden)
+    keep["story"]["acceptance_criteria"][0]["rule"] = \
+        "Every existing tax calculation returns exactly what it returned before."
+    check("shapes: a preservation claim with no capture cannot be met or failed",
+          ("BAS002", "AC AC1") in findings(keep, check_baseline))
+    keep2 = copy.deepcopy(keep)
+    keep2["story"]["baseline"] = [{"metric": "tax totals", "current": "2025 invoice corpus, 41k orders",
+                                   "source": "tests/fixtures/corpus-2025.jsonl @9f2c1ab"}]
+    check("shapes: a recorded corpus satisfies it", not findings(keep2, check_baseline))
+
+    # A migration is not a revert away.
+    check("shapes: no migration subtask means no irreversibility findings",
+          not findings(golden, check_irreversible))
+    mig = copy.deepcopy(golden)
+    s = mig["subtasks"][1]
+    s["kind"] = "migration"
+    s["agent_brief"] = dict(s["agent_brief"], rollback={"flag": "billing.reverse_charge", "note": ""})
+    f = findings(mig, check_irreversible)
+    check("shapes: a migration with no rollback note is reported", ("IRR001", "subtask S1") in f)
+    check("shapes: a migration that verifies nothing is reported", ("IRR002", "subtask S1") in f)
+    check("shapes: a migration with no dry run is reported", ("IRR003", "subtask S1") in f)
+
+    safe = copy.deepcopy(mig)
+    b2 = safe["subtasks"][1]["agent_brief"]
+    b2["rollback"] = {"flag": "", "irreversible": True,
+                      "note": "overwrites tax_reason in place; restorable only from the nightly "
+                              "snapshot, which is 24h behind"}
+    b2["done_when"] = list(b2["done_when"]) + [
+        {"type": "command", "cmd": "psql -c 'select count(*) from orders where tax_reason is null'",
+         "expect": "0"}]
+    b2["preflight"] = list(b2["preflight"]) + [
+        {"type": "command", "cmd": "python manage.py backfill_tax_reason --dry-run", "expect": "exit 0"}]
+    check("shapes: an irreversible migration that says so, verifies and rehearses passes",
+          not findings(safe, check_irreversible))
+    silent = copy.deepcopy(safe)
+    silent["subtasks"][1]["agent_brief"]["rollback"] = {"flag": "", "irreversible": True, "note": ""}
+    check("shapes: 'irreversible' with no explanation is still reported",
+          ("IRR001", "subtask S1") in findings(silent, check_irreversible))
+
+
 def suite_summary():
     """The artefact people actually talk from. It has to work before the bundle is
     finished, and it has to say the unwelcome part."""
-    print("\n-- 11. discussion summary --")
+    print("\n-- 12. discussion summary --")
     import re
     import summary as S
     cfg = load_config(CONFIG)
@@ -1103,7 +1198,7 @@ def suite_roundtrip():
     """A ticket has to be readable back into a bundle, because in a real team the
     stored bundle is on somebody else's laptop. And progress has to be recordable,
     because a plan that never learns what shipped keeps deleting work that exists."""
-    print("\n-- 12. round trip and progress --")
+    print("\n-- 13. round trip and progress --")
     import ingest as I
     import progress as P
 
@@ -1181,7 +1276,7 @@ def suite_roundtrip():
 def suite_batch():
     """Several related stories in one run. These are the findings that do not exist
     for one bundle: they only appear when the bundles are read side by side."""
-    print("\n-- 13. batch --")
+    print("\n-- 14. batch --")
     import batch as B
 
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -1261,7 +1356,7 @@ def suite_batch():
 def suite_review():
     """The critic packets are the only mechanical guarantee of blindness in the
     skill. If the reasoning leaks into one, the panel is grading the reasoning."""
-    print("\n-- 14. adversarial review --")
+    print("\n-- 15. adversarial review --")
     from review import (CRITICS, DEFAULT_PANEL, cmd_check, content_digest,
                         render_brief, resolve_locator)
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -1353,6 +1448,7 @@ def main():
     suite_criteria()
     suite_declutter()
     suite_research()
+    suite_story_shapes()
     suite_summary()
     suite_roundtrip()
     suite_batch()

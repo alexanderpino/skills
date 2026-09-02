@@ -52,6 +52,16 @@
           "description": "Codes of deleted criteria. They stay retired and are never reused (AC011): every reference to a code still resolves, so a reused one resolves to something else."
         },
         "non_goals": {"type": "array", "items": {"type": "string"}},
+        "baseline": {
+          "type": "array",
+          "description": "What the thing this story changes measures TODAY. Required in spirit by two whole classes of story: one that promises to move a number (BAS001) and one that promises to preserve behaviour (BAS002). Neither claim can be demonstrated or falsified without it, and it is the cheapest thing in a refinement to capture.",
+          "items": {"type": "object", "required": ["metric", "current"],
+                    "properties": {
+                      "metric": {"type": "string", "description": "What was measured. Matches a non_functional key when it is one."},
+                      "current": {"type": "string", "description": "The value today. \"n/a - new code path\" is a valid answer; silence is not."},
+                      "source": {"type": "string", "description": "Where it came from, re-derivably: a dashboard and window, a recorded corpus, a characterisation test."}
+                    }}
+        },
         "links": {
           "type": "array",
           "description": "Links this refinement says the tracker must carry, in a canonical vocabulary the adapters map onto their own names (Jira 'is blocked by', Azure DevOps 'Predecessor', ...). tracker_meta.links is what was found; this is what must exist.",
@@ -135,7 +145,7 @@
         },
         "route": {"enum": ["refine", "incident"],
                   "description": "incident: the labels say refinement is the wrong instrument right now (TRI002). Stabilise, then refine what is left."},
-        "kind": {"type": "string", "description": "feature | bug, when the labels settle it."},
+        "kind": {"type": "string", "description": "feature | bug | spike, when the labels settle it."},
         "profile": {"type": "string", "description": "Decomposition profile the labels imply, e.g. bugfix for a production finding (TRI005)."},
         "require_dimensions": {"type": "array", "items": {"type": "string"}, "description": "Extra intake dimensions these labels demand (TRI004)."},
         "mandatory_subtask_kinds": {"type": "array", "items": {"type": "string"}, "description": "Subtask kinds that must exist, e.g. a reproducing test (TRI003)."},
@@ -249,7 +259,7 @@
       "required": ["kind", "verdict", "dimensions"],
       "properties": {
         "assessed_at": {"type": "string"},
-        "kind": {"enum": ["feature", "bug"]},
+        "kind": {"enum": ["feature", "bug", "spike"]},
         "lang": {"type": "string"},
         "verdict": {"enum": ["sufficient", "scoutable", "insufficient"]},
         "domain": {"enum": ["clear", "complicated", "complex", "chaotic"],
@@ -448,7 +458,8 @@
         "forbidden": {"type": "array", "items": {"type": "string"}},
         "out_of_scope": {"type": "array", "items": {"type": "string"}},
         "rollback": {"type": "object", "properties": {"flag": {"type": "string"},
-                                                      "note": {"type": "string"}}},
+                                                      "note": {"type": "string"},
+                                                      "irreversible": {"type": "boolean", "description": "Set when the change cannot be undone - a data migration that overwrites, a destructive backfill. IRR001 requires either a rollback note or this flag plus a note saying what is lost and what it would be restored from. 'We cannot undo this' is a fact the story owner decides on, not one the implementer discovers."}}},
         "preflight": {
           "type": "array",
           "description": "Commands that verify the brief's anchors still hold before work starts. Anchors drift between refinement and implementation; an agent that cannot tell its brief is stale implements against it anyway (BRF013). On failure: stop and report, never improvise.",
