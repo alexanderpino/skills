@@ -273,9 +273,23 @@ def locator_quality() -> tuple[int, int, list[str]]:
     to go up is the honest instrument. It is deliberately a metric, and it is recorded as an
     OPEN row in registers/guard-proofs.tsv rather than counted as a passing check.
     """
-    precise = re.compile(r"(§|\bsec\.|\bsection\b|\beq\.|\bequation\b|\bp\.|\bpp\.|"
-                         r"\bpage\b|\bfig\.|\bfigure\b|\bslide\b|\bch\.|\bchapter\b|"
-                         r"\btable\b|\balgorithm\b|\blisting\b)", re.I)
+    # The first version of this pattern matched the BARE WORDS "equation", "section",
+    # "algorithm", "table" and so on -- so "the fill algorithm" and "the thin-elastic-plate
+    # equation", both pure topic paraphrases, scored as sharp. The metric was measuring
+    # vocabulary, not followability, and it was inflated by exactly the locators it existed to
+    # find. A designator is now required: a number after the word, or a section mark. `§` on
+    # its own is allowed to introduce a NAME ("§Computation of Fn(x)") because a named section
+    # is genuinely followable; the English words are not, because they occur in ordinary prose.
+    precise = re.compile(r"""
+          §\s*\S                                  # numbered or named section mark
+        | \bsec\.\s*\d       | \bsection\s+\d
+        | \beq\.\s*\(?\d     | \bequation\s+\(?\d
+        | \bpp?\.\s*\d       | \bpages?\s+\d
+        | \bfig\.\s*\d       | \bfigure\s+\d
+        | \bch\.\s*\d        | \bchapter\s+\d
+        | \btable\s+\d       | \balgorithm\s+\d
+        | \blisting\s+\d     | \bslide\s+\d
+    """, re.I | re.X)
     skip = set(paper_files()) | {INDEX, COVERAGE}
     total = sharp = 0
     vague: list[str] = []

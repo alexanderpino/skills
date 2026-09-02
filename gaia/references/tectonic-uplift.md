@@ -6,10 +6,10 @@ tags: [generation, tectonics, uplift, isostasy, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: cordonnier2016, tier: P, locator: "the tectonic-uplift term coupled to fluvial erosion, and the lake-graph handling of local minima" }
-  - { id: cortial2019, tier: P, locator: "the plate-motion model on a sphere: subduction and collision under user-controlled plate velocities" }
+  - { id: cordonnier2016, tier: P, locator: "§3.1 eq. 1 — dh(p)/dt = u(p) - k*A(p)^m*s(p)^n, with m/n ≈ 0.5 and the paper taking m = 0.5, n = 1; §4.3 Lake Overflow — the lake super-graph that routes local minima" }
+  - { id: cortial2019, tier: P, locator: "§3 Overview — plates are spherical Voronoi cells of a noise-warped geodetic distance, moving by rigid rotation s(p) = ω w × p; §4.1 subduction, §4.2 collision, §4.4 rifting" }
   - { id: turcotte2014, tier: F, locator: "the Airy root r = pc*h/(pm-pc), and the thin-elastic-plate equation D grad^4 w + delta-rho*g*w = q with D = E*Te^3/12(1-v^2)" }
-  - { id: molnar1990, tier: P, locator: "erosional unloading: summits rise by ~pc/pm of the mean thickness stripped" }
+  - { id: molnar1990, tier: P, locator: "§Definitions of uplift and Fig. 2, p. 30 — eroding ΔT lowers the surface by ΔT*(pm-pc)/pm and raises rock by (pc/pm)*ΔT, their 5ΔT/6; Fig. 2b incises a highland of mean elevation h, dropping the mean to about 5h/6 while peaks rise to about 1.8h" }
 ---
 # Tectonic uplift — the field erosion runs against
 
@@ -56,8 +56,11 @@ order-of-magnitude figures for calibration, not constants read out of a paper.
 
 ## When you do want plates
 
-No canonical source; standard practice is a domain-warped Voronoi partition with per-boundary
-classification:
+No canonical source for the *planar* recipe; standard practice is a domain-warped Voronoi
+partition with per-boundary classification. It is not folklore, though: every step below has a
+published spherical counterpart in [cortial2019] — §3 for plates as spherical Voronoi cells of a
+noise-warped geodetic distance, §4.1–4.4 for the per-boundary branches, and §4.2 for spreading
+boundary uplift inland over a radius of influence. The planar version is a restatement:
 
 1. Seed 8–20 plate centres with Poisson-disk or relaxed random placement — pure random gives
    implausibly uneven plates.

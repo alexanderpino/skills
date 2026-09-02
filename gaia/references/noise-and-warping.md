@@ -6,17 +6,17 @@ tags: [generation, noise, fbm, domain-warp, authoring-time, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: perlin2002, tier: P, locator: "the quintic fade 6t^5 - 15t^4 + 10t^3, and the 12-vector cube-edge gradient set" }
-  - { id: perlin1985, tier: P, locator: "the original cubic fade 3t^2 - 2t^3" }
-  - { id: opensimplex2, tier: F, locator: "the noise3_ImproveXY lattice-rotated variants in the reference source" }
-  - { id: gustavson2005, tier: F, locator: "the skew/unskew constants F2 and G2 and the 2D reference code" }
-  - { id: worley1996, tier: P, locator: "the F1/F2 cellular basis, and the Poisson feature-point count per cell" }
-  - { id: musgrave_tm, tier: F, locator: "the ridged and hybrid multifractal formulations, including the weight-feedback terms" }
-  - { id: quilez_warp, tier: F, locator: "the fbm of fbm of fbm construction" }
-  - { id: fournier1982, tier: P, locator: "the midpoint-displacement subdivision" }
-  - { id: lagae2009, tier: P, locator: "the Gabor kernel, and the setup/evaluate split" }
-  - { id: cook2005, tier: P, locator: "the band-limited tile construction by downsample-upsample difference" }
-  - { id: bridson2007, tier: P, locator: "the curl-of-a-potential construction, divergence-free by definition" }
+  - { id: perlin2002, tier: P, locator: "§3 Modifications, p. 682 — the quintic fade 6t^5 - 15t^4 + 10t^3 replacing 3t^2 - 2t^3, and the 12 cube-edge gradient vectors listed there, padded to 16" }
+  - { id: perlin1985, tier: P, locator: "§ Noise(), p. 289 — a hashed gradient-and-value per lattice point and only 'a smooth (eg. cubic polynomial) interpolation'; the paper never writes 3t^2 - 2t^3 down" }
+  - { id: opensimplex2, tier: F, locator: "README §3D Noise (ImproveXY Orientation), and the noise3_ImproveXY body in java/OpenSimplex2.java — the XY planes are rotated 'far out of alignment with the cube faces'" }
+  - { id: gustavson2005, tier: F, locator: "§Example code, p. 11 — the 2D noise() listing with F2 = 0.5*(sqrt(3)-1) and G2 = (3-sqrt(3))/6; the isotropy claim is the third advantage bullet on p. 1" }
+  - { id: worley1996, tier: P, locator: "§Computation of Fn(x) — a Poisson feature-point count per cube, mean about 4, clamped to 1..9; §Application to texturing — F2-F1 vanishes on the Voronoi boundaries and gives the vein-like ridge tracery" }
+  - { id: musgrave_tm, tier: F, locator: "the RidgedMultifractal() listing, weight = signal*gain clamped to 0..1, and the HybridMultifractal() listing, whose 'prevent divergence' clamp is if weight > 1.0 then weight = 1.0" }
+  - { id: quilez_warp, tier: F, locator: "§The idea — the two nested listings, q then r, both with K = 4.0; §The experiments — q and r exposed as extra outputs for colouring" }
+  - { id: fournier1982, tier: P, locator: "§3.2.3 A Recursive Subdivision Algorithm, pp. 375–376; §4.1.2.1 Polygon Subdivision, p. 379 — side midpoints first, then the centre from the opposed midpoints" }
+  - { id: lagae2009, tier: P, locator: "§2.3 eq. 6, the Gabor kernel; §2.4 — the kernel's magnitude, orientation, principal frequency and bandwidth are the noise's; §4 for procedural evaluation" }
+  - { id: cook2005, tier: P, locator: "§2 Overview, steps 1–4 — N is R minus the downsampled-then-upsampled R; §4.3 Noise tiles for the precomputed tile" }
+  - { id: bridson2007, tier: P, locator: "§2.1 Curl, eq. 1 in 3D and eq. 2 in 2D — v is the curl of a potential, divergence-free because the divergence of a curl is identically zero" }
 ---
 # Noise and domain warping — the initial condition
 
@@ -40,10 +40,14 @@ and a warp amplitude near the largest octave's wavelength.
 Gradient noise is zero at every lattice point by construction. Two consequences follow, and both
 are constants, not code.
 
-**Fade.** Use the quintic `6t^5 - 15t^4 + 10t^3` [perlin2002], never the original cubic
-`3t^2 - 2t^3` [perlin1985]. The cubic's second derivative is non-zero at the lattice points, so
-the grid prints through anything that reads curvature — normal maps and every curvature-driven
-mask in `terrain-analysis-masks.md`. The difference is two multiplies.
+**Fade.** Use the quintic `6t^5 - 15t^4 + 10t^3` [perlin2002], never the cubic `3t^2 - 2t^3`.
+The cubic's second derivative `6 - 12t` is non-zero at the lattice points, so the grid prints
+through anything that reads curvature — normal maps and every curvature-driven mask in
+`terrain-analysis-masks.md`. The difference is two multiplies. ⚠️ **Both the cubic and that
+second derivative are written down in [perlin2002] §2, not in the 1985 paper.** [perlin1985]
+introduces Noise but specifies only "a smooth (eg. cubic polynomial) interpolation" and never
+gives the polynomial, so attributing `3t^2 - 2t^3` to it — as this document did, and as the
+bibliography entry still does — reads a constant into a source that does not carry it.
 
 **Gradient set.** The 12 cube-edge vectors of [perlin2002] remove the directional bias of random
 gradients and reduce `grad()` to adds. The 2D reduction most heightfields actually call uses the
@@ -122,8 +126,8 @@ aliasing that shimmers under LOD, not detail.
 The naive ridged form — `1 - abs(noise)`, squared — gives crumpled paper. What makes it read as
 mountains is **weight feedback**: each octave is multiplied by a clamped function of the previous
 octave's value, so detail concentrates on the ridges and the valleys stay smooth [musgrave_tm].
-Hybrid multifractal multiplies each octave by the accumulated value instead, so low ground stays
-smooth and high ground gets rough — the height-roughness correlation real topography has and plain
+Hybrid multifractal multiplies each octave by a running product of the previous octaves' values
+instead — seeded with octave 0's own value — so low ground stays smooth and high ground gets rough — the height-roughness correlation real topography has and plain
 fBm does not.
 
 Two traps, both in the same source and both routinely dropped in online versions:
@@ -164,7 +168,8 @@ stack. *Simplex* [gustavson2005] — 3 corners instead of 4 in 2D, which is no m
 heightfield; the reason to use it is isotropy, and in 3D/4D the corner count is the win.
 *Worley F2−F1* [worley1996] — cell and crack structure for rock, mud flats and boulder fields, not
 a base layer; note the one-point-per-cell simplification everyone ships is a deviation from the
-paper's Poisson count and makes cells too regular. *Gabor noise* [lagae2009] — the only one with
+paper's Poisson count — its own implementation uses a mean of about 4 per cube, clamped to 1–9 —
+and makes cells too regular. *Gabor noise* [lagae2009] — the only one with
 local control of frequency, bandwidth and **orientation**, so the only one that can do anisotropy
 honestly; far too expensive for base terrain, correct for aligned detail layers. *Wavelet noise*
 [cook2005] — genuinely band-limited, which matters only if you synthesise per-frame at varying
@@ -184,7 +189,7 @@ octaves it cannot resolve anyway, and dropping them is also the poor-man's band-
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | A regular grid of pinch points in the height, and in everything derived from it | Lacunarity exactly 2 *and* no per-octave offsets; all octaves zero at the shared lattice points | Either fix lifts them equally — detune to 2.03, add offsets, or both; octave 0's own zeros remain either way |
-| Faint creases along the grid axes under lighting or curvature masks | The 1985 cubic fade, whose second derivative is non-zero at lattice points | Quintic fade [perlin2002] |
+| Faint creases along the grid axes under lighting or curvature masks | The cubic fade `3t^2 - 2t^3`, whose second derivative `6 - 12t` is non-zero at lattice points | Quintic fade [perlin2002] |
 | Diagonal banding in a field sampled from 3D noise on a flat plane | The simplex lattice has a face parallel to the sampling plane | A lattice-rotated variant [opensimplex2] |
 | A mask thresholded near zero outlines the lattice grid | Gradient noise is identically zero at lattice points | Threshold fBm output, or offset the threshold away from 0 |
 | Isolated spikes to absurd heights | `min(weight, 1)` dropped from hybrid multifractal | Restore the clamp [musgrave_tm] |

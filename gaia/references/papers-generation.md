@@ -34,10 +34,16 @@ axis is sent, so they are restated:
 ## Noise
 
 - **perlin1985** `P` — Perlin, K. (1985). *An Image Synthesizer.* SIGGRAPH '85, 287–296. —
-  The original gradient noise, with the cubic fade `3t² − 2t³`.
+  The original gradient noise: a hashed gradient and value per lattice point, interpolated.
+  It does **not** contain `3t² − 2t³`. The Noise() section (p. 289) says only "a smooth (eg.
+  cubic polynomial) interpolation", and no polynomial appears anywhere in the paper. The
+  cubic, and the `6 − 12t` second derivative the continuity argument turns on, are written
+  down in **perlin2002 §2**, which attributes the description to Ebert et al. 1998. Cite 1985
+  for the construction, 2002 for either fade.
 - **perlin2002** `P` — Perlin, K. (2002). *Improving Noise.* ACM TOG 21(3), SIGGRAPH '02,
-  681–682. — The quintic fade `6t⁵ − 15t⁴ + 10t³` and the 12 cube-edge gradients. Use this, not
-  the 1985 version.
+  681–682. — The quintic fade `6t⁵ − 15t⁴ + 10t³` and the 12 cube-edge gradients (padded to 16
+  so the index is a mask, not a modulo), §3 Modifications, p. 682. It also carries the cubic
+  `3t² − 2t³` it replaces, in §2 — the 1985 paper does not. Use this, not the 1985 version.
 - **opensimplex2** `F` — KdotJPG. *OpenSimplex2.* github.com/KdotJPG/OpenSimplex2 (public
   domain). — No canonical paper; standard practice is to take this reference implementation
   whole, including the lattice-rotated `noise3_ImproveXY` variants. Do not reconstruct its
