@@ -112,9 +112,11 @@ being answerable with "unchanged", and the stakeholder critic joins the panel.
 *outcome*: what breaks, slows or stays risky if we do not do this. Without it the
 item cannot be prioritised against anything and will lose every time.
 
-**`spike` / `discovery`.** The deliverable is information. Require a `spike`
-subtask, with a timebox and a named question - and check it is not a story in
-disguise.
+**`spike` / `discovery`.** The deliverable is information. The rule sets
+`kind: spike` and `profile: research`, which swaps the intake questionnaire -
+question, decision, timebox instead of actor, outcome, trigger - and requires a
+`spike` subtask (`SPK001`) inside its timebox (`SPK002`). Then check it is not a
+story in disguise: `SPK004` reports a research item that already plans the build.
 
 **Priority and status** are context, not consequence, most of the time. Two
 exceptions worth encoding: a top priority with no `blocking` question is

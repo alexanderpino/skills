@@ -59,6 +59,27 @@ nobody has tested. *Tell:* `CYN001`, or acceptance criteria you cannot write
 without guessing at what will work. *Fix:* the output is a probe with a
 hypothesis and a measure, and a decomposition of whatever it returns.
 
+**Research refined as delivery.** An investigation arrives, gets the feature
+questionnaire, and comes out as a story with an actor and an outcome nobody has
+established yet. *Tell:* `INT011`, or an intake whose `actor` was answered by
+assumption on a ticket that says "uitzoeken". *Fix:* `intake.kind: spike`. The
+questions are what we do not know, which decision waits on it, and for how long -
+see `references/intake.md` §7.
+
+**The spike that decides nothing.** A timeboxed investigation nobody is waiting
+for. *Tell:* `SPK003`, or a spike whose answer would not change a single subtask.
+*Fix:* name the decision it resolves or delete it. Reading is valuable and is not
+a ticket.
+
+**The answer assumed before the probe.** A research item that already plans the
+build it exists to inform. *Tell:* `SPK004`, or subtasks whose titles would still
+make sense if the spike returned the opposite result. *Fix:* the build is the
+*next* story; link it with `blocks` so the order outlives the conversation.
+
+**The spike that became the project.** A half-day question estimated at three
+days. *Tell:* `SPK002`. *Fix:* the timebox is the price of an option, not an
+estimate. If the question genuinely needs three days, it is not one question.
+
 **Decision laundering.** A hard choice appears as a statement of fact with no
 rationale, so nobody can challenge it. *Tell:* technical notes contain "we will
 use X" with no `decisions` entry. *Fix:* promote it to a decision with options

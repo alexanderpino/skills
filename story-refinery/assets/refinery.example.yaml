@@ -23,7 +23,8 @@ tailoring:
   skill: .claude/skills/team-billing-refinement   # [claude] where it lives, for a reader
 
 # ---------------------------------------------------------------- decomposition
-# [claude] vertical-slice | layered | workflow-phase | bugfix | expand-contract | custom
+# [claude] vertical-slice | layered | workflow-phase | bugfix | research |
+#          expand-contract | custom
 profile: vertical-slice
 
 decomposition:
@@ -173,8 +174,12 @@ triage:
       require_dimensions: [outcome]
       ask: ["What breaks, slows down or stays risky if we do not do this now?"]
     - id: discovery
-      match: "^spike$|discovery|research"
+      match: "^spike$|discovery|research|onderzoek"
+      kind: spike                    # the feature questionnaire asks this item the wrong things
+      profile: research
+      require_dimensions: [question, decision, timebox]
       mandatory_subtask_kinds: [spike]
+      ask: ["Which decision is waiting on this answer, and who makes it?", "How long are we willing to spend before we decide with what we have?", "What does the answer look like when it arrives - a number, a prototype, a recommendation?"]
 
 # ---------------------------------------------------------------------- intake
 # [script] intake.py + validate.py INT gates. Which dimensions must be present
@@ -184,6 +189,12 @@ intake:
   feature_recommended: [success_signal, scope]
   bug_required: [repro, expected, actual, environment]
   bug_recommended: [impact]
+  # A research item is not a feature with unknowns. It has no actor and no outcome
+  # yet - establishing them may be the whole point - so it gets its own questionnaire:
+  # a question narrow enough to come back answered, a decision waiting on the answer,
+  # and the price we will pay before deciding with what we have.
+  spike_required: [question, decision, timebox]
+  spike_recommended: [answer_shape]
   min_anchors: 1                  # code anchors needed for a "scoutable" verdict
 
 # ----------------------------------------------------------------------- gates

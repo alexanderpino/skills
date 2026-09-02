@@ -134,9 +134,15 @@ either half alone.
   prompt to look twice at what was marked present.
 - **no repos reachable** - the config names repos that are not on disk. Phase 2
   cannot run; `scoutable` is impossible; say so rather than pretending to scan.
-- **kind mismatch** - the text reads as a bug (`INT011`) but the profile is not
-  `bugfix`. The bugfix profile puts the failing test first; using vertical-slice
-  on a defect produces a plan with no reproduction.
+- **kind mismatch** - the text reads as a bug and the profile is not `bugfix`, or
+  as research and the profile is not `research` (`INT011`). Each profile exists
+  because the others handle that shape badly: vertical-slice on a defect produces
+  a plan with no reproduction, and a delivery profile on a research item plans
+  the build the item exists to inform.
+- **unknown kind** - `INT012`. Only `feature`, `bug` and `spike` have a
+  questionnaire. Anything else would silently fall back to the feature one, which
+  is worse than failing: the item comes back assessed, with three dimensions
+  answered that nobody asked about.
 
 ---
 
@@ -168,6 +174,27 @@ runs correctly against an assumption nobody tested.
 The tell is whether you can state the acceptance criteria without guessing at
 what will work. If the honest AC is "we learn whether X moves Y", the output is a
 probe with a hypothesis and a measure, not a decomposition.
+
+### When the item *is* the research
+
+The domain classification above tells a delivery story to grow a probe. A
+research item is the other case: the probe is the whole ticket. It gets
+`intake.kind: spike` - set by the discovery labels, or detected from the ticket
+text - and with it a different questionnaire, because the feature one asks for an
+actor and an outcome that do not exist yet. Answering those anyway is the
+characteristic failure here: it produces a plausible feature story for work
+nobody has established is worth doing.
+
+| Dimension | The question | Why it blocks |
+|---|---|---|
+| **question** | What exactly do we not know, phrased so it can come back answered? | "Investigate caching" is a topic. A topic has no end, so the timebox has nothing to bound |
+| **decision** | Which decision waits on the answer, and who makes it? | If none, this is reading. Reading is valuable and is not a ticket (`SPK003`) |
+| **timebox** | How long before we decide with what we have? | The timebox is the price of the option; without it the spike becomes the project (`SPK002`) |
+| *answer_shape* | What does the answer look like when it arrives - a number, a prototype, a recommendation? | Recommended. Without it two people expect different artefacts and both are disappointed |
+
+The plan that follows is in `references/decomposition.md` §3 under `research`.
+The one thing it must not contain is the build: a research item that already
+plans `feature` work has assumed the answer, and `SPK004` says so.
 
 ## 8. Impact mapping the answer
 

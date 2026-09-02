@@ -210,6 +210,54 @@ Rules `[L]`:
 Use when: the item is a defect. Do not force a bug into `vertical-slice` - there
 is no valuable thin slice of "stop being wrong".
 
+### `research`
+
+The item's deliverable is information. Everything else in this file plans a
+build; this profile plans a *finding out*, and its whole job is to stop before
+the build.
+
+```
+S0 [api] Measure async VAT lookup p95 against the fixture   (spike, covers AC1, AC2)
+```
+
+Usually that is the entire decomposition. One question, one probe, one answer.
+
+Rules `[L]`:
+
+- **The criteria are about the answer, not the behaviour.** "A measured p95 is
+  written down in ms" and "D9 records which design the measurement supports and
+  the number that decided it". If you can write "the user sees X", this is not a
+  research item.
+- **Every possible answer is named in advance, as examples on the criterion.**
+  `under 200ms → build the async design`, `200ms or over → build the pre-computed
+  one`. This is the Real Options discipline applied to the probe: an experiment
+  whose outcomes you have not priced is one you will rationalise afterwards. It
+  is also what makes `AC009` catch the missing value standing exactly on the
+  threshold.
+- **The spike carries `covers`.** A spike on a delivery story is exempt from
+  covering a criterion (`UNCOVERED_OK_KINDS`); here it is the only thing that
+  can, so it does.
+- **The timebox is the price of an option, not an estimate** `[F: Real Options,
+  Maassen & Matts]`. `SPK002` holds the spike to
+  `decomposition.spike_timebox_days`. A spike that overruns has stopped buying
+  information and started doing the job - and the whole point of buying the
+  option was to not do the job yet.
+- **No build subtasks.** `SPK004` reports a research item that plans `feature` or
+  `migration` work: whatever the answer turns out to be, that subtask was written
+  before it. The build belongs to the story this research informs, linked with
+  `blocks` so the order survives outside your head (`references/series.md`).
+- **Something must be waiting for the answer.** On a research item that is the
+  required `decision` intake dimension; on a delivery story it is
+  `decisions[].spike`, and `SPK003` reports a spike no decision defers to. A
+  spike whose answer changes nothing is reading, and reading is not a ticket.
+- **The domain is usually `complex`.** That is the honest reason the item exists,
+  and `CYN001` already demands a probe there. If you can classify it
+  `complicated`, ask why this is not simply refined.
+
+Use when: `intake.kind` is `spike` - the discovery labels set both (`TRI005` if
+the profile disagrees). Do not use it to park a story that is merely vague: the
+fix for an unclear story is the intake questions, not a spike.
+
 ### `custom`
 
 Supply an ordered list of subtask kinds with conditions in config. The engine

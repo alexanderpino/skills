@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Is there enough information to refine this item? Stdlib only, no network.
 
-  python intake.py assess --text ticket.txt [--kind feature|bug|auto] [--lang en|nl|auto]
+  python intake.py assess --text ticket.txt [--kind feature|bug|spike|auto] [--lang en|nl|auto]
   python intake.py assess --bundle bundle.json --write     # fills story.intake + questions
 
 The script finds LEXICAL SIGNALS, not meaning. It can tell that the words
@@ -33,10 +33,15 @@ from _yaml import get, load_config  # noqa: E402
 DEFAULT_REQUIRED = {
     "feature": ["actor", "outcome", "trigger"],
     "bug": ["repro", "expected", "actual", "environment"],
+    # A research item has no actor and no outcome yet - that is the point of it. What
+    # it must have is a question narrow enough to answer, a decision waiting on the
+    # answer, and a price we are willing to pay for it.
+    "spike": ["question", "decision", "timebox"],
 }
 DEFAULT_RECOMMENDED = {
     "feature": ["success_signal", "scope"],
     "bug": ["impact"],
+    "spike": ["answer_shape"],
 }
 
 # Each dimension: list of regexes. Case-insensitive. English and Dutch side by side,
@@ -89,6 +94,21 @@ SIGNALS = {
                r"\b(alle|sommige|\d+) (gebruikers|klanten|orders)\b", r"\b(always|sometimes|intermittent|"
                r"occasionally|since)\b", r"\b(altijd|soms|sinds|af en toe)\b", r"\bper (day|week|dag|week)\b",
                r"\b(blocking|blocker|urgent|sev\d|p[0-3])\b", r"\b(blokkerend|urgent|spoed)\b"],
+    # Research dimensions. "Investigate X" is a topic, not a question - these look for
+    # something that can come back answered.
+    "question": [r"\?", r"\b(whether|which of|how many|how long|can we|is it (feasible|possible))\b",
+                 r"\b(of we|welke van|hoeveel|hoe lang|kunnen we|is het (haalbaar|mogelijk))\b",
+                 r"\bfind out (if|whether|which|how)\b", r"\buitzoeken (of|welke|hoe)\b"],
+    "decision": [r"\b(decide|decision|choose|choice|pick|before we (can )?(build|commit|start))\b",
+                 r"\b(beslis\w*|besluit|keuze|kiezen|voordat we)\b", r"\bdepends on the (answer|outcome)\b",
+                 r"\b(option|alternative)s?\b", r"\b(optie|alternatief|alternatieven)\b"],
+    "timebox": [r"\btimebox\w*\b", r"\b\d+(\.\d+)?\s?(day|days|hour|hours|dag|dagen|uur)\b",
+                r"\bno (more|longer) than\b", r"\bniet (meer|langer) dan\b", r"\bmax(imum|imaal)?\b",
+                r"\bhalf a day\b", r"\bhalve dag\b"],
+    "answer_shape": [r"\b(spike|proof of concept|poc|prototype|benchmark|measurement|comparison)\b",
+                     r"\b(prototype|meting|vergelijking|onderzoeksnotitie)\b",
+                     r"\b(adr|design note|write-?up|recommendation|advies|notitie)\b",
+                     r"\bwe will know\b", r"\bwe weten dan\b"],
 }
 
 # Things that give Phase 2 something to search for.
@@ -120,6 +140,17 @@ BUG_WORDS = [r"\b(bug|defect|broken|crash\w*|error|exception|500|fails?|failing|
              r"\b(fout|foutmelding|storing|kapot|werkt niet|crasht|faalt|regressie|onjuist|"
              r"verkeerd|fixen|gaat mis|mislukt)\b"]
 
+# Deliberately narrow. These name the *act* of finding out; a ticket that merely
+# mentions a risk or an option is not research. One hit is enough because none of
+# these words appears in a story that already knows what it is building.
+RESEARCH_WORDS = [r"\b(spike|proof of concept|feasibility|investigate|investigation|"
+                  r"research|explore|exploration|prototype|evaluate options|"
+                  r"compare (the )?options|find out (if|whether|which|how)|"
+                  r"we don'?t know (yet|if|whether|which))\b",
+                  r"\b(onderzoek|onderzoeken|uitzoeken|uitzoekwerk|haalbaarheid|"
+                  r"haalbaarheidsonderzoek|verkennen|verkenning|vooronderzoek|"
+                  r"opties vergelijken|we weten (nog )?niet)\b"]
+
 DUTCH_STOPWORDS = (r"\b(de|het|een|en|niet|wordt|worden|moet|moeten|zodat|wanneer|gebruiker|"
                    r"gebruikers|klant|klanten|als|maar|voor|bij|op|je|dat|ook|naar|zijn|sinds|"
                    r"altijd|alle|graag|krijg|krijgt|geeft|stappen|verwacht|werkelijk)\b")
@@ -136,6 +167,10 @@ QUESTIONS = {
         "actual": "What happened instead - error text, screenshot, response?",
         "environment": "Which environment, version or build, and which client?",
         "impact": "How many users or orders, how often, since when?",
+        "question": "What exactly do we not know - phrased so it can come back answered, not as a topic?",
+        "decision": "Which decision is waiting on the answer, and who makes it? (If none, this is reading, not a ticket.)",
+        "timebox": "How long are we willing to spend before we decide with what we have?",
+        "answer_shape": "What does the answer look like when it arrives - a number, a working prototype, a recommendation?",
     },
     "nl": {
         "actor": "Voor wie is dit? (vermoeden: {guess})",
@@ -148,6 +183,10 @@ QUESTIONS = {
         "actual": "Wat gebeurde er in plaats daarvan - fouttekst, screenshot, response?",
         "environment": "Welke omgeving, versie of build, en welke client?",
         "impact": "Hoeveel gebruikers of orders, hoe vaak, sinds wanneer?",
+        "question": "Wat weten we precies niet - geformuleerd zodat het beantwoord terug kan komen, niet als onderwerp?",
+        "decision": "Welk besluit wacht op het antwoord, en wie neemt het? (Is er geen, dan is dit lezen en geen ticket.)",
+        "timebox": "Hoeveel tijd willen we eraan besteden voordat we beslissen met wat we hebben?",
+        "answer_shape": "Hoe ziet het antwoord eruit als het er is - een getal, een werkend prototype, een advies?",
     },
 }
 
@@ -157,6 +196,12 @@ def now_iso():
 
 
 def detect_kind(text):
+    """Research first: a research item often talks about a bug or a feature, because
+    that is what it is research *about*. Assessing it as one asks for an actor and a
+    repro that will never exist, and 'insufficient' then looks like a bad ticket
+    rather than the wrong questionnaire."""
+    if sum(len(re.findall(p, text, re.I)) for p in RESEARCH_WORDS) >= 1:
+        return "spike"
     hits = sum(len(re.findall(p, text, re.I)) for p in BUG_WORDS)
     return "bug" if hits >= 2 else "feature"
 
@@ -238,9 +283,10 @@ def repos_reachable(cfg):
 def assess(text, cfg, kind="auto", lang="auto"):
     kind = detect_kind(text) if kind == "auto" else kind
     lang = detect_lang(text) if lang == "auto" else lang
-    required = get(cfg, "intake.%s_required" % kind, DEFAULT_REQUIRED[kind]) or DEFAULT_REQUIRED[kind]
+    fallback = DEFAULT_REQUIRED.get(kind) or DEFAULT_REQUIRED["feature"]
+    required = get(cfg, "intake.%s_required" % kind, fallback) or fallback
     recommended = get(cfg, "intake.%s_recommended" % kind,
-                      DEFAULT_RECOMMENDED[kind]) or DEFAULT_RECOMMENDED[kind]
+                      DEFAULT_RECOMMENDED.get(kind, [])) or DEFAULT_RECOMMENDED.get(kind, [])
     min_anchors = get(cfg, "intake.min_anchors", 1)
 
     dims = []
@@ -372,7 +418,7 @@ def main(argv=None):
     p.add_argument("--config", default="refinery.yaml")
     p.add_argument("--text", help="file with the raw ticket text; '-' for stdin")
     p.add_argument("--bundle", help="bundle.json; reads story.source_text")
-    p.add_argument("--kind", choices=["feature", "bug", "auto"], default="auto")
+    p.add_argument("--kind", choices=["feature", "bug", "spike", "auto"], default="auto")
     p.add_argument("--lang", choices=["en", "nl", "auto"], default="auto")
     p.add_argument("--write", action="store_true",
                    help="with --bundle: write story.intake and add questions for missing dimensions")

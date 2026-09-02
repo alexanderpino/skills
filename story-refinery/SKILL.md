@@ -202,6 +202,12 @@ It maps the metadata through `triage.labels` and records what changes:
 - **`security`**, **`compliance`** → the matching quality attributes stop being
   answerable with "unchanged", a test is required, and the `security` or
   `stakeholder` critic joins the panel.
+- **`spike` / `discovery` / `onderzoek`** → the deliverable is information, so the
+  item gets `kind: spike` and the `research` profile. That swaps the whole
+  questionnaire: not actor, outcome and trigger, but *what exactly do we not
+  know*, *which decision waits on the answer*, and *for how long*. Refining a
+  research item as a feature is the failure to watch for - it produces a
+  convincing plan for work nobody has established is worth doing.
 - **`tech-debt`** → the missing dimension is the outcome: what breaks, slows or
   stays risky if we do not do this.
 - **links** → `blocks` / `is blocked by` order work across teams, and neither the
@@ -433,14 +439,20 @@ Apply the configured profile. Read `references/decomposition.md`.
 
 Default profile is `vertical-slice` `[L]`: each subtask is a thin end-to-end
 slice that leaves the system working `[P: Cockburn, walking skeleton]`.
-Alternatives: `layered`, `workflow-phase`, `bugfix`, `expand-contract`, `custom`.
+Alternatives: `layered`, `workflow-phase`, `bugfix`, `research`, `expand-contract`,
+`custom`.
 **`expand-contract`** is for the change vertical slicing cannot express - a wide
 mechanical migration, where the middle step is allowed to be wide precisely
 because it is mechanical `[P: Pocock, to-tickets]`. Its third phase is the one
 teams skip, so `SUB016` fails a bundle that expands and migrates without ever
 removing the old path. Defects take
 `bugfix` - failing test first, root cause as a recorded decision - because there
-is no valuable thin slice of "stop being wrong".
+is no valuable thin slice of "stop being wrong". A research item takes `research`,
+which is usually one spike and nothing else: its criteria are about the answer,
+every possible answer is priced in advance as an example, and it plans no build
+at all. `SPK004` fails a research item that already has `feature` subtasks -
+whatever the probe returns, those were written before it. The build is the next
+story, linked with `blocks`.
 
 Hard rules, enforced by `validate.py`:
 - **One subtask = one repo = one PR = one reviewable unit** `[L]`

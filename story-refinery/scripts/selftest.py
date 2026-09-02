@@ -597,7 +597,7 @@ def suite_pipeline():
 def suite_docs():
     """SKILL.md is the interface. A flag that no longer exists, or a reference file
     that was renamed, breaks the skill just as thoroughly as a bad regex."""
-    print("\n-- 14. docs consistency --")
+    print("\n-- 15. docs consistency --")
     import re
     with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
         skill = fh.read()
@@ -964,10 +964,88 @@ def suite_declutter():
               ("SUB018", "subtask S2b") not in findings(exempt))
 
 
+def suite_research():
+    """A research item is not a feature with unknowns. Asked the feature questions it
+    answers them plausibly, and the output is a confident plan for work nobody has
+    established is worth doing."""
+    print("\n-- 10. research items --")
+    import intake as I
+    from validate import check_research, check_intake, Report, INTAKE_KINDS
+    cfg = load_config(CONFIG)
+    with open(GOLDEN, encoding="utf-8") as fh:
+        golden = json.load(fh)
+
+    def findings(bundle, fn=check_research):
+        rep = Report()
+        if fn is check_research:
+            fn(bundle, cfg, bundle.get("subtasks") or [], rep)
+        else:
+            fn(bundle, cfg, rep)
+        return {(i["code"], i["where"]) for i in rep.items}
+
+    # The questionnaire. Every kind must have one, or the item silently gets the
+    # feature questions - which is worse than crashing, because it looks like it worked.
+    for kind in INTAKE_KINDS:
+        check("research: kind %r has its own required dimensions" % kind,
+              bool(I.DEFAULT_REQUIRED.get(kind)))
+    check("research: a research item is not asked for an actor and an outcome",
+          not ({"actor", "outcome", "trigger"} & set(I.DEFAULT_REQUIRED["spike"])))
+
+    for text, want in (("We need to uitzoeken of een async lookup p95 haalt.", "spike"),
+                       ("Spike: can we move the VAT lookup off the checkout path?", "spike"),
+                       ("Investigate whether caching helps; it crashes with a 500 error "
+                        "and fails on every retry.", "spike"),
+                       ("The checkout returns a 500 error and the retry fails too.", "bug"),
+                       ("As a customer I want to see my invoices so that I can file them.",
+                        "feature")):
+        check("research: %r detected as %s" % (text[:38], want), I.detect_kind(text) == want)
+
+    # An unknown kind used to raise KeyError out of check_intake and take the whole
+    # validator with it, so a research bundle could not even be reported on.
+    unknown = copy.deepcopy(golden)
+    unknown["story"]["intake"]["kind"] = "chore"
+    check("research: an unknown kind is a finding, not a crash",
+          ("INT012", "story.intake.kind") in findings(unknown, check_intake))
+
+    spike_kind = copy.deepcopy(golden)
+    spike_kind["story"]["intake"]["kind"] = "spike"
+    check("research: kind=spike does not raise", isinstance(findings(spike_kind, check_intake), set))
+    check("research: a delivery profile on a research item is reported",
+          ("INT011", "profile") in findings(spike_kind, check_intake))
+    check("research: a research item that plans the build is reported",
+          ("SPK004", "subtasks") in findings(spike_kind))
+
+    # A well-formed research item: one spike, inside the timebox, nothing else.
+    ok = copy.deepcopy(golden)
+    ok["profile"] = "research"
+    ok["story"]["intake"]["kind"] = "spike"
+    ok["subtasks"] = [dict(golden["subtasks"][0], covers=["AC1"], estimate_days=0.5)]
+    check("research: one spike inside its timebox is left alone", not findings(ok))
+
+    no_spike = copy.deepcopy(ok)
+    no_spike["subtasks"][0]["kind"] = "docs"
+    check("research: a research item with no spike is a story in disguise",
+          ("SPK001", "subtasks") in findings(no_spike))
+
+    over = copy.deepcopy(ok)
+    over["subtasks"][0]["estimate_days"] = 2.0
+    check("research: a spike over its timebox is reported",
+          ("SPK002", "subtask S0") in findings(over))
+
+    # SPK003 runs the other way: on a delivery story, a spike nothing waits for.
+    orphan = copy.deepcopy(golden)
+    for d in orphan["decisions"]:
+        d.pop("spike", None)
+    check("research: a spike no decision defers to is reading, not a ticket",
+          ("SPK003", "subtask S0") in findings(orphan))
+    check("research: a spike a decision does defer to is left alone",
+          ("SPK003", "subtask S0") not in findings(golden))
+
+
 def suite_summary():
     """The artefact people actually talk from. It has to work before the bundle is
     finished, and it has to say the unwelcome part."""
-    print("\n-- 10. discussion summary --")
+    print("\n-- 11. discussion summary --")
     import re
     import summary as S
     cfg = load_config(CONFIG)
@@ -1025,7 +1103,7 @@ def suite_roundtrip():
     """A ticket has to be readable back into a bundle, because in a real team the
     stored bundle is on somebody else's laptop. And progress has to be recordable,
     because a plan that never learns what shipped keeps deleting work that exists."""
-    print("\n-- 11. round trip and progress --")
+    print("\n-- 12. round trip and progress --")
     import ingest as I
     import progress as P
 
@@ -1103,7 +1181,7 @@ def suite_roundtrip():
 def suite_batch():
     """Several related stories in one run. These are the findings that do not exist
     for one bundle: they only appear when the bundles are read side by side."""
-    print("\n-- 12. batch --")
+    print("\n-- 13. batch --")
     import batch as B
 
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -1183,7 +1261,7 @@ def suite_batch():
 def suite_review():
     """The critic packets are the only mechanical guarantee of blindness in the
     skill. If the reasoning leaks into one, the panel is grading the reasoning."""
-    print("\n-- 13. adversarial review --")
+    print("\n-- 14. adversarial review --")
     from review import (CRITICS, DEFAULT_PANEL, cmd_check, content_digest,
                         render_brief, resolve_locator)
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -1274,6 +1352,7 @@ def main():
     suite_triage()
     suite_criteria()
     suite_declutter()
+    suite_research()
     suite_summary()
     suite_roundtrip()
     suite_batch()

@@ -26,6 +26,19 @@ DEFAULT_LEXICON = [
     "user-friendly", "robust", "various", "improve performance",
 ]
 UNCOVERED_OK_KINDS = {"enabling", "spike", "rollout"}
+# What the item is, which decides which questions must be answered before it can be
+# planned at all. A research item is not a feature with unknowns: asking it for an
+# actor and an outcome gets you a plausible answer to the wrong question.
+DEFAULT_REQUIRED_DIMENSIONS = {
+    "feature": ["actor", "outcome", "trigger"],
+    "bug": ["repro", "expected", "actual", "environment"],
+    "spike": ["question", "decision", "timebox"],
+}
+INTAKE_KINDS = tuple(DEFAULT_REQUIRED_DIMENSIONS)
+# intake.kind -> the profile that kind implies (INT011). Refining a bug without
+# putting the failing test first, or a research item with a delivery profile, is
+# refining the wrong shape of work.
+PROFILE_FOR_KIND = {"bug": "bugfix", "spike": "research"}
 PATH_RX = re.compile(r"\b[\w.-]+(?:/[\w.-]+)+\.[A-Za-z0-9]{1,6}\b")
 DEFAULT_NFR_KEYS = ["performance", "concurrency", "failure", "data", "security",
                     "observability", "compatibility"]
@@ -56,7 +69,7 @@ PHASE_OF = {
     "EVI": "2 evidence", "PND": "2 evidence", "SER": "2 evidence",
     "AC": "3 criteria", "DT": "3 criteria", "NFR": "3 criteria", "BUD": "3 criteria",
     "DEC": "4 decisions", "RSK": "4 decisions", "READY": "4 decisions",
-    "SUB": "5 decompose", "DAG": "5 decompose", "PAR": "5 decompose",
+    "SUB": "5 decompose", "DAG": "5 decompose", "PAR": "5 decompose", "SPK": "5 decompose",
     "COV": "5 decompose", "CON": "5 decompose", "SPL": "5 decompose",
     "BRF": "6 briefs", "DOD": "6 briefs",
     "REV": "8 review", "LNK": "9 emit", "STRUCT": "0 configure",
@@ -99,7 +112,7 @@ CONFIG_SPEC = {
     "review": {"method", "panel", "min_critics", "rubber_duck_max_subtasks",
                "require_fresh_context"},
     "intake": {"feature_required", "feature_recommended", "bug_required", "bug_recommended",
-               "min_anchors"},
+               "spike_required", "spike_recommended", "min_anchors"},
     "validation": {"fail_on", "require_command_done_when", "require_coverage_matrix",
                    "vagueness_lexicon", "non_functional_keys", "definition_of_done",
                    "require_intake", "measured_non_functional_keys"},
@@ -726,6 +739,54 @@ def check_clutter(b, cfg, subs, rep):
                  "reviewed by different people" % (parent.get("id"), s.get("id"), days, files))
 
 
+def check_research(b, cfg, subs, rep):
+    """A research item delivers information, and nothing else.
+
+    Its failure mode is not being too vague, it is being too confident: it arrives as
+    a delivery plan for the thing nobody has established yet. So the gates run the
+    other way round from a feature's - they check that the item stops at the answer,
+    that the answer is bounded, and that somebody is waiting for it."""
+    story = b.get("story") or {}
+    kind = ((story.get("intake") or {}).get("kind")) or "feature"
+    spikes = [s for s in subs if s.get("kind") == "spike"]
+
+    if kind == "spike" and subs and not spikes:
+        rep.error("SPK001", "subtasks", "intake says this item is research and not one subtask "
+                  "is a spike - either the plan is not the research, or the item is a story "
+                  "wearing a spike label")
+
+    timebox = get(cfg, "decomposition.spike_timebox_days", 0.5)
+    for s in spikes:
+        est = s.get("estimate_days")
+        if timebox and est is not None and est > timebox:
+            rep.error("SPK002", "subtask %s" % s.get("id"), "spike is %.2gd against a timebox "
+                      "of %.2gd. The timebox is the price of the option, not an estimate of "
+                      "the work - a spike that overruns it has stopped buying information "
+                      "and started doing the job" % (est, timebox))
+
+    # risk-and-options.md: a spike that would not change any decision is research, and
+    # research is not a subtask on this story. On a research item the decision it
+    # unblocks is a required intake dimension, so it is already recorded at story level.
+    if kind != "spike":
+        resolved = {d.get("spike") for d in b.get("decisions") or [] if d.get("spike")}
+        for s in spikes:
+            if s.get("id") not in resolved:
+                rep.warn("SPK003", "subtask %s" % s.get("id"), "no decision defers to this "
+                         "spike - name the decision it resolves, or drop it. A spike whose "
+                         "answer changes nothing is reading, and reading is not a ticket")
+
+    # triage.md: check it is not a story in disguise. Test and docs subtasks are left
+    # alone - decomposition.mandatory can manufacture those - but planning the build is
+    # proof the answer was assumed.
+    if kind == "spike":
+        building = [s.get("id") for s in subs if s.get("kind") in ("feature", "migration")]
+        if building:
+            rep.error("SPK004", "subtasks", "a research item plans the build: %s. Whatever the "
+                      "answer turns out to be, these were written before it - move them to the "
+                      "story this research informs, and link the two"
+                      % ", ".join(str(i) for i in building))
+
+
 def check_graph(subs, reach, graph, rep):
     state = {}
 
@@ -952,9 +1013,14 @@ def check_intake(b, cfg, rep):
     questions = {q.get("id"): q for q in b.get("open_questions") or []}
     source = _norm(story.get("source_text"))
     kind = intake.get("kind") or "feature"
+    if kind not in INTAKE_KINDS:
+        rep.error("INT012", "story.intake.kind", "kind must be %s, got %r - an unknown kind "
+                  "silently gets the feature questionnaire, which asks a research item for "
+                  "an actor and an outcome it does not have"
+                  % (" | ".join(INTAKE_KINDS), kind))
+        kind = "feature"
     required = set(get(cfg, "intake.%s_required" % kind,
-                       {"feature": ["actor", "outcome", "trigger"],
-                        "bug": ["repro", "expected", "actual", "environment"]}[kind]) or [])
+                       DEFAULT_REQUIRED_DIMENSIONS[kind]) or [])
     # The ticket's own labels can demand more: a production finding needs to say
     # since when and how often before anyone knows what to reproduce.
     _, policy, _ = triage_policy(story.get("tracker_meta") or {}, cfg)
@@ -1009,9 +1075,13 @@ def check_intake(b, cfg, rep):
                       "got %r" % status)
     for did in sorted(required - seen):
         rep.error("INT004", "intake.%s" % did, "required dimension not assessed at all")
-    if kind == "bug" and (b.get("profile") or "") not in ("bugfix", ""):
-        rep.warn("INT011", "profile", "intake says this is a bug but profile is %r - "
-                 "the bugfix profile puts the failing test first" % b.get("profile"))
+    wanted = PROFILE_FOR_KIND.get(kind)
+    why = {"bugfix": "the bugfix profile puts the failing test first",
+           "research": "the research profile stops at the answer; a delivery profile plans "
+                       "the build this item exists to inform"}
+    if wanted and (b.get("profile") or "") not in (wanted, ""):
+        rep.warn("INT011", "profile", "intake says this is a %s but profile is %r - %s"
+                 % (kind, b.get("profile"), why[wanted]))
 
 
 TICKET_RX = re.compile(r"\b[A-Z][A-Z0-9]{1,9}-\d+\b")
@@ -1395,6 +1465,7 @@ def validate(bundle, cfg):
     reach, graph = transitive_deps(subs)
     check_graph(subs, reach, graph, rep)
     check_clutter(bundle, cfg, subs, rep)
+    check_research(bundle, cfg, subs, rep)
     check_file_collisions(subs, reach, rep)
     check_contract_ids(bundle, subs, rep)
     check_brief_surface(bundle, subs, rep)
