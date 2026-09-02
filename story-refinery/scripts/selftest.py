@@ -3,7 +3,7 @@
 
   python selftest.py
 
-Eleven suites:
+Twelve suites:
   1. Validator gates  - mutate the golden bundle, assert each gate fires
   2. Config parsing   - the YAML subset, including the cases that bit us
   3. Markup           - wiki / ADF / HTML / plaintext conversion
@@ -12,9 +12,10 @@ Eleven suites:
   6. Tailoring seam   - what a team skill may change, and what it may never relax
   7. Triage           - the label policy, its precedence, and what it reports
   8. Criterion codes  - assigning them, and them still meaning the same thing later
-  9. Batch            - what only shows up when several bundles are read together
- 10. Adversarial review - digests, locators, and that a critic packet really is blind
- 11. Docs consistency - SKILL.md against the scripts and validator codes it cites
+  9. Discussion summary - the one screen a refiner talks from
+ 10. Batch            - what only shows up when several bundles are read together
+ 11. Adversarial review - digests, locators, and that a critic packet really is blind
+ 12. Docs consistency - SKILL.md against the scripts and validator codes it cites
 
 A validator nobody has tried to break is a validator nobody should trust, and the
 same goes for the config reader that decides which gates run at all.
@@ -580,7 +581,7 @@ def suite_pipeline():
 def suite_docs():
     """SKILL.md is the interface. A flag that no longer exists, or a reference file
     that was renamed, breaks the skill just as thoroughly as a bad regex."""
-    print("\n-- 11. docs consistency --")
+    print("\n-- 12. docs consistency --")
     import re
     with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
         skill = fh.read()
@@ -890,10 +891,48 @@ def suite_criteria():
                                                       load_config(CONFIG)).items})
 
 
+def suite_summary():
+    """The artefact people actually talk from. It has to work before the bundle is
+    finished, and it has to say the unwelcome part."""
+    print("\n-- 9. discussion summary --")
+    import summary as S
+    cfg = load_config(CONFIG)
+    with open(GOLDEN, encoding="utf-8") as fh:
+        golden = json.load(fh)
+
+    text = "\n".join(S.one_story(copy.deepcopy(golden), cfg))
+    for heading in ("**Why.**", "**Size.**", "**In order.**", "**It hinges on.**",
+                    "**Needs an answer.**", "**Ready.**"):
+        check("summary: says %s" % heading.strip("*."), heading in text)
+    check("summary: fits a screen", len(text.splitlines()) < 45, len(text.splitlines()))
+    check("summary: separates the work from the elapsed time",
+          "2.8 day(s) of work" in text and "2.2 day(s) end to end" in text, text[:400])
+    check("summary: names the critical path, not just a number", "S0 → S1 → S2" in text)
+    block = text.split("- **Marieke (Finance)**")[1].split("\n- **")[0]
+    check("summary: groups the questions by the person who owes the answer",
+          text.count("- **Marieke (Finance)**") == 1 and block.count("\n  - ") == 3, block)
+
+    unfinished = copy.deepcopy(golden)
+    unfinished["story"]["acceptance_criteria"] = []
+    unfinished["open_questions"].append({"id": "Q9", "text": "which provider?", "owner": "",
+                                         "blocking": True})
+    text = "\n".join(S.one_story(unfinished, cfg))
+    check("summary: still works on an unfinished bundle", "**Size.**" in text)
+    check("summary: leads with what blocks it, not the first error found",
+          "**Not ready**" in text and "READY001" in text, text[-300:])
+    check("summary: says which questions have not been put to anyone yet",
+          "not asked yet" in text)
+
+    days, path = S.critical_path(golden["subtasks"])
+    check("summary: the critical path is the longest chain, not the sum",
+          abs(days - 2.25) < 0.01 and path[0] == "S0", (days, path))
+    check("summary: an empty bundle has no critical path", S.critical_path([]) == (0.0, []))
+
+
 def suite_batch():
     """Several related stories in one run. These are the findings that do not exist
     for one bundle: they only appear when the bundles are read side by side."""
-    print("\n-- 9. batch --")
+    print("\n-- 10. batch --")
     import batch as B
 
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -973,7 +1012,7 @@ def suite_batch():
 def suite_review():
     """The critic packets are the only mechanical guarantee of blindness in the
     skill. If the reasoning leaks into one, the panel is grading the reasoning."""
-    print("\n-- 10. adversarial review --")
+    print("\n-- 11. adversarial review --")
     from review import (CRITICS, DEFAULT_PANEL, cmd_check, content_digest,
                         render_brief, resolve_locator)
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -1063,6 +1102,7 @@ def main():
     suite_tailoring()
     suite_triage()
     suite_criteria()
+    suite_summary()
     suite_batch()
     suite_review()
     suite_docs()

@@ -42,6 +42,7 @@ python scripts/validate.py bundle.json --config refinery.yaml
 python scripts/review.py brief --bundle bundle.json --out reviews/   # blind critics tear it apart
 python scripts/review.py digest --bundle bundle.json --stamp        # after you fix what they found
 python scripts/emit.py bundle.json --config refinery.yaml --out out/
+python scripts/summary.py --bundle bundle.json   # one screen to talk from, at any point
 ```
 
 What you author is `bundle.json` and nothing else. Ticket text, agent briefs and
@@ -361,6 +362,28 @@ Non-functional criteria end in a measure `[P: Bass, Clements & Kazman]`.
 `performance`, `concurrency` and `failure` need a number or the word `unchanged`
 (`NFR002`); prose there is a category, not an answer.
 
+### Talking about it
+
+At any point - and especially at the decision gate, where the conversation
+actually happens:
+
+```bash
+python scripts/summary.py --bundle bundle.json --config refinery.yaml
+python scripts/summary.py --bundle a.json b.json c.json     # a whole batch
+```
+
+One screen, meant to be read out loud: why, the size (work versus end-to-end on
+the critical path), the steps in the order they happen, what it hinges on, who
+owes an answer and which questions have not been put yet, the high risks, what it
+waits on that does not exist, what it leaves behind, and one line on whether it is
+ready. It deliberately works on an unfinished bundle - the moment you most want to
+discuss something is before it is finished, and a summary that refuses until the
+gates are green is one nobody can use.
+
+It is not `preview.md`. That is the push artefact: every ticket body, in full, for
+the person about to create issues. This is the discussion artefact. Show the
+summary in a refinement, the preview before pushing.
+
 ### Phase 4 - Decision gate and premortem
 
 Read `references/risk-and-options.md`.
@@ -548,6 +571,7 @@ over them.
 
 ```bash
 python scripts/emit.py bundle.json --config refinery.yaml --out out/
+python scripts/summary.py --bundle bundle.json   # one screen to talk from, at any point
 ```
 
 It also writes `out/context/<KEY>-context.md`: one document, identical for every
@@ -720,6 +744,8 @@ All stdlib-only Python 3, no dependencies, no network.
   run, and the contradictions that only appear when the bundles are read together
 - `scripts/criteria.py` - `assign` | `check`; criterion codes, and keeping a code
   meaning the same thing across re-refinements
+- `scripts/summary.py` - one screen to discuss, for one story or a batch; works on
+  an unfinished bundle
 - `scripts/emit.py` - render payloads and a push plan; `--previous` for updates
 - `scripts/markup.py` - markdown to wiki / ADF / HTML / plaintext
 - `scripts/selftest.py` - six suites: validator gates, config parsing, markup
@@ -745,5 +771,5 @@ All stdlib-only Python 3, no dependencies, no network.
   that does not fit, and what to do when a refinement-shaped request arrives with no
   invocation at all. Not a trigger eval: with `disable-model-invocation` set, "would
   Claude load this on its own" is no longer a question with an answer
-- `evals/evals.json` - twenty-one behavioural evals with verifiable expectations, for
+- `evals/evals.json` - twenty-two behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

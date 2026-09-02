@@ -266,6 +266,20 @@
         "criteria.py check was run against the stored prior bundle before pushing the update",
         "Subtask covers lists and the decision table still point at the criteria they meant"
       ]
+    },
+    {
+      "id": 22,
+      "prompt": "We have refinement in ten minutes. Give me the gist of ABC-123 so I can walk the team through it.",
+      "expected_output": "One screen someone can talk from, including the parts nobody enjoys saying.",
+      "expectations": [
+        "The summary was produced rather than the full preview or the ticket body pasted back",
+        "It separates the work total from the end-to-end time on the critical path",
+        "The steps are in the order they happen, not the order they were written",
+        "The open questions are grouped by who owes the answer, and it says which have not been asked yet",
+        "Deferred decisions are named as still open, with what they wait for",
+        "If the story is not ready it says so in the summary rather than after it",
+        "Nothing was invented to make the summary read better"
+      ]
     }
   ]
 }
