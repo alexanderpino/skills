@@ -1,0 +1,28 @@
+[
+  { "query": "im writing a heightfield renderer and the tiles crack between LOD levels at distance, whats the standard fix", "should_trigger": true },
+  { "query": "my erosion sim keeps producing rivers that just stop halfway down the mountain and never reach the ocean", "should_trigger": true },
+  { "query": "building a Gaea/World Machine style node tool - what order do the erosion and flow routing nodes go in and why", "should_trigger": true },
+  { "query": "whats the right timestep limit for a shallow water solver in a game, my pool explodes when i fill it", "should_trigger": true },
+  { "query": "how do i make ocean waves that actually look like an ocean - gerstner or fft spectra?", "should_trigger": true },
+  { "query": "which paper do i cite for stream power erosion, and is there a solver thats not O(n log n)", "should_trigger": true },
+  { "query": "the water in my engine looks like blue plastic instead of water, what am i missing", "should_trigger": true },
+  { "query": "float precision falls apart when my camera is 6000km from the origin on a planet renderer", "should_trigger": true },
+  { "query": "i want caustics on the pool floor but cant afford photon mapping at 60fps", "should_trigger": true },
+  { "query": "adding erosion detail to fbm noise mountains so they stop looking like fractal noise", "should_trigger": true },
+  { "query": "d8 or multiple flow direction for computing a wetness map?", "should_trigger": true },
+  { "query": "i need terrain material detail at a resolution no single texture atlas can hold", "should_trigger": true },
+  { "query": "how do i cull terrain chunks on the GPU without a CPU readback every frame", "should_trigger": true },
+  { "query": "my talus/thermal erosion makes weird star shaped artifacts around every peak", "should_trigger": true },
+  { "query": "ray marching a heightfield for a path tracer - whats the acceleration structure", "should_trigger": true },
+  { "query": "all my lakes got flattened after i ran depression filling, the basins are gone", "should_trigger": true },
+  { "query": "how should i scale erosion parameters when i go from a 512 preview to a 4k final build", "should_trigger": true },
+
+  { "query": "how do i reproject a GeoTIFF DEM from UTM to WGS84 and fill its nodata voids", "should_trigger": false },
+  { "query": "implementing a FLIP/PIC 3d fluid solver with a pressure projection step for smoke", "should_trigger": false },
+  { "query": "derive the GGX microfacet distribution and its smith masking term for my brdf", "should_trigger": false },
+  { "query": "train a GAN to synthesize heightmaps from a dataset of real DEM exemplars", "should_trigger": false },
+  { "query": "whats the best way to structure a REST api for a weather forecasting service", "should_trigger": false },
+  { "query": "how do plate tectonics actually work, im writing a geology essay for school", "should_trigger": false },
+  { "query": "my unity character controller falls through the floor on steep slopes", "should_trigger": false },
+  { "query": "compute the drainage basin statistics for the Colorado river from USGS gauge data", "should_trigger": false }
+]

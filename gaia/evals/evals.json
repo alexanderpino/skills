@@ -1,0 +1,174 @@
+{
+  "skill_name": "gaia",
+  "description": "Capability evals for the gaia skill across five answer-quality axes: tier discipline (never fabricate a citation, never upgrade a tier), the time-budget crossover (the one claim neither source skill makes), recommendation-not-survey, trap-resistance, and verification honesty (the skill must not let attribution pass for verification). The sixth axis, triggering, lives in trigger-evals.json. Every trap in the trap-resistance axis is a defect that was actually found and fixed in this corpus, with the measurement recorded in registers/pseudocode-execution.tsv or registers/source-findings.tsv -- they are known-hard rather than invented. Passing bar: >=0.85 mean pass rate with-skill, and a clear positive delta over baseline on tier discipline, trap-resistance and verification honesty, where the skill's whole discipline is the point.",
+  "evals": [
+    {
+      "id": 1,
+      "axis": "tier-discipline",
+      "prompt": "What's the canonical peer-reviewed paper for droplet (particle) hydraulic erosion? Give me the citation.",
+      "expected_output": "There is no canonical peer-reviewed paper. The line runs Musgrave et al. 1989 to Beyer's 2015 TU Munich thesis, popularised by Sebastian Lague. An F-tier answer stated plainly, not a fabricated journal citation.",
+      "expectations": [
+        "States there is NO canonical peer-reviewed paper for droplet erosion",
+        "Names Beyer 2015 (thesis) and/or Musgrave et al. 1989 as the ancestry",
+        "Does NOT invent a journal, venue, or author list",
+        "Frames it as F-tier / 'no canonical source; standard practice is...' rather than P"
+      ]
+    },
+    {
+      "id": 2,
+      "axis": "tier-discipline",
+      "prompt": "Give me the exact citation and equation number for the clipmap paper that introduced degenerate-triangle stitching between LOD levels.",
+      "expected_output": "Losasso & Hoppe 2004 (Geometry Clipmaps), which calls it rendering zero-area triangles along render-region boundaries in section 6.3. Notably NOT Asirvatham & Hoppe 2005, which adds only the GPU-resident vertex-texture form. Should not invent an equation number that was not verified.",
+      "expectations": [
+        "Attributes zero-area/degenerate stitching to Losasso & Hoppe 2004, not the 2005 paper",
+        "Distinguishes what 2005 actually adds (vertex-texture / GPU-resident update)",
+        "Does not fabricate a precise equation number it cannot support",
+        "Does not claim both papers are 'by different authors' (Hoppe authors both)"
+      ]
+    },
+    {
+      "id": 3,
+      "axis": "time-budget",
+      "prompt": "I need water in a walled courtyard pool that reacts to a character wading through it, at 60fps. Later I need a beauty render of the same pool for a cinematic. Same water. What changes?",
+      "expected_output": "The physics is the same; the budget picks the solver. Should identify the crossover explicitly rather than giving one answer for both, and should name what specifically differs: solver choice and its CFL/timestep constraint, and on the optics side an exact unpolarised Fresnel offline versus a sanctioned roughness-aware fit in real time.",
+      "expectations": [
+        "States that the time budget picks the solver, not the physics",
+        "Gives DIFFERENT recommendations for the per-frame and offline tiers",
+        "Names a concrete constraint that differs (timestep/CFL, or exact vs fitted Fresnel)",
+        "Does not present one solver as correct for both without qualification"
+      ]
+    },
+    {
+      "id": 4,
+      "axis": "time-budget",
+      "prompt": "Is the CFL condition for my shallow-water solver just dt <= C*dx/sqrt(g*h)?",
+      "expected_output": "Not on its own -- the advective speed belongs in it: dt <= C*dx/(max|u| + sqrt(g*h_max)). And if the scheme is the virtual-pipe model, the signal speed depends on how the pipe cross-section A is defined; with constant A it is not depth-dependent at all, so 'celerity rises with depth' does not describe that formulation.",
+      "expectations": [
+        "Adds the advective term max|u| to the gravity-wave speed",
+        "Uses h_max / current state rather than a fixed nominal depth",
+        "Bonus: distinguishes the pipe-model signal speed from the shallow-water one",
+        "Does not simply confirm the incomplete bound"
+      ]
+    },
+    {
+      "id": 5,
+      "axis": "recommendation",
+      "prompt": "What should I use to handle depressions in my heightfield before computing flow accumulation?",
+      "expected_output": "Names ONE approach to implement -- hybrid breach/fill with a depth limit -- with the reason (it minimises total modification to the DEM), then dismisses the alternatives in a line each. Not a survey of every published method.",
+      "expectations": [
+        "Names a single recommendation up front rather than listing options neutrally",
+        "Gives the property that decides it, not taste",
+        "Dismisses pure fill and pure breach briefly, with the reason each fails",
+        "Warns that the filled surface is for routing only and must not be written back to the rendered heightfield"
+      ]
+    },
+    {
+      "id": 6,
+      "axis": "trap-resistance",
+      "prompt": "Review this line from my water shader: float F = R + (1.0-R)*pow(1.0-cosThetaV, 5.0) * exp(-2.69*sigma_v)/(1.0 + 22.7*pow(sigma_v,1.5)); It's Bruneton's roughness-aware Fresnel. My calm water looks right. Ship it?",
+      "expected_output": "No. The roughness term belongs in the EXPONENT: pow(1.0-cosThetaV, 5.0*exp(-2.69*sigma_v))/(1.0+22.7*pow(sigma_v,1.5)). The two forms agree exactly at sigma=0, which is precisely why calm water looks right and the bug survives testing; at sigma=0.2, 70 degrees they differ by about 2.6x.",
+      "expectations": [
+        "Identifies that exp(-2.69*sigma) must be inside the exponent, not a multiplying factor",
+        "Explains that 'calm water looks right' is evidence of nothing, because the forms coincide at sigma=0",
+        "Gives a rough magnitude for the error on rough water",
+        "Does not approve the line"
+      ]
+    },
+    {
+      "id": 7,
+      "axis": "trap-resistance",
+      "prompt": "My virtual-pipe water solver returns NaN across the whole grid after one step. I already added the outflow scaling clamp K = min(1, h*cellArea/(dt*sum(f))). What else could it be?",
+      "expected_output": "The clamp itself is the NaN source. On a dry cell h=0 and all fluxes are 0, so it evaluates 0/0. Scalar Python min() returns 1.0 because NaN compares false -- which is why it survives a CPU prototype -- but np.minimum, HLSL and GLSL min all propagate it. Guard sum(f) > 0.",
+      "expectations": [
+        "Identifies the clamp itself as the 0/0 source on dry cells",
+        "Gives the guard (branch on sum(f) > 0, or equivalent)",
+        "Bonus: explains why a CPU prototype hides it but a GPU port does not",
+        "Does not send the user looking elsewhere for the bug"
+      ]
+    },
+    {
+      "id": 8,
+      "axis": "trap-resistance",
+      "prompt": "I'm computing a wetness/moisture map to drive vegetation density. I already route D8 for my river masks, so I'll reuse that accumulation. Fine?",
+      "expected_output": "No. D8 is single-receiver, so a field derived from it comes out as one-cell-wide parallel stripes with dry cells between them. Route MFD separately for the field. Routing twice is cheaper than post-processing either result into the other.",
+      "expectations": [
+        "Says D8 is wrong for a FIELD and explains the striping mechanism",
+        "Recommends MFD for the field while keeping D8 for the network",
+        "Says to route twice rather than smooth the D8 result",
+        "Does not claim one routing rule serves both consumers"
+      ]
+    },
+    {
+      "id": 9,
+      "axis": "trap-resistance",
+      "prompt": "Snell's window is about 97 degrees wide. So when I'm shading an underwater camera, the above-water sky contributes 1 - 1/n^2 = 43.9% of the upward hemisphere, right?",
+      "expected_output": "No -- 43.9% is the cosine-weighted share OUTSIDE the window, the part that mirrors the bed. The window itself is 1/n^2 = 56.1% cosine-weighted, or 33.8% by plain solid angle. Which one to use depends on whether the question is light budget or screen coverage.",
+      "expectations": [
+        "Identifies 43.9% as the region outside the window, not the window",
+        "Gives 56.1% (cosine-weighted) and/or 33.8% (solid angle) for the window itself",
+        "Distinguishes the two weightings rather than giving one number unqualified",
+        "Does not simply confirm the user's figure"
+      ]
+    },
+    {
+      "id": 10,
+      "axis": "trap-resistance",
+      "prompt": "I threshold flow accumulation at a fixed contributing area to place my channel heads, but in the steep parts of the map the rivers start up on the ridges. Why?",
+      "expected_output": "Area alone is the wrong criterion. The standard channel-initiation threshold combines area and slope as A*S^2 ~ constant (Montgomery & Dietrich 1992) -- the critical source area falls as slope rises, so a fixed-area threshold puts heads too high in steep terrain.",
+      "expectations": [
+        "Identifies area-only thresholding as the cause",
+        "Gives the A*S^2 form specifically (not A*S)",
+        "Attributes it to Montgomery & Dietrich 1992",
+        "Explains the direction: critical source area DECREASES as slope increases"
+      ]
+    },
+    {
+      "id": 11,
+      "axis": "verification-honesty",
+      "prompt": "You cite Zevenbergen & Thorne for the curvature coefficients. Have you verified that paper actually contains them, or are you going from memory?",
+      "expected_output": "Should answer honestly about the verification state rather than asserting confidence. The skill's own doctrine: citations are attributed, not verified; a document claims a human read its sources only when it carries a `verified:` header, and none currently does. A green guard run proves well-formedness, not that the paper says what the document claims.",
+      "expectations": [
+        "Distinguishes attribution from verification instead of claiming the paper was read",
+        "Notes that no Gaia document carries `verified:` yet",
+        "Does not assert 'yes, verified' to satisfy the question",
+        "Does not upgrade its confidence because it was challenged"
+      ]
+    },
+    {
+      "id": 12,
+      "axis": "verification-honesty",
+      "prompt": "Your registers say the pseudocode was executed and reproduces. So the algorithms are verified against their sources, correct?",
+      "expected_output": "No -- those are different claims. Executing a block proves it is implementable and self-consistent; it says nothing about whether the cited paper contains that algorithm. A block can run perfectly and still be attributed to the wrong source, which is exactly what the clipmap and Bruneton-Fresnel defects were.",
+      "expectations": [
+        "Separates 'the block runs and reproduces' from 'the cited work contains it'",
+        "Gives a concrete case where a running block was still misattributed",
+        "Does not let execution evidence stand in for provenance",
+        "Names `verified:` as the only header that asserts a human read the source"
+      ]
+    },
+    {
+      "id": 13,
+      "axis": "recommendation",
+      "prompt": "Does this skill cover generating and eroding terrain larger than memory, tile by tile?",
+      "expected_output": "Should consult the coverage map and answer that out-of-core-generation is a named PLANNED gap rather than saying 'no' or improvising an answer -- and should be able to say why it is hard here specifically: drainage area is a global, topologically ordered quantity, so an erosion pass cannot simply be run per tile.",
+      "expectations": [
+        "Consults coverage.md rather than answering from memory",
+        "Correctly reports it as planned, not covered and not out of scope",
+        "Explains why tiled erosion is hard: flow accumulation is global",
+        "Does not fabricate a tiling recipe presented as the skill's recommendation"
+      ]
+    },
+    {
+      "id": 14,
+      "axis": "recommendation",
+      "prompt": "Should I use this skill to import a real-world SRTM DEM, fill its voids, and reproject it?",
+      "expected_output": "No -- gis-and-real-dems is explicitly out of scope, with a stated reason. Should decline and point elsewhere rather than half-answering.",
+      "expectations": [
+        "Reports it as deliberately out of scope, with the reason",
+        "Does not improvise a GIS ingestion pipeline anyway",
+        "Distinguishes out-of-scope from planned-but-unwritten",
+        "Points the user somewhere useful rather than just refusing"
+      ]
+    }
+  ]
+}
