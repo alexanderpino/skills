@@ -258,6 +258,23 @@
                                    "note": {"type": "string"}}}
         },
         "conventions": {"type": "array", "items": {"$ref": "#/$defs/convention"}},
+        "ruled_out": {
+          "type": "array",
+          "description": "Negative results: what refinement looked for and did not find. The most expensive thing a refinement learns and the first thing compression discards - an implementor who does not know a helper is absent will hunt for it, and may 'find' the wrong one (EVI008/EVI009).",
+          "items": {"type": "object", "required": ["claim", "looked_in", "conclusion"],
+                    "properties": {
+                      "claim": {"type": "string", "description": "What is absent, stated as a fact."},
+                      "looked_in": {"type": "array", "items": {"type": "string"},
+                                    "description": "Paths, globs or queries. A negative result nobody can re-check is a rumour."},
+                      "conclusion": {"type": "string", "description": "What an implementor should do given the absence."}}}
+        },
+        "glossary": {
+          "type": "array",
+          "description": "Domain words as they are used here. An implementor with no context reads them as the industry does, which is often not what this codebase means.",
+          "items": {"type": "object", "required": ["term", "means"],
+                    "properties": {"term": {"type": "string"}, "means": {"type": "string"},
+                                   "evidence": {"type": "string"}}}
+        },
         "owners": {"type": "array", "items": {"type": "object",
                    "properties": {"glob": {"type": "string"}, "owner": {"type": "string"}}}}
       }
@@ -321,6 +338,23 @@
                                                      "note": {"type": "string"}}}
         },
         "conventions": {"type": "array", "items": {"$ref": "#/$defs/convention"}},
+        "ruled_out": {
+          "type": "array",
+          "description": "Negative results: what refinement looked for and did not find. The most expensive thing a refinement learns and the first thing compression discards - an implementor who does not know a helper is absent will hunt for it, and may 'find' the wrong one (EVI008/EVI009).",
+          "items": {"type": "object", "required": ["claim", "looked_in", "conclusion"],
+                    "properties": {
+                      "claim": {"type": "string", "description": "What is absent, stated as a fact."},
+                      "looked_in": {"type": "array", "items": {"type": "string"},
+                                    "description": "Paths, globs or queries. A negative result nobody can re-check is a rumour."},
+                      "conclusion": {"type": "string", "description": "What an implementor should do given the absence."}}}
+        },
+        "glossary": {
+          "type": "array",
+          "description": "Domain words as they are used here. An implementor with no context reads them as the industry does, which is often not what this codebase means.",
+          "items": {"type": "object", "required": ["term", "means"],
+                    "properties": {"term": {"type": "string"}, "means": {"type": "string"},
+                                   "evidence": {"type": "string"}}}
+        },
         "done_when": {
           "type": "array", "minItems": 1,
           "items": {
@@ -337,6 +371,17 @@
         "out_of_scope": {"type": "array", "items": {"type": "string"}},
         "rollback": {"type": "object", "properties": {"flag": {"type": "string"},
                                                       "note": {"type": "string"}}},
+        "preflight": {
+          "type": "array",
+          "description": "Commands that verify the brief's anchors still hold before work starts. Anchors drift between refinement and implementation; an agent that cannot tell its brief is stale implements against it anyway (BRF013). On failure: stop and report, never improvise.",
+          "items": {"type": "object", "required": ["cmd"],
+                    "properties": {"type": {"const": "command"}, "cmd": {"type": "string"},
+                                   "expect": {"type": "string"}}}
+        },
+        "stop_and_ask": {
+          "type": "array", "items": {"type": "string"},
+          "description": "Conditions under which the implementor must stop rather than decide. 'forbidden' says what not to touch; this says what not to decide (BRF014)."
+        },
         "context_budget_hint": {"type": "string"},
         "provenance": {"type": "array", "items": {"type": "string"}}
       }

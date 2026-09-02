@@ -416,6 +416,23 @@ def check_evidence(b, rep):
             rep.warn("EVI005", "story.technical_notes_human",
                      "path %r cited in notes but absent from change_surface - verify it exists" % path)
 
+    # Negative results are the most expensive thing a refinement learns and the
+    # first thing compression throws away. An implementor who does not know a
+    # helper is absent will go looking for it, and may "find" the wrong one.
+    ruled_out = ev.get("ruled_out") or []
+    if (b.get("blast_radius") or {}).get("repos", 0) > 1 and not ruled_out and b.get("subtasks"):
+        rep.warn("EVI008", "evidence.ruled_out", "nothing was ruled out on a change across "
+                 "more than one repo - you cannot have read two codebases and learned nothing "
+                 "that is absent; record what you looked for and did not find")
+    for i, entry in enumerate(ruled_out):
+        where = "evidence.ruled_out[%d]" % i
+        if not entry.get("looked_in"):
+            rep.error("EVI009", where, "a negative result with no record of where you looked "
+                      "is a rumour - name the paths, globs or queries")
+        if not entry.get("conclusion"):
+            rep.error("EVI009", where, "no conclusion - say what an implementor should do "
+                      "given the absence, not just that it is absent")
+
     br = b.get("blast_radius") or {}
     if br.get("repos", 0) > 1 and not (ev.get("contracts") or []):
         rep.error("EVI006", "evidence.contracts",
@@ -522,6 +539,17 @@ def _check_brief(s, where, max_files, require_cmd, rep):
         rep.warn("BRF010", where, "no 'forbidden' entries - nothing stops scope creep")
     if not brief.get("out_of_scope"):
         rep.warn("BRF011", where, "no 'out_of_scope' entries")
+    # Anchors drift between refinement and implementation. An agent that cannot
+    # tell its brief has gone stale will implement against the brief anyway.
+    if any(e.get("line") for e in brief.get("entry_points") or []) \
+            and not brief.get("preflight"):
+        rep.warn("BRF013", where, "entry points carry line numbers and nothing verifies them - "
+                 "add a preflight command so the agent finds out the anchor moved instead of "
+                 "editing whatever is at that line now")
+    if not brief.get("stop_and_ask"):
+        rep.warn("BRF014", where, "no 'stop_and_ask' - 'forbidden' says what not to touch, "
+                 "this says when not to decide; without it an agent that finds reality "
+                 "different from the brief improvises")
     blob = json.dumps(brief)
     if "```" in blob or re.search(r"\bdef \w+\(|\bfunction \w+\(|=>\s*\{", blob):
         rep.warn("BRF012", where,

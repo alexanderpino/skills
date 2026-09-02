@@ -258,6 +258,34 @@
       {"rule": "Serializer tests live beside the serializer under tests/api/orders/.", "evidence": "api/tests/api/orders/test_serializers.py:1"},
       {"rule": "User-facing strings come from the i18n catalogue, never inline literals.", "evidence": "web/src/i18n/catalogue.ts:9"}
     ],
+    "ruled_out": [
+      {
+        "claim": "There is no existing VIES client, cache or any VAT-number verification against an external service",
+        "looked_in": ["api/src/billing/**", "api/src/integrations/**", "rg -i 'vies|vat.?check|validate_vat'", "api/pyproject.toml"],
+        "conclusion": "vat.py:12 validates format only. The lookup is new work; do not go looking for a helper to reuse, and do not mistake VatNumber.is_valid for a verification against VIES."
+      },
+      {
+        "claim": "No shared cache abstraction exists in api - Redis is used directly in two places, with no wrapper",
+        "looked_in": ["api/src/**/cache*", "rg -n 'redis|Cache' api/src", "api/src/core/"],
+        "conclusion": "Whatever S0 decides, there is no house cache interface to conform to. If a wrapper is wanted, that is a decision, not a detail - raise it rather than inventing one."
+      },
+      {
+        "claim": "The web repo has no tax or VAT logic at all, and no rate table",
+        "looked_in": ["rg -in 'vat|tax|btw' web/src", "web/src/features/orders/**"],
+        "conclusion": "Web only renders what the response carries. Any tax rule implemented there would be a second source of truth - which is why AC4 is a rendering criterion and nothing more."
+      },
+      {
+        "claim": "No existing feature flag covers billing behaviour; billing.reverse_charge is the first",
+        "looked_in": ["api/config/flags/**", "rg -n 'billing\\.' api/config"],
+        "conclusion": "There is no established rollout pattern for billing flags to copy. S6 sets the precedent, which is why it carries the removal ticket."
+      }
+    ],
+    "glossary": [
+      {"term": "reverse charge", "means": "The EU rule that moves VAT liability to the buyer, so the seller charges 0% and the buyer accounts for it. Not a refund, not a discount, and not a zero rate.", "evidence": "story.source_text; confirmed by Marieke (Finance)"},
+      {"term": "standard rate", "means": "The destination country's normal VAT percentage, resolved from the rate table.", "evidence": "api/src/billing/tax.py:88"},
+      {"term": "VIES", "means": "The European Commission's VAT number validation service. External, unmetered, and it does go down - see R1.", "evidence": "story.risks R1"},
+      {"term": "reason", "means": "The code on the tax object explaining which rule applied: reverse-charge | standard-rate | domestic. Customer-visible via the summary, so its values are a contract, not an implementation detail.", "evidence": "story.acceptance_criteria AC3"}
+    ],
     "owners": [
       {"glob": "api/src/billing/**", "owner": "@team-billing"},
       {"glob": "web/src/features/orders/**", "owner": "@team-storefront"}
@@ -295,6 +323,14 @@
         "forbidden": ["Do not change production code in this subtask.", "Do not add a caching library."],
         "out_of_scope": ["Implementing the cache — S1 does that with the chosen TTL"],
         "rollback": {"flag": "", "note": "documentation only"},
+        "preflight": [
+          {"type": "command", "cmd": "grep -n \"class TaxCalculator\" src/billing/tax.py", "expect": "one hit"},
+          {"type": "command", "cmd": "test -d docs/adr", "expect": "exit 0"}
+        ],
+        "stop_and_ask": [
+          "VIES publishes no revocation frequency you can measure within the timebox - report what you could measure instead of extrapolating",
+          "The measurement suggests no TTL is safe - that is a finding for D2, not a value to pick"
+        ],
         "context_budget_hint": "read_first only; do not index the repo",
         "provenance": ["api@9f2c1ab"]
       }
@@ -352,6 +388,16 @@
           "Non-EU B2B handling (ABC-131)"
         ],
         "rollback": {"flag": "billing.reverse_charge", "note": "default off; no data migration, no backfill"},
+        "preflight": [
+          {"type": "command", "cmd": "grep -n \"def rate_for\" src/billing/tax.py", "expect": "a hit at or near line 88"},
+          {"type": "command", "cmd": "grep -n \"def is_valid\" src/billing/vat.py", "expect": "a hit at or near line 12"},
+          {"type": "command", "cmd": "grep -rn \"billing.reverse_charge\" config/flags", "expect": "the flag exists and defaults off"}
+        ],
+        "stop_and_ask": [
+          "S0 has not landed, so the cache TTL is still unknown - do not pick one",
+          "rate_for turns out to be called from a path the change surface does not list",
+          "VAT validation in vat.py does not distinguish an invalid number from an unreachable VIES - that distinction is AC2 and is not yours to invent"
+        ],
         "context_budget_hint": "read_first only; do not index the repo",
         "provenance": ["api@9f2c1ab", "manifest 2026-09-02"]
       }
@@ -403,6 +449,14 @@
         ],
         "out_of_scope": ["Rendering the tax line in the storefront (S4)"],
         "rollback": {"flag": "billing.reverse_charge", "note": "tax object is present regardless of flag; only its reason value changes"},
+        "preflight": [
+          {"type": "command", "cmd": "grep -n \"def to_representation\" src/api/orders/serializers.py", "expect": "a hit at or near line 31"},
+          {"type": "command", "cmd": "python -m tools.openapi_diff --base origin/main --fail-on breaking", "expect": "exit 0 on a clean tree"}
+        ],
+        "stop_and_ask": [
+          "The additive change turns out not to be additive for a consumer you find in the code - name the consumer and stop",
+          "openapi.yaml already carries a tax object with a different shape"
+        ],
         "context_budget_hint": "read_first only; do not index the repo",
         "provenance": ["api@9f2c1ab"]
       }
@@ -444,6 +498,13 @@
         "forbidden": ["Do not edit openapi.yaml.", "Do not weaken an existing assertion to make a new test pass."],
         "out_of_scope": ["End-to-end browser tests"],
         "rollback": {"flag": "", "note": "tests only"},
+        "preflight": [
+          {"type": "command", "cmd": "ls tests/contract", "expect": "the existing pact fixtures are there"},
+          {"type": "command", "cmd": "pytest tests/contract -q", "expect": "exit 0 before you add anything"}
+        ],
+        "stop_and_ask": [
+          "The contract suite is already red before your change - report it; do not fix it inside this subtask"
+        ],
         "context_budget_hint": "read_first only; do not index the repo",
         "provenance": ["api@9f2c1ab"]
       }
@@ -497,6 +558,14 @@
         ],
         "out_of_scope": ["Invoice PDF layout", "Checkout page tax preview"],
         "rollback": {"flag": "billing.reverse_charge", "note": "server-driven; the component degrades to today's behaviour when tax is absent"},
+        "preflight": [
+          {"type": "command", "cmd": "grep -n \"export function OrderSummary\" src/features/orders/OrderSummary.tsx", "expect": "a hit at or near line 64"},
+          {"type": "command", "cmd": "ls src/i18n/locales", "expect": "nl.json and de.json exist"}
+        ],
+        "stop_and_ask": [
+          "A locale beyond nl and de needs the string - that is Q2 and is unanswered",
+          "The response shape from S2 differs from the one in the shared context"
+        ],
         "context_budget_hint": "read_first only; do not index the repo",
         "provenance": ["web@41ba77c"]
       }
@@ -537,6 +606,12 @@
         "forbidden": ["Do not edit openapi.yaml.", "Do not document behaviour that is not yet merged."],
         "out_of_scope": ["Partner migration guide"],
         "rollback": {"flag": "", "note": "documentation only"},
+        "preflight": [
+          {"type": "command", "cmd": "test -f docs/api/changelog.md", "expect": "exit 0"}
+        ],
+        "stop_and_ask": [
+          "A reason value exists in openapi.yaml that no acceptance criterion mentions - report it rather than documenting a behaviour nobody specified"
+        ],
         "context_budget_hint": "read_first only; do not index the repo",
         "provenance": ["api@9f2c1ab"]
       }
@@ -580,6 +655,14 @@
         "forbidden": ["Do not enable the flag outside NL.", "Do not add a flag entry without a removal date."],
         "out_of_scope": ["Enabling other markets — separate ticket after the first week"],
         "rollback": {"flag": "billing.reverse_charge", "note": "set to off; no data written that depends on it"},
+        "preflight": [
+          {"type": "command", "cmd": "grep -n \"billing.reverse_charge\" config/flags/production.yaml", "expect": "the flag exists"},
+          {"type": "command", "cmd": "python -m tools.flag_lint config/flags/production.yaml", "expect": "exit 0 before your change"}
+        ],
+        "stop_and_ask": [
+          "The zero-VAT counter or the VIES fallback metric is not being emitted yet - without them this rollout is unobservable",
+          "Enabling for NL would also enable it for another market - the flag is not scoped the way the plan assumes"
+        ],
         "context_budget_hint": "read_first only; do not index the repo",
         "provenance": ["api@9f2c1ab"]
       }
@@ -609,7 +692,7 @@
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:e34a85dfb1c765179dc00328acb017d0afc70ade2b65cbef40ddcab70cfa35ec",
+    "bundle_digest": "sha256:ef8377c94dd4bf9d6cc9cc23542d6e93b4a6dd8bffbde1159d144c22ab59cb44",
     "critics": [
       {"id": "implementer", "context": "fresh"},
       {"id": "tester", "context": "fresh"},

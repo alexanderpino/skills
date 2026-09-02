@@ -9,6 +9,7 @@ Writes:
   out/payloads/*.json     one payload per issue, adapter-shaped
   out/briefs/*.json       agent briefs, when the sink is attachment or repo_file
   out/comments/*.md       agent briefs, when the sink is comment
+  out/context/*.md        the shared context every subtask implementor reads first
 
 Pushing is a separate, explicitly approved step. This script never calls an API.
 """
@@ -152,6 +153,85 @@ def render_story(bundle):
     return "\n".join(out).strip() + "\n"
 
 
+def render_shared_context(bundle):
+    """One document every subtask implementor reads, identical for all of them.
+
+    Two reasons it is a separate artefact rather than repeated per brief. It is
+    what refinement *learned* and the ticket does not say - conventions, the
+    glossary, and above all what is absent - so an implementor does not re-derive
+    it, and each re-derivation risks a different answer. And being byte-identical
+    across subtasks, it is a stable prefix: a fan-out runner that puts it first
+    pays for it once."""
+    story = bundle["story"]
+    ev = bundle.get("evidence") or {}
+    key = story.get("key", "")
+    out = ["# Shared context — %s %s" % (key, story.get("title", "")), "",
+           "Read this once before your subtask brief. It is identical for every "
+           "subtask on this story: the facts refinement established, including the "
+           "ones that are absences.", "",
+           "## The outcome this serves", "",
+           (story.get("impact") or {}).get("goal") or story.get("summary_human", ""), ""]
+
+    if ev.get("glossary"):
+        out += ["## Glossary", "",
+                "Domain words in this story mean this here, whatever they mean elsewhere.", ""]
+        for term in ev["glossary"]:
+            out.append("- **%s** — %s%s" % (term.get("term"), term.get("means", ""),
+                                            " (`%s`)" % term["evidence"]
+                                            if term.get("evidence") else ""))
+        out.append("")
+
+    if ev.get("conventions"):
+        out += ["## House conventions, with the code that shows them", "",
+                "Each is cited. Read the citation rather than trusting the sentence, and "
+                "match the code you find.", ""]
+        out += ["- %s — `%s`" % (c.get("rule"), c.get("evidence")) for c in ev["conventions"]]
+        out.append("")
+
+    if ev.get("ruled_out"):
+        out += ["## Already ruled out", "",
+                "Refinement looked for these and did not find them. Do not spend budget "
+                "re-checking, and do not substitute something that merely looks similar.", ""]
+        for r in ev["ruled_out"]:
+            looked = ", ".join("`%s`" % x for x in r.get("looked_in") or [])
+            out.append("- **%s** — looked in %s. %s"
+                       % (r.get("claim"), looked or "unrecorded", r.get("conclusion", "")))
+        out.append("")
+
+    if ev.get("contracts"):
+        out += ["## Contracts that cross a boundary", ""]
+        for c in ev["contracts"]:
+            out.append("- `%s` (%s) — produced by %s, consumed by %s"
+                       % (c.get("path", c.get("id", "?")), c.get("id", ""),
+                          ", ".join(c.get("producers") or []) or "?",
+                          ", ".join(c.get("consumers") or []) or "?"))
+        out.append("")
+
+    decided = [d for d in bundle.get("decisions") or [] if d.get("status") == "locked"]
+    if decided:
+        out += ["## Decided already — do not re-open", ""]
+        out += ["- %s → **%s**. %s" % (d.get("question"), d.get("chosen"), d.get("rationale"))
+                for d in decided]
+        out.append("")
+    deferred = [d for d in bundle.get("decisions") or [] if d.get("status") == "deferred"]
+    if deferred:
+        out += ["## Deliberately still open — do not decide it in passing", ""]
+        out += ["- %s (spike %s, waiting for %s)" % (d.get("question"), d.get("spike"),
+                                                     d.get("waiting_for", "?"))
+                for d in deferred]
+        out.append("")
+
+    provenance = sorted({p for st in bundle.get("subtasks") or []
+                         for p in (st.get("agent_brief") or {}).get("provenance") or []})
+    out += ["## Freshness", "",
+            "This was true at: %s." % (", ".join("`%s`" % p for p in provenance) or "unrecorded"),
+            "",
+            "If your brief's preflight fails, the code has moved since. Stop and report it "
+            "rather than implementing against the brief - a stale anchor is the one case "
+            "where the ticket is wrong and you are right.", ""]
+    return "\n".join(out).strip() + "\n"
+
+
 def render_subtask(st, bundle, cfg, sink):
     parent = bundle["story"].get("key", "")
     out = ["Parent: %s · Covers: %s · Depends on: %s · Est: %sd · Kind: %s" % (
@@ -165,6 +245,11 @@ def render_subtask(st, bundle, cfg, sink):
         else:
             out.append("- [ ] %s" % d.get("text"))
     out.append("")
+    # Preflight and stop_and_ask stay in the brief, not here. The ticket body is
+    # read by a developer who already knows to check whether the file moved; the
+    # agent is the one that needs it written down, and it has the brief.
+    out += ["_Shared context for every subtask on this story: `context/%s-context.md`._"
+            % parent, ""]
     if st.get("needs_coordination"):
         out.append("> Crosses a team boundary: %s. Coordinate before starting."
                    % st.get("coordination_with", "unknown team"))
@@ -460,6 +545,12 @@ def main(argv=None):
             with open(os.path.join(args.out, "comments", stem + ".md"), "w", encoding="utf-8") as fh:
                 fh.write(fence(brief, stem, cfg) + "\n")
 
+    ctx_dir = os.path.join(args.out, "context")
+    os.makedirs(ctx_dir, exist_ok=True)
+    ctx_name = "%s-context.md" % key
+    with open(os.path.join(ctx_dir, ctx_name), "w", encoding="utf-8") as fh:
+        fh.write(render_shared_context(bundle))
+
     plan_waves = waves(bundle.get("subtasks") or [])
     delta = None
     if args.previous:
@@ -528,14 +619,15 @@ def main(argv=None):
                       and i["id"] in delta["subtasks_changed"]],
         "orphans": delta["subtasks_removed"] if delta else [],
         "waves": plan_waves,
+        "shared_context": "context/%s" % ctx_name,
         "idempotency": "search for existing subtasks by exact title under %s before creating" % key,
         "network": "none - this file is a plan, not an action",
     }
     with open(os.path.join(args.out, "push-plan.json"), "w", encoding="utf-8") as fh:
         json.dump(plan, fh, indent=2)
 
-    print("wrote %s/preview.md, push-plan.json, %d payload(s), default sink=%s, %d wave(s)"
-          % (args.out, len(items), sink, len(plan_waves)))
+    print("wrote %s/preview.md, push-plan.json, context/%s, %d payload(s), default sink=%s, "
+          "%d wave(s)" % (args.out, ctx_name, len(items), sink, len(plan_waves)))
     if delta:
         print("  mode=update: +%d subtask(s), ~%d changed, -%d orphaned"
               % (len(delta["subtasks_added"]), len(delta["subtasks_changed"]),

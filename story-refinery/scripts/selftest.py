@@ -120,6 +120,12 @@ MUTATIONS = [
     ("DOD001", mut(lambda b: b["subtasks"][1]["agent_brief"].update(
         {"done_when": [{"type": "command", "cmd": "echo hello", "expect": "exit 0"},
                        {"type": "assertion", "text": "the flag gates the new branch"}]}))),
+    # The dossier: what refinement learned that the ticket does not say.
+    ("EVI008", mut(lambda b: b["evidence"].update({"ruled_out": []}))),
+    ("EVI009", mut(lambda b: b["evidence"]["ruled_out"][0].pop("looked_in"))),
+    ("EVI009-conclusion", mut(lambda b: b["evidence"]["ruled_out"][1].pop("conclusion"))),
+    ("BRF013", mut(lambda b: b["subtasks"][1]["agent_brief"].pop("preflight"))),
+    ("BRF014", mut(lambda b: b["subtasks"][1]["agent_brief"].pop("stop_and_ask"))),
     # Tailoring: the seam a team-tailoring skill layers onto.
     ("TLR001", mut(lambda b: b.pop("tailoring"))),
     ("TLR002", mut(lambda b: b["tailoring"]["applied"][0].update(
@@ -407,6 +413,30 @@ def suite_pipeline():
         check("emit: a held option shows what it waits for and when it expires",
               "stays open until:" in md_preview and "Expires" in md_preview)
         check("emit: the impact goal heads the ticket", "**Goal**:" in md_preview)
+        with open(os.path.join(ws, "out_markdown", "context", "ABC-123-context.md"),
+                  encoding="utf-8") as fh:
+            shared = fh.read()
+        check("emit: the shared context carries what was ruled out",
+              "Already ruled out" in shared and "VIES client" in shared)
+        check("emit: the shared context carries the glossary and the conventions",
+              "reverse charge" in shared and "money.round_half_up" in shared)
+        check("emit: it says what is decided and what is deliberately still open",
+              "do not re-open" in shared and "do not decide it in passing" in shared)
+        check("emit: it dates itself, so a stale brief is detectable",
+              "Freshness" in shared and "api@9f2c1ab" in shared)
+        # The brief itself may be fenced into the description when the tracker has
+        # nowhere else to put it. What must stay clean is the part a person reads.
+        human_half = md_preview.split("## S1 —")[-1].split("<!-- AGENT-BRIEF")[0]
+        check("emit: the human half of the ticket carries no preflight plumbing",
+              "grep -n" not in human_half and "stop_and_ask" not in human_half,
+              human_half[-200:])
+        check("emit: the ticket points at the shared context instead of inlining it",
+              "context/ABC-123-context.md" in human_half)
+        for adapter in ("jira", "github", "linear"):
+            other = open(os.path.join(ws, "out_" + adapter, "context",
+                                      "ABC-123-context.md"), encoding="utf-8").read()
+            check("emit: the shared context is byte-identical for %s - a stable prefix"
+                  % adapter, other == shared)
         check("emit: triage says which labels changed the refinement",
               "## Triage" in md_preview and "**compliance**" in md_preview
               and "blocks ABC-131" in md_preview)

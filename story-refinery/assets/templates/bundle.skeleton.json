@@ -159,6 +159,22 @@
         "note": ""
       }
     ],
+    "ruled_out": [
+      {
+        "_howto": "PHASE 2: what you looked for and did not find. This is the part of the investigation that compression throws away and an implementor pays for twice - once hunting for a helper that is not there, once when they use something that only looks similar. looked_in must be re-checkable: paths, globs, the actual queries.",
+        "claim": "",
+        "looked_in": [],
+        "conclusion": ""
+      }
+    ],
+    "glossary": [
+      {
+        "_howto": "PHASE 2: domain words as they are used here, not as the industry uses them. Cheap to write, and it is what stops an implementor with no context from confidently misreading a noun.",
+        "term": "",
+        "means": "",
+        "evidence": ""
+      }
+    ],
     "conventions": [
       {
         "rule": "",
@@ -225,7 +241,23 @@
             "note": ""
           }
         ],
-        "conventions": [
+        "ruled_out": [
+      {
+        "_howto": "PHASE 2: what you looked for and did not find. This is the part of the investigation that compression throws away and an implementor pays for twice - once hunting for a helper that is not there, once when they use something that only looks similar. looked_in must be re-checkable: paths, globs, the actual queries.",
+        "claim": "",
+        "looked_in": [],
+        "conclusion": ""
+      }
+    ],
+    "glossary": [
+      {
+        "_howto": "PHASE 2: domain words as they are used here, not as the industry uses them. Cheap to write, and it is what stops an implementor with no context from confidently misreading a noun.",
+        "term": "",
+        "means": "",
+        "evidence": ""
+      }
+    ],
+    "conventions": [
           {
             "rule": "",
             "evidence": "path:line"
@@ -250,6 +282,13 @@
           "flag": "",
           "note": ""
         },
+        "preflight": [
+          {"_howto": "PHASE 6: commands that prove the anchors below still hold. Line numbers drift between refinement and implementation; without these an agent edits whatever now sits at line 88. On failure the instruction is stop and report, never improvise.",
+           "type": "command", "cmd": "grep -n \"def <symbol>\" <path>", "expect": "a hit at or near line <n>"}
+        ],
+        "stop_and_ask": [
+          "PHASE 6: the conditions under which the implementor must stop rather than decide. 'forbidden' says what not to touch; this says what not to decide. Include every open question that could surface as a fork mid-implementation."
+        ],
         "context_budget_hint": "read_first only; do not index the repo",
         "provenance": []
       }

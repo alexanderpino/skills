@@ -266,6 +266,18 @@ migration files that cross a repo boundary, with producers and consumers), and
 `evidence.conventions` (house patterns observed in real code, each with a
 citation - these become instructions for the agent).
 
+**Keep the negative results.** `evidence.ruled_out` records what you looked for
+and did not find, with `looked_in` re-checkable (paths, globs, the actual
+queries) and a `conclusion` that says what to do about the absence. This is the
+part of the investigation compression throws away and the implementor pays for
+twice: once hunting for a helper that is not there, once using something that
+only looks similar. Say so explicitly when a near-miss exists - an agent looking
+for VIES verification will happily use a format validator, and every test will
+pass. `EVI008` fires when a story crossing two repos rules nothing out.
+
+`evidence.glossary` costs four to eight lines and stops a context-free
+implementor confidently misreading a domain noun.
+
 ```bash
 python scripts/evidence.py index --config refinery.yaml      # only if provided_index is configured
 python scripts/evidence.py manifest --config refinery.yaml
@@ -406,11 +418,20 @@ text ≤ 80 words. Write what a senior colleague needs: what changes, why, where
 what is risky, what was decided and why. Delete anything they already know.
 
 **Agent brief** - structured JSON per subtask, no budget, assumes nothing. Its
-job is to prevent the four ways agents fail on tickets `[N]`:
+job is to prevent the six ways agents fail on tickets `[N]`:
 - *wandering* → `read_first`, `change_surface`, `context_budget_hint`
 - *scope creep* → `forbidden`, `out_of_scope`
 - *convention drift* → `conventions` with `path:line` evidence
 - *false completion* → `done_when` as runnable commands with expected results
+- *stale anchors* → `preflight`: one command per anchor the brief depends on, and
+  the standing instruction that a failure means stop and report, never implement
+  against it or hunt for where the code moved (`BRF013`)
+- *improvising past an unknown* → `stop_and_ask`: `forbidden` says what not to
+  touch, this says what not to *decide* (`BRF014`)
+
+Preflight and `stop_and_ask` stay in the brief, not in the ticket body. A
+developer reading the ticket already knows to check whether a file moved; the
+ticket is theirs to read and stays readable.
 
 Placement of the agent brief is tracker-dependent and configured via
 `tracker.agent_brief.sink` with a fallback chain:
@@ -500,6 +521,14 @@ over them.
 ```bash
 python scripts/emit.py bundle.json --config refinery.yaml --out out/
 ```
+
+It also writes `out/context/<KEY>-context.md`: one document, identical for every
+subtask, carrying the glossary, the cited conventions, the contracts, the
+ruled-out list, what was decided, what is deliberately still open, and the shas
+it was true at. Being byte-identical it is a stable prefix - a runner that puts
+it first in every implementor's context pays for it once, and one copy cannot
+disagree with itself the way seven repeated ones will. The ticket carries a
+one-line pointer to it.
 
 `emit.py` renders payloads and a push plan, converting the markdown into the
 target markup (`wiki` for Jira Server, `adf` for Jira Cloud, `html`, or
@@ -608,5 +637,5 @@ All stdlib-only Python 3, no dependencies, no network.
 - `assets/examples/example-bundle.json` - a complete, validating two-repo example
 - `evals/trigger-eval.json` - queries that should and should not trigger this
   skill, in the format skill-creator's description optimiser expects
-- `evals/evals.json` - fourteen behavioural evals with verifiable expectations, for
+- `evals/evals.json` - sixteen behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

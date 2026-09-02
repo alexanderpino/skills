@@ -172,6 +172,33 @@
         "The rest of the team's rules were still applied - the refusal is scoped to the one rule",
         "The response did not argue with the tailoring skill at length or moralise about it"
       ]
+    },
+    {
+      "id": 15,
+      "prompt": "Refine ABC-720 (add idempotency keys to the payments endpoint) and prepare it so our implementation agents can pick up the subtasks without us in the loop. Repos ../api and ../worker.",
+      "expected_output": "A refinement whose investigation survives the handoff: negative results recorded, anchors verifiable, and one shared context every subtask agent reads.",
+      "expectations": [
+        "evidence.ruled_out records what was searched for and not found, with re-checkable looked_in entries",
+        "Near-misses are called out explicitly - something that looks like the thing but is not",
+        "A glossary defines the domain nouns as this codebase uses them",
+        "Every brief whose entry points carry line numbers has preflight commands, with the instruction to stop and report on failure",
+        "stop_and_ask lists the open questions that could surface mid-implementation",
+        "The shared context document is produced and each subtask points at it rather than repeating it",
+        "The human-readable ticket is not bloated with the agent plumbing"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "Our agent implemented S2 from last week's refinement and reported that src/billing/tax.py no longer has rate_for at line 88 - it was renamed and moved in an unrelated refactor. Two conventions in the brief also no longer match the code. What now?",
+      "expected_output": "A re-refinement that treats the report as the highest-value input, re-establishes the citations, and folds it into the existing tree.",
+      "expectations": [
+        "The report is treated as correct until checked, not as an agent error",
+        "The citations were re-established by reading the code, not by patching the line number from the report alone",
+        "The conventions that no longer hold are corrected or removed rather than left with stale evidence",
+        "emit.py --previous was used so the existing subtasks are updated instead of a second tree being created",
+        "The bundle was re-validated and the review re-stamped",
+        "Nothing was decomposed further than the correction required"
+      ]
     }
   ]
 }
