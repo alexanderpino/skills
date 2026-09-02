@@ -125,13 +125,21 @@ read from its two sides, and they push a body's interior in opposite directions 
 |---|---|---|
 | What it is | light from the air that **never enters** the water | light from the water **turned back into** it |
 | It behaves as | a **loss**: subtract once, on the way in | a **trap**: it multiplies, `1/(1 - rho*R_int)` |
-| Diffuse (hemispherical) value at `n = 1.335` | **6.67%** | **47.6%** |
+| Cosine-weighted hemispherical value at `n = 1.335` | **6.67%** | **47.63%** |
 | At normal incidence | 2.06% | — the whole cone is sub-critical |
 | Past the critical angle | no critical angle exists from the thin side | **exactly 1** — total internal reflection |
 
 The ratio is **7.14x**, and a reader who takes the wrong one is out by that factor in the direction
 that makes the water too dark. The whole difference is one discontinuity, and the symmetric-looking
 formula `R = (r_s + r_p)/2` does not show it.
+
+⚠️ **Those two are integrals, not angles — say which weighting, as with Snell's window below.**
+6.67% and 47.63% are `R` integrated over the hemisphere **weighted by cosine**, i.e. what a
+Lambertian body above or below the interface actually loses. They are not values at any single
+incidence: at 60° the external figure is 6.01% and the internal one is *exactly 1*, because 60°
+is past `theta_c`. Reproduce by cosine-weighted sampling (`theta = arcsin(sqrt(u))`, `u` uniform)
+of the unpolarised `R` at `n = 1.335`. Quoting either number as "the Fresnel value at grazing" is
+the error this table exists to prevent.
 
 **Total internal reflection and Snell's window.** For water to air, at the one `n` this document
 uses throughout, `n = 1.335`:

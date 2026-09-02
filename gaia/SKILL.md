@@ -80,12 +80,25 @@ Every claim here carries a tier, defined in `references/papers-flow.md`:
 the good answer, and saying "no canonical source; standard practice is…" is stronger than a
 fabricated citation. Half the rendering axis is `F`, correctly.
 
-⚠️ **What "grounded" means here, exactly.** Citations are *attributed*, not *verified*.
-`scripts/check.py` proves every claim points at a real bibliography entry with a locator, that
-nothing is orphaned, and that nothing cites an unverifiable source. It **cannot** prove the
-cited paper says what the document claims. A document says a human has read its sources only
-when it carries `verified:` — and none does yet. Do not describe this skill's contents as
-verified, and do not let a green guard run stand in for having read the paper.
+⚠️ **What "grounded" means here, exactly.** There are three separate claims, and they are
+routinely confused:
+
+| Channel | What it proves | Where it lives |
+|---|---|---|
+| `scripts/check.py` green | every claim points at a real bibliography entry with a locator, nothing is orphaned, nothing cites an unverifiable source | the guard |
+| the block was **run** | the pseudocode, transcribed literally, produces the number printed beside it — it is implementable and self-consistent | `registers/pseudocode-execution.tsv` |
+| `verified:` in a header | a human read the cited work and it says what the document claims | **no document carries this yet** |
+
+Only the third is what most readers hear in the word "grounded". The first cannot prove the
+cited paper says what the document claims; the second cannot either — a block can run
+perfectly and still be attributed to the wrong source, which is exactly what the clipmap and
+Bruneton-Fresnel defects turned out to be. Do not describe this skill's contents as verified,
+and do not let a green guard run, or a green execution row, stand in for having read the paper.
+
+That said, the execution channel earns its place: four of the nine severe defects in the last
+review were invisible to reading and appeared only on running the block — a NaN that scalar
+`min` hides and GPU `min` propagates, a loop that never wrote the variable it read, an
+artefact whose axis was stated backwards, and a pass count wrong by a factor of ten.
 
 ## Routing
 

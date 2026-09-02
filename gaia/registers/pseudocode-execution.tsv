@@ -1,0 +1,41 @@
+# PSEUDOCODE THAT WAS TRANSCRIBED AND RUN, AND WHAT THE RUN MEASURED.
+#
+# WHAT THIS CHANNEL PROVES, AND WHAT IT DOES NOT.
+#
+# This skill's headline caveat is that citations are ATTRIBUTED, not verified: check.py proves
+# a claim points at a real entry with a locator, never that the cited paper says what the
+# document claims. Executing a pseudocode block is a THIRD thing, narrower than either:
+#
+#   check.py green     -> the citation is well-formed.
+#   a row here         -> the block, transcribed literally, produces the number printed beside
+#                         it. The block is self-consistent and implementable.
+#   `verified:` header -> a human read the cited work. NO GAIA DOCUMENT CARRIES THIS.
+#
+# A green row here does NOT mean the algorithm is the one in the cited paper. A block can run
+# perfectly and still be attributed to the wrong source -- the clipmap and Bruneton-Fresnel
+# defects in source-findings.tsv were both exactly that. Do not let this file be read as
+# verification of provenance.
+#
+# WHY IT EXISTS. Four of the nine severe/high defects found in the 2026-09-02 review were
+# invisible to reading and only appeared on execution: a NaN that scalar Python `min` hides
+# and GPU `min` propagates, a droplet loop that never writes the variable it reads, a talus
+# artefact whose axis was stated backwards, and a pass count wrong by 10x. Reading found none
+# of them. An unrun block is an unverified block, and this file is the record of which is which.
+#
+# PROVENANCE COLUMN. `lead` = re-executed by the wave lead against the current tree, numbers
+# below are that run's. `agent` = measured by the reviewing agent and recorded on its report,
+# NOT independently re-run. The distinction is the same one the skill makes everywhere else,
+# and rows are not promoted from agent to lead without an actual second run.
+document	block	what was asserted	what the run measured	outcome	provenance
+terrain-analysis-masks.md	sky-view factor, (1/N)*sum(cos^2 theta)	the discrete sum IS the cosine-weighted visibility integral, not an approximation of it	closed form vs 400k cosine-weighted MC samples at uniform horizon 0/15/30/45/60 deg: 1.0000/0.9330/0.7500/0.5000/0.2500 against 1.0000/0.9325/0.7494/0.5000/0.2489	SOUND -- agrees to MC noise at every angle	lead
+heightfield-lod.md	CDLOD morph, meshDim=8, morphK=1.0	at full morph the child mesh is vertex-identical to its parent, so the LOD transition cannot pop	produced [0 0 2 2 4 4 6 6 8]; every index even, i.e. exactly the parent lattice	SOUND	lead
+water-optics.md	unpolarised Fresnel, both sides, n = 1.335	R_ext 6.67%, R_int 47.63%, ratio 7.14x; F0 2.06%; theta_c 48.51 deg	reproduced exactly, BUT only as COSINE-WEIGHTED HEMISPHERICAL integrals. At a single 60 deg incidence the pair is 6.01% and exactly 1 (past theta_c), ratio 16.65 -- a different statistic entirely.	SOUND, and the run forced a fix: the table said "diffuse (hemispherical)" without naming the weighting, the same ambiguity the Snell's-window warning below it exists to prevent. Weighting and reproduction recipe now stated.	lead
+water-rendering.md	Bruneton roughness-aware Fresnel, roughness in the EXPONENT	the corrected form collapses to Schlick at sigma=0, and the previously shipped factor form is out by 2.6x at sigma=0.2, 70 deg	sigma=0: correct and wrong forms agree to 1.00x, both equal Schlick. sigma=0.2: 70 deg ok/bad = 2.64x; 40 deg 1.22x; 55 deg 2.04x; 83.8 deg 1.98x. Against Schlick the correct fit is 1.19x at 40 deg, 1.38x at 55 deg, 0.82x at 70 deg, 0.44x at 83.8 deg.	SOUND after fix. The sigma=0 agreement is why the bug survived: every calm-water test passes.	lead
+stream-power.md	explicit-diffusion checkerboard analysis, amplification 1-8c	c = 0.25 gives amplification exactly -1 (the artefact is preserved forever, never amplified); c = 0.225 decays it	c=0.25: 1-8c = -1.000, roughness ratio after 32 substeps = 1.000. c=0.225: -0.800, ratio 0.001.	SOUND -- "smooths everything except the artefact" is literally what the numbers say	lead
+stream-power.md	Braun & Willett implicit recurrence, f = K*dt*A^m/dist	the steady state satisfies the slope-area law with exponent -m/n = -0.5	100x100, 500 steps, m=0.5 n=1: log S vs log A regression slope -0.499; adding a per-step priority-flood moves it to -0.501	SOUND	agent
+heightfield-raymarching.md	revised interval-predicate maximum-mip traversal	descending on min(rayHeight(t), rayHeight(tExit)) < node.maxH is direction-free, unlike the tCross form it replaced	293 general + 206 ascending rays against brute-force marching: zero genuine missed hits	SOUND after fix; the pre-fix form leaked shadows on ascending rays	agent
+planetary-precision.md	sphere horizon-culling test	correct on, inside and beyond the horizon circle	exact at z = 1/d, and for points past the far limb	SOUND	agent
+tectonic-uplift.md	spectral flexure solve	fftfreq gives a symmetric deflection; a linspace ramp gives the asymmetric result the warning predicts; the k=0 denominator is finite so no guard is needed	max deflection 0.696 m symmetric vs 0.895 m asymmetric; (rho_m - rho_infill)*g = 7848, finite	SOUND, and the stated failure mode reproduces	agent
+wave-models.md	capillary-gravity minimum and viscous damping alpha = 2*nu*k^2	c_min 0.2312 m/s at lambda_min 0.01712 m; damping table 90 m/345 s, 2.1 m/11 s, 0.14 m/0.3 s; the folk pair is internally inconsistent by 2.49%	all reproduced exactly under the capillary-gravity group speed	SOUND	agent
+noise-and-warping.md	lattice-alignment / per-octave offset table	lacunarity 2 with no offsets gives exactly zero at lattice points; 2.03 gives ratio 0.479; offsets recover comparably	reproduced; agent's independent measurement gave 0.87 vs the document's 0.44, reconciled as an octave-0 difference (non-zero O_0 vs O_0 = 0)	SOUND, with the discrepancy explained rather than waved off	agent
+water-rendering.md	Dupuy erf coverage; Monahan whitecap fraction	erf closed form vs MC; W = 3.84e-6*U^3.41	erf 0.1587 vs MC 0.1583; whitecap 0.093% at 5 m/s, 3.9% at 15 m/s, exactly zero at zero wind	SOUND	agent
