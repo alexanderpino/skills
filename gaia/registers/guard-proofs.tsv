@@ -1,0 +1,22 @@
+# Every assertion in scripts/check.py, with a mutation that turns it RED and a decoy it must
+# NOT fire on. Executed 2026-09-02 against references/flow-routing.md and references/papers.md;
+# every mutation applied to the SUBJECT (a document or the bibliography), never to the guard,
+# and reverted with a byte-comparison afterwards.
+#
+# A guard that has never been seen to fail is not known to be a guard. This file is the
+# evidence, and it is the reason the checker may be believed about FORM -- it says nothing
+# about whether the cited papers contain what the documents claim.
+assertion	mutation	expected	observed	verdict
+citation key resolves	sources id lindsay2016 -> lindsay2017	red: cites an id absent from papers.md	FAIL references/flow-routing.md: cites `lindsay2017`, absent from papers.md	PROVEN
+body marker is declared	delete the montgomery1992 sources row, leave [montgomery1992] in the body	red: body cites an id not in sources	FAIL references/flow-routing.md: body cites [montgomery1992] but it is not in `sources:`	PROVEN
+bibliography entry is well-formed	strip the `P` tier from barnes2014	red: entry does not match the required shape	FAIL papers.md:62: entry does not match `- **id** `T` -- Reference.`	PROVEN
+every citation has a locator	remove locator from the freeman1991 sources row	red: a citation a reader cannot check	FAIL references/flow-routing.md: `freeman1991` has no `locator` (equation or page)	PROVEN
+tier ? is never cited	regrade freeman1991 from P to ?	red: the tier rules forbid citing an unverified claim	FAIL references/flow-routing.md: cites `freeman1991`, graded `?`	PROVEN
+stable requires verification	status draft -> stable, no verified: entry	red: stable claims a human checked the citations	FAIL references/flow-routing.md: status `stable` with no `verified:` entry	PROVEN
+only a human verifies	add verified: { by: process:claude-code }	red: a process can generate, never verify	FAIL references/flow-routing.md: `verified:` without a `human:<id>` actor	PROVEN
+per-document line cap	append 250 filler lines (602 total)	red: over the 450 cap	FAIL references/flow-routing.md: 602 lines, over the 450 cap	PROVEN
+bibliography entry is used	append an entry cited by nothing, not marked [background]	red: the orphan direction	FAIL papers.md: `uncited1999` is cited by no document and is not marked [background]	PROVEN -- tested SEPARATELY, because the first attempt at this row fired the body-marker check instead and would have credited the wrong assertion
+front matter subset is enforced	nested inline map { a: { b: c } }	raise Unparseable rather than silently yield {'a': '{b'}	rejected: nested map or list inside an inline map is outside the subset	PROVEN -- this hole was found by the parser's own first test, which ACCEPTED the nesting and produced garbage
+DECOY reword prose	"Every drainage network" -> "Practically every drainage network"	green: prose edits that touch no citation	exit 0	GREEN
+DECOY background entry	append an entry marked [background]	green: background entries are exempt from the orphan check by design	exit 0	GREEN
+DECOY reorder sources	swap two rows in sources:	green: order carries no meaning	exit 0	GREEN
