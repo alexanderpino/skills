@@ -27,7 +27,8 @@
       "type": "object",
       "description": "criterion id -> subtask ids. Derived; validate.py recomputes it.",
       "additionalProperties": {"type": "array", "items": {"type": "string"}}
-    }
+    },
+    "review": {"$ref": "#/$defs/review"}
   },
   "$defs": {
     "story": {
@@ -247,6 +248,53 @@
                                                       "note": {"type": "string"}}},
         "context_budget_hint": {"type": "string"},
         "provenance": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "review": {
+      "type": "object",
+      "description": "Phase 8. What hostile, blind readers found in the story and its subtasks, and what was done about each finding. Enforced by validate.py REV001-REV009.",
+      "required": ["method", "critics", "findings"],
+      "properties": {
+        "method": {"enum": ["critics", "rubber-duck", "both"],
+                   "description": "critics = the blind panel. rubber-duck = the solo fallback: one voice, full context, lower assurance - say so in the handover."},
+        "bundle_digest": {"type": "string",
+                          "description": "sha256 over the bundle minus 'review' and 'generated_at', written by `review.py digest --stamp`. Proves which content was actually reviewed (REV007)."},
+        "attempted": {"type": "string",
+                      "description": "For a rubber-duck pass that raised nothing: what you tried to break, and why it held."},
+        "critics": {"type": "array", "items": {"$ref": "#/$defs/critic"}},
+        "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}}
+      }
+    },
+    "critic": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string",
+               "description": "implementer | tester | archaeologist | sequencer | stakeholder, or a house critic."},
+        "context": {"enum": ["fresh", "same-session"],
+                    "description": "fresh = a sub-agent that never saw the reasoning. same-session = you re-reading the packet as them, which is weaker and is disclosed."},
+        "attempted": {"type": "string",
+                      "description": "What this critic tried to break and why it held. The only accepted form of a clean report (REV004)."}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": ["id", "severity", "locator", "claim", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "critic": {"type": "string", "description": "Must be one of the recorded critics (REV009)."},
+        "severity": {"enum": ["blocking", "major", "minor"],
+                     "description": "blocking = an implementer would build the wrong thing, or a stated fact is false."},
+        "locator": {"type": "string",
+                    "description": "Path into this bundle, e.g. subtasks[3].agent_brief.done_when[0]. It must resolve (REV005)."},
+        "claim": {"type": "string", "description": "What is wrong, in one sentence."},
+        "failure": {"type": "string",
+                    "description": "The concrete thing that goes wrong downstream if it ships as is: who does what, and what they get."},
+        "status": {"enum": ["open", "fixed", "accepted", "disputed"]},
+        "resolution": {"type": "string",
+                       "description": "What was done. Required for accepted and disputed (REV003)."},
+        "accepted_by": {"type": "string",
+                        "description": "Who accepted the risk. An acceptance only you made is an open question, not an acceptance."}
       }
     }
   }

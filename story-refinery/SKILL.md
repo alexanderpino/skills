@@ -34,6 +34,8 @@ python scripts/evidence.py scan --config refinery.yaml -q "<domain noun>" -q "<s
 cp assets/templates/bundle.skeleton.json bundle.json    # author this, phase by phase
 python scripts/intake.py assess --bundle bundle.json --write   # enough information? stop if not
 python scripts/validate.py bundle.json --config refinery.yaml
+python scripts/review.py brief --bundle bundle.json --out reviews/   # blind critics tear it apart
+python scripts/review.py digest --bundle bundle.json --stamp        # after you fix what they found
 python scripts/emit.py bundle.json --config refinery.yaml --out out/
 ```
 
@@ -78,7 +80,11 @@ an open question.** There is no third state.
    repos depend on each other, contract producers are ordered before consumers.
 6. **Readiness is mechanical.** `validate.py` decides ready/not-ready. Not vibes,
    not a meeting.
-7. **Stop at the seam.** Refinement names files, contracts, conventions and
+7. **Nothing ships unopposed.** Well-formed is not right. Before handover the
+   story and every subtask are read by critics who never saw your reasoning, and
+   every finding ends fixed, accepted with a rationale, or rebutted in writing.
+   You cannot supply that perspective yourself - you already know what you meant.
+8. **Stop at the seam.** Refinement names files, contracts, conventions and
    checks. It does not write the implementation. If you are drafting the diff,
    you have left refinement.
 
@@ -279,7 +285,62 @@ the user rather than deleting them.
 Then score yourself against `references/rubric.md` and report the weakest
 dimension, even when everything passes.
 
-### Phase 8 - Emit and push
+### Phase 8 - Adversarial review
+
+The gates prove the bundle is well-formed. They cannot tell you it is *right* - a
+clean bundle can still name the wrong file, carry criteria nobody can test, and
+plan a wave that deadlocks. Read `references/critique.md`.
+
+```bash
+python scripts/review.py brief --bundle bundle.json --out reviews/
+```
+
+That writes one **sealed packet** per critic: their mandate, the finding contract,
+and only the slice of the bundle that mandate covers. It withholds your reasoning
+mechanically - the conversation, the decision rationales and your self-score are
+never put in the packet - because a critic who can see why you chose something
+judges the reasoning instead of the artefact.
+
+Hand each packet to a separate sub-agent in **fresh context**. The default panel
+`[L]`, each with one question to ask:
+
+| Critic | The one question it exists to ask |
+| --- | --- |
+| `implementer` | executes the brief literally: where must I guess? |
+| `tester` | writes a failing test per criterion: which one is not binary? |
+| `archaeologist` | re-opens every citation: which claim is not in the file? |
+| `sequencer` | attacks the graph: which subtask cannot start when the plan says? |
+| `stakeholder` | source text vs the plan: what is missing, what is uninvited? |
+
+Critics are hostile by assignment. "Looks good" is not a verdict: a critic returns
+findings, or records what they tried to break and why it held. Every finding
+carries a `locator` that resolves in the bundle and a `failure` naming the
+concrete thing that goes wrong downstream - harshness without a locator is vibes,
+and the same evidence rule that binds the refinement binds its critics.
+
+**Rubber-ducking** is the solo fallback: no sub-agents available, or a story at or
+under `review.rubber_duck_max_subtasks`. Speak as the executor, not the author -
+name the first file you would open from each `objective`, narrate each `done_when`
+as if running it and predict its output, say of each criterion "passes when ___,
+fails when ___", and justify why each subtask is separate. Record it as
+`method: "rubber-duck"`; it is lower assurance and the handover should say so.
+
+Then resolve every finding - `fixed`, `accepted` with a written risk, or
+`disputed` with a written rebuttal. Silence is not available. If your rebuttal is
+correct but rests on something not in the bundle, the critic was still right: the
+implementer will see exactly what the critic saw, so put the fact in the bundle.
+
+```bash
+python scripts/validate.py bundle.json --config refinery.yaml   # REV gates, after fixes
+python scripts/review.py digest --bundle bundle.json --stamp    # stamp what was reviewed
+```
+
+A `blocking` finding left open keeps the bundle not-ready (`REV002`), and a stamp
+that no longer matches the content means the review was of an earlier draft
+(`REV007`). Re-run the critics whose slice you changed rather than re-stamping
+over them.
+
+### Phase 9 - Emit and push
 
 ```bash
 python scripts/emit.py bundle.json --config refinery.yaml --out out/
@@ -327,7 +388,8 @@ and why.
 This skill does not: write the implementation; estimate in story points (it
 estimates in days-of-work for sizing only); replace the conversation with
 stakeholders; refine an item it has detected there is not enough information to
-refine; or claim a story is ready when questions remain open.
+refine; hand over a plan that nothing hostile has read; or claim a story is ready
+when questions remain open.
 
 ## Reference files
 
@@ -338,7 +400,8 @@ refine; or claim a story is ready when questions remain open.
 | `references/acceptance-criteria.md` | Phase 3 - example mapping, AC forms, testability |
 | `references/decomposition.md` | Phase 5 - profiles, splitting patterns, sizing, ordering |
 | `references/agent-brief.md` | Phase 6 - agent brief schema, field-by-field guidance |
-| `references/trackers.md` | Phase 0/8 - adapter capabilities, sinks, per-tracker notes |
+| `references/critique.md` | Phase 8 - the critic panel, blindness, findings, rubber-ducking |
+| `references/trackers.md` | Phase 0/9 - adapter capabilities, sinks, per-tracker notes |
 | `references/antipatterns.md` | Any time output feels thin - refinement smells and fixes |
 | `references/rubric.md` | Phase 7 - score the refinement before handing it over |
 
@@ -353,10 +416,13 @@ All stdlib-only Python 3, no dependencies, no network.
 - `scripts/intake.py` - sufficiency detection; exit 0 / 3 / 4 for sufficient / scoutable / insufficient
 - `scripts/evidence.py` - `init` | `manifest` | `index` | `scan` | `contracts`
 - `scripts/validate.py` - the readiness gate
+- `scripts/review.py` - `brief` | `digest` | `check`; sealed critic packets and the
+  REV gates' stamp
 - `scripts/emit.py` - render payloads and a push plan; `--previous` for updates
 - `scripts/markup.py` - markdown to wiki / ADF / HTML / plaintext
-- `scripts/selftest.py` - five suites: validator gates, config parsing, markup
-  conversion, the pipeline end to end, and SKILL.md-to-script consistency. Run
+- `scripts/selftest.py` - six suites: validator gates, config parsing, markup
+  conversion, the pipeline end to end, intake detection, and SKILL.md-to-script
+  consistency. Run
   it after editing anything in `scripts/` or `SKILL.md`; it prints the assertion
   count rather than this file claiming one.
 
@@ -373,5 +439,5 @@ All stdlib-only Python 3, no dependencies, no network.
 - `assets/examples/example-bundle.json` - a complete, validating two-repo example
 - `evals/trigger-eval.json` - queries that should and should not trigger this
   skill, in the format skill-creator's description optimiser expects
-- `evals/evals.json` - five behavioural evals with verifiable expectations, for
+- `evals/evals.json` - eight behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

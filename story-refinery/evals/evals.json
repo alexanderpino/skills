@@ -69,6 +69,31 @@
         "No repo scan was run and no subtasks were written",
         "The answer did not design the cache"
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "Here is a refined bundle for ABC-451 that validate.py already passes. Take it through review before I push it to Jira.",
+      "expected_output": "A blind critic panel run against sealed packets, with findings that name a downstream failure, each one resolved, and the bundle re-stamped.",
+      "expectations": [
+        "review.py brief was used to produce the packets, rather than the critics being asked to read the whole bundle",
+        "Each critic ran in fresh context and was not given the decision rationales or the author's reasoning",
+        "Every finding carries a locator that resolves in the bundle and a concrete downstream failure, not just 'this is unclear'",
+        "No finding was dismissed silently: each ends fixed, accepted with a named accepter, or disputed with a written rebuttal",
+        "validate.py was re-run after the fixes and the bundle was re-stamped with review.py digest",
+        "A panel that raised nothing was reported as a problem with the panel, not as a clean bill of health"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Small one: refine ABC-002 'the CSV export drops the last row when the file ends without a newline'. Single repo, two subtasks at most. No sub-agents available in this session.",
+      "expected_output": "A bugfix-profile refinement checked by an explicit rubber-duck pass, disclosed as lower assurance than a panel.",
+      "expectations": [
+        "The rubber-duck passes were actually performed and their findings recorded, not merely mentioned",
+        "The narration was in the executor's voice: the first file to open, the predicted output of each done_when",
+        "review.method is rubber-duck and the handover says a duck is weaker than a blind panel",
+        "The failing test comes first, per the bugfix profile",
+        "No claim that the story was independently reviewed"
+      ]
     }
   ]
 }

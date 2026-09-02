@@ -1,7 +1,7 @@
 # Handover rubric
 
 `validate.py` decides whether a bundle is *well-formed*. It cannot tell whether
-the refinement is any *good*. Score yourself on these six dimensions before
+the refinement is any *good*. Score yourself on these seven dimensions before
 handover, report the total, and **name the weakest dimension out loud** even when
 the total is high. A refinement handed over with an unnamed weak spot is how the
 weak spot reaches the implementer.
@@ -64,16 +64,25 @@ Score each 0-3. A dimension at 0 or 1 means say so rather than shipping quietly.
 | 1 | Uncertainty smoothed over. |
 | 0 | Readiness theatre: gates ticked with questions still open. |
 
+## 7. Opposition
+
+| | |
+|---|---|
+| 3 | Blind critics with distinct mandates read the artefact, not the reasoning. Findings carry a resolving locator and a named downstream failure. Every one ends fixed, accepted with a written risk and an accepter, or rebutted from the bundle. The stamp matches the content that was reviewed. |
+| 2 | The panel ran and bit, but a mandate or two came back thin. |
+| 1 | Rubber-ducked only, on a story that warranted the panel; or critics who saw the rationale. |
+| 0 | No opposition, or critique theatre: findings recorded, everything accepted, bundle unchanged. |
+
 ---
 
 ## Reading the total
 
 | Total | Meaning |
 |---|---|
-| 16-18 | Hand over. Name the weakest dimension anyway. |
-| 12-15 | Usable. Say which dimension is weak and what would fix it. |
-| 8-11 | Hand over the questions, not the plan. The refinement is not the deliverable yet. |
-| < 8 | Something upstream is missing - usually Phase 2 evidence or a stakeholder answer. Say what you need. |
+| 19-21 | Hand over. Name the weakest dimension anyway. |
+| 14-18 | Usable. Say which dimension is weak and what would fix it. |
+| 9-13 | Hand over the questions, not the plan. The refinement is not the deliverable yet. |
+| < 9 | Something upstream is missing - usually Phase 2 evidence or a stakeholder answer. Say what you need. |
 
 Two failure modes when self-scoring `[N]`: rating your own thoroughness rather
 than the artefact, and rating the effort rather than the result. Score what a

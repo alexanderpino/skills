@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _yaml import get, load_config  # noqa: E402
+from review import SEVERITIES, STATUSES, content_digest, resolve_locator  # noqa: E402
 
 DEFAULT_LEXICON = [
     "etc.", "and so on", "as needed", "appropriately", "properly",
@@ -31,7 +32,7 @@ DEFAULT_NFR_KEYS = ["performance", "concurrency", "failure", "data", "security",
 # leftover, and is reported rather than silently ignored.
 CONFIG_SPEC = {
     "": {"version", "profile", "decomposition", "budgets", "tracker", "evidence",
-         "intake", "gates", "validation"},
+         "intake", "gates", "review", "validation"},
     "decomposition": {"one_repo_per_subtask", "one_pr_per_subtask", "title_pattern",
                       "mandatory", "spike_when_unresolved", "spike_timebox_days"},
     "decomposition.mandatory[]": {"kind", "when"},
@@ -47,7 +48,9 @@ CONFIG_SPEC = {
                            "budget_files", "budget_seconds"},
     "evidence.repos[]": {"name", "path"},
     "evidence.split_thresholds": {"repos", "files", "breaking_contracts", "owner_teams"},
-    "gates": {"design_decisions", "push"},
+    "gates": {"design_decisions", "push", "adversarial_review"},
+    "review": {"method", "panel", "min_critics", "rubber_duck_max_subtasks",
+               "require_fresh_context"},
     "intake": {"feature_required", "feature_recommended", "bug_required", "bug_recommended",
                "min_anchors"},
     "validation": {"fail_on", "require_command_done_when", "require_coverage_matrix",
@@ -598,6 +601,97 @@ def check_intake(b, cfg, rep):
                  "the bugfix profile puts the failing test first" % b.get("profile"))
 
 
+def check_review(b, cfg, rep):
+    """Did anyone hostile read this before an implementer did?
+
+    `validate.py` proves the bundle is well-formed; it cannot tell whether the plan
+    is wrong. That judgement comes from critics who never saw the reasoning, and
+    these gates hold the bundle to what they found."""
+    mode = str(get(cfg, "gates.adversarial_review", "on") or "on").lower()
+    review = b.get("review") or {}
+    if mode == "off" and not review:
+        return
+    if not review:
+        if b.get("subtasks"):
+            rep.error("REV001", "review", "no adversarial review - nothing has criticised "
+                      "this story or its subtasks; run `review.py brief`, run the panel, "
+                      "and record what it found")
+        return
+
+    method = str(review.get("method") or get(cfg, "review.method", "critics")).lower()
+    if method not in ("critics", "rubber-duck", "both"):
+        rep.error("REV001", "review.method",
+                  "method must be critics | rubber-duck | both, got %r" % review.get("method"))
+        return
+
+    digest = review.get("bundle_digest")
+    current = content_digest(b)
+    if not digest:
+        rep.error("REV007", "review.bundle_digest", "review is not stamped - run "
+                  "`review.py digest --bundle <bundle> --stamp` so it is provable which "
+                  "content was reviewed")
+    elif digest != current:
+        rep.error("REV007", "review.bundle_digest", "the bundle changed after this review "
+                  "(stamped %s, now %s) - a review of an earlier draft is not a review of "
+                  "this one; re-run the affected critics"
+                  % (str(digest)[:14], current[:14]))
+
+    critics = review.get("critics") or []
+    findings = review.get("findings") or []
+    critic_ids = {c.get("id") for c in critics}
+
+    if method in ("critics", "both"):
+        minimum = get(cfg, "review.min_critics", 3)
+        if minimum and len(critics) < minimum:
+            rep.error("REV006", "review.critics",
+                      "%d critic(s), minimum %d - one reviewer finds one class of problem"
+                      % (len(critics), minimum))
+    if method == "rubber-duck":
+        limit = get(cfg, "review.rubber_duck_max_subtasks", 3)
+        if limit and len(b.get("subtasks") or []) > limit:
+            rep.warn("REV008", "review.method",
+                     "rubber-ducking alone on %d subtasks (limit %d) - one voice with full "
+                     "context misses what a blind critic catches; run the panel"
+                     % (len(b.get("subtasks") or []), limit))
+
+    for c in critics:
+        if not any(f.get("critic") == c.get("id") for f in findings) and not c.get("attempted"):
+            rep.warn("REV004", "review.critics.%s" % (c.get("id") or "?"),
+                     "found nothing and recorded no 'attempted' note - a critic who reports "
+                     "silence either did not look or was not blind")
+    if not findings and method == "rubber-duck" and not review.get("attempted"):
+        rep.warn("REV004", "review", "rubber-duck pass with no findings and no 'attempted' "
+                 "note - say what you tried to break and why it held")
+
+    for i, f in enumerate(findings):
+        where = "review.findings.%s" % (f.get("id") or i)
+        severity, status = f.get("severity"), f.get("status")
+        if severity not in SEVERITIES:
+            rep.error("REV009", where, "severity must be %s, got %r"
+                      % (" | ".join(SEVERITIES), severity))
+        if status not in STATUSES:
+            rep.error("REV009", where, "status must be %s, got %r"
+                      % (" | ".join(STATUSES), status))
+        if critic_ids and f.get("critic") not in critic_ids:
+            rep.error("REV009", where, "attributed to %r, who is not one of the recorded "
+                      "critics" % f.get("critic"))
+        if not f.get("failure"):
+            rep.warn("REV009", where, "no 'failure' - a finding that does not name what "
+                     "goes wrong downstream cannot be prioritised")
+        resolved, _ = resolve_locator(b, f.get("locator"))
+        if not resolved:
+            rep.error("REV005", where, "locator %r does not resolve in this bundle - it "
+                      "points at nothing an author can fix" % f.get("locator"))
+        if severity == "blocking" and status == "open":
+            rep.error("REV002", where, "blocking finding still open: %s"
+                      % (f.get("claim") or "?"))
+        if status in ("accepted", "disputed") and not f.get("resolution"):
+            rep.error("REV003", where, "%s with no resolution - a finding cannot be waved "
+                      "away silently; record the risk accepted or the rebuttal" % status)
+        if status == "fixed" and not f.get("resolution"):
+            rep.warn("REV003", where, "fixed with no note saying what changed")
+
+
 def check_config(cfg, rep):
     """A typo'd config key is silently ignored, which is how a setting you think is
     enforced turns out not to be. Name them."""
@@ -639,6 +733,7 @@ def validate(bundle, cfg):
     check_coverage(bundle, subs, cfg, rep)
     check_split_thresholds(bundle, cfg, rep)
     check_nonfunctional(bundle, cfg, rep)
+    check_review(bundle, cfg, rep)
     return rep
 
 

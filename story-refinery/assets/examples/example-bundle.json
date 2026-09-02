@@ -523,5 +523,70 @@
     "AC2": ["S1"],
     "AC3": ["S2", "S3", "S5"],
     "AC4": ["S4"]
+  },
+  "review": {
+    "method": "critics",
+    "bundle_digest": "sha256:148fa7bd67117344c4ff96a0d0e8c72543dcf2966ec20b024559fe59390e0ec1",
+    "critics": [
+      {"id": "implementer", "context": "fresh"},
+      {"id": "tester", "context": "fresh"},
+      {"id": "archaeologist", "context": "fresh"},
+      {"id": "sequencer", "context": "fresh"},
+      {"id": "stakeholder", "context": "fresh",
+       "attempted": "Read the source text against the criteria and the subtask titles. Every outcome in the ask maps to AC1-AC4; the two additions — the reason field and the rollout flag — trace to D1 and D2. Nothing asked for is missing and nothing uninvited was added."}
+    ],
+    "findings": [
+      {
+        "id": "F1",
+        "critic": "implementer",
+        "severity": "blocking",
+        "locator": "subtasks[4].agent_brief.forbidden[1]",
+        "claim": "S4's brief edited the German locale file while Q2 — which locales ship on day one — was still open, and nothing in the brief bounded the locale set.",
+        "failure": "An agent adding the tax line follows the i18n convention, finds every file under src/i18n/locales/, and adds machine-invented German tax wording that no reviewer ever saw, to customers who read it as legal text.",
+        "status": "fixed",
+        "resolution": "Added the forbidden entry pinning the set to nl and de until Q2 is answered."
+      },
+      {
+        "id": "F2",
+        "critic": "tester",
+        "severity": "major",
+        "locator": "story.acceptance_criteria[1]",
+        "claim": "AC2 folds 'unverifiable' in with missing and malformed, so a VIES outage and an invalid VAT number are one case with one expected outcome.",
+        "failure": "An implementer treats a VIES timeout as an invalid number and charges 19 percent German VAT to a business customer whose number is valid — and every acceptance test still passes.",
+        "status": "accepted",
+        "resolution": "Deliberate. Falling back to the standard rate during an outage over-charges, which is refundable; the reverse is not. S0's ADR records the exposure at the chosen TTL and S6's alert surfaces a raised fallback rate within 15 minutes.",
+        "accepted_by": "Marieke (Finance)"
+      },
+      {
+        "id": "F3",
+        "critic": "archaeologist",
+        "severity": "blocking",
+        "locator": "story.technical_notes_human",
+        "claim": "TaxCalculator.rate_for was cited at api/src/billing/tax.py:41. Line 41 is the rate table constant; the method is not there.",
+        "failure": "The agent opens tax.py:41, finds a dict literal, and either edits the rate table directly or spends its context budget hunting for the real method — the exact wandering the brief exists to prevent.",
+        "status": "fixed",
+        "resolution": "Re-opened the file: rate_for is at line 88. Corrected in the notes and in evidence.change_surface."
+      },
+      {
+        "id": "F4",
+        "critic": "sequencer",
+        "severity": "major",
+        "locator": "subtasks[6].depends_on",
+        "claim": "The rollout subtask depended on S1 alone, so the flag could be enabled while the customer-facing summary line was still unshipped.",
+        "failure": "Enabling billing.reverse_charge for NL without S4 shows business customers a zero-VAT total with no explanation of why — the support load this story exists to remove.",
+        "status": "fixed",
+        "resolution": "S6 now depends on S4, which transitively orders it behind S1 and S2."
+      },
+      {
+        "id": "F5",
+        "critic": "sequencer",
+        "severity": "minor",
+        "locator": "subtasks[3].estimate_days",
+        "claim": "0.25 days for contract tests over a new response field reads as an estimate written to fit the cap.",
+        "failure": "S3 overruns and takes the wave it shares with S4 and S5 with it, so the rollout slips a day without anyone deciding to slip it.",
+        "status": "disputed",
+        "resolution": "The serializer change and its own tests are S2's work; S3 adds cases to the existing tests/contract suite in the style S2 already established. The estimate covers assertions only, which is what the brief's change_surface shows."
+      }
+    ]
   }
 }

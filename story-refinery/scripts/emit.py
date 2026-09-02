@@ -227,6 +227,46 @@ def resolve_per_subtask_sinks(bundle, cfg, caps, default_sink, warnings):
     return sinks
 
 
+def review_section(bundle):
+    """What the critics found, in the artefact the user approves the push from.
+
+    Accepted risks and rebuttals are decisions someone other than the author should
+    see before this reaches a board, which makes the preview the right place."""
+    review = bundle.get("review") or {}
+    if not review:
+        return ["## Review", "",
+                "**No adversarial review recorded.** Nothing hostile has read this "
+                "story or its subtasks. Say so out loud before anyone implements it.",
+                ""]
+    findings = review.get("findings") or []
+    critics = review.get("critics") or []
+    method = review.get("method", "?")
+    lines = ["## Review", "",
+             "Method: **%s** · critics: %s · findings: %d"
+             % (method, ", ".join("%s (%s)" % (c.get("id"), c.get("context", "?"))
+                                  for c in critics) or "none", len(findings)), ""]
+    if method == "rubber-duck":
+        lines += ["> Rubber-ducked, not reviewed by a blind panel: one voice with full "
+                  "context. Lower assurance, stated here rather than left to be assumed.",
+                  ""]
+    carried = [f for f in findings if f.get("status") in ("open", "accepted", "disputed")]
+    if carried:
+        lines += ["These findings were not fixed. They are what you are approving:", ""]
+        for f in carried:
+            lines.append("- **%s %s** (%s, `%s`): %s"
+                         % (f.get("status", "?"), f.get("id", "?"), f.get("severity", "?"),
+                            f.get("locator", "?"), f.get("claim", "")))
+            if f.get("resolution"):
+                lines.append("  - %s%s" % (f["resolution"],
+                                           " — %s" % f["accepted_by"]
+                                           if f.get("accepted_by") else ""))
+        lines.append("")
+    fixed = [f.get("id") for f in findings if f.get("status") == "fixed"]
+    if fixed:
+        lines += ["Fixed before handover: %s." % ", ".join(fixed), ""]
+    return lines
+
+
 def waves(subtasks):
     """Topological layers. Everything in one wave can run in parallel, which is what a
     fan-out runner needs and what a sprint board should show."""
@@ -367,6 +407,7 @@ def main(argv=None):
     for w in plan_waves:
         preview.append("- **Wave %d**: %s%s" % (w["wave"], ", ".join(w["subtasks"]),
                                                 " — %s" % w["note"] if w.get("note") else ""))
+    preview += [""] + review_section(bundle)
     preview += ["", "_Field names and issue types below are unverified `[?]` until probed "
                 "against the live tracker._", "", "---", ""]
     for item in items:

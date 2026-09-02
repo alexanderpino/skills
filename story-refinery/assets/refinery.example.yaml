@@ -115,6 +115,24 @@ intake:
 gates:
   design_decisions: multiple-choice   # [claude] multiple-choice | narrative | off
   push: manual                        # [claude] manual | auto-on-green
+  adversarial_review: on              # [script] REV001. on | off - off ships unreviewed
+
+# ---------------------------------------------------------------------- review
+# The critique of the refinement itself, before anyone implements it. Critics are
+# blind: they see the artefact and their mandate, never the reasoning behind it.
+review:
+  # [claude] critics | rubber-duck | both. 'critics' is the panel; 'rubber-duck' is
+  # the solo fallback for small stories or sessions that cannot spawn sub-agents.
+  method: critics
+  panel:                          # [claude] ids from references/critique.md
+    - implementer                 #   executes the brief literally
+    - tester                      #   tries to write a failing test per criterion
+    - archaeologist               #   re-opens every citation
+    - sequencer                   #   attacks the graph, waves and sizing
+    # - stakeholder               #   source text vs the plan; add when scope may have drifted
+  min_critics: 3                  # [script] REV006
+  rubber_duck_max_subtasks: 3     # [script] REV008 - above this, a duck is not enough
+  require_fresh_context: true     # [claude] a critic who has read your reasoning grades it
 
 # ------------------------------------------------------------------ validation
 validation:

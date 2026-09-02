@@ -216,5 +216,29 @@
     "AC1": [
       "S1"
     ]
+  },
+  "review": {
+    "_howto": "PHASE 8: once validate.py is green, run `review.py brief --bundle bundle.json --out reviews/` and hand each sealed packet to a separate critic in fresh context. Record what they found here, resolve every finding, re-validate, then `review.py digest --bundle bundle.json --stamp`.",
+    "method": "critics",
+    "bundle_digest": "PHASE 8: written by `review.py digest --stamp`. Never typed by hand.",
+    "critics": [
+      {"id": "implementer", "context": "fresh"},
+      {"id": "tester", "context": "fresh"},
+      {"id": "archaeologist", "context": "fresh"},
+      {"id": "sequencer", "context": "fresh",
+       "attempted": "only when this critic raised nothing: what it tried to break, and why it held"}
+    ],
+    "findings": [
+      {
+        "id": "F1",
+        "critic": "tester",
+        "severity": "blocking",
+        "locator": "story.acceptance_criteria[0]",
+        "claim": "what is wrong, in one sentence",
+        "failure": "who does what, and what they wrongly get, if this ships as is",
+        "status": "fixed",
+        "resolution": "what changed. accepted -> the risk and who accepted it; disputed -> the rebuttal and its evidence"
+      }
+    ]
   }
 }

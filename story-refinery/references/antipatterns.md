@@ -107,3 +107,9 @@ spike that is useful regardless of which way the decision goes.
 **Silent scope inflation.** The refinement is better than the story asked for.
 *Tell:* AC not traceable to `story.source_text`. *Fix:* move the improvements to
 `non_goals` with a follow-up note, and say out loud that you did so.
+
+**Unopposed handover.** The bundle is well-formed and nothing hostile ever read
+it. *Tell:* `REV001`, or a `review` block whose critics all found nothing.
+*Fix:* Phase 8. The smells of the critique itself - the agreeable panel, critique
+theatre, invented severity, the author defending - are in
+`references/critique.md`.

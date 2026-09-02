@@ -3,11 +3,14 @@
 
   python selftest.py
 
-Four suites:
+Seven suites:
   1. Validator gates  - mutate the golden bundle, assert each gate fires
   2. Config parsing   - the YAML subset, including the cases that bit us
   3. Markup           - wiki / ADF / HTML / plaintext conversion
   4. Pipeline         - evidence -> validate -> emit -> emit --previous, end to end
+  5. Intake detection - sufficiency verdicts, English and Dutch
+  6. Adversarial review - digests, locators, and that a critic packet really is blind
+  7. Docs consistency - SKILL.md against the scripts and validator codes it cites
 
 A validator nobody has tried to break is a validator nobody should trust, and the
 same goes for the config reader that decides which gates run at all.
@@ -115,6 +118,24 @@ MUTATIONS = [
     ("DOD001", mut(lambda b: b["subtasks"][1]["agent_brief"].update(
         {"done_when": [{"type": "command", "cmd": "echo hello", "expect": "exit 0"},
                        {"type": "assertion", "text": "the flag gates the new branch"}]}))),
+    # Adversarial review: the panel, and the ways a review can be theatre.
+    ("REV001", mut(lambda b: b.pop("review"))),
+    ("REV001-method", mut(lambda b: b["review"].update({"method": "vibes"}))),
+    ("REV002", mut(lambda b: b["review"]["findings"][0].update({"status": "open"}))),
+    ("REV003", mut(lambda b: b["review"]["findings"][1].pop("resolution"))),
+    ("REV004", mut(lambda b: b["review"]["critics"][4].pop("attempted"))),
+    ("REV005", mut(lambda b: b["review"]["findings"][0].update(
+        {"locator": "subtasks[99].agent_brief.nowhere"}))),
+    ("REV006", mut(lambda b: b["review"].update(
+        {"critics": b["review"]["critics"][:2],
+         "findings": [f for f in b["review"]["findings"]
+                      if f["critic"] in ("implementer", "tester")]}))),
+    ("REV007", mut(lambda b: b["review"].update({"bundle_digest": "sha256:deadbeef"}))),
+    # A review whose findings were addressed by editing the bundle afterwards is a
+    # review of a document that no longer exists.
+    ("REV007-drift", mut(lambda b: b["subtasks"][1].update({"estimate_days": 0.75}))),
+    ("REV008", mut(lambda b: b["review"].update({"method": "rubber-duck"}))),
+    ("REV009", mut(lambda b: b["review"]["findings"][0].update({"severity": "catastrophic"}))),
 ]
 
 
@@ -366,7 +387,7 @@ def suite_pipeline():
 def suite_docs():
     """SKILL.md is the interface. A flag that no longer exists, or a reference file
     that was renamed, breaks the skill just as thoroughly as a bad regex."""
-    print("\n-- 5. docs consistency --")
+    print("\n-- 7. docs consistency --")
     import re
     with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
         skill = fh.read()
@@ -452,7 +473,7 @@ INTAKE_TEXTS = {
 
 
 def suite_intake():
-    print("\n-- 6. intake detection --")
+    print("\n-- 5. intake detection --")
     from intake import assess
     reachable_cfg = {"evidence": {"repos": [{"name": "self", "path": ROOT}]}}
     unreachable_cfg = {"evidence": {"repos": [{"name": "ghost", "path": "/nonexistent/x"}]}}
@@ -512,6 +533,87 @@ def suite_intake():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def suite_review():
+    """The critic packets are the only mechanical guarantee of blindness in the
+    skill. If the reasoning leaks into one, the panel is grading the reasoning."""
+    print("\n-- 6. adversarial review --")
+    from review import (CRITICS, DEFAULT_PANEL, cmd_check, content_digest,
+                        render_brief, resolve_locator)
+    with open(GOLDEN, encoding="utf-8") as fh:
+        golden = json.load(fh)
+
+    digest = content_digest(golden)
+    reordered = json.loads(json.dumps(golden, sort_keys=True))
+    check("digest: stable under key order and whitespace",
+          content_digest(reordered) == digest)
+    check("digest: review block does not hash itself",
+          content_digest(dict(golden, review={"method": "rubber-duck"})) == digest)
+    check("digest: a re-render does not invalidate a review",
+          content_digest(dict(golden, generated_at="2999-01-01T00:00:00Z")) == digest)
+    changed = copy.deepcopy(golden)
+    changed["subtasks"][1]["estimate_days"] = 0.75
+    check("digest: content change moves it", content_digest(changed) != digest)
+    check("digest: the shipped example is stamped with its own content",
+          golden["review"]["bundle_digest"] == digest, golden["review"]["bundle_digest"])
+
+    for locator, expect in (("story.acceptance_criteria[1].id", "AC2"),
+                            ("subtasks[6].depends_on[0]", "S4"),
+                            ("$.story.key", "ABC-123")):
+        ok, value = resolve_locator(golden, locator)
+        check("locator resolves: %s" % locator, ok and value == expect, value)
+    for locator in ("subtasks[99]", "story.nope", "subtasks.0.id", "", "story..key"):
+        ok, _ = resolve_locator(golden, locator)
+        check("locator rejected: %r" % locator, not ok)
+
+    # Blindness: the packet must carry the artefact and nothing that explains it.
+    rationale = golden["decisions"][0]["rationale"]
+    for cid in DEFAULT_PANEL:
+        packet = render_brief(golden, cid)
+        check("packet %s: withholds decision rationale" % cid, rationale not in packet)
+        check("packet %s: withholds the self-score" % cid,
+              "rubric" not in packet.lower() and '"decisions"' not in packet)
+        check("packet %s: carries the finding contract" % cid,
+              "locator" in packet and "failure" in packet)
+        check("packet %s: states what was withheld" % cid, "Withheld deliberately" in packet)
+    # Only the artefact section; the instructions above it legitimately name fields.
+    artefact = lambda cid: render_brief(golden, cid).split("## The artefact", 1)[1]  # noqa: E731
+    impl = artefact("implementer")
+    check("packet implementer: carries the briefs it must execute",
+          "read_first" in impl and "done_when" in impl)
+    check("packet implementer: judges the brief alone, not the criteria behind it",
+          "acceptance_criteria" not in impl)
+    seq = artefact("sequencer")
+    check("packet sequencer: carries the graph, not the prose",
+          "depends_on" in seq and "summary_human" not in seq)
+    arch = artefact("archaeologist")
+    check("packet archaeologist: carries every citation", "change_surface" in arch
+          and "conventions" in arch)
+    stake = artefact("stakeholder")
+    check("packet stakeholder: carries the original ask",
+          golden["story"]["source_text"][:40] in stake)
+    check("packet stakeholder: not shown the technical plan",
+          "technical_notes_human" not in stake)
+    check("every configured panel member is a known critic",
+          all(c in CRITICS for c in
+              (load_config(CONFIG).get("review") or {}).get("panel") or []),
+          (load_config(CONFIG).get("review") or {}).get("panel"))
+
+    check("check: clean bundle exits 0", cmd_check(copy.deepcopy(golden)) == 0)
+    blocked = copy.deepcopy(golden)
+    blocked["review"]["findings"][0]["status"] = "open"
+    check("check: an open blocking finding exits 1", cmd_check(blocked) == 1)
+    unreviewed = copy.deepcopy(golden)
+    unreviewed.pop("review")
+    check("check: no review at all exits 1", cmd_check(unreviewed) == 1)
+
+    # The gate can be switched off, but only deliberately.
+    cfg_off = copy.deepcopy(load_config(CONFIG))
+    cfg_off.setdefault("gates", {})["adversarial_review"] = "off"
+    rep = validate(unreviewed, cfg_off)
+    check("gate off: an unreviewed bundle is not blocked",
+          "REV001" not in {i["code"] for i in rep.items})
+
+
 def main():
     with open(GOLDEN, encoding="utf-8") as fh:
         golden = json.load(fh)
@@ -521,6 +623,7 @@ def main():
     suite_markup()
     suite_pipeline()
     suite_intake()
+    suite_review()
     suite_docs()
     print("\n%s  %d failure(s)" % ("PASS" if not FAILURES else "FAIL", len(FAILURES)))
     if FAILURES:
