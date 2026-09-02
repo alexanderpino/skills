@@ -225,6 +225,20 @@
         "open_questions records who each question was put to and when",
         "Where the user could not answer, the question got a named owner and stayed blocking rather than being resolved by the assistant"
       ]
+    },
+    {
+      "id": 19,
+      "prompt": "Refine ABC-131 (non-EU B2B reverse charge). ABC-123 is still in progress - the tax object it adds to the order response is not merged yet. We use Jira.",
+      "expected_output": "A refinement that cites the unbuilt work as pending, points at the item that creates it, and asks for the blocking link.",
+      "expectations": [
+        "The tax object is recorded in evidence.pending, not cited as though the code existed",
+        "The pending entry names the ticket and subtask that create it, and the bundle where its shape is specified",
+        "The shape of the tax object was not re-specified here - it points at ABC-123 instead",
+        "story.links carries a blocked_by link to ABC-123, and the push plan renders it as Jira's own link type",
+        "The rendered ticket has a Prerequisites section a developer can read",
+        "The shared context tells an implementor not to hunt for the file and not to substitute something similar",
+        "expected_path is presented as a prediction rather than as a citation"
+      ]
     }
   ]
 }

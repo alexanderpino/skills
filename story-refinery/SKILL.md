@@ -67,7 +67,16 @@ Claims in this skill and in the references are tagged so you know what to trust:
 
 Carry the same discipline into your output. **Every technical claim in a
 refinement either cites `repo/path:line` or is tagged `ASSUMPTION` and becomes
-an open question.** There is no third state.
+an open question.**
+
+There is one further state, and only one: a claim about code that **does not
+exist yet because another item specifies it and nobody has implemented it**. That
+is neither evidence nor assumption - it is somebody else's specified work. It
+goes in `evidence.pending`, cites the item that creates it (ticket, subtask, and
+the bundle where its shape is fixed) instead of a line, and requires a
+`blocked_by` link so the ordering survives outside your head (`PND001`,
+`PND002`). Anything that does not fit that shape is an assumption; the state
+exists to be checkable, not to be a third place to put a guess.
 
 ## Core principles
 
@@ -575,6 +584,21 @@ pieces of a split epic, and as the follow-ups earlier refinements created.
   fastest and most silently: the absence someone filled in last sprint is exactly
   what a new story is likely to have added, and stale confidence reads as
   evidence.
+- **Cite what does not exist yet as what it is.** Refining a follow-up means
+  reasoning about code the predecessor has not shipped. Put it in
+  `evidence.pending` with the item that creates it - `expected_path` is a
+  prediction and is labelled as one, never a citation. The rendered ticket gets a
+  **Prerequisites** section and the shared context a "Not there yet" block, so an
+  implementor is told not to hunt for it and not to substitute something that
+  merely looks similar.
+- **Make the order real in the tracker.** Inside one story the wave plan holds
+  the order; across stories nothing does except a link. `story.links` carries the
+  canonical vocabulary - `blocks`, `blocked_by`, `relates`, `duplicates` - and
+  `emit.py` maps it onto what the tracker actually calls it (Jira "is blocked
+  by", Azure DevOps "Predecessor", Linear `blocked_by`) `[?]`, degrading with a
+  note where a tracker has no typed links at all, as GitHub does. `LNK003` is the
+  one that catches the common miss: a follow-up this refinement created, linked
+  to nothing, which is how a follow-up becomes a rediscovery.
 - **Record what this refinement creates.** Non-goals naming a ticket, deferred
   decisions whose answer changes the *next* story, and every flag or migration
   that needs an item to end it. `story.follow_ups` carries them with an
@@ -684,5 +708,5 @@ All stdlib-only Python 3, no dependencies, no network.
 - `assets/examples/example-bundle.json` - a complete, validating two-repo example
 - `evals/trigger-eval.json` - queries that should and should not trigger this
   skill, in the format skill-creator's description optimiser expects
-- `evals/evals.json` - eighteen behavioural evals with verifiable expectations, for
+- `evals/evals.json` - nineteen behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

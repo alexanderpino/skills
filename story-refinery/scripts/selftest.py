@@ -129,6 +129,19 @@ MUTATIONS = [
         {"inherited_from": "ABC-100", "stale": True}))),
     ("SER002", mut(lambda b: b["story"].update({"follow_ups": []}))),
     ("SER002-trigger", mut(lambda b: b["story"]["follow_ups"][0].pop("trigger"))),
+    # Work that does not exist yet: the third citation state, and its link.
+    ("PND001", mut(lambda b: b["evidence"].update(
+        {"pending": [{"claim": "the tax object on the order response"}]}))),
+    ("PND002", mut(lambda b: b["evidence"].update(
+        {"pending": [{"claim": "the tax object", "provided_by": {"ticket": "ABC-999",
+                                                                 "subtask": "S2"}}]}))),
+    ("PND002-type", mut(lambda b: b["evidence"].update(
+        {"pending": [{"claim": "the tax object", "provided_by": {"ticket": "ABC-140",
+                                                                 "subtask": "S2"}}]}))),
+    ("LNK001", mut(lambda b: b["story"]["links"].append(
+        {"type": "is blocked by", "key": "ABC-9", "why": "wrong vocabulary"}))),
+    ("LNK002", mut(lambda b: b["story"]["links"][0].pop("why"))),
+    ("LNK003", mut(lambda b: b["story"].update({"links": []}))),
     # The dossier: what refinement learned that the ticket does not say.
     ("EVI008", mut(lambda b: b["evidence"].update({"ruled_out": []}))),
     ("EVI009", mut(lambda b: b["evidence"]["ruled_out"][0].pop("looked_in"))),
@@ -484,6 +497,39 @@ def suite_pipeline():
               and "refinery:story" in parent["labels"], parent["labels"])
         check("emit: unfixed findings are what the approver sees",
               "These findings were not fixed" in md_preview)
+
+        # A follow-up story cites work that has not been implemented yet. It must
+        # reach both audiences: the ticket says what is missing, the shared context
+        # tells the implementor not to go hunting for it.
+        follow = json.load(open(GOLDEN, encoding="utf-8"))
+        follow["evidence"]["pending"] = [{
+            "claim": "tax.reason on the order response",
+            "provided_by": {"ticket": "ABC-123", "subtask": "S2",
+                            "bundle": ".refinery/bundles/ABC-123@2026-09-02.json"},
+            "expected_path": "api/src/api/orders/serializers.py",
+            "note": "Shape is fixed by AC3 there; do not re-specify it here."}]
+        follow["story"]["links"] = [{"type": "blocked_by", "key": "ABC-123",
+                                     "why": "the tax object it reads does not exist yet"}]
+        fpath = os.path.join(ws, "follow-up.json")
+        with open(fpath, "w", encoding="utf-8") as fh:
+            json.dump(follow, fh)
+        code, out = run([emit, fpath, "--config", CONFIG, "--adapter", "jira",
+                         "--out", "out_follow"], ws)
+        body = open(os.path.join(ws, "out_follow", "preview.md"), encoding="utf-8").read()
+        shared = open(os.path.join(ws, "out_follow", "context", "ABC-123-context.md"),
+                      encoding="utf-8").read()
+        check("emit: the ticket says what does not exist yet and who makes it",
+              "## Prerequisites" in body and "Does not exist yet" in body
+              and "ABC-123 / S2" in body, out)
+        check("emit: the implementor is told not to hunt for it",
+              "Not there yet" in shared and "do not substitute something that" in shared)
+        plan = json.load(open(os.path.join(ws, "out_follow", "push-plan.json")))
+        blocked = [l for l in plan["links"] if l["type"] == "blocked_by"]
+        check("emit: the prerequisite becomes a real link in the tracker's vocabulary",
+              blocked and blocked[0]["adapter_type"] == "is blocked by", plan["links"])
+        codes = {i["code"] for i in validate(follow, load_config(CONFIG)).items}
+        check("validate: a linked, attributed prerequisite passes",
+              not {"PND001", "PND002"} & codes, sorted(codes))
 
         tiny = os.path.join(ws, "tiny.yaml")
         with open(CONFIG, encoding="utf-8") as fh:

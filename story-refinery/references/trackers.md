@@ -15,6 +15,21 @@ capabilities at runtime rather than trusting a hardcoded field id.**
 
 ## 1. Adapter contract
 
+Issue links are canonical in the bundle - `blocks`, `blocked_by`, `relates`,
+`duplicates` - and each adapter maps them onto its own vocabulary. These defaults
+are `[?]` and must be probed: Jira link types are configured per instance, and
+GitLab gates `blocks` behind a licence tier.
+
+| Adapter | Typed links | `blocked_by` is called |
+|---|---|---|
+| jira | yes | `is blocked by` (instance-configurable) |
+| gitlab | yes | `is blocked by` (tier-dependent) |
+| linear | yes | `blocked_by` |
+| azure-devops | yes | `Predecessor` |
+| github | **no** | nothing - degrade to Prerequisites in the body |
+| markdown | no | nothing - degrade to Prerequisites in the body |
+
+
 An adapter declares capabilities; `emit.py` picks a rendering strategy from them.
 
 ```yaml
@@ -33,6 +48,10 @@ Degradation rules `[L]`:
 
 - `subtasks: none` → render subtasks as a checklist in the parent description
   and emit each agent brief into a repo file, linked by path.
+- `links: false` → the ordering a link would carry goes into the description
+  under **Prerequisites**, and the push plan says plainly that nothing enforces
+  it. Do not silently drop the dependency; a prerequisite nobody can see is how a
+  follow-up gets started before the story it reads from has shipped.
 - `attachments: false` and `comments: false` → agent brief goes to
   `description_tail`; if that would exceed `max_description_chars`, it goes to
   `repo_file` and the description carries the link.

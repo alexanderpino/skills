@@ -73,6 +73,14 @@
     "non_goals": [
       "PHASE 3: what this story is not, with follow-up ticket ids."
     ],
+    "links": [
+      {
+        "_howto": "Links the tracker must carry. type: blocks | blocked_by | relates | duplicates - canonical here, mapped to the tracker's own names by emit.py. A prerequisite that exists only in your head is an ordering nothing enforces: if this story reads code another item has not written yet, that is blocked_by, and it belongs here.",
+        "type": "blocked_by",
+        "key": "",
+        "why": ""
+      }
+    ],
     "follow_ups": [
       {
         "_howto": "What this refinement creates for later: every non-goal that names a ticket, every deferred decision whose answer changes the NEXT story, and every flag or migration that needs an item to end it. The trigger is an observable condition, never a date - a backlog date is a wish, and a flag with no trigger becomes load-bearing.",
@@ -173,6 +181,15 @@
         "note": ""
       }
     ],
+    "pending": [
+      {
+        "_howto": "PHASE 2, for a follow-up story: what you are citing that does not exist yet. Not evidence and not an assumption - specified work someone has not done. The citation points at the item that creates it, and that item must be a blocked_by link (PND002), or nothing but your memory holds the order.",
+        "claim": "",
+        "provided_by": {"ticket": "", "subtask": "", "bundle": ""},
+        "expected_path": "",
+        "note": ""
+      }
+    ],
     "ruled_out": [
       {
         "_howto": "PHASE 2: what you looked for and did not find. This is the part of the investigation that compression throws away and an implementor pays for twice - once hunting for a helper that is not there, once when they use something that only looks similar. looked_in must be re-checkable: paths, globs, the actual queries.",
@@ -255,7 +272,16 @@
             "note": ""
           }
         ],
-        "ruled_out": [
+        "pending": [
+      {
+        "_howto": "PHASE 2, for a follow-up story: what you are citing that does not exist yet. Not evidence and not an assumption - specified work someone has not done. The citation points at the item that creates it, and that item must be a blocked_by link (PND002), or nothing but your memory holds the order.",
+        "claim": "",
+        "provided_by": {"ticket": "", "subtask": "", "bundle": ""},
+        "expected_path": "",
+        "note": ""
+      }
+    ],
+    "ruled_out": [
       {
         "_howto": "PHASE 2: what you looked for and did not find. This is the part of the investigation that compression throws away and an implementor pays for twice - once hunting for a helper that is not there, once when they use something that only looks similar. looked_in must be re-checkable: paths, globs, the actual queries.",
         "claim": "",

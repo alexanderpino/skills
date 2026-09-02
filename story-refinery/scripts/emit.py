@@ -28,17 +28,27 @@ SINKS = ("description_tail", "comment", "attachment", "repo_file", "custom_field
 CAPABILITIES = {
     # [?] defaults - probe the live tracker before trusting these.
     "jira":         {"markup": "adf", "subtasks": "native", "attachments": True,
-                     "comments": True, "custom_fields": True, "max_description_chars": 32767},
+                     "comments": True, "custom_fields": True, "max_description_chars": 32767,
+                     "links": True, "link_types": {"blocks": "Blocks", "blocked_by": "is blocked by",
+                                                   "relates": "Relates", "duplicates": "Duplicate"}},
     "github":       {"markup": "markdown", "subtasks": "task_list", "attachments": False,
-                     "comments": True, "custom_fields": False, "max_description_chars": 65536},
+                     "comments": True, "custom_fields": False, "max_description_chars": 65536,
+                     "links": False, "link_types": {}},
     "gitlab":       {"markup": "markdown", "subtasks": "task_list", "attachments": False,
-                     "comments": True, "custom_fields": False, "max_description_chars": 1000000},
+                     "comments": True, "custom_fields": False, "max_description_chars": 1000000,
+                     "links": True, "link_types": {"blocks": "blocks", "blocked_by": "is blocked by",
+                                                   "relates": "relates_to", "duplicates": None}},
     "linear":       {"markup": "markdown", "subtasks": "native", "attachments": True,
-                     "comments": True, "custom_fields": False, "max_description_chars": 65536},
+                     "comments": True, "custom_fields": False, "max_description_chars": 65536,
+                     "links": True, "link_types": {"blocks": "blocks", "blocked_by": "blocked_by",
+                                                   "relates": "related", "duplicates": "duplicate"}},
     "azure-devops": {"markup": "html", "subtasks": "native", "attachments": True,
-                     "comments": True, "custom_fields": True, "max_description_chars": 100000},
+                     "comments": True, "custom_fields": True, "max_description_chars": 100000,
+                     "links": True, "link_types": {"blocks": "Successor", "blocked_by": "Predecessor",
+                                                   "relates": "Related", "duplicates": "Duplicate"}},
     "markdown":     {"markup": "markdown", "subtasks": "none", "attachments": False,
-                     "comments": False, "custom_fields": False, "max_description_chars": 10 ** 9},
+                     "comments": False, "custom_fields": False, "max_description_chars": 10 ** 9,
+                     "links": False, "link_types": {}},
 }
 
 
@@ -86,6 +96,7 @@ def render_story(bundle):
     goal = (s.get("impact") or {}).get("goal")
     if goal:
         out += ["**Goal**: %s" % goal, ""]
+    out += render_prerequisites(bundle)
     out += ["## Acceptance criteria", ""]
     for ac in s.get("acceptance_criteria") or []:
         out.append("**%s — %s**" % (ac.get("id"), ac.get("rule")))
@@ -153,6 +164,64 @@ def render_story(bundle):
     return "\n".join(out).strip() + "\n"
 
 
+def plan_links(bundle, caps, warnings):
+    """The links the tracker must carry, in the adapter's own vocabulary.
+
+    A follow-up story is refined against work that has not been implemented yet.
+    Inside one story the wave plan holds the order; across stories nothing does
+    except a link, so an unlinked prerequisite is an ordering that exists only in
+    the head of whoever refined it."""
+    story = bundle["story"]
+    key = story.get("key")
+    existing = {l.get("key") for l in (story.get("tracker_meta") or {}).get("links") or []}
+    types = caps.get("link_types") or {}
+    plan = []
+    for link in story.get("links") or []:
+        target, kind = link.get("key"), link.get("type")
+        entry = {"from": key, "type": kind, "to": target, "why": link.get("why"),
+                 "already_present": target in existing,
+                 "adapter_type": types.get(kind)}
+        if not caps.get("links"):
+            entry["degraded"] = ("tracker has no typed issue links - stated in the description "
+                                 "under Prerequisites instead")
+        elif types.get(kind) is None:
+            entry["degraded"] = ("adapter has no %r link type - falls back to 'relates' plus the "
+                                 "Prerequisites line" % kind)
+        plan.append(entry)
+    unsupported = [e for e in plan if e.get("degraded")]
+    if unsupported:
+        warnings.append("%d link(s) cannot be expressed by this tracker - the ordering they carry "
+                        "is in the description only, where nothing enforces it" % len(unsupported))
+    return plan
+
+
+def render_prerequisites(bundle):
+    """What must exist before this story can start, for a human and for the pusher.
+
+    This is where a refinement of a follow-up story is honest: some of what it
+    cites does not exist yet, and this says which item is going to create it."""
+    story = bundle["story"]
+    blocked = [l for l in story.get("links") or [] if l.get("type") == "blocked_by"]
+    blocked += [l for l in (story.get("tracker_meta") or {}).get("links") or []
+                if str(l.get("type", "")).lower().replace(" ", "_").endswith("blocked_by")]
+    pending = (bundle.get("evidence") or {}).get("pending") or []
+    if not blocked and not pending:
+        return []
+    out = ["## Prerequisites", ""]
+    for link in blocked:
+        out.append("- Blocked by **%s**%s" % (link.get("key"),
+                                              " — %s" % link["why"] if link.get("why") else ""))
+    for p in pending:
+        provider = p.get("provided_by") or {}
+        out.append("- **Does not exist yet**: %s — created by %s%s%s"
+                   % (p.get("claim"), provider.get("ticket", "?"),
+                      " / %s" % provider["subtask"] if provider.get("subtask") else "",
+                      ". %s" % p["note"] if p.get("note") else ""))
+    out += ["", "_Everything above is specified work that has not landed. Citations to it point "
+            "at the item that creates it, not at a line in the repo._", ""]
+    return out
+
+
 def render_shared_context(bundle):
     """One document every subtask implementor reads, identical for all of them.
 
@@ -171,6 +240,20 @@ def render_shared_context(bundle):
            "ones that are absences.", "",
            "## The outcome this serves", "",
            (story.get("impact") or {}).get("goal") or story.get("summary_human", ""), ""]
+
+    pending = ev.get("pending") or []
+    if pending:
+        out += ["## Not there yet", "",
+                "These are cited by the briefs and do not exist in the repo at the time of "
+                "writing. Do not go looking for them, and do not substitute something that "
+                "looks similar - check the item that creates them.", ""]
+        for p in pending:
+            provider = p.get("provided_by") or {}
+            out.append("- **%s** — from %s%s%s"
+                       % (p.get("claim"), provider.get("ticket", "?"),
+                          " / %s" % provider["subtask"] if provider.get("subtask") else "",
+                          ". %s" % p["note"] if p.get("note") else ""))
+        out.append("")
 
     if ev.get("glossary"):
         out += ["## Glossary", "",
@@ -551,6 +634,7 @@ def main(argv=None):
     with open(os.path.join(ctx_dir, ctx_name), "w", encoding="utf-8") as fh:
         fh.write(render_shared_context(bundle))
 
+    links = plan_links(bundle, caps, warnings)
     plan_waves = waves(bundle.get("subtasks") or [])
     delta = None
     if args.previous:
@@ -586,6 +670,20 @@ def main(argv=None):
             if isinstance(ids, list) and ids:
                 preview.append("- **%s**: %s" % (label.replace("_", " "), ", ".join(ids)))
         preview.append("")
+    if links:
+        preview += ["## Links to create", "",
+                    "| From | Type | To | As the tracker calls it | Already there |",
+                    "|---|---|---|---|---|"]
+        for l in links:
+            preview.append("| %s | %s | %s | %s | %s |"
+                           % (l["from"], l["type"], l["to"],
+                              l.get("adapter_type") or "_unsupported_",
+                              "yes" if l["already_present"] else "no"))
+        for l in links:
+            if l.get("degraded"):
+                preview.append("")
+                preview.append("> %s → %s: %s" % (l["type"], l["to"], l["degraded"]))
+        preview.append("")
     preview += ["## Execution waves", "",
                 "Everything inside a wave can run in parallel. No two subtasks in the same "
                 "wave write the same file.", ""]
@@ -620,6 +718,7 @@ def main(argv=None):
         "orphans": delta["subtasks_removed"] if delta else [],
         "waves": plan_waves,
         "shared_context": "context/%s" % ctx_name,
+        "links": links,
         "idempotency": "search for existing subtasks by exact title under %s before creating" % key,
         "network": "none - this file is a plan, not an action",
     }

@@ -48,6 +48,15 @@
         "decision_table": {"$ref": "#/$defs/decision_table"},
         "impact": {"$ref": "#/$defs/impact"},
         "non_goals": {"type": "array", "items": {"type": "string"}},
+        "links": {
+          "type": "array",
+          "description": "Links this refinement says the tracker must carry, in a canonical vocabulary the adapters map onto their own names (Jira 'is blocked by', Azure DevOps 'Predecessor', ...). tracker_meta.links is what was found; this is what must exist.",
+          "items": {"type": "object", "required": ["type", "key"],
+                    "properties": {
+                      "type": {"enum": ["blocks", "blocked_by", "relates", "duplicates"]},
+                      "key": {"type": "string"},
+                      "why": {"type": "string", "description": "An unexplained link is the first thing deleted in the next backlog cleanup (LNK002)."}}}
+        },
         "follow_ups": {
           "type": "array",
           "description": "Work this refinement creates for later: non-goals with a ticket, decisions whose answer changes the next story, and every flag or migration that needs an item to end it. SER002 links these to the tickets the text itself promises.",
@@ -283,6 +292,19 @@
                                    "note": {"type": "string"}}}
         },
         "conventions": {"type": "array", "items": {"$ref": "#/$defs/convention"}},
+        "pending": {
+          "type": "array",
+          "description": "Work this story depends on that does not exist in the repo yet, because it is specified in another item nobody has implemented. Neither evidence nor assumption: a third state whose citation points at the item that creates it (PND001), and whose ordering has to exist as a tracker link (PND002).",
+          "items": {"type": "object", "required": ["claim", "provided_by"],
+                    "properties": {
+                      "claim": {"type": "string", "description": "What will exist."},
+                      "provided_by": {"type": "object", "required": ["ticket"],
+                                      "properties": {"ticket": {"type": "string"},
+                                                     "subtask": {"type": "string"},
+                                                     "bundle": {"type": "string", "description": "The stored bundle where its shape is specified."}}},
+                      "expected_path": {"type": "string", "description": "Where it is expected to land. A prediction, and labelled as one - never a citation."},
+                      "note": {"type": "string"}}}
+        },
         "ruled_out": {
           "type": "array",
           "description": "Negative results: what refinement looked for and did not find. The most expensive thing a refinement learns and the first thing compression discards - an implementor who does not know a helper is absent will hunt for it, and may 'find' the wrong one (EVI008/EVI009).",
@@ -363,6 +385,19 @@
                                                      "note": {"type": "string"}}}
         },
         "conventions": {"type": "array", "items": {"$ref": "#/$defs/convention"}},
+        "pending": {
+          "type": "array",
+          "description": "Work this story depends on that does not exist in the repo yet, because it is specified in another item nobody has implemented. Neither evidence nor assumption: a third state whose citation points at the item that creates it (PND001), and whose ordering has to exist as a tracker link (PND002).",
+          "items": {"type": "object", "required": ["claim", "provided_by"],
+                    "properties": {
+                      "claim": {"type": "string", "description": "What will exist."},
+                      "provided_by": {"type": "object", "required": ["ticket"],
+                                      "properties": {"ticket": {"type": "string"},
+                                                     "subtask": {"type": "string"},
+                                                     "bundle": {"type": "string", "description": "The stored bundle where its shape is specified."}}},
+                      "expected_path": {"type": "string", "description": "Where it is expected to land. A prediction, and labelled as one - never a citation."},
+                      "note": {"type": "string"}}}
+        },
         "ruled_out": {
           "type": "array",
           "description": "Negative results: what refinement looked for and did not find. The most expensive thing a refinement learns and the first thing compression discards - an implementor who does not know a helper is absent will hunt for it, and may 'find' the wrong one (EVI008/EVI009).",

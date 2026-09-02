@@ -103,6 +103,10 @@
       "impossible": [],
       "note": "Non-EU destinations are a non-goal (ABC-131), so they are not a column value. Adding them re-opens this table rather than adding a branch to the code."
     },
+    "links": [
+      {"type": "blocks", "key": "ABC-140",
+       "why": "The flag cannot be removed until this has shipped and been on everywhere for two weeks. Without the link the removal ticket looks free-standing and gets picked up early."}
+    ],
     "follow_ups": [
       {"ticket": "ABC-131", "trigger": "this story ships to NL", "owner": "Sanne (Product)",
        "note": "Non-EU B2B. Re-opens the decision table with a third destination value rather than adding a branch - see story.decision_table.note."},
@@ -698,7 +702,7 @@
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:8c93277e5fcaf1894d702775de3378a36dcc93d895fe80c573a048ac938ad35d",
+    "bundle_digest": "sha256:a7ca8f1cab0bcd138662a16577d4dde8b20f030c03053f29bbc4758886204ea3",
     "critics": [
       {"id": "implementer", "context": "fresh"},
       {"id": "tester", "context": "fresh"},

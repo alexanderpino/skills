@@ -859,6 +859,76 @@ def check_intake(b, cfg, rep):
 
 
 TICKET_RX = re.compile(r"\b[A-Z][A-Z0-9]{1,9}-\d+\b")
+# Canonical link vocabulary. Adapters map these onto their own names (emit.py);
+# the bundle never carries a tracker's spelling.
+LINK_TYPES = ("blocks", "blocked_by", "relates", "duplicates")
+
+
+def _known_links(story):
+    """Links the tracker already has, plus the ones this refinement says to create."""
+    out = {}
+    for source in ((story.get("tracker_meta") or {}).get("links") or [],
+                   story.get("links") or []):
+        for link in source:
+            if link.get("key"):
+                out.setdefault(link["key"], set()).add(str(link.get("type", "")).lower()
+                                                       .replace(" ", "_").replace("is_", ""))
+    return out
+
+
+def check_pending(b, rep):
+    """Refining a follow-up means reasoning about code that does not exist yet.
+
+    That is neither evidence nor an assumption: it is specified work someone has
+    not done. It gets its own citation - to the item that creates it - and the
+    dependency has to exist in the tracker, or the only thing holding the order
+    together is that you happened to know."""
+    pending = (b.get("evidence") or {}).get("pending") or []
+    links = _known_links(b.get("story") or {})
+    for i, p in enumerate(pending):
+        where = "evidence.pending[%d]" % i
+        provider = p.get("provided_by") or {}
+        ticket = provider.get("ticket")
+        if not p.get("claim"):
+            rep.error("PND001", where, "pending entry with no claim - say what will exist")
+        if not ticket:
+            rep.error("PND001", where, "nothing is recorded as creating this - a claim about "
+                      "code that does not exist yet, with no item that produces it, is a guess "
+                      "wearing a citation")
+            continue
+        if not provider.get("subtask") and not provider.get("bundle"):
+            rep.warn("PND001", where, "provided by %s, but not by which subtask or in which "
+                     "bundle it was specified - an implementor cannot check what shape it will "
+                     "arrive in" % ticket)
+        if ticket not in links:
+            rep.error("PND002", where, "this story depends on %s and no link records it - the "
+                      "tracker does not know the order, so the only thing holding it together "
+                      "is that you happened to know" % ticket)
+        elif "blocked_by" not in links[ticket]:
+            rep.warn("PND002", where, "%s is linked but not as a blocker (%s) - a 'relates to' "
+                     "does not stop anyone starting this first"
+                     % (ticket, ", ".join(sorted(links[ticket])) or "no type"))
+
+
+def check_links(b, rep):
+    story = b.get("story") or {}
+    for i, link in enumerate(story.get("links") or []):
+        where = "story.links[%d]" % i
+        if not link.get("key"):
+            rep.error("LNK001", where, "link with no target")
+        if link.get("type") not in LINK_TYPES:
+            rep.error("LNK001", where, "type must be %s, got %r - adapters map these onto "
+                      "their own names; the bundle never carries a tracker's spelling"
+                      % (" | ".join(LINK_TYPES), link.get("type")))
+        if not link.get("why"):
+            rep.warn("LNK002", where, "link with no reason - an unexplained link is the first "
+                     "thing deleted in the next backlog cleanup")
+    known = set(_known_links(story))
+    for f in story.get("follow_ups") or []:
+        if f.get("ticket") and f["ticket"] not in known:
+            rep.warn("LNK003", "story.follow_ups", "%s is created by this refinement and linked "
+                     "to nothing - nobody walking the ticket graph will find it, which is how a "
+                     "follow-up becomes a rediscovery" % f["ticket"])
 
 
 def check_series(b, rep):
@@ -1152,6 +1222,8 @@ def validate(bundle, cfg):
     check_structure(bundle, rep)
     check_tailoring(bundle, cfg, rep)
     check_series(bundle, rep)
+    check_pending(bundle, rep)
+    check_links(bundle, rep)
     check_triage(bundle, cfg, rep)
     check_intake(bundle, cfg, rep)
     check_questions_and_decisions(bundle, rep)

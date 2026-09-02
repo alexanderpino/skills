@@ -86,6 +86,38 @@ A `trigger` is a condition someone can observe, not a date. Dates in a backlog
 are wishes; "when the flag has been on everywhere for two weeks" is checkable by
 whoever picks it up.
 
+## Refining against work that does not exist yet
+
+The second story in a sequence is refined while the first is still being built,
+so some of what it cites has not been written. This is the single most common way
+a follow-up refinement quietly becomes fiction: a path is cited, it looks like
+evidence, and nobody notices it is a prediction until an implementor opens it.
+
+Three rules `[N]`:
+
+1. **It gets its own state.** Not a citation, not an `ASSUMPTION`, but
+   `evidence.pending`: a claim, and the item that creates it - ticket, subtask,
+   and the stored bundle where its shape is fixed. That is still checkable; it
+   just points at a plan rather than at a line. `expected_path` is allowed and is
+   explicitly a prediction (`PND001`).
+2. **Do not re-specify it.** The shape of the thing belongs to the item that
+   creates it. Restating it here produces two specifications that drift, and the
+   one in the follow-up is the one nobody updates. Point at it.
+3. **The ordering has to leave your head.** Inside a story the wave plan orders
+   the work. Across stories, nothing does except a tracker link, so a pending
+   entry requires a `blocked_by` link to its provider (`PND002`). A "relates to"
+   is not a prerequisite: it does not stop anyone starting this first.
+
+`emit.py` turns `story.links` into the tracker's own vocabulary and reports what
+it cannot express - GitHub has no typed issue links, so the ordering it carries
+lives in the description where nothing enforces it, and the push plan says so
+rather than pretending.
+
+The two-sided output matters here. The **ticket** gets a Prerequisites section
+so a developer sees what has to land first; the **shared context** gets a "Not
+there yet" block so an implementor does not go looking for a file, and - the
+expensive case - does not substitute something that merely looks similar.
+
 ## Sequences
 
 **A split epic.** Map it, draw the release line, then refine **one** story
