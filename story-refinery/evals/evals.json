@@ -293,6 +293,30 @@
         "The re-refinement used emit --previous against the recovered bundle so the existing tree is updated",
         "Nothing about the codebase was carried over from the ticket text as if it were evidence"
       ]
+    },
+    {
+      "id": 24,
+      "prompt": "Refine ABC-990: 'move the whole codebase from the old logger to structured logging'. It touches about sixty files.",
+      "expected_output": "An expand-contract decomposition, not sixty files forced into a vertical slice, and not a plan that stops after the migration.",
+      "expectations": [
+        "The expand-contract profile was chosen and named, rather than stretching vertical-slice",
+        "The wide middle step is a migration subtask whose done_when is a mechanical check, not a judgement per call site",
+        "A contract subtask removes the old logger path, in this story rather than as a vague follow-up",
+        "The expand step leaves the system working with both paths present",
+        "Subtask sizing considered what fits one fresh context window, not only days"
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "Refine ABC-991. I have ten minutes and then I'm in meetings for the rest of the day.",
+      "expected_output": "One round of questions - everything answerable now, numbered, each with a recommendation - and no questions that depend on answers from that round.",
+      "expectations": [
+        "The frontier was computed: only questions whose prerequisites are already settled were asked",
+        "The whole round went out at once, numbered, rather than one question at a time",
+        "Every question carried a recommended answer so a correction is cheap to give",
+        "Questions that depend on an answer from this round were recorded with blocked_by and held back",
+        "The refinement continued as far as it could on the unanswered branches rather than stalling entirely"
+      ]
     }
   ]
 }

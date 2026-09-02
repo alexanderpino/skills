@@ -135,6 +135,41 @@ S4 Rollout: flag on for NL, monitor, flag on globally
 Use when: governance requires phase evidence. Combine with `vertical-slice`
 inside S2 if the implement phase exceeds one day.
 
+### `expand-contract`
+
+For the change vertical slicing cannot express: a wide, mechanical migration -
+rename a symbol across forty files, move every call site to a new signature,
+swap a library. Forcing that into vertical slices produces slices that are not
+demoable and a ≤8-file cap that makes the honest plan impossible to write, so
+the profile makes the shape explicit instead `[P: Pocock, to-tickets - wide
+refactors follow expand-contract rather than vertical slices]`.
+
+Three phases, and the third is the one teams skip:
+
+```
+S1 [api] Add the new signature alongside the old one        (feature, expand)
+S2 [api] Move every call site to it                         (migration, mechanical)
+S3 [api] Delete the old signature and its tests             (feature, contract)
+```
+
+- **Expand** adds the new path without removing the old. Nothing breaks, and it
+  is a normal, small, reviewable subtask.
+- **Migrate** is the wide one. It is allowed to be wide *because* it is
+  mechanical: a codemod or a find-and-replace whose `done_when` is "the codemod
+  ran and the suite is green", not a judgement call per site. If it needs
+  judgement per call site, it is not mechanical and it is not this profile.
+- **Contract** removes the old path. Without it you have shipped two ways of
+  doing the same thing and a comment promising to clean up, which is how the
+  next refinement in this area finds two conventions and cites the wrong one.
+  `SUB016` fails a bundle that expands and migrates without contracting.
+
+The contract step is a subtask in *this* story, not a follow-up, unless
+something outside the team still calls the old path - in which case it is a
+follow-up with a real trigger and a `blocks` link, per `references/series.md`.
+
+Use when: the change is mechanical and wide. Do not use it to smuggle a
+judgement-heavy refactor past the size caps.
+
 ### `bugfix`
 
 Bugs refine differently from features and the other profiles handle them badly.

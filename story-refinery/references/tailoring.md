@@ -129,6 +129,36 @@ What it should *not* contain: a restatement of this skill's method. If the
 tailoring skill explains example mapping, the two will drift and the team's copy
 will be the stale one.
 
+## Keeping this skill's own documents honest
+
+The same discipline applies to the skill you are reading. Every document and
+pointer spends one of two budgets `[P: Pocock, writing-for-agents]`: **context
+load**, what is always in the window, and **cognitive load**, what a reader has
+to index themselves. Push reference behind a pointer to spend less of the first;
+accept the second where judgement lives.
+
+Three tiers, in order of immediacy: an **in-file step** is done now, an
+**in-file reference** is consulted on demand, and a **disclosed reference** is
+pushed into its own file. Keep a concept's definition, rules and caveats under
+one heading rather than scattered - grouped material reads as documentation,
+scattered material fragments meaning.
+
+Three ways these documents rot, worth naming because all three feel harmless:
+
+- **Duplication.** The same rule in the phase *and* in the reference it points
+  at. Keep each meaning in one source of truth; the copy is the one that goes
+  stale.
+- **No-ops.** Instructions the reader already follows. Delete the whole sentence
+  rather than trimming words from it. This skill's own description carried
+  sixty-eight words arguing against being auto-loaded, which
+  `disable-model-invocation` enforces outright - that was a no-op costing more
+  than half the text a user reads in the `/` menu.
+- **Sediment.** Layers that stay because removing them feels risky. Prune.
+
+And a phrasing rule that changes behaviour: **state the target, not the ban.**
+Negation puts the forbidden behaviour into the reader's head; say what to do
+instead.
+
 ## Smells
 
 **Prose that thinks it is a gate.** The tailoring skill says "subtasks are at

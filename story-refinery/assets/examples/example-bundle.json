@@ -221,11 +221,11 @@
     }
   ],
   "open_questions": [
-    {"id": "Q1", "text": "Does Finance need the reverse-charge reason on the invoice PDF this quarter?", "owner": "Marieke (Finance)", "blocking": false, "asked": {"to": "Marieke (Finance)", "when": "2026-09-02", "channel": "refinement session"}},
-    {"id": "Q2", "text": "Which locales must ship with the new string on day one?", "owner": "Product", "blocking": false, "asked": {"to": "Sanne (Product)", "when": "2026-09-02", "channel": "refinement session"}},
-    {"id": "Q3", "text": "Confirm the success signal: manual reverse-charge refunds for qualifying orders reach zero within a month of the NL rollout.", "owner": "Marieke (Finance)", "blocking": false, "dimension": "success_signal", "asked": {"to": "Marieke (Finance)", "when": "2026-09-02", "channel": "refinement session"}},
-    {"id": "Q4", "text": "Confirm scope: non-EU B2B customers and orders placed before go-live are excluded (follow-up ABC-131).", "owner": "Sanne (Product)", "blocking": false, "dimension": "scope", "asked": {"to": "Sanne (Product)", "when": "2026-09-02", "channel": "refinement session"}},
-    {"id": "Q5", "text": "Who signs this off, and do they need evidence retained beyond the code change?", "owner": "Marieke (Finance)", "blocking": false, "source": "triage", "asked": {"to": "Marieke (Finance)", "when": "2026-09-02", "channel": "refinement session"}}
+    {"id": "Q1", "text": "Does Finance need the reverse-charge reason on the invoice PDF this quarter?", "owner": "Marieke (Finance)", "blocking": false, "asked": {"to": "Marieke (Finance)", "when": "2026-09-02", "channel": "refinement session"}, "guess": "No - the PDF template is Finance's and this quarter is full. Assume not, and ask again if a customer complains."},
+    {"id": "Q2", "text": "Which locales must ship with the new string on day one?", "owner": "Product", "blocking": false, "asked": {"to": "Sanne (Product)", "when": "2026-09-02", "channel": "refinement session"}, "guess": "nl and de on day one; the rest fall back to the English catalogue entry."},
+    {"id": "Q3", "text": "Confirm the success signal: manual reverse-charge refunds for qualifying orders reach zero within a month of the NL rollout.", "owner": "Marieke (Finance)", "blocking": false, "dimension": "success_signal", "asked": {"to": "Marieke (Finance)", "when": "2026-09-02", "channel": "refinement session"}, "guess": "Yes - zero manual refunds for qualifying orders within a month of the NL rollout is the signal."},
+    {"id": "Q4", "text": "Confirm scope: non-EU B2B customers and orders placed before go-live are excluded (follow-up ABC-131).", "owner": "Sanne (Product)", "blocking": false, "dimension": "scope", "asked": {"to": "Sanne (Product)", "when": "2026-09-02", "channel": "refinement session"}, "guess": "Yes - non-EU B2B is ABC-131 and pre-go-live orders are out."},
+    {"id": "Q5", "text": "Who signs this off, and do they need evidence retained beyond the code change?", "owner": "Marieke (Finance)", "blocking": false, "source": "triage", "asked": {"to": "Marieke (Finance)", "when": "2026-09-02", "channel": "refinement session"}, "guess": "Marieke signs it off, and the reconciliation report is the evidence she keeps."}
   ],
   "evidence": {
     "generated_at": "2026-09-02T10:02:00Z",
@@ -702,7 +702,7 @@
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:a7ca8f1cab0bcd138662a16577d4dde8b20f030c03053f29bbc4758886204ea3",
+    "bundle_digest": "sha256:75970aa9646c5d3a2e4009b75b7a108073f32a920052f81efa79d3ed98fcd617",
     "critics": [
       {"id": "implementer", "context": "fresh"},
       {"id": "tester", "context": "fresh"},

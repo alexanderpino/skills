@@ -8,7 +8,7 @@
   "properties": {
     "schema_version": {"const": "1.0"},
     "generated_at": {"type": "string"},
-    "profile": {"enum": ["vertical-slice", "layered", "workflow-phase", "bugfix", "custom"]},
+    "profile": {"enum": ["vertical-slice", "layered", "workflow-phase", "bugfix", "expand-contract", "custom"]},
     "story": {"$ref": "#/$defs/story"},
     "decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}},
     "open_questions": {"type": "array", "items": {"$ref": "#/$defs/question"}},
@@ -268,6 +268,9 @@
               "question_id": {"type": "string", "description": "missing: a blocking question; assumed: a non-blocking one"},
               "assumption": {"type": "string"},
               "answer": {"type": "string"},
+        "guess": {"type": "string", "description": "Your recommended answer, attached to the question. A bare question costs the owner an essay; a guess costs them a correction (READY004)."},
+        "blocked_by": {"type": "array", "items": {"type": "string"},
+                       "description": "Question ids whose answers must land first. The frontier is everything not blocked - ask that, and only that, this round (READY005)."},
               "answered_by": {"type": "string"}
             }
           }

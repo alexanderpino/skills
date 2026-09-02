@@ -24,7 +24,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _yaml import load_config  # noqa: E402
 from emit import waves  # noqa: E402
-from validate import validate  # noqa: E402
+from validate import frontier, validate  # noqa: E402
 
 
 def critical_path(subtasks):
@@ -76,10 +76,10 @@ def verdict_line(bundle, cfg):
                                            lead["code"]))
 
 
-def questions_by_owner(bundle):
+def questions_by_owner(bundle, only=None):
     out = {}
     for q in bundle.get("open_questions") or []:
-        if q.get("answer"):
+        if q.get("answer") or (only is not None and q.get("id") not in only):
             continue
         out.setdefault(q.get("owner") or "NOBODY", []).append(q)
     return out
@@ -120,17 +120,31 @@ def one_story(bundle, cfg, heading="#"):
                        % (d.get("question"), d.get("waiting_for", "?"), d.get("expires", "?")))
         out.append("")
 
-    asked = questions_by_owner(bundle)
-    if asked:
-        out += ["**Needs an answer.**", ""]
-        for owner, qs in sorted(asked.items()):
+    # The frontier: everything answerable now. Ask the whole round at once, numbered,
+    # each with your recommended answer; a bare question costs the owner an essay
+    # [P: Pocock, grilling]. What waits on an earlier answer is listed but not asked.
+    now, later = frontier(bundle.get("open_questions") or [])
+    askable = questions_by_owner(bundle, {q.get("id") for q in now})
+    if askable:
+        out += ["**Ask this round.** Everything answerable now - the rest waits on these.", ""]
+        n = 0
+        for owner, qs in sorted(askable.items()):
             out.append("- **%s**" % owner)
             for q in qs:
-                out.append("  - %s%s%s"
-                           % (q.get("text", ""),
-                              " **(blocking)**" if q.get("blocking") else "",
-                              "" if q.get("asked") else " — _not asked yet_"))
+                n += 1
+                out.append("  %d. %s%s%s" % (n, q.get("text", ""),
+                                             " **(blocking)**" if q.get("blocking") else "",
+                                             "" if q.get("asked") else " — _not asked yet_"))
+                if q.get("guess"):
+                    out.append("     _recommend:_ %s" % q["guess"])
         out.append("")
+    if later:
+        out += ["**Waits on an earlier answer.** " + "; ".join(
+            "%s (needs %s)" % (q.get("id"), ", ".join(q.get("blocked_by") or []))
+            for q in later), ""]
+    if not now and not later and (bundle.get("open_questions") or []):
+        out += ["**Every question is answered.** The frontier is empty; nothing is left "
+                "silently assumed.", ""]
 
     high = [r for r in story.get("risks") or [] if str(r.get("severity")) == "high"]
     if high:

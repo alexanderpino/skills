@@ -79,7 +79,8 @@ CONFIG_SPEC = {
     "decomposition.mandatory[]": {"kind", "when"},
     "budgets": {"story_summary_words", "technical_notes_words", "subtask_words",
                 "max_subtasks", "max_files_per_subtask", "max_subtask_days",
-                "min_acceptance_criteria", "max_acceptance_criteria"},
+                "min_acceptance_criteria", "max_acceptance_criteria",
+                "max_context_entries"},
     "tracker": {"adapter", "project", "markup", "story_issue_type", "subtask_issue_type",
                 "parent_field", "max_description_chars", "labels_prefix", "agent_brief"},
     "tracker.agent_brief": {"sink", "fallback", "filename", "repo_file_dir", "custom_field",
@@ -145,9 +146,41 @@ def check_structure(b, rep):
         rep.error("STRUCT003", "subtasks", "no subtasks - nothing was decomposed")
 
 
+def frontier(questions):
+    """The questions you can ask *now* without guessing at answers you have not heard
+    yet - every question whose prerequisites are already settled `[P: Pocock, grilling]`.
+
+    Asking past the frontier is how a round produces answers that the next round
+    invalidates: you ask which cache TTL before anyone has said whether we cache."""
+    answered = {q.get("id") for q in questions if q.get("answer")}
+    now, later = [], []
+    for q in questions:
+        if q.get("answer"):
+            continue
+        blockers = [b for b in q.get("blocked_by") or [] if b not in answered]
+        (later if blockers else now).append(q)
+    return now, later
+
+
 def check_questions_and_decisions(b, rep):
-    for q in b.get("open_questions") or []:
+    questions = b.get("open_questions") or []
+    ids = {q.get("id") for q in questions}
+    askable, _ = frontier(questions)
+    askable_ids = {q.get("id") for q in askable}
+    for q in questions:
         where = "open_questions.%s" % q.get("id", "?")
+        for blocker in q.get("blocked_by") or []:
+            if blocker not in ids:
+                rep.error("READY004", where, "waits on %r, which is not a question in this "
+                          "bundle" % blocker)
+        # A bare question gets an essay back; a question with a guess attached gets a
+        # correction, which is cheaper for everyone and arrives sooner.
+        if not q.get("guess") and not q.get("answer"):
+            rep.warn("READY004", where, "no recommended answer attached - a bare question "
+                     "costs the owner an essay, a guess costs them a correction")
+        if q.get("asked") and q.get("id") not in askable_ids and not q.get("answer"):
+            rep.warn("READY005", where, "asked while it still waits on %s - the answer will "
+                     "be a guess at a guess" % ", ".join(q.get("blocked_by") or []))
         if q.get("blocking"):
             rep.error("READY001", where,
                       "blocking question unresolved: %s (owner: %s)"
@@ -536,7 +569,8 @@ def check_subtasks(b, cfg, rep):
                       "covers no acceptance criterion and kind %r is not enabling/spike/rollout"
                       % s.get("kind"))
 
-        _check_brief(s, where, max_files, require_cmd, rep)
+        _check_brief(s, where, max_files, require_cmd, rep,
+                     get(cfg, "budgets.max_context_entries", 12))
 
     for s in subs:
         for dep in s.get("depends_on") or []:
@@ -546,7 +580,7 @@ def check_subtasks(b, cfg, rep):
     return subs, ids
 
 
-def _check_brief(s, where, max_files, require_cmd, rep):
+def _check_brief(s, where, max_files, require_cmd, rep, max_reading=12):
     brief = s.get("agent_brief")
     if not brief:
         rep.error("BRF001", where, "no agent_brief")
@@ -589,6 +623,16 @@ def _check_brief(s, where, max_files, require_cmd, rep):
         rep.warn("BRF013", where, "entry points carry line numbers and nothing verifies them - "
                  "add a preflight command so the agent finds out the anchor moved instead of "
                  "editing whatever is at that line now")
+    # Days and files bound what a person can hold; an agent is bound by what fits in
+    # one fresh context window, which is the reading, not the writing [P: Pocock,
+    # to-tickets: "sized to fit in a single fresh context window"].
+    reading = len(brief.get("read_first") or []) + len(surface) + \
+        len(brief.get("entry_points") or [])
+    if max_reading and reading > max_reading:
+        rep.warn("BRF015", where, "%d file(s) to read and touch (budget %d) - a subtask sized "
+                 "for a day can still be too big for one fresh context window, and an agent "
+                 "that runs out re-reads from a fuzzy average of the codebase"
+                 % (reading, max_reading))
     if not brief.get("stop_and_ask"):
         rep.warn("BRF014", where, "no 'stop_and_ask' - 'forbidden' says what not to touch, "
                  "this says when not to decide; without it an agent that finds reality "
@@ -715,6 +759,23 @@ def check_split_thresholds(bundle, cfg, rep):
             rep.warn("SPL001", "blast_radius",
                      "%s %s exceeds the split threshold of %s - recommend splitting the story "
                      "(report it, do not restructure the backlog unasked)" % (value, label, limit))
+
+
+def check_expand_contract(b, subs, rep):
+    """Expand, migrate, contract. The third is the one that gets skipped, and skipping
+    it ships two ways of doing the same thing plus a comment promising to clean up."""
+    if (b.get("profile") or "") != "expand-contract" or not subs:
+        return
+    kinds = {s.get("kind") for s in subs}
+    text = " ".join((s.get("title") or "") + " " + (s.get("human") or "") for s in subs).lower()
+    if "migration" not in kinds:
+        rep.warn("SUB016", "subtasks", "profile is expand-contract and no subtask is kind "
+                 "'migration' - the wide mechanical step is the middle one, and it is only "
+                 "allowed to be wide because it is mechanical")
+    if not any(w in text for w in ("remove", "delete", "drop", "contract", "clean up")):
+        rep.error("SUB016", "subtasks", "profile is expand-contract and nothing contracts - "
+                  "no subtask removes the old path. Expanding and migrating without "
+                  "contracting ships two ways of doing the same thing and a promise")
 
 
 def check_one_repo_rule(cfg, subs, rep):
@@ -1275,6 +1336,7 @@ def validate(bundle, cfg):
     check_contract_ids(bundle, subs, rep)
     check_brief_surface(bundle, subs, rep)
     check_one_repo_rule(cfg, subs, rep)
+    check_expand_contract(bundle, subs, rep)
     check_definition_of_done(cfg, subs, rep)
     check_coverage(bundle, subs, cfg, rep)
     check_split_thresholds(bundle, cfg, rep)

@@ -130,6 +130,14 @@ MUTATIONS = [
     ("READY003", mut(lambda b: b["open_questions"][0].pop("asked"))),
     ("READY003-blocking", mut(lambda b: b["open_questions"].append(
         {"id": "Q9", "text": "which tax provider", "owner": "x", "blocking": True}))),
+    # The frontier, the context-window budget, and the profile for wide refactors.
+    ("READY004", mut(lambda b: b["open_questions"][0].pop("guess"))),
+    ("READY004-unknown", mut(lambda b: b["open_questions"][0].update(
+        {"blocked_by": ["Q99"]}))),
+    ("READY005", mut(lambda b: b["open_questions"][1].update({"blocked_by": ["Q1"]}))),
+    ("BRF015", mut(lambda b: b["subtasks"][1]["agent_brief"]["read_first"].extend(
+        [{"path": "f%d.py" % i, "why": "padding"} for i in range(8)]))),
+    ("SUB016", mut(lambda b: b.update({"profile": "expand-contract"}))),
     # Successive stories: inherited evidence and the follow-ups a refinement creates.
     ("SER001", mut(lambda b: b["evidence"]["ruled_out"][0].update(
         {"inherited_from": "ABC-100", "stale": True}))),
@@ -896,6 +904,7 @@ def suite_summary():
     """The artefact people actually talk from. It has to work before the bundle is
     finished, and it has to say the unwelcome part."""
     print("\n-- 9. discussion summary --")
+    import re
     import summary as S
     cfg = load_config(CONFIG)
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -903,7 +912,7 @@ def suite_summary():
 
     text = "\n".join(S.one_story(copy.deepcopy(golden), cfg))
     for heading in ("**Why.**", "**Size.**", "**In order.**", "**It hinges on.**",
-                    "**Needs an answer.**", "**Ready.**"):
+                    "**Ask this round.**", "**Ready.**"):
         check("summary: says %s" % heading.strip("*."), heading in text)
     check("summary: fits a screen", len(text.splitlines()) < 45, len(text.splitlines()))
     check("summary: separates the work from the elapsed time",
@@ -911,7 +920,25 @@ def suite_summary():
     check("summary: names the critical path, not just a number", "S0 → S1 → S2" in text)
     block = text.split("- **Marieke (Finance)**")[1].split("\n- **")[0]
     check("summary: groups the questions by the person who owes the answer",
-          text.count("- **Marieke (Finance)**") == 1 and block.count("\n  - ") == 3, block)
+          text.count("- **Marieke (Finance)**") == 1
+          and len(re.findall(r"\n  \d+\. ", block)) == 3, block)
+    check("summary: the round is numbered and each question carries its recommendation",
+          "  1. " in text and text.count("_recommend:_") == 5, text)
+
+    # The frontier: what cannot be answered yet is listed, not asked.
+    laterb = copy.deepcopy(golden)
+    laterb["open_questions"][1]["blocked_by"] = ["Q1"]
+    laterb["open_questions"][1].pop("asked", None)
+    text2 = "\n".join(S.one_story(laterb, cfg))
+    check("summary: a question waiting on an earlier answer is not in the round",
+          "Waits on an earlier answer" in text2
+          and laterb["open_questions"][1]["text"] not in text2.split("Waits on an earlier")[0],
+          text2)
+    answered = copy.deepcopy(golden)
+    for q in answered["open_questions"]:
+        q["answer"] = "yes"
+    check("summary: an empty frontier is said out loud",
+          "frontier is empty" in "\n".join(S.one_story(answered, cfg)))
 
     unfinished = copy.deepcopy(golden)
     unfinished["story"]["acceptance_criteria"] = []

@@ -23,7 +23,7 @@ tailoring:
   skill: .claude/skills/team-billing-refinement   # [claude] where it lives, for a reader
 
 # ---------------------------------------------------------------- decomposition
-# [claude] vertical-slice | layered | workflow-phase | bugfix | custom
+# [claude] vertical-slice | layered | workflow-phase | bugfix | expand-contract | custom
 profile: vertical-slice
 
 decomposition:
@@ -51,7 +51,11 @@ budgets:
   technical_notes_words: 200      # BUD001
   subtask_words: 80               # SUB008
   max_subtasks: 12                # SUB001
-  max_files_per_subtask: 8        # BRF004
+  max_files_per_subtask: 8        # BRF004 - what one subtask may write
+  # BRF015 - read_first + entry_points + change_surface together. Days bound what a
+  # person can hold; an agent is bound by what fits in one fresh context window, and
+  # that is the reading, not the writing.
+  max_context_entries: 12
   max_subtask_days: 1.0           # SUB011
   min_acceptance_criteria: 2      # AC001
   max_acceptance_criteria: 7      # AC002

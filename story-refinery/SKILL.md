@@ -1,20 +1,18 @@
 ---
 name: story-refinery
 description: >-
-  User-invoked only - reachable exclusively when the user types /story-refinery or names
-  this skill. Do NOT load or act on it because a request looks like refinement, because
-  the user mentions a story, ticket, issue, epic, backlog, acceptance criteria, subtasks,
-  blast radius or a Definition of Ready, or because a vague request would benefit from
-  being refined first. Those are not invocations - answer the request directly instead.
-  When it IS invoked: refines a backlog item into an implementation-ready package -
-  multi-repo code evidence with file:line citations, locked design decisions, testable
-  acceptance criteria, a condensed human-facing description, a machine-readable agent
-  brief, and subtasks decomposed per a configurable house profile. Tracker-agnostic -
-  works with Jira, GitHub, GitLab, Linear, Azure DevOps, or plain markdown.
-# The enforced half of "user-invoked only": Claude Code blocks an automatic load and
-# will not preload this skill into a subagent. The description above is the prompt-level
-# half; metadata is read by other tooling, not by Claude Code.
+  Refine a backlog item into an implementation-ready package: multi-repo code evidence
+  with file:line citations, locked design decisions, testable acceptance criteria with
+  stable codes, a decision table whose completeness is checked, a condensed human
+  description, a machine-readable agent brief, and subtasks decomposed per a configurable
+  house profile. Reads the ticket's own labels first - a production finding refines
+  differently from a feature - keeps the investigation for whoever implements it, and puts
+  the result past blind critics before handover. Tracker-agnostic: Jira, GitHub, GitLab,
+  Linear, Azure DevOps, or plain markdown. Type /story-refinery to run it.
+# Claude Code blocks an automatic load and will not preload this skill into a subagent,
+# so the description says what the skill does rather than arguing against being loaded.
 disable-model-invocation: true
+argument-hint: <ticket key or the item to refine>
 metadata:
   invocation: user
 ---
@@ -87,13 +85,18 @@ exists to be checkable, not to be a third place to put a guess.
    shared. The agent brief is long because it is not. They never disagree; the
    agent brief is the human text plus everything a newcomer would have to ask.
 3. **Questions are the product, and they are asked, not filed.** A refinement
-   that surfaces zero questions did not refine anything. The moment a question
-   arises, put it to the user - in this session, with your best guess attached,
-   using the session's question mechanism if it has one. A question recorded in
-   a bundle nobody has read is a note to yourself: `READY003` fails a blocking
-   question that was never actually asked. Batch them at the phase gates rather
-   than interrupting per question, and never let an unanswered one become an
-   assumption that the next phase quietly builds on.
+   that surfaces zero questions did not refine anything, and a question recorded
+   in a bundle nobody has read is a note to yourself (`READY003`). Ask the
+   **frontier**: every question whose prerequisites are already settled - the
+   ones answerable *now* without guessing at answers you have not heard yet
+   `[P: Pocock, grilling]`. Put the whole frontier in one round, numbered, each
+   with your recommended answer in `guess`, because a bare question costs the
+   owner an essay and a guess costs them a correction (`READY004`). What waits on
+   an earlier answer is recorded with `blocked_by` and asked next round, not now
+   (`READY005`). `summary.py` renders the round. You are done when the frontier
+   is empty: every branch visited, nothing left silently assumed - not when you
+   run out of patience, and never by letting an unanswered question become an
+   assumption the next phase builds on.
 4. **Decisions are locked, not suggested.** Open technical forks go to an
    explicit gate. An unresolved fork becomes a spike subtask - never
    "the implementer decides."
@@ -430,7 +433,12 @@ Apply the configured profile. Read `references/decomposition.md`.
 
 Default profile is `vertical-slice` `[L]`: each subtask is a thin end-to-end
 slice that leaves the system working `[P: Cockburn, walking skeleton]`.
-Alternatives: `layered`, `workflow-phase`, `bugfix`, `custom`. Defects take
+Alternatives: `layered`, `workflow-phase`, `bugfix`, `expand-contract`, `custom`.
+**`expand-contract`** is for the change vertical slicing cannot express - a wide
+mechanical migration, where the middle step is allowed to be wide precisely
+because it is mechanical `[P: Pocock, to-tickets]`. Its third phase is the one
+teams skip, so `SUB016` fails a bundle that expands and migrates without ever
+removing the old path. Defects take
 `bugfix` - failing test first, root cause as a recorded decision - because there
 is no valuable thin slice of "stop being wrong".
 
@@ -439,7 +447,13 @@ Hard rules, enforced by `validate.py`:
 - **≤ 1 day of work** - the Scrum Guide 2020 describes Developers decomposing
   Sprint work "often to units of one day or less" `[P]`; making it a hard cap is
   this skill's choice `[L]`
-- **≤ 8 files touched** (configurable) `[L]`
+- **≤ 8 files touched** (configurable) `[L]`, and separately **≤ 12 files to read
+  and touch** - `read_first` + `entry_points` + `change_surface` (`BRF015`). Days
+  and files bound what a person can hold; an agent is bound by what fits in one
+  fresh context window, and that is the reading, not the writing
+  `[P: Pocock, to-tickets]`. A subtask sized for a day can still be too big for
+  one window, and an agent that runs out implements from a fuzzy average of the
+  codebase.
 - SMART `[P: Wake, 2003]`: specific, measurable, achievable, relevant, timeboxed
 - Every subtask covers ≥ 1 acceptance criterion, or is explicitly tagged
   `enabling` / `spike`
@@ -803,5 +817,5 @@ All stdlib-only Python 3, no dependencies, no network.
   that does not fit, and what to do when a refinement-shaped request arrives with no
   invocation at all. Not a trigger eval: with `disable-model-invocation` set, "would
   Claude load this on its own" is no longer a question with an answer
-- `evals/evals.json` - twenty-three behavioural evals with verifiable expectations, for
+- `evals/evals.json` - twenty-five behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

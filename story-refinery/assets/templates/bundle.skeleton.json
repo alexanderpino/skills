@@ -142,6 +142,16 @@
   ],
   "open_questions": [
     {
+      "_howto": "Ask the frontier: every question whose prerequisites are settled - answerable now without guessing at answers you have not heard yet. Put the whole round at once, numbered, each with its 'guess'. A question that waits on another names it in 'blocked_by' and is asked next round. Done when the frontier is empty.",
+      "id": "Q1",
+      "text": "",
+      "guess": "your recommended answer - a correction is cheaper for the owner than an essay",
+      "owner": "",
+      "blocking": false,
+      "blocked_by": [],
+      "asked": {"to": "", "when": "", "channel": ""}
+    },
+    {
       "id": "Q1",
       "text": "PHASE 3: a red card.",
       "owner": "",
