@@ -253,6 +253,19 @@
         "Where two stories turned out to overlap almost entirely, that was raised rather than refined twice",
         "Any story that was not ready was reported as not ready rather than smoothed over to keep the batch uniform"
       ]
+    },
+    {
+      "id": 21,
+      "prompt": "Re-refine ABC-123. Finance added a criterion about reporting to them within a working day, the VAT-number one was reworded, and the tax-object one moved to ABC-131.",
+      "expected_output": "A second pass where every criterion code still means what it meant, and the new one takes the next free code.",
+      "expectations": [
+        "The reworded criterion kept the code it already had rather than getting a new one",
+        "The new criterion took the next free code, not the code freed by the one that moved away",
+        "The departed criterion's code is retired in story.retired_criterion_ids and left as a gap",
+        "Nothing was renumbered - no criterion now carries what a different code used to say",
+        "criteria.py check was run against the stored prior bundle before pushing the update",
+        "Subtask covers lists and the decision table still point at the criteria they meant"
+      ]
     }
   ]
 }

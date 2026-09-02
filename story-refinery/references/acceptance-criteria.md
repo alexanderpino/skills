@@ -36,6 +36,49 @@ development, testing) perspectives.
 
 ---
 
+## 1a. Codes
+
+A criterion arrives from a ticket as a sentence and leaves this skill as `AC3`.
+From that moment the code is a public reference: subtasks `cover` it, the decision
+table cites it, critics locate findings by it, and people type it into comment
+threads and pull request titles.
+
+**Assign one where the source has none.** Most tickets arrive with prose or
+bullets. Numbering them is free and makes every later conversation shorter -
+"AC3 is not testable" instead of quoting a sentence back.
+
+**Keep the source's scheme where it has one.** If the ticket already says `AC-1`
+or `C1` or "Criterion 3", use that. Renaming someone's existing references to
+match this skill's preference is a cost with no benefit, and `AC010` reports a
+story that ends up carrying both schemes.
+
+**Never renumber** `[L]`. This is the rule that matters, and the one that feels
+harmless to break. Insert a criterion in the middle and the obvious move is to
+shift the rest down - after which `AC4` in a three-week-old comment, in a merged
+PR title, and in a subtask's `covers` list all point at a different rule, and
+nothing anywhere reports an error. A new criterion takes the next free code.
+
+**A deleted criterion leaves a gap.** Its code is retired, recorded in
+`story.retired_criterion_ids`, and never reused (`AC011`). Gaps are cheap;
+a code that changes meaning is not, because every reference to it still resolves.
+
+```bash
+python scripts/criteria.py assign --bundle bundle.json --previous prior.json --write
+python scripts/criteria.py check  --bundle bundle.json --previous prior.json
+```
+
+`assign` fills in what is missing and, on a re-refinement, recovers the code a
+criterion had last time even when the wording changed - text matching, so a
+reworded rule keeps its identity. `check` is the one to run before pushing an
+update: it detects the shift signature, where a code now carries what a different
+code used to say.
+
+One more, for anywhere a code leaves its own story - a batch finding, a `pending`
+entry, a cross-story link: **qualify it**, `ABC-123/AC2`. Inside the story's own
+ticket `AC2` is unambiguous and stays short.
+
+---
+
 ## 2. Choosing an AC form
 
 Two forms. Pick per criterion, not per story.

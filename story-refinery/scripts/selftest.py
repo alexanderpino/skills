@@ -3,7 +3,7 @@
 
   python selftest.py
 
-Ten suites:
+Eleven suites:
   1. Validator gates  - mutate the golden bundle, assert each gate fires
   2. Config parsing   - the YAML subset, including the cases that bit us
   3. Markup           - wiki / ADF / HTML / plaintext conversion
@@ -11,9 +11,10 @@ Ten suites:
   5. Intake detection - sufficiency verdicts, English and Dutch
   6. Tailoring seam   - what a team skill may change, and what it may never relax
   7. Triage           - the label policy, its precedence, and what it reports
-  8. Batch            - what only shows up when several bundles are read together
-  9. Adversarial review - digests, locators, and that a critic packet really is blind
- 10. Docs consistency - SKILL.md against the scripts and validator codes it cites
+  8. Criterion codes  - assigning them, and them still meaning the same thing later
+  9. Batch            - what only shows up when several bundles are read together
+ 10. Adversarial review - digests, locators, and that a critic packet really is blind
+ 11. Docs consistency - SKILL.md against the scripts and validator codes it cites
 
 A validator nobody has tried to break is a validator nobody should trust, and the
 same goes for the config reader that decides which gates run at all.
@@ -579,7 +580,7 @@ def suite_pipeline():
 def suite_docs():
     """SKILL.md is the interface. A flag that no longer exists, or a reference file
     that was renamed, breaks the skill just as thoroughly as a bad regex."""
-    print("\n-- 10. docs consistency --")
+    print("\n-- 11. docs consistency --")
     import re
     with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as fh:
         skill = fh.read()
@@ -834,10 +835,65 @@ def suite_triage():
           and recorded.get("must_answer_nfr") == policy.get("must_answer_nfr"))
 
 
+def suite_criteria():
+    """A criterion code is a public reference the moment it leaves the session.
+    These are about it still meaning the same thing next time."""
+    print("\n-- 8. criterion codes --")
+    import criteria as C
+
+    with open(GOLDEN, encoding="utf-8") as fh:
+        prior = json.load(fh)
+
+    nxt = copy.deepcopy(prior)
+    acs = nxt["story"]["acceptance_criteria"]
+    acs[1]["rule"] = "A missing, malformed or unverifiable VAT number falls back to the " \
+                     "destination standard rate."                       # reworded, same rule
+    del acs[2]                                                          # AC3 retired
+    acs.append({"rule": "A zero-VAT order is reported to Finance within one working day.",
+                "examples": [{"case": "x", "expect": "y"}]})            # genuinely new
+    pasted = dict(acs[0])
+    pasted.pop("id")
+    acs.append(pasted)                                                  # back, without its code
+    del acs[0]
+    actions, retired = C.assign(nxt, prior, "AC")
+    by_kind = {code: what for what, code, _ in actions}
+    check("criteria: a reworded criterion keeps its code", by_kind.get("AC2") == "kept")
+    check("criteria: a criterion pasted back without its code is recovered, not renumbered",
+          by_kind.get("AC1") == "recovered", actions)
+    check("criteria: a new criterion takes the next free code, not the retired one",
+          by_kind.get("AC5") == "assigned" and "AC3" not in by_kind, actions)
+    check("criteria: the deleted code is retired rather than freed", retired == ["AC3"], retired)
+    check("criteria: a stable re-refinement reports nothing that moved",
+          not [f for f in C.check(nxt, prior) if f[0] == "ERROR"], C.check(nxt, prior))
+
+    # The classic: insert at the top, shift everything down.
+    shifted = copy.deepcopy(prior)
+    acs = shifted["story"]["acceptance_criteria"]
+    for i, ac in enumerate(acs):
+        ac["id"] = "AC%d" % (i + 2)
+    acs.insert(0, {"id": "AC1", "rule": "Only paid orders are considered for reverse charge.",
+                   "examples": [{"case": "x", "expect": "y"}]})
+    moved = [f for f in C.check(shifted, prior) if f[1] == "AC011"]
+    check("criteria: renumbering is caught, and named as renumbering", len(moved) == 3, moved)
+
+    reused = copy.deepcopy(prior)
+    reused["story"]["retired_criterion_ids"] = ["AC2"]
+    codes = {i["code"] for i in validate(reused, load_config(CONFIG)).items}
+    check("criteria: a retired code back in use is an error", "AC011" in codes)
+    mixed = copy.deepcopy(prior)
+    mixed["story"]["acceptance_criteria"][1]["id"] = "C2"
+    mixed["coverage"] = {}
+    codes = {i["code"] for i in validate(mixed, load_config(CONFIG)).items}
+    check("criteria: two schemes in one story is reported", "AC010" in codes, sorted(codes))
+    check("criteria: the shipped example carries one scheme and no retired code",
+          "AC010" not in {i["code"] for i in validate(copy.deepcopy(prior),
+                                                      load_config(CONFIG)).items})
+
+
 def suite_batch():
     """Several related stories in one run. These are the findings that do not exist
     for one bundle: they only appear when the bundles are read side by side."""
-    print("\n-- 8. batch --")
+    print("\n-- 9. batch --")
     import batch as B
 
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -917,7 +973,7 @@ def suite_batch():
 def suite_review():
     """The critic packets are the only mechanical guarantee of blindness in the
     skill. If the reasoning leaks into one, the panel is grading the reasoning."""
-    print("\n-- 9. adversarial review --")
+    print("\n-- 10. adversarial review --")
     from review import (CRITICS, DEFAULT_PANEL, cmd_check, content_digest,
                         render_brief, resolve_locator)
     with open(GOLDEN, encoding="utf-8") as fh:
@@ -1006,6 +1062,7 @@ def main():
     suite_intake()
     suite_tailoring()
     suite_triage()
+    suite_criteria()
     suite_batch()
     suite_review()
     suite_docs()

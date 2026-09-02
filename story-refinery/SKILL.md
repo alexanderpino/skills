@@ -323,6 +323,15 @@ Run Example Mapping `[P: Wynne, 2015]` over the story: **rules** (blue),
 
 - Each rule becomes one acceptance criterion. Target 3-7 rules; more than 7 is a
   signal the story should be split, not refined `[F]`.
+- **Give every criterion a code**, and assign one where the source has none - it
+  is how everything downstream refers to it. Keep the ticket's own scheme if it
+  has one (`AC010` catches a story carrying both). Then **never renumber**:
+  insert in the middle and take the next free code, because a shifted `AC4`
+  silently re-points every comment, `covers` list and PR title that cited it. A
+  deleted criterion's code is retired, never reused (`AC011`). On a re-refinement
+  `criteria.py assign --previous` recovers each code by text, so a reworded rule
+  keeps its identity, and `criteria.py check` catches the shift signature before
+  you push.
 - Each rule needs at least one concrete example. A rule with no example is not
   understood yet.
 - Each red question goes into `open_questions` with an owner. Blocking questions
@@ -709,6 +718,8 @@ All stdlib-only Python 3, no dependencies, no network.
   REV gates' stamp
 - `scripts/batch.py` - `order` | `share` | `check`; several related stories in one
   run, and the contradictions that only appear when the bundles are read together
+- `scripts/criteria.py` - `assign` | `check`; criterion codes, and keeping a code
+  meaning the same thing across re-refinements
 - `scripts/emit.py` - render payloads and a push plan; `--previous` for updates
 - `scripts/markup.py` - markdown to wiki / ADF / HTML / plaintext
 - `scripts/selftest.py` - six suites: validator gates, config parsing, markup
@@ -734,5 +745,5 @@ All stdlib-only Python 3, no dependencies, no network.
   that does not fit, and what to do when a refinement-shaped request arrives with no
   invocation at all. Not a trigger eval: with `disable-model-invocation` set, "would
   Claude load this on its own" is no longer a question with an answer
-- `evals/evals.json` - twenty behavioural evals with verifiable expectations, for
+- `evals/evals.json` - twenty-one behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

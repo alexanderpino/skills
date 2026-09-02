@@ -207,6 +207,19 @@ def check_acceptance_criteria(b, cfg, rep):
         if vague:
             rep.error("AC007", where, "vague terms in an acceptance criterion: %s"
                       % ", ".join(vague))
+    # A code is a public reference the moment it leaves this session: subtasks cover
+    # it, the table cites it, people type it into comment threads. Mixed schemes make
+    # every one of those ambiguous.
+    coded = [ac.get("id") for ac in acs if ac.get("id")]
+    prefixes = {re.sub(r"\d+$", "", i) for i in coded}
+    if len(prefixes) > 1:
+        rep.warn("AC010", "story.acceptance_criteria", "mixed code schemes (%s) - use the "
+                 "source's scheme or this skill's, not both; `criteria.py assign` keeps one"
+                 % ", ".join(sorted(coded)))
+    retired = set((b.get("story") or {}).get("retired_criterion_ids") or [])
+    for i in sorted(retired & set(coded)):
+        rep.error("AC011", "AC %s" % i, "this code was retired and is in use again - every "
+                  "reference to it still resolves, and now resolves to something else")
 
 
 def check_example_coverage(b, rep):

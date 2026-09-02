@@ -47,6 +47,10 @@
         "acceptance_criteria": {"type": "array", "items": {"$ref": "#/$defs/criterion"}},
         "decision_table": {"$ref": "#/$defs/decision_table"},
         "impact": {"$ref": "#/$defs/impact"},
+        "retired_criterion_ids": {
+          "type": "array", "items": {"type": "string"},
+          "description": "Codes of deleted criteria. They stay retired and are never reused (AC011): every reference to a code still resolves, so a reused one resolves to something else."
+        },
         "non_goals": {"type": "array", "items": {"type": "string"}},
         "links": {
           "type": "array",

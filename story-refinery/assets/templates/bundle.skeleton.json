@@ -46,6 +46,7 @@
     "technical_notes_human": "PHASE 6: what changes, where, what was decided. Every path cited.",
     "acceptance_criteria": [
       {
+        "_howto_codes": "PHASE 3: every criterion gets a code, and this is the one everything downstream refers to - subtasks cover it, the decision table cites it, people type it into comment threads. Keep the ticket's own scheme if it has one. Never renumber: a new criterion takes the next free code, a deleted one leaves a gap and its code is retired in story.retired_criterion_ids. `criteria.py assign --previous` does both across a re-refinement.",
         "id": "AC1",
         "rule": "PHASE 3: one blue card.",
         "examples": [
