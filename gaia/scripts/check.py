@@ -260,6 +260,44 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
     return problems, used
 
 
+def locator_quality() -> tuple[int, int, list[str]]:
+    """How many citations can a reader actually follow?
+
+    The guard requires a `locator` and rejects an empty one, which is a floor, not a
+    standard: a topic paraphrase ("the fill algorithm" -- that is the entire paper) passes
+    exactly like "eq. 7". An audit found only ~15 of ~120 locators carried a section or
+    equation number, and no guard could see the difference.
+
+    This is REPORTED, not enforced. Failing the ~105 topic-paraphrase locators today would
+    make the guard red for a week and teach everyone to ignore it; a visible ratio that has
+    to go up is the honest instrument. It is deliberately a metric, and it is recorded as an
+    OPEN row in registers/guard-proofs.tsv rather than counted as a passing check.
+    """
+    precise = re.compile(r"(§|\bsec\.|\bsection\b|\beq\.|\bequation\b|\bp\.|\bpp\.|"
+                         r"\bpage\b|\bfig\.|\bfigure\b|\bslide\b|\bch\.|\bchapter\b|"
+                         r"\btable\b|\balgorithm\b|\blisting\b)", re.I)
+    skip = set(paper_files()) | {INDEX, COVERAGE}
+    total = sharp = 0
+    vague: list[str] = []
+    for path in documents(ROOT):
+        if path in skip:
+            continue
+        try:
+            fm, _ = parse_front_matter(path)
+        except Unparseable:
+            continue
+        for s in fm.get("sources", []):
+            if not isinstance(s, dict):
+                continue
+            loc = str(s.get("locator", ""))
+            total += 1
+            if precise.search(loc):
+                sharp += 1
+            else:
+                vague.append(f"{path.name}:{s.get('id')} -> {loc[:44]}")
+    return sharp, total, vague
+
+
 def check_orphans(bib: dict[str, dict], used: set[str]) -> list[str]:
     """The other direction. 216 of terrain-architect's 326 entries were cited by nothing."""
     return [f"{bib[i]['file']}: `{i}` is cited by no document and is not marked [background]"
@@ -397,6 +435,11 @@ def main() -> int:
           f"background {sum(1 for e in bib.values() if e['background'])}")
     if (summary := coverage_summary()):
         print(summary)
+    sharp, tot, _vague = locator_quality()
+    if tot:
+        print(f"locators {sharp}/{tot} ({100 * sharp / tot:.0f}%) name a section, equation or "
+              f"page — the rest are topic paraphrases a reader cannot follow. Reported, not "
+              f"enforced; see registers/guard-proofs.tsv.")
 
     if problems:
         for p in problems:
