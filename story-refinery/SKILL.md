@@ -276,6 +276,19 @@ it is what tells you afterwards whether this worked. Read it right to left to
 test the ticket's deliverable, left to right to find a cheaper impact on the same
 goal - proposing one is the highest-value thing refinement does.
 
+**The item's language is the refinement's language.** Tickets arrive in any
+language; `intake.py` detects it and records `story.language`, and every
+human-facing field you write - summary, technical notes, criteria and their
+examples, subtask text, questions - is written in *that* language, never in the
+language of this skill. The rendered ticket and the summary take their headings
+from the same code (`emit.py`, `summary.py`; tables ship for en, nl, de, fr, es,
+it, pt, `tracker.headings` for any other - `LANG003` says when one is missing).
+When detection cannot tell, it records `unknown`: name the language by reading
+and set `{code, source: given}` (`LANG001`). The dimension patterns cover English
+and Dutch only; in any other language assess every dimension by reading. The
+agent brief stays English - it is a machine-facing document - but every quoted
+convention, criterion and question in it is quoted, not translated.
+
 The detector matches words, not meaning. Read the source text yourself, set
 `heuristic: false` on every dimension you confirm, and record what you did
 about each gap: `missing` (blocking question), `assumed` (stated assumption plus
@@ -539,7 +552,8 @@ are authoring (`story.summary_human`, `story.technical_notes_human`,
 `subtasks[].human`, `subtasks[].agent_brief`); `assets/templates/bundle.skeleton.json`
 shows where each goes.
 
-**Human text** - condensed, decision-dense, assumes shared context. Budgets
+**Human text** - condensed, decision-dense, assumes shared context, **in the
+item's language** (`story.language`; `LANG002` reads it back). Budgets
 (configurable): story summary ≤ 120 words, technical notes ≤ 200 words, subtask
 text ≤ 80 words. Write what a senior colleague needs: what changes, why, where,
 what is risky, what was decided and why. Delete anything they already know.

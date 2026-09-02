@@ -255,6 +255,10 @@
       },
       "method": "highest-level-wins; XL when three metrics are high, or two under a complex domain",
       "computed_at": "2026-09-02T18:34:32+00:00"
+    },
+    "language": {
+      "code": "en",
+      "source": "detected"
     }
   },
   "decisions": [
@@ -650,7 +654,7 @@
   },
   "review": {
     "method": "rubber-duck",
-    "bundle_digest": "sha256:e31486a3f7acf09e0f1f0e70dbabd4a7c4529dc5e9a2fc2b9bc190eb2affe7d6",
+    "bundle_digest": "sha256:0fa9c3cd9c6a03684e3382c6fd60aa6428198676a089f5252bd4bd4fc9a45c46",
     "critics": [
       {
         "id": "rubber-duck",

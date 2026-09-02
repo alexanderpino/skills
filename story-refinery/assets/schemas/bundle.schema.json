@@ -52,6 +52,11 @@
           "description": "Codes of deleted criteria. They stay retired and are never reused (AC011): every reference to a code still resolves, so a reused one resolves to something else."
         },
         "non_goals": {"type": "array", "items": {"type": "string"}},
+        "language": {
+          "type": "object",
+          "description": "The language of the item, adopted for every human-facing field (summary, notes, criteria, subtask text, questions) and for the rendered headings. Detected by intake.py (source: detected) or named by reading when detection cannot tell (source: given). The agent brief stays English: it is a machine-facing document.",
+          "properties": {"code": {"type": "string"}, "source": {"type": "string"}}
+        },
         "complexity": {
           "type": "object",
           "description": "Derived by complexity.py --write, never authored: band (S/M/L/XL), the driving metrics, and every metric with its level. CPX002 reports a card that no longer matches the bundle.",

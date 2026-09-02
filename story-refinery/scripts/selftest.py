@@ -1451,6 +1451,83 @@ def suite_complexity_and_greenfield():
           CX.assess(g, cfg)["levels"].get("greenfield") == 2)
 
 
+def suite_language():
+    """Any language in, the same language out."""
+    print("\n-- 11d. language --")
+    import lang as L
+    import intake as I
+    import emit as E
+    import summary as S
+    from validate import check_language, Report
+    cfg = load_config(CONFIG)
+    with open(GOLDEN, encoding="utf-8") as fh:
+        golden = json.load(fh)
+
+    samples = {
+        "en": "As a finance user I want to export invoices so that I can reconcile them with the bank when the month closes.",
+        "nl": "Als financieel medewerker wil ik facturen kunnen exporteren zodat ik ze kan afstemmen met de bank wanneer de maand wordt afgesloten.",
+        "de": "Als Mitarbeiter der Finanzabteilung möchte ich Rechnungen exportieren, damit ich sie mit der Bank abgleichen kann, wenn der Monat abgeschlossen wird.",
+        "fr": "En tant qu'utilisateur finance, je veux exporter les factures pour que je puisse les rapprocher avec la banque quand le mois est clôturé.",
+        "es": "Como usuario de finanzas quiero exportar las facturas para que pueda conciliarlas con el banco cuando se cierra el mes.",
+        "it": "Come utente della finanza voglio esportare le fatture per poterle riconciliare con la banca quando il mese è chiuso.",
+        "pt": "Como utilizador de finanças quero exportar as faturas para que as possa conciliar com o banco quando o mês é fechado.",
+    }
+    for code, text in samples.items():
+        got, _ = L.detect(text)
+        check("language: %s detected" % code, got == code, got)
+    got, _ = L.detect("Jako uživatel financí chci exportovat faktury, abych je mohl sladit s bankou.")
+    check("language: an unknown language is None, not a guess", got is None, got)
+    check("language: a two-word text is None", L.detect("export invoices")[0] is None)
+
+    rep = I.assess(samples["nl"], cfg)
+    check("language: intake records nl for a Dutch item", rep["lang"] == "nl", rep["lang"])
+    rep = I.assess("Jako uživatel financí chci exportovat faktury, abych je mohl sladit s bankou, když měsíc končí a účetní to potřebuje.", cfg)
+    check("language: an unknown language is recorded as unknown and flagged",
+          rep["lang"] == "unknown" and any(f.startswith("language 'unknown'") for f in rep["flags"]), rep["flags"])
+
+    # rendering follows the story's language
+    nl = copy.deepcopy(golden)
+    nl["story"]["language"] = {"code": "nl", "source": "given"}
+    E._LANG["code"], E._LANG["override"] = "nl", None
+    rendered = E.render_story(nl)
+    text = rendered if isinstance(rendered, str) else "\n".join(rendered)
+    E._LANG["code"] = "en"
+    check("language: the ticket renders Dutch headings for a Dutch story",
+          "## Acceptatiecriteria" in text and "## Acceptance criteria" not in text, text[:200])
+    for code in L.HEADINGS:
+        check("language: heading table %s is complete" % code, set(L.HEADINGS[code]) == set(L.HEADINGS["en"]))
+        check("language: label table %s is complete" % code, set(L.LABELS[code]) == set(L.LABELS["en"]))
+    lines = S.one_story(copy.deepcopy(nl), cfg)
+    check("language: the summary labels follow the story's language",
+          any("**Waarom.**" in l for l in lines) and not any("**Why.**" in l for l in lines), lines[:4])
+    check("language: an override map wins over the shipped table",
+          L.heading("why", "nl", {"why": "Aanleiding"}) == "Aanleiding")
+    check("language: an unshipped language falls back to English headings",
+          L.heading("why", "cs") == "Why / What" and not L.has_headings("cs"))
+
+    def lang_codes(b, c=cfg):
+        rep = Report()
+        check_language(b, c, rep)
+        return {i["code"] for i in rep.items}
+    check("language: the golden records its language and is clean", not lang_codes(golden), lang_codes(golden))
+    missing = copy.deepcopy(golden)
+    missing["story"].pop("language", None)
+    missing["story"]["intake"].pop("lang", None)
+    check("language: no language recorded is reported", "LANG001" in lang_codes(missing))
+    wrong = copy.deepcopy(golden)
+    wrong["story"]["language"] = {"code": "nl", "source": "given"}
+    check("language: English text under a Dutch story is reported", "LANG002" in lang_codes(wrong))
+    cs = copy.deepcopy(golden)
+    cs["story"]["language"] = {"code": "cs", "source": "given"}
+    codes = lang_codes(cs)
+    check("language: a language with no heading table is reported, English text aside",
+          "LANG003" in codes, codes)
+    pinned = copy.deepcopy(cfg)
+    pinned.setdefault("tracker", {})["headings"] = dict(L.HEADINGS["en"])
+    check("language: a full tracker.headings override satisfies it",
+          "LANG003" not in lang_codes(cs, pinned))
+
+
 def suite_summary():
     """The artefact people actually talk from. It has to work before the bundle is
     finished, and it has to say the unwelcome part."""
@@ -1765,6 +1842,7 @@ def main():
     suite_story_shapes()
     suite_manifest_cwd()
     suite_complexity_and_greenfield()
+    suite_language()
     suite_summary()
     suite_roundtrip()
     suite_batch()

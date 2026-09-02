@@ -204,17 +204,20 @@ def card(a):
     return "\n".join(out)
 
 
-def one_line(a):
-    """For summary.py and the ticket: the band and the drivers, nothing else."""
+def one_line(a, code="en"):
+    """For summary.py and the ticket: the band and the drivers, nothing else - in the
+    story's language, so the line does not sit in English inside a Dutch summary."""
+    import lang as L
     parts = []
     for d in a["drivers"]:
+        name = L.metric_name(d, code, NAMES)
         if d in a["metrics"]:
-            parts.append("%s %s" % (a["metrics"][d], NAMES[d]))
+            parts.append("%s %s" % (a["metrics"][d], name))
         elif d == "domain":
-            parts.append("%s domain" % a["domain"])
+            parts.append("%s %s" % (a["domain"], name if code != "en" else "domain"))
         else:
-            parts.append(NAMES.get(d, d))
-    return "%s - %s" % (a["band"], ", ".join(parts) if parts else "nothing reaches medium")
+            parts.append(name)
+    return "%s - %s" % (a["band"], ", ".join(parts) if parts else "-")
 
 
 def record(a):

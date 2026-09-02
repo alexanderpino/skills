@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Is there enough information to refine this item? Stdlib only, no network.
 
-  python intake.py assess --text ticket.txt [--kind feature|bug|spike|enabling|auto] [--lang en|nl|auto]
+  python intake.py assess --text ticket.txt [--kind feature|bug|spike|enabling|auto] [--lang <code>|auto]
   python intake.py assess --bundle bundle.json --write     # fills story.intake + questions
 
 The script finds LEXICAL SIGNALS, not meaning. It can tell that the words
@@ -266,18 +266,22 @@ def _stopword_score(text, pattern):
 
 
 def detect_lang(text):
-    return "nl" if _stopword_score(text, DUTCH_STOPWORDS) >= 4 else "en"
+    """The language of the item, or 'unknown'. Detection lives in lang.py so emit.py
+    and summary.py render in the same language the intake recorded."""
+    import lang as L
+    code, _ = L.detect(text)
+    return code or "unknown"
 
 
 def language_is_supported(text, lang):
-    """The dimension patterns and the vagueness lexicon are English and Dutch only. A
-    ticket in a third language scores near zero against both, is then assessed as if it
-    were one of them, and passes every check without any of them having looked."""
+    """The dimension patterns and the vagueness lexicon cover the languages in
+    lang.PATTERN_LANGUAGES. Any other language is detected and recorded, but its
+    dimensions must be assessed by reading - the patterns would find nothing and the
+    item would pass every check without anyone having looked."""
+    import lang as L
     if len(text.split()) < 12:
         return True                      # too short to judge; 'very short' already flags it
-    best = max(_stopword_score(text, DUTCH_STOPWORDS),
-               _stopword_score(text, ENGLISH_STOPWORDS))
-    return best >= 4
+    return lang in L.PATTERN_LANGUAGES
 
 
 def find_signal(text, dimension):
@@ -371,10 +375,12 @@ def assess(text, cfg, kind="auto", lang="auto"):
 
     flags = []
     if not language_is_supported(text, lang):
-        flags.append("language not recognised as English or Dutch: the dimension patterns and "
-                     "the vagueness lexicon are en/nl only, so this assessment looked at "
-                     "almost nothing. Translate the item, or extend SIGNALS and "
-                     "validation.vagueness_lexicon for your language before trusting it")
+        flags.append("language %r: the dimension patterns and the vagueness lexicon cover %s "
+                     "only, so this assessment looked at almost nothing - assess every "
+                     "dimension by reading, set heuristic: false, and write the refinement in "
+                     "the item's own language (story.language). Add a vagueness_lexicon for "
+                     "it in refinery.yaml, or that check stays decorative"
+                     % (lang, "/".join(__import__("lang").PATTERN_LANGUAGES)))
     if mechanism_only:
         flags.append("mechanism-only: a solution is named but no outcome - ask what it is for "
                      "before scanning for how to build it")
@@ -397,7 +403,10 @@ def assess(text, cfg, kind="auto", lang="auto"):
             questions.append({
                 "dimension": d["id"],
                 "blocking": d["required"],
-                "text": QUESTIONS[lang][d["id"]].format(guess=guess),
+                # Question templates ship in en and nl; any other language gets the
+                # English template and the flag already says to put it in the item's
+                # language when it is asked.
+                "text": QUESTIONS.get(lang, QUESTIONS["en"])[d["id"]].format(guess=guess),
             })
 
     return {
@@ -493,6 +502,13 @@ def write_into_bundle(path, rep):
         if previous.get(k):
             fresh[k] = previous[k]
     story["intake"] = fresh
+    # The item's language is adopted for every human-facing field; record where it
+    # came from so a hand-set language (a mixed ticket, an unknown language named by
+    # reading) is never overwritten by detection.
+    existing = story.get("language") or {}
+    if not (isinstance(existing, dict) and existing.get("source") == "given"):
+        story["language"] = {"code": rep["lang"], "source": "detected" if rep["lang"] != "unknown"
+                             else "undetected - name it by reading and set source: given"}
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(bundle, fh, indent=2, ensure_ascii=False)
         fh.write("\n")
@@ -508,7 +524,7 @@ def main(argv=None):
     p.add_argument("--text", help="file with the raw ticket text; '-' for stdin")
     p.add_argument("--bundle", help="bundle.json; reads story.source_text")
     p.add_argument("--kind", choices=["feature", "bug", "spike", "enabling", "auto"], default="auto")
-    p.add_argument("--lang", choices=["en", "nl", "auto"], default="auto")
+    p.add_argument("--lang", default="auto", help="ISO code, or auto")
     p.add_argument("--write", action="store_true",
                    help="with --bundle: write story.intake and add questions for missing dimensions")
     p.add_argument("--json", action="store_true")

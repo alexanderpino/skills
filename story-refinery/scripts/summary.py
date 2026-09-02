@@ -22,7 +22,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _yaml import load_config  # noqa: E402
+from _yaml import get, load_config  # noqa: E402
 from emit import waves  # noqa: E402
 from validate import frontier, validate  # noqa: E402
 
@@ -85,6 +85,33 @@ def questions_by_owner(bundle, only=None):
     return out
 
 
+_LABEL_KEYS = {"**Why.**": "why", "**Size.**": "size", "**Complexity.**": "complexity",
+               "**In order.**": "in_order", "**It hinges on.**": "hinges",
+               "**Ask this round.**": "ask_round", "**Waits on an earlier answer.**": "waits_earlier",
+               "**Every question is answered.**": "all_answered",
+               "**Worth saying out loud.**": "worth_saying",
+               "**Waits on work that does not exist yet.**": "waits_missing",
+               "**Leaves behind.**": "leaves_behind", "**Ready.**": "ready", "**Not ready**": "not_ready"}
+
+
+def localize(lines, bundle, cfg):
+    """The summary is read out loud to the team, so its labels follow the story's
+    language like the ticket's headings do. The body is already in that language."""
+    import lang as L
+    cfg_lang = str(get(cfg, "tracker.language", "auto") or "auto")
+    code = L.code_of(bundle) if cfg_lang == "auto" else cfg_lang
+    if code == "en":
+        return lines
+    override = get(cfg, "tracker.headings", None) or None
+    out = []
+    for line in lines:
+        for en, key in _LABEL_KEYS.items():
+            if en in line:
+                line = line.replace(en, "**%s**" % L.label(key, code, override))
+        out.append(line)
+    return out
+
+
 def one_story(bundle, cfg, heading="#"):
     story = bundle.get("story") or {}
     s = shape(bundle)
@@ -103,7 +130,10 @@ def one_story(bundle, cfg, heading="#"):
                 % (s["subtasks"], " and ".join(s["repos"]) or "one repo", s["total_days"],
                    s["critical_days"], " → ".join(s["critical_path"]), s["widest"]), ""]
         import complexity as CX
-        out += ["**Complexity.** %s." % CX.one_line(CX.assess(bundle, cfg)), ""]
+        import lang as L
+        cfg_lang = str(get(cfg, "tracker.language", "auto") or "auto")
+        code = L.code_of(bundle) if cfg_lang == "auto" else cfg_lang
+        out += ["**Complexity.** %s." % CX.one_line(CX.assess(bundle, cfg), code), ""]
         out += ["**In order.**", ""]
         by_id = {t.get("id"): t for t in bundle.get("subtasks") or []}
         for w in s["waves"]:
@@ -165,7 +195,7 @@ def one_story(bundle, cfg, heading="#"):
             "%s when %s" % (f.get("ticket"), f.get("trigger")) for f in follow), ""]
 
     out += [verdict_line(bundle, cfg), ""]
-    return out
+    return localize(out, bundle, cfg)
 
 
 def main(argv=None):

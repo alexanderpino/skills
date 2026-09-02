@@ -139,6 +139,12 @@ either half alone.
   because the others handle that shape badly: vertical-slice on a defect produces
   a plan with no reproduction, and a delivery profile on a research item plans
   the build the item exists to inform.
+- **language** - detected from the source text and recorded in `story.language`
+  (`scripts/lang.py`: distinct function words, seven languages, `unknown` below
+  the floor or on a near tie). The refinement is written in that language and
+  the ticket renders its headings in it. The lexical dimension patterns cover
+  English and Dutch only; for any other language the assessment is yours by
+  reading, and the flag says so. `unknown` is a prompt to name it, not a verdict.
 - **unknown kind** - `INT012`. Only `feature`, `bug`, `spike` and `enabling`
   have a questionnaire. Anything else would silently fall back to the feature one, which
   is worse than failing: the item comes back assessed, with three dimensions

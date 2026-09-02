@@ -96,6 +96,16 @@ tracker:
   adapter: jira                   # [script] emit.py capability table
   project: ABC                    # [script] copied into payloads
   markup: adf                     # [claude] the adapter converts at push time
+  # [script] LANG003, emit.py, summary.py. `auto` renders the ticket and the summary in
+  # the item's own language (story.language, detected at intake); a code pins it. The
+  # human text is written in that language by the refiner; this only decides the
+  # headings. Tables ship for en, nl, de, fr, es, it, pt - for any other language add
+  # `headings:` with every key of the English table (see scripts/lang.py) or the ticket
+  # renders English headings around foreign text, which LANG003 reports.
+  language: auto
+  # headings:
+  #   why: "..."
+  #   acceptance_criteria: "..."
   story_issue_type: Story         # [script] payload issue_type
   subtask_issue_type: Sub-task    # [script] payload issue_type
   parent_field: parent            # [claude] used when you actually push

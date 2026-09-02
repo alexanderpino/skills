@@ -92,7 +92,7 @@ PHASE_OF = {
     "IRR": "5 decompose", "BAS": "3 criteria", "ENB": "1 intake",
     "COV": "5 decompose", "CON": "5 decompose", "SPL": "5 decompose",
     "BRF": "6 briefs", "DOD": "6 briefs",
-    "REV": "8 review", "LNK": "9 emit", "STRUCT": "0 configure",
+    "REV": "8 review", "LNK": "9 emit", "STRUCT": "0 configure", "LANG": "6 write",
     "BAT": "9 batch", "GRN": "2 evidence", "CPX": "5 decompose",
 }
 
@@ -120,7 +120,7 @@ CONFIG_SPEC = {
                 "max_subtasks", "max_files_per_subtask", "max_subtask_days",
                 "min_acceptance_criteria", "max_acceptance_criteria",
                 "max_context_entries", "min_subtask_days"},
-    "tracker": {"adapter", "project", "markup", "story_issue_type", "subtask_issue_type",
+    "tracker": {"language", "headings", "adapter", "project", "markup", "story_issue_type", "subtask_issue_type",
                 "parent_field", "max_description_chars", "labels_prefix", "agent_brief"},
     "tracker.agent_brief": {"sink", "fallback", "filename", "repo_file_dir", "custom_field",
                             "marker_begin", "marker_end"},
@@ -296,6 +296,9 @@ CODES = {
     "SUB018": ("warn", "two chained subtasks in one repo on one criterion fit inside every cap together"),
     "SUB019": ("error", "a subtask kind is outside the closed vocabulary and skips every kind-keyed gate"),
     # 6 briefs
+    "LANG001": ("warn", "no language is recorded for a story that carries human-facing text"),
+    "LANG002": ("warn", "a human-facing field reads as a different language than the story's"),
+    "LANG003": ("warn", "the story's language has no heading table, so the ticket renders English headings"),
     "BRF001": ("error", "a subtask has no agent brief at all"),
     "BRF002": ("error", "an agent brief lacks a required field"),
     "BRF003": ("error", "an agent brief names a different repo than its subtask"),
@@ -503,8 +506,8 @@ def check_example_coverage(b, rep):
     three inputs and shows one has two branches nobody has thought about, and a rule
     that draws a line with no example standing on it will be implemented off by one.
     `[P: Myers, equivalence partitioning and boundary value analysis, 1979]`"""
-    lang = ((b.get("story") or {}).get("intake") or {}).get("lang")
-    connector = r"\bof\b" if lang == "nl" else r"\bor\b"
+    import lang as L
+    connector = L.CONNECTOR.get(L.code_of(b), r"\bor\b")
     for ac in (b.get("story") or {}).get("acceptance_criteria") or []:
         where = "AC %s" % ac.get("id", "?")
         rule, examples = ac.get("rule") or "", ac.get("examples") or []
@@ -1144,6 +1147,41 @@ def check_complexity(b, cfg, subs, rep):
     elif not CX.is_current(b, cfg):
         rep.warn("CPX002", "story.complexity", "the recorded card no longer matches the bundle "
                  "- it is derived, regenerate it rather than maintaining it by hand")
+
+
+def check_language(b, cfg, rep):
+    """The refinement goes back in the language the item came in. The story records
+    which; the human-facing fields are held to it where detection can tell; and a
+    language with no heading table is said out loud before the ticket renders."""
+    import lang as L
+    story = b.get("story") or {}
+    human = [story.get("summary_human") or "", story.get("technical_notes_human") or ""]
+    human += [a.get("rule") or "" for a in story.get("acceptance_criteria") or []]
+    if not any(t.strip() for t in human):
+        return
+    lang = story.get("language")
+    code = (lang or {}).get("code") if isinstance(lang, dict) else lang
+    if not code:
+        rep.warn("LANG001", "story.language", "not recorded - `intake.py assess --write` "
+                 "detects it; a ticket in one language refined in another reads as a "
+                 "translation error")
+        return
+    if code == "unknown":
+        rep.warn("LANG001", "story.language", "recorded as unknown - name the language by "
+                 "reading and set {code, source: given}")
+        return
+    joined = " ".join(t for t in human if t)
+    found, _ = L.detect(joined)
+    if found and found != code and len(joined.split()) >= 40:
+        rep.warn("LANG002", "story.summary_human", "the human-facing text reads as %r while "
+                 "the story's language is %r - the refinement is written in the wrong "
+                 "language, or story.language is" % (found, code))
+    cfg_lang = str(get(cfg, "tracker.language", "auto") or "auto")
+    target = code if cfg_lang == "auto" else cfg_lang
+    if not L.has_headings(target, get(cfg, "tracker.headings", None)):
+        rep.warn("LANG003", "story.language", "no heading table for %r - the ticket renders "
+                 "English headings around %s text. Add tracker.headings in refinery.yaml "
+                 "(every key of the English table) or accept the mix at handover" % (target, code))
 
 
 def check_research(b, cfg, subs, rep):
@@ -1907,6 +1945,7 @@ def validate(bundle, cfg):
     check_graph(subs, reach, graph, rep)
     check_clutter(bundle, cfg, subs, rep)
     check_research(bundle, cfg, subs, rep)
+    check_language(bundle, cfg, rep)
     check_greenfield(bundle, subs, rep)
     check_complexity(bundle, cfg, subs, rep)
     check_enabler(bundle, rep)

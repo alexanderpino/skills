@@ -24,6 +24,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _yaml import get, load_config  # noqa: E402
 from markup import render_markup  # noqa: E402
 from validate import validate  # noqa: E402
+import lang as L  # noqa: E402
+
+# Set by main() from story.language / tracker.language; render_* read it.
+_LANG = {"code": "en", "override": None}
+
+
+def H(key):
+    return "## " + L.heading(key, _LANG["code"], _LANG["override"])
+
+
+def B(key):
+    return "**%s**" % L.heading(key, _LANG["code"], _LANG["override"])
+
 
 SINKS = ("description_tail", "comment", "attachment", "repo_file", "custom_field")
 CAPABILITIES = {
@@ -75,7 +88,7 @@ def render_decision_table(table):
     if not conditions or not rules:
         return []
     header = [c["id"] for c in conditions]
-    out = ["**Decision table**", "",
+    out = [B("decision_table"), "",
            "| " + " | ".join(header + ["Outcome", "AC"]) + " |",
            "|" + "|".join("---" for _ in range(len(header) + 2)) + "|"]
     for rule in rules:
@@ -93,18 +106,19 @@ def render_decision_table(table):
 
 def render_story(bundle):
     s = bundle["story"]
-    out = ["## Why / What", "", s.get("summary_human", "").strip(), ""]
+    out = [H("why"), "", s.get("summary_human", "").strip(), ""]
     goal = (s.get("impact") or {}).get("goal")
     if goal:
-        out += ["**Goal**: %s" % goal, ""]
+        out += [B("goal") + ": %s" % goal, ""]
     if s.get("complexity"):
         c = s["complexity"]
         import complexity as CX
-        out += ["**Complexity**: %s - %s" % (c.get("band"), ", ".join(
-            "%s %s" % (c.get("metrics", {}).get(d), CX.NAMES.get(d, d)) if d in (c.get("metrics") or {})
-            else CX.NAMES.get(d, d) for d in c.get("drivers") or []) or "nothing reaches medium"), ""]
+        name = lambda d: L.metric_name(d, _LANG["code"], CX.NAMES)  # noqa: E731
+        out += [B("complexity") + ": %s - %s" % (c.get("band"), ", ".join(
+            "%s %s" % (c.get("metrics", {}).get(d), name(d)) if d in (c.get("metrics") or {})
+            else name(d) for d in c.get("drivers") or []) or "-"), ""]
     out += render_prerequisites(bundle)
-    out += ["## Acceptance criteria", ""]
+    out += [H("acceptance_criteria"), ""]
     for ac in s.get("acceptance_criteria") or []:
         out.append("**%s — %s**" % (ac.get("id"), ac.get("rule")))
         for ex in ac.get("examples") or []:
@@ -119,10 +133,10 @@ def render_story(bundle):
     if s.get("decision_table"):
         out += render_decision_table(s["decision_table"])
     if s.get("non_goals"):
-        out += ["## Non-goals", ""] + ["- %s" % g for g in s["non_goals"]] + [""]
-    out += ["## Technical notes", "", s.get("technical_notes_human", "").strip(), ""]
+        out += [H("non_goals"), ""] + ["- %s" % g for g in s["non_goals"]] + [""]
+    out += [H("technical_notes"), "", s.get("technical_notes_human", "").strip(), ""]
     if bundle.get("decisions"):
-        out.append("**Decisions**")
+        out.append(B("decisions"))
         for d in bundle["decisions"]:
             if d.get("status") == "locked":
                 out.append("- %s %s → **%s**. %s"
@@ -138,20 +152,20 @@ def render_story(bundle):
                            % (d.get("id"), d.get("waiting_for") or "?", d["expires"]))
         out.append("")
     if s.get("risks"):
-        out.append("**Risks**")
+        out.append(B("risks"))
         out += ["- %s %s → %s%s" % (r.get("id"), r.get("desc"), r.get("mitigation"),
                                     " _(detected by: %s)_" % r["detection"]
                                     if r.get("detection") else "")
                 for r in s["risks"]]
         out.append("")
     if bundle.get("open_questions"):
-        out += ["## Open questions", ""]
+        out += [H("open_questions"), ""]
         out += ["- %s %s — owner: %s — blocking: %s"
                 % (q.get("id"), q.get("text"), q.get("owner") or "UNASSIGNED",
                    "yes" if q.get("blocking") else "no")
                 for q in bundle["open_questions"]]
         out.append("")
-    out += ["## Subtasks", "", "| # | Title | Repo | Covers | Depends on | Est |",
+    out += [H("subtasks"), "", "| # | Title | Repo | Covers | Depends on | Est |",
             "|---|-------|------|--------|------------|-----|"]
     for st in bundle.get("subtasks") or []:
         out.append("| %s | %s | %s | %s | %s | %sd |" % (
@@ -162,7 +176,7 @@ def render_story(bundle):
     out.append("")
     nf = s.get("non_functional") or {}
     if nf:
-        out += ["## Non-functional", ""] + ["- **%s**: %s" % (k, v) for k, v in nf.items()] + [""]
+        out += [H("non_functional"), ""] + ["- **%s**: %s" % (k, v) for k, v in nf.items()] + [""]
     if bundle.get("blast_radius"):
         br = bundle["blast_radius"]
         out.append("_Blast radius: %s repo(s), %s primary + %s secondary file(s), %s contract(s)._"
@@ -214,7 +228,7 @@ def render_prerequisites(bundle):
     pending = (bundle.get("evidence") or {}).get("pending") or []
     if not blocked and not pending:
         return []
-    out = ["## Prerequisites", ""]
+    out = [H("prerequisites"), ""]
     for link in blocked:
         out.append("- Blocked by **%s**%s" % (link.get("key"),
                                               " — %s" % link["why"] if link.get("why") else ""))
@@ -245,12 +259,12 @@ def render_shared_context(bundle):
            "Read this once before your subtask brief. It is identical for every "
            "subtask on this story: the facts refinement established, including the "
            "ones that are absences.", "",
-           "## The outcome this serves", "",
+           H("outcome"), "",
            (story.get("impact") or {}).get("goal") or story.get("summary_human", ""), ""]
 
     pending = ev.get("pending") or []
     if pending:
-        out += ["## Not there yet", "",
+        out += [H("not_there_yet"), "",
                 "These are cited by the briefs and do not exist in the repo at the time of "
                 "writing. Do not go looking for them, and do not substitute something that "
                 "looks similar - check the item that creates them.", ""]
@@ -263,7 +277,7 @@ def render_shared_context(bundle):
         out.append("")
 
     if ev.get("glossary"):
-        out += ["## Glossary", "",
+        out += [H("glossary"), "",
                 "Domain words in this story mean this here, whatever they mean elsewhere.", ""]
         for term in ev["glossary"]:
             out.append("- **%s** — %s%s" % (term.get("term"), term.get("means", ""),
@@ -279,7 +293,7 @@ def render_shared_context(bundle):
         out.append("")
 
     if ev.get("ruled_out"):
-        out += ["## Already ruled out", "",
+        out += [H("ruled_out"), "",
                 "Refinement looked for these and did not find them. Do not spend budget "
                 "re-checking, and do not substitute something that merely looks similar.", ""]
         for r in ev["ruled_out"]:
@@ -289,7 +303,7 @@ def render_shared_context(bundle):
         out.append("")
 
     if ev.get("contracts"):
-        out += ["## Contracts that cross a boundary", ""]
+        out += [H("contracts"), ""]
         for c in ev["contracts"]:
             out.append("- `%s` (%s) — produced by %s, consumed by %s"
                        % (c.get("path", c.get("id", "?")), c.get("id", ""),
@@ -313,7 +327,7 @@ def render_shared_context(bundle):
 
     provenance = sorted({p for st in bundle.get("subtasks") or []
                          for p in (st.get("agent_brief") or {}).get("provenance") or []})
-    out += ["## Freshness", "",
+    out += [H("freshness"), "",
             "This was true at: %s." % (", ".join("`%s`" % p for p in provenance) or "unrecorded"),
             "",
             "If your brief's preflight fails, the code has moved since. Stop and report it "
@@ -328,7 +342,7 @@ def render_subtask(st, bundle, cfg, sink):
         parent, ", ".join(st.get("covers") or []) or "—",
         ", ".join(st.get("depends_on") or []) or "—",
         st.get("estimate_days", "?"), st.get("kind", "feature")), "",
-        "## For the developer", "", (st.get("human") or "").strip(), "", "## Done when", ""]
+        H("for_developer"), "", (st.get("human") or "").strip(), "", H("done_when"), ""]
     for d in (st.get("agent_brief") or {}).get("done_when") or []:
         if d.get("type") == "command":
             out.append("- [ ] `%s` → %s" % (d.get("cmd"), d.get("expect", "exit 0")))
@@ -452,7 +466,7 @@ def triage_section(bundle):
     meta, triage = story.get("tracker_meta") or {}, story.get("triage") or {}
     if not meta:
         return []
-    out = ["## Triage", "",
+    out = [H("triage"), "",
            "Labels: %s · components: %s · type: %s · priority: %s"
            % (", ".join(meta.get("labels") or []) or "none",
               ", ".join(meta.get("components") or []) or "none",
@@ -489,14 +503,14 @@ def review_section(bundle):
     see before this reaches a board, which makes the preview the right place."""
     review = bundle.get("review") or {}
     if not review:
-        return ["## Review", "",
+        return [H("review"), "",
                 "**No adversarial review recorded.** Nothing hostile has read this "
                 "story or its subtasks. Say so out loud before anyone implements it.",
                 ""]
     findings = review.get("findings") or []
     critics = review.get("critics") or []
     method = review.get("method", "?")
-    lines = ["## Review", "",
+    lines = [H("review"), "",
              "Method: **%s** · critics: %s · findings: %d"
              % (method, ", ".join("%s (%s)" % (c.get("id"), c.get("context", "?"))
                                   for c in critics) or "none", len(findings)), ""]
@@ -593,6 +607,12 @@ def main(argv=None):
     with open(args.bundle, "r", encoding="utf-8") as fh:
         bundle = json.load(fh)
     cfg = load_config(args.config) if os.path.exists(args.config) else {}
+    # The ticket renders in the item's language (story.language), or in the language
+    # the tracker config pins; a house with a language we ship no table for supplies
+    # tracker.headings, and LANG003 has already said so if it did not.
+    cfg_lang = str(get(cfg, "tracker.language", "auto") or "auto")
+    _LANG["code"] = L.code_of(bundle) if cfg_lang == "auto" else cfg_lang
+    _LANG["override"] = get(cfg, "tracker.headings", None) or None
     adapter = args.adapter or get(cfg, "tracker.adapter", "markdown")
     caps = dict(CAPABILITIES.get(adapter, CAPABILITIES["markdown"]))
     caps["_name"] = adapter
@@ -681,7 +701,7 @@ def main(argv=None):
     if warnings:
         preview += ["> Notes:"] + ["> - %s" % w for w in warnings] + [""]
     if delta:
-        preview += ["## Re-refinement", "",
+        preview += [H("re_refinement"), "",
                     "This is an update, not a first pass. Update the existing tree; do not "
                     "create a second one.", ""]
         preview.append("- **parent story**: %s" % ("changed - update it"
@@ -691,7 +711,7 @@ def main(argv=None):
                 preview.append("- **%s**: %s" % (label.replace("_", " "), ", ".join(ids)))
         preview.append("")
     if links:
-        preview += ["## Links to create", "",
+        preview += [H("links"), "",
                     "| From | Type | To | As the tracker calls it | Already there |",
                     "|---|---|---|---|---|"]
         for l in links:
@@ -704,7 +724,7 @@ def main(argv=None):
                 preview.append("")
                 preview.append("> %s → %s: %s" % (l["type"], l["to"], l["degraded"]))
         preview.append("")
-    preview += ["## Execution waves", "",
+    preview += [H("waves"), "",
                 "Everything inside a wave can run in parallel. No two subtasks in the same "
                 "wave write the same file.", ""]
     for w in plan_waves:
