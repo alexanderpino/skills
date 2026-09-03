@@ -9,6 +9,10 @@ sources:
   - { id: alacarte, tier: P, locator: "§4.1 the three schedulers — 4.1.1 topological, 4.1.2 restarting, 4.1.3 suspending; §4.2 the four rebuilders — 4.2.1 dirty bit, 4.2.2 verifying traces, 4.2.3 constructive traces, 4.2.4 deep constructive traces; §2.3 and Fig. 3 for early cutoff; §2.5 Table 1 for the classification of Make, Excel, Shake and Bazel; §5.4 for Bazel, CloudBuild, Buck and Nix, and the closing paragraph naming suspending + constructive traces" }
   - { id: adapton, tier: P, locator: "§2 Overview — recomputation driven by observation rather than by input change; §4.1 trace structure and propagation semantics" }
   - { id: acar2002, tier: P, locator: "§6 Change Propagation is Sound" }
+  - { id: halide, tier: P, locator: "§4.2 Bounds Inference — required regions inferred backwards from consumers by interval analysis and composed up the pipeline; Fig. 5 for the worked tiled halo; §3.1 for the apron and the redundancy-versus-locality trade" }
+  - { id: barnes2017, tier: P, locator: "§3.1 p.205 for why an apron cannot fix a global-ordered node and how a perimeter aggregate does; §3 p.203 for the three-stage structure and the single-tile residency claim; §2 p.203 for the restriction to non-divergent flow" }
+  - { id: nuke_request, tier: F, locator: "the DD::Image::Iop reference for request() and _request(), and the NDK Developers Guide 'Basic Image Calls' paragraph on _request — requested regions are unioned, and a random-access node must request the input's whole bounding box" }
+  - { id: barnes2016, tier: P, locator: "Abstract p.56 — the same tile-subdivision shape applied to Priority-Flood depression filling, with a fixed number of memory-access and communication events per subdivision" }
   - { id: ta_graph_runtime, tier: F, locator: "§Evaluation for the demand-driven recursion; §Content-addressed caching for the recursive cacheKey and the exclusion of device; §Dirty propagation for the VALUE-versus-TOPOLOGY split" }
   - { id: simd_dispatch_drift, tier: F, locator: "the AVX512-on/AVX512-off comparison table and the paragraph beneath it giving the per-ufunc 1-ULP measurement over 10007 doubles and the droplet_erode amplification" }
 ---
@@ -246,24 +250,55 @@ usually visible.
 
 ## Tiling, and the operators that refuse it
 
-Evaluating a graph tile by tile is what makes an out-of-memory build possible, and it works exactly
-as far as the operators are local. A local operator needs its tile plus a halo — the radius of its
-support — and the halo composes up the pipeline: a chain of local operators needs the sum of their
-radii.
+Evaluating a graph tile by tile is what makes an out-of-memory build possible. For a **local**
+operator a tile plus a halo suffices — the halo being the operator's support radius — and the
+required region composes back up the pipeline. That composition is mechanical, not a heuristic:
+[halide] §4.2 infers it by "interval analysis of the expressions in the caller which index that
+dimension, given the previously computed bounds of all downstream functions", and its Fig. 5
+carries the worked case where a consumer reading `blur_x(x, y-1)` mechanically produces a `-1` in
+the producer's required bounds.
 
-**Some terrain operators are not local at any radius**, and this is the case that defeats naive
-tiling. Flow accumulation is the example, and `flow-routing.md` establishes it: drainage area is a
-**global, topologically ordered** quantity, computed by a traversal that must visit every cell
-upstream of a given one before that cell. There is no halo size that makes it correct per tile,
-because a tile's upstream cone can reach the far edge of the world.
+A second rule applies once a node has more than one consumer, and it is the one people forget:
+**every region requested of an input is unioned**, and the union is what gets computed and cached
+[nuke_request]. Two downstream nodes each asking for half a tile cost one evaluation of their
+union, not two of a half — which is why a single node with random access to its input, which must
+request the whole bounding box, silently defeats tiling for everything upstream of it.
 
-So a tiled runtime must classify its nodes, not just its tiles:
+**Some terrain operators are not local at any radius.** Flow accumulation is the example
+(`flow-routing.md`): drainage area is a **global, topologically ordered** quantity, and a tile's
+upstream cone can reach the far edge of the world. [barnes2017] §3.1 states the mechanism exactly —
+"the fundamental problem each tile encounters is that it does not know how much flow it will
+receive from each neighbouring tile", so "every cell along every flow path is offset from its true
+value by an unknown amount".
 
-- **Local** — a halo suffices. Blur, slope, curvature, most filters.
-- **Global-ordered** — no halo suffices. Flow routing, accumulation, priority-flood depression
-  handling, anything with a stack ordering.
-- **Global-reduce** — needs a whole-domain pass but has no ordering: min/max normalisation,
-  histogram equalisation. Cheaper to fix than global-ordered: run one reduction pass, then tile.
+⚠️ **That does not mean such nodes cannot tile, and assuming so is a real and common error.** The
+same sentence continues: "this information can be calculated by considering in aggregate the
+perimeters of all the tiles." [barnes2017] computes flow accumulation **exactly** over two trillion
+cells with, in the limit, "only the producer's information and a single tile" resident. The fix is
+not a bigger apron — no apron works — it is a **different contract**: a per-tile pass, an
+O(perimeter) boundary digest, one global reduce over the digests, then a per-tile offset pass.
+[barnes2016] applies the same three-stage shape to depression filling, which makes it a pattern
+rather than one algorithm's trick.
+
+So a tiled runtime classifies its nodes by **which contract they need**, not by whether they tile:
+
+| Class | Contract | Examples |
+|---|---|---|
+| **Local** | Tile plus a halo, composed up the chain [halide] | Blur, slope, curvature, most filters |
+| **Global-reduce** | One whole-domain reduction, then tile freely | Min/max normalisation, histogram equalisation |
+| **Global-ordered** | Boundary-summary: per-tile pass → O(perimeter) digest → global reduce → per-tile offset [barnes2017] | Flow accumulation, depression filling [barnes2016] |
+
+⚠️ **The receiver rule decides whether the third row is even available.** [barnes2017] §2 restricts
+itself to non-divergent flow because "the one-to-many property of divergent flows makes developing
+divide-and-conquer approaches difficult". Single-receiver D8 decomposes; multi-receiver MFD and D∞
+resist the same decomposition. So the network-versus-field choice in `flow-routing.md` is *also* a
+tiling decision, and picking MFD for a field may cost you out-of-core evaluation of that branch.
+
+⚠️ **Do not over-read this into "erosion tiles".** [barnes2017] and [barnes2016] operate on a
+**static** DEM. An erosion loop rebuilds the flow DAG every step, so the boundary digest would have
+to be recomputed and re-reduced per iteration, and neither paper measures that. The honest claim is
+that a *single* global-ordered pass tiles exactly; an iterated one is an open question this skill
+does not have a source for.
 
 A node's class is part of its description, alongside its type and its parameters, and the planner
 needs it before it can decide anything. A runtime that discovers the class at evaluation time has

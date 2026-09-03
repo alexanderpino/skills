@@ -44,6 +44,36 @@ recurring case on this axis. Naming them is right; dressing them as peer review 
   concern; §6 proves the propagation sound. The ancestor of the whole self-adjusting-computation
   line that `adapton` continues.
 
+## Tiled evaluation and bounds
+
+- **halide** `P` — Ragan-Kelley, J., Barnes, C., Adams, A., Paris, S., Durand, F. & Amarasinghe,
+  S. (2013). *Halide: A Language and Compiler for Optimizing Parallelism, Locality, and
+  Recomputation in Image Processing Pipelines.* PLDI 2013, 519–530. doi:10.1145/2491956.2462176. —
+  §4.2 Bounds Inference: the region an input must produce is inferred backwards from the region its
+  consumers require, by interval analysis, composed recursively up the pipeline. Fig. 5 carries the
+  worked tiled halo. §3.1 names the apron ("ghost zones", "overlapped tiling") and states the
+  redundancy-versus-locality trade.
+  ⚠️ It does **not** support a claim about how a *masked* operator's footprint combines: the paper
+  contains no notion of union, mask or select, and computes bounds per callee function. Cite
+  `nuke_request` for the union, not this.
+- **barnes2017** `P` — Barnes, R. (2017). *Parallel non-divergent flow accumulation for trillion
+  cell digital elevation models on desktops or clusters.* Environmental Modelling & Software 92,
+  202–212. doi:10.1016/j.envsoft.2017.02.022. — The counterexample to "globally ordered means it
+  cannot tile". §3.1 states why an apron cannot work and how a perimeter aggregate fixes it; §3
+  gives the three-stage structure and the two-trillion-cell result. §2 restricts to non-divergent
+  flow because divergent metrics resist divide-and-conquer — which makes the D8/MFD choice a tiling
+  decision as well as a hydrology one.
+- **barnes2016** `P` — Barnes, R. (2016). *Parallel Priority-Flood depression filling for trillion
+  cell digital elevation models on desktops or clusters.* Computers & Geosciences 96, 56–68.
+  doi:10.1016/j.cageo.2016.07.001. — The same tile → perimeter digest → global reduce → offset
+  shape applied to depression filling, which is what makes it a pattern rather than one algorithm's
+  trick.
+- **nuke_request** `F` — Foundry. *Nuke Developer Kit*, `DD::Image::Iop` class reference,
+  `request()` / `_request()`; and the NDK Developers Guide, "Basic Image Calls". — No canonical
+  paper: a compositing SDK's own documentation. Every region requested of an input is **unioned**,
+  and the union is what gets computed and cached; a node reading a neighbourhood widens the box it
+  requests; a node with random access must request the input's entire bounding box.
+
 ## In-repo sources
 
 These are artefacts in this repository rather than published work. They are `F` — a register or a
