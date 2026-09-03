@@ -206,7 +206,7 @@ any convex shape, so floes are convex to within measurement error. And the isope
 generator producing long thin shards or fractal coastlines is producing something else.
 
 ⚠️ **One transcription trap, recorded because it nearly propagated.** The manuscript's prose gives
-area as `0.56 p²` and its own Table 1 gives `0.66`. `floe_numbers.py`, recorded in `registers/pseudocode-execution.tsv` resolves it
+area as `0.56 p²` and its own Table 1 gives `0.66`. two arithmetic checks by this document's writer — ⚠️ not re-run by the reviewer, and so not in `registers/pseudocode-execution.tsv`, unlike the partition measurement below — resolves it
 two ways: `0.065 × 3.17² = 0.653`, and the table's sd/mean column of 0.08 against sd = 0.05
 implies 0.66 rather than 0.56. [denton2022] Sect. 3.4, reading the published paper, also uses
 `a = 0.66·x²`. **Use 0.66.** This is what "a constant reconstructed from memory is a `?` wearing
@@ -272,13 +272,17 @@ tool with one wind field and one angle has silently picked a convention; say whi
 
 Evaluating `α = sqrt(ρ_a C_a / ρ_w C_w)` over the usual drag-coefficient ranges
 (`ρ_a = 1.3`, `ρ_w = 1026`, `C_a` 1.2–2.5 × 10⁻³, `C_w` 3.0–8.0 × 10⁻³) gives **1.4% to 3.3%**
-which brackets the values referenced to a **near-surface or 10 m** wind — Nansen's ≈2% and Uotila's
-1.3–3.3% — and sits **above** the geostrophic-referenced rows (0.8%, 1.0%, 1.1%). ⚠️ That is the
-same convention split the warning above makes about the turning angle, and it applies to the
-magnitude for the same reason: a geostrophic wind is the stronger one, so the same ice speed
-divided by it gives a smaller factor. An earlier revision of this line claimed the bracket covered
-*every* row, which it does not — four of the five sit outside it, and the fix is to compare like
-with like rather than to widen the bracket. The formula is not a fit; it is a ratio of drag
+— 1.3786% to 3.2494% precisely. Against the table above, **one row lies wholly inside it**
+(Nansen's ≈2%, near-surface), **one overlaps** (Uotila's 1.3–3.3%, 10 m, whose lower end is just
+below), and **three lie wholly below** it: Thorndike & Colony's 0.8% and 1.1% and Polar
+Pathfinder's 1.0%, every one of them referenced to a **geostrophic** wind.
+
+⚠️ That is the same convention split the warning above makes about the turning angle, and it
+applies to the magnitude for the same reason: a geostrophic wind is the stronger one, so the same
+ice speed divided by it gives a smaller factor. Two earlier revisions of this line got it wrong in
+opposite directions — the first claimed the bracket covered *every* row, the second claimed it
+covered Uotila *and* that four rows sat outside, which cannot both hold. Compare like with like;
+do not widen the bracket to fit. The formula is not a fit; it is a ratio of drag
 coefficients, and against the winds it is derived for it lands in the right place.
 
 **The authoring consequence is that a floe field is advected, not simulated.** One vector per

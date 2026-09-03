@@ -84,7 +84,7 @@ modulo the period before hashing** [periodic_lattice_practice]. One line, and it
 i0 = floor(x) % P;  i1 = (floor(x) + 1) % P     # and likewise for y
 ```
 
-Measured, `w8/m1_periodic_noise.py`, max `|f(x) − f(x+T)|` over 512² samples:
+Measured, `m1_periodic_noise.py`, recorded in `registers/pseudocode-execution.tsv`, max `|f(x) − f(x+T)|` over 512² samples:
 
 | construction | T = 7 | T = 16 | T = 64 | T = 256 | T = 300 |
 |---|---|---|---|---|---|
@@ -127,7 +127,7 @@ third-party kernel you call as a black box.
 That document recommends "a lacunarity that is not exactly 2", for good reasons about octave
 alignment. But the modular construction needs an **integer lattice period at every octave**, so
 `P · lacunarity^k` must stay an integer for every `k` you sum. Measured on a 6-octave fBm with
-`P = 64` (`w8/m1_periodic_noise.py`, part M1b):
+`P = 64` (`m1_periodic_noise.py`, recorded in `registers/pseudocode-execution.tsv`, part M1b):
 
 | lacunarity | 2.0 | 3.0 | 1.5 | 1.25 | 1.93 | 2.01 | 2.1 |
 |---|---|---|---|---|---|---|---|
@@ -166,7 +166,7 @@ first without the second.** This is the single most common confusion on this top
 conserves mass perfectly and still produces a rim artefact, because a wall is a *landform* the
 interior does not have.
 
-`w8/m2_erosion_boundary.py` measures it. A 128² field is built by the modular construction above,
+`m2_erosion_boundary.py`, recorded in `registers/pseudocode-execution.tsv` measures it. A 128² field is built by the modular construction above,
 so it wraps bit-exactly before erosion starts (seam ratio 0.898 — the wrapped step is drawn from
 the same distribution as every interior step). Then the [mei2007] pipe model runs on it under each
 boundary condition. **Seam ratio** is the mean absolute step across the wrapped edge over the mean
@@ -227,7 +227,7 @@ priority-queue", and §3.2's paragraph after Algorithm 1 explains why they are t
 definition, edge cells have an ε-descending path to the DEM's edge". [hobley2017] §3.1.4 says the
 same from the other side: "the edges of a Landlab grid are **always** defined by boundary nodes".
 
-On a torus that seed set is empty. `w8/m5_torus_flow.py`, 96² = 9216 cells:
+On a torus that seed set is empty. `m5_torus_flow.py`, recorded in `registers/pseudocode-execution.tsv`, 96² = 9216 cells:
 
 | domain | seeds | cells reached | cells raised | fill volume | max accumulation |
 |---|---|---|---|---|---|
@@ -265,7 +265,7 @@ mirror the tile, cross-blend a margin, or simulate on a torus** [seam_fake_pract
 ### Mirroring
 
 Reflect the field and the copies meet at equal values. Free, exact, and it destroys the seam as a
-place where terrain can exist. `w8/m3_mirroring.py`, 256² tiles:
+place where terrain can exist. `m3_mirroring.py`, recorded in `registers/pseudocode-execution.tsv`, 256² tiles:
 
 | measurement | mirrored | periodic by construction |
 |---|---|---|
@@ -290,7 +290,7 @@ symmetry, not from a run.)
 
 ### Cross-blending a margin
 
-Fade the field into its own translate across a band of width `B`. `w8/m4_crossblend.py`, 192²,
+Fade the field into its own translate across a band of width `B`. `m4_crossblend.py`, recorded in `registers/pseudocode-execution.tsv`, 192²,
 smootherstep weights:
 
 | B | 0 | 4 | 8 | 16 | 32 | 64 |
@@ -349,7 +349,7 @@ A periodic input does not stay periodic through a non-periodic operator, and the
 padding mode is its boundary condition under a different name. `surface-and-scale-space.md`
 recommends `reflect` padding for the Burt-Adelson band split, correctly, because on an open domain
 zero padding asserts sea level one cell outside the field. **On a periodic domain that
-recommendation inverts.** `w8/m6_pyramid_padding.py`, 256², `a = 0.4`, input seam-to-interior step
+recommendation inverts.** `m6_pyramid_padding.py`, recorded in `registers/pseudocode-execution.tsv`, 256², `a = 0.4`, input seam-to-interior step
 ratio 3.48:
 
 | padding | L = 1 | L = 3 | L = 5 | round trip |

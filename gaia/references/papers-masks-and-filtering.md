@@ -41,17 +41,23 @@ pagination intact. The OCR is poor (it renders "can" as "tan" throughout) but le
 locators cite numbered sections and theorems.
 **salembier2009** — the authors' PDF at imatge.upc.edu, figure numbering intact.
 
-⚠️ **Four sources are deliberately absent.** **Rosenfeld & Pfaltz (1966)**, *Sequential
-operations in digital picture processing*, JACM 13(4), 471–494, is the origin of both the
-two-pass raster labelling scan and the two-pass L1 distance transform; **Borgefors (1986)**,
-*Distance transformations in digital images*, CVGIP 34(3), 344–371, is the origin of the 3-4 and
-5-7-11 chamfer masks; **Danielsson (1980)**, *Euclidean distance mapping*, CVGIP 14, 227–248, is
-the origin of the vector-propagation family; and **IEC 61966-2-1** is the sRGB standard itself.
-All four are paywalled or unobtainable here. They are named in prose in the documents, with an
+⚠️ **Three sources are deliberately absent.** **Rosenfeld & Pfaltz (1966)**, *Sequential
+operations in digital picture processing*, JACM 13(4), 471–494, is the origin of the two-pass L1
+distance transform; **Borgefors (1986)**, *Distance transformations in digital images*, CVGIP
+34(3), 344–371, is the origin of the 3-4 and 5-7-11 chamfer masks; and **Danielsson (1980)**,
+*Euclidean distance mapping*, CVGIP 14, 227–248, is the origin of the vector-propagation family.
+All three are paywalled or unobtainable here. They are named in prose in the documents, with an
 opened paper that reports their content cited in their place — felzenszwalb2012 for
-Rosenfeld & Pfaltz, hajdu2012 for the Borgefors masks, meijster2000 for Danielsson, icc_srgb for
-the sRGB constants. Adding bibliography entries for papers nobody here opened would not be
-honest.
+Rosenfeld & Pfaltz, hajdu2012 for the Borgefors masks, meijster2000 for Danielsson. Adding
+bibliography entries for papers nobody here opened would not be honest.
+
+⚠️ **Two riders on that.** This block said "four" and included **IEC 61966-2-1**, the sRGB
+standard — which arrived here with the distance-transform entries during a bibliography merge and
+does not belong: the colour entries went to `papers-rendering.md`, which carries that absence and
+the `icc_srgb` substitution. And Rosenfeld & Pfaltz originate the two-pass **labelling** scan as
+well as the distance transform, but `felzenszwalb2012` stands in only for the distance transform
+— it cites them for that alone, and `wu2009`, the labelling paper here, does not cite them at
+all. **The labelling half has no opened stand-in**, and saying so is the honest form.
 
 ⚠️ **The entries in `## Terrain analysis and edge-aware filtering` came from `papers-generation.md`
 and predate this practice.** Several were never obtained and now say so with `[not-opened]`;

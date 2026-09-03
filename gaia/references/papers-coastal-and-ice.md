@@ -76,7 +76,7 @@ footnote "Submitted to Journal of Geophysical Research". ⚠️ **That is one st
 accepted manuscripts this corpus grades `P` elsewhere**, and there is direct evidence review
 touched the numbers: the manuscript's prose gives floe area as `0.56 p²` while its own Table 1
 gives `0.66`, and `denton2022`, reading the published paper, quotes `0.66`. Two independent
-arithmetic checks in `floe_numbers.py`, recorded in `registers/pseudocode-execution.tsv` resolve it to `0.66` — the table's
+arithmetic checks by this entry's writer — not independently re-run, and so not carried in `registers/pseudocode-execution.tsv` — resolve it to `0.66` — the table's
 `perimeter/p = 3.17` and `area/perimeter² = 0.065` imply `area/p² = 0.653`, and the table's own
 sd/mean column of `0.08` against `sd = 0.05` implies `0.66`, not `0.56`. Section, table and
 figure numbers cited from it are the **manuscript's**; JGR page numbers are *not* asserted, and

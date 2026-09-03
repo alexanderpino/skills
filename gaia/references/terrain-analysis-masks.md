@@ -225,7 +225,7 @@ the terrain is not changing per frame. The line is the baseline length, not the 
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | Materials subtly wrong everywhere, geometry fine | Analysis computed before the last height write | Move it downstream of erosion |
-| Snow on sunny faces; rain shadow on the wrong flank | Aspect taken uphill, or a northness sign that does not match the `dzdy` convention in hand — `+sin` with a raw row difference, `−sin` with this document's `+y`-north `H` | Negate the gradient; `−sin(aspect)` |
+| Snow on sunny faces; rain shadow on the wrong flank | Aspect taken uphill, or a northness sign that does not match the `dzdy` convention in hand — `+sin` with a raw row difference, `−sin` with this document's `+y`-north `H` | Negate the gradient for the downslope aspect; then derive the northness sign from the `dzdy` you hold — `+sin` with this document's `+y`-north `H`, `−sin` with a raw row difference. Do not copy a sign; check one known north-facing cell |
 | A slope mask that was right at 1 m/px and wrong at 8 | Slope is resolution-dependent | State the resolution with the threshold; re-tune per LOD |
 | Factor of safety, TWI or wetness biased low | `tan(slope)` applied to a value that is already a tangent | Divide by `slope` bare |
 | Curvature mask is speckle, or shows concentric rings | Second derivative of a quantised field | Compute on R32F, pre-smooth σ ≈ 1 cell |

@@ -9,7 +9,7 @@ generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 # Papers — flow, rivers, and the rules every bibliography follows
 
 ⚠️ **This file used to be called `Papers` and described itself as "every source Gaia cites".**
-That was true when it was the only bibliography. It now holds 19 of the corpus's 196 entries —
+That was true when it was the only bibliography. It now holds 18 of the corpus's 196 entries —
 flow routing, depression handling, and river networks as authored objects — and the description
 stayed behind, which mattered because `index.md` republished it verbatim as this file's row.
 
@@ -54,8 +54,9 @@ Two rules, inherited verbatim and non-negotiable:
 ### `[not-opened]`, the tag that stops `P` lying
 
 ⚠️ **A tier is a claim about the venue *and* about the reading, and those two came apart.**
-`P` above says "verified to actually contain the algorithm attributed to it". Twenty-one entries
-across this corpus's seven bibliographies could not honestly say that — one of them here: the paper is peer-reviewed and behind a paywall,
+`P` above says "verified to actually contain the algorithm attributed to it". Eighteen `P` entries
+across this corpus's seven bibliographies could not honestly say that — one of them here, and
+three `F` entries carry the tag for the same reason, twenty-one in all: the paper is peer-reviewed and behind a paywall,
 and nobody here ever opened it. Meanwhile the documents citing them had started writing
 `NOT OPENED —` into their locators. **One side of the citation said a human read it and the other
 side said nobody did, and nothing could see the contradiction, because both sides were prose.**
