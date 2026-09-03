@@ -587,6 +587,48 @@ def check_not_opened(bib: dict[str, dict], cites: dict[str, list[tuple[Path, str
     return problems
 
 
+def check_headings() -> list[str]:
+    """Headings must be unique within a document and must not carry unbalanced backticks.
+
+    This exists because of a real corruption that shipped. A section was inserted by replacing
+    the first occurrence of a heading string -- but that string also appeared INSIDE a sentence
+    (`see `## What these fields do to the runtime` below`), so the insertion split the sentence,
+    swallowed the new section's own heading, and left a bogus `## What these fields do to the
+    runtime` below. Worse than the horizon` heading mid-file. The document then had two headings
+    with the same name, one of them a fragment, and a cross-reference pointing at a heading that
+    no longer existed.
+
+    Every other check passed. Citations resolved, the line cap held, the front matter parsed,
+    `## Use this` was still first -- because none of them look at heading STRUCTURE. A document
+    can be spliced in half and stay green.
+
+    Both rules below are cheap and would have caught it: the duplicate name, and the unbalanced
+    backtick in the fragment.
+    """
+    problems: list[str] = []
+    skip = set(paper_files()) | {INDEX}
+    for path in documents(ROOT):
+        if path in skip:
+            continue
+        rel = path.relative_to(ROOT)
+        seen: dict[str, int] = {}
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.startswith("#"):
+                continue
+            text = line.lstrip("#").strip()
+            if line.count("`") % 2:
+                problems.append(f"{rel}:{n}: heading has an unbalanced backtick -- "
+                                f"a heading is not a place for half a code span, and this is "
+                                f"what a spliced insertion looks like: {text[:60]!r}")
+            if text in seen:
+                problems.append(f"{rel}:{n}: duplicate heading {text[:50]!r}, already at "
+                                f"line {seen[text]}. Either one is a leftover from an edit, or "
+                                f"a cross-reference to it is ambiguous")
+            else:
+                seen[text] = n
+    return problems
+
+
 def check_no_artefact(bib: dict[str, dict]) -> list[str]:
     """A `no artefact:` locator is excluded from the locator ratio, so it must be EARNED.
 
@@ -796,7 +838,8 @@ def main() -> int:
     rec_problems, rec_first, rec_total = check_recommendation()
     problems += (doc_problems + check_orphans(bib, used) + check_duplication()
                  + check_coverage() + check_index() + rec_problems
-                 + check_no_artefact(bib) + check_not_opened(bib, citations_by_id()))
+                 + check_no_artefact(bib) + check_not_opened(bib, citations_by_id())
+                 + check_headings())
 
     docs = [p for p in documents(ROOT)
             if p not in paper_files() and p not in (INDEX, COVERAGE)]

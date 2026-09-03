@@ -320,7 +320,13 @@ single highest-value use of any field in this document, because it is what makes
 range incise and the dry side keep its relief.
 
 ⚠️ **It is also a global field with a non-local dependence, so it breaks tiling the same way flow
-accumulation does** — see `## Fetch, which is the same sweep and a different accumulator
+accumulation does** — see `## What these fields do to the runtime` below. Worse than the horizon
+sweep, in fact: the horizon's dependence has a bounded search distance, and an advected
+precipitation field's does not. Compute precipitation whole-domain at a coarse resolution and
+upsample it, rather than trying to tile it; the field is smooth at the scale that matters and the
+error from upsampling is far smaller than the error from a seam.
+
+## Fetch, which is the same sweep and a different accumulator
 
 ⚠️ **Two documents route here for fetch and this section exists because they were routing to
 nothing.** `coastal-erosion.md` calls exposure "the input that matters" and `sea-ice.md` needs a
@@ -354,12 +360,6 @@ rather than take a single ray, because a one-ray fetch flickers between a gap an
 wind rotates by one azimuth step. The arc width is a tuning constant and no source read here fixes
 it. Effective-fetch methods of this shape are standard in coastal engineering, and nothing in this
 corpus's bibliography was opened for them, so nothing here is cited for it.
-
-## What these fields do to the runtime` below. Worse than the horizon
-sweep, in fact: the horizon's dependence has a bounded search distance, and an advected
-precipitation field's does not. Compute precipitation whole-domain at a coarse resolution and
-upsample it, rather than trying to tile it; the field is smooth at the scale that matters and the
-error from upsampling is far smaller than the error from a seam.
 
 ## What these fields do to the runtime
 
