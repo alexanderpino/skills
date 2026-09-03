@@ -74,6 +74,32 @@ recurring case on this axis. Naming them is right; dressing them as peer review 
   and the union is what gets computed and cached; a node reading a neighbourhood widens the box it
   requests; a node with random access must request the input's entire bounding box.
 
+## Tool practice — layering, masking and evaluation
+
+No canonical paper exists for any of this; these are vendors documenting their own products, and
+the prose that rests on them must say so. They are cited for **what a shipping tool chose**, which
+is evidence about practice, never about correctness.
+
+- **gaea_masks** `F` — QuadSpinner. *Gaea 2 Documentation*, Using Gaea → Terrain Basics → "Masks".
+  https://docs.gaea.app/ (the site is JS-rendered; the full corpus is published as plain text at
+  https://docs.gaea.app/llms-full.txt, slug `masks`). — States that a mask is a greyscale weight,
+  that direct masking and the post-hoc Mask node have **"no difference in results"**, and that the
+  Mask node is preferred because masking a node directly "will force a rebuild of the entire node"
+  while the post-process "is extremely fast".
+- **gaea_accumulator** `F` — QuadSpinner. *Gaea 2 Documentation*, Node Reference → Utilities →
+  "Accumulator", and the User Guide page "Accumulators". — A Generator node with no data inputs
+  whose output depends on every Snow/Water/Debris/Trees node in the graph, selected by `Type` and
+  scoped by `Restrict to Group`. Carries its own failure mode verbatim — "The Accumulator will only
+  add nodes that have been built" — and the workaround, which is for the user to draw an edge whose
+  only purpose is ordering.
+- **gaea_mixer** `F` — QuadSpinner. *Gaea 2 Documentation*, Using Gaea → "Layering Textures". — The
+  Mixer node: a layer stack with built-in height and slope masks living inside the DAG.
+- **houdini_hdk** `F` — SideFX. *Houdini Development Kit*, Building Custom Operators → "Cooking",
+  and Basics → "Cooking" (Houdini 22.0). — The documented answer to an undeclared input set: a node
+  that cooks another's data "via some other means" **must** call `OP_Node::addExtraInput()`, and
+  must do so on *every* cook because extra inputs are cleared as soon as dirty propagation
+  traverses them. Also states the two-phase model: dirt is pushed eagerly, data is pulled lazily.
+
 ## In-repo sources
 
 These are artefacts in this repository rather than published work. They are `F` — a register or a
@@ -84,6 +110,11 @@ chapter is not peer review — but they are checkable, which a recollection is n
   and the accumulator pattern. **Carries no citations of its own**, so it is cited here for what a
   practitioner built and for the two defects Gaia found in it, never as evidence that a mechanism
   is correct.
+- **ta_ops_filters** `F` — `terrain-architect/references/10-primitives-ops-filters.md`. —
+  §"Placement & masking" for `apply_masked` and the rules that placements are authored in metres
+  and that a binary mask must never ship; §"Place before you sample, not after" for the
+  coordinate-versus-raster transform measurement. Unlike its sibling chapter this one **does** carry
+  citations, and it records two of its own errors in place, which is why it is worth reading.
 - **simd_dispatch_drift** `F` — `terrain-architect/registers/figure-regen.tsv`, on the branch
   `origin/claude/terrain-architect-definition-of-done`. — A measured, reproducible case of the
   same code on the same CPU producing materially different terrain under two SIMD dispatch
