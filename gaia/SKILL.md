@@ -2,20 +2,19 @@
 name: gaia
 description: >-
   Authority on geological terrain and water — generation, simulation and rendering — for
-  developers building real-time (rasterizer) or near-real-time (ray-traced) systems: a game
-  engine, or an authoring tool in the class of Gaea or World Machine. Covers noise and domain
-  warping, tectonic uplift, flow routing and depression handling, hydraulic/thermal/aeolian
-  erosion, the stream-power law and its O(N) solver, terrain analysis and masks; closed versus
-  open water, wave spectra and the dispersion relation, shallow-water solvers, water optics;
-  heightfield LOD, tiled streaming, virtual texturing, GPU-driven culling, planetary precision,
-  water rendering, caustics and heightfield ray-marching; and the tool architecture itself —
-  node-graph scheduling, caching and invalidation, layering with filters and masks, and the
-  driver fields (temperature, sun and shadow, water and wind flow) that make terrain respond to
-  where it is. Every recommendation carries a source and a provenance tier. Use when building or
-  debugging terrain or water — heightfields, erosion, drainage, oceans, lakes, LOD, streaming, a
-  node graph that rebuilds too much — even if "terrain" is never said. Not for BRDF theory
-  (physically-based-rendering), generic 3D fluid simulation, or GIS and real-world DEM
-  ingestion.
+  developers building a game engine or an authoring tool in the class of Gaea or World Machine,
+  real-time or near-real-time. Covers noise and domain warping, uplift, flow routing, hydraulic,
+  thermal and aeolian erosion, stream power and its O(N) solver, analysis masks and distance
+  fields; the authored landforms — stratigraphy, rivers, craters, coastlines, band-split surface
+  detail, sketch constraints, mask-to-material; closed versus open water, wave spectra,
+  shallow-water solvers, water optics; heightfield LOD, streaming, virtual texturing, culling,
+  planetary precision, water rendering, caustics, ray-marching, offline meshing; and the tool
+  architecture — node-graph scheduling, caching and invalidation, layering, seamless output, and
+  the driver fields (temperature, sun and shadow, precipitation, wind). Every recommendation
+  carries a source and a provenance tier. Use when building or debugging terrain or water —
+  heightfields, erosion, drainage, oceans, lakes, LOD, streaming, seams, a node graph that
+  rebuilds too much — even if "terrain" is never said. Not for BRDF theory
+  (physically-based-rendering), generic 3D fluid simulation, or GIS and DEM ingestion.
 type: Skill
 title: Gaia
 tags: [terrain, water, generation, simulation, rendering, routing]
@@ -109,14 +108,28 @@ artefact whose axis was stated backwards, and a pass count wrong by a factor of 
 go stale as the corpus grows. The axes:
 
 - **Generation** — noise and warping, tectonic uplift, flow routing, hydraulic erosion,
-  thermal and aeolian erosion, stream power, analysis masks.
+  thermal and aeolian erosion, stream power, analysis masks; and the authored landforms:
+  stratigraphy and lithology, river networks, impact craters, coastal erosion, the band split
+  in surface and scale space, sketch-based authoring, and the mask utilities — distance
+  transforms, component filtering, and mask-to-material.
 - **Simulation** — the time budget first, then closed versus open water, wave models,
-  shallow water, water optics.
+  shallow water, water optics, sea ice.
 - **Rendering** — heightfield LOD, tiled streaming, virtual texturing, GPU-driven culling,
-  planetary precision, water rendering, caustics, heightfield ray-marching.
+  planetary precision, water rendering, caustics, heightfield ray-marching, offline mesh
+  extraction.
 - **Architecture** — the machine that runs the graph: scheduling and caching, layering with
-  filters and masks, and the driver fields the graph carries. Start at `node-graph-runtime.md`;
-  it routes to the other two.
+  filters and masks, the driver fields the graph carries, and what it takes to make the output
+  tile. Start at `node-graph-runtime.md`; it routes to the rest.
+
+⚠️ **Four questions cut across the axes, and the answer lives in one place each.** A reader who
+does not know this asks the wrong document and gets a partial answer:
+
+| Question | Where it is answered |
+|---|---|
+| How wide must a tile's halo be? | `surface-and-scale-space.md` for a pyramid, `node-graph-runtime.md` for the general local / global-reduce / global-ordered classification |
+| Where does the water come from? | `driver-fields.md` — precipitation, and why drainage area is a uniform-rainfall assumption |
+| How do I make this wrap? | `seamless-and-periodic.md`, which also carries the periodic corrections to noise and to the band split |
+| How do I compute a distance field? | `mask-operators.md`, which several other documents prescribe and none of them implemented |
 
 `references/coverage.md` states what is written, what is planned, and what is deliberately
 out of scope — with a reason for each. **Consult it before saying this skill does not cover
