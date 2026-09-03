@@ -1,7 +1,7 @@
 ---
 type: Bibliography
 title: Papers — coasts and sea ice
-description: "Sources for what water does at the margin of the land: the equilibrium beach profile and its scale parameter, the Bruun rule together with the published case for abandoning it, alongshore transport and the high-angle instability that makes a coast roughen, threshold-driven cliff retreat, and the sea-ice floe size distribution and free-drift balance."
+description: "Sources for what water does at the margin of the land: the equilibrium beach profile and its scale parameter, the Bruun rule together with the published case for abandoning it, alongshore transport and the high-angle instability that makes a coast roughen, threshold-driven cliff retreat, the sea-ice floe size distribution and free-drift balance, and the airborne-lidar survey behind the one to five metres of pressure-ridge sail relief that is the only part of sea ice touching height at all."
 tags: [bibliography, provenance, generation, simulation, coastal, water]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
@@ -12,9 +12,14 @@ One family, two documents, and a shared boundary: this is what happens where wat
 rather than where it flows over it. `flow-routing.md` and `hydraulic-erosion.md` own water on the
 land; `wave-models.md` owns the wave field itself. These sources own the margin.
 
-Coastal erosion and sea ice sit together because each alone would be a stub of four entries, and
-because they share the same structure of argument — a published law, a published rebuttal of it,
-and a distribution whose exponent is contested.
+Coastal erosion and sea ice sit together for one reason and it is enough: **each alone would be a
+stub of four entries.** ⚠️ An earlier version of this paragraph also claimed they "share the same
+structure of argument — a published law, a published rebuttal of it, and a distribution whose
+exponent is contested". They do not. The coastal half has the law and the rebuttal (the Bruun rule
+and `cooper2004`) and no contested exponent; the ice half has the contested exponent and no
+law/rebuttal pair, since `rothrock1984` explicitly declines to assert a power law. Each supplies
+two of three and not the same two — and the claim contradicted the read-log section twelve lines
+below, which says the two sets of sources have nothing in common beyond the boundary.
 
 **The tier table, the `[not-opened]` rule and the two non-negotiable rules live in
 `papers-flow.md`** and are not repeated here.
@@ -93,14 +98,19 @@ Introduction and the sail-height definition around eq. (10) quoted from it.
 
 ⚠️ **Sources named in `sea-ice.md` that were NOT reached, and are therefore not entries here.**
 
-- **Stern, H.L., Schweiger, A.J., Zhang, J. & Steele, M. (2018).** *On reconciling disparate
-  studies of the sea-ice floe size distribution.* Elementa 6, art. 49, doi:10.1525/elementa.304.
-  This is the paper written specifically about the disagreement this document is built around,
-  and **the publisher returned HTTP 403 to every retrieval attempt.** It is named in prose, and
-  every claim that would have rested on it rests on `denton2022` instead, which reviews it,
-  quotes its slope range from its Table 4, and applies the conversion between its convention and
-  its own. Adding an entry for a paper nobody here opened would be the fabrication the tier
-  rules exist to prevent.
+- **Stern et al. (2018) — two papers, and they do different jobs.** ⚠️ An earlier version of this
+  note conflated them. **Stern, Schweiger, Zhang & Steele (2018a)**, *On reconciling disparate
+  studies of the sea-ice floe size distribution*, Elementa 6, art. 49, doi:10.1525/elementa.304,
+  is the paper written about the disagreement itself; `denton2022` cites it for the *discussion*
+  of that disagreement. The **slope range this corpus quotes comes from Stern et al. (2018b)**,
+  *Seasonal evolution of the sea-ice floe size distribution*, doi:10.1525/elementa.305 — a
+  different paper with a different author list, which `denton2022` names as the source of the
+  single-power-law finding across 10 m to 30 km. Verified by extracting `denton2022`'s own text:
+  it cites "Stern et al., 2018b" for the single power law and "Stern et al., 2018a" for the
+  discussion. **Neither was reached** — the publisher returned HTTP 403 to every attempt — so
+  neither is an entry, and every claim that would have rested on them rests on `denton2022`.
+  Adding an entry for a paper nobody here opened would be the fabrication the tier rules exist
+  to prevent.
 - **Toyota et al. (2006, 2011)**, **Steer et al. (2008)**, **Geise et al. (2017)**,
   **Gherardi & Lagomarsino (2015)**, **Hwang et al. (2017)**, **Herman (2010)** — the studies on
   both sides of the one-power-law-or-two argument. None was opened. `sea-ice.md` reports the
@@ -134,5 +144,5 @@ Introduction and the sail-height definition around eq. (10) quoted from it.
 
 - **rothrock1984** `P` — Rothrock, D.A. & Thorndike, A.S. (1984). *Measuring the sea ice floe size distribution.* Journal of Geophysical Research 89(C4), 6477–6486, doi:10.1029/JC089iC04p06477. — The founding paper of the subject, and much more sceptical than its reputation. Defines the two useful distributions (`F`, fractional area covered by floes no smaller than `p`; `N`, number per unit area no smaller than `p`), proves the finiteness constraints on the exponent, gives the measured shape ratios for 782 digitised summer floes, and reports slopes between −1.7 and −2.5 while explicitly declining to assert a power law. Also the source of the result that a **Poisson line field has an exponential piece-size distribution**, which is the negative control for every tessellation-based floe generator. See the caveat above: the artefact read is the submitted manuscript in NASA report NAG-5-160.
 - **denton2022** `P` — Denton, A.A. & Timmermans, M.-L. (2022). *Characterizing the sea-ice floe size distribution in the Canada Basin from high-resolution optical satellite imagery.* The Cryosphere 16, 1563–1578, doi:10.5194/tc-16-1563-2022. — 78 high-resolution optical images, 1999–2014, floe areas from 5 m² to 100 km². Reports a single power law over 50 m² to 5 km², least-squares slopes from −2.03 to −1.65 with mean −1.79 ± 0.08, an MLE mean of −1.77 ± 0.11, and — the honest number — that only 76% of the fits pass the Clauset goodness-of-fit test. Sect. 1 is the cleanest published statement of the one-power-law-or-two disagreement; Sect. 3.4 gives the `2m+1` conversion between area-based and diameter-based noncumulative slopes that explains much of the apparent disagreement; Sect. 2.3 explains why a cumulative FSD is concave-down for a bounded population and therefore ambiguous to read. Open access.
-- **brunette2022** `P` — Brunette, C., Tremblay, L.B. & Newton, R. (2022). *A new state-dependent parameterization for the free drift of sea ice.* The Cryosphere 16, 533–553, doi:10.5194/tc-16-533-2022. — Sect. 3.1 states the sea-ice momentum equation and reduces it, under steady state and no internal ice stress, to the free-drift balance `τ_a = τ_w` with the closed-form solution `U_i = α·e^(−iθ)·U_a + U_w` and `α = sqrt(ρ_a C_a / ρ_w C_w)`. Sect. 1 reviews the measured wind factors and turning angles from Nansen (1902) onward and records that this one-line relation explains roughly 70% of sea-ice velocity variance in the central Arctic. Cited here for the balance and the coefficient band, not for the paper's own thickness-dependent parameterisation. Open access.
+- **brunette2022** `P` — Brunette, C., Tremblay, L.B. & Newton, R. (2022). *A new state-dependent parameterization for the free drift of sea ice.* The Cryosphere 16, 533–557, doi:10.5194/tc-16-533-2022. — Sect. 3.1 states the sea-ice momentum equation and reduces it, under steady state and no internal ice stress, to the free-drift balance `τ_a = τ_w` with the closed-form solution `U_i = α·e^(−iθ)·U_a + U_w` and `α = sqrt(ρ_a C_a / ρ_w C_w)`. Sect. 1 reviews the measured wind factors and turning angles from Nansen (1902) onward — that is where the wind-factor table's values come from. ⚠️ The "roughly 70% of sea-ice velocity variance in the central Arctic" figure is **Sect. 3.1, after eq. (6)**, not Sect. 1; an earlier version of this entry put it in Sect. 1 while `sea-ice.md:253`, which cites it, had Sect. 3.1 right — the bibliography disagreed with the document citing it. Cited here for the balance and the coefficient band, not for the paper's own thickness-dependent parameterisation. Open access.
 - **duncan2018** `P` — Duncan, K., Farrell, S.L., Connor, L.N., Richter-Menge, J., Hutchings, J.K. & Dominguez, R. (2018). *High-resolution airborne observations of sea-ice pressure ridge sail height.* Annals of Glaciology 59(76pt2), 137–147, doi:10.1017/aog.2018.2. — Sail heights derived from shadow lengths in Operation IceBridge visible imagery along 12 mapped Arctic pressure ridges. Cited for the only vertical numbers in this document: mean sail height 0.99–2.16 m, maximum 2.1–4.8 m, and a 0.6 m lower cutoff below which a bump is sastrugi rather than a ridge. Open access.

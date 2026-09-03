@@ -5,7 +5,7 @@ description: "Every Gaia document, its axis, and whether a human has checked its
 tags: [index, routing]
 status: draft
 okf_version: "0.2"
-generated: { by: process:gaia-index, at: 2026-09-03T18:26:39Z }
+generated: { by: process:gaia-index, at: 2026-09-03T18:29:36Z }
 ---
 # Gaia index
 
@@ -76,7 +76,7 @@ work says what the document claims. That distinction is the whole point of the
 | Document | What it answers | Status |
 |---|---|---|
 | [`papers-architecture.md`](papers-architecture.md) | Sources for the architecture axis: graph evaluation, caching and invalidation, layering, and the driver fields a terrain graph carries. | draft |
-| [`papers-coastal-and-ice.md`](papers-coastal-and-ice.md) | Sources for what water does at the margin of the land: the equilibrium beach profile and its scale parameter, the Bruun rule together with the published case for abandoning it, alongshore transport and the high-angle instability that makes a coast roughen, threshold-driven cliff retreat, and the sea-ice floe size distribution and free-drift balance. | draft |
+| [`papers-coastal-and-ice.md`](papers-coastal-and-ice.md) | Sources for what water does at the margin of the land: the equilibrium beach profile and its scale parameter, the Bruun rule together with the published case for abandoning it, alongshore transport and the high-angle instability that makes a coast roughen, threshold-driven cliff retreat, the sea-ice floe size distribution and free-drift balance, and the airborne-lidar survey behind the one to five metres of pressure-ridge sail relief that is the only part of sea ice touching height at all. | draft |
 | [`papers-flow.md`](papers-flow.md) | Two jobs in one file: the sources for flow routing, depression handling and river networks as authored objects; and the shared apparatus every other bibliography points at — the provenance tier table, the [not-opened] rule, and the two non-negotiable rules that bind every entry in the corpus. | draft |
 | [`papers-generation.md`](papers-generation.md) | Sources for the generation axis: noise and fractal composition, tectonics and isostasy, hydraulic, thermal and aeolian erosion, landscape evolution, layered rock and grain classes, impact cratering, constraint-based authoring, and periodic construction. Terrain analysis and edge-aware filtering moved to papers-masks-and-filtering.md. | draft |
 | [`papers-masks-and-filtering.md`](papers-masks-and-filtering.md) | Sources for the operators that turn a heightfield into a mask and a mask into something usable: exact and approximate distance transforms, connected-component labelling and area filtering, multi-band scale-space decomposition, and the edge-aware filters that smooth a mask without moving its edges. | draft |
