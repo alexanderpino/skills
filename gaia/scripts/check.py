@@ -45,9 +45,12 @@ MAX_LINES = 450          # per the plan: a document at the cap is two topics wan
 TIERS = {"P", "F", "L", "N", "?"}
 STATUS = {"draft", "stable", "deprecated"}
 
-# `- **id** `T` — Reference text.`  with an optional trailing ` [background]`
+# `- **id** `T` — Reference text.`  with optional trailing ` [background]` and ` [no-artefact]`.
+# [no-artefact] is a STRUCTURED declaration, not prose: it is what lets a locator opt out of the
+# locator-quality denominator. It replaced a regex over the entry's prose, which was gameable by
+# moving four words onto the first line -- see check_no_artefact.
 _ENTRY = re.compile(r"^- \*\*(?P<id>[a-z][a-z0-9_]*)\*\*\s+`(?P<tier>[PFLN?])`\s+—\s+(?P<ref>.+?)"
-                    r"(?P<background>\s+\[background\])?\s*$")
+                    r"(?P<background>\s+\[background\])?(?P<noartefact>\s+\[no-artefact\])?\s*$")
 # an inline citation marker in a body: [ocallaghan1984]  (not a markdown link, so not `](`)
 _ID_OPENER = re.compile(r"^- \*\*[a-z][a-z0-9_]*\*\*")
 _TOPIC = re.compile(r"^- \*\*(?P<id>[a-z][a-z0-9-]*)\*\*\s+`(?P<state>covered|planned|out-of-scope)`"
@@ -56,7 +59,7 @@ _MARKER = re.compile(r"(?<!\])\[(?P<id>[a-z][a-z0-9_]{3,})\](?!\()")
 
 
 def bibliography() -> tuple[dict[str, dict], list[str]]:
-    """id -> {tier, ref, background}. Problems are returned, never printed and swallowed."""
+    """id -> {tier, ref, background, no_artefact}. Problems are returned, never raised."""
     problems: list[str] = []
     files = paper_files()
     if not files:
@@ -118,7 +121,8 @@ def _scan(papers: Path, body: str, entries: dict, problems: list, offset: int = 
             problems.append(f"{stem}:{n}: duplicate id `{m['id']}` "
                             f"(already defined in {entries[m['id']]['file']})")
         entries[m["id"]] = {"tier": m["tier"], "ref": m["ref"].strip(),
-                            "background": bool(m["background"]), "file": stem}
+                            "background": bool(m["background"]),
+                              "no_artefact": bool(m["noartefact"]), "file": stem}
 
 
 def sources_digest(fm: dict) -> str:
@@ -432,11 +436,17 @@ def check_no_artefact(bib: dict[str, dict]) -> list[str]:
     this skill exists to prevent, and it would be invisible -- the guard stays green and the
     number gets better.
 
-    So the claim is checked against the bibliography, which is where a source's nature is
-    already recorded: an entry may only be marked `no artefact:` if its own entry says it has
-    no canonical, citable or external source. Two independent places have to agree.
+    So the claim is checked against the bibliography, in BOTH directions: a locator may open with
+    `no artefact:` only if its entry carries the explicit `[no-artefact]` tag, and an entry
+    carrying that tag may not be cited anywhere with an ordinary locator.
+
+    An earlier version regex-matched the entry's PROSE for "no canonical source" and read only
+    the entry's first physical line. That was gameable and a reviewer demonstrated it: move four
+    words onto line 1 of a source with a real, openable artefact and the exclusion passed green,
+    moving the reported ratio 53% -> 54%. Prose written by the same author who wrote the locator
+    is not a second opinion. An explicit tag is at least an explicit claim, in a different file,
+    that a reader can check against the reference it sits beside.
     """
-    declares_none = re.compile(r"no (single )?(canonical|citable|external)", re.I)
     problems: list[str] = []
     skip = set(paper_files()) | {INDEX, COVERAGE}
     for path in documents(ROOT):
@@ -452,13 +462,38 @@ def check_no_artefact(bib: dict[str, dict]) -> list[str]:
             if not str(s.get("locator", "")).strip().lower().startswith(LOCATOR_NO_ARTEFACT):
                 continue
             sid = s.get("id")
-            ref = (bib.get(sid) or {}).get("ref", "")
-            if not declares_none.search(ref):
+            entry = bib.get(sid)
+            if entry is None:
+                continue                      # a dangling id is reported by check_documents
+            if not entry["no_artefact"]:
                 problems.append(
-                    f"{path.relative_to(ROOT)}: `{sid}` is marked `no artefact:`, which "
-                    f"excludes it from the locator ratio, but its bibliography entry does not "
-                    f"say it lacks a canonical source. Either the marker is wrong, or the "
-                    f"entry needs to say so -- do not shrink the denominator by assertion")
+                    f"{path.relative_to(ROOT)}: `{sid}` is marked `no artefact:`, which excludes "
+                    f"it from the locator ratio, but its bibliography entry in "
+                    f"{entry['file']} is not tagged [no-artefact]. Either the marker is wrong, "
+                    f"or the entry must declare it -- do not shrink the denominator by assertion")
+
+    # And the other direction: an entry tagged [no-artefact] that some document cites with a
+    # REAL locator is either mistagged or being cited beyond what it can support.
+    for sid, entry in sorted(bib.items()):
+        if not entry["no_artefact"]:
+            continue
+        for path in documents(ROOT):
+            if path in skip:
+                continue
+            try:
+                fm, _ = parse_front_matter(path)
+            except Unparseable:
+                continue
+            for s2 in fm.get("sources", []):
+                if not isinstance(s2, dict) or s2.get("id") != sid:
+                    continue
+                loc = str(s2.get("locator", "")).strip().lower()
+                if not loc.startswith(LOCATOR_NO_ARTEFACT):
+                    problems.append(
+                        f"{path.relative_to(ROOT)}: `{sid}` is tagged [no-artefact] in "
+                        f"{entry['file']}, but this document gives it a locator that does not "
+                        f"open with `{LOCATOR_NO_ARTEFACT}`. A source cannot have no artefact "
+                        f"here and an openable one there")
     return problems
 
 

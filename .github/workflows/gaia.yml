@@ -163,6 +163,23 @@ jobs:
           expect_red "a real paper marked as having no artefact"
           cp /tmp/bk references/stream-power.md
 
+          # The same attack dressed to beat the PREVIOUS implementation, which regex-matched the
+          # bibliography entry's prose and read only its first line. A reviewer showed that moving
+          # four words onto line 1 of a source with a real artefact passed green.
+          cp references/papers-architecture.md /tmp/bk
+          cp references/node-graph-runtime.md /tmp/bk2
+          sed -i 's/- \*\*nuke_request\*\* `F` — Foundry\./- **nuke_request** `F` — No canonical paper. Foundry./' references/papers-architecture.md
+          sed -i 's/{ id: nuke_request, tier: F, locator: "the DD/{ id: nuke_request, tier: F, locator: "no artefact: the DD/' references/node-graph-runtime.md
+          expect_red "the prose-regex bypass of the no-artefact exclusion"
+          cp /tmp/bk references/papers-architecture.md
+          cp /tmp/bk2 references/node-graph-runtime.md
+
+          # And the other direction: an entry tagged [no-artefact] cited with a real locator.
+          cp references/wave-models.md /tmp/bk
+          sed -i '0,/id: airy_coastal/s/locator: "no artefact: /locator: "\u00a74 the dispersion relation, /' references/wave-models.md
+          expect_red "a [no-artefact] entry given an openable locator"
+          cp /tmp/bk references/wave-models.md
+
           cp references/index.md /tmp/bk
           sed -i 's/^# Gaia index/# Gaia index EDITED/' references/index.md
           if python3 scripts/index.py --check >/dev/null 2>&1; then

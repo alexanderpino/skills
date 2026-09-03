@@ -8,11 +8,14 @@ description: >-
   erosion, the stream-power law and its O(N) solver, terrain analysis and masks; closed versus
   open water, wave spectra and the dispersion relation, shallow-water solvers, water optics;
   heightfield LOD, tiled streaming, virtual texturing, GPU-driven culling, planetary precision,
-  water rendering, caustics and heightfield ray-marching. Every recommendation carries a source
-  and a provenance tier. Use when building or debugging terrain or water — heightfields,
-  erosion, drainage, oceans, lakes, LOD, streaming — even if "terrain" is never said. Not for
-  BRDF theory (physically-based-rendering), generic 3D fluid simulation, or GIS and real-world
-  DEM ingestion.
+  water rendering, caustics and heightfield ray-marching; and the tool architecture itself —
+  node-graph scheduling, caching and invalidation, layering with filters and masks, and the
+  driver fields (temperature, sun and shadow, water and wind flow) that make terrain respond to
+  where it is. Every recommendation carries a source and a provenance tier. Use when building or
+  debugging terrain or water — heightfields, erosion, drainage, oceans, lakes, LOD, streaming, a
+  node graph that rebuilds too much — even if "terrain" is never said. Not for BRDF theory
+  (physically-based-rendering), generic 3D fluid simulation, or GIS and real-world DEM
+  ingestion.
 type: Skill
 title: Gaia
 tags: [terrain, water, generation, simulation, rendering, routing]
@@ -111,6 +114,9 @@ go stale as the corpus grows. The axes:
   shallow water, water optics.
 - **Rendering** — heightfield LOD, tiled streaming, virtual texturing, GPU-driven culling,
   planetary precision, water rendering, caustics, heightfield ray-marching.
+- **Architecture** — the machine that runs the graph: scheduling and caching, layering with
+  filters and masks, and the driver fields the graph carries. Start at `node-graph-runtime.md`;
+  it routes to the other two.
 
 `references/coverage.md` states what is written, what is planned, and what is deliberately
 out of scope — with a reason for each. **Consult it before saying this skill does not cover

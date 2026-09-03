@@ -182,3 +182,40 @@ NOT PROVEN	cross-skill path resolution	-	four documents pointed at water-physics
 # genuine gap from the denominator silently. 20/20 locator fixtures and 7/7 marker fixtures.
 #
 # Runs in CI (.github/workflows/gaia.yml, `bites`).
+#
+# ── check_no_artefact() REWRITTEN, 2026-09-03: a reviewer broke the previous one ─────────────
+#
+# The version recorded above regex-matched the bibliography entry's PROSE for "no canonical
+# source", and `bibliography()` only captures an entry's FIRST PHYSICAL LINE. A reviewing agent
+# demonstrated the bypass: `nuke_request` has a real, openable artefact (Foundry's NDK docs) and
+# says "No canonical paper" on its third line, so marking it `no artefact:` failed -- but move
+# those four words onto line 1 and the identical edit passed GREEN, excluding a citable source
+# from the locator denominator and moving the reported ratio 53% -> 54%.
+#
+# That is the only mutation in the suite that IMPROVES a reported number, which is what makes it
+# worth attacking, and the old docstring's defence -- "two independent places have to agree" --
+# was one author's prose checked against the same author's prose by a four-word regex.
+#
+# The exclusion is now a STRUCTURED DECLARATION, not an inference. `_ENTRY` gained an explicit
+# `[no-artefact]` tag alongside the existing `[background]`, and the check runs BOTH ways:
+#
+#   MUTATION A  `no artefact:` prepended to braun2013's locator (entry not tagged)
+#     -> RED: "marked `no artefact:` ... but its bibliography entry in papers-generation.md is
+#        not tagged [no-artefact]"
+#   MUTATION B  the reviewer's exact bypass -- "No canonical paper." moved to line 1 of
+#               nuke_request's entry AND its locator opened with `no artefact:`
+#     -> RED. Under the old implementation this passed green and bought 53% -> 54%.
+#   MUTATION C  airy_coastal, which IS tagged [no-artefact], given a real locator in
+#               wave-models.md ("§4 the dispersion relation, ...")
+#     -> RED: "tagged [no-artefact] in papers-simulation.md, but this document gives it a
+#        locator that does not open with `no artefact:`. A source cannot have no artefact here
+#        and an openable one there"
+#   DECOY     the seven legitimate no-artefact citations, untouched
+#     -> GREEN, 9 exclusions, ratio unchanged at 85/159
+#
+# All three mutations run in CI (.github/workflows/gaia.yml, `bites`), which now carries eleven
+# mutations and two decoys.
+#
+# THE LESSON, which generalises past this check: a guard that reads PROSE is not checking a
+# second source, it is re-reading the first one through a regex. Where a claim must be
+# corroborated, corroborate it against a structured field somebody had to write on purpose.
