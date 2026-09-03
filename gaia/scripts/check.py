@@ -451,20 +451,27 @@ def selftest() -> int:
     for t, want in cbad:
         print(f"  FAIL  cost fixture: {t!r} should be "
               f"{'COUNTED as priced' if want else 'not counted'}")
-    if bad or nbad or ubad or ebad or cbad:
+    rbad = [(t, want) for t, want in ERROR_FIXTURES
+            if bool(ERROR_STATED.search(t)) != want]
+    for t, want in rbad:
+        print(f"  FAIL  error fixture: {t!r} should be "
+              f"{'COUNTED as an error' if want else 'not counted'}")
+    if bad or nbad or ubad or ebad or cbad or rbad:
         # `ebad` used to gate the exit code and not appear in this sentence, so a run with
         # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
         print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
               f"{len(nbad)} of {len(NO_ARTEFACT_FIXTURES)} no-artefact fixtures, "
               f"{len(ubad)} of {len(NOT_OPENED_FIXTURES)} not-opened fixtures and "
               f"{len(ebad)} of {len(ENTRY_TAG_FIXTURES)} entry-tag fixtures and "
-              f"{len(cbad)} of {len(COST_FIXTURES)} cost fixtures misclassified.")
+              f"{len(cbad)} of {len(COST_FIXTURES)} cost fixtures and "
+              f"{len(rbad)} of {len(ERROR_FIXTURES)} error fixtures misclassified.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
           f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct; "
           f"not-opened marker: {len(NOT_OPENED_FIXTURES)}/{len(NOT_OPENED_FIXTURES)} correct; "
           f"entry tag: {len(ENTRY_TAG_FIXTURES)}/{len(ENTRY_TAG_FIXTURES)} correct; "
-          f"cost unit: {len(COST_FIXTURES)}/{len(COST_FIXTURES)} correct.")
+          f"cost unit: {len(COST_FIXTURES)}/{len(COST_FIXTURES)} correct; "
+          f"error: {len(ERROR_FIXTURES)}/{len(ERROR_FIXTURES)} correct.")
     return 0
 
 
@@ -520,7 +527,27 @@ def locator_quality() -> tuple[int, int, int, list[str]]:
 # this UNDER-counts, which is the safe direction for a number that is supposed to go up, and a
 # document that wants credit has to state the cost precisely enough to be actionable anyway.
 COST_UNIT = re.compile(r"(?<![\w.])\d[\d.,]*\s*(?:ms|\u00b5s|us|MB|GB|KB|TB|MiB|GiB|KiB|fps|FPS)\b"
-                       r"|bytes?\s*(?:per|/)\s*cell", re.I)
+                       r"|bytes?\s*(?:per|/)\s*cell"
+                       r"|budget tier|per-frame|per frame|frame budget|offline bake", re.I)
+
+# The other half of the engineer's question. Deliberately NOT matching a bare "N% of": that
+# catches "70% of the variance" and every other proportion in the corpus, and a metric that
+# counts prose about percentages is not measuring error at all.
+ERROR_STATED = re.compile(r"(?:\u00b1|\+/-)\s?\d[\d.]*"
+                          r"|\bwithin\s+\d[\d.]*\s?%"
+                          r"|\d[\d.]*\s?%\s+(?:error|too\s+\w+|low|high|off|out)"
+                          r"|\berror\s+(?:of|is|was)\s+[-+]?\d[\d.]*"
+                          r"|\b(?:max(?:imum)?|mean|rms|peak)\s+(?:relative\s+)?error\b", re.I)
+
+ERROR_FIXTURES = [
+    ("the max relative error is 14.32% at 78.89 deg", True),
+    ("T = (0.14 \u00b1 0.062) R^0.77", True),
+    ("within 30% where R < 5 km", True),
+    ("runs 22% low at the Brewster angle", True),
+    ("about 70% of the variance is explained", False),   # a proportion, not an error
+    ("39.18% coverage, 25676 set cells", False),
+    ("it is a good approximation", False),
+]
 
 COST_FIXTURES = [
     ("the bake is 104 ms at 4k", True),
@@ -536,38 +563,50 @@ COST_FIXTURES = [
 ]
 
 
-def cost_coverage() -> tuple[int, int, list[str]]:
-    """Does a recommendation say what it COSTS?
+def approximation_coverage() -> tuple[int, int, int, int]:
+    """Can a reader tell how good the recommendation is AND what it costs?
 
-    This skill's audience builds a game engine or an authoring tool, and for that reader the
-    cost IS the decision: a technique that is correct and unaffordable is not a
-    recommendation, it is a fact. The corpus grades whether a claim is TRUE -- tiers,
-    locators, read logs, all of it -- and had no instrument at all for whether the advice is
-    BUILDABLE. Measured when this was added: 6 of 34 documents stated a cost in a machine
-    unit. `simulation-time-budget.md` exists precisely because the offline-versus-per-frame
-    crossover is the one claim neither source skill makes, and that idea was then applied
-    almost nowhere else.
+    This skill's audience builds a game engine or an authoring tool, and the question they
+    actually bring is not "what is true" but **"how well can I approximate this inside a frame
+    budget"**. That question has two halves and needs both in the same document: the error the
+    approximation carries, and the cost it incurs. Either alone is unactionable -- an error
+    bound with no cost cannot be budgeted, a cost with no error cannot be justified.
 
-    REPORTED, not enforced, for the same reason `locators` is: failing 28 documents today
-    would make the guard red for a week and teach everyone to ignore it. It is an OPEN row in
-    registers/guard-proofs.tsv, not a passing check.
+    Measured when this was added: **7 of 34 documents state both**. 5 say how good and not what
+    it costs; 14 say what it costs and not how good; 8 say neither. So 27 of 34 answer at most
+    half the question, and the two halves are largely in DIFFERENT documents -- the ones richest
+    in error analysis (sketch-based-authoring, sea-ice, seamless-and-periodic, impact-craters)
+    are almost absent from the cost side.
 
-    What it cannot see, stated so nobody mistakes the number for more than it is: it counts a
-    UNIT, not a claim. A document could print "32 MB" in an unrelated aside and score; a
-    document could give a careful asymptotic cost in cells and not. It is a floor on how many
-    documents talk about cost at all, and nothing more.
+    An earlier version of this metric counted cost alone, which measured the wrong unit: cost is
+    half of a pair, and reporting it by itself made 6/34 look like the problem when the real
+    problem is that the halves rarely meet.
+
+    REPORTED, not enforced, like `locators`. An OPEN row in registers/guard-proofs.tsv.
+
+    What it cannot see: it counts UNITS, not claims. It cannot tell a measured error from a
+    quoted one, cannot tell whether the cost and the error describe the same technique, and
+    cannot see an error stated in cells or an asymptotic cost stated in O-notation. It is a
+    floor on how many documents put both halves in front of the reader at all.
     """
     docs = [p for p in documents(ROOT)
             if p not in paper_files() and p not in (INDEX, COVERAGE)]
-    without = []
+    both = err = cost = neither = 0
     for d in docs:
         try:
             _, body = parse_front_matter(d)
         except (OSError, Unparseable):
             continue
-        if not COST_UNIT.search(body):
-            without.append(d.name)
-    return len(docs) - len(without), len(docs), sorted(without)
+        e, c = bool(ERROR_STATED.search(body)), bool(COST_UNIT.search(body))
+        if e and c:
+            both += 1
+        elif e:
+            err += 1
+        elif c:
+            cost += 1
+        else:
+            neither += 1
+    return both, err, cost, neither
 
 
 def check_orphans(bib: dict[str, dict], used: set[str]) -> list[str]:
@@ -1063,13 +1102,15 @@ def main() -> int:
         print(f"recommendation {rec_total}/{rec_total} documents name an approach to "
               f"implement; {rec_first} state it first, before any explanation.")
 
-    priced, ndocs, _unpriced = cost_coverage()
-    if ndocs:
-        print(f"cost {priced}/{ndocs} ({100 * priced / ndocs:.0f}%) of documents state what their "
-              f"recommendation COSTS in a machine unit -- ms, MB, bytes per cell, fps. The rest say "
-              f"what is correct and not what it is worth, which for someone choosing what to ship is "
-              f"half an answer. Wall-clock prose is not counted: an e-folding time and a bake time "
-              f"look identical to a regex. Reported, not enforced; see registers/guard-proofs.tsv.")
+    both, eonly, conly, none = approximation_coverage()
+    ntot = both + eonly + conly + none
+    if ntot:
+        print(f"approximation {both}/{ntot} ({100 * both / ntot:.0f}%) of documents state BOTH how "
+              f"good the recommendation is and what it costs -- the two halves of \"how well can I "
+              f"approximate this inside a frame budget\", which is the question this audience "
+              f"actually brings. {eonly} give an error and no cost, {conly} a cost and no error, "
+              f"{none} neither. An error nobody can budget and a cost nobody can justify are each "
+              f"half an answer. Reported, not enforced; see registers/guard-proofs.tsv.")
 
     sharp, tot, noart, _vague = locator_quality()
     if tot:

@@ -66,6 +66,17 @@ Four rules that decide most arguments before they start:
 - **The time budget picks the solver, not the physics.** The same equations have a different
   best answer offline and per-frame. That crossover is the most consequential thing this
   skill knows, and it has its own document.
+- **A recommendation needs an error AND a cost.** The question this audience brings is not
+  "what is true" but *how well can I approximate this inside a frame budget*, and that has two
+  halves. An error bound nobody can budget and a cost nobody can justify are each half an
+  answer. `check.py` reports the ratio of documents carrying both; it was **7 of 34** when the
+  measure was added, with the two halves largely sitting in different documents.
+- **A crossover has a date and a direction.** Hardware moves it, almost always the same way:
+  what was an offline bake becomes a per-frame solve, and the approximation converges on the
+  reference. So a crossover stated without a year is a claim with a hidden expiry. Say when it
+  was true, which way it is moving, and what would move it — that is more useful than the
+  threshold itself, and it is the difference between a skill that ages and one that dates
+  itself honestly. Three documents in this corpus currently do it.
 
 ## Provenance is the point
 
