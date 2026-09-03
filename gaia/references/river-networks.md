@@ -255,7 +255,7 @@ river rather than as a bent pipe.
 ## Ordering: a generator, and a cheap check
 
 [strahler1957] p. 914 gives the ordering rule, credited as only slightly modified from Horton
-(1945, which could not be obtained — see `papers-wave-4.md`): finger-tip tributaries are order 1,
+(1945, which could not be obtained — see `papers-flow.md`): finger-tip tributaries are order 1,
 and two channels of order *k* joining make order *k*+1. Horton's law of stream numbers says the
 counts per order form an inverse geometric sequence, whose ratio is the **bifurcation ratio**.
 

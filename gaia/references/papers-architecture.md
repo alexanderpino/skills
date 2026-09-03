@@ -147,7 +147,7 @@ is evidence about practice, never about correctness.
   Barstad, I. (2004), *A linear theory of orographic precipitation*, J. Atmos. Sci. 61, 1377–1391 —
   behind the AMS paywall, four retrieval routes tried and all refused — and Minder et al. (2008),
   the Olympics gauge study, not sought separately. `driver-fields.md` cites this review for both and
-  says so, which is the same form `papers-wave-3.md` uses for McGetchin.
+  says so, which is the same form `papers-generation.md` uses for McGetchin.
 - **reda2004** `P` — Reda, I. & Andreas, A. (2004). *Solar position algorithm for solar radiation
   applications.* Solar Energy 76(5), 577–589. doi:10.1016/j.solener.2003.12.003.
   ⚠️ **What was actually read is the companion NREL technical report** NREL/TP-560-34302 (rev.

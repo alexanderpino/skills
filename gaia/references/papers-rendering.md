@@ -15,6 +15,49 @@ Note for editors: entry ids are written **without** square brackets in this file
 id anywhere in a bibliography's body reads as an uncited inline citation and the guard rejects
 it — bibliographies are checked as documents like everything else.
 
+## What was read, and what was not — offline meshing and colour
+
+The two sections added to this file from separately written documents. The rest of this
+bibliography predates the practice.
+
+**`pike1977`** — the ADS scanned page images of the Pergamon volume were read directly. Table 1
+(p. 491) and equations (1)–(4) (p. 492) are transcribed from that scan, digit for digit, and the
+two stated intersection diameters were then reproduced numerically from the transcribed
+coefficients as a check on the transcription.
+**`austin2024`** — open access at the publisher; §6.2 and equation (1) read there.
+**`minton2019`** — the accepted-manuscript PDF; §1.1 and Figure 1 read there.
+**`silber2017`** — the accepted-manuscript PDF of the JGR-Planets paper; §1 and §5 read there.
+**`garland1997`** — the authors' own PDF of the SIGGRAPH '97 paper; §3–§5 read there.
+
+**felzenszwalb2012** — the journal's own open-access PDF at theoryofcomputing.org. Algorithm 1,
+Theorems 2.1–3.2 and §2.2 read there; Algorithm 1 was then transcribed into
+`scratchpad/w6/edt_error.py` and its output checked against brute force.
+**meijster2000** — a course-hosted scan of the Kluwer chapter, complete with the printed page
+numbers 331–340 used in the locators.
+**hajdu2012** — **the arXiv preprint 1201.0876v1 was read, not the journal version.** The
+preprint's own footer says "Preprint submitted to Acta Cybernetica"; the published record is
+Acta Cybernetica 20(3), 399–417 (2012), which was located but not opened. The three error
+constants quoted from it were independently reproduced numerically, which is the only reason
+the citation is worth anything here.
+**rongtan2006** — the authors' submitted version at comp.nus.edu.sg. It has no ACM pagination,
+so the page range below comes from the ACM record rather than from the artefact read, and the
+locators cite sections and figures instead of pages.
+**fiorio1996** — the HAL deposit of the published Theoretical Computer Science article, printed
+pagination intact. The OCR is poor (it renders "can" as "tan" throughout) but legible.
+**wu2009** — the authors' accepted manuscript at sdm.lbl.gov. No journal pagination, so the
+locators cite numbered sections and theorems.
+**salembier2009** — the authors' PDF at imatge.upc.edu, figure numbering intact.
+**sharma2005** — the author's PDF at hajim.rochester.edu, plus the 34-pair supplementary test
+file `ciede2000testdata.txt` from the same site, which was used to validate the implementation
+in `scratchpad/w6/colour_blend.py`.
+**moreland2009** — **the author's "Expanded" version was read, not the ISVC proceedings paper.**
+Section and equation numbers in the locator refer to that expanded PDF, and the proceedings
+pagination is not asserted.
+
+⚠️ **The sRGB standard itself, IEC 61966-2-1, is deliberately absent**: it is paywalled and was
+not opened. `icc_srgb` — a standards-body technical note restating it, graded `F` accordingly —
+carries the constants instead, and `mask-to-material.md` names the standard in prose. The full
+list of absences from this family is in `papers-masks-and-filtering.md`.
 ## What `F` means on this axis, and why there is so much of it
 
 Real-time rendering's load-bearing literature is largely **not peer-reviewed**, and pretending
@@ -128,3 +171,18 @@ documents on the simulation axis. What is listed here is what a *renderer* consu
 - **drobot2010** `F` — Drobot, M. (2010). *Quadtree displacement mapping with height blending.* GPU Pro 1 / GDC 2010. — The max-mip pyramid applied to material displacement, and the height-blend compositor beside it. Book chapter and conference talk.
 - **smacke** `F` — s-macke. *VoxelSpace* — algorithm reconstruction and reference implementation, github.com/s-macke/VoxelSpace. — Column raycasting with the ascending y-buffer, as shipped in Comanche (1992). A repository, and the canonical modern reconstruction of a technique whose original has no publication.
 - **dxrspec** `F` — Microsoft *DirectX Raytracing (DXR)* specification and the Khronos `VK_EXT_opacity_micromap` / `VK_NV_displacement_micromap` registry entries. — Intersection shaders for procedural AABB geometry, BLAS build-versus-refit semantics, and what opacity micromaps do and do not classify. API specifications.
+
+## Offline mesh extraction and simplification
+
+
+- **garland1997** `P` — Garland, M. & Heckbert, P.S. (1997). *Surface simplification using quadric error metrics.* SIGGRAPH '97, 209–216, doi:10.1145/258734.258849. — The canonical error-driven simplifier. Iterative contraction of vertex *pairs* (not only edges, so disconnected regions can be joined), with the error at a vertex defined as the sum of squared distances to the planes of its incident triangles and stored as a single symmetric 4×4 quadric; the additive rule for merging two vertices' plane sets, the 4×4 linear solve for the optimal contraction target, and the cost heap that orders the whole run. §6 adds the boundary and discontinuity constraint planes, naming terrain height fields as the case that needs them. Note that the paper is careful about what its metric *is*: a sum of squared distances to a plane set, deliberately double-counting shared planes up to three times, whose absolute value has no intrinsic meaning outside the ranking it produces.
+- **garland1995** `F` — Garland, M. & Heckbert, P.S. (1995). *Fast polygonal approximation of terrains and height fields.* Technical report CMU-CS-95-181, School of Computer Science, Carnegie Mellon University; C++ implementation released as `scape`. — The refinement family: greedy insertion of the highest-error grid point into a Delaunay TIN, four progressively optimised variants, the empirical comparison of importance measures that settles on plain vertical error against the current approximation, and the error-versus-vertex-count behaviour. `F` because it is a technical report and never went through peer review; the report itself records that greedy insertion "has been reinvented many times", so there is no canonical paper to promote to, and the honest form is to say so. Still the most useful single treatment of simplification aimed specifically at a heightfield.
+- **hoppe1996** `P` — Hoppe, H. (1996). *Progressive meshes.* SIGGRAPH '96, 99–108, doi:10.1145/237170.237216. — The nested multiresolution representation: a base mesh plus a stream of vertex-split records, built by edge collapses alone, from which every intermediate mesh in the chain is recoverable. Cited here for the structural consequence rather than the construction — because consecutive levels share vertices by construction, a geomorph between them is definable at all, which is the property an exported LOD chain either has or does not.
+
+## Mask to material
+
+
+- **sharma2005** `P` — Sharma, G., Wu, W. & Dalal, E.N. (2005). *The CIEDE2000 color-difference formula: Implementation notes, supplementary test data, and mathematical observations.* Color Research & Application 30(1), 21–30, doi:10.1002/col.20070. — The colour-difference metric, plus the thing that makes it usable: 34 supplementary CIELAB pairs with published ΔE00 values, designed to catch the implementation errors — signed chroma and hue differences, the arctangent quadrant, the mean-hue boundary cases — that the CIE's own worked examples do not. The paper's own account is that several widely distributed implementations, including the authors' early ones, passed the CIE examples and were still wrong.
+- **moreland2009** `P` — Moreland, K. (2009). *Diverging color maps for scientific visualization.* Proc. 5th International Symposium on Visual Computing (ISVC 2009), LNCS 5876, 92–103. Read as the author's expanded version, `ColorMapsExpanded.pdf`. — Mapping a scalar to a colour, done deliberately. §2 is the case against the rainbow map: no perceptual ordering, non-uniform perceptual rate, and sensitivity to colour-vision deficiency. §3 gives the sRGB → linear → XYZ → CIELAB chain, eqs. (1)–(3), and states the operative distinction for a terrain palette — physical light effects belong in a linear space, perception of a colour belongs in CIELAB.
+- **icc_srgb** `F` — International Color Consortium. *How to interpret the sRGB color space (specified in IEC 61966-2-1) for ICC profiles*, color.org. — The sRGB transfer function and primaries, restated from the standard by the body that maintains ICC profiles. §A.7 gives the XYZ(D65) → linear sRGB matrix; §B gives the encoding and decoding equations with the 0.0031308 / 0.04045 thresholds, the 12.92 slope, the 0.055 offset and the 2.4 exponent. `F` because it is a standards-body technical note, not peer review, and because the normative document it restates — IEC 61966-2-1 — is paywalled and was not opened.
+- **srgb1996** `F` — Stokes, M., Anderson, M., Chandrasekar, S. & Motta, R. (1996). *A Standard Default Color Space for the Internet — sRGB*, version 1.10, W3C Note. — The original proposal. Cited here only for the warning W3C now prints at the top of it: the document is obsolete, sRGB was standardised as IEC 61966-2-1, and "during standardization, a small numerical error caused by rounding error was corrected". That is the provenance of every slightly-different set of sRGB constants in circulation. The equations themselves are images in the HTML and were not read as text, which is why icc_srgb is cited for the numbers instead.
