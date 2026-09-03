@@ -20,6 +20,10 @@ Masking is how a procedural terrain becomes art-directable: erode this valley, l
 It looks like a UI convenience and it is actually a decision about **where the mask sits in the
 graph**, which decides what your cache can reuse and what a mask tweak costs.
 
+⚠️ **Everything on this axis rests on `F` sources.** There is no canonical paper for how a tool
+composes layers, filters and masks; standard practice is vendor documentation, and the tiers below
+say so. They are evidence about what shipping tools chose, never about what is correct.
+
 **Boundary.** `terrain-analysis-masks.md` owns how a mask is *computed* — slope, curvature,
 occlusion, wetness — and the selector stack that turns masks into materials. This document owns how
 a mask is *applied*: the algebra of a masked operator, where it belongs in the graph, and the
@@ -70,20 +74,52 @@ its mask port is implemented as the post-blend — not a general theorem. `lerp(
 "`f` restricted to `m`" only when `f` is **pointwise**. An operator that *moves material across the
 mask boundary* gives two different answers, and the difference grows with iteration count.
 
-Measured, binary mask over half a 128² field, comparing post-mask against a domain-restricted run
-in which cells outside the mask are frozen after every step:
+Measured on a 128² field: `default_rng(4)` uniform noise smoothed by 30 box passes and scaled to
+relief 17.47, a binary mask over the left half, and a thermal-style transport step that moves
+`0.15·Δh` to any neighbour more than 0.5 below. "Domain-restricted" here means the exterior is
+frozen after every step. Percentages are of relief; "cells differing" uses a 1e-9 threshold:
 
 | Operator | Iterations | max abs difference | as % of relief | cells differing |
 |---|---|---|---|---|
 | Pointwise (`h·0.5 + 10`) | — | **0.000000000** | 0.0000% | 0 |
+
 | Transport (thermal-style) | 1 | **0.000000000** | 0.0000% | 0 |
 | Transport | 5 | 0.206 | 1.18% | 257 |
 | Transport | 20 | 0.664 | 3.80% | 517 |
 | Transport | 80 | 1.162 | 6.65% | 775 |
 
 At 80 iterations **45% of the total difference lies within four cells of the mask boundary**, which
-is 6% of the domain. So the reading is precise: the post-process form is *exact* for pointwise
-operators and for a single transport step, and diverges at the mask edge as transport accumulates.
+is 6% of the domain. So the post-process form matched domain restriction exactly for the pointwise
+operator on this field, and diverges at the mask edge as transport accumulates.
+
+⚠️ **Three honest qualifications, because this measurement is easy to over-read.**
+
+1. **"Exact" is algebraic, not bitwise-guaranteed.** `h + (f(h) − h)·m` is exactly `f(h)` where
+   `m = 1` in real arithmetic, and IEEE-754 rounding can still separate them; it happened not to on
+   this field. Given that this corpus elsewhere argues one ULP can matter, do not read the zero as
+   a guarantee.
+2. **The 1-iteration row is nearly a tautology.** With a binary mask, one step of *any* operator
+   agrees, because nothing has yet crossed the boundary to be frozen.
+3. **Freezing the exterior is not the only way to restrict a domain, and it is the pessimal one.**
+   It imposes a no-flux wall. A runtime would instead evaluate on the mask's bounding box dilated by
+   the operator's support radius and then post-blend — which is *the same computation* as the
+   post-process form, just cheaper, and is where a masked expensive operator should actually go.
+
+### It does not conserve mass, and that is the defect that matters
+
+The divergence above is an edge effect. This one is not. `h + (f(h) − h)·m` **scales a transport
+result**, so material the operator carried across the mask boundary is simply deleted.
+
+Measured on the same field: the transport operator conserves mass to **1.2e-10**, while the
+post-masked result changes total mass by **17.6 units** — 0.37% of all material moved at 20
+iterations, settling to 0.22% by 200 as the relaxation reaches its fixed point. A soft mask does
+not rescue it (0.12–0.19%). It plateaus here rather than growing without bound, because this
+operator stops moving material; an operator that does not reach a fixed point has no such ceiling.
+
+**Why it matters beyond tidiness:** `terrain-analysis-masks.md` uses deposition to drive sediment
+materials, and a deposition field that quietly loses a fraction of a percent of its mass at every
+mask edge is wrong in exactly the places an artist has been directing. If you need conservation,
+restrict the domain properly — bounding box plus support radius — rather than scaling the result.
 
 **What to do about it.** Nothing, usually — the post-process form is the one the tool defines as
 correct, and the divergence is an edge effect. But do not claim the two are interchangeable for a
@@ -110,8 +146,10 @@ The strongest lesson on this axis comes from a node that exists in a shipping to
 own failure.
 
 [gaea_accumulator] is a registry: a node that collects every snow mask, water mask or debris mask in
-the graph so an artist need not wire N producers to M consumers. It is declared a *Generator* — a
-node with **no data inputs** — while its output depends on every matching node in the graph. Its
+the graph so an artist need not wire N producers to M consumers. It is declared "a special type of standalone
+Generator node" — the class of node that produces rather than transforms — while its output depends
+on every matching node in the graph. It *does* expose an Accumulator Input, but only for the
+ordering workaround below; nothing about the masks it collects arrives through it. Its
 dependencies are expressed **intensionally**, by a `Type` predicate and a `Restrict to Group` scope,
 rather than **extensionally**, by wires.
 

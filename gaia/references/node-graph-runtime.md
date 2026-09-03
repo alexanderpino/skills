@@ -37,7 +37,8 @@ never restates what a node computes, only what the runtime must know about it.
 
 ## Use this
 
-**A suspending scheduler with constructive traces** [alacarte].
+**A suspending scheduler, with verifying traces by default and constructive traces promoted onto
+the nodes that earn them** [alacarte].
 
 That is one sentence in a vocabulary most terrain tools do not use, so unpack it:
 
@@ -47,11 +48,23 @@ That is one sentence in a vocabulary most terrain tools do not use, so unpack it
   resulting value*. Before building, look up whether a value produced from those same dependency
   hashes already exists; if so, take it and do no work.
 
-**Why it wins.** These are the only two choices that give all three properties a terrain tool
-needs at once — dynamic dependencies, **early cutoff**, and a cache that can be shared between
-machines. [alacarte] §5.4 says so directly, closing with the observation that a suspending
-scheduler combined with constructive traces was, in 2018, *"the most interesting build system as
-yet unavailable"*. A terrain runtime is a small enough world to build it in.
+**Why it wins.** A suspending scheduler gives dynamic dependencies and minimality; a trace-based
+rebuilder gives **early cutoff**, which a dirty bit cannot. [alacarte] §5.4 names a suspending
+scheduler combined with constructive traces as *"the most interesting build system as yet
+unavailable"* in 2018.
+
+⚠️ **Why "promoted onto the nodes that earn them", rather than constructive everywhere.** A
+constructive trace stores the *value*, and terrain values are enormous. A 4096² float32 field is
+**67.1 MB**, and it is essentially incompressible — zlib at level 1 gives **1.11×**, and the lossy
+option is barred here specifically, because the stored value is what the next node hashes, so
+quantising it changes every downstream key. A ten-node cone re-evaluated 400 times in a working day
+is on the order of **hundreds of gigabytes** of stored artefacts per artist.
+
+Worse, sharing is not free either. Fetching 67 MB over 1 GbE takes **~537 ms**, while computing
+`a + b` on that field takes **~14 ms**: for a cheap node the shared cache is **38× slower than
+recomputing**. So the promotion rule is a comparison, not a policy — **store the value only where
+the node's compute time exceeds its transfer time**, and let everything else be a verifying trace
+that stores a hash and reruns on a miss.
 
 **What it beats.** *Topological scheduling* [alacarte] §4.1.1 — a linear pre-pass, correct and
 simple, but it can only extract dependencies from an applicative task, so a node whose inputs
@@ -112,7 +125,8 @@ the graph proper has given up both a topological order and a cache key.
 The scheduler above says *what order*; this says *what runs it*. For a content-generation graph in
 2026 the honest answer is that **the 2016 answer still holds**: compute kernels over persistent
 buffers, dispatched indirectly, with bindless resources and a better front end
-[d3d12indirect] [haar2015] [wihlidal2016]. A document claiming novelty here would be inventing it.
+[d3d12indirect] [haar2015] [wihlidal2016]. **There is no canonical paper for any of this; standard
+practice is a vendor specification and two conference talks**, and it is graded `F` accordingly. A document claiming novelty here would be inventing it.
 
 That is worth saying because there *was* a genuinely different mechanism — GPU-scheduled recursive
 node execution, where the GPU itself expands and schedules downstream work — and it has just been
@@ -205,11 +219,22 @@ The mechanism is a 1-ULP difference: transcendental ufunc loops (`pow`, `exp`, `
 `add`, `mul`, `sqrt`, `sin` and `hypot` are bit-identical. Droplet erosion amplifies that by ~1e14,
 because a steepest-descent step is a **discrete choice** and a tie flips [simd_dispatch_drift].
 
-⚠️ **This is not a rounding curiosity, it is a cache-correctness argument.** A local cache on one
-machine never notices. A shared cache across a studio serves another machine's result, and if that
-machine dispatched differently the terrain is different. Either put the arithmetic regime in the
-key, or make the promise real and test it — and note that "CPU versus GPU" is the easy version of
-this problem; the measured failure was two code paths inside one CPU.
+⚠️ **Read the magnitudes honestly before drawing the conclusion.** Relief moved 0.6% and
+**pit storage moved 20%** — and pit storage is an extremal, topology-sensitive statistic, exactly
+the kind of quantity a flipped tie moves most. This is not evidence that terrain arithmetic is
+generally unstable; it is evidence that **an operator making a discrete choice on a float
+comparison** will amplify any divergence, however small. The root cause is tie-breaking, and
+`flow-routing.md` already fixes the analogous case with a monotonic tie-break rather than by
+distrusting arithmetic.
+
+⚠️ **And putting the regime in the key is in tension with the reason to have a shared cache at
+all.** Key on the arithmetic regime and two machines with different dispatch never share an entry —
+which is most of the benefit gone. The resolution is not to widen the key across a cross-product of
+regime × device × library version, but to **pin the arithmetic** and key on that pin: one toolchain,
+opportunistic dispatch disabled, no fast-math, deterministic reductions, and a startup conformance
+digest in the key so a machine that fails the pin is excluded rather than silently serving. That
+also removes the temptation to trust a "CPU versus GPU" tolerance test, which cannot see the
+failure that was actually measured — two code paths inside one CPU.
 
 ## Determinism is a runtime property, not a node property
 
@@ -246,19 +271,27 @@ rule in `simulation-time-budget.md` applied to authoring.
 |---|---|---|
 | Wanted | Latency on one parameter | Throughput on the whole graph |
 | Scheduler | Suspending, on the preview tier only | Suspending; parallelism across independent cones |
-| Rebuilder | **Verifying traces** — hash the result, get cutoff, no value storage | **Constructive traces** — store values so other machines skip the work |
-| Output hashing | Worth it: an avoided erosion pass costs seconds, a 4k hash costs milliseconds | Worth it: the hash is a rounding error against a farm job |
+| Rebuilder | **Verifying traces** — hash the result, get cutoff, no value storage | Same, plus **constructive traces** on nodes whose compute exceeds their transfer |
+| Output hashing | Worth it only above the threshold below | Worth it: the hash is a rounding error against a farm job |
 | Cheap nodes | **Do not hash.** A node that costs less than hashing its output should just rerun | Same |
 
-That last row is the honest limit of early cutoff. Hashing a 4k float field is not free, and for a
-node cheaper than its own output hash the comparison is pure overhead. The rule that follows:
-**apply cutoff where a node is expensive and its output is stable** — erosion, flow accumulation,
-long-baseline occlusion — and skip it on arithmetic combinators.
+⚠️ **Hashing a 4k field is not "milliseconds", and the threshold is higher than it looks.** Measured
+on one machine, 4096² float32 (67.1 MB): **sha256 50 ms**, blake2b 104 ms — against **copy 15 ms**,
+`a + b` **14 ms**, a masked lerp **30 ms**. The hash costs *more than the node* for every pointwise
+operator in the corpus. So cutoff belongs on erosion, flow accumulation and long-baseline occlusion,
+and nowhere near an arithmetic combinator.
 
-⚠️ **No millisecond figures are given here, deliberately.** They would depend on grid size, memory
-bandwidth and hash function, and this skill has no benchmark to cite; writing one would be a `?`
-wearing a `P`'s confidence. What is safe to say is the *shape*: hash cost is linear in field size
-and independent of node cost, so the crossover is a property of the node, not of the machine.
+These figures are one machine's and are quoted to establish a **ratio**, not a budget: the shape
+that matters is that hash cost is linear in field size and single-threaded, while node cost varies
+by orders of magnitude and parallelises. That asymmetry moves the crossover *against* cutoff on
+better hardware, which is the opposite of the usual intuition.
+
+**Hash the tiles, not the field.** The document already requires every node to declare a tiling
+class, so make the tile the Merkle leaf: hash each tile, then hash the tile hashes. Measured on the
+same field with 512² tiles: the full tree costs **55 ms**, the same as hashing the field once — but
+when a single tile changed, re-deriving the root took **0.82 ms**, a **67×** saving. That turns
+cutoff from a whole-field toll into a per-tile one, and it composes with the tiling contracts below
+rather than fighting them.
 
 ## Two invalidations, not one
 

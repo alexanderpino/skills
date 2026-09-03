@@ -5,7 +5,7 @@ description: "Every Gaia document, its axis, and whether a human has checked its
 tags: [index, routing]
 status: draft
 okf_version: "0.2"
-generated: { by: process:gaia-index, at: 2026-09-03T04:47:43Z }
+generated: { by: process:gaia-index, at: 2026-09-03T05:10:17Z }
 ---
 # Gaia index
 
@@ -56,7 +56,7 @@ work says what the document claims. That distinction is the whole point of the
 
 | Document | What it answers | Status |
 |---|---|---|
-| [`driver-fields.md`](driver-fields.md) | The non-height fields a terrain graph carries: why one horizon sweep produces both the solar and the wind-shelter field, what the lapse rate is actually worth, and which of these fields refuse to tile. | draft |
+| [`driver-fields.md`](driver-fields.md) | The non-height fields a terrain graph carries: why one horizon sweep produces both the solar and the wind-shelter field, what the lapse rate is actually worth, and why these fields need a halo measured in kilometres. | draft |
 | [`layering-filters-and-masks.md`](layering-filters-and-masks.md) | Applying a filter through a mask: why masking is a post-process rather than a domain restriction, exactly where that equivalence stops holding, and the undeclared input sets that break a cache. | draft |
 | [`node-graph-runtime.md`](node-graph-runtime.md) | Executing a terrain node graph: the scheduler and rebuilder that decide it, why early cutoff is the property that matters, and the determinism a shared cache silently assumes. | draft |
 

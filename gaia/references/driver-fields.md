@@ -1,7 +1,7 @@
 ---
 type: Technique
 title: Driver fields — temperature, sun, shadow and flow
-description: "The non-height fields a terrain graph carries: why one horizon sweep produces both the solar and the wind-shelter field, what the lapse rate is actually worth, and which of these fields refuse to tile."
+description: "The non-height fields a terrain graph carries: why one horizon sweep produces both the solar and the wind-shelter field, what the lapse rate is actually worth, and why these fields need a halo measured in kilometres."
 tags: [architecture, tooling, climate, wind, insolation, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
@@ -30,6 +30,8 @@ aeolian pass "needs a wind field computed first", and nothing produced one.
 no mask analogue. Shadow appears twice on purpose: here it is an input to temperature; drawing
 shadows is `lighting-and-shadows`. `flow-routing.md` owns routing water over a heightfield; this
 document owns what is different about a **vector field** with direction and magnitude.
+`heightfield-raymarching.md` owns the max-mip marcher, which is one of the ways the occlusion
+below can be evaluated.
 
 ## Use this
 
@@ -48,8 +50,9 @@ field as well. Nothing else in this document has that property, and it is what m
 pass affordable at all.
 
 **What it beats.** *Per-cell ray marching over the heightfield* — the obvious implementation, and
-measurably the wrong one, quantified below. *A full CFD solve for wind* — accurate and far outside
-an authoring budget [forthofer2014]. *Aspect alone as a proxy for insolation* — cheap and blind: it
+measurably the wrong one, quantified below. *A full CFD solve for wind* — the most accurate of the three, and
+slower, but not as far outside an authoring budget as its reputation: [forthofer2014] reports
+30–90 minutes per simulation on a laptop [forthofer2014]. *Aspect alone as a proxy for insolation* — cheap and blind: it
 knows which way a slope faces and not whether the ridge across the valley blocks it, which is the
 whole point of a horizon.
 
@@ -63,12 +66,23 @@ same cell reads exposed. **The search distance chooses which landform does the s
 
 ## The horizon sweep, and who actually invented it
 
-The method is: for each azimuth, sweep the grid in that direction maintaining a running maximum of
-the elevation angle, so each cell's horizon is found in constant time [dozier2022] §II-A. The naive
-alternative — comparing every cell against every other — is O(N²) and was what the field did first.
+The method is: for each azimuth, sweep the grid in that direction maintaining the horizon's
+**upper convex hull** incrementally, which gives each cell's horizon in amortised constant time
+[dozier2022] §II-A. The naive alternative — comparing every cell against every other — is O(N²) and
+is what the field did first.
 
-⚠️ **Attribution correction.** Gaia's `terrain-analysis-masks.md` credits the sweep to a 2010 paper.
-[dozier2022] §I records the real lineage: the order-N horizon method is **Dozier, Bruno & Downey
+⚠️ **It is a hull, not a running maximum of the angle, and the difference is not cosmetic.** An
+elevation angle is measured *from the observer*, so it cannot be carried from one cell to the next:
+the horizon at cell `i` is `max over j>i of (z_j − z_i)/(j − i)`, and every denominator changes when
+`i` moves. Carrying a running max of the angle instead: on a flat profile with a single 5-unit peak
+ten cells away, the true horizon rises `0.50, 0.56, 0.63 … 5.00` toward the peak, the hull sweep
+reproduces it **exactly** (error 0.0), and the running-max-of-angle returns **5.0 at every cell** —
+a 10× overestimate that reports an entire flat plain as shadowed. `terrain-analysis-masks.md` states
+this correctly; an earlier revision of this document did not.
+
+⚠️ **Attribution correction, now applied in both places.** Gaia credited the sweep to a 2010 paper;
+`terrain-analysis-masks.md` carries the corrected lineage as of the same change that added this
+document. [dozier2022] §I records it: the order-N horizon method is **Dozier, Bruno & Downey
 (1981)**, *Computers & Geosciences* 7(2), 145–151, and "many, if not most, radiation calculations
 over mountains now use that method". Twenty-nine years earlier than the citation Gaia carried. The
 1981 paper itself could not be obtained here, so it is **named and not cited** — the tier rules
@@ -81,13 +95,32 @@ support it, and the reason is structural rather than generational.
 
 | Method | Hardware | Problem size | Time |
 |---|---|---|---|
-| Order-N sweep [dozier2022] §III-E | 16 CPU cores | 3601² ≈ 13 Mcell, per azimuth | **~2 s** — so ~1 minute for a full-circle bake at 32 azimuths |
-| Per-point DDA ray march [stendardo2020] | GPU (CUDA) | 3.4 km at 0.5 m ≈ 46 Mcell, 580 directions | **1–2 hours per tile** |
+| Hull sweep [dozier2022] §III-E | 16 CPU cores | 3601² ≈ 13 Mcell, **per azimuth** | **~2 s** |
+| Per-point DDA ray march [stendardo2020] | GPU (CUDA) | ≈ 46 Mcell, **580 directions** | **1–2 hours per tile** |
 
-**Brute-force marching on a GPU is orders of magnitude behind the sweep on a CPU.** The sweep is
-O(N) in cells and amortises every cell's horizon across one pass per azimuth; marching pays per cell
-*per direction*. The algorithm dominates the hardware here, and any "just ray-trace it" proposal has
-to clear that gap first.
+⚠️ **Those two rows are not a like-for-like comparison, and reading them as one is a trap this
+document nearly set.** Normalise: the sweep on the larger grid at the same 580 directions is
+`3.566 × 580 × 2 s ≈ 4136 s ≈ 1.15 h` — *inside* the band it would appear to beat. The apparent
+thousandfold gap is the **direction count**, not the algorithm. This document's own rule two
+sections down — a number quoted without saying what consumes it is meaningless — applies to its
+author first.
+
+**What actually survives, and it is enough.** Both methods cost roughly `directions × O(cells)`, so
+per direction they are comparable. The sweep wins for two structural reasons instead:
+
+- **A terrain horizon needs 8–16 azimuths, not 580.** The 580 figure is an urban solar cadaster
+  resolving a sky vault [stendardo2020]; a terrain shelter or shading field is not that problem. At
+  16 azimuths the same sweep on the same grid is about **2 minutes**.
+- **The horizon field is sun-independent.** One bake serves every sun position and every hour, and
+  per [winstral2002] the wind field as well. Marching per sun position buys nothing back.
+
+⚠️ **The baseline above is a NAIVE marcher, and that limits what it can be used to dismiss.**
+[stendardo2020]'s method is a per-point DDA through the raster, one step at a time
+(§3.2, Listings 1–3). It is not the hierarchical maximum-mip traversal that
+`heightfield-raymarching.md` recommends — and that document explicitly names "sun shadows,
+long-range occlusion" among the things its one shared kernel serves. Beating a per-point DDA does
+not beat a max-mip marcher, and this document does not claim it does. If you already ship that
+kernel, using it here is reasonable; what it will not give you is the sun-independence below.
 
 ⚠️ **No peer-reviewed comparison of a hardware-RT bake against a horizon sweep on a heightfield
 could be found.** A direct search returned vendor and blog material only, which this skill does not
@@ -96,11 +129,20 @@ question**, and the reason to suspect RT could compete is that a BVH over a 4k h
 triangles is the real obstacle — which displaced-micro-mesh hardware exists to address. That lead
 was not read here and is not cited.
 
-**The long-baseline problem has a cheap shipping answer that is not a longer ray.** [stendardo2020]
-§3.2 evaluates distant obstruction on a **100× coarser** heightfield — 50 m instead of 50 cm — and
-takes the minimum of the fine and coarse results, marching the coarse grid only outside the tile.
-A mip of the terrain, not a longer ray. It composes with [dozier2022] §III-C's tile-halo
-requirement: a wide halo or a coarse far field, pick one.
+**The long-baseline problem has a cheap shipping answer that is not a longer ray.**
+[stendardo2020] evaluates distant obstruction on a **100× coarser** heightfield — 50 m instead of
+50 cm — marching the coarse grid only outside the tile, since inside it the fine model is better
+information. A mip of the terrain, not a longer ray. It composes with [dozier2022] §III-C's
+tile-halo requirement: a wide halo or a coarse far field, pick one.
+
+⚠️ **Combine the two resolutions with a disjunction, not a minimum** — and note the obvious choice
+is the one the source rejects. Taking the minimum of fine and coarse is [stendardo2020]'s *earlier*
+method (§2); §3.2 discards it because it "does not give the correct result when local obstacles …
+are not situated in the same direction as remote relief features", since cumulative shadowing from
+both "should be considered … instead of merely taking the minimum of both SVFs". The shipped method
+tests both resolutions **inside the marching loop** in a given direction and takes "the disjunction
+of both results". An earlier revision of this document cited §3.2 for the minimum — the section
+that exists to refute it.
 
 ⚠️ **Direction count is set by what the field feeds, not by the geometry.** Production values in the
 sources span **8–16** azimuths for a terrain mask, **32–64** for a view factor [dozier2022], and
@@ -157,10 +199,15 @@ A flow field is a **vector** field — a direction and a magnitude per cell — 
 distinguishes it from anything else in the graph. `flow-routing.md`'s receivers are a routing
 *decision* over a heightfield; a wind field has no heightfield to descend.
 
-[forthofer2014] compares three approaches for fine-scale surface wind, with cost against accuracy
-across them: a coarse weather model, a mass-consistent solver, and a full CFD solve. For an
-authoring budget the interesting result is that a mass-consistent solver captures most of the
-terrain effect at a fraction of CFD's cost.
+[forthofer2014] compares three approaches for fine-scale surface wind: a coarse weather model, a
+mass-conserving solver, and a momentum-conserving (CFD) one. Both of its models were "designed to
+be run by casual users on standard personal computers", with the CFD one at 30–90 minutes per
+simulation on a laptop — so the gap is real but smaller than folklore suggests.
+
+⚠️ **Take the paper's caveat with its recommendation, because it lands where this document goes
+next.** [forthofer2014] found that *both* models had reduced accuracy **on the lee side**, and that
+the momentum-conserving model did better there. Lee-slope deposition is exactly what `Sb` below is
+for, so the cheap option is weakest at the feature you most want from it.
 
 **But there is a third option that fits a node graph better, and it is peer-reviewed.**
 [winstral2002] derives the wind field's *magnitude* from terrain geometry alone, with no flow solve
