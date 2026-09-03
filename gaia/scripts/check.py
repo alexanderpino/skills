@@ -49,7 +49,13 @@ STATUS = {"draft", "stable", "deprecated"}
 # [no-artefact] is a STRUCTURED declaration, not prose: it is what lets a locator opt out of the
 # locator-quality denominator. It replaced a regex over the entry's prose, which was gameable by
 # moving four words onto the first line -- see check_no_artefact.
-_ENTRY = re.compile(r"^- \*\*(?P<id>[a-z][a-z0-9_]*)\*\*\s+`(?P<tier>[PFLN?])`\s+—\s+(?P<ref>.+?)"
+# `[not-opened]` sits IMMEDIATELY AFTER THE TIER, unlike `[background]` and `[no-artefact]`,
+# which trail the entry. That is deliberate and not an inconsistency: those two qualify the
+# entry's ROLE, while this one qualifies the GRADE, and a reader scanning tiers has to see it
+# in the same glance. Trailing it would bury it after a paragraph of commentary, which is
+# exactly how eighteen unread `P` entries went unnoticed for as long as they did.
+_ENTRY = re.compile(r"^- \*\*(?P<id>[a-z][a-z0-9_]*)\*\*\s+`(?P<tier>[PFLN?])`"
+                    r"(?P<notopened>\s+\[not-opened\])?\s+—\s+(?P<ref>.+?)"
                     r"(?P<background>\s+\[background\])?(?P<noartefact>\s+\[no-artefact\])?\s*$")
 # an inline citation marker in a body: [ocallaghan1984]  (not a markdown link, so not `](`)
 _ID_OPENER = re.compile(r"^- \*\*[a-z][a-z0-9_]*\*\*")
@@ -122,7 +128,8 @@ def _scan(papers: Path, body: str, entries: dict, problems: list, offset: int = 
                             f"(already defined in {entries[m['id']]['file']})")
         entries[m["id"]] = {"tier": m["tier"], "ref": m["ref"].strip(),
                             "background": bool(m["background"]),
-                              "no_artefact": bool(m["noartefact"]), "file": stem}
+                            "no_artefact": bool(m["noartefact"]),
+                            "not_opened": bool(m["notopened"]), "file": stem}
 
 
 def sources_digest(fm: dict) -> str:
@@ -305,6 +312,17 @@ LOCATOR_NO_ARTEFACT = "no artefact:"
 # not more honest, it is less useful. What matters is that the count is on screen every run.
 LOCATOR_NOT_OPENED = ("NOT OPENED", "NO LOCATOR")
 
+# The ENTRY side of the same claim. These assert the grammar accepts the tag where it belongs
+# and nowhere else -- a tag the regex silently dropped would turn the bidirectional check into a
+# one-directional one, and the corpus would drift back to a tier saying "read" beside a locator
+# saying "not read".
+ENTRY_TAG_FIXTURES = [
+    ("- **beven1979** `P` [not-opened] — Beven, K. (1979). *A physically based model.*", True),
+    ("- **beven1979** `P` — Beven, K. (1979). *A physically based model.*", False),
+    ("- **strat_authoring** `F` [not-opened] — No canonical source. [no-artefact]", True),
+    ("- **burt1983** `P` — Burt, P.J. (1983). *The Laplacian Pyramid.* [background]", False),
+]
+
 NOT_OPENED_FIXTURES = [
     ("\u00a73.1 eq. 1, the stream-power form", False),
     ("the topographic index ln(a / tan beta). NOT OPENED \u2014 the journal is paywalled", True),
@@ -404,19 +422,28 @@ def selftest() -> int:
     for t, want in nbad:
         print(f"  FAIL  no-artefact fixture: {t!r} should be "
               f"{'EXCLUDED' if want else 'counted'}")
+    ebad = []
+    for t, want in ENTRY_TAG_FIXTURES:
+        m = _ENTRY.match(t)
+        if m is None or bool(m["notopened"]) != want:
+            ebad.append((t, want))
+    for t, want in ebad:
+        print(f"  FAIL  entry-tag fixture: {t!r} should parse with not_opened="
+              f"{want}")
     ubad = [(t, want) for t, want in NOT_OPENED_FIXTURES
             if any(mark in t for mark in LOCATOR_NOT_OPENED) != want]
     for t, want in ubad:
         print(f"  FAIL  not-opened fixture: {t!r} should be "
               f"{'COUNTED as unread' if want else 'not counted'}")
-    if bad or nbad or ubad:
+    if bad or nbad or ubad or ebad:
         print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
               f"{len(nbad)} of {len(NO_ARTEFACT_FIXTURES)} no-artefact fixtures and "
               f"{len(ubad)} of {len(NOT_OPENED_FIXTURES)} not-opened fixtures misclassified.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
           f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct; "
-          f"not-opened marker: {len(NOT_OPENED_FIXTURES)}/{len(NOT_OPENED_FIXTURES)} correct.")
+          f"not-opened marker: {len(NOT_OPENED_FIXTURES)}/{len(NOT_OPENED_FIXTURES)} correct; "
+          f"entry tag: {len(ENTRY_TAG_FIXTURES)}/{len(ENTRY_TAG_FIXTURES)} correct.")
     return 0
 
 
@@ -495,6 +522,69 @@ def check_duplication(threshold: float = 0.7) -> list[str]:
                 out.append(f"{a} and {b} share {j:.0%} of their sources and overlapping tags "
                            "-- merge candidates")
     return out
+
+
+def citations_by_id() -> dict[str, list[tuple[Path, str]]]:
+    """id -> [(document, locator)], built by walking every document ONCE.
+
+    check_no_artefact used to re-walk and re-parse the whole corpus once per tagged entry --
+    7 entries x 34 documents was ~238 redundant parses of the same front matter, and adding a
+    second bidirectional check would have doubled it. One pass, shared.
+    """
+    out: dict[str, list[tuple[Path, str]]] = {}
+    skip = set(paper_files()) | {INDEX, COVERAGE}
+    for path in documents(ROOT):
+        if path in skip:
+            continue
+        try:
+            fm, _ = parse_front_matter(path)
+        except Unparseable:
+            continue
+        for s in fm.get("sources", []):
+            if isinstance(s, dict) and s.get("id"):
+                out.setdefault(s["id"], []).append((path, str(s.get("locator", ""))))
+    return out
+
+
+def check_not_opened(bib: dict[str, dict], cites: dict[str, list[tuple[Path, str]]]) -> list[str]:
+    """The bibliography's grade and the document's locator must agree about whether it was READ.
+
+    `papers-flow.md` defines `P` as "Peer-reviewed, AND verified to actually contain the algorithm
+    attributed to it", and says again below the table that `P` asserts a human read the paper and
+    found the algorithm in it. Eighteen `P` entries nevertheless declared, in their own prose,
+    that the artefact was never obtained -- while the documents citing them had already started
+    writing `NOT OPENED --` into their locators. The two halves of the same citation contradicted
+    each other, and nothing could see it, because one half was prose and the other was prose.
+
+    `[not-opened]` makes the bibliography's half structural, and this check ties the halves
+    together in BOTH directions:
+
+      - an entry tagged [not-opened] must not be cited with a locator that claims a reading;
+      - a locator saying NOT OPENED must sit against an entry that admits it.
+
+    It is deliberately NOT a failure to have unread sources. A corpus that cannot cite a paywalled
+    paper is less useful, not more honest. What is a failure is claiming, on one side of a
+    citation, something the other side denies.
+    """
+    problems: list[str] = []
+    for sid, entry in sorted(bib.items()):
+        tagged = entry["not_opened"]
+        for path, loc in cites.get(sid, []):
+            declares = any(mark in loc for mark in LOCATOR_NOT_OPENED)
+            rel = path.relative_to(ROOT)
+            if tagged and not declares:
+                problems.append(
+                    f"{rel}: cites `{sid}`, whose entry in {entry['file']} is tagged "
+                    f"[not-opened], with a locator that does not say so. Either the source was "
+                    f"opened after all and the tag is stale, or this locator is claiming a "
+                    f"reading nobody did")
+            elif declares and not tagged:
+                problems.append(
+                    f"{rel}: cites `{sid}` with a locator declaring NOT OPENED, but its entry in "
+                    f"{entry['file']} is not tagged [not-opened]. A tier that says a human read "
+                    f"the paper, beside a locator that says nobody did, is the contradiction this "
+                    f"tag exists to close")
+    return problems
 
 
 def check_no_artefact(bib: dict[str, dict]) -> list[str]:
@@ -706,7 +796,7 @@ def main() -> int:
     rec_problems, rec_first, rec_total = check_recommendation()
     problems += (doc_problems + check_orphans(bib, used) + check_duplication()
                  + check_coverage() + check_index() + rec_problems
-                 + check_no_artefact(bib))
+                 + check_no_artefact(bib) + check_not_opened(bib, citations_by_id()))
 
     docs = [p for p in documents(ROOT)
             if p not in paper_files() and p not in (INDEX, COVERAGE)]

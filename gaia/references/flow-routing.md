@@ -14,7 +14,7 @@ sources:
   - { id: lindsay2016, tier: P, locator: "hybrid breach/fill with a depth limit; DEM-modification comparison" }
   - { id: planchon2002, tier: P, locator: "the fill algorithm" }
   - { id: montgomery1992, tier: P, locator: "the area-slope channel-initiation threshold, A*S^2 = const" }
-  - { id: braun2013, tier: P, locator: "the O(N) stack ordering: base levels first, every cell after its receiver" }
+  - { id: braun2013, tier: P, locator: "the O(N) stack ordering and the unconditionally stable implicit discretisation. NOT OPENED — Geomorphology is paywalled at Elsevier and no open copy was reachable from here, so nothing inside it is named; the scheme is read instead in cordonnier2016 §5 eq. 2, which restates it and calls it the original method from BW13" }
 ---
 # Flow routing — where the water goes
 

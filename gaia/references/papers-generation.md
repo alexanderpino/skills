@@ -98,14 +98,14 @@ axis is sent, so they are restated:
 
 ## Hydraulic erosion
 
-- **musgrave1989** `P` — Musgrave, F.K., Kolb, C.E. & Mace, R.S. (1989). *The Synthesis and
+- **musgrave1989** `P` [not-opened] — Musgrave, F.K., Kolb, C.E. & Mace, R.S. (1989). *The Synthesis and
   Rendering of Eroded Fractal Terrains.* SIGGRAPH '89, 41–50. — The origin of both thermal
   erosion and grid-based hydraulic erosion in graphics. Everything downstream traces here.
   ⚠️ **Not obtained.** The ACM Digital Library refused the download and no open copy was
   reachable, so no locator into this paper is verified anywhere in this repository. What the
   documents attribute to it was read second-hand in `olsen2004` p. 5, which restates the
   thermal pass and credits Musgrave et al. 1989 for both erosion types.
-- **obrien1995** `P` — O'Brien, J.F. & Hodgins, J.K. (1995). *Dynamic Simulation of Splashing
+- **obrien1995** `P` [not-opened] — O'Brien, J.F. & Hodgins, J.K. (1995). *Dynamic Simulation of Splashing
   Fluids.* Proc. Computer Animation '95, 198–205. — The virtual-pipe height-field water model:
   a fluid surface as height columns coupled by pipes on the head difference. Not an erosion
   paper; the lineage runs O'Brien & Hodgins → Mei → Šťava. ⚠️ **Not obtained** — the proceedings
@@ -127,7 +127,7 @@ axis is sent, so they are restated:
   GPU.* Eurographics 2011 Short Papers. — Adds the `lmax(d)` depth ramp on transport capacity
   to the Mei pipe model, plus a thermal pass. Eq. (10) and the ramp definition were read in
   Jákó's CESCG 2011 copy of the same work (old.cescg.org), not in the Eurographics printing.
-- **beyer2015** `F` — Beyer, H.T. (2015). *Implementation of a Method for Hydraulic Erosion.*
+- **beyer2015** `F` [not-opened] — Beyer, H.T. (2015). *Implementation of a Method for Hydraulic Erosion.*
   Bachelor thesis, Technische Universität München. — A thesis, not peer review. There is no
   canonical droplet-erosion paper; this is the modern formulation, borrowing Mei's transport
   capacity and applying it per droplet. ⚠️ **Not obtained** — the TUM mediatum copy did not serve
@@ -156,21 +156,21 @@ axis is sent, so they are restated:
   buffering that `thermal-and-aeolian-erosion.md` requires, so the variant cannot be reached for
   casually. Measured there: 500 iterations in 10 s against 60 s, stabilising sooner but scoring
   5% worse at 500 iterations (p. 7, *Analysis*).
-- **montgomery1994** `P` — Montgomery, D.R. & Dietrich, W.E. (1994). *A physically based model
+- **montgomery1994** `P` [not-opened] — Montgomery, D.R. & Dietrich, W.E. (1994). *A physically based model
   for the topographic control on shallow landsliding.* Water Resources Research 30(4),
   1153–1171. — The shallow-landslide susceptibility model behind SHALSTAB: wetness from drainage
   area coupled to infinite-slope stability. Failures concentrate in steep, convergent, wet
   hollows. ⚠️ **Not obtained** — paywalled at AGU, no open copy reachable; nothing inside it is
   cited by section or equation anywhere here, and the summary above is repeated from secondary
   descriptions.
-- **corominas1996** `P` — Corominas, J. (1996). *The angle of reach as a mobility index for
+- **corominas1996** `P` [not-opened] — Corominas, J. (1996). *The angle of reach as a mobility index for
   small and large landslides.* Canadian Geotechnical Journal 33(2), 260–271. — The runout stop
   rule `L = H/tan(α)`, with the reach angle shrinking as volume grows, across 204 landslides.
   ⚠️ **Not obtained** — paywalled at Canadian Science Publishing, no open copy reachable. The
   204-landslide sample and the reach-angle bands (rockfalls ~30–45°, small slides 20–30°, large
   rock avalanches under 10°) that `thermal-and-aeolian-erosion.md` quotes are repeated from
   secondary descriptions and are **unverified against the paper**.
-- **bagnold1941** `F` — Bagnold, R.A. (1941). *The Physics of Blown Sand and Desert Dunes.*
+- **bagnold1941** `F` [not-opened] — Bagnold, R.A. (1941). *The Physics of Blown Sand and Desert Dunes.*
   Methuen, London. — A **monograph, not a peer-reviewed paper**; `F` on the same rule as every
   other book here, and the demotion costs nothing because the physics is canonical either way.
   The origin of the threshold friction velocity and the `u*³` saltation law. Cite it for
@@ -192,14 +192,14 @@ axis is sent, so they are restated:
   minimum size for slip-face formation" to the companion paper (Kroy, Sauermann & Herrmann,
   *Minimal Model for Sand Dunes*, PRL 88, 054301), which adds the turbulent wind field this one
   does not carry. Cite Sauermann for the saturation length; cite Kroy et al. for the minimum size.
-- **werner1995** `P` — Werner, B.T. (1995). *Eolian dunes: Computer simulations and attractor
+- **werner1995** `P` [not-opened] — Werner, B.T. (1995). *Eolian dunes: Computer simulations and attractor
   interpretation.* Geology 23(12), 1107–1110. — The implementable dune model. Slab CA with a
   shadow zone and differential deposition probability; produces barchan, transverse, linear and
   star dunes from wind regime alone. Under-cited relative to its usefulness.
   ⚠️ **Not obtained** — paywalled at GeoScienceWorld, no open copy reachable. The shadow-zone
   rule, the `p_sand > p_bare` values and the saltation length that
   `thermal-and-aeolian-erosion.md` attributes to it are **unverified against the paper**.
-- **momiji2000** `P` — Momiji, H., Carretero-González, R., Bishop, S.R. & Warren, A. (2000).
+- **momiji2000** `P` [not-opened] — Momiji, H., Carretero-González, R., Bishop, S.R. & Warren, A. (2000).
   *Simulation of the effect of wind speedup in the formation of transverse dune fields.* Earth
   Surface Processes and Landforms 25, 905–918. — Refines Werner with a **height-dependent
   saltation length**: wind speeds up over a dune's windward profile, so a slab launched from
@@ -212,7 +212,7 @@ axis is sent, so they are restated:
 
 ## Landscape evolution
 
-- **whipple1999** `P` — Whipple, K.X. & Tucker, G.E. (1999). *Dynamics of the stream-power river
+- **whipple1999** `P` [not-opened] — Whipple, K.X. & Tucker, G.E. (1999). *Dynamics of the stream-power river
   incision model: implications for height limits of mountain ranges, landscape response
   timescales, and research needs.* Journal of Geophysical Research 104(B8), 17661–17674. — The
   reference for stream-power incision dynamics, the roles of `m` and `n`, and knickpoint
@@ -220,30 +220,30 @@ axis is sent, so they are restated:
   claim has been checked, and second-hand: `cordonnier2016` §3.1 states `m/n ≈ 0.5` as constrained
   by stream-profile shape and cites Whipple & Tucker for it. The knickpoint-celerity claim
   `stream-power.md` hangs on this entry is **unverified**.
-- **crosby2006** `P` — Crosby, B.T. & Whipple, K.X. (2006). *Knickpoint initiation and
+- **crosby2006** `P` [not-opened] — Crosby, B.T. & Whipple, K.X. (2006). *Knickpoint initiation and
   distribution within fluvial networks: 236 waterfalls in the Waipaoa River, North Island, New
   Zealand.* Geomorphology 82(1–2), 16–38. — Where waterfalls come from and how they propagate
   through a network; the empirical anchor for "a waterfall is a knickpoint". ⚠️ **Not obtained** —
   paywalled at Elsevier, no open copy reachable. Note that "236 waterfalls in the Waipaoa" is the
   paper's title, so quoting it is a citation and not a locator.
-- **culling1960** `P` — Culling, W.E.H. (1960). *Analytical Theory of Erosion.* Journal of
+- **culling1960** `P` [not-opened] — Culling, W.E.H. (1960). *Analytical Theory of Erosion.* Journal of
   Geology 68(3), 336–344. — Hillslope transport as diffusion, `D·∇²h`. The origin of the
   companion term in the stream-power equation. ⚠️ **Not obtained** — behind JSTOR, no open copy
   reachable, so no section or equation inside it is cited anywhere here.
 
 ## Analysis and filtering
 
-- **horn1981** `P` — Horn, B.K.P. (1981). *Hill shading and the reflectance map.* Proceedings of
+- **horn1981** `P` [not-opened] — Horn, B.K.P. (1981). *Hill shading and the reflectance map.* Proceedings of
   the IEEE 69(1), 14–47. — The Sobel-weighted slope and aspect estimator GIS tools use.
   ⚠️ **Not obtained** — paywalled at IEEE and the MIT author copies now 404, so no locator into it
   is verified here.
-- **zevenbergen1987** `P` — Zevenbergen, L.W. & Thorne, C.R. (1987). *Quantitative analysis of
+- **zevenbergen1987** `P` [not-opened] — Zevenbergen, L.W. & Thorne, C.R. (1987). *Quantitative analysis of
   land surface topography.* Earth Surface Processes and Landforms 12(1), 47–56. — The 3×3
   partial-quartic fit; profile and plan curvature. ⚠️ **Not obtained** — paywalled at Wiley, no
   open copy reachable, so the coefficient and curvature expressions `terrain-analysis-masks.md`
   writes out are the standard published form and have **not** been checked against Zevenbergen &
   Thorne's own numbering.
-- **beven1979** `P` — Beven, K.J. & Kirkby, M.J. (1979). *A physically based, variable
+- **beven1979** `P` [not-opened] — Beven, K.J. & Kirkby, M.J. (1979). *A physically based, variable
   contributing area model of basin hydrology.* Hydrological Sciences Bulletin 24(1), 43–69. —
   TOPMODEL, and the topographic wetness index. ⚠️ **Not obtained** — paywalled at Taylor &
   Francis, and the White Rose repository record for it states that no full text is held there, so
@@ -271,7 +271,7 @@ axis is sent, so they are restated:
 - **tomasi1998** `P` — Tomasi, C. & Manduchi, R. (1998). *Bilateral Filtering for Gray and Color
   Images.* ICCV '98, 839–846. — Edge-preserving smoothing by the product of a spatial and a
   range weight.
-- **he2010** `P` — He, K., Sun, J. & Tang, X. (2010). *Guided Image Filtering.* ECCV 2010;
+- **he2010** `P` [not-opened] — He, K., Sun, J. & Tang, X. (2010). *Guided Image Filtering.* ECCV 2010;
   extended in IEEE PAMI 35(6), 2013, 1397–1409. — O(1) per cell at any radius, no gradient
   reversal, and it accepts a separate guide image. Better than bilateral for terrain.
   ⚠️ **Not obtained** — the SpringerLink chapter PDF served an HTML shell and both author copies

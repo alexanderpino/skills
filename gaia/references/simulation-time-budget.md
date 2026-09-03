@@ -10,7 +10,7 @@ sources:
   - { id: kass1990, tier: P, locator: "sections are unnamed by number: 'Integration', eq. 9-16, the first-order implicit step and its symmetric tridiagonal system; 'Three Dimensions', eq. 18-20, the alternating-direction split that keeps each sub-iteration tridiagonal" }
   - { id: stam1999, tier: P, locator: "§2.2 'Method of Solution' — the advection step by the method of characteristics and its unconditional-stability claim, with the derivation in Appendix A, and the diffusion and projection steps that follow it as sparse global solves; the numerical-dissipation admission is in §1" }
   - { id: mei2007, tier: P, locator: "§3.2.1 'Outflow Flux Computation', eq. 4 defines K = min of 1 and d1*lX*lY over the summed outflow times dt, and eq. 5 applies it to all four fluxes" }
-  - { id: braun2013, tier: P, locator: "the implicit stream-power update over the receiver-tree stack ordering" }
+  - { id: braun2013, tier: P, locator: "the implicit stream-power update over the receiver-tree stack ordering. NOT OPENED — Geomorphology is paywalled at Elsevier and no open copy was reachable from here, so nothing inside it is named; the scheme is read instead in cordonnier2016 §5 eq. 2, which restates it" }
   - { id: fiedler_timestep, tier: F, locator: "§'Free the physics' — the accumulator loop that consumes produced time in fixed dt steps; the leftover-remainder interpolation is the section after it, §'The final touch'. The post numbers no sections" }
   - { id: explicit_diffusion_limit, tier: F, locator: "no artefact: the explicit FTCS bound, dt <= dx^2 / (4D) in two dimensions. Von Neumann analysis, standard and unpublished as such" }
 ---

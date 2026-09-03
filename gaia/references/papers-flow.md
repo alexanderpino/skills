@@ -28,7 +28,7 @@ prevent — confident fabrication of a citation — is the one Gaia is most expo
 
 | Tier | Meaning | How to write about it |
 |---|---|---|
-| **P** | **Paper.** Peer-reviewed, and verified to actually contain the algorithm attributed to it. | Cite it directly. |
+| **P** | **Paper.** Peer-reviewed, and verified to actually contain the algorithm attributed to it. If the artefact was never obtained here, the entry must carry `[not-opened]` — see below. | Cite it directly. |
 | **F** | **Folklore.** Universal practice with no canonical paper — a thesis, a blog post, a repo, or nothing. | Say "no canonical source; standard practice is…". Naming a thesis or a repo is fine; do not dress it as peer review. |
 | **L** | **Landform, not algorithm.** An outcome, produced by composing other operators. | "There is no X algorithm. X emerges from A + B + C", then give the recipe. |
 | **N** | **Node, not algorithm.** A tool's UI branding over an operator. | Name the underlying algorithm. |
@@ -41,10 +41,37 @@ Two rules, inherited verbatim and non-negotiable:
 - **A constant reconstructed from memory is a `?` wearing a P's confidence.** If you cannot
   point at the equation, you do not have the constant.
 
+### `[not-opened]`, the tag that stops `P` lying
+
+⚠️ **A tier is a claim about the venue *and* about the reading, and those two came apart.**
+`P` above says "verified to actually contain the algorithm attributed to it". Twenty-one entries
+in this bibliography could not honestly say that: the paper is peer-reviewed and behind a paywall,
+and nobody here ever opened it. Meanwhile the documents citing them had started writing
+`NOT OPENED —` into their locators. **One side of the citation said a human read it and the other
+side said nobody did, and nothing could see the contradiction, because both sides were prose.**
+
+So an entry whose artefact was never obtained carries an explicit tag, immediately after the tier
+where a reader scanning grades cannot miss it:
+
+```
+- **beven1979** `P` [not-opened] — Beven, K.J. & Kirkby, M.J. (1979). *A physically based…*
+```
+
+`check.py` then ties the two halves together **in both directions**: an entry tagged
+`[not-opened]` may not be cited with a locator that claims a reading, and a locator saying
+`NOT OPENED` may not sit against an untagged entry. Enabling that check found three documents
+citing a source as read that two other documents already described as unread.
+
+**This is not a demotion and `[not-opened]` is not a failing grade.** A corpus that cannot cite a
+paywalled paper is less useful, not more honest — `braun2013` is still the right citation for the
+O(N) stack ordering. What the tag refuses is the *silent* version: a `P` that looks like every
+other `P`, on a paper nobody has seen.
+
 ⚠️ **What a tier is not.** `P` asserts that *a human read the paper and found the algorithm in
-it*. `check.py` cannot establish that — it checks that the citation is well-formed and used.
-The `verified:` key in a document's front matter is where a human records having done the
-reading; until it is there, the document stays `draft`.
+it* — or, with `[not-opened]`, says openly that they did not. `check.py` cannot establish the
+reading itself; it checks that the citation is well-formed, that it is used, and that both sides
+agree about whether anyone read it. The `verified:` key in a document's front matter is where a
+human records having done the reading; until it is there, the document stays `draft`.
 
 ⚠️ **A wrong locator is worse than a vague one, and the metric rewards the wrong direction.**
 `check.py` reports how many locators name a section, equation or page, and that number is
@@ -89,4 +116,4 @@ implementer to the wrong paper.
 - **lindsay2016** `P` — Lindsay, J.B. (2016). *Efficient hybrid breaching-filling sink removal methods for flow path enforcement in digital elevation models.* Hydrological Processes 30(6), 846–857. — Breaching, and the hybrid breach/fill policy.
 - **planchon2002** `P` — Planchon, O. & Darboux, F. (2002). *A fast, simple and versatile algorithm to fill the depressions of digital elevation models.* Catena 46(2–3), 159–176. — The other standard fill.
 - **montgomery1992** `P` — Montgomery, D.R. & Dietrich, W.E. (1992). *Channel initiation and the problem of landscape scale.* Science 255(5046), 826–830. — The channel-head threshold in contributing area × slope: where hillslope becomes channel.
-- **braun2013** `P` — Braun, J. & Willett, S.D. (2013). *A very efficient O(n), implicit and parallel method to solve the stream power equation governing fluvial incision and landscape evolution.* Geomorphology 180–181, 170–179. — The O(N) implicit solver. ⚠️ **Not obtained** — paywalled at Elsevier, no open copy reachable, so no locator into it is verified anywhere here. The scheme itself was verified second-hand in `cordonnier2016` §5 eq. 2, which restates the implicit update and the root-to-leaves ordering and attributes both to Braun & Willett. [background]
+- **braun2013** `P` [not-opened] — Braun, J. & Willett, S.D. (2013). *A very efficient O(n), implicit and parallel method to solve the stream power equation governing fluvial incision and landscape evolution.* Geomorphology 180–181, 170–179. — The O(N) implicit solver. ⚠️ **Not obtained** — paywalled at Elsevier, no open copy reachable, so no locator into it is verified anywhere here. The scheme itself was verified second-hand in `cordonnier2016` §5 eq. 2, which restates the implicit update and the root-to-leaves ordering and attributes both to Braun & Willett. [background]

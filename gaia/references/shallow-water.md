@@ -7,7 +7,7 @@ status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: mei2007, tier: P, locator: "§3.2 eq. (2) the flux update with pipe cross-section A and pipe length l as constants, eq. (4) the outflow scaling factor K, and the §3.2.2 CFL statement Δt·u ≤ lX" }
-  - { id: obrien1995, tier: P, locator: "the height-column fluid coupled to its neighbours by virtual pipes on the head difference" }
+  - { id: obrien1995, tier: P, locator: "the height-column fluid coupled to its neighbours by virtual pipes on the head difference. NOT OPENED — the Computer Animation 1995 proceedings are not online free and the author copy was unreachable from here, so no section, equation or page inside it is named" }
   - { id: stava2008, tier: P, locator: "§4 eq. (1), the pipe cross-section fixed at C = l² and the outflow scale-down written as a guarded branch rather than a min; §5 the sediment-slippage and material-layer extensions" }
   - { id: kass1990, tier: P, locator: "the linearised shallow-water heightfield and its implicit integration" }
   - { id: courant1928, tier: P, locator: "the hyperbolic case — the domain-of-dependence requirement on the difference scheme" }
