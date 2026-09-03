@@ -260,10 +260,26 @@ for each class i:                       # |v|, alpha and d1 computed ONCE, outsi
   a smooth one.
 
 **Per-class repose is the payoff, and it is nearly free.** Šťava's sediment slippage [stava2008] is
-a thermal pass restricted to the deposited layer; with classes it becomes `k` passes, each run on
-its **own** deposit layer against its **own** limit. Keeping the layers separate is what makes the
-result order-independent — run them in any sequence and the composite is the same, because no pass
-sees another's material. `thermal-and-aeolian-erosion.md`'s calibration ranges are the numbers to
+a thermal pass restricted to the deposited layer; with classes it becomes `k` passes, each moving
+only its **own** deposit layer against its **own** limit. ⚠️ They are **not** independent: each
+pass measures slope on the *composite* surface, so a coarse layer that moves changes the slope the
+fine pass then sees, and the order is a real choice. Run **coarse first** — the coarse layer is the
+one that stops nearest where it started, so letting it settle before the mobile classes relax over
+it matches the order the material actually arrives in, and it stops a fine apron being built on a
+slope that the next pass removes.
+
+Measured on co-located piles, sand at 32° under scree at 38°, flat bedrock, 64²: reading the
+composite, the surface relaxes to **38.00°** and the two orders differ by **0.25 m**. The tempting
+fix is to let each pass read only its own layer over bedrock — which does make the result exactly
+order-independent, **0.000e+00 m** between orders — and the composite surface then stands at
+**54.6°**, sixteen degrees steeper than any repose angle in the scene. There is no third option: a
+pass that cannot see the other layers cannot respect their combined slope, and a pass that can is a
+pass whose result depends on when it ran. Take the order dependence, fix the order, and put it in
+the cache key. The exception is a stack that is **a splatmap rather than geometry** — nothing there
+is rendered as a slope, so the exactness is free and worth having. Separated piles are unaffected
+either way; each relaxes to exactly its own limit (32.00° and 38.00° measured), and the trade
+appears only where two classes overlap — which, since selective deposition is what puts them in the
+same place, is wherever the feature you wanted is. `thermal-and-aeolian-erosion.md`'s calibration ranges are the numbers to
 start from: dry sand 30–35°, gravel and scree 35–40°, unsourced there and unsourced here. The
 visible consequence is that **a sand apron slumps to a gentle cone while a scree apron beside it
 stands steeper, in the same frame, out of the same pass** — which is the single thing a one-angle
