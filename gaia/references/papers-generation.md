@@ -175,7 +175,7 @@ axis is sent, so they are restated:
   erosion and grid-based hydraulic erosion in graphics. Everything downstream traces here.
   ⚠️ **Not obtained.** The ACM Digital Library refused the download and no open copy was
   reachable, so no locator into this paper is verified anywhere in this repository. What the
-  documents attribute to it was read second-hand in `olsen2004` p. 5, which restates the
+  documents attribute to it was read second-hand in `olsen2004` p. 6, which restates the
   thermal pass and credits Musgrave et al. 1989 for both erosion types.
 - **obrien1995** `P` [not-opened] — O'Brien, J.F. & Hodgins, J.K. (1995). *Dynamic Simulation of Splashing
   Fluids.* Proc. Computer Animation '95, 198–205. — The virtual-pipe height-field water model:
@@ -218,7 +218,7 @@ axis is sent, so they are restated:
 
 - **olsen2004** `F` — Olsen, J. (2004). *Realtime Procedural Terrain Generation.* Technical
   report, University of Southern Denmark. — A technical report, not peer review. **Read in
-  full.** Section *Thermal erosion*: the reference implementation on p. 5 is
+  full.** Section *Thermal erosion*: the reference implementation on **p. 6** is
   `h_i += c·(d_max − T)·d_i/d_total` with "A reasonable value for c is 0.5", credited to
   Musgrave et al. 1989; the *Optimizations* sub-head on pp. 6–7 is the fast variant, and it is
   four specific changes — Von Neumann rather than Moore, material to the **lowest neighbour
@@ -254,10 +254,18 @@ axis is sent, so they are restated:
 - **sauermann2001** `P` — Sauermann, G., Kroy, K. & Herrmann, H.J. (2001). *A continuum
   saltation model for sand dunes.* Physical Review E 64, 031305. — **Read in full** (arXiv
   cond-mat/0101377v2). The continuum branch: flux relaxes toward saturation over a saturation
-  length. Section VI *A Minimal Model for the Sand Flux* carries the two load-bearing
-  expressions — eq. 46, `∂q/∂x = (q/l_s)(1 − q/q_s)`, which is **logistic and not the linear
-  `dq/ds = (q_sat − q)/L_sat` that circulates**, and eq. 47 for `l_s`, plotted in Figure 5 as
-  0.4–0.8 m asymptotically and diverging as `u*` nears the threshold. The linear form is its
+  length. Section VI — its actual heading is *A Minimal Model for Geomorphological Applications*,
+  not "for the Sand Flux", which both ends of this citation had invented — carries the two
+  load-bearing expressions: eq. 46, `∂q/∂x = (q/l_s)(1 − q/q_s)`, which is **logistic and not the
+  linear `dq/ds = (q_sat − q)/L_sat` that circulates**, and eq. 47 for `l_s`.
+  ⚠️ **The saturation length is about 0.09 m, not 0.4–0.8 m.** This entry read the divergent part
+  of Figure 5 and called it the asymptote — the caption says the opposite, that `l_s` "is
+  asymptotically constant for high shear velocities, but diverges for shear velocities near the
+  threshold". Recomputed from the paper's own eq. 47 with its own fitted constants (α = 0.35,
+  γ = 0.2, `z1` = 0.005 m, `zm` = 0.04 m, `u*t` = 0.28 m/s, `d` = 250 µm, `Cd` = 3): the asymptote
+  is **0.087 m**, the curve is 0.122 m at `u*/u*t` = 8, and 0.4–0.8 m occurs only over
+  `u*/u*t` ≈ 1.7–2.3, inside the near-threshold divergence. Five to nine times too large, on the
+  length a reader is told to size grid cells against. The linear form is its
   linearisation about saturation and carries the same `l_s`.
   ⚠️ **This entry used to credit it with setting the minimum dune size. It does not.** Section
   VIII explicitly defers "the question of shape differences between small and large dunes or the
@@ -316,7 +324,7 @@ axis is sent, so they are restated:
 
 
 - **parker1982** `P` — Parker, G. & Klingeman, P.C. (1982). *On why gravel bed streams are paved.* Water Resources Research 18(5), 1409–1423. doi:10.1029/WR018i005p01409. — Why a coarse surface layer forms over a finer subsurface, and the equal-mobility argument behind it: coarse grains are intrinsically less mobile, so the pavement must be what equalises mobility, by exposing proportionally more coarse grains to the flow. The prediction that pavement is absent in most sand-bed streams is the falsifiable half. ⚠️ **Abstract only** — AGU paywall; the locator says `Abstract`.
-- **gaea_erosion2** `F` — Gaea 2.x documentation, the Erosion2 node. — The shipped multi-class formulation this skill describes: three sediment classes, **Suspended Load**, **Bed Load** and **Coarse Sediments**, ordered by increasing mass and decreasing mobility, each with its own *Discharge Amount* and its own *Discharge Angle*, the angle being the slope at or above which that class comes to rest. Tool documentation, cited as tool documentation: it evidences that the practice exists and what its controls are called, and it is not a derivation. No paper covers the heightfield form.
+- **gaea_erosion2** `F` — Gaea 2.x documentation, the Erosion2 node. — The shipped multi-class formulation this skill describes: three sediment classes, **Suspended Load**, **Bed Load** and **Coarse Sediments**, ordered by increasing mass and decreasing mobility, each with an amount slider and its own *Discharge Angle*, the angle being the slope at or above which that class comes to rest. ⚠️ This entry used to name the first control *Discharge Amount*. There is no such control: "Discharge Angle" occurs four times in the whole published Gaea documentation corpus and "Discharge Amount" zero times — the docs say only "Each type has its own Discharge Angle" and refer to "sliders". `hydraulic-erosion.md` already had this right and wrote "an amount slider"; the invented name survived in the one entry whose entire stated value is what the controls are called. Tool documentation, cited as tool documentation: it evidences that the practice exists and what its controls are called, and it is not a derivation. No paper covers the heightfield form.
 
 ## Impact cratering
 
