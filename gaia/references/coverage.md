@@ -72,7 +72,7 @@ and that sentence is what stops the same topic being proposed every six months.
 - **glacial-flow** `planned` — How do you move ice as a very slow fluid, and what exact benchmark proves the solver right? Deferred when this axis was narrowed to water; the sources are ready in terrain-architect `12`.
 - **mass-wasting-runout** `planned` — Once a slope fails, where does the material actually come to rest? Deferred with the same narrowing; its space-integrated runout is the one mass-movement solver with no timestep.
 - **snow-and-weather-state** `planned` — How do you carry surface state that changes while the heightfield does not? Deferred with the same narrowing.
-- **sea-ice** `planned` — How does an ice sheet fracture into floes, and what moves them? Deferred with the same water-narrowing as glacial flow; the lowest-value row in this file and recorded so it is not rediscovered.
+- **sea-ice** `covered` — How does an ice sheet fracture into floes, and what moves them? Written because Gaea ships an `IceFloe` node; this row was previously recorded as the lowest-value one in this file, and the document states its own verdict on how much of the topic belongs here. → sea-ice.md
 - **full-3d-fluid** `out-of-scope` — Eulerian or particle 3D fluid is a general simulation subject with its own literature, and a terrain skill that half-covers it would be worse than one that points elsewhere. Height-field water is what this audience ships.
 
 ## Rendering
