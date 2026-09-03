@@ -37,8 +37,10 @@ so the page range below comes from the ACM record rather than from the artefact 
 locators cite sections and figures instead of pages.
 **fiorio1996** — the HAL deposit of the published Theoretical Computer Science article, printed
 pagination intact. The OCR is poor (it renders "can" as "tan" throughout) but legible.
-**wu2009** — the authors' accepted manuscript at sdm.lbl.gov. No journal pagination, so the
-locators cite numbered sections and theorems.
+**wu2009** — **not** the accepted manuscript of the journal article, as this log previously
+claimed. What is at sdm.lbl.gov is the earlier LBNL technical report LBNL-59102, under a different
+title and with Roman section numbering; the published Pattern Analysis and Applications article was
+never opened here. The locators cite the report's sections and theorems, renumbered to Arabic.
 **salembier2009** — the authors' PDF at imatge.upc.edu, figure numbering intact.
 
 ⚠️ **Three sources are deliberately absent.** **Rosenfeld & Pfaltz (1966)**, *Sequential
@@ -70,8 +72,23 @@ that tag, not this section, is where their status is recorded.
 - **hajdu2012** `P` — Hajdu, A., Hajdu, L. & Tijdeman, R. (2012). *Approximation of the Euclidean distance by chamfer distances.* Acta Cybernetica 20(3), 399–417. Read as arXiv:1201.0876v1. — Determines the *best possible* maximum relative error of a chamfer mask at each neighbourhood size, under three different boundary conditions, and prints the classical Borgefors masks and their errors for comparison. The comparison table is the useful part for a tool builder: the 3×3 `<3,4>` mask, the 5×5 `<5,7,11>` mask and the 7×7 mask have maximum relative errors of 0.0572, 0.0198 and 0.0138, against optimal-for-their-size values of 0.0396, 0.0136 and 0.0065.
 - **rongtan2006** `P` — Rong, G. & Tan, T.-S. (2006). *Jump flooding in GPU with applications to Voronoi diagram and distance transform.* Proc. ACM Symposium on Interactive 3D Graphics and Games (I3D '06), 109–116, doi:10.1145/1111411.1111431. — The GPU method: each grid point carries its best-known seed, and `log n` rounds of flooding with step lengths `n/2, n/4, …, 1` propagate every seed to every point. The paper is unusually honest about being an approximation — §5 analyses where errors occur (at and around Voronoi vertices), §6 measures them on 10000 random runs per configuration, and §3 gives the JFA+1 and JFA+2 variants that add rounds of step length 1 to clean them up. It also rejects the obvious alternative of *doubling* the step length, with a figure showing the error explosion.
 - **fiorio1996** `P` — Fiorio, C. & Gustedt, J. (1996). *Two linear time Union-Find strategies for image processing.* Theoretical Computer Science 154(2), 165–181, doi:10.1016/0304-3975(94)00262-2. — The honest complexity statement for label merging. §1 records that general union-find is O(α(n,m)·m) by Tarjan's algorithm, that this bound is *sharp* for pointer machines, and that whether a RAM can do better is open — then shows that the restricted sequence of unions produced by a raster scan is linear, because the trees can be kept flat. This is the paper that makes "union-find is basically constant time" a theorem for this use rather than a folk belief.
-- **wu2009** `P` — Wu, K., Otoo, E. & Suzuki, K. (2009). *Optimizing two-pass connected-component labeling algorithms.* Pattern Analysis and Applications 12(2), 117–135, doi:10.1007/s10044-008-0109-y. — The practical two-pass labeller. §1.1 lays out the three phases — scan with provisional labels, analyse equivalences, relabel — and the taxonomy of multi-pass, two-pass and one-pass approaches. §3 gives the array-based union-find; §4.1 the decision tree that cuts the average number of neighbours examined by about half; §4.2 Theorem 3 proves that a two-pass labeller using *any* union-find with path compression runs in O(p) for `p` pixels, generalising fiorio1996.
-- **salembier2009** `P` — Salembier, P. & Wilkinson, M.H.F. (2009). *Connected operators: A review of region-based morphological image processing techniques.* IEEE Signal Processing Magazine 26(6), 136–157, doi:10.1109/MSP.2009.934154. — Why a component filter is not an opening. Connected operators act by merging flat zones, so they "cannot create new contours nor modify their position"; the area opening removes every connected component below a pixel-count threshold and is shown to equal the *supremum of all possible openings by a connected structuring element of that many pixels*, which is exactly the sense in which it is shape-agnostic where a disk opening is not. §"Size filtering" and Fig. 11 for the operator, Figs. 17–18 for the union-find implementation, Fig. 21 for the side-by-side against a disk opening. **On the venue:** a review article in a peer-reviewed IEEE magazine. A reader who thinks magazine reviews should be `F` should say so and demote it; nothing here rests on it alone.
+- **wu2009** `P` — Wu, K., Otoo, E. & Suzuki, K. (2009). *Optimizing two-pass connected-component labeling algorithms.* Pattern Analysis and Applications 12(2), 117–135, doi:10.1007/s10044-008-0109-y. — The practical two-pass labeller.
+  ⚠️ **What was read is the authors' technical report, not the journal article.** The artefact is
+  **LBNL-59102, *Two Strategies to Speed up Connected Component Labeling Algorithms***, by the same
+  three authors — a different title, Roman-numbered sections, and no journal pagination. It is the
+  precursor of the Pattern Analysis and Applications article cited above, which was **not opened
+  here**. Every locator below points into the report, using Arabic numerals for its Roman sections
+  (§4.3 = §IV.C). Same form as `reda2004` in `papers-architecture.md`.
+  §1 Introduction lays out the three phases — scan with provisional labels, analyse equivalences,
+  relabel — as **category 2 of five** (multi-pass, two-pass, one-pass, hierarchical formats,
+  parallel); it is not a three-way taxonomy and there is no §1.1. §3 gives the array-based
+  union-find. §4.1 Theorem 1 states only that a decision tree **minimises** the number of neighbours
+  visited — a minimality claim carrying no factor; the quantity is §4.3 Theorem 4, which integrates
+  `(2 − q)²` over density `q` to give **7/3 neighbours on average against 4**, and §5.2 turns that
+  into an expected speedup of **12/7 ≈ 1.7** (observed ≈1.7 on random images, ≈2 on application
+  images, Table V). §4.2 Theorem 3 proves that a two-pass algorithm using *any* union-find with path
+  compression runs in O(p) for `p` pixels, generalising fiorio1996.
+- **salembier2009** `P` — Salembier, P. & Wilkinson, M.H.F. (2009). *Connected operators: A review of region-based morphological image processing techniques.* IEEE Signal Processing Magazine 26(6), 136–157, doi:10.1109/MSP.2009.934154. — Why a component filter is not an opening. Connected operators act by merging flat zones, so they "cannot create new contours nor modify their position"; the area opening removes every connected component below a pixel-count threshold and is shown to equal the *supremum of all possible openings by a connected structuring element of that many pixels*, which is exactly the sense in which it is shape-agnostic where a disk opening is not. §"Increasing criterion" p. 146 and Fig. 11 for the operator and for the supremum identity — **not** §"Size filtering" p. 140, which is the opening by reconstruction of an erosion, a different operator. Figs. 17–18 for the union-find implementation, Fig. 21 for the side-by-side against a disk opening. **On the venue:** a review article in a peer-reviewed IEEE magazine. A reader who thinks magazine reviews should be `F` should say so and demote it; nothing here rests on it alone.
 
 ## Scale-space decomposition
 
@@ -153,8 +170,10 @@ evidence about practice and never about correctness.
 - **timonen2010** `P` — Timonen, V. & Westerholm, J. (2010). *Scalable Height Field
   Self-Shadowing.* Computer Graphics Forum 29(2) (Eurographics 2010), 723–731. — O(1)-per-cell
   horizon computation by sweep plus incremental convex hull. **Read in full** (author copy at
-  wili.cc). §4 states the O(n)-per-line complexity and the absence of approximation; §5 and
-  Algorithm 1 are the convex-hull stack. ⚠️ §4 also claims the authors are "not aware of this
+  wili.cc). §3 *Summary of core ideas* states the O(n)-per-line complexity and the absence of
+  approximation; §5 *Occlusion extraction* and Algorithm 1 are the convex-hull stack, and derive the
+  O(N) from exactly `N` pushes and at most `2N` comparisons. §4 is *Computation framework* —
+  rasterisation and thread topology — and carries none of it. ⚠️ §3 also claims the authors are "not aware of this
   method having been introduced in a field outside computer graphics before" — which `dozier2022`
   §I contradicts, attributing the order-N sweep to Dozier, Bruno & Downey (1981). Cite Timonen for
   the GPU formulation, not for the idea.
