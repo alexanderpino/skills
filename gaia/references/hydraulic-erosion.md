@@ -13,6 +13,8 @@ sources:
   - { id: beyer2015, tier: F, locator: "the per-droplet transport-capacity formulation, and the erosion-brush radius" }
   - { id: musgrave1989, tier: P, locator: "the original grid hydraulic and thermal erosion passes" }
   - { id: lague_erosion, tier: F, locator: "the droplet loop, brush weights and parameter defaults in the published source" }
+  - { id: parker1982, tier: P, locator: "Abstract — coarse grains are intrinsically less mobile, so the pavement must be the mechanism that equalises mobility, by exposing proportionally more coarse grains to the flow; and the prediction that pavement is absent in most sand-bed streams. Abstract only; the full text was not reached" }
+  - { id: gaea_erosion2, tier: F, locator: "the Erosion2 node's three sediment classes — Suspended Load, Bed Load and Coarse Sediments — each with its own Discharge Amount and Discharge Angle, and the documented reading of a 24 degree coarse discharge angle as depositing only on or near such steep inclines" }
 ---
 # Hydraulic erosion — droplet and pipe
 
@@ -192,6 +194,88 @@ per-frame operation at authoring resolution. If velocity spikes, clamp it rather
 **Order in the graph: hydraulic first, thermal after.** Hydraulic over-steepens and thermal
 relaxes; reversed, the hydraulic pass re-steepens what thermal fixed and the thermal pass was
 wasted work.
+
+## Grain classes: one capacity, one talus angle, and why that is not enough
+
+Everything above carries **one** sediment field and **one** transport capacity, and the thermal
+pass that follows it carries **one** angle of repose. Real transport does not work that way: silt,
+gravel and boulders move by different mechanisms, start moving at different thresholds, and stop in
+different places. Two landforms follow directly from that difference and cannot be produced by any
+tuning of a single-class model.
+
+⚠️ **No canonical source; standard practice is** to split the load into three classes ordered by
+increasing mass and decreasing mobility, give each its own capacity constant and its own settling
+threshold, and give each its own repose angle. The shipped example is Gaea's Erosion2
+[gaea_erosion2]: *Suspended Load*, *Bed Load* and *Coarse Sediments*, each with a **Discharge
+Amount** and a **Discharge Angle**. There is no paper for the heightfield formulation — it is a
+practice, cited here from a tool's documentation and graded accordingly. The geomorphology
+underneath it is not folklore, and one part of it is [parker1982].
+
+**Armouring, which one class cannot do.** With a single class the bed never changes character:
+erosion removes an undifferentiated material and the next step erodes it the same way. With
+classes, the mobile fines leave first and a coarse lag concentrates at the surface, and that lag
+then protects what is beneath it. [parker1982] is the canonical statement of why the coarse surface
+exists at all: coarse grains are intrinsically less mobile than fine ones, so *something* must
+nearly equalise mobility, and the pavement is that mechanism — it works by exposing proportionally
+more coarse grains to the flow. Its falsifiable half is that pavement should be absent in most
+sand-bed streams, which is also the authoring rule: **armouring is a gravel-bed phenomenon, so a
+scene with no coarse class should not show it.** Visually this is the difference between a gully
+that deepens without limit and one that stabilises on a stony floor.
+
+**Fining downstream** falls out for free, the moment the settling thresholds differ: coarse drops
+first, so a fan grades from blocks at its head to silt at its toe. ⚠️ The model earns that pattern
+by *selective deposition only*. Real fining is also abrasion — grains wearing down as they travel —
+which no heightfield model represents, so read the grading as a placement, not as a grain size.
+
+**Per-class capacity.** The classes share one flow and not one budget. Compute the velocity field
+once, then give each class its own capacity of the same shape as the single-class one — [mei2007]
+eq. (10) with [jako2011]'s depth ramp — differing only in its constant:
+
+```
+for each class i:                       # |v|, alpha and d1 computed ONCE, outside this loop
+    C_i = Kc_i * sin(max(alpha, alpha_min)) * |v| * lmax(d1)
+    if s_i > C_i:  deposit (s_i - C_i) * depositSpeed_i    into layer i
+    else:          erode   min((C_i - s_i) * erodeSpeed_i, available_i)
+```
+
+- **Order the `Kc_i`, do not tune them independently.** `Kc_susp > Kc_bed > Kc_coarse` is the whole
+  content of "increasing mass, decreasing mobility"; three constants tuned freely will cross over
+  somewhere in the domain and the classes stop meaning anything.
+- **Erosion has to draw from a source that can run out.** A class can only be picked up if that
+  grain size is present. Without an `available_i` term the coarse class manufactures boulders out
+  of bedrock everywhere and armouring never happens — it is the same omission as the droplet loop
+  never writing `sediment`, in a different place.
+- **Settling is a threshold on slope, not a rate**, and its direction is the counter-intuitive
+  part. Gaea documents a coarse discharge angle of 24° as meaning coarse material "will be
+  deposited only on or near such steep inclines; you will not see them on flat areas"
+  [gaea_erosion2]. That is not steep ground catching boulders — it is boulders never leaving the
+  steep ground they started on, while the fines ride the flow out onto the flats. So the coarse
+  class's angle is high *because* it is immobile, and reading it as "coarse settles last" gets the
+  sign backwards and puts scree in the valley floor.
+- **Do not assume the three angles are ordered.** They are independent authored controls, and the
+  presets shipped with the tool do not order them monotonically [gaea_erosion2]. Author each
+  against the landform it is meant to place.
+- **Advect each class separately**, through the same semi-Lagrangian step. The diffusion that step
+  already introduces now applies `k` times over, and it is what blurs a sharp fining gradient into
+  a smooth one.
+
+**Per-class repose is the payoff, and it is nearly free.** Šťava's sediment slippage [stava2008] is
+a thermal pass restricted to the deposited layer; with classes it becomes `k` passes, each run on
+its **own** deposit layer against its **own** limit. Keeping the layers separate is what makes the
+result order-independent — run them in any sequence and the composite is the same, because no pass
+sees another's material. `thermal-and-aeolian-erosion.md`'s calibration ranges are the numbers to
+start from: dry sand 30–35°, gravel and scree 35–40°, unsourced there and unsourced here. The
+visible consequence is that **a sand apron slumps to a gentle cone while a scree apron beside it
+stands steeper, in the same frame, out of the same pass** — which is the single thing a one-angle
+model cannot fake, because one angle means every deposit in the scene has the same profile.
+
+This is the material-layer stack again: grain classes are layers distinguished by property
+[stava2008] §5, and `stratigraphy-and-lithology.md` is the same idea applied to rock rather than to
+sediment. The cost is honest and linear — `k` sediment fields, `k` advections, `k` capacity
+evaluations, `k` slippage passes — against a flow solve that dominates the step, so three classes
+cost far less than three times a single-class run. **Three is where the returns stop**: two gives
+you armouring and a fining gradient, three gives you scree that behaves unlike sand, and a fourth
+is a constant nobody can tune by eye.
 
 ## How this fails, and what it looks like
 
