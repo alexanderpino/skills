@@ -236,12 +236,45 @@ not the dip that broke it; it is `T / sin δ` falling below the grid.
 area than their thickness predicts, and at high contrast they hold conspicuously *less* (0.300 at
 16×). The area concentrates in the **weak** beds: those are the gentle stretches wide enough to
 occupy map, which is a strike valley, not a mesa top. A mesa is a flat top *held up* by a caprock,
-and producing one needs the scarp to retreat laterally while the top stays level — mass wasting, the
-slope-limited pass and the failure model of `thermal-and-aeolian-erosion.md`, not incision. So
-Gaia's sentence is right about cuestas and caprock scarps and **overstated about mesas**: layered
-`K` is necessary for a mesa and does not produce one on its own. Run thermal after the layered
-hydraulic pass with a **per-bed talus angle** — the second attribute the column carries, and what
-turns a steep reach into a cliff with a scree apron.
+and producing one needs the scarp to retreat laterally while the top stays level. So Gaia's sentence
+is right about cuestas and caprock scarps and **overstated about mesas**: layered `K` is necessary
+for a mesa and does not produce one on its own.
+
+### The obvious fix does not work, and the per-bed quantity is not the talus angle
+
+A slope-limited pass with a **per-bed talus angle** is the natural thing to reach for, and it was
+measured. On a synthetic butte — a 400 m escarpment, 100 m beds, resistant standing at 60° and weak
+at 32°, 50 m cells — relaxing to those limits moved the escarpment **from 1.998 km to 1.996 km**.
+Two metres, on a two-kilometre butte. `area_hard` went 49.61% → 48.91%, against single-angle
+controls at 49.46%, 49.52% and 49.62% — the per-bed angles are **indistinguishable from one angle**
+on this measure. A slope limit only moves material where the slope exceeds it; once the face is at
+60° the pass converges and stops, and nothing has undermined anything.
+
+**Retreat needs a removal term, and the removal is what has to be per-bed.** Adding weathering on
+steep faces and controlling for total mass removed:
+
+| Pass | Scarp radius | Tread std | Tread mean | Verdict |
+|---|---|---|---|---|
+| Talus limit alone | 1.998 → **1.996 km** | 1.01 m | 500.02 m | Nothing happens |
+| Talus + **uniform** weathering | — | 1.01 → **7.21 m** | 500.02 → **151.01 m** | The mesa is destroyed |
+| Talus + **bed-selective** weathering | 1.998 → **1.360 km** | **1.01 m** | **500.02 m** | Parallel retreat |
+
+That third row is the mesa: the top stays at full height and bit-for-bit as flat as it started,
+while the cliff comes in by 640 m. The caprock survives because it is *not weathered*; the weak beds
+beneath it are, and the slope-limited pass then drops the unsupported cap. **The talus angle is what
+makes the debris apron; the per-bed weathering rate is what makes the landform.** Carry both
+attributes on the column, and if you carry only one, carry the rate. `thermal-and-aeolian-erosion.md`
+owns the slope-limited pass and the failure-and-runout model; the bed-selective removal term is not
+in it, and adding it is the work.
+
+⚠️ **And `area_hard` cannot see a mesa even when there is one.** In the run that produced textbook
+parallel retreat it *fell*, 49.61% → 44.66%, because retreat shrinks the cap and the metric counts
+map area. The metric is right for the question it was built for — does a bed hold more landscape
+than its thickness predicts — and it is the wrong instrument for "is this a mesa", which is a
+statement about **shape**: a flat top, a steep side, and a break of slope between them. Measure the
+tread's standard deviation and the scarp's position, as the table above does. A metric that is
+insensitive to the landform you are chasing will report failure just as confidently when you
+succeed.
 
 [benes2001] §7 Fig. 3 is the same result from the other end: a hard letter buried under weak
 material, exhumed by thermal erosion alone and left "unchanged". Differential erosion needs no
@@ -332,7 +365,10 @@ a material mask, not as a simulation input.
 | A dipped column that reads as noise or as stripes one cell wide | Outcrop width `T/sin δ` below the grid — 25 m beds at 10° are 1.4 cells on a 100 m grid, and measured the weakest of any layered run | Thicken the beds with the dip: `T ≥ 4·cellSize·sin δ` |
 | The scarp weakened when the timestep was refined | The coarse step was inflating it: one-sided over-resistance at contacts | Believe the finer step; `Δt ≤ 0.2·min(bed thickness)/max(K·A^m·S^n)` |
 | Cuestas that vanish after a long run | Beds dipping downstream, so contacts migrate fast | Dip into the drainage: `φ < 0` slows contact migration [mitchell2021] §2.5 eq. (12) |
-| Cliff bands but no flat-topped mesas | Incision plus linear diffusion makes the riser, not the tread; measured area in resistant beds never exceeded 0.5, and fell to 0.30 at high contrast | Mass wasting after the hydraulic pass, with a per-bed talus angle (`thermal-and-aeolian-erosion.md`) |
+| Cliff bands but no flat-topped mesas | Incision plus linear diffusion makes the riser, not the tread | A **per-bed weathering rate**, not a per-bed talus angle: measured, the talus limit alone retreats a 2 km butte by 2 m, and bed-selective removal retreats it by 640 m with the tread bit-preserved |
+| A per-bed talus angle changed nothing | A slope limit only moves material where slope exceeds it; once the face sits at the limit the pass converges | Add a removal term. The angle makes the debris apron; the rate makes the landform |
+| Weathering was added and the mesa dissolved | The removal was uniform, so the caprock weathered too — tread mean fell 500 → 151 m at equal mass removed | Gate the removal on the bed: the resistant unit must not be weathered, or nothing holds the top up |
+| The metric says no mesa but the render clearly has one | `area_hard` counts map area, and parallel retreat *shrinks* the cap — it fell 49.61% → 44.66% in the run that produced textbook retreat | Measure shape, not area: the tread's standard deviation and the scarp's position |
 | Thin beds erased entirely | Per-step incision comparable to bed thickness, so the bed is skipped in one update | `Δt ≤ 0.2·min(bed thickness) / max(K·A^m·S^n)`, or thicker beds |
 | Resistant beds look thicker than authored | One-sided contact error: a cell cutting through a contact erodes the whole step at the bed above's `K` | Same ratio; count contact crossings per step as a diagnostic |
 | Erosion rates never settle, so the run never looks finished | Expected: layered stratigraphy is not steady-state in the way uniform `K` is [forte2016] | Stop on a morphology target, not on rate convergence |
