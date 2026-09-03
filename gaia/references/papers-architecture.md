@@ -100,6 +100,24 @@ is evidence about practice, never about correctness.
   must do so on *every* cook because extra inputs are cleared as soon as dirty propagation
   traverses them. Also states the two-phase model: dirt is pushed eagerly, data is pulled lazily.
 
+## GPU execution, 2026
+
+- **hlsl_wg_removal** `F` — Microsoft. *HLSL Specifications*, `proposals/0018-work-graphs.md`
+  (status Completed), and `proposals/0046-dxil110.md`. github.com/microsoft/hlsl-specs. — The
+  primary artefact for the removal: the header reads "Version: SM 6.8 / Removed: SM 6.10", and the
+  body states "Work Graphs was introduced in Shader Model 6.8, and has been removed effective
+  Shader Model 6.10. Driver support for Work Graphs is still available and supported on many
+  devices." 0046 adds "DXIL 1.10 removes support for 'node' shaders."
+- **dxc_wg_removal** `F` — Microsoft. *DirectXShaderCompiler*, PR #8798 "[SM 6.10] Disable Work
+  Graphs in SM 6.10", merged 2026-08-31. — The implementation, and the exact lifecycle in a source
+  comment: "Work graph node record objects: available SM6.8, deprecated SM6.9, obsoleted SM6.10."
+  `lib_6_x` targets are explicitly exempted from the new diagnostic.
+- **d3d_worklists** `F` — Microsoft. *DirectX Specs*, `d3d/WorkLists.md`, v0.851, added 2026-08-21.
+  — Motivated by `ExecuteIndirect`'s inability to switch PSOs from the GPU timeline, and
+  self-described as an `ExecuteIndirect` analog. It does **not** claim to replace work graphs, and
+  states "This feature is early in development. While the spec is public, implementations are not
+  ready. Hopefully a preview can be available some time in 2027."
+
 ## In-repo sources
 
 These are artefacts in this repository rather than published work. They are `F` — a register or a

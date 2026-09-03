@@ -13,6 +13,12 @@ sources:
   - { id: barnes2017, tier: P, locator: "§3.1 p.205 for why an apron cannot fix a global-ordered node and how a perimeter aggregate does; §3 p.203 for the three-stage structure and the single-tile residency claim; §2 p.203 for the restriction to non-divergent flow" }
   - { id: nuke_request, tier: F, locator: "the DD::Image::Iop reference for request() and _request(), and the NDK Developers Guide 'Basic Image Calls' paragraph on _request — requested regions are unioned, and a random-access node must request the input's whole bounding box" }
   - { id: barnes2016, tier: P, locator: "Abstract p.56 — the same tile-subdivision shape applied to Priority-Flood depression filling, with a fixed number of memory-access and communication events per subdivision" }
+  - { id: hlsl_wg_removal, tier: F, locator: "proposals/0018-work-graphs.md — the header 'Version: SM 6.8 / Removed: SM 6.10' and the paragraph beneath it; proposals/0046-dxil110.md §'Removing Support for Node Shaders'" }
+  - { id: dxc_wg_removal, tier: F, locator: "PR #8798, merged 2026-08-31 — the ASTContextHLSL.cpp comment 'available SM6.8, deprecated SM6.9, obsoleted SM6.10', the SemaHLSLDiagnoseTU.cpp guard, and the lib_6_x exemption with its sm6_10_lib_6x_no_diagnostics.hlsl test" }
+  - { id: d3d_worklists, tier: F, locator: "d3d/WorkLists.md v0.851 — the Motivation section on ExecuteIndirect and PSO switching, and the closing statement that implementations are not ready and a preview is hoped for in 2027" }
+  - { id: d3d12indirect, tier: F, locator: "ExecuteIndirect and the Vulkan indirect equivalents — the dispatch mechanism a GPU-resident graph still runs on in 2026" }
+  - { id: haar2015, tier: F, locator: "the GPU-driven pipeline structure: persistent buffers, GPU-side culling and indirect submission" }
+  - { id: wihlidal2016, tier: F, locator: "compute-shader replacement of fixed-function pipeline stages, and indirect dispatch chaining" }
   - { id: ta_graph_runtime, tier: F, locator: "§Evaluation for the demand-driven recursion; §Content-addressed caching for the recursive cacheKey and the exclusion of device; §Dirty propagation for the VALUE-versus-TOPOLOGY split" }
   - { id: simd_dispatch_drift, tier: F, locator: "the AVX512-on/AVX512-off comparison table and the paragraph beneath it giving the per-ufunc 1-ULP measurement over 10007 doubles and the droplet_erode amplification" }
 ---
@@ -100,6 +106,41 @@ by construction. That is a suspending scheduler written without the name.
 and erosion that feed each other are a fixed-iteration outer loop around a subgraph, expressed as a
 composite node, so the DAG invariant survives [ta_graph_runtime]. A runtime that permits cycles in
 the graph proper has given up both a topological order and a cache key.
+
+## Executing it on the GPU, and the 2026 answer
+
+The scheduler above says *what order*; this says *what runs it*. For a content-generation graph in
+2026 the honest answer is that **the 2016 answer still holds**: compute kernels over persistent
+buffers, dispatched indirectly, with bindless resources and a better front end
+[d3d12indirect] [haar2015] [wihlidal2016]. A document claiming novelty here would be inventing it.
+
+That is worth saying because there *was* a genuinely different mechanism — GPU-scheduled recursive
+node execution, where the GPU itself expands and schedules downstream work — and it has just been
+withdrawn. **Work graphs shipped in Shader Model 6.8 and are removed as of SM 6.10.**
+[hlsl_wg_removal] is unambiguous: *"Work Graphs was introduced in Shader Model 6.8, and has been
+removed effective Shader Model 6.10. Driver support for Work Graphs is still available and
+supported on many devices."* The compiler change records the lifecycle exactly — *"available SM6.8,
+deprecated SM6.9, obsoleted SM6.10"* [dxc_wg_removal].
+
+⚠️ **A ceiling, not a deletion.** SM 6.8 and 6.9 still compile and run, drivers still support it,
+and `lib_6_x` targets are explicitly exempted from the new diagnostic [dxc_wg_removal]. Existing
+work-graph code does not stop working; what stops is targeting it from 6.10 onward. So the
+practical rule is narrow and clear: **do not architect a new terrain runtime on work graphs**, and
+do not rewrite one that already uses them.
+
+Its nearest successor is early. [d3d_worklists] is motivated by `ExecuteIndirect`'s inability to
+switch PSOs from the GPU timeline and describes itself as an `ExecuteIndirect` analog; it says
+plainly that "implementations are not ready" and hopes for a preview "some time in 2027". It does
+not claim to replace work graphs — that framing is press narrative, not spec.
+
+⚠️ **How this was established, because the method matters more than the conclusion.** The obvious
+primary source is the `WorkGraphs.md` spec, and it contains **no deprecation language at all** —
+its `## Shader target` even says node shaders target "lib_6_8 **or above**", an open floor. That
+reads as evidence the feature is alive. It is not: that file's last edit was 2026-02-04 and the
+decision landed in August 2026 in two different repositories. **Absence of a statement in a spec is
+not evidence of absence when the spec is stale** — check the file's date before drawing an
+inference from its silence, and prefer the repository that carries the change over the one that
+carries the description.
 
 ## The rebuilder: where the days actually go
 
