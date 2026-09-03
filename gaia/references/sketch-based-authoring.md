@@ -48,7 +48,7 @@ Concretely:
   user's line becomes a river mouth, a slope map, a spring or a band of soft material, and the
   generator then guarantees the invariant "independently on the quality of the user input".
 
-**What it beats**, each measured below in `scratchpad/w7/constraint_solvers.py`:
+**What it beats**, each measured below in `constraint_solvers.py`, recorded in `registers/pseudocode-execution.tsv`:
 
 - *Impose it before, as an initial condition, and let erosion have it* — a 4-cell ridge keeps
   **18.8% of its visible relief** after 200 diffusion steps. This is the right answer only when

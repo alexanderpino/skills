@@ -110,8 +110,9 @@ strike is the horizontal line perpendicular to it), the stratigraphic height of 
 s(x, y, z) = z + tan(delta) * (x*cos(psi) + y*sin(psi))
 ```
 
-and everything else is unchanged: the bed index is `floor((s − datum) / period)` into the same
-list. **This is the whole of dip.** Two multiplies, an add, a floor and a lookup — it costs
+and everything else is unchanged: the bed is still found by `fmod(s − datum, period)` into the same
+list, exactly as the block above does. (`floor((s − datum)/period)` indexes the **column repeat**,
+not the bed — a different quantity, and not what the code computes.) **This is the whole of dip.** Two multiplies, an add, a floor and a lookup — it costs
 nothing next to the flow routing in the same step, and it is the single highest-value knob in the
 column, because horizontal beds give concentric bands on every hill and a dipping column gives
 cuestas, strike valleys and hogbacks.
@@ -135,8 +136,8 @@ its own stated range.
 
 and if `w` is not several cells wide the bed cannot be expressed at all — it aliases into a
 one-cell stripe that erosion cannot organise around. Measured (see below, same rig): 25 m beds at
-10° give `w = 144 m` = **1.4 cells** on a 100 m grid and produce the **weakest** layered signal of
-any run in the set; 100 m beds at the same 10° give `w = 576 m` = **5.8 cells** and produce the
+10° give `w = 141.8 m` = **1.4 cells** on a 100 m grid and produce the **weakest** layered signal of
+any run in the set; 100 m beds at the same 10° give `w = 567.1 m` = **5.7 cells** and produce the
 **strongest**. The rule is `T ≥ 4·cellSize·tan(δ)` — steepen the dip and the beds must get thicker
 in proportion, and a nearly vertical column needs beds as thick as the outcrop pattern you want to
 see. This is the first thing to check when a dipped column looks like noise.
@@ -239,9 +240,9 @@ what the bed thicknesses alone predict.
 | Horizontal, 25 m beds, 4×, run to 4 Myr | ∞ | 1.597 | 1.57× | 0.502 |
 | Horizontal, 25 m beds, **16×** | ∞ | 1.323 | **2.29×** | **0.300** |
 | Horizontal, 100 m beds, 4× | ∞ | **2.131** | 1.45× | 0.308 |
-| Dip 10°, 100 m beds, 4× | 576 m — 5.8 cells | 1.705 | **1.85×** | 0.287 |
+| Dip 10°, 100 m beds, 4× | 567.1 m — 5.7 cells | 1.705 | **1.85×** | 0.287 |
 | Dip 2°, 25 m beds, 4× | 716 m — 7.2 cells | 1.408 | 0.92× | 0.476 |
-| Dip 10°, 25 m beds, 4× | 144 m — **1.4 cells** | **1.322** | 1.21× | 0.378 |
+| Dip 10°, 25 m beds, 4× | 141.8 m — **1.4 cells** | **1.322** | 1.21× | 0.378 |
 
 The two control rows are what make the rest mean anything: with `K` uniform, scoring the same
 bands gives `S_area` 0.94–1.01 and `conc` 0.86–0.89× — no signal, in fact very slightly negative,

@@ -134,7 +134,7 @@ of ice*, something in it must break the self-similarity — a shore, a ship, a l
 
 The obvious recipe is to scatter points and tessellate. It does not work, and the failure is
 large enough to see without measuring — but measuring it says by how much.
-`scratchpad/w9/floe_partition.py` builds each partition on a 1024² periodic grid by jump flooding
+`floe_partition.py`, recorded in `registers/pseudocode-execution.tsv` builds each partition on a 1024² periodic grid by jump flooding
 (the operator `mask-operators.md` describes), takes exact cell areas as pixel counts, and fits
 the **same** noncumulative log-log density [denton2022] fits, with the same minimum-two-per-bin
 rule. Target: `m = −1.79 ± 0.08` over about five decades of area.
@@ -206,7 +206,7 @@ any convex shape, so floes are convex to within measurement error. And the isope
 generator producing long thin shards or fractal coastlines is producing something else.
 
 ⚠️ **One transcription trap, recorded because it nearly propagated.** The manuscript's prose gives
-area as `0.56 p²` and its own Table 1 gives `0.66`. `scratchpad/w9/floe_numbers.py` resolves it
+area as `0.56 p²` and its own Table 1 gives `0.66`. `floe_numbers.py`, recorded in `registers/pseudocode-execution.tsv` resolves it
 two ways: `0.065 × 3.17² = 0.653`, and the table's sd/mean column of 0.08 against sd = 0.05
 implies 0.66 rather than 0.56. [denton2022] Sect. 3.4, reading the published paper, also uses
 `a = 0.66·x²`. **Use 0.66.** This is what "a constant reconstructed from memory is a `?` wearing
@@ -272,8 +272,14 @@ tool with one wind field and one angle has silently picked a convention; say whi
 
 Evaluating `α = sqrt(ρ_a C_a / ρ_w C_w)` over the usual drag-coefficient ranges
 (`ρ_a = 1.3`, `ρ_w = 1026`, `C_a` 1.2–2.5 × 10⁻³, `C_w` 3.0–8.0 × 10⁻³) gives **1.4% to 3.3%**
-(`scratchpad/w9/floe_numbers.py`), which brackets every measured value in the table above. The
-formula is not a fit; it is a ratio of drag coefficients, and it lands in the right place.
+which brackets the values referenced to a **near-surface or 10 m** wind — Nansen's ≈2% and Uotila's
+1.3–3.3% — and sits **above** the geostrophic-referenced rows (0.8%, 1.0%, 1.1%). ⚠️ That is the
+same convention split the warning above makes about the turning angle, and it applies to the
+magnitude for the same reason: a geostrophic wind is the stronger one, so the same ice speed
+divided by it gives a smaller factor. An earlier revision of this line claimed the bracket covered
+*every* row, which it does not — four of the five sit outside it, and the fix is to compare like
+with like rather than to widen the bracket. The formula is not a fit; it is a ratio of drag
+coefficients, and against the winds it is derived for it lands in the right place.
 
 **The authoring consequence is that a floe field is advected, not simulated.** One vector per
 frame, applied to the whole mask as a rigid translation plus a slow rotation, reproduces the

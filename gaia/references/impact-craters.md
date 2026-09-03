@@ -213,7 +213,7 @@ every range tested. So:
   "airless, ancient, no sense of size" look, and it is one number.
 
 The empirical ceiling is worth carrying: an equilibrium surface sits at roughly **2%** of
-geometric saturation, `n_geom,>r = 0.385 r^-2` [minton2019] — cumulative count per unit area, so the coefficient carries units and only means 0.385 in the paper's own metres; port the *ratio*, not the constant. Past that you are not making an
+geometric saturation, `n_geom,>r = 0.385 r^-2` [minton2019] — cumulative count per unit area, so `n` is `1/L²` and `r^-2` is `1/L²` and **0.385 is dimensionless**: it ports to any unit unchanged. (An earlier revision of this line said the opposite, that the coefficient carries units — contradicting the bullet five lines above, which gives being dimensionless at slope 2 as the whole reason the surface is scale-free.) Past that you are not making an
 older surface, you are making mush — which is what a naive "just add more craters" loop produces.
 
 ## Superposition is the history

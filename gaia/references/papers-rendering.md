@@ -24,7 +24,7 @@ bibliography predates the practice.
 
 **sharma2005** — the author's PDF at hajim.rochester.edu, plus the 34-pair supplementary test
 file `ciede2000testdata.txt` from the same site, which was used to validate the implementation
-in `scratchpad/w6/colour_blend.py`.
+in `colour_blend.py`, recorded in `registers/pseudocode-execution.tsv`.
 **moreland2009** — **the author's "Expanded" version was read, not the ISVC proceedings paper.**
 Section and equation numbers in the locator refer to that expanded PDF, and the proceedings
 pagination is not asserted.

@@ -24,7 +24,7 @@ citation.
 
 **felzenszwalb2012** — the journal's own open-access PDF at theoryofcomputing.org. Algorithm 1,
 Theorems 2.1–3.2 and §2.2 read there; Algorithm 1 was then transcribed into
-`scratchpad/w6/edt_error.py` and its output checked against brute force.
+`edt_error.py`, recorded in `registers/pseudocode-execution.tsv` and its output checked against brute force.
 **meijster2000** — a course-hosted scan of the Kluwer chapter, complete with the printed page
 numbers 331–340 used in the locators.
 **hajdu2012** — **the arXiv preprint 1201.0876v1 was read, not the journal version.** The

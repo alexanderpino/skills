@@ -72,7 +72,7 @@ nodes. That object does not exist in a forest. It is not that D8 braids badly �
 **unrepresentable** in the data structure, at any resolution, for any terrain.
 
 Measured on a 256×256 fractal dome, priority-flood filled, D8 routed
-(`scratchpad/w4/d8_is_a_tree.py`):
+(`d8_is_a_tree.py`, recorded in `registers/pseudocode-execution.tsv`):
 
 | quantity | D8 | same terrain, MFD |
 |---|---|---|
@@ -323,7 +323,7 @@ height is monotonically decreasing. When this fails, we propagate the heights of
 trajectories downwards."
 
 Measured on a 512×512 terrain with 170 m of relief along the path
-(`scratchpad/w4/carve_monotone.py`):
+(`carve_monotone.py`, recorded in `registers/pseudocode-execution.tsv`):
 
 | path | uphill segments | extra excavation, mean | deepest final channel |
 |---|---|---|---|

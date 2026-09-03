@@ -77,7 +77,7 @@ this document is built on: physical light effects belong in a linear space, perc
 CIELAB. A palette *ramp* is perceptual — you want even-looking steps — and this is the one place
 where interpolating in linear light is the wrong answer. Stepping a 32-entry ramp between two
 terrain colours three ways and measuring the perceptual size of each step with ΔE00
-(`scratchpad/w6/colour_blend.py`):
+(`colour_blend.py`, recorded in `registers/pseudocode-execution.tsv`):
 
 | Ramp | largest / smallest step | coefficient of variation |
 |---|---|---|
@@ -167,7 +167,7 @@ on top. There is **no canonical source for it; standard practice is** the recipe
 [mishkinis2013] — graded `F`, not peer-reviewed — reimplemented in every engine since: bias each layer's height by its weight, take the maximum,
 and keep only the layers within `depth` of it.
 
-Measured (`scratchpad/w6/colour_blend.py`, 4096 texels, uniform height channels):
+Measured (`colour_blend.py`, recorded in `registers/pseudocode-execution.tsv`, 4096 texels, uniform height channels):
 
 | | alpha blend | height blend, depth 0.02 | depth 0.1 | depth 0.3 |
 |---|---|---|---|---|
@@ -241,7 +241,7 @@ where the two branches actually disagree, the round-trip error is **2.3e-09**. S
 the curve is not float64-exact, it is exact everywhere you are unlikely to sample.
 
 **Blending in the encoded space is a real, large error, not a purist's complaint.** Measured
-(`scratchpad/w6/colour_blend.py`) as the difference between lerping the *encoded* values and
+(`colour_blend.py`, recorded in `registers/pseudocode-execution.tsv`) as the difference between lerping the *encoded* values and
 lerping the *linear* ones, for chosen 8-bit terrain albedos, reported as CIEDE2000 and as the error
 in linear luminance:
 

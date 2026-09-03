@@ -107,7 +107,7 @@ the same lower envelope, with the metric appearing only as the choice of a singl
 squared difference for Euclidean, absolute difference for Manhattan, max for chessboard (§3).
 
 **Verified here.** Algorithm 1 was transcribed line for line into
-`scratchpad/w6/edt_error.py` and compared against brute-force minimisation over all seed
+`edt_error.py`, recorded in `registers/pseudocode-execution.tsv` and compared against brute-force minimisation over all seed
 pixels: on a 64×64 field with 40 random seeds and on a 129×129 field with a single centre seed,
 the two agree **exactly** — maximum absolute difference 0.000e+00, not merely small. That is the
 check to run before trusting any distance field, and it takes ten lines.
@@ -259,7 +259,7 @@ any union-find with path compression runs in **O(p)** for `p` pixels, generalisi
 result. So the operator is linear in the field, provably, and you may budget it as one more pass.
 
 Measured on a 256² mask from a thresholded noise field (39.18% coverage, 25676 set cells,
-`scratchpad/w6/component_filter.py`): 927 components, of which **921 are smaller than 25 cells —
+`component_filter.py`, recorded in `registers/pseudocode-execution.tsv`): 927 components, of which **921 are smaller than 25 cells —
 99.4% of the components and 6.46% of the set cells**. That ratio is the whole case for the
 operator: nearly every object in the mask is speckle, and nearly none of the mask is. The
 union-find did 2622 pointer hops for 25676 object cells — **0.102 hops per cell**, which is what
