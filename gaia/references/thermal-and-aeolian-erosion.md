@@ -74,14 +74,21 @@ and it is the only reason the result does not depend on visit order.
   cardinal, apex 5.92; per-neighbour limit → both classes settle at `0.7002 = tan 35°`, footprint
   9.90 / 9.00, apex 6.86. The same bug hides a second time in the volume term if the excess is
   measured as `d − talus` against a cardinal limit.
-- **`c·maxExcess/2`.** The `/2` is a **stability margin, not an oscillation cure**, and the
+- **`c·maxExcess/2`.** The `/2` traces to [olsen2004] p. 7, where `Δh = d_max/2` is introduced
+  for a geometric reason — it is the transfer that levels a cell with its lowest neighbour — and
+  not for stability. Used here it is a **stability margin, not an oscillation cure**, and the
   difference is measurable. Unclamped, varying the effective coefficient in
   `moved = c_eff·maxExcess/2`: `c_eff` = 0.5, 1.0, 1.4 and **2.0** — that last is the `/2`
   dropped entirely at `c = 1.0` — all converge to the same fixed point at max slope 0.70021,
   with zero sign-flips over the last 300 passes. The failure past the margin is **divergence,
   not bounded oscillation**, and it begins at `c_eff ≥ 3`, so `c` in 0.3..0.7 with the `/2`
-  kept leaves a 4–10× margin. `c` itself is a **tuning range from practice, not a cited
-  result** — no canonical source fixes it, and lower simply converges more slowly.
+  kept leaves a 4–10× margin. `c` itself is a **tuning range from practice**: the only
+  stated value anywhere in this bibliography is [olsen2004]'s "A reasonable value for c is 0.5"
+  (p. 5), and Olsen is a technical report, so no *peer-reviewed* source fixes it. Lower simply
+  converges more slowly. Olsen's own reason for keeping it down — that "higher values may cause
+  oscillation when the changes to the height map are applied only after completion of an entire
+  iteration" (p. 5) — is precisely the claim the measurements above fail to reproduce: past the
+  margin the failure is divergence, not oscillation.
 - **The per-pair clamp** `min(share, (d − dLimit)/2)` bounds one transfer *in isolation*: that
   transfer alone leaves the pair at `dLimit`, so it cannot invert it. It is **not** a convergence
   guarantee. A cell issues up to eight outgoing transfers and accumulates its neighbours' incoming
@@ -95,7 +102,9 @@ and it is the only reason the result does not depend on visit order.
   over its limit*, where the pass is the identity (measured `|h_next − h|_∞ = 0`). Every
   configuration tried reached it; that is evidence, not a proof, which is why the stopping rule
   below is a measurement. Sizing the move from the single steepest neighbour and splitting it by
-  `d/dTotal` is a fast abstraction [olsen2004], not physics.
+  `d/dTotal` is an abstraction, not physics: it is the *reference* implementation of
+  [olsen2004] p. 5, `h_i += c·(d_max − T)·d_i/d_total`, which Olsen in turn credits to Musgrave
+  et al. — not his fast variant, which does something else entirely (see the time budget below).
 - **The clamp earns very little, and the claim it prevents micro-oscillation did not reproduce.** It
   binds on 10.7% of transfers; clamped and unclamped runs from the same 25² noisy cone end within
   0.027 of each other on 39.6 of relief, both at max slope `0.70021 ≈ tan 35°`, and the unclamped
@@ -219,6 +228,8 @@ q     = q_sat + (q_up − q_sat) · exp(−ds/L_sat)             # dq/ds = (q_sa
                                                             #   along the streamline: q_up is q
                                                             #   one step ds upwind; exact step
                                                             #   for q_sat constant over ds
+                                                            #   LINEARISED Sauermann eq. 46,
+                                                            #   which is logistic — see below
 q⃗     = q · normalize(wind)
 bed  −= dt · ∇·q⃗ / ρ_bed                                    # Exner
 ```
@@ -245,7 +256,20 @@ The symbols, all of them, with the values that make the expressions run:
 
 Those values are conventional working numbers, not read out of the cited locators: [bagnold1941] is
 `F` here and is cited for the *form* of the threshold and the cubic law, [sauermann2001] for the
-form of the relaxation.
+form of the relaxation. `L_sat ≈ (ρ_s/ρ_a)·grain` is the drag-length scaling that circulates in the
+dune literature and is **not** Sauermann's expression; his `l_s` is eq. 47, a different functional
+form that diverges as `u*` approaches the threshold. The two agree in magnitude at typical shear
+velocities — Sauermann's Figure 5 asymptote is 0.4–0.8 m, the drag length 0.55 m for 250 µm sand —
+which is why the shorthand is usable, but a `L_sat` that stays constant as the wind drops toward
+threshold is the shorthand's approximation and not the paper's.
+
+⚠️ **The linear relaxation above is a linearisation of [sauermann2001], not its equation.** Sauermann's
+eq. 46 is `∂q/∂x = (q/l_s)·(1 − q/q_s)` — **logistic**, so a flux far below saturation grows slowly
+because it is proportional to `q` itself. Substituting `q = q_s(1 + ε)` gives `dε/dx = −ε/l_s`, which
+is the linear relaxation this chain integrates, so the two share `l_s` and agree wherever the bed is
+near saturation. They do not agree at a phase boundary — bedrock meeting sand with `q = 0` — where the
+logistic form starts from a *stalled* flux and the linear one ramps immediately. If sand entering the
+domain matters to your result, integrate eq. 46 rather than the exponential.
 
 **`∇·q⃗` changes the bed, not `q`.** Divergence deflates, convergence deposits. Feed it a
 **constant** wind vector and `∇·q⃗ ≡ 0` — nothing happens, ever, at any wind speed. That is both the
@@ -266,7 +290,11 @@ table blames on a missing `L_sat`; with the relaxation it saturates at `amplitud
 every `λ` at or below `L_sat`. Short bumps are damped rather than amplified — the full
 minimum-dune-size result also needs the upwind shift of the shear stress over the bump, which these
 five lines do not carry, so read this as the *mechanism* for a minimum size and not as a prediction
-of what it is. Clamp deflation to the sand that is there; wind does not excavate bedrock.
+of what it is. That is [sauermann2001]'s own division of labour, not a hedge added here: its section
+VIII says the implications of saturation transients for dune formation, "in particular, the question
+of shape differences between small and large dunes or the minimum size for slip-face formation", are
+deferred to a companion paper — Kroy, Sauermann and Herrmann's minimal model, which adds the wind
+field. **Do not cite the saturation-length paper for the minimum dune size.** Clamp deflation to the sand that is there; wind does not excavate bedrock.
 
 **What it beats.** *Gaussian blur as a talus pass* — smooths ridges and cliffs, the features you
 wanted, and leaves the noise. *Perona–Malik anisotropic diffusion* — the same object as thermal
@@ -281,8 +309,15 @@ passes for a 3:1 cone from 17² to 49², measured above). Inside an erosion loop
 is the argument for putting it there rather than at the end: hydraulic re-steepens a little each
 step, a handful of passes take that back, and nothing ever relaxes a whole map from scratch. As a
 one-off post-process on a map that is over-steep everywhere it is thousands of full-grid passes, and
-that is where the sweep form [olsen2004] is worth reaching for — it is reported to converge in fewer
-iterations, `F`-tier and not measured here. Werner is the expensive one — one slab per iteration
+that is where [olsen2004]'s fast variant is worth *reading* — but read it before reaching for it.
+⚠️ **It is not a sweep, and this document called it one.** Olsen's four changes (pp. 6–7,
+*Optimizations*) are: the Von Neumann neighbourhood instead of Moore, material distributed to the
+**lowest neighbour only**, `Δh = d_max/2` instead of a fraction of the excess, and — the one that
+matters here — **writing the height map immediately instead of into a difference map**. That last
+change deletes, deliberately and for speed, the double buffering this document tells you to keep, so
+the variant is order-dependent by construction. Olsen measures 500 iterations in 10 s against the
+reference implementation's 60 s, and reports the optimised version stabilising sooner while scoring
+5% worse at 500 iterations (p. 7, *Analysis*). `F`-tier, and not re-measured here. Werner is the expensive one — one slab per iteration
 means of order 10⁷ iterations for a 1k map before every cell has been touched a handful of times —
 arithmetic on the cell count, not a measurement — so it is authoring-time only; batch source cells
 with non-overlapping paths, or accumulate with atomics as with droplets. The continuum chain is five

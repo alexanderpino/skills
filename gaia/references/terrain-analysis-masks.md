@@ -6,14 +6,14 @@ tags: [generation, analysis, masks, curvature, materials, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: zevenbergen1987, tier: P, locator: "the 3x3 partial-quartic fit, and the profile and plan curvature expressions" }
-  - { id: horn1981, tier: P, locator: "the Sobel-weighted 3x3 slope and aspect estimator" }
-  - { id: beven1979, tier: P, locator: "the topographic index ln(a / tan beta)" }
-  - { id: timonen2010, tier: P, locator: "the per-azimuth sweep with an incremental convex hull, O(1) per cell. NOTE the order-N sweep itself is Dozier, Bruno & Downey 1981, per dozier2022 §I -- this paper is a refinement, not the origin" }
+  - { id: zevenbergen1987, tier: P, locator: "the 3x3 partial-quartic fit, and the profile and plan curvature expressions. NOT OPENED — Earth Surface Processes and Landforms is paywalled at Wiley and no open copy was reachable from here, so no equation number is named. The five coefficients and the two curvature expressions this document writes out are the standard published form, but they have not been checked against Zevenbergen and Thorne's own numbering" }
+  - { id: horn1981, tier: P, locator: "the Sobel-weighted 3x3 slope and aspect estimator. NOT OPENED — Proceedings of the IEEE is paywalled and the MIT author copies that used to carry it 404, so no section, equation or page inside it is named" }
+  - { id: beven1979, tier: P, locator: "the topographic index ln(a / tan beta). NOT OPENED — Hydrological Sciences Bulletin is paywalled at Taylor and Francis, and the White Rose repository record states outright that no full text is held there, so no section or equation inside it is named" }
+  - { id: timonen2010, tier: P, locator: "READ IN FULL. Section 4 Computation framework states the result this document uses — a thread keeps the samples it has processed in a convex hull subset, so that 'the total time complexity for processing a line of n samples is O(n)' with no approximation beyond data-type precision; section 5 Occlusion extraction and Algorithm 1 are the mechanism, a stack popped while h(v2)*d(v1) >= h(v1)*d(v2) and then pushed, which finds the new sample's horizon and restores convexity in the same operation. NOTE section 4 also says the authors are 'not aware of this method having been introduced in a field outside computer graphics before' — dozier2022 section I says otherwise, and the order-N sweep is Dozier, Bruno and Downey 1981; this paper is a refinement, not the origin" }
   - { id: dozier2022, tier: P, locator: "§I p.1 — the O(N^2) origin, the order-N method attributed to Dozier, Bruno & Downey 1981, and the note that most mountain radiation calculations use it" }
-  - { id: bavoil2008, tier: F, locator: "the sin(h) - sin(t) horizon weighting" }
-  - { id: weiss2001, tier: F, locator: "the topographic position index at multiple radii" }
-  - { id: he2010, tier: P, locator: "the local linear model with a, b from box filters; eps as the variance threshold" }
+  - { id: bavoil2008, tier: F, locator: "READ IN FULL. Slide 12, Horizon-Based AO, defines both angles as arctangents of z over the length of the xy part — h(H) = atan(H.z / ||H.xy||) for the horizon vector and t(T) = atan(T.z / ||T.xy||) for the tangent vector — and gives the weighting as AO = sin h − sin t; slide 16, Core Algorithm, is where it is averaged over 2D directions, AO(theta) = sin h(theta) − sin t(theta). A SIGGRAPH talk deck, not a peer-reviewed paper, hence F" }
+  - { id: weiss2001, tier: F, locator: "READ IN FULL. Fig. 2a defines the index as the elevation of a cell minus the mean elevation of a neighbourhood around it, and Figs. 2b and 2c give the poster's own two worked scales on a 30 m DEM as annulus focal means, tpi300 with inner and outer radii of 5 and 10 cells and tpi2000 with 62 and 67; Fig. 3b and 3c threshold each by standard-deviation units; Fig. 4a is the multi-scale part this document cites, combining a small and a large scale into landform classes, and Fig. 4b shows the resulting ten classes. An ESRI User Conference poster, not peer review, hence F" }
+  - { id: he2010, tier: P, locator: "the local linear model with a, b from box filters; eps as the variance threshold. NOT OPENED — the SpringerLink chapter PDF served an HTML shell, the author copies at kaiminghe.com and kaiminghe.github.io both 404, and no other copy was reachable, so no section or equation inside it is named" }
   - { id: tomasi1998, tier: P, locator: "§2.1 Example: the Gaussian Case — the product of the CLOSENESS function c(xi,x) and the SIMILARITY function s(phi,f), both Gaussian. Note the paper's own words: searching it for 'spatial' and 'range' will not find this" }
 ---
 # Terrain analysis and masks — deriving fields from height
@@ -130,12 +130,17 @@ terrain. Start at 2–5% of the domain extent, `N = 8–16` azimuths — the hor
 ⚠️ **The order-N horizon sweep is older than the citation below suggests.** [dozier2022] §I records
 that computing horizons in order-N time is **Dozier, Bruno & Downey (1981)**, *Computers &
 Geosciences* 7(2), 145–151, and that "many, if not most, radiation calculations over mountains now
-use that method". [timonen2010] is a 2010 refinement of a 1981 idea, not its origin. The 1981 paper
-could not be obtained here, so it is named rather than cited — see `driver-fields.md`, which builds
-on the same sweep.
+use that method". [timonen2010] is a 2010 refinement of a 1981 idea, not its origin — and says so
+by accident: its §4 states that the authors are "not aware of this method having been introduced in
+a field outside computer graphics before", which is exactly the blind spot [dozier2022] is
+complaining about. The 1981 paper could not be obtained here, so it is named rather than cited —
+see `driver-fields.md`, which builds on the same sweep.
 
 Naive marching is O(N · maxDist/cellSize) per cell. [timonen2010] sweeps each azimuth across the
-field maintaining the horizon's convex hull incrementally, O(1) per cell: the difference between
+field maintaining the horizon's convex hull incrementally — a stack popped while
+`h(v₂)·d(v₁) ≥ h(v₁)·d(v₂)` then pushed, which restores convexity and finds the new sample's
+horizon in the same operation (§5, Algorithm 1) — giving `O(n)` for a line of `n` samples, so
+amortised O(1) per cell: the difference between
 seconds and hours for a 4k bake at kilometre radius. It is also the substrate for insolation —
 horizon angle depends on azimuth, not on the sun, so a precomputed per-azimuth horizon makes every
 sun sample a table lookup. **Insolation is not AO**: a pole-facing wall can be wide open to the sky

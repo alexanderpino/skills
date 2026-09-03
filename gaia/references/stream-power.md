@@ -6,11 +6,11 @@ tags: [generation, erosion, stream-power, landscape-evolution, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: braun2013, tier: P, locator: "the O(N) stack ordering and the unconditionally stable implicit discretisation" }
-  - { id: cordonnier2016, tier: P, locator: "§3.1 eq. 1 — dh(p)/dt = u(p) - k*A(p)^m*s(p)^n, the uplift coupling, with the paper taking m = 0.5, n = 1; §4.3 Lake Overflow for the lake super-graph that handles local minima inside the loop. NOT the diffusion term: eq. 1 carries none, that is culling1960" }
-  - { id: whipple1999, tier: P, locator: "the stream-power incision model: the roles of m, n, and knickpoint behaviour" }
-  - { id: crosby2006, tier: P, locator: "knickpoint distribution across a network: 236 waterfalls in the Waipaoa" }
-  - { id: culling1960, tier: P, locator: "hillslope transport as diffusion, the D grad^2 h term" }
+  - { id: braun2013, tier: P, locator: "the O(N) stack ordering and the unconditionally stable implicit discretisation. NOT OPENED — Geomorphology is paywalled at Elsevier and no open copy was reachable from here, so nothing inside it is named. The scheme this document implements was read instead in cordonnier2016 section 5, eq. 2 — the same implicit update, solved with the receiver already known by parsing the stream trees root-to-leaves, and stated there as O(N) — and cordonnier2016 section 1 calls it 'the original method from Braun and Willett 2013'" }
+  - { id: cordonnier2016, tier: P, locator: "READ IN FULL. Section 3.1 Geological Background, eq. 1 — dh(p)/dt = u(p) − k*A(p)^m*s(p)^n, the uplift coupling, with the paper's own sentence 'As in most geomorphological studies, we use n = 1 and m = 0.5'; section 5 Erosion, eq. 2, the implicit update h_i(t+dt) = (h_i(t) + dt*u_i + f*h_j(t+dt))/(1 + f) that this document's solver block transcribes, with the ordering requirement and the O(N) claim stated in the two sentences after it; section 4.3 Lake Overflow for the lake super-graph that handles local minima inside the loop, and its statement that Braun and Willett's own optional lake step costs O(N*sqrt(N)) against this paper's O(N + M log M). NOT the diffusion term: eq. 1 carries none, that is culling1960" }
+  - { id: whipple1999, tier: P, locator: "the concavity ratio m/n ≈ 0.5, and the roles of m and n. NOT OPENED — JGR is paywalled at AGU and no open copy was reachable from here, so nothing inside it is named. The concavity claim alone was read second-hand in cordonnier2016 section 3.1, which states that 'the ratio m/n is constrained by the shape of the stream profiles and is thought of being m/n ≈ 0.5' and attributes it to Whipple and Tucker 1999. The kinematic-wave knickpoint celerity that this document's Knickpoints section also hangs on Whipple is NOT covered by that second-hand reading and is unverified" }
+  - { id: crosby2006, tier: P, locator: "knickpoint distribution across a network. NOT OPENED — Geomorphology is paywalled at Elsevier and no open copy was reachable from here. The 236 waterfalls in the Waipaoa is the paper's own TITLE, not a place inside it, so it is a citation and not a locator; nothing in the body of this document has been checked against the paper's text" }
+  - { id: culling1960, tier: P, locator: "hillslope transport as diffusion, the D*grad^2(h) term. NOT OPENED — Journal of Geology 1960 sits behind JSTOR and no open copy was reachable from here, so no section or equation inside it is named" }
   - { id: explicit_diffusion_limit, tier: F, locator: "no artefact: the explicit FTCS bound, dt <= dx^2 / (4D) in two dimensions. Von Neumann analysis, standard and unpublished as such" }
 ---
 # Stream power — the erosion backbone at map scale
@@ -34,8 +34,12 @@ with depressions handled **inside** the loop [cordonnier2016] and the diffusion 
 [culling1960].
 
 `m ≈ 0.5`, `n = 1`. The concavity ratio `m/n ≈ 0.5` is the well-constrained part [whipple1999]:
-it is what makes river long profiles concave and it matches measured rivers. Use `n = 1` unless
-you have a reason; `n` in 1–2 is defensible and the visual difference is subtle.
+it is what makes river long profiles concave and it matches measured rivers. Whipple & Tucker
+itself could not be opened here; the claim is taken from [cordonnier2016] §3.1, which states that
+"the ratio `m/n` is constrained by the shape of the stream profiles and is thought of being
+`m/n ≈ 0.5`" and cites Whipple & Tucker for it, then adopts `n = 1`, `m = 0.5` on that basis.
+Use `n = 1` unless you have a reason; `n` in 1–2 is defensible and the visual difference is
+subtle.
 
 ## Why the solver is the whole difficulty
 
@@ -46,7 +50,10 @@ take hours.
 
 [braun2013] discretises it implicitly. For `n = 1` the result is linear and closed-form, and the
 receiver has already been updated when you reach a cell, because the stack is ordered base-levels
-first:
+first. Braun & Willett could not be opened here, so the block below was checked against
+[cordonnier2016] §5 eq. 2 instead, which is the same update written for a stream *tree*
+(`h_i(t+δt) = (h_i(t) + δt·u_i + f·h_j(t+δt)) / (1 + f)`, with the receiver `j` solved first by
+parsing root-to-leaves) and which attributes the method to Braun & Willett:
 
 ```
 stack = buildStack(receivers)               # flow-routing.md, "Accumulation, and the three arrays"
@@ -125,14 +132,17 @@ if valley spacing is a parameter you are tuning, `D·∇²h` stays.
 A waterfall is a **knickpoint** — a step where the long profile departs from its concave
 equilibrium. There is no waterfall algorithm. With `n = 1` the incision equation is a kinematic
 wave, so a step migrates *upstream* at a celerity set by discharge, preserving its height rather
-than diffusing away [whipple1999]:
+than diffusing away [whipple1999] — a claim this document has **not** been able to check against
+Whipple & Tucker, which was not obtainable, and which the second-hand reading through
+[cordonnier2016] does not cover:
 
 ```
 C_kp(A) = K * pow(A, m)      # m/yr upstream — larger rivers consume knickpoints faster
 ```
 
 Which is why trunk streams have rapids and small tributaries keep their falls — [crosby2006]
-mapped 236 of them doing exactly that. The solver above already *produces* knickpoints wherever
+mapped 236 of them, though "236 waterfalls in the Waipaoa" is that paper's *title* and not
+something read inside it; the paper was not obtainable here. The solver above already *produces* knickpoints wherever
 `K` jumps, and the `max(h[i], h[r])` guard is what preserves the step. So: to get a durable
 waterfall, put a **hard bed across the channel**; to get a migrating one, **drop the base level**
 and let it run. Carving a vertical cliff into the heightfield with uniform `K` gives a step

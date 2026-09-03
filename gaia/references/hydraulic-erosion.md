@@ -6,15 +6,15 @@ tags: [generation, erosion, hydraulic, droplet, pipe, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: mei2007, tier: P, locator: "§3, the five-stage pipe formulation (water increment, flow, erosion-deposition, sediment transport, evaporation); §3.2 eq. (2) the flux update with pipe area A and pipe length l, eq. (4) the outflow scaling factor K, eq. (10) transport capacity, and the §3.2.2 CFL statement Δt·u ≤ lX" }
-  - { id: stava2008, tier: P, locator: "§4 eq. (1), pipe cross-section fixed at C = l² and the outflow scale-down written as a guarded branch; §5 sediment slippage and the material-layer stack" }
+  - { id: mei2007, tier: P, locator: "READ IN FULL, and every reference below re-checked against the PDF. Section 3 opens 'The proposed hydraulic erosion model is decomposed into five steps' — 3.1 Water Increment, 3.2 Flow Simulation, 3.3 Erosion and Deposition, 3.4 Sediment Transportation, 3.5 Evaporation; section 3.2.1 eq. 2 is the flux update with pipe cross-section A and pipe length lX, eq. 4 the outflow scaling factor K = min(1, d1*lX*lY/(sum of fluxes)*dt); section 3.3 eq. 10 is the transport capacity C = Kc*sin(alpha)*|v|; the CFL statement dt*u <= lX and dt*v <= lY closes section 3.2.2" }
+  - { id: stava2008, tier: P, locator: "§4 eq. (1), pipe cross-section fixed at C = l² and the outflow scale-down written as a guarded branch rather than Mei's min; §5 sediment slippage and the material-layer stack" }
   - { id: jako2011, tier: P, locator: "eq. (10) as numbered in the CESCG 2011 printing, which is the copy that was read: the capacity term scaled by the depth ramp lmax(d1), and the ramp definition (0 below zero depth, linear to 1 at Kdmax). Numbering may differ in the Eurographics Short Papers printing" }
-  - { id: obrien1995, tier: P, locator: "the height-column fluid surface coupled by pipes on the head difference" }
-  - { id: beyer2015, tier: F, locator: "the per-droplet transport-capacity formulation, and the erosion-brush radius" }
-  - { id: musgrave1989, tier: P, locator: "the original grid hydraulic and thermal erosion passes" }
-  - { id: lague_erosion, tier: F, locator: "the droplet loop, brush weights and parameter defaults in the published source" }
+  - { id: obrien1995, tier: P, locator: "the height-column fluid surface coupled by pipes on the head difference. NOT OPENED — the Computer Animation 1995 proceedings are not online free and the Berkeley author copy was unreachable from here, so no section, equation or page inside it is named" }
+  - { id: beyer2015, tier: F, locator: "the per-droplet transport-capacity formulation, and the erosion-brush radius. NOT OPENED — the TUM mediatum copy did not serve the PDF and no other copy was reachable, so no section inside the thesis is named. A bachelor thesis and not peer review, hence F. What this document actually verified is the implementation that follows it, lague_erosion" }
+  - { id: musgrave1989, tier: P, locator: "the original grid hydraulic and thermal erosion passes. NOT OPENED — SIGGRAPH 1989 sits behind the ACM paywall, which refused the download, so nothing inside it is named. The lineage claim was read instead in olsen2004 p. 5, which opens its erosion chapter with the sentence that thermal and hydraulic erosion 'were first described by Ken Musgrave et al in 1989' and cites this paper for both" }
+  - { id: lague_erosion, tier: F, locator: "READ IN FULL, Assets/Scripts/Erosion.cs at github.com/SebLague/Hydraulic-Erosion. Defaults, lines 6-22: erosionRadius 3, inertia 0.05, sedimentCapacityFactor 4, minSedimentCapacity 0.01, erodeSpeed and depositSpeed 0.3, evaporateSpeed 0.01, gravity 4, maxDropletLifetime 30. Erode, lines 47-128: capacity at line 93, deposition at lines 98-106 with the source's own comment 'Deposition is not distributed over a radius (like erosion) so that it can fill small pits', brush-weighted erosion at lines 111-120. InitializeBrushIndices, lines 155-200: weight = 1 − sqrt(sqrDst)/radius inside a circular radius, normalised by weightSum. CAUTION line 124, speed = sqrt(speed^2 + deltaHeight*gravity), has the sign this document warns against — deltaHeight is negative downhill, so as published the droplets accelerate UPHILL. Cross-check defaults and brush weights against this file; do not copy line 124" }
   - { id: parker1982, tier: P, locator: "Abstract — coarse grains are intrinsically less mobile, so the pavement must be the mechanism that equalises mobility, by exposing proportionally more coarse grains to the flow; and the prediction that pavement is absent in most sand-bed streams. Abstract only; the full text was not reached" }
-  - { id: gaea_erosion2, tier: F, locator: "the Erosion2 node's three sediment classes — Suspended Load, Bed Load and Coarse Sediments — each with its own Discharge Amount and Discharge Angle, and the documented reading of a 24 degree coarse discharge angle as depositing only on or near such steep inclines" }
+  - { id: gaea_erosion2, tier: F, locator: "READ, the Gaea documentation page Using Gaea, Erosion_2, at docs.gaea.app. §Sedimentary Control names the three classes in the docs' own words, 'Suspended Load, Bed Load and Coarse Sediments. These types represent increasing sediment mass and decreasing mobility', and states 'Each type has its own Discharge Angle, which controls the slope angle at which sediment begins to settle'; the sub-head §Coarse Sediments carries the sentence this document quotes, 'A discharge angle of 24 degrees for coarse sediments means they will be deposited only on or near such steep inclines; you will not see them on flat areas'. NOTE the page read gives each class an amount slider and a Discharge Angle but never uses the phrase 'Discharge Amount', and says nothing about the shipped presets, so this document's claim about preset ordering is NOT supported by the page read" }
 ---
 # Hydraulic erosion — droplet and pipe
 
@@ -93,13 +93,22 @@ pos    = pos_new
   20k droplets took the relief to ~10⁶⁸; with them, to 0.91.
 - **Erosion is brush-wise; deposition is point-wise.** This asymmetry is the method. Erode through
   a single cell and you get one-pixel scratches instead of valleys; deposit through a brush and
-  your rivers silt into mush. Getting it backwards is the commonest droplet bug there is.
+  your rivers silt into mush. Getting it backwards is the commonest droplet bug there is. The
+  reference implementation says so in its own comment: "Deposition is not distributed over a
+  radius (like erosion) so that it can fill small pits" ([lague_erosion], `Erosion.cs` line 102),
+  with deposit spread bilinearly over the four corners of the current cell and erosion spread over
+  a circular brush weighted `1 − sqrt(d²)/radius` and normalised to sum to 1.
 - **`min(Δh, sediment)` going uphill.** Deposit only enough to fill the pit just hit, never the
   whole load, or droplets bury the terrain in front of every rise.
 - **`minSlope ≈ 0.01`** stops capacity collapsing to zero on flats, which would dump the entire
   load into one cell as a spike.
 - **The sign in the speed update.** `Δh` is negative downhill, so speed rises with `+(-Δh)·gravity`.
-  Written the other way, droplets accelerate uphill and the terrain grows tumours.
+  Written the other way, droplets accelerate uphill and the terrain grows tumours. ⚠️ **The most-read
+  droplet implementation has it the other way.** [lague_erosion] `Erosion.cs` line 124 is
+  `speed = sqrt(speed*speed + deltaHeight*gravity)`, and `deltaHeight` there is `newHeight −
+  oldHeight`, negative downhill — so as published, that line slows a droplet falling and speeds up
+  one climbing, and goes `NaN` once `deltaHeight·gravity < −speed²`. Take the defaults and the
+  brush from that file; do not take line 124.
 - **Inertia** blends gradient-following against going straight: high gives straighter, wider
   valleys; low gives gradient-hugging scratches.
 - **Count** is the honest cost: roughly 0.5–2× the cell count for a visible effect, 4× for a mature
@@ -179,7 +188,9 @@ model* [musgrave1989] — the ancestor of both families and the origin of the th
 as an erosion model, still the correct citation for the lineage. *Lague's implementation*
 [lague_erosion] — no canonical paper; it follows [beyer2015] and is the code most people have
 actually read, which makes it the useful cross-check on brush weights and defaults, not a source
-for the method. *Thermal erosion alone* — relaxes what is there; it cuts nothing and moves no water.
+for the method — and not on the speed update, whose sign it gets wrong (above). It is also the only
+member of the droplet lineage this repository has actually been able to open: Beyer's thesis and
+Musgrave's paper both defeated it. *Thermal erosion alone* — relaxes what is there; it cuts nothing and moves no water.
 
 **Time budget.** Both are authoring-time. Droplet cost is droplet count × lifetime, decoupled from
 resolution, so it is the one you can dial down to interact with; pipe cost is a fixed number of
@@ -206,8 +217,10 @@ tuning of a single-class model.
 ⚠️ **No canonical source; standard practice is** to split the load into three classes ordered by
 increasing mass and decreasing mobility, give each its own capacity constant and its own settling
 threshold, and give each its own repose angle. The shipped example is Gaea's Erosion2
-[gaea_erosion2]: *Suspended Load*, *Bed Load* and *Coarse Sediments*, each with a **Discharge
-Amount** and a **Discharge Angle**. There is no paper for the heightfield formulation — it is a
+[gaea_erosion2]: *Suspended Load*, *Bed Load* and *Coarse Sediments* — the documentation's own
+phrasing is that these "represent increasing sediment mass and decreasing mobility" — each with an
+amount slider and its own **Discharge Angle**, "which controls the slope angle at which sediment
+begins to settle". There is no paper for the heightfield formulation — it is a
 practice, cited here from a tool's documentation and graded accordingly. The geomorphology
 underneath it is not folklore, and one part of it is [parker1982].
 
@@ -252,9 +265,11 @@ for each class i:                       # |v|, alpha and d1 computed ONCE, outsi
   steep ground they started on, while the fines ride the flow out onto the flats. So the coarse
   class's angle is high *because* it is immobile, and reading it as "coarse settles last" gets the
   sign backwards and puts scree in the valley floor.
-- **Do not assume the three angles are ordered.** They are independent authored controls, and the
-  presets shipped with the tool do not order them monotonically [gaea_erosion2]. Author each
-  against the landform it is meant to place.
+- **Do not assume the three angles are ordered.** They are independent authored controls, so
+  nothing in the model forces `angle_susp < angle_bed < angle_coarse`; author each against the
+  landform it is meant to place. ⚠️ This document used to add that Gaea's shipped presets do not
+  order them monotonically, citing [gaea_erosion2]; the Erosion_2 documentation page says nothing
+  about presets, so that half is **withdrawn as unsourced** rather than left looking checked.
 - **Advect each class separately**, through the same semi-Lagrangian step. The diffusion that step
   already introduces now applies `k` times over, and it is what blurs a sharp fining gradient into
   a smooth one.

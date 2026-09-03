@@ -273,6 +273,8 @@ LOCATOR_PRECISE = re.compile(r"""
         | \bchs?\.\s*\d      | \bchapters?\s+\d
         | \btables?\s+\d     | \balgorithms?\s+\d
         | \blistings?\s+\d   | \bslides?\s+\d
+        | \blines?\s+\d                          # source code: a file and a line range IS
+                                                  # a locator, and a sharper one than a section
     """, re.I | re.X)
 
 # A locator that opens with this marker declares there is NOTHING TO OPEN: the claim rests on
@@ -288,6 +290,58 @@ LOCATOR_NO_ARTEFACT = "no artefact:"
 # wrong for weeks, counting "the fill algorithm" as a precise locator because it matched
 # the bare word "algorithm". Enforced assertions get mutation rows because failing is
 # what they do; a reported number needs a fixture set instead, or it is decoration.
+# A locator carrying this marker declares the OPPOSITE of `no artefact:`: the artefact exists,
+# it is peer-reviewed, and NOBODY IN THIS PROJECT HAS READ IT. The claim rests on the paper's
+# reputation and on whatever secondary source reported it.
+#
+# This exists because the tier vocabulary has no cell for it. `P` means peer-reviewed AND opened;
+# demoting an unread paper to `F` would assert "no canonical source", which is a DIFFERENT
+# falsehood; and `?` is forbidden from citation, which would make eight documents uncitable. A
+# grounding pass hit that wall on 21 sources at once and resolved it in the only honest way
+# available -- saying so in the locator. That made the gap visible to a reader and invisible to
+# the guard, which is exactly the shape of a number that drifts. So it is counted here.
+#
+# It is NOT a failure and must never become one. A corpus that cannot cite a paywalled paper is
+# not more honest, it is less useful. What matters is that the count is on screen every run.
+LOCATOR_NOT_OPENED = ("NOT OPENED", "NO LOCATOR")
+
+NOT_OPENED_FIXTURES = [
+    ("\u00a73.1 eq. 1, the stream-power form", False),
+    ("the topographic index ln(a / tan beta). NOT OPENED \u2014 the journal is paywalled", True),
+    ("NO LOCATOR \u2014 not obtained, and deliberately not guessed", True),
+    ("no artefact: a convention this repository recommends", False),
+    ("Abstract only; the full text was not reached", False),  # weaker, but something WAS read
+]
+
+
+def not_opened_count() -> tuple[int, int]:
+    """(citations declaring the source was never opened, total citations with a locator).
+
+    Deliberately counts the DECLARATION, not the reading -- there is nothing else to count.
+    Its only guarantee is that a writer who declines to declare is making a claim in prose that
+    the guard will not repeat for them.
+    """
+    skip = set(paper_files()) | {INDEX, COVERAGE}
+    seen = unread = 0
+    for path in documents(ROOT):
+        if path in skip:
+            continue
+        try:
+            fm, _ = parse_front_matter(path)
+        except Unparseable:
+            continue
+        for src in fm.get("sources", []):
+            if not isinstance(src, dict):
+                continue
+            loc = src.get("locator", "")
+            if not loc:
+                continue
+            seen += 1
+            if any(mark in loc for mark in LOCATOR_NOT_OPENED):
+                unread += 1
+    return unread, seen
+
+
 LOCATOR_FIXTURES = [
     ("the fill algorithm", False),
     ("the thin-elastic-plate equation", False),
@@ -313,6 +367,14 @@ LOCATOR_FIXTURES = [
     ("Runtime Virtual Texture -- page composition and invalidation", False),
     ("page tables, the feedback pass, page borders", False),
     ("the software page-table indirection and feedback loop", False),
+    # Source code. A grounding agent's honest locator for `lague_erosion` named a file and four
+    # line ranges -- more followable than most section numbers, since it survives no reformatting
+    # but pins an exact revision -- and scored VAGUE, because the pattern knew every designator
+    # a PAPER uses and none that code uses. The metric was penalising the sharpest locator in
+    # the corpus.
+    ("Erosion.cs lines 47-128, the droplet loop", True),
+    ("line 124, the speed update", True),
+    ("the droplet loop and brush weights in the published source", False),
 ]
 
 
@@ -342,12 +404,19 @@ def selftest() -> int:
     for t, want in nbad:
         print(f"  FAIL  no-artefact fixture: {t!r} should be "
               f"{'EXCLUDED' if want else 'counted'}")
-    if bad or nbad:
-        print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures and "
-              f"{len(nbad)} of {len(NO_ARTEFACT_FIXTURES)} no-artefact fixtures misclassified.")
+    ubad = [(t, want) for t, want in NOT_OPENED_FIXTURES
+            if any(mark in t for mark in LOCATOR_NOT_OPENED) != want]
+    for t, want in ubad:
+        print(f"  FAIL  not-opened fixture: {t!r} should be "
+              f"{'COUNTED as unread' if want else 'not counted'}")
+    if bad or nbad or ubad:
+        print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
+              f"{len(nbad)} of {len(NO_ARTEFACT_FIXTURES)} no-artefact fixtures and "
+              f"{len(ubad)} of {len(NOT_OPENED_FIXTURES)} not-opened fixtures misclassified.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
-          f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct.")
+          f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct; "
+          f"not-opened marker: {len(NOT_OPENED_FIXTURES)}/{len(NOT_OPENED_FIXTURES)} correct.")
     return 0
 
 
@@ -656,6 +725,16 @@ def main() -> int:
               f"cannot follow. A further {noart} cite doctrine or classical results with no "
               f"artefact to open — declared in the locator, and excluded from the ratio rather "
               f"than held against it. Reported, not enforced; see registers/guard-proofs.tsv.")
+
+    unread, seen = not_opened_count()
+    if seen:
+        print(f"unread {unread}/{seen} ({100 * unread / seen:.0f}%) of citations DECLARE that "
+              f"the source was never opened here — paywalled, or not obtainable — so the claim "
+              f"rests on the paper's reputation and on whatever secondary source reported it. "
+              f"Not a failure: a corpus that cannot cite a paywalled paper is less useful, not "
+              f"more honest. The tier vocabulary has no cell for 'peer-reviewed, not read', so "
+              f"this counts the declaration instead. A writer who declines to declare is making "
+              f"a claim in prose the guard will not repeat for them.")
 
     if problems:
         for p in problems:
