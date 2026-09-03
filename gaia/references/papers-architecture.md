@@ -118,6 +118,40 @@ is evidence about practice, never about correctness.
   states "This feature is early in development. While the spec is public, implementations are not
   ready. Hopefully a preview can be available some time in 2027."
 
+## Driver fields — temperature, sun, shadow, wind
+
+- **dozier2022** `P` — Dozier, J. (2022). *Revisiting Topographic Horizons in the Era of Big Data
+  and Parallel Computing.* IEEE Geoscience and Remote Sensing Letters 19, art. 8024605.
+  doi:10.1109/LGRS.2021.3125278 (open access). — The horizon sweep, its complexity, its real
+  lineage, tile-halo requirements and measured timings. §I records that the order-N horizon method
+  is **Dozier, Bruno & Downey (1981)**, Computers & Geosciences 7(2), 145–151 — not a 2010 paper.
+- **winstral2002** `P` — Winstral, A., Elder, K. & Davis, R.E. (2002). *Spatial Snow Modeling of
+  Wind-Redistributed Snow Using Terrain-Based Parameters.* Journal of Hydrometeorology 3(5),
+  524–538. — The keystone for this axis: §3 states that "the selection of a maximum
+  shelter-producing pixel based on slope is analogous to the determination of solar shading within
+  the horizon function used in radiation modeling". Also Eq. (1) defining `Sx`, Eqs. (3)–(5) for the
+  flow-separation detector `Sb`, and §4's measured search-distance comparison.
+- **minder2010** `P` — Minder, J.R., Mote, P.W. & Lundquist, J.D. (2010). *Surface temperature lapse
+  rates over complex terrain: Lessons from the Cascade Mountains.* J. Geophysical Research 115,
+  D14122. doi:10.1029/2009JD013493. — Measures what the conventional 6.5 °C/km assumption is worth.
+- **reda2004** `P` — Reda, I. & Andreas, A. (2004). *Solar position algorithm for solar radiation
+  applications.* Solar Energy 76(5), 577–589. doi:10.1016/j.solener.2003.12.003.
+  ⚠️ **What was actually read is the companion NREL technical report** NREL/TP-560-34302 (rev.
+  January 2008, 40 pp.), not the Solar Energy article. The locator points into the report.
+- **furich2002** `P` — Fu, P. & Rich, P.M. (2002). *A geometric solar radiation model with
+  applications in agriculture and forestry.* Computers and Electronics in Agriculture 37(1–3),
+  25–35. — The peer-reviewed model behind ArcGIS's Area Solar Radiation tool; the occlusion →
+  insolation coupling with its fitted equations.
+- **forthofer2014** `P` — Forthofer, J.M., Butler, B.W. & Wagenbrenner, N.S. (2014). *A comparison
+  of three approaches for simulating fine-scale surface winds… Part I.* International Journal of
+  Wildland Fire 23(7), 969–981. doi:10.1071/WF12089. — The wind-field taxonomy with a measured
+  cost/accuracy comparison across the three approaches.
+- **stendardo2020** `P` — Stendardo, N., Desthieux, G., Abdennadher, N. & Gallinelli, P. (2020).
+  *GPU-Enabled Shadow Casting for Solar Potential Estimation in Large Urban Areas.* Applied Sciences
+  10(15), 5361. doi:10.3390/app10155361 (open access). — The GPU brute-force baseline, and §3.2's
+  coarse-grid trick for long-baseline occlusion: evaluate distant obstruction on a 100× coarser
+  heightfield and take the minimum.
+
 ## In-repo sources
 
 These are artefacts in this repository rather than published work. They are `F` — a register or a

@@ -9,7 +9,8 @@ sources:
   - { id: zevenbergen1987, tier: P, locator: "the 3x3 partial-quartic fit, and the profile and plan curvature expressions" }
   - { id: horn1981, tier: P, locator: "the Sobel-weighted 3x3 slope and aspect estimator" }
   - { id: beven1979, tier: P, locator: "the topographic index ln(a / tan beta)" }
-  - { id: timonen2010, tier: P, locator: "the per-azimuth sweep with an incremental convex hull, O(1) per cell" }
+  - { id: timonen2010, tier: P, locator: "the per-azimuth sweep with an incremental convex hull, O(1) per cell. NOTE the order-N sweep itself is Dozier, Bruno & Downey 1981, per dozier2022 §I -- this paper is a refinement, not the origin" }
+  - { id: dozier2022, tier: P, locator: "§I p.1 — the O(N^2) origin, the order-N method attributed to Dozier, Bruno & Downey 1981, and the note that most mountain radiation calculations use it" }
   - { id: bavoil2008, tier: F, locator: "the sin(h) - sin(t) horizon weighting" }
   - { id: weiss2001, tier: F, locator: "the topographic position index at multiple radii" }
   - { id: he2010, tier: P, locator: "the local linear model with a, b from box filters; eps as the variance threshold" }
@@ -125,6 +126,13 @@ terrain map is a different quantity.
 **`maxDist` is the parameter that matters.** A small radius gives a crevice map that reads as dirt;
 a large radius darkens valleys and lets mountains catch light, which is what actually sells
 terrain. Start at 2–5% of the domain extent, `N = 8–16` azimuths — the horizon varies smoothly.
+
+⚠️ **The order-N horizon sweep is older than the citation below suggests.** [dozier2022] §I records
+that computing horizons in order-N time is **Dozier, Bruno & Downey (1981)**, *Computers &
+Geosciences* 7(2), 145–151, and that "many, if not most, radiation calculations over mountains now
+use that method". [timonen2010] is a 2010 refinement of a 1981 idea, not its origin. The 1981 paper
+could not be obtained here, so it is named rather than cited — see `driver-fields.md`, which builds
+on the same sweep.
 
 Naive marching is O(N · maxDist/cellSize) per cell. [timonen2010] sweeps each azimuth across the
 field maintaining the horizon's convex hull incrementally, O(1) per cell: the difference between

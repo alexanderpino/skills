@@ -82,5 +82,6 @@ and that sentence is what stops the same topic being proposed every six months.
 
 - **node-graph-runtime** `covered` — How is a node graph executed, cached, invalidated and kept resolution-independent? → node-graph-runtime.md
 - **layering-filters-and-masks** `covered` — How are layering, filters and masks composed and executed, and what does masking cost the runtime? → layering-filters-and-masks.md
+- **driver-fields** `covered` — What non-height fields does the graph carry — temperature, sun, shadow, water and wind flow — and how are they computed and shared? → driver-fields.md
 - **verification-failures** `planned` — What does each characteristic failure look like, and what is the minimal fix? One catalogue across all three axes.
 - **output-contracts** `planned` — What does a terrain pipeline hand downstream, and what contract stops a heightfield meaning different things in two places?

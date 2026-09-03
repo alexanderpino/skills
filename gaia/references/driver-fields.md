@@ -1,0 +1,205 @@
+---
+type: Technique
+title: Driver fields — temperature, sun, shadow and flow
+description: "The non-height fields a terrain graph carries: why one horizon sweep produces both the solar and the wind-shelter field, what the lapse rate is actually worth, and which of these fields refuse to tile."
+tags: [architecture, tooling, climate, wind, insolation, authoring-time]
+status: draft
+generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
+sources:
+  - { id: winstral2002, tier: P, locator: "§3 p.528-529, the sentence immediately after Eq. 1 stating that maximum-shelter selection is analogous to solar shading in the horizon function; Eq. (1) defining Sx with a 5 degree azimuth increment; Eqs. (3)-(5) for Sb; §4 p.531 for the search-distance comparison and the significance of Sx100 against elevation, radiation and slope" }
+  - { id: dozier2022, tier: P, locator: "§I p.1 for the O(N^2) origin, the order-N method and its attribution; §II-A Eq. (1) and Fig. 2 for the algorithm; §III-C for the tile-halo requirement; §III-E for the measured per-azimuth timing" }
+  - { id: minder2010, tier: P, locator: "Abstract — the 6.5 degrees per km assumption named as an assumption, against measured windward annual means of 3.9-5.2" }
+  - { id: reda2004, tier: P, locator: "NREL/TP-560-34302 rev. January 2008 — the stated uncertainty of the algorithm and its validity range" }
+  - { id: furich2002, tier: P, locator: "the geometric solar radiation model: the viewshed-based occlusion term and the direct/diffuse split it feeds" }
+  - { id: forthofer2014, tier: P, locator: "the three-approach comparison — mass-consistent, and the cost against accuracy result across them" }
+  - { id: stendardo2020, tier: P, locator: "Abstract p.1 for the 3.4 km at 0.5 m in up to two hours figure; §3.2 Code Listings 1-3 pp.8-9 for the per-point DDA march and the coarse-DTM substitution beyond the tile, taking the minimum of the two results" }
+  - { id: ta_graph_runtime, tier: F, locator: "§Side-channel masks & the accumulator pattern — the observation that simulations emit more than their primary field" }
+---
+# Driver fields — temperature, sun, shadow and flow
+
+A terrain graph carries more than a heightfield. It carries **driver fields**: temperature,
+insolation, shadow, and the flow fields for water and wind. These are what make erosion, snow and
+vegetation respond to *where* they are rather than uniformly, and they behave differently from
+heightfields in ways the runtime has to know about.
+
+This document exists because Gaia had a hole: `thermal-and-aeolian-erosion.md` states that an
+aeolian pass "needs a wind field computed first", and nothing produced one.
+
+**Boundary.** `terrain-analysis-masks.md` owns computing slope, curvature, occlusion and wetness as
+*masks*. This document owns the same geometry used as *physical drivers*, and the fields that have
+no mask analogue. Shadow appears twice on purpose: here it is an input to temperature; drawing
+shadows is `lighting-and-shadows`. `flow-routing.md` owns routing water over a heightfield; this
+document owns what is different about a **vector field** with direction and magnitude.
+
+## Use this
+
+**Compute one horizon field by the order-N sweep, and drive both insolation and wind shelter from
+it** [winstral2002] [dozier2022].
+
+That is the organising fact of this axis and it is not folklore. [winstral2002] §3 states it
+outright: *"The selection of a maximum shelter-producing pixel based on slope is analogous to the
+determination of solar shading within the horizon function used in radiation modeling."* The
+maximum upwind slope that decides whether a cell is sheltered from wind is the same quantity as the
+horizon angle that decides whether it is shaded from sun. One sweep, two fields.
+
+**Why it wins.** The horizon field is **sun-independent**. It is a property of the terrain alone, so
+one bake serves every sun position, every hour of every day, and — per the sentence above — the wind
+field as well. Nothing else in this document has that property, and it is what makes a driver-field
+pass affordable at all.
+
+**What it beats.** *Per-cell ray marching over the heightfield* — the obvious implementation, and
+measurably the wrong one, quantified below. *A full CFD solve for wind* — accurate and far outside
+an authoring budget [forthofer2014]. *Aspect alone as a proxy for insolation* — cheap and blind: it
+knows which way a slope faces and not whether the ridge across the valley blocks it, which is the
+whole point of a horizon.
+
+⚠️ **The two fields want the same sweep and very different search distances.** Wind shelter is
+useful at **100–300 m** — [winstral2002] §4 found `Sx` at 100 m the strongest predictor of snow
+depth, and tested 50 m to 2000 m. The insolation horizon needs **kilometres**. Same algorithm, same
+code path, two parameterisations; running one and reusing it for the other at the wrong distance is
+a real and easy mistake. [winstral2002] Fig. 4 shows why it matters: at 300 m the shelter-defining
+pixel lies across the valley and a cell reads sheltered; at 100 m the search never crosses and the
+same cell reads exposed. **The search distance chooses which landform does the sheltering.**
+
+## The horizon sweep, and who actually invented it
+
+The method is: for each azimuth, sweep the grid in that direction maintaining a running maximum of
+the elevation angle, so each cell's horizon is found in constant time [dozier2022] §II-A. The naive
+alternative — comparing every cell against every other — is O(N²) and was what the field did first.
+
+⚠️ **Attribution correction.** Gaia's `terrain-analysis-masks.md` credits the sweep to a 2010 paper.
+[dozier2022] §I records the real lineage: the order-N horizon method is **Dozier, Bruno & Downey
+(1981)**, *Computers & Geosciences* 7(2), 145–151, and "many, if not most, radiation calculations
+over mountains now use that method". Twenty-nine years earlier than the citation Gaia carried. The
+1981 paper itself could not be obtained here, so it is **named and not cited** — the tier rules
+forbid manufacturing a locator for a paper nobody has opened.
+
+## Ray marching is not the modern answer, and the numbers are not close
+
+The tempting 2026 move is to replace the sweep with hardware ray tracing. The evidence does not
+support it, and the reason is structural rather than generational.
+
+| Method | Hardware | Problem size | Time |
+|---|---|---|---|
+| Order-N sweep [dozier2022] §III-E | 16 CPU cores | 3601² ≈ 13 Mcell, per azimuth | **~2 s** — so ~1 minute for a full-circle bake at 32 azimuths |
+| Per-point DDA ray march [stendardo2020] | GPU (CUDA) | 3.4 km at 0.5 m ≈ 46 Mcell, 580 directions | **1–2 hours per tile** |
+
+**Brute-force marching on a GPU is orders of magnitude behind the sweep on a CPU.** The sweep is
+O(N) in cells and amortises every cell's horizon across one pass per azimuth; marching pays per cell
+*per direction*. The algorithm dominates the hardware here, and any "just ray-trace it" proposal has
+to clear that gap first.
+
+⚠️ **No peer-reviewed comparison of a hardware-RT bake against a horizon sweep on a heightfield
+could be found.** A direct search returned vendor and blog material only, which this skill does not
+cite. So the honest position is: **the sweep is the recommendation, the RT crossover is an open
+question**, and the reason to suspect RT could compete is that a BVH over a 4k heightfield's ~33 M
+triangles is the real obstacle — which displaced-micro-mesh hardware exists to address. That lead
+was not read here and is not cited.
+
+**The long-baseline problem has a cheap shipping answer that is not a longer ray.** [stendardo2020]
+§3.2 evaluates distant obstruction on a **100× coarser** heightfield — 50 m instead of 50 cm — and
+takes the minimum of the fine and coarse results, marching the coarse grid only outside the tile.
+A mip of the terrain, not a longer ray. It composes with [dozier2022] §III-C's tile-halo
+requirement: a wide halo or a coarse far field, pick one.
+
+⚠️ **Direction count is set by what the field feeds, not by the geometry.** Production values in the
+sources span **8–16** azimuths for a terrain mask, **32–64** for a view factor [dozier2022], and
+**137 then 580** for an urban solar cadaster [stendardo2020]. A number quoted without saying what
+consumes it is meaningless.
+
+## Temperature, and a constant that is a convention
+
+Temperature falls with elevation, and the number every tool uses is 6.5 °C/km. It is worth knowing
+what that number is.
+
+⚠️ **It is a standard-atmosphere convention, not a measurement of the terrain you are modelling.**
+[minder2010] measured surface lapse rates over the Cascades and found annual means of **3.9–5.2
+°C/km on the windward side** — "substantially smaller" than the conventional value, which the paper
+names explicitly as an assumption that gridded climate models rely on.
+
+For a terrain tool this matters in one specific way: **the snow line is the T = 0 isotherm**, so an
+over-steep lapse rate puts the snow line too low and does it consistently. If you want snow at a
+particular elevation, tune the lapse rate to put it there and say that you did — do not cite 6.5 as
+though it were measured for your mountain.
+
+The second term is insolation: a slope facing the sun is warmer than one facing away, and a slope
+whose horizon is high is colder than its aspect alone suggests. [furich2002] is the peer-reviewed
+model behind ArcGIS's solar radiation tool and couples the two — viewshed-based occlusion feeding a
+direct/diffuse split — which is the chain from the horizon field to a temperature offset.
+
+⚠️ **Do not oversell that chain.** [winstral2002] §4 found that in an alpine basin net potential
+radiation was **not** a significant predictor of snow depth (p = 0.38), nor was elevation (p = 0.88),
+while wind redistribution was. Winstral's own hedge is that "complex process interactions can
+diminish measures of statistical significance taken from individual parameter tests", and the
+quantities differ — [furich2002] models temperature, [winstral2002] models accumulation rather than
+melt. But a document claiming insolation drives the snow line should not pretend that result does
+not exist. **Where wind moves snow, wind wins.**
+
+## Sun position is a parameter, not a field
+
+Worth stating because it decides where it lives in the graph: the sun's position is two scalars —
+azimuth and elevation — derived from latitude, date and time. It is a **scene parameter**. The
+fields are what it produces when crossed with the horizon.
+
+[reda2004] is the citable algorithm. Its uncertainty is far below anything terrain rendering can
+perceive, so the practical rule is simply not to invent an approximation: use the published one,
+and spend the attention on the horizon field instead, which is where the cost and the error are.
+
+The runtime consequence is the interesting part. A sun-position change invalidates **every field
+downstream of it** — insolation, temperature, snow cover, vegetation — which is a large cone, and
+it is why the sun-independence of the horizon field matters so much. Structure the graph so the
+expensive sweep sits *above* the sun parameter and only the cheap projection sits below it. That is
+the same move `layering-filters-and-masks.md` makes with masks, for the same reason.
+
+## Flow fields for water and wind
+
+A flow field is a **vector** field — a direction and a magnitude per cell — and that alone
+distinguishes it from anything else in the graph. `flow-routing.md`'s receivers are a routing
+*decision* over a heightfield; a wind field has no heightfield to descend.
+
+[forthofer2014] compares three approaches for fine-scale surface wind, with cost against accuracy
+across them: a coarse weather model, a mass-consistent solver, and a full CFD solve. For an
+authoring budget the interesting result is that a mass-consistent solver captures most of the
+terrain effect at a fraction of CFD's cost.
+
+**But there is a third option that fits a node graph better, and it is peer-reviewed.**
+[winstral2002] derives the wind field's *magnitude* from terrain geometry alone, with no flow solve
+at all: `Sx`, the maximum upwind slope within a search distance, read directly as a shelter
+parameter. Increasingly negative `Sx` means constriction and higher speed; increasingly positive
+means shelter and lower speed [winstral2002] §3. It is the same sweep as the horizon field, so a
+graph that already computes horizons gets a defensible wind magnitude for almost nothing.
+
+[winstral2002] Eqs. (3)–(5) add `Sb`, an upwind *break in slope* that detects flow separation and
+marks lee-slope deposition zones. That is peer-reviewed grounding for the lee-shadow step that
+terrain tools usually carry as folklore.
+
+## What these fields do to the runtime
+
+Driver fields are not heightfields, and three properties follow:
+
+- **They are global, or nearly so.** A horizon at kilometre baselines reaches far outside any tile.
+  [dozier2022] §III-C states the halo requirement directly, and it is large. In
+  `node-graph-runtime.md`'s classification these are **local operators with an enormous support
+  radius**, not global-ordered ones — an important distinction, because that means a halo *does*
+  work, it is just expensive, and the coarse-far-field trick above is the way to shrink it.
+- **They are shared by many consumers.** [ta_graph_runtime] observes that simulations emit more than
+  their primary field, and driver fields are the upstream version of the same thing: one horizon
+  field feeds insolation, temperature, snow, vegetation and wind. That fan-out is exactly the case
+  where the union rule in `layering-filters-and-masks.md` and early cutoff in
+  `node-graph-runtime.md` pay off most.
+- **They are vector or multi-channel.** A wind field is two components; a horizon field is one value
+  per azimuth. The port model must carry that, and a runtime that assumes every edge is a scalar
+  heightfield will force these into side channels, which is where undeclared inputs start.
+
+## How this fails, and what it looks like
+
+| Symptom | Mechanism | Fix |
+|---|---|---|
+| Shaded north slopes still melt out first | Aspect used as the insolation proxy; it cannot see the ridge across the valley | Compute the horizon field and drive insolation from it [furich2002] |
+| The snow line sits consistently too low | 6.5 °C/km taken as measured when it is a standard-atmosphere convention; real windward means are 3.9–5.2 [minder2010] | Tune the lapse rate to place the snow line, and say that is what you did |
+| Snow accumulates evenly across a ridge that should scour and drift | No wind field; only melt is modelled | Add `Sx` shelter from the same sweep [winstral2002]; where wind moves snow it beats radiation |
+| The wind shelter field marks the wrong cells | Search distance chosen without reference to the landform — at 100 m the search never crosses the valley, at 300 m it does [winstral2002] Fig. 4 | Choose `dmax` by which landform should do the sheltering; 100–300 m is the measured useful range |
+| Reusing the insolation horizon for wind gives nonsense | Same algorithm, but the insolation baseline is kilometres and the wind baseline is hundreds of metres | Run the sweep twice with different `dmax`; the code is shared, the parameter is not |
+| The occlusion bake takes hours | Per-cell, per-direction ray marching — 1–2 hours per tile on a GPU against ~2 s per azimuth for the sweep on CPU [stendardo2020] [dozier2022] | Use the order-N sweep; it is O(N) and sun-independent |
+| Changing the time of day rebuilds everything | The horizon sweep sits below the sun parameter in the graph | Put the sun-independent sweep above the sun parameter; only the projection is downstream |
+| Tiled driver-field bake seams at kilometre scale | Halo sized for a local filter, not for a kilometre horizon [dozier2022] §III-C | Widen the halo, or evaluate the far field on a coarse grid and take the minimum [stendardo2020] |
