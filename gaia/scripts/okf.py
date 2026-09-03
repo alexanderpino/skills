@@ -83,7 +83,14 @@ def _split_commas(body: str, where: str) -> list[str]:
             if ch == quote:
                 quote = ""
             buf.append(ch)
-        elif ch in "\"'":
+        elif ch == '"':
+            # Only the DOUBLE quote opens a quoted span. An apostrophe must not: YAML uses
+            # single quotes too, but this subset does not, and treating ' as a delimiter meant
+            # an ordinary possessive silently swallowed the following commas --
+            #   [don't, generation, won't]   -> one item, three tags merged
+            #   [rock's, sand's, generation] -> two items instead of three
+            # with no error raised. The FIRST tag is the document's axis, so a merged tag
+            # refiles the document, which is precisely what this function's caller warns about.
             quote = ch
             buf.append(ch)
         elif ch == ",":
@@ -150,8 +157,6 @@ def parse_front_matter(path: Path) -> tuple[dict, str]:
             stripped = line.strip()
             if not stripped.startswith("- "):
                 raise Unparseable(f"{where}: indented line that is not a `- ` list item")
-            if key is None:
-                raise Unparseable(f"{where}: list item before any key")
             if key is None:
                 raise Unparseable(f"{where}: list item before any key")
             item = stripped[2:].strip()

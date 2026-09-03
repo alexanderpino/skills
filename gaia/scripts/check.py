@@ -587,6 +587,58 @@ def check_not_opened(bib: dict[str, dict], cites: dict[str, list[tuple[Path, str
     return problems
 
 
+AXIS_TAGS = ("generation", "simulation", "rendering", "architecture")
+
+
+def check_axis_agreement() -> list[str]:
+    """A document's axis tag must match the coverage.md section its topic row sits under.
+
+    Three sources name a document's axis and nothing compared them: the document's own `tags:`
+    (from which index.py builds the routing table), coverage.md's hand-written `## ` sections,
+    and SKILL.md's routing bullets. Three documents had drifted -- seamless-and-periodic filed
+    Generation by tag and Architecture by the router, sea-ice Generation by tag and Simulation
+    by coverage, mask-to-material Rendering by tag and Generation by coverage.
+
+    A reader following SKILL.md to the generated index landed under a different heading, and no
+    check could see it: check_coverage() matches topics to files and never reads the headings
+    those topics sit under. This compares the two machine-readable halves. SKILL.md's prose is
+    still on the author.
+    """
+    problems: list[str] = []
+    try:
+        text = COVERAGE.read_text(encoding="utf-8")
+    except OSError:
+        return problems
+    section = None
+    for n, line in enumerate(text.splitlines(), 1):
+        if line.startswith("## "):
+            section = line[3:].strip().lower()
+            continue
+        m = _TOPIC.match(line)
+        if not m or section not in AXIS_TAGS:
+            continue
+        doc = re.search(r"→\s*([a-z0-9-]+\.md)", m["rest"])
+        if not doc:
+            continue
+        path = ROOT / "references" / doc.group(1)
+        if not path.exists():
+            continue                      # reported by check_coverage
+        try:
+            fm, _ = parse_front_matter(path)
+        except Unparseable:
+            continue
+        tags = [str(t).strip().lower() for t in fm.get("tags", [])]
+        axis = next((t for t in tags if t in AXIS_TAGS), None)
+        if axis is None:
+            problems.append(f"references/{doc.group(1)}: no axis tag, so index.py cannot route "
+                            f"it, while coverage.md files it under `{section}`")
+        elif axis != section:
+            problems.append(f"references/{doc.group(1)}:{n}: tagged `{axis}` -- so the generated "
+                            f"index lists it under {axis.title()} -- but coverage.md files it "
+                            f"under `{section}`. A reader routed by one lands under the other")
+    return problems
+
+
 def check_headings() -> list[str]:
     """Headings must be unique within a document and must not carry unbalanced backticks.
 
@@ -839,7 +891,7 @@ def main() -> int:
     problems += (doc_problems + check_orphans(bib, used) + check_duplication()
                  + check_coverage() + check_index() + rec_problems
                  + check_no_artefact(bib) + check_not_opened(bib, citations_by_id())
-                 + check_headings())
+                 + check_headings() + check_axis_agreement())
 
     docs = [p for p in documents(ROOT)
             if p not in paper_files() and p not in (INDEX, COVERAGE)]

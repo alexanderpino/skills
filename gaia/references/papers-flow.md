@@ -55,7 +55,7 @@ Two rules, inherited verbatim and non-negotiable:
 
 ⚠️ **A tier is a claim about the venue *and* about the reading, and those two came apart.**
 `P` above says "verified to actually contain the algorithm attributed to it". Twenty-one entries
-in this bibliography could not honestly say that: the paper is peer-reviewed and behind a paywall,
+across this corpus's seven bibliographies could not honestly say that — one of them here: the paper is peer-reviewed and behind a paywall,
 and nobody here ever opened it. Meanwhile the documents citing them had started writing
 `NOT OPENED —` into their locators. **One side of the citation said a human read it and the other
 side said nobody did, and nothing could see the contradiction, because both sides were prose.**

@@ -14,7 +14,8 @@ description: >-
   carries a source and a provenance tier. Use when building or debugging terrain or water —
   heightfields, erosion, drainage, oceans, lakes, LOD, streaming, seams, a node graph that
   rebuilds too much — even if "terrain" is never said. Not for BRDF theory
-  (physically-based-rendering), generic 3D fluid simulation, or GIS and DEM ingestion.
+  (physically-based-rendering), generic 3D fluid simulation, learned or example-based terrain
+  synthesis, or GIS and real-world DEM ingestion.
 type: Skill
 title: Gaia
 tags: [terrain, water, generation, simulation, rendering, routing]
@@ -72,7 +73,7 @@ Every claim here carries a tier, defined in `references/papers-flow.md`:
 
 | | |
 |---|---|
-| **P** | a peer-reviewed paper, verified to contain the algorithm attributed to it |
+| **P** | a peer-reviewed paper, verified to contain the algorithm attributed to it — or, carrying `[not-opened]`, one nobody here obtained, saying so |
 | **F** | universal practice with no canonical paper — say so plainly |
 | **L** | an outcome composed of other operators; "there is no X algorithm" |
 | **N** | a tool's UI branding over an algorithm; name the algorithm |
@@ -118,8 +119,9 @@ go stale as the corpus grows. The axes:
   planetary precision, water rendering, caustics, heightfield ray-marching, offline mesh
   extraction.
 - **Architecture** — the machine that runs the graph: scheduling and caching, layering with
-  filters and masks, the driver fields the graph carries, and what it takes to make the output
-  tile. Start at `node-graph-runtime.md`; it routes to the rest.
+  filters and masks, and the driver fields the graph carries. Start at `node-graph-runtime.md`;
+  it routes to the other two. (Making the output *tile* is `seamless-and-periodic.md`, on the
+  generation axis — an output concern with a generation subject, and tagged accordingly.)
 
 ⚠️ **Four questions cut across the axes, and the answer lives in one place each.** A reader who
 does not know this asks the wrong document and gets a partial answer:

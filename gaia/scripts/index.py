@@ -19,6 +19,7 @@ corpus is meant to grow, and a router that grows with it stops being a router.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -146,7 +147,13 @@ def main() -> int:
         have = INDEX.read_text(encoding="utf-8") if INDEX.exists() else ""
         # The timestamp changes every run, so comparing it would make --check always fail.
         # Compare everything else; a stale BODY is the drift that matters.
-        strip = lambda s: "\n".join(l for l in s.splitlines() if not l.startswith("generated:"))
+        # NORMALISE the stamp; do not DELETE every line that starts with it. The old form
+        # dropped any such line from both sides, so a hand-written line beginning `generated:`
+        # was invisible: injecting `generated: FABRICATED -- 99 documents, all human-verified`
+        # under the heading left --check reporting "index.md is current", exit 0, while the
+        # banner three lines above promises it would fail.
+        strip = lambda s: re.sub(r"^(generated: \{ by: [^,]*, at: )[^}]*(\})",
+                                 r"\1<stamp>\2", s, flags=re.M)
         if strip(have) != strip(want):
             print("index.md is out of date. Run `python3 gaia/scripts/index.py`.")
             return 1

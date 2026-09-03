@@ -2,7 +2,7 @@
 type: Technique
 title: Sea ice — floes as a partition, and the two metres of relief that justify it
 description: "What a floe field actually is for a terrain tool: a mask partitioned into cells, whose size distribution is a genuinely contested power law, advected rigidly by a wind-driven free-drift balance, and carrying one to five metres of ridge relief — the only part of the subject that touches height at all."
-tags: [generation, water, masks, sea-ice, authoring-time]
+tags: [simulation, water, masks, sea-ice, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
 sources:

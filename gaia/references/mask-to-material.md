@@ -2,7 +2,7 @@
 type: Technique
 title: Mask to material — from weights to albedo
 description: "The step terrain-analysis-masks.md stops before: turning a set of material weights into a colour. Palettes driven by a scalar, the partition of unity, the splatmap channel budget, height-blended against alpha-blended transitions, and the colour space each of those has to happen in."
-tags: [rendering, materials, masks, colour, splatmap, real-time]
+tags: [generation, materials, masks, colour, splatmap, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
 sources:
