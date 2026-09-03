@@ -21,8 +21,12 @@ Entry format, as in the flow family:
 
 ## What was read, and what was not
 
-Three families were added to this file from documents written separately, and each carries its own
-read log. Older sections of this bibliography predate the practice; where a source was never
+Six sections were added to this file from documents written separately, and **three** of them
+carry a read log below — impact cratering, constraint and sketch-based authoring, and periodicity
+and boundaries. ⚠️ This paragraph used to say "three families … and each carries its own read log",
+which counted the read logs and called it the number of sections. *Layered rock and stratigraphy*
+and *Grain classes in sediment transport* have none: of their seven entries, exactly one says where
+it was read. Older sections of this bibliography predate the practice; where a source was never
 obtained, its entry carries `[not-opened]`.
 
 ### Impact cratering
