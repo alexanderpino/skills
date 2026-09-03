@@ -42,8 +42,9 @@ turns either into a raster edit. What is published — and what this document is
 number and every sign that pass has to get right.
 
 **The exposure field is the input you will be tempted to skip, and it is the one that matters.**
-`driver-fields.md` computes a horizon sweep and reuses it for insolation and wind shelter; fetch
-is the same sweep over water, and it decides which shores get waves at all — see
+`driver-fields.md` computes fetch by the same per-azimuth sweep it uses for the horizon, with a
+first-hit **distance** accumulated instead of a maximum **angle** — the two are not
+interchangeable, and that document says why. Fetch decides which shores get waves at all — see
 `water-closed-vs-open.md` for why a closed body has none of its own. A coastline operator with a
 global wave height erodes the sheltered side of an island exactly as hard as the exposed side, and
 that single error is more visible than any profile constant.
@@ -249,11 +250,23 @@ move is to give the river mouth a fixed sediment input and let the shoreline mod
 ## The 42° switch, where smoothing becomes roughening
 
 Differentiate the deepwater transport with respect to shoreline orientation and the diffusivity's
-angle dependence is [ashton2006b] eq. (10), whose sign is carried by
+angle dependence is [ashton2006b] eq. (10). Its **zero** is carried by
 
 ```
-(6.0/5.0) * sin(psi)**2 - cos(psi)**2
+(6.0/5.0) * sin(psi)**2 - cos(psi)**2          # ZERO here is the threshold.
+                                               # The SIGN is -mu, not mu. See below.
 ```
+
+⚠️ **Do not read that expression as `μ` and multiply through.** Its zero is the threshold and is
+exact; its sign is inverted relative to the diffusivity. At `ψ = 20°` the expression is **−0.743**
+while the coast is *smoothing*, which is `μ > 0`; at `ψ = 60°` it is **+0.650** while the coast is
+roughening, which is `μ < 0`. The reason is the angle the derivative is taken with respect to:
+`μ = −(1/D)·∂Q_s/∂θ` is differentiated by **shoreline orientation**, and `ψ` above is the **wave
+approach angle relative to the shore normal** — the two run in opposite directions, so a
+derivative written in `ψ` picks up the extra minus sign. Write `mu = K * (cos(psi)**2 -
+(6.0/5.0)*sin(psi)**2)`, or negate at the point of use. Getting this wrong is silent and total:
+every regime in this section inverts, the coast roughens below 42° and smooths above it, and the
+threshold still lands at exactly the right angle so the obvious check passes.
 
 That expression is zero at `arctan(sqrt(5/6))`, which is **42.392°** — and the same angle is where
 eq. (7)'s transport is maximised, recomputed here by two independent routes that agree to four
@@ -334,7 +347,7 @@ one is a bake rather than a per-cell query.
 | Field | What it is | Where it comes from |
 |---|---|---|
 | Sea level | one scalar | authored; everything below is a contour of it |
-| Exposure / fetch | per-cell, over water | the same sweep `driver-fields.md` uses for wind shelter |
+| Exposure / fetch | per-cell, over water | `driver-fields.md`'s fetch sweep — the same traversal as the wind-shelter horizon, accumulating distance rather than angle |
 | Wave angle `ψ` | per-shoreline-cell | shore normal from the contour, wave direction from `wave-models.md` |
 
 ⚠️ **Run the coastal pass after erosion, not before.** A coastline cut into a pre-erosion surface
@@ -365,7 +378,7 @@ later processes would destroy.
 | A step or wall at the waterline | `h = A·x^(2/3)` drawn to `x = 0`, where its slope is infinite | Splice a planar face — [dean1991] eq. (8) is the gravity-corrected form |
 | Every beach the same width regardless of sand | `A` not exposed, or exposed and ignored | `W* = (h*/A)^(3/2)`: halving `A` widens the shoreface by 2^(3/2) = 2.83× |
 | Beaches invisible at map scale, and tuning does nothing | Shoreface is under ~5 cells wide | Above ~50 km of domain, express the profile as material, not height |
-| Sheltered lee shores eroded like exposed ones | No fetch/exposure field; one global wave height | Bake exposure with `driver-fields.md`'s sweep; `H0^(12/5)` makes the difference enormous |
+| Sheltered lee shores eroded like exposed ones | No fetch/exposure field; one global wave height | Bake exposure with `driver-fields.md`'s fetch sweep — **not** its `Sx` horizon, which saturates: 10 m of land reads 0.0115° at 50 km and 0.1146° at 5 km; `H0^(12/5)` makes the difference enormous |
 | Transport rates out by ~2.3× | Significant wave height fed into the r.m.s. constant | `K_2` = 0.34 for `H_rms`, 0.15 for `H_s` [ashton2006b] |
 | The whole coast retreats by the same distance | Bruun applied per-cell as an operator | Bruun is a one-number estimate; use one-line diffusion for shape [cooper2004] |
 | Sea-level retreat numbers feel arbitrary | They are — `h*` is a convention | 4 m to 18 m of assumed closure depth spans 2.86× in retreat [cooper2004] |

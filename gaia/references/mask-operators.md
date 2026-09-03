@@ -123,12 +123,27 @@ Those errors are *not* small, and they are the reason to reach for the exact tra
 | Best possible at 5×5 | 0.0136 | — | — |
 
 The middle column reproduces the paper's published constants to four decimals from an independent
-implementation, which validates the transcription and the paper simultaneously. The error is also
-**systematically positive** — chamfer distances over-estimate, by +0.45% on average over the
-polyline field — so a chamfer field thresholded at 100 m selects a slightly smaller region than an
-exact one, everywhere, in a direction that depends on the local direction to the seed. On a 45°
-diagonal the 3-4 mask returns `4/3 = 1.333` per step against `√2 = 1.414`: it is *anisotropic*, and
-a radial ramp built on it is visibly an octagon.
+implementation, which validates the transcription and the paper simultaneously.
+
+⚠️ **The error is bipolar, not systematically positive, and the published constant is the
+*under*-estimate.** An earlier draft of this document claimed chamfer distances over-estimate
+"everywhere", and its own next sentence disproved it. Measured on a 201² field, single centre seed,
+cells beyond `r = 20`:
+
+| Mask | most positive | most negative | cells reading short | worst underestimate at |
+|---|---|---|---|---|
+| 3-4 | +5.41% | **−5.72%** | 25.0% | 45° |
+| 5-7-11 | +1.98% | −1.61% | **58.1%** | 63.4° |
+
+For 5-7-11 the *majority* of cells read short. And `E = 0.0572`, the constant the table above
+quotes for 3-4, is the error at 45°, where the mask returns `4/3 = 1.333` per step against
+`√2 = 1.414` — **short by 5.72%**, not long. The `+0.45%` that motivated "systematically positive"
+is a *mean* over one polyline field, and the sign of a mean was attached to a magnitude that is an
+absolute value.
+
+So a chamfer field thresholded at a fixed distance selects a **larger** region along the diagonals
+and a **smaller** one near 18°, which is the anisotropy stated as a shape rather than as a bias: it
+is *anisotropic*, and a radial ramp built on it is visibly an octagon.
 
 **Jump flooding** [rongtan2006] is the GPU form and a genuinely different animal: each cell stores
 the coordinates of the best seed it has heard about, and `log n` rounds with step lengths
@@ -186,12 +201,21 @@ result, or seed the transform with the *exact* distance from each near-curve cel
 segment and let the transform propagate from there. The second is the generalisation
 [felzenszwalb2012] already provides — a non-binary `f` is exactly what the algorithm takes.
 
-**Signed fields.** Run the transform on the mask and again on its complement, and subtract:
+**Signed fields.** Run the transform on the mask and again on its complement, and subtract. ⚠️ The
+order is the whole content of this line, and an earlier draft had it backwards:
 
 ```
-sdf = edt(outside) − edt(inside)      # positive outside, negative inside
+# edt(S) is this document's D_f with f = 0 on S: DISTANCE TO THE NEAREST CELL OF S.
+# So edt(inside) is small inside the mask -- which is why it is the term that gets negated.
+sdf = edt(inside) − edt(outside)      # positive outside, negative inside
 ```
 
+Checked on a 7×7 square in a 21² field: as written this gives **−4.00** at the centre and **+9.90**
+at a corner. Reversing the two terms gives +4.00 and −9.90 — the same field, negated, with a
+comment that reads exactly as plausible. This is the failure the table below calls "a coin flip",
+and nothing downstream will tell you: an inverted SDF still looks like a distance field, still has
+the right gradient magnitude, and still produces a smooth falloff — it just selects the outside.
+Assert the sign at one known interior cell before you use it.
 Two cautions. The sign convention is a coin flip and both are in circulation — write it into the
 node name, because the failure is a silently inverted mask. And the two transforms are each exact,
 but the *combined* field has a one-cell plateau of zeros at the boundary, because a boundary cell
@@ -278,7 +302,7 @@ differently — the same defect `terrain-analysis-masks.md` documents for slope 
 |---|---|---|
 | A "distance field" that stops varying a few cells out | A Gaussian blur used as a distance field | Blur saturates; use a real transform |
 | Distance ramp is a visible octagon | Chamfer anisotropy — 4/3 per diagonal step against √2 | Exact transform, or 5-7-11 if the error budget allows |
-| Every distance reads a few percent too far | Chamfer over-estimates systematically, +5.7% worst case for 3-4 | Exact transform [felzenszwalb2012] |
+| A thresholded distance region is an octagon, not a circle | Chamfer error is bipolar and direction-dependent: 3-4 runs +5.41% at 18° and **−5.72% at 45°**, so the region bulges on the diagonals and pulls in near 18° | 5-7-11 if approximate is fine (+1.98%/−1.61%); exact separable if the threshold is a specification [felzenszwalb2012] |
 | Field is right near seeds, wrong far away | Squared distance square-rooted between the two passes | Stay in squared distance until the end |
 | NaNs in the second pass | `inf` used as the empty value; `inf − inf` in the intersection | A large finite float; `m + n` suffices |
 | Beads-on-a-string bumps along a spline-driven ridge | Curve rasterised at more than half-cell spacing | Sample at ≤ 0.5 cell, or rasterise conservatively |

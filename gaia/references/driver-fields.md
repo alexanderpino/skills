@@ -312,7 +312,42 @@ single highest-value use of any field in this document, because it is what makes
 range incise and the dry side keep its relief.
 
 ⚠️ **It is also a global field with a non-local dependence, so it breaks tiling the same way flow
-accumulation does** — see `## What these fields do to the runtime` below. Worse than the horizon
+accumulation does** — see `## Fetch, which is the same sweep and a different accumulator
+
+⚠️ **Two documents route here for fetch and this section exists because they were routing to
+nothing.** `coastal-erosion.md` calls exposure "the input that matters" and `sea-ice.md` needs a
+wind field over water; both pointed at the horizon sweep above. That was wrong, and the reason is
+worth stating because it is the general trap with reusing a sweep.
+
+**Fetch is the over-water distance the wind has blown before it reaches a cell** — the quantity
+that sets wave height. The horizon sweep computes an **angle**; fetch is a **distance**. They run
+the same traversal and accumulate different things, and one cannot be recovered from the other:
+
+- **The angle saturates where fetch does not.** Land 10 m high at 50 km subtends a horizon angle of
+  **0.0115°**, and 10 m high at 5 km subtends **0.1146°** — a tenfold change in fetch buys a tenth
+  of a degree, which is inside any threshold you would set on `Sx` and inside the quantisation of a
+  heightfield stored at metre precision. Meanwhile 1000 m of land at 20 km gives **2.86°**, so a
+  distant mountain reads as more sheltering than a near sandbar, which is backwards for waves: the
+  sandbar blocks the fetch and the mountain does not.
+- **The search distances are an order of magnitude apart.** `Sx` is useful at 100–300 m
+  [winstral2002] §4 and the insolation horizon at kilometres; wave fetch matters at **tens of
+  kilometres**, because that is the scale over which wind does work on a sea surface.
+
+**So run the same per-azimuth traversal and accumulate a first-hit distance instead of a maximum
+angle**: march from each water cell into the wind, stop at the first cell above sea level, record
+the distance, cap it at a maximum fetch. It is the same `O(N)` sweep per direction, the same halo
+argument, the same cache position above the wind parameter — everything the horizon section says
+about cost and invalidation carries over unchanged. What does not carry over is the *value*, and
+reusing the baked horizon field because the code is shared is the mistake this section is here to
+stop.
+
+⚠️ **No canonical source; standard practice is** to average the fetch over a small arc of azimuths
+rather than take a single ray, because a one-ray fetch flickers between a gap and a headland as the
+wind rotates by one azimuth step. The arc width is a tuning constant and no source read here fixes
+it. Effective-fetch methods of this shape are standard in coastal engineering, and nothing in this
+corpus's bibliography was opened for them, so nothing here is cited for it.
+
+## What these fields do to the runtime` below. Worse than the horizon
 sweep, in fact: the horizon's dependence has a bounded search distance, and an advected
 precipitation field's does not. Compute precipitation whole-domain at a coarse resolution and
 upsample it, rather than trying to tile it; the field is smooth at the scale that matters and the

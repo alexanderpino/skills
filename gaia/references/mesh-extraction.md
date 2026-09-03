@@ -101,8 +101,14 @@ measured:
 - **On a real surface the gap is large.** Over 3,453 interior edge contractions on the
   paraboloid, mean `sqrt(Δ)` was **0.0175** against a mean true vertical miss of **0.0031** — a
   ratio of **5.60**, ranging 4.17 to 6.94 across the contractions. Feeding `sqrt(Δ)` into the
-  runtime controller as `e` therefore over-tessellates by roughly 5× *and* by an amount that
-  varies per region, which is the worst of both.
+  runtime controller as `e` therefore over-tessellates *and* by an amount that varies per region,
+  which is the worst of both. ⚠️ **The factor is not a constant of the metric — it is a function of
+  the surface's slope**, and an earlier draft quoted the single paraboloid above as "roughly 5×".
+  Varying only the surface in the same rig: **6.91× at max slope 0.1, 5.59× at slope 1.0** (the
+  measured configuration), **4.09× at 2.0, 2.54× at 4.0 and 1.17× at 10.0**. So it is worst on
+  gentle ground — most terrain, and exactly where a controller is cheapest to satisfy — and nearly
+  honest on cliffs. The direction holds everywhere (the ratio never drops below 1); only the
+  magnitude was overreach.
 
 **So use each metric for the job it is for.** The quadric is a **ranking key**: it decides which
 edge to collapse next, and its absolute value is meaningful only against itself. The screen-space
@@ -231,7 +237,7 @@ carry the removed detail, which is the whole point; the reverse loses it permane
 |---|---|---|
 | Tile edges no longer meet after export | Boundary edges collapsed at zero quadric cost | Constraint planes at a large penalty, and freeze or share the seam [garland1997] |
 | Adjacent tiles have matching outlines but different vertex counts on the shared edge | Boundary constrained but still simplified, independently on each side | Simplify the seam once, hand the identical result to both |
-| Runtime tessellates ~5× more than the budget implies | `sqrt(Δ)` exported as the geometric error `e` | Measure `e` against the source grid; the quadric is a ranking key |
+| Runtime tessellates 1.2× to 7× more than the budget implies, worst on gentle ground | `sqrt(Δ)` exported as the geometric error `e` | Measure `e` against the source grid; the quadric is a ranking key |
 | Two chunks with the same true error get different LOD | `Δ` scales with mesh valence, not with deviation | Same fix; `Δ/(n·d²)` is constant, so `Δ` is measuring `n` too |
 | An export threshold that worked yesterday keeps 10× the triangles | Model rescaled; `Δ` is in squared units | Specify the target in metres and solve for the threshold |
 | Refining the source grid changes the exported triangle count at a fixed threshold | A quadric threshold is not resolution-independent | Same fix; see `node-graph-runtime.md` on parameters that must rescale |

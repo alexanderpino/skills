@@ -29,8 +29,9 @@ at each size, and which ones cut which.
 
 **Stamp an authored radial profile whose depth, rim height and rim width come from the
 morphometric power laws, choosing the simple or the complex branch by comparing the diameter
-against a transition diameter you scaled to your world's gravity; then lay the field down in
-age order, oldest first, so later craters overwrite earlier ones.** Everything that makes a
+against a transition diameter you scaled to your world's gravity — blending the two branches
+across 0.53–1.58 × `D*` if the scene shows craters near it, which the body argues is the faithful
+form; then lay the field down in age order, oldest first, so later craters overwrite earlier ones.** Everything that makes a
 crater field read correctly is in that sentence: the profile is measured, the branch is chosen
 by a gravity-dependent threshold, and the history is carried by draw order.
 
@@ -256,7 +257,7 @@ argument: it is material added to slopes, so it should be there before the mater
 |---|---|---|
 | One hero crater, art-directed | Author the profile directly; ignore the SFD | The population statistics say nothing about a single object |
 | A field on a planet, any airless body | SFD sampling + age-ordered stamping | Both the count and the cut-order are what make it read as history |
-| Diameters straddling the transition | Blend the two branches across a 10–30 km band | The transition is a band, not a threshold [pike1977] |
+| Diameters straddling the transition | Blend the two branches across **0.53–1.58 × `D*`** | The transition is a band, not a threshold [pike1977]. ⚠️ Pike's 10–30 km is the **lunar** band; expressed against the lunar `D*` of 19 km it is 0.53–1.58 × `D*`, and in that form it scales with gravity like `D*` does. On Earth's predicted `D* = 3.1 km` that is **1.7–5.0 km** — blending across 10–30 km there would blend entirely inside the complex regime, at 3× to 10× `D*` |
 | A world that is not Earth or Moon | Scale `D*` by `1/g` first, then everything else | The branch choice moves before any coefficient does [silber2017] |
 | An old, saturated surface | Drive `η` toward 2 and cap at ~2% of geometric saturation | Past the cap, more craters make mush, not more age [minton2019] |
 | Craters on a world with water and weather | Stamp, then erode — never the reverse | The rim is a divide and the floor is a lake; `flow-routing.md` owns the rest |

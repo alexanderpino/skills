@@ -39,10 +39,13 @@ lookup per cell per step:
 # once, at authoring time
 beds = [(thickness_0, K_0), (thickness_1, K_1), ...]      # resistant and weak alternating
 period = sum(t for t, _ in beds)                          # the column repeats
-d      = (cos(psi), sin(psi))                             # dip direction, psi = strike + 90 deg
+# ANGLES ARE IN RADIANS FROM HERE DOWN. psi and delta are authored in degrees, so convert
+# once at the boundary -- tan(30) is -6.405 and inverts the dip; tan(radians(30)) is 0.5774.
+psi, delta = radians(strike + 90), radians(dip_degrees)
+dx, dy = cos(psi), sin(psi)                               # dip direction
 
 # per cell, per erosion step, from the CURRENT surface height
-s   = h[y][x] + tan(delta) * (d.x * x * cellSize + d.y * y * cellSize)   # stratigraphic height
+s   = h[y][x] + tan(delta) * (dx * x * cellSize + dy * y * cellSize)     # stratigraphic height
 u   = fmod(s - datum, period);  if u < 0: u += period
 K   = lookup(beds, u)                                     # walk or prefix-sum table
 ```
@@ -117,14 +120,24 @@ cuestas, strike valleys and hogbacks.
 at `δ` crops out across a map-plane width
 
 ```
-w = T / sin(delta)
+w = T / tan(delta)        # T is the VERTICAL span the sampler above uses, not perpendicular thickness
 ```
+
+⚠️ **`T` here is the *vertical* span the sampler uses, not the bed's perpendicular thickness, and
+the two give different formulas.** The block above builds `s` by adding `tan δ · horizontal` to a
+height, so a bed's `thickness` is a vertical interval of `s`. A vertical span `T` crops out over
+`T/tan δ`; a perpendicular thickness `T⊥ = T·cos δ` crops out over `T⊥/sin δ` — the same distance,
+written two ways, and mixing them costs a factor of `1/cos δ`. Measured against the sampler's own
+output on a flat surface at 1 m cells: at 2° the two differ by 0.06%, at 10° by 1.5%, at 30° by
+**15%** and at 60° by **2×**. An earlier draft used `T/sin δ` with the vertical `T`, which is why
+this note exists — invisible at the shallow dips the results table quotes, and wrong at the top of
+its own stated range.
 
 and if `w` is not several cells wide the bed cannot be expressed at all — it aliases into a
 one-cell stripe that erosion cannot organise around. Measured (see below, same rig): 25 m beds at
 10° give `w = 144 m` = **1.4 cells** on a 100 m grid and produce the **weakest** layered signal of
 any run in the set; 100 m beds at the same 10° give `w = 576 m` = **5.8 cells** and produce the
-**strongest**. The rule is `T ≥ 4·cellSize·sin(δ)` — steepen the dip and the beds must get thicker
+**strongest**. The rule is `T ≥ 4·cellSize·tan(δ)` — steepen the dip and the beds must get thicker
 in proportion, and a nearly vertical column needs beds as thick as the outcrop pattern you want to
 see. This is the first thing to check when a dipped column looks like noise.
 
@@ -229,7 +242,7 @@ than you want to see, not less**, and never read an authored `K` ratio off the r
 ⚠️ **Outcrop width dominates dip angle.** Dipping 100 m beds at 10° gives the strongest scarp in
 the set (`conc` 1.85× against 1.45× for the same beds horizontal) — dip *helps*. Dipping 25 m beds
 at the same 10° gives the weakest (`S_area` 1.322), because their outcrop is 1.4 cells wide. It is
-not the dip that broke it; it is `T / sin δ` falling below the grid.
+not the dip that broke it; it is `T / tan δ` falling below the grid.
 
 ⚠️ **Stream power plus linear diffusion gives the riser and never the tread.** `area_hard` runs
 0.287 to 0.502 across every run and **never meaningfully exceeds 0.5** — resistant beds hold no more of the landscape's
@@ -362,7 +375,7 @@ a material mask, not as a simulation input.
 | Bands visible on hillshade but no scarps in the channels | The `K` field built but never handed to the solver — painted as a colour map instead | It is the same `K` in `f = K·Δt·A^m/dist` [cordonnier2016] §3.1 eq. 1 |
 | The scarps read far weaker than the authored contrast | Contact migration keeps neither unit at local equilibrium; a 4× `K` contrast measured 1.35–2.16× in slope | Author more contrast than you want to see, and never read `K` back off the slope [mitchell2021] |
 | Concentric bands on every hill, like a contour map | Zero dip | Give the column dip and strike; even 5° breaks the concentricity |
-| A dipped column that reads as noise or as stripes one cell wide | Outcrop width `T/sin δ` below the grid — 25 m beds at 10° are 1.4 cells on a 100 m grid, and measured the weakest of any layered run | Thicken the beds with the dip: `T ≥ 4·cellSize·sin δ` |
+| A dipped column that reads as noise or as stripes one cell wide | Outcrop width `T/tan δ` below the grid — 25 m beds at 10° are 1.4 cells on a 100 m grid, and measured the weakest of any layered run | Thicken the beds with the dip: `T ≥ 4·cellSize·tan δ` |
 | The scarp weakened when the timestep was refined | The coarse step was inflating it: one-sided over-resistance at contacts | Believe the finer step; `Δt ≤ 0.2·min(bed thickness)/max(K·A^m·S^n)` |
 | Cuestas that vanish after a long run | Beds dipping downstream, so contacts migrate fast | Dip into the drainage: `φ < 0` slows contact migration [mitchell2021] §2.5 eq. (12) |
 | Cliff bands but no flat-topped mesas | Incision plus linear diffusion makes the riser, not the tread | A **per-bed weathering rate**, not a per-bed talus angle: measured, the talus limit alone retreats a 2 km butte by 2 m, and bed-selective removal retreats it by 640 m with the tread bit-preserved |

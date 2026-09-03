@@ -40,7 +40,7 @@ def low_band(h, L):                       # Burt-Adelson analysis then synthesis
     return g
 
 lo = low_band(h, L)           # the silhouette
-hi = h - lo                   # the residual; mean(hi) == 0 by construction
+hi = h - lo                   # the residual. NOT zero-mean -- see below; that is the point
 r  = f(hi)                    # the surface operator, whatever it is
 r -= r.mean()                 # <-- the line that makes the volume claim true
 out = lo + r
@@ -70,10 +70,28 @@ toggle is the only place in the family where the marketing word is literally tru
 **What it beats.** *Blur-and-subtract with a box or single Gaussian* — the same two-band split
 with an unconstrained kernel; fine, and it is what most tools actually do, but you lose the
 recursive structure that makes more than two bands affordable and you re-derive the boundary rules
-from scratch. *An undecimated (à-trous) pyramid* — dilate the kernel per level instead of
-decimating the image; measured exactly shift-invariant where the decimated pyramid drifts up to
-2.7 m under a 1-to-8 px shift, which is worth real money under tiling (below), but it costs
-`(L+1)×` the field in storage against `1.33×` for the pyramid (measured at `L = 4`). *Editing the full field and
+from scratch. *An undecimated (à-trous) low band* — dilate the kernel per level instead of decimating the image.
+⚠️ **An earlier draft dismissed this on a storage figure that does not apply to the recipe above,
+and on the evidence here it is the better default for a tiled build.** `(L+1)×` the field is the
+cost of storing a full undecimated *pyramid*; `## Use this` builds **two bands**, `lo` and
+`hi = h − lo`, and an à-trous `lo` is `L` dilated separable convolutions in place — **2 fields,
+same as the decimated version**. Measured on the same kernel:
+
+| | decimated (recommended) | à-trous |
+|---|---|---|
+| support radius, `L = 4` / `L = 5` | 46 / 94 px | **30 / 62 px** |
+| halo needed | `3·2^L` **and** a phase rule | the radius, no phase rule |
+| low band under a 1/2/4/8 px shift | 2.23 / 4.35 / 8.02 / 12.35 m | **0.00 / 0.00 / 0.00 / 0.00** |
+| storage for the two-band split | 2 fields | 2 fields |
+| wall time, 512², `L = 5`, numpy | 0.096 s | 0.142 s |
+
+**The crossover is whether the build is tiled and whether you need more than two bands.** Untiled,
+or building a full multi-band pyramid where the `4^-k` storage decay is what makes depth
+affordable, the decimated version wins on time and on storage. Tiled — which is the Gaea-class case
+this skill targets — the à-trous form is 48% cheaper in halo at `L = 5`, is exactly shift-invariant
+where the decimated pyramid drifts metres, and makes every phase rule in this document *vacuous*.
+It costs about 1.5× the arithmetic. Four pages below are spent on the decimated pyramid's phase
+tax; that tax is the price of the recommendation, not a law of band splitting. *Editing the full field and
 re-imposing the low band afterwards* — looks equivalent, is not, and has its own section.
 *Frequency-domain (FFT) filtering* — clean band shapes and a natural `Keep DC`, but it is globally
 supported, so it cannot be tiled at all and a single edited cell rebuilds the whole domain.
@@ -146,14 +164,21 @@ users' projects.
 
 The mechanism is parity, and it does reproduce. `EXPAND` inserts zeros between samples and then
 pads; `reflect` mirrors *without repeating* the edge sample, so the even/odd lattice survives,
-while `symmetric`, `edge` and `wrap` all repeat it, invert the parity in the apron, and smear real
-samples into the zero slots. That makes `reflect` the only pad mode whose apron is *structurally*
-right — but note that on smoothed noise `symmetric` measured **smaller** than `reflect`
+while `symmetric` and `edge` repeat it, invert the parity in the apron, and smear real samples into
+the zero slots. ⚠️ **`wrap` is parity-correct too**, and an earlier draft of this document wrongly
+grouped it with the other two: on the even-length arrays `EXPAND` actually produces, a two-cell
+`wrap` apron measures `[40, 0]` against `reflect`'s `[20, 0]` — sample, then zero, in both cases —
+where `symmetric` gives `[0, 10]` and `edge` `[10, 10]`. (On an odd-length array `wrap` does invert;
+`EXPAND` does not make one.) So `reflect` and `wrap` are the two structurally right pads — but note that on smoothed noise `symmetric` measured **smaller** than `reflect`
 (+0.02% against −0.15%). Being structurally right is not the same as winning on one field, and one
 field is not an argument. Choose `reflect` for the parity argument, not for a measured win.
 
-Depth matters too: at `reflect`/`reflect` the error is −2.0e-06 at `L = 1`, −9.3e-06 at `L = 2`,
-−5.0e-05 at `L = 4` and −1.3e-04 at `L = 5` — about ×2.6 per level. Still negligible, but it is
+Depth matters too, though ⚠️ **the series below is on a different field from the table above and
+the two must not be read as one measurement**: on a 257² fractal surface `reflect`/`reflect` gives
+−2.0e-06 at `L = 1`, −9.3e-06 at `L = 2`, −5.0e-05 at `L = 4` and −1.3e-04 at `L = 5`, while the
+256² smoothed-noise field of the padding table measures **−0.15%** at `L = 5` — 11.6× more, same
+padding, same level. Which is the point of the field-dependence warning above, restated by
+accident: quoting either number as "the reflect figure" is the mistake. Still negligible, but it is
 the floor your mean-correction converges to, so quote it rather than claiming zero.
 
 ### What the operator does
@@ -389,8 +414,8 @@ The one parameter with no defensible default. `Detail Size` in Gaea's terms [gae
 | Terrain visibly "grows" or "shrinks" through a surface node that claims volume preservation | The residual operator has a non-zero DC response; the split conserved nothing but the silhouette | `r -= r.mean()` before recombining; then assert `Σh` across the node |
 | A faint quilt aligned to tile borders in the low band and in every mask derived from it | Halo is ≥ the support radius but not a multiple of `2^L`; each tile decimated on a different lattice phase | Round the halo up to `3·2^L`; do not blend the seam, fix the phase |
 | Tiled build seams that get worse as you add pyramid levels | Halo sized for the 5-tap kernel, not for the chain: `R(L) = 3·2^L − 2` doubles per level | Size from `R(L)`, then round to the phase |
-| A dark rim of lost height one apron-width inside the domain edge | Zero-padded convolution; the padding asserts sea level exactly one cell outside the domain | `reflect`; at `L = 5` that is −1.3e-04 against −15.1% for a zero-padded `REDUCE` |
-| The low band is visibly taller or shorter than the input, and `collapse(split(h)) == h` is bit-exact | `EXPAND` pads a *zero-interleaved* array; `edge`, `symmetric` and `wrap` repeat the edge sample, invert the lattice parity in the apron and smear real samples into the zero slots. Measured +36.8% volume at `L = 5` alongside a 1.4e-12 m round trip | `reflect` in `EXPAND`, always. And assert `Σ(lo)` against `Σ(h)` — the round-trip test is structurally blind to this |
+| A dark rim of lost height one apron-width inside the domain edge | Zero-padded convolution; the padding asserts sea level exactly one cell outside the domain | `reflect` or `wrap`; at `L = 5` either is under 0.2% against −15.0% for a zero-padded `REDUCE` |
+| The low band is visibly taller or shorter than the input, and `collapse(split(h)) == h` is bit-exact | `EXPAND` pads a *zero-interleaved* array; `edge` and `symmetric` repeat the edge sample, invert the lattice parity in the apron and smear real samples into the zero slots. Measured −15.0% to +2.2% at `L = 5` depending on the field, alongside a round trip of 1.4e-14 to 2.3e-13 m | `reflect` on an open tile, `wrap` on a periodic one — **not** "reflect always". And assert `Σ(lo)` against `Σ(h)`: the round-trip test is structurally blind to this |
 | Bright halo above every cliff, dark undershoot below | Generating kernel with negative lobes — `a = 0.6` is trimodal [burt1983] Fig. 3 | `a = 0.4` first; if it survives, it is the next row |
 | Bright ledge above and dark trench below every escarpment, at the scale of one EQ band | Per-band gain deforms the step itself; inherent to rescaling Laplacian coefficients [paris2011] §2, and it rounds the edge as well [paris2011] Fig. 3 | Local Laplacian filtering [paris2011] §4 Algorithm 1 — remap locally, then build the coefficient. Costs O(N log N) |
 | Every band is a quarter of its expected height | The factor 4 dropped from `expand` [burt1983] eq. (2) | Restore it; do not compensate with a gain |
