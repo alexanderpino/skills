@@ -80,7 +80,8 @@ where a reader scanning grades cannot miss it:
 
 `check.py` then ties the two halves together **in both directions**: an entry tagged
 `[not-opened]` may not be cited with a locator that claims a reading, and a locator saying
-`NOT OPENED` may not sit against an untagged entry. Enabling that check found three documents
+`NOT OPENED` — or `NO LOCATOR`, the second marker the guard accepts and this paragraph used to
+omit, in live use in `water-optics.md` — may not sit against an untagged entry. Enabling that check found three documents
 citing a source as read that two other documents already described as unread.
 
 **This is not a demotion and `[not-opened]` is not a failing grade.** A corpus that cannot cite a
@@ -109,8 +110,13 @@ wrong, and it looked better than the paraphrase it replaced.
 So: **sharpen a locator only from the source in front of you.** If the paper is unreachable,
 leave the paraphrase and say so — that is a correct outcome, not a failure to hit a number.
 The one thing never to do is transplant a section number from a different edition, a
-reproduction, or another document's entry: the corpus already carries one such locator that
-nobody has been able to verify, and it is recorded as outstanding rather than trusted.
+reproduction, or another document's entry. ⚠️ This paragraph used to claim the corpus already
+carries such a locator, "recorded as outstanding rather than trusted". It does not, and the row
+it was pointing at says the opposite: `source-findings.tsv` row 17 records that Zevenbergen &
+Thorne's equation numbering **could not be verified and the locator was deliberately left as a
+paraphrase**, because "writing 'eq. 15' from memory would be a `?` wearing a P's confidence". That
+is the rule working, and the register's one OPEN row is a success story, not the violation this
+paragraph was using it as.
 
 ## Attribution corrections
 
@@ -153,7 +159,10 @@ page images.
 4 on p. 915 and the order-designation text on p. 914 were read from the page images.
 **`genevaux2013`** — the authors' PDF hosted at Purdue CGVLab; §4–§7 read there.
 **`peytavie2019`** — the authors' PDF at `perso.liris.cnrs.fr/eric.galin`; §4–§5 read there.
-**`paris2023`** — the accepted version deposited at HAL (hal-04227965); §4 and §6 read there.
+**`paris2023`** — the accepted version deposited at HAL (hal-04227965); §3.1, §4 and §6 read
+there. ⚠️ §3.1 was missing from this list while carrying all three things the paper is cited
+for, and every locator into it said §4. §4 is the migration model, which is not what Gaia
+cites this paper for.
 **`candel2021`** — open access (SAGE, CC-BY) at `edepot.wur.nl/532990`; §2.2, §2.3, eqs. (4)–(11)
 and Table 1 read there.
 
@@ -184,6 +193,6 @@ The coefficient is attributed here to `genevaux2013` and `peytavie2019`, which b
 - **candel2021** `P` — Candel, J., Kleinhans, M., Makaske, B. & Wallinga, J. *Predicting river channel pattern based on stream power, bed material and bank strength.* Progress in Physical Geography, doi:10.1177/0309133320948831. Open access (CC-BY); the online-first version read here is stamped © The Author(s) 2020 and paginated 1–26, so the volume, issue and final page range are not asserted, though the paper is generally cited as 2021. — Puts eight published channel-pattern discriminators on one dataset and scores them. Restates the Leopold–Wolman line, the Van den Berg (1995) and Makaske et al. (2009) potential-specific-stream-power discriminators, and the Crosato–Mosselman bar-mode equation, then reports the fraction each classifies correctly and a κ statistic. This is the source for the honest answer to "does the braiding threshold work?", and for the two facts an authoring tool most needs: that anastomosing/laterally stable reaches sit an order of magnitude *below* the braiding threshold in stream power, and that a thread count is predictable from bar mode.
 - **genevaux2013** `P` — Génevaux, J.-D., Galin, E., Guérin, E., Peytavie, A. & Beneš, B. (2013). *Terrain generation using procedural models based on hydrology.* ACM Transactions on Graphics 32(4), art. 143. doi:10.1145/2461912.2461996. — The paper that inverts the pipeline: build the river network first as a geometric graph, then construct the terrain around it. A grammar grows the network under Horton–Strahler rules with user-controlled continuation, symmetric-branch and asymmetric-branch probabilities; Voronoi cells of the river nodes become watersheds and their shared edges become ridges; a construction tree of compactly supported primitives with a *replace* operator carves the river into the blended terrain. Its river primitive is the whole carve operator in one line.
 - **peytavie2019** `P` — Peytavie, A., Dupont, T., Guérin, E., Cortial, Y., Benes, B., Gain, J. & Galin, E. (2019). *Procedural riverscapes.* Computer Graphics Forum 38(7) (Pacific Graphics 2019); the page range is not on the author version read here and is not asserted. — The complement to `genevaux2013`: it takes an existing bare-earth heightfield, extracts the network from it, and then amplifies. Contributes the two things that document does not — a cross-section template normalised to unit area and scaled by discharge over velocity, and an explicit downstream-monotonicity check on the carved bed with the propagate-downstream fix. Its Rosgen-D handling is the only published account here of building a multi-thread channel as an authoring primitive.
-- **paris2023** `P` — Paris, A., Guérin, E., Collon, P. & Galin, E. (2023). *Authoring and simulating meandering rivers.* ACM Transactions on Graphics 42(6), art. 241. doi:10.1145/3618350. — Meander migration as an authoring loop: a network of channel curves migrated by a curvature-driven rate with user control terms, with cutoffs and avulsions handled as topological edits to the network graph. Cited here for three specific things rather than for the migration model: the width law it actually implements, the junction-angle rule keyed to the flow ratio, and the fact that a migrating network needs explicit collision cases — which is what it costs to leave the tree.
+- **paris2023** `P` — Paris, A., Guérin, E., Collon, P. & Galin, E. (2023). *Authoring and simulating meandering rivers.* ACM Transactions on Graphics 42(6), art. 241. doi:10.1145/3618350. — Meander migration as an authoring loop: a network of channel curves migrated by a curvature-driven rate with user control terms, with cutoffs and avulsions handled as topological edits to the network graph. Cited here for three specific things rather than for the migration model — and all three are in **§3.1 River network and channel models**, not §4: the width law it actually implements, the junction-angle rule keyed to the flow ratio, and the fact that a migrating network needs explicit collision cases — which is what it costs to leave the tree.
 - **braid_flow_split** `F` — No canonical source. — How to divide a reach's discharge among the threads of a braid. `peytavie2019` §5.2 says the parameters are "determined by partitioning the aggregate flow between channels" and prints no rule; nothing else opened here prints one either. [no-artefact]
 - **subcell_channel** `F` — No canonical source. — The rule that a channel narrower than about two cells cannot be carved into a heightfield at all, and that below that width a river has to become a texture or a spline rather than geometry. Universal in practice, unpublished as such. [no-artefact]

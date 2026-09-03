@@ -12,7 +12,7 @@ sources:
   - { id: candel2021, tier: P, locator: "Table 1 — the Leopold & Wolman discriminator classifies 79% of 126 rivers correctly, κ = 0.48, 'moderate' agreement (79% of 97 single-thread, 76% of 29 multi-thread), against 96% of 111 and κ = 0.95 for Kleinhans & Van den Berg read as lower limits; §2.2 eqs. (4)–(5) for potential specific stream power ω_pot = ρgQ_ef·S_v/W_r with reference width W_r = φ√Q_ef, φ = 4.7 sand-bed and 3.0 gravel-bed; eq. (6) ω_bm = 900 D50^0.42 for the braided–meandering transition and eq. (7) ω_ia = 90 D50^0.42, 'defined at a tenfold lower stream power', for the inactive–active transition anchored on the anastomosing upper Columbia; p. 9 eq. (10) for the bar mode m² = (0.17g(n−3)/√(((ρs−ρ)/ρ)D50)) · W³S/(CQ) with n = 4 sand and 10 gravel, and eq. (11) B_i = (m−1)/2 + 1" }
   - { id: genevaux2013, tier: P, locator: "§4 Table 1 and fig. 6 — the expansion grammar whose branching rules are Horton–Strahler symmetric (n−1, n−1) and asymmetric (n, m<n) junctions, applied with user probabilities Pc + Ps + Pa = 1, and fig. 8 for what those probabilities do to the order histogram (Ps = 0.7 gives >75% order-1 streams); §5.1 §River flow evaluation for φ = 0.42·A^0.69 with A in m² and φ in m³/s, 'This equation takes into account evaporation and infiltration, and that is why the volume flow is not preserved'; §7 for the river primitive h(p) = u_z(p) + δ(d(p)) — the elevation of the projection on the centreline plus a stored profile of signed distance — and for the replace operator h_C(A,B) = (1−w_B)h_A + w_B h_B that puts it into the terrain; §6.2 fig. 14 for terrain elevation as a distance-weighted combination of the projection on the river and the projection on the ridge; §6.1 fig. 12 for the junction-angle rule, 'nearly perpendicular' when the joining flows differ and a small angle when they are the same size" }
   - { id: peytavie2019, tier: P, locator: "§5.1 and its margin note — 'We check that the river height is monotonically decreasing. When this fails, we propagate the heights of the river trajectories downwards and perform local adjusments at the junctions'; §5.2 with fig. 8 for cross-section templates 'normalized in the sense that their scale assumes unit area for water in the cross section', scaled by a = φ/‖u‖ with φ = 0.42A^0.69; §5.2 with fig. 13 for Rosgen D — 'We first establish the number of channels based on the flow volume and width of the river', each thread on its own trajectory with width and depth 'determined by partitioning the aggregate flow between channels', and 'in order to preserve flow, the final height of the riverbed is set as the minimum height over all channels'; §5.2 fig. 12 for the asymmetric cross-section in high-curvature bends" }
-  - { id: paris2023, tier: P, locator: "§4 — 'the width of the channel is related to the drainage by the power law w_Γ ∝ a^0.5' and the width–depth relation w_Γ = 18.8 d_Γ^1.41 attributed to Konsoer et al. 2013, both held constant per channel; §6.1 fig. 21 for the junction-angle rule, near perpendicular when the two flows differ and a small angle when they are similar; §6.2 fig. 22 for the three collision cases — upstream, downstream and disconnected — that a migrating network needs and a static tree does not" }
+  - { id: paris2023, tier: P, locator: "§3.1 (NOT §4, which is the migration model) — 'the width of the channel is related to the drainage by the power law w_Γ ∝ a^0.5' and the width–depth relation w_Γ = 18.8 d_Γ^1.41 attributed to Konsoer et al. 2013, both held constant per channel; §6.1 fig. 21 for the junction-angle rule, near perpendicular when the two flows differ and a small angle when they are similar; §6.2 fig. 22 for the three collision cases — upstream, downstream and disconnected — that a migrating network needs and a static tree does not" }
   - { id: braid_flow_split, tier: F, locator: "no artefact: how a reach's discharge is divided among the threads of a braid. peytavie2019 §5.2 says only that the parameters are 'determined by partitioning the aggregate flow between channels' and prints no rule" }
   - { id: subcell_channel, tier: F, locator: "no artefact: the rule that a channel narrower than about two cells cannot be carved into a heightfield at all. Universal in practice, unpublished as such" }
 ---
@@ -122,7 +122,7 @@ therefore, the intercept values, `a`, `c`, and `k`, will vary" (p. 9). So expose
 the coefficient: the user names one river on the map and its width, and every other river
 follows `w/w₀ = (Q/Q₀)^0.5`. A hard-coded `a` is a constant reconstructed from nothing.
 
-**Two published chains disagree, and the gap is large.** [paris2023] §4 uses `w ∝ A^0.5` — width
+**Two published chains disagree, and the gap is large.** [paris2023] §3.1 uses `w ∝ A^0.5` — width
 against drainage *area*. Chaining `φ = 0.42A^0.69` [genevaux2013] into `w ∝ Q^0.5` gives
 `w ∝ A^0.345` instead. Normalised to agree at 1 km², the two differ by 1.43× at 10 km² and 2.92×
 at 1000 km² (`hydraulic_geometry.py` §5). Pick one and state it; do not mix them across a
@@ -137,7 +137,7 @@ much of a network that is: in the basin Strahler fits, 139 of the 200 segments (
 order 1 [strahler1957]. That is a rendering decision forced by geometry, and it is better made
 deliberately than discovered as flicker.
 
-**Depth and shape.** [paris2023] §4 pairs the width with `w = 18.8·d^1.41` (Konsoer et al. 2013,
+**Depth and shape.** [paris2023] §3.1 pairs the width with `w = 18.8·d^1.41` (Konsoer et al. 2013,
 not opened here) and holds both constant along a channel. That constancy is the approximation to
 question first if a river looks uniform.
 
@@ -365,7 +365,7 @@ two share authors, so treat this as one rule stated twice rather than as corrobo
   control of position. If you need neither, `flow-routing.md` is cheaper and always consistent.
 - **Tree or DAG** flips the moment a second thread exists, and the cost is the collision handling
   of [paris2023] §6.2 — not a small addition.
-- **Constant width per channel or width per node**: constant is what [paris2023] §4 ships. With
+- **Constant width per channel or width per node**: constant is what [paris2023] §3.1 ships. With
   `w ∝ A^0.345`, a reach spanning a factor 1.32 in drainage area varies 10% in width, a factor 2
   varies 27%, and a factor 10 varies 121% (`hydraulic_geometry.py` §10). Split the edge at every
   confluence and the question stops arising.

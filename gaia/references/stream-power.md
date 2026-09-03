@@ -53,7 +53,11 @@ receiver has already been updated when you reach a cell, because the stack is or
 first. Braun & Willett could not be opened here, so the block below was checked against
 [cordonnier2016] §5 eq. 2 instead, which is the same update written for a stream *tree*
 (`h_i(t+δt) = (h_i(t) + δt·u_i + f·h_j(t+δt)) / (1 + f)`, with the receiver `j` solved first by
-parsing root-to-leaves) and which attributes the method to Braun & Willett:
+parsing root-to-leaves). The attribution to Braun & Willett is in that paper's **§1** — "The
+original method from [BW13] is extended to efficiently model water flowing from lakes" — and §4,
+where extending it to lakes is costed at O(N√N). ⚠️ This passage used to place the attribution in
+§5; §5 states the scheme and the ordering requirement and cites nobody, so the section named as
+the credit was the one section that does not give it.
 
 ```
 stack = buildStack(receivers)               # flow-routing.md, "Accumulation, and the three arrays"
