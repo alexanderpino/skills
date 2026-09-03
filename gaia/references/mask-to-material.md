@@ -178,11 +178,20 @@ Measured (`scratchpad/w6/colour_blend.py`, 4096 texels, uniform height channels)
 
 Three things fall out of that table.
 
-**`depth` is the transition width, in weight units, to within 11%.** It is not a vague contrast
-knob: set `depth = 0.05` and the blend takes 4.5% of the weight range to go from 10% to 90%. That
-makes it directly authorable — and it is the parameter that decides whether a boundary reads as
-interlocking gravel (small) or as a soft cross-fade (large, at which point you have paid for height
-blending and got alpha blending).
+**`depth` is the *per-texel* transition width, in weight units, to within 14% — and it is not the
+width of the boundary you see.** ⚠️ There are two widths here and an earlier draft reported one of
+them as both. Per texel, the flip from 10% to 90% takes `0.89 × depth` at every depth measured
+(0.018, 0.089, 0.259 at depth 0.02, 0.10, 0.30). But every texel flips at a *different* `t`,
+because each carries a different height, so the **ensemble** band — the range of `t` over which the
+surface is a visible mixture — measures **0.56, 0.56, 0.61**: essentially independent of `depth`,
+and 30× wider than the per-texel figure at `depth = 0.02`.
+
+So `depth` sets **how dithered the boundary is, not how wide it is**. That is still the parameter
+worth authoring, and the table's own strongest row says why: at `t = 0.5` alpha blending has
+**100%** of texels in a mixed state and height blending has **4.9%** at `depth = 0.02`. The
+boundary occupies a similar span of weight either way; what changes is whether it resolves into
+interlocking grains or smears. A reader sizing a transition band from `depth` alone would ask for
+0.018 and get 0.56.
 
 **Alpha blending destroys texture contrast, by an amount you can predict.** Averaging two
 independent textures of equal standard deviation gives `σ/√2 = 70.7%` of the original — measured at
@@ -225,7 +234,11 @@ one-LSB seam: `12.92 × 0.0031308 = 0.040449936`, against the decode threshold o
 of **6.4e-8**, or 0.00002 of an 8-bit code value. That is the residue of the rounding error
 [srgb1996] records being corrected during standardisation, and it is far below quantisation, so it
 matters only if you are testing exact continuity. The round trip itself is clean: decode∘encode
-over 10001 samples of [0,1] is accurate to **4.4e-16**, i.e. float64 exact.
+over 10001 samples of [0,1] is accurate to **4.4e-16** — but ⚠️ that is a **sampling artefact**, not
+exactness: a coarse grid steps over the knot. Resampling 300001 points across [0.0030, 0.0033],
+where the two branches actually disagree, the round-trip error is **2.3e-09**. Still far below any
+8-bit or even 16-bit quantisation, so the conclusion is unchanged and the reason for it is not:
+the curve is not float64-exact, it is exact everywhere you are unlikely to sample.
 
 **Blending in the encoded space is a real, large error, not a purist's complaint.** Measured
 (`scratchpad/w6/colour_blend.py`) as the difference between lerping the *encoded* values and

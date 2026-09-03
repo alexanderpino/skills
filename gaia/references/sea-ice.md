@@ -155,7 +155,10 @@ the fitter is not the problem.
 
 **Plain Poisson-Voronoi is off by the entire exponent.** Its fitted slope is near *zero*: cell
 areas have a coefficient of variation of about 0.5, span under two decades, and the largest tenth
-of the cells holds a fifth of the ice. In a real field the largest tenth holds **nine tenths**.
+of the cells holds a fifth of the ice. In a **synthetic power law** at the observed exponent the largest tenth holds **0.88** of the ice
+at −1.8 and **0.74** at −2.0 — ⚠️ both ends of that pair sit inside Denton's own measured range, so
+this is a property of the fitted law, not a field observation, and it moves by a seventh across the
+published spread. No source read here reports the statistic directly.
 A real field is a few enormous floes among a scatter of chips; a Poisson-Voronoi field is
 interchangeable pebbles, which is what every naive floe node looks like. The CV barely moves
 across N = 300, 1000 and 3000 — 0.52, 0.52, 0.53 — so this is the construction's own statistic

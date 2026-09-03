@@ -126,7 +126,7 @@ flux through that pipe, `|v|` the flow speed reconstructed from the fluxes. Pipe
 cross-sectional area and `l` its length — **both constants**, not functions of depth; Šťava
 fixes `A = l²` with `l` the cell spacing [stava2008], and the choice is a stability parameter,
 not a free one (see **Time budget**). Erosion: `Kc` the sediment-capacity constant, `α` the
-local tilt angle, `α_min ≈ 0.05` its floor, `lmax(d)` a ramp from 0 at zero depth to 1 at a
+local tilt angle **in radians**, `α_min ≈ 0.05` its floor — ⚠️ radians too, and the mistake is quiet because `sin(0.05 rad) = 0.04998`, so a floor read as degrees is 57× too small and still looks like a small number — `lmax(d)` a ramp from 0 at zero depth to 1 at a
 depth `Kdmax` [jako2011].
 
 ```
@@ -292,7 +292,10 @@ pass that cannot see the other layers cannot respect their combined slope, and a
 pass whose result depends on when it ran. Take the order dependence, fix the order, and put it in
 the cache key. The exception is a stack that is **a splatmap rather than geometry** — nothing there
 is rendered as a slope, so the exactness is free and worth having. Separated piles are unaffected
-either way; each relaxes to exactly its own limit (32.00° and 38.00° measured), and the trade
+once their **runouts** stop overlapping, which is the condition, not the separation of their peaks:
+at 32° and 38° with 12 m cones, centres 12 cells apart still differ by 0.38 m between orders, 16
+cells by 0.016 m, and 24 cells or more by exactly 0.000. Beyond that each relaxes to exactly its
+own limit (32.00° and 38.00° measured), and the trade
 appears only where two classes overlap — which, since selective deposition is what puts them in the
 same place, is wherever the feature you wanted is. `thermal-and-aeolian-erosion.md`'s calibration ranges are the numbers to
 start from: dry sand 30–35°, gravel and scree 35–40°, unsourced there and unsourced here. The

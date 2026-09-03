@@ -173,7 +173,14 @@ anything that assumes it is right about a particular river.
 **The better threshold, if you have a grain size.** [candel2021] §2.2 defines potential specific
 stream power `ω_pot = ρgQ_ef·S_v/W_r` on a reference width `W_r = φ√Q_ef` (`φ = 4.7` sand-bed,
 3.0 gravel-bed — note `√Q` is `b = 0.5` again, arriving from a different direction), then puts
-the braided–meandering transition at `ω_bm = 900·D50^0.42`. The `√Q` reference width is what
+the braided–meandering transition at `ω_bm = 900·D50^0.42`.
+
+⚠️ **Both of those constants are unit-bound, and this document warns about exactly that trap two
+sections later for `λ = 6.5·w^1.1`.** `W_r = φ√Q` is dimensionally `m = φ·(m³/s)^0.5`, so `φ`
+carries `m^-0.5·s^0.5` and 4.7 is an SI number: feed it cfs and the width is wrong by
+`√35.31 = 5.94×`. `ω_bm = 900·D50^0.42` likewise fixes a unit for `D50` that the expression does
+not state — [candel2021] works in millimetres. Neither constant is dimensionless and neither
+survives a unit change; convert the discharge and the grain size before you use them, or refit. The `√Q` reference width is what
 makes this pattern-independent: it does not need to know the answer to compute the input.
 
 ## Two multi-thread planforms, and they are opposites
@@ -286,9 +293,13 @@ h(p) = u_z(p) + delta(d(p))
 
 `u(p)` is the projection of `p` onto the centreline, `u_z` its bed elevation, `d(p)` the signed
 distance, and `δ` a stored 1-D profile — piecewise, per river type, and it can carry layers for
-bedrock, water and sand. Put it into the terrain with the *replace* operator rather than a blend,
-`h_C = (1−w_B)h_A + w_B h_B`, so the channel wins inside its support and the terrain is untouched
-outside it. **Valley widening is the same operator with a wider support and a shallower profile**
+bedrock, water and sand. Put it into the terrain with [genevaux2013]'s *replace* operator,
+`h_C = (1−w_B)h_A + w_B h_B`. ⚠️ **That expression is a convex blend, and it only "replaces"
+because `w_B` is compactly supported and saturates**: it is 1 inside the channel and 0 beyond the
+support radius, so the channel wins where it is defined and the terrain is untouched outside it.
+Written with a `w_B` that merely tapers — a Gaussian, or a falloff with no flat top — the same line
+is an ordinary blend and the channel bed comes out a fraction of the depth you asked for. The name
+is a property of the weight, not of the formula. **Valley widening is the same operator with a wider support and a shallower profile**
 — [genevaux2013] §6.2 computes terrain elevation as a distance-weighted combination of the
 projection on the river and the projection on the ridge, which is a valley cross-section by
 construction. It is not a separate algorithm.

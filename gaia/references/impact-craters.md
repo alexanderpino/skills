@@ -147,7 +147,7 @@ applies:
 | 5 km | 57.9 m | 184 m | 0.31 |
 | 10 km | 98.7 m | 372 m | 0.27 |
 
-So **roughly half to three-quarters of the rim is uplift rather than deposit, and the deposited
+So **45% to 73% of the rim is uplift rather than deposit, rising with diameter, and the deposited
 share falls as the crater grows.** That is a modelling instruction, not trivia: only the ejecta
 part continues outward as the blanket, so a profile that extrudes the whole rim height outward
 under the falloff law puts two to four times too much material on the surrounding ground. Build
@@ -271,7 +271,7 @@ argument: it is material added to slopes, so it should be there before the mater
 | Large craters are implausibly deep | Simple-branch depth extrapolated past the transition | At 250 km the simple law gives ~52 km of depth against the complex law's ~5.5 km |
 | Every crater on an alien world is the same shape as the Moon's | `D*` hard-coded at a lunar value | Scale by `1/g`; then expose it, because target strength moves it too [silber2017] |
 | Ejecta reads as a wide stain or a pedestal | Falloff exponent far below 3 | `t ∝ (r/R)^−2.8`; thickness is 1/7 at 2R and 1/49 at 4R [austin2024] |
-| Far too much material heaped around the crater | The whole rim height extruded outward as ejecta | Only the ejecta share travels: `T = 0.14·R^0.77` m, a quarter to a half of the rim height [austin2024] |
+| Far too much material heaped around the crater | The whole rim height extruded outward as ejecta | Only the ejecta share travels: `T = 0.14·R^0.77` m, 0.55 of the rim height at D = 0.5 km falling to 0.27 at 10 km [austin2024] |
 | A visible seam or ring at the rim crest | Cavity and rim authored as two stamps that disagree there | One radial profile covering cavity, crest and blanket |
 | Craters landing in a basin float above its floor | The whole stamp added to existing height | Cavity replaces, ejecta adds |
 | The field is all tiny pits and one big hole | `D_min` set from performance, with `η ≈ 3` | Half the cratered area lives in the smallest tenth of the log range; choose `D_min` deliberately |

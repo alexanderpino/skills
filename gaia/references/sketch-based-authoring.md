@@ -123,6 +123,16 @@ and **after** otherwise. Measured against theory, exactly (`constraint_solvers.p
 | 8 | 480 | 480 | 0.667 |
 | 16 | 1920 | 1920 | 0.873 |
 
+⚠️ **That closed form is in PEAK amplitude, and the table above it reports RELIEF. They are not the
+same number and the document owes you the reconciliation.** The same σ = 4 crest over the same 200
+steps keeps **0.408 of its peak** and **18.8% of its visible relief**, because diffusion raises the
+flanks while it lowers the crest and relief is the difference between them. The measurement script
+says it outright: *peak retention flatters the survivor; relief is what a viewer sees.* So a ridge
+sitting exactly on `σ = sqrt(2DT/3)` keeps half its peak and appreciably less than half of what a
+viewer would call the ridge. Treat the closed form as a **lower bound on the width you need**, not
+as the width that works, and check relief on your own field before trusting it. (Curvature is not
+the explanation: a curved arc decays within 0.5% of a straight ridge, 0.410 against 0.408.)
+
 At `D = 1`, `Δt = 0.2`, 200 steps, the threshold is `σ ≥ 5.16` cells, and the table crosses
 between 4 and 8 as it must. **Half-life goes as width squared**: doubling the width of a drawn
 feature buys four times the life. That is why erosion eats drawn creases and spares drawn

@@ -110,6 +110,10 @@ dimensions and evaluate a 4-D noise there [periodic_lattice_practice]:
 
 ```
 a = 2*pi*x/T;  b = 2*pi*y/T
+# r is the CIRCLE RADIUS and it is the embedding's only free parameter: it sets feature
+# scale, because arc length around the circle is 2*pi*r while the tile spans T. A feature
+# of f cells in the tile maps to f * (2*pi*r/T) units of 4-D noise space, so pick
+# r = T / (2*pi) to make the mapping unit-rate and then set scale in the noise as usual.
 n(x, y) = noise4(r*cos a, r*sin a, r*cos b, r*sin b)
 ```
 
@@ -302,7 +306,13 @@ either side of it, and widening the band widens the strip.
 
 **What the band is actually for is a *statistical* mismatch, and there the width has a formula.**
 A blend does not remove a difference of `D` between the two sides; it converts a step of `D` into a
-ramp of slope `D/B`. It is invisible once that ramp is below the terrain's own mean step `s`.
+ramp of slope `D/B` **on a linear blend** — and nobody blends linearly, which is where the factor
+of 2 in the crossover comes from. A smootherstep weight `6t⁵ − 15t⁴ + 10t³` has a maximum slope of
+`30/16 = 1.875` at the band centre (measured 1.87500), so the steepest part of the ramp is
+`1.875·D/B`, not `D/B`. Rounding 1.875 up to 2 is the whole of the gap between this mechanism and
+the measured crossover below — the mechanism was not wrong, it was quoting the average where the
+seam is set by the maximum. It is invisible once that steepest slope is below the terrain's own
+mean step `s`.
 Measured `B*`, the smallest band at which the band's mean step falls to the terrain's:
 
 | mismatch `D/s`, in cells | 1.3 | 2.6 | 5.2 | 7.8 | 13.0 | 25.9 | 51.9 |

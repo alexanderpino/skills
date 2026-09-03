@@ -151,7 +151,19 @@ term [mitchell2021] §2.5 eq. (12):
 
 ```
 C_H = K_W * A^m * |dz/dx|^n / ( |dz/dx| - tan(phi) )        # phi < 0 dips upstream
+# VALID ONLY FOR |dz/dx| > tan(phi). See the warning below: for phi > 0 this is
+# singular at S = tan(phi) and NEGATIVE below it, which is most channel slopes.
 ```
+
+⚠️ **The dip-corrected form has a pole, and downstream dip walks straight into it.** For `φ > 0`
+(beds dipping downstream) the denominator `S − tan φ` vanishes at `S = tan φ` and goes negative
+below it. At `φ = +15°`, `tan φ = 0.268` — steeper than almost every channel in a real domain — so
+the expression returns a **negative celerity** at `S = 0.10`, `0.05` and `0.02`, and blows up near
+0.268. [mitchell2021] Table 1 tests −45° to **+15°**, so the published range stops exactly where
+this bites, and the prose above ("beds dipping downstream speed it up") describes only the
+`S > tan φ` branch. Clamp the denominator away from zero and fall back to the undipped `C_H` below
+`S = tan φ`, or restrict `φ` to the upstream-dipping case, where `S + |tan φ|` is unconditionally
+positive and the formula behaves as described.
 
 Beds dipping **upstream** (`φ < 0`) enlarge the denominator and **slow** contact migration; beds
 dipping **downstream** speed it up. [mitchell2021] Table 1 works dips from −45° to +15°. The
