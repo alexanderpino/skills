@@ -246,6 +246,46 @@ jobs:
           cp /tmp/bk_guard scripts/check.py
           cp /tmp/bk references/tiled-streaming.md
 
+          # Three guards were added in a single day and NOTHING asserted they run. Gutting them
+          # to `return []` left check.py and --selftest both green -- because on a clean corpus a
+          # check that finds nothing is indistinguishable from a check that does nothing. So the
+          # mutation has to be a VIOLATION each guard uniquely catches.
+
+          # check_not_opened: an entry whose citing locator declares NOT OPENED, untagged.
+          cp references/papers-generation.md /tmp/bk_no
+          python3 - <<'PYNO'
+          import re, pathlib
+          p = pathlib.Path("references/papers-generation.md"); s = p.read_text(encoding="utf-8")
+          assert "`P` [not-opened]" in s, "no tagged entry -- mutation would pass vacuously"
+          p.write_text(s.replace("`P` [not-opened]", "`P`", 1), encoding="utf-8")
+          PYNO
+          expect_red "a not-opened tag removed while the locator still declares it"
+          cp /tmp/bk_no references/papers-generation.md
+
+          # check_headings: a duplicated heading at the same level.
+          cp $SUBJ /tmp/bk
+          python3 - <<'PYHD'
+          import pathlib
+          p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
+          h = "## Use this"
+          assert h in s, "no `## Use this` -- mutation would pass vacuously"
+          p.write_text(s.replace(h, h + "\n\ndup\n\n" + h, 1), encoding="utf-8")
+          PYHD
+          expect_red "a heading duplicated at the same level"
+          cp /tmp/bk $SUBJ
+
+          # check_axis_agreement: a document tagged onto an axis coverage.md does not file it under.
+          cp references/sea-ice.md /tmp/bk_ax
+          python3 - <<'PYAX'
+          import re, pathlib
+          p = pathlib.Path("references/sea-ice.md"); s = p.read_text(encoding="utf-8")
+          assert re.search(r"^tags: \[simulation", s, re.M), "axis tag moved -- update this mutation"
+          p.write_text(re.sub(r"^tags: \[simulation", "tags: [generation", s, count=1, flags=re.M),
+                       encoding="utf-8")
+          PYAX
+          expect_red "axis tag disagreeing with the coverage section"
+          cp /tmp/bk_ax references/sea-ice.md
+
           python3 scripts/check.py >/dev/null || { echo "::error::copy not restored"; fails=$((fails+1)); }
           echo
           [ "$fails" -eq 0 ] && echo "all mutations bite; decoy clean" || { echo "$fails problem(s)"; exit 1; }

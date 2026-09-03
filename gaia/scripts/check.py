@@ -56,7 +56,8 @@ STATUS = {"draft", "stable", "deprecated"}
 # exactly how eighteen unread `P` entries went unnoticed for as long as they did.
 _ENTRY = re.compile(r"^- \*\*(?P<id>[a-z][a-z0-9_]*)\*\*\s+`(?P<tier>[PFLN?])`"
                     r"(?P<notopened>\s+\[not-opened\])?\s+—\s+(?P<ref>.+?)"
-                    r"(?P<background>\s+\[background\])?(?P<noartefact>\s+\[no-artefact\])?\s*$")
+                    r"(?P<background>\s+\[background\])?(?P<noartefact>\s+\[no-artefact\])?"
+                    r"(?P<notopened_trailing>\s+\[not-opened\])?\s*$")
 # an inline citation marker in a body: [ocallaghan1984]  (not a markdown link, so not `](`)
 _ID_OPENER = re.compile(r"^- \*\*[a-z][a-z0-9_]*\*\*")
 _TOPIC = re.compile(r"^- \*\*(?P<id>[a-z][a-z0-9-]*)\*\*\s+`(?P<state>covered|planned|out-of-scope)`"
@@ -129,7 +130,8 @@ def _scan(papers: Path, body: str, entries: dict, problems: list, offset: int = 
         entries[m["id"]] = {"tier": m["tier"], "ref": m["ref"].strip(),
                             "background": bool(m["background"]),
                             "no_artefact": bool(m["noartefact"]),
-                            "not_opened": bool(m["notopened"]), "file": stem}
+                            "not_opened": bool(m["notopened"] or m["notopened_trailing"]),
+                            "file": stem}
 
 
 def sources_digest(fm: dict) -> str:
@@ -321,6 +323,12 @@ ENTRY_TAG_FIXTURES = [
     ("- **beven1979** `P` — Beven, K. (1979). *A physically based model.*", False),
     ("- **strat_authoring** `F` [not-opened] — No canonical source. [no-artefact]", True),
     ("- **burt1983** `P` — Burt, P.J. (1983). *The Laplacian Pyramid.* [background]", False),
+    # An author writes the tag where the two SIBLING tags go -- at the END. There it used to be
+    # swallowed silently by the `ref` group, with no format error, because the line still
+    # matched. 69 of 196 entries wrap onto a continuation line, so for those the visual end of
+    # the entry is a line this regex never reads, which is exactly where a hand would put it.
+    ("- **horn1981** `P` — Horn, B.K.P. (1981). *Hill shading.* [not-opened]", True),
+    ("- **horn1981** `P` — Horn, B. (1981). *Hill shading.* [background] [not-opened]", True),
 ]
 
 NOT_OPENED_FIXTURES = [
@@ -329,6 +337,7 @@ NOT_OPENED_FIXTURES = [
     ("NO LOCATOR \u2014 not obtained, and deliberately not guessed", True),
     ("no artefact: a convention this repository recommends", False),
     ("Abstract only; the full text was not reached", False),  # weaker, but something WAS read
+    ("\u00a73.1. not opened -- the journal is paywalled", True),  # lower case must count too
 ]
 
 
@@ -355,7 +364,7 @@ def not_opened_count() -> tuple[int, int]:
             if not loc:
                 continue
             seen += 1
-            if any(mark in loc for mark in LOCATOR_NOT_OPENED):
+            if any(mark in loc.upper() for mark in LOCATOR_NOT_OPENED):
                 unread += 1
     return unread, seen
 
@@ -425,20 +434,23 @@ def selftest() -> int:
     ebad = []
     for t, want in ENTRY_TAG_FIXTURES:
         m = _ENTRY.match(t)
-        if m is None or bool(m["notopened"]) != want:
+        if m is None or bool(m["notopened"] or m["notopened_trailing"]) != want:
             ebad.append((t, want))
     for t, want in ebad:
         print(f"  FAIL  entry-tag fixture: {t!r} should parse with not_opened="
               f"{want}")
     ubad = [(t, want) for t, want in NOT_OPENED_FIXTURES
-            if any(mark in t for mark in LOCATOR_NOT_OPENED) != want]
+            if any(mark in t.upper() for mark in LOCATOR_NOT_OPENED) != want]
     for t, want in ubad:
         print(f"  FAIL  not-opened fixture: {t!r} should be "
               f"{'COUNTED as unread' if want else 'not counted'}")
     if bad or nbad or ubad or ebad:
+        # `ebad` used to gate the exit code and not appear in this sentence, so a run with
+        # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
         print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
-              f"{len(nbad)} of {len(NO_ARTEFACT_FIXTURES)} no-artefact fixtures and "
-              f"{len(ubad)} of {len(NOT_OPENED_FIXTURES)} not-opened fixtures misclassified.")
+              f"{len(nbad)} of {len(NO_ARTEFACT_FIXTURES)} no-artefact fixtures, "
+              f"{len(ubad)} of {len(NOT_OPENED_FIXTURES)} not-opened fixtures and "
+              f"{len(ebad)} of {len(ENTRY_TAG_FIXTURES)} entry-tag fixtures misclassified.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
           f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct; "
@@ -570,7 +582,7 @@ def check_not_opened(bib: dict[str, dict], cites: dict[str, list[tuple[Path, str
     for sid, entry in sorted(bib.items()):
         tagged = entry["not_opened"]
         for path, loc in cites.get(sid, []):
-            declares = any(mark in loc for mark in LOCATOR_NOT_OPENED)
+            declares = any(mark in loc.upper() for mark in LOCATOR_NOT_OPENED)
             rel = path.relative_to(ROOT)
             if tagged and not declares:
                 problems.append(
@@ -658,26 +670,38 @@ def check_headings() -> list[str]:
     backtick in the fragment.
     """
     problems: list[str] = []
-    skip = set(paper_files()) | {INDEX}
+    skip = {INDEX, COVERAGE}
     for path in documents(ROOT):
         if path in skip:
             continue
         rel = path.relative_to(ROOT)
-        seen: dict[str, int] = {}
+        seen: dict[tuple[int, str], int] = {}
+        fenced = False
         for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if not line.startswith("#"):
+            if line.lstrip().startswith("```"):
+                fenced = not fenced
                 continue
+            # A `#` comment inside a code block is not a heading. Without this, a duplicated
+            # comment in two fences was reported as a duplicate heading, and an odd backtick in
+            # a comment as an unbalanced one -- naming a line the reader does not see as a
+            # heading at all. Every other walker in this file tracks fences; this one did not.
+            if fenced or not line.startswith("#"):
+                continue
+            level = len(line) - len(line.lstrip("#"))
             text = line.lstrip("#").strip()
             if line.count("`") % 2:
                 problems.append(f"{rel}:{n}: heading has an unbalanced backtick -- "
                                 f"a heading is not a place for half a code span, and this is "
                                 f"what a spliced insertion looks like: {text[:60]!r}")
-            if text in seen:
-                problems.append(f"{rel}:{n}: duplicate heading {text[:50]!r}, already at "
-                                f"line {seen[text]}. Either one is a leftover from an edit, or "
-                                f"a cross-reference to it is ambiguous")
+            # Keyed on (level, text): a `### Cost` under two different `##` sections is
+            # legitimate, and the bibliographies -- previously skipped, which was hiding this
+            # rather than deciding it -- carry three real `##`/`###` same-name pairs.
+            if (level, text) in seen:
+                problems.append(f"{rel}:{n}: duplicate heading {text[:50]!r} at the same level, "
+                                f"already at line {seen[(level, text)]}. Either one is a leftover "
+                                f"from an edit, or a cross-reference to it is ambiguous")
             else:
-                seen[text] = n
+                seen[(level, text)] = n
     return problems
 
 
