@@ -446,18 +446,25 @@ def selftest() -> int:
     for t, want in ubad:
         print(f"  FAIL  not-opened fixture: {t!r} should be "
               f"{'COUNTED as unread' if want else 'not counted'}")
-    if bad or nbad or ubad or ebad:
+    cbad = [(t, want) for t, want in COST_FIXTURES
+            if bool(COST_UNIT.search(t)) != want]
+    for t, want in cbad:
+        print(f"  FAIL  cost fixture: {t!r} should be "
+              f"{'COUNTED as priced' if want else 'not counted'}")
+    if bad or nbad or ubad or ebad or cbad:
         # `ebad` used to gate the exit code and not appear in this sentence, so a run with
         # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
         print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
               f"{len(nbad)} of {len(NO_ARTEFACT_FIXTURES)} no-artefact fixtures, "
               f"{len(ubad)} of {len(NOT_OPENED_FIXTURES)} not-opened fixtures and "
-              f"{len(ebad)} of {len(ENTRY_TAG_FIXTURES)} entry-tag fixtures misclassified.")
+              f"{len(ebad)} of {len(ENTRY_TAG_FIXTURES)} entry-tag fixtures and "
+              f"{len(cbad)} of {len(COST_FIXTURES)} cost fixtures misclassified.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
           f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct; "
           f"not-opened marker: {len(NOT_OPENED_FIXTURES)}/{len(NOT_OPENED_FIXTURES)} correct; "
-          f"entry tag: {len(ENTRY_TAG_FIXTURES)}/{len(ENTRY_TAG_FIXTURES)} correct.")
+          f"entry tag: {len(ENTRY_TAG_FIXTURES)}/{len(ENTRY_TAG_FIXTURES)} correct; "
+          f"cost unit: {len(COST_FIXTURES)}/{len(COST_FIXTURES)} correct.")
     return 0
 
 
@@ -505,6 +512,62 @@ def locator_quality() -> tuple[int, int, int, list[str]]:
             else:
                 vague.append(f"{path.name}:{s.get('id')} -> {loc[:44]}")
     return sharp, total, noart, vague
+
+
+# A number bound to a unit that can only mean MACHINE COST. Wall-clock prose is deliberately
+# absent: "about 2 minutes" and "1.3 hours" are indistinguishable by pattern from a physical
+# timescale, and coastal-erosion.md's "1.3 hours" is a shoreline e-folding time, not a bake. So
+# this UNDER-counts, which is the safe direction for a number that is supposed to go up, and a
+# document that wants credit has to state the cost precisely enough to be actionable anyway.
+COST_UNIT = re.compile(r"(?<![\w.])\d[\d.,]*\s*(?:ms|\u00b5s|us|MB|GB|KB|TB|MiB|GiB|KiB|fps|FPS)\b"
+                       r"|bytes?\s*(?:per|/)\s*cell", re.I)
+
+COST_FIXTURES = [
+    ("the bake is 104 ms at 4k", True),
+    ("32 MB per resident tile", True),
+    ("4 bytes per cell, so 1.3 GB", True),
+    ("holds 20 fps on the preview", True),
+    ("about 2 minutes at 16 azimuths", False),      # wall clock: not a machine unit
+    ("an e-folding time of 1.3 hours", False),      # physical, and the reason minutes/hours are out
+    ("a 512 preview against a 4k build", False),    # resolutions are not costs
+    ("the timestep limit is 0.5", False),
+    ("wind at 0.28 m s-1", False),
+    ("it is fast in practice", False),
+]
+
+
+def cost_coverage() -> tuple[int, int, list[str]]:
+    """Does a recommendation say what it COSTS?
+
+    This skill's audience builds a game engine or an authoring tool, and for that reader the
+    cost IS the decision: a technique that is correct and unaffordable is not a
+    recommendation, it is a fact. The corpus grades whether a claim is TRUE -- tiers,
+    locators, read logs, all of it -- and had no instrument at all for whether the advice is
+    BUILDABLE. Measured when this was added: 6 of 34 documents stated a cost in a machine
+    unit. `simulation-time-budget.md` exists precisely because the offline-versus-per-frame
+    crossover is the one claim neither source skill makes, and that idea was then applied
+    almost nowhere else.
+
+    REPORTED, not enforced, for the same reason `locators` is: failing 28 documents today
+    would make the guard red for a week and teach everyone to ignore it. It is an OPEN row in
+    registers/guard-proofs.tsv, not a passing check.
+
+    What it cannot see, stated so nobody mistakes the number for more than it is: it counts a
+    UNIT, not a claim. A document could print "32 MB" in an unrelated aside and score; a
+    document could give a careful asymptotic cost in cells and not. It is a floor on how many
+    documents talk about cost at all, and nothing more.
+    """
+    docs = [p for p in documents(ROOT)
+            if p not in paper_files() and p not in (INDEX, COVERAGE)]
+    without = []
+    for d in docs:
+        try:
+            _, body = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        if not COST_UNIT.search(body):
+            without.append(d.name)
+    return len(docs) - len(without), len(docs), sorted(without)
 
 
 def check_orphans(bib: dict[str, dict], used: set[str]) -> list[str]:
@@ -999,6 +1062,14 @@ def main() -> int:
     if rec_total:
         print(f"recommendation {rec_total}/{rec_total} documents name an approach to "
               f"implement; {rec_first} state it first, before any explanation.")
+
+    priced, ndocs, _unpriced = cost_coverage()
+    if ndocs:
+        print(f"cost {priced}/{ndocs} ({100 * priced / ndocs:.0f}%) of documents state what their "
+              f"recommendation COSTS in a machine unit -- ms, MB, bytes per cell, fps. The rest say "
+              f"what is correct and not what it is worth, which for someone choosing what to ship is "
+              f"half an answer. Wall-clock prose is not counted: an e-folding time and a bake time "
+              f"look identical to a regex. Reported, not enforced; see registers/guard-proofs.tsv.")
 
     sharp, tot, noart, _vague = locator_quality()
     if tot:
