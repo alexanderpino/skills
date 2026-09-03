@@ -87,9 +87,16 @@ Three implementation notes that cost an afternoon each if missed:
 - **Stay in squared distance until the very end.** The recurrence is exact in integers for an
   integer grid; the square root is one pass at the end, and taking it early destroys the
   separability outright, because the sum of two Euclidean distances is not the distance.
-- **`∞` must be big enough and finite.** Use a large float, not `inf` — the intersection formula
-  divides differences of `f` values, and `inf − inf` is `NaN`. [meijster2000] makes the same point
-  from the other side: `m + n` suffices as the "infinity" of an `m × n` grid.
+- **`∞` must be big enough and finite, and "big enough" is a squared distance.** Use a large float,
+  not `inf` — the intersection formula divides differences of `f` values, and `inf − inf` is `NaN`.
+  The floor must exceed **`m² + n²`**, the largest squared distance the grid can hold.
+  ⚠️ **An earlier version of this bullet said `m + n` suffices, borrowing the constant from
+  [meijster2000] across a units boundary** — that figure is the "infinity" of *his* first phase,
+  which carries unsquared per-column distance, and this pass is squared throughout, as the bullet
+  above insists. Measured on 64², single seed: with `m + n = 128` every cell beyond `√128 = 11.31`
+  cells saturates, giving a max error of **70.7 cells** against a true distance of 82. And the unit
+  test in the next bullet **passes anyway**, because the corruption is symmetric in the two
+  orderings. A wrong floor is silent in exactly the place you would look for it.
 - **Order does not matter.** Columns-then-rows and rows-then-columns give the same field
   [felzenszwalb2012] §2.2, which is a free unit test.
 
@@ -125,8 +132,11 @@ Those errors are *not* small, and they are the reason to reach for the exact tra
 The middle column reproduces the paper's published constants to four decimals from an independent
 implementation, which validates the transcription and the paper simultaneously.
 
-⚠️ **The error is bipolar, not systematically positive, and the published constant is the
-*under*-estimate.** An earlier draft of this document claimed chamfer distances over-estimate
+⚠️ **The error is bipolar, not systematically positive — and which extreme the published constant
+names depends on the mask.** For **3-4** the constant `0.0572` is the *under*-estimate, at 45°. For
+**5-7-11** it is the other way round: `0.0198` is the *over*-estimate at 11.3°, and the worst
+underestimate is only **1.61%**, at the 63.4° knight direction. The table below prints both signs
+and is the authority; do not carry the 3-4 story across to 5-7-11. An earlier draft of this document claimed chamfer distances over-estimate
 "everywhere", and its own next sentence disproved it. Measured on a 201² field, single centre seed,
 cells beyond `r = 20`:
 

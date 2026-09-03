@@ -188,7 +188,12 @@ Four rules make a selector correct rather than a tell:
 
 Two details worth the line each: **`northness = dot(aspectVec(aspect), northDir)`** costs one term
 and is what makes people say terrain "feels real" — but on a standard north-up raster the row index
-increases southward, so it is `−sin(aspect)`; the naive `+sin` silently moves snow to the sunny
+increases southward, so it is `−sin(aspect)` **if `dzdy` is a raw row difference** — but ⚠️ **that
+is not this document's convention.** The stencil above defines `H = (Z2 − Z8)/(2L)` as `dz/dy` with
+**+y NORTH**, and under it a north-facing slope gives `aspect = 90°` and northness `+sin(aspect) =
++1`, which is correct. Using `−sin` with this document's own `H` produces precisely the inverted
+result the next paragraph warns about. **Decide which `dzdy` you hold and derive the sign from it;
+the naive mismatch silently moves snow to the sunny
 side. And **use the erosion's deposition field, not a slope proxy, for sediment materials** — it
 puts sand where sand actually went.
 
@@ -220,7 +225,7 @@ the terrain is not changing per frame. The line is the baseline length, not the 
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | Materials subtly wrong everywhere, geometry fine | Analysis computed before the last height write | Move it downstream of erosion |
-| Snow on sunny faces; rain shadow on the wrong flank | Aspect taken uphill, or `+sin` northness on a north-up raster | Negate the gradient; `−sin(aspect)` |
+| Snow on sunny faces; rain shadow on the wrong flank | Aspect taken uphill, or a northness sign that does not match the `dzdy` convention in hand — `+sin` with a raw row difference, `−sin` with this document's `+y`-north `H` | Negate the gradient; `−sin(aspect)` |
 | A slope mask that was right at 1 m/px and wrong at 8 | Slope is resolution-dependent | State the resolution with the threshold; re-tune per LOD |
 | Factor of safety, TWI or wetness biased low | `tan(slope)` applied to a value that is already a tangent | Divide by `slope` bare |
 | Curvature mask is speckle, or shows concentric rings | Second derivative of a quantised field | Compute on R32F, pre-smooth σ ≈ 1 cell |

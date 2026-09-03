@@ -147,19 +147,28 @@ consumer of the sea state agrees.
 ⚠️ **Elfouhaily et al. (1997)**, *A unified directional spectrum for long and short wind-driven
 waves* (J. Geophys. Res. 102(C7), 15781–15796; DOI 10.1029/97JC00467), is the wind- *and*
 fetch-parameterised spectrum spanning gravity and capillary wavenumbers continuously, and it is the
-right target if you need one curve across the whole band. **Gaia does not cite it, deliberately.**
-The fullest treatment of it in this family of skills records that **the paper is paywalled and was
-not read**, and that the equations reproduced there are not taken from the paper but assembled as
-the agreed **intersection of four independent restatements** — Mobley's *Ocean Optics Web Book*
-(which carries the paper's own equation numbers), Wang et al. 2025 (AMT 18, 6329, open access),
-Zhang et al. (PMC6111991, open access), and Hwang & Fois (arXiv:2204.11591). Under Gaia's tier
-rules an unread source cannot be graded `P`, so it is named in prose and graded nowhere.
+right target if you need one curve across the whole band. **Gaia does not cite it, deliberately** — the
+paper is paywalled and nobody working on this skill has opened it. Under Gaia's tier rules an
+unread source cannot be graded `P`, so it is named in prose here and graded nowhere.
 
-⚠️ **That treatment lives in `water-physics/references/12b-water-provenance.md`, which is not in
-this repository.** It exists only on the unmerged branch
-`origin/claude/swimming-pool-voronoi-render-m22g6r` — not on `main`, and not on this branch. The
-substance is restated in full above for exactly that reason: a provenance chain that depends on an
-unmerged branch is not a provenance chain, so nothing here is lost if that branch never lands.
+⚠️ **This paragraph used to claim much more than that, and every part of the extra claim was
+false.** It said a sibling skill's `water-physics/references/12b-water-provenance.md` recorded the
+paper as unread and assembled its equations as "the agreed intersection of four independent
+restatements", naming Mobley's *Ocean Optics Web Book*, Wang et al. 2025, Zhang et al. and
+Hwang & Fois. Checked against every ref in this repository:
+
+- **No `water-physics/` directory exists on any branch.** The file is
+  `terrain-renderer/references/12b-water-provenance.md`, and a register row that "corrected" this
+  path stated the swap in the wrong direction, which is how the phantom prefix spread to six places.
+- **That file does not mention Elfouhaily.** Its two sections are *Provenance tiers* and
+  *Sources & provenance*. The string "Elfouhaily" appears nowhere on that branch, nowhere on `main`,
+  and nowhere in this repository outside Gaia itself.
+- So the four restatements, the "intersection" method, and the record of non-reading were
+  attributed to a document that contains none of them, at a path that does not exist.
+
+The decision not to cite is still right and still stands on its own: the paper is paywalled and
+unread, which is all that is needed. What is gone is a provenance chain that pointed at nothing —
+the exact failure this skill exists to prevent, committed by this skill, about its own sources.
 
 **The field's slope statistics are the part the renderer actually reads.** Below the wavelength a
 displacement grid can resolve, waves stop being geometry and become **variance** — and the crossover

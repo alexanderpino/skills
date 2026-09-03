@@ -117,7 +117,7 @@ authority.
 
 ## Water surfaces
 
-The wave field itself, the dispersion relation, and the absorption law belong to the water-physics
+The wave field itself, the dispersion relation, and the absorption law belong to the water
 documents on the simulation axis. What is listed here is what a *renderer* consumes.
 
 - **bruneton2010** `P` — Bruneton, E., Neyret, F. & Holzschuch, N. (2010). *Real-time realistic ocean lighting using seamless transitions from geometry to BRDF.* Computer Graphics Forum 29(2) (Eurographics), 487–496. — The slope-variance tensor that carries unresolved wave detail out of geometry and into the BRDF, the roughness-aware Fresnel fit — whose `exp(-2.69σ)` term scales the *exponent* of the Schlick power, not the result — and the solar-disc clamp on variance.

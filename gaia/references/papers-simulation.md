@@ -19,13 +19,17 @@ Two tier decisions recur in this family and are stated once:
   is. Tessendorf's ocean notes and Born & Wolf are the load-bearing examples. Naming them is right;
   dressing them as peer review is not.
 - **A number that this repository's own sources record as unread or unverified is not cited at
-  all.** The Elfouhaily unified spectrum is the case: `water-physics/references/12b-water-provenance.md`
-  records that the paper is paywalled and was not read, so `wave-models.md` names it in prose rather
-  than manufacturing a `P`.
+  all.** The Elfouhaily unified spectrum is the case: it is paywalled and nobody working on this
+  skill has opened it, so `wave-models.md` names it in prose rather than manufacturing a `P`.
+  ⚠️ This bullet used to source that record to a sibling skill's `12b-water-provenance.md`. That
+  file does not mention Elfouhaily, and the path it was given does not exist — see
+  `wave-models.md`. The decision stands; the citation for it did not.
 
-⚠️ **`water-physics/` is not in this repository.** Three entries below (`bodytype_doctrine`,
-`iop_split`, and the Elfouhaily note above) point into `water-physics/references/`, which exists
-only on the unmerged branch `origin/claude/swimming-pool-voronoi-render-m22g6r` — not on `main` and
+⚠️ **There is no `water-physics/` skill, and there never was one in this repository** — an earlier
+version of this block named one, and the phantom prefix spread to six places before anyone checked.
+Two entries below (`bodytype_doctrine`, `iop_split`) point at material that really lives in
+`terrain-renderer/references/`, which exists only on the unmerged branch
+`origin/claude/swimming-pool-voronoi-render-m22g6r` — not on `main` and
 not on this branch. `check.py` checks the form of attribution and cannot detect a dangling
 cross-skill path, so it is stated here in prose. Wherever such a pointer is load-bearing, the
 substance is restated inline in the citing document, so nothing depends on that branch ever being
@@ -46,7 +50,7 @@ merged.
 
 ## Body classification
 
-- **bodytype_doctrine** `F` — No external source; a convention this repository recommends, not a finding. The authored `bodyType` enum, the gate table that flips nearly every water default between natural and man-made bodies, and the driven-basin model of a closed body's wave field are the doctrine of `water-physics/references/12-water-physics.md` — ⚠️ **a file that is not in this repository**: it is on the unmerged branch `origin/claude/swimming-pool-voronoi-render-m22g6r`, not on `main`. That chapter marks its own phrase "driven basin" as a term it coined rather than a term of art, and marks the wall reflection coefficient as unmeasured; both marks are carried into the prose of `water-closed-vs-open.md`, which also states the gate table's doctrinal status inline so it stands without the branch. [no-artefact]
+- **bodytype_doctrine** `F` — No external source; a convention this repository recommends, not a finding. The authored `bodyType` enum, the gate table that flips nearly every water default between natural and man-made bodies, and the driven-basin model of a closed body's wave field are the doctrine of `terrain-renderer/references/12-water-rendering.md` — ⚠️ **a file that is not in this repository**: it is on the unmerged branch `origin/claude/swimming-pool-voronoi-render-m22g6r`, not on `main`. That chapter marks its own phrase "driven basin" as a term it coined rather than a term of art, and marks the wall reflection coefficient as unmeasured; both marks are carried into the prose of `water-closed-vs-open.md`, which also states the gate table's doctrinal status inline so it stands without the branch. [no-artefact]
 - **beaufort** `F` — Observational scale, not a paper. The Beaufort wind force scale with the standard sea-state descriptions; the wording used in Gaia is NOAA's Storm Prediction Center table. Whitecaps first at Force 3, spray at Force 5, foam streaks at Force 7. Adoption dates for the related Douglas and WMO sea-state codes conflict across secondary sources and are deliberately not stated.
 - **lamb_damping** `F` — Lamb, H. *Hydrodynamics.* — The deep-water viscous decay rate of a free-surface wave, `α = 2νk²`, from which the e-folding distance follows against the group speed. A textbook, not a paper.
 
@@ -67,4 +71,4 @@ merged.
 - **solonenko2015** `P` [not-opened] — Solonenko, M.G. & Mobley, C.D. (2015). *Inherent optical properties of Jerlov water types.* Applied Optics 54(17), 5392–5401. — The published inherent optical properties behind the water-type presets. ⚠️ The numeric `K_d(λ)` tables circulating in blog posts and asset packs are largely untraceable to this or to Jerlov's own tables; extract from source or generate from a published relation, and say which. ⚠️ **Not obtained** — paywalled at Optica; the GEOMAR OceanRep record that OpenAlex lists as open access served HTML rather than the PDF. So the trace this entry demands has still not been made, and no table inside the paper is cited here.
 - **schlick1994** `P` [not-opened] — Schlick, C. (1994). *An Inexpensive BRDF Model for Physically-based Rendering.* Computer Graphics Forum 13(3), 233–246. — The Fresnel approximation. ⚠️ **Not obtained** — paywalled at Wiley, the Eurographics digital-library copy unreachable, every mirror tried 403 or 404. The "about 1% of `R` for common dielectrics" accuracy claim attributed to the original is therefore **unverified against Schlick's text**. At water's low index it is not: measured against the exact equations it runs about +11% at grazing angles and 22% low at the Brewster angle.
 - **bornwolf_optics** `F` [not-opened] — Born, M. & Wolf, E. *Principles of Optics*. ⚠️ **This entry used to assert `§1.5.2` and name no edition, and nobody has been able to verify it.** Two agents tried: Cambridge drops the tunnel on the front-matter PDF, `cambridge.org/core` returned 503, and all five archive.org scans are lending-restricted. A section number carried without an edition is barely a locator even when right, and this one is unchecked, so it is withdrawn rather than left looking verified. It is the highest-value locator still outstanding in this corpus. — The exact unpolarised Fresnel reflectance of a dielectric interface, and the Snell relation behind the critical angle. A textbook, not a paper, and graded accordingly; the physics is as canonical as physics gets.
-- **iop_split** `F` — No single canonical source. The split between beam attenuation `c = a + b`, which governs a sharp sightline, and diffuse attenuation `K_d`, which governs the ambient light column — and the observation that `c` typically runs 5–20× `K_d` because natural water scatters strongly forward. Standard ocean optics; stated in this form in `terrain-architect/references/28-liquids.md` (present in this repository) and in `water-physics/references/12-water-physics.md` (⚠️ **not in this repository** — unmerged branch `origin/claude/swimming-pool-voronoi-render-m22g6r`). The claim itself is standard ocean optics and does not depend on either file. [no-artefact]
+- **iop_split** `F` — No single canonical source. The split between beam attenuation `c = a + b`, which governs a sharp sightline, and diffuse attenuation `K_d`, which governs the ambient light column — and the observation that `c` typically runs 5–20× `K_d` because natural water scatters strongly forward. Standard ocean optics; stated in this form in `terrain-architect/references/28-liquids.md` (present in this repository) and in `terrain-renderer/references/12-water-rendering.md` (⚠️ **not in this repository** — unmerged branch `origin/claude/swimming-pool-voronoi-render-m22g6r`). The claim itself is standard ocean optics and does not depend on either file. [no-artefact]
