@@ -7,7 +7,8 @@ status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
 sources:
   - { id: winstral2002, tier: P, locator: "§3 p.528-529, the sentence immediately after Eq. 1 stating that maximum-shelter selection is analogous to solar shading in the horizon function; Eq. (1) defining Sx with a 5 degree azimuth increment; Eqs. (3)-(5) for Sb; §4 p.531 for the search-distance comparison and the significance of Sx100 against elevation, radiation and slope" }
-  - { id: dozier2022, tier: P, locator: "§I p.1 for the O(N^2) origin, the order-N method and its attribution; §II-A Eq. (1) and Fig. 2 for the algorithm; §III-C for the tile-halo requirement; §III-E for the measured per-azimuth timing" }
+  - { id: dozier2022, tier: P, locator: "READ IN FULL (NTRS copy of the published paper). §I p.1 for the O(N^2) origin, the order-N method and its attribution to Dozier, Bruno and Downey 1981; §II-A One-Dimension, Eq. (1) and Fig. 2, for the algorithm -- a HORIZON-POINTER CHAIN with jumping, H_f(k), skipping the points between k and H_f(k); NOT a convex hull, and the strings convex hull, amortised and constant time appear nowhere in the paper; §III-C for the tile-halo requirement; §III-E for the measured per-azimuth timing, which used 32 azimuths" }
+  - { id: timonen2010, tier: P, locator: "section 5 Occlusion extraction and Algorithm 1 for the UPPER CONVEX HULL maintained on a stack, and the O(N) derived there from exactly N pushes and at most 2N comparisons -- this is the hull formulation, which dozier2022 does not use; section 3 Summary of core ideas states the O(n)-per-line result. Cited here only for whose formulation the hull is" }
   - { id: minder2010, tier: P, locator: "Abstract — the 6.5 degrees per km assumption named as an assumption, against measured windward annual means of 3.9-5.2" }
   - { id: reda2004, tier: P, locator: "NREL/TP-560-34302 rev. January 2008 — the stated uncertainty of the algorithm and its validity range" }
   - { id: furich2002, tier: P, locator: "the geometric solar radiation model: the viewshed-based occlusion term and the direct/diffuse split it feeds" }
@@ -36,14 +37,21 @@ below can be evaluated.
 
 ## Use this
 
-**Compute one horizon field by the order-N sweep, and drive both insolation and wind shelter from
-it** [winstral2002] [dozier2022].
+**Compute both the insolation and the wind-shelter field with the same order-N horizon sweep —
+one algorithm, two bakes at two search distances** [winstral2002] [dozier2022].
 
 That is the organising fact of this axis and it is not folklore. [winstral2002] §3 states it
 outright: *"The selection of a maximum shelter-producing pixel based on slope is analogous to the
 determination of solar shading within the horizon function used in radiation modeling."* The
 maximum upwind slope that decides whether a cell is sheltered from wind is the same quantity as the
-horizon angle that decides whether it is shaded from sun. One sweep, two fields.
+horizon angle that decides whether it is shaded from sun. One method, two fields.
+
+⚠️ This recommendation used to read "compute **one** horizon field and drive both from it",
+and "one sweep, two fields". The section below says reusing one for the other is "a real and
+easy mistake", and the failure table says to run the sweep twice — so the headline was
+prescribing what the rest of the document documents as a failure. What is shared is the
+**algorithm and the code**; what is not shared is the search distance, and per the bounded-
+`dmax` argument below it cannot be, because the two bakes are not the same computation.
 
 **Why it wins.** The horizon field is **sun-independent**. It is a property of the terrain alone, so
 one bake serves every sun position, every hour of every day, and — per the sentence above — the wind
@@ -64,18 +72,37 @@ the water is` below. Every erosion document in this corpus assumes uniform rainf
 
 ⚠️ **The two fields want the same sweep and very different search distances.** Wind shelter is
 useful at **100–300 m** — [winstral2002] §4 found `Sx` at 100 m the strongest predictor of snow
-depth, and tested 50 m to 2000 m. The insolation horizon needs **kilometres**. Same algorithm, same
-code path, two parameterisations; running one and reusing it for the other at the wrong distance is
-a real and easy mistake. [winstral2002] Fig. 4 shows why it matters: at 300 m the shelter-defining
+depth, and tested 50 m to 2000 m. The insolation horizon needs **kilometres**.
+
+⚠️ **And a bounded search distance is not a parameter you can hang on the unbounded sweep.** Both
+the pointer chain and the hull answer the *unbounded* horizon, and they get their efficiency by
+discarding a candidate the moment something further away dominates it. A `dmax`-limited horizon is
+a sliding-window query, and the discarded candidate is often the answer inside the window.
+Constructed and run: a flat profile with a 1-unit bump at `j = 3` and a 50-unit peak at `j = 40`.
+The unbounded structure retains only cells 40 and beyond — cell 3 is never the unbounded answer for
+any cell before it, so it is dropped — yet at `dmax = 10` cell 3 **is** the horizon for cells 0, 1
+and 2 (angles 0.333, 0.500, 1.000). So the two fields need **two bakes**, and the second is not the
+first with a different constant: bounding the search changes the algorithm, not just a parameter.
+Running one and reusing it for the other is a real and easy mistake, and so is assuming one code
+path serves both. [winstral2002] Fig. 4 shows why it matters: at 300 m the shelter-defining
 pixel lies across the valley and a cell reads sheltered; at 100 m the search never crosses and the
 same cell reads exposed. **The search distance chooses which landform does the sheltering.**
 
 ## The horizon sweep, and who actually invented it
 
-The method is: for each azimuth, sweep the grid in that direction maintaining the horizon's
-**upper convex hull** incrementally, which gives each cell's horizon in amortised constant time
-[dozier2022] §II-A. The naive alternative — comparing every cell against every other — is O(N²) and
-is what the field did first.
+The method is: for each azimuth, sweep each profile in that direction carrying the horizon
+forward incrementally, in **order N** for a profile of N points, rather than comparing every cell
+against every other at O(N²) [dozier2022] §II-A.
+
+⚠️ **Two different formulations, and this document used to merge them under one citation.**
+[dozier2022] §II-A "One-Dimension" is a **horizon-pointer chain with jumping**: it stores `H_f(k)`,
+the horizon of `k`, and observes that if `slope(j,k) > slope(j, H_f(k))` then `H_f(j) = k` and
+everything beyond `k` can be skipped, else the next candidate is `H_f(k)` — "ignoring points between
+`k` and `H_f(k)`". The **upper convex hull maintained on a stack**, and the amortised-constant-time
+argument for it, are [timonen2010] §5 and Algorithm 1, which `terrain-analysis-masks.md` cites for
+exactly that. The strings "convex hull", "amortised" and "constant time" appear **nowhere** in
+Dozier — checked against the NTRS copy of the published paper. Both formulations are order N; only
+one of them is a hull, and the citation named the wrong paper for it.
 
 ⚠️ **It is a hull, not a running maximum of the angle, and the difference is not cosmetic.** An
 elevation angle is measured *from the observer*, so it cannot be carried from one cell to the next:
@@ -114,7 +141,9 @@ author first.
 **What actually survives, and it is enough.** Both methods cost roughly `directions × O(cells)`, so
 per direction they are comparable. The sweep wins for two structural reasons instead:
 
-- **A terrain horizon needs 8–16 azimuths, not 580.** The 580 figure is an urban solar cadaster
+- **A terrain horizon plausibly needs 8–16 azimuths rather than 580 — but only the 580 is
+  sourced.** The 8–16 is this corpus's own practice line, uncited; see the direction-count note
+  below before resting a budget on it. The 580 figure is an urban solar cadaster
   resolving a sky vault [stendardo2020]; a terrain shelter or shading field is not that problem. At
   16 azimuths the same sweep on the same grid is about **2 minutes**.
 - **The horizon field is sun-independent.** One bake serves every sun position and every hour, and
@@ -150,10 +179,14 @@ tests both resolutions **inside the marching loop** in a given direction and tak
 of both results". An earlier revision of this document cited §3.2 for the minimum — the section
 that exists to refute it.
 
-⚠️ **Direction count is set by what the field feeds, not by the geometry.** Production values in the
-sources span **8–16** azimuths for a terrain mask, **32–64** for a view factor [dozier2022], and
+⚠️ **Direction count is set by what the field feeds, not by the geometry.** The values that come
+from a source are **32–64** for a view factor [dozier2022] — whose own timing run used 32 — and
 **137 then 580** for an urban solar cadaster [stendardo2020]. A number quoted without saying what
 consumes it is meaningless.
+⚠️ **The 8–16 figure is this corpus's own practice, not a published one.** It is stated in
+`terrain-analysis-masks.md` without a citation, and this sentence used to place it "in the sources"
+alongside two figures that really are. It is a reasonable default and it is graded as folklore, not
+borrowed authority — which matters because the crossover below leans on it.
 
 ## Temperature, and a constant that is a convention
 
@@ -395,4 +428,4 @@ Driver fields are not heightfields, and three properties follow:
 | The rain shadow is sharper than any real range | A single authored wind direction; the Alps' storms arrive from many, which erases the simple shadow [minderroe] | Average the dot product over three to five weighted directions |
 | The wet band sits on the windward face and looks pasted on | The upslope model has no conversion or fallout timescale, so nothing is advected downwind | Named fix is Smith and Barstad's linear theory — read it before implementing; the cheap partial fix is to advect the clamped field downwind before accumulating |
 | Ridge-tops are drier than the reference imagery | The upslope model's known failure at kilometre scale — measured maxima sit on ridge-tops via seeder-feeder [minderroe] | Add a curvature-weighted term and label it a correction, not physics |
-| Tiled driver-field bake seams at kilometre scale | Halo sized for a local filter, not for a kilometre horizon [dozier2022] §III-C | Widen the halo, or evaluate the far field on a coarse grid and take the minimum [stendardo2020] |
+| Tiled driver-field bake seams at kilometre scale | Halo sized for a local filter, not for a kilometre horizon [dozier2022] §III-C | Widen the halo, or evaluate the far field on a coarse grid and combine by DISJUNCTION, never the minimum — [stendardo2020] §3.2 rejects the minimum explicitly |
