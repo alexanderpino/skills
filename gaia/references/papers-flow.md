@@ -39,7 +39,7 @@ prevent — confident fabrication of a citation — is the one Gaia is most expo
 | Tier | Meaning | How to write about it |
 |---|---|---|
 | **P** | **Paper.** Peer-reviewed, and verified to actually contain the algorithm attributed to it. If the artefact was never obtained here, the entry must carry `[not-opened]` — see below. | Cite it directly. |
-| **F** | **Folklore.** Universal practice with no canonical paper — a thesis, a blog post, a repo, or nothing. | Say "no canonical source; standard practice is…". Naming a thesis or a repo is fine; do not dress it as peer review. |
+| **F** | **Not peer-reviewed.** That is the whole criterion, and it is not the same as "no canonical source". Folklore qualifies — a thesis, a blog post, a repo, or nothing — but so does an artefact that is perfectly canonical and simply was not refereed: a standard, a vendor documentation page, a conference talk, a book, a set of course notes, a lab technical report. | Say "no canonical source; standard practice is…" where that is true. Where the source *is* canonical, name it plainly and say what it is; do not dress it as peer review. |
 | **L** | **Landform, not algorithm.** An outcome, produced by composing other operators. | "There is no X algorithm. X emerges from A + B + C", then give the recipe. |
 | **N** | **Node, not algorithm.** A tool's UI branding over an operator. | Name the underlying algorithm. |
 | **?** | **Claimed but unverified.** Plausible, repeated, unconfirmed. | **Do not cite.** `check.py` rejects any document that does. Say it needs checking. |
@@ -60,6 +60,16 @@ three `F` entries carry the tag for the same reason, twenty-one in all: the pape
 and nobody here ever opened it. Meanwhile the documents citing them had started writing
 `NOT OPENED —` into their locators. **One side of the citation said a human read it and the other
 side said nobody did, and nothing could see the contradiction, because both sides were prose.**
+
+⚠️ **The third case: the work was read, but in a different artefact.** `reda2004` cites a Solar
+Energy article and was read in NREL's companion technical report; `wu2009` cites a Pattern Analysis
+and Applications article and was read in the LBNL technical report that preceded it, under another
+title. These are **not** `[not-opened]` — a source was obtained and every locator is verified
+against it, so the tag would be false in the other direction and would forbid locators that were
+actually checked. They stay `P`, and the entry must name the artefact that was read and say the
+cited one was not. Whether a peer-reviewed paper read only through its own preprint deserves a
+weaker grade is a real question this vocabulary does not answer; it is recorded here rather than
+settled by whichever entry was written last.
 
 So an entry whose artefact was never obtained carries an explicit tag, immediately after the tier
 where a reader scanning grades cannot miss it:

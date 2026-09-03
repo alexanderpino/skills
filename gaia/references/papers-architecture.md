@@ -94,11 +94,16 @@ is evidence about practice, never about correctness.
   only purpose is ordering.
 - **gaea_mixer** `F` — QuadSpinner. *Gaea 2 Documentation*, Using Gaea → "Layering Textures". — The
   Mixer node: a layer stack with built-in height and slope masks living inside the DAG.
-- **houdini_hdk** `F` — SideFX. *Houdini Development Kit*, Building Custom Operators → "Cooking",
-  and Basics → "Cooking" (Houdini 22.0). — The documented answer to an undeclared input set: a node
+- **houdini_hdk** `F` — SideFX. *Houdini Development Kit*, Basics → **"Data Dependencies"**
+  (`_h_d_k__op_basics__overview__dependencies.html`, Houdini 22.0). — The documented answer to an
+  undeclared input set: a node
   that cooks another's data "via some other means" **must** call `OP_Node::addExtraInput()`, and
   must do so on *every* cook because extra inputs are cleared as soon as dirty propagation
   traverses them. Also states the two-phase model: dirt is pushed eagerly, data is pulled lazily.
+  ⚠️ This entry named two "Cooking" pages. The HDK has one, and it carries none of this: fetched
+  live, `addExtraInput`, "via some other means" and "extra inputs" are 0/0/0 hits on the Cooking
+  page and 6/1/2 on Data Dependencies. The content was right and the page was wrong, which is the
+  harder error to notice because nothing about the quote looks off.
 
 ## GPU execution, 2026
 
@@ -162,9 +167,17 @@ is evidence about practice, never about correctness.
   cost/accuracy comparison across the three approaches.
 - **stendardo2020** `P` — Stendardo, N., Desthieux, G., Abdennadher, N. & Gallinelli, P. (2020).
   *GPU-Enabled Shadow Casting for Solar Potential Estimation in Large Urban Areas.* Applied Sciences
-  10(15), 5361. doi:10.3390/app10155361 (open access). — The GPU brute-force baseline, and §3.2's
+  10(15), 5361. doi:10.3390/app10155361 (open access). — The GPU brute-force baseline, and the
   coarse-grid trick for long-baseline occlusion: evaluate distant obstruction on a 100× coarser
-  heightfield and take the minimum.
+  heightfield (DTM at 50 m against DUSM at 50 cm) **and take the disjunction, not the minimum**.
+  §3.2 pp. 7–8, Code Listings 1–3 on p. 8.
+  ⚠️ This entry used to cite §3.2 for taking the *minimum* — which is the section that exists to
+  refute it. §3.2 says of the earlier §2 method that it "does not give the correct result when
+  local obstacles … are not situated in the same direction as remote relief features", and
+  integrates both resolutions into the marching loop so the check returns "the disjunction of both
+  results". `driver-fields.md` found this and stated it in prose; the correction never reached this
+  entry or that document's own locator, so both said minimum while the paragraph between them said
+  disjunction.
 
 ## In-repo sources
 
@@ -181,9 +194,15 @@ chapter is not peer review — but they are checkable, which a recollection is n
   and that a binary mask must never ship; §"Place before you sample, not after" for the
   coordinate-versus-raster transform measurement. Unlike its sibling chapter this one **does** carry
   citations, and it records two of its own errors in place, which is why it is worth reading.
-- **simd_dispatch_drift** `F` — `terrain-architect/registers/figure-regen.tsv`, on the branch
+- **simd_dispatch_drift** `F` — `terrain-architect/registers/figure-regen.tsv`, **on the branch**
   `origin/claude/terrain-architect-definition-of-done`. — A measured, reproducible case of the
   same code on the same CPU producing materially different terrain under two SIMD dispatch
   regimes. Records the reproduction recipe, the per-ufunc 1-ULP measurement over 10007 doubles,
-  and the amplification mechanism. **Not present on `main` or on this branch** — cite it to that
-  branch or not at all.
+  and the amplification mechanism.
+  ⚠️ **Read the branch, not just the path.** This entry used to say the file is "not present on
+  `main` or on this branch". It is absent from `main`, but it *does* exist on this branch — 72
+  lines, blob `51942cb…` — and that copy contains **no SIMD material at all**: zero hits for simd,
+  avx or ulp. The branch copy is a different blob, `bea9118…`, 125 lines, and only that one carries
+  the measurement. So a reader who follows the path from here lands on a real file that resolves
+  cleanly and says nothing of the kind, which is worse than a dangling link: nothing fails. Cite it
+  to `origin/claude/terrain-architect-definition-of-done` explicitly, or not at all.
