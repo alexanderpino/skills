@@ -211,6 +211,7 @@ CODES = {
     "EVI007": ("warn", "a brief edits a file the evidence never recorded touching"),
     "EVI008": ("warn", "a change across repos rules nothing out, so near-misses go unnamed"),
     "EVI009": ("error", "a negative result records nowhere it looked or no conclusion"),
+    "CON002": ("error", "a contract this story edits carries no concrete draft of its new shape"),
     "PND001": ("error | warn", "a pending claim names nothing that will create the code it cites"),
     "PND002": ("error | warn", "the story depends on another item and no link records it"),
     "SER001": ("warn", "entries inherited from an earlier bundle are stale and unverified"),
@@ -740,6 +741,24 @@ def check_evidence(b, rep):
         rep.error("EVI006", "evidence.contracts",
                   "%d repos change but no contract recorded - find the seam and order across it"
                   % br.get("repos"))
+
+    # Recording the seam is not the same as specifying it. Where the story edits the
+    # contract file itself, "the response gains a tax object" is a description an
+    # implementor has to turn into a decision - and the two sides of the seam will each
+    # turn it into a different one. The exact shape is the cheapest thing to agree on
+    # here and the most expensive thing to discover in review.
+    edited = {(e.get("repo"), e.get("path")) for e in surface
+              if e.get("role") in ("create", "modify")}
+    for i, c in enumerate(ev.get("contracts") or []):
+        if (c.get("repo"), c.get("path")) not in edited:
+            continue          # crossed but unchanged - there is nothing new to draft
+        if not (c.get("draft") or "").strip() and not (c.get("draft_source") or "").strip():
+            rep.error("CON002", "evidence.contracts[%d]" % i,
+                      "%s is edited by this story and carries no draft - write the exact new "
+                      "shape (payload, schema, DDL, config key) in `draft`, or cite where it is "
+                      "already specified in `draft_source`; prose about what changes leaves both "
+                      "sides of the seam to guess, differently"
+                      % (c.get("path") or c.get("id") or "the contract"))
 
 
 def check_subtasks(b, cfg, rep):

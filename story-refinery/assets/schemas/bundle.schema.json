@@ -334,6 +334,8 @@
                                    "path": {"type": "string"}, "kind": {"type": "string"},
                                    "producers": {"type": "array", "items": {"type": "string"}},
                                    "consumers": {"type": "array", "items": {"type": "string"}},
+                                   "draft": {"type": "string", "description": "The exact new or changed shape - payload, schema fragment, DDL, config key - not a description of it. Required by CON002 when the story edits this contract file, because both sides of a seam will resolve prose into different shapes."},
+                                   "draft_source": {"type": "string", "description": "Where the exact shape is already specified, when it is not drafted here: a path:line, an ADR, or the bundle of the item that fixes it. Satisfies CON002 instead of `draft`."},
                                    "note": {"type": "string"}}}
         },
         "conventions": {"type": "array", "items": {"$ref": "#/$defs/convention"}},

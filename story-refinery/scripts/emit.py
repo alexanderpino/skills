@@ -39,6 +39,13 @@ def B(key):
 
 
 SINKS = ("description_tail", "comment", "attachment", "repo_file", "custom_field")
+
+# A contract `kind` names the artefact, not a highlighter. Anything unmapped fences bare.
+FENCE_LANG = {"openapi": "yaml", "asyncapi": "yaml", "swagger": "yaml",
+              "graphql": "graphql", "proto": "protobuf", "protobuf": "protobuf",
+              "json-schema": "json", "jsonschema": "json", "json": "json",
+              "avro": "json", "sql": "sql", "migration": "sql", "ddl": "sql",
+              "config": "yaml", "yaml": "yaml", "toml": "toml"}
 CAPABILITIES = {
     # [?] defaults - probe the live tracker before trusting these.
     "jira":         {"markup": "adf", "subtasks": "native", "attachments": True,
@@ -309,6 +316,15 @@ def render_shared_context(bundle):
                        % (c.get("path", c.get("id", "?")), c.get("id", ""),
                           ", ".join(c.get("producers") or []) or "?",
                           ", ".join(c.get("consumers") or []) or "?"))
+            # The exact shape, verbatim and in one place. Both sides of the seam read
+            # this same file, so they cannot resolve it into two different shapes.
+            draft = (c.get("draft") or "").strip()
+            if draft:
+                out += ["", "  Agreed shape — implement exactly this:", "",
+                        "```%s" % FENCE_LANG.get(c.get("kind"), ""), draft, "```", ""]
+            elif (c.get("draft_source") or "").strip():
+                out.append("  Shape is specified in %s — read it before editing."
+                           % c["draft_source"])
         out.append("")
 
     decided = [d for d in bundle.get("decisions") or [] if d.get("status") == "locked"]

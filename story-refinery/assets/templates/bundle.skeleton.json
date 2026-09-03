@@ -189,6 +189,8 @@
         "kind": "openapi",
         "producers": [],
         "consumers": [],
+        "draft": "the exact new or changed shape, verbatim - required by CON002 when this story edits the file",
+        "draft_source": "",
         "note": ""
       }
     ],

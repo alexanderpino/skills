@@ -345,6 +345,18 @@ python scripts/evidence.py contracts --config refinery.yaml  # cross-repo edges;
 order the subtasks in Phase 5. Where it says the direction is guessed, confirm
 which repo owns the file before you rely on it.
 
+**Where the story edits a contract, draft it.** Finding the seam is not the same
+as specifying it. "The order response gains a tax object" is a sentence two repos
+resolve into two different shapes, and the disagreement surfaces in review at the
+earliest and in production at the latest. Put the exact new shape - payload,
+schema fragment, DDL, config key - in `contracts[].draft`, or cite where it is
+already fixed in `draft_source`; `CON002` asks whenever a contract file appears in
+the change surface with role `create` or `modify`, and nothing is asked of one this
+story only reads across, because there is no new shape to agree on. It costs a
+dozen lines and it is the single artefact both sides implement against: `emit.py`
+renders it verbatim into the shared context document, so producer and consumer
+cannot be working from two versions of it.
+
 It finds seams that already exist. When the story is about to *create* one and
 the boundary is unclear, event-storm it first `[P: Brandolini]`: write the domain
 events in past tense and time order, name what triggers each and what it carries,
@@ -557,6 +569,12 @@ item's language** (`story.language`; `LANG002` reads it back). Budgets
 (configurable): story summary ≤ 120 words, technical notes ≤ 200 words, subtask
 text ≤ 80 words. Write what a senior colleague needs: what changes, why, where,
 what is risky, what was decided and why. Delete anything they already know.
+
+A word budget is a reason to compress prose, never a reason to describe a contract
+instead of specifying one. The exact shapes live in `evidence.contracts[].draft`
+(Phase 2), are not counted against any budget, and reach both audiences through the
+shared context document - so the notes can say *that* the response gains a tax
+object and let the draft say what it looks like.
 
 **Agent brief** - structured JSON per subtask, no budget, assumes nothing. Its
 job is to prevent the six ways agents fail on tickets `[N]`:
@@ -852,5 +870,5 @@ All stdlib-only Python 3, no dependencies, no network.
   shaped request, a calling skill passing `--wishes`), when not to (an implementation
   request, a general question about agile), and what to do once invoked on a request
   that does not fit
-- `evals/evals.json` - twenty-five behavioural evals with verifiable expectations, for
+- `evals/evals.json` - twenty-six behavioural evals with verifiable expectations, for
   skill-creator's run/grade loop

@@ -127,6 +127,31 @@ which repo owns the file - usually the one that generates it, serves it, or has
 it under version control rather than vendored - before you order subtasks on it.
 Getting the direction backwards produces a plan that ships the consumer first.
 
+### Draft the ones this story edits
+
+Direction orders the work; it does not say what the work produces. Where the story
+edits the contract file itself, record the **exact** new or changed shape in
+`contracts[].draft` - the payload, the schema fragment, the DDL, the config key, as
+it will actually read - or, when the shape is already fixed somewhere, cite that in
+`draft_source` (a `path:line`, an ADR, the bundle of the item that froze it).
+`CON002` asks for one whenever a contract appears in the change surface with role
+`create` or `modify`, and asks nothing of a contract the story only reads across.
+
+The failure it prevents is not a missing detail, it is a *silent disagreement*.
+"The response gains a tax object" is a shape to the person who wrote it and a
+question to everyone else: is `total` a string or a number, is `rate` a fraction or
+a percentage, is the field always present or only when non-zero. The producer picks
+one answer and the consumer picks another, both write passing tests against their
+own answer, and the two only meet in integration - or in production, if the
+consumer is a client you do not deploy. A dozen lines here is the cheapest place
+that argument ever happens.
+
+Draft it once, not per subtask. `emit.py` renders the draft verbatim into
+`out/context/<KEY>-context.md`, which is byte-identical for every implementor, so
+the producer and the consumer are reading the same characters rather than two
+paraphrases that have drifted. Keep prose about *why* the shape is that way in the
+`note`; the `draft` is for the shape.
+
 The rule `[F]`:
 
 > **A contract change ships before the code that depends on it, behind a

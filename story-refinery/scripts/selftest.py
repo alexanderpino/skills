@@ -78,6 +78,8 @@ MUTATIONS = [
     ("BUD005", mut(lambda b: b["story"].pop("source_text"))),
     ("EVI001", mut(lambda b: b["evidence"].update({"change_surface": []}))),
     ("EVI006", mut(lambda b: b["evidence"].update({"contracts": []}))),
+    ("CON002", mut(lambda b: b["evidence"]["contracts"][0].pop("draft"))),
+    ("CON002-blank", mut(lambda b: b["evidence"]["contracts"][0].update({"draft": "   \n"}))),
     ("EVI007", mut(lambda b: b["evidence"]["change_surface"].pop(0))),
     ("SUB011", mut(lambda b: b["subtasks"][1].update({"estimate_days": 3.0}))),
     ("SUB012", mut(lambda b: b["subtasks"][1].update({"covers": ["AC9"]}))),
@@ -256,6 +258,24 @@ def suite_gates(golden, cfg):
         rep = validate(mutation(copy.deepcopy(golden)), cfg)
         codes = {i["code"] for i in rep.items}
         check("gate %s" % code, expected in codes, "got %s" % sorted(codes))
+
+    # CON002 asks for a shape, not for it to be typed in here. A contract whose shape is
+    # already fixed elsewhere is satisfied by the citation, and a contract this story only
+    # reads across has no new shape to draft - a gate that fired on either would teach
+    # people to paste a placeholder.
+    b = copy.deepcopy(golden)
+    b["evidence"]["contracts"][0].pop("draft")
+    b["evidence"]["contracts"][0]["draft_source"] = "api/openapi.yaml:214 (frozen in ADR-11)"
+    codes = {i["code"] for i in validate(b, cfg).items}
+    check("CON002: a cited source satisfies the draft", "CON002" not in codes, sorted(codes))
+
+    b = copy.deepcopy(golden)
+    b["evidence"]["contracts"][0].pop("draft")
+    b["evidence"]["change_surface"] = [e for e in b["evidence"]["change_surface"]
+                                       if e.get("path") != "openapi.yaml"]
+    codes = {i["code"] for i in validate(b, cfg).items}
+    check("CON002: a contract crossed but not edited needs no draft",
+          "CON002" not in codes, sorted(codes))
 
 
 # --------------------------------------------------------- suite 2: config parsing
@@ -610,6 +630,27 @@ def suite_docs():
           all(("references/%s" % f) in skill
               for f in os.listdir(os.path.join(ROOT, "references"))),
           sorted(os.listdir(os.path.join(ROOT, "references"))))
+
+    # A count written out in prose is a claim, and it rots the first time anything is
+    # added. This file may not tell you how many evals there are and be wrong.
+    words = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
+             8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve",
+             13: "thirteen", 14: "fourteen", 15: "fifteen", 16: "sixteen",
+             17: "seventeen", 18: "eighteen", 19: "nineteen", 20: "twenty",
+             21: "twenty-one", 22: "twenty-two", 23: "twenty-three",
+             24: "twenty-four", 25: "twenty-five", 26: "twenty-six",
+             27: "twenty-seven", 28: "twenty-eight", 29: "twenty-nine", 30: "thirty"}
+    with open(os.path.join(ROOT, "evals", "evals.json"), encoding="utf-8") as fh:
+        n_evals = len(json.load(fh)["evals"])
+    claimed = re.search(r"([\w-]+) behavioural evals", skill)
+    check("SKILL.md's eval count is current",
+          bool(claimed) and claimed.group(1) == words.get(n_evals),
+          "SKILL.md says %r, there are %d"
+          % (claimed.group(1) if claimed else None, n_evals))
+
+    ids = [e["id"] for e in json.load(open(os.path.join(ROOT, "evals", "evals.json"),
+                                           encoding="utf-8"))["evals"]]
+    check("eval ids are unique", len(set(ids)) == len(ids), ids)
 
     # Every documented command must use flags the script actually defines.
     cmds = re.findall(r"^python (scripts/\w+\.py) ([^\n]*)$", skill, re.M)

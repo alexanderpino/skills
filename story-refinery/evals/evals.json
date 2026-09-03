@@ -317,6 +317,19 @@
         "Questions that depend on an answer from this round were recorded with blocked_by and held back",
         "The refinement continued as far as it could on the unanswered branches rather than stalling entirely"
       ]
+    },
+    {
+      "id": 26,
+      "prompt": "Refine ABC-77: 'Add a webhook so the billing service tells the CRM when a subscription is cancelled.' Repos are ../billing (Python) and ../crm (Node). Produce subtasks.",
+      "expected_output": "A validating bundle whose new webhook contract carries the exact payload, not a description of it.",
+      "expectations": [
+        "evidence.contracts records the webhook as a seam, with billing as producer and crm as consumer",
+        "The contract entry carries a draft holding the exact payload shape - field names, types and which fields are optional - or a draft_source citing where that shape is already fixed",
+        "The draft is concrete enough that the producer and the consumer could not implement two different shapes from it: no placeholder text and no 'e.g.'",
+        "The rendered out/context/ABC-77-context.md contains the draft verbatim, so both subtasks read the same shape",
+        "The human technical notes stay inside their word budget and do not repeat the payload - they say that the webhook is added, not what it looks like",
+        "validate.py was run and reported no CON002"
+      ]
     }
   ]
 }

@@ -705,6 +705,7 @@
         "consumers": [
           "web"
         ],
+        "draft": "# components.schemas.Order at api/openapi.yaml:214 - additive.\n# Every property that exists today is unchanged; `tax` is new and always present,\n# so web@1.4 keeps working through the deploy window by ignoring it.\nOrder:\n  properties:\n    tax:\n      type: object\n      required: [total, rate, reason]\n      properties:\n        total:\n          type: string        # decimal string, never a JSON number - money.py:17\n          example: \"0.00\"\n        rate:\n          type: string        # the rate applied, as a decimal string: \"0.21\", \"0.00\"\n          example: \"0.00\"\n        reason:\n          type: string\n          enum: [standard-rate, reverse-charge]\n",
         "note": "additive only during the deploy window"
       }
     ],
@@ -1659,7 +1660,7 @@
     "overrides": [],
     "wishes": {
       "path": "assets/examples/team-billing-refinement.wishes.md",
-      "digest": "sha256:2abe1d6475b1f46557607b2b0e485f52ae295016f83c90c638377f9a48c7d9e7",
+      "digest": "sha256:1b5e652605d75f9e17a42598751fb24be5bf83358bdd11b126e7d6c0f53036ad",
       "headings": [
         "Refinement wishes - team billing",
         "Who we are",
@@ -1671,12 +1672,12 @@
         "Escalate rather than assume when"
       ],
       "source": "team-billing-refinement",
-      "stamped_at": "2026-09-02T19:00:24+00:00"
+      "stamped_at": "2026-09-03T06:26:49+00:00"
     }
   },
   "review": {
     "method": "critics",
-    "bundle_digest": "sha256:626297cf39967373241fcda5840770b656a944df372f2a8de772deac0b4fb2e3",
+    "bundle_digest": "sha256:3ffbcead567113498c04558136e590790a8b97e077aaebea9db3bfcd094eeba3",
     "critics": [
       {
         "id": "implementer",
