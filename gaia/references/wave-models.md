@@ -147,9 +147,13 @@ consumer of the sea state agrees.
 ⚠️ **Elfouhaily et al. (1997)**, *A unified directional spectrum for long and short wind-driven
 waves* (J. Geophys. Res. 102(C7), 15781–15796; DOI 10.1029/97JC00467), is the wind- *and*
 fetch-parameterised spectrum spanning gravity and capillary wavenumbers continuously, and it is the
-right target if you need one curve across the whole band. **Gaia does not cite it, deliberately** — the
-paper is paywalled and nobody working on this skill has opened it. Under Gaia's tier rules an
-unread source cannot be graded `P`, so it is named in prose here and graded nowhere.
+right target if you need one curve across the whole band. **Gaia does not cite it, deliberately** — nobody
+working on this skill has read it. Under Gaia's tier rules an unread source cannot be graded `P`,
+so it is named in prose here and graded nowhere. ⚠️ This sentence used to give the reason as a
+paywall. It is **open access** — Unpaywall `is_oa: true, bronze`, and the full published article
+is free at `archimer.ifremer.fr/doc/00091/20226/17877.pdf`, hosted by Ifremer, where three of the
+four authors worked. The tier bar is a reading, not a paywall, and saying "paywalled" made the
+omission look forced when it is simply outstanding work.
 
 ⚠️ **This paragraph used to claim much more than that, and every part of the extra claim was
 false.** It said a sibling skill's `water-physics/references/12b-water-provenance.md` recorded the

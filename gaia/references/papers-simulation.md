@@ -18,22 +18,37 @@ Two tier decisions recur in this family and are stated once:
 - **A book, a thesis, a set of course notes or a talk is graded `F`, not `P`**, however canonical it
   is. Tessendorf's ocean notes and Born & Wolf are the load-bearing examples. Naming them is right;
   dressing them as peer review is not.
-- **A number that this repository's own sources record as unread or unverified is not cited at
-  all.** The Elfouhaily unified spectrum is the case: it is paywalled and nobody working on this
-  skill has opened it, so `wave-models.md` names it in prose rather than manufacturing a `P`.
-  ⚠️ This bullet used to source that record to a sibling skill's `12b-water-provenance.md`. That
-  file does not mention Elfouhaily, and the path it was given does not exist — see
-  `wave-models.md`. The decision stands; the citation for it did not.
+- **A source nobody here has opened is not cited, whatever its reputation.** The Elfouhaily
+  unified spectrum is the case: nobody working on this skill has read it, so `wave-models.md`
+  names it in prose rather than manufacturing a `P`.
+  ⚠️ **Two rounds of reasoning about this entry were wrong, in opposite directions, and both are
+  corrected here.** The first attached a fabricated provenance chain to a sibling skill's
+  `12b-water-provenance.md`. The second — the "correction" — declared that file nonexistent and
+  its Elfouhaily record imaginary. Checked with `git show`: `water-physics/references/12b-water-provenance.md`
+  is real on `origin/claude/swimming-pool-voronoi-render-m22g6r`, and it does cite Elfouhaily et al.
+  1997, graded `P (attribution)`, with the DOI. And the paper is **not paywalled**: Unpaywall
+  reports `is_oa: true, bronze`, and the publisher-typeset 16-page article is free from the authors'
+  own institution at `archimer.ifremer.fr/doc/00091/20226/17877.pdf`. So the non-citation now rests
+  on the one ground that survives checking — **nobody here has read it** — and it is a decision
+  someone can now reverse by opening it, which was not true when this bullet claimed a paywall.
 
-⚠️ **There is no `water-physics/` skill, and there never was one in this repository** — an earlier
-version of this block named one, and the phantom prefix spread to six places before anyone checked.
-Two entries below (`bodytype_doctrine`, `iop_split`) point at material that really lives in
-`terrain-renderer/references/`, which exists only on the unmerged branch
-`origin/claude/swimming-pool-voronoi-render-m22g6r` — not on `main` and
-not on this branch. `check.py` checks the form of attribution and cannot detect a dangling
-cross-skill path, so it is stated here in prose. Wherever such a pointer is load-bearing, the
-substance is restated inline in the citing document, so nothing depends on that branch ever being
-merged.
+⚠️ **This block had both skills backwards, and the error was the dangerous direction.** It is
+now checked with `git ls-tree` rather than from memory:
+
+- **`terrain-renderer/references/` is on `main` and on this branch**, twenty files;
+  `12-water-rendering.md` is 1691 lines on both. Three entries below point into it —
+  `fluid_authority`, `bodytype_doctrine` and `iop_split`, not the two this block used to count.
+  The block declared that live path dead. A false "this exists" is caught by the first reader who
+  clicks; a false "this does not exist" stops anyone ever clicking, which is why it survived.
+- **`water-physics/` does exist** — 84 files on the unmerged branch
+  `origin/claude/swimming-pool-voronoi-render-m22g6r`, including
+  `references/12b-water-provenance.md`. It is on neither `main` nor this branch, which is all
+  that was ever true; "there never was one in this repository" was not.
+
+`check.py` checks the form of attribution and cannot follow a cross-skill path, so this is stated
+in prose — which is exactly why the prose has to be re-checked against git and not against the
+last person who wrote it. Wherever such a pointer is load-bearing the substance is restated inline
+in the citing document, so nothing depends on that branch being merged.
 
 ## Numerical stability and time stepping
 
@@ -69,6 +84,6 @@ merged.
 - **lee2015** `P` — Lee, Z., Shang, S., Hu, C., Du, K., Weidemann, A., Hou, W., Lin, J. & Lin, G. (2015). *Secchi disk depth: A new theory and mechanistic model for underwater visibility.* Remote Sensing of Environment 169, 139–149. — **Read in full** (open access, CC BY-NC-ND; USF/UMass Boston copy). Shows the classical Secchi relation is not derivable from radiative transfer and replaces it with eq. 29 / eq. 33: `Z_SD = ln((0.14 − R_rs_pc)/C_t) / (2.5·min_λ K_d)`, with `C_t = 0.013 sr⁻¹` from Blackwell (1946), validated on N = 338 measurements at 18.2% mean absolute difference and `R² = 0.96` (§4). ⚠️ **This entry used to state the model as `Z_SD ≈ 1/min_λ K_d`. The paper never writes that.** The reciprocal is eq. 33 with the log term collapsed; the true prefactor `ln((0.14 − R_rs)/C_t)/2.5` runs 0.95 in very clear water down to 0.85 at `R_rs ≈ 0.03` and 0.77 at `R_rs ≈ 0.05`, so the shorthand is good in clear water and progressively optimistic in turbid water. Still the bridge from an artist's visibility dial to inherent optical properties.
 - **nicodemus1963** `P` [not-opened] — Nicodemus, F.E. (1963). *Radiance.* American Journal of Physics 31(5), 368–377. — The invariance of `L/n²` along a ray and across a smooth boundary between lossless media, a consequence of étendue `n²dAdΩ` being the conserved quantity. Radiance itself is not conserved across a refracting interface. ⚠️ **Not obtained** — paywalled at AIP, no open copy reachable, so no section, equation or page inside it is cited here.
 - **solonenko2015** `P` [not-opened] — Solonenko, M.G. & Mobley, C.D. (2015). *Inherent optical properties of Jerlov water types.* Applied Optics 54(17), 5392–5401. — The published inherent optical properties behind the water-type presets. ⚠️ The numeric `K_d(λ)` tables circulating in blog posts and asset packs are largely untraceable to this or to Jerlov's own tables; extract from source or generate from a published relation, and say which. ⚠️ **Not obtained** — paywalled at Optica; the GEOMAR OceanRep record that OpenAlex lists as open access served HTML rather than the PDF. So the trace this entry demands has still not been made, and no table inside the paper is cited here.
-- **schlick1994** `P` [not-opened] — Schlick, C. (1994). *An Inexpensive BRDF Model for Physically-based Rendering.* Computer Graphics Forum 13(3), 233–246. — The Fresnel approximation. ⚠️ **Not obtained** — paywalled at Wiley, the Eurographics digital-library copy unreachable, every mirror tried 403 or 404. The "about 1% of `R` for common dielectrics" accuracy claim attributed to the original is therefore **unverified against Schlick's text**. At water's low index it is not: measured against the exact equations it runs about +11% at grazing angles and 22% low at the Brewster angle.
+- **schlick1994** `P` [not-opened] — Schlick, C. (1994). *An Inexpensive BRDF Model for Physically-based Rendering.* Computer Graphics Forum 13(3), 233–246. — The Fresnel approximation. ⚠️ **Not obtained** — paywalled at Wiley, the Eurographics digital-library copy unreachable, every mirror tried 403 or 404. The "about 1% of `R` for common dielectrics" accuracy claim attributed to the original is therefore **unverified against Schlick's text**. At water's low index it is not: measured against the exact equations at `n = 1.335` the signed error peaks at **+14.32% at 78.89°** and bottoms at **−22.75% at 51.30°**, beside the 53.16° Brewster angle where it is −22.39%. ⚠️ This entry used to say "+11% at grazing angles": +11.40% is the value at 83.8°, not the maximum, and **at true grazing the error goes to zero** — both forms tend to 1 — so the old wording named the one place the approximation is not the problem. `water-optics.md` has the full curve and its mean of −8.91% over 38–79°, and had it right while this entry did not.
 - **bornwolf_optics** `F` [not-opened] — Born, M. & Wolf, E. *Principles of Optics*. ⚠️ **This entry used to assert `§1.5.2` and name no edition, and nobody has been able to verify it.** Two agents tried: Cambridge drops the tunnel on the front-matter PDF, `cambridge.org/core` returned 503, and all five archive.org scans are lending-restricted. A section number carried without an edition is barely a locator even when right, and this one is unchecked, so it is withdrawn rather than left looking verified. It is the highest-value locator still outstanding in this corpus. — The exact unpolarised Fresnel reflectance of a dielectric interface, and the Snell relation behind the critical angle. A textbook, not a paper, and graded accordingly; the physics is as canonical as physics gets.
 - **iop_split** `F` — No single canonical source. The split between beam attenuation `c = a + b`, which governs a sharp sightline, and diffuse attenuation `K_d`, which governs the ambient light column — and the observation that `c` typically runs 5–20× `K_d` because natural water scatters strongly forward. Standard ocean optics; stated in this form in `terrain-architect/references/28-liquids.md` (present in this repository) and in `terrain-renderer/references/12-water-rendering.md` (⚠️ **not in this repository** — unmerged branch `origin/claude/swimming-pool-voronoi-render-m22g6r`). The claim itself is standard ocean optics and does not depend on either file. [no-artefact]

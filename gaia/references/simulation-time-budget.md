@@ -108,7 +108,8 @@ And the payment is usually a **global data dependency**, which is the harder cos
 
 - [kass1990] integrates heightfield water implicitly with alternating tridiagonal sweeps, and it
   was the right call for offline film water. ⚠️ It is routinely called **unconditionally** stable —
-  this repository's own bibliography entry says so — and **the paper does not claim that.** It
+  this repository's own bibliography entry said so until it was corrected, and
+  `shallow-water.md` said so for longer — and **the paper does not claim that.** It
   claims implicitness buys a frame-sized step, and it then freezes the wave speed inside a step by
   holding `d` constant, which it says "virtually ensures that the iteration will not diverge". A
   strong practical guarantee, not an unconditional one. What is unarguable is the *shape* of the

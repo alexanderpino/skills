@@ -231,7 +231,9 @@ changes the navigable world also invalidates collision and navmesh.
 
 **What it beats.** (*Full nonlinear shallow water with a shock-capturing solver* is deliberately
 **not** in this list — it is the crossover above, not a dismissal.) *An implicit heightfield solve*
-[kass1990] — unconditionally stable, and each step is a global solve, so it buys a bigger `dt` you
+[kass1990] — stable enough to take a frame-sized step, though **not** unconditionally stable: it
+derives stability from implicitness and then freezes the depth `d` within a step, which it says
+"virtually ensures that the iteration will not diverge". Each step is a global solve, so it buys a bigger `dt` you
 do not need in a frame.
 *A wave-equation or convolution ripple patch* — cheapest of all, and it carries no mass: it cannot
 flood, drain, or make a river. *Particles (SPH, position-based)* — necessary exactly when the
