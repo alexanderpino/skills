@@ -20,33 +20,8 @@ it — bibliographies are checked as documents like everything else.
 The two sections added to this file from separately written documents. The rest of this
 bibliography predates the practice.
 
-**`pike1977`** — the ADS scanned page images of the Pergamon volume were read directly. Table 1
-(p. 491) and equations (1)–(4) (p. 492) are transcribed from that scan, digit for digit, and the
-two stated intersection diameters were then reproduced numerically from the transcribed
-coefficients as a check on the transcription.
-**`austin2024`** — open access at the publisher; §6.2 and equation (1) read there.
-**`minton2019`** — the accepted-manuscript PDF; §1.1 and Figure 1 read there.
-**`silber2017`** — the accepted-manuscript PDF of the JGR-Planets paper; §1 and §5 read there.
 **`garland1997`** — the authors' own PDF of the SIGGRAPH '97 paper; §3–§5 read there.
 
-**felzenszwalb2012** — the journal's own open-access PDF at theoryofcomputing.org. Algorithm 1,
-Theorems 2.1–3.2 and §2.2 read there; Algorithm 1 was then transcribed into
-`scratchpad/w6/edt_error.py` and its output checked against brute force.
-**meijster2000** — a course-hosted scan of the Kluwer chapter, complete with the printed page
-numbers 331–340 used in the locators.
-**hajdu2012** — **the arXiv preprint 1201.0876v1 was read, not the journal version.** The
-preprint's own footer says "Preprint submitted to Acta Cybernetica"; the published record is
-Acta Cybernetica 20(3), 399–417 (2012), which was located but not opened. The three error
-constants quoted from it were independently reproduced numerically, which is the only reason
-the citation is worth anything here.
-**rongtan2006** — the authors' submitted version at comp.nus.edu.sg. It has no ACM pagination,
-so the page range below comes from the ACM record rather than from the artefact read, and the
-locators cite sections and figures instead of pages.
-**fiorio1996** — the HAL deposit of the published Theoretical Computer Science article, printed
-pagination intact. The OCR is poor (it renders "can" as "tan" throughout) but legible.
-**wu2009** — the authors' accepted manuscript at sdm.lbl.gov. No journal pagination, so the
-locators cite numbered sections and theorems.
-**salembier2009** — the authors' PDF at imatge.upc.edu, figure numbering intact.
 **sharma2005** — the author's PDF at hajim.rochester.edu, plus the 34-pair supplementary test
 file `ciede2000testdata.txt` from the same site, which was used to validate the implementation
 in `scratchpad/w6/colour_blend.py`.
@@ -58,6 +33,7 @@ pagination is not asserted.
 not opened. `icc_srgb` — a standards-body technical note restating it, graded `F` accordingly —
 carries the constants instead, and `mask-to-material.md` names the standard in prose. The full
 list of absences from this family is in `papers-masks-and-filtering.md`.
+
 ## What `F` means on this axis, and why there is so much of it
 
 Real-time rendering's load-bearing literature is largely **not peer-reviewed**, and pretending
@@ -107,7 +83,7 @@ authority.
 - **deboer2000** `F` — de Boer, W.H. (2000). *Fast terrain rendering using geometrical mipmapping.* Self-published whitepaper (flipcode). — Geomipmapping: fixed chunks, per-chunk mip chain, index-buffer edge stitching. No venue and no review; universally cited anyway.
 - **ulrich2002** `F` — Ulrich, T. (2002). *Rendering massive terrains using chunked level of detail control.* SIGGRAPH 2002 course notes. — Chunked LOD: quadtree of pre-simplified static chunks, per-chunk maximum geometric error, skirts, per-chunk geomorph. Course notes, not peer review.
 - **losasso2004** `P` — Losasso, F. & Hoppe, H. (2004). *Geometry clipmaps: terrain rendering using nested regular grids.* ACM TOG 23(3), SIGGRAPH '04, 769–776. — Nested viewer-centred rings, each 2× coarser, with a transition region on each ring's fringe. Also, and contrary to how it is usually split against the 2005 chapter: toroidal (2D wraparound, mod-addressed) access to each level's vertex array and to the textures, §3; the L-shaped incremental update that toroidal access makes possible, §5; and zero-area-triangle stitching for T-junction removal, at the close of §6.2 (§6.3 is Texture mapping).
-- **asirvatham2005** `F` — Asirvatham, A. & Hoppe, H. (2005). *Terrain rendering using GPU-based geometry clipmaps.* GPU Gems 2, ch. 2, NVIDIA/Addison-Wesley. — The GPU-resident form, and that is the whole of what is new here: elevations live in a single-channel *vertex texture* the vertex shader reads (§2.3.5), and the clipmap is updated GPU-side by rendering quads into that texture (§2.4). Toroidal addressing and the zero-area stitching triangles are inherited from losasso2004, which flagged the vertex-texture path as future work. Book chapter, not peer review.
+- **asirvatham2005** `F` — Asirvatham, A. & Hoppe, H. (2005). *Terrain rendering using GPU-based geometry clipmaps.* GPU Gems 2, ch. 2, NVIDIA/Addison-Wesley. — The GPU-resident form: elevations live in a single-channel *vertex texture* the vertex shader reads (§2.3.5), and the clipmap is updated GPU-side by rendering quads into that texture (§2.4). Toroidal addressing and the zero-area stitching triangles ORIGINATE in losasso2004, which flagged the vertex-texture path as future work — cite 2004 for those mechanisms. ⚠️ But this entry used to say the GPU-resident form "is the whole of what is new here", and that overstates it: §2.4 Update restates the L-shaped region and toroidal wraparound in its own words and adds an observation the 2004 paper does not make. Inherited is not the same as absent. Book chapter, not peer review.
 - **strugar2009** `F` — Strugar, F. (2009). *Continuous distance-dependent level of detail for rendering heightmaps (CDLOD).* Self-published whitepaper with a reference implementation; a peer-reviewed journal version exists as Journal of Graphics, GPU, and Game Tools 14(4), 57–74, doi:10.1080/2151237X.2009.10129287. — Quadtree selection over one shared grid mesh, with a per-vertex distance morph that makes a node vertex-identical to its parent at the range boundary. **Why this stays `F` while upchurch2012 — same journal, later run under its earlier name — is `P`: the difference is verification state, not venue.** ⚠️ The promotion path this entry used to give was itself wrong: it said to obtain JGGGT 14(4) and confirm "the morph derivation and the per-level morph constants" are there. The reachable whitepaper contains **neither** — it gives `morphK` as an input to `morphVertex()` and a 15–30% band, not a derivation or a constant table — so a reader could not have completed that path from the artefact this skill actually cites. Note too that the whitepaper is dated 11 July 2010 and closes "Paper revision 1 — Originally published in the journal of graphics, gpu and game tools", so it POST-dates the journal article. The venue argument for `F` is therefore stronger, not weaker. The journal article is peer-reviewed and on venue alone would qualify; the artefact read here is the whitepaper, every citing document's locator points into the whitepaper's derivation, and `P` asserts that a human read *the cited work* and found the algorithm in it. This is the most load-bearing `F` on the axis, since CDLOD is the primary recommendation of heightfield-lod.md, so the promotion path is written down rather than left implicit: obtain JGGGT 14(4), 57–74, confirm the morph-factor derivation and the per-level morph constants are there, re-point the locators at its sections, promote to `P`, and record the reader under `verified:`.
 - **dupuy2020** `P` — Dupuy, J. (2020). *Concurrent binary trees (with application to longest edge bisection).* Proceedings of the ACM on Computer Graphics and Interactive Techniques 3(2) (HPG 2020), art. 21, doi:10.1145/3406186. — A GPU-resident bitfield binary tree: lock-free split/merge from thousands of threads, O(1) leaf enumeration for indirect draw.
 

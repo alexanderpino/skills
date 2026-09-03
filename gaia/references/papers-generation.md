@@ -34,7 +34,6 @@ coefficients as a check on the transcription.
 **`austin2024`** — open access at the publisher; §6.2 and equation (1) read there.
 **`minton2019`** — the accepted-manuscript PDF; §1.1 and Figure 1 read there.
 **`silber2017`** — the accepted-manuscript PDF of the JGR-Planets paper; §1 and §5 read there.
-**`garland1997`** — the authors' own PDF of the SIGGRAPH '97 paper; §3–§5 read there.
 
 ⚠️ **One source is deliberately absent.** McGetchin, Settle & Head (1973), *Radial thickness
 variation in impact crater ejecta*, EPSL 20, 226–236, is the origin of the ejecta falloff
@@ -84,7 +83,7 @@ this paper anywhere. What the sketch does carry, and what is cited, is the shape
 
 **`mei2007`** — the authors' HAL deposit `inria-00402079`. §3.2.2 and §4 read there.
 
-**`barnes2014`** — the arXiv/accepted PDF already in the corpus, re-opened for this document. §1,
+**`barnes2014`** (defined in `papers-flow.md`) — the arXiv/accepted PDF already in the corpus, re-opened for this document. §1,
 §3.1 and §3.3 read there.
 
 ⚠️ **One source is named in prose and deliberately absent.** Lagae & Dutré, *Long-period hash

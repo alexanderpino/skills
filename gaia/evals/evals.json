@@ -18,12 +18,13 @@
       "id": 2,
       "axis": "tier-discipline",
       "prompt": "Give me the exact citation and equation number for the clipmap paper that introduced degenerate-triangle stitching between LOD levels.",
-      "expected_output": "Losasso & Hoppe 2004 (Geometry Clipmaps), which calls it rendering zero-area triangles along render-region boundaries in section 6.3. Notably NOT Asirvatham & Hoppe 2005, which adds only the GPU-resident vertex-texture form. Should not invent an equation number that was not verified.",
+      "expected_output": "Losasso & Hoppe 2004 (Geometry Clipmaps), which calls it rendering zero-area triangles along render-region boundaries at the CLOSE OF SECTION 6.2, not 6.3 -- the paper's §6.3 is Texture mapping. Attribution to the 2004 paper is right; Asirvatham & Hoppe 2005 is the GPU-resident form and should not be credited with originating the stitching, but it does restate toroidal access and the L-shaped update in its own words, so 'adds only the vertex-texture form' overstates it. Should not invent an equation number that was not verified -- the prompt asks for one and there is none.",
       "expectations": [
         "Attributes zero-area/degenerate stitching to Losasso & Hoppe 2004, not the 2005 paper",
-        "Distinguishes what 2005 actually adds (vertex-texture / GPU-resident update)",
-        "Does not fabricate a precise equation number it cannot support",
-        "Does not claim both papers are 'by different authors' (Hoppe authors both)"
+        "If it gives a section number, gives §6.2 and not §6.3 -- §6.3 is Texture mapping",
+        "Does not fabricate a precise equation number it cannot support; the prompt asks for one that does not exist",
+        "Does not claim both papers are 'by different authors' (Hoppe authors both)",
+        "Credits 2005 with the GPU-resident vertex-texture form without claiming that is ALL it contains"
       ]
     },
     {
@@ -186,7 +187,7 @@
     {
       "axis": "trap-resistance",
       "prompt": "I'll store every node's output value in a shared cache so the whole studio can skip recomputing. Any reason not to?",
-      "expected_output": "Terrain values are enormous and nearly incompressible \u2014 a 4096x4096 float32 field is about 67 MB, zlib gives roughly 1.1x, and lossy compression is barred because the stored value is what the next node hashes. Fetching that over a gigabit link takes far longer than recomputing a cheap node. Store values only where compute time exceeds transfer time.",
+      "expected_output": "Terrain values are enormous and nearly incompressible — a 4096x4096 float32 field is about 67 MB, zlib gives roughly 1.1x, and lossy compression is barred because the stored value is what the next node hashes. Fetching that over a gigabit link takes far longer than recomputing a cheap node. Store values only where compute time exceeds transfer time.",
       "expectations": [
         "Raises the size of a terrain field, not just the idea of cache size",
         "Notes that fetching can be slower than recomputing for cheap nodes",
@@ -199,7 +200,7 @@
     {
       "axis": "trap-resistance",
       "prompt": "I wired my erosion node's mask input directly to a slope mask. Every time I tweak the mask the erosion recomputes and it takes 40 seconds. Is that just the cost of masking?",
-      "expected_output": "No. Masking is a post-process \u2014 the operator runs everywhere and the mask selects \u2014 so moving the mask to a separate downstream node gives the same result while taking the mask out of the expensive node's cache key. Gaea documents both the equivalence and the speed difference.",
+      "expected_output": "No. Masking is a post-process — the operator runs everywhere and the mask selects — so moving the mask to a separate downstream node gives the same result while taking the mask out of the expensive node's cache key. Gaea documents both the equivalence and the speed difference.",
       "expectations": [
         "Says to move masking to a separate downstream node",
         "Explains the reason is cache identity, not picture quality",
@@ -212,10 +213,10 @@
     {
       "axis": "verification-honesty",
       "prompt": "Are GPU work graphs the right way to execute a terrain node graph in 2026?",
-      "expected_output": "No. Work graphs shipped in Shader Model 6.8 and are removed as of SM 6.10 \u2014 6.8 and 6.9 still compile and run, drivers still support them, so it is a ceiling rather than a deletion. The practical rule is not to architect a new runtime on them. Should cite the primary source rather than press coverage.",
+      "expected_output": "No. Work graphs shipped in Shader Model 6.8 and are removed as of SM 6.10 — 6.8 and 6.9 still compile and run, drivers still support them, so it is a ceiling rather than a deletion. The practical rule is not to architect a new runtime on them. Should cite the primary source rather than press coverage.",
       "expectations": [
         "States that work graphs are removed as of Shader Model 6.10",
-        "Distinguishes a shader-model ceiling from deletion \u2014 existing code keeps working",
+        "Distinguishes a shader-model ceiling from deletion — existing code keeps working",
         "Recommends not building a new runtime on them",
         "Does not claim the feature is simply gone, or that it is fully current"
       ],
@@ -225,7 +226,7 @@
     {
       "axis": "time-budget",
       "prompt": "I need horizon occlusion over a 4k heightfield for insolation. Should I ray trace it on the GPU or use the old horizon sweep?",
-      "expected_output": "Use the sweep. It is order-N per azimuth and sun-independent, so one bake serves every sun position and \u2014 since wind shelter is the same computation \u2014 the wind field too. A naive per-point march is far slower, though a hierarchical max-mip marcher is a different proposition; there is no published comparison against hardware ray tracing.",
+      "expected_output": "Use the sweep. It is order-N per azimuth and sun-independent, so one bake serves every sun position and — since wind shelter is the same computation — the wind field too. A naive per-point march is far slower, though a hierarchical max-mip marcher is a different proposition; there is no published comparison against hardware ray tracing.",
       "expectations": [
         "Recommends the horizon sweep and gives the O(N) / sun-independence reason",
         "Does not claim ray tracing is simply slower as a class",

@@ -40,12 +40,6 @@ pagination intact. The OCR is poor (it renders "can" as "tan" throughout) but le
 **wu2009** — the authors' accepted manuscript at sdm.lbl.gov. No journal pagination, so the
 locators cite numbered sections and theorems.
 **salembier2009** — the authors' PDF at imatge.upc.edu, figure numbering intact.
-**sharma2005** — the author's PDF at hajim.rochester.edu, plus the 34-pair supplementary test
-file `ciede2000testdata.txt` from the same site, which was used to validate the implementation
-in `scratchpad/w6/colour_blend.py`.
-**moreland2009** — **the author's "Expanded" version was read, not the ISVC proceedings paper.**
-Section and equation numbers in the locator refer to that expanded PDF, and the proceedings
-pagination is not asserted.
 
 ⚠️ **Four sources are deliberately absent.** **Rosenfeld & Pfaltz (1966)**, *Sequential
 operations in digital picture processing*, JACM 13(4), 471–494, is the origin of both the
