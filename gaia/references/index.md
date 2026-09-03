@@ -5,7 +5,7 @@ description: "Every Gaia document, its axis, and whether a human has checked its
 tags: [index, routing]
 status: draft
 okf_version: "0.2"
-generated: { by: process:gaia-index, at: 2026-09-03T11:08:57Z }
+generated: { by: process:gaia-index, at: 2026-09-03T11:16:21Z }
 ---
 # Gaia index
 
@@ -25,9 +25,9 @@ work says what the document claims. That distinction is the whole point of the
 | [`flow-routing.md`](flow-routing.md) | Routing flow over a heightfield: which receiver rule to use, and how to handle depressions. | draft |
 | [`hydraulic-erosion.md`](hydraulic-erosion.md) | The two detail-scale water models: which one to run, the transcription details that decide whether each works, and the standing-water crossover between them. | draft |
 | [`impact-craters.md`](impact-craters.md) | Stamping craters whose geometry is measured rather than invented: the two-branch depth-to-diameter law, the transition diameter that moves with gravity, the ejecta falloff, and the size-frequency distribution and draw order that make a field read as a history. | draft |
-| [`mask-operators.md`](mask-operators.md) | STUB — in progress. | draft |
+| [`mask-operators.md`](mask-operators.md) | The two utilities the rest of this corpus assumes and never provides: an exact Euclidean distance transform, including distance from a spline, and an area-thresholded component filter that despeckles a mask without eroding it. | draft |
 | [`noise-and-warping.md`](noise-and-warping.md) | The base layer erosion runs on: which gradient noise, which fractal composition, and the warp that costs three evaluations. | draft |
-| [`river-networks.md`](river-networks.md) | STUB — in progress. | draft |
+| [`river-networks.md`](river-networks.md) | Synthesising a river as a thing you draw rather than a thing erosion leaves behind: width from discharge, the cross-section carve, the slope–discharge threshold that decides braided from meandering, and the structural reason a single-receiver network can express neither. | draft |
 | [`stratigraphy-and-lithology.md`](stratigraphy-and-lithology.md) | Authoring a stratigraphic column, giving it dip and strike, sampling it to K(x, y, z), and handing that to the erosion law you already run — with what layered K measurably does and does not produce. | draft |
 | [`stream-power.md`](stream-power.md) | The one-line incision law, the O(N) implicit solver that makes it tractable, the companion diffusion term, and the slope-area check that proves it. | draft |
 | [`surface-and-scale-space.md`](surface-and-scale-space.md) | Band-splitting a heightfield so an operator can rework the surface without destroying the silhouette: what the split does and does not conserve, and what it costs a tiled build. | draft |
@@ -53,7 +53,7 @@ work says what the document claims. That distinction is the whole point of the
 | [`gpu-driven-culling.md`](gpu-driven-culling.md) | Moving per-frame terrain visibility and LOD onto the GPU: the persistent scene, the culling ladder, two-phase HiZ occlusion, and indirect submission. | draft |
 | [`heightfield-lod.md`](heightfield-lod.md) | Picking a level-of-detail scheme for regular-grid terrain, and the crack contract that decides whether it ships. | draft |
 | [`heightfield-raymarching.md`](heightfield-raymarching.md) | Fixing the pixel and searching the terrain along a ray: the max-mip traversal that serves primary rendering, shadows, occlusion and picking, and how heightfields enter a ray-tracing pipeline. | draft |
-| [`mask-to-material.md`](mask-to-material.md) | STUB — in progress. | draft |
+| [`mask-to-material.md`](mask-to-material.md) | The step terrain-analysis-masks.md stops before: turning a set of material weights into a colour. Palettes driven by a scalar, the partition of unity, the splatmap channel budget, height-blended against alpha-blended transitions, and the colour space each of those has to happen in. | draft |
 | [`mesh-extraction.md`](mesh-extraction.md) | Turning a heightfield into a triangle mesh an authoring tool can export: quadric-error simplification, the greedy-insertion alternative for pure heightfields, why the quadric cost is not a screen-space error, and whether the exported LOD levels have to be nested. | draft |
 | [`planetary-precision.md`](planetary-precision.md) | Camera-relative rendering, reversed-Z depth, and cube-sphere patch frames: the numerical architecture any world past ten kilometres already needs. | draft |
 | [`tiled-streaming.md`](tiled-streaming.md) | Streaming a terrain tile pyramid: the residency state machine, the priority function, and the invariant that separates a shippable streamer from a demo. | draft |
