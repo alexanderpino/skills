@@ -1,71 +1,292 @@
 [
   {
     "query": "im writing a heightfield renderer and the tiles crack between LOD levels at distance, whats the standard fix",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "heightfield-lod.md"
+    ]
   },
   {
     "query": "my erosion sim keeps producing rivers that just stop halfway down the mountain and never reach the ocean",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "flow-routing.md"
+    ]
   },
   {
     "query": "building a Gaea/World Machine style node tool - what order do the erosion and flow routing nodes go in and why",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "node-graph-runtime.md"
+    ]
   },
   {
     "query": "whats the right timestep limit for a shallow water solver in a game, my pool explodes when i fill it",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "shallow-water.md"
+    ]
   },
   {
     "query": "how do i make ocean waves that actually look like an ocean - gerstner or fft spectra?",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "wave-models.md"
+    ]
   },
   {
     "query": "which paper do i cite for stream power erosion, and is there a solver thats not O(n log n)",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "stream-power.md"
+    ]
   },
   {
     "query": "the water in my engine looks like blue plastic instead of water, what am i missing",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "water-optics.md"
+    ]
   },
   {
     "query": "float precision falls apart when my camera is 6000km from the origin on a planet renderer",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "planetary-precision.md"
+    ]
   },
   {
     "query": "i want caustics on the pool floor but cant afford photon mapping at 60fps",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "caustics.md"
+    ]
   },
   {
     "query": "adding erosion detail to fbm noise mountains so they stop looking like fractal noise",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "noise-and-warping.md"
+    ]
   },
   {
     "query": "d8 or multiple flow direction for computing a wetness map?",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "flow-routing.md",
+      "terrain-analysis-masks.md"
+    ]
   },
   {
     "query": "i need terrain material detail at a resolution no single texture atlas can hold",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "virtual-texturing.md"
+    ]
   },
   {
     "query": "how do i cull terrain chunks on the GPU without a CPU readback every frame",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "gpu-driven-culling.md"
+    ]
   },
   {
     "query": "my talus/thermal erosion makes weird star shaped artifacts around every peak",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "thermal-and-aeolian-erosion.md"
+    ]
   },
   {
     "query": "ray marching a heightfield for a path tracer - whats the acceleration structure",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "heightfield-raymarching.md"
+    ]
   },
   {
     "query": "all my lakes got flattened after i ran depression filling, the basins are gone",
-    "should_trigger": true
+    "should_trigger": true,
+    "routes_to": [
+      "flow-routing.md"
+    ]
   },
   {
-    "query": "how should i scale erosion parameters when i go from a 512 preview to a 4k final build",
-    "should_trigger": true
+    "query": "my terrain node graph rebuilds the whole erosion chain every time i nudge a slider",
+    "should_trigger": true,
+    "routes_to": [
+      "node-graph-runtime.md"
+    ]
+  },
+  {
+    "query": "how should i key the cache in my procedural terrain tool so edits dont invalidate everything",
+    "should_trigger": true,
+    "routes_to": [
+      "node-graph-runtime.md"
+    ]
+  },
+  {
+    "query": "whats the right way to apply an effect through a mask in a node graph - mask port or a separate node",
+    "should_trigger": true,
+    "routes_to": [
+      "layering-filters-and-masks.md"
+    ]
+  },
+  {
+    "query": "adding a new snow sim didnt update the combined mask and nothing errored",
+    "should_trigger": true,
+    "routes_to": [
+      "layering-filters-and-masks.md"
+    ]
+  },
+  {
+    "query": "i need a wind field over my terrain to drive dune formation, what actually produces one",
+    "should_trigger": true,
+    "routes_to": [
+      "driver-fields.md"
+    ]
+  },
+  {
+    "query": "how do i compute insolation and shadow on a heightfield to drive snow melt",
+    "should_trigger": true,
+    "routes_to": [
+      "driver-fields.md"
+    ]
+  },
+  {
+    "query": "my 512 preview doesnt match the 4k build in my terrain tool",
+    "should_trigger": true,
+    "routes_to": [
+      "node-graph-runtime.md",
+      "layering-filters-and-masks.md"
+    ]
+  },
+  {
+    "query": "can i evaluate my terrain graph tile by tile when one node is flow accumulation",
+    "should_trigger": true,
+    "routes_to": [
+      "node-graph-runtime.md"
+    ]
+  },
+  {
+    "query": "my shoreline is just a flat bevel where the sea meets the land, how do i get a profile that actually retreats",
+    "should_trigger": true,
+    "routes_to": [
+      "coastal-erosion.md"
+    ]
+  },
+  {
+    "query": "droplet erosion or the pipe model for my terrain generator, and when does the answer change",
+    "should_trigger": true,
+    "routes_to": [
+      "hydraulic-erosion.md"
+    ]
+  },
+  {
+    "query": "scattering craters on a moon heightmap - what depth to diameter ratio, and how do the rim and ejecta work",
+    "should_trigger": true,
+    "routes_to": [
+      "impact-craters.md"
+    ]
+  },
+  {
+    "query": "i need a distance field from a spline to drive my uplift mask, and my curvature mask is nothing but speckle",
+    "should_trigger": true,
+    "routes_to": [
+      "mask-operators.md"
+    ]
+  },
+  {
+    "query": "how do i turn my slope and height masks into an actual albedo map instead of just material weights",
+    "should_trigger": true,
+    "routes_to": [
+      "mask-to-material.md"
+    ]
+  },
+  {
+    "query": "exporting terrain as a mesh offline - how do i build a TIN and simplify by error instead of shipping the full grid",
+    "should_trigger": true,
+    "routes_to": [
+      "mesh-extraction.md"
+    ]
+  },
+  {
+    "query": "i want to author braided rivers with a real channel width, not whatever falls out of the erosion sim",
+    "should_trigger": true,
+    "routes_to": [
+      "river-networks.md"
+    ]
+  },
+  {
+    "query": "gaea has an icefloe node - how do you actually fracture an ice sheet into floes and move them",
+    "should_trigger": true,
+    "routes_to": [
+      "sea-ice.md"
+    ]
+  },
+  {
+    "query": "my terrain tile has a visible seam when i repeat it, the noise wraps but the erosion doesnt",
+    "should_trigger": true,
+    "routes_to": [
+      "seamless-and-periodic.md"
+    ]
+  },
+  {
+    "query": "should i bake this erosion offline or run it per frame, and where is the actual crossover",
+    "should_trigger": true,
+    "routes_to": [
+      "simulation-time-budget.md"
+    ]
+  },
+  {
+    "query": "i want an artist to draw a ridge line and have the erosion model still respect it",
+    "should_trigger": true,
+    "routes_to": [
+      "sketch-based-authoring.md"
+    ]
+  },
+  {
+    "query": "how do i author rock layers so erosion gives me caprock and mesas instead of smooth cones",
+    "should_trigger": true,
+    "routes_to": [
+      "stratigraphy-and-lithology.md"
+    ]
+  },
+  {
+    "query": "adding surface detail wrecks my mountain silhouettes, how do i only touch the small scales",
+    "should_trigger": true,
+    "routes_to": [
+      "surface-and-scale-space.md"
+    ]
+  },
+  {
+    "query": "where does the large scale relief come from before i run any erosion at all",
+    "should_trigger": true,
+    "routes_to": [
+      "tectonic-uplift.md"
+    ]
+  },
+  {
+    "query": "terrain paging hitches whenever the camera moves fast and tiles pop in late",
+    "should_trigger": true,
+    "routes_to": [
+      "tiled-streaming.md"
+    ]
+  },
+  {
+    "query": "is a lake the same solver as an open ocean or do i need two, the boundary conditions are killing me",
+    "should_trigger": true,
+    "routes_to": [
+      "water-closed-vs-open.md"
+    ]
+  },
+  {
+    "query": "drawing the water surface from underneath looks wrong - reflection, refraction, depth colour and the shoreline foam",
+    "should_trigger": true,
+    "routes_to": [
+      "water-rendering.md"
+    ]
   },
   {
     "query": "how do i reproject a GeoTIFF DEM from UTM to WGS84 and fill its nodata voids",
@@ -100,43 +321,35 @@
     "should_trigger": false
   },
   {
-    "query": "my terrain node graph rebuilds the whole erosion chain every time i nudge a slider",
-    "should_trigger": true
-  },
-  {
-    "query": "how should i key the cache in my procedural terrain tool so edits dont invalidate everything",
-    "should_trigger": true
-  },
-  {
-    "query": "whats the right way to apply an effect through a mask in a node graph - mask port or a separate node",
-    "should_trigger": true
-  },
-  {
-    "query": "adding a new snow sim didnt update the combined mask and nothing errored",
-    "should_trigger": true
-  },
-  {
-    "query": "i need a wind field over my terrain to drive dune formation, what actually produces one",
-    "should_trigger": true
-  },
-  {
-    "query": "how do i compute insolation and shadow on a heightfield to drive snow melt",
-    "should_trigger": true
-  },
-  {
-    "query": "my 512 preview doesnt match the 4k build in my terrain tool",
-    "should_trigger": true
-  },
-  {
-    "query": "can i evaluate my terrain graph tile by tile when one node is flow accumulation",
-    "should_trigger": true
-  },
-  {
     "query": "set up a bazel remote cache for our c++ monorepo",
     "should_trigger": false
   },
   {
     "query": "explain how make decides which targets are out of date",
+    "should_trigger": false
+  },
+  {
+    "query": "set up terraform state locking with an s3 backend for our infra repo",
+    "should_trigger": false
+  },
+  {
+    "query": "implement A* pathfinding on a navmesh so my NPCs walk around the hills",
+    "should_trigger": false
+  },
+  {
+    "query": "how do i rig and skin a character mesh in blender",
+    "should_trigger": false
+  },
+  {
+    "query": "what soil moisture sensor should i wire to an arduino for garden irrigation",
+    "should_trigger": false
+  },
+  {
+    "query": "colour grade my drone landscape photos and pull the haze out in lightroom",
+    "should_trigger": false
+  },
+  {
+    "query": "build a voxel destruction system with marching cubes for my FPS",
     "should_trigger": false
   }
 ]

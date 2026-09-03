@@ -283,8 +283,31 @@ jobs:
           p.write_text(re.sub(r"^tags: \[simulation", "tags: [generation", s, count=1, flags=re.M),
                        encoding="utf-8")
           PYAX
+          # Regenerate the index first. Without this the mutation is red because the index went
+          # stale, NOT because the axes disagree -- so it would stay red with check_axis_agreement
+          # deleted, and prove nothing about the guard it names. Caught by running this job.
+          python3 scripts/index.py >/dev/null
           expect_red "axis tag disagreeing with the coverage section"
           cp /tmp/bk_ax references/sea-ice.md
+          python3 scripts/index.py >/dev/null
+
+          # A trigger suite is graded by size and never by reach. Before `routes_to` existed,
+          # 17 of 34 written documents had no positive query and nothing could say so, because
+          # `should_trigger` records whether the SKILL fires, never which document answers.
+          # Deleting one query is the violation this guard uniquely catches: every other check
+          # in this file stays green on it.
+          cp evals/trigger-evals.json /tmp/bk_tr
+          cat > /tmp/mut_tr.py <<'PYTR'
+          import json, pathlib
+          p = pathlib.Path("evals/trigger-evals.json")
+          rows = json.loads(p.read_text(encoding="utf-8"))
+          keep = [r for r in rows if r.get("routes_to") != ["sea-ice.md"]]
+          assert len(keep) < len(rows), "no query routes to sea-ice.md -- mutation would pass vacuously"
+          p.write_text(json.dumps(keep, indent=2), encoding="utf-8")
+          PYTR
+          python3 /tmp/mut_tr.py
+          expect_red "a covered document no trigger query reaches"
+          cp /tmp/bk_tr evals/trigger-evals.json
 
           python3 scripts/check.py >/dev/null || { echo "::error::copy not restored"; fails=$((fails+1)); }
           echo

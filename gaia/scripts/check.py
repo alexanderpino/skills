@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import re
 import subprocess
 import sys
@@ -30,6 +31,7 @@ from okf import Unparseable, documents, parse_front_matter  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "references" / "index.md"
 COVERAGE = ROOT / "references" / "coverage.md"
+TRIGGERS = ROOT / "evals" / "trigger-evals.json"
 
 
 def paper_files() -> list[Path]:
@@ -602,6 +604,76 @@ def check_not_opened(bib: dict[str, dict], cites: dict[str, list[tuple[Path, str
 AXIS_TAGS = ("generation", "simulation", "rendering", "architecture")
 
 
+def covered_documents() -> dict[str, str]:
+    """`{document filename: topic id}` for every `covered` row in coverage.md.
+
+    Shares `_TOPIC` with `check_coverage`, which reports the malformed rows; this one assumes
+    the rows it can parse and stays silent about the rest so the same defect is not reported
+    from two places with two different wordings.
+    """
+    out: dict[str, str] = {}
+    try:
+        _, body = parse_front_matter(COVERAGE)
+    except (OSError, Unparseable):
+        return out
+    in_fence = False
+    for line in body.split("\n"):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence or not (m := _TOPIC.match(line.rstrip())):
+            continue
+        if m["state"] == "covered" and "\u2192" in m["rest"]:
+            out[m["rest"].split("\u2192")[-1].strip()] = m["id"]
+    return out
+
+
+def check_trigger_coverage() -> list[str]:
+    """Does the trigger suite actually exercise the corpus, or only the parts someone remembered?
+
+    A trigger suite is easy to grade by its size and impossible to grade by its reach: 25 queries
+    look thorough right up until you ask which documents they touch. When this was first counted,
+    **17 of 34 written documents had no positive query at all** -- half the corpus, including every
+    one of the eleven gap documents written most recently. Nothing reported that, because nothing
+    could: `should_trigger` says whether the SKILL should fire, never which document should answer.
+
+    So each positive now names the document(s) it should reach, and this asserts the same two
+    directions `check_coverage` asserts of the map itself: every `covered` document is reached by
+    some query, and every query reaches a document that exists and is claimed. The first direction
+    is the one that catches a new document arriving with no eval; the second catches a rename.
+    """
+    if not TRIGGERS.exists():
+        return [f"evals/{TRIGGERS.name} is missing -- trigger coverage cannot be checked"]
+    try:
+        rows = json.loads(TRIGGERS.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return [f"evals/{TRIGGERS.name}: {e}"]
+
+    problems: list[str] = []
+    reached: set[str] = set()
+    for i, row in enumerate(rows):
+        if not row.get("should_trigger"):
+            if "routes_to" in row:
+                problems.append(f"evals/{TRIGGERS.name}[{i}]: a NEGATIVE query carries `routes_to`. "
+                                "A query the skill must not fire on cannot route anywhere.")
+            continue
+        targets = row.get("routes_to")
+        if not targets:
+            problems.append(f"evals/{TRIGGERS.name}[{i}]: positive query names no `routes_to` -- "
+                            f"{row.get('query', '')[:60]!r}. Without it the suite's reach across "
+                            "the corpus is unmeasurable, which is how half of it went untested.")
+            continue
+        reached.update(targets)
+
+    claimed = covered_documents()
+    problems += [f"evals/{TRIGGERS.name}: `routes_to` names {t}, which no `covered` coverage.md "
+                 "topic claims -- renamed, or never written" for t in sorted(reached - set(claimed))]
+    problems += [f"references/{d} is `covered` (topic `{claimed[d]}`) but no positive trigger "
+                 "query routes to it -- the skill is never tested on the subject it claims"
+                 for d in sorted(set(claimed) - reached)]
+    return problems
+
+
 def check_axis_agreement() -> list[str]:
     """A document's axis tag must match the coverage.md section its topic row sits under.
 
@@ -915,7 +987,8 @@ def main() -> int:
     problems += (doc_problems + check_orphans(bib, used) + check_duplication()
                  + check_coverage() + check_index() + rec_problems
                  + check_no_artefact(bib) + check_not_opened(bib, citations_by_id())
-                 + check_headings() + check_axis_agreement())
+                 + check_headings() + check_axis_agreement()
+                 + check_trigger_coverage())
 
     docs = [p for p in documents(ROOT)
             if p not in paper_files() and p not in (INDEX, COVERAGE)]
