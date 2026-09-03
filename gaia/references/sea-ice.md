@@ -88,10 +88,10 @@ calibration to carry into a tool. The distribution is a good default and a bad l
 A large part of the apparent spread is bookkeeping, and [denton2022] Sect. 3.4 gives the
 conversion. A slope fitted to the noncumulative density of floe **areas** and a slope fitted to
 the noncumulative density of floe **diameters** are not the same number: with `a ∼ x²`, a
-diameter-based slope equals **`2m+1`**. Applying that to Stern's reported −2.81 to −1.90 yields
-−1.91 to −1.45, which overlaps Denton's own range closely. **Two papers agreeing to within
-their error bars can look like a factor-of-two disagreement if you read the exponents off the
-abstracts.**
+diameter-based slope equals **`2m+1`**. Inverting that for Stern's reported −2.81 to −1.90 puts
+them at −1.91 to −1.45 in the area convention, which overlaps Denton's own −2.03 to −1.65
+closely. **Two papers that very nearly agree can look a full unit of exponent apart if you read
+the numbers off the abstracts.**
 
 The cumulative form adds a second trap. [denton2022] Sect. 2.3: when the population has a finite
 largest floe — which it always does, because the domain is finite — a straight noncumulative
@@ -118,7 +118,10 @@ For `N ∼ p^α` at small `p`:
 
 This is worth having because it is not a fit, it is arithmetic: an exponent at or past −2 in the
 cumulative diameter form makes the small floes cover infinite area, so any generator quoting one
-is relying entirely on its lower truncation to stay finite. That is legitimate and it must be
+is relying entirely on its lower truncation to stay finite. **And note where that puts the
+measurements**: [rothrock1984]'s own reported range, −1.7 to −2.5, straddles the limit. Half of
+the observed slopes are steeper than a single power law is allowed to be down to `p = 0`, which
+is the arithmetic behind the paper's refusal to assert one. That is legitimate and it must be
 deliberate: **`p_min` is not a performance setting, it is the parameter holding the distribution
 together**, exactly as `D_min` is for a crater field in `impact-craters.md`.
 
@@ -136,25 +139,26 @@ large enough to see without measuring — but measuring it says by how much.
 the **same** noncumulative log-log density [denton2022] fits, with the same minimum-two-per-bin
 rule. Target: `m = −1.79 ± 0.08` over about five decades of area.
 
-| Construction | CV of area | decades of area | area in the largest 10% of cells | fitted `m` |
-|---|---|---|---|---|
-| **Poisson-Voronoi, N = 300 / 1000 / 3000** | **0.50–0.53** | **1.6–1.9** | **0.20** | **−0.15 / −0.21 / −0.05** |
-| clustered (Thomas) seeds | 2.13 | 3.6 | 0.62 | −1.01 |
-| Laguerre, radii from `r^−2` | 2.71 | 4.6 | 0.67 | −0.84 |
-| Laguerre, radii from `r^−3` | 1.48 | 4.0 | 0.32 | −0.83 |
-| recursive fracture, split prob. 0.65 / 0.75 / 0.85 | 7.9–12.4 | 4.9–6.0 | 0.89–0.99 | −1.27 / −1.28 / −1.43 |
-| Voronoi(4000) + uniform merge to 1000 / 300 / 120 | 3.6–15.7 | 3.5–4.5 | 0.68–0.98 | −1.33 / −1.55 / −1.63 |
-| *control: a true `a^−1.8` sample, same fitter* | *20.5* | *4.9* | *0.91* | ***−1.78*** |
-| *control: a true `a^−2.0` sample, same fitter* | *20.4* | *4.4* | *0.79* | ***−1.97*** |
+| Construction | fitted `m` | CV of area | area in the largest 10% of cells |
+|---|---|---|---|
+| **Poisson-Voronoi, N = 300 / 1000 / 3000** | **−0.20 / −0.53 / −0.07** | **0.52–0.53** | **0.21** |
+| clustered (Thomas) seeds | −1.16 | 2.01 | 0.60 |
+| Laguerre, radii drawn from `r^−2` | −0.92 | 2.62 | 0.68 |
+| Laguerre, radii drawn from `r^−3` | −0.76 | 1.16 | 0.30 |
+| recursive fracture, split prob. 0.65 / 0.75 / 0.85 † | −1.20 / −1.21 / −1.36 | — | — |
+| Voronoi(4000) + random merge to 1000 / 300 / 120 † | −1.21 / −1.18 / −0.80 | 3.2–15.3 | 0.68–0.98 |
+| *control: a true `a^−1.8` sample, same fitter* | ***−1.80*** | *13.1* | *0.88* |
+| *control: a true `a^−2.0` sample, same fitter* | ***−1.99*** | *8.8* | *0.74* |
 
-The controls recover −1.78 and −1.97 from true −1.8 and −2.0, so the fitter is not the problem.
+† mean of 5 seeded realisations. The controls recover −1.80 and −1.99 from true −1.8 and −2.0, so
+the fitter is not the problem.
 
 **Plain Poisson-Voronoi is off by the entire exponent.** Its fitted slope is near *zero*: cell
 areas have a coefficient of variation of about 0.5, span under two decades, and the largest tenth
 of the cells holds a fifth of the ice. In a real field the largest tenth holds **nine tenths**.
 A real field is a few enormous floes among a scatter of chips; a Poisson-Voronoi field is
 interchangeable pebbles, which is what every naive floe node looks like. The CV barely moves
-across N = 300, 1000 and 3000 — 0.50, 0.50, 0.53 — so this is the construction's own statistic
+across N = 300, 1000 and 3000 — 0.52, 0.52, 0.53 — so this is the construction's own statistic
 and not a sampling artefact of one run.
 
 [rothrock1984] §3 got there first, with the neighbouring construction: a **Poisson line field**
@@ -164,12 +168,16 @@ none to summer ice… **We do not expect to observe exponential distributions in
 exponential and a near-constant cell size are the same failure: a tessellation of a
 homogeneous point process has a characteristic scale, and a floe field does not.
 
-**Every cheap fix tested gets closer and none arrives.** Clustered seeding, Laguerre weights from
-a power law, recursive fracture and random coalescence all land between −0.6 and −1.6. The best
-is Voronoi followed by random merging of adjacent cells down to a quarter or less of the original
-count, at −1.55 to −1.63 — inside the observed *spread* but consistently shallower than the
-observed *mean*, and fitted over only five or six populated bins, so read it as "close" and not
-as "matched".
+**Every cheap fix tested gets closer and none arrives.** Clustered seeding, Laguerre weights drawn
+from a power law, recursive fracture and random coalescence all land between −0.76 and −1.36 on
+average — half to three-quarters of the way, and none of them inside the observed −2.03 to −1.65.
+
+⚠️ **And they are wildly seed-dependent, which is why the means above are over five realisations
+and not one.** Voronoi-plus-merge to 300 cells ranges from −1.49 to −0.92 across five seeds; a
+single run of it produced −1.63 during drafting, which looked like a near-match and was luck.
+Recursive fracture is worse: with a per-node continue probability, the very first split can fail,
+and two of the fifteen realisations here terminated at one or three pieces. **Any claim that a
+construction "matches the power law" that rests on one realisation is measuring its seed.**
 
 **Hence the recommendation.** Draw the sizes from the distribution you want, by inverse transform
 from a truncated power law between an explicit `p_min` and `p_max`, and then place them. Use the
@@ -276,7 +284,9 @@ does not model. Take the vector from your weather authoring and the two coeffici
 Everything above is a mask. Ridging is not: it is the one mechanism that puts a floe field into
 a heightfield at all. Ridges form where floes converge and collide [duncan2018] — the ice has
 nowhere to go, so it goes up and down, rubble piling into a **sail** above the waterline and a
-much deeper **keel** below.
+**keel** below it. Only the sail is in your heightfield, and only the sail is measured here — keel
+depth is the larger number in the literature and **no source opened for this document reports
+one**, so none is asserted.
 
 The numbers, from 12 Arctic ridges mapped in Operation IceBridge imagery [duncan2018]:
 
@@ -307,7 +317,7 @@ here states it as a published operator.
 | A still frame, ice as ground cover | Mask only; no drift, no ridging | The relief is `10⁻³`; nothing else is visible |
 | You need the published size statistic | Sample sizes from the power law and place them | Every partition tested fits `m` shallower than −1.65 |
 | You need leads that look right | Voronoi or Laguerre partition, edges as leads | Straight shared edges are what packed-floe cracks are |
-| You need both | Partition for edges, sampled sizes for cells, merge to reconcile | Merging a fine partition reached −1.55 to −1.63 |
+| You need both | Partition for edges, sampled sizes for cells | Merging a fine partition averaged only −1.2, with a −0.9 to −1.5 seed spread |
 | Motion over hours to days | Free drift, `α ≈ 1–2%`, `θ ≈ 20°` | One line, ~70% of the variance [brunette2022] |
 | Motion in a converging field | Free drift plus ridge lines on convergent edges | Convergence is the only source of vertical relief |
 | Marginal ice zone, wave-broken | Smaller `p_max`, steeper `m` — but do not quote a break | The two-regime claim is contested and unread here |
@@ -317,7 +327,7 @@ here states it as a published operator.
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| Every floe is the same size | Cell sizes taken from a Poisson-Voronoi partition | Measured CV 0.50 against a real field's ~20; sample sizes from the distribution instead |
+| Every floe is the same size | Cell sizes taken from a Poisson-Voronoi partition | Measured CV 0.52 and a fitted slope near zero; sample sizes from the distribution instead |
 | A few huge floes and nothing between | Power law sampled with no `p_min`, or `p_min` set from cell size | `p_min` sets what the field looks like, not just its cost |
 | Total floe area diverges as you refine | Cumulative diameter exponent at or past −2 | `α > −2` is required for finite area [rothrock1984] §3 |
 | Your fitted exponent disagrees with a paper's by ~2× | Comparing area-based to diameter-based, or cumulative to noncumulative | Diameter slope = `2m+1` [denton2022] Sect. 3.4; settle the convention first |

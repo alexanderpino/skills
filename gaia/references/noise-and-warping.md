@@ -104,6 +104,20 @@ anyway: only the offsets decorrelate the octaves. And do not expect a detune to 
 stack that already offsets; it will not, and reading that as "the detune worked" is the trap this
 note exists to close.
 
+⚠️ **If the output has to tile, drop the detune and keep the offsets.** An irrational lacunarity
+makes the stack non-periodic at every octave above the first: measured on a 6-octave fBm at period
+64, lacunarity 2.0 wraps to 4.8e-14 while 1.93, 2.01 and 2.1 leave a wrap error of 0.51 to 0.58 —
+half the field's own amplitude, so the tile visibly does not meet itself. The condition is that
+`period × lacunarity^k` stays an integer for every octave summed; in lowest terms `p/q`, that means
+`q^(n-1)` must divide the period for `n` octaves. `3/2` needs only 32 and so wraps on any
+power-of-two period.
+
+This costs nothing here, because the table above is the argument: **offsets recover the pinch grid
+as well as the detune does, 0.44 against 0.44**, and a translation leaves a periodic function
+periodic. So a tiling build keeps the offsets, sets the lacunarity to 2 or to a rational the period
+supports, and loses none of what the detune was for. `seamless-and-periodic.md` carries the
+measurements and the rest of the periodic construction.
+
 **Gain** ≈ 0.5. Tying it to a Hurst exponent — `gain = lacunarity^(−H)`, i.e. `2^(-H)` at
 lacunarity 2 — is the standard fBm parameterisation and is stated here as common practice, with
 no source in this bibliography cited for the identity: H = 1 is the standard smooth-ish terrain,

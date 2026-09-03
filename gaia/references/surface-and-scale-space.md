@@ -266,6 +266,32 @@ wrong: sub-metre, structured, and aligned to tile borders — a faint quilt in t
 survives into every mask derived from it, and that no amount of blending at the seam removes,
 because the two tiles disagree about the terrain rather than about the blend.
 
+### On a periodic domain the padding recommendation inverts
+
+Everything above assumes an open tile whose edges are a boundary. If the domain is **meant to
+wrap** — a planet, a seamless tileset, anything `seamless-and-periodic.md` covers — then `reflect`
+is the wrong pad and `wrap` is the only right one, and the failure is large. Measured on a
+periodic 256² field, low-band step across the wrap seam as a multiple of the mean interior step:
+
+| Pad | L = 1 | L = 3 | L = 5 |
+|---|---|---|---|
+| `wrap` | 3.34 | 2.41 | **1.19** |
+| `reflect` | 10.37 | 35.51 | **221.53** |
+| `symmetric` | 18.84 | 76.72 | 397.69 |
+| `edge` | 22.97 | 94.70 | 523.04 |
+
+⚠️ **And the round trip is 1.1e-16 for every row.** This document's own recommended validation —
+assert `collapse(split(h)) == h` — is structurally blind to a seam 221× the interior step, for the
+same reason it is blind to the volume error above: the error lives in how the low band and the
+residual divide the field, not in their sum. Two different failures, one blind spot. Assert the
+wrapped step against the interior step separately.
+
+There is a periodic counterpart to the phase rule too, and it is the domain size rather than the
+halo that carries it: the split reproduces the infinite-periodic low band **iff `N ≡ 0 (mod 2^L)`**,
+where `N` is the period. Measured: 0.000e+00 at `N = 256` for `L = 2, 3, 5` and at `N = 252` for
+`L = 2`; wrong by up to 22% of relief at `N = 250`. Same arithmetic as the tile rule, one level up
+— on a tile the sub-array origin must land on the retained phase, and on a torus the period must.
+
 An undecimated (à-trous) split has no phase at all: measured shift-invariant to 0.0000 m at shifts
 of 1, 2, 4, 8 and 16 px, where the decimated pyramid drifted 0.45, 0.89, 1.72 and 2.72 m and only
 returned to zero at the full period of 16. If your build is tiled and the seams are the thing that
