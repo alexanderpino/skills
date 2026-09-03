@@ -1,7 +1,7 @@
 ---
 type: Bibliography
 title: Papers — rendering
-description: "Sources for the rendering axis: heightfield LOD, streaming, virtual texturing, GPU-driven submission, planetary precision, water surfaces, caustics, and ray marching."
+description: "Sources for the rendering axis: heightfield LOD, streaming, virtual texturing, GPU-driven submission, planetary precision, water surfaces, caustics, ray marching, and — arriving with a bibliography merge — offline mesh extraction and the colour sources behind mask-to-material."
 tags: [bibliography, provenance, rendering]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
@@ -17,7 +17,8 @@ it — bibliographies are checked as documents like everything else.
 
 ## What was read, and what was not — offline meshing and colour
 
-The two sections added to this file from separately written documents. The rest of this
+This section covers the two sections a bibliography merge added to this file from separately
+written documents. The rest of this
 bibliography predates the practice.
 
 **`garland1997`** — the authors' own PDF of the SIGGRAPH '97 paper; §3–§5 read there.
@@ -31,8 +32,13 @@ pagination is not asserted.
 
 ⚠️ **The sRGB standard itself, IEC 61966-2-1, is deliberately absent**: it is paywalled and was
 not opened. `icc_srgb` — a standards-body technical note restating it, graded `F` accordingly —
-carries the constants instead, and `mask-to-material.md` names the standard in prose. The full
-list of absences from this family is in `papers-masks-and-filtering.md`.
+carries the constants instead. ⚠️ This note used to add "and `mask-to-material.md` names the
+standard in prose", offered as the compensating control that made declining an entry acceptable.
+It does not: `IEC` and `61966` occur in that document only inside the `srgb1996` YAML locator,
+nowhere in its body. The absence is still the right call — the standard is paywalled and unopened,
+and a `?` may not be cited — but it rests on `icc_srgb` restating the constants, not on a naming
+that never happened. And the "full list of absences from this family" in
+`papers-masks-and-filtering.md` does not include this one.
 
 ## What `F` means on this axis, and why there is so much of it
 
@@ -111,7 +117,7 @@ authority.
 
 ## Planetary scale and numerical precision
 
-- **upchurch2012** `P` — Upchurch, P. & Desbrun, M. (2012). *Tightening the precision of perspective rendering.* Journal of Graphics Tools 16(1), 40–56. — Error analysis of the depth transform: why a reversed-Z mapping into a floating-point depth buffer keeps relative error near-constant across the whole range.
+- **upchurch2012** `P` — Upchurch, P. & Desbrun, M. (2012). *Tightening the precision of perspective rendering.* Journal of Graphics Tools 16(1), 40–56. — Error analysis of the depth transform, and the two mappings the paper actually recommends: the infinite projection (§3.2) and the two-step transform (§4.1). ⚠️ **It is not the source for reversed-Z.** This entry used to sell it as "why a reversed-Z mapping into a floating-point depth buffer keeps relative error near-constant" — the paper's §6 says complementary reversed Z suffers the **same 2ε arithmetic loss** as 1/Z. `planetary-precision.md` read §6 and says so at both ends; the bibliography kept advertising the conclusion that section denies.
 - **reed2015** `F` — Reed, N. (2015). *Depth precision visualized.* Public write-up. — The standard practical explanation of the float-depth / reversed-Z interaction. Blog post.
 - **epiclwc** `F` — Epic Games. *Large World Coordinates* documentation, Unreal Engine 5. — Engine-native double-precision world transforms, and the shader-side paths that still break. Engine documentation.
 
@@ -159,6 +165,6 @@ documents on the simulation axis. What is listed here is what a *renderer* consu
 
 
 - **sharma2005** `P` — Sharma, G., Wu, W. & Dalal, E.N. (2005). *The CIEDE2000 color-difference formula: Implementation notes, supplementary test data, and mathematical observations.* Color Research & Application 30(1), 21–30, doi:10.1002/col.20070. — The colour-difference metric, plus the thing that makes it usable: 34 supplementary CIELAB pairs with published ΔE00 values, designed to catch the implementation errors — signed chroma and hue differences, the arctangent quadrant, the mean-hue boundary cases — that the CIE's own worked examples do not. The paper's own account is that several widely distributed implementations, including the authors' early ones, passed the CIE examples and were still wrong.
-- **moreland2009** `P` — Moreland, K. (2009). *Diverging color maps for scientific visualization.* Proc. 5th International Symposium on Visual Computing (ISVC 2009), LNCS 5876, 92–103. Read as the author's expanded version, `ColorMapsExpanded.pdf`. — Mapping a scalar to a colour, done deliberately. §2 is the case against the rainbow map: no perceptual ordering, non-uniform perceptual rate, and sensitivity to colour-vision deficiency. §3 gives the sRGB → linear → XYZ → CIELAB chain, eqs. (1)–(3), and states the operative distinction for a terrain palette — physical light effects belong in a linear space, perception of a colour belongs in CIELAB.
-- **icc_srgb** `F` — International Color Consortium. *How to interpret the sRGB color space (specified in IEC 61966-2-1) for ICC profiles*, color.org. — The sRGB transfer function and primaries, restated from the standard by the body that maintains ICC profiles. §A.7 gives the XYZ(D65) → linear sRGB matrix; §B gives the encoding and decoding equations with the 0.0031308 / 0.04045 thresholds, the 12.92 slope, the 0.055 offset and the 2.4 exponent. `F` because it is a standards-body technical note, not peer review, and because the normative document it restates — IEC 61966-2-1 — is paywalled and was not opened.
+- **moreland2009** `P` — Moreland, K. (2009). *Diverging color maps for scientific visualization.* Proc. 5th International Symposium on Visual Computing (ISVC 2009), LNCS 5876, 92–103. Read as the author's expanded version, `ColorMapsExpanded.pdf`. — Mapping a scalar to a colour, done deliberately. ⚠️ The colour-space chain and eqs. (1)–(3) are **§2.2 Color Spaces**, not §3: §3 is "Color Map Requirements", a six-bullet list with no equations in it. This entry and `mask-to-material.md` both carried §2.2's title against §3's number. §2.1 is the case against the rainbow map: no perceptual ordering, non-uniform perceptual rate, and sensitivity to colour-vision deficiency. §3 gives the sRGB → linear → XYZ → CIELAB chain, eqs. (1)–(3), and states the operative distinction for a terrain palette — physical light effects belong in a linear space, perception of a colour belongs in CIELAB.
+- **icc_srgb** `F` — International Color Consortium. *How to interpret the sRGB color space (specified in IEC 61966-2-1) for ICC profiles*, color.org. — The sRGB transfer function and primaries, restated from the standard by the body that maintains ICC profiles. §A.7 gives the XYZ(D65) → linear sRGB matrix; **§A.8 "Color component transfer function" gives the ENCODING equations and Part B "Hints for profile makers" gives only the DECODING inverse** — this entry and `mask-to-material.md` both credited §B with both halves. ⚠️ Do not "correct" the corpus's constants against this artefact: the ICC note itself misprints the blue inverse as `BL = B/12.02`, where 12.92 is right. §B gives the encoding and decoding equations with the 0.0031308 / 0.04045 thresholds, the 12.92 slope, the 0.055 offset and the 2.4 exponent. `F` because it is a standards-body technical note, not peer review, and because the normative document it restates — IEC 61966-2-1 — is paywalled and was not opened.
 - **srgb1996** `F` — Stokes, M., Anderson, M., Chandrasekar, S. & Motta, R. (1996). *A Standard Default Color Space for the Internet — sRGB*, version 1.10, W3C Note. — The original proposal. Cited here only for the warning W3C now prints at the top of it: the document is obsolete, sRGB was standardised as IEC 61966-2-1, and "during standardization, a small numerical error caused by rounding error was corrected". That is the provenance of every slightly-different set of sRGB constants in circulation. The equations themselves are images in the HTML and were not read as text, which is why icc_srgb is cited for the numbers instead.

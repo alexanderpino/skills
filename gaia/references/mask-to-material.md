@@ -7,8 +7,8 @@ status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
 sources:
   - { id: sharma2005, tier: P, locator: "the 34-pair supplementary test data (Table I and the file ciede2000testdata.txt from the first author's site), used here to validate an implementation; the Introduction, for the finding that several independently distributed CIEDE2000 implementations — including the authors' own early ones — passed the CIE's worked examples and were still wrong; the implementation notes on signed ΔC′ and ΔH′, the arctangent quadrant in eq. (7) and the mean-hue boundary cases in eq. (14)" }
-  - { id: moreland2009, tier: P, locator: "read in the author's expanded version, ColorMapsExpanded.pdf. §3 Color Spaces, eqs. (1)–(3) — the sRGB→linear transfer function, the linear-RGB→XYZ matrix and the XYZ→CIELAB conversion, with the statement that physical light effects belong in a linear space while perception of a colour belongs in CIELAB; §2 for the case against the rainbow map — no perceptual ordering, non-uniform perceptual rate, and sensitivity to colour-vision deficiency" }
-  - { id: icc_srgb, tier: F, locator: "§B, the encoding and decoding equations — linear ≤ 0.0031308 scaled by 12.92, otherwise 1.055·L^(1/2.4) − 0.055; encoded ≤ 0.04045 divided by 12.92, otherwise ((E+0.055)/1.055)^2.4; §A.7 for the XYZ(D65)→linear-sRGB matrix used to build the CIELAB conversion here; §A.1–A.3 for the BT.709 primaries and the D65 white point" }
+  - { id: moreland2009, tier: P, locator: "read in the author's expanded version, ColorMapsExpanded.pdf. §2.2 Color Spaces, eqs. (1)-(3) (NOT §3, which is Color Map Requirements and contains no equations) — the sRGB→linear transfer function, the linear-RGB→XYZ matrix and the XYZ→CIELAB conversion, with the statement that physical light effects belong in a linear space while perception of a colour belongs in CIELAB; §2 for the case against the rainbow map — no perceptual ordering, non-uniform perceptual rate, and sensitivity to colour-vision deficiency" }
+  - { id: icc_srgb, tier: F, locator: "§A.8 Color component transfer function for the ENCODING equations and Part B Hints for profile makers for the DECODING inverse (NOT §B for both, as this said) — linear <= 0.0031308 scaled by 12.92, otherwise 1.055·L^(1/2.4) − 0.055; encoded ≤ 0.04045 divided by 12.92, otherwise ((E+0.055)/1.055)^2.4; §A.7 for the XYZ(D65)→linear-sRGB matrix used to build the CIELAB conversion here; §A.1–A.3 for the BT.709 primaries and the D65 white point" }
   - { id: srgb1996, tier: F, locator: "the W3C obsolescence notice at the head of the document — the 1996 proposal was superseded by IEC 61966-2-1 and 'during standardization, a small numerical error caused by rounding error was corrected'" }
   - { id: mishkinis2013, tier: F, locator: "the height-based splat blend — per-layer height maps biased by the layer weights, with a depth or contrast term deciding how much of the runner-up survives near the boundary" }
 ---
@@ -220,7 +220,7 @@ for anything geometric, and reserve the height blend for surface appearance.
 ## Colour space: where linear is required, and where it is wrong
 
 sRGB is not a gamma-2.2 curve; it is piecewise — a linear segment near black and a 2.4 power
-elsewhere [icc_srgb] §B:
+elsewhere — `encode` is [icc_srgb] §A.8, `decode` is its Part B:
 
 ```
 encode(L) = 12.92·L                       for L ≤ 0.0031308

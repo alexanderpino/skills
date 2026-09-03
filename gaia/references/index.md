@@ -5,7 +5,7 @@ description: "Every Gaia document, its axis, and whether a human has checked its
 tags: [index, routing]
 status: draft
 okf_version: "0.2"
-generated: { by: process:gaia-index, at: 2026-09-03T18:29:36Z }
+generated: { by: process:gaia-index, at: 2026-09-03T21:28:55Z }
 ---
 # Gaia index
 
@@ -80,6 +80,6 @@ work says what the document claims. That distinction is the whole point of the
 | [`papers-flow.md`](papers-flow.md) | Two jobs in one file: the sources for flow routing, depression handling and river networks as authored objects; and the shared apparatus every other bibliography points at — the provenance tier table, the [not-opened] rule, and the two non-negotiable rules that bind every entry in the corpus. | draft |
 | [`papers-generation.md`](papers-generation.md) | Sources for the generation axis: noise and fractal composition, tectonics and isostasy, hydraulic, thermal and aeolian erosion, landscape evolution, layered rock and grain classes, impact cratering, constraint-based authoring, and periodic construction. Terrain analysis and edge-aware filtering moved to papers-masks-and-filtering.md. | draft |
 | [`papers-masks-and-filtering.md`](papers-masks-and-filtering.md) | Sources for the operators that turn a heightfield into a mask and a mask into something usable: exact and approximate distance transforms, connected-component labelling and area filtering, multi-band scale-space decomposition, and the edge-aware filters that smooth a mask without moving its edges. | draft |
-| [`papers-rendering.md`](papers-rendering.md) | Sources for the rendering axis: heightfield LOD, streaming, virtual texturing, GPU-driven submission, planetary precision, water surfaces, caustics, and ray marching. | draft |
+| [`papers-rendering.md`](papers-rendering.md) | Sources for the rendering axis: heightfield LOD, streaming, virtual texturing, GPU-driven submission, planetary precision, water surfaces, caustics, ray marching, and — arriving with a bibliography merge — offline mesh extraction and the colour sources behind mask-to-material. | draft |
 | [`papers-simulation.md`](papers-simulation.md) | Sources behind Gaia's water and simulation documents, each graded by provenance tier. | draft |
 
