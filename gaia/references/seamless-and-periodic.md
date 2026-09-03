@@ -96,8 +96,16 @@ Three things fall out of that table.
 
 **The period divides the domain, or there is no wrap.** The naive row is zero at exactly one
 value, 256, which is the permutation table's own length — that is [lagae2010]'s Table 1 footnote 1
-made visible, storage `O(N)` *in the period N*. A field is periodic at `T` if and only if `T`
-divides the hash's period; the modular construction makes any `T` divide it by force.
+made visible, storage `O(N)` *in the period N*. A field is periodic at `T` if and only if
+**the hash's period divides `T`** — that is, `T` is a *multiple* of the table size, not a divisor
+of it.
+⚠️ **This sentence used to say the reverse**, and the reverse is false in both directions.
+Measured on a 256-entry permutation table, `max |f(x) − f(x+T)|` over random samples:
+`T` = 2, 4, 32, 64 and **128** all divide 256 and all fail at full noise amplitude (0.74–0.98);
+`T` = 512, 768 and 1024 divide by nothing and are exact to 1e-13. A reader who picked `T` = 128
+"because it divides 256" would get a seam at full amplitude. The error survived because the
+canonical case, `T` = 256, satisfies both readings — it is the one period that cannot tell them
+apart.
 
 **Simplex does not take the trick.** Simplex noise skews the square lattice by `F2 = (√3−1)/2`
 before flooring, so the integers being hashed live on a triangular lattice whose relationship to
@@ -378,7 +386,7 @@ padding, the split reproduces the infinite-periodic answer only when the period 
 | `N mod 2^L` | 0 | 0 | 4 | 2 | 2 |
 | max difference | **0.000e+00** | **0.000e+00** | 1.8e-01 | 2.2e-01 | 4.2e-01 |
 
-Exact when `N ≡ 0 (mod 2^L)`, and wrong by up to 22% of relief when it is not. **Pick the domain
+Exact when `N ≡ 0 (mod 2^L)`, and wrong by up to **42%** of relief when it is not — the `N` = 250, `L` = 3 cell in the row above. ⚠️ This line used to say 22%, which is the `N` = 250, `L` = 2 cell: a sample quoted as the maximum, in a sentence whose whole job is to bound the error. The same 22% propagated to `surface-and-scale-space.md` and to `registers/pseudocode-execution.tsv`, so three places agreed with each other and disagreed with the only table that shows the numbers. **Pick the domain
 period as a multiple of `2^L` for the deepest pyramid anywhere in the graph, before anything else
 is chosen.** 1024 or 2048 costs nothing and settles it.
 

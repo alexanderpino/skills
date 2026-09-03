@@ -314,7 +314,7 @@ wrapped step against the interior step separately.
 There is a periodic counterpart to the phase rule too, and it is the domain size rather than the
 halo that carries it: the split reproduces the infinite-periodic low band **iff `N ≡ 0 (mod 2^L)`**,
 where `N` is the period. Measured: 0.000e+00 at `N = 256` for `L = 2, 3, 5` and at `N = 252` for
-`L = 2`; wrong by up to 22% of relief at `N = 250`. Same arithmetic as the tile rule, one level up
+`L = 2`; wrong by up to 42% of relief at `N = 250`, `L = 3` — 22% is the `L = 2` cell, not the worst. Same arithmetic as the tile rule, one level up
 — on a tile the sub-array origin must land on the retained phase, and on a torus the period must.
 
 An undecimated (à-trous) split has no phase at all: measured shift-invariant to 0.0000 m at shifts
