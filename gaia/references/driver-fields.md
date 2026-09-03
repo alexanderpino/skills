@@ -13,6 +13,7 @@ sources:
   - { id: furich2002, tier: P, locator: "the geometric solar radiation model: the viewshed-based occlusion term and the direct/diffuse split it feeds" }
   - { id: forthofer2014, tier: P, locator: "the three-approach comparison — mass-consistent, and the cost against accuracy result across them" }
   - { id: stendardo2020, tier: P, locator: "Abstract p.1 for the 3.4 km at 0.5 m in up to two hours figure; §3.2 Code Listings 1-3 pp.8-9 for the per-point DDA march and the coarse-DTM substitution beyond the tile, taking the minimum of the two results" }
+  - { id: minderroe, tier: F, locator: "the 'Fundamentals' section, Eq. (1) — the upslope model's vertically integrated condensation source as moisture flux (rho*q_v) times the topographic slope in the airflow direction — and the sentence that moist ascent over topography alone is typically insufficient, so orographic effects 'mainly modify precipitation during preexisting storms'; Eq. (2) for the Brunt-Vaisala frequency and the dry adiabatic lapse rate of -9.8 K/km; the 'Observations' section for the dense southwestern Olympics gauge network showing precipitation maximising on RIDGE-TOPS over scales of a few kilometres, 'distinct from the rain shadow predicted by the upslope model', attributed to the seeder-feeder mechanism; the Alps paragraph, where storms from a wide range of directions erase 'any simple rain shadow' and produce maxima on both sides; the 'Models' section for what Smith and Barstad (2004) add to the upslope model. An encyclopedia review article, not peer-reviewed primary research — graded on what it is" }
   - { id: ta_graph_runtime, tier: F, locator: "§Side-channel masks & the accumulator pattern — the observation that simulations emit more than their primary field" }
 ---
 # Driver fields — temperature, sun, shadow and flow
@@ -55,6 +56,11 @@ slower, but not as far outside an authoring budget as its reputation: [forthofer
 30–90 minutes per simulation on a laptop [forthofer2014]. *Aspect alone as a proxy for insolation* — cheap and blind: it
 knows which way a slope faces and not whether the ridge across the valley blocks it, which is the
 whole point of a horizon.
+
+**And compute precipitation, because it is nearly free and it is what erosion actually wants.** One
+dot product against the wind field you already have, clamped and renormalised, turns `stream-power.md`'s
+drainage area `A` into a real discharge `Q` — see `## Precipitation, the field that decides where
+the water is` below. Every erosion document in this corpus assumes uniform rainfall until you do.
 
 ⚠️ **The two fields want the same sweep and very different search distances.** Wind shelter is
 useful at **100–300 m** — [winstral2002] §4 found `Sx` at 100 m the strongest predictor of snow
@@ -220,6 +226,98 @@ graph that already computes horizons gets a defensible wind magnitude for almost
 marks lee-slope deposition zones. That is peer-reviewed grounding for the lee-shadow step that
 terrain tools usually carry as folklore.
 
+## Precipitation, the field that decides where the water is
+
+Every erosion document in this corpus takes water as given. `stream-power.md` uses drainage area
+`A` as the stand-in for discharge, and `flow-routing.md` accumulates one unit per cell. That is a
+**uniform-rainfall assumption**, stated nowhere, and precipitation is the driver field that removes
+it. It matters more than temperature does: temperature decides where snow and vegetation go,
+precipitation decides where the erosion happens at all.
+
+**The upslope model is the whole of the cheap version.** Condensation rate is the moisture flux
+times the terrain slope **in the direction of the airflow** — `S ∝ ρ · q_v · (v · ∇h)`
+[minderroe] Eq. (1). Three things fall out of that one expression and they are the three things an
+authoring tool needs:
+
+- It is `v · ∇h`, a **directional derivative**, not `|∇h|`. A slope facing the wind condenses; the
+  same slope facing away does not. Steepness alone is the wrong input, and it is the mistake a
+  slope mask invites.
+- The lee is **negative** and that is the rain shadow: descending air warms and dries, and both
+  cloud and precipitation evaporate [minderroe].
+- You already have the wind direction. This section costs one dot product against the field
+  `## Flow fields for water and wind` above already computes, which is why precipitation is the
+  cheapest driver field in this document and the one most often left out.
+
+⚠️ **Clamp at zero and then re-normalise, or your continent loses half its water.** `v · ∇h`
+integrates to zero over any terrain that comes back to its own level — every windward slope has a
+lee. Measured, 256², central differences: on smoothed noise and on an isolated Gaussian ridge the
+sum is zero to −3.4e-05 of `Σ|v · ∇h|` (to machine precision if the domain wraps), and **49.6% to
+50.1% of cells carry a negative value** at every wind direction tried. So an unclamped field hands
+negative rainfall to half your map, and clamping alone then delivers **0.50×** the mean magnitude
+you asked for — the base rate silently halves. Clamp, then rescale so the domain total matches the
+rate you intended. The base rate is the parameter an artist wants; the pattern is what the terrain
+computes.
+
+The one terrain where this does not bite is the one with no lee: a full-width monotonic ramp
+measures **0.0%** negative cells and a normalised sum of exactly `+1.0`. If your test scene is a
+tilted plane you will not see this bug, and every real heightfield will trip it.
+
+### Three ways the cheap model is wrong, in the direction that matters here
+
+The upslope model is a teaching tool, and this corpus's rule is to say where a recommendation
+breaks before recommending it.
+
+**It has no timescales, so the pattern is pinned to the wrong place.** Condensate does not fall
+where it forms — it is advected downwind while it converts to precipitation and while it falls. The
+standard fix is the linear theory of Smith and Barstad (2004), which [minderroe]'s *Models* section
+describes as building on the upslope model by adding linearized mountain-wave airflow dynamics,
+**microphysical conversion and fallout timescales**, and lee-side evaporation. ⚠️ That paper is
+named here and **not cited**: it is behind the AMS paywall and was not opened, so the description
+above is [minderroe]'s and the two conversion/fallout timescales it introduces are not quoted,
+because quoting a constant from a paper nobody here read is exactly what this skill refuses to do.
+If you implement it, read it. Practically: the missing timescales are why an upslope field puts the
+maximum on the windward face and a real one puts it further downwind, often past the crest.
+
+**At the resolution a terrain tool works at, the observed pattern is not the modelled one.**
+[minderroe] reports a dense gauge network in the southwestern Olympics measuring large differences
+in annual mean precipitation over **scales of a few kilometres, maximising on ridge-tops** — and
+states plainly that this "is distinct from the rain shadow predicted by the upslope model". The
+mechanism is seeder-feeder: precipitation falling from aloft through low-level orographic cloud
+grows by collecting droplets. **A few kilometres is your grid.** So the upslope model is defensible
+for the range-scale windward/lee contrast and is *measured wrong* at the scale where you place
+individual ridges — and the correction, ridge-tops wetter than the model says, is one you can apply
+as a curvature-weighted term without pretending it came from the physics.
+
+**One wind direction is what makes a rain shadow sharp.** [minderroe]'s Alps paragraph is the
+control experiment: that range receives storms from a much wider range of directions, which erases
+"any simple rain shadow" and produces precipitation maxima on **both** sides. A tool with a single
+authored wind vector will always produce a cleaner windward/lee split than a real range of the same
+shape. If the scene wants an Alpine look rather than a Cascades look, **average the field over a
+few weighted directions** — it is the same dot product run three or five times, and it is the
+difference between a coast range and an interior massif.
+
+⚠️ **And the field is a modifier, not a generator.** [minderroe] states that moist ascent over
+topography alone is typically insufficient to generate precipitation, and that orographic effects
+"mainly modify precipitation during preexisting storms". So the honest form of the parameter is a
+**base rate times a terrain multiplier**, not a rate the terrain produces. A tool that lets the
+multiplier reach zero has invented a desert that the physics does not support.
+
+### What it costs downstream, which is the reason to bother
+
+Precipitation enters erosion as **discharge**, not as area: `Q = Σ(P · cellArea)` over the
+contributing cells, accumulated by exactly the machinery `flow-routing.md` already describes — the
+accumulation is a weighted sum instead of a count, and nothing else about it changes. Substituting
+`Q` for `A` in the stream-power law is a one-line change to `stream-power.md`'s update and it is the
+single highest-value use of any field in this document, because it is what makes the wet side of a
+range incise and the dry side keep its relief.
+
+⚠️ **It is also a global field with a non-local dependence, so it breaks tiling the same way flow
+accumulation does** — see `## What these fields do to the runtime` below. Worse than the horizon
+sweep, in fact: the horizon's dependence has a bounded search distance, and an advected
+precipitation field's does not. Compute precipitation whole-domain at a coarse resolution and
+upsample it, rather than trying to tile it; the field is smooth at the scale that matters and the
+error from upsampling is far smaller than the error from a seam.
+
 ## What these fields do to the runtime
 
 Driver fields are not heightfields, and three properties follow:
@@ -249,4 +347,9 @@ Driver fields are not heightfields, and three properties follow:
 | Reusing the insolation horizon for wind gives nonsense | Same algorithm, but the insolation baseline is kilometres and the wind baseline is hundreds of metres | Run the sweep twice with different `dmax`; the code is shared, the parameter is not |
 | The occlusion bake takes hours | Per-cell, per-direction ray marching — 1–2 hours per tile on a GPU against ~2 s per azimuth for the sweep on CPU [stendardo2020] [dozier2022] | Use the order-N sweep; it is O(N) and sun-independent |
 | Changing the time of day rebuilds everything | The horizon sweep sits below the sun parameter in the graph | Put the sun-independent sweep above the sun parameter; only the projection is downstream |
+| Rivers run out of dry valleys, or half the map is a desert | An unclamped upslope field: 49.6–50.1% of cells measure negative, and clamping alone then halves the base rate | Clamp at zero, then rescale so the domain total matches the intended base rate |
+| Erosion is identical on both sides of a range | Discharge taken as drainage area `A`, which assumes uniform rainfall | Accumulate `Q = Σ(P·cellArea)` with the same router and substitute `Q` for `A` [minderroe] |
+| The rain shadow is sharper than any real range | A single authored wind direction; the Alps' storms arrive from many, which erases the simple shadow [minderroe] | Average the dot product over three to five weighted directions |
+| The wet band sits on the windward face and looks pasted on | The upslope model has no conversion or fallout timescale, so nothing is advected downwind | Named fix is Smith and Barstad's linear theory — read it before implementing; the cheap partial fix is to advect the clamped field downwind before accumulating |
+| Ridge-tops are drier than the reference imagery | The upslope model's known failure at kilometre scale — measured maxima sit on ridge-tops via seeder-feeder [minderroe] | Add a curvature-weighted term and label it a correction, not physics |
 | Tiled driver-field bake seams at kilometre scale | Halo sized for a local filter, not for a kilometre horizon [dozier2022] §III-C | Widen the halo, or evaluate the far field on a coarse grid and take the minimum [stendardo2020] |

@@ -134,6 +134,20 @@ is evidence about practice, never about correctness.
 - **minder2010** `P` — Minder, J.R., Mote, P.W. & Lundquist, J.D. (2010). *Surface temperature lapse
   rates over complex terrain: Lessons from the Cascade Mountains.* J. Geophysical Research 115,
   D14122. doi:10.1029/2009JD013493. — Measures what the conventional 6.5 °C/km assumption is worth.
+- **minderroe** `F` — Minder, J.R. & Roe, G.H. *Orographic Precipitation.* Encyclopedia article,
+  8 pp., read from the authors' own copy at earthweb.ess.washington.edu. — The source for the
+  upslope model's Eq. (1), for the Brunt–Väisälä frequency Eq. (2), for the dense Olympics gauge
+  network measuring precipitation maxima on ridge-tops "distinct from the rain shadow predicted by
+  the upslope model", for the Alps' many storm directions erasing any simple rain shadow, and for
+  what Smith & Barstad (2004) add to the upslope model.
+  ⚠️ **Graded `F` because of what the artefact is, not what the authors are.** It is an
+  encyclopedia review by two published researchers in the field, and it is not peer-reviewed
+  primary research; the tier records the artefact. Everything cited from it was read in it. Two
+  papers it reports are named in prose and deliberately **not** given entries here: Smith, R.B. &
+  Barstad, I. (2004), *A linear theory of orographic precipitation*, J. Atmos. Sci. 61, 1377–1391 —
+  behind the AMS paywall, four retrieval routes tried and all refused — and Minder et al. (2008),
+  the Olympics gauge study, not sought separately. `driver-fields.md` cites this review for both and
+  says so, which is the same form `papers-wave-3.md` uses for McGetchin.
 - **reda2004** `P` — Reda, I. & Andreas, A. (2004). *Solar position algorithm for solar radiation
   applications.* Solar Energy 76(5), 577–589. doi:10.1016/j.solener.2003.12.003.
   ⚠️ **What was actually read is the companion NREL technical report** NREL/TP-560-34302 (rev.
