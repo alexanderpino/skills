@@ -258,6 +258,14 @@ you asked for — the base rate silently halves. Clamp, then rescale so the doma
 rate you intended. The base rate is the parameter an artist wants; the pattern is what the terrain
 computes.
 
+⚠️ **Which of the two formulations you ship decides whether the 0.50× applies at all**, and this
+section states both, so be explicit. Shipping `P = clamp(v · ∇h)` — precipitation *as* the upslope
+term — is the case measured above: zero-mean, half the cells negative, and clamping alone halves
+your water. Shipping `P = base · (1 + k·clamp(v · ∇h)/scale)` — the base-rate-times-multiplier form
+the closing warning below argues for — is **not** zero-mean, loses nothing to the clamp, and needs
+no renormalisation. Take the second. The renormalisation above is what you need if you took the
+first, and the reason to state it is that the first is the one everybody writes down.
+
 The one terrain where this does not bite is the one with no lee: a full-width monotonic ramp
 measures **0.0%** negative cells and a normalised sum of exactly `+1.0`. If your test scene is a
 tilted plane you will not see this bug, and every real heightfield will trip it.

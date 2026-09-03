@@ -209,6 +209,41 @@ jobs:
           cp references/tiled-streaming.md /tmp/bk
           sed -i 's/^## How this fails.*/## Failure modes/' references/tiled-streaming.md
           expect_green "a heading that is not the recommendation renamed"
+
+          # The two metrics added after a grounding pass disagreed with an honest writer:
+          # a locator naming source-code line ranges scored vague because the pattern knew
+          # only the designators a PAPER uses, and 21 unopened sources had nowhere in the
+          # tier vocabulary to live. Both are now fixtures, so crippling either is caught.
+          cp scripts/check.py /tmp/bk_guard
+          python3 - <<'PY2'
+          import pathlib
+          p = pathlib.Path("scripts/check.py"); s = p.read_text(encoding="utf-8")
+          old = r"| \blines?\s+\d"
+          assert old in s, "locator source-line alternative missing -- mutation would pass vacuously"
+          p.write_text(s.replace(old, r"| \bNEVERMATCHES?\s+\d"), encoding="utf-8")
+          PY2
+          if python3 scripts/check.py --selftest >/tmp/out 2>&1; then
+            echo "::error::--selftest stayed GREEN with the locator pattern crippled"
+            fails=$((fails + 1))
+          else
+            echo "  red as required: selftest catches a crippled locator pattern"
+          fi
+          cp /tmp/bk_guard scripts/check.py
+
+          python3 - <<'PY3'
+          import pathlib
+          p = pathlib.Path("scripts/check.py"); s = p.read_text(encoding="utf-8")
+          old = 'LOCATOR_NOT_OPENED = ("NOT OPENED", "NO LOCATOR")'
+          assert old in s, "not-opened marker missing -- mutation would pass vacuously"
+          p.write_text(s.replace(old, 'LOCATOR_NOT_OPENED = ("ZZ_NEVER",)'), encoding="utf-8")
+          PY3
+          if python3 scripts/check.py --selftest >/tmp/out 2>&1; then
+            echo "::error::--selftest stayed GREEN with the not-opened marker disabled"
+            fails=$((fails + 1))
+          else
+            echo "  red as required: selftest catches a disabled not-opened marker"
+          fi
+          cp /tmp/bk_guard scripts/check.py
           cp /tmp/bk references/tiled-streaming.md
 
           python3 scripts/check.py >/dev/null || { echo "::error::copy not restored"; fails=$((fails+1)); }

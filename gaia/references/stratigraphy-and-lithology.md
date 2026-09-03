@@ -141,6 +141,17 @@ any run in the set; 100 m beds at the same 10° give `w = 576 m` = **5.8 cells**
 in proportion, and a nearly vertical column needs beds as thick as the outcrop pattern you want to
 see. This is the first thing to check when a dipped column looks like noise.
 
+⚠️ **That rule is scoped to dip and goes vacuous at `δ = 0`, where the same aliasing is at its
+worst.** Horizontal beds do not escape it — they crop out across a *hillside*, and the width is
+`T / tan(surface slope)`, which is the same expression with the surface's slope in place of the
+dip. Measured for 25 m beds on a 100 m grid: **2.86 cells** on a 5° hillside, 1.42 on 10°, 0.69 on
+20° and **0.43 on 30°** — well under the 1.4 cells that made the dipped case the weakest run in the
+set. So the general statement is that a bed's visibility is set by the angle between the bedding
+and the **surface**, not by the dip alone: `w = T / tan(angle between bedding and surface)`, and
+`T ≥ 4·cellSize·tan(that angle)`. Dip is the case where the surface is flat and the bedding is not;
+a hillside with horizontal beds is the same problem with the roles swapped, and it is the case a
+mountainous scene actually hits.
+
 Dip is not only cosmetic; it changes the *rate* at which the pattern moves. A lithologic contact
 migrates upstream at the kinematic wave speed [mitchell2021] §2.4 eq. (6),
 `C_H = K·A^m·|dz/dx|^(n−1)`, which at `n = 1` is exactly `K·A^m` — **the same expression

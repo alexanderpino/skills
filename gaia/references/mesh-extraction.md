@@ -194,6 +194,15 @@ need constraint quadrics; and a mesh that arrived from somewhere other than a gr
 input points" to insert. In an authoring tool, all three fail often enough that QEM is the one to
 build and greedy insertion is the one to offer for the heightfield fast path.
 
+⚠️ **The first half of that is argued, not measured, and it is the one load-bearing comparison in
+this document with no number behind it.** Everything else here was run; "greedy insertion gives the
+fewest triangles for a stated vertical error" was not. The argument is sound in form — greedy's
+importance measure is the vertical error itself, and the quadric is a proxy that this document
+separately measures overstating true deviation by 1.2× to 7× — but greedy insertion is a *greedy*
+heuristic and is not optimal either: its own convergence, quoted above, is `m^-0.7` against the
+`m^-1` an L2-optimal triangulation achieves. Treat the direction as reliable and the margin as
+unknown, and if you are choosing between them on triangle count, measure it on your terrain.
+
 ## The LOD chain a tool exports, and whether it has to be nested
 
 An export is rarely one mesh. It is a chain — full detail, then a ladder of coarser versions,
