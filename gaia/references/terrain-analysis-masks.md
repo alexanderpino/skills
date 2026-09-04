@@ -131,7 +131,7 @@ terrain. Start at 2–5% of the domain extent, `N = 8–16` azimuths — the hor
 that computing horizons in order-N time is **Dozier, Bruno & Downey (1981)**, *Computers &
 Geosciences* 7(2), 145–151, and that "many, if not most, radiation calculations over mountains now
 use that method". [timonen2010] is a 2010 refinement of a 1981 idea, not its origin — and says so
-by accident: its §4 states that the authors are "not aware of this method having been introduced in
+by accident: its §3 states that the authors are "not aware of this method having been introduced in
 a field outside computer graphics before", which is exactly the blind spot [dozier2022] is
 complaining about. The 1981 paper could not be obtained here, so it is named rather than cited —
 see `driver-fields.md`, which builds on the same sweep.
