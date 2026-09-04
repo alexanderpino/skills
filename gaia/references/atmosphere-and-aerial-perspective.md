@@ -43,7 +43,8 @@ iPhone 6s:
 **0.31 ms total at 1280×720**, updates included — and **do the subtraction before you budget it**.
 The four LUTs sum to **0.17 ms**, and every one of them is a fixed size that does not change with
 screen resolution. The remaining **0.14 ms** is the on-screen apply, and that is the only part that
-scales with pixels. So the shape of the budget is `0.17 + 0.14 × (pixels / 0.92 Mpix)`: about
+scales with pixels. So the shape of the budget is `0.17 + 0.14 × (pixels / 0.92 Mpix)` — ⚠️ a decomposition **derived
+here** from the paper's own two figures, not a scaling law it states — about
 **0.485 ms at 1080p** and about **1.4 ms at 4K** on the same 2016-era GPU, against 0.31 quoted.
 
 That the LUTs do not scale is a design decision, not an accident. [hillaire2020] §5.3 says so
@@ -63,20 +64,29 @@ three times the unshadowed pass, and the single largest discretionary number on 
 
 ## Rebuild on change, not on frame
 
+⚠️ **Derived here, not taken from a source.** The per-LUT
+times and dependencies below are [hillaire2020]'s; the *cadence* — which to bake and which to rebuild
+— is reasoning from them, and no artefact in this corpus states it.
+
 The table above reads as though all four LUTs are rebuilt every frame. They are not, and the
 cadence is the difference between the technique fitting a mobile frame and not:
 
 | LUT | Depends on | Rebuild when |
 |---|---|---|
 | Transmittance | the medium only | the medium changes — in practice a **load-time bake** |
-| Multi-scattering | the medium only | the medium changes — a **load-time bake**, like transmittance |
+| Multi-scattering | medium; sun zenith is an **axis**, not an input | the medium changes — a **load-time bake** |
 | Sky-view | view altitude + sun direction | per frame |
 | Aerial perspective | camera frustum + sun | per frame, **per view** |
 
 ⚠️ **On an iPhone 6s the two medium-only LUTs — transmittance at 0.53 ms and multi-scattering at
 0.12 ms — are 63% of the whole 1.03 ms LUT budget, and neither depends on the sun.** [hillaire2020]
-§5.5 is explicit that the multiple-scattering LUT "is valid for **any point of view and light
-direction** around the planet". Bake both at load and the per-frame set costs **0.38 ms**, for a
+§5.5 says the multiple-scattering LUT "is valid for any point of view and light direction around the
+planet" — **"for an atmosphere material setup"**, which is the clause that matters. ⚠️ And the
+mechanism is not that it ignores the sun: §5.5.2 parameterises it with `u = 0.5 + 0.5·cos(θs)`,
+where `θs` is the sun zenith angle. **Sun zenith is an axis of that table**, exactly as it is an axis
+of Bruneton's 4D table one document over. The conclusion — bake it once, never rebuild it for a sun
+move — is right; an earlier revision of this line gave "the medium only" as the reason, which
+inverts the mechanism in the same sentence that condemns the inversion. Bake both at load and the per-frame set costs **0.38 ms**, for a
 moving camera *and* a moving sun.
 ⚠️ An earlier revision of this table said to gate multi-scattering on ~1° of sun elevation. That is
 the same error `sky-and-weather-state.md` spends a whole section correcting one document over —
@@ -107,8 +117,16 @@ forbids in bold. **Accuracy is bought in the bake; bandwidth is still bought in 
 **The comparison that is usually stated backwards.** [hillaire2020] §7 does *not* claim to be
 faster than its predecessor, and repeating that it does is a misreading: *"the total render time is
 0.31 ms … For the same view, the Bruneton model [BN08] renders in **0.22ms**, but this is without
-all the LUTs being updated. Updating all the LUTs using the code provided costs **250ms**, where
-99% of this cost comes from the many iterations required to estimate multiple scattering."*
+all the LUTs being updated. Updating all the LUTs using the code provided **[Bru17b]** costs
+**250ms**, where 99% of this cost comes from the many iterations required to estimate multiple
+scattering."* The paper then names its own mitigation: *"As already shown by Hillaire [Hil16], it is
+possible to time slice the update over several frames. However, latency would increase … and it
+would take a long time before any result would be available on screen."*
+
+⚠️ **`[Bru17b]` matters and an earlier revision deleted it from inside the quotation.** It cites
+Bruneton's **2017 code release**, not the 2008 paper, so the 250 ms measures that implementation on
+2016-era hardware. Cutting the key and the time-slicing sentence made a bake sound unconditionally
+impossible when the paper itself names a way to spread it.
 
 Bruneton renders **faster**. What it cannot do is rebuild its state inside a frame. So the real
 claim is about *dynamism*, not throughput: if your medium never changes, the older model is cheaper
@@ -129,15 +147,17 @@ by a different mechanism, and one that also makes a changed medium free.
   mountain read as a small model behind grey glass [tr_lighting_shadows].
 - **Exponential height fog as the distance model** — a bounded, art-directed local medium. Keep it;
   do not let it do aerial perspective's job.
-- **Ray march the atmosphere per pixel with no LUTs** — what [hillaire2020] §5.3 falls back to for
+- **Ray march the atmosphere per pixel with no LUTs** — what [hillaire2020] §7 falls back to for
   space views, where the sky-view LUT wastes most of its resolution on empty space. Right there,
   wrong everywhere else.
 
 ## One fullscreen triangle, drawn last
 
-[tr_lighting_shadows] states the idiom: *"The skybox is the same fullscreen triangle. Modern sky
-rendering is neither a dome mesh nor a box: draw the sky **last** as one fullscreen triangle,
-depth-test."*
+[tr_lighting_shadows] states the idiom **and its state**, in full: *"The skybox is the same
+fullscreen triangle. Modern sky rendering is neither a dome mesh nor a box: draw the sky **last** as
+one fullscreen triangle, depth-tested **at the far plane (`GREATER_EQUAL` at depth 0 under
+reversed-Z)** so only pixels no geometry touched get shaded — zero overdraw behind terrain, and the
+sun-disk occlusion above comes free."*
 
 Three properties, and each removes a class of bug. Drawing **last** means the sky only shades pixels
 no geometry claimed, so *the sky shader's* cost falls as the scene fills — note that the
@@ -147,11 +167,14 @@ behind the terrain — the named failure is *"a disk drawn over terrain"*, which
 without a depth test looks like the first time a mountain reaches the horizon. And **one triangle**
 rather than a quad avoids a seam along the diagonal where two triangles meet.
 
-⚠️ **This is folklore, and the corpus convention is to say so.** There is no canonical source for
-the composite idiom — sky as a fullscreen triangle, drawn last, depth-tested. Standard practice is
-what is described above, and the artefacts that state it are a practitioner chapter and a
-scattering of tutorials that contradict each other on depth-write and compare function. Decide
-those two yourself and write them down.
+⚠️ **This is folklore, and the corpus convention is to say so.** There is no canonical *paper* for
+the composite idiom; the artefact that states it is a practitioner chapter, and the tutorials around
+it contradict each other. But it is folklore with a **specified state**, and an earlier revision of
+this document truncated the quotation at "depth-test" and then told the reader to "decide depth-write
+and compare function yourself" — cutting the answer out of the sentence and then declaring it
+missing. The state is: **test `GREATER_EQUAL` against depth 0 under reversed-Z, at the far plane, and
+do not write depth.** Reversed-Z is `planetary-precision.md`'s subject; if you are not using it, the
+compare inverts with it.
 
 ⚠️ **The reason usually given for the triangle is not in the source it is attributed to, and it is
 small.** [bilodeau2014] slide 12 says only *"Triangle has better performance than quad"* — the
@@ -172,7 +195,9 @@ expensive has not been true for a decade.
 The froxel volume is the mechanism: a low-resolution 3D texture over the camera frustum, 32³ at 30
 steps, holding in-scatter and transmittance per depth slice. Every terrain pixel samples it at its
 own depth and composites. That is the entire **consumer** side — and the producer side is where the
-work actually is:
+work actually is. ⚠️ **Everything below this line is derived here, not taken from a source** — the
+volume's resolution and cost are [hillaire2020]'s; the rest is reasoning about a screen-space
+resource and should be read as reasoning:
 
 - **Depth distribution.** 32 slices linearly over a long frustum makes each slice kilometres thick at
   range, and two slices meeting on a distant mountain face is a visible colour band. Power-distribute
@@ -196,7 +221,7 @@ work actually is:
   merely ugly — drive both eyes from one blue-noise offset.
 - **Cuts and altitude transitions.** A camera cut invalidates all reprojection history: flag it or
   eat a frame of smeared shafts. And the switch to the ray-march fallback for space views
-  [hillaire2020] §5.3 is a **visible pop** unless you blend across an altitude band — which a tool
+  [hillaire2020] §7 is a **visible pop** unless you blend across an altitude band — which a tool
   camera flying from ground to orbit hits every time.
 
 That is why the sea and the land must share it — see below.
@@ -252,7 +277,7 @@ interface above.
 
 ## Where this sits in the frame
 
-Short, and it decides whether the 0.17 ms is visible at all.
+⚠️ **Derived here, not taken from a source.** Short, and it decides whether the 0.17 ms is visible at all.
 
 The dependency chain is **transmittance → multi-scattering → {sky-view, aerial perspective}**: three
 dispatches deep, all tiny, all latency-tolerant. The useful asymmetry is that the **sky-view LUT
@@ -355,7 +380,7 @@ today, which is where the remaining discretionary cost sits.
 | Shadowed slopes and valley floors are flat black, or lit by a constant | The sky's **ambient** output is missing; only the sun and the AP term were wired up | Convolve the sky into an irradiance probe — the 16×64 ground-irradiance table is already produced upstream |
 | The ambient lighting steps visibly while an artist drags the time slider | The probe re-convolved every N frames | Dual-buffer and cross-fade, and hold steady during the drag |
 | The sun disc is white at sunset while the sky is red | The sun colour taken as a constant instead of from the transmittance LUT along the sun path | One sun colour, from the atmosphere |
-| The sky is fine on the ground and wastes resolution from orbit | The sky-view LUT spends most of itself on empty space | Switch to on-screen ray marching for space views [hillaire2020] §5.3 |
+| The sky is fine on the ground and wastes resolution from orbit | The sky-view LUT spends most of itself on empty space | Switch to on-screen ray marching for space views [hillaire2020] §7 |
 | Mobile spends 3% of the frame rebuilding LUTs | All four rebuilt every frame; the transmittance LUT alone is 0.53 ms on an iPhone 6s and depends only on the medium | Bake transmittance at load; gate multi-scattering on ~1° of sun elevation. Roughly 1.03 ms → 0.38 ms |
 | Water and terrain disagree in colour at the horizon *after* both were told to share the atmosphere | They share the LUT and not the **far-field fallback**: one clamps to the last froxel slice, the other evaluates analytically | Same fallback, same cross-fade width, on both surfaces |
 | Water is milky and washed out at range, losing all depth colour | Aerial perspective applied to the scene colour the water refracts, then again by the water, then again on the surface — the in-scatter term accumulates while the transmittance term collapses, so it goes **pale**, not dark | Apply AP once, after the water composite; refract against a pre-AP copy |
