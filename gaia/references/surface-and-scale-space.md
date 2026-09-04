@@ -30,6 +30,13 @@ property that the machinery does not deliver and mostly does not even measure.
 **Split the heightfield into a low band and a residual at an authored cutoff, run the operator on
 the residual, force the edited residual back to zero mean, and add the low band back unchanged.**
 
+⚠️ **Choose the split by whether your build is tiled, and the decimated pyramid below is not the
+default for the case this skill targets.** Untiled, decimated wins on time and storage. **Tiled —
+the Gaea-class case — use the undecimated (à-trous) form**: it is exactly shift-invariant where the
+decimated pyramid drifts metres, it is 35% cheaper in halo at `L = 5`, it stores the same two
+fields, and it makes every phase rule in this document vacuous. It costs about 1.5× the arithmetic.
+The four pages of phase rules below are what you are buying your way out of.
+
 ```
 def low_band(h, L):                       # Burt-Adelson analysis then synthesis
     shapes, g = [h.shape], h
@@ -50,7 +57,15 @@ Four claims, all measured below on a 257×257 fractal field with 1000 m of relie
 `reflect` boundary, `L = 4`:
 
 - The split **reconstructs exactly**: `collapse(split(h)) − h` is 1.8e-15 m, machine precision.
-  That is [burt1983] eq. (4) and it holds numerically.
+  ⚠️ **This is an identity, not a test, and an earlier version offered it as a validation.**
+  The recipe defines `hi = h − lo`, so `lo + hi = h` holds for *any* `lo` whatsoever. Measured:
+  set `lo := 0` and it passes at **exactly 0.000000e+00**; set `lo` to random noise and it passes
+  at 1.14e-13; drop the factor 4 from `expand` — which destroys **99.609%** of the low band,
+  exactly `4⁻⁴ − 1` at `L = 4` — and it still passes at 1.14e-13. A guard that cannot fail is not
+  evidence that `expand` is right. ⚠️ It is also **not [burt1983] eq. (4)**: that is the multi-level
+  result `g₀ = Σ L_{l,l}` (p. 535), which this two-band split does not use. The eq. (4) citation
+  belongs where this document uses it later, on the multi-band equaliser. To actually test
+  `expand`, compare the low band against a direct wide Gaussian, or check that its gain is 4.
 - The split **moves no volume**: the residual's mean is 2.5e-02 m on a 1000 m field — 25 ppm of
   relief, and it is the split's own floor, not the operator's.
 - The **operator** moves the volume, and by a lot. Recombining `lo + f(hi)` changed `Σh` by
@@ -88,7 +103,9 @@ same as the decimated version**. Measured on the same kernel:
 **The crossover is whether the build is tiled and whether you need more than two bands.** Untiled,
 or building a full multi-band pyramid where the `4^-k` storage decay is what makes depth
 affordable, the decimated version wins on time and on storage. Tiled — which is the Gaea-class case
-this skill targets — the à-trous form is 48% cheaper in halo at `L = 5`, is exactly shift-invariant
+this skill targets — the à-trous form is **35.4%** cheaper in halo at `L = 5` (the row above:
+`3·2⁵ = 96` px against 62, so `(96−62)/96`; ⚠️ an earlier version said 48%, which the table it
+sits under does not give), is exactly shift-invariant
 where the decimated pyramid drifts metres, and makes every phase rule in this document *vacuous*.
 It costs about 1.5× the arithmetic. Four pages below are spent on the decimated pyramid's phase
 tax; that tax is the price of the recommendation, not a law of band splitting. *Editing the full field and
