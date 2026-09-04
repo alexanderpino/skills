@@ -84,10 +84,10 @@ and it is the only reason the result does not depend on visit order.
   not bounded oscillation**, and it begins at `c_eff ≥ 3`, so `c` in 0.3..0.7 with the `/2`
   kept leaves a 4–10× margin. `c` itself is a **tuning range from practice**: the only
   stated value anywhere in this bibliography is [olsen2004]'s "A reasonable value for c is 0.5"
-  (p. 5), and Olsen is a technical report, so no *peer-reviewed* source fixes it. Lower simply
+  (p. 6), and Olsen is a technical report, so no *peer-reviewed* source fixes it. Lower simply
   converges more slowly. Olsen's own reason for keeping it down — that "higher values may cause
   oscillation when the changes to the height map are applied only after completion of an entire
-  iteration" (p. 5) — is precisely the claim the measurements above fail to reproduce: past the
+  iteration" (p. 6) — is precisely the claim the measurements above fail to reproduce: past the
   margin the failure is divergence, not oscillation.
 - **The per-pair clamp** `min(share, (d − dLimit)/2)` bounds one transfer *in isolation*: that
   transfer alone leaves the pair at `dLimit`, so it cannot invert it. It is **not** a convergence
@@ -121,7 +121,12 @@ and it is the only reason the result does not depend on visit order.
   49², 2304 at 65²** — that is `0.54·n²`. And it is the *feature* that costs, not the grid: a
   radius-8 cone takes 283 passes whether the grid is 41², 65² or 97², while radius 16 / 24 / 32 in
   the same grid take 1155 / 2611 / 4346. So halving the cell size quadruples the passes for the same
-  landform, and a map-scale over-steepening on a 4k grid is thousands. Raising `c` buys a constant
+  landform. ⚠️ **A map-scale over-steepening on a 4k grid is NOT "thousands", as an earlier version
+  of this line said — it is millions.** The law measured here is `passes ≈ 4.5·r²` in the feature
+  radius `r`, flat to well under 1% out to `r = 64`. A feature spanning a 4096² map is `r ≈ 2048`,
+  which is **~1.9·10⁷ passes**; even a quarter-map feature is ~10⁶. At 30 s per 4096² pass on one
+  CPU core that is **years**, and at ~1 ms per pass on a GPU it is **hours**. Quote the radius with
+  the figure — this is the one number in the section that moves by four orders with it. Raising `c` buys a constant
   factor only (c = 0.7: 110 / 239 / 419 / 929 for the same four sizes), not a better exponent.
   Running longer than the fixed point changes nothing — the pass is then the identity — but the
   fixed point is much further away than the folklore range says. The defensible stopping rule is a
@@ -258,18 +263,36 @@ Those values are conventional working numbers, not read out of the cited locator
 `F` here and is cited for the *form* of the threshold and the cubic law, [sauermann2001] for the
 form of the relaxation. `L_sat ≈ (ρ_s/ρ_a)·grain` is the drag-length scaling that circulates in the
 dune literature and is **not** Sauermann's expression; his `l_s` is eq. 47, a different functional
-form that diverges as `u*` approaches the threshold. The two agree in magnitude at typical shear
-velocities — Sauermann's Figure 5 asymptote is 0.4–0.8 m, the drag length 0.55 m for 250 µm sand —
-which is why the shorthand is usable, but a `L_sat` that stays constant as the wind drops toward
-threshold is the shorthand's approximation and not the paper's.
+form that diverges as `u*` approaches the threshold. The two do agree in magnitude over the wind
+speeds you will actually simulate, but ⚠️ **not for the reason an earlier version of this line
+gave.** It called 0.4–0.8 m "Sauermann's Figure 5 asymptote". That is the **divergent
+near-threshold branch**, and the caption says the opposite — `l_s` "*is asymptotically constant for
+high shear velocities, but diverges for shear velocities near the threshold*". Recomputed from
+eq. 47 with the paper's own constants, the true asymptote is **0.087 m**, five to nine times
+smaller, and 0.4–0.8 m occurs only around `u*/u*t ≈ 1.7–2.3`.
+
+**What rescues the shorthand is the operating range, not the asymptote.** Sauermann names his own
+regime on p. 2 — "*typical sand storms, when shear velocities are in the range of 0.18 to
+0.6 m s⁻¹*" — and across the transporting part of that band `l_s` runs from about 0.46 m upward,
+crossing the 0.55 m drag length at `u* ≈ 0.55 m/s`. So the two agree **where sand actually moves**,
+and diverge in both directions outside it. ⚠️ **Do not size grid cells against the 0.087 m
+asymptote either**: it is reached only at shear velocities far above any sand storm. A `L_sat` held
+constant as the wind drops toward threshold is the shorthand's approximation and not the paper's.
 
 ⚠️ **The linear relaxation above is a linearisation of [sauermann2001], not its equation.** Sauermann's
 eq. 46 is `∂q/∂x = (q/l_s)·(1 − q/q_s)` — **logistic**, so a flux far below saturation grows slowly
 because it is proportional to `q` itself. Substituting `q = q_s(1 + ε)` gives `dε/dx = −ε/l_s`, which
 is the linear relaxation this chain integrates, so the two share `l_s` and agree wherever the bed is
 near saturation. They do not agree at a phase boundary — bedrock meeting sand with `q = 0` — where the
-logistic form starts from a *stalled* flux and the linear one ramps immediately. If sand entering the
-domain matters to your result, integrate eq. 46 rather than the exponential.
+logistic form starts from a *stalled* flux and the linear one ramps immediately.
+
+⚠️ **"Stalled" is exact, and it makes the obvious fix useless.** `q = 0` is not slow under eq. 46;
+it is an exact fixed point, because the whole right-hand side is proportional to `q`. So
+integrating eq. 46 from `q = 0` at the inflow — which an earlier version of this line told you to
+do — returns `q ≡ 0` at every cell downwind, forever. Seed it instead: [sauermann2001] does exactly
+this and says so, "*we used a constant influx `q_in`, much smaller than the saturated one, which
+represents the inter–dune sand flux*". Give the inflow a small non-zero `q_in` and integrate eq. 46
+from there; with `q_in = 0` the equation has nothing to grow.
 
 **`∇·q⃗` changes the bed, not `q`.** Divergence deflates, convergence deposits. Feed it a
 **constant** wind vector and `∇·q⃗ ≡ 0` — nothing happens, ever, at any wind speed. That is both the
@@ -308,7 +331,8 @@ barchan field will not migrate or interact.
 passes for a 3:1 cone from 17² to 49², measured above). Inside an erosion loop that is fine, and it
 is the argument for putting it there rather than at the end: hydraulic re-steepens a little each
 step, a handful of passes take that back, and nothing ever relaxes a whole map from scratch. As a
-one-off post-process on a map that is over-steep everywhere it is thousands of full-grid passes, and
+one-off post-process on a map that is over-steep everywhere it is **millions** of full-grid passes
+— see the `4.5·r²` law above, which puts a map-spanning feature on a 4k grid near 10⁷ — and
 that is where [olsen2004]'s fast variant is worth *reading* — but read it before reaching for it.
 ⚠️ **It is not a sweep, and this document called it one.** Olsen's four changes (pp. 6–7,
 *Optimizations*) are: the Von Neumann neighbourhood instead of Moore, material distributed to the
