@@ -187,6 +187,109 @@ documents on the simulation axis. What is listed here is what a *renderer* consu
 - **smacke** `F` — s-macke. *VoxelSpace* — algorithm reconstruction and reference implementation, github.com/s-macke/VoxelSpace. — Column raycasting with the ascending y-buffer, as shipped in Comanche (1992). A repository, and the canonical modern reconstruction of a technique whose original has no publication.
 - **dxrspec** `F` — Microsoft *DirectX Raytracing (DXR)* specification and the Khronos `VK_EXT_opacity_micromap` / `VK_NV_displacement_micromap` registry entries. — Intersection shaders for procedural AABB geometry, BLAS build-versus-refit semantics, and what opacity micromaps do and do not classify. API specifications.
 
+## Clouds
+
+⚠️ **Read the tier column before the content here.** This is the one subject in the corpus where the
+standard-setting artefacts are all unrefereed: the founding cloud documents are SIGGRAPH *course*
+talks — invited instructors, no referee report — and every wall-clock figure in the subject comes
+from one. Every error figure comes from a refereed paper measuring a different system. That
+asymmetry is stated in `volumetric-clouds.md` and is the honest state of the evidence, not a
+shortcoming of this list.
+
+- **schneidervos2015** `F` — Schneider, A. & Vos, N. (2015). *The Real-time Volumetric Cloudscapes
+  of Horizon: Zero Dawn.* In SIGGRAPH 2015 Course: Advances in Real-Time Rendering in Games. 99
+  slide-pages; **no DOI on the released artefact** (the parent course record is doi:10.1145/2776880,
+  which is course-level and not a paper DOI). — The founding artefact: Perlin–Worley base at 128³
+  eroded by 32³ Worley, a coverage/precipitation/type weather texture, a 64→128 sample march with a
+  cheap/expensive two-level sampler, and the 20 ms → 2 ms PS4 datum showing that **reprojection, not
+  the density model, is what made real-time cloudscapes shippable**. ⚠️ `F` despite being the most
+  influential real-time cloud document in existence — **being standard-setting is not review.** The
+  artefact is PowerPoint exported to PDF with speaker notes; its own p.1 says so. ⚠️ Authorship
+  differs across surfaces: the PDF metadata and the course index name **Schneider alone**, while the
+  deck's own p.1 names both authors — "Schneider & Vos" is supported by p.1, not by the index.
+  ⚠️ It **contradicts itself on the upsample factor** (quarter-res 1-in-16 of a 4×4 block, p.94, vs
+  "render this at half res", p.95); quote both. ⚠️ Page numbers are PDF slide-pages and run one to
+  two ahead of the deck's printed numbers, so ranges quoted elsewhere for this talk are suspect.
+  ⚠️ It contains **no depth compositing against terrain and no ground-receiving cloud shadow**, and
+  p.64 concedes its own "powder" term is **not in the refereed literature** — the author says he
+  searched the ACM Digital Library for it and found nothing.
+- **schneidervos2017** `F` — Schneider, A. & Vos, N. (2017). *Nubis: Authoring Real-Time Volumetric
+  Cloudscapes with the Decima Engine.* SIGGRAPH 2017 Course: Advances in Real-Time Rendering. 108
+  pages. — The optimisation ladder, **22 ms → 1.2 ms on PS4**, of which **depth culling against
+  scene geometry alone is 1.81 → 1.2 ms**, taken with a conservative `max()` over a low-LOD depth
+  mip because reprojection needs *next*-frame visibility. Also cloud depth as the depth at which
+  alpha reaches 0.5 (p.101). ⚠️ **Its 22 ms baseline is POST-reprojection while schneidervos2015's
+  20 ms is PRE-reprojection.** The two must not be stacked or read as a regression — same studio,
+  same console, one year apart, measuring different things. A course talk, not peer review.
+- **schneider2022** `F` — Schneider, A. (2022). *Nubis, Evolved.* SIGGRAPH 2022 Course: Advances in
+  Real-Time Rendering. 207 pages. — The console-generation scaling table: PS4 at 960×540 with 6
+  light samples in ≤4 ms against PS5 at 1920×1080 with 10 in ≤2–3 ms; the HLSL early-out at p.91
+  (three texture reads, one multiply, `return 0.0`); `SampleLongDistanceShadowMap()` at p.112.
+  ⚠️ The circulating PDF is **videos-stripped and carries no speaker notes**, so only on-slide text
+  is quotable from it. A course talk, not peer review.
+- **schneider2023** `F` — Schneider, A. (2023). *Nubis Cubed: Methods (and madness) to model and
+  render immersive real-time voxel clouds.* SIGGRAPH 2023 Course: Advances in Real-Time Rendering.
+  220 pages. — **The published successor, and the artefact that dates the lineage in both
+  directions.** p.3 for the 2011 offline baseline (10 minutes to 4 hours per 1920×1080 frame); p.9
+  for the term "2.5D clouds"; p.81 for a 2048×2048×256 voxel grid at **2.146 GB uncompressed**
+  against 2015's whole-system "20 mb of ram", which is the memory arithmetic the whole lineage turns
+  on; pp.176–185 for voxel costs (2.2–4 ms at 960×540, PS5) and the 200 m depth split replacing
+  temporal upscaling; pp.177–179 for the geometry-against-cloud budget handoff. **p.198 carries the
+  seven-axis capability table in which the 2015/2017 method scores `No` on Terrain-Cast Shadows,
+  Flight-Capable and Freeform Modeling** — direct evidence from the originator against its own
+  earlier method. ⚠️ **Its own reference list at p.219 labels course talks "ACM SIGGRAPH" and a 2018
+  talk "Eurographics"**; a citation copied from that slide will read as refereed and is not.
+- **hillaire2016** `F` — Hillaire, S. (2016). *Physically Based Sky, Atmosphere and Cloud Rendering
+  in Frostbite.* SIGGRAPH 2016 Course: Physically Based Shading in Theory and Practice. 62 pages. —
+  **The independent second lineage, and the source for the terrain couplings the Guerrilla decks
+  lack.** Reaches the same density model separately (pp.33–34) and reports one deviation worth
+  having: single-channel noise, "made cloud a lot faster to render … still giving the same final
+  visual result". **Eq. 21, p.43** for cloud depth as a transmittance-weighted mean front depth;
+  **p.42** for the ground-receiving cloud shadow baked to a 2D transmittance texture and projected
+  onto the world, also feeding GI — ⚠️ with a **flat-planet assumption** that a large terrain breaks.
+  0.91 ms at 720p on Xbox One. These are **written course notes**, not a slide deck, which is why
+  they are quotable at a finer grain than the Guerrilla artefacts — but course notes are not peer
+  review, hence `F`.
+- **bouthors2008** `P` — Bouthors, A., Neyret, F., Max, N., Bruneton, E. & Crassin, C. (2008).
+  *Interactive Multiple Anisotropic Scattering in Clouds.* I3D 2008, 173–182,
+  doi:10.1145/1342250.1342277. — A Monte-Carlo reference **tabulated to 5% accuracy at the 95%
+  confidence level**, which is what a multiple-scattering claim can be measured against; 2–10 fps at
+  800×600 on an 8800 GTS; and the verdict on the phase function every real-time implementation still
+  ships, that Henyey–Greenstein phase functions "give far from accurate visual effects". Also notes
+  its transport function "allows us to easily account for points of view inside the clouds" (p.7),
+  which is one of the few refereed remarks on the inside-the-deck regime. ⚠️ Read here in the
+  authors' **submitted version** deposited at HAL, paginated 1–10 rather than 173–182, so sections
+  are citable and journal pages are not.
+- **yusov2014** `P` — Yusov, E. (2014). *High-Performance Rendering of Realistic Cumulus Clouds
+  Using Pre-computed Lighting.* High Performance Graphics 2014, 127–136, doi:10.2312/hpg.20141101. —
+  **The refereed source for both terrain couplings, which is why it matters out of proportion to its
+  fame.** §5.4 and §5.6 (pp.132–133) give a screen-space "closest distance to cloud" buffer compared
+  against the marched distance — depth-aware compositing with a referee behind it; p.133 gives a
+  light-space cloud transparency buffer that **shares the cascaded-shadow-map matrices**, which is
+  the ground-receiving cloud shadow. 5.6–15.4 ms at 1080p on a GTX 680.
+- **kallweit2017** `P` — Kallweit, S., Müller, T., McWilliams, B., Gross, M. & Novák, J. (2017).
+  *Deep Scattering: Rendering Atmospheric Clouds with Radiance-Predicting Neural Networks.* ACM TOG
+  36(6) [SIGGRAPH Asia 2017], Art. 231, doi:10.1145/3130800.3130880. — **The error anchor for this
+  subject.** RMSE against a path-traced reference stated at **34 hours to converge**, and an
+  equal-time variance comparison per phase function — Henyey–Greenstein **698** against Lorenz–Mie
+  **23136** — which makes bouthors2008's verdict on HG quantitative rather than editorial. ⚠️ The
+  volume number differs between the paper's own front matter (36,4) and the ACM DL record (36,6);
+  **the article number is the stable handle**.
+- **yang2020** `P` — Yang, L., Liu, S. & Salvi, M. (2020). *A Survey of Temporal Antialiasing
+  Techniques.* Computer Graphics Forum 39(2), EG STAR, doi:10.1111/cgf.14018. — p.10 names the
+  failure modes of temporal reprojection: "transparency, particles and reflection … are known
+  challenging cases for TAA to handle". This is the **refereed reason behind schneider2023's
+  retirement of temporal upscaling for near-camera clouds**, a decision that artefact states without
+  explaining.
+- **olajos2026** `P` [not-opened] — Olajos, R., Doggett, M. & Goswami, P. (2026). *Neural cloud
+  shading.* Proc. ACM Comput. Graph. Interact. Tech. 9(4). — ⚠️ **Not opened**: ACM DL returned 403
+  on three attempts, the DiVA deposit reset the connection, the LUP mirror returned 500, and
+  Unpaywall and Semantic Scholar both resolve back to the blocked DOI. Named for **direction only** —
+  that the refereed frontier is proposing to drop ray marching entirely in favour of rasterised
+  neural cloud assets. No parameter, cost or error from it is used anywhere in this corpus. `P` from
+  the publication record, not from a reading; the CC-BY licence in that record is why the failure to
+  obtain it is a fetch problem rather than a paywall.
+
 ## Sky and atmosphere
 
 The clear-sky literature is unusually easy to grade because one of its own papers measures the

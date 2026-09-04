@@ -365,5 +365,26 @@
   {
     "query": "build a voxel destruction system with marching cubes for my FPS",
     "should_trigger": false
+  },
+  {
+    "query": "my volumetric clouds get drawn on top of the mountain peaks the moment a summit pokes into the cloud layer",
+    "should_trigger": true,
+    "routes_to": [
+      "volumetric-clouds.md"
+    ]
+  },
+  {
+    "query": "following the horizon zero dawn cloud slides but there is nothing in them about casting cloud shadows onto the terrain",
+    "should_trigger": true,
+    "routes_to": [
+      "volumetric-clouds.md"
+    ]
+  },
+  {
+    "query": "how many raymarch steps and sun samples for a perlin-worley cloud deck, and what does it cost per frame",
+    "should_trigger": true,
+    "routes_to": [
+      "volumetric-clouds.md"
+    ]
   }
 ]
