@@ -47,6 +47,13 @@ jobs:
       - name: Reported metrics must classify their fixtures correctly
         run: python3 gaia/scripts/check.py --selftest
 
+      # The re-quote pass is stdlib-only for its fixtures and needs no artefact cache to run
+      # them. Its corpus mode DOES need one, so CI runs the fixtures only -- and that is the
+      # honest split: without a cache the tool reports "nothing was checked, and that is not
+      # a pass" rather than exiting green on an empty run.
+      - name: Re-quote fixtures must classify correctly
+        run: python3 gaia/scripts/requote.py --selftest
+
       - name: Guard must be green
         run: python3 gaia/scripts/check.py
 
