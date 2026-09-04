@@ -28,7 +28,15 @@ depressions, and which receiver rule to use.
 shallow pits, fill the deep ones.
 
 **Receivers: D8 if the result is a network, MFD if the result is a field.** See the crossover
-below — this is the one place the answer genuinely changes.
+below — this is the one place the answer genuinely changes. With MFD, **normalise slopes by the
+steepest before raising them to `p`**, or the exponent underflows on ε-filled flats and silently
+destroys water from `p = 22` up.
+
+**Route on a filled COPY, never on the heightfield.** Writing the filled surface back flattens
+every lake basin you meant to keep.
+
+**Threshold channel heads on `A·S²`, not on area** [montgomery1992] — an area-only threshold
+marches channel heads up over ridge lines.
 
 ## Depressions first, and why the hybrid wins
 
@@ -231,10 +239,24 @@ mfdWeights(i at (x, y), p):                     # i interior, as above
 ```
 
 Dividing by `total` is what conserves water; the exponent only sets how sharply the split
-concentrates on the steepest neighbour. `p = 1.1` is [freeman1991]'s calibrated value, `p → ∞`
-degenerates to D8, and `p = 1` weighted by contour length rather than bare slope is
-[quinn1991] — a different method, not a tuning of this one. Measured over 3600 cells, the
-weights sum to 1 within 4e-16.
+concentrates on the steepest neighbour. `p = 1.1` is [freeman1991]'s calibrated value, and `p = 1`
+weighted by contour length rather than bare slope is [quinn1991] — a different method, not a
+tuning of this one. Measured over 3600 cells, the weights sum to 1 within 4e-16.
+
+⚠️ **`p → ∞` degenerates to D8 in the limit and NOT in float64, and the block above written
+literally destroys water long before it gets there.** This document routes on the ε-filled copy,
+so flats carry slopes of order `ε ≈ 1e-15`. `pow(s, p)` underflows to zero once `15p > 323` —
+that is **`p ≥ 22`, exactly**, and the threshold is a property of the double, not of your terrain.
+At that point `total == 0` fires on cells that *do* have a lower neighbour, `return {}` discards
+their accumulated water, and the deficit is silent because the sum rule still holds over what is
+left. Reproduced here: at `p = 21` all 3600 units reach the edge; at `p = 22`, 422 cells return
+empty and 2778.78 arrive. **The amount lost is configuration-specific — an independent run on a
+different grid lost 91% where this one loses 23% — but the threshold is not.**
+
+**The fix is one line: normalise before the power, not after.** Take `w[k] = (s[k]/s_max)^p` and
+divide by `Σw`. It is algebraically identical, it cannot underflow because the largest term is
+always exactly 1, and it makes the D8 limit actually reachable — verified here conserving all 3600
+units at `p` = 22, 100, 400 and 1000, where the printed form fails at 22 and reaches NaN by 400.
 
 The choice is decided by what consumes the result, and this is the crossover:
 
@@ -333,3 +355,4 @@ steepness, which draws rivers straight over ridges in steep terrain.
 | Every lake basin has flattened | The filled surface was written back to the heightfield | Fill the routing copy only |
 | Canyons cut through basins that should hold water | Breaching with no depth limit | Set the limit; use the hybrid |
 | Channel heads march up over ridge lines | Area-only channel threshold | Threshold on `A·S²` [montgomery1992] |
+| Water disappears at high MFD exponents; totals no longer sum to the input | `pow(s, p)` underflows on ε-filled flats — at `ε ≈ 1e-15` this is exactly `p ≥ 22` — so `total == 0` fires on cells that do have a lower neighbour and their water is discarded | Normalise by the steepest slope before the power: `w[k] = (s[k]/s_max)^p` |
