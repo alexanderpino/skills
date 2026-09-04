@@ -157,9 +157,15 @@ S_crit = 0.0125 * Q^-0.44          # Q in m^3/s, S dimensionless
 | 100 | 0.00165 | | 0.1% | 311 m³/s |
 | 1,000 | 0.00060 | | 0.01% | 58,300 m³/s |
 
-The paper's own demonstration is worth repeating because it isolates the variable: on Cottonwood
-Creek the reach above the gage meanders at slope 0.0011 and the reach immediately below braids at
-0.004, at the same 800 cfs, with no tributary between them. Fed into the SI line, 800 cfs is
+The paper's own demonstration is worth repeating: on Cottonwood Creek the reach above the gage
+meanders at slope 0.0011 and the reach immediately below braids at 0.004, at the same 800 cfs, with
+no tributary between them. ⚠️ **It does not isolate the variable, and an earlier version of this
+line said it did.** The same page continues past the clause quoted here: "*The difference in slope
+is accompanied by a change in the median grain size from 0.049 foot in the meander to 0.060 foot in
+the braided reach*", and Leopold & Wolman attribute the braid to "*the fortuitous occurrence of a
+patch of coarser gravel*". Two variables move, and the authors credit the **other** one — which is
+awkward eleven lines above a dismissal of the grain-size-aware discriminator, and is a reason to
+read the ⚠️ below rather than a reason to distrust the example. Fed into the SI line, 800 cfs is
 22.7 m³/s and `S_crit = 0.00317` — the meandering reach falls below it and the braided reach
 above it (`hydraulic_geometry.py` §4). The threshold reproduces its own worked example.
 
@@ -179,8 +185,13 @@ the braided–meandering transition at `ω_bm = 900·D50^0.42`.
 sections later for `λ = 6.5·w^1.1`.** `W_r = φ√Q` is dimensionally `m = φ·(m³/s)^0.5`, so `φ`
 carries `m^-0.5·s^0.5` and 4.7 is an SI number: feed it cfs and the width is wrong by
 `√35.31 = 5.94×`. `ω_bm = 900·D50^0.42` likewise fixes a unit for `D50` that the expression does
-not state — [candel2021] works in millimetres. Neither constant is dimensionless and neither
-survives a unit change; convert the discharge and the grain size before you use them, or refit. The `√Q` reference width is what
+not state. ⚠️ **That unit is METRES, and an earlier version of this line said millimetres.**
+[candel2021] §2.1 states it in prose — "median bed grain size (**D50, m**)" — and the axes of
+Fig. 2d, Fig. 3c and Fig. 6 all read `D50 (m)`. The error is not cosmetic and it has a direction:
+converting a metre value to millimetres multiplies `ω_bm` by `1000^0.42 = 18.2`, which lifts the
+braiding threshold clean out of range, **so the tool never braids**. Neither constant is
+dimensionless and neither survives a unit change; convert the discharge, leave `D50` in metres,
+or refit. The `√Q` reference width is what
 makes this pattern-independent: it does not need to know the answer to compute the input.
 
 ## Two multi-thread planforms, and they are opposites
@@ -189,13 +200,19 @@ Both braided and anastomosing rivers have more than one thread, so both are unre
 tree — and an authoring tool that lumps them will get both wrong, because they sit at opposite
 ends of the energy axis.
 
+⚠️ **`ω` discriminates *among* multi-thread rivers; it does not detect them.** [candel2021] anchors
+`ω_ia` on the anastomosing upper Columbia, so anastomosis does sit below the line — but the class
+below it is dominated by laterally immobile, bar-free **single**-thread rivers. Read the test as
+necessary and not sufficient, or a tool will author a multi-thread channel everywhere the terrain
+is flat.
+
 [candel2021] eq. (7) puts the inactive–active transition at `ω_ia = 90·D50^0.42`, "defined at a
 tenfold lower stream power than the ω_bm-discriminator", and anchors it on the laterally stable
 reaches of the anastomosing upper Columbia. So:
 
 | | braided | anastomosing / laterally stable |
 |---|---|---|
-| potential specific stream power | above `ω_bm = 900·D50^0.42` | below `ω_ia = 90·D50^0.42` |
+| potential specific stream power (`D50` in **metres**) | above `ω_bm = 900·D50^0.42` | below `ω_ia = 90·D50^0.42` |
 | what holds the planform in place | nothing — it is reworked | cohesive banks |
 | [candel2021] fig. 1 exemplar | Rakaia, New Zealand | Nqoga, Botswana |
 
@@ -265,7 +282,13 @@ Two uses, and they are not equally good.
 `log N` against order: it must be a straight line, of slope `−log₁₀ r_b`. Strahler's fig. 3 (Smith 1953
 data) gives counts 139, 46, 11, 3, 1 for orders 1–5; refitting those by least squares reproduces
 `b = 0.547` against the paper's printed 0.541 and `r_b = 3.53` against its 3.52
-(`hydraulic_geometry.py` §7). This is the drainage-network analogue of the `log S` vs `log A`
+(`hydraulic_geometry.py` §7). ⚠️ **The residual disagreement is Strahler's, not the refit's**:
+`10^0.541 = 3.475`, so the paper's own printed slope and its own printed `r_b` of 3.52 do not
+correspond — a discrepancy the figure carries unremarked. The refit is internally consistent — the unrounded
+slope is `b = 0.547167` and `10^b = 3.52506`, which is the printed 3.53. ⚠️ Check it from the
+unrounded slope: `10^0.547` alone gives 3.5237, which rounds to 3.52 and makes the refit look
+inconsistent when it is not. Do not tune a generator to close the 0.3%; it is an artefact of the
+source, not of the fit. This is the drainage-network analogue of the `log S` vs `log A`
 check in `stream-power.md`: cheap, quantitative, and it catches networks that look plausible in
 a hillshade.
 
@@ -294,12 +317,15 @@ h(p) = u_z(p) + delta(d(p))
 `u(p)` is the projection of `p` onto the centreline, `u_z` its bed elevation, `d(p)` the signed
 distance, and `δ` a stored 1-D profile — piecewise, per river type, and it can carry layers for
 bedrock, water and sand. Put it into the terrain with [genevaux2013]'s *replace* operator,
-`h_C = (1−w_B)h_A + w_B h_B`. ⚠️ **That expression is a convex blend, and it only "replaces"
-because `w_B` is compactly supported and saturates**: it is 1 inside the channel and 0 beyond the
-support radius, so the channel wins where it is defined and the terrain is untouched outside it.
-Written with a `w_B` that merely tapers — a Gaussian, or a falloff with no flat top — the same line
-is an ordinary blend and the channel bed comes out a fraction of the depth you asked for. The name
-is a property of the weight, not of the formula. **Valley widening is the same operator with a wider support and a shallower profile**
+`h_C = (1−w_B)h_A + w_B h_B`. ⚠️ **That expression is a convex blend, and this
+document used to say it "replaces" because `w_B` saturates to 1 inside the channel. It does not
+saturate.** [genevaux2013] §7 prints `w(p) = (1 − d(p)²)² / r⁴` — a quartic bump with **no flat
+top**, reaching 1 only at the single point `d = 0`. So the case the warning described as safe is
+the paper's actual weight, and the channel bed does come out shallower than the profile asks for
+except directly on the centreline. Compensate on the profile, or use a weight with a genuine
+plateau and know you have left the paper. ⚠️ The name is also not from the weight: [genevaux2013]
+calls it "*This asymmetric operator*", after the asymmetry of the formula in `h_A` and `h_B` — this
+document had that backwards too. **Valley widening is the same operator with a wider support and a shallower profile**
 — [genevaux2013] §6.2 computes terrain elevation as a distance-weighted combination of the
 projection on the river and the projection on the ridge, which is a valley cross-section by
 construction. It is not a separate algorithm.
@@ -358,7 +384,7 @@ two share authors, so treat this as one rule stated twice rather than as corrobo
 - **Braided or meandering** flips at `S = 0.0125·Q^−0.44` (SI). At 0.4% slope that is 13 m³/s; at
   0.1% it is 311 m³/s.
 - **Braided or anastomosing** is not a fuzzy boundary but a *tenfold* gap in potential specific
-  stream power: `ω_bm = 900·D50^0.42` above, `ω_ia = 90·D50^0.42` below [candel2021].
+  stream power: `ω_bm = 900·D50^0.42` above, `ω_ia = 90·D50^0.42` below, **`D50` in metres** [candel2021].
 - **Carve or don't** flips at about two cells of width [subcell_channel]. Above it, geometry;
   below it, a decal.
 - **Author the network or route it** flips on whether you need multi-thread planforms or user
@@ -396,7 +422,7 @@ this document produces the bed the water sits in, not the water.
 | Meanders read as wallpaper | Wavelength authored directly instead of derived from width | `λ = 7.32·w^1.1` (m), and let width come from discharge |
 | A ported meander generator produces wavelengths 11% short | `λ = 6.5·w^1.1` used with metres; the exponent ≠ 1, so the coefficient is unit-bound | 7.32 in metres, 6.5 in feet |
 | Braid appears on a lowland river, or a meander on a mountain torrent | Planform authored by hand instead of from the slope–discharge line | `S = 0.0125·Q^−0.44`; expose it as a bias, not a truth |
-| A "multi-channel" river in a flat wetland looks like a gravel braid | Braided and anastomosing conflated; they differ by 10× in stream power | Switch on `ω`: below `90·D50^0.42` it is the low-energy multi-thread, not a braid [candel2021] |
+| A "multi-channel" river in a flat wetland looks like a gravel braid | Braided and anastomosing conflated; they differ by 10× in stream power | Switch on `ω` **once you already have a multi-thread reach**: below `90·D50^0.42` it is the low-energy multi-thread, not a braid [candel2021]. ⚠️ Low `ω` alone does not imply multi-thread — most rivers below `ω_ia` are bar-free single-thread |
 | Thread count insensitive to the parameters the user is moving | `m ∝ W^1.5·S^0.5·Q^−0.5` — width dominates | Drive thread count from belt width [candel2021] eqs. (10)–(11) |
 | Bifurcation-ratio slider does nothing perceptible | Real-world `r_b` spans about 3–5; it is a constant with noise | Show it as a validation readout; author with branching *probabilities* [genevaux2013] §4 |
 | Carved channel vanishes after the erosion pass | Uniform `K`; the solver erases a step nothing pins | Carve after erosion, or pin with lithology (`stream-power.md`) |
