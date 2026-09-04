@@ -625,6 +625,123 @@ def approximation_coverage() -> tuple[int, int, int, int]:
     return both, err, cost, neither
 
 
+# Words that carry no subject matter, so a section whose heading is only these has nothing
+# distinctive to look for downstream. Kept deliberately short: the check's job is to find
+# sections with NO reachable subject, and a long stop list would manufacture that condition.
+_REACH_STOP = {
+    "the", "and", "for", "with", "what", "which", "that", "this", "from", "into", "your",
+    "you", "are", "not", "but", "how", "why", "when", "where", "who", "does", "actually",
+    "here", "there", "them", "they", "its", "it's", "one", "two", "three", "each", "every",
+    "any", "all", "own", "why", "use", "using", "used", "make", "makes", "made", "gets",
+    "get", "put", "puts", "than", "then", "also", "more", "most", "less", "least", "same",
+    "different", "other", "another", "about", "over", "under", "after", "before", "way",
+    "ways", "thing", "things", "part", "parts", "side", "sides", "enough", "still", "just",
+}
+
+_REACH_WORD = re.compile(r"[a-z][a-z0-9'-]{2,}")
+
+
+def _reach_terms(heading: str) -> set[str]:
+    """Content words of a section heading, singular and plural collapsed."""
+    out = set()
+    for w in _REACH_WORD.findall(heading.lower()):
+        if w in _REACH_STOP:
+            continue
+        out.add(w)
+        if w.endswith("s") and len(w) > 4:
+            out.add(w[:-1])          # classes -> classe, angles -> angle
+        else:
+            out.add(w + "s")
+    return out
+
+
+def _is_anchor(heading_lower: str) -> bool:
+    """The two headings a reader lands on first.
+
+    The failure table is `## How this fails, and what it looks like` in 35 documents and
+    `## When it fails` in two. Matching a bare "fails" anywhere would also swallow content
+    sections -- "The priority function, and why FIFO fails" is a section ABOUT a failure, not
+    the table -- so the two spellings are named rather than pattern-matched.
+    """
+    return (heading_lower.startswith("use this")
+            or heading_lower.startswith("how this fails")
+            or heading_lower.startswith("when it fails"))
+
+
+def check_section_reach() -> tuple[list[str], int, int]:
+    """Does every major section reach `## Use this` or the failure table?
+
+    This corpus is read in two places first: the recommendation at the top and the failure
+    table at the bottom. A section reachable from neither is invisible to the reader it was
+    written for, however good it is.
+
+    WHY THIS EXISTS. The shape was found BY HAND in five consecutive documents, and it is the
+    corpus's most-recorded process defect: a correction lands in the prose and not at the two
+    ends a reader actually uses. The largest instance was hydraulic-erosion.md, where the grain
+    classes section -- about 31% of the body, carrying armouring, downstream fining, per-class
+    capacity and per-class repose -- appeared in neither. Finding that by hand five times and
+    not mechanising it is the definition of a discipline that does not hold.
+
+    HOW IT DECIDES. For each `## ` section other than `## Use this` and the failure table, it
+    takes the content words of the heading and asks whether ANY of them appears in the union of
+    those two. One word is enough to pass.
+
+    ⚠️ IT DOES NOT CATCH THE CASE IT WAS BUILT FOR, AND THAT IS MEASURED, NOT SUSPECTED.
+    Run against hydraulic-erosion.md at 634ca6f -- the version whose grain-classes section
+    reached neither end -- it reports NOTHING. The heading is "Grain classes: one capacity, one
+    talus angle, and why that is not enough", and the words `capacity` and `angle` both appear in
+    that document's failure table already, in rows belonging to the PIPE section. Weighting by
+    corpus-wide rarity does not help: `capacity` is rare across the corpus and still present in
+    this document's table. Lexical overlap cannot separate "the table covers this section" from
+    "the table happens to use this word elsewhere", because the distinction is semantic. A
+    stronger word rule would not fix it; a different instrument would be needed.
+
+    SO WHAT IT IS FOR. It catches the strictly weaker condition it can actually see: a section
+    with NO lexical contact with either end at all. That found 21 of 193 sections, several of
+    which are real ("The three-media rule", "The 42 degree switch") and several of which are
+    generic headings with no subject matter to match ("Submission", "The ladder"). It is a net
+    with a known hole, reported as such, and it does not discharge the hand review.
+
+    REPORTED, not enforced. An OPEN row in registers/guard-proofs.tsv records the negative
+    result above so nobody rebuilds this and believes it works.
+    """
+    problems: list[str] = []
+    docs = [p for p in documents(ROOT)
+            if p not in paper_files() and p not in (INDEX, COVERAGE)]
+    unreachable = total = 0
+    for d in docs:
+        try:
+            _, body = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        text = _unfenced(body)
+        parts = re.split(r"^## +(.+?)\s*$", text, flags=re.M)
+        if len(parts) < 3:
+            continue
+        heads = parts[1::2]
+        bodies = parts[2::2]
+        anchor = []
+        for h, b in zip(heads, bodies):
+            hl = h.lower()
+            if _is_anchor(hl):
+                anchor.append(h + " " + b)
+        if not anchor:
+            continue
+        anchor_text = " ".join(anchor).lower()
+        for h in heads:
+            hl = h.lower()
+            if _is_anchor(hl):
+                continue
+            total += 1
+            terms = _reach_terms(h)
+            if terms and not any(t in anchor_text for t in terms):
+                unreachable += 1
+                problems.append(
+                    f"  ....  {d.relative_to(ROOT)}: section '{h}' reaches neither "
+                    f"`## Use this` nor the failure table")
+    return problems, unreachable, total
+
+
 def check_orphans(bib: dict[str, dict], used: set[str]) -> list[str]:
     """The other direction. 216 of terrain-architect's 326 entries were cited by nothing."""
     return [f"{bib[i]['file']}: `{i}` is cited by no document and is not marked [background]"
@@ -1199,6 +1316,18 @@ def main() -> int:
               f"actually brings. {eonly} give an error and no cost, {conly} a cost and no error, "
               f"{none} neither. An error nobody can budget and a cost nobody can justify are each "
               f"half an answer. Reported, not enforced; see registers/guard-proofs.tsv.")
+
+    _reach_problems, unreach, reach_tot = check_section_reach()
+    if reach_tot:
+        print(f"reach {unreach}/{reach_tot} ({100 * unreach / reach_tot:.0f}%) of body sections "
+              f"share NO word with either `## Use this` or the failure table -- the two places a "
+              f"reader lands first. Content reachable from neither is invisible to the reader it "
+              f"was written for, a shape found by hand in five consecutive documents. ⚠️ This "
+              f"check DOES NOT catch the case that motivated it: hydraulic-erosion.md's "
+              f"grain-classes section, 31% of that body and absent from both ends, shares the "
+              f"words `capacity` and `angle` with failure rows belonging to a different section, "
+              f"so it passes. Lexical overlap cannot see a semantic gap. Reported, not enforced, "
+              f"and it does not discharge the hand review; see registers/guard-proofs.tsv.")
 
     sharp, tot, noart, _vague = locator_quality()
     if tot:
