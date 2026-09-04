@@ -54,6 +54,14 @@ spectral option gives you that too.
 far away. The moment the depth field says otherwise, a separate shore-wave band owns the water; see
 [the shore](#the-shore-is-a-different-field-not-a-modulation).
 
+**Whatever field you synthesise, the dispersion relation is what makes it read as water**
+[capillary_gravity] [airy_coastal] — it is a constraint on the result, not a feature of one model.
+Four consequences, each a visible bug if ignored: there is a **slowest possible wave** (~23 cm/s,
+at ~1.7 cm), so nothing may travel slower; **long waves outrun short ones**, so a sea without
+groups reads as a metronome; **period is conserved across a depth change and wavelength is not**,
+so a train entering shallow water must shorten rather than slow uniformly; and **in shallow water
+celerity depends on depth alone**, which is what refracts crests onto every shore for free.
+
 ## Querying the field is a per-model question
 
 "A wave field can be evaluated identically on the CPU for physics and on the GPU for rendering" is
