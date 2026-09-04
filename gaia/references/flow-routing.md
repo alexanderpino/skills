@@ -29,8 +29,8 @@ shallow pits, fill the deep ones.
 
 **Receivers: D8 if the result is a network, MFD if the result is a field.** See the crossover
 below — this is the one place the answer genuinely changes. With MFD, **normalise slopes by the
-steepest before raising them to `p`**, or the exponent underflows on ε-filled flats and silently
-destroys water from `p = 22` up.
+steepest before raising them to `p`**, or the exponent underflows on ε-filled flats and
+strands water on cells that plainly drain, from a `p` that depends on your elevations.
 
 **Route on a filled COPY, never on the heightfield.** Writing the filled surface back flattens
 every lake basin you meant to keep.
@@ -243,20 +243,39 @@ concentrates on the steepest neighbour. `p = 1.1` is [freeman1991]'s calibrated 
 weighted by contour length rather than bare slope is [quinn1991] — a different method, not a
 tuning of this one. Measured over 3600 cells, the weights sum to 1 within 4e-16.
 
-⚠️ **`p → ∞` degenerates to D8 in the limit and NOT in float64, and the block above written
-literally destroys water long before it gets there.** This document routes on the ε-filled copy,
-so flats carry slopes of order `ε ≈ 1e-15`. `pow(s, p)` underflows to zero once `15p > 323` —
-that is **`p ≥ 22`, exactly**, and the threshold is a property of the double, not of your terrain.
-At that point `total == 0` fires on cells that *do* have a lower neighbour, `return {}` discards
-their accumulated water, and the deficit is silent because the sum rule still holds over what is
-left. Reproduced here: at `p = 21` all 3600 units reach the edge; at `p = 22`, 422 cells return
-empty and 2778.78 arrive. **The amount lost is configuration-specific — an independent run on a
-different grid lost 91% where this one loses 23% — but the threshold is not.**
+⚠️ **`p → ∞` degenerates to D8 in the limit but not in float64, and the block above stops
+behaving like D8 at exactly the point it is supposed to converge to it.** This document routes on
+the ε-filled copy, so flats carry slopes of order one ulp. `pow(s, p)` underflows to zero at large
+`p`, `total == 0` then fires on cells that *do* have a lower neighbour, and `return {}` strands
+their accumulated water where the comment claims a pit.
 
-**The fix is one line: normalise before the power, not after.** Take `w[k] = (s[k]/s_max)^p` and
-divide by `Σw`. It is algebraically identical, it cannot underflow because the largest term is
-always exactly 1, and it makes the D8 limit actually reachable — verified here conserving all 3600
-units at `p` = 22, 100, 400 and 1000, where the printed form fails at 22 and reaches NaN by 400.
+⚠️ **The threshold scales with your elevations, so there is no single number to remember.** The
+epsilon that survives is an ulp of `z`, and an ulp at 8000 m is far larger than at 1 m — the same
+warning this document gives above about sizing `eps`. Measured on one 40² bowl at three base
+elevations, the first `p` at which a cell with a strictly lower neighbour returns empty is
+**21 at 1 m, 25 at 1000 m, and 27 at 8000 m**. Anything in the ordinary range (`p` = 1.1 to ~10)
+is far from it; a "make it sharper" slider that runs to 30 is not.
+
+⚠️ **It strands water, it does not destroy it — and getting this wrong is easy.** Audit every
+terminus and the total is conserved exactly: 1600.0000 of 1600 at `p` = 25 and `p` = 30, with
+250.0 sitting on 110 interior cells. An earlier version of this paragraph said "destroys", having
+measured only what reached the edge and called the difference a loss. The harm is a **wrong
+field**, not a missing one — and it is real: on the same grid **D8 strands nothing**, delivering
+all 1600 units, so the high-`p` failure is a divergence *from* D8, not an approach to it.
+
+**The fix is to normalise before the power, not after** — and it needs its guard:
+
+```
+smax = max(s)                              # over the 8 neighbours
+if smax == 0: return {}                    # a real pit or flat: THIS is the empty case
+w[k]  = pow(s[k] / smax, p)                # largest term is exactly 1, so nothing underflows
+return { (nbr[k], w[k] / Σw) for every k with s[k] > 0 }
+```
+
+Algebraically identical to the printed form, and it makes the D8 limit reachable — all units
+conserved and delivered at `p` = 22, 100, 400 and 1000, where the printed form breaks and reaches
+NaN by 400. ⚠️ Written as a bare one-liner without the `smax == 0` line it divides by zero on
+every genuine pit, which is worse than the bug it replaces.
 
 The choice is decided by what consumes the result, and this is the crossover:
 
@@ -355,4 +374,4 @@ steepness, which draws rivers straight over ridges in steep terrain.
 | Every lake basin has flattened | The filled surface was written back to the heightfield | Fill the routing copy only |
 | Canyons cut through basins that should hold water | Breaching with no depth limit | Set the limit; use the hybrid |
 | Channel heads march up over ridge lines | Area-only channel threshold | Threshold on `A·S²` [montgomery1992] |
-| Water disappears at high MFD exponents; totals no longer sum to the input | `pow(s, p)` underflows on ε-filled flats — at `ε ≈ 1e-15` this is exactly `p ≥ 22` — so `total == 0` fires on cells that do have a lower neighbour and their water is discarded | Normalise by the steepest slope before the power: `w[k] = (s[k]/s_max)^p` |
+| At a high MFD exponent, wetness pools on hillslope cells that plainly drain, and D8 on the same grid does not | `pow(s, p)` underflows on ε-filled flats, so `total == 0` fires on cells that DO have a lower neighbour and strands their water. The `p` at which this starts scales with your elevations — measured 21/25/27 at base 1 m/1000 m/8000 m | Normalise by the steepest slope before the power, `w[k] = (s[k]/s_max)^p`, keeping an explicit `s_max == 0` guard for real pits |
