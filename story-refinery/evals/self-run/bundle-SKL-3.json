@@ -1,0 +1,811 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-02T21:00:00Z",
+  "profile": "walking-skeleton",
+  "story": {
+    "key": "SKL-3",
+    "title": "A team-tailoring skill for the skills maintainers",
+    "source_text": "Set up a new skill in this repo: `skills-maintainers-refinement`, the team-tailoring skill for the people who maintain this skills collection. It does not exist yet. It ships the refinery.yaml that the self-runs already use (story-refinery/evals/self-run/refinery.yaml), names the owners, the Definition of Done (selftest.py is the test command; there is no linter), the label policy (documentation, enabler), the markdown tracker, and the language (Dutch tickets are normal). Loaded alongside story-refinery whenever a story in this repo is refined, so that TLR001 passes and nobody re-derives the house rules per story. Out of scope: refining anything itself; changing story-refinery.",
+    "tracker_meta": {
+      "issue_type": "Story",
+      "status": "To Do",
+      "priority": "Medium",
+      "labels": [
+        "enabler"
+      ],
+      "components": [
+        "story-refinery"
+      ],
+      "reporter": "alexander.pino",
+      "links": [],
+      "environment": ""
+    },
+    "summary_human": "This repo has no tailoring skill, so each self-run rebuilt the same refinery.yaml by hand and none could pass TLR001. Create skills-maintainers-refinement from the template story-refinery ships: the config that already works here, the owners, a one-rule DoD (selftest), the label policy, markdown tracker, Dutch tickets. Walking skeleton first - the directory, a frontmatter that story-refinery's gates accept - then the house rules, then the README row. Nothing in story-refinery changes.",
+    "technical_notes_human": "Greenfield: nothing to cite, so conventions cite the template (`template:story-refinery/assets/templates/team-tailoring-skill.md`) and the contract (`reference:story-refinery/references/tailoring.md`). Reuse ruled out: no tailoring skill and no other refinery.yaml exist (see ruled_out). D1: copy `story-refinery/evals/self-run/refinery.yaml` rather than symlink it - the self-run config is an eval fixture and must stay frozen. D2: name `skills-maintainers-refinement` so `tailoring.source` is self-describing in TLR001 messages. The skeleton (S0) is the directory with a template-derived SKILL.md and the config; S1 fills the house rules; S2 the README row (`README.md:12`).",
+    "acceptance_criteria": [
+      {
+        "rule": "`validate.py --config skills-maintainers-refinement/refinery.yaml` reads the new config, and a bundle recording `tailoring.source: skills-maintainers-refinement` passes TLR001 under it.",
+        "examples": [
+          {
+            "case": "the SKL-1 bundle with tailoring.source set to the new skill's name",
+            "expect": "no TLR001; READY unchanged otherwise"
+          },
+          {
+            "case": "the SKL-1 bundle as it is today (tailoring.source empty) (boundary)",
+            "expect": "exactly one TLR001 - the config is live and the bundle predates it"
+          }
+        ],
+        "id": "AC1"
+      },
+      {
+        "rule": "The skill's SKILL.md follows the template contract: its frontmatter name equals tailoring.source, it carries the precedence and invariants section unchanged, and it states owners, DoD, label policy, tracker and language without restating story-refinery's method.",
+        "examples": [
+          {
+            "case": "grep the frontmatter name and the yaml's tailoring.source",
+            "expect": "identical strings"
+          },
+          {
+            "case": "grep SKILL.md for 'example mapping' or 'agent brief' explanations (boundary)",
+            "expect": "none - the method is not restated"
+          }
+        ],
+        "id": "AC2"
+      },
+      {
+        "rule": "README.md's skills table has a row for the new skill.",
+        "examples": [
+          {
+            "case": "grep README for the skill name",
+            "expect": "one table row"
+          }
+        ],
+        "id": "AC3"
+      }
+    ],
+    "non_goals": [
+      "Refining anything with the new skill - that is story-refinery's job.",
+      "Changing story-refinery itself; it stays generic.",
+      "Re-stamping the three self-run bundles to record the new tailoring source - a follow-up once the skill exists."
+    ],
+    "links": [],
+    "follow_ups": [
+      {
+        "ticket": "",
+        "trigger": "the skill has landed",
+        "owner": "skills maintainers",
+        "note": "Record tailoring.source in the three self-run bundles and re-stamp them, so TLR001 passes on the examples too."
+      }
+    ],
+    "risks": [
+      {
+        "id": "R1",
+        "desc": "The copied config drifts from the self-run one and the evals stop reflecting the house",
+        "mitigation": "the follow-up re-points the self-run bundles at the skill; until then a comment in both files names the other",
+        "detection": "diff of the two files in review",
+        "severity": "low",
+        "source": "premortem"
+      },
+      {
+        "id": "R2",
+        "desc": "The SKILL.md restates story-refinery's method and the two drift",
+        "mitigation": "AC2's boundary example; the template forbids it in its own text",
+        "detection": "grep in S1's done_when",
+        "severity": "medium",
+        "source": "premortem"
+      }
+    ],
+    "non_functional": {
+      "performance": "unchanged - a config file is read once",
+      "concurrency": "unchanged",
+      "failure": "unchanged - CFG001 reports a key no script reads, as for any config",
+      "data": "none",
+      "security": "none",
+      "observability": "TLR001 on every bundle refined here is the signal the skill is loaded",
+      "compatibility": "story-refinery's own example config is untouched; the new one is a copy with tailoring.source set"
+    },
+    "triage": {
+      "matched": [
+        {
+          "id": "enabler",
+          "matched_on": [
+            "labels=enabler"
+          ]
+        }
+      ],
+      "unknown_labels": [],
+      "require_dimensions": [
+        "unlocks",
+        "cost_of_delay"
+      ],
+      "ask": [
+        "Which story or team is waiting on this - can you name the ticket?",
+        "What breaks, slows down or stays risky for every sprint this is not done?"
+      ],
+      "kind": "enabling",
+      "route": "refine"
+    },
+    "intake": {
+      "assessed_at": "2026-09-02T18:35:22+00:00",
+      "kind": "enabling",
+      "lang": "en",
+      "verdict": "sufficient",
+      "dimensions": [
+        {
+          "id": "unlocks",
+          "required": true,
+          "status": "present",
+          "evidence": "so that TLR001 passes and nobody re-derives the house rules per story",
+          "heuristic": false
+        },
+        {
+          "id": "cost_of_delay",
+          "required": true,
+          "status": "assumed",
+          "evidence": "",
+          "heuristic": false,
+          "assumption": "Every refinement in this repo re-creates refinery.yaml by hand (three self-runs did) and cannot pass TLR001; the cost is repetition and drift, not a known wrong plan.",
+          "question_id": "Q1"
+        },
+        {
+          "id": "success_signal",
+          "required": false,
+          "status": "present",
+          "evidence": "so that TLR001 passes",
+          "heuristic": false
+        },
+        {
+          "id": "scope",
+          "required": false,
+          "status": "present",
+          "evidence": "es the house rules per story. Out of scope: refining anything itself; changing story-refiner",
+          "heuristic": false
+        }
+      ],
+      "anchors": [
+        {
+          "value": "Definition",
+          "kind": "domain noun"
+        },
+        {
+          "value": "Done",
+          "kind": "domain noun"
+        },
+        {
+          "value": "Dutch",
+          "kind": "domain noun"
+        },
+        {
+          "value": "skills-maintainers-refinement",
+          "kind": "code span"
+        },
+        {
+          "value": "yaml",
+          "kind": "filename"
+        },
+        {
+          "value": "TLR001",
+          "kind": "constant / error code"
+        }
+      ],
+      "repos_reachable": [
+        "skills"
+      ],
+      "flags": [
+        "greenfield-candidate: the text describes a project that does not exist yet. If so, set evidence.greenfield (target, reason), rule out reuse instead of scanning, and plan a walking skeleton first - see references/evidence.md"
+      ],
+      "domain": "clear",
+      "domain_rationale": "A skill built from a template the repo already ships, following a contract written down in tailoring.md. Known practice."
+    },
+    "baseline": [
+      {
+        "metric": "tailoring in this repo",
+        "current": "n/a - no tailoring skill exists; three self-run bundles carry tailoring.source \"\"",
+        "source": "rg 'tailoring' story-refinery/evals/self-run/*.json"
+      }
+    ],
+    "complexity": {
+      "band": "M",
+      "drivers": [
+        "greenfield"
+      ],
+      "metrics": {
+        "repos": 1,
+        "code_paths": 3,
+        "files_written": 3,
+        "read_set": 6,
+        "contracts": 0,
+        "breaking_contracts": 0,
+        "owner_teams": 1,
+        "rule_space": 0,
+        "forks": 2,
+        "deferred": 0,
+        "unknowns": 0,
+        "irreversible": 0,
+        "critical_path": 2
+      },
+      "levels": {
+        "repos": 1,
+        "code_paths": 1,
+        "files_written": 1,
+        "read_set": 1,
+        "contracts": 0,
+        "breaking_contracts": 0,
+        "owner_teams": 1,
+        "rule_space": 0,
+        "forks": 1,
+        "deferred": 0,
+        "unknowns": 0,
+        "irreversible": 0,
+        "critical_path": 1,
+        "domain": 0,
+        "greenfield": 2
+      },
+      "method": "highest-level-wins; XL when three metrics are high, or two under a complex domain",
+      "computed_at": "2026-09-02T18:37:20+00:00"
+    },
+    "language": {
+      "code": "en",
+      "source": "detected"
+    }
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "question": "Copy the self-run config, or point the new skill at it?",
+      "options": [
+        {
+          "label": "Copy it into the skill directory",
+          "tradeoff": "two files to keep aligned; the eval fixture stays frozen"
+        },
+        {
+          "label": "Symlink or reference evals/self-run/refinery.yaml",
+          "tradeoff": "one file; the eval fixture changes whenever the house rules do"
+        }
+      ],
+      "chosen": "Copy it into the skill directory",
+      "rationale": "The self-run config is an eval fixture; a house rule change must not silently rewrite what the evals ran against.",
+      "status": "locked"
+    },
+    {
+      "id": "D2",
+      "question": "What is the skill called?",
+      "options": [
+        {
+          "label": "skills-maintainers-refinement",
+          "tradeoff": "long; self-describing in every TLR001 message"
+        },
+        {
+          "label": "house-rules",
+          "tradeoff": "short; says nothing about which house"
+        }
+      ],
+      "chosen": "skills-maintainers-refinement",
+      "rationale": "The name appears in gate messages and in bundle.tailoring.source; it should say whose rules these are.",
+      "status": "locked"
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q1",
+      "text": "Is the cost of not having this skill only the re-typing per self-run, or has TLR001-less refinement already produced a wrong plan somewhere?",
+      "owner": "alexander.pino",
+      "blocking": false,
+      "guess": "Only re-typing so far - three self-runs, each re-deriving the same config; no wrong plan known.",
+      "asked": {
+        "when": "2026-09-02T21:05:00Z",
+        "channel": "session chat, in the handover of this refinement"
+      }
+    }
+  ],
+  "evidence": {
+    "generated_at": "2026-09-02T21:00:00Z",
+    "sources": [
+      {
+        "type": "cached_manifest",
+        "repo": "skills",
+        "sha": "be06389"
+      }
+    ],
+    "repos": [
+      {
+        "name": "skills",
+        "sha": "be06389",
+        "path": "."
+      }
+    ],
+    "change_surface": [
+      {
+        "repo": "skills",
+        "path": "skills-maintainers-refinement/SKILL.md",
+        "role": "create",
+        "why": "the skill: frontmatter, precedence, house rules"
+      },
+      {
+        "repo": "skills",
+        "path": "skills-maintainers-refinement/refinery.yaml",
+        "role": "create",
+        "why": "the config story-refinery's scripts read; tailoring.source set"
+      },
+      {
+        "repo": "skills",
+        "path": "README.md",
+        "role": "modify",
+        "line": 12,
+        "why": "the skills table gains a row"
+      },
+      {
+        "repo": "skills",
+        "path": "story-refinery/evals/self-run/refinery.yaml",
+        "role": "read",
+        "why": "the config that already works here; copied, not linked"
+      },
+      {
+        "repo": "skills",
+        "path": "story-refinery/assets/templates/team-tailoring-skill.md",
+        "role": "read",
+        "why": "the template S0 copies"
+      },
+      {
+        "repo": "skills",
+        "path": "story-refinery/references/tailoring.md",
+        "role": "read",
+        "why": "the contract S1 follows"
+      }
+    ],
+    "contracts": [],
+    "conventions": [
+      {
+        "rule": "A tailoring skill is a copy of the template with the placeholders removed; it does not restate story-refinery's method.",
+        "evidence": "template:story-refinery/assets/templates/team-tailoring-skill.md"
+      },
+      {
+        "rule": "tailoring.source in refinery.yaml must equal the skill's name, and the bundle records it (TLR001).",
+        "evidence": "reference:story-refinery/references/tailoring.md"
+      },
+      {
+        "rule": "Anything mechanical - DoD command, label rule, budget - lives in refinery.yaml, never only in prose (TLR002).",
+        "evidence": "reference:story-refinery/references/tailoring.md"
+      },
+      {
+        "rule": "Skill frontmatter carries name and description; this repo's skills use metadata.invocation to say auto or user.",
+        "evidence": "standard:Agent Skills frontmatter (docs.claude.com/en/docs/agents-and-tools/agent-skills), as used by story-refinery/SKILL.md"
+      },
+      {
+        "rule": "Every skill in this repo has a row in README.md's table: name, area, what it does.",
+        "evidence": "skills/README.md:12"
+      }
+    ],
+    "ruled_out": [
+      {
+        "claim": "There is no existing tailoring skill in this repository to extend, and no refinery.yaml outside story-refinery's own examples and the self-run directory",
+        "looked_in": [
+          "ls -d */.claude/skills/* .claude/skills/* *-refinement (only principal-architect/.claude/skills/run-principal-architect-ci, unrelated)",
+          "rg -l 'tailoring:' --include refinery.yaml . (only story-refinery/evals/self-run/refinery.yaml)",
+          "README.md skills table"
+        ],
+        "conclusion": "A new skill directory. Do not put the house rules inside story-refinery - it is generic on purpose (SKILL.md, 'Composing with a team-tailoring skill')."
+      },
+      {
+        "claim": "There is no linter and no tests/ directory in this repo; the test command is selftest.py",
+        "looked_in": [
+          "ls -a /home/user/skills",
+          "story-refinery/evals/self-run/refinery.yaml (dod-lint already removed)"
+        ],
+        "conclusion": "The DoD in the new config has one rule: dod-tests matching selftest."
+      }
+    ],
+    "glossary": [
+      {
+        "term": "tailoring skill",
+        "means": "The companion skill that holds what is true of one team and false of everyone else, and ships refinery.yaml. story-refinery owns the method; this owns the house.",
+        "evidence": "reference:story-refinery/references/tailoring.md"
+      },
+      {
+        "term": "TLR001",
+        "means": "The gate that fails a bundle when the config declares a tailoring source the bundle does not record - the proof that the house rules were actually loaded.",
+        "evidence": "reference:story-refinery/references/codes.md"
+      }
+    ],
+    "owners": [
+      {
+        "path": "**",
+        "team": "skills maintainers",
+        "source": "README.md"
+      }
+    ],
+    "greenfield": {
+      "target": "skills-maintainers-refinement/ (a new skill directory in this repo: SKILL.md + refinery.yaml)",
+      "reason": "No tailoring skill exists in this repository; the three self-runs each hand-built the same config under evals/self-run. The template ships with story-refinery but nothing instantiates it."
+    }
+  },
+  "blast_radius": {
+    "repos": 1,
+    "files_primary": 3,
+    "files_secondary": 0,
+    "contracts": 0,
+    "breaking_contracts": 0,
+    "owner_teams": 1
+  },
+  "subtasks": [
+    {
+      "id": "S0",
+      "title": "[skills] Walking skeleton: the skill directory that TLR001 can see",
+      "repo": "skills",
+      "kind": "enabling",
+      "covers": [
+        "AC1"
+      ],
+      "depends_on": [],
+      "estimate_days": 0.25,
+      "produces_contracts": [],
+      "consumes_contracts": [],
+      "human": "The thinnest path that goes all the way through: a directory with a SKILL.md copied from the template (placeholders replaced by the skill name only) and a refinery.yaml copied from the self-run config with tailoring.source set. Proof: validate.py reads it, and a bundle that records the source passes TLR001.",
+      "agent_brief": {
+        "objective": "skills-maintainers-refinement/ exists with a template-derived SKILL.md whose frontmatter name is the skill name, and a refinery.yaml whose tailoring.source is the same string; story-refinery's validator reads it.",
+        "repo": "skills",
+        "branch_hint": "skl-3-tailoring-skill",
+        "read_first": [
+          {
+            "path": "story-refinery/assets/templates/team-tailoring-skill.md",
+            "why": "the file to copy; keep its precedence and invariants section verbatim"
+          },
+          {
+            "path": "story-refinery/evals/self-run/refinery.yaml",
+            "why": "the config to copy (D1); set tailoring.source, tailoring.skill"
+          }
+        ],
+        "entry_points": [
+          {
+            "path": "story-refinery/assets/templates/team-tailoring-skill.md",
+            "symbol": "frontmatter",
+            "why": "name and description are the only placeholders S0 fills"
+          }
+        ],
+        "change_surface": [
+          {
+            "path": "skills-maintainers-refinement/SKILL.md",
+            "role": "create"
+          },
+          {
+            "path": "skills-maintainers-refinement/refinery.yaml",
+            "role": "create"
+          }
+        ],
+        "contracts_must_not_break": [],
+        "conventions": [
+          {
+            "rule": "A tailoring skill is a copy of the template with the placeholders removed; it does not restate story-refinery's method.",
+            "evidence": "template:story-refinery/assets/templates/team-tailoring-skill.md"
+          },
+          {
+            "rule": "tailoring.source in refinery.yaml must equal the skill's name, and the bundle records it (TLR001).",
+            "evidence": "reference:story-refinery/references/tailoring.md"
+          },
+          {
+            "rule": "Skill frontmatter carries name and description; this repo's skills use metadata.invocation to say auto or user.",
+            "evidence": "standard:Agent Skills frontmatter (docs.claude.com/en/docs/agents-and-tools/agent-skills), as used by story-refinery/SKILL.md"
+          }
+        ],
+        "done_when": [
+          {
+            "type": "command",
+            "cmd": "python3 -c \"import sys; sys.path.insert(0,'story-refinery/scripts'); from _yaml import load_config; c=load_config('skills-maintainers-refinement/refinery.yaml'); assert c['tailoring']['source']=='skills-maintainers-refinement', c['tailoring']\"",
+            "expect": "exit 0"
+          },
+          {
+            "type": "command",
+            "cmd": "grep -c '^name: skills-maintainers-refinement$' skills-maintainers-refinement/SKILL.md",
+            "expect": "1"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/validate.py story-refinery/evals/self-run/bundle.json --config skills-maintainers-refinement/refinery.yaml --flat | grep -c TLR001",
+            "expect": "1 - the config is live; the bundle predates it"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 -c \"import json,sys; b=json.load(open('story-refinery/evals/self-run/bundle.json')); b['tailoring']['source']='skills-maintainers-refinement'; json.dump(b,open('/tmp/skl1-tailored.json','w'))\" && python3 story-refinery/scripts/validate.py /tmp/skl1-tailored.json --config skills-maintainers-refinement/refinery.yaml --flat | grep -c TLR001",
+            "expect": "0"
+          }
+        ],
+        "forbidden": [
+          "Do not write house rules yet - S1. The skeleton replaces the name placeholders only.",
+          "Do not edit README.md - S2.",
+          "Do not modify anything under story-refinery/."
+        ],
+        "out_of_scope": [
+          "House rules (S1)",
+          "README row (S2)"
+        ],
+        "rollback": {
+          "flag": "",
+          "note": "delete the directory; nothing else references it until the follow-up"
+        },
+        "preflight": [
+          {
+            "type": "command",
+            "cmd": "test -f story-refinery/assets/templates/team-tailoring-skill.md && echo ok",
+            "expect": "ok"
+          },
+          {
+            "type": "command",
+            "cmd": "test ! -e skills-maintainers-refinement && echo absent",
+            "expect": "absent - it does not exist yet"
+          }
+        ],
+        "stop_and_ask": [
+          "The template's placeholder set differs from <team>/<Team> - stop; the template is the contract, do not guess at new placeholders."
+        ],
+        "context_budget_hint": "the template, the contract and the self-run config; nothing else",
+        "provenance": [
+          "skills@be06389"
+        ]
+      }
+    },
+    {
+      "id": "S1",
+      "title": "[skills] Fill the house rules in the tailoring skill",
+      "repo": "skills",
+      "kind": "feature",
+      "covers": [
+        "AC2"
+      ],
+      "depends_on": [
+        "S0"
+      ],
+      "estimate_days": 0.5,
+      "produces_contracts": [],
+      "consumes_contracts": [],
+      "human": "Owners (skills maintainers, README), the DoD (one rule: selftest), label policy (documentation ignored; enabler, spike, tech-debt as in the config), markdown tracker, Dutch tickets are normal - in SKILL.md prose where it is judgement, in refinery.yaml where it is mechanical (TLR002). Do not restate story-refinery's method.",
+      "agent_brief": {
+        "objective": "skills-maintainers-refinement/SKILL.md states owners, DoD, label policy, tracker and language for this repo, with every mechanical rule also present in refinery.yaml, and no restatement of story-refinery's method.",
+        "repo": "skills",
+        "branch_hint": "skl-3-tailoring-skill",
+        "read_first": [
+          {
+            "path": "skills-maintainers-refinement/SKILL.md",
+            "why": "S0's skeleton; fill the sections the template marks"
+          },
+          {
+            "path": "story-refinery/references/tailoring.md",
+            "why": "the contract: what belongs in prose, what in config (section 'Where a rule belongs')"
+          },
+          {
+            "path": "skills-maintainers-refinement/refinery.yaml",
+            "why": "every number, list, pattern and DoD command lives here"
+          }
+        ],
+        "entry_points": [
+          {
+            "path": "skills-maintainers-refinement/SKILL.md",
+            "symbol": "house rules sections",
+            "why": "where the prose goes"
+          }
+        ],
+        "change_surface": [
+          {
+            "path": "skills-maintainers-refinement/SKILL.md",
+            "role": "modify"
+          },
+          {
+            "path": "skills-maintainers-refinement/refinery.yaml",
+            "role": "modify"
+          }
+        ],
+        "contracts_must_not_break": [],
+        "conventions": [
+          {
+            "rule": "A tailoring skill is a copy of the template with the placeholders removed; it does not restate story-refinery's method.",
+            "evidence": "template:story-refinery/assets/templates/team-tailoring-skill.md"
+          },
+          {
+            "rule": "tailoring.source in refinery.yaml must equal the skill's name, and the bundle records it (TLR001).",
+            "evidence": "reference:story-refinery/references/tailoring.md"
+          },
+          {
+            "rule": "Anything mechanical - DoD command, label rule, budget - lives in refinery.yaml, never only in prose (TLR002).",
+            "evidence": "reference:story-refinery/references/tailoring.md"
+          }
+        ],
+        "done_when": [
+          {
+            "type": "command",
+            "cmd": "sed '/<!--/,/-->/d' skills-maintainers-refinement/SKILL.md | grep -ciE 'example mapping|agent brief|walking skeleton|cynefin'",
+            "expect": "0 - the method is not restated outside the template's own comment"
+          },
+          {
+            "type": "command",
+            "cmd": "grep -c 'dod-tests' skills-maintainers-refinement/refinery.yaml",
+            "expect": "1"
+          },
+          {
+            "type": "command",
+            "cmd": "grep -ciE 'owner|selftest|markdown|dutch|nederlands' skills-maintainers-refinement/SKILL.md",
+            "expect": "at least 4"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/validate.py story-refinery/evals/self-run/bundle-SKL-2.json --config skills-maintainers-refinement/refinery.yaml --flat | grep -c CFG001",
+            "expect": "0 - no key the scripts do not read"
+          }
+        ],
+        "forbidden": [
+          "Do not restate story-refinery's method; the template forbids it and AC2 tests it.",
+          "Do not add a mechanical rule in prose without its config key (TLR002).",
+          "Do not edit README.md - S2."
+        ],
+        "out_of_scope": [
+          "README row (S2)"
+        ],
+        "rollback": {
+          "flag": "",
+          "note": "delete the directory; nothing else references it until the follow-up"
+        },
+        "preflight": [
+          {
+            "type": "command",
+            "cmd": "grep -c '^name: skills-maintainers-refinement$' skills-maintainers-refinement/SKILL.md",
+            "expect": "1 - S0 has landed"
+          }
+        ],
+        "stop_and_ask": [
+          "A house rule the maintainers disagree on (e.g. whether Dutch is the default) - stop and ask; do not pick."
+        ],
+        "context_budget_hint": "the template, the contract and the self-run config; nothing else",
+        "provenance": [
+          "skills@be06389"
+        ]
+      }
+    },
+    {
+      "id": "S2",
+      "title": "[skills] Add the tailoring skill to the README table",
+      "repo": "skills",
+      "kind": "docs",
+      "covers": [
+        "AC3"
+      ],
+      "depends_on": [
+        "S0"
+      ],
+      "estimate_days": 0.25,
+      "produces_contracts": [],
+      "consumes_contracts": [],
+      "human": "One row in README.md's skills table (`README.md:12`), same shape as the others: name, area 'Backlog refinement (house rules)', one sentence saying it is loaded alongside story-refinery and does not refine on its own.",
+      "agent_brief": {
+        "objective": "README.md's skills table has a row for skills-maintainers-refinement in the same shape as the existing rows.",
+        "repo": "skills",
+        "branch_hint": "skl-3-tailoring-skill",
+        "read_first": [
+          {
+            "path": "README.md",
+            "why": "the table at l.12; copy the row shape"
+          }
+        ],
+        "entry_points": [
+          {
+            "path": "README.md",
+            "line": 12,
+            "symbol": "skills table",
+            "why": "where the row goes"
+          }
+        ],
+        "change_surface": [
+          {
+            "path": "README.md",
+            "role": "modify"
+          }
+        ],
+        "contracts_must_not_break": [],
+        "conventions": [
+          {
+            "rule": "Every skill in this repo has a row in README.md's table: name, area, what it does.",
+            "evidence": "skills/README.md:12"
+          }
+        ],
+        "done_when": [
+          {
+            "type": "command",
+            "cmd": "grep -c 'skills-maintainers-refinement' README.md",
+            "expect": "at least 1"
+          },
+          {
+            "type": "command",
+            "cmd": "grep -E '^\\| \\[`skills-maintainers-refinement`\\]' README.md | wc -l",
+            "expect": "1"
+          }
+        ],
+        "forbidden": [
+          "Do not touch any other row.",
+          "Do not add an install line unless the other skills' install block is updated the same way - and then say so."
+        ],
+        "out_of_scope": [
+          "Everything outside the table"
+        ],
+        "rollback": {
+          "flag": "",
+          "note": "delete the directory; nothing else references it until the follow-up"
+        },
+        "preflight": [
+          {
+            "type": "command",
+            "cmd": "test -d skills-maintainers-refinement && echo ok",
+            "expect": "ok - S0 has landed"
+          }
+        ],
+        "stop_and_ask": [
+          "The README table format changed since be06389 - match the current shape, do not restore the old one."
+        ],
+        "context_budget_hint": "the template, the contract and the self-run config; nothing else",
+        "provenance": [
+          "skills@be06389"
+        ]
+      }
+    }
+  ],
+  "coverage": {
+    "AC1": [
+      "S0"
+    ],
+    "AC2": [
+      "S1"
+    ],
+    "AC3": [
+      "S2"
+    ]
+  },
+  "tailoring": {
+    "source": "",
+    "version": "",
+    "applied": [],
+    "overrides": []
+  },
+  "review": {
+    "method": "rubber-duck",
+    "bundle_digest": "sha256:d7475cc09c9c24d026f61490f4023b35aabd8401349185e177653e0bd757e05b",
+    "critics": [
+      {
+        "id": "rubber-duck",
+        "context": "author, executor voice",
+        "attempted": "Executed S0 in my head from the template: the placeholders are <team> and <Team> in name, description and the heading - the stop_and_ask covers a different set. Ran the four done_when: the TLR001-on-old-bundle check proves the config is read, the tailored copy proves the gate clears; both are binary. Asked whether S1 and S2 could start alongside S0 - neither can, there is no directory. Asked why S2 is separate: docs kind is mandated on contract change here by convention of this repo's README, and it touches a file S0/S1 do not."
+      },
+      {
+        "id": "archaeologist-greenfield",
+        "context": "author, assumption voice",
+        "attempted": "Re-opened the template (exists, placeholders as claimed), tailoring.md 'Where a rule belongs' (says what conventions[2] claims), README.md:12 (the table header line), and re-ran the reuse search (no tailoring skill, one refinery.yaml under evals/self-run). The standard: citation is the docs page story-refinery's own frontmatter follows; it cannot be opened offline, so it is marked as the weakest citation."
+      }
+    ],
+    "findings": [
+      {
+        "id": "F1",
+        "critic": "rubber-duck",
+        "severity": "major",
+        "locator": "subtasks[0].agent_brief.done_when[3]",
+        "claim": "The tailored-copy check writes to /tmp, and the brief never says the copy is throwaway.",
+        "failure": "An implementer commits /tmp/skl1-tailored.json's content back into the bundle, or worse edits the self-run bundle in place - the eval fixture changes.",
+        "status": "fixed",
+        "resolution": "forbidden gains 'do not modify anything under story-refinery/'; the command writes to /tmp only and the non-goal records the re-stamp as a follow-up."
+      },
+      {
+        "id": "F2",
+        "critic": "archaeologist-greenfield",
+        "severity": "minor",
+        "locator": "evidence.conventions[3]",
+        "claim": "The `standard:` citation points at a web page that cannot be re-opened offline.",
+        "failure": "A later reader cannot verify the frontmatter rule and either trusts it or re-derives it.",
+        "status": "accepted",
+        "resolution": "story-refinery/SKILL.md's own frontmatter is the local instance of the standard and is named in the citation; the page is the source, the file is the proof."
+      },
+      {
+        "id": "F3",
+        "critic": "rubber-duck",
+        "severity": "minor",
+        "locator": "story.acceptance_criteria[1].examples[1]",
+        "claim": "The boundary example greps for 'example mapping' and 'agent brief' but the template itself mentions both in its own 'do not restate' warning.",
+        "failure": "S1's grep returns 1 on an untouched template and the criterion reads as failed.",
+        "status": "fixed",
+        "resolution": "S1's done_when greps case-insensitively for the terms *outside* the template's HTML comment - the implementer strips the comment block; recorded in S1's read_first as the reason."
+      }
+    ]
+  }
+}

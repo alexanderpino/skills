@@ -1,0 +1,386 @@
+{
+  "_howto": "This is what you author. Everything else - ticket text, agent briefs, tracker payloads - is rendered from it by emit.py. Fill it in phase order, delete this key, then run validate.py. See assets/examples/example-bundle.json for a complete one.",
+  "schema_version": "1.0",
+  "generated_at": "",
+  "profile": "vertical-slice",
+  "story": {
+    "key": "",
+    "title": "",
+    "source_text": "PHASE 1: the original ask, verbatim. Scope creep is detected against this.",
+    "tracker_meta": {
+      "_howto": "PHASE 1, first: copy what the tracker already says, verbatim. Labels are decisions somebody made before you opened this - 'production-issue' means it escaped to customers, 'sev1' means refinement is the wrong instrument right now. Never invent a label, and never edit one to make a rule match. This is also what stops a push from deleting the labels somebody set.",
+      "issue_type": "",
+      "status": "",
+      "priority": "",
+      "labels": [],
+      "components": [],
+      "reporter": "",
+      "links": [],
+      "environment": ""
+    },
+    "triage": {
+      "_howto": "PHASE 1: written by `triage.py apply --bundle bundle.json --write`. Do not hand-write it; if the labels are wrong, fix the ticket, and if the policy is wrong, fix triage.labels in refinery.yaml.",
+      "matched": [],
+      "unknown_labels": [],
+      "route": "refine"
+    },
+    "intake": {
+      "_howto": "PHASE 1: run `intake.py assess --bundle bundle.json --write`, then read source_text and set heuristic:false on every dimension you confirm. Statuses: present (quote it) | missing (blocking question) | assumed (assumption + non-blocking question) | answered (answer + answered_by).",
+      "kind": "feature",
+      "verdict": "sufficient",
+      "domain": "complicated",
+      "domain_rationale": "PHASE 1: Cynefin. clear (known practice) | complicated (knowable, needs expertise) | complex (only knowable by probing - the output is a spike, not a plan) | chaotic (act first, refine later). Say why in one arguable sentence.",
+      "dimensions": [],
+      "anchors": [],
+      "repos_reachable": [],
+      "flags": []
+    },
+    "impact": {
+      "_howto": "PHASE 1, when the ask names a mechanism with no outcome, or whenever the goal is worth stating: goal -> actor -> impact -> deliverable. Fill it right to left if you have to, but the goal is what tells you afterwards whether this worked.",
+      "goal": "measurable, with a number and a date",
+      "actors": [],
+      "impacts": [],
+      "deliverables": []
+    },
+    "summary_human": "PHASE 6: why and what, within the word budget.",
+    "technical_notes_human": "PHASE 6: what changes, where, what was decided. Every path cited.",
+    "acceptance_criteria": [
+      {
+        "_howto_codes": "PHASE 3: every criterion gets a code, and this is the one everything downstream refers to - subtasks cover it, the decision table cites it, people type it into comment threads. Keep the ticket's own scheme if it has one. Never renumber: a new criterion takes the next free code, a deleted one leaves a gap and its code is retired in story.retired_criterion_ids. `criteria.py assign --previous` does both across a re-refinement.",
+        "id": "AC1",
+        "rule": "PHASE 3: one blue card.",
+        "examples": [
+          {
+            "case": "",
+            "expect": ""
+          },
+          {
+            "case": "boundary",
+            "expect": ""
+          }
+        ]
+      }
+    ],
+    "decision_table": {
+      "_howto": "PHASE 3, for rule-heavy stories. List the conditions and every value each can take; write one rule per combination, using \"*\" for any. Anything the system cannot reach goes in 'impossible' with a reason. validate.py enumerates the product and names what neither covers (DT001) - that is the hole an implementer would otherwise fill by guessing. Delete this block for stories that are not rule-driven.",
+      "conditions": [
+        {"id": "", "values": ["", ""]}
+      ],
+      "rules": [
+        {"when": {}, "then": "", "ac": "AC1"}
+      ],
+      "impossible": []
+    },
+    "non_goals": [
+      "PHASE 3: what this story is not, with follow-up ticket ids."
+    ],
+    "links": [
+      {
+        "_howto": "Links the tracker must carry. type: blocks | blocked_by | relates | duplicates - canonical here, mapped to the tracker's own names by emit.py. A prerequisite that exists only in your head is an ordering nothing enforces: if this story reads code another item has not written yet, that is blocked_by, and it belongs here.",
+        "type": "blocked_by",
+        "key": "",
+        "why": ""
+      }
+    ],
+    "follow_ups": [
+      {
+        "_howto": "What this refinement creates for later: every non-goal that names a ticket, every deferred decision whose answer changes the NEXT story, and every flag or migration that needs an item to end it. The trigger is an observable condition, never a date - a backlog date is a wish, and a flag with no trigger becomes load-bearing.",
+        "ticket": "",
+        "trigger": "",
+        "owner": "",
+        "note": ""
+      }
+    ],
+    "series": {
+      "_howto": "Set when this is not the first story through this code. `evidence.py inherit --from <prior bundle> --write` fills predecessors and carries the glossary, conventions and ruled_out across, marking them stale when the repo has moved. Re-verify before relying on them: an inherited absence is the first thing to stop being true.",
+      "epic": "",
+      "predecessors": []
+    },
+    "risks": [
+      {
+        "_howto": "PHASE 4: from the premortem. It is three months later, this shipped and caused an incident - write the postmortem, then record each cause here. 'detection' is the alert, metric or report that tells you it is happening; a high risk without one is a risk you hear about from a customer.",
+        "id": "R1",
+        "desc": "",
+        "mitigation": "",
+        "detection": "",
+        "severity": "medium",
+        "source": "premortem"
+      }
+    ],
+    "non_functional": {
+      "_howto": "PHASE 3: a quality attribute scenario ends in a response measure. performance, concurrency and failure need a number or the word 'unchanged' (NFR002); the rest may be categorical, but never blank.",
+      "performance": "e.g. checkout p95 stays under 400ms at 500 rps, or 'unchanged'",
+      "concurrency": "",
+      "failure": "",
+      "data": "",
+      "security": "",
+      "observability": "",
+      "compatibility": ""
+    }
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "question": "PHASE 4: an open technical fork.",
+      "options": [
+        {
+          "label": "",
+          "tradeoff": ""
+        },
+        {
+          "label": "",
+          "tradeoff": ""
+        }
+      ],
+      "chosen": "",
+      "rationale": "",
+      "status": "locked",
+      "_howto_deferred": "PHASE 4: when status is 'deferred', add 'waiting_for' (the information that would decide it) and 'expires' (the event or date after which deferring costs more than deciding - the last responsible moment). Real Options: an option without an expiry is not a held option, it is an unmade decision.",
+      "waiting_for": "",
+      "expires": ""
+    }
+  ],
+  "open_questions": [
+    {
+      "_howto": "Ask the frontier: every question whose prerequisites are settled - answerable now without guessing at answers you have not heard yet. Put the whole round at once, numbered, each with its 'guess'. A question that waits on another names it in 'blocked_by' and is asked next round. Done when the frontier is empty.",
+      "id": "Q1",
+      "text": "",
+      "guess": "your recommended answer - a correction is cheaper for the owner than an essay",
+      "owner": "",
+      "blocking": false,
+      "blocked_by": [],
+      "asked": {"to": "", "when": "", "channel": ""}
+    },
+    {
+      "id": "Q1",
+      "text": "PHASE 3: a red card.",
+      "owner": "",
+      "blocking": false
+    }
+  ],
+  "evidence": {
+    "generated_at": "",
+    "sources": [
+      "PHASE 2: which of index / manifest / scan produced this"
+    ],
+    "repos": [
+      {
+        "name": "",
+        "rev": "",
+        "root": "",
+        "test_cmd": ""
+      }
+    ],
+    "change_surface": [
+      {
+        "repo": "",
+        "path": "",
+        "symbol": "",
+        "line": 0,
+        "role": "modify",
+        "note": ""
+      }
+    ],
+    "contracts": [
+      {
+        "id": "C1",
+        "repo": "",
+        "path": "",
+        "kind": "openapi",
+        "producers": [],
+        "consumers": [],
+        "draft": "the exact new or changed shape, verbatim - required by CON002 when this story edits the file",
+        "draft_source": "",
+        "note": ""
+      }
+    ],
+    "pending": [
+      {
+        "_howto": "PHASE 2, for a follow-up story: what you are citing that does not exist yet. Not evidence and not an assumption - specified work someone has not done. The citation points at the item that creates it, and that item must be a blocked_by link (PND002), or nothing but your memory holds the order.",
+        "claim": "",
+        "provided_by": {"ticket": "", "subtask": "", "bundle": ""},
+        "expected_path": "",
+        "note": ""
+      }
+    ],
+    "ruled_out": [
+      {
+        "_howto": "PHASE 2: what you looked for and did not find. This is the part of the investigation that compression throws away and an implementor pays for twice - once hunting for a helper that is not there, once when they use something that only looks similar. looked_in must be re-checkable: paths, globs, the actual queries.",
+        "claim": "",
+        "looked_in": [],
+        "conclusion": ""
+      }
+    ],
+    "glossary": [
+      {
+        "_howto": "PHASE 2: domain words as they are used here, not as the industry uses them. Cheap to write, and it is what stops an implementor with no context from confidently misreading a noun.",
+        "term": "",
+        "means": "",
+        "evidence": ""
+      }
+    ],
+    "conventions": [
+      {
+        "rule": "",
+        "evidence": "path:line"
+      }
+    ],
+    "owners": [
+      {
+        "glob": "",
+        "owner": ""
+      }
+    ]
+  },
+  "blast_radius": {
+    "repos": 0,
+    "files_primary": 0,
+    "files_secondary": 0,
+    "contracts": 0,
+    "breaking_contracts": 0,
+    "owner_teams": 0
+  },
+  "subtasks": [
+    {
+      "id": "S1",
+      "title": "[repo] Verb object",
+      "repo": "",
+      "kind": "feature",
+      "human": "PHASE 6: within the word budget, assumes shared context.",
+      "covers": [
+        "AC1"
+      ],
+      "depends_on": [],
+      "estimate_days": 0.5,
+      "produces_contracts": [],
+      "consumes_contracts": [],
+      "needs_coordination": false,
+      "agent_brief": {
+        "objective": "The post-condition, not the activity.",
+        "repo": "",
+        "branch_hint": "",
+        "read_first": [
+          {
+            "path": "",
+            "why": ""
+          }
+        ],
+        "entry_points": [
+          {
+            "path": "",
+            "line": 0,
+            "symbol": "",
+            "why": ""
+          }
+        ],
+        "change_surface": [
+          {
+            "path": "",
+            "role": "modify"
+          }
+        ],
+        "contracts_must_not_break": [
+          {
+            "path": "",
+            "note": ""
+          }
+        ],
+        "pending": [
+      {
+        "_howto": "PHASE 2, for a follow-up story: what you are citing that does not exist yet. Not evidence and not an assumption - specified work someone has not done. The citation points at the item that creates it, and that item must be a blocked_by link (PND002), or nothing but your memory holds the order.",
+        "claim": "",
+        "provided_by": {"ticket": "", "subtask": "", "bundle": ""},
+        "expected_path": "",
+        "note": ""
+      }
+    ],
+    "ruled_out": [
+      {
+        "_howto": "PHASE 2: what you looked for and did not find. This is the part of the investigation that compression throws away and an implementor pays for twice - once hunting for a helper that is not there, once when they use something that only looks similar. looked_in must be re-checkable: paths, globs, the actual queries.",
+        "claim": "",
+        "looked_in": [],
+        "conclusion": ""
+      }
+    ],
+    "glossary": [
+      {
+        "_howto": "PHASE 2: domain words as they are used here, not as the industry uses them. Cheap to write, and it is what stops an implementor with no context from confidently misreading a noun.",
+        "term": "",
+        "means": "",
+        "evidence": ""
+      }
+    ],
+    "conventions": [
+          {
+            "rule": "",
+            "evidence": "path:line"
+          }
+        ],
+        "done_when": [
+          {
+            "type": "command",
+            "cmd": "",
+            "expect": "exit 0"
+          },
+          {
+            "type": "assertion",
+            "text": ""
+          }
+        ],
+        "forbidden": [
+          "Do not edit files another subtask owns."
+        ],
+        "out_of_scope": [],
+        "rollback": {
+          "flag": "",
+          "note": ""
+        },
+        "preflight": [
+          {"_howto": "PHASE 6: commands that prove the anchors below still hold. Line numbers drift between refinement and implementation; without these an agent edits whatever now sits at line 88. On failure the instruction is stop and report, never improvise.",
+           "type": "command", "cmd": "grep -n \"def <symbol>\" <path>", "expect": "a hit at or near line <n>"}
+        ],
+        "stop_and_ask": [
+          "PHASE 6: the conditions under which the implementor must stop rather than decide. 'forbidden' says what not to touch; this says what not to decide. Include every open question that could surface as a fork mid-implementation."
+        ],
+        "context_budget_hint": "read_first only; do not index the repo",
+        "provenance": []
+      }
+    }
+  ],
+  "coverage": {
+    "AC1": [
+      "S1"
+    ]
+  },
+  "tailoring": {
+    "_howto": "PHASE 0: when a team-tailoring skill is loaded alongside this one, record which of its rules you applied and anything of this skill's it turned off. mechanism: config (name the refinery.yaml key that really enforces it) | prompt (judgement) | gate. An override needs a reason and a person's name. An override of an invariant is refused - see references/tailoring.md. Delete this block when the refinement is untailored, and say so at handover.",
+    "source": "",
+    "version": "",
+    "applied": [],
+    "overrides": []
+  },
+  "review": {
+    "_howto": "PHASE 8: once validate.py is green, run `review.py brief --bundle bundle.json --out reviews/` and hand each sealed packet to a separate critic in fresh context. Record what they found here, resolve every finding, re-validate, then `review.py digest --bundle bundle.json --stamp`.",
+    "method": "critics",
+    "bundle_digest": "PHASE 8: written by `review.py digest --stamp`. Never typed by hand.",
+    "critics": [
+      {"id": "implementer", "context": "fresh"},
+      {"id": "tester", "context": "fresh"},
+      {"id": "archaeologist", "context": "fresh"},
+      {"id": "sequencer", "context": "fresh",
+       "attempted": "only when this critic raised nothing: what it tried to break, and why it held"}
+    ],
+    "findings": [
+      {
+        "id": "F1",
+        "critic": "tester",
+        "severity": "blocking",
+        "locator": "story.acceptance_criteria[0]",
+        "claim": "what is wrong, in one sentence",
+        "failure": "who does what, and what they wrongly get, if this ships as is",
+        "status": "fixed",
+        "resolution": "what changed. accepted -> the risk and who accepted it; disputed -> the rebuttal and its evidence"
+      }
+    ]
+  }
+}

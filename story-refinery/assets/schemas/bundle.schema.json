@@ -1,0 +1,574 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/story-refinery/bundle.schema.json",
+  "title": "story-refinery bundle",
+  "description": "Single source of truth for one refined backlog item. Tracker payloads and agent briefs are projections of this document, never hand-edited independently. NOTE: nothing in this skill runs a JSON Schema validator - scripts/validate.py is the enforcer and checks more than this file can express (dependency cycles, contract ordering, file ownership, coverage). This schema exists for editor completion and for other tools that consume the bundle.",
+  "type": "object",
+  "required": ["schema_version", "story", "subtasks"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "generated_at": {"type": "string"},
+    "profile": {"enum": ["vertical-slice", "layered", "workflow-phase", "bugfix", "expand-contract", "custom"]},
+    "story": {"$ref": "#/$defs/story"},
+    "decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}},
+    "open_questions": {"type": "array", "items": {"$ref": "#/$defs/question"}},
+    "evidence": {"$ref": "#/$defs/evidence"},
+    "blast_radius": {
+      "type": "object",
+      "properties": {
+        "repos": {"type": "integer"}, "files_primary": {"type": "integer"},
+        "files_secondary": {"type": "integer"}, "contracts": {"type": "integer"},
+        "breaking_contracts": {"type": "integer"},
+        "owner_teams": {"type": "integer"}
+      }
+    },
+    "subtasks": {"type": "array", "items": {"$ref": "#/$defs/subtask"}},
+    "coverage": {
+      "type": "object",
+      "description": "criterion id -> subtask ids. Derived; validate.py recomputes it.",
+      "additionalProperties": {"type": "array", "items": {"type": "string"}}
+    },
+    "review": {"$ref": "#/$defs/review"},
+    "tailoring": {"$ref": "#/$defs/tailoring"}
+  },
+  "$defs": {
+    "story": {
+      "type": "object",
+      "required": ["key", "title", "summary_human", "acceptance_criteria"],
+      "properties": {
+        "key": {"type": "string"},
+        "title": {"type": "string"},
+        "source_text": {"type": "string", "description": "The original ask, verbatim. Scope creep is detected against this."},
+        "tracker_meta": {"$ref": "#/$defs/tracker_meta"},
+        "triage": {"$ref": "#/$defs/triage"},
+        "intake": {"$ref": "#/$defs/intake"},
+        "summary_human": {"type": "string", "description": "Why and what. Word-budgeted."},
+        "technical_notes_human": {"type": "string", "description": "What changes, where, what was decided. Every path cited."},
+        "acceptance_criteria": {"type": "array", "items": {"$ref": "#/$defs/criterion"}},
+        "decision_table": {"$ref": "#/$defs/decision_table"},
+        "impact": {"$ref": "#/$defs/impact"},
+        "retired_criterion_ids": {
+          "type": "array", "items": {"type": "string"},
+          "description": "Codes of deleted criteria. They stay retired and are never reused (AC011): every reference to a code still resolves, so a reused one resolves to something else."
+        },
+        "non_goals": {"type": "array", "items": {"type": "string"}},
+        "language": {
+          "type": "object",
+          "description": "The language of the item, adopted for every human-facing field (summary, notes, criteria, subtask text, questions) and for the rendered headings. Detected by intake.py (source: detected) or named by reading when detection cannot tell (source: given). The agent brief stays English: it is a machine-facing document.",
+          "properties": {"code": {"type": "string"}, "source": {"type": "string"}}
+        },
+        "complexity": {
+          "type": "object",
+          "description": "Derived by complexity.py --write, never authored: band (S/M/L/XL), the driving metrics, and every metric with its level. CPX002 reports a card that no longer matches the bundle.",
+          "properties": {"band": {"enum": ["S", "M", "L", "XL"]}, "drivers": {"type": "array", "items": {"type": "string"}},
+                         "metrics": {"type": "object"}, "levels": {"type": "object"}, "method": {"type": "string"}, "computed_at": {"type": "string"}}
+        },
+        "baseline": {
+          "type": "array",
+          "description": "What the thing this story changes measures TODAY. Required in spirit by two whole classes of story: one that promises to move a number (BAS001) and one that promises to preserve behaviour (BAS002). Neither claim can be demonstrated or falsified without it, and it is the cheapest thing in a refinement to capture.",
+          "items": {"type": "object", "required": ["metric", "current"],
+                    "properties": {
+                      "metric": {"type": "string", "description": "What was measured. Matches a non_functional key when it is one."},
+                      "current": {"type": "string", "description": "The value today. \"n/a - new code path\" is a valid answer; silence is not."},
+                      "source": {"type": "string", "description": "Where it came from, re-derivably: a dashboard and window, a recorded corpus, a characterisation test."}
+                    }}
+        },
+        "links": {
+          "type": "array",
+          "description": "Links this refinement says the tracker must carry, in a canonical vocabulary the adapters map onto their own names (Jira 'is blocked by', Azure DevOps 'Predecessor', ...). tracker_meta.links is what was found; this is what must exist.",
+          "items": {"type": "object", "required": ["type", "key"],
+                    "properties": {
+                      "type": {"enum": ["blocks", "blocked_by", "relates", "duplicates"]},
+                      "key": {"type": "string"},
+                      "why": {"type": "string", "description": "An unexplained link is the first thing deleted in the next backlog cleanup (LNK002)."}}}
+        },
+        "follow_ups": {
+          "type": "array",
+          "description": "Work this refinement creates for later: non-goals with a ticket, decisions whose answer changes the next story, and every flag or migration that needs an item to end it. SER002 links these to the tickets the text itself promises.",
+          "items": {"type": "object", "required": ["ticket", "trigger"],
+                    "properties": {
+                      "ticket": {"type": "string"},
+                      "trigger": {"type": "string", "description": "An observable condition, not a date. Dates in a backlog are wishes."},
+                      "owner": {"type": "string"},
+                      "note": {"type": "string"}}}
+        },
+        "progress": {
+          "type": "object",
+          "description": "What has actually landed. Handed to the skill (progress.py), never fetched - this skill makes no network calls. A status nobody can date is one nobody should act on, so it carries both.",
+          "properties": {
+            "subtasks": {"type": "object", "additionalProperties": {"enum": ["todo", "started", "done"]}},
+            "updated_at": {"type": "string"},
+            "source": {"type": "string", "description": "Who said so, e.g. 'standup 2026-09-09' or the status file it came from."},
+            "shipped_tickets": {"type": "array", "items": {"type": "string"},
+                                "description": "Other items that have shipped - a pending claim whose provider is here is no longer pending."}
+          }
+        },
+        "series": {
+          "type": "object",
+          "description": "Where this story sits in a stream. Predecessors are the bundles its dossier was inherited from - see references/series.md and `evidence.py inherit`.",
+          "properties": {
+            "epic": {"type": "string"},
+            "position": {"type": "string"},
+            "predecessors": {
+              "type": "array",
+              "items": {"type": "object", "required": ["key"],
+                        "properties": {"key": {"type": "string"},
+                                       "bundle": {"type": "string"},
+                                       "relation": {"type": "string"}}}
+            }
+          }
+        },
+        "risks": {"type": "array", "items": {"$ref": "#/$defs/risk"}},
+        "non_functional": {
+          "type": "object",
+          "description": "Give a number or the word 'unchanged'. Never leave a key blank.",
+          "additionalProperties": {"type": "string"}
+        }
+      }
+    },
+    "tracker_meta": {
+      "type": "object",
+      "description": "Phase 1. What the tracker already says about this item, copied verbatim before refining: labels, components, type, priority, status, reporter, links. Never invented, and never edited to make a triage rule match. Also what stops a push from deleting the labels somebody set (emit.py carries them through).",
+      "properties": {
+        "issue_type": {"type": "string"},
+        "status": {"type": "string"},
+        "priority": {"type": "string"},
+        "labels": {"type": "array", "items": {"type": "string"}},
+        "components": {"type": "array", "items": {"type": "string"}},
+        "reporter": {"type": "string"},
+        "environment": {"type": "string"},
+        "links": {
+          "type": "array",
+          "items": {"type": "object", "properties": {"type": {"type": "string"},
+                                                     "key": {"type": "string"}}}
+        }
+      }
+    },
+    "triage": {
+      "type": "object",
+      "description": "Phase 1. What those labels change about the refinement. Written by `triage.py apply --write` from the triage.labels policy; enforced by validate.py TRI gates.",
+      "properties": {
+        "matched": {
+          "type": "array",
+          "items": {"type": "object", "required": ["id"],
+                    "properties": {"id": {"type": "string"},
+                                   "matched_on": {"type": "array", "items": {"type": "string"}}}}
+        },
+        "route": {"enum": ["refine", "incident"],
+                  "description": "incident: the labels say refinement is the wrong instrument right now (TRI002). Stabilise, then refine what is left."},
+        "kind": {"type": "string", "description": "feature | bug | spike | enabling, when the labels settle it."},
+        "profile": {"type": "string", "description": "Decomposition profile the labels imply, e.g. bugfix for a production finding (TRI005)."},
+        "require_dimensions": {"type": "array", "items": {"type": "string"}, "description": "Extra intake dimensions these labels demand (TRI004)."},
+        "mandatory_subtask_kinds": {"type": "array", "items": {"type": "string"}, "description": "Subtask kinds that must exist, e.g. a reproducing test (TRI003)."},
+        "must_answer_nfr": {"type": "array", "items": {"type": "string"}, "description": "Quality attributes that cannot be blank or 'unchanged' here (TRI006)."},
+        "add_critics": {"type": "array", "items": {"type": "string"}, "description": "Critics the labels add to the Phase 8 panel, e.g. operator, security (TRI008)."},
+        "ask": {"type": "array", "items": {"type": "string"}, "description": "Questions these labels raise; written into open_questions with source 'triage'."},
+        "unknown_labels": {"type": "array", "items": {"type": "string"}, "description": "Labels no rule and no ignore pattern covers (TRI007) - nobody decided whether they matter."}
+      }
+    },
+    "criterion": {
+      "type": "object",
+      "required": ["id", "rule", "examples"],
+      "properties": {
+        "id": {"type": "string"},
+        "rule": {"type": "string"},
+        "examples": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "oneOf": [
+              {"type": "string"},
+              {"type": "object", "required": ["case", "expect"],
+               "properties": {"case": {"type": "string"}, "expect": {"type": "string"}}},
+              {"type": "object", "required": ["given", "when", "then"],
+               "properties": {"given": {"type": "string"}, "when": {"type": "string"},
+                              "then": {"type": "string"}}}
+            ]
+          }
+        }
+      }
+    },
+    "risk": {
+      "type": "object", "required": ["id", "desc", "mitigation"],
+      "properties": {
+        "id": {"type": "string"}, "desc": {"type": "string"},
+        "mitigation": {"type": "string", "description": "What reduces it. A risk without one is a worry (RSK001)."},
+        "detection": {"type": "string", "description": "The alert, metric or report that tells you it is happening. Required in practice for high severity (RSK002) - otherwise you hear it from a customer."},
+        "severity": {"enum": ["low", "medium", "high"]},
+        "source": {"type": "string", "description": "Where the risk came from, e.g. premortem, critic finding F3, incident history."}
+      }
+    },
+    "decision_table": {
+      "type": "object",
+      "description": "Phase 3. The only form of criteria that can be proved complete: every combination of condition values is a rule, an impossibility, or a hole validate.py names (DT001).",
+      "required": ["conditions", "rules"],
+      "properties": {
+        "conditions": {
+          "type": "array",
+          "items": {"type": "object", "required": ["id", "values"],
+                    "properties": {"id": {"type": "string"},
+                                   "values": {"type": "array", "items": {"type": "string"}, "minItems": 2}}}
+        },
+        "rules": {
+          "type": "array",
+          "items": {"type": "object", "required": ["when", "then"],
+                    "properties": {
+                      "when": {"type": "object", "description": "condition id -> value, or \"*\" for any.",
+                               "additionalProperties": {"type": "string"}},
+                      "then": {"type": "string", "description": "The expected outcome for this combination."},
+                      "ac": {"type": "string", "description": "Criterion this row belongs to."}}}
+        },
+        "impossible": {
+          "type": "array",
+          "description": "Combinations that cannot occur. Same shape as a rule's 'when'. Use it rather than inventing an outcome for a state the system cannot reach.",
+          "items": {"type": "object", "additionalProperties": {"type": "string"}}
+        },
+        "note": {"type": "string"}
+      }
+    },
+    "impact": {
+      "type": "object",
+      "description": "Phase 1. Goal -> actor -> impact -> deliverable [P: Adzic, Impact Mapping, 2012]. The answer to a ticket that named a mechanism without an outcome, recorded as a chain rather than prose.",
+      "required": ["goal"],
+      "properties": {
+        "goal": {"type": "string", "description": "Measurable, with a number and a date (IMP002). It is what tells you afterwards whether this worked."},
+        "actors": {"type": "array", "items": {"type": "string"}},
+        "impacts": {"type": "array", "items": {"type": "string"}, "description": "The behaviour change in each actor that moves the goal."},
+        "deliverables": {"type": "array", "items": {"type": "string"}, "description": "What we build to cause the impact. The least important column, and the one tickets usually start from."}
+      }
+    },
+    "decision": {
+      "type": "object", "required": ["id", "question", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "question": {"type": "string"},
+        "options": {
+          "type": "array",
+          "items": {"type": "object", "required": ["label"],
+                    "properties": {"label": {"type": "string"},
+                                   "tradeoff": {"type": "string"}}}
+        },
+        "chosen": {"type": "string"},
+        "rationale": {"type": "string"},
+        "rationale_source": {"type": "string"},
+        "status": {"enum": ["locked", "deferred"]},
+        "spike": {"type": "string", "description": "Subtask id. Required when status is deferred."},
+        "waiting_for": {"type": "string", "description": "deferred: the information that would decide this. An option nobody can tell has matured never gets exercised (DEC008)."},
+        "expires": {"type": "string", "description": "deferred: the event or date after which deferring costs more than deciding - the last responsible moment [P: Maassen & Matts, Commitment, 2013]. Required (DEC007): an option without an expiry is not a held option, it is an unmade decision."}
+      }
+    },
+    "question": {
+      "type": "object", "required": ["id", "text"],
+      "properties": {
+        "id": {"type": "string"}, "text": {"type": "string"},
+        "owner": {"type": "string"}, "blocking": {"type": "boolean"},
+        "dimension": {"type": "string", "description": "Intake dimension this question resolves, if any."}
+      }
+    },
+    "intake": {
+      "type": "object",
+      "description": "Was there enough information to refine? Written by intake.py, confirmed by the reader, enforced by validate.py INT gates.",
+      "required": ["kind", "verdict", "dimensions"],
+      "properties": {
+        "assessed_at": {"type": "string"},
+        "kind": {"enum": ["feature", "bug", "spike", "enabling"]},
+        "lang": {"type": "string"},
+        "verdict": {"enum": ["sufficient", "scoutable", "insufficient"]},
+        "domain": {"enum": ["clear", "complicated", "complex", "chaotic"],
+                   "description": "Cynefin [P: Snowden & Boone, 2007]. Enough information is not enough knowledge: in a complex domain the honest output is a probe, not a plan (CYN001)."},
+        "domain_rationale": {"type": "string", "description": "Why that domain. One sentence, arguable."},
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["id", "status"],
+            "properties": {
+              "id": {"type": "string"},
+              "required": {"type": "boolean"},
+              "status": {"enum": ["present", "missing", "assumed", "answered"]},
+              "evidence": {"type": "string", "description": "present: a verbatim quote from source_text"},
+              "heuristic": {"type": "boolean", "description": "true until a reader confirms the matched snippet"},
+              "question_id": {"type": "string", "description": "missing: a blocking question; assumed: a non-blocking one"},
+              "assumption": {"type": "string"},
+              "answer": {"type": "string"},
+        "guess": {"type": "string", "description": "Your recommended answer, attached to the question. A bare question costs the owner an essay; a guess costs them a correction (READY004)."},
+        "blocked_by": {"type": "array", "items": {"type": "string"},
+                       "description": "Question ids whose answers must land first. The frontier is everything not blocked - ask that, and only that, this round (READY005)."},
+              "answered_by": {"type": "string"}
+            }
+          }
+        },
+        "anchors": {"type": "array", "items": {"type": "object",
+                    "properties": {"value": {"type": "string"}, "kind": {"type": "string"}}}},
+        "repos_reachable": {"type": "array", "items": {"type": "string"}},
+        "flags": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "greenfield": {
+          "type": "object",
+          "description": "Set when the story is a project that does not exist yet. The evidence rule turns around: reuse is ruled out (GRN002), conventions cite declared sources, nothing cites a line into a file that will be created (GRN003), and the decomposition is a walking skeleton (GRN004).",
+          "required": ["target", "reason"],
+          "properties": {"target": {"type": "string"}, "reason": {"type": "string"}}
+        },
+        "generated_at": {"type": "string"},
+        "sources": {"type": "array", "items": {"type": "string"}},
+        "repos": {
+          "type": "array",
+          "items": {"type": "object", "required": ["name"],
+                    "properties": {"name": {"type": "string"}, "rev": {"type": "string"},
+                                   "root": {"type": "string"}, "test_cmd": {"type": "string"}}}
+        },
+        "change_surface": {
+          "type": "array",
+          "items": {"type": "object", "required": ["repo", "path"],
+                    "properties": {"repo": {"type": "string"}, "path": {"type": "string"},
+                                   "symbol": {"type": "string"}, "line": {"type": "integer"},
+                                   "role": {"enum": ["touch", "read", "create", "modify", "delete"]},
+                                   "note": {"type": "string"}}}
+        },
+        "contracts": {
+          "type": "array",
+          "items": {"type": "object", "required": ["id", "repo", "path"],
+                    "properties": {"id": {"type": "string"}, "repo": {"type": "string"},
+                                   "path": {"type": "string"}, "kind": {"type": "string"},
+                                   "producers": {"type": "array", "items": {"type": "string"}},
+                                   "consumers": {"type": "array", "items": {"type": "string"}},
+                                   "draft": {"type": "string", "description": "The exact new or changed shape - payload, schema fragment, DDL, config key - not a description of it. Required by CON002 when the story edits this contract file, because both sides of a seam will resolve prose into different shapes."},
+                                   "draft_source": {"type": "string", "description": "Where the exact shape is already specified, when it is not drafted here: a path:line, an ADR, or the bundle of the item that fixes it. Satisfies CON002 instead of `draft`."},
+                                   "note": {"type": "string"}}}
+        },
+        "conventions": {"type": "array", "items": {"$ref": "#/$defs/convention"}},
+        "pending": {
+          "type": "array",
+          "description": "Work this story depends on that does not exist in the repo yet, because it is specified in another item nobody has implemented. Neither evidence nor assumption: a third state whose citation points at the item that creates it (PND001), and whose ordering has to exist as a tracker link (PND002).",
+          "items": {"type": "object", "required": ["claim", "provided_by"],
+                    "properties": {
+                      "claim": {"type": "string", "description": "What will exist."},
+                      "provided_by": {"type": "object", "required": ["ticket"],
+                                      "properties": {"ticket": {"type": "string"},
+                                                     "subtask": {"type": "string"},
+                                                     "bundle": {"type": "string", "description": "The stored bundle where its shape is specified."}}},
+                      "expected_path": {"type": "string", "description": "Where it is expected to land. A prediction, and labelled as one - never a citation."},
+                      "note": {"type": "string"}}}
+        },
+        "ruled_out": {
+          "type": "array",
+          "description": "Negative results: what refinement looked for and did not find. The most expensive thing a refinement learns and the first thing compression discards - an implementor who does not know a helper is absent will hunt for it, and may 'find' the wrong one (EVI008/EVI009).",
+          "items": {"type": "object", "required": ["claim", "looked_in", "conclusion"],
+                    "properties": {
+                      "claim": {"type": "string", "description": "What is absent, stated as a fact."},
+                      "looked_in": {"type": "array", "items": {"type": "string"},
+                                    "description": "Paths, globs or queries. A negative result nobody can re-check is a rumour."},
+                      "conclusion": {"type": "string", "description": "What an implementor should do given the absence."}}}
+        },
+        "glossary": {
+          "type": "array",
+          "description": "Domain words as they are used here. An implementor with no context reads them as the industry does, which is often not what this codebase means.",
+          "items": {"type": "object", "required": ["term", "means"],
+                    "properties": {"term": {"type": "string"}, "means": {"type": "string"},
+                                   "evidence": {"type": "string"}}}
+        },
+        "owners": {"type": "array", "items": {"type": "object",
+                   "properties": {"glob": {"type": "string"}, "owner": {"type": "string"}}}}
+      }
+    },
+    "convention": {
+      "type": "object", "required": ["rule", "evidence"],
+      "properties": {
+        "rule": {"type": "string"},
+        "evidence": {"type": "string", "pattern": ".+:.+",
+                     "description": "path:line. An uncited convention is a training prior, not a house rule."}
+      }
+    },
+    "subtask": {
+      "type": "object",
+      "required": ["id", "title", "repo", "kind", "human", "agent_brief"],
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string", "maxLength": 70},
+        "repo": {"type": "string"},
+        "kind": {"enum": ["feature", "test", "docs", "migration", "spike", "enabling", "rollout"]},
+        "human": {"type": "string"},
+        "covers": {"type": "array", "items": {"type": "string"}},
+        "depends_on": {"type": "array", "items": {"type": "string"}},
+        "estimate_days": {"type": "number", "exclusiveMinimum": 0},
+        "produces_contracts": {"type": "array", "items": {"type": "string"}},
+        "consumes_contracts": {"type": "array", "items": {"type": "string"}},
+        "needs_coordination": {"type": "boolean"},
+        "coordination_with": {"type": "string"},
+        "agent_brief": {"$ref": "#/$defs/agent_brief"}
+      }
+    },
+    "agent_brief": {
+      "type": "object",
+      "required": ["objective", "repo", "read_first", "change_surface", "done_when"],
+      "properties": {
+        "objective": {"type": "string", "description": "The post-condition, not the activity."},
+        "repo": {"type": "string"},
+        "branch_hint": {"type": "string"},
+        "read_first": {
+          "type": "array", "minItems": 1,
+          "items": {"type": "object", "required": ["path", "why"],
+                    "properties": {"path": {"type": "string"}, "why": {"type": "string"}}}
+        },
+        "entry_points": {
+          "type": "array",
+          "items": {"type": "object", "required": ["path"],
+                    "properties": {"path": {"type": "string"}, "line": {"type": "integer"},
+                                   "symbol": {"type": "string"}, "why": {"type": "string"}}}
+        },
+        "change_surface": {
+          "type": "array", "minItems": 1,
+          "items": {"type": "object", "required": ["path", "role"],
+                    "properties": {"path": {"type": "string"},
+                                   "role": {"enum": ["create", "modify", "delete"]},
+                                   "note": {"type": "string"}}}
+        },
+        "contracts_must_not_break": {
+          "type": "array",
+          "items": {"type": "object", "properties": {"path": {"type": "string"},
+                                                     "repo": {"type": "string", "description": "Only when the contract lives in another repo than the brief's own."},
+                                                     "note": {"type": "string"}}}
+        },
+        "conventions": {"type": "array", "items": {"$ref": "#/$defs/convention"}},
+        "pending": {
+          "type": "array",
+          "description": "Work this story depends on that does not exist in the repo yet, because it is specified in another item nobody has implemented. Neither evidence nor assumption: a third state whose citation points at the item that creates it (PND001), and whose ordering has to exist as a tracker link (PND002).",
+          "items": {"type": "object", "required": ["claim", "provided_by"],
+                    "properties": {
+                      "claim": {"type": "string", "description": "What will exist."},
+                      "provided_by": {"type": "object", "required": ["ticket"],
+                                      "properties": {"ticket": {"type": "string"},
+                                                     "subtask": {"type": "string"},
+                                                     "bundle": {"type": "string", "description": "The stored bundle where its shape is specified."}}},
+                      "expected_path": {"type": "string", "description": "Where it is expected to land. A prediction, and labelled as one - never a citation."},
+                      "note": {"type": "string"}}}
+        },
+        "ruled_out": {
+          "type": "array",
+          "description": "Negative results: what refinement looked for and did not find. The most expensive thing a refinement learns and the first thing compression discards - an implementor who does not know a helper is absent will hunt for it, and may 'find' the wrong one (EVI008/EVI009).",
+          "items": {"type": "object", "required": ["claim", "looked_in", "conclusion"],
+                    "properties": {
+                      "claim": {"type": "string", "description": "What is absent, stated as a fact."},
+                      "looked_in": {"type": "array", "items": {"type": "string"},
+                                    "description": "Paths, globs or queries. A negative result nobody can re-check is a rumour."},
+                      "conclusion": {"type": "string", "description": "What an implementor should do given the absence."}}}
+        },
+        "glossary": {
+          "type": "array",
+          "description": "Domain words as they are used here. An implementor with no context reads them as the industry does, which is often not what this codebase means.",
+          "items": {"type": "object", "required": ["term", "means"],
+                    "properties": {"term": {"type": "string"}, "means": {"type": "string"},
+                                   "evidence": {"type": "string"}}}
+        },
+        "done_when": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "oneOf": [
+              {"type": "object", "required": ["type", "cmd"],
+               "properties": {"type": {"const": "command"}, "cmd": {"type": "string"},
+                              "expect": {"type": "string"}}},
+              {"type": "object", "required": ["type", "text"],
+               "properties": {"type": {"const": "assertion"}, "text": {"type": "string"}}}
+            ]
+          }
+        },
+        "forbidden": {"type": "array", "items": {"type": "string"}},
+        "out_of_scope": {"type": "array", "items": {"type": "string"}},
+        "rollback": {"type": "object", "properties": {"flag": {"type": "string"},
+                                                      "note": {"type": "string"},
+                                                      "irreversible": {"type": "boolean", "description": "Set when the change cannot be undone - a data migration that overwrites, a destructive backfill. IRR001 requires either a rollback note or this flag plus a note saying what is lost and what it would be restored from. 'We cannot undo this' is a fact the story owner decides on, not one the implementer discovers."}}},
+        "preflight": {
+          "type": "array",
+          "description": "Commands that verify the brief's anchors still hold before work starts. Anchors drift between refinement and implementation; an agent that cannot tell its brief is stale implements against it anyway (BRF013). On failure: stop and report, never improvise.",
+          "items": {"type": "object", "required": ["cmd"],
+                    "properties": {"type": {"const": "command"}, "cmd": {"type": "string"},
+                                   "expect": {"type": "string"}}}
+        },
+        "stop_and_ask": {
+          "type": "array", "items": {"type": "string"},
+          "description": "Conditions under which the implementor must stop rather than decide. 'forbidden' says what not to touch; this says what not to decide (BRF014)."
+        },
+        "context_budget_hint": {"type": "string"},
+        "provenance": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "review": {
+      "type": "object",
+      "description": "Phase 8. What hostile, blind readers found in the story and its subtasks, and what was done about each finding. Enforced by validate.py REV001-REV009.",
+      "required": ["method", "critics", "findings"],
+      "properties": {
+        "method": {"enum": ["critics", "rubber-duck", "both"],
+                   "description": "critics = the blind panel. rubber-duck = the solo fallback: one voice, full context, lower assurance - say so in the handover."},
+        "bundle_digest": {"type": "string",
+                          "description": "sha256 over the bundle minus 'review' and 'generated_at', written by `review.py digest --stamp`. Proves which content was actually reviewed (REV007)."},
+        "attempted": {"type": "string",
+                      "description": "For a rubber-duck pass that raised nothing: what you tried to break, and why it held."},
+        "critics": {"type": "array", "items": {"$ref": "#/$defs/critic"}},
+        "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}}
+      }
+    },
+    "tailoring": {
+      "type": "object",
+      "description": "Which team-tailoring skill's house rules produced this bundle, what they changed, and what they turned off. See references/tailoring.md; enforced by TLR001-TLR005.",
+      "properties": {
+        "source": {"type": "string", "description": "The tailoring skill's name. Must match tailoring.source in refinery.yaml (TLR001)."},
+        "version": {"type": "string"},
+        "applied": {
+          "type": "array",
+          "items": {"type": "object", "required": ["rule"],
+                    "properties": {
+                      "rule": {"type": "string"},
+                      "mechanism": {"enum": ["config", "prompt", "gate"],
+                                    "description": "config: a key in refinery.yaml. prompt: judgement applied while reading the tailoring skill. gate: a validator rule."},
+                      "key": {"type": "string", "description": "Required for mechanism 'config': the key that actually enforces it. If it is unset, the rule only reads as enforced (TLR002)."},
+                      "note": {"type": "string"}}}
+        },
+        "overrides": {
+          "type": "array",
+          "description": "Anything of this skill's that the team turned off or down. An override naming an invariant is refused (TLR003).",
+          "items": {"type": "object", "required": ["rule", "reason", "authorised_by"],
+                    "properties": {
+                      "rule": {"type": "string"},
+                      "of": {"type": "string", "description": "What is overridden: a config key, a validator code, or an invariant id."},
+                      "reason": {"type": "string"},
+                      "authorised_by": {"type": "string", "description": "A person. 'The team skill says so' is not a person (TLR004)."},
+                      "refused": {"type": "boolean", "description": "true when the tailoring asked for something an invariant forbids and it was refused."}}}
+        }
+      }
+    },
+    "critic": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string",
+               "description": "implementer | tester | archaeologist | sequencer | stakeholder, or a house critic."},
+        "context": {"enum": ["fresh", "same-session"],
+                    "description": "fresh = a sub-agent that never saw the reasoning. same-session = you re-reading the packet as them, which is weaker and is disclosed."},
+        "attempted": {"type": "string",
+                      "description": "What this critic tried to break and why it held. The only accepted form of a clean report (REV004)."}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": ["id", "severity", "locator", "claim", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "critic": {"type": "string", "description": "Must be one of the recorded critics (REV009)."},
+        "severity": {"enum": ["blocking", "major", "minor"],
+                     "description": "blocking = an implementer would build the wrong thing, or a stated fact is false."},
+        "locator": {"type": "string",
+                    "description": "Path into this bundle, e.g. subtasks[3].agent_brief.done_when[0]. It must resolve (REV005)."},
+        "claim": {"type": "string", "description": "What is wrong, in one sentence."},
+        "failure": {"type": "string",
+                    "description": "The concrete thing that goes wrong downstream if it ships as is: who does what, and what they get."},
+        "status": {"enum": ["open", "fixed", "accepted", "disputed"]},
+        "resolution": {"type": "string",
+                       "description": "What was done. Required for accepted and disputed (REV003)."},
+        "accepted_by": {"type": "string",
+                        "description": "Who accepted the risk. An acceptance only you made is an open question, not an acceptance."}
+      }
+    }
+  }
+}

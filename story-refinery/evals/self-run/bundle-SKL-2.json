@@ -1,0 +1,698 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-02T20:10:00Z",
+  "profile": "bugfix",
+  "story": {
+    "key": "SKL-2",
+    "title": "manifest lifts a CI test command out of its working directory",
+    "source_text": "evidence.py manifest reports a test command that does not run at the repo root. Steps to reproduce: 1. python3 story-refinery/scripts/evidence.py manifest --config story-refinery/evals/self-run/refinery.yaml on skills@eeb5595 (Linux, Python 3.11). 2. Read the summary line. Expected: a test command that runs from the repo root, or none, with the file it came from. Actual: `test=python -m pytest tests/ -q -rs`, lifted from .github/workflows/terrain-architect.yml, whose `defaults.run.working-directory` is terrain-architect/reference-impl; there is no tests/ at the root, so the command fails with 'no tests ran' and the source file is not shown. Impact: every monorepo with per-package CI; the wrong command lands in agent briefs as a done_when and becomes a false completion gate. Workaround: none short of editing the manifest by hand.",
+    "tracker_meta": {
+      "issue_type": "Bug",
+      "status": "To Do",
+      "priority": "Medium",
+      "labels": [],
+      "components": [
+        "story-refinery"
+      ],
+      "reporter": "alexander.pino",
+      "links": [],
+      "environment": "skills@eeb5595, Linux, Python 3.11"
+    },
+    "summary_human": "The manifest scanner reads `run:` lines out of CI workflows but ignores `defaults.run.working-directory`, so a command that only runs inside terrain-architect/reference-impl is presented as the repo's test command and lands in briefs as a done_when that fails at the root. Fix: honour the workflow default and step-level working-directory by prefixing `cd <dir> &&`, and print the source file next to each command. Failing test first, then the fix.",
+    "technical_notes_human": "Root cause (D1): `detect_commands` (`story-refinery/scripts/evidence.py:94`) matches `run:`/`script:` lines (l.108) and records the first test-looking one via `put` (l.98), never reading `defaults.run.working-directory` or a step's `working-directory:`. The workflow sets the default at `.github/workflows/terrain-architect.yml:25` and the command at l.59. `command_sources` already records the file; the summary print at l.399 just does not show it. The manifest is sha-keyed, so a fixed scanner only takes effect on a rebuild - compatibility note in the handover. No YAML parser is available (stdlib only, `_yaml.py` is a subset reader) - the fix tracks the two keys with the same line-regex style as the existing loop.",
+    "acceptance_criteria": [
+      {
+        "rule": "A `run:` command taken from a workflow whose `defaults.run.working-directory` is set is recorded as `cd <dir> && <command>`.",
+        "examples": [
+          {
+            "case": "terrain-architect.yml, defaults working-directory terrain-architect/reference-impl",
+            "expect": "commands.test = 'cd terrain-architect/reference-impl && python -m pytest tests/ -q -rs'"
+          },
+          {
+            "case": "a workflow with no working-directory anywhere (boundary)",
+            "expect": "the command is recorded unchanged, as today"
+          }
+        ],
+        "id": "AC1"
+      },
+      {
+        "rule": "A step-level `working-directory:` overrides the workflow default for that step's command.",
+        "examples": [
+          {
+            "case": "defaults say pkg-a, the step says pkg-b",
+            "expect": "cd pkg-b && ..."
+          },
+          {
+            "case": "step working-directory set, no defaults block (boundary)",
+            "expect": "cd <step dir> && ..."
+          }
+        ],
+        "id": "AC2"
+      },
+      {
+        "rule": "The manifest summary line names the file each command came from.",
+        "examples": [
+          {
+            "case": "the repro",
+            "expect": "the line reads `test=cd terrain-architect/reference-impl && python -m pytest tests/ -q -rs  (.github/workflows/terrain-architect.yml)`"
+          },
+          {
+            "case": "a command inferred from a manifest file rather than CI (boundary)",
+            "expect": "the source reads `(python project)` - the string detect_commands already records"
+          }
+        ],
+        "id": "AC3"
+      }
+    ],
+    "non_goals": [
+      "Verifying that a command's paths exist at its working directory - a second behaviour with its own failure modes; a follow-up if the cd prefix proves insufficient.",
+      "GitLab CI and Azure Pipelines working-directory equivalents (`before_script: cd`, `workingDirectory:`) - same bug class, out of this fix; recorded in follow_ups."
+    ],
+    "links": [
+      {
+        "type": "blocked_by",
+        "key": "SKL-1",
+        "why": "SKL-1 rewrote selftest's docs suite; S1 here extends the same file and was refined against that state. Order it after SKL-1 or the two edits collide."
+      }
+    ],
+    "follow_ups": [
+      {
+        "ticket": "",
+        "trigger": "a GitLab or Azure repo hits the same lift",
+        "owner": "skills maintainers",
+        "note": "Honour `workingDirectory:` (Azure) and a leading `cd` in `before_script` (GitLab) the same way."
+      }
+    ],
+    "risks": [
+      {
+        "id": "R1",
+        "desc": "A workflow with several jobs and different working directories records the first test command's cd, which may be the wrong job",
+        "mitigation": "first-hit behaviour is unchanged; the source file is now printed so a reader can see which",
+        "detection": "the summary line names the file",
+        "severity": "low",
+        "source": "premortem"
+      },
+      {
+        "id": "R2",
+        "desc": "Existing manifests keep the wrong command until rebuilt",
+        "mitigation": "handover says to rebuild; ttl_days bounds it",
+        "detection": "the summary line shows a command without a cd prefix on a repo whose CI has one",
+        "severity": "medium",
+        "source": "premortem"
+      }
+    ],
+    "non_functional": {
+      "performance": "unchanged - one extra regex per workflow line",
+      "concurrency": "unchanged",
+      "failure": "unchanged - a workflow that fails to parse is skipped as today",
+      "data": "manifest schema unchanged: commands stay strings; the cd prefix is part of the string",
+      "security": "none - no new input source",
+      "observability": "the summary line now shows the source file per command",
+      "compatibility": "manifests built before the fix keep validating; a re-run at the same sha rebuilds only when ttl_days has passed, so say in the handover that a rebuild is needed"
+    },
+    "series": {
+      "epic": "",
+      "predecessors": [
+        {
+          "key": "SKL-1",
+          "bundle": "story-refinery/evals/self-run/bundle.json",
+          "relation": "same area"
+        }
+      ]
+    },
+    "triage": {
+      "matched": [],
+      "unknown_labels": [],
+      "route": "refine"
+    },
+    "intake": {
+      "assessed_at": "2026-09-02T18:19:52+00:00",
+      "kind": "bug",
+      "lang": "en",
+      "verdict": "sufficient",
+      "dimensions": [
+        {
+          "id": "repro",
+          "required": true,
+          "status": "present",
+          "evidence": "oes not run at the repo root. Steps to reproduce: 1. python3 story-refinery/scripts/evidence.py ma",
+          "heuristic": false
+        },
+        {
+          "id": "expected",
+          "required": true,
+          "status": "present",
+          "evidence": "1). 2. Read the summary line. Expected: a test command that runs from the repo root, or",
+          "heuristic": false
+        },
+        {
+          "id": "actual",
+          "required": true,
+          "status": "present",
+          "evidence": ", with the file it came from. Actual: `test=python -m pytest tests/ -q -rs`, lifted fr",
+          "heuristic": false
+        },
+        {
+          "id": "environment",
+          "required": true,
+          "status": "present",
+          "evidence": "vidence.py manifest reports a test command that does not run at the repo root. Steps",
+          "heuristic": false
+        },
+        {
+          "id": "impact",
+          "required": false,
+          "status": "present",
+          "evidence": "every monorepo with per-package CI",
+          "heuristic": false
+        }
+      ],
+      "anchors": [
+        {
+          "value": "Linux",
+          "kind": "domain noun"
+        },
+        {
+          "value": "Python",
+          "kind": "domain noun"
+        },
+        {
+          "value": "done_when",
+          "kind": "snake_case symbol"
+        },
+        {
+          "value": "test=python -m pytest tests/ -q -rs",
+          "kind": "code span"
+        },
+        {
+          "value": "defaults.run.working-directory",
+          "kind": "code span"
+        },
+        {
+          "value": "yaml",
+          "kind": "filename"
+        },
+        {
+          "value": "yml",
+          "kind": "filename"
+        }
+      ],
+      "repos_reachable": [
+        "skills"
+      ],
+      "flags": [],
+      "domain": "clear",
+      "domain_rationale": "A scanner ignoring a YAML default; the cause is visible in twenty lines and the fix is known practice."
+    },
+    "baseline": [
+      {
+        "metric": "manifest test command on this repo",
+        "current": "python -m pytest tests/ -q -rs, source .github/workflows/terrain-architect.yml; fails at the root with 'no tests ran'",
+        "source": ".refinery/manifests/skills@a837f43.json, and the repro on 2026-09-02"
+      }
+    ],
+    "progress": {
+      "subtasks": {
+        "S1": "done",
+        "S2": "done"
+      },
+      "updated_at": "2026-09-02T18:24:43+00:00",
+      "source": "implemented in this commit"
+    },
+    "complexity": {
+      "band": "S",
+      "drivers": [],
+      "metrics": {
+        "repos": 1,
+        "code_paths": 3,
+        "files_written": 2,
+        "read_set": 3,
+        "contracts": 0,
+        "breaking_contracts": 0,
+        "owner_teams": 1,
+        "rule_space": 0,
+        "forks": 2,
+        "deferred": 0,
+        "unknowns": 1,
+        "irreversible": 0,
+        "critical_path": 2
+      },
+      "levels": {
+        "repos": 1,
+        "code_paths": 1,
+        "files_written": 1,
+        "read_set": 1,
+        "contracts": 0,
+        "breaking_contracts": 0,
+        "owner_teams": 1,
+        "rule_space": 0,
+        "forks": 1,
+        "deferred": 0,
+        "unknowns": 1,
+        "irreversible": 0,
+        "critical_path": 1,
+        "domain": 0
+      },
+      "method": "highest-level-wins; XL when three metrics are high, or two under a complex domain",
+      "computed_at": "2026-09-02T18:34:32+00:00"
+    },
+    "language": {
+      "code": "en",
+      "source": "detected"
+    }
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "question": "Root cause: why does a sub-project's command surface as the repo's?",
+      "options": [
+        {
+          "label": "The regex only sees `run:` lines and has no notion of working directory",
+          "tradeoff": "the cause; fix is local to detect_commands"
+        },
+        {
+          "label": "The manifest schema cannot express a cwd",
+          "tradeoff": "true but not the cause - the command string can carry `cd dir &&`"
+        }
+      ],
+      "chosen": "The regex only sees `run:` lines and has no notion of working directory",
+      "rationale": "evidence.py:104-108 reads lines in isolation; the workflow's default at terrain-architect.yml:25 is never read. Five whys stop here: this is the first cause we own and can fix.",
+      "status": "locked"
+    },
+    {
+      "id": "D2",
+      "question": "Carry the directory in the command string, or as a separate manifest field?",
+      "options": [
+        {
+          "label": "`cd <dir> && <command>` in the string",
+          "tradeoff": "no schema change; every consumer that runs the string gets it right"
+        },
+        {
+          "label": "a `cwd` field per command",
+          "tradeoff": "cleaner data; every consumer must be updated, and briefs copy the string"
+        }
+      ],
+      "chosen": "`cd <dir> && <command>` in the string",
+      "rationale": "Briefs and done_when copy the string verbatim; a separate field would be dropped on the way.",
+      "status": "locked"
+    }
+  ],
+  "open_questions": [],
+  "evidence": {
+    "generated_at": "2026-09-02T20:05:00Z",
+    "sources": [
+      {
+        "type": "cached_manifest",
+        "repo": "skills",
+        "sha": "eeb5595"
+      }
+    ],
+    "repos": [
+      {
+        "name": "skills",
+        "sha": "eeb5595",
+        "path": "."
+      }
+    ],
+    "change_surface": [
+      {
+        "repo": "skills",
+        "path": "story-refinery/scripts/evidence.py",
+        "role": "modify",
+        "line": 94,
+        "why": "detect_commands: track working-directory; summary print shows the source"
+      },
+      {
+        "repo": "skills",
+        "path": "story-refinery/scripts/selftest.py",
+        "role": "modify",
+        "line": 360,
+        "why": "a check that fails before the fix: a fixture workflow with a working-directory default"
+      },
+      {
+        "repo": "skills",
+        "path": ".github/workflows/terrain-architect.yml",
+        "role": "read",
+        "line": 25,
+        "why": "the real-world shape the fix must handle; not edited"
+      }
+    ],
+    "contracts": [],
+    "conventions": [
+      {
+        "rule": "Scripts are stdlib-only, no network; selftest prints ok/FAIL per named check and a failure total.",
+        "evidence": "skills/story-refinery/SKILL.md:821"
+      },
+      {
+        "rule": "selftest's check(name, ok, detail) prints `ok <name>` or `FAIL <name> <- detail`; a new check is one call.",
+        "evidence": "skills/story-refinery/scripts/selftest.py:50"
+      },
+      {
+        "rule": "detect_commands scans CI files line by line with a regex; extend the same loop, do not add a YAML parser.",
+        "evidence": "skills/story-refinery/scripts/evidence.py:104"
+      }
+    ],
+    "ruled_out": [
+      {
+        "claim": "There is no linter configuration in this repository",
+        "looked_in": [
+          "ls -a /home/user/skills (ruff, flake8, setup.cfg, pyproject, tox, eslint)"
+        ],
+        "conclusion": "dod-lint removed from the self-run config; do not put a lint command in done_when.",
+        "inherited_from": "SKL-1 (bundle.json)",
+        "verified_at": {
+          "skills": "a837f43"
+        },
+        "reverified_at": "eeb5595"
+      },
+      {
+        "claim": "There is no tests/ directory; the manifest's guessed test command `python -m pytest tests/ -q -rs` is wrong for this repo",
+        "looked_in": [
+          "ls /home/user/skills/tests",
+          ".refinery/manifests/skills@a837f43.json"
+        ],
+        "conclusion": "The test command is `python3 story-refinery/scripts/selftest.py`. Do not use the manifest's guess.",
+        "inherited_from": "SKL-1 (bundle.json)",
+        "verified_at": {
+          "skills": "a837f43"
+        },
+        "reverified_at": "eeb5595"
+      },
+      {
+        "claim": "No consumer parses commands.test beyond printing it or copying it into a brief, so a `cd dir &&` prefix breaks nothing",
+        "looked_in": [
+          "rg 'commands' story-refinery/scripts/emit.py story-refinery/scripts/validate.py story-refinery/scripts/summary.py",
+          "rg '\\[\"test\"\\]' story-refinery/scripts/"
+        ],
+        "conclusion": "Carry the directory in the string (D2); no schema change."
+      }
+    ],
+    "glossary": [
+      {
+        "term": "manifest",
+        "means": "The sha-keyed per-repo summary evidence.py builds: files, languages, commands, contracts. Rebuilt when HEAD moves or ttl_days passes.",
+        "evidence": "story-refinery/references/evidence.md"
+      },
+      {
+        "term": "working directory (CI)",
+        "means": "GitHub Actions `defaults.run.working-directory` at workflow level, or `working-directory:` on a step; a `run:` command executes there, not at the repo root.",
+        "evidence": ".github/workflows/terrain-architect.yml:25"
+      }
+    ],
+    "owners": [
+      {
+        "path": "story-refinery/**",
+        "team": "skills maintainers",
+        "source": "README.md"
+      }
+    ]
+  },
+  "blast_radius": {
+    "repos": 1,
+    "files_primary": 2,
+    "files_secondary": 0,
+    "contracts": 0,
+    "breaking_contracts": 0,
+    "owner_teams": 1
+  },
+  "subtasks": [
+    {
+      "id": "S1",
+      "title": "[skills] Reproduce the lifted test command in selftest",
+      "repo": "skills",
+      "kind": "test",
+      "covers": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "depends_on": [],
+      "estimate_days": 0.25,
+      "produces_contracts": [],
+      "consumes_contracts": [],
+      "human": "Three selftest checks that reproduce the bug on HEAD and pass after S2: a fixture repo whose workflow sets a default working directory; one whose step overrides it; and the manifest summary line naming the source file. A check that passes on HEAD has not reproduced anything.",
+      "agent_brief": {
+        "objective": "Three named selftest checks - `manifest: workflow default cwd`, `manifest: step cwd overrides`, `manifest: summary names the source` - built on a fixture repo, failing on HEAD and passing once S2 lands.",
+        "repo": "skills",
+        "branch_hint": "skl-2-repro",
+        "read_first": [
+          {
+            "path": "story-refinery/scripts/selftest.py",
+            "why": "check() at l.50; where the evidence/pipeline checks live (l.360)"
+          },
+          {
+            "path": "story-refinery/scripts/evidence.py",
+            "why": "detect_commands(root, files) signature at l.94 - call it directly on a temp dir"
+          }
+        ],
+        "entry_points": [
+          {
+            "path": "story-refinery/scripts/selftest.py",
+            "line": 360,
+            "symbol": "pipeline suite",
+            "why": "add the checks beside the existing manifest assertions"
+          }
+        ],
+        "change_surface": [
+          {
+            "path": "story-refinery/scripts/selftest.py",
+            "role": "modify"
+          }
+        ],
+        "contracts_must_not_break": [],
+        "conventions": [
+          {
+            "rule": "selftest's check(name, ok, detail) prints `ok <name>` or `FAIL <name> <- detail`; a new check is one call.",
+            "evidence": "skills/story-refinery/scripts/selftest.py:50"
+          },
+          {
+            "rule": "detect_commands scans CI files line by line with a regex; extend the same loop, do not add a YAML parser.",
+            "evidence": "skills/story-refinery/scripts/evidence.py:104"
+          }
+        ],
+        "done_when": [
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/selftest.py | grep -cE '^FAIL +manifest: (workflow default cwd|step cwd overrides|summary names the source)'",
+            "expect": "3 on HEAD - the bug reproduced"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/selftest.py | grep -cE '^(ok|FAIL) +manifest: '",
+            "expect": "at least 3"
+          }
+        ],
+        "forbidden": [
+          "Do not touch evidence.py - S2 fixes it; a test that passes on HEAD has not reproduced the bug.",
+          "Do not weaken any existing check."
+        ],
+        "out_of_scope": [
+          "The fix (S2)"
+        ],
+        "rollback": {
+          "flag": "",
+          "note": "revert the commit; manifests rebuild on next run"
+        },
+        "preflight": [
+          {
+            "type": "command",
+            "cmd": "grep -n '^def detect_commands' story-refinery/scripts/evidence.py",
+            "expect": "line 94"
+          },
+          {
+            "type": "command",
+            "cmd": "grep -n '^def check(' story-refinery/scripts/selftest.py",
+            "expect": "line 50"
+          }
+        ],
+        "stop_and_ask": [
+          "detect_commands cannot be called on a temp dir without a git repo - stop and report which call needs one, do not mock it."
+        ],
+        "context_budget_hint": "read_first only",
+        "provenance": [
+          "skills@eeb5595"
+        ]
+      }
+    },
+    {
+      "id": "S2",
+      "title": "[skills] Honour working-directory when lifting CI commands",
+      "repo": "skills",
+      "kind": "feature",
+      "covers": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "depends_on": [
+        "S1"
+      ],
+      "estimate_days": 0.5,
+      "produces_contracts": [],
+      "consumes_contracts": [],
+      "human": "In detect_commands, track `defaults.run.working-directory` (workflow level) and `working-directory:` (step level, resets per step) with the same line-regex style, and record `cd <dir> && <command>` (D2). Print the source file after each command in the manifest summary. S1's three checks go green; nothing else changes.",
+      "agent_brief": {
+        "objective": "detect_commands records CI commands with their working directory as a cd prefix, and the manifest summary line shows each command's source file; S1's checks pass, all others unchanged.",
+        "repo": "skills",
+        "branch_hint": "skl-2-fix",
+        "read_first": [
+          {
+            "path": "story-refinery/scripts/evidence.py",
+            "why": "detect_commands l.94-150; the summary print at l.399"
+          },
+          {
+            "path": ".github/workflows/terrain-architect.yml",
+            "why": "the real-world shape: defaults at l.25, the command at l.59"
+          }
+        ],
+        "entry_points": [
+          {
+            "path": "story-refinery/scripts/evidence.py",
+            "line": 104,
+            "symbol": "detect_commands workflow loop",
+            "why": "where the two keys are tracked"
+          },
+          {
+            "path": "story-refinery/scripts/evidence.py",
+            "line": 399,
+            "symbol": "manifest summary print",
+            "why": "append the source"
+          }
+        ],
+        "change_surface": [
+          {
+            "path": "story-refinery/scripts/evidence.py",
+            "role": "modify"
+          }
+        ],
+        "contracts_must_not_break": [],
+        "conventions": [
+          {
+            "rule": "Scripts are stdlib-only, no network; selftest prints ok/FAIL per named check and a failure total.",
+            "evidence": "skills/story-refinery/SKILL.md:821"
+          },
+          {
+            "rule": "selftest's check(name, ok, detail) prints `ok <name>` or `FAIL <name> <- detail`; a new check is one call.",
+            "evidence": "skills/story-refinery/scripts/selftest.py:50"
+          },
+          {
+            "rule": "detect_commands scans CI files line by line with a regex; extend the same loop, do not add a YAML parser.",
+            "evidence": "skills/story-refinery/scripts/evidence.py:104"
+          }
+        ],
+        "done_when": [
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/selftest.py | grep -cE '^ok +manifest: (workflow default cwd|step cwd overrides|summary names the source)'",
+            "expect": "3"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/selftest.py",
+            "expect": "PASS  0 failure(s)"
+          },
+          {
+            "type": "command",
+            "cmd": "rm -f .refinery/manifests/skills@*.json; python3 story-refinery/scripts/evidence.py manifest --config story-refinery/evals/self-run/refinery.yaml | grep -F 'test=cd terrain-architect/reference-impl && python -m pytest tests/ -q -rs'",
+            "expect": "one line, ending with (.github/workflows/terrain-architect.yml)"
+          }
+        ],
+        "forbidden": [
+          "Do not add a YAML parser or a dependency; the loop is line-regex by convention.",
+          "Do not change the manifest schema - commands stay strings (D2).",
+          "Do not touch selftest.py beyond nothing - S1 owns it."
+        ],
+        "out_of_scope": [
+          "Path-existence checks for commands (non-goal)",
+          "GitLab/Azure equivalents (follow-up)"
+        ],
+        "rollback": {
+          "flag": "",
+          "note": "revert the commit; manifests rebuild on next run"
+        },
+        "preflight": [
+          {
+            "type": "command",
+            "cmd": "grep -n 'working-directory' .github/workflows/terrain-architect.yml",
+            "expect": "line 25"
+          },
+          {
+            "type": "command",
+            "cmd": "python3 story-refinery/scripts/selftest.py | grep -cE '^FAIL +manifest: '",
+            "expect": "3 - S1 has landed and still fails"
+          }
+        ],
+        "stop_and_ask": [
+          "A step's `working-directory:` appears before its `run:` in some workflows and after it in others - if the second shape occurs in a real workflow, stop; the line-by-line scan cannot see ahead."
+        ],
+        "context_budget_hint": "read_first only",
+        "provenance": [
+          "skills@eeb5595"
+        ]
+      }
+    }
+  ],
+  "coverage": {
+    "AC1": [
+      "S1",
+      "S2"
+    ],
+    "AC2": [
+      "S1",
+      "S2"
+    ],
+    "AC3": [
+      "S1",
+      "S2"
+    ]
+  },
+  "tailoring": {
+    "source": "",
+    "version": "",
+    "applied": [],
+    "overrides": []
+  },
+  "review": {
+    "method": "rubber-duck",
+    "bundle_digest": "sha256:0fa9c3cd9c6a03684e3382c6fd60aa6428198676a089f5252bd4bd4fc9a45c46",
+    "critics": [
+      {
+        "id": "rubber-duck",
+        "context": "author, executor voice",
+        "attempted": "Opened evidence.py:104 as S2's first file and narrated the loop: a `defaults:` block followed by `run:` then `working-directory:` on separate lines - the line regex must carry state across lines, which the brief's stop_and_ask already names for the reversed step shape. Ran each done_when in my head: S1's grep needs the exact check names, which the objective fixes. Predicted AC3's boundary (source for a pyproject-inferred command) - detect_commands already records 'python project' as the source, so the print change covers it. Asked why S1 and S2 are separate: the bugfix profile requires the failing test to land first, and the file ownership is clean."
+      }
+    ],
+    "findings": [
+      {
+        "id": "F1",
+        "critic": "rubber-duck",
+        "severity": "major",
+        "locator": "subtasks[1].agent_brief.stop_and_ask[0]",
+        "claim": "A workflow-level default is under `defaults:` → `run:` → `working-directory:`, three lines deep; the loop's `run:` regex will match the `run:` line under `defaults:` as a command with empty text.",
+        "failure": "`put` is never called for empty text (`if key not in cmds and value`), so nothing breaks - but an implementer reading the regex may special-case it and lose the default.",
+        "status": "accepted",
+        "resolution": "Harmless today by the `and value` guard at evidence.py:99; noted in S2's read_first so it is not 'fixed'."
+      },
+      {
+        "id": "F2",
+        "critic": "rubber-duck",
+        "severity": "minor",
+        "locator": "story.acceptance_criteria[2].examples[1]",
+        "claim": "The boundary case names `(pyproject.toml)` but detect_commands records the source of an inferred python command as the string 'python project', not a filename.",
+        "failure": "S1's third check expects a filename and fails after S2 for the wrong reason.",
+        "status": "fixed",
+        "resolution": "example now expects `(python project)`, the source string the code already records."
+      },
+      {
+        "id": "F3",
+        "critic": "rubber-duck",
+        "severity": "minor",
+        "locator": "subtasks[0].agent_brief.done_when[0]",
+        "claim": "The first done_when grepped for lines that S1 must name exactly; the objective did not fix the names.",
+        "failure": "An implementer names the checks differently and the grep counts 0.",
+        "status": "fixed",
+        "resolution": "the three names are in S1's objective verbatim and the grep counts them."
+      }
+    ]
+  }
+}

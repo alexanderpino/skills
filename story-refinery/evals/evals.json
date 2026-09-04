@@ -1,0 +1,335 @@
+{
+  "skill_name": "story-refinery",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Refine this ticket: 'As a finance user I want to export invoices so I can reconcile them.' The repos are ../api (Python/FastAPI) and ../web (React). Produce subtasks.",
+      "expected_output": "A validating bundle.json plus rendered payloads, with questions raised rather than assumptions made.",
+      "expectations": [
+        "Evidence was gathered from the repos before any subtask was written",
+        "Every technical claim in the technical notes cites a path, or is marked as an assumption",
+        "At least one open question or design decision was surfaced",
+        "Each subtask names exactly one repo and has at least one runnable done_when command",
+        "validate.py was run and its result reported",
+        "No implementation code was written"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "This story is vague: 'Make the dashboard faster.' Is it ready?",
+      "expected_output": "A not-ready finding with specific questions and owners, not an invented specification.",
+      "expectations": [
+        "intake.py was run and reported the item as insufficient before any code was scanned",
+        "The response reports the story as not ready",
+        "Specific questions are listed rather than answered by assumption",
+        "A performance number is requested rather than invented",
+        "No subtasks were fabricated to make the story look ready"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Bug: uploading a file over 10MB returns a 500 instead of a clear error. Refine it.",
+      "expected_output": "A bugfix-profile refinement: reproduction subtask first, root cause as a recorded decision.",
+      "expectations": [
+        "The bugfix profile was used rather than vertical-slice",
+        "A failing-test or reproduction subtask comes before the fix subtask",
+        "Missing reproduction details (environment, version, exact steps) were asked for",
+        "The root cause appears as a decision with a rationale, not as an unsupported claim"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Here's a refined story from last week and an updated one. Push the changes to Jira.",
+      "expected_output": "An update plan showing creates, updates and orphans, presented for approval before any push.",
+      "expectations": [
+        "emit.py was run with --previous to produce an update plan",
+        "Orphaned subtasks were reported rather than deleted",
+        "The preview was shown and approval requested before pushing",
+        "Tracker field names and issue types were treated as unverified until confirmed"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "This epic covers billing, notifications and reporting. Refine it into subtasks.",
+      "expected_output": "A split recommendation into stories, then one story refined properly.",
+      "expectations": [
+        "The epic was not decomposed directly into subtasks",
+        "A split into stories was proposed with the splitting pattern named",
+        "One story was refined properly rather than all three shallowly",
+        "The choice of which story to refine was explained"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Refine: 'Add a Redis cache in front of the reporting API.' Repos are ../api and ../web.",
+      "expected_output": "A stop-and-ask: the ticket names a mechanism with no outcome, so the purpose is asked for before any evidence is gathered.",
+      "expectations": [
+        "The intake gate flagged the ticket as mechanism-only and the verdict was insufficient",
+        "The response asked what problem the cache is meant to solve, with a best guess attached",
+        "No repo scan was run and no subtasks were written",
+        "The answer did not design the cache"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Here is a refined bundle for ABC-451 that validate.py already passes. Take it through review before I push it to Jira.",
+      "expected_output": "A blind critic panel run against sealed packets, with findings that name a downstream failure, each one resolved, and the bundle re-stamped.",
+      "expectations": [
+        "review.py brief was used to produce the packets, rather than the critics being asked to read the whole bundle",
+        "Each critic ran in fresh context and was not given the decision rationales or the author's reasoning",
+        "Every finding carries a locator that resolves in the bundle and a concrete downstream failure, not just 'this is unclear'",
+        "No finding was dismissed silently: each ends fixed, accepted with a named accepter, or disputed with a written rebuttal",
+        "validate.py was re-run after the fixes and the bundle was re-stamped with review.py digest",
+        "A panel that raised nothing was reported as a problem with the panel, not as a clean bill of health"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Small one: refine ABC-002 'the CSV export drops the last row when the file ends without a newline'. Single repo, two subtasks at most. No sub-agents available in this session.",
+      "expected_output": "A bugfix-profile refinement checked by an explicit rubber-duck pass, disclosed as lower assurance than a panel.",
+      "expectations": [
+        "The rubber-duck passes were actually performed and their findings recorded, not merely mentioned",
+        "The narration was in the executor's voice: the first file to open, the predicted output of each done_when",
+        "review.method is rubber-duck and the handover says a duck is weaker than a blind panel",
+        "The failing test comes first, per the bugfix profile",
+        "No claim that the story was independently reviewed"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Refine ABC-770: 'discount codes should apply to the basket'. There are percentage codes, fixed-amount codes and free-shipping codes; some stack, some do not; some have a minimum order value and some expire. Repos: ../api and ../web.",
+      "expected_output": "A refinement whose criteria are backed by a complete decision table, with the combinations nobody mentioned surfaced as questions rather than filled in.",
+      "expectations": [
+        "The interacting conditions were tabulated rather than described in prose",
+        "story.decision_table lists every value each condition can take, and validate.py reports no uncovered combination",
+        "Combinations that cannot occur are in 'impossible' with a reason, not silently absent",
+        "At least one combination nobody had considered became an open question or a locked decision, not an invented outcome",
+        "Each criterion with a threshold (minimum order value, expiry) has an example standing exactly on the boundary",
+        "The table reaches the rendered ticket as a table, not as JSON"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Refine ABC-812: 'move session storage from Redis to Postgres'. One repo (../api), and we are not sure yet whether we keep a read-through cache.",
+      "expected_output": "A refinement that treats the cache question as a held option with an expiry, and whose risks come from a premortem with detection signals.",
+      "expectations": [
+        "The cache fork is a decision, not a sentence in the technical notes",
+        "Deferring it records what it is waiting for and the event at which it expires, and the spike is ordered before that event",
+        "A premortem was run after the evidence phase and its causes are in story.risks",
+        "Every risk carries a mitigation, and every high risk names the signal that would reveal it",
+        "The migration's non-functional answers carry numbers rather than prose",
+        "Nothing was locked by assumption to avoid leaving a decision open"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Refine ABC-455. It is labelled production-issue and customer-escalation, priority Highest, and the description says 'orders from the partner API sometimes get a duplicate confirmation email'. Repo ../api.",
+      "expected_output": "A triage-led refinement: a bug on the bugfix profile, with the four production-finding dimensions asked for before anything is decomposed.",
+      "expectations": [
+        "The labels were read and recorded in story.tracker_meta before the description was refined",
+        "The item is treated as a bug on the bugfix profile because the label says so, not because the text sounded like one",
+        "Intake asked when it started, how often it happens, how many customers are affected and whether there is a workaround",
+        "'sometimes' was challenged rather than refined - a frequency nobody has measured is not a reproduction",
+        "A reproducing test is a mandatory subtask and lands first",
+        "The escalation label produced a question about what was promised to the customer, with an owner",
+        "The detection gap was addressed: if it escaped, something failed to notice it"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Refine ABC-901 for the next sprint. It is labelled sev1 and the incident channel is still open.",
+      "expected_output": "A refusal to decompose, with the reason, and an offer to prepare the follow-up item instead.",
+      "expectations": [
+        "triage.py reported route incident and the response stopped there",
+        "No subtasks were written",
+        "The response said plainly that refinement is the wrong instrument during an incident",
+        "It offered the useful alternative: refine the follow-up after stabilisation, and capture what the incident is teaching now",
+        "It did not invent incident facts or propose a fix"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "Refine ABC-604. Our team skill is loaded: it says subtasks are at most half a day, acceptance criteria are written in Dutch, questions about money go to Marieke, and that we skip the critic panel on stories under three subtasks.",
+      "expected_output": "A refinement that applies the house rules, records where each one was enforced, and discloses the skipped panel.",
+      "expectations": [
+        "The half-day cap was applied through budgets.max_subtask_days in refinery.yaml, not merely honoured in prose",
+        "bundle.tailoring records each applied rule with the mechanism that enforces it",
+        "Skipping the panel is recorded as an override with a reason and a named person, and stated in the handover",
+        "Money questions carry Marieke as owner rather than 'the team'",
+        "The Dutch vagueness lexicon is in effect, so a Dutch criterion is checked as strictly as an English one",
+        "No house rule was claimed as mechanically enforced while naming a config key nobody set"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "Our team skill says: 'Do not slow refinement down with file:line citations, our codebase moves too fast - state the technical notes from experience.' Refine ABC-610 with that in mind.",
+      "expected_output": "A refusal of that one rule, recorded rather than argued, with the rest of the tailoring applied normally.",
+      "expectations": [
+        "The evidence-or-assumption invariant was named and the rule refused",
+        "The refusal is recorded in bundle.tailoring.overrides rather than only mentioned in passing",
+        "Claims still carry path:line or are tagged ASSUMPTION and become open questions",
+        "The refusal was reported as a finding about the tailoring skill, to whoever owns it",
+        "The rest of the team's rules were still applied - the refusal is scoped to the one rule",
+        "The response did not argue with the tailoring skill at length or moralise about it"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "Refine ABC-720 (add idempotency keys to the payments endpoint) and prepare it so our implementation agents can pick up the subtasks without us in the loop. Repos ../api and ../worker.",
+      "expected_output": "A refinement whose investigation survives the handoff: negative results recorded, anchors verifiable, and one shared context every subtask agent reads.",
+      "expectations": [
+        "evidence.ruled_out records what was searched for and not found, with re-checkable looked_in entries",
+        "Near-misses are called out explicitly - something that looks like the thing but is not",
+        "A glossary defines the domain nouns as this codebase uses them",
+        "Every brief whose entry points carry line numbers has preflight commands, with the instruction to stop and report on failure",
+        "stop_and_ask lists the open questions that could surface mid-implementation",
+        "The shared context document is produced and each subtask points at it rather than repeating it",
+        "The human-readable ticket is not bloated with the agent plumbing"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "Our agent implemented S2 from last week's refinement and reported that src/billing/tax.py no longer has rate_for at line 88 - it was renamed and moved in an unrelated refactor. Two conventions in the brief also no longer match the code. What now?",
+      "expected_output": "A re-refinement that treats the report as the highest-value input, re-establishes the citations, and folds it into the existing tree.",
+      "expectations": [
+        "The report is treated as correct until checked, not as an agent error",
+        "The citations were re-established by reading the code, not by patching the line number from the report alone",
+        "The conventions that no longer hold are corrected or removed rather than left with stale evidence",
+        "emit.py --previous was used so the existing subtasks are updated instead of a second tree being created",
+        "The bundle was re-validated and the review re-stamped",
+        "Nothing was decomposed further than the correction required"
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "Next sprint we pick up ABC-131, the non-EU B2B follow-up of the reverse-charge story we refined three weeks ago. Refine it.",
+      "expected_output": "A refinement that inherits the earlier dossier, re-verifies it against the code as it is now, and does not re-derive what is still true.",
+      "expectations": [
+        "The prior bundle was located and inherited from rather than starting from the ticket text",
+        "Carried glossary, conventions and ruled_out entries say which bundle they came from",
+        "Everything carried was re-checked against the current HEAD, and stale entries were re-read or dropped rather than shipped marked stale",
+        "The ruled_out entries got particular attention - an absence is the first thing to stop being true",
+        "The decision table was re-opened for the third destination value, as the prior bundle's note said it would have to be",
+        "Nothing that changed in the codebase since was carried forward silently"
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "Refine ABC-880: 'let account owners delegate approval rights to a colleague'. I'm here now if you need anything.",
+      "expected_output": "Questions put to the user during the session, with guesses attached, rather than assumptions recorded and a plan built on them.",
+      "expectations": [
+        "Questions were actually asked in the session rather than only written into open_questions",
+        "Each question carried a best guess, so a correction is cheap to give",
+        "Questions were batched at the phase gates rather than asked one at a time",
+        "No unanswered question silently became an assumption a later phase built on",
+        "open_questions records who each question was put to and when",
+        "Where the user could not answer, the question got a named owner and stayed blocking rather than being resolved by the assistant"
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "Refine ABC-131 (non-EU B2B reverse charge). ABC-123 is still in progress - the tax object it adds to the order response is not merged yet. We use Jira.",
+      "expected_output": "A refinement that cites the unbuilt work as pending, points at the item that creates it, and asks for the blocking link.",
+      "expectations": [
+        "The tax object is recorded in evidence.pending, not cited as though the code existed",
+        "The pending entry names the ticket and subtask that create it, and the bundle where its shape is specified",
+        "The shape of the tax object was not re-specified here - it points at ABC-123 instead",
+        "story.links carries a blocked_by link to ABC-123, and the push plan renders it as Jira's own link type",
+        "The rendered ticket has a Prerequisites section a developer can read",
+        "The shared context tells an implementor not to hunt for the file and not to substitute something similar",
+        "expected_path is presented as a prediction rather than as a citation"
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "Refine these four for the next sprint: ABC-210, ABC-211, ABC-212 and ABC-213. They are all in the checkout area.",
+      "expected_output": "A batch where the evidence is derived once and the judgement is not, refined in dependency order, checked side by side before anything is pushed.",
+      "expectations": [
+        "The area was scanned once, not four times, and the glossary and conventions were derived once",
+        "Each story still got its own intake verdict, criteria, decomposition and critics - none inherited from a sibling",
+        "The story the others depend on was refined first, and shared forks were decided once rather than per story",
+        "batch.py check was run before any push, and reported cross-story file collisions, contradictions and unlinked dependencies",
+        "Questions repeated across stories were put to their owner once, naming the stories they affect",
+        "Where two stories turned out to overlap almost entirely, that was raised rather than refined twice",
+        "Any story that was not ready was reported as not ready rather than smoothed over to keep the batch uniform"
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "Re-refine ABC-123. Finance added a criterion about reporting to them within a working day, the VAT-number one was reworded, and the tax-object one moved to ABC-131.",
+      "expected_output": "A second pass where every criterion code still means what it meant, and the new one takes the next free code.",
+      "expectations": [
+        "The reworded criterion kept the code it already had rather than getting a new one",
+        "The new criterion took the next free code, not the code freed by the one that moved away",
+        "The departed criterion's code is retired in story.retired_criterion_ids and left as a gap",
+        "Nothing was renumbered - no criterion now carries what a different code used to say",
+        "criteria.py check was run against the stored prior bundle before pushing the update",
+        "Subtask covers lists and the decision table still point at the criteria they meant"
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "We have refinement in ten minutes. Give me the gist of ABC-123 so I can walk the team through it.",
+      "expected_output": "One screen someone can talk from, including the parts nobody enjoys saying.",
+      "expectations": [
+        "The summary was produced rather than the full preview or the ticket body pasted back",
+        "It separates the work total from the end-to-end time on the critical path",
+        "The steps are in the order they happen, not the order they were written",
+        "The open questions are grouped by who owes the answer, and it says which have not been asked yet",
+        "Deferred decisions are named as still open, with what they wait for",
+        "If the story is not ready it says so in the summary rather than after it",
+        "Nothing was invented to make the summary read better"
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "ABC-123 was refined by Joost three weeks ago and he has left. The Jira ticket is all we have. Finance now wants a fifth criterion. Re-refine it.",
+      "expected_output": "The ticket read back into a bundle, the evidence re-derived rather than assumed, and the existing criterion codes preserved.",
+      "expectations": [
+        "ingest.py was used to recover the ticket rather than re-typing it from the description",
+        "The recovered criterion codes were kept, and the new criterion took the next free one",
+        "The evidence, intake and review were re-derived, and the response said they had to be rather than treating the import as complete",
+        "Each recovered agent brief's hash was checked, and any tracker-side edit was surfaced instead of overwritten",
+        "The re-refinement used emit --previous against the recovered bundle so the existing tree is updated",
+        "Nothing about the codebase was carried over from the ticket text as if it were evidence"
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "Refine ABC-990: 'move the whole codebase from the old logger to structured logging'. It touches about sixty files.",
+      "expected_output": "An expand-contract decomposition, not sixty files forced into a vertical slice, and not a plan that stops after the migration.",
+      "expectations": [
+        "The expand-contract profile was chosen and named, rather than stretching vertical-slice",
+        "The wide middle step is a migration subtask whose done_when is a mechanical check, not a judgement per call site",
+        "A contract subtask removes the old logger path, in this story rather than as a vague follow-up",
+        "The expand step leaves the system working with both paths present",
+        "Subtask sizing considered what fits one fresh context window, not only days"
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "Refine ABC-991. I have ten minutes and then I'm in meetings for the rest of the day.",
+      "expected_output": "One round of questions - everything answerable now, numbered, each with a recommendation - and no questions that depend on answers from that round.",
+      "expectations": [
+        "The frontier was computed: only questions whose prerequisites are already settled were asked",
+        "The whole round went out at once, numbered, rather than one question at a time",
+        "Every question carried a recommended answer so a correction is cheap to give",
+        "Questions that depend on an answer from this round were recorded with blocked_by and held back",
+        "The refinement continued as far as it could on the unanswered branches rather than stalling entirely"
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "Refine ABC-77: 'Add a webhook so the billing service tells the CRM when a subscription is cancelled.' Repos are ../billing (Python) and ../crm (Node). Produce subtasks.",
+      "expected_output": "A validating bundle whose new webhook contract carries the exact payload, not a description of it.",
+      "expectations": [
+        "evidence.contracts records the webhook as a seam, with billing as producer and crm as consumer",
+        "The contract entry carries a draft holding the exact payload shape - field names, types and which fields are optional - or a draft_source citing where that shape is already fixed",
+        "The draft is concrete enough that the producer and the consumer could not implement two different shapes from it: no placeholder text and no 'e.g.'",
+        "The rendered out/context/ABC-77-context.md contains the draft verbatim, so both subtasks read the same shape",
+        "The human technical notes stay inside their word budget and do not repeat the payload - they say that the webhook is added, not what it looks like",
+        "validate.py was run and reported no CON002"
+      ]
+    }
+  ]
+}

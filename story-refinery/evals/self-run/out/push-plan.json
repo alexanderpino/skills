@@ -1,0 +1,65 @@
+{
+  "ready": true,
+  "blocking": [],
+  "adapter": "markdown",
+  "project": "SKL",
+  "capabilities": {
+    "markup": "markdown",
+    "subtasks": "none",
+    "attachments": false,
+    "comments": false,
+    "custom_fields": false,
+    "max_description_chars": 65536,
+    "links": false,
+    "link_types": {}
+  },
+  "agent_brief_sink": "description_tail",
+  "agent_brief_sink_per_subtask": {
+    "S1": "description_tail",
+    "S2": "description_tail"
+  },
+  "warnings": [],
+  "mode": "create",
+  "diff": null,
+  "creates": [
+    {
+      "id": "SKL-1",
+      "title": "Every validator code can be looked up",
+      "issue_type": "Story",
+      "parent": null
+    },
+    {
+      "id": "S1",
+      "title": "[skills] Register every code behind validate.py --codes",
+      "issue_type": "Sub-task",
+      "parent": "SKL-1"
+    },
+    {
+      "id": "S2",
+      "title": "[skills] Gate references/codes.md in selftest",
+      "issue_type": "Sub-task",
+      "parent": "SKL-1"
+    }
+  ],
+  "updates": [],
+  "orphans": [],
+  "orphans_already_underway": [],
+  "waves": [
+    {
+      "wave": 1,
+      "subtasks": [
+        "S1"
+      ]
+    },
+    {
+      "wave": 2,
+      "subtasks": [
+        "S2"
+      ]
+    }
+  ],
+  "shared_context": "context/SKL-1-context.md",
+  "links": [],
+  "idempotency": "search for existing subtasks by exact title under SKL-1 before creating",
+  "network": "none - this file is a plan, not an action"
+}
