@@ -147,32 +147,37 @@ consumer of the sea state agrees.
 ⚠️ **Elfouhaily et al. (1997)**, *A unified directional spectrum for long and short wind-driven
 waves* (J. Geophys. Res. 102(C7), 15781–15796; DOI 10.1029/97JC00467), is the wind- *and*
 fetch-parameterised spectrum spanning gravity and capillary wavenumbers continuously, and it is the
-right target if you need one curve across the whole band. **Gaia does not cite it, deliberately** — nobody
-working on this skill has read it. Under Gaia's tier rules an unread source cannot be graded `P`,
-so it is named in prose here and graded nowhere. ⚠️ This sentence used to give the reason as a
-paywall. It is **open access** — Unpaywall `is_oa: true, bronze`, and the full published article
-is free at `archimer.ifremer.fr/doc/00091/20226/17877.pdf`, hosted by Ifremer, where three of the
-four authors worked. The tier bar is a reading, not a paywall, and saying "paywalled" made the
-omission look forced when it is simply outstanding work.
+right target if you need one curve across the whole band. **Gaia does not cite it — but the reason is that nobody
+here has read it yet, not that it cannot be graded.** It is **open access**: Unpaywall reports
+`is_oa: true, bronze`, and the publisher-typeset article is free at
+`archimer.ifremer.fr/doc/00091/20226/17877.pdf`, hosted by Ifremer, where three of the four authors
+worked. Reading it and citing it as `P [not-opened]` → `P` is outstanding work, not a closed
+question.
 
-⚠️ **This paragraph used to claim much more than that, and every part of the extra claim was
-false.** It said a sibling skill's `water-physics/references/12b-water-provenance.md` recorded the
-paper as unread and assembled its equations as "the agreed intersection of four independent
-restatements", naming Mobley's *Ocean Optics Web Book*, Wang et al. 2025, Zhang et al. and
-Hwang & Fois. Checked against every ref in this repository:
+⚠️ **This paragraph carried two wrong rounds of reasoning, in opposite directions. Both are
+corrected here, and the second was the worse of the two.**
 
-- **No `water-physics/` directory exists on any branch.** The file is
-  `terrain-renderer/references/12b-water-provenance.md`, and a register row that "corrected" this
-  path stated the swap in the wrong direction, which is how the phantom prefix spread to six places.
-- **That file does not mention Elfouhaily.** Its two sections are *Provenance tiers* and
-  *Sources & provenance*. The string "Elfouhaily" appears nowhere on that branch, nowhere on `main`,
-  and nowhere in this repository outside Gaia itself.
-- So the four restatements, the "intersection" method, and the record of non-reading were
-  attributed to a document that contains none of them, at a path that does not exist.
+- The first round attached a **fabricated provenance chain** to a sibling skill — plausible detail
+  invented around a real file.
+- The second round, written as a verified audit ("checked against every ref in this repository"),
+  declared that file **nonexistent** and its Elfouhaily record **imaginary**. That denial was itself
+  false in every part. Checked here with `git show` against
+  `origin/claude/swimming-pool-voronoi-render-m22g6r` @ `92bc35f3`:
+  `water-physics/` **does** exist, `water-physics/references/12b-water-provenance.md` **is** 1299
+  lines, and its lines 95–107 **do** carry the Elfouhaily entry — graded `P (attribution)` with
+  DOI 10.1029/97JC00467, declaring "**The paper is NOT held in this repository and was not read**",
+  and naming the equations as "the agreed **intersection of four independent restatements**":
+  Mobley's *Ocean Optics Web Book*, Wang et al. 2025, Zhang et al., and Hwang & Fois.
+- **The mechanism, because it will recur.** That "audit" ran against stale remote-tracking refs. Every
+  negative claim in it was true of the commit the clone happened to hold and false of the branch. **A
+  negative claim about a repository is only as good as the last fetch**, and a sweeping negative —
+  "nowhere on any branch" — is the form most likely to be asserted without one. Fetch before you
+  deny, and prefer naming the commit you checked to naming the absence.
 
-The decision not to cite is still right and still stands on its own: the paper is paywalled and
-unread, which is all that is needed. What is gone is a provenance chain that pointed at nothing —
-the exact failure this skill exists to prevent, committed by this skill, about its own sources.
+⚠️ **This third statement also misread Gaia's own tier rule.** It said an unread source "cannot be
+graded `P`". `P [not-opened]` is exactly the sanctioned form for a peer-reviewed paper nobody here
+opened, and the corpus's bibliographies carry twenty entries graded exactly that way. The tier bar is peer review; `[not-opened]`
+records the reading separately. A rule invented to justify an omission is worse than the omission.
 
 **The field's slope statistics are the part the renderer actually reads.** Below the wavelength a
 displacement grid can resolve, waves stop being geometry and become **variance** — and the crossover
