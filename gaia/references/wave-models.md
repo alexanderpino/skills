@@ -88,6 +88,17 @@ requires **inverting the horizontal displacement** — two or three fixed-point 
 whichever side asks the question. Skipping it is the boat that floats a metre beside its own wave,
 worst exactly where choppiness is strongest, at the crests, where it is most visible.
 
+⚠️ **The iteration and the Jacobian clamp are the same condition, one way round.** The fixed point
+converges when the displacement gradient is a contraction, and `J = det(I + ∂D/∂p)`, so a
+**negative Jacobian is sufficient for the iteration to fail**: on a 2×2 real matrix, `det(I+A) ≤ 0`
+forces real eigenvalues of opposite sign and hence an eigenvalue of `A` at or below −1. Verified
+here over 400 000 random matrices with no counterexample. ⚠️ **The converse does not hold** — about
+41% of diverging cases had `J > 0` — so `J > 0` is not a licence to skip the clamp, and this is not
+a 2-D artefact: the one-way implication fails in 1-D too. Practically: clamp choppiness on `J`, and
+treat a failure to converge as its own signal rather than assuming the clamp already caught it. A
+non-converging iteration returns a different plausible root per frame, which reads as jitter rather
+than as an error.
+
 ## What the dispersion relation actually constrains
 
 One equation governs every model here [capillary_gravity] [airy_coastal]:
@@ -179,7 +190,14 @@ displacement grid can resolve, waves stop being geometry and become **variance**
 must be handled deliberately or far water turns to plastic [bruneton2010]. Cox & Munk's photographic
 regressions are the ground truth for how much slope a given wind produces [coxmunk1954]: for a clean
 sea, mean-square slope rises **linearly** in wind speed and is **anisotropic**, rougher along the
-wind than across it.
+wind than across it — ⚠️ **above about 2.4 m/s, and this document used to state it unconditionally.**
+The two fits cross where `3.16e-3·U = 0.003 + 1.92e-3·U`, i.e. `U = 2.42 m/s`, which is inside the
+1–14 m/s range they were calibrated over. Below it the anisotropy **inverts** and the sea is rougher
+across the wind than along it; at `U = 0` the along-wind term vanishes entirely and the ellipse is
+degenerate, which is extrapolation past the data rather than a physical claim. The gap at the very
+bottom of the range is inside the regressions' own scatter, so do not read it as a measured
+reversal — read it as a reason not to drive glitter anisotropy from these fits in a light breeze,
+where they will orient the streaks 90° wrong.
 
 ```
 sigma_up^2    = 0.000 + 3.16e-3 * U        # along wind
@@ -282,9 +300,12 @@ it already cites:
 | Gerstner sum | scales linearly in wave count | **error of 3%** on the stated form, falling to **0.1%** with the correction [yuksel2007] §7 |
 
 **The two parameters that set both, and which this document used to leave unstated:** `N`, the
-frequency-grid size, and `L`, the patch size in metres. The resolvable wavelength floor is `L/N`, so
-the 2 cm figure above is a statement about `L/N`, not about the FFT. Quote them together or the cost
-means nothing: 512² at `L = 400 m` is a 78 cm floor, not 2 cm.
+frequency-grid size, and `L`, the patch size in metres. The sample spacing is `L/N` and the shortest
+representable **wavelength** is **`2L/N`** — Nyquist, two samples per wave. ⚠️ **An earlier version
+of this line called `L/N` the wavelength floor and was short by a factor of two.** So the 2 cm figure
+above is a statement about `2L/N`, not about the FFT: 512² at `L = 400 m` gives a **1.56 m** floor,
+not 2 cm and not the 78 cm that same version printed. Quote `N` and `L` together or the cost means
+nothing, and quote the floor as a wavelength or it is off by two.
 
 ⚠️ **Provenance note.** The four figures above were read from the artefacts by a verification pass,
 not re-fetched at the time of writing: `inria.hal.science` serves a bot challenge for the
