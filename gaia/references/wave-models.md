@@ -34,7 +34,10 @@ axis; where a body is closed rather than open, read the taxonomy first.
 
 **Open sea: a spectral FFT field in 2–4 cascades** [tessendorf_ocean]. Sample an oceanographic
 spectrum into a frequency grid, inverse-FFT to a displacement map per frame, sum cascades at
-different world-space patch sizes (order 400 m / 60 m / 10 m). It is the AAA default because it is
+different world-space patch sizes. ⚠️ **Pick those sizes near-co-prime, and do not use the round
+numbers this line used to print.** 400 / 60 / 10 m share a factor of 20: their LCM is **1200 m**, so
+the whole stack repeats every 1.2 km — the exact defect the failure table below sends you here to
+avoid. 401 / 61 / 11 m looks identical and has an LCM of **269 071 m**, past any draw distance. It is the AAA default because it is
 the only family that is statistically ocean-like across the whole band. (The spectrum, the
 transform and the choppy displacement are the cited notes. **The cascade stack is not**: the notes
 describe one patch, 10 m to 2 km on a side, and warn that tiling it makes the field periodic.
@@ -154,30 +157,14 @@ here has read it yet, not that it cannot be graded.** It is **open access**: Unp
 worked. Reading it and citing it as `P [not-opened]` → `P` is outstanding work, not a closed
 question.
 
-⚠️ **This paragraph carried two wrong rounds of reasoning, in opposite directions. Both are
-corrected here, and the second was the worse of the two.**
-
-- The first round attached a **fabricated provenance chain** to a sibling skill — plausible detail
-  invented around a real file.
-- The second round, written as a verified audit ("checked against every ref in this repository"),
-  declared that file **nonexistent** and its Elfouhaily record **imaginary**. That denial was itself
-  false in every part. Checked here with `git show` against
-  `origin/claude/swimming-pool-voronoi-render-m22g6r` @ `92bc35f3`:
-  `water-physics/` **does** exist, `water-physics/references/12b-water-provenance.md` **is** 1299
-  lines, and its lines 95–107 **do** carry the Elfouhaily entry — graded `P (attribution)` with
-  DOI 10.1029/97JC00467, declaring "**The paper is NOT held in this repository and was not read**",
-  and naming the equations as "the agreed **intersection of four independent restatements**":
-  Mobley's *Ocean Optics Web Book*, Wang et al. 2025, Zhang et al., and Hwang & Fois.
-- **The mechanism, because it will recur.** That "audit" ran against stale remote-tracking refs. Every
-  negative claim in it was true of the commit the clone happened to hold and false of the branch. **A
-  negative claim about a repository is only as good as the last fetch**, and a sweeping negative —
-  "nowhere on any branch" — is the form most likely to be asserted without one. Fetch before you
-  deny, and prefer naming the commit you checked to naming the absence.
-
-⚠️ **This third statement also misread Gaia's own tier rule.** It said an unread source "cannot be
-graded `P`". `P [not-opened]` is exactly the sanctioned form for a peer-reviewed paper nobody here
-opened, and the corpus's bibliographies carry nineteen distinct entries graded exactly that way. The tier bar is peer review; `[not-opened]`
-records the reading separately. A rule invented to justify an omission is worse than the omission.
+⚠️ **Two earlier rounds of reasoning about this entry were wrong in opposite directions, and the
+second was the worse.** The first invented a provenance chain in a sibling skill. The second, written
+as a verified audit, declared that file nonexistent and its record imaginary — and was itself false
+in every load-bearing part: the file exists, is 1299 lines, and carries the entry. It also invented a
+tier rule to justify the omission, that an unread source "cannot be graded `P`"; `P [not-opened]` is
+the sanctioned form and nineteen distinct entries in this corpus use it. **The mechanism is the part
+worth keeping: that audit ran against stale remote-tracking refs, so a negative claim about a
+repository is only as good as the last fetch.** Full forensics in `registers/source-findings.tsv`.
 
 **The field's slope statistics are the part the renderer actually reads.** Below the wavelength a
 displacement grid can resolve, waves stop being geometry and become **variance** — and the crossover
@@ -253,8 +240,12 @@ takes over, cross-faded with the ambient sea over a blend band offshore [airy_co
   deep water). Iso-lines of `tau` *are* refracted wavefronts: crests wrap headlands, focus on
   points and align to every shore for free. Animate `phase = tau/T - t/T`.
 - **Shoaling.** Energy-flux conservation through the slowdown pumps amplitude up; the shallow
-  asymptote is Green's law, `a ∝ h^(-1/4)`. The visual is a monotonic **rise then a cut** — never a
-  plain fade.
+  asymptote is Green's law, `a ∝ h^(-1/4)`. The visual is a **rise then a cut** — never a plain fade.
+  ⚠️ **It is not monotonic, and an earlier version of this bullet said it was.** `Ks = √(C_g0/C_g)`
+  **dips below 1 before it rises**: derived here, the minimum is **Ks = 0.9130 at h/L₀ = 0.15916**
+  (that is 1/2π), and it does not climb back to 1 until **h/L₀ ≈ 0.0574**. So a wave entering
+  intermediate depth gets about **8.7% shorter** before it grows. Clamping `Ks ≥ 1` to "fix" the dip
+  removes a real effect; if you do not want it, say so rather than calling the curve monotonic.
 - **Breaking.** A wave breaks at roughly `H ≈ 0.78 h`. *How* it breaks is the surf-similarity
   (Iribarren) number `xi = tan(beta) / sqrt(H/L0)`: low → **spilling**, mid → **plunging**, high →
   **surging**. Beach slope and depth are both in the handoff, so breaker character per shore is
@@ -268,6 +259,30 @@ is no path into a geometric shadow. Behind an obstacle of width `W` the lee fill
 of order `W^2/lambda`, and at `W/lambda ≈ 1` — an isolated rock in ordinary swell — the shadow a ray
 model carves is wrong across the whole of it. The test is one object and it is cheap: put an
 isolated obstacle a wavelength across in the scene and look behind it.
+
+## What it costs, and how close it is
+
+⚠️ **An earlier version of this document stated neither, across 312 lines** — no cost figure, no
+error figure, and the FFT's two governing parameters never named. Both halves exist in the sources
+it already cites:
+
+| Model | Cost, as the source states it | Accuracy, as the source states it |
+|---|---|---|
+| FFT, single patch | interactive at **512²** [tessendorf_ocean] | resolves down to a **~2 cm** floor at that grid; below it, waves become variance |
+| FFT, full pipeline | **19.2 ms**, broken down per stage [bruneton2010] | — |
+| Wave packets / dispersion kernels | **under 10 ms**, **5.33 MB** of state [dupuy2012] Fig. 2 caption | — |
+| Gerstner sum | scales linearly in wave count | **error of 3%** on the stated form, falling to **0.1%** with the correction [yuksel2007] §7 |
+
+**The two parameters that set both, and which this document used to leave unstated:** `N`, the
+frequency-grid size, and `L`, the patch size in metres. The resolvable wavelength floor is `L/N`, so
+the 2 cm figure above is a statement about `L/N`, not about the FFT. Quote them together or the cost
+means nothing: 512² at `L = 400 m` is a 78 cm floor, not 2 cm.
+
+⚠️ **Provenance note.** The four figures above were read from the artefacts by a verification pass,
+not re-fetched at the time of writing: `inria.hal.science` serves a bot challenge for the
+[dupuy2012] PDF and `journals.ametsoc.org` returns 403 without a browser user-agent, both confirmed
+here. Treat them as attributed, in this corpus's usual sense, and re-read before relying on the
+exact digits.
 
 ## What it beats
 
@@ -303,7 +318,8 @@ isolated obstacle a wavelength across in the scene and look behind it.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | Surf marches diagonally onto the sand | Deep-water field modulated by depth; no refraction | Travel-time phase field [airy_coastal] |
-| The whole sea visibly repeats its motion | Gerstner loop, or a single FFT tile | More cascades at near-co-prime sizes; verify from max altitude |
+| The whole sea visibly repeats its motion | A single FFT tile, or a cascade stack whose patch sizes share a factor — 400/60/10 m repeats at their LCM of 1200 m | Near-co-prime sizes (401/61/11 m, LCM 269 071 m); verify from max altitude |
+| A Gerstner sea repeats its motion no matter how the tiles are sized | The sum of N Gerstner waves has a period at the LCM of the component periods — a temporal repeat, not a spatial one, so cascade sizing cannot reach it | Irrational-ratio frequencies push it past a session; otherwise this is a reason to choose the FFT family, not a tuning problem |
 | Waves fade out toward shore instead of growing then breaking | Amplitude faded by depth with no shoaling gain | Green's-law rise, clamped, then cut at the break |
 | A wall of water in the blend band | Ambient and shore bands added rather than cross-faded | Fade one down as the other comes up |
 | Crests shimmer and self-intersect | Choppiness past ~1.0 driving `J` negative over large areas | Clamp choppiness; keep folding rare and foamed |
