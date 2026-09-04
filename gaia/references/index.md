@@ -5,7 +5,7 @@ description: "Every Gaia document, its axis, and whether a human has checked its
 tags: [index, routing]
 status: draft
 okf_version: "0.2"
-generated: { by: process:gaia-index, at: 2026-09-04T06:22:22Z }
+generated: { by: process:gaia-index, at: 2026-09-04T06:26:47Z }
 ---
 # Gaia index
 

@@ -53,6 +53,29 @@ it on a cadence is the first saving available, and it is worth **half** of the m
 Volumetric shadows through the atmosphere, at 32 samples, take the total to **1.0 ms** — roughly
 three times the unshadowed pass, and the single largest discretionary number on this page.
 
+## Rebuild on change, not on frame
+
+The table above reads as though all four LUTs are rebuilt every frame. They are not, and the
+cadence is the difference between the technique fitting a mobile frame and not:
+
+| LUT | Depends on | Rebuild when |
+|---|---|---|
+| Transmittance | the medium only | the medium changes — in practice a **load-time bake** |
+| Multi-scattering | medium + sun elevation | a material sun move; it varies smoothly, so gate on ~1° |
+| Sky-view | view altitude + sun direction | per frame |
+| Aerial perspective | camera frustum + sun | per frame, **per view** |
+
+⚠️ **On an iPhone 6s the transmittance LUT is 0.53 ms — 51% of the whole 1.03 ms LUT budget — and it
+is a pure function of constants.** Bake it once and the same set costs about **0.38 ms** for a moving
+camera under a static sun. An engineer reading the flat table as written spends 3% of a 33 ms mobile
+frame rebuilding tables two thirds of which did not change, and may reasonably conclude the technique
+does not fit and fall back to an analytic gradient at 88.1 RMSE. It fits; it fits **with the
+cadence**.
+
+The implementation is a dirty flag, not a scheduler: hash the atmosphere parameter block and the
+quantised sun direction, and rebuild only the LUTs whose inputs moved. A tool viewport nobody is
+interacting with rebuilds nothing.
+
 **How wrong it is.** The pass inherits the accuracy of whatever model was precomputed, and
 [bruneton2017] Table 2 prices that in RMSE against the sky **measurements** (not against
 `libRadtran`, which is a comparison point in that paper rather than the error reference), over a
@@ -163,9 +186,42 @@ is subject to it.
 
 `water-rendering.md` already prescribes this and, until this document existed, had nothing to point
 at: **share the atmosphere LUT and the view-depth coordinate with the terrain**, or the sea/sky
-junction mismatches the land horizon at every sunset. A private water fog colour is the mechanism;
-one atmosphere source is the fix. The sea, the land and the sky are three surfaces under one
-medium, and the horizon is where a disagreement between them is most visible and least forgivable.
+junction mismatches the land horizon at every sunset.
+
+⚠️ **That sentence is a slogan, and two teams cannot implement it independently and meet in the
+middle.** "The atmosphere LUT" is four LUTs; "the view-depth coordinate" is ambiguous in the one
+place water has two depths. Stated so it is implementable — this is a contract derived here, not
+taken from a source:
+
+> **Exported once, consumed by terrain, water and translucents.**
+> - `Transmittance(viewDir, viewAltitude) → RGB` — the sun-path attenuation. **The sun colour every
+>   surface lights with comes from here.** A private sun colour is the same class of bug as a
+>   private water fog colour, and it is what makes a sunset glint red.
+> - `AerialPerspective(screenUV, airDistance) → RGB inscatter + RGB transmittance` — from the froxel
+>   volume while `airDistance < volumeFar`, from the sky-view path beyond it, **with the same
+>   fallback and the same cross-fade width on both surfaces**. An ocean horizon is 4.8 km from a
+>   1.8 m eye and 36 km from a 100 m cliff, so the far field is not an edge case here: if terrain
+>   clamps to the last froxel slice and water evaluates analytically, they disagree *exactly at the
+>   horizon*, which is the symptom this contract exists to fix.
+> - `Sky(dir, viewAltitude) → RGB` — valid for any direction, **including one refracted through a
+>   water surface from below**, which is how the sky arrives inside the Snell window when the camera
+>   goes under.
+>
+> **Ordering, which is not derivable from either document.** Aerial perspective is applied **once,
+> after the water composite**, on each pixel's own **air** distance. A translucent shader that
+> samples scene colour must sample a **pre-aerial-perspective** copy — otherwise the bed's colour
+> already carries AP, the water extinguishes it again over the refracted path, and the surface
+> applies it a third time. That is three transmittances over one path: the three-media rule above,
+> committed across a document boundary where neither side can see it.
+>
+> **`airDistance` is the camera-to-*surface* distance in air.** `water-rendering.md` is emphatic
+> that the in-water path is the refracted distance and never the depth-buffer difference; that
+> segment is a different medium and **must not enter the atmosphere lookup at all**. Feed it the bed
+> depth and the water goes hazy with bathymetry.
+
+A private water fog colour is the mechanism; one atmosphere source is the fix. The sea, the land and
+the sky are three surfaces under one medium, and the horizon is where a disagreement between them is
+most visible and least forgivable.
 
 ## The crossover, with a date and a direction
 
@@ -194,5 +250,9 @@ today, which is where the remaining discretionary cost sits.
 | Sea and land disagree in colour exactly at the horizon | A private water fog colour instead of the shared atmosphere path | One atmosphere state, shared — `water-rendering.md` |
 | Sky and terrain detach at the horizon when the camera moves | A planet-absolute atmosphere shader jittering against jitter-free terrain | Evaluate in the camera-relative frame — `planetary-precision.md` |
 | The sky is fine on the ground and wastes resolution from orbit | The sky-view LUT spends most of itself on empty space | Switch to on-screen ray marching for space views [hillaire2020] §5.3 |
+| Mobile spends 3% of the frame rebuilding LUTs | All four rebuilt every frame; the transmittance LUT alone is 0.53 ms on an iPhone 6s and depends only on the medium | Bake transmittance at load; gate multi-scattering on ~1° of sun elevation. Roughly 1.03 ms → 0.38 ms |
+| Water and terrain disagree in colour at the horizon *after* both were told to share the atmosphere | They share the LUT and not the **far-field fallback**: one clamps to the last froxel slice, the other evaluates analytically | Same fallback, same cross-fade width, on both surfaces |
+| Water is too dark, and worse the further the camera is | Aerial perspective applied to the scene colour the water refracts, then again by the water, then again on the surface | Apply AP once, after the water composite; refract against a pre-AP copy |
+| Water hazes with depth of the sea bed rather than distance from the camera | The refracted in-water path fed into the atmosphere lookup | `airDistance` is camera-to-surface, in air, only |
 | A time-of-day sweep costs 250 ms a step | The old precompute being rebuilt per step for a sun move it does not need — sun angle is a table AXIS, not a bake input | Move `u_µs`; rebuild nothing. If the medium is what changes, use the in-frame LUT set [hillaire2020] |
 | Volumetric shadows triple the sky cost | 32 ray-march samples with jitter and reprojection | Budget the 1.0 ms, or drop the feature. ⚠️ Do **not** simply cut samples and lean harder on TAA: that trades a measured cost for ghosting and crawling shafts, which is an unmeasured one |

@@ -176,9 +176,32 @@ three fields, they drift, and the drift is not subtle — shadows arrive where t
 
 The same source ties the motion together: the scroll vector of the coverage field **is** the wind
 vector. Gaia already produces one — `driver-fields.md` computes a wind field from the horizon
-sweep — so the coverage field should be advected by that field and not by a private constant.
-Clouds, blowing snow and bending grass then agree about the weather because they are reading one
-answer to one question.
+sweep — so the coverage field should move with that field and not with a private constant. Clouds,
+blowing snow and bending grass then agree about the weather because they are reading one answer to
+one question.
+
+⚠️ **Advect analytically, not iteratively — the difference decides whether the sky is
+reproducible.** An advected *buffer* has state: its value at `t` depends on every step taken to
+reach `t`. Make coverage a pure function of time instead —
+`coverage(p, t) = noise(p − windVec·t, t·evolutionRate)`, a scroll offset plus a slow evolution on a
+third axis. It reads the same on screen, costs less, and buys three properties an integrated field
+cannot have:
+
+- **The time slider is reversible.** Scrub to 10 s and back to 0 and you get the sky you started
+  with. In a tool whose reference workflow is a slider nudged two hundred times an hour, a
+  one-way time axis is a defect and not a nuance.
+- **Any frame evaluates without its predecessors**, so a render farm can split a shot. An advected
+  buffer's inputs do not determine its output — the iteration history does — and
+  `node-graph-runtime.md`'s cache key asserts exactly the opposite.
+- **It does not force a whole-domain pass.** `driver-fields.md` already worked this out for the
+  neighbouring case: "the horizon's dependence has a bounded search distance, and an advected
+  precipitation field's does not. Compute precipitation whole-domain at a coarse resolution and
+  upsample it, rather than trying to tile it." Advected coverage has the identical property, and an
+  analytic one has neither problem.
+
+Reach for a genuinely integrated buffer only when coverage must respond to the terrain — orographic
+cloud forming on a windward face. When you do, declare it global-ordered and accept that it is a
+bake.
 
 **A sun move does not invalidate a 4D table, and believing it does is expensive.** The sun
 direction is a scene parameter owned by `driver-fields.md`. What belongs here is what has to be
@@ -216,10 +239,29 @@ second.
 
 ## What this hands to the rest of the corpus
 
-- **Cloud shadow is a driver field.** The sun-visibility term multiplied by cloud coverage is an
-  input to insolation, and insolation drives snow line and thermal weathering — see
-  `driver-fields.md`, which owns shadow as a physical input and already couples insolation to those
-  processes. A cloud deck that darkens the ground should also slow the melt.
+- **Cloud shadow reaches the driver fields as a statistic, not as a shadow.** The instantaneous
+  cloud shadow is a *rendering* term: it modulates sun visibility in the frame and nowhere else.
+  What `driver-fields.md` can consume is the **mean cloud fraction over the simulated interval**,
+  because insolation there is a bake over seasons while this coverage field moves at metres per
+  second. The two quantities differ by orders of magnitude in timescale, and connecting them with a
+  multiply produces either a driver field that re-bakes as clouds drift or a snow line that
+  jitters when an artist scrubs the wind direction.
+  ⚠️ **And it is not a multiply in the first place.** Clouds do not remove sunlight so much as
+  **convert direct beam into diffuse**, which *flattens* the aspect-dependence of insolation rather
+  than scaling it down. `driver-fields.md` already routes to Fu & Rich's model for exactly a
+  direct/diffuse split — cited there, not here, because this document has not opened it — so the
+  correct coupling moves energy from the direct term the horizon field gates into the diffuse term
+  the sky-view factor gates. Written as `insolation × coverage`, a
+  cloudy world gets deep aspect contrast at low total energy — the opposite of what an overcast
+  landscape looks like.
+  ⚠️ **And the corpus has already priced the whole term as second-order where it matters most.**
+  `driver-fields.md` records, from Winstral et al., that net potential radiation was "**not** a
+  significant predictor of snow depth (p = 0.38)" in an alpine basin while wind redistribution was,
+  and concludes "**Where wind moves snow, wind wins.**" That reading is `driver-fields.md`'s and is
+  cited there; this document repeats it at second hand and says so. An earlier revision of this bullet asserted
+  that a cloud deck "should also slow the melt" as though that finding did not exist. In graph
+  terms: mean cloud fraction is a scalar scene parameter sitting beside the sun, **not** an edge
+  from the cloud renderer into a bake.
 - **The tables are what the renderer samples.** `atmosphere-and-aerial-perspective.md` owns the
   pass; it consumes the three tables produced here and must not rebuild them.
 - **The coverage field is what the cloud march reads.** ⚠️ `volumetric-clouds.md` is `planned` and
@@ -238,6 +280,10 @@ integral (`terrain-analysis-masks.md`), or surface snow state, which is the sepa
 | Sky is plausible at noon and wrong at sunset | An analytic model fitted mainly to high sun. ⚠️ [bruneton2017]'s 88.1 does **not** evidence this: its measurement window is 09h30–13h30 and its 06h00 cell is `n/a`, so the number describes midday. Table 2's `sunset sunrise` column does — Preetham and Hosek are both marked `no` | Move to a model whose row says `yes`, and do not cite an RMSE measured at noon for a sunset defect |
 | Sunsets are too yellow and no parameter fixes it | Ozone is absent from the model — it is absent from [brunetonneyret2008] entirely and appears in [preethamshirleysmits1999] only on the direct beam | Add an ozone absorption term — [hillaire2020] Table 1 supplies coefficients and a tent-shaped profile, crediting [bruneton2017]; the other four sources here will not |
 | The multiple-scattering bake never "converges" | There is no convergence test in [brunetonneyret2008] Algorithm 4.1 — it runs a fixed `norders` | Choose an order count, state it, and measure what the last order was worth |
+| The time slider is not reversible; scrubbing back gives a different sky | The coverage field is an advected buffer, so its value carries iteration history | Make it a pure function of time: `noise(p − windVec·t, t·evolutionRate)` |
+| Two farm machines render different clouds for the same frame | Same cause: inputs do not determine the output, the history does, so the cache key is a lie | Same fix; declare a genuinely integrated field global-ordered and treat it as a bake |
+| The snow line jitters when the artist scrubs wind direction | An instantaneous cloud shadow multiplied into an authoring-time insolation bake | Pass **mean cloud fraction** over the simulated interval, as a scene parameter, not a per-frame edge |
+| An overcast scene has strong aspect contrast and looks wrong | `insolation × coverage` scales total energy and keeps the directionality | Move energy from the direct term into the diffuse term; overcast **flattens** aspect contrast |
 | Shadows fall where there is no cloud | Two coverage fields, one for shading and one for the cloud pass [tr_lighting_shadows] | One field, many readers |
 | Rain falls in clear sky | Weather intensity authored independently of coverage | Derive intensity from the same field |
 | Clouds and blowing snow drift apart | The cloud scroll vector is a private constant instead of the wind field [tr_lighting_shadows] | Advect coverage with `driver-fields.md`'s wind field |
