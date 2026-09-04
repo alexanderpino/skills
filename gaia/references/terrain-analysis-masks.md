@@ -14,7 +14,7 @@ sources:
   - { id: bavoil2008, tier: F, locator: "READ IN FULL. Slide 12, Horizon-Based AO, defines both angles as arctangents of z over the length of the xy part — h(H) = atan(H.z / ||H.xy||) for the horizon vector and t(T) = atan(T.z / ||T.xy||) for the tangent vector — and gives the weighting as AO = sin h − sin t; slide 16, Core Algorithm, is where it is averaged over 2D directions, AO(theta) = sin h(theta) − sin t(theta). A SIGGRAPH talk deck, not a peer-reviewed paper, hence F" }
   - { id: weiss2001, tier: F, locator: "READ IN FULL. Fig. 2a defines the index as the elevation of a cell minus the mean elevation of a neighbourhood around it, and Figs. 2b and 2c give the poster's own two worked scales on a 30 m DEM as annulus focal means, tpi300 with inner and outer radii of 5 and 10 cells and tpi2000 with 62 and 67; Fig. 3b and 3c threshold each by standard-deviation units; Fig. 4a is the multi-scale part this document cites, combining a small and a large scale into landform classes, and Fig. 4b shows the resulting ten classes. An ESRI User Conference poster, not peer review, hence F" }
   - { id: he2010, tier: P, locator: "the local linear model with a, b from box filters; eps as the variance threshold. NOT OPENED — the SpringerLink chapter PDF served an HTML shell, the author copies at kaiminghe.com and kaiminghe.github.io both 404, and no other copy was reachable, so no section or equation inside it is named" }
-  - { id: tomasi1998, tier: P, locator: "§2.1 Example: the Gaussian Case — the product of the CLOSENESS function c(xi,x) and the SIMILARITY function s(phi,f), both Gaussian. Note the paper's own words: searching it for 'spatial' and 'range' will not find this" }
+  - { id: tomasi1998, tier: P, locator: "§2.1 Example: the Gaussian Case — the product of the CLOSENESS function c(xi,x) and the SIMILARITY function s(phi,f), both Gaussian. The paper's own axis pair is DOMAIN and RANGE, not spatial and range; search it for 'closeness' and 'similarity' to reach these two weights" }
 ---
 # Terrain analysis and masks — deriving fields from height
 
@@ -192,10 +192,10 @@ increases southward, so it is `−sin(aspect)` **if `dzdy` is a raw row differen
 is not this document's convention.** The stencil above defines `H = (Z2 − Z8)/(2L)` as `dz/dy` with
 **+y NORTH**, and under it a north-facing slope gives `aspect = 90°` and northness `+sin(aspect) =
 +1`, which is correct. Using `−sin` with this document's own `H` produces precisely the inverted
-result the next paragraph warns about. **Decide which `dzdy` you hold and derive the sign from it;
-the naive mismatch silently moves snow to the sunny
-side. And **use the erosion's deposition field, not a slope proxy, for sediment materials** — it
-puts sand where sand actually went.
+result the failure table's aspect row warns about. **Decide which `dzdy` you hold and derive the
+sign from it** — the naive mismatch silently moves snow to the sunny side. And **use the erosion's
+deposition field, not a slope proxy, for sediment materials** — it puts sand where sand actually
+went.
 
 **Loose material has depth.** Snow, sand and scree fill the hollows of the rock beneath, so the
 shaded surface is smoother than the bedrock. `depositFill(h, r) = max(closing(h, r) − h, 0)` gives
