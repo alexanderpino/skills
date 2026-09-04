@@ -456,7 +456,11 @@ def selftest() -> int:
     for t, want in rbad:
         print(f"  FAIL  error fixture: {t!r} should be "
               f"{'COUNTED as an error' if want else 'not counted'}")
-    if bad or nbad or ubad or ebad or cbad or rbad:
+    pbad = [(t, want) for t, want in PROPAGATION_FIXTURES if section_tokens(t) != want]
+    for t, want in pbad:
+        print(f"  FAIL  propagation fixture: {t!r} should yield {sorted(want)}, "
+              f"got {sorted(section_tokens(t))}")
+    if bad or nbad or ubad or ebad or cbad or rbad or pbad:
         # `ebad` used to gate the exit code and not appear in this sentence, so a run with
         # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
         print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
@@ -464,14 +468,16 @@ def selftest() -> int:
               f"{len(ubad)} of {len(NOT_OPENED_FIXTURES)} not-opened fixtures and "
               f"{len(ebad)} of {len(ENTRY_TAG_FIXTURES)} entry-tag fixtures and "
               f"{len(cbad)} of {len(COST_FIXTURES)} cost fixtures and "
-              f"{len(rbad)} of {len(ERROR_FIXTURES)} error fixtures misclassified.")
+              f"{len(rbad)} of {len(ERROR_FIXTURES)} error fixtures and "
+              f"{len(pbad)} of {len(PROPAGATION_FIXTURES)} propagation fixtures misclassified.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
           f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct; "
           f"not-opened marker: {len(NOT_OPENED_FIXTURES)}/{len(NOT_OPENED_FIXTURES)} correct; "
           f"entry tag: {len(ENTRY_TAG_FIXTURES)}/{len(ENTRY_TAG_FIXTURES)} correct; "
           f"cost unit: {len(COST_FIXTURES)}/{len(COST_FIXTURES)} correct; "
-          f"error: {len(ERROR_FIXTURES)}/{len(ERROR_FIXTURES)} correct.")
+          f"error: {len(ERROR_FIXTURES)}/{len(ERROR_FIXTURES)} correct; "
+          f"propagation: {len(PROPAGATION_FIXTURES)}/{len(PROPAGATION_FIXTURES)} correct.")
     return 0
 
 
@@ -784,6 +790,70 @@ def check_trigger_coverage() -> list[str]:
                  "query routes to it -- the skill is never tested on the subject it claims"
                  for d in sorted(set(claimed) - reached)]
     return problems
+
+
+_SECTION = re.compile(r"(?:§|\bsections?\s+)\s*([0-9]+(?:\.[0-9]+)*|[IVX]+(?:-[A-Z])?)", re.I)
+
+# A section belonging to a DIFFERENT paper named in the prose. The first version of this check
+# had no such filter and its single corpus-wide hit was exactly that: `orzan2008`'s entry says
+# "the paper `hnaidi2010` §4.2 borrows from", and §4.2 was read as orzan2008's own.
+_FOREIGN_SECTION = re.compile(
+    r"[`\[]?\b[a-z][a-z0-9_]{4,}\b[`\]]?\s+(?:§|sections?\s+)\s*[0-9IVX][0-9.\-A-Z]*", re.I)
+
+
+def section_tokens(text: str) -> set[str]:
+    """Section numbers a passage claims for its OWN source."""
+    return {m.group(1).upper() for m in _SECTION.finditer(_FOREIGN_SECTION.sub(" ", text))}
+
+
+PROPAGATION_FIXTURES = [
+    ("§4.2 Theorem 3 and §3", {"4.2", "3"}),
+    ("section 3.1 River network and channel models", {"3.1"}),
+    ("§II-A Eq. (1) and Fig. 2", {"II-A"}),
+    ("the paper `hnaidi2010` §4.2 borrows from", set()),      # a foreign section, not ours
+    ("READ IN FULL, no section named", set()),
+    ("p. 146 and Fig. 11", set()),                            # pages are not sections
+]
+
+
+def check_propagation(bib: dict[str, dict],
+                      cites: dict[str, list[tuple[Path, str]]]) -> tuple[list[str], int, int]:
+    """Do the two ends of a citation name the SAME section?
+
+    The most common defect this corpus has ever recorded is a correction landing at one end of a
+    citation and not the other -- a locator sharpened in a document while its bibliography entry
+    keeps the old section, or the reverse. It has been found by hand at least eight times, and
+    twice the *fix* for it landed at one end only. `check_not_opened` already ties the two ends
+    on the question of whether a source was read; this ties them on WHERE.
+
+    It reports only the unambiguous case: both ends name sections and the sets are **disjoint**.
+    Overlap passes, because a bibliography entry legitimately describes more of a paper than any
+    one document cites.
+
+    ⚠️ **What it cannot see, and the number is the point.** Only about 6% of citation pairs name a
+    section at both ends; the rest name one at one end or neither, and nothing can be
+    cross-checked there. This is a narrow instrument over a corpus-wide problem, and the ratio is
+    reported so nobody mistakes a green check for a checked corpus.
+    """
+    problems: list[str] = []
+    both = total = 0
+    for cid, uses in sorted(cites.items()):
+        entry = bib.get(cid)
+        if not entry:
+            continue
+        btoks = section_tokens(f"{entry.get('ref', '')} {entry.get('note', '')}")
+        for path, locator in uses:
+            total += 1
+            ltoks = section_tokens(locator)
+            if not btoks or not ltoks:
+                continue
+            both += 1
+            if not (btoks & ltoks):
+                problems.append(
+                    f"references/{path.name}: cites `{cid}` at section(s) "
+                    f"{sorted(ltoks)}, but its bibliography entry names {sorted(btoks)} and the "
+                    "two do not overlap. One end was corrected and the other was not")
+    return problems, both, total
 
 
 def check_axis_agreement() -> list[str]:
@@ -1101,6 +1171,8 @@ def main() -> int:
                  + check_no_artefact(bib) + check_not_opened(bib, citations_by_id())
                  + check_headings() + check_axis_agreement()
                  + check_trigger_coverage())
+    prop_problems, prop_both, prop_total = check_propagation(bib, citations_by_id())
+    problems += prop_problems
 
     docs = [p for p in documents(ROOT)
             if p not in paper_files() and p not in (INDEX, COVERAGE)]
@@ -1111,6 +1183,12 @@ def main() -> int:
     if rec_total:
         print(f"recommendation {rec_total}/{rec_total} documents name an approach to "
               f"implement; {rec_first} state it first, before any explanation.")
+
+    if prop_total:
+        print(f"propagation {prop_both}/{prop_total} ({100 * prop_both / prop_total:.0f}%) of "
+              f"citations name a section at BOTH ends, so the rest cannot be cross-checked at all. "
+              f"Where both ends name one they must overlap -- a correction landing at one end only "
+              f"is this corpus's most-recorded defect, found by hand at least eight times.")
 
     both, eonly, conly, none = approximation_coverage()
     ntot = both + eonly + conly + none

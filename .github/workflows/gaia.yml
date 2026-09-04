@@ -309,6 +309,28 @@ jobs:
           expect_red "a covered document no trigger query reaches"
           cp /tmp/bk_tr evals/trigger-evals.json
 
+          # The propagation guard: both ends of a citation must name overlapping sections. This
+          # mutation moves ONE end, which is exactly the defect -- a locator sharpened in a
+          # document while its bibliography entry keeps the old section. No other check in this
+          # file sees it: the id still resolves, the locator is still non-empty and still sharp.
+          # It must target a citation the guard can SEE -- one whose bibliography entry also names
+          # a section. The first version of this mutation moved a locator whose entry named none,
+          # so the pair fell into the 94% that cannot be cross-checked and the job passed
+          # vacuously. Caught by running it.
+          cp references/mask-operators.md /tmp/bk_pr
+          cat > /tmp/mut_pr.py <<'PYPR'
+          import pathlib
+          p = pathlib.Path("references/mask-operators.md")
+          s = p.read_text(encoding="utf-8")
+          assert "§1 Introduction and overview" in s, "fiorio1996 locator not as expected"
+          p.write_text(s.replace("§1 Introduction and overview",
+                                 "§9 Introduction and overview", 1), encoding="utf-8")
+          print("moved fiorio1996 from section 1 to section 9 at the document end only")
+          PYPR
+          python3 /tmp/mut_pr.py
+          expect_red "a locator moved at one end of a citation only"
+          cp /tmp/bk_pr references/mask-operators.md
+
           python3 scripts/check.py >/dev/null || { echo "::error::copy not restored"; fails=$((fails+1)); }
           echo
           [ "$fails" -eq 0 ] && echo "all mutations bite; decoy clean" || { echo "$fails problem(s)"; exit 1; }
