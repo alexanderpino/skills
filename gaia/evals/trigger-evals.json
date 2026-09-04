@@ -289,6 +289,13 @@
     ]
   },
   {
+    "query": "my sky looks fine at noon and completely wrong at sunset, and no parameter fixes it",
+    "should_trigger": true,
+    "routes_to": [
+      "sky-and-weather-state.md"
+    ]
+  },
+  {
     "query": "how do i reproject a GeoTIFF DEM from UTM to WGS84 and fill its nodata voids",
     "should_trigger": false
   },

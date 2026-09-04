@@ -1,7 +1,7 @@
 ---
 type: Bibliography
 title: Papers — rendering
-description: "Sources for the rendering axis: heightfield LOD, streaming, virtual texturing, GPU-driven submission, planetary precision, water surfaces, caustics, ray marching, and — arriving with a bibliography merge — offline mesh extraction and the colour sources behind mask-to-material."
+description: "Sources for the rendering axis: heightfield LOD, streaming, virtual texturing, GPU-driven submission, planetary precision, water surfaces, caustics, ray marching, the clear-sky and atmosphere models behind the sky documents, and — arriving with a bibliography merge — offline mesh extraction and the colour sources behind mask-to-material."
 tags: [bibliography, provenance, rendering]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
@@ -83,6 +83,33 @@ authority.
 | "Bruneton's roughness-aware Fresnel is Schlick multiplied by `exp(-2.69σ)`" | The published form puts that factor **inside the exponent**: `pow(1 - cosθ, 5*exp(-2.69σ)) / (1 + 22.7σ^1.5)`, applied as `F = R + (1-R)·that`. Multiplied on the outside instead it can only *lower* reflectance, while the real fit raises it above Schlick through the middle of the angular range. Both forms agree exactly at σ = 0, so a calm-water test passes and only rough water at grazing angles is wrong. |
 | "Opacity micromaps let ray tracing follow a deforming heightfield" | Category error. Opacity micromaps classify **alpha coverage** for traversal; they encode no displacement and track no height edits. See dxrspec, and keep the ray-tracing proxy contract. |
 
+### Sky and atmosphere
+
+Five refereed sources, all obtained and read. **Four of the five diverge from the published
+record**, so every locator below is indexed by section, equation, figure or table rather than by
+page — the exception is `preethamshirleysmits1999`, the one copy carrying real proceedings folios.
+
+**`brunetonneyret2008`** — the publisher-typeset EGSR/CGF version via the Inria HAL deposit
+(`inria-00288758`), carrying the Eurographics masthead and the Blackwell footer. Paginated 1–8 as
+an article, **not** 1079–1086; section and equation numbering match the record.
+**`bruneton2017`** — arXiv:1612.04336v1, which states on its own first page that it is "the
+author's version of an article that has been published in this journal". Paginated 1–15, not
+2641–2655, and dated 2016 against a 2017 issue. Section, figure and table numbers match.
+**`hosekwilkie2012`** — the authors' *lowres* preprint on the Charles University CGG page. Every
+one of its nine pages is stamped "To appear in ACM TOG 31(4)." — checked, nine of nine — so it
+carries no article pagination against the record's 95:1–95:9, and figure detail is degraded. Its
+**supplemental material**, which holds the fitted matrices and the per-band SNR charts, is not in
+this PDF and was **not opened**.
+**`preethamshirleysmits1999`** — the ACM proceedings version, mirrored on a Duke course page, with
+folios 91–99 present, so page citations into it are valid. ⚠️ Its embedded fonts use a non-standard
+encoding: extracted mathematics comes out as escape sequences (`/#0B /=/1 /: /3`), so every formula
+quoted from it was reconstructed from context rather than copied.
+**`nishita1993`** — the author's own **raster scan** at nishitalab.org, with no text layer and
+pages stored vertically flipped; it was read as page images. Unpaywall reports the DOI closed with
+no OA location, so this is the only route found. Quotations from it are transcriptions from a
+bilevel scan, punctuation approximate, and **no proceedings folios were visible**, so pp. 175–182
+comes from the record and not from the artefact.
+
 ## Heightfield LOD
 
 - **duchaineau1997** `P` — Duchaineau, M., Wolinsky, M., Sigeti, D.E., Miller, M.C., Aldrich, C. & Mineev-Weinstein, M.B. (1997). *ROAMing terrain: real-time optimally adapting meshes.* IEEE Visualization '97, 81–88. — Longest-edge-bisection binary triangle tree with frame-coherent split/merge priority queues.
@@ -153,6 +180,71 @@ documents on the simulation axis. What is listed here is what a *renderer* consu
 - **drobot2010** `F` — Drobot, M. (2010). *Quadtree displacement mapping with height blending.* GPU Pro 1 / GDC 2010. — The max-mip pyramid applied to material displacement, and the height-blend compositor beside it. Book chapter and conference talk.
 - **smacke** `F` — s-macke. *VoxelSpace* — algorithm reconstruction and reference implementation, github.com/s-macke/VoxelSpace. — Column raycasting with the ascending y-buffer, as shipped in Comanche (1992). A repository, and the canonical modern reconstruction of a technique whose original has no publication.
 - **dxrspec** `F` — Microsoft *DirectX Raytracing (DXR)* specification and the Khronos `VK_EXT_opacity_micromap` / `VK_NV_displacement_micromap` registry entries. — Intersection shaders for procedural AABB geometry, BLAS build-versus-refit semantics, and what opacity micromaps do and do not classify. API specifications.
+
+## Sky and atmosphere
+
+The clear-sky literature is unusually easy to grade because one of its own papers measures the
+others. Read `bruneton2017` before choosing anything here.
+
+- **bruneton2017** `P` — Bruneton, E. (2017). *A Qualitative and Quantitative Evaluation of 8 Clear
+  Sky Models.* IEEE Transactions on Visualization and Computer Graphics 23(12), 2641–2655,
+  doi:10.1109/TVCG.2016.2622272. — **The error half of this axis, and there is no substitute for
+  it.** §14.1 and **Table 2** rank eight models by RMSE in mW/(m²·sr·nm) against `libRadtran`,
+  itself calibrated against the Kider et al. ground-truth measurements: Preetham **88.1**, O'Neal
+  49.5, Hosek **41.5**, Nishita93 26.6, Nishita96 18.3, Haber 14.7, Bruneton **11.3**, Elek 11.3.
+  Table 2 is also a **cost** table in the same rows — precompute time, precompute memory and render
+  time as complexities — which makes it the one artefact in this corpus that states both halves of
+  a recommendation in a single table. ⚠️ The paper spells the third author's model **O'Neal**, not
+  O'Neil. It gives complexities, not wall-clock, so an RMSE from here must not be paired with a
+  frame time from another paper and called a measurement.
+- **brunetonneyret2008** `P` — Bruneton, E. & Neyret, F. (2008). *Precomputed Atmospheric
+  Scattering.* Computer Graphics Forum 27(4), 1079–1086 (EGSR 2008),
+  doi:10.1111/j.1467-8659.2008.01245.x. — The precomputation that the modern LUT pipeline descends
+  from. §4 Algorithm 4.1 `PRECOMPUTE(norders)`; §2.1 for the medium — ground radius `Rg` = 6360 km,
+  top of atmosphere `Rt` = 6420 km, Rayleigh scale height `HR` = 8 km, Mie `HM` ≈ 1.2 km, and
+  `βs_R` = (5.8, 13.5, 33.1)·10⁻⁶ m⁻¹ at λ = (680, 550, 440) nm; eq. 2 for the Rayleigh phase
+  function and eq. 4 for Cornette–Shanks. §6 for the tables: transmittance 64×256, ground
+  irradiance 16×64, and inscattering as a 32×128×32×8 four-dimensional table packed into one
+  32×128×256 RGBA texture, **8 MB at half precision**. §6 also states the cost: 125 fps at
+  1024×768 on an NVidia 8800 GTS, of which 0.4 ms is the first three terms and 2.6 ms the rest,
+  and 25 fps with light shafts.
+  ⚠️ **It does not iterate to convergence, and a document must not say it does.** Algorithm 4.1 is
+  `for i ← 1 to i < norders` — a fixed count with no stopping criterion, tolerance or residual
+  anywhere in the paper. The implementation uses **five** orders. Checked: the string "ozone" does
+  not appear in the paper at all; the medium is air molecules and aerosols only.
+  ⚠️ Its two validation figures against the CIE clear sky model use **different** aerosol fits —
+  Fig. 6 gives `g` = 0.76 with `βs_M` = 2·10⁻⁵ m⁻¹, Fig. 7 gives `g` = 0.73 with 2.2·10⁻⁵ m⁻¹. Cite
+  one or the other with its figure; there is no single "the" value.
+- **hosekwilkie2012** `P` — Hosek, L. & Wilkie, A. (2012). *An Analytic Model for Full Spectral
+  Sky-Dome Radiance.* ACM Transactions on Graphics 31(4), art. 95 (SIGGRAPH 2012),
+  doi:10.1145/2185520.2185591. — The analytic successor to Preetham, fitted to a brute-force
+  reference rather than to a simpler model. Cited for the analytic tier: zero precompute, O(1)
+  render, and per `bruneton2017` Table 2 an RMSE of 41.5 — better than Preetham's 88.1 and far
+  worse than a precomputed model. ⚠️ The fitted matrices live in **supplemental material that was
+  not opened here**, so nothing in this corpus may quote a coefficient from it.
+- **preethamshirleysmits1999** `P` — Preetham, A.J., Shirley, P. & Smits, B. (1999). *A Practical
+  Analytic Model for Daylight.* SIGGRAPH '99, 91–100, doi:10.1145/311535.311545. — The analytic
+  daylight model that everything after it is measured against, and the worst performer in
+  `bruneton2017`'s table at RMSE 88.1, overestimating by roughly a factor of two. Cited for what it
+  is: the baseline that made analytic skies routine, not a model to ship in 2026. It is also the
+  only one of these five that treats **ozone** at all, and then only as a 0.0035 m NTP column
+  absorber on the direct solar beam — read on the page, in a sentence whose surrounding mathematics
+  the artefact's font encoding renders unquotable.
+- **nishita1993** `P` — Nishita, T., Sirai, T., Tadamura, K. & Nakamae, E. (1993). *Display of the
+  Earth Taking into Account Atmospheric Scattering.* SIGGRAPH '93, 175–182,
+  doi:10.1145/166117.166140. — The origin of the scale-height atmosphere in graphics, and the
+  source of the constants everything since has inherited. `bruneton2017` scores it 26.6 — better
+  than two models published a decade later. ⚠️ Read as a **raster scan with no text layer**; see
+  the read log. Quotations are transcriptions, and its page numbers come from the record.
+
+- **tr_lighting_shadows** `F` — `terrain-renderer/references/10-lighting-shadows.md`, this
+  repository. — Not peer review: a practitioner chapter in a sibling skill, cited for what a
+  shipping renderer chose and never as evidence that a mechanism is correct. §"Atmospheric
+  integration" for the fullscreen-triangle sky idiom, the three-media composition hazard and the
+  height-fog boundary; the volumetric-cloud bullets for the **one sky state** rule — "the coverage
+  field that shapes the clouds is the *same* map that drives the cloud-shadow term below and, where
+  a weather system exists, `13`'s weather intensity" — and for the cloud scroll vector being the
+  wind vector. Checked present on this branch and on `main`.
 
 ## Offline mesh extraction and simplification
 

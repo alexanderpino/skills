@@ -537,13 +537,15 @@ ERROR_STATED = re.compile(r"(?:\u00b1|\+/-)\s?\d[\d.]*"
                           r"|\bwithin\s+\d[\d.]*\s?%"
                           r"|\d[\d.]*\s?%\s+(?:error|too\s+\w+|low|high|off|out)"
                           r"|\berror\s+(?:of|is|was)\s+[-+]?\d[\d.]*"
-                          r"|\b(?:max(?:imum)?|mean|rms|peak)\s+(?:relative\s+)?error\b", re.I)
+                          r"|\b(?:max(?:imum)?|mean|rms|peak)\s+(?:relative\s+)?error\b"
+                          r"|\b(?:RMSE|MAE|RMS error|L2 error|absolute error|relative error)\b", re.I)
 
 ERROR_FIXTURES = [
     ("the max relative error is 14.32% at 78.89 deg", True),
     ("T = (0.14 \u00b1 0.062) R^0.77", True),
     ("within 30% where R < 5 km", True),
     ("runs 22% low at the Brewster angle", True),
+    ("an RMSE of 11.3 against libRadtran", True),        # an error in physical units, not a percentage
     ("about 70% of the variance is explained", False),   # a proportion, not an error
     ("39.18% coverage, 25676 set cells", False),
     ("it is a good approximation", False),
