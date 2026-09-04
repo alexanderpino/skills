@@ -296,6 +296,13 @@
     ]
   },
   {
+    "query": "my distant mountains look like a miniature model, 40km away and no sense of scale",
+    "should_trigger": true,
+    "routes_to": [
+      "atmosphere-and-aerial-perspective.md"
+    ]
+  },
+  {
     "query": "how do i reproject a GeoTIFF DEM from UTM to WGS84 and fill its nodata voids",
     "should_trigger": false
   },

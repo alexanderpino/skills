@@ -237,6 +237,37 @@ others. Read `bruneton2017` before choosing anything here.
   than two models published a decade later. ⚠️ Read as a **raster scan with no text layer**; see
   the read log. Quotations are transcriptions, and its page numbers come from the record.
 
+- **hillaire2020** `P` — Hillaire, S. (2020). *A Scalable and Production Ready Sky and Atmosphere
+  Rendering Technique.* Computer Graphics Forum 39(4), 13–22 (EGSR 2020), doi:10.1111/cgf.14050. —
+  **The cost half of this axis.** The LUT set that makes a physical sky fit in a frame *including*
+  its own updates. §7 and **Table 2** give resolutions, step counts and per-LUT times on an NVIDIA
+  1080 and an iPhone 6s: transmittance 256×64 / 40 steps / 0.01 ms, sky-view 200×100 / 30 / 0.05 ms,
+  aerial perspective 32³ / 30 / 0.04 ms, multi-scattering 32² / 20 / 0.07 ms, **0.31 ms total at
+  1280×720**; mobile 0.53 / 0.27 / 0.11 / 0.12 ms with sky-view dropped to 96×50. Volumetric
+  atmospheric shadows at 32 samples take it to 1.0 ms.
+  ⚠️ **It is not simply faster than its predecessor, and the entry must not say so.** §7 verbatim:
+  "the total render time is 0.31 ms … For the same view, the Bruneton model [BN08] renders in
+  0.22ms, **but this is without all the LUTs being updated**. Updating all the LUTs using the code
+  provided costs **250ms**, where 99% of this cost comes from the many iterations required to
+  estimate multiple scattering." Bruneton renders *faster*; what it cannot do is rebuild its state
+  in a frame. That is the whole contribution, and it is a different claim from speed.
+  ⚠️ Three Hillaire sky artefacts circulate and are routinely conflated: this refereed EGSR/CGF
+  paper; a 2016 Frostbite SIGGRAPH **course talk** (`F`, and there is no written notes PDF at all —
+  the substance is in a PowerPoint's speaker-notes pane); and a **2020 SIGGRAPH course** on the same
+  technique in the same year (`F`). Only this one is peer-reviewed. Read at the author's copy
+  `sebh.github.io/publications/egsr2020.pdf`, whose page 1 carries "Eurographics Symposium on
+  Rendering 2020 / Volume 39 (2020), Number 4" and whose acknowledgments thank "the **anonymous
+  reviewers**" — both checked. The publisher copy was not reached, so byte-identity with the record
+  is unverified.
+- **bilodeau2014** `F` — Bilodeau, B. (2014). *Vertex Shader Tricks*, AMD, GDC 2014. — A conference
+  talk, not peer review. Cited for exactly one sentence, on slide 12: **"Triangle has better
+  performance than quad."**
+  ⚠️ **The reasoning everybody repeats is not in this artefact.** All 33 slides and their speaker
+  notes were read; the quad-utilisation and diagonal-seam explanation appears nowhere in it, and
+  slide 12 has no notes at all. That argument lives only in personal blogs, and the measurements
+  there are small — about 0.1 ms on an artificial 512² shader, and **0.2% at 1080p**. Cite this for
+  the claim; do not attribute the explanation to it, and do not present the effect as large.
+
 - **tr_lighting_shadows** `F` — `terrain-renderer/references/10-lighting-shadows.md`, this
   repository. — Not peer review: a practitioner chapter in a sibling skill, cited for what a
   shipping renderer chose and never as evidence that a mechanism is correct. §"Atmospheric
