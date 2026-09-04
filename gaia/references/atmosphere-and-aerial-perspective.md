@@ -81,7 +81,14 @@ interacting with rebuilds nothing.
 `libRadtran`, which is a comparison point in that paper rather than the error reference), over a
 09h30–13h30 window: a Bruneton-class model 11.3, Hosek
 41.5, Preetham 88.1 — all three rendering in O(1). **Accuracy is bought in the bake, not in the
-pass.** Once the tables exist, the cheap model and the accurate model cost the frame the same.
+pass** — but `O(1)` is a complexity class, not a cost. The analytic model evaluates a polynomial in
+registers: no texture, no bandwidth, no residency. The tabulated one costs 8 MB resident, two 3D
+fetches and a manual lerp in the fourth coordinate per sample, with a working set that does not fit
+a tile-based mobile GPU's cache. On desktop that difference is noise; on mobile or handheld it is
+why the analytic branch is still alive in 2026. ⚠️ An earlier revision said the two "cost the frame
+the same" — taking the `O(1)` column of a **complexity** table and turning it into a frame cost, one
+line after quoting RMSE from the same table. That is exactly the move `sky-and-weather-state.md`
+forbids in bold. **Accuracy is bought in the bake; bandwidth is still bought in the pass.**
 
 **The comparison that is usually stated backwards.** [hillaire2020] §7 does *not* claim to be
 faster than its predecessor, and repeating that it does is a misreading: *"the total render time is
@@ -173,6 +180,35 @@ rather than a derivation — the practitioners who describe it say in their own 
 physically correct, and they ship it anyway because the error is small and the alternative is a
 second full integration.
 
+## The sky is a light, and that is a second output
+
+⚠️ **The largest omission this document had.** For outdoor terrain the sky is the **dominant** light
+source on every surface the sun does not reach — every north face, every shadowed valley, everything
+under a cloud deck. A document naming itself the owner of "how the sky is drawn" owes that output,
+and an earlier revision of this one did not mention ambient, a probe, spherical harmonics or a
+diffuse sky term at all.
+
+The LUT set has **four** consumers, not two:
+
+1. **Sky radiance** for the pixels no geometry claimed — the fullscreen triangle above.
+2. **Aerial perspective** for every pixel geometry did claim — the froxel volume above.
+3. **Sun colour**, from the transmittance LUT along the sun path. Every lit surface uses it. A
+   private sun colour is the same class of bug as a private water fog colour, and it is what makes a
+   sunset glint red instead of white.
+4. **Ambient irradiance** for everything the sun misses — an SH-9, a small prefiltered cubemap, or
+   the ground-irradiance table `sky-and-weather-state.md` already produces at 16×64 and which, until
+   now, nothing in this corpus consumed.
+
+**The fourth output is what makes a time-of-day scrub expensive, not the atmosphere LUTs.**
+Re-convolving a probe every frame is a real cost; re-convolving every N frames **pops** while an
+artist drags the slider, which is worse than either. State the cadence: re-convolve when the sun
+passes a threshold, dual-buffer and cross-fade so it never steps, and hold it steady *while* the
+slider is being dragged rather than only after it is released.
+
+This is also what `water-rendering.md` reaches for when it puts "distant probe or sky capture last"
+at the bottom of its reflection fallback. That capture is an atmosphere output and belongs in the
+interface above.
+
 ## The camera-relative frame
 
 At planetary scale the atmosphere must be evaluated in **the same camera-relative frame as
@@ -244,11 +280,14 @@ today, which is where the remaining discretionary cost sits.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | A disk of sky drawn over a mountain | Sky composited without a depth test [tr_lighting_shadows] | Draw last, depth-test |
-| A seam along the screen diagonal | Two triangles instead of one | One fullscreen triangle [bilodeau2014] |
+| A seam along the screen diagonal | Two triangles instead of one — ⚠️ this mechanism is folklore and is **not** what [bilodeau2014] states; see the note above | One fullscreen triangle. The performance claim is [bilodeau2014]'s; the seam reasoning is nobody's |
 | A 40 km vista reads as a miniature | No aerial perspective; fog cards and grading cannot substitute | The froxel volume, 0.04 ms at 32³ [hillaire2020] — but check its depth range covers the vista: a 32-slice volume sized for a few hundred metres leaves the far field to fall back on the sky term alone |
 | The scene goes muddy at range and no parameter fixes it | Three media attenuating the same path — aerial perspective, height fog and froxel fog composited as results | Sum coefficients in the shared froxel, integrate once; apply the sky term once at one depth |
 | Sea and land disagree in colour exactly at the horizon | A private water fog colour instead of the shared atmosphere path | One atmosphere state, shared — `water-rendering.md` |
 | Sky and terrain detach at the horizon when the camera moves | A planet-absolute atmosphere shader jittering against jitter-free terrain | Evaluate in the camera-relative frame — `planetary-precision.md` |
+| Shadowed slopes and valley floors are flat black, or lit by a constant | The sky's **ambient** output is missing; only the sun and the AP term were wired up | Convolve the sky into an irradiance probe — the 16×64 ground-irradiance table is already produced upstream |
+| The ambient lighting steps visibly while an artist drags the time slider | The probe re-convolved every N frames | Dual-buffer and cross-fade, and hold steady during the drag |
+| The sun disc is white at sunset while the sky is red | The sun colour taken as a constant instead of from the transmittance LUT along the sun path | One sun colour, from the atmosphere |
 | The sky is fine on the ground and wastes resolution from orbit | The sky-view LUT spends most of itself on empty space | Switch to on-screen ray marching for space views [hillaire2020] §5.3 |
 | Mobile spends 3% of the frame rebuilding LUTs | All four rebuilt every frame; the transmittance LUT alone is 0.53 ms on an iPhone 6s and depends only on the medium | Bake transmittance at load; gate multi-scattering on ~1° of sun elevation. Roughly 1.03 ms → 0.38 ms |
 | Water and terrain disagree in colour at the horizon *after* both were told to share the atmosphere | They share the LUT and not the **far-field fallback**: one clamps to the last froxel slice, the other evaluates analytically | Same fallback, same cross-fade width, on both surfaces |
