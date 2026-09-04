@@ -5,7 +5,7 @@ description: "Every Gaia document, its axis, and whether a human has checked its
 tags: [index, routing]
 status: draft
 okf_version: "0.2"
-generated: { by: process:gaia-index, at: 2026-09-04T05:57:15Z }
+generated: { by: process:gaia-index, at: 2026-09-04T06:18:47Z }
 ---
 # Gaia index
 
@@ -54,7 +54,7 @@ work says what the document claims. That distinction is the whole point of the
 
 | Document | What it answers | Status |
 |---|---|---|
-| [`atmosphere-and-aerial-perspective.md`](atmosphere-and-aerial-perspective.md) | How the sky is drawn and how every terrain pixel gets its distance cue: one fullscreen triangle drawn last and depth-tested, four LUTs that fit in a third of a millisecond, and the rule that stops three participating media attenuating the same path twice. | draft |
+| [`atmosphere-and-aerial-perspective.md`](atmosphere-and-aerial-perspective.md) | How the sky is drawn and how every terrain pixel gets its distance cue: one fullscreen triangle drawn last and depth-tested, four resolution-independent LUTs costing 0.17 ms with only the on-screen apply scaling with pixels, and the rule that stops three participating media attenuating the same path twice. | draft |
 | [`caustics.md`](caustics.md) | Underwater and surface caustics on terrain: the caustic-map path for a rasterizer, the ray-traced path for studio quality, and why the scrolling texture everyone ships is not a caustic. | draft |
 | [`gpu-driven-culling.md`](gpu-driven-culling.md) | Moving per-frame terrain visibility and LOD onto the GPU: the persistent scene, the culling ladder, two-phase HiZ occlusion, and indirect submission. | draft |
 | [`heightfield-lod.md`](heightfield-lod.md) | Picking a level-of-detail scheme for regular-grid terrain, and the crack contract that decides whether it ships. | draft |

@@ -189,12 +189,18 @@ others. Read `bruneton2017` before choosing anything here.
 - **bruneton2017** `P` — Bruneton, E. (2017). *A Qualitative and Quantitative Evaluation of 8 Clear
   Sky Models.* IEEE Transactions on Visualization and Computer Graphics 23(12), 2641–2655,
   doi:10.1109/TVCG.2016.2622272. — **The error half of this axis, and there is no substitute for
-  it.** §14.1 and **Table 2** rank eight models by RMSE in mW/(m²·sr·nm) against `libRadtran`,
-  itself calibrated against the Kider et al. ground-truth measurements: Preetham **88.1**, O'Neal
+  it.** §14.1 and **Table 2** rank eight models by RMSE in mW/(m²·sr·nm) against the **sky measurements**
+  themselves — `libRadtran` is a physically-based comparison point in the paper, not the error
+  reference, and an earlier version of this entry said otherwise: Preetham **88.1**, O'Neal
   49.5, Hosek **41.5**, Nishita93 26.6, Nishita96 18.3, Haber 14.7, Bruneton **11.3**, Elek 11.3.
   Table 2 is also a **cost** table in the same rows — precompute time, precompute memory and render
   time as complexities — which makes it the one artefact in this corpus that states both halves of
-  a recommendation in a single table. ⚠️ The paper spells the third author's model **O'Neal**, not
+  a recommendation in a single table. ⚠️ **Its caption footnote is load-bearing and easy to drop:**
+  the precompute columns for **Haber and Nishita96 are per single sun zenith angle**, Bruneton's and
+  Elek's are for `n` angles, and Nishita93's are independent of sun angle. The columns are not
+  comparable as printed. ⚠️ And the measurement window is **09h30–13h30 only** (§3.1, 17 daytimes,
+  81 directions); the 06h00 cell is `n/a`, so no RMSE here evidences a sunset claim — Table 2's
+  separate `sunset sunrise` column does. ⚠️ The paper spells the third author's model **O'Neal**, not
   O'Neil. It gives complexities, not wall-clock, so an RMSE from here must not be paired with a
   frame time from another paper and called a measurement.
 - **brunetonneyret2008** `P` — Bruneton, E. & Neyret, F. (2008). *Precomputed Atmospheric

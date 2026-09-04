@@ -1,14 +1,14 @@
 ---
 type: Technique
 title: Atmosphere and aerial perspective
-description: "How the sky is drawn and how every terrain pixel gets its distance cue: one fullscreen triangle drawn last and depth-tested, four LUTs that fit in a third of a millisecond, and the rule that stops three participating media attenuating the same path twice."
+description: "How the sky is drawn and how every terrain pixel gets its distance cue: one fullscreen triangle drawn last and depth-tested, four resolution-independent LUTs costing 0.17 ms with only the on-screen apply scaling with pixels, and the rule that stops three participating media attenuating the same path twice."
 tags: [rendering, atmosphere, sky, aerial-perspective, fog]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-04T00:00:00Z }
 sources:
   - { id: hillaire2020, tier: P, locator: "READ IN FULL (the author's copy at sebh.github.io/publications/egsr2020.pdf; p.1 carries 'Eurographics Symposium on Rendering 2020 / Volume 39 (2020), Number 4' and the acknowledgments thank 'the anonymous reviewers' -- both checked, which is what settles the P tier against two same-year course artefacts on the same technique). Section 7 and Table 2 for the four LUTs with resolutions, step counts and per-LUT times on an NVIDIA 1080 and an iPhone 6s, and for the 0.31 ms total at 1280x720; section 7 verbatim for the comparison that matters -- 'the Bruneton model BN08 renders in 0.22ms, but this is without all the LUTs being updated. Updating all the LUTs using the code provided costs 250ms, where 99% of this cost comes from the many iterations required to estimate multiple scattering'; section 7 for volumetric shadows at 32 samples costing 1.0 ms; section 5.3 for the sky-view LUT losing accuracy from space and the switch to on-screen ray marching" }
   - { id: brunetonneyret2008, tier: P, locator: "the precomputed model this pass samples, and the render cost it achieves once its tables exist -- 125 fps at 1024x768 on an 8800 GTS, of which 0.4 ms is the first three terms of eqs. 17-18 and 2.6 ms the remainder including 1 ms for the non-linear parameterisation, in section 6. The tables themselves and the precompute are sky-and-weather-state.md's subject, not this document's. Read in the Inria HAL deposit inria-00288758, paginated 1-8 rather than 1079-1086, so sections are cited and pages are not" }
-  - { id: bruneton2017, tier: P, locator: "Table 2 for the accuracy the pass inherits from whichever model was precomputed -- render-time complexity and RMSE in the same rows, Bruneton and Elek at O(1) and 11.3, Hosek at O(1) and 41.5, Preetham at O(1) and 88.1. Cited here only for what the choice of model costs the FRAME; the precompute columns belong to sky-and-weather-state.md. Read in arXiv:1612.04336v1, the author's accepted version" }
+  - { id: bruneton2017, tier: P, locator: "Table 2 for the accuracy the pass inherits from whichever model was precomputed -- render-time complexity and RMSE in the same rows, the RMSE being against the sky MEASUREMENTS and not against libRadtran, over a 09h30-13h30 window only, Bruneton and Elek at O(1) and 11.3, Hosek at O(1) and 41.5, Preetham at O(1) and 88.1. Cited here only for what the choice of model costs the FRAME; the precompute columns belong to sky-and-weather-state.md. Read in arXiv:1612.04336v1, the author's accepted version" }
   - { id: bilodeau2014, tier: F, locator: "slide 12 only, verbatim 'Triangle has better performance than quad'. A GDC talk, not peer review. The quad-utilisation and diagonal-seam explanation usually attributed to this deck is NOT in it -- all 33 slides and their speaker notes were read and slide 12 carries no notes; that reasoning exists only in personal blogs, which measure the effect at about 0.2% at 1080p" }
   - { id: tr_lighting_shadows, tier: F, locator: "section 'Atmospheric integration' for the fullscreen-triangle sky idiom, verbatim 'The skybox is the same fullscreen triangle. Modern sky rendering is neither a dome mesh nor a box: draw the sky last as one fullscreen triangle, depth-test', for the failure it prevents -- 'a disk drawn over terrain' is sky composited without a depth test -- for the vertex-fog-to-height-fog-to-physical-atmosphere history, for aerial perspective as a core terrain feature rather than a post effect, and for the double-attenuation rule extended to three media. A practitioner chapter in a sibling skill, not peer review" }
 ---
@@ -32,9 +32,26 @@ iPhone 6s:
 | Aerial perspective | 32³ (32²×16 mobile) | 30 / 8 | 0.04 ms | 0.11 ms |
 | Multi-scattering | 32² | 20 | 0.07 ms | 0.12 ms |
 
-**0.31 ms total at 1280×720**, updates included. Volumetric shadows through the atmosphere, at 32
-samples, take it to **1.0 ms** — so the shadowed variant costs roughly three times the unshadowed
-one, and that is the single largest discretionary number on this page.
+**0.31 ms total at 1280×720**, updates included — and **do the subtraction before you budget it**.
+The four LUTs sum to **0.17 ms**, and every one of them is a fixed size that does not change with
+screen resolution. The remaining **0.14 ms** is the on-screen apply, and that is the only part that
+scales with pixels. So the shape of the budget is `0.17 + 0.14 × (pixels / 0.92 Mpix)`: about
+**0.44 ms at 1080p** and about **1.4 ms at 4K** on the same 2016-era GPU, against 0.31 quoted.
+
+That the LUTs do not scale is a design decision, not an accident. [hillaire2020] §5.3 says so
+directly: ray marching the sky per pixel "can be expensive, especially at high resolution such as
+4K or 8K", so the distant sky is rendered into a fixed 200×100 latitude/longitude texture and
+upsampled. **The sky is resolution-independent by construction; the aerial-perspective apply is
+not.**
+
+⚠️ These are one paper's measurements on one GPU at one resolution. They are the right *shape* to
+reason with and they are not your budget. The mobile column is the warning: the same transmittance
+LUT costs 0.01 ms on a 1080 and **0.53 ms** on an iPhone 6s, 53× more, and that LUT is a pure
+function of the medium that need not be rebuilt every frame at all — on a tight platform, updating
+it on a cadence is the first saving available, and it is worth **half** of the mobile LUT cost.
+
+Volumetric shadows through the atmosphere, at 32 samples, take the total to **1.0 ms** — roughly
+three times the unshadowed pass, and the single largest discretionary number on this page.
 
 **How wrong it is.** The pass inherits the accuracy of whatever model was precomputed, and
 [bruneton2017] Table 2 prices that in RMSE against `libRadtran`: a Bruneton-class model 11.3, Hosek
@@ -48,9 +65,15 @@ all the LUTs being updated. Updating all the LUTs using the code provided costs 
 99% of this cost comes from the many iterations required to estimate multiple scattering."*
 
 Bruneton renders **faster**. What it cannot do is rebuild its state inside a frame. So the real
-claim is about *dynamism*, not throughput: if your sky never changes, the older model is cheaper and
-you should use it. The moment the sun moves, 250 ms lands in your frame and the newer method is the
-only one of the two that survives it.
+claim is about *dynamism*, not throughput: if your medium never changes, the older model is cheaper
+and you should use it.
+
+⚠️ **And "the medium", not "the sun".** Sun zenith is an axis of the older model's 4D table, so
+moving the sun there costs a texture coordinate — see `sky-and-weather-state.md`, which corrects
+this at length. What lands 250 ms in your frame is a change of *medium*: turbidity, scale heights,
+or ground albedo. The newer method inverts the trade, building a small sun-specific LUT every frame
+at 0.05 ms instead of a large sun-general one once, which is why a moving sun is free there too —
+by a different mechanism, and one that also makes a changed medium free.
 
 **Alternatives, dismissed in a line each.**
 
@@ -71,7 +94,9 @@ rendering is neither a dome mesh nor a box: draw the sky **last** as one fullscr
 depth-test."*
 
 Three properties, and each removes a class of bug. Drawing **last** means the sky only shades pixels
-no geometry claimed, so its cost falls as the scene fills. **Depth-testing** is what keeps it
+no geometry claimed, so *the sky shader's* cost falls as the scene fills — note that the
+aerial-perspective apply moves the opposite way, since it is paid on every pixel geometry *did*
+claim. A closed interior scene pays almost no sky and almost all apply. **Depth-testing** is what keeps it
 behind the terrain — the named failure is *"a disk drawn over terrain"*, which is what compositing
 without a depth test looks like the first time a mountain reaches the horizon. And **one triangle**
 rather than a quad avoids a seam along the diagonal where two triangles meet.
@@ -162,10 +187,10 @@ today, which is where the remaining discretionary cost sits.
 |---|---|---|
 | A disk of sky drawn over a mountain | Sky composited without a depth test [tr_lighting_shadows] | Draw last, depth-test |
 | A seam along the screen diagonal | Two triangles instead of one | One fullscreen triangle [bilodeau2014] |
-| A 40 km vista reads as a miniature | No aerial perspective; fog cards and grading cannot substitute | The froxel volume, 0.04 ms at 32³ [hillaire2020] |
+| A 40 km vista reads as a miniature | No aerial perspective; fog cards and grading cannot substitute | The froxel volume, 0.04 ms at 32³ [hillaire2020] — but check its depth range covers the vista: a 32-slice volume sized for a few hundred metres leaves the far field to fall back on the sky term alone |
 | The scene goes muddy at range and no parameter fixes it | Three media attenuating the same path — aerial perspective, height fog and froxel fog composited as results | Sum coefficients in the shared froxel, integrate once; apply the sky term once at one depth |
 | Sea and land disagree in colour exactly at the horizon | A private water fog colour instead of the shared atmosphere path | One atmosphere state, shared — `water-rendering.md` |
 | Sky and terrain detach at the horizon when the camera moves | A planet-absolute atmosphere shader jittering against jitter-free terrain | Evaluate in the camera-relative frame — `planetary-precision.md` |
 | The sky is fine on the ground and wastes resolution from orbit | The sky-view LUT spends most of itself on empty space | Switch to on-screen ray marching for space views [hillaire2020] §5.3 |
-| A time-of-day sweep costs 250 ms a step | The old precompute rebuilt per step | Rebuild only the sun-dependent table, or use the in-frame LUT set [hillaire2020] |
-| Volumetric shadows triple the sky cost | 32 ray-march samples with jitter and reprojection | Budget 1.0 ms, or reduce samples and lean harder on TAA [hillaire2020] |
+| A time-of-day sweep costs 250 ms a step | The old precompute being rebuilt per step for a sun move it does not need — sun angle is a table AXIS, not a bake input | Move `u_µs`; rebuild nothing. If the medium is what changes, use the in-frame LUT set [hillaire2020] |
+| Volumetric shadows triple the sky cost | 32 ray-march samples with jitter and reprojection | Budget the 1.0 ms, or drop the feature. ⚠️ Do **not** simply cut samples and lean harder on TAA: that trades a measured cost for ghosting and crawling shafts, which is an unmeasured one |
