@@ -206,17 +206,28 @@ published result — only the transform in the middle is:
 
 **Sub-cell accuracy, if you need it.** The raster transform quantises the source to cell centres,
 so the field is accurate to about half a cell near the curve — fine at 2 km, wrong if the spline is
-a river centreline at 1 m/px. Two ways out: supersample the seed mask by 2–4× and downsample the
-result, or seed the transform with the *exact* distance from each near-curve cell to the analytic
-segment and let the transform propagate from there. The second is the generalisation
-[felzenszwalb2012] already provides — a non-binary `f` is exactly what the algorithm takes.
+a river centreline at 1 m/px. Supersample the seed mask by 2–4× and downsample the result: the
+quantisation error falls with the sample spacing, at 4× the seed memory and 4× the transform.
+
+⚠️ **Do not try to buy it by seeding the transform with the exact distance instead.** A non-binary
+`f` is indeed what [felzenszwalb2012] takes, but its `f` is an additive *cost*, not a residual
+geometry: seeding `f(q) = d(q)²` returns `min_q[|p−q|² + d(q)²]`, a Pythagorean sum, when the
+quantity wanted is `min_q(|p−q| + d(q))²` — which carries a cross term `2·|p−q|·d(q)` that no
+separable form of this algorithm can express. It does not merely fail to help. Measured here on a
+straight curve at `x = 50.37` across a 101-cell span, worst-case error against the analytic
+distance: plain binary transform **0.37 cells**; seeded with exact distances over a band of 1, 2
+and 4 cells, **0.63, 1.60 and 3.49**. The error grows with the amount of exact information seeded,
+and the scheme lost to the plain binary transform in eight of the nine configurations tried. The
+mechanism that does work is the one jump flooding uses below — propagate the nearest *position*,
+then take the distance to the analytic segment from the propagated coordinate.
 
 **Signed fields.** Run the transform on the mask and again on its complement, and subtract. ⚠️ The
 order is the whole content of this line, and an earlier draft had it backwards:
 
 ```
 # edt(S) is this document's D_f with f = 0 on S: DISTANCE TO THE NEAREST CELL OF S.
-# So edt(inside) is small inside the mask -- which is why it is the term that gets negated.
+# So edt(inside) is 0 inside the mask, and edt(outside) is 0 outside it.
+# edt(outside) -- the SECOND term -- is the one that carries the minus sign.
 sdf = edt(inside) − edt(outside)      # positive outside, negative inside
 ```
 
@@ -314,7 +325,7 @@ differently — the same defect `terrain-analysis-masks.md` documents for slope 
 | Distance ramp is a visible octagon | Chamfer anisotropy — 4/3 per diagonal step against √2 | Exact transform, or 5-7-11 if the error budget allows |
 | A thresholded distance region is an octagon, not a circle | Chamfer error is bipolar and direction-dependent: 3-4 runs +5.41% at 18° and **−5.72% at 45°**, so the region bulges on the diagonals and pulls in near 18° | 5-7-11 if approximate is fine (+1.98%/−1.61%); exact separable if the threshold is a specification [felzenszwalb2012] |
 | Field is right near seeds, wrong far away | Squared distance square-rooted between the two passes | Stay in squared distance until the end |
-| NaNs in the second pass | `inf` used as the empty value; `inf − inf` in the intersection | A large finite float; `m + n` suffices |
+| NaNs in the second pass | `inf` used as the empty value; `inf − inf` in the intersection | A large finite float; the floor must exceed `m² + n²` — `m + n` is [meijster2000]'s unsquared first-phase constant and saturates silently |
 | Beads-on-a-string bumps along a spline-driven ridge | Curve rasterised at more than half-cell spacing | Sample at ≤ 0.5 cell, or rasterise conservatively |
 | Ridge from a spline has a flat top and cliff sides | Distance thresholded rather than profiled | `exp(−d²/2σ²)` or a smoothstep band |
 | Distance mask breaks at a different LOD | Threshold left in cells | Multiply by cell size; threshold in metres |
