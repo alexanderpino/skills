@@ -33,7 +33,7 @@ provenance tier.
 
 ## Provenance tiers
 
-Carried over from `terrain-architect/references/00-index.md`, because the failure they
+Carried over from `obsolete/terrain-architect/references/00-index.md`, because the failure they
 prevent — confident fabrication of a citation — is the one Gaia is most exposed to.
 
 | Tier | Meaning | How to write about it |

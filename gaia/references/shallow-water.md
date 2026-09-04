@@ -209,7 +209,7 @@ error, and unconditional positivity plus a fixed per-cell cost are worth more th
 ## Authority: which half of the water is real
 
 ⚠️ **This section is doctrine, not physics.** `fluid_authority` has **no external source**: it is
-a convention this repository recommends, carried from terrain-renderer's `19-fluid-simulation.md`.
+a convention this repository recommends, carried from the retired `obsolete/terrain-renderer`'s `19-fluid-simulation.md`.
 It is an engineering preference about ownership, replication and persistence, not a fact about
 water, and it is written as a rule only because a project that leaves it implicit discovers it at
 the worst possible moment.

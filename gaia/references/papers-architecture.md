@@ -13,7 +13,7 @@ invalidated and kept resolution-independent. **The tier table and the two non-ne
 live in `papers-flow.md`** and are not repeated here; read them before citing anything below.
 
 ⚠️ **This axis was grounded from scratch, and that is worth stating.** Its in-repo source,
-`terrain-architect/references/14-graph-runtime.md`, is 425 lines of architecture prose carrying
+`obsolete/terrain-architect/references/14-graph-runtime.md`, is 425 lines of architecture prose carrying
 **zero citations** — checked, no inline markers anywhere in the file. Distilling it would have
 produced confident unsourced assertion, which is the failure mode this skill exists to prevent.
 So the mechanisms below are grounded in the **incremental-computation and build-systems**
@@ -184,12 +184,12 @@ is evidence about practice, never about correctness.
 These are artefacts in this repository rather than published work. They are `F` — a register or a
 chapter is not peer review — but they are checkable, which a recollection is not.
 
-- **ta_graph_runtime** `F` — `terrain-architect/references/14-graph-runtime.md`. — The node and
+- **ta_graph_runtime** `F` — `obsolete/terrain-architect/references/14-graph-runtime.md`. — The node and
   parameter model, demand-driven evaluation, the content-addressed cache key, dirty propagation,
   and the accumulator pattern. **Carries no citations of its own**, so it is cited here for what a
   practitioner built and for the two defects Gaia found in it, never as evidence that a mechanism
   is correct.
-- **ta_ops_filters** `F` — `terrain-architect/references/10-primitives-ops-filters.md`. —
+- **ta_ops_filters** `F` — `obsolete/terrain-architect/references/10-primitives-ops-filters.md`. —
   §"Placement & masking" for `apply_masked` and the rules that placements are authored in metres
   and that a binary mask must never ship; §"Place before you sample, not after" for the
   coordinate-versus-raster transform measurement. Unlike its sibling chapter this one **does** carry

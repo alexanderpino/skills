@@ -386,7 +386,7 @@ others. Read `bruneton2017` before choosing anything here.
   there are small — about 0.1 ms on an artificial 512² shader, and **0.2% at 1080p**. Cite this for
   the claim; do not attribute the explanation to it, and do not present the effect as large.
 
-- **tr_lighting_shadows** `F` — `terrain-renderer/references/10-lighting-shadows.md`, this
+- **tr_lighting_shadows** `F` — `obsolete/terrain-renderer/references/10-lighting-shadows.md`, this
   repository. — Not peer review: a practitioner chapter in a sibling skill, cited for what a
   shipping renderer chose and never as evidence that a mechanism is correct. §"Atmospheric
   integration" for the fullscreen-triangle sky idiom, the three-media composition hazard and the

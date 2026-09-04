@@ -4,6 +4,13 @@
     python3 tools/okf_apply.py            # write the headers
     python3 tools/okf_apply.py --dry-run  # print what would change
 
+⚠️ HISTORICAL. This is a one-shot migration that has already been applied, and its
+~150 hard-coded paths are PRE-MOVE: `terrain-architect/...` and `terrain-renderer/...`
+are now under `obsolete/`. The paths are left as they were rather than rewritten,
+because they record which files this migration actually touched and when. Re-running
+it as-is will find nothing. If it is ever needed again, prefix the two skill roots
+with `obsolete/` at that point rather than editing this record now.
+
 WHAT OKF IS. The Open Knowledge Format, version 0.2 -- a vendor-neutral
 convention for knowledge as plain markdown with YAML frontmatter, published by
 Google Cloud. Only `type` is required (SPEC section 11); `title`,

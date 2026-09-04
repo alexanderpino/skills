@@ -152,10 +152,15 @@ something**, and add a `planned` row before writing a new document.
 
 - **physically-based-rendering** — microfacet BRDFs, the rendering equation, material models.
   Gaia cites it rather than restating it; anything about BRDF theory belongs there.
-- **terrain-architect**, **terrain-renderer** — the source skills Gaia is
-  distilled from. (An earlier version of this list also named **water-physics**; no such skill
-  exists in this repository, and the water material it referred to is in `terrain-renderer`.) They are larger, carry executable reference implementations, and are kept
-  for provenance. Prefer Gaia; reach for them when you need the code or the long derivations.
+- **terrain-architect**, **terrain-renderer** — the source skills Gaia is distilled from.
+  ⚠️ **Both are RETIRED and now live under `obsolete/`, superseded by this skill.** Do not treat
+  them as a live alternative: they were written to a weaker standard than Gaia, and
+  `registers/source-findings.tsv` records specific defects found in them while distilling.
+  Two things in them did not survive distillation and are still worth reaching for: the
+  executable reference implementation at `obsolete/terrain-architect/reference-impl/`, since
+  Gaia ships no code, and the long derivations behind results Gaia states with a locator only.
+  (An earlier version of this list also named **water-physics**; no such skill exists in this
+  repository, and the water material it referred to is in `obsolete/terrain-renderer`.)
 
 ## When not to use this
 

@@ -35,7 +35,7 @@ Two tier decisions recur in this family and are stated once:
 ⚠️ **This block had both skills backwards, and the error was the dangerous direction.** It is
 now checked with `git ls-tree` rather than from memory:
 
-- **`terrain-renderer/references/` is on `main` and on this branch**, twenty files;
+- **`obsolete/terrain-renderer/references/` is on `main` and on this branch**, twenty files;
   `12-water-rendering.md` is 1691 lines on both. Three entries below point into it —
   `fluid_authority`, `bodytype_doctrine` and `iop_split`, not the two this block used to count.
   The block declared that live path dead. A false "this exists" is caught by the first reader who

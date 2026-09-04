@@ -489,7 +489,7 @@ Before declaring any subsystem "done", verify *every* item:
 Use only sibling skills present in this repository:
 
 - `physically-based-rendering` — authoritative material/BRDF/BSDF math and color management.
-- `terrain-architect` — terrain generation, clipmaps, streaming, and world-scale terrain systems.
+- `gaia` — terrain and water: generation, erosion and flow, terrain rendering, LOD and streaming, and world-scale precision. (Supersedes `terrain-architect` and `terrain-renderer`, now retired under `obsolete/`.)
 - `principal-architect` — organization-wide architecture, delivery, governance, and cross-system trade-offs.
 
 ---

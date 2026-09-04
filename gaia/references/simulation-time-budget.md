@@ -61,7 +61,7 @@ c   = sqrt(g * h)           # shallow water: the long-wave celerity, h the water
 Read what that says about a water patch. Celerity rises with **depth**, so a deep pool costs a
 smaller step than a puddle at the same resolution, and a flood that deepens as it fills gets
 *progressively* more expensive. Shipped code does not run at `C = 1`:
-`terrain-architect/reference-impl/shallow_water.py` uses `C = 0.20`, a 5x margin, because `c` is
+`obsolete/terrain-architect/reference-impl/shallow_water.py` uses `C = 0.20`, a 5x margin, because `c` is
 estimated from the state at the start of the step and the state moves during it.
 
 **Diffusive / parabolic** — viscous damping, thermal relaxation, hillslope creep, anything of the
