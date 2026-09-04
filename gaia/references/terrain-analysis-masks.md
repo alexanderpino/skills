@@ -11,7 +11,7 @@ sources:
   - { id: beven1979, tier: P, locator: "the topographic index ln(a / tan beta). NOT OPENED — Hydrological Sciences Bulletin is paywalled at Taylor and Francis, and the White Rose repository record states outright that no full text is held there, so no section or equation inside it is named" }
   - { id: timonen2010, tier: P, locator: "READ IN FULL. Section 3 Summary of core ideas states the result this document uses — a thread keeps the samples it has processed in a convex hull subset, so that 'the total time complexity for processing a line of n samples is O(n)' with no approximation beyond data-type precision; section 5 Occlusion extraction and Algorithm 1 are the mechanism, a stack popped while h(v2)*d(v1) >= h(v1)*d(v2) and then pushed, which finds the new sample's horizon and restores convexity in the same operation, and where the O(N) is derived from exactly N pushes and at most 2N comparisons. Section 4 Computation framework is rasterisation and thread topology and carries neither claim. NOTE section 3 also says the authors are 'not aware of this method having been introduced in a field outside computer graphics before' — dozier2022 section I says otherwise, and the order-N sweep is Dozier, Bruno and Downey 1981; this paper is a refinement, not the origin" }
   - { id: dozier2022, tier: P, locator: "§I p.1 — the O(N^2) origin, the order-N method attributed to Dozier, Bruno & Downey 1981, and the note that most mountain radiation calculations use it" }
-  - { id: bavoil2008, tier: F, locator: "READ IN FULL. Slide 12, Horizon-Based AO, defines both angles as arctangents of z over the length of the xy part — h(H) = atan(H.z / ||H.xy||) for the horizon vector and t(T) = atan(T.z / ||T.xy||) for the tangent vector — and gives the weighting as AO = sin h − sin t; slide 16, Core Algorithm, is where it is averaged over 2D directions, AO(theta) = sin h(theta) − sin t(theta). A SIGGRAPH talk deck, not a peer-reviewed paper, hence F" }
+  - { id: bavoil2008, tier: F, locator: "READ IN FULL. Slide 12, Horizon-Based AO, defines both angles as arctangents of z over the length of the xy part — h(H) = atan(H.z / ||H.xy||) for the horizon vector and t(T) = atan(T.z / ||T.xy||) for the tangent vector — and gives the weighting as AO = sin h − sin t; slide 16, Core Algorithm, is where it is averaged over 2D directions, AO(theta) = sin h(theta) − sin t(theta); slide 23, Attenuation Function, verbatim 'We use the attenuation W(r) = 1 - r squared', which is the one part of HBAO that transfers to a baked terrain map, and slide 24 for its per-sample form. A SIGGRAPH talk deck, not a peer-reviewed paper, hence F" }
   - { id: weiss2001, tier: F, locator: "READ IN FULL. Fig. 2a defines the index as the elevation of a cell minus the mean elevation of a neighbourhood around it, and Figs. 2b and 2c give the poster's own two worked scales on a 30 m DEM as annulus focal means, tpi300 with inner and outer radii of 5 and 10 cells and tpi2000 with 62 and 67; Fig. 3b and 3c threshold each by standard-deviation units; Fig. 4a is the multi-scale part this document cites, combining a small and a large scale into landform classes, and Fig. 4b shows the resulting ten classes. An ESRI User Conference poster, not peer review, hence F" }
   - { id: he2010, tier: P, locator: "the local linear model with a, b from box filters; eps as the variance threshold. NOT OPENED — the SpringerLink chapter PDF served an HTML shell, the author copies at kaiminghe.com and kaiminghe.github.io both 404, and no other copy was reachable, so no section or equation inside it is named" }
   - { id: tomasi1998, tier: P, locator: "§2.1 Example: the Gaussian Case — the product of the CLOSENESS function c(xi,x) and the SIMILARITY function s(phi,f), both Gaussian. The paper's own axis pair is DOMAIN and RANGE, not spatial and range; search it for 'closeness' and 'similarity' to reach these two weights" }
@@ -25,12 +25,14 @@ both are wrong in ways that look fine, which is what this document is about.
 
 **Run every analysis node downstream of the last node that modifies height.** Central differences
 for slope on a clean R32F field, [horn1981] if it is noisy or quantised; the quartic fit
-[zevenbergen1987] for curvature; the sweep [timonen2010] for occlusion; and selectors built as a
+[zevenbergen1987] for curvature; the horizon sweep — Dozier's 1981 idea, [timonen2010] for the GPU
+formulation — for occlusion; and selectors built as a
 **priority stack in world units with noise-broken thresholds**, so coverage sums to ≤ 1 by
 construction.
 
-⚠️ The ordering rule is the second-commonest defect in a terrain graph, after unhandled
-depressions, and it is harder to see: a snow mask built on pre-erosion slope paints snow onto the
+⚠️ The ordering rule is, in this corpus's experience, among the most common defects in a terrain
+graph — no survey is being cited for that, and none exists here — and it is harder to see than an
+unhandled depression: a snow mask built on pre-erosion slope paints snow onto the
 walls of valleys that erosion has since cut, and the output looks superficially fine — the
 materials are just subtly, inexplicably wrong. The one legitimate exception is analysis used as an
 *input* to erosion, such as slope-dependent erodibility. Name it differently so nobody wires it
@@ -84,15 +86,28 @@ first derivatives, so the guard below is a guard on slope.
 
 **Both expressions are checkable in closed form, and worth checking.** They are exact to twelve
 digits on any quadratic surface, and second-order on anything else: on a Gaussian hill, halving `L`
-quarters the error against the analytic `f''(r)` and `f'(r)/r`. The sharpest single test is that
-`plan / sqrt(p)` is the contour's own curvature — on a radially symmetric hill it reproduces `1/r`
-to seven digits at every radius, so a wrong sign or a dropped `L` shows up immediately.
+quarters the error against the analytic `f''(r)` and `f'(r)/r` (measured ratios 3.979, 3.995, 3.999
+as `L` goes 0.2 → 0.025). The sharpest single test is that `plan / sqrt(p)` is the contour's own
+curvature — on a hill it must reproduce **`−1/r`**, negative because the contour curves *away* from
+the summit. ⚠️ **Do not expect seven digits from it.** Twelve digits are a quadratic identity, not a
+property of the operator: on a Gaussian hill at `r = 1.3` this test gives 2.4, 3.5 and 4.7
+significant digits at `L` = 0.4, 0.1 and 0.025. It catches a wrong sign or a dropped `L` at the
+first digit, which is all it is for.
 
 - **Profile** (along steepest descent) — negative where the slope steepens downhill (ridges, cliff
   lips), positive where it flattens (valley floors, slope bases). This is the erosion/deposition
   mask.
 - **Plan** (across it) — negative on diverging spurs, positive in converging hollows. This is the
   **flow-convergence proxy**, and it is far cheaper than real flow accumulation.
+  ⚠️ **This sign is the negation of the one every mainstream GIS documents, and a threshold ported
+  from one must be flipped.** ArcGIS ("*a positive value indicates the surface is upwardly convex*"),
+  GRASS r.slope.aspect ("*convex form values are positive*") and spatialEco ("*positive values in the
+  planform curvature indicate … the surface is laterally convex*") all make a **diverging spur
+  positive**; here a spur is negative and a **converging hollow** is positive. Checked by deriving
+  both on `z = −0.05x² − 0.5y²` at `(1,0)`: this document gives `−1.000`, spatialEco's own R source
+  gives `+0.995`. The convention here is kept because it makes `profile + plan = ∇²z` hold exactly
+  and keeps `plan/√p` equal to the signed contour curvature — but it is the minority convention and
+  it is not labelled as such anywhere else in this file.
 - **Laplacian**, `(Z2 + Z4 + Z6 + Z8 − 4·Z5)/L²` — one op, not slope-normalised, and usually what
   people actually want from a "convexity" node. If the mask feeds a blend, use this.
 
@@ -101,8 +116,13 @@ threshold in this document the value moves with the resolution — it is not a l
 
 ⚠️ **Sign conventions differ between tools** — ArcGIS, GRASS and Houdini do not all agree on the
 sign of profile curvature, and neither the block above nor any of them is canonical. The signs
-printed above are the ones that match the bullets above them, verified on parabolic ridge and
-valley surfaces: profile −0.0027 and plan −0.037 on the ridge, exactly the opposites in the valley.
+printed above are the ones that match the bullets above them. Reproduce them like this: on
+`z = −0.00135x² − 0.0185y²` sampled at `(1, 0)`, the block gives **profile −0.002700, plan −0.037000**
+at any `L` (the stencil is exact on a quadratic), and the signs invert on `z = +0.00135x² + 0.0185y²`.
+⚠️ **The surface, the sample point and `L` are all load-bearing and an earlier version printed none of
+them.** A cylinder `z = −0.5x²` gives `plan ≡ 0`, and a paraboloid of revolution gives
+`profile = plan` everywhere — neither can produce the pair above, so "a parabolic ridge" alone does
+not identify the test.
 Render it once over a known ridge with a diverging ramp and write the convention into the node.
 
 **Curvature is a second derivative, so it amplifies quantisation brutally.** On an R16 field it is
@@ -121,13 +141,19 @@ which is the correct integral for a **baked terrain AO map with an up normal**, 
 fully open ground. HBAO [bavoil2008] — a SIGGRAPH talk rather than a peer-reviewed paper, graded
 `F` like every other talk in this bibliography — uses `sin h − sin t` instead; that is a
 screen-space weighting derived for a real per-pixel normal, and substituting it into a baked
-terrain map is a different quantity.
+terrain map is a different quantity. The two diverge most where terrain lives: at a 30° horizon
+`1 − sin h` is **0.500** against `cos²h` at **0.750**, and at 60° it is **0.134** against **0.250**.
+**The part of HBAO that does transfer is its radial attenuation**, `W(r) = 1 − r²` (slide 23),
+which is the `maxDist` falloff below rather than the angular weighting above.
 
 **`maxDist` is the parameter that matters.** A small radius gives a crevice map that reads as dirt;
 a large radius darkens valleys and lets mountains catch light, which is what actually sells
 terrain. Start at 2–5% of the domain extent, `N = 8–16` azimuths — the horizon varies smoothly.
+Attenuate with distance rather than cutting off hard: [bavoil2008]'s `W(r) = 1 − r²` is the cheap
+choice and stops the bake showing a ring at the radius you picked.
 
-⚠️ **The order-N horizon sweep is older than the citation below suggests.** [dozier2022] §I records
+⚠️ **The linear-time horizon sweep is older than the citation below suggests.** (Linear in the
+number of CELLS along a line — `N` means azimuths everywhere else in this document.) [dozier2022] §I records
 that computing horizons in order-N time is **Dozier, Bruno & Downey (1981)**, *Computers &
 Geosciences* 7(2), 145–151, and that "many, if not most, radiation calculations over mountains now
 use that method". [timonen2010] is a 2010 refinement of a 1981 idea, not its origin — and says so
@@ -140,8 +166,14 @@ Naive marching is O(N · maxDist/cellSize) per cell. [timonen2010] sweeps each a
 field maintaining the horizon's convex hull incrementally — a stack popped while
 `h(v₂)·d(v₁) ≥ h(v₁)·d(v₂)` then pushed, which restores convexity and finds the new sample's
 horizon in the same operation (§5, Algorithm 1) — giving `O(n)` for a line of `n` samples, so
-amortised O(1) per cell: the difference between
-seconds and hours for a 4k bake at kilometre radius. It is also the substrate for insolation —
+amortised O(1) per cell. ⚠️ **An earlier
+version priced that difference as "seconds and hours"; the "hours" end was an order of magnitude
+out.** Naive marching at 4096² × 16 azimuths × 1000 steps is 2.68·10¹¹ samples, which is **4.5 to 45
+minutes on one core** at 10⁹ to 10⁸ samples/s. Neither figure had a source, a date or a machine
+attached, which is how it drifted. **Hours is reachable, but only at a far heavier configuration**:
+`driver-fields.md` prices a sourced per-point DDA bake at 1–2 hours per tile on a GPU for 46 Mcell
+across **580** directions — about a hundred times the work of the 4k × 16 case above. State the cell
+count, the direction count and the machine, or the figure means nothing. It is also the substrate for insolation —
 horizon angle depends on azimuth, not on the sun, so a precomputed per-azimuth horizon makes every
 sun sample a table lookup. **Insolation is not AO**: a pole-facing wall can be wide open to the sky
 and never see the sun, so substituting one for the other puts melt in shaded ravines.
@@ -204,8 +236,14 @@ that pile depth for free: deep in hollows, ~0 on ridges.
 **What it beats.** *[horn1981] for everything* — more robust on noisy or quantised data, slightly
 smoothed on clean R32F; pick by input quality, not by habit. *Topographic position index*
 [weiss2001] — no peer review; a multi-radius neighbourhood-mean difference that classifies
-ridge/slope/valley, useful, but curvature already gives the same signal with a defensible
-derivation. *Bilateral filtering* [tomasi1998] for smoothing a mask — O(r²), not separable, and it
+ridge/slope/valley. ⚠️ **It is not the same signal as curvature, and an earlier version of this line
+said it was.** TPI is a band-pass at a chosen radius, and it degenerates to the Laplacian only as
+`r → 0`: `f − mean_ring_r(f) = (r²/4)·∇²f + O(r⁴)`. The poster's own worked scales are annuli of
+62 and 67 cells on a 30 m DEM — **1.86 and 2.01 km** — where no expansion in `r` survives, and its
+introduction exists to make exactly this point, that topographic position is "*an inherently
+scale-dependent phenomenon*": a point in Yosemite is a flat plain at 100 m and the bottom of a
+1500 m canyon at several kilometres. Prefer curvature when you want the local differential signal;
+use TPI, or a difference-of-Gaussians, when you want a band you choose. *Bilateral filtering* [tomasi1998] for smoothing a mask — O(r²), not separable, and it
 reverses gradients near strong edges; the **guided filter** [he2010] is O(1) per cell at any
 radius, has no gradient reversal, and takes a *separate guide*, so you can smooth a material mask
 with the **height** as guide and have the mask edges snap to terrain features. *Gaussian blur* —
@@ -231,7 +269,7 @@ the terrain is not changing per frame. The line is the baseline length, not the 
 | Curvature mask is speckle, or shows concentric rings | Second derivative of a quantised field | Compute on R32F, pre-smooth σ ≈ 1 cell |
 | Curvature mask selects ridges where it should select valleys | Sign convention differs from the tool you learned it in | Render over a known ridge and document the convention |
 | AO reads as dirt in the crevices, mountains unlit | `maxDist` far too small | 2–5% of domain extent |
-| AO bake takes hours at 4k | Naive per-cell marching | The sweep [timonen2010] |
+| AO bake is far slower than it needs to be at 4k | Naive per-cell marching | The horizon sweep — Dozier's 1981 idea, [timonen2010] for the GPU formulation |
 | Melt appearing in shaded ravines that are open overhead | AO substituted for insolation | Integrate over the sun's arc, reusing the horizon maps |
 | TWI is infinite on floodplains | `slope → 0` | Clamp `slope`, and `A_specific` to one cell |
 | Wetness in one-cell stripes with dry gaps | D8 used for a hillslope field | Route MFD |
