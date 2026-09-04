@@ -19,8 +19,16 @@ sources:
 **Draw the sky as one fullscreen triangle, last, depth-tested, and give every terrain pixel its
 transmittance and in-scatter from the same atmosphere state** [tr_lighting_shadows] [hillaire2020].
 
-The tables come from `sky-and-weather-state.md`, which owns the precompute. This document owns what
-happens in the frame.
+⚠️ **These are not the tables `sky-and-weather-state.md` describes, and the two documents are not a
+pipeline.** That document works through [brunetonneyret2008]'s precompute — transmittance 64×256,
+ground irradiance 16×64, and a 4D inscattering table at 8 MB. The four LUTs below are
+[hillaire2020]'s — a different model, a different count, and transmittance transposed. They are
+**two answers to the same question**: bake every sun angle once and pay the memory, or rebuild a
+small sun-specific set every frame and pay almost nothing. `sky-and-weather-state.md` owns choosing
+between them and the nature of a precompute; this document owns the frame, and describes the second
+answer because it is the one that survives a moving sun. An earlier revision said "the tables come
+from" that document, which would have had a reader build one model's precompute and sample the
+other's LUTs.
 
 **What it costs.** [hillaire2020] Table 2, measured on an NVIDIA 1080 at 1280×720 and on an
 iPhone 6s:
@@ -36,7 +44,7 @@ iPhone 6s:
 The four LUTs sum to **0.17 ms**, and every one of them is a fixed size that does not change with
 screen resolution. The remaining **0.14 ms** is the on-screen apply, and that is the only part that
 scales with pixels. So the shape of the budget is `0.17 + 0.14 × (pixels / 0.92 Mpix)`: about
-**0.44 ms at 1080p** and about **1.4 ms at 4K** on the same 2016-era GPU, against 0.31 quoted.
+**0.485 ms at 1080p** and about **1.4 ms at 4K** on the same 2016-era GPU, against 0.31 quoted.
 
 That the LUTs do not scale is a design decision, not an accident. [hillaire2020] §5.3 says so
 directly: ray marching the sky per pixel "can be expensive, especially at high resolution such as
@@ -61,13 +69,19 @@ cadence is the difference between the technique fitting a mobile frame and not:
 | LUT | Depends on | Rebuild when |
 |---|---|---|
 | Transmittance | the medium only | the medium changes — in practice a **load-time bake** |
-| Multi-scattering | medium + sun elevation | a material sun move; it varies smoothly, so gate on ~1° |
+| Multi-scattering | the medium only | the medium changes — a **load-time bake**, like transmittance |
 | Sky-view | view altitude + sun direction | per frame |
 | Aerial perspective | camera frustum + sun | per frame, **per view** |
 
-⚠️ **On an iPhone 6s the transmittance LUT is 0.53 ms — 51% of the whole 1.03 ms LUT budget — and it
-is a pure function of constants.** Bake it once and the same set costs about **0.38 ms** for a moving
-camera under a static sun. An engineer reading the flat table as written spends 3% of a 33 ms mobile
+⚠️ **On an iPhone 6s the two medium-only LUTs — transmittance at 0.53 ms and multi-scattering at
+0.12 ms — are 63% of the whole 1.03 ms LUT budget, and neither depends on the sun.** [hillaire2020]
+§5.5 is explicit that the multiple-scattering LUT "is valid for **any point of view and light
+direction** around the planet". Bake both at load and the per-frame set costs **0.38 ms**, for a
+moving camera *and* a moving sun.
+⚠️ An earlier revision of this table said to gate multi-scattering on ~1° of sun elevation. That is
+the same error `sky-and-weather-state.md` spends a whole section correcting one document over —
+treating an axis as a bake input — and it would have introduced a threshold that pops, behaves
+differently by latitude, and buys nothing. An engineer reading the flat table as written spends 3% of a 33 ms mobile
 frame rebuilding tables two thirds of which did not change, and may reasonably conclude the technique
 does not fit and fall back to an analytic gradient at 88.1 RMSE. It fits; it fits **with the
 cadence**.
@@ -246,9 +260,12 @@ depends on view position and sun direction but not on view direction**, so it ca
 the camera orientation is final; the **AP volume depends on the full jittered projection** and
 cannot. That one fact decides what you can start early.
 
-All of it is a natural **async-compute** candidate, overlapping the shadow-map passes or the depth
-pre-pass where the graphics queue is geometry-bound and these are small compute dispatches. That is
-how 0.17 ms becomes closer to zero on a console.
+On a console or desktop it is a natural **async-compute** candidate, overlapping the shadow-map
+passes or the depth pre-pass where the graphics queue is geometry-bound. ⚠️ **But not on the
+platform where the number actually hurts.** Mobile TBDR parts generally expose no async compute
+queue, and that is exactly where the LUT set costs 1.03 ms rather than 0.17 — so on mobile the
+answer is the cadence table above, not overlapping. These are also three *dependent* dispatches with
+barriers between them; they do not vanish, they hide.
 
 ⚠️ **One ordering hazard worth choosing deliberately.** If you want cloud shadows inside the AP
 volume, the volume now depends on the cloud pass, which usually depends on depth — and the free
@@ -275,7 +292,8 @@ place water has two depths. Stated so it is implementable — this is a contract
 taken from a source:
 
 > **Exported once, consumed by terrain, water and translucents.**
-> - `Transmittance(viewDir, viewAltitude) → RGB` — the sun-path attenuation. **The sun colour every
+> - `Transmittance(sunDir, viewAltitude) → RGB` — the **sun**-path attenuation, so the argument is
+>   the sun direction and not the view direction. **The sun colour every
 >   surface lights with comes from here.** A private sun colour is the same class of bug as a
 >   private water fog colour, and it is what makes a sunset glint red.
 > - `AerialPerspective(screenUV, airDistance) → RGB inscatter + RGB transmittance` — from the froxel
@@ -340,7 +358,7 @@ today, which is where the remaining discretionary cost sits.
 | The sky is fine on the ground and wastes resolution from orbit | The sky-view LUT spends most of itself on empty space | Switch to on-screen ray marching for space views [hillaire2020] §5.3 |
 | Mobile spends 3% of the frame rebuilding LUTs | All four rebuilt every frame; the transmittance LUT alone is 0.53 ms on an iPhone 6s and depends only on the medium | Bake transmittance at load; gate multi-scattering on ~1° of sun elevation. Roughly 1.03 ms → 0.38 ms |
 | Water and terrain disagree in colour at the horizon *after* both were told to share the atmosphere | They share the LUT and not the **far-field fallback**: one clamps to the last froxel slice, the other evaluates analytically | Same fallback, same cross-fade width, on both surfaces |
-| Water is too dark, and worse the further the camera is | Aerial perspective applied to the scene colour the water refracts, then again by the water, then again on the surface | Apply AP once, after the water composite; refract against a pre-AP copy |
+| Water is milky and washed out at range, losing all depth colour | Aerial perspective applied to the scene colour the water refracts, then again by the water, then again on the surface — the in-scatter term accumulates while the transmittance term collapses, so it goes **pale**, not dark | Apply AP once, after the water composite; refract against a pre-AP copy |
 | Water hazes with depth of the sea bed rather than distance from the camera | The refracted in-water path fed into the atmosphere lookup | `airDistance` is camera-to-surface, in air, only |
 | A time-of-day sweep costs 250 ms a step | The old precompute being rebuilt per step for a sun move it does not need — sun angle is a table AXIS, not a bake input | Move `u_µs`; rebuild nothing. If the medium is what changes, use the in-frame LUT set [hillaire2020] |
 | Volumetric shadows triple the sky cost | 32 ray-march samples with jitter and reprojection | Budget the 1.0 ms, or drop the feature. ⚠️ Do **not** simply cut samples and lean harder on TAA: that trades a measured cost for ghosting and crawling shafts, which is an unmeasured one |

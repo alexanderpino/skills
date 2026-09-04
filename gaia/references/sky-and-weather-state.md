@@ -183,9 +183,24 @@ one question.
 ⚠️ **Advect analytically, not iteratively — the difference decides whether the sky is
 reproducible.** An advected *buffer* has state: its value at `t` depends on every step taken to
 reach `t`. Make coverage a pure function of time instead —
-`coverage(p, t) = noise(p − windVec·t, t·evolutionRate)`, a scroll offset plus a slow evolution on a
-third axis. It reads the same on screen, costs less, and buys three properties an integrated field
-cannot have:
+`coverage(p, t) = noise(p − prevailingWind·t, t·evolutionRate)`, a scroll offset plus a slow
+evolution on a third axis.
+
+⚠️ **And note what that closed form can and cannot consume.** `prevailingWind` is a **scene
+parameter**, a single vector. It is *not* `driver-fields.md`'s wind field, which is a per-cell
+terrain-shelter magnitude over a 100–300 m search distance — a near-surface quantity, while cloud
+base is kilometres up where terrain shelter is irrelevant. The coherence this section argues for
+runs through the shared prevailing-wind **parameter**, not through the field, and an earlier
+revision of this document said "advected by that field", which is not a thing the closed form can
+do. Blowing snow and bending grass read the field; the cloud deck reads the parameter; both agree
+about the weather because the field is derived from the same prevailing wind.
+
+⚠️ **Keep the offset bounded.** `prevailingWind·t` grows without limit, and in fp32 a noise
+coordinate stops resolving detail after roughly 10⁵ metres of accumulated offset — the sky visibly
+freezes after some tens of minutes of simulated time. Wrap the offset into the noise's period, or
+carry `t` in double and reduce before the fetch. It reads the same on screen and buys three properties an integrated field cannot have — though not
+necessarily more cheaply, since a cloud march pays N octaves of noise per sample where a buffer pays
+one fetch:
 
 - **The time slider is reversible.** Scrub to 10 s and back to 0 and you get the sky you started
   with. In a tool whose reference workflow is a slider nudged two hundred times an hour, a
@@ -223,9 +238,13 @@ term **inside Algorithm 4.1 itself** — it appears in the `∆J ← J[T·ᾱ/π
 `∆E ← Ē[T·ᾱ/π·∆E + ∆S]` lines, so the ground's brightness participates in the multiple-scattering
 solve.
 
-**That is a coupling this corpus had not noticed.** Ground albedo in a terrain tool is **snow
-cover**. A snow line that advances or retreats changes `ᾱ`, and a changed `ᾱ` invalidates the
-scattering bake. Nothing else in Gaia connects `snow-and-weather-state` to the sky, and this does —
+**That is a coupling this corpus had not noticed** — and the right response is to cut it, not to
+schedule it. Ground albedo in a terrain tool is **snow cover**. A snow line that advances or retreats
+changes `ᾱ`, and a changed `ᾱ` invalidates the scattering bake. ⚠️ But insolation depends on the
+sky, and snow depends on insolation, so wiring `ᾱ` back into the bake **closes a cycle**, which
+`node-graph-runtime.md` forbids outright. Hold `ᾱ` constant at a representative value. The effect is
+a second-order brightening, which is precisely the assessment that justifies cutting the edge rather
+than trying to schedule around it. Nothing else in Gaia connects `snow-and-weather-state` to the sky, and this does —
 weakly, since the effect is a second-order brightening rather than a visible colour shift, but it is
 the difference between a bake you can schedule and one that surprises you.
 
@@ -274,15 +293,20 @@ explicit that "a node's class is part of its description, alongside its type and
 the planner needs it before it can decide anything. A runtime that discovers the class at evaluation
 time has already allocated the wrong buffers." So:
 
-- **The sky bake is a global-reduce node.** Its key is the medium constants, the order count
-  `norders`, the ground albedo `ᾱ` and the planet radii — and explicitly **not** the sun direction,
-  for the reason set out above. The multiple-scattering accumulation is a reduction, so that
+- **The sky bake is not a spatial node at all**, and mis-declaring it is exactly the wrong-buffer
+  failure the quoted rule warns about. It has no domain, no halo and no tiles: it consumes a
+  parameter block and produces fixed-size tables. Its key is the medium constants, the order count
+  `norders`, the ground albedo `ᾱ` and the planet radii — and explicitly **not** the sun direction. The multiple-scattering accumulation is a reduction, so that
   document's rule that iteration order counts as arithmetic applies to it directly.
-- **The coverage field, in its analytic form, is a local node with zero halo.** In an advected form
-  it is global with an *unbounded* dependence — worse than flow accumulation, which at least has a
-  bounded search distance — and must then be evaluated whole-domain at coarse resolution and
-  upsampled, exactly as `driver-fields.md` prescribes for precipitation. That is a third reason to
-  take the analytic form.
+- **The coverage field, in its analytic form, is a local node with zero halo.** ⚠️ An earlier
+  revision called an advected form "global with an unbounded dependence — worse than flow
+  accumulation, which at least has a bounded search distance". Both halves were wrong. Flow
+  accumulation is the corpus's example of a **global-ordered** quantity with no bounded search
+  distance; the bounded one is the horizon sweep, which this document quotes correctly elsewhere.
+  And an advected field's dependence over an interval `T` is `|W|·T` — **bounded, and therefore
+  tileable with a halo that size**, which is the case `driver-fields.md` handles for precipitation
+  by going whole-domain-coarse when that halo grows large. The analytic form still wins, on
+  reversibility and farm-splittability, not on tiling.
 
 This document does **not** own the sun position or direction (`driver-fields.md`), the occlusion
 integral (`terrain-analysis-masks.md`), or surface snow state, which is the separate
