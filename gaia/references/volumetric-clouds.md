@@ -37,16 +37,24 @@ couplings from it, because they are not in it.
 **What it costs.** Every figure below is from an unrefereed source, because that is where cost
 figures exist — see *What error you are accepting*.
 
-| Configuration | Cost | Hardware, as stated |
-|---|---|---|
-| Full-res march, no reprojection | ~20 ms | PS4, 2015 [schneidervos2015] |
-| After temporal amortisation over 16 frames | ~2 ms | PS4, 2015 [schneidervos2015] |
-| Optimisation ladder, post-reprojection baseline → final | 22 ms → 1.2 ms | PS4, 2017 [schneidervos2017] |
-| — of which depth culling against scene geometry alone | 1.81 ms → 1.2 ms | PS4, 2017 [schneidervos2017] |
-| Second lineage, independent implementation | 0.91 ms @ 720p | Xbox One, 2016 [hillaire2016] |
-| Console generation shift | 960×540, 6 light samples, ≤4 ms → 1920×1080, 10, ≤2–3 ms | PS4 → PS5 [schneider2022] |
-| Voxel successor | 2.2–4 ms @ 960×540 | PS5, 2023 [schneider2023] |
-| Refereed implementation | 5.6–15.4 ms @ 1080p | GTX 680, 2014 [yusov2014] |
+| Configuration | Cost | Resolution | Hardware, as stated |
+|---|---|---|---|
+| Full-res march, no reprojection | ~20 ms | **not stated** | PS4, 2015 [schneidervos2015] |
+| After temporal amortisation over 16 frames | ~2 ms | **not stated** | PS4, 2015 [schneidervos2015] |
+| Optimisation ladder, post-reprojection baseline → final | 22 ms → 1.2 ms | **not stated** | PS4, 2017 [schneidervos2017] |
+| — of which depth culling against scene geometry alone | 1.81 ms → 1.2 ms | **not stated** | PS4, 2017 [schneidervos2017] |
+| Second lineage, independent implementation | 0.91 ms | 720p | Xbox One, 2016 [hillaire2016] |
+| Console generation shift | ≤4 ms → ≤2–3 ms, 6 → 10 light samples | 960×540 → 1920×1080 | PS4 → PS5 [schneider2022] |
+| Voxel successor | 2.2–4 ms | 960×540 | PS5, 2023 [schneider2023] |
+| Refereed implementation | 5.6–15.4 ms | 1080p | GTX 680, 2014 [yusov2014] |
+
+⚠️ **Four of those eight rows state no resolution, including the famous 2 ms and 1.2 ms, and that
+makes them unnormalisable rather than merely imprecise.** 1.2 ms is **0.58 ms/Mpix** at 1080p,
+**2.3** at 960×540 and **9.3** at 480×270 — a **16× spread hiding inside the missing column**. The
+resolution is not recorded here because the sources do not state it, and inventing one would be
+worse than the gap; but a figure you cannot normalise cannot be scaled to your own target, so treat
+those four as historical evidence that the technique shipped, not as a budget you can plan against.
+The rows that do carry a resolution are the ones to plan from.
 
 ⚠️ **Do not stack these numbers or read them as a series.** The 20 ms is *pre*-reprojection and the
 22 ms is *post*-reprojection — same studio, same console, one year apart, measuring different
@@ -69,6 +77,14 @@ precondition, "*the reason we are able to render our cloudscapes in 2ms is re-pr
 | 2017 | Offline sets the yardstick the other way: a converged path-traced cloud is 34 hours | [kallweit2017] |
 | 2020 | Ground-to-space becomes tractable, with an error and a cost stated together | [hillaire2020] |
 | 2023 | **The direction reverses.** Voxels return — the 2011 representation, now affordable | [schneider2023] pp.51, 176–185 |
+
+⚠️ **The reversal is not free, and this document used to describe it without pricing it.** Both
+PS5 figures normalise: procedural is ≤2–3 ms at 1920×1080 → **0.96–1.45 ms/Mpix**; voxel is
+2.2–4 ms at 960×540 → **4.24–7.72 ms/Mpix**. Pairing like with like that is **4.4–5.3× the cost per
+pixel**, and the full envelope spans 2.9–8.0×. So voxels bought freeform authoring, terrain-cast
+shadows and flight-capability at roughly **five times the per-pixel cost**, absorbed by running at
+a quarter of the pixels. That is the trade, and a team that reads the reversal without it will
+assume hardware simply caught up.
 
 **The reversal is the part a terrain engine must not miss.** The field went offline voxels (2011) →
 procedural 2.5D *because voxels did not fit on a PS4* (2015–2022) → **back to voxels on a PS5**
@@ -160,6 +176,24 @@ for the **atmosphere**, switching away from the sky-view LUT once the camera lea
 [schneider2023] covers flying *through* clouds at 4 ms, 960×540, PS5; [bouthors2008] p.7 notes its
 transport function "*allows us to easily account for points of view inside the clouds*".
 
+⚠️ **Low sun is not one failure but three, and they converge.** All three go as `1/sin` or
+`1/tan` of the sun elevation, so they arrive together at exactly the time of day the feature exists
+to sell. Derived here on a 1500 m deck base — **state your own deck height, because every figure
+below scales with it**:
+
+| Sun elevation | Sun-ray slant path through the deck, `1/sin θ` | Shadow offset from its cloud, `h/tan θ` |
+|---|---|---|
+| 45° | 1.41× | 1.5 km |
+| 20° | 2.92× | 4.1 km |
+| 10° | 5.76× | 8.5 km |
+| 5° | **11.5×** | **17.1 km** |
+| 2° | 28.7× | 43 km |
+
+The sun cone is a **fixed** 4–10 samples, so at 5° those samples stretch over 11.5× the path and the
+self-shadowing term bands. The shadow offset means a cloud's shadow leaves a 16 km map entirely
+below about 5°, whatever the map size — which is why "bound the map size" alone does not close the
+flat-planet failure row, and why the deck height belongs beside it.
+
 ⚠️ **The gap is real and is not closed here: no artefact in this set gives a cloud-top or orbital
 view of a cloud *deck* with a stated error and a stated cost.** If you need that regime, you are
 past the published envelope and should measure your own.
@@ -216,7 +250,7 @@ pixels**. A cloud budget quoted without the geometry it displaces is half a numb
 | Cloud drawn over a mountain the first time a peak enters the deck | The march does not terminate at the terrain depth hit | Depth-aware compositing; pick one of the three depth definitions and use it everywhere [yusov2014] |
 | Clouds pop at silhouettes as the camera turns | The depth-mip reduce picks the NEAREST depth in the footprint, so the march terminates early — the operator that does this flips with the depth convention | Reduce toward the FARTHEST depth: `min()` under reversed-Z, `max()` under standard depth. Write the quantity, not the operator [schneidervos2017] p.98 |
 | Landscape looks dead and evenly lit under a dramatic sky | No ground-receiving cloud shadow — it is absent from the 2015/2017 lineage, so an implementation faithful to those decks has none | Light-space transparency buffer on the CSM matrices [yusov2014] p.133 |
-| Cloud shadows drift wrong across a large map | The projected-shadow formulation assumes a flat planet | Declare the assumption and bound the map size, or project on the sphere [hillaire2016] p.42 |
+| Cloud shadows drift wrong across a large map | The projected-shadow formulation assumes a flat planet, and its error grows with BOTH vista length and falling sun | Bound both, not just the map: the shadow offset is `h/tan(elevation)`, so it leaves any map at low sun. Or project on the sphere [hillaire2016] p.42 |
 | Ghosting and smearing on fast camera turns, worst near camera | Temporal amortisation over 16 frames cannot resolve in time | Depth-split the render instead of upscaling near clouds [schneider2023] p.185 |
 | Sky is fine at ground level, wrong from a summit | The 2015 model draws clouds "in a zone above the camera" | Past the published envelope above the deck; measure it yourself |
 | A cost budget that holds in isolation and blows up in play | Cloud and geometry compete for the same pixels | Budget the pair together [schneider2023] pp.177–179 |
