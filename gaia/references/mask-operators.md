@@ -126,11 +126,19 @@ Those errors are *not* small, and they are the reason to reach for the exact tra
 |---|---|---|---|
 | 3-4 (3×3) | 0.0572 | **0.0572** | max 0.0572, rms 0.0358 |
 | 5-7-11 (5×5) | 0.0198 | **0.0198** | max 0.0198, rms 0.0104 |
-| Best possible at 3×3 | 0.0396 | — | — |
+| Best possible at 3×3, unconstrained | 0.0396 | — | — |
+| Best possible at 3×3 **reachable by an integer mask** (`E^B_1`) | ≈0.0551 | — | — |
 | Best possible at 5×5 | 0.0136 | — | — |
 
 The middle column reproduces the paper's published constants to four decimals from an independent
 implementation, which validates the transcription and the paper simultaneously.
+
+⚠️ **Read the two 3×3 optima together, or the classical mask looks far worse than it is.** An earlier
+version of this table printed only 0.0396, from which 3-4's 0.0572 reads as ~31% off optimal. But
+0.0396 is unreachable for a mask of this form — the `⟨a,b⟩/a` normalisation forces the class whose
+optimum is `E^B_1 ≈ 0.0551`, and [hajdu2012] states the gain over the classical mask as
+"approximately 4%". **Switching integer masks buys you 4%, not 31%.** If you need better than 5.7%,
+the answer is the exact transform, not a cleverer mask — which is the point this section is making.
 
 ⚠️ **The error is bipolar, not systematically positive — and which extreme the published constant
 names depends on the mask.** For **3-4** the constant `0.0572` is the *under*-estimate, at 45°. For
@@ -145,7 +153,10 @@ cells beyond `r = 20`:
 | 3-4 | +5.41% | **−5.72%** | 25.0% | 45° |
 | 5-7-11 | +1.98% | −1.61% | **58.1%** | 63.4° |
 
-For 5-7-11 the *majority* of cells read short. And `E = 0.0572`, the constant the table above
+For 5-7-11 the majority of cells read short **on a square domain** — but that figure is a domain
+artefact worth naming, because the corners sit at 45°, which is the under-estimating direction. Take
+the same measurement on a disc and it is **49.3%**, i.e. no majority at all. Quote 58.1% only with
+the square attached. And `E = 0.0572`, the constant the table above
 quotes for 3-4, is the error at 45°, where the mask returns `4/3 = 1.333` per step against
 `√2 = 1.414` — **short by 5.72%**, not long. The `+0.45%` that motivated "systematically positive"
 is a *mean* over one polyline field, and the sign of a mean was attached to a magnitude that is an
@@ -263,7 +274,9 @@ reason — 4-connected foreground splits diagonal chains into separate specks.
 
 **The complexity, stated honestly.** General union-find is **O(α(n,m)·m)**, not O(m), and
 [fiorio1996] §1 is careful that this bound is *sharp* for pointer machines and that the
-random-access case is open. `α` is under 5 for any grid that fits in memory, so the practical claim
+random-access case "is not known until now" — ⚠️ **a 1996 present tense, and it had already been
+settled**: Fredman & Saks (1989) give the same Ω(α) lower bound in the cell-probe model, which
+subsumes the RAM. Read the sentence as dated, not as a live open problem. `α` is under 5 for any grid that fits in memory, so the practical claim
 is safe — but the reason it is safe here is stronger than "α is small": the union sequence produced
 by a raster scan is *restricted*, and [wu2009] §4.2 Theorem 3 proves that a two-pass labeller using
 any union-find with path compression runs in **O(p)** for `p` pixels, generalising fiorio1996's
@@ -339,3 +352,4 @@ differently — the same defect `terrain-analysis-masks.md` documents for slope 
 | A one-cell-wide 40-cell filament vanished, a 16-cell blob survived | Opening selects by thickness, not size | Area filter: it is size-selective by construction |
 | Despeckling threshold behaves differently per LOD | Threshold in cells, not m² | Store m²; divide by cell area at use |
 | Labelling splits diagonal chains into separate specks | 4-connectivity on the foreground | 8-connectivity for foreground, 4 for background |
+| Sub-cell seeding makes the distance field WORSE than the plain binary transform, and worse as the band widens | Exact distances seeded as a generalised-transform cost: `min[\|p−q\|² + d(q)²]` is a Pythagorean sum and drops the cross term `2·\|p−q\|·d(q)` | Supersample the seed mask 2–4×, or propagate the nearest position and take the distance from it |
