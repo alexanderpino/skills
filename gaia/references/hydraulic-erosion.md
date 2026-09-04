@@ -36,6 +36,11 @@ easiest to get looking good on a small map.
 persist** — lakes, ponding, deltas, standing water of any kind. Droplet erosion has no water; it
 has droplets, and they leave.
 
+**Three grain classes the moment you want armouring or a downstream fining gradient**
+[gaea_erosion2] [stava2008] §5. One capacity and one repose angle cannot produce either at any
+tuning — they are properties of the class structure, not parameters. Two classes give armouring and
+fining; three give scree that behaves unlike sand; a fourth is a constant nobody can tune by eye.
+
 ## The crossover, which is cells, standing water and simulated time
 
 ⚠️ **The governing quantity is cells, not kilometres.** A droplet's life is a fixed number of
@@ -318,6 +323,9 @@ is a constant nobody can tune by eye.
 | NaN spikes a few steps into the run | Pipe outflow exceeds the water in the cell; depth goes negative | The outflow scaling factor `K` in the flow stage [mei2007] |
 | The *whole* field is NaN after one step, worst on a dry map | `K` transcribed as `min(1, d1·lx·ly/(Σf·Δt))`: on a dry cell that is `0/0` | Guard the denominator — scale only when `Σf > 0` [stava2008] |
 | It ran in the Python prototype and NaNs on the GPU | Scalar `min(1, NaN)` returns 1; `np.minimum`, and `min` on NaN in GLSL/HLSL, do not | Same guard; never rely on `min` to absorb a NaN |
+| The bed never changes character — erosion keeps removing the same undifferentiated material | A single sediment class: there are no fines to leave first and no coarse lag to concentrate | Split the load into classes; armouring is structural, not tunable [parker1982] |
+| Sediment is the same calibre at the mouth as at the head | One settling threshold, so nothing sorts along the profile | Per-class settling thresholds — fining downstream then falls out for free |
+| Scree on a cliff stands at the same angle as sand on a dune | One angle of repose shared by all sediment | Per-class repose, run as `k` slippage passes [stava2008] |
 | Droplets erode forever and the terrain explodes | The droplet loop never writes `sediment`, so it can never reach the deposit branch | `sediment -= amount` on deposit, `+= amount` on erode |
 | One-pixel scratches instead of valleys | Droplet erosion applied per-cell instead of through a brush | Erode through a disc of 2–4 cells |
 | Rivers silted into mush | Deposition spread through a brush | Deposit bilinearly, 4 cells |
