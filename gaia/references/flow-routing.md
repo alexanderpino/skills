@@ -63,10 +63,20 @@ stops, so downstream contributing area is wrong everywhere below it.
   Lindsay's claim — treat the depth limit as a parameter you tune against your own noise, not
   as a physical boundary.
 
-**Why it wins**: measured as total elevation change to the input, the hybrid modifies less than
-either pure policy [lindsay2016] — fill-everything raises every basin, breach-everything
-trenches through real ones. That is an aggregate result over test DEMs, not a per-basin
-guarantee: on the single deep basin measured below, breaching everything moves **11.9** units of
+**Why it wins — and read the source's own qualification before relying on it.** [lindsay2016]
+§"When to breach and when to fill?" reports, verbatim: "*Soille (2004a) and Lindsay and Creed
+(2005) both compared the modifications to DEMs made by filling, breaching, and hybrid approaches.
+These studies showed that hybrid solutions offer the lowest impact on modelled flow paths but that
+the improvements are only marginally better than a breaching-only solution. Thus, when breaching
+and filling approaches are combined for sink removal, the breaching component of the solution will
+result in the lower impact in most cases.*" ⚠️ **Three things an earlier version of this line got
+wrong.** The metric is **modelled flow paths**, not total elevation change — the paper contains no
+elevation-change metric at all. The result is **credited to Soille and to Lindsay & Creed**, not
+Lindsay's own. And the sentence was **cut before the clause that qualifies it**: the hybrid's
+margin over breaching-only is marginal, and the credit goes to its breaching half.
+
+Fill-everything raises every basin and breach-everything trenches through real ones. That is an
+aggregate result over test DEMs, not a per-basin guarantee: on the single deep basin measured below, breaching everything moves **11.9** units of
 elevation against the hybrid's **680** — and drains the basin doing it. Less modification is the
 argument for the policy, not a property of every depression it meets.
 
@@ -104,8 +114,19 @@ priorityFlood(z, useEpsilon):                  # z is the ROUTING COPY, never th
 
 That is [barnes2014]'s Algorithm 1 with the epsilon lift folded in. Every cell is pushed once
 and popped once, which is the O(n log n) above — the caveat, not a different algorithm. The
-paper's own epsilon variant (Algorithm 3) is built on the *Improved* Algorithm 2 instead, and
-if you want the `m ≤ n` bound that is the one to transcribe; the fill it produces is the same.
+paper's own epsilon variant (Algorithm 3) is built on the *Improved* Algorithm 2 instead, and if
+you want the `m ≤ n` bound that is the one to transcribe.
+
+⚠️ **It does not produce the same fill, and an earlier version of this line said it did.** With
+both run on a total order, so tie-breaking is not the variable: Algorithm 3 differs from the block
+above on **171 of 441** cells and moves **187 of 441** receivers, and it is **strictly higher on
+all 171 and lower on none**. The reason is structural — the block above ramps by shortest path
+from the *nearest* outlet, while Algorithm 3 as printed ramps one way from a *single* outlet. On
+that input Algorithm 3 fails [barnes2014]'s own third criterion for a depression fill, "*W is the
+lowest surface allowed by properties (1) and (2)*", which the simpler block satisfies. **The
+direction is the opposite of what a reader would guess: the paper's variant is the worse fill
+here.** Transcribe it for the bound if you need the bound, not on the assumption that the answer
+is unchanged.
 
 ⚠️ **The tie-breaking is part of the algorithm, and a bare heap gets it wrong.** Algorithm 3's
 first line is "Let `Open` be a priority queue **with total order**", and §4 Ordering says why:
@@ -119,10 +140,23 @@ counter as a second key.
 **Measured, because the failure is invisible where you would look for it.** A flat basin with
 two outlets at exactly equal elevation, epsilon fill, tie order randomised over six seeds: the
 **filled surface is bit-identical every time** — so nothing that checks elevations catches
-this. What moves is the drainage. Up to **13 of 361** interior cells change which outlet they
-flood from, and the basin's split wanders from 181/180 to 187/174 between seeds. The fill looks
-perfect and the flow directions are non-deterministic, which is the worst possible arrangement
-for a bug: it survives every test of the thing it damages least.
+this. Up to **13 of 361** interior cells change which outlet they
+flood from, and the basin's split wanders from 181/180 to 187/174 between seeds.
+
+⚠️ **What moves is the flooding source, NOT the flow directions, and an earlier version of this
+paragraph said otherwise.** `receivers[]` is a pure function of the filled `z`, and `z` is
+bit-identical across seeds, so on the block printed above the D8 receivers differ on **0 of 361**
+cells — and non-vacuously: no interior cell is self-receiving and the receivers reach 293 distinct
+targets. The quantity that wanders is the **watershed label**, which this document does not
+compute. If you do compute one — for basin statistics, for a lake-by-lake fill, for anything keyed
+on "which outlet does this cell drain to" — it is non-deterministic and the elevation check will
+not catch it.
+
+⚠️ **The warning above is nonetheless real, and it applies to [barnes2014]'s Algorithm 3 rather
+than to the block printed here.** Run with the same six tie orders, Algorithm 3 moves **342 of 441
+elevations and 355 of 441 receivers**. So the total-order requirement is not pedantry — it is
+load-bearing for the paper's own variant, which is exactly the one the previous section tells you
+to transcribe for the better bound.
 
 **Route on the epsilon variant, not on the plain fill.** Transcribed and run on a 60×60 bowl
 carrying 380 pits: both fills leave zero pits, the plain fill agrees to **0.0** with an
