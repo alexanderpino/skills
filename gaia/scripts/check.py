@@ -638,7 +638,16 @@ _REACH_STOP = {
     "ways", "thing", "things", "part", "parts", "side", "sides", "enough", "still", "just",
 }
 
-_REACH_WORD = re.compile(r"[a-z][a-z0-9'-]{2,}")
+# Hyphen is a SEPARATOR, not a word character. Keeping it inside the token made
+# "The three-media rule" read as unreachable from a failure row that says "Three media
+# attenuating the same path" -- the row covers the section exactly, in two words instead of
+# one. That was a false positive in a check whose whole output is candidate false positives,
+# and splitting on it removed two of twenty-one.
+# A bare number is a content word here. "The 42 degree switch, where smoothing becomes
+# roughening" read as unreachable while `## Use this` and three failure rows all named 42
+# degrees -- the distinctive term in that heading is the NUMBER, and requiring a leading
+# letter threw it away. Removed one more false positive, 19 -> 18.
+_REACH_WORD = re.compile(r"[a-z][a-z0-9']{2,}|[0-9]{2,}")
 
 
 def _reach_terms(heading: str) -> set[str]:
@@ -697,10 +706,20 @@ def check_section_reach() -> tuple[list[str], int, int]:
     stronger word rule would not fix it; a different instrument would be needed.
 
     SO WHAT IT IS FOR. It catches the strictly weaker condition it can actually see: a section
-    with NO lexical contact with either end at all. That found 21 of 193 sections, several of
-    which are real ("The three-media rule", "The 42 degree switch") and several of which are
-    generic headings with no subject matter to match ("Submission", "The ladder"). It is a net
-    with a known hole, reported as such, and it does not discharge the hand review.
+    with NO lexical contact with either end at all -- 18 of 193 sections.
+
+    ⚠️ THE FIRST TWO EXAMPLES THIS DOCSTRING CITED AS REAL WERE BOTH FALSE POSITIVES, and
+    fixing them is why the count fell from 21. "The three-media rule" is covered by a failure
+    row reading "Three media attenuating the same path" -- the hyphen made one token where the
+    row has two. "The 42 degree switch" is named in `## Use this` and three failure rows -- the
+    distinctive term there is a NUMBER, and the pattern required a leading letter. Both are now
+    tokenised correctly. The lesson is that this instrument's output is CANDIDATES, and the two
+    the author reached for first as evidence it worked were both wrong.
+
+    What remains is mostly generic navigational headings with no subject matter to match at all
+    ("Submission", "The ladder", "Where this sits in the pipeline", "The handoff"), for which a
+    failure row would be meaningless. A net with a known hole and a known false-positive rate,
+    reported as such. It does not discharge the hand review.
 
     REPORTED, not enforced. An OPEN row in registers/guard-proofs.tsv records the negative
     result above so nobody rebuilds this and believes it works.
@@ -1326,8 +1345,10 @@ def main() -> int:
               f"check DOES NOT catch the case that motivated it: hydraulic-erosion.md's "
               f"grain-classes section, 31% of that body and absent from both ends, shares the "
               f"words `capacity` and `angle` with failure rows belonging to a different section, "
-              f"so it passes. Lexical overlap cannot see a semantic gap. Reported, not enforced, "
-              f"and it does not discharge the hand review; see registers/guard-proofs.tsv.")
+              f"so it passes. Lexical overlap cannot see a semantic gap. Its output is CANDIDATES: "
+              f"most of what remains is generic navigational headings with nothing to match. "
+              f"Reported, not enforced, and it does not discharge the hand review; see "
+              f"registers/guard-proofs.tsv.")
 
     sharp, tot, noart, _vague = locator_quality()
     if tot:
