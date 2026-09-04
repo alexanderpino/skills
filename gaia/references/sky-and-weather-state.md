@@ -269,6 +269,21 @@ second.
   advance, deliberately, so that whoever writes it inherits the one-sky-state rule rather than
   authoring a second coverage field. Until then the obligation is on the reader, not on a link.
 
+**And the two graph-visible artefacts here must declare their class.** `node-graph-runtime.md` is
+explicit that "a node's class is part of its description, alongside its type and its parameters, and
+the planner needs it before it can decide anything. A runtime that discovers the class at evaluation
+time has already allocated the wrong buffers." So:
+
+- **The sky bake is a global-reduce node.** Its key is the medium constants, the order count
+  `norders`, the ground albedo `ᾱ` and the planet radii — and explicitly **not** the sun direction,
+  for the reason set out above. The multiple-scattering accumulation is a reduction, so that
+  document's rule that iteration order counts as arithmetic applies to it directly.
+- **The coverage field, in its analytic form, is a local node with zero halo.** In an advected form
+  it is global with an *unbounded* dependence — worse than flow accumulation, which at least has a
+  bounded search distance — and must then be evaluated whole-domain at coarse resolution and
+  upsampled, exactly as `driver-fields.md` prescribes for precipitation. That is a third reason to
+  take the analytic form.
+
 This document does **not** own the sun position or direction (`driver-fields.md`), the occlusion
 integral (`terrain-analysis-masks.md`), or surface snow state, which is the separate
 `snow-and-weather-state` topic — that row is surface state and this one is atmospheric state.

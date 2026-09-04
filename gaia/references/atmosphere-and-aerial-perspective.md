@@ -157,8 +157,35 @@ expensive has not been true for a decade.
 
 The froxel volume is the mechanism: a low-resolution 3D texture over the camera frustum, 32³ at 30
 steps, holding in-scatter and transmittance per depth slice. Every terrain pixel samples it at its
-own depth and composites. That is the entire terrain-side contract, and it is why the sea and the
-land must share it — see below.
+own depth and composites. That is the entire **consumer** side — and the producer side is where the
+work actually is:
+
+- **Depth distribution.** 32 slices linearly over a long frustum makes each slice kilometres thick at
+  range, and two slices meeting on a distant mountain face is a visible colour band. Power-distribute
+  the slices and dither the depth sample per pixel so TAA resolves the boundary.
+- **Beyond the far plane.** The volume ends somewhere. This corpus's own headline case — a 40 km
+  vista — is past any sane `volumeFar`, and clamping to the last slice makes every distant ridge the
+  same colour, which is the flattening this document exists to prevent. Fall back to the sky-view
+  path beyond it and cross-fade one slice.
+- **Jitter.** Build the volume with the **same jittered projection** as the G-buffer, or every
+  ridgeline at range shimmers — and it will be misdiagnosed as TAA failure, because that is what it
+  looks like.
+- **Reprojection is not the 2D problem.** A froxel's world position depends on camera position *and*
+  on the slice mapping, so a dolly moves its contents along the slice axis and a naive history fetch
+  smears fog in depth. Reproject each froxel's centre world position, reject history more than one
+  slice away, then neighbourhood-clamp.
+- **One volume per frustum.** Transmittance and multi-scattering are per-world and shareable across
+  every view; sky-view is per view-**altitude**, so two VR eyes share one and two split-screen
+  players on a summit and in a valley do not; the AP volume is per-frustum and shares with nothing.
+  Stereo means two volumes, two builds, two applies. ⚠️ And in stereo, independently dithered volumes
+  **decorrelate between the eyes**, which reads as boiling haze and is uncomfortable rather than
+  merely ugly — drive both eyes from one blue-noise offset.
+- **Cuts and altitude transitions.** A camera cut invalidates all reprojection history: flag it or
+  eat a frame of smeared shafts. And the switch to the ray-march fallback for space views
+  [hillaire2020] §5.3 is a **visible pop** unless you blend across an altitude band — which a tool
+  camera flying from ground to orbit hits every time.
+
+That is why the sea and the land must share it — see below.
 
 **Height fog is a different system with a different job.** Aerial perspective is the planet-scale
 physical medium and owns the distance cue; exponential height fog is a local, art-directed layer
@@ -208,6 +235,24 @@ slider is being dragged rather than only after it is released.
 This is also what `water-rendering.md` reaches for when it puts "distant probe or sky capture last"
 at the bottom of its reflection fallback. That capture is an atmosphere output and belongs in the
 interface above.
+
+## Where this sits in the frame
+
+Short, and it decides whether the 0.17 ms is visible at all.
+
+The dependency chain is **transmittance → multi-scattering → {sky-view, aerial perspective}**: three
+dispatches deep, all tiny, all latency-tolerant. The useful asymmetry is that the **sky-view LUT
+depends on view position and sun direction but not on view direction**, so it can be kicked before
+the camera orientation is final; the **AP volume depends on the full jittered projection** and
+cannot. That one fact decides what you can start early.
+
+All of it is a natural **async-compute** candidate, overlapping the shadow-map passes or the depth
+pre-pass where the graphics queue is geometry-bound and these are small compute dispatches. That is
+how 0.17 ms becomes closer to zero on a console.
+
+⚠️ **One ordering hazard worth choosing deliberately.** If you want cloud shadows inside the AP
+volume, the volume now depends on the cloud pass, which usually depends on depth — and the free
+async dispatch becomes a serialised one.
 
 ## The camera-relative frame
 
@@ -283,6 +328,10 @@ today, which is where the remaining discretionary cost sits.
 | A seam along the screen diagonal | Two triangles instead of one — ⚠️ this mechanism is folklore and is **not** what [bilodeau2014] states; see the note above | One fullscreen triangle. The performance claim is [bilodeau2014]'s; the seam reasoning is nobody's |
 | A 40 km vista reads as a miniature | No aerial perspective; fog cards and grading cannot substitute | The froxel volume, 0.04 ms at 32³ [hillaire2020] — but check its depth range covers the vista: a 32-slice volume sized for a few hundred metres leaves the far field to fall back on the sky term alone |
 | The scene goes muddy at range and no parameter fixes it | Three media attenuating the same path — aerial perspective, height fog and froxel fog composited as results | Sum coefficients in the shared froxel, integrate once; apply the sky term once at one depth |
+| A hard colour band across a distant mountain face | Two froxel depth slices meeting on the face; slices are kilometres thick at range | Power-distribute the slices, dither the depth sample, let TAA resolve it |
+| Every ridge beyond the volume is the same colour and the vista flattens again | Depth clamped to the last froxel slice | Fall back to the sky-view path beyond `volumeFar`, cross-fade one slice |
+| A shimmering rim on ridgelines at range, blamed on TAA | The froxel volume built with a different projection matrix than the G-buffer | Build it with the same jittered matrix |
+| In VR the haze boils, and differently in each eye | Per-eye volumes dithered independently, so the noise decorrelates | One blue-noise offset shared by both eyes |
 | Sea and land disagree in colour exactly at the horizon | A private water fog colour instead of the shared atmosphere path | One atmosphere state, shared — `water-rendering.md` |
 | Sky and terrain detach at the horizon when the camera moves | A planet-absolute atmosphere shader jittering against jitter-free terrain | Evaluate in the camera-relative frame — `planetary-precision.md` |
 | Shadowed slopes and valley floors are flat black, or lit by a constant | The sky's **ambient** output is missing; only the sun and the AP term were wired up | Convolve the sky into an irradiance probe — the 16×64 ground-irradiance table is already produced upstream |
