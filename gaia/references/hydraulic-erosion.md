@@ -8,9 +8,9 @@ generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: mei2007, tier: P, locator: "READ IN FULL, and every reference below re-checked against the PDF. Section 3 opens 'The proposed hydraulic erosion model is decomposed into five steps' — 3.1 Water Increment, 3.2 Flow Simulation, 3.3 Erosion and Deposition, 3.4 Sediment Transportation, 3.5 Evaporation; section 3.2.1 eq. 2 is the flux update with pipe cross-section A and pipe length lX, eq. 4 the outflow scaling factor K = min(1, d1*lX*lY/(sum of fluxes)*dt); section 3.3 eq. 10 is the transport capacity C = Kc*sin(alpha)*|v|; the CFL statement dt*u <= lX and dt*v <= lY closes section 3.2.2" }
   - { id: stava2008, tier: P, locator: "§4 eq. (1), pipe cross-section fixed at C = l² and the outflow scale-down written as a guarded branch rather than Mei's min; §5 sediment slippage and the material-layer stack" }
-  - { id: jako2011, tier: P, locator: "eq. (10) as numbered in the CESCG 2011 printing, which is the copy that was read: the capacity term scaled by the depth ramp lmax(d1), and the ramp definition (0 below zero depth, linear to 1 at Kdmax). Numbering may differ in the Eurographics Short Papers printing" }
+  - { id: jako2011, tier: F, locator: "NOT PEER REVIEWED, and the artefact says so on every page: the footer of all 8 pages of the CESCG 2011 printing reads 'Proceedings of CESCG 2011: The 15th Central European Seminar on Computer Graphics (non-peer-reviewed)'. Graded P here until that footer was read. A seminar for student work, not a refereed venue. eq. (10) as numbered in that printing, which is the copy that was read: the capacity term scaled by the depth ramp lmax(d1), and the ramp definition (0 below zero depth, linear to 1 at Kdmax). Numbering may differ in the Eurographics Short Papers printing" }
   - { id: obrien1995, tier: P, locator: "the height-column fluid surface coupled by pipes on the head difference. NOT OPENED — the Computer Animation 1995 proceedings are not online free and the Berkeley author copy was unreachable from here, so no section, equation or page inside it is named" }
-  - { id: beyer2015, tier: F, locator: "the per-droplet transport-capacity formulation, and the erosion-brush radius. NOT OPENED — the TUM mediatum copy did not serve the PDF and no other copy was reachable, so no section inside the thesis is named. A bachelor thesis and not peer review, hence F. What this document actually verified is the implementation that follows it, lague_erosion" }
+  - { id: beyer2015, tier: F, locator: "the per-droplet transport-capacity formulation, and the erosion-brush radius. NOT OPENED — the TUM mediatum copy did not serve the PDF and no other copy was reachable, so no section inside the thesis is named. A bachelor thesis and not peer review, hence F. What this document verified in that file is the SIGN of the speed update at line 124 and the capacity form at line 93 -- NOT the minSlope floor, which is this document's own formulation and appears nowhere in the file, lague_erosion" }
   - { id: musgrave1989, tier: P, locator: "the original grid hydraulic and thermal erosion passes. NOT OPENED — SIGGRAPH 1989 sits behind the ACM paywall, which refused the download, so nothing inside it is named. The lineage claim was read instead in olsen2004 p. 5, which opens its erosion chapter with the sentence that thermal and hydraulic erosion 'were first described by Ken Musgrave et al in 1989' and cites this paper for both" }
   - { id: lague_erosion, tier: F, locator: "READ IN FULL, Assets/Scripts/Erosion.cs at github.com/SebLague/Hydraulic-Erosion. Defaults, lines 6-22: erosionRadius 3, inertia 0.05, sedimentCapacityFactor 4, minSedimentCapacity 0.01, erodeSpeed and depositSpeed 0.3, evaporateSpeed 0.01, gravity 4, maxDropletLifetime 30. Erode, lines 47-128: capacity at line 93, deposition at lines 98-106 with the source's own comment 'Deposition is not distributed over a radius (like erosion) so that it can fill small pits', brush-weighted erosion at lines 111-120. InitializeBrushIndices, lines 155-200: weight = 1 − sqrt(sqrDst)/radius inside a circular radius, normalised by weightSum. CAUTION line 124, speed = sqrt(speed^2 + deltaHeight*gravity), has the sign this document warns against — deltaHeight is negative downhill, so as published the droplets accelerate UPHILL. Cross-check defaults and brush weights against this file; do not copy line 124" }
   - { id: parker1982, tier: P, locator: "Abstract — coarse grains are intrinsically less mobile, so the pavement must be the mechanism that equalises mobility, by exposing proportionally more coarse grains to the flow; and the prediction that pavement is absent in most sand-bed streams. Abstract only; the full text was not reached" }
@@ -50,6 +50,21 @@ say what a cell measures. At 1024 cells across 2 km (≈2 m/cell) that reach is 
 valley. On the same grid across 100 km (≈100 m/cell) it is 3–6 km, which sounds large and is not:
 it is still 3–6% of a domain whose trunk network spans the whole thing, so the droplet scratches
 rather than carves.
+
+⚠️ **Simulated time per wall-clock second collapses as you refine, and much faster than the cell
+count alone suggests.** [mei2007] Table 1 halves the timestep at every doubling of resolution —
+0.002 s at 256² down to 0.000125 s at 4096², stated in §3.2.2 and printed in the row labels — so
+you pay twice: more cells per step **and** more steps per simulated second. Over that 16× range
+the measured collapse is **1612×** (of which 1131× is the timestep alone), on a P4 2.4 GHz with an
+8800 GTX, PG 2007. The structural expectation is a **cube** law — cells scale as `N²`, steps as
+`N` — which predicts 4096×; the measured exponent is **2.66**, and the per-doubling factor climbs
+toward `2³ = 8` as the grid grows. ⚠️ It is *not* a fourth-power law: that would predict 65 536×,
+forty times what Mei measured. [stava2008] Table 1, on an Athlon X2 6000+ with an 8800 GTX,
+SCA 2008, shows where the step goes — the fluid solve is only **14–20%** of it, and the slippage
+pass is what scales, **6.00×** for four layers against one.
+
+**Budget from this, not from the cell count**: a configuration that runs at 512² in real time is
+not "4× slower" at 1024². It is closer to 8×, and the gap widens with every doubling.
 
 The km bands below assume **1024–4096 cells across the domain** — ≈0.5–2 m/cell at the small end,
 ≈12–100 m/cell at the crossover. Re-derive them if your cell size is elsewhere; the cell column is
@@ -106,7 +121,17 @@ pos    = pos_new
 - **`min(Δh, sediment)` going uphill.** Deposit only enough to fill the pit just hit, never the
   whole load, or droplets bury the terrain in front of every rise.
 - **`minSlope ≈ 0.01`** stops capacity collapsing to zero on flats, which would dump the entire
-  load into one cell as a spike.
+  load into one cell as a spike. ⚠️ **This is the document's own formulation and is NOT what
+  [lague_erosion] does, despite a locator that used to imply the code was checked for it.**
+  `Erosion.cs` line 93 reads
+  `Mathf.Max(-deltaHeight * speed * water * sedimentCapacityFactor, minSedimentCapacity)` —
+  the floor is on the **whole product**, and the constant is a minimum *capacity*, not a minimum
+  *slope*. The identifier `minSlope` appears nowhere in that file, nor in any other artefact this
+  document cites. Where the floor bites — flats, the regime the bullet is about — flooring the
+  slope gives roughly **3–12× more capacity** than flooring the product, across the parameter
+  envelope that code ships with, and unlike the product form it keeps scaling with `speed` and
+  `water`. Both work; they are different models, so **do not read one as a transcription of the
+  other**, and do not port the constant between them.
 - **The sign in the speed update.** `Δh` is negative downhill, so speed rises with `+(-Δh)·gravity`.
   Written the other way, droplets accelerate uphill and the terrain grows tumours. ⚠️ **The most-read
   droplet implementation has it the other way.** [lague_erosion] `Erosion.cs` line 124 is
@@ -289,10 +314,18 @@ it matches the order the material actually arrives in, and it stops a fine apron
 slope that the next pass removes.
 
 Measured on co-located piles, sand at 32° under scree at 38°, flat bedrock, 64²: reading the
-composite, the surface relaxes to **38.00°** and the two orders differ by **0.25 m**. The tempting
-fix is to let each pass read only its own layer over bedrock — which does make the result exactly
-order-independent, **0.000e+00 m** between orders — and the composite surface then stands at
-**54.6°**, sixteen degrees steeper than any repose angle in the scene. There is no third option: a
+composite, the surface relaxes to **38.00°** — ⚠️ **but only while the sand volume is below the
+scree volume.** At parity or above, the sand spreads past the scree flank and the composite
+relaxes to **32.00°** instead. Both are stable regimes of the same rule, and an earlier version of
+this paragraph printed 38.00° as though it were the answer. ⚠️ It also printed a **0.25 m**
+difference between the two pass orders; that figure did not reproduce, and independent runs across
+nineteen configurations span 2·10⁻⁵ m to 0.13 m. The order dependence is real and its magnitude is
+configuration-specific — measure it on your own stack rather than budgeting from a number here.
+
+The tempting fix is to let each pass read only its own layer over bedrock — which does make the
+result exactly order-independent, **0.000e+00 m** between orders — and the composite surface then
+stands at **54.6°** (checkable in closed form: `atan(tan 32° + tan 38°) = 54.58°`, because
+independent layers add their *gradients*, not their angles), sixteen degrees steeper than any repose angle in the scene. There is no third option: a
 pass that cannot see the other layers cannot respect their combined slope, and a pass that can is a
 pass whose result depends on when it ran. Take the order dependence, fix the order, and put it in
 the cache key. The exception is a stack that is **a splatmap rather than geometry** — nothing there

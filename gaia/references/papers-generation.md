@@ -199,10 +199,19 @@ axis is sent, so they are restated:
   cross-section at `C = l²`, **constant**, and writes the outflow scale-down as a guarded
   branch rather than Mei's `min`. It does **not** contain the `lmax` depth ramp often
   attributed to it — that is `jako2011`; its capacity (eq. 2) is `|v|·C_k·sin α`, unramped.
-- **jako2011** `P` — Jákó, B. & Tóth, B. (2011). *Fast Hydraulic and Thermal Erosion on the
-  GPU.* Eurographics 2011 Short Papers. — Adds the `lmax(d)` depth ramp on transport capacity
-  to the Mei pipe model, plus a thermal pass. Eq. (10) and the ramp definition were read in
-  Jákó's CESCG 2011 copy of the same work (old.cescg.org), not in the Eurographics printing.
+- **jako2011** `F` — Jákó, B. & Tóth, B. (2011). *Fast Hydraulic and Thermal Erosion on the
+  GPU.* Proceedings of CESCG 2011 (15th Central European Seminar on Computer Graphics). — Adds
+  the `lmax(d)` depth ramp on transport capacity to the Mei pipe model, plus a thermal pass.
+  Eq. (10) and the ramp definition were read in that printing (old.cescg.org, 8 pp).
+  ⚠️ **This entry was graded `P` until the artefact's own footer was read.** All eight pages
+  stamp "*Proceedings of CESCG 2011: The 15th Central European Seminar on Computer Graphics
+  **(non-peer-reviewed)***", and the paper's byline is student work — "Balázs Jákó, *Supervised
+  by:* Balázs Tóth". ⚠️ **An earlier version of this entry gave the venue as "Eurographics 2011
+  Short Papers", and nothing here establishes that printing**: the artefact mentions
+  Eurographics zero times, no DOI was ever recorded, and a Crossref title search returns no such
+  work. The read-elsewhere rule above would have kept a `P` had the refereed venue been real —
+  which is exactly why an unverified venue is worse than an unread paper. If someone obtains the
+  Eurographics printing, this goes back to `P` with the CESCG copy named as what was read.
 - **beyer2015** `F` [not-opened] — Beyer, H.T. (2015). *Implementation of a Method for Hydraulic Erosion.*
   Bachelor thesis, Technische Universität München. — A thesis, not peer review. There is no
   canonical droplet-erosion paper; this is the modern formulation, borrowing Mei's transport
