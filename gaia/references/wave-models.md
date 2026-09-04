@@ -176,7 +176,7 @@ corrected here, and the second was the worse of the two.**
 
 ⚠️ **This third statement also misread Gaia's own tier rule.** It said an unread source "cannot be
 graded `P`". `P [not-opened]` is exactly the sanctioned form for a peer-reviewed paper nobody here
-opened, and the corpus's bibliographies carry twenty entries graded exactly that way. The tier bar is peer review; `[not-opened]`
+opened, and the corpus's bibliographies carry nineteen distinct entries graded exactly that way. The tier bar is peer review; `[not-opened]`
 records the reading separately. A rule invented to justify an omission is worse than the omission.
 
 **The field's slope statistics are the part the renderer actually reads.** Below the wavelength a
