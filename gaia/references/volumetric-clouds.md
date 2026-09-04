@@ -129,9 +129,18 @@ descending order of provenance:
 | The depth at which alpha reaches 0.5 | [schneidervos2017] p.101 | `F` |
 
 It is also the single largest optimisation in the ladder: depth culling against scene geometry is
-**1.81 ms → 1.2 ms** on PS4 — a third of the remaining cost — using a **conservative `max()` over a
-low-LOD depth mip**, because reprojection needs *next*-frame visibility, not this frame's
-[schneidervos2017] p.98. ⚠️ Use `min()` there and clouds pop at silhouettes as the camera turns.
+**1.81 ms → 1.2 ms** on PS4 — a third of the remaining cost — by reducing a low-LOD depth mip
+**conservatively toward the FARTHEST depth in the footprint**, because reprojection needs
+*next*-frame visibility, not this frame's [schneidervos2017] p.98.
+
+⚠️ **Write the quantity, not the operator, because the operator flips with the depth convention —
+and an earlier version of this line got it backwards for this corpus.** Farthest-in-footprint is
+`max()` under standard depth (near = 0), which is the convention [schneidervos2017] was written in,
+and **`min()` under reversed-Z**, which is what `planetary-precision.md` mandates and what you are
+almost certainly running. Transcribing the source's `max()` unchanged selects the *nearest* depth,
+terminates the march early, and produces exactly the popping this optimisation exists to avoid —
+`gpu-driven-culling.md` states the same rule for its HiZ reduce and names the same symptom,
+"geometry near silhouettes disappears for a frame under motion".
 
 **2 — The shadow the ground receives.** The cheapest large-scale life a vista buys, and absent from
 the 2015/2017 lineage entirely.
@@ -205,7 +214,7 @@ pixels**. A cloud budget quoted without the geometry it displaces is half a numb
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | Cloud drawn over a mountain the first time a peak enters the deck | The march does not terminate at the terrain depth hit | Depth-aware compositing; pick one of the three depth definitions and use it everywhere [yusov2014] |
-| Clouds pop at silhouettes as the camera turns | `min()` over the depth mip instead of a conservative `max()` — reprojection needs next-frame visibility | `max()` over a low-LOD mip [schneidervos2017] p.98 |
+| Clouds pop at silhouettes as the camera turns | The depth-mip reduce picks the NEAREST depth in the footprint, so the march terminates early — the operator that does this flips with the depth convention | Reduce toward the FARTHEST depth: `min()` under reversed-Z, `max()` under standard depth. Write the quantity, not the operator [schneidervos2017] p.98 |
 | Landscape looks dead and evenly lit under a dramatic sky | No ground-receiving cloud shadow — it is absent from the 2015/2017 lineage, so an implementation faithful to those decks has none | Light-space transparency buffer on the CSM matrices [yusov2014] p.133 |
 | Cloud shadows drift wrong across a large map | The projected-shadow formulation assumes a flat planet | Declare the assumption and bound the map size, or project on the sphere [hillaire2016] p.42 |
 | Ghosting and smearing on fast camera turns, worst near camera | Temporal amortisation over 16 frames cannot resolve in time | Depth-split the render instead of upscaling near clouds [schneider2023] p.185 |
