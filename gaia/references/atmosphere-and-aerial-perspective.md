@@ -54,7 +54,9 @@ Volumetric shadows through the atmosphere, at 32 samples, take the total to **1.
 three times the unshadowed pass, and the single largest discretionary number on this page.
 
 **How wrong it is.** The pass inherits the accuracy of whatever model was precomputed, and
-[bruneton2017] Table 2 prices that in RMSE against `libRadtran`: a Bruneton-class model 11.3, Hosek
+[bruneton2017] Table 2 prices that in RMSE against the sky **measurements** (not against
+`libRadtran`, which is a comparison point in that paper rather than the error reference), over a
+09h30–13h30 window: a Bruneton-class model 11.3, Hosek
 41.5, Preetham 88.1 — all three rendering in O(1). **Accuracy is bought in the bake, not in the
 pass.** Once the tables exist, the cheap model and the accurate model cost the frame the same.
 

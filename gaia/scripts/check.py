@@ -527,8 +527,7 @@ def locator_quality() -> tuple[int, int, int, list[str]]:
 # this UNDER-counts, which is the safe direction for a number that is supposed to go up, and a
 # document that wants credit has to state the cost precisely enough to be actionable anyway.
 COST_UNIT = re.compile(r"(?<![\w.])\d[\d.,]*\s*(?:ms|\u00b5s|us|MB|GB|KB|TB|MiB|GiB|KiB|fps|FPS)\b"
-                       r"|bytes?\s*(?:per|/)\s*cell"
-                       r"|budget tier|per-frame|per frame|frame budget|offline bake", re.I)
+                       r"|bytes?\s*(?:per|/)\s*cell", re.I)
 
 # The other half of the engineer's question. Deliberately NOT matching a bare "N% of": that
 # catches "70% of the variance" and every other proportion in the corpus, and a metric that
@@ -538,14 +537,18 @@ ERROR_STATED = re.compile(r"(?:\u00b1|\+/-)\s?\d[\d.]*"
                           r"|\d[\d.]*\s?%\s+(?:error|too\s+\w+|low|high|off|out)"
                           r"|\berror\s+(?:of|is|was)\s+[-+]?\d[\d.]*"
                           r"|\b(?:max(?:imum)?|mean|rms|peak)\s+(?:relative\s+)?error\b"
-                          r"|\b(?:RMSE|MAE|RMS error|L2 error|absolute error|relative error)\b", re.I)
+                          r"|\b(?:RMSE|MAE|RMS error|L2 error)\b[^.\n]{0,60}?\d"
+                          r"|\d[^.\n]{0,60}?\b(?:RMSE|MAE|RMS error|L2 error)\b", re.I)
 
 ERROR_FIXTURES = [
     ("the max relative error is 14.32% at 78.89 deg", True),
     ("T = (0.14 \u00b1 0.062) R^0.77", True),
     ("within 30% where R < 5 km", True),
     ("runs 22% low at the Brewster angle", True),
-    ("an RMSE of 11.3 against libRadtran", True),        # an error in physical units, not a percentage
+    ("an RMSE of 11.3 against the measurements", True),        # an error in physical units, not a percentage
+    ("we did not compute an RMSE for this", False),      # a negation, not a measurement
+    ("MAE", False),                                      # a bare acronym with no number
+    ("giving near-constant relative error across the range", False),  # qualitative, not a figure
     ("about 70% of the variance is explained", False),   # a proportion, not an error
     ("39.18% coverage, 25676 set cells", False),
     ("it is a good approximation", False),
@@ -556,6 +559,9 @@ COST_FIXTURES = [
     ("32 MB per resident tile", True),
     ("4 bytes per cell, so 1.3 GB", True),
     ("holds 20 fps on the preview", True),
+    ("if the composite below is too expensive per frame", False),  # the false positive that made
+    ("synthesise triangles per frame from a heightfield", False),  # this metric read 10/36 when
+    ("choose a budget tier and stick to it", False),               # the honest answer was 4/36
     ("about 2 minutes at 16 azimuths", False),      # wall clock: not a machine unit
     ("an e-folding time of 1.3 hours", False),      # physical, and the reason minutes/hours are out
     ("a 512 preview against a 4k build", False),    # resolutions are not costs
@@ -574,15 +580,17 @@ def approximation_coverage() -> tuple[int, int, int, int]:
     approximation carries, and the cost it incurs. Either alone is unactionable -- an error
     bound with no cost cannot be budgeted, a cost with no error cannot be justified.
 
-    Measured when this was added: **7 of 34 documents state both**. 5 say how good and not what
-    it costs; 14 say what it costs and not how good; 8 say neither. So 27 of 34 answer at most
-    half the question, and the two halves are largely in DIFFERENT documents -- the ones richest
-    in error analysis (sketch-based-authoring, sea-ice, seamless-and-periodic, impact-craters)
-    are almost absent from the cost side.
+    Measured honestly: **4 of 36 documents state both**. 10 say how good and not what it costs;
+    4 say what it costs and not how good; 18 say neither.
 
-    An earlier version of this metric counted cost alone, which measured the wrong unit: cost is
-    half of a pair, and reporting it by itself made 6/34 look like the problem when the real
-    problem is that the halves rarely meet.
+    It read 10/36 for half a day, and that was this metric committing the defect it exists to
+    detect. `COST_UNIT` matched the bare phrases "per frame", "budget tier" and "offline bake", so
+    six documents scored on sentences that are not costs at all -- one of them on "if the composite
+    below is too expensive per frame", a sentence whose whole point is that the cost is UNKNOWN.
+    The error side was equally loose: "we did not compute an RMSE" matched. Both patterns now
+    require a NUMBER, and the fixtures pin exactly those cases.
+
+    An earlier version counted cost alone, which measured the wrong unit: cost is half of a pair.
 
     REPORTED, not enforced, like `locators`. An OPEN row in registers/guard-proofs.tsv.
 

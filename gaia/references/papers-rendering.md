@@ -85,13 +85,18 @@ authority.
 
 ### Sky and atmosphere
 
-Five refereed sources, all obtained and read. **Four of the five diverge from the published
-record**, so every locator below is indexed by section, equation, figure or table rather than by
-page — the exception is `preethamshirleysmits1999`, the one copy carrying real proceedings folios.
+**Six** refereed sources plus two `F` entries, all obtained and read. ⚠️ This paragraph said "five"
+and was written before `hillaire2020` was added a commit later and never folded in — the count is
+part of what a read log is for, so it is corrected rather than quietly widened. **Four of the six
+`P` artefacts diverge from the published record**, so locators are indexed by section, equation,
+figure or table rather than by page; the exception is `preethamshirleysmits1999`, the one copy
+carrying real proceedings folios.
 
 **`brunetonneyret2008`** — the publisher-typeset EGSR/CGF version via the Inria HAL deposit
-(`inria-00288758`), carrying the Eurographics masthead and the Blackwell footer. Paginated 1–8 as
-an article, **not** 1079–1086; section and equation numbering match the record.
+(`inria-00288758`), carrying the Eurographics masthead and the Blackwell footer. **Its eight
+article pages carry no folio numbers at all**, so cite sections and equations, never pages. ⚠️ An
+earlier version of this log said "paginated 1–8, not 1079–1086" — both halves were wrong: there is
+no 1–8 numbering to read, and the HAL cover sheet *does* print "27 (4), pp.1079-1086".
 **`bruneton2017`** — arXiv:1612.04336v1, which states on its own first page that it is "the
 author's version of an article that has been published in this journal". Paginated 1–15, not
 2641–2655, and dated 2016 against a 2017 issue. Section, figure and table numbers match.
@@ -101,7 +106,8 @@ carries no article pagination against the record's 95:1–95:9, and figure detai
 **supplemental material**, which holds the fitted matrices and the per-band SNR charts, is not in
 this PDF and was **not opened**.
 **`preethamshirleysmits1999`** — the ACM proceedings version, mirrored on a Duke course page, with
-folios 91–99 present, so page citations into it are valid. ⚠️ Its embedded fonts use a non-standard
+folios **91–100** present across its ten pages, so page citations into it are valid. ⚠️ This log
+said 91–99 while the entry beside it cited 91–100; the entry was right. ⚠️ Its embedded fonts use a non-standard
 encoding: extracted mathematics comes out as escape sequences (`/#0B /=/1 /: /3`), so every formula
 quoted from it was reconstructed from context rather than copied.
 **`nishita1993`** — the author's own **raster scan** at nishitalab.org, with no text layer and
@@ -232,9 +238,12 @@ others. Read `bruneton2017` before choosing anything here.
   Analytic Model for Daylight.* SIGGRAPH '99, 91–100, doi:10.1145/311535.311545. — The analytic
   daylight model that everything after it is measured against, and the worst performer in
   `bruneton2017`'s table at RMSE 88.1, overestimating by roughly a factor of two. Cited for what it
-  is: the baseline that made analytic skies routine, not a model to ship in 2026. It is also the
-  only one of these five that treats **ozone** at all, and then only as a 0.0035 m NTP column
-  absorber on the direct solar beam — read on the page, in a sentence whose surrounding mathematics
+  is: the baseline that made analytic skies routine, not a model to ship in 2026. Among the five
+  *clear-sky model* sources it is the only one treating **ozone**, and then only as a 0.0035 m NTP
+  column absorber on the direct solar beam — but ⚠️ `hillaire2020` **does** model it, with a
+  dedicated Table 1 row (σ_oa = 0.650, 1.881, 0.085 ·10⁻⁶ m⁻¹ and a tent profile), and calls it
+  "key to achieving sky-blue colors when the sun is at the horizon". Do not read the five as the
+  whole field — read on the page, in a sentence whose surrounding mathematics
   the artefact's font encoding renders unquotable.
 - **nishita1993** `P` — Nishita, T., Sirai, T., Tadamura, K. & Nakamae, E. (1993). *Display of the
   Earth Taking into Account Atmospheric Scattering.* SIGGRAPH '93, 175–182,
