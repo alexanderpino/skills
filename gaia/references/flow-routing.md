@@ -14,7 +14,7 @@ sources:
   - { id: lindsay2016, tier: P, locator: "hybrid breach/fill with a depth limit; DEM-modification comparison" }
   - { id: planchon2002, tier: P, locator: "the fill algorithm" }
   - { id: montgomery1992, tier: P, locator: "the area-slope channel-initiation threshold, A*S^2 = const" }
-  - { id: braun2013, tier: P, locator: "the O(N) stack ordering and the unconditionally stable implicit discretisation. NOT OPENED — Geomorphology is paywalled at Elsevier and no open copy was reachable from here, so nothing inside it is named; the scheme is read instead in cordonnier2016 eq. 2, which restates it. NOTE the crediting section is NOT section 5: stream-power.md carries a checked retraction showing section 5 credits nobody, and the attribution to BW13 sits in section 1 and section 4. The section number is omitted here rather than replaced because the artefact could not be re-fetched to confirm it" }
+  - { id: braun2013, tier: P, locator: "the O(N) stack ordering and the unconditionally stable implicit discretisation. NOT OPENED — Geomorphology is paywalled at Elsevier and no open copy was reachable from here, so nothing inside it is named; the scheme is read instead in cordonnier2016 SECTION 5 eq. 2, which restates it and states the ordering requirement. NOTE section 5 CREDITS NOBODY: the attribution to BW13 sits in section 1 and section 4, per the checked retraction in stream-power.md. Section 5 is nonetheless the correct locator for the scheme and eq. 2, and an intermediate revision here wrongly deleted it along with the false attribution clause" }
 ---
 # Flow routing — where the water goes
 

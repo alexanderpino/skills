@@ -320,7 +320,10 @@ where `N` is the period. Measured: 0.000e+00 at `N = 256` for `L = 2, 3, 5` and 
 An undecimated (à-trous) split has no phase at all: measured shift-invariant to 0.0000 m at shifts
 of 1, 2, 4, 8 and 16 px, where the decimated pyramid drifted 0.45, 0.89, 1.72 and 2.72 m and only
 returned to zero at the full period of 16. If your build is tiled and the seams are the thing that
-keeps failing, that exactness is what you are buying with the `(L+1)×` storage.
+keeps failing, that exactness is close to free: the two-band recipe in `## Use this` stores `lo`
+and `hi` either way, so an à-trous split costs **2 fields, the same as the decimated one**, at about
+1.5× the arithmetic. ⚠️ The `(L+1)×` storage figure this line used to cite is the cost of a full
+undecimated *pyramid*, which is not what is being built — see the retraction above.
 
 ## Where this competes with erosion, and where it does not
 
@@ -423,4 +426,4 @@ The one parameter with no defensible default. `Detail Size` in Gaea's terms [gae
 | Two implementations of "preserve the silhouette" disagree by ~10% of relief | One is `lo + f(hi)`, the other is `f(h) − lowband(f(h)) + lo`; they agree only for linear homogeneous `f` | Pick one on whether the operator needs absolute elevation; document which |
 | Restoring the low band after erosion re-creates mountains the water removed | The volume loss was physical — an open basin exporting sediment, measured −23.6% | Restore the low band only against non-physical drift; never against transported mass |
 | An operator's thresholds behave differently on flat and mountainous input | It was tuned on the full field, where the local mean varies; on the residual the mean is 0 everywhere | Run it on the residual, where thresholds are scale- and elevation-independent |
-| The band split is exact in isolation and drifts sub-metre when the field is shifted | The decimated pyramid is only shift-invariant at multiples of `2^L`; measured 2.72 m at an 8 px shift | Align edits to the lattice, or use an undecimated split at `(L+1)×` storage |
+| The band split is exact in isolation and drifts sub-metre when the field is shifted | The decimated pyramid is only shift-invariant at multiples of `2^L`; measured 2.72 m at an 8 px shift | Align edits to the lattice, or use an undecimated split — still 2 fields, about 1.5× the arithmetic, and exactly shift-invariant |
