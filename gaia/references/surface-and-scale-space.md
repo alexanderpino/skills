@@ -57,7 +57,7 @@ Four claims, all measured below on a 257×257 fractal field with 1000 m of relie
 `reflect` boundary, `L = 4`:
 
 - The split **reconstructs exactly**: `collapse(split(h)) − h` is 1.8e-15 m, machine precision.
-  ⚠️ **This is an identity, not a test, and an earlier version offered it as a validation.**
+  ⚠️ **This is an identity, not a test — do not use it to validate `expand`.**
   The recipe defines `hi = h − lo`, so `lo + hi = h` holds for *any* `lo` whatsoever. Measured:
   set `lo := 0` and it passes at **exactly 0.000000e+00**; set `lo` to random noise and it passes
   at 1.14e-13; drop the factor 4 from `expand` — which destroys **99.609%** of the low band,
@@ -104,8 +104,8 @@ same as the decimated version**. Measured on the same kernel:
 or building a full multi-band pyramid where the `4^-k` storage decay is what makes depth
 affordable, the decimated version wins on time and on storage. Tiled — which is the Gaea-class case
 this skill targets — the à-trous form is **35.4%** cheaper in halo at `L = 5` (the row above:
-`3·2⁵ = 96` px against 62, so `(96−62)/96`; ⚠️ an earlier version said 48%, which the table it
-sits under does not give), is exactly shift-invariant
+`3·2⁵ = 96` px against 62, so `(96−62)/96` — check it against the row above rather than taking
+the number; an earlier version said 48%, which that table does not give), is exactly shift-invariant
 where the decimated pyramid drifts metres, and makes every phase rule in this document *vacuous*.
 It costs about 1.5× the arithmetic. Four pages below are spent on the decimated pyramid's phase
 tax; that tax is the price of the recommendation, not a law of band splitting. *Editing the full field and
