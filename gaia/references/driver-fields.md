@@ -49,9 +49,16 @@ horizon angle that decides whether it is shaded from sun. One method, two fields
 ⚠️ This recommendation used to read "compute **one** horizon field and drive both from it",
 and "one sweep, two fields". The section below says reusing one for the other is "a real and
 easy mistake", and the failure table says to run the sweep twice — so the headline was
-prescribing what the rest of the document documents as a failure. What is shared is the
-**algorithm and the code**; what is not shared is the search distance, and per the bounded-
-`dmax` argument below it cannot be, because the two bakes are not the same computation.
+prescribing what the rest of the document documents as a failure. ⚠️ **What is shared is the IDEA, not the code, and an
+earlier version of this erratum said "the algorithm and the code".** The insight — that maximum
+upwind slope and horizon angle are the same quantity — transfers exactly. The implementation does
+not: the unbounded sweep keeps an upper-hull **stack** and pops dominated candidates permanently,
+so a candidate masked by a far tall peak is gone before any bounded query can ask for it.
+Measured here on this document's own profile (`z[3] = 1.0`, `z[40] = 50.0`, window 8): the bounded
+truth is **0.3333** and the retained unbounded hull returns **0.0000**, with 132 of 9900 cells
+disagreeing across 300 random profiles. Bounding the search is a different data structure, not a
+different parameter — and the bounded form is **O(N log W)**, not the amortised O(1) of the
+unbounded one.
 
 **Why it wins.** The horizon field is **sun-independent**. It is a property of the terrain alone, so
 one bake serves every sun position, every hour of every day, and — per the sentence above — the wind
@@ -420,7 +427,7 @@ Driver fields are not heightfields, and three properties follow:
 | The snow line sits consistently too low | 6.5 °C/km taken as measured when it is a standard-atmosphere convention; real windward means are 3.9–5.2 [minder2010] | Tune the lapse rate to place the snow line, and say that is what you did |
 | Snow accumulates evenly across a ridge that should scour and drift | No wind field; only melt is modelled | Add `Sx` shelter from the same sweep [winstral2002]; where wind moves snow it beats radiation |
 | The wind shelter field marks the wrong cells | Search distance chosen without reference to the landform — at 100 m the search never crosses the valley, at 300 m it does [winstral2002] Fig. 4 | Choose `dmax` by which landform should do the sheltering; 100–300 m is the measured useful range |
-| Reusing the insolation horizon for wind gives nonsense | Same algorithm, but the insolation baseline is kilometres and the wind baseline is hundreds of metres | Run the sweep twice with different `dmax`; the code is shared, the parameter is not |
+| Reusing the insolation horizon for wind gives nonsense | Same algorithm, but the insolation baseline is kilometres and the wind baseline is hundreds of metres | Run the sweep twice with different `dmax`; the IDEA is shared, the implementation is not -- the bounded sweep needs a windowed structure, because the unbounded hull discards the nearer candidates a bounded query needs |
 | The occlusion bake takes hours | Per-cell, per-direction ray marching — 1–2 hours per tile on a GPU against ~2 s per azimuth for the sweep on CPU [stendardo2020] [dozier2022] | Use the order-N sweep; it is O(N) and sun-independent |
 | Changing the time of day rebuilds everything | The horizon sweep sits below the sun parameter in the graph | Put the sun-independent sweep above the sun parameter; only the projection is downstream |
 | Rivers run out of dry valleys, or half the map is a desert | An unclamped upslope field: 49.6–50.1% of cells measure negative, and clamping alone then halves the base rate | Clamp at zero, then rescale so the domain total matches the intended base rate |
