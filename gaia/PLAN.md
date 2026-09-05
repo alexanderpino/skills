@@ -267,3 +267,56 @@ front-matter row, or a coverage row.
 
 Total surface, honestly estimated: **two parser functions, ~8 guard functions, one CI job, ~40
 sentences across ~25 documents, ~6 coverage rows, and one decision.**
+
+---
+
+## Target: 9+ / 10
+
+The audit rated the skill **7.5**, by dimension. A target changes the question from *"is the plan
+sound"* to *"does the plan reach the number"* — and the honest answer is that Phases 0–4 reach
+about 8.5, and the last point is gated by three things the plan currently defers or leaves
+ungated. They are named here so nobody executes the whole plan and finds the target still out
+of reach.
+
+| Dimension | Now | What 9 means | Phase | Reached by the plan? |
+|---|---|---|---|---|
+| Stated constants and derivations | 9 | hold it | 3 | yes — Phase 3's re-derivation rule protects it |
+| **Executable content** | **3** | all **54** executable blocks across **25** documents re-run under a termination column; 0 fail. Two documents (`tiled-streaming`, `water-closed-vs-open`) have blocks and no register row at all | 1 | **yes** — Phase 1's *done when* already says every block, not only the broken four |
+| **Recommendations and failure tables** | **5** | `check_repudiation` reports 0; every `## Use this` declares a budget regime | 2, 4 | **yes** |
+| Provenance as a system | 9 | hold it | 0 | yes |
+| **Provenance in practice** | **6** | the six locator defects fixed **and** `requote.py` reaches most quotations, not 6 of 119 | 3, 6 | **no as written** — the artefact cache sits in the standing programme with no gate. It is an access problem, not a logic problem, and it is the only instrument aimed at the fabrication surface |
+| **Guard engineering** | **5** | all six reproduced holes closed, each with a `bites` row that goes red | 0 | **yes** |
+| Coverage and routing | 8 | the ~6 rows, `budget:`/`audience:` tags, `dated-crossover` | 4 | yes |
+| **Audit state** | **5** | the load-bearing documents carry `verified:` by a **named human** | — | **no — and no agent can do it.** `SKILL.md`'s three-channel table is explicit: guard-green and block-ran are not human-read. Eight critics and ~60 re-derived numbers are the second channel. The third has **0 of 37**, and nothing in this plan produces one |
+| **Usability for the stated audience** | **7** | F1, F4, F9 closed; the three tool documents written; **and G53 decided as *close***, not *declare* | 4, 6 | **only if Phase 6's decision is *close*.** Declared, the rendering axis stops at algorithm-and-pass and the engine audience caps below 9 |
+
+### The three items that gate the last point
+
+1. **Decide G53 as *close*.** One `shader-craft` document owning precision, derivatives and LOD
+   selection, sampling and filtering, early-Z and depth-output semantics under both conventions,
+   divergence and occupancy, and the mobile/tiler caveats — written to the same standard as the
+   rest, with its own failure table, and cited by the nine rendering documents at their handoff
+   rows. This is the single largest gap for the skill's primary audience, and it is a document,
+   not a decision to defer.
+2. **Gate the artefact cache.** Move it from Phase 6's standing programme into Phase 3 with a
+   number: `requote.py` locates ≥ 60% of checkable quotations, and every ALTERED verdict is
+   resolved. Without it, "provenance in practice" cannot rise, because the corpus's worst recurring
+   defect — a quotation cut at the clause that reverses it — stays caught by hand.
+3. **Human `verified:` stamps on the load-bearing documents.** Start with the six the critics
+   called best-in-corpus, because verifying an already-good document is cheapest and lifts the
+   dimension fastest: `simulation-time-budget`, `shallow-water`, `water-optics`,
+   `node-graph-runtime`, `heightfield-lod`, `atmosphere-and-aerial-perspective`. A named person
+   reads each cited work and confirms it says what the document claims. **This is the one thing no
+   fan-out substitutes for**, by the corpus's own doctrine — and it is why T1 and T2 are P0: the
+   first stamp must land on a digest that covers the claims, or the stamp is worthless.
+
+### Sequence for 9+
+
+```
+Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3 (+ artefact cache, gated) ──► Phase 4
+                                                                          ──► shader-craft document (G53 = close)
+                                                                          ──► first six `verified:` stamps
+```
+
+Phases 0–4 as written: **~8.5**. The three gated items above: **9+**. Nothing else in the plan moves
+the number; Phase 5 (handoffs, prefixes) protects it from falling back.
