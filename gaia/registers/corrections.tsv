@@ -1,0 +1,6 @@
+# CORRECTIONS APPLIED TO THE CORPUS, and who checked them. PLAN.md rule 1: every replacement is
+# re-derived by an implementer (A), independently disproved-or-confirmed by a verifier (B), and
+# recorded here. A row with no verifier is not a finished correction. `gate` is the numeric or
+# textual test named in PLAN.md for that finding, and what it read after the change.
+# Tab-separated. Rows are appended per sitting; the commit column is filled when the row lands.
+finding	document	replacement	derivation	gate	implementer	verifier	commit
