@@ -8,7 +8,8 @@ generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: tevs2008, tier: P, locator: "§3.1 Data Structure for the max-reduce mipmap and its build cost table; §3.2 Intersection Algorithm for the hierarchical traversal loop; §3.3 for level of detail. §4 is Comparison, not the method" }
   - { id: drobot2010, tier: F, locator: "GDC 2010 deck: slide 24 builds the quadtree by mipmapping with a min operator, slides 26–27 and 44 give the traversal and the cell-boundary intersection test, slides 45–49 the refinement, iteration cap and LOD; height blending is slides 81–84 and 91–92" }
-  - { id: dummer2006, tier: F, locator: "the per-texel cone opening and the relaxed variant" }
+  - { id: dummer2006, tier: F, locator: "the per-texel cone opening" }
+  - { id: policarpo2007, tier: F, locator: "ch. 18, the relaxed cone and its one-overshoot-then-bisect search. NOT OPENED -- the GPU Gems 3 chapter was not obtained here; the attribution rests on papers-rendering.md own sentence about it and on the audit X11, so no page range is asserted" }
   - { id: tatarchuk2006, tier: P, locator: "§4, view-angle-adaptive step counts and refinement" }
   - { id: policarpo2005, tier: P, locator: "§3, linear search plus binary refinement" }
   - { id: smacke, tier: F, locator: "the front-to-back bullet in README.md and the Python listing under it, where ybuffer holds the highest drawn y per screen column and DrawVerticalLine clips against it" }
@@ -36,7 +37,8 @@ deforming field), and the pyramid *is* the LOD — selected per step by footprin
 machinery to write.
 
 ```
-level = coarsestMip; t = tEnter                     // tEnter, tExit: ray ∩ [mapMin, mapMax], both FINITE
+level = coarsestMip; t = tEnter; steps = 0          // tEnter = max(0, ·), tExit: ray ∩ [mapMin, mapMax]
+                                                    // both FINITE and NON-NEGATIVE
 while (t < tExit) {
   node      = texelAt(rayPos(t), level)             // explicit-LOD fetch: SampleLevel or Load, never Sample
   tExitNode = min(exitDistance(node, ray), tExit)   // DDA to the node boundary, CLAMPED
@@ -50,7 +52,7 @@ while (t < tExit) {
     }
     level--                                         // descend
   } else {                                          // safe skip, pop up
-    t     = max(t, tExitNode) * (1 + 0x1p-22)       // RELATIVE step off the boundary — never `+ eps`
+    t     = max(t, tExitNode) * (1.0f + 2.38418579e-7f)  // RELATIVE step — never `+ eps`
     level = min(level+1, coarsestMip)
   }
   if (++steps > stepCap) return miss                // a belt, NOT the termination argument
@@ -74,8 +76,8 @@ the node. Ascending and horizontal rays simply enter the candidate span at `t`.
 The skip branch is where this loop hangs. `t = tExitNode` lands the ray exactly on a node boundary;
 pop up, descend again, and `exitDistance` at the finer level returns that same `t`, so the branch
 assigns `t = t` forever. **An absolute nudge is not a fix**: `t + 1e-4` is a *no-op in fp32 for
-every `t ≥ 2048 m`*, one ULP there already being 2.4e-4 — the guard evaporates at exactly the
-distances a terrain marcher lives at. `max(t, tExitNode)·(1 + 2⁻²²)` moves 2–4 ULP *whatever the
+every `t ≥ 2048 m`*, half a ULP there already exceeding it (ULP 2.4e-4) — the guard evaporates at exactly the
+distances a terrain marcher lives at. `max(t, tExitNode)·(1 + 2⁻²²)` moves 2–4 ULP *at every positive normal
 magnitude* (1 mm at 5 km, 23 mm at 100 km, and the skipped sliver sits inside a span the predicate
 just proved clear), and the `max` keeps the increase unconditional when the boundary rounds back
 behind `t`. Advancing the DDA's integer cell index instead and deriving `t` from it is equally
@@ -85,23 +87,33 @@ changes `level` between them, so there is no one cell index to increment.
 
 The clamp is not tidiness. A straight-down picking ray — a use this kernel is sold for — never
 leaves its column, so `exitDistance` is `+inf` and the level-0 branch calls `refine(t, ∞)`, a
-binary search on an unbounded interval. With `rayDir.y == 0`, `rayHeight(tExitNode)` evaluates
-`∞·0 = NaN`; `NaN < node.maxH` is **false**, so the skip branch fires, sets `t = ∞`, and the query
-reports clear line of sight through terrain it never tested. Clamping to a finite `tExit` removes
-every unbounded operand from the loop and both failures with it. **Termination is then
-structural** — each iteration strictly increases `t` or decreases `level`, and `level` only rises
-on the branch that increases `t` — which is why the step cap is a belt against a pathological
+binary search on an unbounded interval. Clamping to a finite `tExit` removes that, and every
+unbounded operand with it. ⚠️ It does **not** remove every NaN: a reciprocal-form DDA
+(`invD = 1/0 = ∞`) on a ray with `dir.x == 0` sitting exactly on an x-boundary computes
+`(bound − o.x)·invD = 0·∞ = NaN`, and `min(NaN, tExit)` is still NaN. Which branch that takes
+depends on your `min`: a NaN-propagating one skips and reports clear line of sight through
+terrain it never tested; an IEEE `minNum` descends instead. Test the one your target ships.
+**Termination is then structural, given `tEnter ≥ 0`** — each iteration strictly increases `t` or
+decreases `level`, and `level` only rises on the branch that increases `t`. ⚠️ The precondition is
+load-bearing and the caller owns it: at `t = 0` the relative advance is `0·(1+2⁻²²) = 0` and the
+loop cycles, and at negative `t` the multiply moves *away* from zero, i.e. backward, to an exact
+fixed point. Clamp `tEnter` with `max(0, ·)`; the textbook slab entry for an origin inside the
+map is negative. That is why the step cap is a belt against a pathological
 field, not the argument. Say that out loud in review: a capped livelock looks exactly like a slow
 frame.
 
 **Registration, which the block assumes and which nothing else pins.** A level-`L` texel `(i,j)`
 owns the half-open square `[i·s_L, (i+1)·s_L)`, `s_L = s₀·2^L`, and carries its sample at that
 square's centre; `texelAt` is `floor(pos.xz / s_L)`, never a rounded texel-centre lookup, and
-`node.maxH` is the max over that footprint **plus a one-texel apron** if the surface is
+`node.maxH` is the max over that footprint **plus a one-texel apron at level 0** — dilate the base
+samples 3×3 and max-reduce *that*, which stays conservative at every level, where aproning per
+level over-bounds by 2^L and aproning only the top level is not conservative below it — if the
+surface is
 reconstructed bilinearly, since interpolation inside an edge texel reaches the neighbour's sample
 and an un-aproned reduce is not conservative there. Leave this unstated and even the failure is
-unstable: two independent fp32 transcriptions of the unfixed block livelocked on 26% and 63% of
-the same 600-ray budget.
+unstable: two independent transcriptions of the unfixed block — different fields, different DDAs,
+different ray sets — livelocked on 14.8% and 63.0% of 600 rays each, and a third, in fp32, ranged
+over 36–63% with nothing changed but the registration convention.
 
 **Build it once and share it.** The same kernel — parameterized by start bias, max distance, mip
 clamp, and whether refinement runs — serves primary marching, sun shadows, long-range occlusion,
@@ -150,8 +162,8 @@ the geometry band.
 | Parallax offset | 1–2 | none | Swims at steep angles; fine for shallow relief |
 | **POM** [tatarchuk2006] | 8–32 + refine | none | **The shipping default**; step count scales with view angle |
 | Relief, linear + binary [policarpo2005] | 8–16 + log refine | none | Better on thin features than pure linear search |
-| Relaxed cone step — Policarpo & Oliveira, over Dummer's cone [dummer2006] | 4–12 | heavy bake | Static detail maps only |
-| Quadtree / max-mip [drobot2010] | ~2–3·log(res) | mip chain | Long tail on grazing rays; wins at 1k+ detail maps and steep relief |
+| Relaxed cone step — Policarpo & Oliveira [policarpo2007], over Dummer's cone [dummer2006] | 4–12 | heavy bake | Static detail maps only |
+| Quadtree / max-mip [drobot2010] | median ≈1.4·log(res), p99 far higher | mip chain | Long tail on grazing rays; wins at 1k+ detail maps and steep relief |
 
 **The structural limit, stated so nobody spends a week on it:** the march lives in the interpolated
 tangent frame of a rasterized triangle, so **the silhouette is still the mesh's**. Relief detail
@@ -229,8 +241,8 @@ baseline.
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| Some pixels hang, or the shader TDRs, and only far from the camera | The skip branch set `t = tExitNode`, landing on a node boundary that re-derives the same node — `t = t` forever. An absolute `+ eps` hides it near the camera and is absorbed by fp32 ULP past 2 km | `t = max(t, tExitNode)·(1 + 2⁻²²)`; a step cap only converts the hang into a slow frame |
-| A picking or straight-down ray never returns | `exitDistance` is `+inf` for a column-locked ray, so `refine(t, ∞)` bisects an unbounded interval; with `rayDir.y == 0` the same `∞` makes `rayHeight` NaN, the predicate false, and the query reports clear sight | `tExitNode = min(exitDistance(...), tExit)` before the predicate |
+| Some pixels hang, or the shader TDRs, and only far from the camera | The skip branch set `t = tExitNode`, landing on a node boundary that re-derives the same node — `t = t` forever. An absolute `+ eps` hides it near the camera and is absorbed by fp32 ULP past 2048 m | `t = max(t, tExitNode)·(1 + 2⁻²²)`; a step cap only converts the hang into a slow frame |
+| A picking or straight-down ray never returns | `exitDistance` is `+inf` for a column-locked ray, so `refine(t, ∞)` bisects an unbounded interval; a reciprocal-form DDA can make `exitDistance` NaN, which the clamp does not remove, the predicate false, and the query reports clear sight | `tExitNode = min(exitDistance(...), tExit)` before the predicate |
 | Concentric contour steps on slopes | The march found the crossing one step late | Binary or secant refinement, then per-pixel first-step jitter, then a temporal resolve. Raising the raw step count is the expensive non-fix |
 | Frame rate collapses only on the mountaintop horizon shot | Grazing rays take max steps and diverge within the wave | Budget from the worst-case capture; cap steps with a graceful miss; prefer pyramid traversal, whose step count degrades logarithmically |
 | Normals dissolve into noise at silhouettes | Screen-space derivatives of the hit position across a silhouette | Analytic central differences at a footprint-matched mip |
