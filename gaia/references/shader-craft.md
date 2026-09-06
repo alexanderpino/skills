@@ -6,7 +6,7 @@ tags: [rendering, rasterizer, shading, hlsl, glsl, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-06T00:00:00Z }
 sources:
-  - { id: d3d11spec, tier: F, locator: "§16.8.1 for what makes a loop varying flow control; §16.8.2 (a) for the derivative and implicit-LOD instructions forbidden there and (b) for sample_l and sample_d being unrestricted; §16.9.2 for oDepth disabling early z; §16.9.3 and §16.9.3.1 for conservative output depth and which comparison mode each token is compatible with; §16.9.3.2 for the clamp implementations may apply; §16.13 for helper invocations and the UAV-into-a-derivative rule; §22.19.1 for _sat as min(1.0f, max(0.0f, value)) and sat(NaN) = 0, over the min and max instructions of §22.10.11 and §22.10.10" }
+  - { id: d3d11spec, tier: F, locator: "§16.2 for the 2x2 block as the minimum atom of shader execution and the dummy invocations off the edge of a primitive; §16.8.1 for what makes a loop varying flow control; §16.8.2 (a) for the derivative and implicit-LOD instructions forbidden there and (b) for sample_l and sample_d being unrestricted; §16.9.2 for oDepth disabling early z; §16.9.3 and §16.9.3.1 for conservative output depth and which comparison mode each token is compatible with; §16.9.3.2 for the clamp implementations may apply; §16.13 for helper invocations, their outputs being valid but ignored, and the UAV-into-a-derivative rule; §3.1.5 for full float16 mandating round-to-nearest-even and preserved denorms, against §7.20.2.2.1 where 16-bit MIN-precision arithmetic may flush float16 denorms to 0 and may truncate instead of rounding; §22.19.1 for _sat as min(1.0f, max(0.0f, value)) and sat(NaN) = 0, over the min and max instructions of §22.10.11 and §22.10.10" }
   - { id: glsl460, tier: F, locator: "§7.1.5 Fragment Shader Special Variables, gl_HelperInvocation — helper invocations exist to evaluate derivatives, 'computed implicitly in the built-in function texture()'; §8.2 Exponential Functions — pow, 'Results are undefined if x < 0'; §8.3 Common Functions — clamp as min(max(x, minVal), maxVal), and min/max defined by a bare comparison with no NaN carve-out; §8.14.1 Derivative Functions — 'Derivatives are undefined within non-uniform control flow', and the forward/backward-differencing definition over the 2x2 stamp" }
   - { id: nonuniform_idx, tier: F, locator: "the Resource Binding document's § 'Divergence and derivatives' — the LOD-undefined sentence, the compiler's uniformity assumption, the undefined result without the intrinsic, and 'sufficient to apply NonUniformResourceIndex to any index'; its § 'Shader Derivatives and Divergent Indexing' for the per-lookup cost; the GL_EXT_nonuniform_qualifier extension's Mapping to SPIR-V section, 'nonuniformEXT -> NonUniformEXT decoration on variables'; and the SPIR-V core grammar spirv.core.grammar.json, Decoration value 5300, enumerant NonUniform with NonUniformEXT as an alias, version 1.5, extension SPV_EXT_descriptor_indexing" }
   - { id: tevs2008, tier: P, locator: "§3.1 Data Structure for the max-reduce mipmap whose texels this document forbids filtering; §3.2 Intersection Algorithm for the traversal loop whose fetch must be explicit-LOD" }
@@ -28,12 +28,15 @@ transform — belongs to the **physically-based-rendering** skill, and nothing h
 one BRDF expression that appears below appears only because its `pow` base is the one that goes
 negative. The frame budget, its profiling, the frame graph and GPU-driven rendering in general
 belong to the **game-engine-guru** skill, and nothing here prints a per-stage millisecond split.
-Read both. What is left over is heightfield-specific and is what follows: seven hazards, each
-already sitting in the failure table of one or more of the eleven rendering documents, harvested
-here rather than invented so those eleven can cite one place. **Four of the seven are undefined
-behaviour by specification** — the derivative inside varying flow control, `pow` on a negative
-base, a divergent resource index without the qualifier, and a broken conservative-depth promise —
-and every one of the seven compiles.
+Read both. What is left over is heightfield-specific and is what follows: seven hazards, five of
+them already sitting in the failure table of one or more of the eleven rendering documents and
+harvested here rather than invented, so those eleven can cite one place. ⚠️ **The other two are
+not harvested, and are marked where they appear**: the fp16 `normalize` collapse and the cross-API
+`saturate`/`clamp` divergence are derived here against the specifications, and no document in the
+corpus carries either. **Four of the seven are undefined behaviour by specification** — the
+derivative inside varying flow control, `pow` on a negative base, a divergent resource index
+without the qualifier, and a broken conservative-depth promise — and every one of the seven
+compiles.
 
 ## Use this
 
@@ -55,7 +58,8 @@ inside the loop and at the hit are different failures with different fixes:
 6. Depth output: SV_DepthLessEqual under reversed-Z. SV_DepthGreaterEqual under standard Z.
 7. Per-pixel material or page index: NonUniformResourceIndex (HLSL) / nonuniformEXT (GLSL).
 8. Grazing terms: saturate BOTH ends of a pow base; branch AROUND a normalize whose vector
-   can vanish. In fp16 it vanishes at 1.726e-4 per component, not at the denormal ceiling.
+   can vanish. In fp16 it vanishes at 1.7e-4 per component at BEST, and at 7.8e-3 where
+   float16 denorms are flushed -- 45x worse.             [d3d11spec] §3.1.5, §7.20.2.2.1
 ```
 
 **What it beats.** *Reading the two sibling skills and assuming the rest transfers* — both are
@@ -95,10 +99,15 @@ to a derivative calculation in a Pixel Shader"). In a GPU-driven pipeline the pa
 chunk record are often exactly that UAV.
 
 **Second, and the one that gets misdiagnosed: under a rasterizer, at a LOD seam the derivative is
-never taken across the seam.** Quads are generated per primitive, so two terrain chunks at
-different LODs — two draws, two triangles — never put lanes in one quad; the lanes on the far side
-of the edge are helper invocations extrapolated from *this* triangle's own plane equations
-[d3d11spec] §16.13. The seam-crossing derivative that readers go hunting for does not exist.
+never taken across the seam.** Quads are generated per primitive, and the sentence that says so is
+[d3d11spec] §16.2: the minimum atom of shader execution is a 2×2 block, so "there may be **dummy
+invocations off the edge of a primitive** to fill out the minimum 2×2 size." Two terrain chunks at
+different LODs are two draws and two triangles, so they never put lanes in one quad; the far lanes
+belong to *this* triangle. The seam-crossing derivative readers go hunting for does not exist.
+⚠️ **That those lanes carry this triangle's own attributes extrapolated past its edge is correct
+hardware behaviour cited to nothing here**: §16.2 says the invocations exist, §16.13 that their
+outputs are "valid but ignored", neither states the extrapolation — and the conclusion does not
+need it, because §16.2 alone closes the seam question.
 ⚠️ **The exception is the one path that does not rasterize the shading**: a visibility-buffer pass
 shades screen tiles in compute, where a quad swizzle *does* pair neighbouring pixels from
 different chunks, and there the seam-crossing derivative is real. That is precisely why
@@ -301,50 +310,85 @@ Three details that are not in the folklore version of this rule:
 ## The grazing terms: two ways to write a NaN, and two languages that disagree about it
 
 Grazing angles are where a terrain and water shader spends its subtlety, and they are also where
-the arguments to `pow`, `sqrt` and `normalize` approach the edges of their domains. The first two
-hazards below are already recorded in the corpus and are quoted from it; the third is new here,
-and it is not a way to *make* a NaN — it is the reason one API shows you the ones you made and the
-other does not.
+the arguments to `pow`, `sqrt` and `normalize` approach the edges of their domains. ⚠️ **Only the
+first hazard below is harvested**: it is `water-rendering.md`'s and is quoted from it. The second
+and third are the document's own, derived here against the specifications — the second is a cousin
+of that document's `mediump` degenerate-divide guard by a different mechanism, and the third is not
+a way to *make* a NaN at all, but the reason one API shows you the ones you made and the other does
+not.
 
 **`pow` with a negative base is undefined, and clamping one end is the trap.** [glsl460] §8.2:
 *"Results are undefined if x < 0."* `water-rendering.md` measured what that costs on the
 roughness-aware Fresnel fit [bruneton2010] and the finding is quoted, not re-derived: a normal
 blended from a detail map and left unrenormalized makes `dot(N, V)` exceed 1 near normal incidence
-— *"an additive blend on essentially every sample"*, and even a renormalised fp32 pair lands up to
-one ULP above, `max dot = 1.000000238` — so `1 − cosThetaV` goes negative and the band around the
-mirror direction goes NaN. Clamping only the top, `max(1.0 − cosThetaV, 0.0)`, removes the NaN and
+— *"an additive blend on essentially every sample"*, and even a renormalised fp32 pair lands above
+it, at `max dot = 1.000000238` — **two** ULP, the binary32 step above 1.0 being `2^-23` and one ULP
+being `1.0000001`. (⚠️ `water-rendering.md`:125 writes "one ULP" against that same value: the value
+is the measurement, the count is the slip, and that document is not this one's to edit.) So
+`1 − cosThetaV` goes negative and the band around the mirror direction goes NaN.
+Clamping only the top, `max(1.0 − cosThetaV, 0.0)`, removes the NaN and
 leaves the other end open: a back-facing `dot(N, V) = −1` gives `1 − cos = 2`, and at
 `sigma_v = 0.12` that is `m = 6.3` and **`F = 6.2`**, on **8.8%** of pixels at an 85° view.
 `saturate` closes both ends. **Renormalise at the fetch as well**, or every other term still reads
 the bad normal.
 
 **`normalize` of a near-zero vector is `0/0`, and in fp16 "near zero" is much larger than you
-think.** This is arithmetic read straight off IEEE 754 binary16 and nothing here cites a paper for
-it, in the same way `planetary-precision.md` reads its ULP table off binary32. The smallest normal
-binary16 value is `2^-14 = 6.104e-5` and the smallest subnormal is `2^-24 = 5.960e-8`; under
-round-to-nearest-even any magnitude at or below `2^-25` becomes zero. So a **square** vanishes at
-`|x| ≤ 2^-12.5 = 1.726e-4` — which is `2.83×` **above** the smallest normal, so every component is
-an ordinary normal number and denormal flush-to-zero never enters the story. A vector — two
-components or three, it makes no difference — all of whose components are at or under that
-magnitude therefore has `dot(v, v) == 0` exactly, and `normalize(v)` is `0/0`. Confirmed by
-evaluating the sum in IEEE binary16 rather than only deriving it — `numpy.float16`,
-`s = h(h(x*x) + h(x*x)); s = h(s + h(x*x))`, one line a reader can re-run: at the largest
-representable value below `2^-12.5`, `1.7262e-4`, the sum is `0.0`; one exponent step up at
-`2^-12 = 2.441e-4` it is `1.788e-7` and the normalize succeeds.
+think — and how much larger is the target's choice, not the format's.** The arithmetic is read
+straight off IEEE 754 binary16, as `planetary-precision.md` reads its ULP table off binary32; but
+binary16 alone does not fix the answer, and the two specifications that do give opposite ones. For
+**full** float16, [d3d11spec] §3.1.5 mandates the forgiving regime — unfused operations round to
+nearest even at 0.5 ULP, and *"16-bit floating point numbers must preserve denorms"*. For the
+**minimum-precision** type this hazard lives in, `min16float` and GLSL ES `mediump`, §7.20.2.2.1
+hands that back: *"Float16 arithmetic operations within the shader may or may not flush float16
+denorm to 0, and may either round to nearest even or truncate to a representable number."*
 
-⚠️ **The precondition is that each product is rounded to binary16 before it is accumulated**, which
-is what a `mediump`/`min16float` dot does when the multiply-add is not fused and the accumulator is
-not widened. Where the compiler emits an FMA, or accumulates the dot at fp32, the products never
-round and the collapse does not happen. That is not a reason to relax: which of the two you get is
-a compiler and target decision that is invisible in the source and can change between driver
-versions, so the guard below is the right code either way — and it is free.
+Smallest normal `2^-14 = 6.104e-5`, smallest subnormal `2^-24 = 5.960e-8`. Rounding to nearest
+even, a **square** is lost at or below `2^-25` — half the smallest subnormal, the tie going to the
+even significand, zero. Truncating, once below `2^-24`. Flushing subnormal results, once below the
+smallest **normal**, `2^10` sooner. Square-root each for the component bound, and the value at it:
 
-The heightfield instance is
-`normalize(N.xz)` — the aspect or flow direction that `terrain-analysis-masks.md` and
-`driver-fields.md` both build — where `N.xz ≈ (−∂h/∂x, −∂h/∂z)`: a slope under `1.73e-4`, about
-`0.0099°`, or `0.35 mm` of height difference across a 2 m grid cell. Plains are full of those
-cells. In fp32 the same collapse needs components below `2^-75 ≈ 2.6e-23`, so there the expression
-only fails on an exactly-flat cell; this is an fp16 hazard specifically.
+| Regime, all three conforming under §7.20.2.2.1 | Component bound | Largest value there | As a slope | Height across a 2 m cell |
+|---|---|---|---|---|
+| round to nearest even, subnormals preserved — the **floor**, and all §3.1.5 permits | `\|x\| ≤ 2^-12.5` | `1.7262e-4` | `0.0099°` | `0.35 mm` |
+| truncate, subnormals preserved | `\|x\| < 2^-12` | `2.4402e-4` | `0.0140°` | `0.49 mm` |
+| subnormal **products** flushed to zero, under either rounding | `\|x\| < 2^-7` | `7.8087e-3` | `0.447°` | `15.6 mm` |
+
+A vector — two components or three, no difference — all of whose components sit at or under the
+threshold in force has `dot(v, v) == 0` exactly, so `normalize(v)` is `0/0`. Measured, not only
+derived: an exhaustive sweep over all `31743` positive finite binary16 values under each regime
+returns exactly those three as the largest giving `dot(v,v) == 0`, 2-vector and 3-vector alike.
+
+**What is *not* the mechanism, stated narrowly because the wide version is wrong.** Every threshold
+is far above the smallest normal — `2.83×` at the floor, `128×` at the top — so each **component**
+is an ordinary normal number and the collapse is never an artefact of denormal *inputs*. Flushing
+decides the fate of the **products**, and the squares land in the subnormal range by construction,
+so a target that flushes them loses the dot `45×` earlier. ⚠️ The boundary moves with it: one step
+above the floor, at `2^-12 = 2.441e-4`, three squares sum to `3·2^-24 = 1.788e-7` and the normalize
+succeeds — *on a target that preserves float16 denorms*. Where they are flushed, `2^-24` **is** the
+smallest subnormal, each product goes to zero alone, the sum is `0.0`, and the normalize fails here
+too.
+
+⚠️ **Three target decisions move this threshold and not one is visible in the source.** The collapse
+needs each product rounded to binary16 *before* it is accumulated, which is what a
+`mediump`/`min16float` dot does when the multiply-add is not fused and the accumulator is not
+widened — the one direction that helps, since an FMA or an fp32 accumulator means the products
+never round and there is no collapse at all. The other two make it worse: truncation by `1.41×`,
+flushed subnormal products by `45×`, and `water-rendering.md` already records that flush-to-zero is
+*"the default on many mobile parts"*, on exactly the `mediump` this section names. Which you get
+can change between driver versions, so **size the hazard at `7.8e-3`, not `1.7e-4`** — and the
+guard below is the right code in every regime, and free.
+
+The heightfield instance is `normalize(N.xz)`, a slope aspect or flow direction taken straight from
+the horizontal gradient, `N.xz ≈ (−∂h/∂x, −∂h/∂z)`. ⚠️ **No document in this corpus writes that
+expression today**, so the warning is conditional, not a citation: `terrain-analysis-masks.md`
+builds aspect as an *angle*, `atan2(-dzdy, -dzdx)`, and reconstructs a unit vector from it — a
+different mechanism, degenerate at `atan2(0,0)`, needing a different guard, which the argument
+above does not reach. Any shader taking a direction from the horizontal gradient by `normalize` is
+exposed, and the table sizes the exposure: at best a slope under `0.0099°`, `0.35 mm` across a 2 m
+cell, which is plains; at worst `0.447°` and `15.6 mm`, which is not plains at all but ordinary
+gentle terrain, and a great deal of any heightfield. In fp32 the same collapse
+needs components below `2^-75 ≈ 2.6e-23`, so there the expression fails only on an exactly-flat
+cell; this is an fp16 hazard specifically.
 
 ⚠️ **The obvious guard does not work.** `normalize(v) * (dot(v,v) > 0.0)` still evaluates the
 divide, and `NaN * 0` is `NaN` — the multiply cannot un-poison a value the divide already made.
@@ -359,9 +403,11 @@ float2 dir = (d > 0.0) ? v * rsqrt(d)   // rsqrt, not normalize: the branch owns
 
 Returning `(0,0)` moves the NaN one step downstream into whatever consumes the direction; pick a
 fallback the consumer can survive — for aspect, any fixed compass direction, since a flat cell has
-no aspect and every answer is equally wrong. A smaller epsilon does not reach this at all: the
-collapse is in the *square*, so no threshold on `|v|` above `1.726e-4` fixes it and every threshold
-below it is inert.
+no aspect and every answer is equally wrong. ⚠️ **An epsilon has to be on the right quantity.** `d`
+has already collapsed to exactly `0`, so `d > 0.0` catches every regime with no epsilon at all, and
+one on `d` — or on an fp16 `length(v)`, which is `sqrt(0)` — adds nothing. The epsilon that fails
+is the one on the *components*, or on a magnitude taken at fp32 while the divide runs at fp16: to
+catch this it must exceed the threshold in force, up to `7.8e-3`, not the `1e-6` fp32 suggests.
 
 ⚠️ **`saturate` and `clamp` do not agree about NaN across the two APIs, and the safe-looking one is
 the one that hides the bug.** [d3d11spec] §22.19.1 defines `_sat` as `min(1.0f, max(0.0f, value))`
@@ -400,5 +446,5 @@ under [glsl460] §8.3.
 | Conservative depth declared, image correct, and the pass costs exactly what it did before | The token is the wrong one for the depth convention. §16.9.3.1: valid with any depth mode, "but the early depth cull will be disabled" — no error, no warning, no visual change | `SV_DepthLessEqual` under reversed-Z, `SV_DepthGreaterEqual` under standard Z; assert the token against the pipeline's comparison function |
 | Pixels missing from a depth-writing march, worst where the proxy is coarse | The conservative-depth promise was broken; §16.9.3.2's clamp is optional and mostly absent | The proxy must be a **max-height** hull (`heightfield-raymarching.md`), not a mean-height or raster-LOD one |
 | A NaN band around the mirror direction on water, permanent in TAA history | `pow` with a negative base — undefined per [glsl460] §8.2 — from `1 − dot(N, V)` on an unrenormalized blended normal | `saturate` **both** ends, and renormalise at the fetch; the one-sided `max(·, 0)` leaves `F = 6.2` on back-facing normals (`water-rendering.md`) |
-| Aspect, flow direction or triplanar weights speckle with NaN on flat ground — in `mediump`, on some targets and not others | `normalize(N.xz)` where both components are ≤ `1.726e-4`: their squares round to zero in binary16, so `dot(v,v) == 0` and the divide is `0/0`. That is 2.83× above the smallest normal, so denormal flush-to-zero is not the cause. It needs the products rounded before accumulation — an FMA or an fp32 accumulator hides it, which is why it is target-dependent | Branch **around** the divide — `d = dot(v,v); (d > 0) ? v*rsqrt(d) : fallbackDir` — with a named fallback. `normalize(v) * (dot(v,v) > 0)` does not work: `NaN * 0` is `NaN`. A smaller epsilon is inert; `highp` moves the threshold to `2^-75` |
+| Aspect, flow direction or triplanar weights speckle with NaN on flat ground — in `mediump`, on some targets and not others | `normalize(N.xz)` where both components sit under the threshold: their **squares** vanish in binary16, so `dot(v,v) == 0` and the divide is `0/0`. The threshold is the target's, not the format's — [d3d11spec] §7.20.2.2.1 permits three regimes for min-precision float16 and they span `45×`: `1.726e-4` rounding to nearest even with subnormals preserved, `2.440e-4` truncating, `7.809e-3` where subnormal products are flushed. The components are normal numbers in all three, so denormal *inputs* are not the cause; the *products* are. An FMA or an fp32 accumulator suppresses it entirely, which is why it is target-dependent | Branch **around** the divide — `d = dot(v,v); (d > 0) ? v*rsqrt(d) : fallbackDir` — with a named fallback. `normalize(v) * (dot(v,v) > 0)` does not work: `NaN * 0` is `NaN`. Size it at `7.8e-3`, not `1.7e-4`; an epsilon on `d` adds nothing and one on the components must beat that same number; `highp` moves the threshold to `2^-75` |
 | A shader that is clean on D3D and speckles on Vulkan, or the reverse | `saturate`/`clamp` NaN semantics: [d3d11spec] §22.19.1 states `sat(NaN) = 0`, [glsl460] §8.3 defines `clamp` over comparisons with no NaN carve-out and propagates it | Fix the NaN at its source; treat a load-bearing `saturate` as a bug the D3D build is hiding, and never rely on `min` to absorb one (`hydraulic-erosion.md`) |

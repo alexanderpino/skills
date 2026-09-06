@@ -12,7 +12,7 @@ sources:
   - { id: lamb_damping, tier: F, locator: "6th ed. 1932, ch. XI Viscosity, Art. 348, pp. 623-624 — eq. 7 da/dt = -2*nu*k^2*a, eq. 8 its exponential decay, eq. 9 the decay modulus tau = 1/2*nu*k^2 = lambda^2/8*pi^2*nu" }
   - { id: airy_coastal, tier: F, locator: "no artefact: the linear (Airy) dispersion relation, Green's law, the breaker index and the surf-similarity parameter. Coastal-engineering canon with no single citable paper for the set" }
   - { id: coxmunk1954, tier: P, locator: "§6.3 'Mean Square Slopes', p. 847 — the clean- and slick-surface least-squares regressions, with W recorded at 41 ft, i.e. 12.5 m; the 1-14 m/s range and the factor two-or-three slick reduction are in the abstract, p. 838" }
-  - { id: bruneton2010, tier: P, locator: "§3.2 'Model hierarchy' eq. 4, the slope variance summed over the trochoids filtered out of the geometry; §5.1 'Sun light', which clamps sigma_x^2 and sigma_y^2 to a minimum in eq. 15 so the Sun keeps a finite disc" }
+  - { id: bruneton2010, tier: P, locator: "§3.2 'Model hierarchy' eq. 4, the slope variance summed over the trochoids filtered out of the geometry, and the surface itself, a sum of n = 60 trochoid wave trains on a projected grid; §5.1 'Sun light', which clamps sigma_x^2 and sigma_y^2 to a minimum in eq. 15 so the Sun keeps a finite disc; §7.3 'Results' for the timing — 52 fps, i.e. 19.2 ms, at 1024x768 on an NVIDIA 8800 GTS, split 11.1 ms for p, n, sigma_x, sigma_y and 8.1 ms for Algorithm 5.1, with 87 fps at 1000 m and 130 fps at 8000 m" }
   - { id: dupuy2012, tier: P, locator: "the statistical whitecap coverage from the Jacobian's footprint mean and variance" }
   - { id: monahan1980, tier: P, locator: "§5 'Conclusions', p. 2097 eq. 5 — the robust-biweight fit W = 3.84e-6 U^3.41 of Table 3, combined data set; the paper's ordinary-least-squares fit is eq. 4, W = 2.95e-6 U^3.52. U at 10 m in both" }
   - { id: yuksel2007, tier: P, locator: "§3.2 'Wave Particles' — eq. 7, the radial local deviation function, and the subdivision rule that splits one particle into three when neighbour spacing exceeds half the particle radius" }
@@ -61,11 +61,13 @@ far away. The moment the depth field says otherwise, a separate shore-wave band 
 [capillary_gravity] [airy_coastal] — it is a constraint on the result, not a feature of one model.
 Four consequences, each a visible bug if ignored: **phase speed has a minimum**, 0.2312 m/s at
 1.712 cm — but **energy travels at the group speed, whose minimum is lower still, 0.1776 m/s at
-4.35 cm**, so neither is a floor on how fast water may move (the 3 cm damping row below transports
-at 0.19 m/s); **long waves outrun short ones**, so a sea without groups reads as a metronome;
-**period is conserved across a depth change and wavelength is not**, so a train entering shallow
-water must shorten rather than slow uniformly; and **in shallow water celerity depends on depth
-alone**, which is what refracts crests onto every shore for free.
+4.35 cm**, so the *phase* minimum is no floor on how fast water may move: the 3 cm damping row below
+transports at 0.19 m/s, under it. ⚠️ **The group minimum is a floor** — in deep water no free wave
+carries energy slower than it, at any wavelength — and that same row sits just above it, not below.
+**Long waves outrun short ones**, so a sea without groups reads as a metronome; **period is
+conserved across a depth change and wavelength is not**, so a train entering shallow water must
+shorten rather than slow uniformly; and **in shallow water celerity depends on depth alone**, which
+is what refracts crests onto every shore for free.
 
 ## Querying the field is a per-model question
 
@@ -157,6 +159,9 @@ produces sets.
 **3. Period is conserved across a depth change; wavelength is not.** A train entering shallow water
 keeps `omega`, so `k` must rise: **crests bunch and slow** toward shore. Tabulate `k(omega,h)`
 offline, never per frame [airy_coastal], and in **1-D** not 2-D: `X·tanh X = ω²h/g` with `X = kh`.
+⚠️ That collapse to one variable needs the `k³` capillary term dropped — with it there is no such
+form — which is free at shore-wave scales (0.03% of `gk` at `lambda = 1 m`) but is a precondition,
+not an identity.
 
 **4. In shallow water celerity depends on depth alone.** `c ≈ sqrt(g*h)` for `h < lambda/20`. Two
 consequences: crests rotate toward alignment with the depth contours (refraction, the strongest
@@ -256,10 +261,13 @@ the wind range. Name the fit beside the constant, exactly as this skill asks abs
 quoted beside its sample wavelengths.
 
 ⚠️ **Choppiness is the horizontal-displacement scale, and *"past ~1.0 it drives `J` negative"* —
-which this line used to print — is not a constant.** The folded fraction depends on `q·√mss` alone:
-clamp `q ≤ s_p/√mss_resolved`, `mss` the **total** mean-square slope of that cascade, both
-components. Derived here, `s_p ≈ 0.51 / 0.40 / 0.69` at accepted fold fractions `p` of 1% / 0.1% /
-5% (`cos²` spread; 6–17% higher unspread). `p` is a choice: **clamp per cascade on its own `J`**.
+which this line used to print — is not a constant.** At a fixed directional spread the folded
+fraction depends on `q` and on the spectrum only through `s = q·√mss` — the **radial** shape drops
+out exactly; the spread does not. So clamp `q ≤ s_p/√mss_resolved`, `mss` the **total** mean-square
+slope of that cascade, both components. Derived here, `s_p ≈ 0.51 / 0.40 / 0.69` at accepted fold
+fractions `p` of 1% / 0.1% / 5% (`cos²` spread; **6–17% higher** unspread across those three — that
+band is the spread moving the threshold, which is why the spread has to be stated). `p` is a
+choice: **clamp per cascade on its own `J`**.
 
 ## The shore is a different field, not a modulation
 
@@ -299,7 +307,7 @@ the FFT's two governing parameters never named. Both halves exist in the sources
 | Model | Cost, as the source states it | Accuracy, as the source states it |
 |---|---|---|
 | FFT, single patch | interactive at **512²** [tessendorf_ocean] | resolves to `2L/N` — Nyquist over the notes' own 10 m–2 km patch range, so **3.9 cm** at `L = 10 m` and **1.56 m** at `L = 400 m`; below it, waves become variance |
-| FFT, full pipeline | **19.2 ms**, broken down per stage [bruneton2010]. ⚠️ **That is more than a whole 16.6 ms frame at 60 fps, for the water surface alone** — budget it against the frame before adopting the pipeline, not after | — |
+| Gerstner/trochoid sum, full lighting pipeline | **19.2 ms** — 52 fps at 1024×768 on an NVIDIA 8800 GTS, 60 trochoids from 2 cm to 30 m, viewed horizontally from 4 m up; 11.1 ms for position, normal and slope variance, 8.1 ms for the shading [bruneton2010] §7.3. ⚠️ **That is 15% over a whole 16.7 ms frame at 60 fps, for the water alone** — but it is that paper's *near-view worst case* on a mid-2000s GPU; the same sentence reports 87 fps (**11.5 ms**) at 1000 m and 130 fps (**7.7 ms**) at 8000 m, both inside a frame. Re-measure before budgeting from it | — |
 
 **The two parameters that set both, and which this document used to leave unstated:** `N`, the
 frequency-grid size, and `L`, the patch size in metres. The sample spacing is `L/N` and the shortest
@@ -310,8 +318,12 @@ range.** Quote `N` and `L` together, and the floor as a wavelength, or it is off
 
 ⚠️ **Provenance note.** Two rows were deleted here: a wave-packet cost sourced to the whitecap paper
 [dupuy2012], and a Gerstner accuracy figure sourced to [yuksel2007] §7, whose declared locator is
-§3.2 and which uses no Gerstner waves. What is left was read by a verification pass, not re-fetched
-(`inria.hal.science` bot-challenges the [dupuy2012] PDF); re-read before trusting the digits.
+§3.2 and which uses no Gerstner waves. A third was **re-labelled**: 19.2 ms stood as the *FFT's*
+cost until [bruneton2010] was re-fetched from `hal.science` and read — that paper sums 60 trochoids
+on a projected grid, writes "Fourier" nowhere, and names FFT once, in related work, as the branch it
+did not take. **A cost is only a cost for the model it was measured on.** The `512²` cell is still
+second-hand — read by a verification pass, not re-fetched — so re-read it before trusting the digits
+(`inria.hal.science` still bot-challenges the [dupuy2012] PDF).
 
 ## What it beats
 
@@ -321,9 +333,10 @@ range.** Quote `N` and `L` together, and the floor as a wavelength, or it is off
   the cited chapter names: those are vertex loops that form over a crest once the steepness sum
   `Q_i*w_i*A_i` passes 1, they are avoidable, and the chapter says how. The temporal repeat is
   not.
-- **A single FFT tile** [tessendorf_ocean] — visibly repeats from any altitude; cascades at
-  near-co-prime sizes push the repeat beyond notice, but verify from maximum gameplay altitude,
-  because tiling *returns* at height as the small cascades mip away.
+- **A single FFT tile** [tessendorf_ocean] — visibly repeats from any altitude. ⚠️ Near-co-prime
+  cascades do **not** push that repeat beyond notice: they remove only the *coincident* return, and
+  the one an eye finds is the largest cascade's own `L`. Pick `L_max` against draw distance, and
+  verify from maximum gameplay altitude, where tiling *returns* as the small cascades mip away.
 - **Shallow-water simulation as an ocean** — no dispersion, so no groups, no swell and no correct
   deep-water motion. It is the right tool for a bounded interactive body and the wrong one for a sea.
 - **Wave particles** [yuksel2007] — Lagrangian carriers of wave energy, each holding a radial

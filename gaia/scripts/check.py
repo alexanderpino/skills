@@ -24,6 +24,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -631,8 +632,11 @@ def selftest() -> int:
     for t, want in xrbad:
         print(f"  FAIL  crossref ratio fixture: {t!r} should yield {sorted(want)}, "
               f"got {sorted(_x_ratios(t))}")
+    xcbad = crossref_corpus_selftest()
+    for msg in xcbad:
+        print(f"  FAIL  crossref corpus: {msg}")
     xbad += xpbad + xrbad
-    if bad or nbad or ubad or ebad or cbad or rbad or pbad or xbad:
+    if bad or nbad or ubad or ebad or cbad or rbad or pbad or xbad or xcbad:
         # `ebad` used to gate the exit code and not appear in this sentence, so a run with
         # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
         print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
@@ -644,7 +648,8 @@ def selftest() -> int:
               f"{len(pbad)} of {len(PROPAGATION_FIXTURES)} propagation fixtures and "
               f"{len(xbad)} of "
               f"{len(CROSSREF_FIXTURES) + len(CROSSREF_PATH_FIXTURES) + len(CROSSREF_RATIO_FIXTURES)}"
-              f" crossref fixtures misclassified.")
+              f" crossref fixtures misclassified, and {len(xcbad)} crossref corpus "
+              f"assertion(s) failed.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
           f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct; "
@@ -655,7 +660,10 @@ def selftest() -> int:
           f"propagation: {len(PROPAGATION_FIXTURES)}/{len(PROPAGATION_FIXTURES)} correct; "
           f"crossref: {len(CROSSREF_FIXTURES)}/{len(CROSSREF_FIXTURES)} formula, "
           f"{len(CROSSREF_PATH_FIXTURES)}/{len(CROSSREF_PATH_FIXTURES)} path, "
-          f"{len(CROSSREF_RATIO_FIXTURES)}/{len(CROSSREF_RATIO_FIXTURES)} ratio correct.")
+          f"{len(CROSSREF_RATIO_FIXTURES)}/{len(CROSSREF_RATIO_FIXTURES)} ratio correct, and "
+          f"check_crossrefs() itself reports {len(CROSSREF_CORPUS_EXPECTED)}/"
+          f"{len(CROSSREF_CORPUS_EXPECTED)} reconstructed instances on the fixture corpus and "
+          f"nothing once they are corrected.")
     return 0
 
 
@@ -1139,8 +1147,184 @@ CROSSREF_RATIO_FIXTURES = [
     ("its signal speed is `sqrt(g·A/l)`, fixed by parameters", set()),
 ]
 
+# A CORPUS, not a span. Four fixture documents and a fixture bibliography carrying two of the
+# five real instances this guard was built from, reconstructed in the shape they had on disk:
+#   * `fx-tide.md`  -- body `sqrt(2*g*A/l)` against its OWN failure table's `sqrt(g*A/l)`,
+#                      which is shallow-water.md at 1816b23^
+#   * `papers-fx.md` -- an entry keeping "5–20×" after the document derived 0.75–1.20, which is
+#                      papers-simulation.md's `iop_split` at dcc2f65^ (49d1b94^ is the
+#                      water-rendering end of the same correction, and had this one already)
+# plus a cross-document positive (`A = h*lx/3` against `A = h*lx/2`) and FOUR negative controls
+# that must stay quiet: a bare `sqrt(g*A/l)` mentioned in another document with no constant of
+# its own; every value once corrected; `fx-basin.md`, which is quiet only because of the
+# union-overlap escape (see CROSSREF_CORPUS_QUIET); and the FENCED entry in papers-fx.md, which
+# is quiet only because the entry scan skips fences. The last two exist because each guards a
+# decision in check_crossrefs that nothing else here can see: removing either leaves all three
+# extractor suites and all three positive pins green.
+# This exists because `--selftest` asserted only the three EXTRACTORS: gutting check_crossrefs()
+# to `return [], 0, 0, 0, 0` left it green, and check.py still exited 0 -- an assertion defined
+# and never invoked, which is the hole this register already records for check_not_opened and
+# for requote's `check()`.
+# The fixture entry is one over-long line ON PURPOSE: this guard reads only an entry's OPENER
+# line, so a wrapped fixture would test nothing. 41% of the real bibliography wraps.
+_FX_FM = "---\ntype: reference\ntitle: {t}\n---\n\n"
+CROSSREF_CORPUS = {
+    # The front-matter `description` carries a DECOY: `sqrt(7*g*A/l)` shares the body's key but
+    # is not body, and `_offset` is the only thing that keeps it out. Hardwiring `_offset` to
+    # `return 1` makes the first pin below read `fx-tide.md:1 ... constants [2.0, 7.0]` instead
+    # of `fx-tide.md:11 ... constants [2.0]`, and it fails. A LINE pin alone could never catch
+    # that -- see the note over CROSSREF_CORPUS_EXPECTED -- so the pinned CONSTANTS do it.
+    # It is also the guard's stated limit made testable: front matter is not read, which is why
+    # heightfield-raymarching.md's front-matter locator is one of the three instances it misses.
+    "fx-tide.md": "---\ntype: reference\ntitle: Fixture -- the constant-A pipe form\n"
+    "description: A fixture. Front matter is not body: `sqrt(7*g*A/l)` must never be read.\n"
+    "---\n\n" + """\
+# Fixture: the constant-`A` pipe form
 
-def check_crossrefs() -> tuple[list[str], int, int, int, int]:
+## Use this
+
+The pipe form's own signal speed is `sqrt(2*g*A/l)`, and with `A` and `l` held constant it does
+not move with depth at all. The cross-section one cell offers a face is `A = h*lx/2`.
+
+## How this fails, and what it looks like
+
+| Symptom | Mechanism | Fix |
+|---|---|---|
+| Reducing `dt` by the deepest cell changes nothing | its signal speed is `sqrt(g*A/l)` | Bound on `sqrt(g*A/l)` |
+""",
+    "fx-other.md": _FX_FM.format(t="Fixture -- the same section from another document") + """\
+# Fixture: the same cross-section, quoted from another document
+
+`fx-tide.md` derives the constant-`A` pipe form. The cross-section used here is `A = h*lx/3`,
+and the signal speed it quotes, `sqrt(g*A/l)`, is repeated with no constant of its own.
+""",
+    "fx-basin.md": _FX_FM.format(t="Fixture -- a formula, then the same formula evaluated")
+    + """\
+# Fixture: a formula stated, then the same formula with its value
+
+## Use this
+
+Compactness of a cell footprint is the isoperimetric ratio `4*Aw/P^2`, which is 1 for a disc and
+falls as the outline gets ragged. Its mean depth is `h = V/Aw`.
+
+## How this fails, and what it looks like
+
+| Symptom | Mechanism | Fix |
+|---|---|---|
+| Footprints read as ragged | Boundary noise applied after the partition | `4*Aw/P^2 = 0.817`, so they are compact |
+| Depth is read off the bounding box | The footprint is not its box | `h = V/Aw`, over the wetted area |
+""",
+    "fx-optics.md": _FX_FM.format(t="Fixture -- the two attenuation coefficients") + """\
+# Fixture: beam and diffuse attenuation
+
+Beam attenuation `c` and diffuse attenuation `K_d` are not interchangeable [fx_split]. In pure
+water the ratio between them runs:
+
+```
+mu_d    c/K_d at 450 / 500 nm
+1.00    1.20 / 1.07
+0.75    0.90 / 0.80
+```
+""",
+    "papers-fx.md": _FX_FM.format(t="Fixture bibliography") + """\
+# Fixture bibliography
+
+- **fx_split** `F` — No single canonical source. The split between beam attenuation `c` and diffuse attenuation `K_d`, and the observation that `c` typically runs 5–20× `K_d` because natural water scatters strongly forward. [no-artefact]
+
+An entry looks like this:
+
+```
+- **fx_split** `F` — the ratio `c`/`K_d` here runs 900–999× for illustration only.
+```
+""",
+}
+# The same corpus with both corrections landed at BOTH ends. Overlaid on the dict above.
+CROSSREF_CORPUS_FIXED = {
+    "fx-tide.md": CROSSREF_CORPUS["fx-tide.md"].replace(
+        "| its signal speed is `sqrt(g*A/l)` | Bound on `sqrt(g*A/l)` |",
+        "| its signal speed is `sqrt(2*g*A/l)` | Bound on `sqrt(2*g*A/l)` |"),
+    "fx-other.md": CROSSREF_CORPUS["fx-other.md"].replace("`A = h*lx/3`", "`A = h*lx/2`"),
+    "papers-fx.md": CROSSREF_CORPUS["papers-fx.md"].replace(
+        "the observation that `c` typically runs 5–20× `K_d` because natural water scatters "
+        "strongly forward",
+        "a `c`/`K_d` ratio of 0.75–1.20 in pure water, which crosses one"),
+}
+# The two `fx-basin.md` shared keys, which must appear in NO finding of EITHER corpus. Each is
+# held quiet by ONE HALF of `if (va & vb) or (ua & ub)` in check_crossrefs and by nothing else,
+# and that line is the tuning decision holding the corpus-wide count at 1. Both halves were
+# unasserted until these controls existed: either could be deleted with the whole fixture green.
+#   * `Aw|P` -- `4*Aw/P^2` in the body against `4*Aw/P^2 = 0.817` in the failure row, a formula
+#     stated against the SAME formula with its evaluated value. That is sea-ice.md:206 against
+#     sea-ice.md:356, and it is the commonest quiet shape in the corpus. The tuple sets are
+#     DISJOINT ({(2.0, 4.0)} against {(0.817, 2.0, 4.0)}); only the flattened unions overlap, so
+#     `or (ua & ub)` alone keeps it quiet. Dropping that half: real tree 1 finding -> 7.
+#   * `Aw|V|h` -- `h = V/Aw` at both ends, neither printing a constant. Both tuple sets are
+#     {()}, so they intersect while the unions are EMPTY and cannot: `va & vb` alone keeps it
+#     quiet. Dropping that half: real tree 1 finding -> 34. Within one document a missing
+#     constant is a finding by design, which is what makes this pair worth pinning.
+CROSSREF_CORPUS_QUIET = ("`Aw`, `P`", "`Aw`, `V`, `h`")
+# Each entry is the set of substrings ONE finding must contain, pinned to the LINE and to the
+# CONSTANTS, and the two pins assert different things.
+# The LINE asserts the BLOCK-START attribution: replacing `head = base + body[:cut].count("\n")`
+# with `head = base` moves the second end of the first pin from `fx-tide.md:18` to `:9`.
+# The LINE CANNOT assert `_offset`, and no line pin anywhere ever could: the body is sliced at
+# `base` and then numbered from that same `base`, so the two cancel exactly, and hardwiring
+# `_offset` to `return 1` (17 -> 1 on shallow-water.md) leaves every line number here and every
+# number the real corpus reports unchanged. What `_offset` decides is which lines are SCANNED,
+# not what they are called -- so it is the CONSTANTS that pin it, against the decoy planted in
+# fx-tide.md's front matter above.
+# The corrected corpus must produce none of them and no others: both counts are asserted.
+CROSSREF_CORPUS_EXPECTED = [
+    # the shallow-water shape: one document against its own failure table, factor dropped
+    ("references/fx-tide.md:11 and references/fx-tide.md:18", "`A`, `g`, `l`, `sqrt`",
+     "constants [2.0] at the first and none at the second"),
+    # the cross-document shape: a document against one it names in prose
+    ("references/fx-other.md:8 and references/fx-tide.md:11", "`A`, `h`, `lx`",
+     "constants [3.0] at the first and [2.0] at the second"),
+    # the iop_split shape: a document against the bibliography entry it cites
+    ("references/fx-optics.md:11 and references/papers-fx.md:8", "ratio `c/K_d`",
+     "against [5.0, 20.0]"),
+]
+
+
+def _crossref_corpus_run(files: dict[str, str]) -> list[str]:
+    """Write a fixture corpus to a temporary tree and return what check_crossrefs() says of it.
+
+    The tree is temporary on purpose: a fixture corpus living under `references/` would be read
+    by every other check in this file and would have to be a real document to pass them.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        refs = Path(tmp) / "references"
+        refs.mkdir()
+        for name, text in files.items():
+            (refs / name).write_text(text, encoding="utf-8")
+        return check_crossrefs(Path(tmp))[0]
+
+
+def crossref_corpus_selftest() -> list[str]:
+    """Assert check_crossrefs() itself -- not only its extractors -- on the reconstructed corpus."""
+    bad: list[str] = []
+    broken = _crossref_corpus_run(CROSSREF_CORPUS)
+    for want in CROSSREF_CORPUS_EXPECTED:
+        if not any(all(s in p for s in want) for p in broken):
+            bad.append("no finding matches the reconstructed instance "
+                       + " + ".join(repr(s) for s in want))
+    if len(broken) != len(CROSSREF_CORPUS_EXPECTED):
+        bad.append(f"{len(broken)} findings on the broken fixture corpus, expected "
+                   f"{len(CROSSREF_CORPUS_EXPECTED)}: {broken}")
+    for p in broken:
+        # Named, not left to the count above, so the failure says WHICH decision was removed.
+        for k in CROSSREF_CORPUS_QUIET:
+            if k in p:
+                bad.append(f"the quiet control over {k} is REPORTED, so one half of "
+                           f"`if (va & vb) or (ua & ub)` in check_crossrefs is gone: " + p.strip())
+    quiet = _crossref_corpus_run({**CROSSREF_CORPUS, **CROSSREF_CORPUS_FIXED})
+    if quiet:
+        bad.append(f"the corrected fixture corpus is not quiet: {quiet}")
+    return bad
+
+
+def check_crossrefs(root: Path | None = None) -> tuple[list[str], int, int, int, int]:
     """Does a NUMBER agree at both ends of a link this corpus already draws?
 
     WHY THIS EXISTS. A correction landing at one end only is this corpus's most-recorded defect;
@@ -1186,12 +1370,22 @@ def check_crossrefs() -> tuple[list[str], int, int, int, int]:
     two different formulas, not two versions of one, and no lexical rule separates them --
     the same number meaning different things is this instrument's characteristic error.
 
+    ⚠️ AND IT READS ONLY THE OPENER LINE OF A BIBLIOGRAPHY ENTRY. 92 of the 225 entries (41%,
+    measured 2026-09-06) wrap onto a continuation line, and for those the whole of the
+    continuation -- which is where a long entry does most of its arguing -- is not compared at
+    all. That is the same blind spot the `[not-opened]` tag was once lost in.
+
     REPORTED, not enforced, like approximation / reach / locators / unread. Its output is
     CANDIDATES for a human, it does not discharge the hand review, and an OPEN row in
     registers/guard-proofs.tsv records the measured miss above.
+
+    `root` exists so `--selftest` can run this FUNCTION over the reconstructed fixture corpus
+    rather than only its extractors; see CROSSREF_CORPUS.
     """
-    docs = [p for p in documents(ROOT) if p not in (INDEX, COVERAGE)]
-    papers = set(paper_files())
+    root = ROOT if root is None else root
+    refs = root / "references"
+    docs = [p for p in documents(root) if p not in (refs / "index.md", refs / "coverage.md")]
+    papers = {p for p in refs.glob(PAPERS_GLOB)}
     techs = [p for p in docs if p not in papers]
     names = {p.name for p in techs}
 
@@ -1214,10 +1408,19 @@ def check_crossrefs() -> tuple[list[str], int, int, int, int]:
             lines = p.read_text(encoding="utf-8").split("\n")
         except OSError:
             continue
-        off = _offset(p)
+        off, fence = _offset(p), False
         for i, line in enumerate(lines[off - 1:], off):
-            m = _ID_OPENER.match(line)
-            if m:
+            # Skip fenced blocks, as `_scan` already does: papers-flow.md and
+            # papers-generation.md document the ENTRY FORMAT inside a fence, and one of those
+            # illustrations is a copy of a real entry (`beven1979`). Without this the example is
+            # registered as a side under the real id, and which of the two a citation is
+            # compared against is decided by filename order -- papers-flow sorts before
+            # papers-masks-and-filtering, so today the real entry happens to win. Luck is not a
+            # rule. Three phantom sides on the current tree; no reported number moves.
+            if line.lstrip().startswith("```"):
+                fence = not fence
+                continue
+            if not fence and _ID_OPENER.match(line):
                 cid = line.split("**")[1]
                 sides[f"{p.name}#{cid}"] = _x_side(line, i) + (p.name,)
                 entry_side[cid] = f"{p.name}#{cid}"

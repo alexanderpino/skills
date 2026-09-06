@@ -435,8 +435,26 @@ named, and the quoted sentences are transcribed from it rather than recalled.
   either "is valid with any depth mode" while "the early depth cull will be disabled" when it is
   not. Breaking the promise is undefined behaviour; §16.9.3.2 describes the clamp implementations
   *may* apply and records that most never did.
-  **§16.13** on helper invocations existing solely to support derivatives in 2×2 stamps, and the
-  rule that no result dependent on a UAV read may contribute to a derivative.
+  **§16.2 Pixel Shader Invocation**: the minimum atom of shader execution is a 2×2 block, "to
+  support derivative calculations via x/y deltas between shader invocations. This means there may
+  be dummy invocations off the edge of a primitive to fill out the minimum 2x2 size" — the
+  sentence that makes a quad a property of one primitive. ⚠️ It does **not** say what those dummy
+  invocations are fed, and neither does §16.13; attribute extrapolation past the triangle edge is
+  hardware behaviour this bibliography has no artefact for.
+  **§16.13** on helper invocations existing solely to support derivatives in 2×2 stamps, their
+  outputs being "valid but ignored", and the rule that no result dependent on a UAV read may
+  contribute to a derivative. It says nothing about primitives or plane equations.
+  **§3.1.5 16-bit Floating Point against §7.20.2.2.1 float16** — two different float16s, and the
+  pair is the whole of `shader-craft.md`'s fp16 threshold. §3.1.5 *mandates* the forgiving regime
+  for full float16: unfused operations "must produce a result that is the nearest representable
+  value to an infinitely precise result (round to nearest even, per IEEE-754, applied to 16-bit
+  values)", at 0.5 ULP, and "Denorms: 16-bit floating point numbers must preserve denorms" — the
+  opposite of §3.1.3.2's 32-bit rule that "Denorms MUST be flushed to sign-preserved zero on input
+  and output of any floating point mathematical operation". §7.20.2.2.1, under §7.20.2.2's 16-bit
+  **min-precision** level — `min16float`, and GLSL ES `mediump` by the same logic — gives that
+  guarantee back: "Float16 arithmetic operations within the shader may or may not flush float16
+  denorm to 0, and may either round to nearest even or truncate to a representable number." Three
+  conforming regimes where the type is a minimum, one where it is the format.
   **§22.19.1 `_sat`**, defined as `min(1.0f, max(0.0f, value))` over the min and max
   *instructions*, which §22.10.11 and §22.10.10 define to return the other operand when one is
   NaN — so, in the spec's own words, "sat(NaN) returns 0, by the rules for min and max". A vendor

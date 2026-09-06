@@ -47,7 +47,9 @@ the result by refinement rather than by eye.** Four rules, in the order they bit
    timestep chosen once are five spellings of one bug.
 2. **Derive the cell-valued form where the grid is known**: `radius_cells = radius_m/Δx`,
    `lifetime = reach_m/Δx`, `count = density_per_km² · area`, `passes = ceil(4.5·(r_m/Δx)²)`. The
-   table below gives the exponent per family; none of them is 1 for every parameter.
+   table below gives the exponent per family; none of them is 1 for every parameter, and a droplet
+   count needs a further `1/Δx²` on top of that conversion for reasons the droplet section
+   measures.
 3. **A rate per step is not a rate.** Evaporation, erode and deposit fractions, a relaxation
    coefficient — anything applied once per iteration compounds a different number of times at
    every resolution, so re-express it per unit of simulated time or of path length.
@@ -91,7 +93,7 @@ permits is a length that the grid supplies.
 |---|---|---|---|
 | `erosionRadius = 3` | droplet brush [lague_erosion] | cells | `radius_m/Δx`, and see the floor below |
 | `maxDropletLifetime = 30` | droplet [lague_erosion] | steps, ~one cell each | `reach_m/Δx` |
-| `evaporateSpeed = 0.01` | droplet [lague_erosion] | per step | `e(Δx) = 1 − (1 − e₀)^(Δx/L₀)` |
+| `evaporateSpeed = 0.01` | droplet [lague_erosion] | per step | `e(Δx) = 1 − (1 − e₀)^(Δx/L₀)`, for `e₀` as authored at cell size `L₀` |
 | `minSlope ≈ 0.01` | droplet capacity (`hydraulic-erosion.md`) | compared against a per-step **drop** | `minSlope·Δx` |
 | saltation hop ≈ 5 | slab automaton (`thermal-and-aeolian-erosion.md`) | cells | `hop_m/Δx` |
 | pass count | thermal, `passes ≈ 4.5·r²` in cells | passes | `ceil(4.5·(r_m/Δx)²)` to budget; stop on a measurement |
@@ -133,7 +135,7 @@ count.
 
 | Family | What moves, and by what exponent | Cost of one halving | Verdict |
 |---|---|---|---|
-| Droplet | radius and lifetime `∝ 1/Δx`; count `∝ 1/Δx²`; per-step rates `∝ Δx`; the capacity floor `·Δx` | ×8 | approximate — statistical, never pointwise |
+| Droplet | radius and lifetime `∝ 1/Δx`; count `∝ 1/Δx²`; the brush `∝ 1/Δx²` cells; per-step rates `∝ Δx`; the capacity floor `·Δx` | ×32 (×8 in steps) | approximate — statistical, never pointwise |
 | Pipe / shallow water | `Δt ∝ Δx` at a fixed signal speed; `A = l²` ties that speed to the cell | ×8, or ×5.7 with `A = l²` | invariant only once `A ≈ h·lx/2` |
 | Thermal | nothing in the rule; pass count `∝ 1/Δx²` | ×16 | invariant at the fixed point; the cost is quartic |
 | Aeolian | hop `∝ 1/Δx`; slabs `∝ 1/Δx²`; `L_sat` is already metres | ×4, ×8 if the hop is marched | invariant above a floor near `L_sat` |
@@ -141,9 +143,17 @@ count.
 | Flow routing | `dist` is already metres; the `A·S²` threshold moves | ×4 | **not available** — the receiver is a discrete choice |
 
 **Droplet.** A droplet's life is a fixed number of steps of about one cell, so its reach is
-`lifetime × cellSize` (`hydraulic-erosion.md`) — 30 to 60 cells at every extent. Hold the reach
-in metres and the lifetime scales as `1/Δx`; hold droplets per square kilometre and the count
-scales as `1/Δx²`; the product is the cube law. Two subtler parameters.
+`lifetime × cellSize` (`hydraulic-erosion.md`) — 30 to 60 cells at every extent. Hold the reach in
+metres and the lifetime scales as `1/Δx`. The count is less obvious than the other two: a density
+per square kilometre is a *fixed* number of droplets, but the cut per droplet is not fixed. On the
+loop of `hydraulic-erosion.md` at 128² and 256², one 2 km domain, every parameter here already in
+world units, eroded volume fell **4.1–4.6× per halving at an unchanged count** across three seeds
+and came back within ±30% at four times the droplets — so the count that holds the *result* goes
+as `1/Δx²`, loosely, and droplet *steps* go as the cube law. ⚠️ **The work does not.** Erosion is
+brush-wise [lague_erosion], so every erode step touches a disc of `radius_m/Δx` cells — 25 of them
+at 128², 109 at 256² — and the work goes as `1/Δx⁵`: those same runs touched **32.1–33.0× the
+brush cells** for 7.8–7.9× the steps. Over a 512² → 4096² span that is 32 768×, not 512×. Two
+subtler parameters.
 **The per-step rates compound.** `water *= (1 − evaporate)` runs `L/Δx` times
 over a path of physical length `L`, so what is invariant is `ln(1 − e)/Δx`, and for small `e` the
 fix is simply `e ∝ Δx` — the same argument applies unchanged to `erodeSpeed` and `depositSpeed`.
@@ -319,9 +329,10 @@ sub-cycles at 156.25, 78.12 and 39.06 m — computed, not measured, and checkabl
 **Slope, and everything keyed on it.** Measured above, so every threshold carrying a slope — a
 material selector, a talus mask, the `A·S²` channel head between 500 and 4000 m² [montgomery1992]
 — moves with the sampling density. `A·S²` is the sharpest case, because it is quoted in m² and so
-reads as a fixed physical quantity. It is not: `A` converges and `S` does not, so with
-`S ∝ Δx^(H−1)` the *threshold constant* has to scale as `Δx^(2H−2)` to keep selecting the same
-ground — at `H = 0.5` that is `1/Δx`, so coarsening by two requires **halving** the number, the
+reads as a fixed physical quantity. It is not: only `S` carries a cell-size exponent — `A` is an
+area in m² on either grid, and its own failure is the discontinuity above rather than a drift with
+`Δx` — so with `S ∝ Δx^(H−1)` the *threshold constant* has to scale as `Δx^(2H−2)` to go on
+selecting the same ground: at `H = 0.5` that is `1/Δx`, so coarsening by two **halves** it, the
 direction nobody guesses. And `H` is a property of the terrain rather than of the tool, so no
 coefficient a tool ships can carry it. State the resolution beside the threshold
 (`terrain-analysis-masks.md`) and re-tune per level; that is the whole available fix.
@@ -402,8 +413,9 @@ what make it a test rather than a demonstration.
    floor the claim is void, and saying so is cheaper than being found out.
 6. **The measured cost exponent.** Wall clock against `1/Δx`, fitted, and compared with the
    predicted exponent from the table above. A mismatch is diagnostic: work rising as `1/Δx²` where
-   the model predicts `1/Δx³` means a timestep that did not move, and `1/Δx⁴` where `1/Δx²` was
-   predicted means a pass count that did.
+   the model predicts `1/Δx³` means a timestep that did not move, `1/Δx⁴` where `1/Δx²` was
+   predicted means a pass count that did, and `1/Δx³` from a droplet pipeline where `1/Δx⁵` was
+   predicted means a brush radius still counted in cells.
 
 [skinner2023] is the closest thing in this bibliography to that test run in public — one 2 m DEM
 resampled to every cell size from 2 to 30 m plus 50 m (§2.1), fifteen metrics each reported with
@@ -419,6 +431,7 @@ holds is not evidence that the model is doing the same thing.
 | Erosion detail is finer and weaker at every increase in resolution | Droplet reach is `lifetime × cellSize`, and the brush radius is in cells | `lifetime = reach_m/Δx`, `radius_cells = radius_m/Δx` |
 | Droplets run out of water and dump their load early once the grid is refined | `evaporate` and the erode/deposit fractions are applied per *step*, and a path of the same physical length now takes `L/Δx` more of them | Re-express per unit path length; for small `e`, `e ∝ Δx` |
 | Isolated deposit spikes appear on flats when the map is coarsened, and erosion goes slope-blind over much of it when the map is refined | `max(−Δh, minSlope)` floors a per-step **drop**, not a slope, so the effective slope floor is `minSlope/Δx` — nearly inert at coarse spacing, dominant at fine | `max(−Δh, minSlope·Δx)` |
+| A droplet pass affordable at 512² misses its 4k wall-clock budget by orders of magnitude, with every parameter correctly in metres | Steps go as `1/Δx³`, but each erode step touches a brush of `radius_m/Δx` cells, so the work goes as `1/Δx⁵` — 32 768× over that span, not 512× | Budget `1/Δx⁵` for the droplet pass. Capping the brush in cells buys the time back and re-introduces the resolution dependence; declare it if you do |
 | Halving the cell size makes the water slower and the sloshing period longer | `A = l²` with `l` the cell, so the model's effective depth is `2Δx` and its signal speed `√(2gΔx)` [stava2008] | `A ≈ h·lx/2`, or accept a fixed authored signal speed and say so |
 | The pipe solve is stable at one resolution and explodes at the next | `Δt` chosen once; the bound is `0.50·dx/√(g·A/l)`, and `dx` moved — and if `A = l²`, so did `A/l` | Recompute per resolution, and per step wherever the celerity tracks depth [courant1928] |
 | Ridges relax fully at 512 and stay knife-edged at 4k on the same pass budget | Thermal pass count goes as `4.5·(r_m/Δx)²` | Stop on a measured over-steep count, never a pass count |

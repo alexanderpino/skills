@@ -158,17 +158,20 @@ something**, and add a `planned` row before writing a new document.
   rendering in general. Gaia's cost tables are checked against that skill's *Performance and
   Profiling* breakdown; Gaia does not print a per-stage millisecond split of its own.
 
-⚠️ **Shader craft — what the rendering documents assume, provisionally.** Gaia's eleven rendering
-documents are written for someone who already writes shaders: they say *which* fetch, *which*
-derivative, *which* depth convention, and they do not teach the craft around it. The general
-part of that craft belongs to the two skills above. The **heightfield-specific** part belongs to
-nobody yet — screen-space derivatives across LOD seams and inside a divergent ray march,
-virtual-texture gradient scaling and feedback bias, explicit-LOD fetch semantics in a max-mip
-traversal, the depth-output direction under both depth conventions, the fp16 hazards of `pow`
-and `normalize` on grazing terms — and today those hazards are scattered across the eleven
-documents' failure tables. `coverage.md` carries a `planned` row, **shader-craft**, that will
-collect them in one document the eleven can cite; until it exists, read the failure table of
-every rendering document you use, not only the one you opened.
+⚠️ **Shader craft — what the rendering documents assume.** Gaia's eleven rendering documents are
+written for someone who already writes shaders: they say *which* fetch, *which* derivative,
+*which* depth convention, and they do not teach the craft around it. The general part of that
+craft belongs to the two skills above. The **heightfield-specific** part is
+`references/shader-craft.md` — screen-space derivatives across LOD seams and inside a divergent
+ray march, virtual-texture gradient scaling and feedback bias, explicit-LOD fetch semantics in a
+max-mip traversal, the depth-output direction under both depth conventions, and the fp16 hazards
+of `pow` and `normalize` on grazing terms.
+
+⚠️ **That document is written and nothing points at it yet.** It was assembled from hazards
+already sitting in the eleven documents' failure tables, but none of those eleven cites it back,
+so a reader who opens one of them still meets each hazard in isolation. Until they do, read the
+failure table of every rendering document you use, not only the one you opened. Closing that half
+is what finishes this item; the document existing is not the same as the corpus routing to it.
 - **terrain-architect**, **terrain-renderer** — the source skills Gaia is distilled from.
   ⚠️ **Both are RETIRED and now live under `obsolete/`, superseded by this skill.** Do not treat
   them as a live alternative: they were written to a weaker standard than Gaia, and
