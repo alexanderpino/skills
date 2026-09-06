@@ -20,10 +20,10 @@ sources:
 ---
 # Volumetric clouds
 
-**Tier: real-time rasteriser, amortised over frames.** Every cost below is a per-frame GPU cost,
-and the technique fits a frame because the march is spread across frames and, in most
-configurations here, run below output resolution — so the resolve back to full res, against the
-terrain's depth buffer, is part of the technique rather than a detail of it.
+**Tier: real-time rasteriser, amortised over frames.** Every cost on this page is a per-frame GPU
+cost on console-class hardware, and the technique only fits a frame because the march is spread
+across frames and, in several configurations here, run below output resolution — which makes the
+resolve back to full res part of the technique rather than a detail of it.
 
 ## Use this
 
@@ -35,7 +35,9 @@ with a cheap sampler that only escalates to the expensive one where the cheap sa
 ⚠️ **The density model is the durable part; the 2015 rendering envelope around it is not.** Its own
 originator's 2023 capability table scores that method **No** on terrain-cast shadows, **No** on
 flight-capability and **No** on freeform modelling, and their verdict on the voxel successor is
-"**Voxel clouds check almost all of the boxes**" [schneider2023]. Two of those three failures are
+"**Voxel clouds check almost all of the boxes**" [schneider2023] — a verdict about *capability*,
+and the boxes are not free: normalised like for like, voxels cost **4.4–5.3× per pixel**, paid for
+by running at a quarter of them (*the crossover has a date*, below). Two of those three failures are
 exactly terrain's problems. Take the density model from the 2015 lineage; do **not** take the
 couplings from it, because they are not in it.
 
@@ -163,22 +165,29 @@ terminates the march early, and produces exactly the popping this optimisation e
 `gpu-driven-culling.md` states the same rule for its HiZ reduce and names the same symptom,
 "geometry near silhouettes disappears for a frame under motion".
 
-- **The resolve back to full resolution is depth-aware — nearest-depth or bilateral, never plain
-  bilinear.** The march runs below output resolution in most configurations on this page — the
-  2015 scheme's reduced-res buffer, 480×270 near and 960×540 far in 2023 — and composites against
-  a full-res terrain depth buffer. At a mountain silhouette the four low-res neighbours a bilinear
-  tap mixes are not one surface: one terminated on rock a kilometre away, its neighbour ran to
-  the cloud exit tens of kilometres out. Blending them fringes every ridge — cloud bleeding onto
-  the rock, a thinned band just beyond it. A bilinear tap reaches one low-res texel to either
-  side, so the fringe runs **2 px each side at half-res per axis, 4 px each side at
-  quarter-res**, and it crawls as the camera turns. Instead pick, per full-res
-  pixel, the low-res sample whose depth is closest to *this* pixel's depth (nearest-depth), or
-  weight the four with a depth-difference falloff (bilateral), keeping plain bilinear where all
-  four agree so open sky keeps its smooth gradient. ⚠️ **That makes two reductions over one
-  quantity, in opposite directions, and one shared helper gets one of them wrong.** Termination
-  reduces the depth footprint toward the FARTHEST candidate; the upsample selects the NEAREST
-  match to the full-res depth. Write the quantity each one is looking for, not the operator —
-  the rule directly above, and the one `gpu-driven-culling.md` states for its HiZ reduce.
+- **Resolve the low-res march with a depth-aware filter — nearest-depth or bilateral — never a
+  plain bilinear one.** Several configurations here march below output resolution (2015's
+  reduced-res reprojection buffer, at the factor the deck contradicts itself on; 2023's 480×270
+  near and 960×540 far) and every one of them has to land back on the full-res scene. At a
+  mountain silhouette the four low-res neighbours a bilinear tap mixes are not one surface: one
+  stopped on rock a kilometre out, its neighbour ran to the cloud exit tens of kilometres beyond.
+  Blending them fringes every ridge — cloud bleeding onto the rock, a thinned band just past
+  it — and the fringe crawls as the camera turns. Bilinear support is one low-res texel, so at
+  `1/S` per axis it reaches **at most `S` full-res pixels either side of the silhouette**: 2 px at
+  half-res, 4 px at quarter-res. Instead pick, per full-res pixel, the low-res neighbour whose
+  depth is closest to *this* pixel's (nearest-depth), or weight the four by a falloff in the depth
+  difference (bilateral), and keep plain bilinear where all four agree so open sky keeps its
+  smooth gradient. Compare against the depth the march actually stopped at — the farthest-reduced
+  low-res mip above — not a freshly reduced one. Derived here from two facts already on this page,
+  a sub-resolution march and a full-res composite; no artefact in this set is quoted for it.
+  ⚠️ **Two reductions over depth, and neither is the other's opposite.** Termination extremises
+  depth itself — FARTHEST in the footprint. The resolve extremises a *difference* — smallest gap
+  to this pixel's depth. A helper that "reduces depth" is wrong for one of them whichever way its
+  comparator points; write the quantity each is looking for, as the rule directly above and
+  `gpu-driven-culling.md`'s HiZ reduce both say. ⚠️ And it does not close the case it looks like it
+  closes: a ridge thinner than one low-res texel puts sky in every candidate's footprint, so no
+  choice among four sky samples helps. That one wants the near split or a full-res march, not a
+  better filter.
 
 **2 — The shadow the ground receives.** The cheapest large-scale life a vista buys, and absent from
 the 2015/2017 lineage entirely.
@@ -271,7 +280,7 @@ pixels**. A cloud budget quoted without the geometry it displaces is half a numb
 |---|---|---|
 | Cloud drawn over a mountain the first time a peak enters the deck | The march does not terminate at the terrain depth hit | Depth-aware compositing; pick one of the three depth definitions and use it everywhere [yusov2014] |
 | Clouds pop at silhouettes as the camera turns | The depth-mip reduce picks the NEAREST depth in the footprint, so the march terminates early — the operator that does this flips with the depth convention | Reduce toward the FARTHEST depth: `min()` under reversed-Z, `max()` under standard depth. Write the quantity, not the operator [schneidervos2017] p.98 |
-| A fringe hugging every ridge — cloud bleeding onto the rock, a thin band just beyond it — crawling under camera motion | The low-res march is resolved to full res by a plain bilinear tap, which mixes samples that stopped on terrain with samples that ran to the cloud exit | Nearest-depth or bilateral upsample against the full-res depth; bilinear only where the four candidates agree. Note this reduce selects the NEAREST match while termination reduces toward the FARTHEST — do not share one helper |
+| A fringe hugging every ridge — cloud bleeding onto the rock, a thinned band just past it — crawling under camera motion | The low-res march is resolved by a plain bilinear tap, which mixes low-res samples that stopped on terrain with samples that ran to the cloud exit; at `1/S` per axis it reaches `S` full-res pixels either side | Nearest-depth or bilateral resolve against the depth the march stopped at; bilinear only where the four candidates agree. The two reductions differ in *quantity*, not in operator: termination takes the FARTHEST depth, the resolve the smallest depth *difference* — one helper cannot serve both |
 | Landscape looks dead and evenly lit under a dramatic sky | No ground-receiving cloud shadow — it is absent from the 2015/2017 lineage, so an implementation faithful to those decks has none | Light-space transparency buffer on the CSM matrices [yusov2014] p.133 |
 | Cloud shadows drift wrong across a large map | The projected-shadow formulation assumes a flat planet, and its error grows with BOTH vista length and falling sun | Bound both, not just the map: the shadow offset is `h/tan(elevation)`, so it leaves any map at low sun. Or project on the sphere [hillaire2016] p.42 |
 | Ghosting and smearing on fast camera turns, worst near camera | Temporal amortisation over 16 frames cannot resolve in time | Depth-split the render instead of upscaling near clouds [schneider2023] p.185 |

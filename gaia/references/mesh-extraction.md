@@ -12,6 +12,9 @@ sources:
 ---
 # Mesh extraction — getting terrain out of the tool, offline
 
+**Tier: authoring-time.** Every cost on this page is an offline bake inside the exporter; nothing
+here runs in a frame, and the only thing that crosses into a frame budget is one number per level.
+
 `heightfield-lod.md` is about a mesh that never exists on disk: CDLOD, clipmaps and CBTs all
 synthesise triangles per frame from a heightfield and a camera. **This document is the other
 job** — producing an actual triangle mesh, once, offline, that leaves the tool as a file. That
@@ -46,9 +49,10 @@ sample) — the mip-chain of meshes; it spends the same triangles on a cliff and
 is the entire thing simplification exists to avoid. *Marching cubes over a signed distance field* —
 the right answer if the terrain genuinely has caves and overhangs authored as volume, and a
 category error if it is a heightfield: it converts an exact 2.5-D function into an approximated
-3-D one and then needs simplifying anyway. *Exporting the full grid and letting the engine
-simplify* — defensible, and it moves the same decision to a tool with less information about what
-the terrain means.
+3-D one and then needs simplifying anyway (volumetric terrain is out of scope for this skill —
+`coverage.md`'s `isosurface-extraction` row records that decision and takes its reason from
+here). *Exporting the full grid and letting the engine simplify* — defensible, and it moves the
+same decision to a tool with less information about what the terrain means.
 
 ## The metric, exactly
 
@@ -78,9 +82,11 @@ Three properties, each transcribed and then run:
   on a flat patch: the condition number of that matrix is `inf`. Fall back to the endpoints or the
   midpoint; do not let a linear solver return a random point on a plateau.
 
-The additive rule `Q̄ = Q1 + Q2` double-counts planes shared by the two vertices, at most three
-times each, and [garland1997] accepts that trade deliberately. Keep the trade; the alternative is
-carrying explicit plane sets that grow as simplification proceeds.
+The additive rule `Q̄ = Q1 + Q2` double-counts the plane of every triangle that touches **both**
+endpoints: that plane enters `Q1` once and `Q2` once, so **exactly twice**, and never three
+times — a triangle has three distinct vertices, so it contributes to any one `Q_v` at most once.
+[garland1997] accepts that trade deliberately. Keep the trade; the alternative is carrying
+explicit plane sets that grow as simplification proceeds.
 
 ## The quadric cost is not a screen-space error
 
@@ -226,7 +232,17 @@ cross-fade.
 | Fixed levels, the engine cross-fades or pops | Independent per-level runs | Simplest; each level is optimal for its own budget |
 | The engine geomorphs between levels | A nested chain — one run, snapshot the ladder | Correspondence is what makes the blend definable [hoppe1996] |
 | The engine streams detail progressively | The vertex-split record stream itself | It is lossless and continuous-resolution [hoppe1996] |
-| The consumer is a cluster-DAG renderer | Per-cluster simplification with locked cluster borders | The DAG wants independently-simplified groups, not one global chain |
+| The consumer is a cluster-DAG renderer | Simplify per **group** of clusters with the *group's* border locked, and re-partition the grouping at every level | A border locked at one level is interior at the next, so nothing stays frozen for the whole chain |
+
+⚠️ **That row used to say "locked cluster borders", which cannot build a DAG at all.** Freeze
+each cluster's own border at every level and those vertices survive to the coarsest level, so the
+chain floors out at the cluster-boundary vertex count however far you push the error threshold.
+The published mechanism locks the *group* boundary and then re-partitions, which is what makes a
+locked edge simplifiable one level up. It is Nanite's, from Karis, Stubbe & Wihlidal (2021) —
+named here in prose and not as a marker, because `karis2021` is in this corpus's bibliography and
+cited by `gpu-driven-culling.md` but is **not yet in this document's `sources:`**. A source named
+without a marker is a recorded debt, not a citation; the proposed `sources:` row is with the
+maintainer.
 
 Whichever you pick, **write the measured maximum vertical error into each level's metadata, in
 metres, beside its bounding box.** `heightfield-lod.md` is explicit that this number must come

@@ -48,9 +48,9 @@ spreadsheet, and it decides whether the rest of this document applies to you.
 
 ```
 unloaded --> requested --> loading --> resident --> renderable <---+
-   ^ ^           |            |                         |          |
-   | |    cancel |     cancel | (discard                v          | free promotion:
-   | +-----------+<-----------+  the completion)    evictable -----+ back into the cut
+   ^ ^           |            |            |            |          |
+   | |    cancel |     cancel | discard    |            v          | free promotion:
+   | +-----------+<-----------+<-----------+        evictable -----+ back into the cut
    |                                                    |
    +----------------------- evict ----------------------+
 ```
@@ -59,7 +59,12 @@ unloaded --> requested --> loading --> resident --> renderable <---+
 - **loading** — IO or decode in flight. Cancellation must be supported: mark the request
   abandoned and discard its completion. If the IO layer cannot cancel, at minimum do not *upload*
   the corpse.
-- **resident** — bytes in memory, not yet legal to draw.
+- **resident** — bytes in memory, not yet legal to draw. **A tile whose want expired before its
+  upload ran is discarded from here, not completed.** Without that exit, an exhausted upload
+  budget (below) parks it in `resident` until it has been uploaded and built anyway — one
+  mechanism behind the resident set that never plateaus. Demoting it to `evictable` instead is
+  the wrong edge: that state's whole property is that re-entry is a *free* promotion, and a tile
+  that was never uploaded cannot deliver one.
 - **renderable** — uploaded, derived data ready, seam constraints satisfiable.
 - **evictable** — out of the cut, still in memory. This is the cache, and a re-entering tile is a
   free promotion.
@@ -91,14 +96,16 @@ starve a whole mid-distance band indefinitely.
 same tile every frame: sustained IO with a near-stationary camera, and visible flicker. Apply the
 same band to the eviction distance.
 
-**What it beats.** *Pure LRU* — evicts the tile immediately behind you, the one you are about to
-turn back toward. *Pure priority* — evicts nothing until the crisis. The hybrid evicts the lowest
-priority *evictable* tile, breaking ties by last-used frame, and never touches tiles in the cut,
-pinned tiles, or tiles mid-upload. *A fixed ring cut* [losasso2004] — clipmap-shaped residency is
-the right *shape* for the resident set and the wrong *mechanism* for choosing it, because it
-cannot spend more on the ridge in front of you than on the flat behind. *Zone/cell load-on-cross*
-— the old open-world pattern; it hitches at the boundary by construction and has no notion of
-partial detail.
+**What it beats.** *Pure LRU* — recency is a poor proxy for future value. It **protects**
+everything you have just driven past, because that is exactly what carries the newest use stamp,
+and it is blind to the high-error tile ahead: it has no notion of projected error or camera
+velocity, so the only thing it can order by is the past. *Pure priority* — evicts nothing until
+the crisis. The hybrid evicts the lowest priority *evictable* tile, breaking ties by last-used
+frame, and never touches tiles in the cut, pinned tiles, or tiles mid-upload. *A fixed ring cut*
+[losasso2004] — clipmap-shaped residency is the right *shape* for the resident set and the wrong
+*mechanism* for choosing it, because it cannot spend more on the ridge in front of you than on
+the flat behind. *Zone/cell load-on-cross* — the old open-world pattern; it hitches at the
+boundary by construction and has no notion of partial detail.
 
 ## The frame must never wait on the disk
 
@@ -150,7 +157,7 @@ the bake. Blurring the seam hides it at one distance and reveals it at every oth
 | Double-drawn, z-fighting terrain at one tile | Parent and children both drawn during a transition | Refinement is atomic per parent |
 | Distant tiles never sharpen | Requests dropped silently — queue overflow, or IDs recycled by the streamer | Count every drop; key requests by stable tile ID |
 | A visible seam in lighting exactly on tile edges | Per-tile bakes ran without a neighbour apron | Re-bake with an apron at least the kernel radius; do not blur at runtime |
-| Resident set grows through a long flight and never plateaus | Eviction never reaches the cache, or evictable tiles are pinned by a stale reference | Plot the resident-set curve on a soak; it must plateau |
+| Resident set grows through a long flight and never plateaus | Eviction never reaches the cache; evictable tiles are pinned by a stale reference; or `resident` tiles whose want expired have no discard edge, so they hold their bytes until the upload budget finally reaches them | Plot the resident-set curve on a soak; it must plateau. Give `resident` an exit |
 | Cross-tile seams appear only after a patch | Old baked tiles mixed with new ones | Version every tile blob by a content hash of source data plus bake parameters; reject mixed versions per region |
 | Players fall through the world at speed | Collision residency coupled to render residency, or R sized without the latency term | Separate pyramid, guaranteed ring, R from max speed × worst-case latency |
 | Everything works at walking speed | The streamer was tuned only at walking speed | Verify at max traversal speed and by teleporting into a cold region |
