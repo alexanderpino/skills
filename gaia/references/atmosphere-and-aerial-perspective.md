@@ -15,7 +15,8 @@ sources:
 # Atmosphere and aerial perspective
 
 **Tier: real-time rasteriser.** Every cost below is a per-frame cost at a stated resolution unless
-it is named as a bake; the only work this document moves off the frame is two LUTs baked at load.
+it is named as a bake; the work this document moves off the frame is two load-time LUT bakes and the
+ambient probe's re-convolution cadence.
 
 ## Use this
 
@@ -46,8 +47,8 @@ iPhone 6s:
 **0.31 ms total at 1280×720**, updates included — and **do the subtraction before you budget it**.
 The four LUTs sum to **0.17 ms**, and every one of them is a fixed size that does not change with
 screen resolution. The remaining **0.14 ms** is the on-screen apply, and that is the only part that
-scales with pixels. So the shape of the budget is `0.17 + 0.14 × (pixels / 0.92 Mpix)` — ⚠️ a decomposition **derived
-here** from the paper's own two figures, not a scaling law it states — about
+scales with pixels. So the shape of the budget is `0.17 + 0.14 × (pixels / 0.92 Mpix)` — the 0.14 ms
+apply is the paper's own §7 figure; ⚠️ the **scaling** is derived here, and is not a law it states — about
 **0.485 ms at 1080p** and about **1.4 ms at 4K** on the same 2016-era GPU, against 0.31 quoted.
 
 That the LUTs do not scale is a design decision, not an accident. [hillaire2020] §5.3 says so
@@ -81,8 +82,8 @@ cadence is the difference between the technique fitting a mobile frame and not:
 | Sky-view | view altitude + sun direction | per frame |
 | Aerial perspective | camera frustum + sun | per frame, **per view** |
 
-⚠️ **On an iPhone 6s the two medium-only LUTs — transmittance at 0.53 ms and multi-scattering at
-0.12 ms — are 63% of the whole 1.03 ms LUT budget, and neither depends on the sun.** [hillaire2020]
+⚠️ **On an iPhone 6s the two LUTs a sun move never dirties — transmittance at 0.53 ms and
+multi-scattering at 0.12 ms — are 63% of the whole 1.03 ms LUT budget.** [hillaire2020]
 §5.5 says the multiple-scattering LUT "is valid for any point of view and light direction around the
 planet" — **"for an atmosphere material setup"**, which is the clause that matters. ⚠️ And the
 mechanism is not that it ignores the sun: §5.5.2 parameterises it with `u = 0.5 + 0.5·cos(θs)`,
@@ -104,14 +105,21 @@ Table 2 measures four LUTs on an iPhone 6s and nothing else. The on-screen apply
 0.31 ms PC total, and the **only** term on this page that scales with pixels — is never measured on
 mobile at any resolution. ⚠️ **Bounded here, not measured anywhere**: take the apply's 0.14 ms at
 1280×720, scale it to the 6s's 1334×750 (×1.09 → 0.15 ms), and multiply by the page's own PC→mobile
-ratios at their two honest ends — **1.7×** for multi-scattering and **53×** for transmittance, the
-two LUTs built at the same resolution and the same step count on both parts, so their ratio is the
-hardware and nothing else. The apply lands somewhere between **0.26 ms and 8.1 ms**; add the 0.38 ms
-of LUTs the cadence still leaves per frame and the whole pass is **0.64 ms to 8.44 ms of a 33 ms
-frame — 2% to 26%**. A **13× spread on the one term that decides the verdict**, and the upper bound
-is soft in its own right because 53× rests on a PC figure of 0.01 ms sitting at the table's rounding
-floor. So: the LUTs fit with the cadence.
-**Whether the pass fits is a measurement nobody in this corpus has taken** — take it on your target
+ratios at their two ends — **1.7×** for multi-scattering and **53×** for transmittance, the two
+LUTs built at the same resolution and the same step count on both parts. ⚠️ Those two ratios
+disagree by 31×, so they are **not** "the hardware": normalised per sample, multi-scattering does
+twice transmittance's work and the two swap order between the platforms. Read them as a bracket,
+not a measurement. The apply lands somewhere between **0.26 ms and 8.1 ms**; add the 0.38 ms of
+LUTs the cadence still leaves per frame and the whole pass is **0.64 ms to 8.44 ms of a 33 ms
+frame — 2% to 26%**, a **13× spread** on the one term that decides the verdict. Both ends are soft:
+53× rests on a PC figure of 0.01 ms at the table's two-decimal rounding floor, which puts the true
+ratio anywhere in 35×–106× and the upper bound anywhere up to 16.5 ms. ⚠️ **The one real mobile
+anchor cuts the other way, and it is in the section quoted above**: [hillaire2020] §7 reports that
+*"for Epic Games' Fortnite, the total sky rendering cost was roughly 1ms on iPhone 6s"* — a shipped
+whole-pass figure at about the LUT sum, which makes the top of this bracket implausible even though
+the apply is never broken out there. So: the LUTs fit with the cadence, and the one shipped mobile
+total says the pass did too, on that title's settings.
+**Whether *your* pass fits is a measurement nobody in this corpus has taken** — take it on your target
 part before you sign off the budget.
 
 ⚠️ **And on a tiler, cost the apply as it is scheduled, not as it is written.** A separate
@@ -232,8 +240,10 @@ resource and should be read as reasoning:
   path beyond it and cross-fade one slice.
 - **Jitter.** Build the volume with the **same jittered projection** as the G-buffer — as hygiene,
   not as the cure for shimmer. At 32³ one froxel column is 40 px wide at 1280 px, so ±0.5 px of TAA
-  jitter moves the lookup **1.25% of one froxel step** (0.42% at 4K) and the bilinear result moves
-  by 1.25% of the difference between two screen-adjacent froxels — under an 8-bit LSB unless those
+  jitter moves the lookup **1.25% of a froxel step horizontally and 2.22% vertically** at 1280×720
+  over a 16:9 frame, where one froxel is 40 px wide and 22.5 px tall (0.42% and 0.74% at 4K), and
+  the bilinear result moves by that fraction of the difference between two screen-adjacent
+  froxels — under an 8-bit LSB, on the tighter axis, unless those
   neighbours differ by more than about a third of the range, which a field this smooth does not do.
   The ridgeline shimmer is on the **depth axis**: the per-pixel depth dither two bullets up, and
   slice quantisation on a face where one slice spans kilometres, so a ridge's depth jumps whole
@@ -265,14 +275,14 @@ that sells valley mist. Both can exist. Only one is allowed to be the distance m
 ⚠️ **Aerial perspective, height fog and camera-frustum froxel fog can attenuate the same path
 twice**, and the result is a scene that goes muddy at range in a way no single parameter fixes.
 
-The rule, as the practitioner literature converges on it: **media sharing a volume are combined as
+The rule, as the practitioner literature converges on it [tr_lighting_shadows]: **media sharing a volume are combined as
 coefficients, not composited as results.** Sum the extinction and in-scatter of every medium
 occupying the same froxel, average the phase functions, and integrate once. Compositing three
 finished attenuations multiplies three transmittances that each already accounted for the same path.
 
 The world-scale sky term is the exception, and it is applied **once**, at a single representative
 depth, rather than being integrated alongside the local media. That is a documented compromise
-rather than a derivation — the practitioners who describe it say in their own words that it is not
+rather than a derivation — the practitioners who describe it [tr_lighting_shadows] say in their own words that it is not
 physically correct, and they ship it anyway because the error is small and the alternative is a
 second full integration.
 
@@ -364,9 +374,11 @@ taken from a source:
 > **What `RGB` is, so a second team can type-check against it.** `Sky` and the `inscatter` half of
 > `AerialPerspective` are **scene-referred linear radiance in `W·m⁻²·sr⁻¹`**, band-averaged over the
 > three wavelengths the medium is tabulated at — 680, 550 and 440 nm in [brunetonneyret2008] §2.1,
-> which `sky-and-weather-state.md` carries — and scaled so that a white Lambertian surface under a
-> zenith top-of-atmosphere sun reads `L = E_sun/π`. `E_sun` is the engine's; this corpus states it
-> nowhere. The two transmittances are dimensionless per-band factors in `[0, 1]`, and the sun colour a
+> which `sky-and-weather-state.md` carries — three samples that both source models then treat *as*
+> linear RGB with no spectral integration, so "Rec.709/D65" below names the primaries the triple is
+> **interpreted in**, not a colorimetric match. Scaled so that a white Lambertian surface under a
+> zenith top-of-atmosphere sun reads `L = E_sun/π`. `E_sun` is the engine's, and it is per-band, not
+> a scalar; this corpus states it nowhere. The two transmittances are dimensionless per-band factors in `[0, 1]`, and the sun colour a
 > surface lights with is `E_sun · Transmittance`, an irradiance in `W·m⁻²`. All of it is
 > **pre-exposure**, in Rec.709/D65 primaries unless the engine states otherwise — say which. Exposure
 > and the display transform are applied **once, downstream**, after the water composite and after
@@ -424,7 +436,7 @@ today, which is where the remaining discretionary cost sits.
 | The sun disc is white at sunset while the sky is red | The sun colour taken as a constant instead of from the transmittance LUT along the sun path | One sun colour, from the atmosphere |
 | The sky is fine on the ground and wastes resolution from orbit | The sky-view LUT spends most of itself on empty space | Switch to on-screen ray marching for space views [hillaire2020] §7 |
 | Mobile spends 3% of the frame rebuilding LUTs | All four rebuilt every frame, though a sun move dirties neither of the first two: transmittance is a pure function of the medium (0.53 ms on an iPhone 6s), and multi-scattering takes sun zenith as a table **axis** rather than an input (0.12 ms). Together 63% of the 1.03 ms | Bake both at load — multi-scattering takes sun zenith as a table **axis**, so never gate it on sun elevation. 1.03 ms → 0.38 ms |
-| The mobile budget was signed off from the LUT table and the frame still misses | The on-screen apply is the only pixel-scaling term and [hillaire2020] never measures it on mobile; bounded by this page's own PC→mobile ratios it is 0.26–8.1 ms, a 13× spread | Profile the apply on the target part before budgeting it. On a tiler, fold it into the opaque pass rather than a separate fullscreen pass that stores and reloads the tile |
+| The mobile budget was signed off from the LUT table and the frame still misses | The on-screen apply is the only pixel-scaling term and [hillaire2020] never measures it on mobile; bounded by this page's own PC→mobile ratios it is 0.26–8.1 ms, a 31× spread that carries the whole pass to 0.64–8.44 ms; the paper's one mobile whole-pass figure, ~1 ms for Fortnite on a 6s, sits near the bottom of it | Profile the apply on the target part before budgeting it. On a tiler, fold it into the opaque pass rather than a separate fullscreen pass that stores and reloads the tile |
 | Water and terrain disagree in colour at the horizon *after* both were told to share the atmosphere | They share the LUT and not the **far-field fallback**: one clamps to the last froxel slice, the other evaluates analytically | Same fallback, same cross-fade width, on both surfaces |
 | Water is milky and washed out at range, losing all depth colour | Aerial perspective applied to the scene colour the water refracts, then again by the water, then again on the surface — the in-scatter term accumulates while the transmittance term collapses, so it goes **pale**, not dark | Apply AP once, after the water composite; refract against a pre-AP copy |
 | Water hazes with depth of the sea bed rather than distance from the camera | The refracted in-water path fed into the atmosphere lookup | `airDistance` is camera-to-surface, in air, only |

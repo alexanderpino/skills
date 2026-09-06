@@ -26,18 +26,19 @@ graph the masks are applied.
 ## Use this
 
 **Composite materials as a weighted sum of linear-light albedos, with the weights normalised to
-sum to exactly 1 at the point of use, and let the weights come from a height-aware blend rather
-than a straight cross-fade.** In one expression, for `n` materials with weights `w_i`, albedo
-textures `A_i` and height channels `h_i`:
+sum to exactly 1 *before anything else reads them*, and let the weights come from a height-aware
+blend rather than a straight cross-fade.** In one expression, for `n` materials with weights `w_i`,
+albedo textures `A_i` and height channels `h_i`:
 
 ```
-b_i  = w_i + h_i                                 # height-biased weight [mishkinis2013]
+w_i  ← w_i / max(Σ_j w_j, eps)                   # normalise FIRST — the producer owes only Σw ≤ 1
+b_i  = w_i · (1 + h_i)                           # height bias, scaled so it dies with the weight [mishkinis2013]
 m    = max_i(b_i) − depth                        # keep only what is within `depth` of the winner
 w'_i = max(b_i − m, 0)
 A    = Σ w'_i · linear(A_i) / Σ w'_i             # linear light, normalised at the last moment
 ```
 
-Four decisions are packed into that, and each is dismissible in a line:
+Five decisions are packed into that, and each is dismissible in a line:
 
 - **Weighted sum, not an ordered over-composite.** An over-composite hides an over-subscribed
   weight set completely (`terrain-analysis-masks.md` makes the same point at the producer end); a
@@ -50,6 +51,11 @@ Four decisions are packed into that, and each is dismissible in a line:
   costs **29% of the texture's contrast**.
 - **Normalise at the point of use.** Not at the producer, not per layer — see the partition of
   unity below, where an unnormalised sum is exactly a brightness multiplier until it clips.
+- **A bias that dies with the weight — never a gate on `w_i > 0`.** The recipe as it is usually
+  printed adds the height, `b_i = w_i + h_i`, which compares an *absent* material's height against
+  a present one's weight-plus-height and so paints materials nobody asked for. Scaling instead of
+  adding cannot: `w_i·(1 + h_i) ≤ 2w_i`, so a weight of zero scores zero. Measured below, with the
+  reason a `w_i > 0` gate looks like a fix and is not.
 
 **What it beats.** *A colour ramp on height alone* — the "topographic map" look; height is the one
 input that guarantees horizontal banding. *An ID map with no blending* — hard boundaries at texel

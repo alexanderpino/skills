@@ -18,6 +18,9 @@ sources:
 ---
 # Water optics — absorption, refraction, and the two-sided interface
 
+**Tier: the quantities; both budgets consume them.** Nothing here is a per-frame cost — these are
+coefficients an authoring tool exports once and a renderer reads every frame.
+
 Water's colour is not a swatch and its transparency is not an alpha value. Both are consequences of
 a handful of measured coefficients and one refracting boundary, and picking them from physics
 rather than a colour picker is the difference between "blue-tinted glass" and *this specific water*.
@@ -79,19 +82,106 @@ peer-reviewed [solonenko2015]. This is a bookkeeping rule, not a contested physi
   object's own radiance is lost on the way to the eye.
 - **`K_d`** — **diffuse** attenuation. It governs the *ambient light column* with depth.
 
-Because natural water scatters strongly forward, `c` typically runs **5–20x larger than `K_d`**.
-Whichever of the two a single constant was fitted to, the other term is wrong by that factor.
+**The factor between them is not a property of "natural water" — it is one formula.** With
+`c = a + b` and Gordon's (1989) diffuse-attenuation approximation `K_d ≈ (a + b_b)/mu_d`:
+
+```
+c / K_d  =  mu_d * (a + b) / (a + b_b)
+#           \____/  \_______________/
+#            sun      water only
+```
+
+`mu_d` is the mean cosine of the downwelling field just below the surface, and refraction bounds it
+hard: a sun at zenith angle 0 / 30 / 45 / 60° gives `mu_0 = 1.00 / 0.93 / 0.85 / 0.76` below a flat
+surface, and a uniform overcast sky gives about **0.86**. The other factor is the water's entire
+contribution, and in **pure water it runs 1.00 to 1.20 across 450–610 nm** — this document's own
+Pope & Fry absorption against molecular scattering, `b_w(500 nm) = 0.0029 m^-1` falling as
+`lambda^-4.32` (Morel 1974), with `b_b = b/2` because the Rayleigh phase function is symmetric. So
+in clear water the two coefficients agree to within about 25%, and **which of them is
+larger is decided by the sun, not by the water**:
+
+```
+mu_d    c/K_d at 450 / 500 / 550 / 610 nm     pure water
+1.00    1.20 / 1.07 / 1.02 / 1.00             sun at the zenith            -> c > K_d
+0.86    1.03 / 0.92 / 0.87 / 0.86             uniform overcast sky         -> c ~ K_d
+0.75    0.90 / 0.80 / 0.76 / 0.75             scattering-dominated deep    -> K_d > c
+        #  0.75 is an asymptote pure water never reaches -- it needs b >> a to get there
+```
+
+⚠️ **A `c`/`K_d` ratio quoted without its `mu_d` is not a number.** The same pure water spans 1.20
+to 0.90 at 450 nm over the range above, and that span *crosses one* — it changes which coefficient
+is the larger. Quote `mu_d` with the ratio, exactly as this file quotes sample wavelengths with an
+absorption triple.
+
+**Particles are what makes the ratio large**, because they are what makes `b` exceed `a`. Their
+backscatter ratio `B = b_b/b` is about **0.018**, so as `b/a` climbs the formula tends to `mu_d/B`
+— about **42** at `mu_d = 0.75`. At that same `mu_d`: clear oceanic (`a = 0.05`, `b = 0.15`) gives
+**2.8**, coastal (`0.2`, `1.0`) **4.1**, turbid (`0.5`, `5.0`) **7.0**, very turbid (`1.0`, `20`)
+**11.6**. *That* is where the familiar "5–20×" comes from — it is a turbid-water range, and
+applying it to an alpine lake makes the beam path several times too attenuating.
+
 Export both, label both, and apply each to its own path:
 
 ```
-T_beam = exp(-c   * rayDistance)      # the bed's own radiance, along the refracted path
-T_diff = exp(-K_d * verticalDepth)    # the light column, straight down
-L      = bedRadiance * T_beam + L_scatter * (1 - T_diff)
+T_beam = exp(-c * rayDistance)                    # the bed's own radiance, refracted path
+T_col  = exp(-(K_d + c/mu_v) * verticalDepth)     # the scattering column: down, then back out
+L      = bedRadiance * T_beam + L_scatter * (1 - T_col)
 ```
 
 **Those two terms are not a lerp and their weights do not sum to one.** They are two transport
-paths. `L_scatter` — the radiance the column itself returns — is computed from `b_b`, `K_d` and the
-incident irradiance; it is never an authored swatch.
+paths, and the column's exponent carries **both** coefficients because that light makes two trips:
+down the column at `K_d`, then back out along the sightline at `c/mu_v`. `mu_v` is the Snell cosine
+of the view, so it never falls below `cos(theta_c) = 0.6625`.
+
+**`L_scatter` is computed, never an authored swatch** — and computing it is the one place `b_b` and
+`phase_g` are actually spent. Single scattering out of the downwelling beam, integrated down the
+view path, following Mobley (1994):
+
+```
+B(g)      = (1 - g)/(2*g) * ((1 + g)/sqrt(1 + g*g) - 1)          # HG backscatter fraction
+b         = b_b / B(g)                                           # total scattering, from exported b_b
+c         = a + b                                                # NOT a + b_b
+p(g,th_s) = (1 - g^2) / (4*pi * (1 + g^2 - 2*g*cos(th_s))^1.5)   # 1/sr; integrates to 1 over 4*pi
+L_scatter = b * p(g, th_s) * E_d(0-) / (K_d + c/mu_v)            # W m^-2 sr^-1
+#  th_s = angle between the REFRACTED sun and the REFRACTED view, both taken below the surface
+#  g    = phase_g;  B(0.924) = 0.0170, so b = 58.9 * b_b
+```
+
+That is also how the descriptor's five fields yield `c` at all: `c` is not exported, it is
+reconstructed as `a + b_b/B(phase_g)`.
+
+⚠️ **`b_b` has already integrated the phase function over the back hemisphere — never multiply it
+by `p` again.** `b_b * p` applies the angular shape twice: at `g = 0.924` that alone is `1/B` =
+**59x** too dark, partly offset if it is also paired with a too-small `(K_d + a)` denominator. The
+net is `(1/B) * (K_d + a)/(K_d + c)` — **35x** too dark in the worked case below. Recover `b` by
+dividing `b_b` by `B(g)`, then apply `p` exactly once.
+
+⚠️ **The error this form accepts.** The path integral behind it puts `mu_v` on the whole
+denominator, `b*p*E_d/(mu_v*K_d + c)`. The two agree exactly at nadir, and the form above is low by
+`mu_v` away from it — bounded at **1.51x** at the edge of Snell's window, which is the whole range
+a viewer above the water can occupy. The exponent inside `T_col` is the same either way.
+
+**The cheap form, when the view direction does not matter.** Replace `p` by its back-hemisphere
+mean `B/(2*pi)` and the expression collapses to `b_b/(2*pi*(K_d + c/mu_v))`, with no `g` left in
+it. At nadir that is the `f/Q` irradiance-reflectance form Mobley states:
+
+```
+L_scatter ~= (f/Q) * b_b/(a + b_b) * E_d(0-)          # f/Q ~ 0.09 /sr
+```
+
+Use it to *check* the directional form, not to replace it. The two are the same budget seen twice
+and they coincide in the weak-scattering limit, where the reduction gives `f/Q -> 1/(4*pi)` =
+**0.0796** against Mobley's 0.09 — so `f/Q ≈ 0.09` is not a fitted mystery. As the
+single-scattering albedo `b/c` climbs, single scattering falls *below* `f/Q`, because it carries no
+multiply-scattered return. Worked at `a = 0.2`, `b_b = 0.005`, `g = 0.924`, `mu_v = 1` and
+`mu_d = 0.86` — so `b = 0.294`, `c = 0.494`, `K_d = 0.238`, albedo 0.60 — the directional form runs
+`6.6e-4 /sr` in exact backscatter up to `1.9e-3 /sr` at 90°, its isotropic reduction is
+`1.1e-3 /sr`, and `f/Q` gives `2.2e-3 /sr`: a factor of **2.0**. More than about 2x apart is a bug
+in one of them, not physics.
+
+**`L_scatter` is radiance at `0-`, inside the water.** Crossing back into air still costs the
+internal Fresnel term and the `n^2` divisor — the renderer applies `(1 - R_int)/n^2` on the way
+out, and `water-rendering.md` owns both.
 
 **Use the refracted path length, not the straight one.** The distance travelled in water is the
 vertical depth divided by the **Snell** cosine, and that is bounded:
@@ -301,7 +391,8 @@ The rendering axis owns light transport. What it needs from here, and nothing mo
 | Interior is far too dark | `R_ext` used where `R_int` belonged — a factor of 7.14 | Two names, two numbers, one interface |
 | A lossless pool returns more light than it received | The `n^2` divisor on radiance leaving the water is missing | `L/n^2` is the invariant [nicodemus1963] |
 | Grazing reflections are too bright | Schlick's fit at water's low IOR | Exact unpolarised Fresnel offline [bornwolf_optics]; the sanctioned roughness-aware fit in real time [bruneton2010] |
-| Water looks far murkier than it is | One extinction coefficient fitted to `c`, applied to the light column | `c` and `K_d` are two coefficients, 5–20x apart |
+| Water looks far murkier than it is | One extinction coefficient fitted to a turbid `c`, applied to the light column | `c/K_d = mu_d*(a+b)/(a+b_b)` — near 1 in clear water, tens in turbid; quote its `mu_d` |
+| The water has depth colour but no body of its own | `L_scatter` left at zero, or authored as a swatch | `b*p(g,th_s)*E_d(0-)/(K_d + c/mu_v)`, with `b = b_b/B(g)` — the phase function applies once |
 | Extinction blows up toward the horizon | Straight-ray depth difference used as the in-water path | Divide vertical depth by the Snell cosine |
 | A tannin river renders as mud | Turbidity raised to darken it | CDOM darkens without scattering; sediment brightens |
 | Nothing above the surface is visible from below | Snell's window not modelled | Above `theta_c` the surface mirrors the bottom; below it is a ~97° bright circle |
