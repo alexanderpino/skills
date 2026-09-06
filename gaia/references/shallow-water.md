@@ -75,7 +75,10 @@ below, min depth **−5.6 × 10¹⁷⁸** and then NaN, against **−0.000000** 
 the two passes are not a convenience: every cell's `K` must land before *any* cell's inflow is
 summed. Fuse them into one sweep and a receiving cell books the neighbour's **unclamped** flux —
 measured on a sequential row-major sweep, mass drift **1.4 × 10³⁷** with pre-clamp neighbours, and
-**24.7%** even in the gentler variant where each cell clamps itself before its neighbours are read.
+**24.7%** even in the gentler variant where each cell clamps itself before any neighbour reads it.
+(Read the other way — the cell clamping before *it* reads its neighbours — the change is provably a
+no-op: the inflow sum touches only neighbours' flux entries, and a verifier measured both orders
+byte-identical.)
 The reference implementation does it in two passes for exactly this reason.
 
 Four properties make this the recommendation, in order of how much they matter.
@@ -173,7 +176,7 @@ chain returns **0.7071**. So a shipped `C = 0.20` — the constant in
 limit, *not* the 5× that reading `C ≤ 1` as the bound suggests; what the margin buys is the two
 things the linearisation dropped, the one-way `max(0,·)` pipes and the outflow clamp. So:
 
-- **Full nonlinear shallow water, and the pipe form with `A ≈ h·lx`**: the bound above, both
+- **Full nonlinear shallow water, and the pipe form with `A ≈ h·lx/2`**: the bound above, both
   terms, recomputed every step. Celerity rises with depth, so **a filling pool gets progressively
   more expensive**; velocity rises as a front steepens, so **a dam break gets more expensive as it
   runs**. Do not compute it once at initialisation.
@@ -289,8 +292,8 @@ no solver at all.
 | Every cell is NaN after one step, and the dry parts went first | The clamp itself: `min(1, h·cellArea/(dt·Σf))` is `0/0` where there is no water and no flux | Scale only when `Σf > 0`; the guarded branch form [stava2008] |
 | Clean in the Python prototype, NaN in the shader | Scalar `min(1, NaN)` returns 1; `np.minimum` propagates, and GLSL/HLSL leave it undefined | Same guard — never let `min` be the NaN handler |
 | Checkerboard sloshing that never damps, no NaN | `dt` above the CFL limit while the clamp holds positivity | Positivity is not stability — lower `dt` [courant1928] |
-| Stable until the pool fills, then explodes | `sqrt(g*h)` grew with depth; `dt` computed once. Only in a scheme whose celerity tracks depth: full SWE, or a pipe model with `A ≈ h·lx` | Recompute the limit each step from the current state |
-| Reducing `dt` by the deepest cell each step changes nothing, and it still explodes | Constant-`A` pipe model: its signal speed is `sqrt(g·A/l)`, fixed by parameters, not by depth | Bound on `sqrt(g·A/l)`; lower `A/l` or `dt`, and stop measuring depth |
+| Stable until the pool fills, then explodes | `sqrt(g*h)` grew with depth; `dt` computed once. Only in a scheme whose celerity tracks depth: full SWE, or a pipe model with `A ≈ h·lx/2` | Recompute the limit each step from the current state |
+| Reducing `dt` by the deepest cell each step changes nothing, and it still explodes | Constant-`A` pipe model: its signal speed is `sqrt(2·g·A/l)`, fixed by parameters, not by depth | Bound on `sqrt(2·g·A/l)`, i.e. `dt <= 0.50·dx/sqrt(g·A/l)`; lower `A/l` or `dt`, and stop measuring depth |
 | Stable while still, explodes as soon as anything moves fast | Advective speed left out of the CFL bound — in a solver that carries `(u.grad)u`; the constant-`A` pipe form has no `u` in its update to destabilise | Bound on `max\|u\| + sqrt(g*h)`, never on `sqrt(g*h)` alone [courant1928] |
 | A thin supercritical sheet explodes at a "correct" gravity-wave `dt` | Advective solver again: at `Fr ≳ 1` the advective half dominates; at 1 mm depth `sqrt(g*h)` is 0.099 m/s and `\|u\|` is metres per second | Recompute both halves every step from the current state |
 | Water piles up along the domain border | Closed boundary where an open one was meant | Ghost cells at a very low elevation drain the edge |

@@ -80,7 +80,7 @@ The linearised two-pipe form — two one-way pipes per face, each integrating th
 net face flux carries the head difference twice — propagates at `sqrt(2·g·A/l)`, and the 2-D
 leapfrog bound `1/sqrt(2)` on that speed gives `dt_crit = 0.50·dx/sqrt(g·A/l)`. Bisected here on a
 32² grid with the nonlinearities off, that constant holds at **0.5006** across `A`, `l`, `dx`
-and two decades of depth; `shallow-water.md` measures 0.502 on its own harness. That over `C = 0.20`
+and two decades of depth; `shallow-water.md` measures 0.5000 on its own harness for the same linear scheme (its 0.502 is the `max(0,·)`-on figure, so it is not the comparable one). That over `C = 0.20`
 is 2.5, and the margin pays for what the linearisation drops — the one-way `max(0, ·)` pipes and
 the outflow clamp are both nonlinear.
 
