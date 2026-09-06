@@ -457,8 +457,10 @@ ENTRY_TAG_FIXTURES = [
     ("- **burt1983** `P` — Burt, P.J. (1983). *The Laplacian Pyramid.* [background]", False),
     # An author writes the tag where the two SIBLING tags go -- at the END. There it used to be
     # swallowed silently by the `ref` group, with no format error, because the line still
-    # matched. 69 of 196 entries wrap onto a continuation line, so for those the visual end of
+    # matched. 88 of 214 entries wrap onto a continuation line, so for those the visual end of
     # the entry is a line this regex never reads, which is exactly where a hand would put it.
+    # (This comment said 69 of 196 while check_propagation's docstring said 88 of 214 -- one
+    # count, two places in this file, neither re-run. Measured 2026-09-06: 88 of 214.)
     ("- **horn1981** `P` — Horn, B.K.P. (1981). *Hill shading.* [not-opened]", True),
     ("- **horn1981** `P` — Horn, B. (1981). *Hill shading.* [background] [not-opened]", True),
 ]

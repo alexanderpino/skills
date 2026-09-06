@@ -216,11 +216,10 @@ from the other two and expect the published number.)
 
 Two limits on quoting them: wind speed is referenced at **12.5 m** — the paper says 41 feet — not
 the 10 m of standard wind data, and the fit is calibrated only over **1–14 m/s** — do not
-extrapolate to storm winds. A third
-is worth knowing because it is usually implemented as the wrong mechanism: a **surfactant film damps
-the short waves that carry most of the slope**, and slicked water measures a factor of 2–3 lower
-total mean-square slope [coxmunk1954] — so an oil slick, a wind shadow or a convergence line is a
-*local reduction of this variance*, not a dark decal.
+extrapolate to storm winds. A third is worth knowing because it is usually implemented as the wrong
+mechanism: a **surfactant film damps the short waves that carry most of the slope**, and slicked
+water measures a factor of 2–3 lower total mean-square slope [coxmunk1954] — so an oil slick, a wind
+shadow or a convergence line is a *local reduction of this variance*, not a dark decal.
 
 That is where this document's job ends and the rendering axis begins: the variance tensor, the
 solar-disc clamp on it, and the roughness-aware Fresnel fit that consumes it are how a shader spends
@@ -245,11 +244,10 @@ mean and variance over a footprint — is what keeps it stable at distance [dupu
 
 Two checks that the coverage is physical rather than tuned. Whitecap coverage from wind follows a
 power law with **no offset** — `W = 3.84e-6 * U^3.41`, with `U` at 10 m [monahan1980] — so at zero
-wind the sea must carry exactly zero foam pixels; and that law puts coverage near zero around
-5 m/s and conspicuous by 15 m/s, which agrees
-with the Beaufort observation that whitecaps begin at Force 3. An empirical formula and a
-19th-century observational scale agreeing on where foam starts is a strong argument for driving foam
-from wind rather than from a constant.
+wind the sea must carry exactly zero foam pixels; and that law puts coverage near zero around 5 m/s
+and conspicuous by 15 m/s, which agrees with the Beaufort observation that whitecaps begin at
+Force 3. An empirical formula and a 19th-century observational scale agreeing on where foam starts
+is a strong argument for driving foam from wind rather than from a constant.
 
 ⚠️ **That paper publishes two fits and they are not the same curve.** `3.84e-6 * U^3.41` is its
 **robust-biweight** fit; its **ordinary-least-squares** fit is `2.95e-6 * U^3.52`. They cross near
@@ -261,7 +259,7 @@ quoted beside its sample wavelengths.
 which this line used to print — is not a constant.** The folded fraction depends on `q·√mss` alone:
 clamp `q ≤ s_p/√mss_resolved`, `mss` the **total** mean-square slope of that cascade, both
 components. Derived here, `s_p ≈ 0.51 / 0.40 / 0.69` at accepted fold fractions `p` of 1% / 0.1% /
-5% (`cos²` spread; 8–17% higher unspread). `p` is a choice: **clamp per cascade on its own `J`**.
+5% (`cos²` spread; 6–17% higher unspread). `p` is a choice: **clamp per cascade on its own `J`**.
 
 ## The shore is a different field, not a modulation
 
@@ -300,9 +298,8 @@ the FFT's two governing parameters never named. Both halves exist in the sources
 
 | Model | Cost, as the source states it | Accuracy, as the source states it |
 |---|---|---|
-| FFT, single patch | interactive at **512²** [tessendorf_ocean] | resolves to `2L/N` — **3.9 cm** at `L = 10 m`, **1.56 m** at `L = 400 m`; below it, waves become variance |
+| FFT, single patch | interactive at **512²** [tessendorf_ocean] | resolves to `2L/N` — Nyquist over the notes' own 10 m–2 km patch range, so **3.9 cm** at `L = 10 m` and **1.56 m** at `L = 400 m`; below it, waves become variance |
 | FFT, full pipeline | **19.2 ms**, broken down per stage [bruneton2010]. ⚠️ **That is more than a whole 16.6 ms frame at 60 fps, for the water surface alone** — budget it against the frame before adopting the pipeline, not after | — |
-| Gerstner sum | scales linearly in wave count | — |
 
 **The two parameters that set both, and which this document used to leave unstated:** `N`, the
 frequency-grid size, and `L`, the patch size in metres. The sample spacing is `L/N` and the shortest
@@ -311,10 +308,10 @@ of this line called `L/N` the floor and printed 78 cm where 512² at `L = 400 m`
 cell above carried a bare "~2 cm", which needs `L = 5.12 m`, outside the notes' own 10 m–2 km
 range.** Quote `N` and `L` together, and the floor as a wavelength, or it is off by two.
 
-⚠️ **Provenance note.** Both figures above were read from the artefacts by a verification pass, not
-re-fetched at the time of writing, and artefact access here is unreliable: `inria.hal.science`
-serves a bot challenge for the [dupuy2012] PDF and `journals.ametsoc.org` returns 403 without a
-browser user-agent, both confirmed here. Re-read before relying on the exact digits.
+⚠️ **Provenance note.** Two rows were deleted here: a wave-packet cost sourced to the whitecap paper
+[dupuy2012], and a Gerstner accuracy figure sourced to [yuksel2007] §7, whose declared locator is
+§3.2 and which uses no Gerstner waves. What is left was read by a verification pass, not re-fetched
+(`inria.hal.science` bot-challenges the [dupuy2012] PDF); re-read before trusting the digits.
 
 ## What it beats
 

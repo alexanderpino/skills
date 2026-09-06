@@ -44,16 +44,18 @@ selection itself GPU-resident, and the team is comfortable in compute — see th
 camera keeps a steady altitude.
 
 **Say where the descent runs.** Canonical CDLOD walks the quadtree on the CPU every frame, and
-`gpu-driven-culling.md` makes it a rule that nothing proportional to world size may be rebuilt on
+`gpu-driven-culling.md` makes it a rule that no array proportional to world size may be rebuilt on
 the CPU per frame. The two compose, but only if you are explicit about which of three shapes you
 built:
 
 - **CPU descent, GPU everything else** — the descent is O(*selected cut*), a few thousand nodes,
   not O(world): it early-outs on the range test and never touches a node outside the view's range
-  bands. Upload the cut once as an instance buffer and leave frustum, occlusion, per-pass survivor
-  lists and submission in compute. This is what most shipped CDLOD is, and it does not violate the
-  sibling document's rule — that rule is about arrays that scale with the *world*, not with the
-  visible cut. Say so in writing, or the next person "fixes" it.
+  bands. What it uploads is a *candidate* list that the GPU then culls, so the **selected cut is
+  not the visible set** — pruning it CPU-side to make it one is the mistake. Leave frustum,
+  occlusion, per-pass survivor lists and submission in compute. This is what most shipped CDLOD
+  is, and `gpu-driven-culling.md` names it in those words as **not partial adoption**: its rule is
+  about what the cost scales *with*, not where the code runs, and the selected cut scales with the
+  view. Say so in writing, or the next person "fixes" it.
 - **Compute descent** — a persistent node buffer plus a compute kernel that appends selected nodes
   straight into the indirect argument buffer, so the CPU never sees the cut at all. Legitimate;
   CDLOD's descent was simply not designed for it, and the split/merge logic is yours to write.
@@ -73,6 +75,14 @@ K   = viewportHeight / (2 * tan(fovY / 2))   // pixels; the perspective scale co
 rho = (e * K) / d                            // projected error in pixels
 refine while rho > tau                       // tau = the budget, 1-4 px in practice
 ```
+
+⚠️ **`rho` is an orientation-independent worst case, not the projected error.** `e` is a *vertical*
+deviation, and a vertical segment at distance `d` subtends `e·K·sin θ / d` pixels, where `θ` is the
+angle between the view ray and world up. The form above is the `sin θ = 1` case — looking at the
+horizon — and the projection falls to zero looking straight down. Taking the orientation-free
+maximum is the right engineering call, cheap and conservative, but say that it is one: an engineer
+who instruments `rho` and finds measured error consistently *below* prediction otherwise cannot
+tell a conservative metric from a broken one, and will distrust the quadrupling diagnostic below.
 
 Three things about this that are wrong in shipped code more often than not:
 
@@ -97,16 +107,31 @@ lying somewhere and no amount of scheme-swapping will fix it.
 morphK   = saturate((dist - rangeStart) / (rangeEnd - rangeStart));  // 0 inside, 1 at boundary
 fracPart = frac(gridPos * meshDim * 0.5) * (2.0 / meshDim);          // 0 for even verts
 gridPos  = gridPos - fracPart * morphK;                              // odd verts -> even verts
-height   = sampleHeight(gridPos);                                    // re-sample AFTER morph
+uv       = worldToHeightmapUV(gridPos);      // ONE mapping, shared with the parent node
+height   = lerp(sampleHeight(uv, nodeLod), sampleHeight(uv, nodeLod + 1), morphK);
+normal   = normalize(lerp(sampleNormal(uv, nodeLod), sampleNormal(uv, nodeLod + 1), morphK));
 ```
 
 - **`morphK` must reach exactly 1.0 at the selection boundary.** Not 0.98. A morph that stops
   short leaves a hairline crack that appears only at one camera distance, which is why it
   survives review and ships.
-- **Height must be re-sampled at the morphed position**, or lerped between the two levels'
-  samples. Sliding XZ alone leaves the silhouette popping while the wireframe looks perfect.
-- **Normals morph too.** Geometry morphing under un-morphed normals still pops; lighting
-  discontinuity reads louder than a silhouette change.
+- **Height is *lerped between the two levels' samples*, not merely re-sampled at the morphed
+  position.** Those are not two spellings of one rule. Sliding XZ alone leaves the silhouette
+  popping while the wireframe looks perfect — but re-sampling closes the pop and leaves the crack,
+  because at `morphK = 1` the fine node reads mip `nodeLod` where its parent reads `nodeLod + 1` at
+  the *same* XZ, and the two surfaces still disagree vertically. Only the lerp makes the fine
+  vertex *become* the parent's sample. Measured below.
+- **One `morphK` drives XZ, height and normal.** Three factors are three chances to disagree, and
+  the vertex is identical to its parent only if all three reach 1.0 together. Geometry morphing
+  under un-morphed normals still pops, and a lighting discontinuity reads louder than a silhouette
+  change: across the same field the two levels' normals differ by a median 4.6–5.9° and a p95 of
+  11–13° at the shared vertices.
+- **Both nodes must share one heightmap registration** — one world-XZ→UV mapping, one reduction
+  filter, one mip convention — or `sampleHeight(uv, nodeLod + 1)` on the fine node is not the value
+  the parent computed at that XZ. Half a coarse texel of disagreement leaves a residual **4–5×
+  larger than the crack the lerp was closing**, so this is a condition on the contract, not a
+  detail. A mip chain reduced with a filter centred on the retained sample keeps the registration;
+  a half-texel-shifted box does not.
 
 Restrict morphing to the outer band of each range — the CDLOD whitepaper puts the morph area at
 "the last 15%-30% of every LOD range", and that is the figure to start from — so most vertices
@@ -155,11 +180,22 @@ breaks under streaming, and it fails precisely on the frames where LOD changes.
 
 | Contract | Mechanism | What it costs you |
 |---|---|---|
-| Vertex morphing | Fine vertices *become* coarse ones by the boundary | Nothing, if `morphK` hits 1.0 exactly |
+| Vertex morphing | Fine vertices *become* coarse ones by the boundary | A second, mandatory morph — the heightmap mip lerp — plus one registration shared by both nodes; and `morphK` must hit 1.0 exactly |
 | Conforming subdivision | A split propagates to the edge-neighbour; T-junction-free by rule [dupuy2020] | The whole CBT machinery; bugs move into the split/merge kernel |
 | Transition regions | Ring fringes blend toward the coarser level; the T-junctions that remain are stitched with zero-area (degenerate) triangles along the ring boundary [losasso2004] | Only available inside the clipmap structure |
 | Index stitching | The finer chunk drops every other edge vertex [deboer2000] | Heights still pop; needs the ≤1-level adjacency invariant |
 | Skirts | A vertical curtain dropped from each chunk edge [ulrich2002] | The curtain is visible to SSAO, fog, shadows and decals as dark seam lines |
+
+**How big is the gap the XZ morph does not close?** Measured on a synthetic 2048² fBm field at
+2 m spacing, across four roughness settings and three mip-reduction kernels: at the shared vertices
+the mip `L` and mip `L + 1` surfaces disagree by **0.16–0.47 × the coarse level's geometric error
+`e` at p95, and 0.25–1.0 × `e` at maximum**. The ratio is the useful form, because the level
+boundary is by construction where `e·K/d = tau` — so the gap projects to **0.2–0.5 `tau` at p95 and
+up to a full `tau` at worst, at every level, FOV and resolution**, since `K` and `d` cancel. Do not
+read sub-`tau` as safe: `tau` prices a surface in the wrong *place*, which is invisible, while this
+is a *hole* the background shows through, in a ribbon along every level boundary in the frame.
+Substitute the lerp form and the same measurement is **0.000000 m at `morphK = 1`, exactly, in
+fp32** — that is what makes it a contract rather than a mitigation.
 
 **A T-junction is a crack even when the vertex lies exactly on the edge.** Watertight
 rasterization is guaranteed only between triangles *sharing the same two vertices*; the coarse
@@ -174,7 +210,8 @@ holes, which is exactly why they are cheap and why they leak into every screen-s
 |---|---|---|
 | Hairline cracks at chunk borders, only at certain distances | `morphK` does not reach exactly 1.0 at the range boundary | Fix the morph constants; sweep the *full* distance range, not one camera position |
 | Single-pixel shimmer along straight, otherwise clean seams | T-junction: vertex on the edge, different edge equation | Remove it structurally; do not nudge the vertex |
-| Wireframe is continuous but the silhouette still pops | Height not re-sampled at the morphed position | Sample after the morph, or lerp both levels' samples |
+| Wireframe is continuous but the silhouette still pops | Height sampled at the un-morphed position | Sample at `gridPos` *after* the morph, never before |
+| A hairline crack survives a `morphK` verified to reach exactly 1.0 | At the boundary the fine node reads mip `L` and its parent mip `L+1` at one shared XZ | `lerp(sampleHeight(uv, L), sampleHeight(uv, L+1), morphK)`, with one registration on both nodes |
 | Geometry morphs but lighting jumps at the band | Normals not morphed with the same factor | Blend both levels' normals by the same `morphK` |
 | Vertices swim only inside the morph band | Morph factor depends on frame state, not (vertex, camera) | Make it a pure function; one selection result per frame |
 | Terrain silhouette differs between depth prepass and base pass | Each pass selected LOD independently | One selection, shared by every pass including all shadow cascades |

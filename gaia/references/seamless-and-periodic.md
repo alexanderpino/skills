@@ -16,12 +16,13 @@ sources:
 ---
 # Seamless and periodic — output that tiles
 
-[lagae2010] §2.3 lists the properties a good procedural noise has, and the third one is that it
-is **not periodic**: it "is unlimited in extent and can cover an arbitrary large area *without
-seams and unwanted repetition*". You are about to ask for the defect on purpose. That is fine —
-periodicity is a *requirement*, not a quality — but it means every source you will find is
-optimising away from where you are going, and the survey's Table 1 says exactly what it costs:
-storage is expressed "in function of the period N", so a lattice noise's memory *is* its period.
+**Tier: authoring-time.** [lagae2010] §2.3 lists the properties a good procedural noise has, and
+the third one is that it is **not periodic**: it "is unlimited in extent and can cover an
+arbitrary large area *without seams and unwanted repetition*". You are about to ask for the defect
+on purpose. That is fine — periodicity is a *requirement*, not a quality — but it means every
+source you will find is optimising away from where you are going, and the survey's Table 1 says
+exactly what it costs: storage is expressed "in function of the period N", so a lattice noise's
+memory *is* its period.
 
 The topic splits cleanly and unevenly. **Making noise wrap is arithmetic** and takes one line.
 **Making an eroded field wrap is a modelling decision made before the first timestep**, because a
@@ -38,6 +39,7 @@ period a multiple of `2^L` for the deepest pyramid anywhere in the graph.**
 
 ```
 period P                       # cells, chosen once, a multiple of 2^L_max
+hash:   perm table with >= P entries, or an integer mixer  # a 256-entry table caps the period
 noise:  gradient(i mod P_l, j mod P_l)     # P_l = P * frequency_l, MUST be an integer
 sim:    neighbour(i, j) = grid[(i + di) mod H, (j + dj) mod W]
 route:  priority_flood(seeds = [the one authored sink])
@@ -62,7 +64,7 @@ steps, 13 at 1200, with no sign of converging. *Wang or corner tiles* — the re
 want variation rather than repetition, named by [lagae2010] §7 as one of the two published fixes
 for a noise's period; a different problem from making **one** tile wrap, and out of scope here.
 *A four-dimensional torus embedding* — the only route when the lattice cannot be reindexed at all,
-which is simplex; measured at `2.3e-14` for any period and 4× the gradient work.
+which is simplex; measured at `2.3e-14` for any period, at 5 simplex corners against 3 — 1.7×.
 
 `noise-and-warping.md` owns noise construction and `surface-and-scale-space.md` owns the band
 split; this document owns only what makes each of them wrap. `tiled-streaming.md` and
@@ -81,7 +83,7 @@ deterministic function of the *integers* `i, j, k`, and it repeats exactly when 
 modulo the period before hashing** [periodic_lattice_practice]. One line, and it is exact:
 
 ```
-i0 = floor(x) % P;  i1 = (floor(x) + 1) % P     # and likewise for y
+i0 = floor(x) % P;  i1 = (floor(x) + 1) % P     # and likewise for y; hash period >= P
 ```
 
 Measured, `m1_periodic_noise.py`, recorded in `registers/pseudocode-execution.tsv`, max `|f(x) − f(x+T)|` over 512² samples:
@@ -95,17 +97,20 @@ Measured, `m1_periodic_noise.py`, recorded in `registers/pseudocode-execution.ts
 Three things fall out of that table.
 
 **The period divides the domain, or there is no wrap.** The naive row is zero at exactly one
-value, 256, which is the permutation table's own length — that is [lagae2010]'s Table 1 footnote 1
-made visible, storage `O(N)` *in the period N*. A field is periodic at `T` if and only if
-**the hash's period divides `T`** — that is, `T` is a *multiple* of the table size, not a divisor
-of it.
-⚠️ **This sentence used to say the reverse**, and the reverse is false in both directions.
-Measured on a 256-entry permutation table, `max |f(x) − f(x+T)|` over random samples:
-`T` = 2, 4, 32, 64 and **128** all divide 256 and all fail at full noise amplitude (0.74–0.98);
-`T` = 512, 768 and 1024 divide by nothing and are exact to 1e-13. A reader who picked `T` = 128
-"because it divides 256" would get a seam at full amplitude. The error survived because the
-canonical case, `T` = 256, satisfies both readings — it is the one period that cannot tell them
-apart.
+value, 256, which is the permutation table's own length — that is [lagae2010]'s Table 1 footnote
+1 made visible, storage `O(N)` *in the period N*. A field is periodic at `T` if and only if **the
+hash's period divides `T`** — that is, `T` is a *multiple* of the table size, not a divisor of
+it. ⚠️ **This sentence used to say the reverse**, and the reverse is false in both directions:
+measured on a 256-entry table, `T` = 2, 4, 32, 64 and **128** all divide 256 and all fail at full
+noise amplitude (0.74–0.98), while `T` = 512, 768 and 1024 divide by nothing and are exact to
+1e-13. A reader who picked `T` = 128 "because it divides 256" gets a full-amplitude seam; the
+error survived because `T` = 256 satisfies both readings and cannot tell them apart.
+⚠️ **And that is half of it: *divides* makes the field periodic at `T`, it does not make `T` the
+*smallest* period.** With a 256-entry table a `P` = 1024 tile is a 256 tile laid 4×4 —
+`max|f(x) − f(x+256)|` inside it is 2.4e-13, against 1.31 with a 1024-entry table — and the wrap
+test at `T = P` reads 2.6e-13 either way, blind to it. **Give the hash a period of at least `P`:
+a `P`-entry table, or an integer mixer with no 8-bit mask** [periodic_lattice_practice] —
+[lagae2010] §7's long-period hashes; both exact at 512, 1024, 2048.
 
 **Simplex does not take the trick.** Simplex noise skews the square lattice by `F2 = (√3−1)/2`
 before flooring, so the integers being hashed live on a triangular lattice whose relationship to
@@ -113,23 +118,23 @@ your rectangular tile is irrational. Reducing them modulo `T` reduces the *wrong
 measured error stays at full noise amplitude for every period tried. Simplex is periodic-hostile
 by construction and the fix is not a fix to simplex.
 
-**The general fix is a torus embedding, and it costs 4×.** Map the tile onto two circles in four
-dimensions and evaluate a 4-D noise there [periodic_lattice_practice]:
+**The general fix is a torus embedding, and on simplex it costs about 1.7×.** Map the tile onto
+two circles in four dimensions and evaluate a 4-D noise there [periodic_lattice_practice]:
 
 ```
 a = 2*pi*x/T;  b = 2*pi*y/T
-# r is the CIRCLE RADIUS and it is the embedding's only free parameter: it sets feature
-# scale, because arc length around the circle is 2*pi*r while the tile spans T. A feature
-# of f cells in the tile maps to f * (2*pi*r/T) units of 4-D noise space, so pick
-# r = T / (2*pi) to make the mapping unit-rate and then set scale in the noise as usual.
+# r is the CIRCLE RADIUS, the embedding's only free parameter, and it sets feature scale:
+# arc length around the circle is 2*pi*r while the tile spans T, so a feature of f cells
+# maps to f*(2*pi*r/T) units of noise space. Pick r = T/(2*pi) for a unit-rate mapping.
 n(x, y) = noise4(r*cos a, r*sin a, r*cos b, r*sin b)
 ```
 
 Periodic by construction, for any noise, with no modular indexing anywhere. Measured `2.3e-14` at
-`T` = 7, 16, 64 and 300 — the residue is the `cos`/`sin` round-off, not a seam. It costs 16 lattice
-corners per sample instead of 4. **Crossover: use modular indexing whenever you control the hash;
-use the embedding only for a noise whose lattice you cannot reindex** — simplex, or any
-third-party kernel you call as a black box.
+`T` = 7, 16, 64 and 300 — the residue is the `cos`/`sin` round-off, not a seam. It costs 5 simplex
+corners per sample instead of 3, not the 16-against-4 of a gradient lattice, which needs none.
+**Crossover: use modular indexing whenever you control the hash; use the embedding only for a
+noise whose lattice you cannot reindex** — simplex, or any third-party kernel you call as a black
+box.
 
 ⚠️ **Lacunarity is now a correctness parameter, and this contradicts `noise-and-warping.md`.**
 That document recommends "a lacunarity that is not exactly 2", for good reasons about octave
