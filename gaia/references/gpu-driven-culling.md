@@ -34,7 +34,8 @@ restated rather than replaced:
   material and page IDs, offsets into shared vertex and heightmap pools.
 - **The GPU owns per-frame truth.** Which chunks are visible, at what LOD, in which passes —
   decided in compute, written into indirect argument buffers, consumed without the CPU ever seeing
-  the answer. Per-object CPU cost is zero, or at worst O(visible cut). The CPU issues a handful of
+  the answer. Per-object CPU cost is zero and total CPU cost never scales with the world — at worst
+  O(selected cut). The CPU issues a handful of
   dispatches and one indirect draw per pass, regardless of world size.
 
 **The test for whether you have actually built this**: if any array proportional to world size is
@@ -47,9 +48,9 @@ serial producer. *Explicit-API driver-overhead reduction alone* — it made the 
 cheaper per item without removing it. *Partial adoption* — keeping a CPU visibility pass "for
 safety" and uploading its results pays both costs and adds a frame of latency; this is the one
 failure mode worth naming as a rule rather than a pitfall. The rule is about what the cost scales
-*with*, not where the code runs: O(visible cut) CPU work that produces a *candidate* list the GPU
+*with*, not where the code runs: O(selected cut) CPU work that produces a *candidate* list the GPU
 then culls — a CDLOD descent that early-outs on range, a few thousand nodes — is not partial
-adoption; see `heightfield-lod.md`. Per-object CPU cost O(world) is.
+adoption — it is the *selected* cut of `heightfield-lod.md`. CPU work that scales with the world is.
 
 ## The ladder
 
@@ -66,7 +67,7 @@ stage is legitimate. Reordering them is not.
 
 **The small-primitive test carries a rasterizer assumption.** It rejects a triangle whose
 screen-space bounds enclose no pixel *centre*. That is the rasterizer's rule only for
-single-sample, non-conservative, full-rate pixels. Under MSAA coverage is evaluated at *sample*
+single-sample, non-conservative pixels. Under MSAA coverage is evaluated at *sample*
 positions, so the test culls triangles that legitimately cover samples and the edge anti-aliasing
 goes ragged; under conservative rasterization any overlap of the pixel *area* counts, so it culls
 triangles that must draw. Under coarse-rate VRS coverage is still resolved on the pixel grid and
@@ -75,7 +76,9 @@ the active sample pattern, or skip the stage, whenever the pass is not single-sa
 non-conservative: it is the one rung of the ladder whose correctness depends on pipeline state, and
 it passes every single-sample test you will write for it.
 
-⚠️ **Conservative bounds are the terrain-specific trap.** The tested bound must contain the
+⚠️ **Conservative bounds are the terrain-specific trap** — a different sense of the word from the
+rasterizer state above, and this document's own doctrine is that a shared word is how a sign gets
+copied to the wrong place. The tested bound must contain the
 geometry *as rasterized*: inflate by the chunk's height min/max, by skirt depth, by geomorph
 excursion — a morphing vertex sweeps between two levels' heights, so bound the union — and by any
 material displacement. Under-inflated bounds fail *at the screen edge*, where a chunk whose peak
@@ -119,21 +122,25 @@ Three HiZ build details, in the order they bite:
    3×3 at the edges, or pad with the *non-occluding* extreme for your convention.
 3. **Footprint mip.** Project the bound's corners, clamp to screen, choose the mip where the rect
    spans at most 2×2 texels — computed from the *larger* dimension, log2 rounded up, so one texel
-   is at least as wide as the rect and the four corner taps cover it at *any* alignment. The error
-   has a sign, and it is the sign bullet 2 already stated. Too **fine** leaves texels *inside* the
-   rect unread between the corner taps: the sampled max is ≤ the true max, `zNear > sampledMax`
-   fires more often than truth, and **visible geometry is culled**. Too **coarse** reads texels the
-   rect does not cover: the sampled max is ≥ the true max and the test is merely conservative —
-   it looks correct and saves nothing.
+   is at least as wide as the rect and the four corner taps cover it at *any* alignment. That
+   coverage is the whole invariant, and losing it has the sign bullet 2 already stated. Too **fine**
+   leaves texels *inside* the rect unread between the corner taps while the corner texels still
+   spill *outside* it, so `sampled ≥ trueMax` no longer holds: `zNear > sampledMax` can fire where
+   truth says draw, and **visible geometry is culled**. Too **coarse** still covers a superset of
+   the rect, so the sampled max stays ≥ the true max and the test is merely conservative — it looks
+   correct and saves nothing.
 
    Worked on a 64 px rect, standard Z, max-depth reduce, a ridge at depth 0.3 with a 24 px sky gap
    through it, and the object at 0.6. The rule gives mip 6 (64 px texels), and at mip 6 the taps
-   see the gap, `0.6 > 1.0` is false, and the object draws — correct. One level finer, at mip 5,
-   the rect straddles three 32 px texels and the two corner taps read only the outer two, so the
-   gap sits in the middle texel that nothing sampled: the max comes back 0.3, `0.6 > 0.3` fires,
-   and an object you can plainly see through the gap is culled. One level coarser, at mip 7, a
-   128 px texel reaches a gap 36 px *outside* the rect, and an object genuinely behind the ridge —
-   one that mip 6 culls — survives. Under-reading is the direction that costs you pixels, whether
+   see the gap, `0.6 > 1.0` is false, and the object draws — correct. One level finer, at mip 5, a
+   rect not aligned to 32 px straddles three 32 px texels — 31 of the 32 offsets do — and the corner
+   taps read only the outer two in x, so the gap sits in the middle texel that nothing sampled: the
+   max comes back 0.3, `0.6 > 0.3` fires, and an object you can plainly see through the gap is
+   culled. Now a *second* 64 px rect, sitting on the mip-6 grid at x = [0, 64) with that same gap
+   starting 36 px past its right edge: at mip 6 one 64 px texel covers it exactly, the max is 0.3,
+   and it is culled — correct, it really is behind the ridge. One level coarser, at mip 7, the
+   128 px texel [0, 128) reaches the gap, the max comes back 1.0, `0.6 > 1.0` is false, and the cull
+   is silently lost. Under-reading is the direction that costs you pixels, whether
    the cause is a dropped edge texel or a mip chosen too fine; over-reading only costs you the win.
 
 **After a teleport or camera cut there is no history.** Treat everything as visible for one frame
@@ -157,12 +164,13 @@ streaming, one frame of the wrong world also requests the wrong pages.
 - **Bindless, or you are back to per-draw CPU descriptor binding** — which reintroduces exactly
   the per-object cost this architecture exists to remove. The material and page IDs this pipeline
   indexes with are per-pixel, not per-wave: a descriptor index that is not wave-uniform must be
-  wrapped in `NonUniformResourceIndex()` (D3D12) / `nonuniformEXT` (SPIR-V), or the compiler may
+  wrapped in `NonUniformResourceIndex()` (HLSL) / `nonuniformEXT` (GLSL, the SPIR-V `NonUniform`
+  decoration) [d3d12indirect], or the compiler may
   assume uniformity and broadcast one lane's index to the wave — the classic bug that renders
   correctly on one vendor and ships.
-- **Per-pass visibility bits, one culling dispatch, N frusta.** Opaque, skirts, water and each
+- **Per-pass visibility bits, one dispatch per stage, N frusta.** Opaque, skirts, water and each
   shadow cascade are different pipeline states and therefore different survivor lists — and the
-  cascades are different *frusta*. The shape is: one dispatch, one read of the persistent scene,
+  cascades are different *frusta*. The shape is: each stage's dispatch reads the persistent scene once,
   every frustum (the camera's, plus each cascade's light frustum) tested in-kernel against the
   same chunk record, N bit-planes written, N compactions. The HiZ occlusion stage runs for the
   camera bucket only; a cascade that wants occlusion builds its own HiZ from its own depth. "Cull

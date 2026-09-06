@@ -373,8 +373,8 @@ The rendering axis owns light transport. What it needs from here, and nothing mo
 | The renderer wants | Give it |
 |---|---|
 | Surface blend between reflection and refraction | `ior` — the exact unpolarised form offline, the sanctioned roughness-aware fit in real time |
-| Refracted colour with depth | `c` per channel, and the **refracted** path length |
-| The column's own glow | `b_b`, `K_d`, `phase_g` |
+| Refracted colour with depth | `c` per channel — reconstructed as `a + b_b/B(phase_g)`, not exported — and the **refracted** path length |
+| The column's own glow | `b_b`, `K_d`, `phase_g`, spent as `b*p(g,th_s)*E_d(0-)/(K_d + c/mu_v)` |
 | Caustics on the bed | the surface's normals and the same `ior`; brightness is the inverse Jacobian of the refracted-ray map — **the caustic pass is theirs** |
 | The underwater state | `theta_c`, the 47.6% hemispherical `R_int`, and the `n^2` divisor on radiance leaving the water — spent by `water-rendering.md` |
 | The shallow-to-deep ramp | the bathymetry depth field — flat-coloured water is almost always a missing depth field |
