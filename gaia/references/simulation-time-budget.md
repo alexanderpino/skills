@@ -69,24 +69,29 @@ c   = sqrt(g * h)           # shallow water: the long-wave celerity, h the water
 
 Read what that says about a water patch. Celerity rises with **depth**, so a deep pool costs a
 smaller step than a puddle at the same resolution, and a flood that deepens as it fills gets
-*progressively* more expensive. Shipped code does not run at the limit:
+*progressively* more expensive — ⚠️ but *only for a scheme whose signal speed carries `h`*. The
+constant-`A` pipe form below does not: its speed is `sqrt(2·g·A/l)`, in which depth does not appear,
+so for that scheme the per-step `max(c)` reduction this section prescribes measures nothing and the
+filling pool costs exactly what the empty one did. Know which of the two you are running before you
+budget it. Shipped code does not run at the limit:
 `obsolete/terrain-architect/reference-impl/shallow_water.py` uses `C = 0.20`, and measured against
 that scheme's own signal speed that is a **2.5× margin, not the 5× a `C <= 1` reading gives you**.
 The linearised two-pipe form — two one-way pipes per face, each integrating the *full* head, so the
 net face flux carries the head difference twice — propagates at `sqrt(2·g·A/l)`, and the 2-D
 leapfrog bound `1/sqrt(2)` on that speed gives `dt_crit = 0.50·dx/sqrt(g·A/l)`. Bisected here on a
-32² grid with the outflow clamp disabled, that constant holds at **0.5006** across `A`, `l`, `dx`
+32² grid with the nonlinearities off, that constant holds at **0.5006** across `A`, `l`, `dx`
 and two decades of depth; `shallow-water.md` measures 0.502 on its own harness. That over `C = 0.20`
 is 2.5, and the margin pays for what the linearisation drops — the one-way `max(0, ·)` pipes and
 the outflow clamp are both nonlinear.
 
 ⚠️ **`C` was never what was wrong with that line; what `C` multiplied was.** As originally written
 the step divided by `sqrt(g·relief)` — the bed *relief*, which appears nowhere in the stability
-condition, where `A/l` does — making the step `0.398·sqrt(dx/relief)` times the true limit. At
+condition, where `A/l` does — making the step `0.400·sqrt(dx/relief)` times the true limit. At
 `dx = 1 m` over 500 m of relief that is **56× too small**, and 56× the iterations to cover the same
-physical time; on ground flat enough for the code's 1 m relief floor to bind it is **2× above** the
+physical time; on ground flat enough for that version's 1 m relief floor to bind it was **2× above** the
 limit at `dx = 25 m` and **4× above** at `dx = 100 m`, where [mei2007]'s outflow clamp keeps depth
-positive and hides the sloshing behind a green smoke test. `shallow-water.md` owns that correction.
+positive and hides the sloshing behind a green smoke test. That line now reads
+`0.20·cellsize/sqrt(G·cellsize)`; `shallow-water.md` owns the derivation.
 
 **Diffusive / parabolic** — viscous damping, thermal relaxation, hillslope creep, anything of the
 form `∂u/∂t = ∇·(D∇u)`. Explicit stepping is bounded far harder [explicit_diffusion_limit]:
@@ -183,9 +188,10 @@ stability, and that asymmetry is where "it was fine until I moved the rain slide
 **Never derive `dt` from frame time — and here is the whole runtime scheduler, stated once.** Fix
 `dt <= dt_stable`. Each frame, add the elapsed wall time to an accumulator and **clamp the
 accumulator to `N_max·dt`**; consume it in whole `dt` ticks and keep the sub-`dt` remainder. That
-clamp is [fiedler_timestep]'s max-frame-time guard put on the sum rather than on the sample — the
-same bound, stated on the quantity you actually spend, so that `N_max` *is* the most ticks any one
-frame can take. A solver whose stability constant is a function of frame rate explodes on the first
+clamp is [fiedler_timestep]'s max-frame-time guard moved from the sample to the sum — a *stronger*
+bound, not the same one. Both cap a frame at `N_max` ticks, but clamping the sum also throws away
+the carried remainder whenever a frame exceeds `(N_max−1)·dt`, and that is where the tick counts
+below fall short. A solver whose stability constant is a function of frame rate explodes on the first
 hitch — and a hitch is guaranteed, because streaming a texture causes one.
 
 What the clamp throws away is **sim-time lag, not physics**. Every tick taken is a full, legal
@@ -201,14 +207,21 @@ dropped at tick 250 — and not to frames or to wall time. Two runs with the sam
 agree bit-for-bit at any frame rate. Measured on a 48-cell pipe model at `dt = 1/60`, `N_max = 4`,
 over seven frame timings from 144 fps to 8 fps — one jittered, one carrying a 2 s hitch — the state
 after 480 ticks hashes to **one** digest, although the wall clock at that point reads anywhere from
-8.0 s to 19.6 s. Key those same two inputs to wall time instead and the seven timings give **seven
-different** states, because each one is a different distance behind the clock when the input lands.
+8.0 s to 15.0 s. Key those same two inputs to wall time instead and they land on different ticks in
+every run — 100, 99, 98, 80 and 52 across the seven — and the states **diverge**. How many distinct
+ones you count is a property of how fast the model forgets an input, not of the scheduler: four on
+the reference implementation's open, draining edges, seven when the basin is closed.
 
 What it does **not** buy — and nothing can, without moving `dt` — is an equal number of ticks per
 wall-second once the clamp binds: on the same settings, ten seconds of wall clock is 600 ticks at
 60 fps, 480 at 12 fps and 320 at 8 fps, and the slow machine is showing the *same* simulation
-later, not a different one. At or above `1/(N_max·dt)` — 15 fps here — the counts are equal by
-construction, because the clamp never binds.
+later, not a different one. At or above `1/((N_max−1)·dt)` — 20 fps here — the counts are equal by
+construction, because a remainder smaller than `dt` plus a frame no longer than `(N_max−1)·dt` can
+never reach the cap. ⚠️ Between 15 and 20 fps the clamp bites *intermittently* and the count falls
+short while the frame rate still looks fine: 16 fps gives **560** ticks in ten seconds, not 600, and
+17 gives 595. `1/(N_max·dt)` — 15 fps — is only where the clamp starts binding every frame; it
+survives there on a knife edge, because `1/15` is exactly `4·dt`, and 1 ms of jitter around it gives
+525.
 
 ## The crossover
 
@@ -222,7 +235,7 @@ construction, because the clamp never binds.
 | Stability bought with | substeps, or an implicit solve | the CFL limit plus a per-step injection clamp |
 | Must survive | nothing; it is your machine | a slider drag, a teleport, a hitch, a pause, a resize |
 | Global solve per step | fine | forbidden — it is the boundary between amortised and baked |
-| Determinism | reproducible run to run | reproducible run-to-run for the same tick sequence, inputs keyed to ticks; ticks per wall-second equal across machines only at or above `1/(N_max·dt)` fps, by construction |
+| Determinism | reproducible run to run | reproducible run-to-run for the same tick sequence, inputs keyed to ticks; ticks per wall-second equal across machines only at or above `1/((N_max−1)·dt)` fps, by construction — between that and `1/(N_max·dt)` the clamp bites intermittently |
 
 **The middle tier is real and is where tools actually live.** Between "every frame" and "baked
 once" is *amortised*: the sim exposes `(state, step(state, budget_ms), progress)` and the runtime
