@@ -48,7 +48,8 @@ Five decisions are packed into that, and each is dismissible in a line:
 - **Height-aware weights, not a linear cross-fade.** A cross-fade makes every texel at the
   boundary a 50/50 average, which is a third material that exists nowhere. Measured below: alpha
   blending leaves **100%** of texels a mix at the midpoint against **8.1%** for the blend above at
-  `depth = 0.02`, and costs **29% of the texture's contrast** where that blend costs 7%.
+  `depth = 0.02`, and costs **29% of the texture's contrast** where that blend costs 7% at
+  `depth = 0.1`.
 - **Normalise at the point of use, and before the bias reads the weights.** Not at the producer,
   not per layer — see the partition of unity below, where an unnormalised sum is exactly a
   brightness multiplier until it clips.
@@ -102,7 +103,8 @@ data to UNORM, but a palette is colour, and linear code values are evenly spaced
 eye is not. Measured on a neutral ramp, an 8-bit **linear** LUT costs **ΔE00 2.13 per LSB** at the
 bottom of the range and a **median 0.94 across the dark third** (`L* < 33`) — a just-noticeable
 difference *per entry*, by this document's own scale, in exactly the dark colours terrain is made
-of. fp16 costs at most **0.011** per ULP and R11G11B10F **0.50**, both worst at the *bright* end
+of. fp16 costs at most **0.022** per ULP and R11G11B10F **0.99** (0.009 and 0.74 as round-trip
+error), both worst at the *bright* end
 where the eye is least sensitive. The same ramp quantised in 8-bit sRGB costs 0.40 at worst — which
 is the measure of how much of 8 bits linear encoding wastes, not a licence to store it encoded.
 
@@ -168,7 +170,8 @@ The arithmetic that decides the design:
   re-export of every material.
 - **The splatmap does not need the albedo's resolution.** Material boundaries are low-frequency;
   the detail comes from the tiling textures. A splatmap at 1/4 of the albedo resolution is normal,
-  and the height blend below is what keeps the boundary crisp despite it.
+  and the height blend below narrows the band it produces — 0.19 of one splatmap texel against
+  0.80 cross-faded — without ever making it independent of that texel.
 
 Beyond that budget, the answer is to composite once and cache — which is `virtual-texturing.md`'s
 subject, and it owns both the page cache and the crossover into streaming.
@@ -193,7 +196,8 @@ Measured (`colour_blend.py`, recorded in `registers/pseudocode-execution.tsv`, 4
 
 Three things fall out of that table.
 
-**`depth` is the *per-texel* transition width, in weight units, to within 14% — and it is not the
+**`depth` is the *per-texel* transition width, in weight units, to within 14% with the additive
+bias and 40% with the weight-scaled one — and it is not the
 width of the boundary you see.** ⚠️ There are two widths here and an earlier draft reported one of
 them as both. Per texel, the flip from 10% to 90% takes `0.89 × depth` at every depth measured
 (0.018, 0.089, 0.259 at depth 0.02, 0.10, 0.30). But every texel flips at a *different* `t`,
@@ -223,24 +227,34 @@ cross-faded, **0.55** with the additive bias, **0.19** with the weight-scaled on
 prescribes. So a 512² splatmap under a 2048² albedo spreads the boundary over 3.2 albedo pixels
 cross-faded, 2.2 or 0.75 height-blended — every one of them scaling as `1/S`, a constant factor
 apart and never independent. What the height blend buys is that *inside* that span the boundary
-resolves into interlocking grains at albedo resolution instead of a uniform smear, and that is the
+resolves into interlocking grains at albedo resolution instead of a uniform smear — ⚠️ only where that span is several albedo pixels wide, which at 512² under 2048² it is not: 0.75 px for the prescribed form holds no grain at all. The argument needs a splatmap ratio of 1/8 or finer. That is the
 reason it earns its cost on a memory-constrained target.
 
 ⚠️ **The bias has to die with the weight, and a `w_i > 0` gate does not do it.** `b_i = w_i + h_i`
 as [mishkinis2013] prints it lets a material with *no weight at all* win on height alone. Measured
-over 200k texels, three materials, `h ~ U(0,1)`: at `depth = 0.1`, **5.1% of texels at `Σw = 1` and
-19.3% at `Σw = 0.5`** give a nonzero share to a material whose weight is exactly zero — 8.7% and
-27.2% at `depth = 0.2`, and the worst texels give it the *whole* pixel. `Σw ≤ 1` is all the producer
-promises, so that is the normal case and not a corner. Gating the survivors on `w_i > 0` fixes it
+by exact quadrature, three materials, flat-Dirichlet weights, `h ~ U(0,1)`: at `depth = 0.1`,
+**4.3% of texels at `Σw = 1` and 18.9% at `Σw = 0.5`** give a nonzero share to a material whose
+weight is exactly zero — 7.6% and 26.5% at `depth = 0.2`, and the worst texels give it the *whole*
+pixel. The producer closes its stack at `Σw = 1` by emitting the base as its own channel
+(`terrain-analysis-masks.md`), so `Σw = 0.5` is a producer bug this compositor turns into painted
+material rather than into the dark debug region :136 promises — but the first number is the
+in-contract one, and 4.3% of texels leak at `Σw = 1` alone. Gating the survivors on `w_i > 0` fixes it
 only *at* zero: the splatmap is bilinearly filtered, so one texel inside every edge the weight is
 small and nonzero, and there the gated form leaks identically to the ungated one — 5.1% / 19.4% at
 `w = 1e-3` and 5.6% / 20.5% at `w = 1e-2`, unchanged to three figures — while inventing a step at
 `w = 0` that bilinear filtering cannot produce. Normalising first and *scaling* the bias does both
 jobs at once. With height channels in [0,1] as required below, `b_i = w_i·(1 + h_i) ≤ 2w_i` while
 the winner scores at least `1/n`, so for any `depth < 1/n` **every material below `(1/n − depth)/2`
-of the normalised weight is provably absent** — not statistically absent. Measured: 0.000% leak at
+of the normalised weight is provably absent** at every texel where `Σw ≥ eps` — not statistically
+absent. ⚠️ Below `eps` the proof has nothing to work with and the normalisation cannot invent it:
+every `b_i` is zero, `m = −depth`, every layer survives, and the pixel comes out an equal blend of
+all `n` — the third material that exists nowhere, applied `n`-wide. Assert on that texel, or take
+the base material; `terrain-analysis-masks.md` closes its stack so it never arrives. Measured:
+0.000% leak at
 `w = 0`, `1e-3` and `1e-2` at both depths, and walking `w_A` from `1e-1` to 0 the share moves
-continuously, largest step **0.000** against 0.44 for the additive bias and 0.50 for the gate. What
+continuously, largest step **0.000**, and 0.50 for the gate — a jump that survives any refinement
+of the walk, where the additive bias is merely continuous *and* wrong, handing the absent material
+the whole pixel at every step of it. What
 it costs is that `depth` now compares normalised weights: the per-texel window is `0.60 × depth`
 instead of `0.89 ×` and the ensemble band 0.19 instead of 0.55, and because the flip points cluster
 nearer `t = 0.5`, twice as many texels are caught mid-transition exactly at the midpoint (8.1%
@@ -249,17 +263,23 @@ same `depth`, not a different parameter.
 
 ⚠️ **Every number above is a mip-0 number, and a real sampler does not sample mip 0.** The height
 channel filters like any other texture — box-filtering it over an `F×F` footprint, which is what
-sampling mip `log2 F` does, divides its standard deviation by `F` — and the blend's entire character
+sampling mip `log2 F` does, divides its standard deviation by `F` — for a height channel whose
+texels are uncorrelated, which is the fastest this can happen; an fBm channel at `H = 0.5` keeps 97%
+of its σ at a 16-texel footprint and degenerates several levels later, so what follows is the
+white-noise bound — and the blend's entire character
 is `σ(h)` measured against `depth`. At `depth = 0.1` the fraction of texels that are a genuine
 mixture at `t = 0.5` runs **18.8% at mip 0 → 67.3% at mip 2 → 94.7% at mip 3 → 100% at mip 4**:
 three levels in, what is being drawn is this section's own villain, the cross-fade in which every
-texel is an average of gravel and grass. And the ensemble band collapses with it (0.55 → 0.13 →
-0.066 → 0.033 of the weight ramp), so the residue is not a wide smear but a **step 9–13× sharper
-than the alpha boundary it degenerated into** — and a step aliases where a dither does not. Three
+texel is an average of gravel and grass. And the band stops shrinking once it reaches the per-texel
+window: 0.56 → 0.16 → 0.11 → 0.094 of the weight ramp at mips 0/2/3/4, floored at `0.89 × depth`.
+So the residue is not a wide smear but a single ramp **9× narrower than the alpha boundary it
+degenerated into** (13× with the weight-scaled bias) — and a step aliases where a dither does not. Three
 fixes, in increasing order of how completely they work: `SampleLevel` the height at a **capped**
 LOD so `σ(h)` stops falling with distance, accepting that the height channel then aliases; widen
-`depth` with the footprint — `depth ≳ σ(h)` at the mip actually sampled is the crossover, so
-`max(depth, σ_L)` degrades the blend into the smooth normalised form below instead of into a step;
+`depth` **as `σ(h)` falls**, not toward it — holding the band takes `depth_L ≈ depth·σ₀/σ_L`, which
+saturates near 0.6 where the blend *is* the cross-fade. ⚠️ `max(depth, σ_L)` does **nothing**: past
+the crossover `σ_L` is already the smaller of the two, so at `depth = 0.1` the band and mixture are
+bit-identical with and without it from mip 2 on — which is where the aliasing lives;
 or composite once into a virtual-texture page, where you mip the *result* and the question stops
 existing — `virtual-texturing.md`.
 
@@ -350,7 +370,7 @@ been run against that file.
 | Surfaces too smooth in the mid-range | Roughness map sampled through an sRGB decoder | Roughness, height, AO and masks are linear/UNORM data, not colour |
 | A muddy 50/50 band at every material boundary | Linear cross-fade; every texel is a genuine average | Height blend [mishkinis2013] |
 | Material textures look softer where they meet | Averaging two textures of equal σ gives σ/√2 — 29% of contrast lost | Height blend keeps 96%, or 93% with the weight-scaled bias |
-| Boundaries blurry in exact proportion to the splatmap resolution | Both bands are a fixed fraction of the splatmap's bilinear ramp — 0.80 cross-faded, 0.55 height-blended; `depth` sets the dither grain, not the band width | Raise the splatmap resolution. A height blend buys a 0.7× narrower, grainier band, never independence |
+| Boundaries blurry in exact proportion to the splatmap resolution | Both bands are a fixed fraction of the splatmap's bilinear ramp — 0.80 cross-faded, 0.55 with the additive bias, 0.19 with the weight-scaled one; `depth` sets the dither grain, not the band width | Raise the splatmap resolution. A height blend buys a 4× narrower, grainier band, never independence, never independence |
 | A material with no weight at all is painted over the terrain | `b_i = w_i + h_i` compares an absent material's height against a present one's weight-plus-height — 19.3% of texels at `Σ w = 0.5` | Normalise `w` first, then scale the bias: `w_i·(1 + h_i)`. A `w_i > 0` gate fixes only exactly zero |
 | The interlocking edge becomes a hard cross-fade at distance, and shimmers | Height sampled at the footprint's mip; `σ(h)` halves per level, so by mip 3–4 every texel is a mixture and the band has collapsed to a step | Cap the height LOD, or widen `depth` to `σ(h)` at the sampled mip; or cache the composite and mip the result |
 | One material wins every boundary regardless of weights | Height channels authored at incomparable ranges | Normalise every height channel to the same range at import |
