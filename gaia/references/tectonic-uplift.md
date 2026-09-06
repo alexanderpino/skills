@@ -132,8 +132,11 @@ whole).
 
 **Flexural** is the one to implement, and over a heightfield the practical solve is spectral,
 because `∇⁴` is a multiply in Fourier space. **The deflection is a state variable.** Carry
-`w_prev`, the deflection already applied to `h` (zeros on the first call), and on every call
-rebuild the load from the *un-deflected* rock column, then apply only the change in deflection:
+`w_prev`, the deflection already applied to `h` — zeros on the first call when `h` starts as
+un-deflected rock (a flat plain that `U` will build up); an authored surface that is meant to
+already stand at `h` starts with `w_prev = IFFT2(T/(1 − T) · FFT2(h))`, its own flexural root, so
+the first call changes nothing — and on every call rebuild the load from the *un-deflected* rock
+column, then apply only the change in deflection:
 
 ```
 t_load = h + w_prev                          # the UN-deflected rock column, not the surface
@@ -144,22 +147,25 @@ w_new = IFFT2(W)                             # subside under loads, rebound at d
 h = h − (w_new − w_prev) ;  w_prev = w_new   # apply the INCREMENT; the state carries the rest
 ```
 
-Written with `T(k) = ρc·g / (D·k⁴ + Δρ·g)`, the first call gives `w = T·h₀` and `h = (1 − T)·h₀`;
+Written with `T(k) = ρc·g / (D·k⁴ + Δρ·g)`, `Δρ = ρm − ρinfill`, the first call gives `w = T·h₀` and `h = (1 − T)·h₀`;
 the second rebuilds `t_load = h + w = h₀`, gets the same `w`, and changes nothing — the block is
 idempotent, which is what a periodic update inside a long loop has to be. The naive form —
 `q = ρc·g·h` from the current, already-deflected surface, written back over `h` — is not, because
 each call multiplies the long-wavelength surface by another `1 − ρc/Δρ = 0.15`, so it converges to
 zero: on a 3000 m Gaussian bump (`σ = 60 km`, `Te = 20 km`) one call leaves a 1163 m peak, ten
-leave 76 m, and `0.15¹⁰ ≈ 6×10⁻⁹` of the range survives a long run. Nor is the half-fix of
+leave 76 m, and the domain-mean component is down to `0.15¹⁰ ≈ 6×10⁻⁹` after those ten — a long
+run leaves nothing. Nor is the half-fix of
 computing `w_new` from the deflected `h` and subtracting only the increment: that converges to
 `h₀/(1 + T)`, `0.54·h₀` at long wavelength against the correct `0.15·h₀`, and a gate of *"the
 ridge survives"* passes it. The gate that catches both is numeric: ten calls must agree with one
-to `< 1e-9 m`. The block above does, to `2×10⁻¹³ m`.
+to `< 1e-9 m`. The block above does, to fp64 roundoff (`~10⁻¹³ m` on a 512² grid; `~10⁻⁴ m` in
+fp32, still idempotent to the metre).
 
 `Te`, the effective elastic thickness inside `D`, is the one knob that matters: a few km for weak
 hot lithosphere, tens of km for old cold lithosphere. The response width is
 `α = [4D / ((ρm − ρinfill)·g)]^¼`, and since `D ∝ Te³` it grows as **`Te^(3/4)`** — thickening
-the plate *widens* the response (`E = 70 GPa`, `ν = 0.25`, `ρm − ρinfill = 3300 kg/m³`):
+the plate *widens* the response (`E = 70 GPa`, `ν = 0.25`, chosen as calibration like the
+densities above, `ρm − ρinfill = 3300 kg/m³`):
 
 | `Te` (km) | 5 | 10 | 20 | 40 | 80 |
 |---|---|---|---|---|---|
@@ -169,8 +175,9 @@ the plate *widens* the response (`E = 70 GPa`, `ν = 0.25`, `ρm − ρinfill = 
 solve is most often quietly wrong. `fftfreq` returns the signed, Nyquist-wrapped frequencies in
 the FFT's own mode order; the angular wavenumber is `2π` times that, in rad/m, so `Δx` must be in
 metres. `k` is the **radial magnitude** `sqrt(kx² + ky²)`, so `k⁴ = (kx² + ky²)²`; the plausible
-slip `kx⁴ + ky⁴` is a different, anisotropic operator and gives a four-lobed flexural moat, nearly
-twice as deep on the diagonals as on the axes, where the correct response is circular. No `k = 0`
+slip `kx⁴ + ky⁴` is a different, anisotropic operator and gives a four-lobed flexural moat where
+the correct response is circular — on the `σ = 60 km` bump above nearly twice as deep on the
+diagonals as on the axes, subtler for narrower loads (1.1× at `σ = 20 km`) but never round. No `k = 0`
 guard is needed — the denominator there is finite, `(ρm − ρinfill)·g`, and the domain-mean load
 subsides uniformly by `T(0) = ρc/(ρm − ρinfill) = 0.85` of its column, leaving the surface at
 `0.15·t_load`. **That reproduces Airy only when `t_load` is the whole column:** with `ρinfill = 0`,
@@ -199,5 +206,5 @@ frame — a runtime that needs tectonics needs a baked `U` and a baked heightfie
 | Peaks sink as valleys incise, through a long run | No isostatic rebound | Couple erosional unloading, `ρc/ρm ≈ 0.85` of mean stripped thickness [molnar1990] |
 | Flexural deflection wraps or ripples across the domain | `k` built from a `linspace` ramp, or a domain smaller than a few `α` | `fftfreq` in rad/m; enlarge the domain or **lower** `Te` — `α ∝ Te^(3/4)`, so raising it widens the response and shrinks `domain/α` (512 km is 10.3 `α` at `Te = 20 km`, 3.6 at 80) |
 | The range loses most of its height over a run with no erosion | Flexure re-loaded from the already-deflected surface each periodic call, `0.15` per call at long wavelength | Carry `w_prev`; load from `h + w_prev`; apply only `w_new − w_prev` — ten calls must equal one to `< 1e-9 m` |
-| A four-lobed star in the flexural moat around a point load | `k⁴` built as `kx⁴ + ky⁴` | `k = sqrt(kx² + ky²)`, then `k⁴` |
+| A four-lobed star in the flexural moat around an isolated load | `k⁴` built as `kx⁴ + ky⁴` | `k = sqrt(kx² + ky²)`, then `k⁴` |
 | Rivers meet the sea at arbitrary points, with no estuaries | Coastline authored by thresholding noise before erosion | Set sea level after erosion |
