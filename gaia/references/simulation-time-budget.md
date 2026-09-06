@@ -16,6 +16,9 @@ sources:
 ---
 # Simulation time budget — minutes offline, milliseconds in a frame
 
+**Tier: the crossover document; both budgets.** Its subject *is* the boundary between authoring-time
+and runtime, so every section states the same step under each regime and says what changes.
+
 This is the axis every other simulation document in Gaia hangs off, because it is the question the
 source material does not ask. An authoring tool assumes it has minutes and an artist willing to
 wait. An engine assumes it has a slice of 16 ms and a player who is not. **The physics is the same
@@ -30,7 +33,11 @@ nothing about how you run them is shared.
 
 **Before choosing a solver, ask whether you need a solver at all** — see
 [the cheapest step](#the-cheapest-stable-step-is-the-one-you-do-not-take). An ambient ocean has no
-timestep and no state; that is why it fits in a frame and a pipe model does not.
+timestep and no state; that is why a whole ocean of it fits in a frame and an ocean-*sized* pipe
+model does not. A **bounded** pipe-model patch — the ripple field around the player, the filling
+pool in the Runtime column below — does fit, and `shallow-water.md` makes the pipe form *"the
+default at both time budgets"*. The closed form buys you the sea; the solver buys you the tens of
+metres that have to respond to something.
 
 When you do need one: **write the explicit, CFL-limited step once, and change the scheduler around
 it, not the solver.** The step is identical at both budgets — compute a stable `dt` from the
@@ -39,9 +46,11 @@ you do when you run out.*
 
 - **Authoring-time**: substeps are unbounded and adaptive. Cover the whole physical interval the
   artist asked for, however many steps that takes. The artist waits; that is the deal.
-- **Runtime**: substeps are capped, and the cap binding is a **designed state**, not a bug. When it
-  binds, simulated time falls behind wall-clock time — the sim runs in slow motion — and `dt` never
-  moves.
+- **Runtime**: substeps are capped at `N_max` — the time accumulator is clamped to `N_max·dt` —
+  and the cap binding is a **designed state**, not a bug. When it binds, simulated time falls
+  behind wall-clock time: the sim runs in slow motion, the lag is dropped rather than repaid, and
+  `dt` never moves. The whole scheduler is stated once, under
+  [the slider](#when-the-user-drags-a-slider).
 
 Reach for an implicit or unconditionally-stable scheme only when the *physical time you must cover
 per call* is enormous compared to the stable step. That is the authoring-time case and almost never
@@ -60,9 +69,24 @@ c   = sqrt(g * h)           # shallow water: the long-wave celerity, h the water
 
 Read what that says about a water patch. Celerity rises with **depth**, so a deep pool costs a
 smaller step than a puddle at the same resolution, and a flood that deepens as it fills gets
-*progressively* more expensive. Shipped code does not run at `C = 1`:
-`obsolete/terrain-architect/reference-impl/shallow_water.py` uses `C = 0.20`, a 5x margin, because `c` is
-estimated from the state at the start of the step and the state moves during it.
+*progressively* more expensive. Shipped code does not run at the limit:
+`obsolete/terrain-architect/reference-impl/shallow_water.py` uses `C = 0.20`, and measured against
+that scheme's own signal speed that is a **2.5× margin, not the 5× a `C <= 1` reading gives you**.
+The linearised two-pipe form — two one-way pipes per face, each integrating the *full* head, so the
+net face flux carries the head difference twice — propagates at `sqrt(2·g·A/l)`, and the 2-D
+leapfrog bound `1/sqrt(2)` on that speed gives `dt_crit = 0.50·dx/sqrt(g·A/l)`. Bisected here on a
+32² grid with the outflow clamp disabled, that constant holds at **0.5006** across `A`, `l`, `dx`
+and two decades of depth; `shallow-water.md` measures 0.502 on its own harness. That over `C = 0.20`
+is 2.5, and the margin pays for what the linearisation drops — the one-way `max(0, ·)` pipes and
+the outflow clamp are both nonlinear.
+
+⚠️ **`C` was never what was wrong with that line; what `C` multiplied was.** As originally written
+the step divided by `sqrt(g·relief)` — the bed *relief*, which appears nowhere in the stability
+condition, where `A/l` does — making the step `0.398·sqrt(dx/relief)` times the true limit. At
+`dx = 1 m` over 500 m of relief that is **56× too small**, and 56× the iterations to cover the same
+physical time; on ground flat enough for the code's 1 m relief floor to bind it is **2× above** the
+limit at `dx = 25 m` and **4× above** at `dx = 100 m`, where [mei2007]'s outflow clamp keeps depth
+positive and hides the sloshing behind a green smoke test. `shallow-water.md` owns that correction.
 
 **Diffusive / parabolic** — viscous damping, thermal relaxation, hillslope creep, anything of the
 form `∂u/∂t = ∇·(D∇u)`. Explicit stepping is bounded far harder [explicit_diffusion_limit]:
@@ -90,7 +114,7 @@ N = physical_time_you_must_cover_per_call / dt_stable
 | `N` | Do this |
 |---|---|
 | `N <= 1` | Explicit, one step. You are not near a limit; stop reading. |
-| `N` small (2–8) and bounded | Explicit with adaptive substepping. This is the answer for nearly all runtime water. |
+| `N` small (2–8) and bounded | Explicit with adaptive substepping; the cap `N_max` below is that bound. This is the answer for nearly all runtime water. |
 | `N` large, and you are offline | Substep and wait, **or** buy `dt` with an implicit solve if waiting is the bottleneck. Measure before switching — an implicit step is not free. |
 | `N` large, and you are in a frame | **You are asking the wrong question.** Reduce the physical time per call, reduce resolution or domain, or move the process to a bake. Do not raise `dt`. |
 
@@ -156,9 +180,35 @@ clamps a cell's total outflow to the water it holds, so depth cannot go negative
 `dt`. **Nothing in the model does the same for inflow.** Positivity on the outflow side is not
 stability, and that asymmetry is where "it was fine until I moved the rain slider" comes from.
 
-**Never derive `dt` from frame time.** Accumulate real time, step a fixed `dt`, keep the remainder
-[fiedler_timestep]. A solver whose stability constant is a function of frame rate explodes on the
-first hitch — and a hitch is guaranteed, because streaming a texture causes one.
+**Never derive `dt` from frame time — and here is the whole runtime scheduler, stated once.** Fix
+`dt <= dt_stable`. Each frame, add the elapsed wall time to an accumulator and **clamp the
+accumulator to `N_max·dt`**; consume it in whole `dt` ticks and keep the sub-`dt` remainder. That
+clamp is [fiedler_timestep]'s max-frame-time guard put on the sum rather than on the sample — the
+same bound, stated on the quantity you actually spend, so that `N_max` *is* the most ticks any one
+frame can take. A solver whose stability constant is a function of frame rate explodes on the first
+hitch — and a hitch is guaranteed, because streaming a texture causes one.
+
+What the clamp throws away is **sim-time lag, not physics**. Every tick taken is a full, legal
+step; the world simply runs behind the wall clock by whatever a slow frame exceeded `N_max·dt`, and
+that lag is *dropped*, never repaid. The alternative — keep the whole debt and pay it off at
+`N_max` ticks a frame — fast-forwards the sim after every hitch, and spirals when the catch-up is
+itself what makes the next frame slow. The cap binding is therefore the slow-motion row in the
+table below, by construction, and not a second policy competing with it.
+
+What it buys is **tick determinism**: the state after tick `k` is a deterministic function of the
+tick count, provided every input is keyed to ticks — the slider value read at tick 100, the dam
+dropped at tick 250 — and not to frames or to wall time. Two runs with the same tick sequence then
+agree bit-for-bit at any frame rate. Measured on a 48-cell pipe model at `dt = 1/60`, `N_max = 4`,
+over seven frame timings from 144 fps to 8 fps — one jittered, one carrying a 2 s hitch — the state
+after 480 ticks hashes to **one** digest, although the wall clock at that point reads anywhere from
+8.0 s to 19.6 s. Key those same two inputs to wall time instead and the seven timings give **seven
+different** states, because each one is a different distance behind the clock when the input lands.
+
+What it does **not** buy — and nothing can, without moving `dt` — is an equal number of ticks per
+wall-second once the clamp binds: on the same settings, ten seconds of wall clock is 600 ticks at
+60 fps, 480 at 12 fps and 320 at 8 fps, and the slow machine is showing the *same* simulation
+later, not a different one. At or above `1/(N_max·dt)` — 15 fps here — the counts are equal by
+construction, because the clamp never binds.
 
 ## The crossover
 
@@ -167,12 +217,12 @@ first hitch — and a hitch is guaranteed, because streaming a texture causes on
 | Water example | hydraulic erosion to steady state; a bathymetry bake; a drainage solve | a wave field; a ripple patch around the player; a filling pool |
 | Physical time per call | all of it — hundreds of iterations to convergence | 1/60 s, and you chose that |
 | `dt` | as large as the scheme allows | fixed, `<= dt_stable`, never frame-derived |
-| Substeps | unbounded, adaptive, one reduction per step | capped at a small integer; the cap binding is a designed state |
-| When the budget runs out | the artist waits | sim time falls behind wall clock — slow motion, never a bigger `dt` |
+| Substeps | unbounded, adaptive, one reduction per step | capped at `N_max` — the accumulator clamped to `N_max·dt`; the cap binding is a designed state |
+| When the budget runs out | the artist waits | sim time lags wall clock — slow motion; the lag is dropped, never repaid, and never a bigger `dt` |
 | Stability bought with | substeps, or an implicit solve | the CFL limit plus a per-step injection clamp |
 | Must survive | nothing; it is your machine | a slider drag, a teleport, a hitch, a pause, a resize |
 | Global solve per step | fine | forbidden — it is the boundary between amortised and baked |
-| Determinism | reproducible run to run | reproducible *and* independent of frame rate |
+| Determinism | reproducible run to run | reproducible run-to-run for the same tick sequence, inputs keyed to ticks; ticks per wall-second equal across machines only at or above `1/(N_max·dt)` fps, by construction |
 
 **The middle tier is real and is where tools actually live.** Between "every frame" and "baked
 once" is *amortised*: the sim exposes `(state, step(state, budget_ms), progress)` and the runtime
@@ -180,6 +230,17 @@ spends a millisecond budget per frame. Budget in milliseconds and adapt the step
 iteration count per frame is a frame-time landmine that only fires at high resolution. A
 partially-converged erosion is a real intermediate terrain, and showing it evolve is half of what
 makes a tool feel interactive.
+
+**No millisecond split for terrain, water and sky is given here — a pointer instead, and that is a
+choice between two options, not an omission.** Any per-stage number this document invented would be
+a constant with no source, in a document where every other constant carries one; grading it `F`
+would label that, not fix it. The split is the engine's to set, and the sibling skill already sets
+one: `game-engine-guru/references/PERFORMANCE_AND_PROFILING.md` breaks a 60 Hz frame down by stage
+and gives simulation its own line, explicitly on a fixed timestep — the policy this page argues
+for. That line is the ceiling the amortised tier above spends inside. What this page can say
+without borrowing a number is the mechanism: budget in milliseconds, adapt the tick count to the
+budget, and check a document's cost table against that ceiling rather than against its neighbours.
+A per-frame recommendation carrying neither a cost nor a pointer is the thing to refuse.
 
 ## The cheapest stable step is the one you do not take
 
@@ -211,14 +272,15 @@ the tens of metres the player is standing in.
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| Sim explodes after a frame hitch or a streaming spike | `dt` derived from frame time | Fixed-step accumulator [fiedler_timestep] |
+| Sim explodes after a frame hitch or a streaming spike | `dt` derived from frame time | Fixed `dt`; accumulate; clamp the accumulator to `N_max·dt` [fiedler_timestep] |
 | Fine at 512, explodes at 2048 | The `dx` (advective) or `dx^2` (diffusive) in the bound | Recompute `dt_stable` from the current `dx` |
 | Water patch is stable until the pool fills | `c = sqrt(g*h)` grew with depth; `dt` was computed once | Recompute the limit every step from the current state |
 | "It was fine until I moved that slider" | A source term changed; `dt_stable` predates the injection | Clamp per-step injection to a fraction of the local state |
 | Depth goes negative, then NaN | Outflow exceeded what the cell held | The outflow scaling clamp [mei2007] |
 | Checkerboard sloshing that never damps, but no NaN | `dt` above the limit while a positivity clamp holds | Positivity is not stability — lower `dt` |
-| Frame time spikes whenever the water is deep | Adaptive substep count unbounded at runtime | Cap the substeps and let sim time lag |
-| Slow motion nobody asked for | The substep cap is binding every frame | That is the cap working; shrink resolution or domain, not the cap |
-| Result differs between a fast and a slow machine | Step count tied to frames, not accumulated time | Fixed `dt`, accumulate the remainder |
+| Frame time spikes whenever the water is deep | Substep count unbounded at runtime — the accumulator is not clamped | Clamp it to `N_max·dt`; let sim time lag |
+| Slow motion nobody asked for | The `N_max·dt` clamp is binding every frame | That is the clamp working; shrink resolution or domain, do not raise `N_max` |
+| A hitch, then the water runs fast-forward for a second | The accumulator was not clamped: the debt was kept and paid back at `N_max` ticks a frame | Clamp to `N_max·dt`; the lag is dropped, not repaid |
+| Two machines diverge from the same inputs | An input keyed to a frame or to wall time lands on a different tick; or `dt` moved | Fixed `dt`; key every input to a tick — the state after tick `k` is then identical, and only how far behind the wall clock it sits differs |
 | An offline solver ported to the viewport tanks the frame | Global solve per step [kass1990] [braun2013] | Bake it, or amortise with checkpoints; do not shrink it |
 | The ocean is simulated and costs a fortune | A wave field was treated as a sim when it is a closed form | Evaluate the spectrum; simulate only the interactive patch |

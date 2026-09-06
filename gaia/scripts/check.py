@@ -2,6 +2,7 @@
 
     python gaia/scripts/check.py            # report and exit non-zero on any problem
     python gaia/scripts/check.py --list     # what is checked, and what is NOT
+    python gaia/scripts/check.py --digest references/caustics.md   # the two digests a stamp needs
 
 WHAT THIS CAN AND CANNOT ESTABLISH -- read this before quoting a green run.
 
@@ -34,6 +35,12 @@ COVERAGE = ROOT / "references" / "coverage.md"
 TRIGGERS = ROOT / "evals" / "trigger-evals.json"
 
 
+# One spelling of the bibliography glob, used by `paper_files()` and by the error text that
+# names it. They disagreed for a whole rename: the files became `papers-*.md` and the guard went
+# on telling readers a citation was "absent from papers.md", a file that no longer existed.
+PAPERS_GLOB = "papers*.md"
+
+
 def paper_files() -> list[Path]:
     """The bibliography, split by family across `papers*.md`.
 
@@ -41,11 +48,23 @@ def paper_files() -> list[Path]:
     already organises itself, and splitting lets documents and their sources land together.
     Globbed from disk, never listed by hand -- a hand-kept list is the thing that goes stale.
     """
-    return sorted((ROOT / "references").glob("papers*.md"))
+    return sorted((ROOT / "references").glob(PAPERS_GLOB))
 
 MAX_LINES = 450          # per the plan: a document at the cap is two topics wanting a split
+# A bibliography is a LIST, not a topic, and it grows with the corpus by design -- so the
+# "it is two topics" reading of the cap does not apply to it. It was exempt from the cap
+# altogether, by two conditions that could never fire (the paths were already excluded from
+# the loop), which is not a decision, it is a leftover: papers-rendering.md reached 411 lines
+# with no ceiling at all. They get a looser cap of their own instead of none. Past it, a family
+# file wants splitting the way `papers.md` itself already was.
+BIB_MAX_LINES = 600
 TIERS = {"P", "F", "L", "N", "?"}
 STATUS = {"draft", "stable", "deprecated"}
+# The only keys a `sources:` row may carry. `Tier:`, `teir:` and `locater:` all used to pass
+# in silence, and a misspelled `tier:` is worse than an absent one: the tier-agreement check
+# reads `if "tier" in s`, so the row loses its comparison while still LOOKING graded on the
+# page. An unknown key here is either a typo or a field nothing reads.
+SOURCE_KEYS = {"id", "tier", "locator"}
 
 # `- **id** `T` — Reference text.`  with optional trailing ` [background]` and ` [no-artefact]`.
 # [no-artefact] is a STRUCTURED declaration, not prose: it is what lets a locator opt out of the
@@ -149,6 +168,39 @@ def sources_digest(fm: dict) -> str:
     return hashlib.sha256("\n".join(f"{i}|{l}" for i, l in rows).encode()).hexdigest()[:12]
 
 
+def body_digest(body: str) -> str:
+    """A fingerprint of the two sections a reader actually lands on.
+
+    `sources_digest` scopes a stamp to a CITATION SET, which is necessary and not sufficient.
+    Reproduced end to end before this existed: stamp a document, then replace EVERY prose
+    sentence in its body with an invention -- keeping headings, tables and citation markers --
+    and the guard exits 0 while the index goes on printing **checked**. The stamp certified
+    which papers were cited, and the claims are what a human actually read.
+
+    Hashing the whole body would make a stamp brittle against a typo fix, which is how a
+    digest gets routed around. `## Use this` and the failure table are the two places this
+    corpus's readers land (`SKILL.md:42` tells them to take the failure table as one packet)
+    and the two places its recorded corrections land. The text is whitespace-normalised, so a
+    re-wrap or a reflow is not a change; a word is.
+
+    ⚠️ WHAT THIS CANNOT SEE, stated so no one reads a valid stamp as a checked document. It is
+    a digest, not a reader: it detects that the anchors MOVED, never that they are wrong, and
+    the three defect shapes this audit records most often all sit outside its scope.
+      * X7 (`gpu-driven-culling.md:108`, an inverted consequence one bullet below its own
+        correct statement) lives in body prose. It is not hashed, and a stamp survives both the
+        defect and its fix untouched.
+      * X17 (`node-graph-runtime.md:232` vs `:386`, opposite prescriptions for one decision)
+        and X52 (`mask-to-material.md:296,300`, a retracted claim re-asserted in two failure
+        rows) sit INSIDE the anchors and are hashed -- but they shipped that way, so a human
+        stamping the document would digest the defect along with everything else.
+    A hash scopes a reading. It does not perform one.
+    """
+    parts = re.split(r"^## +(.+?)\s*$", body, flags=re.M)
+    chunks = [" ".join((h + " " + b).split())
+              for h, b in zip(parts[1::2], parts[2::2]) if _is_anchor(h.strip().lower())]
+    return hashlib.sha256("\n".join(chunks).encode()).hexdigest()[:12]
+
+
 def _unfenced(body: str) -> str:
     """Body with code blanked, so indexing is never read as a citation.
 
@@ -182,13 +234,9 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
     problems: list[str] = []
     used: set[str] = set()
 
-    skip = set(paper_files()) | {INDEX, COVERAGE}
+    papers = set(paper_files())
+    apparatus_paths = papers | {INDEX, COVERAGE}
     for path in documents(ROOT):
-        # Bibliographies, the index and the coverage map make no claims of their own -- they
-        # are apparatus, and each has its own check. Demanding `sources:` from them would be
-        # the guard misreading its own furniture as content.
-        if path in skip:
-            continue
         rel = path.relative_to(ROOT)
         try:
             fm, body = parse_front_matter(path)
@@ -196,35 +244,101 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
             problems.append(str(e))
             continue
 
-        # --- OKF conformance -------------------------------------------------------------
+        # Bibliographies, the index and the coverage map make no claims of their own -- they
+        # are apparatus. But `if path in skip: continue` at the top of this loop exempted them
+        # from the OKF conformance block as well, and that block is the FORMAT contract for
+        # every document in the bundle: a bibliography could lose its `type:`, take an illegal
+        # `status:`, grow an `okf_version:` or carry a `verified:` naming nobody, and nothing
+        # here looked. The exemption is now exactly two things, both of them about CLAIMS:
+        # the `sources:` requirement, and the body-marker cross-check.
+        #
+        # The second half of that exemption is not cosmetic. `papers-flow.md:146` ends a prose
+        # sentence with the literal `[background]`, which `_MARKER` reads as a citation to an id
+        # that exists in no bibliography -- so running the cross-check over apparatus reports a
+        # fabricated citation in a clean corpus. Verified by running it; the marker is prose
+        # about the tag, not a citation.
+        apparatus = path in apparatus_paths
+
+        # --- OKF conformance, on EVERY document ------------------------------------------
         if "type" not in fm:
             problems.append(f"{rel}: no `type` -- the one always-required OKF key")
-        if fm.get("status", "stable") not in STATUS:
-            problems.append(f"{rel}: status `{fm.get('status')}` is not one of {sorted(STATUS)}")
+        # ABSENT `status:` is a failure, not a default. Three sites used to disagree about a
+        # missing key: this one validated it as `stable`, the "stable needs `verified:`" rule
+        # below read None and never fired, and index.py PRINTED stable -- so DELETING one line
+        # from a draft document advertised it as checked by a human, past both guards. The
+        # obvious repair, defaulting to `draft` here and in index.py, fixes the display and
+        # makes its own mutation a no-op: a draft with the line deleted is still a draft, so
+        # nothing could ever be seen going red. The key is required instead.
+        status = fm.get("status")
+        if status is None:
+            problems.append(f"{rel}: no `status:` -- required, not defaulted. An absent status "
+                            "read as `stable` in the index and as neither value in this guard, "
+                            "so deleting one line advertised a document as human-checked.")
+        elif status not in STATUS:
+            problems.append(f"{rel}: status `{status}` is not one of {sorted(STATUS)}")
         if "okf_version" in fm and path != INDEX:
             problems.append(f"{rel}: `okf_version` belongs in the bundle root only")
         # `generated` is not `verified`. A document may not claim a human checked it unless a
         # human is named -- this is the only line between attribution and verification.
         ver = fm.get("verified")
-        digest = sources_digest(fm)
+        digest, bdigest = sources_digest(fm), body_digest(body)
         for entry in (ver if isinstance(ver, list) else [ver] if ver else []):
             who = str(entry.get("by", "")) if isinstance(entry, dict) else ""
-            if not who.startswith("human:") or len(who) <= len("human:"):
+            # `len(who) > len("human:")` passed `by: "human: "` -- seven characters, naming
+            # nobody. What has to be non-empty is the ID, not the string.
+            if not (who.startswith("human:") and who[len("human:"):].strip()):
                 problems.append(f"{rel}: `verified:` needs a named `human:<id>` actor. "
-                                "`human:` alone names nobody, and a process can only generate.")
-            elif entry.get("covers") != digest:
+                                f"`{who}` names nobody -- `human:` with nothing after it is not "
+                                "an actor, and a process can only generate.")
+                continue
+            if not isinstance(entry, dict) or "covers" not in entry or "covers_body" not in entry:
+                missing = [k for k in ("covers", "covers_body")
+                           if not isinstance(entry, dict) or k not in entry]
                 problems.append(
-                    f"{rel}: `verified:` covers `{entry.get('covers')}` but the sources now "
-                    f"digest to `{digest}`. The citations changed since {who} read them, so "
-                    "the verification is stale. Re-check and update `covers`, or drop to draft.")
-        if fm.get("status") == "stable" and not ver:
+                    f"{rel}: `verified:` is missing {', '.join(f'`{k}`' for k in missing)}. A "
+                    f"stamp scopes to BOTH halves of what was read: `covers` is the citation "
+                    f"set (now `{digest}`), `covers_body` is `## Use this` and the failure "
+                    f"table (now `{bdigest}`). Without the second, every claim in the document "
+                    f"can be replaced and the stamp stays valid.")
+                continue
+            # Which half moved is the whole message. "The digest changed" sends a reader to
+            # re-read a document when all that happened was a new citation, or the reverse.
+            moved = []
+            if entry["covers"] != digest:
+                moved.append(f"the SOURCES changed -- `covers` says `{entry['covers']}`, they "
+                             f"now digest to `{digest}`")
+            if entry["covers_body"] != bdigest:
+                moved.append(f"the CLAIMS changed -- `covers_body` says "
+                             f"`{entry['covers_body']}`, `## Use this` and the failure table "
+                             f"now digest to `{bdigest}`")
+            if moved:
+                problems.append(f"{rel}: `verified:` is stale: " + "; and ".join(moved) +
+                                f". That happened after {who} read it, so the verification no "
+                                "longer covers the document. Re-check and update the digest, "
+                                "or drop to draft.")
+        if status == "stable" and not ver:
             problems.append(f"{rel}: status `stable` with no `verified:` entry -- stable claims "
                             "a human checked the citations. Use `draft` until one has.")
+        # And the other direction. index.py prints **checked** on the presence of `verified:`
+        # alone, so a draft carrying a stamp read as verified in the index while its own status
+        # line said otherwise. A stamp is what makes a document stable; the two must agree.
+        if ver and status != "stable":
+            problems.append(f"{rel}: `verified:` on a `{status}` document. The index prints "
+                            "**checked** for any document carrying a stamp, so this advertises "
+                            "a verification the status line denies. A stamp requires "
+                            "`status: stable`.")
 
         # --- size ------------------------------------------------------------------------
-        n = len(path.read_text(encoding="utf-8").splitlines())
-        if n > MAX_LINES and path not in paper_files() and path != INDEX:
-            problems.append(f"{rel}: {n} lines, over the {MAX_LINES} cap -- it is two topics")
+        # index.md is generated: its length is a function of how many documents exist, so a cap
+        # on it would report the corpus growing as a defect. Every other file has one.
+        if path != INDEX:
+            cap = BIB_MAX_LINES if path in papers else MAX_LINES
+            n = len(path.read_text(encoding="utf-8").splitlines())
+            if n > cap:
+                problems.append(f"{rel}: {n} lines, over the {cap} cap -- it is two topics")
+
+        if apparatus:
+            continue
 
         # --- citations, both directions --------------------------------------------------
         # A document with no `sources:` used to pass everything, because only DECLARED sources
@@ -240,8 +354,24 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
             if not isinstance(s, dict) or "id" not in s:
                 problems.append(f"{rel}: a `sources:` entry has no `id`")
                 continue
+            # Checked before the id is resolved, so a row that is BOTH misspelled and dangling
+            # still reports the misspelling.
+            extra = sorted(set(s) - SOURCE_KEYS)
+            if extra:
+                problems.append(f"{rel}: `{s['id']}` carries unknown `sources:` key(s) "
+                                f"{', '.join(f'`{k}`' for k in extra)}; only "
+                                f"{', '.join(f'`{k}`' for k in sorted(SOURCE_KEYS))} are read. "
+                                "A misspelled `tier:` is worse than an absent one -- the row "
+                                "still looks graded on the page and nothing compares it.")
+            # The bibliography was split into seven `papers-*.md` files and this message went on
+            # naming `papers.md`, which has not existed since. `guard-proofs.tsv:17` already
+            # records that rows naming it were a known post-rename problem -- the register was
+            # corrected and the guard's own error text was not, inside the tool that polices
+            # exactly that shape. Named from the glob so a future split cannot stale it again.
             if s["id"] not in bib:
-                problems.append(f"{rel}: cites `{s['id']}`, absent from papers.md")
+                problems.append(f"{rel}: cites `{s['id']}`, absent from every "
+                                f"references/{PAPERS_GLOB} "
+                                f"({', '.join(p.name for p in paper_files())})")
                 continue
             if bib[s["id"]]["tier"] == "?" and path != INDEX:
                 problems.append(f"{rel}: cites `{s['id']}`, graded `?` (claimed but "
@@ -878,7 +1008,14 @@ def covered_documents() -> dict[str, str]:
         if in_fence or not (m := _TOPIC.match(line.rstrip())):
             continue
         if m["state"] == "covered" and "\u2192" in m["rest"]:
-            out[m["rest"].split("\u2192")[-1].strip()] = m["id"]
+            target = m["rest"].split("\u2192")[-1].strip()
+            # A target that does not exist is check_coverage's finding and only its finding.
+            # Passing it on gave ONE defect two messages from two functions, and that is why
+            # the `bites` row for it was vacuous: it stayed red with check_coverage deleted,
+            # because check_trigger_coverage was reporting the same broken row in its own
+            # words. Same rule as this docstring already states for malformed rows.
+            if (ROOT / "references" / target).exists():
+                out[target] = m["id"]
     return out
 
 
@@ -949,6 +1086,12 @@ PROPAGATION_FIXTURES = [
     ("the paper `hnaidi2010` §4.2 borrows from", set()),      # a foreign section, not ours
     ("READ IN FULL, no section named", set()),
     ("p. 146 and Fig. 11", set()),                            # pages are not sections
+    # The text of a WRAPPED entry's continuation line -- where a section number sits for 88 of
+    # the 214 entries, and the half `check_propagation` deliberately does not read. It
+    # tokenises perfectly; the reason it is unread is the measured false-positive rate in that
+    # function's docstring, not an inability to parse it. Pinned here so the two claims stay
+    # distinguishable.
+    ("cross-section at `C = l²`, constant, and §4 writes the outflow", {"4"}),
 ]
 
 
@@ -970,6 +1113,21 @@ def check_propagation(bib: dict[str, dict],
     section at both ends; the rest name one at one end or neither, and nothing can be
     cross-checked there. This is a narrow instrument over a corpus-wide problem, and the ratio is
     reported so nobody mistakes a green check for a checked corpus.
+
+    ⚠️ **Why the bibliography side reads only the entry's first line.** This used to say
+    `f"{entry['ref']} {entry.get('note', '')}"`, and `_scan` builds no `note` key, so half the
+    text named in that expression was always `""`. The obvious repair -- populate `note` from the
+    88 entries that wrap onto continuation lines -- was BUILT AND MEASURED before being rejected:
+    it lifts the comparable pairs from 16/256 to 48/256 and reports **seven** corpus-wide hits,
+    every one of them correct prose. `mei2007`'s entry names §3 while three documents cite §3.2,
+    §3.2.1 and §3.2.2 (a parent section, read as disjoint by a token compare); `stava2008`'s
+    entry names §4 for the pipe cross-section while two documents cite §5, §7 and §8 for other
+    claims; `hillaire2020`'s entry names §7 and Table 2 for the cost figures while two documents
+    cite §5.3. That is the identical false-positive shape already recorded in
+    `guard-proofs.tsv` for the body-prose direction: a document legitimately cites different
+    sections of one paper for different claims, and an entry need not enumerate them all. So the
+    dead key is REMOVED rather than filled, and this paragraph is why -- the reach stays at
+    16/256 by choice, not by oversight.
     """
     problems: list[str] = []
     both = total = 0
@@ -977,7 +1135,7 @@ def check_propagation(bib: dict[str, dict],
         entry = bib.get(cid)
         if not entry:
             continue
-        btoks = section_tokens(f"{entry.get('ref', '')} {entry.get('note', '')}")
+        btoks = section_tokens(entry.get("ref", ""))
         for path, locator in uses:
             total += 1
             ltoks = section_tokens(locator)
@@ -1181,6 +1339,14 @@ def check_recommendation() -> tuple[list[str], int, int]:
     defines the phenomenon before recommending a tier, and hard-failing it would be the guard
     dictating prose order. But a corpus quietly drifting toward explain-then-maybe-recommend
     is the slide into a survey, so the count is visible.
+
+    THE FAILURE TABLE IS STRUCTURE TOO, and for a second reason. It is the other place a reader
+    lands (`SKILL.md:42` tells them to take it as one packet), and since `body_digest` it is
+    half of what a `verified:` stamp certifies. A digest keyed on a heading spelling is a digest
+    that can be emptied by renaming the heading -- so the two spellings the corpus uses are
+    named here, exactly one per document, rather than left to `_is_anchor` to find or not find.
+    Two spellings, not a pattern: matching a bare "fails" would swallow content sections like
+    "The priority function, and why FIFO fails", which is a section ABOUT a failure.
     """
     problems: list[str] = []
     skip = set(paper_files()) | {INDEX, COVERAGE}
@@ -1188,10 +1354,19 @@ def check_recommendation() -> tuple[list[str], int, int]:
     for path in documents(ROOT):
         if path in skip:
             continue
+        rel = path.relative_to(ROOT)
         body = path.read_text(encoding="utf-8")
         heads = [ln.strip() for ln in body.splitlines() if ln.startswith("## ")]
+        fails = [h for h in heads if h.lower().startswith("## how this fails")
+                 or h.lower().startswith("## when it fails")]
+        if len(fails) != 1:
+            problems.append(
+                f"{rel}: {len(fails)} heading(s) start `## How this fails` or `## When it "
+                f"fails`; exactly one is required. That heading is where a reader's second "
+                f"landing is, and half of what `covers_body` digests -- renaming it would "
+                f"empty that half of a stamp with nothing going red.")
         if not any(h.lower().startswith("## use this") for h in heads):
-            problems.append(f"{path.relative_to(ROOT)}: no `## Use this` section -- it "
+            problems.append(f"{rel}: no `## Use this` section -- it "
                             "surveys rather than recommends, or the recommendation is buried")
             continue
         total += 1
@@ -1292,9 +1467,22 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="what is checked, and what is not")
     ap.add_argument("--selftest", action="store_true",
                     help="assert the reported metrics classify their fixture sets correctly")
+    ap.add_argument("--digest", metavar="DOC",
+                    help="print the two digests a `verified:` stamp for DOC must carry")
     args = ap.parse_args()
     if args.selftest:
         return selftest()
+    if args.digest:
+        # A stamp has to be computable by the human writing it. Before this the only way to
+        # obtain `covers` was to read sources_digest and run it by hand, which is the kind of
+        # friction that ends with a guessed value and a permanently stale stamp.
+        p = Path(args.digest)
+        if not p.exists():
+            p = ROOT / args.digest
+        fm, body = parse_front_matter(p)
+        print(f"covers: {sources_digest(fm)}          # the citation set")
+        print(f"covers_body: {body_digest(body)}     # `## Use this` + the failure table")
+        return 0
     if args.list:
         print(__doc__)
         return 0

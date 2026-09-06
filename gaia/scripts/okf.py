@@ -71,7 +71,17 @@ def _inline_map(raw: str, where: str) -> dict:
         if ":" not in part:
             raise Unparseable(f"{where}: `{part.strip()}` in an inline map has no `key: value`")
         k, v = part.split(":", 1)
-        out[k.strip()] = _scalar(v)
+        k = k.strip()
+        # The same rule parse_front_matter applies at top level. This is the one construct that
+        # carries `id`, `tier` and `locator`, and without it `{ id: x, tier: F, tier: P }` resolved
+        # to P: the document visibly graded the source F, the parser read P, and the
+        # tier-agreement guard compared P against the bibliography's P and passed. Written singly,
+        # `tier: F` is a hard failure -- so written twice it must be one too. Same one-sibling-fixed
+        # shape this file already records for `_inline_list` against `_inline_map`.
+        if k in out:
+            raise Unparseable(f"{where}: duplicate key `{k}` in an inline map; the first would "
+                              "be discarded")
+        out[k] = _scalar(v)
     return out
 
 
@@ -139,10 +149,23 @@ def parse_front_matter(path: Path) -> tuple[dict, str]:
     lines = text.replace("\r\n", "\n").split("\n")
     if not lines or lines[0].strip() != _FENCE:
         raise Unparseable(f"{path}: no OKF front matter (first line is not `---`)")
+    # A fence closes at COLUMN 0 only, as in YAML. `strip()` here accepted `---` at any
+    # indentation, including inside a block scalar -- so a folded `note: >` whose text contained
+    # an indented `---` closed the front matter early, and every key written below it (visibly
+    # inside the fences) vanished into the body without a word. Silent truncation is exactly what
+    # this module's docstring promises never happens.
     try:
-        close = next(i for i in range(1, len(lines)) if lines[i].strip() == _FENCE)
+        close = next(i for i in range(1, len(lines)) if lines[i].rstrip() == _FENCE)
     except StopIteration:
         raise Unparseable(f"{path}: front matter is never closed by `---`") from None
+    # And an indented `---` INSIDE the fences is rejected rather than read as text. Real YAML
+    # would take it as literal content of the block scalar; this subset does not guess which of
+    # the two the author meant, because the two readings put different keys in the front matter.
+    for i in range(1, close):
+        if lines[i].strip() == _FENCE:
+            raise Unparseable(f"{path}:{i + 1}: indented `---` inside the front matter. A fence "
+                              "closes only at column 0, and this parser will not guess whether "
+                              "this was meant as text or as the close")
 
     fm: dict = {}
     key = None

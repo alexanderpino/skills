@@ -71,6 +71,15 @@ tool viewports that need "sea level" visualized without buying the LOD apparatus
 displacement (normals only, unless you march), rasterized motion vectors (derive them analytically
 or the frame ghosts), and cheap handling of many bodies at many elevations.
 
+⚠️ **Guard that divide, or the horizon row is NaN.** At `rayDir.y == 0` the quotient is `±inf` and
+the hit point `camPos.y + t*rayDir.y` is `inf*0 = NaN` — and denormal flush-to-zero, the default on
+many mobile parts, makes exactly-zero reachable from merely very small. Write the acceptance as
+`if (!(t > 0.0 && t < tFar)) discard;`: it rejects the backward hit, the beyond-far hit, and the
+NaN itself, because every comparison against a NaN is false. An absolute `abs(rayDir.y) < eps` test
+is the weaker form of the same guard — it only means something for
+`eps >= abs(camPos.y - h_water) / tFar`, which is `1e-4` for a 2 m camera at 20 km and `1e-2` for a
+1 km camera at 100 km. That is a per-frame number, not a constant to paste.
+
 ## The variance spine, and the four ways distance kills water
 
 Water that reads beautifully at 50 m reads as shrink-wrapped perspex at 5 km. This is a filtering
@@ -98,11 +107,37 @@ facet orientations pushes reflectance *above* Schlick through the middle of the 
 roughness-aware fit captures both, and it is one line [bruneton2010]:
 
 ```hlsl
-float sigma_v = sqrt(sigma_x2*cos2Phi + sigma_y2*sin2Phi);   // slope variance toward the viewer
+float sig2      = sigma_x2*cos2Phi + sigma_y2*sin2Phi;       // the VARIANCE toward the viewer
+float sigma_v   = sqrt(max(sig2, 0.0));                      // its RMS slope -- see the note below
+float cosThetaV = saturate(dot(normalize(N), V));            // normalise HERE, and clamp BOTH ends
 float m = pow(1.0 - cosThetaV, 5.0*exp(-2.69*sigma_v))       // roughness rides in the EXPONENT
         / (1.0 + 22.7*pow(sigma_v, 1.5));
 float F = R + (1.0 - R) * m;                                 // R = F0 from the body's own ior
 ```
+
+⚠️ **Both clamps are load-bearing, and the one-sided version is the trap.** `pow(x, y)` is
+spec-undefined for `x < 0` (GLSL: *"Results are undefined if x < 0"*) and NaN in practice, and a
+NaN written to the colour target is absorbed permanently into TAA history. With a normal blended
+from a detail map and left unrenormalized — the normal case in a water shader — `dot(N, V)`
+exceeds 1 on **50%** of samples at normal incidence, so `1 - cosThetaV` is negative across the
+whole band around the mirror direction and that band goes NaN. Clamping only the top,
+`max(1.0 - cosThetaV, 0.0)`, removes the NaN and leaves the other end open: a back-facing
+`dot(N, V) = -1` gives `1 - cos = 2`, `m = 6.3` and **`F = 6.2`**, energy from nowhere, on **8.8%**
+of pixels at an 85° view. `saturate` closes both ends, and then `m` lands in `[0, 1]` and `F` in
+`[R, 1]` by construction, for every normal a blend can produce. Renormalise at the fetch as well,
+not only here, or every other term still reads the bad normal. `sqrt(max(sig2, 0.0))` is the second
+NaN source and it is not hypothetical: recover the variance as `E[A²] − E[A]²` below and rounding
+alone puts it a ULP under zero on a flat footprint.
+
+⚠️ **`sigma_v` is an RMS slope here, not a variance, and this block says so because
+`water-optics.md` asks the reader to choose deliberately.** [bruneton2010] is not self-consistent
+about the symbol: eq. 25 defines `sigma_v^2` as the view-direction variance, eq. 26 then writes
+`sigma_v`, and Fig. 7's caption labels the fitted axis `sigma_v^2` again. **This block commits to
+reading eq. 26's symbol as the standard deviation** — the `sqrt` is kept, so what the `exp` and the
+`pow(·, 1.5)` see is an RMS slope. Feeding the variance instead is not a rounding difference: over
+Cox–Munk's own mean-square slope at 10–14 m/s it is **2.26–2.34× the reflectance at 85°**, and it
+runs the other way (**0.76–0.79×**) at 45°, so no exposure or `F0` tweak absorbs it. The two
+readings agree exactly at normal incidence, which is why the wrong one survives a spot check.
 
 ⚠️ **`exp(-2.69*sigma_v)` scales the exponent; it is not a factor on the result.** The
 transcription that multiplies Schlick's fifth power by it is a different function: it can only ever
@@ -129,9 +164,39 @@ within the footprint and integrate coverage in closed form [dupuy2012]:
 
 ```
 W ~= 0.5 + 0.5 * erf( (sqrt(2)/(2*sigma_A)) * (eps - mu_A) )
-#  mu_A, sigma_A^2 = footprint mean and variance of the Jacobian
-#  both are linearly prefilterable -> free hardware mipmapping and aniso
+#  eps = wave-models.md's breaking threshold on the Jacobian A
+#  STORE AND MIP THE PAIR (A, A^2), never sigma: A and A^2 are what is linear in A, so
+#  hardware mipmapping and aniso are exact on them. Then, per footprint:
+#     mu_A    = E[A]
+#     sigma_A = sqrt(max(E[A^2] - mu_A*mu_A, 0.0))
 ```
+
+⚠️ **Mip a variance channel and most of the variance is gone.** By the law of total variance a
+footprint's variance is `mean(sub-variances) + variance(sub-means)`, and averaging a stored
+`sigma^2` carries only the first term — which is precisely the term that does *not* grow with the
+footprint. On a synthetic Jacobian field (a resolved swell plus ripple and sub-texel noise) the
+mipped variance channel sits **constant at 0.0014** while the true footprint variance runs
+**0.0042 → 0.0161** from 8×8 to 64×64: **67% to 91% of the answer dropped**, worse as the water
+gets further away. The two terms reconcile to `1.9e-17` when they are both computed, and the
+`(A, A²)` pair reproduces the true variance to **zero error at every footprint** because both of
+its channels really are linear. Under-reported variance narrows the `erf` and suppresses coverage,
+which is this document's own *"far sea loses its speckle"* failure row — reintroduced by the
+prefilter that exists to prevent it.
+
+⚠️ **`erf` is not an HLSL or GLSL intrinsic; the block above will not compile until you supply
+one.** Standard practice is Abramowitz & Stegun's 7.1.26 — a fifth-order rational in
+`1/(1 + p·x)` times `exp(-x²)`, odd-extended below zero — whose published error bound is `1.5e-7`
+(measured 1.4e-7 over ±6), orders below anything foam coverage can resolve; or a single-term
+`tanh` fit where one transcendental is cheaper than five multiplies and an `exp`.
+
+⚠️ **fp16 for the pair only while `|mu_A − 1| ≲ 3·sigma_A`.** `A ≈ 1` on unbroken water, so
+`E[A²] − E[A]²` is a catastrophic cancellation: in fp16 a `sigma_A` of 0.01 recovers as **0.000**,
+a Heaviside where the entire point was a soft edge. Offset-centring — store `(A − 1)` and
+`(A − 1)²` and add the offset back — repairs it while the offset is small against the spread,
+because the cancellation amplifies the format's `2^-11` ULP by `1 + (|mu_A − 1|/sigma_A)²`: **10×
+at 3σ** (measured ≤ 0.2% error in `sigma_A`), 101× at 10σ (3.1%), 901× at 30σ (23.5%). A footprint
+straddling a breaking crest leaves that band, and there the pair goes in **R32G32F**; the memory is
+what the coverage being right costs.
 
 Ground-truth the *amount* against the oceanographic wind→coverage power law, which `wave-models.md`
 states with its no-offset property and its Beaufort cross-check: essentially no foam at 5 m/s,
@@ -168,8 +233,12 @@ The first two are not alternatives: tier 1 gives correct statistics, tier 2 give
 granularity. Ship tier 1 everywhere and tier 2 inside a fade radius.
 
 ⚠️ **The limits on that regression — a 12.5 m wind reference, not the 10 m of standard wind data,
-and a 1–14 m/s calibration range — are stated in `wave-models.md` and are not restated here.** They
-bind every consumer of the variance field, and this is one.
+a 1–14 m/s calibration range, and the anisotropy itself holding only above `U = 2.42 m/s` — are
+stated in `wave-models.md` and are not restated here.** They bind every consumer of the variance
+field, and this is one. The third is the limit this section spends: below that crossing the
+along-wind and crosswind fits swap order, so an elongation driven from them in a light breeze lays
+the glitter streaks 90° wrong. Take the anisotropy from the wind above it and an isotropic lobe
+below, rather than extrapolating an ellipse the data does not support.
 
 ⚠️ **Slicks are a variance effect, not an albedo effect.** Films damp capillary and short gravity
 waves; slicked water measures a factor of 2–3 lower total mean-square slope [coxmunk1954]. An oil
@@ -214,9 +283,12 @@ if (LinearEyeDepth(SceneDepth.Sample(s, uvR)) < waterViewDepth) uvR = uv;   // s
   whose weights do not sum to one:
 
 ```
-L = bedRadiance * exp(-c * rayDistance) + L_scatter * (1 - exp(-K_d * verticalDepth))
+L_w = bedRadiance * exp(-c * rayDistance) + L_scatter * (1 - exp(-K_d * verticalDepth))
+L   = L_w / (n*n)     # crossing back into air. L/n^2 is the invariant, not L
 #  c is beam attenuation along the sightline; K_d is diffuse attenuation down the light column
 #  L_scatter is computed from b_b, K_d and the incident irradiance -- never an authored swatch
+#  L is the refracted_underwater term of the composite above. The lerp's (1-F) is the Fresnel
+#  transmittance and does NOT stand in for the n^2 divisor -- two different factors, both needed
 ```
 
 - **Two distances, and the first one is refracted.** The **ray distance** through water is the
@@ -271,10 +343,17 @@ the frame for closed bodies, and the bed is mostly seen from in the water. Every
   bed. Implement it as a branch on the refracted ray rather than as a vignette texture: past
   `theta_c` there is no transmitted ray to sample at all, so the reflection is the only
   contribution and the boundary is a hard, physical edge that a radial fade cannot imitate.
-- **Divide radiance by `n^2` on the way out.** `L/n^2` is the invariant across the boundary, not
-  `L`; for fresh water the divisor is about **1.78**. Drop it and a lossless body with a white bed
-  returns more light than it received — an energy bug no Fresnel test can catch, because a Fresnel
-  test never crosses the interface.
+- **Divide by `n^2` leaving the water; multiply by `n^2` entering it.** `L/n^2` is the invariant
+  across the boundary, not `L`; for fresh water the factor is about **1.78** and it is the same
+  rule in both directions, not two rules. *Leaving*: the bed-radiance block above carries the
+  divisor. Drop it and a lossless body with a white bed returns more light than it received — an
+  energy bug no Fresnel test can catch, because a Fresnel test never crosses the interface.
+  *Entering*: sky radiance sampled through Snell's window arrives in the water as `n^2` times its
+  above-water value, which is why the window reads **bright** rather than merely undimmed, and a
+  renderer that applies one direction and not the other is out by 1.78 with no term left to absorb
+  it. The two are consistent, and that is the check worth running: the `n^2` gain going in and the
+  `1/n^2` solid angle of the window cancel exactly, so the bed receives precisely the irradiance
+  the surface transmitted and not a photon more.
 - **Underwater fog is the depth-colour pair, re-aimed.** The same `c` and `K_d` — but the camera is
   now *inside* the medium, so `c` runs along the whole camera ray with no refracted segment and no
   surface to start it at, with the column's own glow added exactly as above.
