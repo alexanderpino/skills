@@ -11,6 +11,9 @@ sources:
   - { id: lee2015, tier: P, locator: "READ IN FULL. Section 3.2, eq. 29 — Z_SD = 1/(2.5*K_d_tr) * ln((r_T − r_w_pc)/C_t), the replacement Secchi relation, with eq. 28 the exact form before the K_T ≈ 1.5*K_d approximation; section 4, eq. 33, is the operational version, whose denominator is literally 2.5*Min(K_d(443, 488, 532, 555, 665)) and whose threshold contrast C_t = 0.013 per steradian is fixed on p. 147 from Blackwell 1946. NOTE the paper never writes Z_SD = 1/min(K_d): that shorthand is eq. 33 with the log term collapsed, and it happens to land within about 10 percent only because ln(0.135/0.013)/2.5 ≈ 0.94. Section 4 also carries the validation, N = 338, 18.2 percent mean absolute difference, R^2 = 0.96" }
   - { id: nicodemus1963, tier: P, locator: "the invariance of L over n-squared along a ray and across a smooth boundary. NOT OPENED — American Journal of Physics is paywalled at AIP and no open copy was reachable from here, so no section, equation or page inside it is named" }
   - { id: solonenko2015, tier: P, locator: "the inherent optical properties tabulated per Jerlov water type. NOT OPENED — Applied Optics is paywalled at Optica and the GEOMAR OceanRep copy that OpenAlex lists as open access served an HTML shell rather than the PDF, so no table inside it is named. This matters more than usual here, because the warning this document attaches to the entry is precisely that the circulating K_d tables cannot be traced back to it — and that trace has still not been made" }
+  - { id: gordon1989, tier: P, locator: "the approximation K_d ~= (a + b_b)/mu_d, from which c/K_d = mu_d*(a+b)/(a+b_b) follows with c = a + b. NOT OPENED -- Limnology and Oceanography sits behind a Wiley bot challenge that returned 403 on all four routes tried on 2026-09-06: the DOI resolver, the /doi/ landing page, /doi/pdf/ and the pdfdirect URL OpenAlex lists as open access. So no section, equation or page inside it is named. The reference metadata 34(8), 1389-1409 IS verified, and against Crossref rather than the register that claimed the OA link; the RELATION is not, and is repeated from its standard secondary statement" }
+  - { id: morel1974, tier: F, locator: "molecular scattering of pure water, b_w(500 nm) = 0.0029 1/m falling as lambda^-4.32, with b_b = b/2 for the symmetric Rayleigh phase function. NO LOCATOR -- the chapter was not obtained and NO PAGE RANGE IS GUESSED; Crossref holds no DOI for it. What was verified here is only the containing volume, Open Library edition OL5415268M, Optical aspects of oceanography, edited by N. G. Jerlov and E. Steemann Nielsen, Academic Press 1974, 494 pp. The VALUE is repeated from standard secondary statement, and all this document can show is that it is the value its own printed pure-water table already assumes: with b_b = b/2 and Pope and Fry absorption at 450/500/550/610 nm = 0.00922/0.0204/0.0565/0.2644 1/m -- three of those four are printed in this document, and the 500 nm value is carried from the same popefry1997 secondary table, which is itself NOT OPENED -- it reproduces the printed row 0.90/0.80/0.76/0.75 at mu_d = 0.75 to the last digit, which is internal consistency and NOT verification of b_w" }
+  - { id: mobley1994, tier: F, locator: "the single-scattering source term b*p_tilde(theta_s)*E_d integrated along the view path, and the f/Q form of irradiance reflectance with f/Q ~= 0.09 per steradian at nadir. NO LOCATOR -- not obtained and deliberately not guessed: oceanopticsbook.info, the book's own companion site, served no bytes through this session's network path on three attempts on 2026-09-06, so no chapter, equation or page number is named. NOT OPENED. The only check standing behind the 0.09 is this document's own arithmetic: the isotropic reduction of the single-scattering form gives f/Q -> 1/(4*pi) = 0.0796 per steradian in the weak-scattering limit, and 0.09 is 1.13x that -- again internal consistency, not a reading of Mobley" }
   - { id: schlick1994, tier: P, locator: "the Fresnel approximation R(theta) = R0 + (1 − R0)*(1 − cos theta)^5, and the accuracy the original claims for it. NOT OPENED — Computer Graphics Forum is paywalled at Wiley, the Eurographics digital library copy was not reachable, and every mirror tried returned 403 or 404, so no section or equation inside it is named. The 'about 1 percent of R for common dielectrics' figure in the bibliography entry is therefore UNVERIFIED against the paper; the counter-measurement beside it, +11 percent at grazing and 22 percent low at Brewster, is this repository's own arithmetic against the exact Fresnel equations and does not depend on Schlick's text" }
   - { id: bruneton2010, tier: P, locator: "§5.2 'Sky light', sub-head 'Average Fresnel reflectance' — eq. 26 is the roughness-aware mean-Fresnel fit, plotted against the exact integral in Fig. 7; the view-direction slope variance it takes is eq. 25. Not §3, which is the ocean model" }
   - { id: bornwolf_optics, tier: F, locator: "the exact unpolarised Fresnel reflectance for a dielectric interface, and the Snell relation behind the critical angle. NO LOCATOR — not obtained, and deliberately not guessed. The section number this entry used to carry was withdrawn as unchecked and no edition was ever named; three attempts across two agents have failed on Cambridge, on cambridge.org/core and on five lending-restricted archive.org scans. The physics is canonical; the pointer is not" }
@@ -83,7 +86,7 @@ peer-reviewed [solonenko2015]. This is a bookkeeping rule, not a contested physi
 - **`K_d`** — **diffuse** attenuation. It governs the *ambient light column* with depth.
 
 **The factor between them is not a property of "natural water" — it is one formula.** With
-`c = a + b` and Gordon's (1989) diffuse-attenuation approximation `K_d ≈ (a + b_b)/mu_d`:
+`c = a + b` and Gordon's diffuse-attenuation approximation [gordon1989] `K_d ≈ (a + b_b)/mu_d`:
 
 ```
 c / K_d  =  mu_d * (a + b) / (a + b_b)
@@ -96,7 +99,7 @@ hard: a sun at zenith angle 0 / 30 / 45 / 60° gives `mu_0 = 1.00 / 0.93 / 0.85 
 surface, and a uniform overcast sky gives about **0.86**. The other factor is the water's entire
 contribution, and in **pure water it runs 1.00 to 1.20 across 450–610 nm** — this document's own
 Pope & Fry absorption against molecular scattering, `b_w(500 nm) = 0.0029 m^-1` falling as
-`lambda^-4.32` (Morel 1974), with `b_b = b/2` because the Rayleigh phase function is symmetric. So
+`lambda^-4.32` [morel1974], with `b_b = b/2` because the Rayleigh phase function is symmetric. So
 in clear water the two coefficients agree to within about 25%, and **which of them is
 larger is decided by the sun, not by the water**:
 
@@ -135,7 +138,7 @@ of the view, so it never falls below `cos(theta_c) = 0.6625`.
 
 **`L_scatter` is computed, never an authored swatch** — and computing it is the one place `b_b` and
 `phase_g` are actually spent. Single scattering out of the downwelling beam, integrated down the
-view path, following Mobley (1994):
+view path, following Mobley [mobley1994]:
 
 ```
 B(g)      = (1 - g)/(2*g) * ((1 + g)/sqrt(1 + g*g) - 1)          # HG backscatter fraction
@@ -163,7 +166,7 @@ a viewer above the water can occupy. The exponent inside `T_col` is the same eit
 
 **The cheap form, when the view direction does not matter.** Replace `p` by its back-hemisphere
 mean `B/(2*pi)` and the expression collapses to `b_b/(2*pi*(K_d + c/mu_v))`, with no `g` left in
-it. At nadir that is the `f/Q` irradiance-reflectance form Mobley states:
+it. At nadir that is the `f/Q` irradiance-reflectance form Mobley states [mobley1994]:
 
 ```
 L_scatter ~= (f/Q) * b_b/(a + b_b) * E_d(0-)          # f/Q ~ 0.09 /sr
@@ -391,8 +394,8 @@ The rendering axis owns light transport. What it needs from here, and nothing mo
 | Interior is far too dark | `R_ext` used where `R_int` belonged — a factor of 7.14 | Two names, two numbers, one interface |
 | A lossless pool returns more light than it received | The `n^2` divisor on radiance leaving the water is missing | `L/n^2` is the invariant [nicodemus1963] |
 | Grazing reflections are too bright | Schlick's fit at water's low IOR | Exact unpolarised Fresnel offline [bornwolf_optics]; the sanctioned roughness-aware fit in real time [bruneton2010] |
-| Water looks far murkier than it is | One extinction coefficient fitted to a turbid `c`, applied to the light column | `c/K_d = mu_d*(a+b)/(a+b_b)` — near 1 in clear water, tens in turbid; quote its `mu_d` |
-| The water has depth colour but no body of its own | `L_scatter` left at zero, or authored as a swatch | `b*p(g,th_s)*E_d(0-)/(K_d + c/mu_v)`, with `b = b_b/B(g)` — the phase function applies once |
+| Water looks far murkier than it is | One extinction coefficient fitted to a turbid `c`, applied to the light column | `c/K_d = mu_d*(a+b)/(a+b_b)` [gordon1989] — near 1 in clear water, tens in turbid; quote its `mu_d` |
+| The water has depth colour but no body of its own | `L_scatter` left at zero, or authored as a swatch | `b*p(g,th_s)*E_d(0-)/(K_d + c/mu_v)` [mobley1994], with `b = b_b/B(g)` — the phase function applies once |
 | Extinction blows up toward the horizon | Straight-ray depth difference used as the in-water path | Divide vertical depth by the Snell cosine |
 | A tannin river renders as mud | Turbidity raised to darken it | CDOM darkens without scattering; sediment brightens |
 | Nothing above the surface is visible from below | Snell's window not modelled | Above `theta_c` the surface mirrors the bottom; below it is a ~97° bright circle |

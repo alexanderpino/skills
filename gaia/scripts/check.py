@@ -620,7 +620,19 @@ def selftest() -> int:
     for t, want in pbad:
         print(f"  FAIL  propagation fixture: {t!r} should yield {sorted(want)}, "
               f"got {sorted(section_tokens(t))}")
-    if bad or nbad or ubad or ebad or cbad or rbad or pbad:
+    xbad = [(t, want) for t, want in CROSSREF_FIXTURES if _x_formula(t) != want]
+    for t, want in xbad:
+        print(f"  FAIL  crossref fixture: {t!r} should yield {want}, got {_x_formula(t)}")
+    xpbad = [(t, want) for t, want in CROSSREF_PATH_FIXTURES if _x_is_path(t) != want]
+    for t, want in xpbad:
+        print(f"  FAIL  crossref path fixture: {t!r} should be "
+              f"{'a PATH' if want else 'a formula'}")
+    xrbad = [(t, want) for t, want in CROSSREF_RATIO_FIXTURES if _x_ratios(t) != want]
+    for t, want in xrbad:
+        print(f"  FAIL  crossref ratio fixture: {t!r} should yield {sorted(want)}, "
+              f"got {sorted(_x_ratios(t))}")
+    xbad += xpbad + xrbad
+    if bad or nbad or ubad or ebad or cbad or rbad or pbad or xbad:
         # `ebad` used to gate the exit code and not appear in this sentence, so a run with
         # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
         print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
@@ -629,7 +641,10 @@ def selftest() -> int:
               f"{len(ebad)} of {len(ENTRY_TAG_FIXTURES)} entry-tag fixtures and "
               f"{len(cbad)} of {len(COST_FIXTURES)} cost fixtures and "
               f"{len(rbad)} of {len(ERROR_FIXTURES)} error fixtures and "
-              f"{len(pbad)} of {len(PROPAGATION_FIXTURES)} propagation fixtures misclassified.")
+              f"{len(pbad)} of {len(PROPAGATION_FIXTURES)} propagation fixtures and "
+              f"{len(xbad)} of "
+              f"{len(CROSSREF_FIXTURES) + len(CROSSREF_PATH_FIXTURES) + len(CROSSREF_RATIO_FIXTURES)}"
+              f" crossref fixtures misclassified.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
           f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct; "
@@ -637,7 +652,10 @@ def selftest() -> int:
           f"entry tag: {len(ENTRY_TAG_FIXTURES)}/{len(ENTRY_TAG_FIXTURES)} correct; "
           f"cost unit: {len(COST_FIXTURES)}/{len(COST_FIXTURES)} correct; "
           f"error: {len(ERROR_FIXTURES)}/{len(ERROR_FIXTURES)} correct; "
-          f"propagation: {len(PROPAGATION_FIXTURES)}/{len(PROPAGATION_FIXTURES)} correct.")
+          f"propagation: {len(PROPAGATION_FIXTURES)}/{len(PROPAGATION_FIXTURES)} correct; "
+          f"crossref: {len(CROSSREF_FIXTURES)}/{len(CROSSREF_FIXTURES)} formula, "
+          f"{len(CROSSREF_PATH_FIXTURES)}/{len(CROSSREF_PATH_FIXTURES)} path, "
+          f"{len(CROSSREF_RATIO_FIXTURES)}/{len(CROSSREF_RATIO_FIXTURES)} ratio correct.")
     return 0
 
 
@@ -919,6 +937,347 @@ def check_section_reach() -> tuple[list[str], int, int]:
                     f"  ....  {d.relative_to(ROOT)}: section '{h}' reaches neither "
                     f"`## Use this` nor the failure table")
     return problems, unreachable, total
+
+
+# ── check_crossrefs: does a value agree at both ends of a link? ───────────────────────────────
+# Superscripts and `N × 10^M` are folded into ordinary floats BEFORE anything is compared. This
+# is not cosmetic. `U = 5×10⁻⁴ m/yr` and `U = 0.0005 m/yr` are the same measurement written two
+# ways, and without the fold the guard read them as {5, 10} against {0.0005} and reported three
+# corpus-wide disagreements that were all the same number. Folding removed all three.
+_SUPS = "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻"
+_SUP_MAP = str.maketrans(_SUPS, "0123456789+-")
+_SUP_RUN = re.compile(f"[{_SUPS}]+")
+_SCI = re.compile(r"(?<![A-Za-z0-9_.])(\d+(?:\.\d+)?)\s*\*\s*10\^(-?\d+)")
+# A number, exponent included. `1.2e-7` must be ONE token: reading it as `1.2` + an identifier
+# `e` + `7` invented a shared key `e|x` and reported planetary-precision.md against
+# shader-craft.md for two unrelated ULP figures.
+_XNUM = re.compile(r"(?<![A-Za-z0-9_.])\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+_XIDENT = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*")
+_XSPAN = re.compile(r"`([^`\n]+)`")
+_XSYM = r"[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)?"
+_XRATIO = re.compile(rf"^({_XSYM})\s*/\s*({_XSYM})$")
+# The same ratio with the slash OUTSIDE the code spans -- water-optics.md writes `c`/`K_d`.
+_XSPLIT_RATIO = re.compile(rf"`({_XSYM})`\s*/\s*`({_XSYM})`")
+# `c` typically runs 5–20× `K_d`  -- a multiplier magnitude standing between two named symbols.
+_XMULT = re.compile(rf"`(?P<s1>{_XSYM})`[^`]{{0,80}}?"
+                    r"\d+(?:\.\d+)?(?:\s*[–—-]\s*\d+(?:\.\d+)?)?\s*[×x]"
+                    rf"[^`]{{0,80}}?`(?P<s2>{_XSYM})`")
+_XPATHY = re.compile(r"://|\.(?:md|py|tsv|cs|json|glsl|hlsl)\b")
+_XSLUG = re.compile(r"[\w.-]+(?:/[\w.-]+)+")
+_XFAILS = re.compile(r"^## +(?:How this fails|When it fails).*$", re.M)
+_XOPS = "*/+^"
+
+
+def _x_norm(s: str) -> str:
+    """One spelling of arithmetic, so `·`, `×`, `⁻⁴` and `5×10⁻⁴` compare with `*`, `^-4`, `0.0005`."""
+    for a, b in (("·", "*"), ("×", "*"), ("−", "-"),
+                 ("≈", "="), ("≃", "=")):
+        s = s.replace(a, b)
+    s = _SUP_RUN.sub(lambda m: "^" + m.group(0).translate(_SUP_MAP), s)
+
+    def fold(m: re.Match) -> str:
+        try:
+            return repr(float(m.group(1)) * 10 ** int(m.group(2)))
+        except (OverflowError, ValueError):
+            return m.group(0)      # `10^400` overflows a float; leave it as written
+    return _SCI.sub(fold, s)
+
+
+def _x_is_path(span: str) -> bool:
+    """A file path or a branch name is not a formula, even though `/` is an operator.
+
+    The first version of this test was `[a-z]/[a-z]` anywhere in the span, which also ate
+    `dt <= 0.50·dx/sqrt(g·A/l)` -- a real formula -- and with it the 0.50 that the shallow-water
+    failure row is checked against. A path is now required to be path-SHAPED: no spaces, no
+    brackets, and either an extension, a scheme, two separators, or a hyphen or dot inside.
+    """
+    if _XPATHY.search(span):
+        return True
+    return ("/" in span and _XSLUG.fullmatch(span) is not None
+            and ("-" in span or "." in span or span.count("/") > 1))
+
+
+def _x_formula(span: str) -> tuple[str, tuple[float, ...]] | None:
+    """A code span -> (identifier-set key, the numeric constants it prints), or None.
+
+    The KEY is the set of identifiers, not the expression's shape, so `sqrt(2·g·A/l)` and
+    `sqrt(g·A/l)` land on the same key and their constants can be compared. Two identifiers and
+    one operator are required: a bare symbol names a quantity rather than asserting a value.
+    """
+    s = _x_norm(span)
+    if not any(c in _XOPS for c in s):
+        return None
+    vals = tuple(sorted({float(n) for n in _XNUM.findall(s)}))
+    ids = sorted(set(_XIDENT.findall(_XNUM.sub(" ", s))))
+    if len(ids) < 2:
+        return None
+    return "|".join(ids), vals
+
+
+def _x_ratios(block: str) -> set[str]:
+    """Ratio keys a block claims a magnitude for: `c/K_d`, or "`c` runs 5–20× `K_d`"."""
+    out: set[str] = set()
+    for m in _XSPAN.finditer(block):
+        r = _XRATIO.match(m.group(1).strip())
+        if r:
+            out.add(f"{r.group(1)}/{r.group(2)}")
+    if block.startswith("```"):
+        for m in re.finditer(rf"(?<![A-Za-z0-9_/])({_XSYM})\s*/\s*({_XSYM})(?![A-Za-z0-9_/])",
+                             block):
+            out.add(f"{m.group(1)}/{m.group(2)}")
+    for m in _XSPLIT_RATIO.finditer(block):
+        out.add(f"{m.group(1)}/{m.group(2)}")
+    for m in _XMULT.finditer(block):
+        out.add(f"{m['s1']}/{m['s2']}")
+    return out
+
+
+def _x_blocks(text: str, base: int = 1) -> list[tuple[int, str]]:
+    """(first line, text) per paragraph, fenced block, table row, or `- **id**` entry.
+
+    A table ROW and a bibliography ENTRY are their own blocks. Lumping the failure table into one
+    paragraph, or a bibliography into one list, pools every number in it -- and pooling is what
+    let the whole of papers-simulation.md's number set stand in for one entry's, which hid the
+    `iop_split` disagreement this guard exists to find.
+    """
+    out: list[tuple[int, str]] = []
+    buf: list[str] = []
+    start, fence = base, False
+    for i, line in enumerate(text.split("\n"), base):
+        if line.startswith("```"):
+            if not fence and buf:
+                out.append((start, "\n".join(buf)))
+                buf = []
+            fence = not fence
+            if fence:
+                start = i
+            buf.append(line)
+            if not fence:
+                out.append((start, "\n".join(buf)))
+                buf = []
+            continue
+        if fence:
+            buf.append(line)
+            continue
+        if line.startswith("|") or line.startswith("- **"):
+            if buf:
+                out.append((start, "\n".join(buf)))
+                buf = []
+            out.append((i, line))
+            continue
+        if not line.strip():
+            if buf:
+                out.append((start, "\n".join(buf)))
+                buf = []
+            continue
+        if not buf:
+            start = i
+        buf.append(line)
+    if buf:
+        out.append((start, "\n".join(buf)))
+    return out
+
+
+def _x_side(text: str, base: int = 1) -> tuple[dict, dict]:
+    """One end of a link, as two key -> (values, first line) tables: formulas and ratios.
+
+    A formula's value is the tuple of constants IN ITS OWN SPAN, and a side holds the SET of
+    those tuples -- not their union. The difference is load-bearing. shallow-water.md's body
+    prints both `2A/l` and `A/l` in one sentence ("`2A/l`, not `A/l`, is the effective depth"),
+    so under a union the body reads {2} against the table's {} and the guard cries wolf. As a set
+    of tuples the body holds {(2,), ()}, the table holds {()}, they intersect, and it stays
+    quiet. A ratio's value IS a flat set: the magnitude sits in the prose around the symbol, not
+    inside it.
+    """
+    f: dict[str, list] = {}
+    r: dict[str, list] = {}
+    for ln, block in _x_blocks(text, base):
+        clean = _XSPAN.sub(lambda m: " " if _x_is_path(m.group(1)) else m.group(0), block)
+        for m in _XSPAN.finditer(clean):
+            k = _x_formula(m.group(1).strip())
+            if k is None:
+                continue
+            slot = f.setdefault(k[0], [set(), ln])
+            slot[0].add(k[1])
+        nums = {float(n) for n in _XNUM.findall(_x_norm(clean))}
+        if not nums:
+            continue
+        for key in _x_ratios(clean):
+            slot = r.setdefault(key, [set(), ln])
+            slot[0] |= nums
+    return f, r
+
+
+# The two ends of each real instance this guard was built from, plus the normalisations that
+# had to exist before they compared at all. `--selftest` asserts every row.
+CROSSREF_FIXTURES = [
+    ("sqrt(2·g·A/l)", ("A|g|l|sqrt", (2.0,))),      # shallow-water.md's body
+    ("sqrt(g·A/l)", ("A|g|l|sqrt", ())),            # its failure table, before the fix
+    ("A ≈ h·lx/2", ("A|h|lx", (2.0,))),
+    ("A ≈ h·lx", ("A|h|lx", ())),
+    ("U = 5×10⁻⁴ m/yr", ("U|m|yr", (0.0005,))),     # folded, so it equals `U = 0.0005 m/yr`
+    ("Δt ≤ Δx²/(4D)", ("D|t|x", (2.0, 4.0))),       # a superscript is a constant, not decoration
+    ("x · 1.2e-7", None),                           # `e` is an exponent, never an identifier
+    ("K_d", None),                                  # a bare symbol names, it does not assert
+    ("1/(b − b_b)", ("b|b_b", (1.0,))),             # the clean corpus's one false positive,
+    ("b_b = b/2", ("b|b_b", (2.0,))),               # pinned: two formulas, one identifier pair
+]
+# A path is not a formula. The second row is the span the first version of `_x_is_path` ate.
+CROSSREF_PATH_FIXTURES = [
+    ("references/papers-flow.md", True),
+    ("dt <= 0.50·dx/sqrt(g·A/l)", False),
+    ("origin/claude/swimming-pool-voronoi-render-m22g6r", True),
+    ("terrain-architect/references/28-liquids.md", True),
+    ("c/K_d", False),
+    ("b_b/b", False),
+]
+CROSSREF_RATIO_FIXTURES = [
+    ("the observation that `c` typically runs 5–20× `K_d` because natural water "
+     "scatters strongly forward", {"c/K_d"}),       # papers-simulation.md's `iop_split`, as it was
+    ("A `c`/`K_d` ratio quoted without its `mu_d` is not a number", {"c/K_d"}),
+    ("their backscatter ratio `b_b/b` is about 0.018", {"b_b/b"}),
+    ("its signal speed is `sqrt(g·A/l)`, fixed by parameters", set()),
+]
+
+
+def check_crossrefs() -> tuple[list[str], int, int, int, int]:
+    """Does a NUMBER agree at both ends of a link this corpus already draws?
+
+    WHY THIS EXISTS. A correction landing at one end only is this corpus's most-recorded defect;
+    it has been found BY HAND five times in two days. Every instance is the same shape -- one
+    site is rewritten and a second site that prints the same quantity is not:
+      * shallow-water.md's body said `sqrt(2·g·A/l)` while its own failure table said `sqrt(g·A/l)`
+      * papers-simulation.md's `iop_split` entry kept the "5–20×" that water-optics.md replaced
+      * water-rendering.md printed `exp(-K_d*z)` after water-optics.md derived `exp(-(K_d+c/mu_v)*z)`
+      * mask-to-material.md retracted a claim at :217 and restated it at :169
+      * heightfield-raymarching.md's front-matter locator still credited Dummer after the body moved
+    `check_propagation` already ties the two ends of a citation on WHICH SECTION. This ties two
+    ends on WHAT NUMBER.
+
+    HOW IT DECIDES. Both ends must be linked already, by one of three relations the corpus
+    writes for itself: a document's body against its own failure table; a document against
+    another it NAMES in prose (`water-optics.md`); a document against the BIBLIOGRAPHY ENTRY it
+    cites (`[iop_split]`). On each end it extracts *keyed magnitudes* -- a formula keyed by its
+    identifier set and valued by the constants in the span, and a ratio (`c/K_d`, or "`c` runs
+    5–20× `K_d`") valued by the numbers printed around it. A key present at both ends whose
+    values neither match nor overlap is reported. Across two documents both ends must actually
+    print a constant; within one document a MISSING constant counts, because a failure row
+    restates the body's own quantity and dropping the factor there is the shallow-water defect
+    exactly.
+
+    ⚠️ IT DOES NOT CATCH THREE OF THE FIVE INSTANCES ABOVE, AND ONE MISS IS MEASURED, NOT
+    SUSPECTED. Reconstruct water-rendering.md at 49d1b94^ -- `exp(-K_d * verticalDepth)` where
+    water-optics.md derives `exp(-(K_d + c/mu_v) * verticalDepth)` -- and this check reports
+    NOTHING. The correction added a TERM, so the identifier set changed from
+    `{exp, K_d, verticalDepth}` to `{exp, K_d, c, mu_v, verticalDepth}`, the two ends no longer
+    share a key, and nothing is ever compared. The instrument sees a constant that moved; a
+    correction that renames, rewords, adds or drops a term is invisible to it. mask-to-material's
+    retraction (prose, no number) and heightfield-raymarching's locator (an attribution, and in
+    front matter, which this does not read) are outside its reach for the same reason.
+
+    ⚠️ AND ITS REACH IS THE POINT. Measured 2026-09-06 on a 39-document tree: only 103 of 1101
+    linked side-pairs share a single keyed magnitude at all. For the other 91% there is nothing
+    to compare and a green line here says nothing whatever about them. The two numbers move with
+    the corpus; the run prints the current pair, and the ratio is what to read.
+
+    ⚠️ IT HAS FALSE POSITIVES, AND THE ONE ON THE CLEAN CORPUS IS NAMED SO NOBODY HUNTS IT
+    TWICE. caustics.md's scattering length `1/(b − b_b)` and water-optics.md's Rayleigh
+    backscatter `b_b = b/2` share the identifier pair `{b, b_b}` and print 1 against 2. They are
+    two different formulas, not two versions of one, and no lexical rule separates them --
+    the same number meaning different things is this instrument's characteristic error.
+
+    REPORTED, not enforced, like approximation / reach / locators / unread. Its output is
+    CANDIDATES for a human, it does not discharge the hand review, and an OPEN row in
+    registers/guard-proofs.tsv records the measured miss above.
+    """
+    docs = [p for p in documents(ROOT) if p not in (INDEX, COVERAGE)]
+    papers = set(paper_files())
+    techs = [p for p in docs if p not in papers]
+    names = {p.name for p in techs}
+
+    sides: dict[str, tuple[dict, dict, str]] = {}
+    for d in techs:
+        try:
+            text = d.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        base = _offset(d)
+        body = "\n".join(text.split("\n")[base - 1:])
+        m = _XFAILS.search(body)
+        cut = m.start() if m else len(body)
+        head = base + body[:cut].count("\n")
+        sides[f"{d.name}#body"] = _x_side(body[:cut], base) + (d.name,)
+        sides[f"{d.name}#fails"] = _x_side(body[cut:], head) + (d.name,)
+    entry_side: dict[str, str] = {}
+    for p in sorted(papers):
+        try:
+            lines = p.read_text(encoding="utf-8").split("\n")
+        except OSError:
+            continue
+        off = _offset(p)
+        for i, line in enumerate(lines[off - 1:], off):
+            m = _ID_OPENER.match(line)
+            if m:
+                cid = line.split("**")[1]
+                sides[f"{p.name}#{cid}"] = _x_side(line, i) + (p.name,)
+                entry_side[cid] = f"{p.name}#{cid}"
+
+    pairs: set[tuple[str, str]] = set()
+    for d in techs:
+        try:
+            text = d.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        pairs.add((f"{d.name}#body", f"{d.name}#fails"))
+        for m in re.finditer(r"([a-z0-9][a-z0-9-]*\.md)", text):
+            other = m.group(1)
+            if other in names and other != d.name:
+                for h in ("body", "fails"):
+                    for g in ("body", "fails"):
+                        pairs.add(tuple(sorted((f"{d.name}#{g}", f"{other}#{h}"))))
+        for m in _MARKER.finditer(text):
+            if m.group("id") in entry_side:
+                for g in ("body", "fails"):
+                    pairs.add(tuple(sorted((f"{d.name}#{g}", entry_side[m.group("id")]))))
+
+    problems: list[str] = []
+    seen: set[tuple] = set()
+    compared = reach = 0
+    for a, b in sorted(pairs):
+        if a not in sides or b not in sides:
+            continue
+        fa, ra, na = sides[a]
+        fb, rb, nb = sides[b]
+        shared_f = sorted(set(fa) & set(fb))
+        shared_r = sorted(set(ra) & set(rb))
+        compared += len(shared_f) + len(shared_r)
+        reach += 1 if (shared_f or shared_r) else 0
+        for k in shared_f:
+            va, vb = fa[k][0], fb[k][0]
+            ua = {x for tup in va for x in tup}
+            ub = {x for tup in vb for x in tup}
+            if (va & vb) or (ua & ub):
+                continue
+            if na != nb and not (ua and ub):
+                continue          # a bare mention in another document is normal usage
+            if (na, nb, "f", k) in seen:
+                continue
+            seen.add((na, nb, "f", k))
+            problems.append(
+                f"  ....  references/{na}:{fa[k][1]} and references/{nb}:{fb[k][1]} both print "
+                f"the expression over `{k.replace('|', '`, `')}`, with constants "
+                f"{sorted(ua) or 'none'} at the first and {sorted(ub) or 'none'} at the second. "
+                f"One end may have been corrected and the other not")
+        for k in shared_r:
+            va, vb = ra[k][0], rb[k][0]
+            if va & vb or (na, nb, "r", k) in seen:
+                continue
+            seen.add((na, nb, "r", k))
+            problems.append(
+                f"  ....  references/{na}:{ra[k][1]} and references/{nb}:{rb[k][1]} give the "
+                f"ratio `{k}` magnitudes that do not overlap: {sorted(va)[:6]} against "
+                f"{sorted(vb)[:6]}. One end may have been corrected and the other not")
+    return problems, len(problems), compared, reach, len(pairs)
 
 
 def check_orphans(bib: dict[str, dict], used: set[str]) -> list[str]:
@@ -1567,6 +1926,25 @@ def main() -> int:
               f"most of what remains is generic navigational headings with nothing to match. "
               f"Reported, not enforced, and it does not discharge the hand review; see "
               f"registers/guard-proofs.tsv.")
+
+    _x_problems, xdis, xcmp, xreach, xpairs = check_crossrefs()
+    if xpairs:
+        print(f"crossrefs {xdis}/{xcmp} shared keyed magnitudes DISAGREE across the "
+              f"{xreach}/{xpairs} linked side-pairs that print one at both ends -- a document "
+              f"against its own failure table, against a document it names, or against the "
+              f"bibliography entry it cites. A correction landing at one end only is this "
+              f"corpus's most-recorded defect, found by hand five times in two days. "
+              f"⚠️ Its reach is {100 * xreach / xpairs:.0f}% of linked pairs: for the rest there "
+              f"is nothing to compare and this line says nothing about them. ⚠️ It DOES NOT "
+              f"catch three of the five instances that motivated it -- reconstructing "
+              f"water-rendering.md's `exp(-K_d*z)` against water-optics.md's "
+              f"`exp(-(K_d + c/mu_v)*z)` reports NOTHING, because the correction added a TERM "
+              f"and the two ends stop sharing a key. It sees a constant that moved, never a "
+              f"rewording. Output is CANDIDATES with a known false positive (caustics.md's "
+              f"`1/(b − b_b)` against water-optics.md's `b_b = b/2`, two formulas over one "
+              f"identifier pair). Reported, not enforced; see registers/guard-proofs.tsv.")
+        for p in _x_problems:
+            print(p)
 
     sharp, tot, noart, _vague = locator_quality()
     if tot:

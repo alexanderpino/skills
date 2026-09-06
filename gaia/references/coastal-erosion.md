@@ -13,11 +13,11 @@ sources:
 ---
 # Coastal erosion — the shore profile, and why a coast smooths
 
-Everything else in this skill's erosion axis **roughens**. Stream power cuts valleys into a
-surface and makes the divides between them sharper; thermal relaxation smooths, but only locally,
-and only to a repose angle. The coast is the one process in the corpus whose governing equation is
-the **heat equation** — the one-line shoreline model is a diffusion equation, literally, in the
-form its authors write it [ashton2006b]. A coastline is the place where the terrain gets *simpler*.
+**Tier: authoring-time.** Everything else in this skill's erosion axis **roughens**. Stream power
+cuts valleys into a surface and sharpens the divides between them; thermal relaxation smooths, but
+only locally and to a repose angle. The coast is the corpus's one process whose governing equation
+is the **heat equation** — the one-line shoreline model is a diffusion equation, literally, in the
+form its authors write it [ashton2006b]. A coastline is where the terrain gets *simpler*.
 
 And then there is the twist that makes the subject worth a document: **that diffusivity changes
 sign.** Above a deepwater wave approach angle of about 42° it is negative, the equation runs
@@ -97,11 +97,11 @@ different beach out of different sand. Dean's two published anchors [dean1991]:
 | 0.6 mm (coarse sand) | 0.20 |
 
 and the fitted relation to settling velocity `w` in cm/s, `A = 0.067·w^0.44` [dean1991]. Inverting
-that at Dean's own two anchors gives `w = 2.49 cm/s` and `w = 12.0 cm/s`; running it forward,
-`A` moves only **3.74×** across a 20× range of settling velocity, because the exponent 0.44 is a
-strong damper. **So `A` is a narrow knob.** Expose it as grain size, give it a 0.05–0.25 range,
-and do not expect it to be the control that makes two coasts look different — that is the wave
-climate's job, not the sand's.
+that at Dean's own two anchors gives `w = 2.49 cm/s` and `w = 12.0 cm/s`; running it forward, `A`
+moves only **2×** across that 4.83× range of settling velocity, because the exponent 0.44 is a
+strong damper — it would take a 20× range of `w` to move `A` by 3.74×. **So `A` is a narrow
+knob.** Expose it as grain size, give it a 0.05–0.25 range, and do not expect it to be the control
+that makes two coasts look different — that is the wave climate's job, not the sand's.
 
 What `A` *does* control is width, and width is what a heightfield sees. With `x` measured from the
 waterline out to a closure depth `h*`, the seaward limit is `W* = (h*/A)^(3/2)` [dean1991]:
@@ -175,10 +175,10 @@ equation. Grain size does the same thing in the other direction: at `h* = 8 m`, 
 0.10 to 0.20 takes the retreat from 21.5 m to 7.6 m.
 
 **So: use the Bruun rule as a scale hint and never as an operator.** It tells you that a shoreline
-responds to sea level by tens of metres per decimetre, which is genuinely useful when you are
-deciding whether sea level is a slider worth having. It does not tell you where the shoreline
-goes, it cannot produce a shape, and a coastline node built on it will translate every coast
-uniformly — which is precisely the behaviour [cooper2004] says does not happen in nature.
+responds to sea level by 7.2 m per decimetre in the case worked above, which is genuinely useful
+when you are deciding whether sea level is a slider worth having. It does not tell you where the
+shoreline goes, it cannot produce a shape, and a coastline node built on it will translate every
+coast uniformly — which is precisely the behaviour [cooper2004] says does not happen in nature.
 
 ## Plan view: the one-line model is a diffusion equation
 
@@ -233,11 +233,11 @@ r.m.s. constant, `T = 10 s`, `H0 = 1 m`, waves straight on, and a 10 m shoreface
 | 100 km | 149 yr | 786 yr |
 
 Those are upper-bound rates — real climates spend most of their time at angles that reduce `|μ|`,
-and the net over a wave record is what [ashton2006b] eq. (5) computes. But the **`L²` scaling is
-the design fact**, and it is the reason a coastline reads the way it does: metre-scale wiggles are
-erased within a day, kilometre-scale ones within a month, and only the hundred-kilometre features
-survive long enough to record anything else. Halving the wave height costs a factor of 5.3 in
-rate, because `H^(12/5)`.
+and the net over a wave record needs a climate-averaged `μ` — **unsourced here**, outside this
+file's [ashton2006b] locator. But the **`L²` scaling is the design fact**, and it is the reason a
+coastline reads the way it does: metre-scale wiggles are erased within a day, kilometre-scale ones
+within a month, and only the hundred-kilometre features survive long enough to record anything
+else. Halving the wave height costs a factor of 5.3 in rate, because `H^(12/5)`.
 
 **This is the exact opposite of the fluvial axis, and the contrast is the point.** `stream-power.md`
 describes an *advective* process: knickpoints propagate upstream, a signal travels and is
@@ -285,10 +285,10 @@ Three consequences a tool must respect:
 
 - **A single wave direction is a modelling decision with a visible outcome.** 42.4° of the 0–90°
   range is stable and the remaining **52.9%** is unstable, so a coast forced by one direction is
-  overwhelmingly likely to be in one regime or the other, permanently. Real coasts are marginal:
-  [ashton2006b] §3.3 computes an instability index of 0.02 — essentially balanced — for the Outer
-  Banks. **Drive the model with a wave-angle distribution, not a vector**, and the balance between
-  smooth and cuspate becomes a knob.
+  overwhelmingly likely to be in one regime or the other, permanently. Real coasts sit near the
+  balance point — asserted here and **unsourced**: the instability index [ashton2006b] reports for
+  the Outer Banks is outside this file's declared locator. **Drive the model with a wave-angle
+  distribution, not a vector**, and the balance between smooth and cuspate becomes a knob.
 - **It is not unique to CERC.** [ashton2006b] compares five transport formulations and every one
   has a deepwater maximum, between 35° and 50°; the threshold is a consequence of energy
   conservation and Snell's law, not of one empirical fit. So the instability is not an artefact
@@ -315,8 +315,8 @@ Three things follow, and each is a modelling instruction:
   is intrinsically episodic; p. 3 reports a ~130-year mean retreat of 5.8 ± 4.0 cm/yr at one site
   and 5.9 ± 4.3 cm/yr at another, against a **2–25 cm/yr range along ~2 km of the same coast**,
   attributed to "the stochastic pattern of erosion in space and time". A cliff operator that
-  retreats every cell by the mean rate produces a smooth wall and is wrong by more than an order
-  of magnitude locally. Retreat in blocks, at intervals, or not at all.
+  retreats every cell by the mean rate produces a smooth wall and is wrong by up to **4.3×**
+  locally, in a field spanning 12.5×. Retreat in blocks, at intervals, or not at all.
 - **The forcing is concentrated at one elevation.** Retreat in that model is driven exclusively at
   the **cliff foot**, with subaerial weathering and groundwater unrepresented [shadrick2022]. So
   the operator is a *notch* cut in a band around sea level, and the face above it fails by
@@ -366,7 +366,7 @@ later processes would destroy.
 | You need a coastline *shape* | One-line diffusion, never Bruun | Bruun translates uniformly; [cooper2004] is the reason not to trust that |
 | Sandy coast, waves mostly shore-normal | Positive `μ` — the coast smooths, fast at small `L` | `τ = L²/(4π²μ)`; metre-scale wiggles die in hours |
 | Sandy coast, waves mostly oblique | Negative `μ` — capes and spits grow | Past 42.392° the diffusion runs backwards [ashton2006b] |
-| You want both on one map | Give the wave climate an angular distribution | Real coasts sit near the balance point [ashton2006b] |
+| You want both on one map | Give the wave climate an angular distribution | One direction picks a permanent regime, and every formulation [ashton2006b] compares peaks somewhere in 35°–50° |
 | Rock coast | Threshold on `F_R`, notch at the foot, repose collapse above | A cliff has no sediment budget to diffuse [shadrick2022] |
 | Cliff with a wide beach | Suppress the notch | The waves do not reach the foot |
 | A river mouth | Fixed sediment input, then let the shoreline model spread it | Advective process meeting a diffusive one; see `stream-power.md` |

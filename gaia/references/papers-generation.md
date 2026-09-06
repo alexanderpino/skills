@@ -324,6 +324,28 @@ axis is sent, so they are restated:
   companion term in the stream-power equation. ⚠️ **Not obtained** — behind JSTOR, no open copy
   reachable, so no section or equation inside it is cited anywhere here.
 
+## Resolution and grid scaling
+
+- **skinner2023** `P` — Skinner, C.J. & Coulthard, T.J. (2023). *Testing the sensitivity of the
+  CAESAR-Lisflood landscape evolution model to grid cell size.* Earth Surface Dynamics 11,
+  695–711. doi:10.5194/esurf-11-695-2023. Open access, CC-BY 4.0; **read in full from the
+  publisher's PDF.** — The one study in this bibliography that varies cell size as a parameter
+  and measures what moves. Its §2.1 resamples a single 2 m photogrammetric DEM of Tin Camp Creek
+  (0.5 km², Northern Territory) to every cell size from 2 to 30 m in 2 m steps plus a 50 m grid,
+  so each run is the *same ground* at a different sampling density — a refinement series on real
+  terrain rather than on a synthetic field. Its §3.1 and Table 3 tabulate which of fifteen output
+  metrics hold and where each one breaks down; §3.3 and Fig. 5 carry the drainage-network result,
+  including the sentence that makes network connectivity a **non-monotonic** function of
+  resolution rather than a smoothly degrading one; §4.1 and the abstract carry the warning that a
+  headline metric can hold while the behaviour producing it has changed. ⚠️ Its §1 reports three
+  earlier results at second hand — Hancock & Evans (2006) on the area–slope relationship across
+  10–50 m grids, Finlayson & Montgomery (2003) on mean slope from 30 to 90 to 900 m, and Hancock
+  et al. (2016) on random perturbations that leave basin sediment yield alone while changing local
+  patterns. None of those three was obtained here, so each is quoted as Skinner & Coulthard report
+  it and never as read.
+- **selfaffine_slope** `F` — No single canonical source. The corollary that a finite-difference slope taken over a lag `Δx` on a self-affine surface of Hurst exponent `H` scales as `Δx^(H−1)`, so a slope threshold does not transfer between sampling densities and is not a length that can be re-expressed in metres. The self-affine scaling of topography itself — expected height increment over a lag `L` going as `L^H` — is textbook and far older than this bibliography; the one-line consequence for a *discrete gradient* has no single citable origin and is measured here instead, on a seeded spectral fBm box-averaged over a 16× range. ⚠️ The measured exponents run 3.7%, 6.8% and 27% steeper than `H−1` at `H` = 0.4, 0.6 and 0.8, so the gap widens with `H`; the harness does not separate the box filter's own transfer function from the field's exponent, so the **direction** is certain and the exponent is approximate. `terrain-analysis-masks.md` states the same dependence without an exponent, and `skinner2023` §1 reports two published statements of it at second hand. [no-artefact]
+- **grid_unit_transfer** `F` — No canonical source. The conversion of an erosion coefficient between the two unit systems terrain codes routinely mix — heights in metres, horizontal distances counted in *cells*. For `E = K·A^m·S^n` it gives `K_grid = K_SI·Δx^(2m−n)`, so a coefficient tuned on one grid transfers unchanged exactly when `n = 2m`; the field's default pair `m = 0.5, n = 1` sits on that line and no other common pair does, which is why the defect is invisible at the defaults. Dimensional bookkeeping rather than a finding, and confirmed by arithmetic rather than cited. `stream-power.md` and `driver-fields.md` carry the SI dimensions of `K_A` and `K_Q`; neither states the cell-size exponent, because in SI there is none. [no-artefact]
+
 ## Layered rock and stratigraphy
 
 

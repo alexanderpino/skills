@@ -19,7 +19,7 @@ of the exponent, constant across each power-of-two band and doubling at the next
 is read straight off IEEE 754 binary32 — it is the definition of the format's ULP, not a result
 borrowed from any source below, and nothing here cites a paper for it. The column below
 is the **exact** spacing at each listed magnitude, not the `x · 1.2e-7` upper bound — that bound is
-the spacing just under a power of two and runs up to 2× high everywhere else, which is enough to
+tight just *above* a power of two and runs up to 2× high just *under* the next, which is enough to
 make two documents in this corpus quote different numbers for the same distance.
 
 | Distance from origin | float32 spacing (exact ULP) | Consequence |
@@ -32,8 +32,8 @@ make two documents in this corpus quote different numbers for the same distance.
 
 Read each row as "the spacing at *this* magnitude", not as a bound over the decade: at 900 km the
 spacing is still 6.25 cm, and it doubles to 12.5 cm the moment `x` crosses 2^20 m ≈ 1 049 km.
-`noise-and-warping.md` quotes the same 7.8 mm at 100 km; if a third document ever disagrees, it is
-quoting the bound rather than the ULP.
+`noise-and-warping.md` quotes ~8 mm at 100 km, which is this table's 7.8 mm rounded; a document
+quoting the bound instead would say 12 mm there, and that is the disagreement to look for.
 
 An open-world game hits this on a flat map without ever leaving the ground. Half of what gets
 reported as "planet renderer bugs" is this table with scenery attached.

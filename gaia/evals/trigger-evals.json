@@ -159,7 +159,8 @@
     "should_trigger": true,
     "routes_to": [
       "node-graph-runtime.md",
-      "layering-filters-and-masks.md"
+      "layering-filters-and-masks.md",
+      "resolution-independence.md"
     ]
   },
   {
@@ -385,6 +386,28 @@
     "should_trigger": true,
     "routes_to": [
       "volumetric-clouds.md"
+    ]
+  },
+  {
+    "query": "my terrain raymarch samples textures inside the loop and the mip selection is noise - what do i use instead of ddx/ddy",
+    "should_trigger": true,
+    "routes_to": [
+      "shader-craft.md"
+    ]
+  },
+  {
+    "query": "i declared conservative depth output on my heightfield march under reversed-Z and early-Z is still off, no warnings anywhere",
+    "should_trigger": true,
+    "routes_to": [
+      "shader-craft.md"
+    ]
+  },
+  {
+    "query": "if i double my terrain resolution do i have to change the erosion droplet count and brush radius, or does it scale itself",
+    "should_trigger": true,
+    "routes_to": [
+      "resolution-independence.md",
+      "hydraulic-erosion.md"
     ]
   }
 ]

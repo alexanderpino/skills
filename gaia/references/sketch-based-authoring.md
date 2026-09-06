@@ -15,12 +15,12 @@ sources:
 ---
 # Sketch-based authoring — a drawn constraint against a solver
 
-A user draws a ridge line. Two things now want the heightfield and they want different things:
-the drawing, which is a sparse set of exact values on a curve, and the erosion model, which is a
-solver with its own opinion about what a hillside looks like. Everything hard about sketch-based
-authoring is that conflict, and the decision that resolves it is not *how* to interpolate the
-drawing — that part is a linear solve with a known answer — but **when** the constraint is
-imposed relative to the simulation.
+**Tier: authoring-time, interactive.** A user draws a ridge line. Two things now want the
+heightfield and they want different things: the drawing, which is a sparse set of exact values on
+a curve, and the erosion model, which is a solver with its own opinion about what a hillside looks
+like. Everything hard about sketch-based authoring is that conflict, and the decision that
+resolves it is not *how* to interpolate the drawing — that part is a linear solve with a known
+answer — but **when** the constraint is imposed relative to the simulation.
 
 This document owns the general constraint problem: sparse drawing to dense field, hard against
 soft, and the edge of the edited region. The **river carve** is one instance of it and belongs to
@@ -62,7 +62,8 @@ Concretely:
 - *Sculpt the heightfield by hand with no falloff* — a 40 m edit at a hard cut is a
   **40 m/cell** slope step at the seam. A linear falloff over 32 cells still leaves 1.25 m/cell.
 - *Interpolate with a thin-plate (biharmonic) solve* — smooth, but it passes **through** the
-  constraint instead of creasing at it, which is wrong for a ridge and right for a hill (§1).
+  constraint instead of creasing at it, which is wrong for a ridge and right for an isolated hill;
+  and between two drawn heights it rings, 39% of the range past the higher one at six cells (§1).
 - *Example-based synthesis from an exemplar DEM* — excluded from this skill by design; see the
   last section.
 
@@ -186,10 +187,25 @@ hilltop and wrong for an arête. [hnaidi2010]'s answer — stay second order, ad
 equation — gets both, because the gradient constraint sets the slope leaving the curve on each
 side independently, and a crease is just two different slopes.
 
-⚠️ **The textbook plate overshoot did not appear.** The clamped plate undershot the lowest
-constraint value by 2.2×10⁻⁵ of the constraint height, which is nothing. Do not repeat the folk
-claim that biharmonic interpolation rings badly; for this configuration it does not. The reason
-to prefer Laplace here is the crease, not stability.
+⚠️ **The textbook plate overshoot did not appear — because a single constraint value cannot
+ring.** The clamped plate undershot the lowest constraint value by 2.2×10⁻⁵ of the constraint
+height, which is nothing. But the folk claim is about interpolation *between* values, and that
+test has only one. Add a second drawn line at a different height to the same rig — same 65², same
+columns, values 0 and 1, `s` rows apart — and the plate leaves the constraint range badly:
+
+| `s`, rows between the two drawn lines | plate min | plate max | membrane |
+|---|---|---|---|
+| 6 | **−0.616** | **1.387** | [0.000, 1.000] |
+| 10 | −0.332 | 1.120 | [0.000, 1.000] |
+| 24 | −0.090 | 1.020 | [0.000, 1.000] |
+
+At six cells apart the plate sits 39% of the constraint range above the top value and 62% below
+the bottom one; it is still 2% and 9% out at 24. The membrane cannot do this at any `s` — the
+5-point discrete Laplacian obeys a maximum principle, so its solution is bounded by its own data,
+and that column is guaranteed rather than merely observed. (An independently assembled 1-D clamped
+beam reproduces every plate entry to within 0.014.) **So the folk claim survives, scoped to what
+it was always about: prefer Laplace for the crease, and prefer it again wherever two drawn
+features at different heights run close together — in a sketch, the ordinary case.**
 
 **Both are global.** A single drawn line moved 92% (Laplace) or 80% (plate) of the domain above
 1% of its own height. [orzan2008] §3.2.4 names this directly — "any color value can influence any
@@ -307,8 +323,9 @@ flow routing.
 - **Before or after the erosion pass** flips at `σ ≥ √(2DT/3)` for the diffusion term. At
   `D = 1`, `T = 40` that is 5.2 cells; below it the sim eats the feature.
 - **Laplace or biharmonic** flips on whether the drawn feature is a *crease*. Ridges, cliffs and
-  riverbanks: Laplace, which sheds 16.5× more height in the first cell. Hilltops and domes:
-  either, and the plate is smoother.
+  riverbanks: Laplace, which sheds 16.5× more height in the first cell. An isolated hilltop or
+  dome: either, and the plate is smoother. Two drawn heights near each other: Laplace, because the
+  plate overshoots the constraint range by 39% at six cells' separation.
 - **Hard or soft constraint** flips on whether the feature has an edge. Elevation on a ridge:
   hard (`α = 0`). Noise amplitude, roughness, gradient magnitude: soft.
 - **Per-step projection or not**: never, on these measurements — not on cost (21% of a step) but
@@ -351,6 +368,7 @@ Constraint-based authoring, which is what is above, is not part of that exclusio
 | Editing "here" invalidates the cache everywhere | Gaussian falloff has no support radius | Polynomial weight with `w = 0` beyond `r` [genevaux2013] §7 |
 | Coarse shape smudged, or fine detail with a hard edge, and no radius fixes both | One blend radius used for every frequency | Contract the support per level, `B_i = (φ_i/φ_0)·B_0` [gain2009] §4 |
 | A drawn ridge line comes out as a smooth ridge with no crest | Biharmonic or plate interpolation, which passes through the constraint; or a softened elevation constraint, `α > 0`, which "breaks edges on features" | Laplace plus a gradient equation, elevation constraints hard at `α = 0` [hnaidi2010] §5.2 |
+| A bulge above, or a hollow below, everything the user drew | Biharmonic/plate interpolation ringing between two constraint values at different heights: min −0.616 and max 1.387 on a 0-and-1 pair six cells apart | Laplace, whose maximum principle bounds the solution by its own data |
 | A drawn hilltop comes out with a crease along the curve | Elevation constraint with no angle constraint — the membrane creases by default | Add the horizontal angle constraint; this is the case Poisson cannot express [hnaidi2010] §4.2 |
 | Two crossing feature curves produce a spike or a smear at the junction | Antagonistic gradient directions averaged | Leave the intersection empty and Laplace-diffuse the hole [hnaidi2010] §4.1 fig. 9 |
 | Sharp features dissolve where two curves run close together | Value sources rasterised onto the curve collide | Offset the sources normal to the curve (`d = 3` px) and keep the gradient on the curve [orzan2008] §3.2.1 |

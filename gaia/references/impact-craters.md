@@ -14,12 +14,12 @@ sources:
 ---
 # Impact craters — the depth law, the rim, and the field
 
-A crater is the one landform in this skill whose geometry has been **measured to three
-significant figures** and published as a regression. Almost everything else here is a process
-whose output you argue about; a fresh crater's depth, rim height and rim width are each a power
-law in its diameter, fitted to hundreds of craters [pike1977]. So the failure mode is not
-"my crater looks wrong" — it is "my crater is not the shape a crater is", and that is checkable
-against numbers rather than against taste.
+**Tier: authoring-time.** A crater is the one landform in this skill whose geometry has been
+**measured to three significant figures** and published as a regression. Almost everything else
+here is a process whose output you argue about; a fresh crater's depth, rim height and rim width
+are each a power law in its diameter, fitted to hundreds of craters [pike1977]. So the failure
+mode is not "my crater looks wrong" — it is "my crater is not the shape a crater is", and that is
+checkable against numbers rather than against taste.
 
 The second half of the subject is that **one crater is not the interesting object.** A field is,
 and a field is defined by two things a single crater cannot express: how many craters there are
@@ -42,14 +42,17 @@ is a textbook subject [melosh1989]. What *is* published, and what this document 
 number the profile has to hit.
 
 **What it beats.** *A subtracted paraboloid* — the commonest crater node there is, and it has no
-rim, so it reads as a dent; the raised rim is roughly 18% of the crater's depth — most of that
-uplift rather than deposit — and it is the feature the eye uses to identify the landform. *Radially-warped noise* — a texture, with no
-depth law, so it does not change shape as it changes size. *An impact hydrocode* (iSALE and
-relatives) — the right tool for asking why the transition diameter is where it is, and orders of
-magnitude too expensive to place a thousand craters; use its published outputs, which is what
-the morphometry already is. *Gaea's `Crater`, `CraterField` and `Pockmarks`* — UI branding over
-exactly this stamping operation; the node names are not algorithms, and the question to ask of
-any of them is which of the numbers below it actually hits.
+rim, so it reads as a dent; the raised rim is roughly 18% of the crater's depth **for simple
+craters** — the complex branch runs 0.25–0.39 — and above about 0.75 km of diameter most of that
+rim is uplift rather than deposit; below it the deposit wins, 55% ejecta at `D` = 0.5 km in the
+table further down. It is the feature the eye uses to identify the landform. *Radially-warped
+noise* — a texture, with no depth law, so it does not change shape as it changes size, and
+therefore no branch either. *An impact hydrocode* (iSALE and relatives) — the right tool for
+asking why the transition diameter is where it is, and orders of magnitude too expensive to place
+a thousand craters; use its published outputs, which is what the morphometry already is. *Gaea's
+`Crater`, `CraterField` and `Pockmarks`* — UI branding over exactly this stamping operation; the
+node names are not algorithms, and the question to ask of any of them is which of the numbers
+below it actually hits.
 
 ## The depth-to-diameter law, and where it breaks
 
@@ -82,6 +85,11 @@ a spread of 5.1%; the rim-height-to-depth ratio runs 0.1820 to 0.1857 against th
 two intercepts, 0.036/0.196 = 0.1837. **Treat both as constants and you are inside the fit's
 own scatter.** So for the simple branch, the practical form is: depth `= D/5`, rim crest
 `= 0.18·depth` above the pre-impact surface, rim flank out to about `0.26·D` beyond the crest.
+
+**On the complex branch that ratio is neither 0.18 nor a constant.** It is
+`(0.236/1.044)·D^(0.399−0.301)` = `0.226·D^0.098` — 0.25 at `D` = 3 km, 0.30 at 19 km, 0.39 at
+250 km, so roughly double the simple value at basin scale, and still climbing. Carrying 0.18
+across the transition understates every large rim; carry the branch, not the constant.
 
 ⚠️ **There is no single diameter at which a crater becomes complex, and the paper says so three
 separate times.** Pike's depth fits intersect at about 10.6 km, his rim-height fits at about
@@ -163,14 +171,18 @@ about 3–4 radii, with only rays and isolated patches beyond [austin2024]. A bl
 linear or `1/r` falloff spreads a visible pedestal across the whole domain and reads as a stain.
 
 **Mass balance, as a sanity check on your own profile.** Integrating `2πr·t(r)` against a
-paraboloidal cavity of Pike's depth, the blanket carries **26.6%** of the cavity volume out to
-four radii for a 2 km crater at `B = 3.0`, and 37.1% for a 0.5 km one; even integrated to a
-hundred radii it reaches only 35% and 49%. The cavity model there is this document's own
-construction, not Pike's, so read it as an order check rather than a result — but the order is
-right, and it tells the same story as the rim table: **most of the displaced material never
-leaves as a blanket.** It goes into structural uplift, into the breccia lens on the floor, and
-into distal rays. A blanket that integrates to 300% of the cavity means your `T`, your falloff or
-your depth disagree with each other, and that test costs one integral.
+paraboloidal cavity of **Pike's depth less the rim height — the depth below the pre-impact
+plain**, because that plain is the surface the excavated volume came out of — the blanket carries
+**26.6%** of the cavity volume out to four radii for a 2 km crater at `B = 3.0`, and 37.1% for a
+0.5 km one; even integrated to a hundred radii it reaches only 35% and 49%. Use Pike's depth
+*below the rim crest* instead and the same two integrals give 21.7% and 30.3%: the rim stands
+above the plain, so it is not part of the hole, and the two conventions differ by a factor of
+1.23. The cavity model there is this document's own construction, not Pike's, so read it as an
+order check rather than a result — but the order is right, and it tells the same story as the rim
+table: **most of the displaced material never leaves as a blanket.** It goes into structural
+uplift, into the breccia lens on the floor, and into distal rays. A blanket that integrates to
+300% of the cavity means your `T`, your falloff or your depth disagree with each other, and that
+test costs one integral.
 
 Two implementation notes that decide whether it looks right. **Make the cavity, the rim and the
 blanket one radial profile** — a crater whose rim is a separate additive ring shows a seam at the
@@ -266,7 +278,7 @@ argument: it is material added to slopes, so it should be there before the mater
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| Craters read as dents, not craters | No raised rim — a subtracted paraboloid | Rim crest at ~0.18 of the depth above the pre-impact surface [pike1977] |
+| Craters read as dents, not craters | No raised rim — a subtracted paraboloid | Rim crest at ~0.18 of the depth above the pre-impact surface **for simple craters**; `0.226·D^0.098`, i.e. 0.25–0.39, on the complex branch [pike1977] |
 | Big craters look like scaled-up small ones | One profile for every diameter; the complex branch never used | Switch to `1.044·D^0.301` above the transition; the exponent is 0.301, not 1 |
 | Large craters are implausibly deep | Simple-branch depth extrapolated past the transition | At 250 km the simple law gives ~52 km of depth against the complex law's ~5.5 km |
 | Every crater on an alien world is the same shape as the Moon's | `D*` hard-coded at a lunar value | Scale by `1/g`; then expose it, because target strength moves it too [silber2017] |

@@ -411,3 +411,63 @@ others. Read `bruneton2017` before choosing anything here.
 - **moreland2009** `P` — Moreland, K. (2009). *Diverging color maps for scientific visualization.* Proc. 5th International Symposium on Visual Computing (ISVC 2009), LNCS 5876, 92–103. Read as the author's expanded version, `ColorMapsExpanded.pdf`. — Mapping a scalar to a colour, done deliberately. ⚠️ The colour-space chain and eqs. (1)–(3) are **§2.2 Color Spaces**, not §3: §3 is "Color Map Requirements", a six-bullet list with no equations in it. This entry and `mask-to-material.md` both carried §2.2's title against §3's number. §2.1 is the case against the rainbow map: no perceptual ordering, non-uniform perceptual rate, and sensitivity to colour-vision deficiency. §3 gives the sRGB → linear → XYZ → CIELAB chain, eqs. (1)–(3), and states the operative distinction for a terrain palette — physical light effects belong in a linear space, perception of a colour belongs in CIELAB.
 - **icc_srgb** `F` — International Color Consortium. *How to interpret the sRGB color space (specified in IEC 61966-2-1) for ICC profiles*, color.org. — The sRGB transfer function and primaries, restated from the standard by the body that maintains ICC profiles. §A.7 gives the XYZ(D65) → linear sRGB matrix; **§A.8 "Color component transfer function" gives the ENCODING equations and Part B "Hints for profile makers" gives only the DECODING inverse** — this entry and `mask-to-material.md` both credited §B with both halves. ⚠️ Do not "correct" the corpus's constants against this artefact: the ICC note itself misprints the blue inverse as `BL = B/12.02`, where 12.92 is right. §B gives the encoding and decoding equations with the 0.0031308 / 0.04045 thresholds, the 12.92 slope, the 0.055 offset and the 2.4 exponent. `F` because it is a standards-body technical note, not peer review, and because the normative document it restates — IEC 61966-2-1 — is paywalled and was not opened.
 - **srgb1996** `F` — Stokes, M., Anderson, M., Chandrasekar, S. & Motta, R. (1996). *A Standard Default Color Space for the Internet — sRGB*, version 1.10, W3C Note. — The original proposal. Cited here only for the warning W3C now prints at the top of it: the document is obsolete, sRGB was standardised as IEC 61966-2-1, and "during standardization, a small numerical error caused by rounding error was corrected". That is the provenance of every slightly-different set of sRGB constants in circulation. The equations themselves are images in the HTML and were not read as text, which is why icc_srgb is cited for the numbers instead.
+
+## Shader craft — the language and API specifications
+
+Three specifications, graded `F` on venue like every other standards or vendor document on this
+axis. All three were **opened here**: every section named below was read out of the artefact
+named, and the quoted sentences are transcribed from it rather than recalled.
+
+- **d3d11spec** `F` — Microsoft. *Direct3D 11.3 Functional Specification.* Archived in the
+  `microsoft/DirectX-Specs` repository as `d3d/archive/D3D11_3_FunctionalSpec.htm`. — The
+  normative statement of four rules `shader-craft.md` turns on.
+  **§16.8 Interaction of Varying Flow Control With Screen Derivatives**: §16.8.1 puts the *entire
+  contents* of a loop inside varying flow control as soon as it contains a `break`, `breakc`,
+  `continue`, `continuec`, `ret` or `retc`; §16.8.2 (a) then forbids the four derivative
+  instructions and the implicit-LOD `sample` there when the operand is a shader-computed
+  temporary, while (b) lists `sample_l` as having no restriction at all — "here the application
+  provides LOD as an operand, so no derivative calculation is required, and there is no issue with
+  flow control" — and `sample_d` likewise because the derivatives are input operands. Since
+  D3D11.2 the HLSL compiler only *warns* about a violation.
+  **§16.9.2–§16.9.3 Conservative Output Depth**: "Enabling oDepth in a pixel shader disables early
+  z culling", and `SV_DepthGreaterEqual` (§24.6) / `SV_DepthLessEqual` (§24.7) buy it back — but
+  §16.9.3.1 pairs each token with the depth comparison modes it is compatible with, and using
+  either "is valid with any depth mode" while "the early depth cull will be disabled" when it is
+  not. Breaking the promise is undefined behaviour; §16.9.3.2 describes the clamp implementations
+  *may* apply and records that most never did.
+  **§16.13** on helper invocations existing solely to support derivatives in 2×2 stamps, and the
+  rule that no result dependent on a UAV read may contribute to a derivative.
+  **§22.19.1 `_sat`**, defined as `min(1.0f, max(0.0f, value))` over the min and max
+  *instructions*, which §22.10.11 and §22.10.10 define to return the other operand when one is
+  NaN — so, in the spec's own words, "sat(NaN) returns 0, by the rules for min and max". A vendor
+  functional specification, not peer review.
+- **glsl460** `F` — The Khronos Group. *The OpenGL Shading Language*, version 4.60. Read as
+  `specs/gl/GLSLangSpec.4.60.html` in the `KhronosGroup/OpenGL-Registry` repository. — The other
+  half of every cross-API divergence in `shader-craft.md`. **§8.2 Exponential Functions**:
+  `pow(x, y)` carries "Results are undefined if x < 0" and a second undefined case at `x = 0,
+  y ≤ 0`; `sqrt` carries the same rule for its own argument. **§8.3 Common Functions**: `clamp` is
+  "Returns min(max(x, minVal), maxVal)", and `min`/`max` are defined by a bare comparison —
+  "Returns y if y < x; otherwise it returns x" and "Returns y if x < y; otherwise it returns x" —
+  with no NaN carve-out anywhere, which is the whole of the divergence from `d3d11spec` §22.19.1.
+  **§8.14.1 Derivative Functions** is one sentence on the point that matters: "Derivatives are
+  undefined within non-uniform control flow", followed by the forward/backward-differencing
+  definition that makes a derivative a difference over the 2×2 stamp and by the coarse/fine
+  split. A Khronos specification, not peer review.
+- **nonuniform_idx** `F` — Microsoft. *Resource Binding* (the D3D12 `ResourceBinding.md` in
+  `microsoft/DirectX-Specs`), and The Khronos Group, `GL_EXT_nonuniform_qualifier` (the
+  `extensions/ext/` text in `KhronosGroup/GLSL`). — Two spellings of one rule. The Microsoft
+  document's § "Divergence and derivatives" states that when a resource index diverges across a
+  quad "the hardware-computed derivative and derived quantities such as LOD may be undefined …
+  similar to computing derivatives in divergent control flow"; that the compiler *assumes* the
+  index is uniform; that a non-uniform index without the `NonUniformResourceIndex` intrinsic
+  leaves "the result … undefined"; and that for a multi-dimensional resource "it is sufficient to
+  apply NonUniformResourceIndex to any index". Its § "Shader Derivatives and Divergent Indexing"
+  gives the cost side — the LOD calculation and sample are done independently per lookup in the
+  stamp. The Khronos extension's *Mapping to SPIR-V* section is the other spelling,
+  "nonuniformEXT -> NonUniformEXT decoration on variables", required by Vulkan whenever a
+  descriptor binding is indexed by something not dynamically uniform. Read alongside it, and the
+  reason the two spellings in circulation need no reconciling: the SPIR-V core grammar,
+  `include/spirv/unified1/spirv.core.grammar.json` in `KhronosGroup/SPIRV-Headers`, gives
+  Decoration **5300** as enumerant `NonUniform` with `NonUniformEXT` listed as an *alias*, version
+  `1.5`, extension `SPV_EXT_descriptor_indexing` — one decoration value, two names, promoted to
+  core. API specifications and the machine-readable grammar that accompanies them.
