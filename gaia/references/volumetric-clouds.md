@@ -20,6 +20,11 @@ sources:
 ---
 # Volumetric clouds
 
+**Tier: real-time rasteriser, amortised over frames.** Every cost below is a per-frame GPU cost,
+and the technique fits a frame because the march is spread across frames and, in most
+configurations here, run below output resolution — so the resolve back to full res, against the
+terrain's depth buffer, is part of the technique rather than a detail of it.
+
 ## Use this
 
 **Model density analytically and spend the saved memory on instructions; then buy the frame back
@@ -158,6 +163,23 @@ terminates the march early, and produces exactly the popping this optimisation e
 `gpu-driven-culling.md` states the same rule for its HiZ reduce and names the same symptom,
 "geometry near silhouettes disappears for a frame under motion".
 
+- **The resolve back to full resolution is depth-aware — nearest-depth or bilateral, never plain
+  bilinear.** The march runs below output resolution in most configurations on this page — the
+  2015 scheme's reduced-res buffer, 480×270 near and 960×540 far in 2023 — and composites against
+  a full-res terrain depth buffer. At a mountain silhouette the four low-res neighbours a bilinear
+  tap mixes are not one surface: one terminated on rock a kilometre away, its neighbour ran to
+  the cloud exit tens of kilometres out. Blending them fringes every ridge — cloud bleeding onto
+  the rock, a thinned band just beyond it. A bilinear tap reaches one low-res texel to either
+  side, so the fringe runs **2 px each side at half-res per axis, 4 px each side at
+  quarter-res**, and it crawls as the camera turns. Instead pick, per full-res
+  pixel, the low-res sample whose depth is closest to *this* pixel's depth (nearest-depth), or
+  weight the four with a depth-difference falloff (bilateral), keeping plain bilinear where all
+  four agree so open sky keeps its smooth gradient. ⚠️ **That makes two reductions over one
+  quantity, in opposite directions, and one shared helper gets one of them wrong.** Termination
+  reduces the depth footprint toward the FARTHEST candidate; the upsample selects the NEAREST
+  match to the full-res depth. Write the quantity each one is looking for, not the operator —
+  the rule directly above, and the one `gpu-driven-culling.md` states for its HiZ reduce.
+
 **2 — The shadow the ground receives.** The cheapest large-scale life a vista buys, and absent from
 the 2015/2017 lineage entirely.
 
@@ -249,6 +271,7 @@ pixels**. A cloud budget quoted without the geometry it displaces is half a numb
 |---|---|---|
 | Cloud drawn over a mountain the first time a peak enters the deck | The march does not terminate at the terrain depth hit | Depth-aware compositing; pick one of the three depth definitions and use it everywhere [yusov2014] |
 | Clouds pop at silhouettes as the camera turns | The depth-mip reduce picks the NEAREST depth in the footprint, so the march terminates early — the operator that does this flips with the depth convention | Reduce toward the FARTHEST depth: `min()` under reversed-Z, `max()` under standard depth. Write the quantity, not the operator [schneidervos2017] p.98 |
+| A fringe hugging every ridge — cloud bleeding onto the rock, a thin band just beyond it — crawling under camera motion | The low-res march is resolved to full res by a plain bilinear tap, which mixes samples that stopped on terrain with samples that ran to the cloud exit | Nearest-depth or bilateral upsample against the full-res depth; bilinear only where the four candidates agree. Note this reduce selects the NEAREST match while termination reduces toward the FARTHEST — do not share one helper |
 | Landscape looks dead and evenly lit under a dramatic sky | No ground-receiving cloud shadow — it is absent from the 2015/2017 lineage, so an implementation faithful to those decks has none | Light-space transparency buffer on the CSM matrices [yusov2014] p.133 |
 | Cloud shadows drift wrong across a large map | The projected-shadow formulation assumes a flat planet, and its error grows with BOTH vista length and falling sun | Bound both, not just the map: the shadow offset is `h/tan(elevation)`, so it leaves any map at low sun. Or project on the sphere [hillaire2016] p.42 |
 | Ghosting and smearing on fast camera turns, worst near camera | Temporal amortisation over 16 frames cannot resolve in time | Depth-split the render instead of upscaling near clouds [schneider2023] p.185 |

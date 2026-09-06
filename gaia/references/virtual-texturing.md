@@ -72,14 +72,30 @@ not for a parameter that touches every page at once.
   neighbour is unrelated pool memory. Each physical page stores a 2–4 texel border duplicated from
   the adjacent virtual pages [mittring2008]. **Border width caps usable anisotropy** — a footprint
   wider than the border reads across the seam, so VT samplers clamp max aniso, typically 4–8×.
-- **Gradients come from *virtual* UVs, never post-indirection UVs.** This is the single most
-  common VT bug: computing the derivative after the page-table lookup gives a garbage mip and
-  aniso choice exactly at page boundaries, which draws the page grid as hairline seams — worst at
-  grazing angles, which is how terrain is always viewed.
+- **Gradients come from *virtual* UVs, never post-indirection UVs — and then they must be
+  scaled.** Computing the derivative *after* the page-table lookup gives a garbage mip and aniso
+  choice exactly at page boundaries, where `physUV` jumps; that draws the page grid as hairline
+  seams, worst at grazing angles, which is how terrain is always viewed. But virtual derivatives
+  are only half the rule, because `SampleGrad` interprets its gradients in the **sampled**
+  texture's coordinate space — the pool's, not the virtual texture's. So they must carry the
+  Jacobian of the virtual→physical map, which inside a page is the constant
+  `s = virtualSize / (poolSize × 2^pageMip)`:
+  `SampleGrad(pool, physUV, ddx(virtualUV) × s, ddy(virtualUV) × s)`. `pageMip` is the virtual
+  mip the resident page came from, and the page table already hands it to you — `physUV` cannot
+  be computed without it. A 256k² virtual over a 16k² pool gives `s = 16` for a mip-0 page, so
+  the unscaled call asks for a level `log2 16 = 4` mips too fine. The error is
+  `pageMip − log2(virtualSize/poolSize)` levels: too fine on the finest pages, too coarse on the
+  coarsest, and exactly zero at one page mip — which is how a single test view passes.
 - **A feedback pass** discovers which pages pixels want: render a reduced-resolution buffer of
   (pageID, mip), read it back, dedupe, prioritise coarse mips first [barrett2008]. Latency is 1–3
   frames minimum. Design for it — prefetch along predicted camera motion, prime requests before a
-  hard cut — do not deny it.
+  hard cut — do not deny it. **And bias the mip it asks for.** At 1/S resolution the feedback
+  pass's own `ddx` spans S pixels of the final image, so the mip it computes is `log2(S)` too
+  coarse for what the main pass will sample: write
+  `mip = computeMip(virtualUV) − log2(feedbackScale)`. At 1/4 res that is 2 mips — **6.25% of the
+  texel density the main pass needs** — and the pages that would sharpen the image are never
+  requested at all, so the page table keeps serving a coarse ancestor while the pool sits
+  *under*-full.
 - **Permanently resident top mips.** The page table stores the finest *available* ancestor, so a
   miss renders blurry rather than black or chequerboard. Every VT that ever showed a magenta page
   was missing this.
@@ -122,8 +138,9 @@ in the distance — a defect that is invisible in the near view where it was aut
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | The page grid appears as hairline seams, worst at grazing angles | Gradients computed after indirection, or aniso set above what the border supports | Take derivatives from virtual UVs; clamp aniso to the border width |
+| The whole surface sits a mip or more off — aliasing near, over-blurred far — with the page seams clean | Gradients taken from virtual UVs but never scaled into the pool's space, so `SampleGrad` measured the footprint against `poolSize` | Multiply both by `virtualSize/(poolSize × 2^pageMip)`. Test a view holding several page mips at once: the error passes through zero at one of them |
 | Blurry patches that sharpen a beat later | Feedback → request → upload latency, showing the fallback mip meanwhile | Prefetch by camera velocity; budget the transcode burst, and measure the latency, not the hit rate |
-| Permanent blur plus saturated IO | Page thrash: the working set exceeds the pool | Eviction-age histogram; grow the pool or bias mips, or cut the aniso overshoot inflating the set |
+| Permanent blur, and the pool says which of two causes | **Thrash** — the working set exceeds the pool: IO saturated, eviction age under a couple of seconds of camera motion. **Or the feedback bias** — requests are `log2(feedbackScale)` mips too coarse, so the finest pages are never asked for, the pool sits *under*-full and the IO is quiet | Read the eviction-age histogram before growing anything. Saturated: grow the pool or bias mips, or cut the aniso overshoot inflating the set. Under-full: subtract `log2(feedbackScale)` from the requested mip |
 | A multi-frame spike when the season or rain level changes | Global dynamic state was composited into pages, so one parameter dirtied the world | Move it out of the cache; sample the base, apply the overlay after |
 | Persistent decals vanish sporadically | Stamps injected into pages were evicted with them and never replayed | Keep a stamp replay list; re-apply on page load |
 | Dark or wrong-hue halos at layer boundaries, only in the distance | Composite mips box-filtered in non-premultiplied space | Premultiply weights before generating mips |
