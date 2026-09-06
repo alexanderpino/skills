@@ -459,6 +459,8 @@ def main() -> int:
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--id", help="check one citation id only")
     ap.add_argument("--cache", help="artefact cache directory")
+    ap.add_argument("--require-cache", action="store_true",
+                    help="exit non-zero when no cache is available, for CI")
     ap.add_argument("--show-matches", action="store_true",
                     help="print every MATCH with its continuation, not just the summary")
     args = ap.parse_args()
@@ -466,6 +468,7 @@ def main() -> int:
     if args.selftest:
         return selftest()
 
+    require_cache = args.require_cache
     cache = Path(args.cache) if args.cache else DEFAULT_CACHE
     findings, match, altered, unfetched, nocite, excluded = check(cache, args.id)
 
@@ -480,9 +483,13 @@ def main() -> int:
 
     total = match + altered + unfetched
     if cache is None:
+        # This used to print "that is not a pass" and then return 0 -- the sentence and the exit
+        # status disagreeing in the same breath. guard-proofs.tsv recorded the contradiction as
+        # fixed when the fix had landed only on the cache-present sibling: the same
+        # one-sibling-fixed shape okf.py records for _inline_list against _inline_map.
         print("requote: NO ARTEFACT CACHE. Set GAIA_ARTEFACT_CACHE or pass --cache. "
-              "Nothing was checked, and that is not a pass.")
-        return 0
+              "Nothing was attempted, so nothing is asserted either way.")
+        return 2 if require_cache else 0
     print(f"requote {match}/{total} quotations located in their artefact; "
           f"{altered} NOT FOUND (misquotation, or an extraction the normaliser cannot "
           f"reach); {unfetched} UNFETCHED because no artefact is cached for that citation. "

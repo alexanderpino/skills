@@ -168,6 +168,9 @@ def sources_digest(fm: dict) -> str:
     return hashlib.sha256("\n".join(f"{i}|{l}" for i, l in rows).encode()).hexdigest()[:12]
 
 
+_EMPTY_BODY_DIGEST = hashlib.sha256(b"").hexdigest()[:12]
+
+
 def body_digest(body: str) -> str:
     """A fingerprint of the two sections a reader actually lands on.
 
@@ -249,8 +252,12 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
         # from the OKF conformance block as well, and that block is the FORMAT contract for
         # every document in the bundle: a bibliography could lose its `type:`, take an illegal
         # `status:`, grow an `okf_version:` or carry a `verified:` naming nobody, and nothing
-        # here looked. The exemption is now exactly two things, both of them about CLAIMS:
-        # the `sources:` requirement, and the body-marker cross-check.
+        # here looked. What apparatus is still exempt from is the whole CITATION block --
+        # not, as this comment once claimed, exactly two things. `if apparatus: continue`
+        # below skips the `sources:` requirement, the body-marker cross-check AND every
+        # per-entry check with them, so a `sources:` row on a bibliography with a dangling
+        # id and a misspelled key produces no failure at all. That is safe only while no
+        # apparatus file carries `sources:`; the day one does, this exemption has to narrow.
         #
         # The second half of that exemption is not cosmetic. `papers-flow.md:146` ends a prose
         # sentence with the literal `[background]`, which `_MARKER` reads as a citation to an id
@@ -274,6 +281,13 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
             problems.append(f"{rel}: no `status:` -- required, not defaulted. An absent status "
                             "read as `stable` in the index and as neither value in this guard, "
                             "so deleting one line advertised a document as human-checked.")
+        elif not isinstance(status, str):
+            # `status:` with an empty value parses to a list, and `in STATUS` on an
+            # unhashable raised TypeError -- CI went red with a traceback instead of a
+            # FAIL line, breaking this module's promise that problems are returned,
+            # never raised.
+            problems.append(f"{rel}: status `{status!r}` is not a scalar. Write one of "
+                            f"{sorted(STATUS)} on the line, unquoted.")
         elif status not in STATUS:
             problems.append(f"{rel}: status `{status}` is not one of {sorted(STATUS)}")
         if "okf_version" in fm and path != INDEX:
@@ -290,6 +304,20 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
                 problems.append(f"{rel}: `verified:` needs a named `human:<id>` actor. "
                                 f"`{who}` names nobody -- `human:` with nothing after it is not "
                                 "an actor, and a process can only generate.")
+                continue
+            # A stamp over NO anchor section certifies nothing. Apparatus -- the
+            # bibliographies, index.md, coverage.md -- has neither `## Use this` nor a failure
+            # table, so `body_digest` hashes the empty string and every one of them digests to
+            # the same value. Proved end to end: stamp a bibliography, replace all 19 of its
+            # references with inventions attributed to nobody, and this guard stayed green while
+            # the index printed **checked**. One such stamp is valid on all nine files. Phase 0
+            # made these rules REACHABLE on apparatus; without this line it made them vacuous.
+            if bdigest == _EMPTY_BODY_DIGEST:
+                problems.append(
+                    f"{rel}: `verified:` on a document with neither `## Use this` nor a failure "
+                    f"table. `covers_body` is the digest of the empty string here, so the stamp "
+                    f"is identical on every such file and scopes to nothing. Stamp a Technique, "
+                    f"or give this document the two anchor sections first.")
                 continue
             if not isinstance(entry, dict) or "covers" not in entry or "covers_body" not in entry:
                 missing = [k for k in ("covers", "covers_body")
@@ -335,7 +363,7 @@ def check_documents(bib: dict[str, dict]) -> tuple[list[str], set[str]]:
             cap = BIB_MAX_LINES if path in papers else MAX_LINES
             n = len(path.read_text(encoding="utf-8").splitlines())
             if n > cap:
-                problems.append(f"{rel}: {n} lines, over the {cap} cap -- it is two topics")
+                problems.append(f"{rel}: {n} lines, over the {cap} cap -- {'split the family' if cap == BIB_MAX_LINES else 'it is two topics'}")
 
         if apparatus:
             continue
@@ -457,7 +485,7 @@ ENTRY_TAG_FIXTURES = [
     ("- **burt1983** `P` — Burt, P.J. (1983). *The Laplacian Pyramid.* [background]", False),
     # An author writes the tag where the two SIBLING tags go -- at the END. There it used to be
     # swallowed silently by the `ref` group, with no format error, because the line still
-    # matched. 88 of 214 entries wrap onto a continuation line, so for those the visual end of
+    # matched. most entries wrap onto a continuation line (the absolute count moves with the corpus; an earlier version of this comment froze it and went stale twice), so for those the visual end of
     # the entry is a line this regex never reads, which is exactly where a hand would put it.
     # (This comment said 69 of 196 while check_propagation's docstring said 88 of 214 -- one
     # count, two places in this file, neither re-run. Measured 2026-09-06: 88 of 214.)

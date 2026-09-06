@@ -300,9 +300,16 @@ jobs:
           # A mutation applied to the GUARD's own fixtures. There is no second pass here: the
           # mutation IS the guard removed, and the `guard` job runs the same command green on
           # an intact tree, so the pair is already complete.
+          # $1 command, $2 label, $3 pattern the failure output must carry. Without $3 this
+          # asserted only a non-zero exit: a `raise RuntimeError` at the top of selftest() made
+          # it print BITES, which is the "something went wrong" standard this job rejects.
           expect_red_crippled() {
             if $1 >/tmp/out 2>&1; then
               echo "::error::$2 stayed GREEN with the guard crippled"
+              fails=$((fails + 1))
+            elif ! grep -qE "$3" /tmp/out; then
+              echo "::error::$2 went red, but not for its own reason (no match for: $3)"
+              sed -n '1,12p' /tmp/out
               fails=$((fails + 1))
             else
               echo "  BITES  $2"
@@ -423,6 +430,10 @@ jobs:
           cp references/papers-architecture.md /tmp/bk
           cp references/node-graph-runtime.md /tmp/bk2
           sed -i 's/- \*\*nuke_request\*\* `F` — Foundry\./- **nuke_request** `F` — No canonical paper. Foundry./' references/papers-architecture.md
+          grep -q 'nuke_request\*\* `F` — No canonical paper' references/papers-architecture.md || {
+            echo "::error::bypass decoy: the papers-architecture sed matched nothing, so this row"
+            echo "::error::  degenerates into a duplicate of the row above it"
+            fails=$((fails + 1)); }
           sed -i 's/{ id: nuke_request, tier: F, locator: "the DD/{ id: nuke_request, tier: F, locator: "no artefact: the DD/' references/node-graph-runtime.md
           red_check "the prose-regex bypass of the no-artefact exclusion" 'is marked .no artefact:.' no_artefact_locator
           cp /tmp/bk references/papers-architecture.md
