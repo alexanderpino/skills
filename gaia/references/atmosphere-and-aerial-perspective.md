@@ -14,6 +14,9 @@ sources:
 ---
 # Atmosphere and aerial perspective
 
+**Tier: real-time rasteriser.** Every cost below is a per-frame cost at a stated resolution unless
+it is named as a bake; the only work this document moves off the frame is two LUTs baked at load.
+
 ## Use this
 
 **Draw the sky as one fullscreen triangle, last, depth-tested, and give every terrain pixel its
@@ -93,8 +96,29 @@ the same error `sky-and-weather-state.md` spends a whole section correcting one 
 treating an axis as a bake input — and it would have introduced a threshold that pops, behaves
 differently by latitude, and buys nothing. An engineer reading the flat table as written spends 3% of a 33 ms mobile
 frame rebuilding tables two thirds of which did not change, and may reasonably conclude the technique
-does not fit and fall back to an analytic gradient at 88.1 RMSE. It fits; it fits **with the
-cadence**.
+does not fit and fall back to an analytic gradient at 88.1 RMSE. The **LUT** budget fits, and it
+fits **with the cadence**.
+
+⚠️ **That is a verdict about the LUTs, and the mobile column has no apply in it.** [hillaire2020]
+Table 2 measures four LUTs on an iPhone 6s and nothing else. The on-screen apply — 0.14 ms of the
+0.31 ms PC total, and the **only** term on this page that scales with pixels — is never measured on
+mobile at any resolution. ⚠️ **Bounded here, not measured anywhere**: take the apply's 0.14 ms at
+1280×720, scale it to the 6s's 1334×750 (×1.09 → 0.15 ms), and multiply by the page's own PC→mobile
+ratios at their two honest ends — **1.7×** for multi-scattering and **53×** for transmittance, the
+two LUTs built at the same resolution and the same step count on both parts, so their ratio is the
+hardware and nothing else. The apply lands somewhere between **0.26 ms and 8.1 ms**; add the 0.38 ms
+of LUTs the cadence still leaves per frame and the whole pass is **0.64 ms to 8.44 ms of a 33 ms
+frame — 2% to 26%**. A **13× spread on the one term that decides the verdict**, and the upper bound
+is soft in its own right because 53× rests on a PC figure of 0.01 ms sitting at the table's rounding
+floor. So: the LUTs fit with the cadence.
+**Whether the pass fits is a measurement nobody in this corpus has taken** — take it on your target
+part before you sign off the budget.
+
+⚠️ **And on a tiler, cost the apply as it is scheduled, not as it is written.** A separate
+fullscreen pass that samples the depth attachment forces a tile store and a tile reload of data that
+was already in tile memory — bandwidth that appears in no per-LUT figure and is charged in exactly
+the place mobile is weakest. Fold the apply into the opaque shader, or into a subpass that reads
+depth through framebuffer-fetch / `subpassLoad`, wherever the engine's pass structure allows it.
 
 The implementation is a dirty flag, not a scheduler: hash the atmosphere parameter block and the
 quantised sun direction, and rebuild only the LUTs whose inputs moved. A tool viewport nobody is
@@ -206,9 +230,15 @@ resource and should be read as reasoning:
   vista — is past any sane `volumeFar`, and clamping to the last slice makes every distant ridge the
   same colour, which is the flattening this document exists to prevent. Fall back to the sky-view
   path beyond it and cross-fade one slice.
-- **Jitter.** Build the volume with the **same jittered projection** as the G-buffer, or every
-  ridgeline at range shimmers — and it will be misdiagnosed as TAA failure, because that is what it
-  looks like.
+- **Jitter.** Build the volume with the **same jittered projection** as the G-buffer — as hygiene,
+  not as the cure for shimmer. At 32³ one froxel column is 40 px wide at 1280 px, so ±0.5 px of TAA
+  jitter moves the lookup **1.25% of one froxel step** (0.42% at 4K) and the bilinear result moves
+  by 1.25% of the difference between two screen-adjacent froxels — under an 8-bit LSB unless those
+  neighbours differ by more than about a third of the range, which a field this smooth does not do.
+  The ridgeline shimmer is on the **depth axis**: the per-pixel depth dither two bullets up, and
+  slice quantisation on a face where one slice spans kilometres, so a ridge's depth jumps whole
+  slices between neighbouring pixels and the dither aliases against the slice boundary frame to
+  frame. It will still be misdiagnosed as TAA failure, because that is what it looks like.
 - **Reprojection is not the 2D problem.** A froxel's world position depends on camera position *and*
   on the slice mapping, so a dolly moves its contents along the slice axis and a naive history fetch
   smears fog in depth. Reproject each froxel's centre world position, reject history more than one
@@ -331,6 +361,18 @@ taken from a source:
 >   water surface from below**, which is how the sky arrives inside the Snell window when the camera
 >   goes under.
 >
+> **What `RGB` is, so a second team can type-check against it.** `Sky` and the `inscatter` half of
+> `AerialPerspective` are **scene-referred linear radiance in `W·m⁻²·sr⁻¹`**, band-averaged over the
+> three wavelengths the medium is tabulated at — 680, 550 and 440 nm in [brunetonneyret2008] §2.1,
+> which `sky-and-weather-state.md` carries — and scaled so that a white Lambertian surface under a
+> zenith top-of-atmosphere sun reads `L = E_sun/π`. `E_sun` is the engine's; this corpus states it
+> nowhere. The two transmittances are dimensionless per-band factors in `[0, 1]`, and the sun colour a
+> surface lights with is `E_sun · Transmittance`, an irradiance in `W·m⁻²`. All of it is
+> **pre-exposure**, in Rec.709/D65 primaries unless the engine states otherwise — say which. Exposure
+> and the display transform are applied **once, downstream**, after the water composite and after
+> aerial perspective; both are out of this skill's scope — `physically-based-rendering` §7, *Scene
+> integration & lighting*, owns them, and `coverage.md` says so as a `display-transform` row.
+>
 > **Ordering, which is not derivable from either document.** Aerial perspective is applied **once,
 > after the water composite**, on each pixel's own **air** distance. A translucent shader that
 > samples scene colour must sample a **pre-aerial-perspective** copy — otherwise the bed's colour
@@ -373,7 +415,7 @@ today, which is where the remaining discretionary cost sits.
 | The scene goes muddy at range and no parameter fixes it | Three media attenuating the same path — aerial perspective, height fog and froxel fog composited as results | Sum coefficients in the shared froxel, integrate once; apply the sky term once at one depth |
 | A hard colour band across a distant mountain face | Two froxel depth slices meeting on the face; slices are kilometres thick at range | Power-distribute the slices, dither the depth sample, let TAA resolve it |
 | Every ridge beyond the volume is the same colour and the vista flattens again | Depth clamped to the last froxel slice | Fall back to the sky-view path beyond `volumeFar`, cross-fade one slice |
-| A shimmering rim on ridgelines at range, blamed on TAA | The froxel volume built with a different projection matrix than the G-buffer | Build it with the same jittered matrix |
+| A shimmering rim on ridgelines at range, blamed on TAA | The **depth** axis of the froxel lookup: the per-pixel depth dither and slice quantisation on a face where a slice spans kilometres, and the ridge's depth jumping whole slices between neighbouring pixels. Not screen-space jitter, which at 32³ moves the lookup 1.25% of a froxel | Size the depth dither to the local slice thickness and drive it with blue noise so TAA converges; power-distribute the slices. Keep the same jittered matrix as hygiene — it is not the cause |
 | In VR the haze boils, and differently in each eye | Per-eye volumes dithered independently, so the noise decorrelates | One blue-noise offset shared by both eyes |
 | Sea and land disagree in colour exactly at the horizon | A private water fog colour instead of the shared atmosphere path | One atmosphere state, shared — `water-rendering.md` |
 | Sky and terrain detach at the horizon when the camera moves | A planet-absolute atmosphere shader jittering against jitter-free terrain | Evaluate in the camera-relative frame — `planetary-precision.md` |
@@ -381,7 +423,8 @@ today, which is where the remaining discretionary cost sits.
 | The ambient lighting steps visibly while an artist drags the time slider | The probe re-convolved every N frames | Dual-buffer and cross-fade, and hold steady during the drag |
 | The sun disc is white at sunset while the sky is red | The sun colour taken as a constant instead of from the transmittance LUT along the sun path | One sun colour, from the atmosphere |
 | The sky is fine on the ground and wastes resolution from orbit | The sky-view LUT spends most of itself on empty space | Switch to on-screen ray marching for space views [hillaire2020] §7 |
-| Mobile spends 3% of the frame rebuilding LUTs | All four rebuilt every frame; the transmittance LUT alone is 0.53 ms on an iPhone 6s and depends only on the medium | Bake transmittance at load; gate multi-scattering on ~1° of sun elevation. Roughly 1.03 ms → 0.38 ms |
+| Mobile spends 3% of the frame rebuilding LUTs | All four rebuilt every frame, though a sun move dirties neither of the first two: transmittance is a pure function of the medium (0.53 ms on an iPhone 6s), and multi-scattering takes sun zenith as a table **axis** rather than an input (0.12 ms). Together 63% of the 1.03 ms | Bake both at load — multi-scattering takes sun zenith as a table **axis**, so never gate it on sun elevation. 1.03 ms → 0.38 ms |
+| The mobile budget was signed off from the LUT table and the frame still misses | The on-screen apply is the only pixel-scaling term and [hillaire2020] never measures it on mobile; bounded by this page's own PC→mobile ratios it is 0.26–8.1 ms, a 13× spread | Profile the apply on the target part before budgeting it. On a tiler, fold it into the opaque pass rather than a separate fullscreen pass that stores and reloads the tile |
 | Water and terrain disagree in colour at the horizon *after* both were told to share the atmosphere | They share the LUT and not the **far-field fallback**: one clamps to the last froxel slice, the other evaluates analytically | Same fallback, same cross-fade width, on both surfaces |
 | Water is milky and washed out at range, losing all depth colour | Aerial perspective applied to the scene colour the water refracts, then again by the water, then again on the surface — the in-scatter term accumulates while the transmittance term collapses, so it goes **pale**, not dark | Apply AP once, after the water composite; refract against a pre-AP copy |
 | Water hazes with depth of the sea bed rather than distance from the camera | The refracted in-water path fed into the atmosphere lookup | `airDistance` is camera-to-surface, in air, only |
