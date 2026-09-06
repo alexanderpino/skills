@@ -47,10 +47,11 @@ Five decisions are packed into that, and each is dismissible in a line:
   **ΔE00 = 16.4** and **48% of the luminance** on the pairs measured below.
 - **Height-aware weights, not a linear cross-fade.** A cross-fade makes every texel at the
   boundary a 50/50 average, which is a third material that exists nowhere. Measured below: alpha
-  blending leaves **100%** of texels a mix at the midpoint against **4.9%** for a height blend, and
-  costs **29% of the texture's contrast**.
-- **Normalise at the point of use.** Not at the producer, not per layer — see the partition of
-  unity below, where an unnormalised sum is exactly a brightness multiplier until it clips.
+  blending leaves **100%** of texels a mix at the midpoint against **8.1%** for the blend above at
+  `depth = 0.02`, and costs **29% of the texture's contrast** where that blend costs 7%.
+- **Normalise at the point of use, and before the bias reads the weights.** Not at the producer,
+  not per layer — see the partition of unity below, where an unnormalised sum is exactly a
+  brightness multiplier until it clips.
 - **A bias that dies with the weight — never a gate on `w_i > 0`.** The recipe as it is usually
   printed adds the height, `b_i = w_i + h_i`, which compares an *absent* material's height against
   a present one's weight-plus-height and so paints materials nobody asked for. Scaling instead of
@@ -214,15 +215,16 @@ terrain shader, and no amount of sharpening the albedos fixes it, because the lo
 they are sampled. Height blending keeps **96%**.
 
 **What the splatmap resolution changes is the grain, not the width.** ⚠️ An earlier draft claimed
-here that "the transition width no longer depends on the splatmap resolution" — one paragraph after
-retracting exactly that. It still depends on it. A 0→1 weight step across a splatmap texel edge
-reconstructs bilinearly as a ramp one splatmap texel wide, and the ensemble band is a fixed
-*fraction* of that ramp: 0.80 of it cross-faded, **0.55** height-blended, **0.19** with the
-weight-scaled bias `## Use this` prescribes. A 512² splatmap under a 2048² albedo therefore spreads
-the boundary over 3.2 albedo pixels cross-faded and 2.2 or 0.75 height-blended — a constant factor,
-every one of them scaling as `1/S`. What the height blend buys is that *inside* that span the
-boundary resolves into interlocking grains at albedo resolution instead of a uniform smear, and
-that is the reason it is worth its cost on a memory-constrained target.
+here that "the transition width no longer depends on the splatmap resolution" — two paragraphs
+after retracting the premise that claim rests on, that the width is `depth`. It still depends on it.
+A 0→1 weight step across a splatmap texel edge reconstructs bilinearly as a ramp exactly one
+splatmap texel wide, and the ensemble band is a fixed *fraction* of that ramp: 0.80 of it
+cross-faded, **0.55** with the additive bias, **0.19** with the weight-scaled one `## Use this`
+prescribes. So a 512² splatmap under a 2048² albedo spreads the boundary over 3.2 albedo pixels
+cross-faded, 2.2 or 0.75 height-blended — every one of them scaling as `1/S`, a constant factor
+apart and never independent. What the height blend buys is that *inside* that span the boundary
+resolves into interlocking grains at albedo resolution instead of a uniform smear, and that is the
+reason it earns its cost on a memory-constrained target.
 
 ⚠️ **The bias has to die with the weight, and a `w_i > 0` gate does not do it.** `b_i = w_i + h_i`
 as [mishkinis2013] prints it lets a material with *no weight at all* win on height alone. Measured
@@ -239,21 +241,23 @@ the winner scores at least `1/n`, so for any `depth < 1/n` **every material belo
 of the normalised weight is provably absent** — not statistically absent. Measured: 0.000% leak at
 `w = 0`, `1e-3` and `1e-2` at both depths, and walking `w_A` from `1e-1` to 0 the share moves
 continuously, largest step **0.000** against 0.44 for the additive bias and 0.50 for the gate. What
-it costs is that `depth` now compares normalised weights, so the per-texel window is `0.60 × depth`
-instead of `0.89 ×` and the ensemble band 0.19 instead of 0.55: a crisper boundary at the same
-`depth`, not a different parameter.
+it costs is that `depth` now compares normalised weights: the per-texel window is `0.60 × depth`
+instead of `0.89 ×` and the ensemble band 0.19 instead of 0.55, and because the flip points cluster
+nearer `t = 0.5`, twice as many texels are caught mid-transition exactly at the midpoint (8.1%
+against 4.2% at `depth = 0.02`), for 93% of the contrast rather than 96%. A crisper boundary at the
+same `depth`, not a different parameter.
 
 ⚠️ **Every number above is a mip-0 number, and a real sampler does not sample mip 0.** The height
 channel filters like any other texture — box-filtering it over an `F×F` footprint, which is what
 sampling mip `log2 F` does, divides its standard deviation by `F` — and the blend's entire character
 is `σ(h)` measured against `depth`. At `depth = 0.1` the fraction of texels that are a genuine
-mixture at `t = 0.5` runs **18.8% at mip 0 → 67.3% at mip 2 → 94.7% at mip 3 → 100% at mip 4**: three
-levels in, what is being drawn is this section's own villain, the cross-fade in which every texel is
-an average of gravel and grass. And the ensemble band collapses with it (0.55 → 0.13 → 0.066 →
-0.033 of the weight ramp), so the residue is not a wide smear but a **step 9× sharper than the alpha
-boundary it degenerated into** — and a step aliases where a dither does not. Three fixes, in
-increasing order of how completely they work: `SampleLevel` the height at a **capped** LOD so `σ(h)`
-stops falling with distance, accepting that the height channel then aliases on its own terms; widen
+mixture at `t = 0.5` runs **18.8% at mip 0 → 67.3% at mip 2 → 94.7% at mip 3 → 100% at mip 4**:
+three levels in, what is being drawn is this section's own villain, the cross-fade in which every
+texel is an average of gravel and grass. And the ensemble band collapses with it (0.55 → 0.13 →
+0.066 → 0.033 of the weight ramp), so the residue is not a wide smear but a **step 9–13× sharper
+than the alpha boundary it degenerated into** — and a step aliases where a dither does not. Three
+fixes, in increasing order of how completely they work: `SampleLevel` the height at a **capped**
+LOD so `σ(h)` stops falling with distance, accepting that the height channel then aliases; widen
 `depth` with the footprint — `depth ≳ σ(h)` at the mip actually sampled is the crossover, so
 `max(depth, σ_L)` degrades the blend into the smooth normalised form below instead of into a step;
 or composite once into a virtual-texture page, where you mip the *result* and the question stops
@@ -355,7 +359,8 @@ been run against that file.
 | Height blend behaves like an expensive cross-fade | `depth` sets the dither grain, not the band width; raising it just widens each texel's own ramp until the grain disappears | `depth ≈ 0.02–0.1` in weight units — and check the mip, which is the other way it degenerates |
 | A faint grid of brighter and darker cells at splatmap-texel spacing, ≈0.8% of brightness | Weights normalised per-texel *before* 8-bit quantisation, so `Σ w` interpolates between 254/255 and 256/255. Bilinear is C0 — there is no step to hunt for | Normalise in the shader after the fetch |
 | Horizontal colour banding across the whole terrain | Palette driven by height alone | Drive from wetness, deposition or occlusion; noise-break the index |
-| A palette ramp that crawls then jumps | Ramp interpolated in linear light — 10.6× step-size ratio measured | Interpolate in CIELAB; store the baked LUT linear |
+| A palette ramp that crawls then jumps | Ramp interpolated in linear light — 10.6× step-size ratio measured | Interpolate in CIELAB; store the baked LUT linear, in fp16 or R11G11B10F |
+| The baked palette bands in its dark half, though the authored ramp was even | LUT stored as 8-bit *linear* UNORM: ΔE00 2.13 per LSB at the bottom, median 0.94 below `L* = 33` | fp16 or R11G11B10F — never 8-bit UNORM for a linear colour LUT |
 | The palette obscures the very feature it was made to show | Rainbow map: no perceptual order, uneven rate | [moreland2009] §2; a monotone or diverging ramp |
 | 24 texture fetches per pixel and falling frame rate | One splatmap channel per material, all fetched everywhere | Bound *simultaneous* materials with ID+weight pairs into a texture array |
 | A new material cannot be added without re-exporting the library | Texture array requires identical dimensions, format and mip count per slice | Fix the array format at project start |

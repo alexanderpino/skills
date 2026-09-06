@@ -19,10 +19,11 @@ sources:
 ---
 # Wave models — spectra, trochoids, and what dispersion actually settles
 
-A wave field is not a simulation. It is a **closed form evaluated at time `t`**, which is why an
-ocean fits in a frame when a fluid solver does not. Choosing which closed form is most of the work
-— and part of that choice is whether physics can ask the field a question cheaply, which is **not**
-the same answer for every model here; see [querying the
+**Tier: real-time rasteriser for the wave field; the shore band's travel-time solve is
+authoring-time.** A wave field is not a simulation. It is a **closed form evaluated at time `t`**,
+which is why an ocean fits in a frame when a fluid solver does not. Choosing which closed form is
+most of the work — and part of that choice is whether physics can ask the field a question cheaply,
+which is **not** the same answer for every model here; see [querying the
 field](#querying-the-field-is-a-per-model-question).
 
 This document owns the *field*: what it is, what it may contain, what motion it produces, and the
@@ -35,13 +36,15 @@ axis; where a body is closed rather than open, read the taxonomy first.
 **Open sea: a spectral FFT field in 2–4 cascades** [tessendorf_ocean]. Sample an oceanographic
 spectrum into a frequency grid, inverse-FFT to a displacement map per frame, sum cascades at
 different world-space patch sizes. ⚠️ **Pick those sizes near-co-prime, and do not use the round
-numbers this line used to print.** 400 / 60 / 10 m share a factor of 20: their LCM is **1200 m**, so
-the whole stack repeats every 1.2 km — the exact defect the failure table below sends you here to
-avoid. 401 / 61 / 11 m looks identical and has an LCM of **269 071 m**, past any draw distance. It is the AAA default because it is
-the only family that is statistically ocean-like across the whole band. (The spectrum, the
-transform and the choppy displacement are the cited notes. **The cascade stack is not**: the notes
-describe one patch, 10 m to 2 km on a side, and warn that tiling it makes the field periodic.
-Layering several patch sizes is later production practice, and is credited here to nobody.)
+numbers this line used to print.** 400 / 60 / 10 m have a `gcd` of **10** and an LCM of **1200 m**,
+so the whole stack repeats every 1.2 km. 401 / 61 / 11 m looks identical and has an LCM of
+**269 071 m**. ⚠️ **That LCM is not the visible repeat.** Co-prime sizes remove only the *coincident*
+return of all cascades at once; each still tiles at its own `L`, so the largest — **401 m** here —
+is the repeat an eye finds, whatever the LCM. **Choose `L_max` against draw distance.** The family
+is the AAA default because it is the only one statistically ocean-like across the whole band. (The
+spectrum, the transform and the choppy displacement are the cited notes. **The cascade stack is
+not**: the notes describe one patch, 10 m to 2 km on a side, and warn that tiling it makes the field
+periodic. Layering patch sizes is later production practice, credited here to nobody.)
 
 **Stylised, hero, gameplay-authored or tight-budget: a Gerstner (trochoidal) sum**
 [gerstner_trochoid]. 4–16 analytic waves, each with horizontal and vertical displacement, sharp
@@ -56,11 +59,13 @@ far away. The moment the depth field says otherwise, a separate shore-wave band 
 
 **Whatever field you synthesise, the dispersion relation is what makes it read as water**
 [capillary_gravity] [airy_coastal] — it is a constraint on the result, not a feature of one model.
-Four consequences, each a visible bug if ignored: there is a **slowest possible wave** (~23 cm/s,
-at ~1.7 cm), so nothing may travel slower; **long waves outrun short ones**, so a sea without
-groups reads as a metronome; **period is conserved across a depth change and wavelength is not**,
-so a train entering shallow water must shorten rather than slow uniformly; and **in shallow water
-celerity depends on depth alone**, which is what refracts crests onto every shore for free.
+Four consequences, each a visible bug if ignored: **phase speed has a minimum**, 0.2312 m/s at
+1.712 cm — but **energy travels at the group speed, whose minimum is lower still, 0.1776 m/s at
+4.35 cm**, so neither is a floor on how fast water may move (the 3 cm damping row below transports
+at 0.19 m/s); **long waves outrun short ones**, so a sea without groups reads as a metronome;
+**period is conserved across a depth change and wavelength is not**, so a train entering shallow
+water must shorten rather than slow uniformly; and **in shallow water celerity depends on depth
+alone**, which is what refracts crests onto every shore for free.
 
 ## Querying the field is a per-model question
 
