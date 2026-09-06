@@ -6,6 +6,7 @@ tags: [rendering, rasterizer, water, shading, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
+  - { id: abramowitz1964, tier: F, locator: "formula 7.1.26 -- the approximation to erf on x >= 0 as 1 minus a degree-5 polynomial in t = 1/(1 + p x) times exp(-x^2), p = 0.3275911, stated bound |eps| <= 1.5e-7, odd-extended for x < 0" }
   - { id: bruneton2010, tier: P, locator: "§3.2 eq. 4 for the slope variances, derived in Appendix A; §5.2 eq. 26 for the roughness-aware Fresnel, where exp of −2.69σv sits inside the Schlick exponent over 1 + 22.7σv^1.5" }
   - { id: coxmunk1954, tier: P, locator: "§6.3 Mean Square Slopes — the clean-surface and slick-surface regressions on wind at 41 ft, about 12.5 m; the along-wind and crosswind principal axes are §6.1" }
   - { id: ross2005, tier: P, locator: "the Gaussian-slope BRDF with Smith masking" }
@@ -73,7 +74,9 @@ or the frame ghosts), and cheap handling of many bodies at many elevations.
 
 ⚠️ **Guard that divide, or the horizon row is NaN.** At `rayDir.y == 0` the quotient is `±inf` and
 the hit point `camPos.y + t*rayDir.y` is `inf*0 = NaN` — and denormal flush-to-zero, the default on
-many mobile parts, makes exactly-zero reachable from merely very small. Write the acceptance as
+many mobile parts, makes exactly-zero reachable from merely very small **in `mediump`** (the fp16
+denormal ceiling is 6.10e-5, a ray 0.0035° off horizontal; in fp32 it is 1.175e-38 and the argument
+is vacuous). Write the acceptance as
 `if (!(t > 0.0 && t < tFar)) discard;`: it rejects the backward hit, the beyond-far hit, and the
 NaN itself, because every comparison against a NaN is false. An absolute `abs(rayDir.y) < eps` test
 is the weaker form of the same guard — it only means something for
@@ -119,15 +122,17 @@ float F = R + (1.0 - R) * m;                                 // R = F0 from the 
 spec-undefined for `x < 0` (GLSL: *"Results are undefined if x < 0"*) and NaN in practice, and a
 NaN written to the colour target is absorbed permanently into TAA history. With a normal blended
 from a detail map and left unrenormalized — the normal case in a water shader — `dot(N, V)`
-exceeds 1 on **50%** of samples at normal incidence, so `1 - cosThetaV` is negative across the
+exceeds 1 near normal incidence for any blend that does not renormalise — an *additive* blend on essentially every sample — and even a renormalised fp32 pair lands up to one ULP above (`max dot = 1.000000238`). A lerp, UDN or whiteout blend does not, at normal incidence. The rate does not matter: one pixel poisons the history. So `1 - cosThetaV` is negative across the
 whole band around the mirror direction and that band goes NaN. Clamping only the top,
 `max(1.0 - cosThetaV, 0.0)`, removes the NaN and leaves the other end open: a back-facing
-`dot(N, V) = -1` gives `1 - cos = 2`, `m = 6.3` and **`F = 6.2`**, energy from nowhere, on **8.8%**
+`dot(N, V) = -1` gives `1 - cos = 2`, and at `sigma_v = 0.12` that is `m = 6.3` and **`F = 6.2`** — energy from nowhere. (At this page's own worked `sigma_v = 0.2` it is 2.50 and 2.47; the blow-up is not a property of one roughness.) On **8.8%**
 of pixels at an 85° view. `saturate` closes both ends, and then `m` lands in `[0, 1]` and `F` in
 `[R, 1]` by construction, for every normal a blend can produce. Renormalise at the fetch as well,
-not only here, or every other term still reads the bad normal. `sqrt(max(sig2, 0.0))` is the second
-NaN source and it is not hypothetical: recover the variance as `E[A²] − E[A]²` below and rounding
-alone puts it a ULP under zero on a flat footprint.
+not only here, or every other term still reads the bad normal. `sqrt(sig2)` is the second NaN
+source and the `max` is the fix: `sigma_x2`/`sigma_y2` are themselves a difference — total
+mean-square slope minus the part geometry and normals already resolve — and rounding alone puts
+that difference a ULP under zero on a near-flat footprint. (This is a different variance from the
+foam pair below: that one comes from the Jacobian, this one from the slope tensor.)
 
 ⚠️ **`sigma_v` is an RMS slope here, not a variance, and this block says so because
 `water-optics.md` asks the reader to choose deliberately.** [bruneton2010] is not self-consistent
@@ -178,23 +183,27 @@ footprint. On a synthetic Jacobian field (a resolved swell plus ripple and sub-t
 mipped variance channel sits **constant at 0.0014** while the true footprint variance runs
 **0.0042 → 0.0161** from 8×8 to 64×64: **67% to 91% of the answer dropped**, worse as the water
 gets further away. The two terms reconcile to `1.9e-17` when they are both computed, and the
-`(A, A²)` pair reproduces the true variance to **zero error at every footprint** because both of
+`(A, A²)` pair reproduces the true variance **exactly in algebra** — 7.7e-13 relative in fp64 — because both of
 its channels really are linear. Under-reported variance narrows the `erf` and suppresses coverage,
 which is this document's own *"far sea loses its speckle"* failure row — reintroduced by the
 prefilter that exists to prevent it.
 
 ⚠️ **`erf` is not an HLSL or GLSL intrinsic; the block above will not compile until you supply
-one.** Standard practice is Abramowitz & Stegun's 7.1.26 — a fifth-order rational in
-`1/(1 + p·x)` times `exp(-x²)`, odd-extended below zero — whose published error bound is `1.5e-7`
-(measured 1.4e-7 over ±6), orders below anything foam coverage can resolve; or a single-term
-`tanh` fit where one transcendental is cheaper than five multiplies and an `exp`.
+one.** Standard practice is Abramowitz & Stegun's 7.1.26 [abramowitz1964] — **`1` minus** a
+fifth-order *polynomial* in `t = 1/(1 + p·x)`, times `exp(-x²)`, odd-extended below zero — whose
+published error bound is `1.5e-7` (measured 1.4e-7 over ±6), orders below anything foam coverage
+can resolve. ⚠️ Implement it as a *rational* in `t` instead and you get `erf(0) = 1` and a maximum
+error of 1.0. The cheap alternative is a `tanh` fit **with a cubic argument** (3.7e-4); a genuinely
+single-term `tanh(1.12838x)` is 3.5e-2, which foam coverage can resolve.
 
-⚠️ **fp16 for the pair only while `|mu_A − 1| ≲ 3·sigma_A`.** `A ≈ 1` on unbroken water, so
+⚠️ **An offset-centred fp16 pair holds only while `|mu_A − 1| ≲ 3·sigma_A`; an *uncentred* one
+fails on calm water at any offset.** `A ≈ 1` on unbroken water, so
 `E[A²] − E[A]²` is a catastrophic cancellation: in fp16 a `sigma_A` of 0.01 recovers as **0.000**,
 a Heaviside where the entire point was a soft edge. Offset-centring — store `(A − 1)` and
 `(A − 1)²` and add the offset back — repairs it while the offset is small against the spread,
-because the cancellation amplifies the format's `2^-11` ULP by `1 + (|mu_A − 1|/sigma_A)²`: **10×
-at 3σ** (measured ≤ 0.2% error in `sigma_A`), 101× at 10σ (3.1%), 901× at 30σ (23.5%). A footprint
+because the cancellation amplifies the format's `2^-11` unit roundoff (the fp16 ULP at 1.0 is
+`2^-10`) by `1 + (|mu_A − 1|/sigma_A)²`: **10×
+at 3σ** (~0.2% error in `sigma_A`; 0.34% worst over twenty seeds), 101× at 10σ (3.1%), 901× at 30σ (23.5%). A footprint
 straddling a breaking crest leaves that band, and there the pair goes in **R32G32F**; the memory is
 what the coverage being right costs.
 
@@ -203,6 +212,14 @@ states with its no-offset property and its Beaufort cross-check: essentially no 
 conspicuous by 15 m/s. The rendering stake in it is one sentence — the exponent is steep enough
 that coverage must be driven by the wind, never by a tuned constant — and the law itself is not
 restated here.
+
+⚠️ **Aerial perspective is applied once, after the water composite**, on each pixel's own **air**
+distance, and a shader that refracts scene colour must sample a **pre-aerial-perspective** copy.
+Otherwise the bed carries AP, the water extinguishes it again over the refracted path, and the
+surface applies it a third time: the in-scatter accumulates while the transmittance collapses, so
+the water goes **pale**, not dark. The in-water segment never enters the atmosphere lookup —
+`airDistance` is camera-to-surface, in air, only. `atmosphere-and-aerial-perspective.md` states
+this contract across a boundary neither document can see alone; this is its other end.
 
 **Four: everything else that flattens the far field.** Missing aerial perspective (share the
 atmosphere LUT and the view-depth coordinate with terrain, or the sea/sky junction mismatches the
@@ -283,7 +300,7 @@ if (LinearEyeDepth(SceneDepth.Sample(s, uvR)) < waterViewDepth) uvR = uv;   // s
   whose weights do not sum to one:
 
 ```
-L_w = bedRadiance * exp(-c * rayDistance) + L_scatter * (1 - exp(-K_d * verticalDepth))
+L_w = bedRadiance * exp(-c * rayDistance) + L_scatter * (1 - exp(-(K_d + c/mu_v) * verticalDepth))
 L   = L_w / (n*n)     # crossing back into air. L/n^2 is the invariant, not L
 #  c is beam attenuation along the sightline; K_d is diffuse attenuation down the light column
 #  L_scatter is computed from b_b, K_d and the incident irradiance -- never an authored swatch
@@ -348,8 +365,9 @@ the frame for closed bodies, and the bed is mostly seen from in the water. Every
   rule in both directions, not two rules. *Leaving*: the bed-radiance block above carries the
   divisor. Drop it and a lossless body with a white bed returns more light than it received — an
   energy bug no Fresnel test can catch, because a Fresnel test never crosses the interface.
-  *Entering*: sky radiance sampled through Snell's window arrives in the water as `n^2` times its
-  above-water value, which is why the window reads **bright** rather than merely undimmed, and a
+  *Entering*: sky radiance sampled through Snell's window arrives in the water as `n^2·(1 − R(θ_air))`
+  times its above-water value — the `n^2` and the transmission factor are separate, and at the window
+  edge `R → 1`, which is why the window reads **bright** rather than merely undimmed, and a
   renderer that applies one direction and not the other is out by 1.78 with no term left to absorb
   it. The two are consistent, and that is the check worth running: the `n^2` gain going in and the
   `1/n^2` solid angle of the window cancel exactly, so the bed receives precisely the irradiance
