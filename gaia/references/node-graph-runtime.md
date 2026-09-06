@@ -25,12 +25,11 @@ sources:
 # Node-graph runtime — scheduling, caching and invalidating a terrain graph
 
 **Tier: authoring-time; the runtime that hosts the graph.** Every cost here is an authoring-loop
-cost — an interactive edit answered in milliseconds, a farm build in minutes — and none of it runs
-inside a rendered frame. A tool in the Gaea / World Machine class is a node graph plus the machine
-that runs it. The nodes are the subject of the rest of this skill; **this document is the
-machine**, and it is where a studio actually loses days — to a rebuild that recomputes an erosion
-pass nobody changed, or to a cache that serves a stale mask and produces a splatmap that is quietly
-wrong.
+cost — an interactive edit answered in milliseconds, a farm build in minutes — never a frame cost.
+A tool in the Gaea / World Machine class is a node graph plus the machine that runs it. The nodes
+are the subject of the rest of this skill; **this document is the machine**, and it is where a
+studio actually loses days — to a rebuild that recomputes an erosion pass nobody changed, or to a
+cache that serves a stale mask and produces a splatmap that is quietly wrong.
 
 **Boundary.** This document owns evaluation, cache identity, invalidation, resolution independence
 and tiling. `layering-filters-and-masks.md` owns how a filter is applied through a mask and what
@@ -222,16 +221,15 @@ The mechanism is a 1-ULP difference: transcendental ufunc loops (`pow`, `exp`, `
 `add`, `mul`, `sqrt`, `sin` and `hypot` are bit-identical. Droplet erosion amplifies that by ~1e14,
 because a steepest-descent step is a **discrete choice** and a tie flips [simd_dispatch_drift].
 
-⚠️ **Read the magnitudes honestly before drawing the conclusion.** Relief moved 0.6% and
-**pit storage moved 20%** — every percentage here, the table's included, is the gap over the
-**AVX512-on** value: `(5.2169e6 − 4.1597e6) / 5.2169e6 = 20.3%`. (Against the other column the same
-gap reads 25%; neither run is a reference, so the denominator has to be stated rather than picked
-per sentence.) Pit storage is an extremal, topology-sensitive statistic, exactly the kind of
-quantity a flipped tie moves most. This is not evidence that terrain arithmetic is
-generally unstable; it is evidence that **an operator making a discrete choice on a float
-comparison** will amplify any divergence, however small. The root cause is tie-breaking, and
-`flow-routing.md` already fixes the analogous case with a monotonic tie-break rather than by
-distrusting arithmetic.
+⚠️ **Read the magnitudes honestly before drawing the conclusion.** Relief moved 0.6% and **pit
+storage moved 20%** — every percentage here, the table's included, is the gap over the **AVX512-on**
+value, `(5.2169e6 − 4.1597e6)/5.2169e6 = 20.3%`; against the other column the same gap reads 25%,
+and neither run is a reference, so the denominator is stated rather than picked per sentence. Pit
+storage is an extremal, topology-sensitive statistic, exactly the kind of quantity a flipped tie
+moves most. This is not evidence that terrain arithmetic is generally unstable; it is evidence that
+**an operator making a discrete choice on a float comparison** will amplify any divergence, however
+small. The root cause is tie-breaking, and `flow-routing.md` already fixes the analogous case with
+a monotonic tie-break rather than by distrusting arithmetic.
 
 ⚠️ **And putting the regime in the key is in tension with the reason to have a shared cache at
 all.** Key on the arithmetic regime and two machines with different dispatch never share an entry —
@@ -250,12 +248,11 @@ The practical rules that follow, and none of them are optional if the cache is s
   never-reused entries per drag [ta_graph_runtime].
 - **Hash the effective seed**, so re-rolling a stochastic node invalidates that node's cone and
   nothing else [ta_graph_runtime].
-- **Pin the arithmetic; key on the pin, not on the regime.** One toolchain, opportunistic dispatch
-  disabled, no fast-math, deterministic reductions — and a **startup conformance digest** in the
-  key, so a machine that fails the pin is excluded rather than silently serving. Putting the regime
-  itself in the key, or the device, the fast-math flags or the library version, splits the cache
-  along the one axis it exists to share (above); take that only if you are prepared to test the
-  equivalence you would otherwise be asserting.
+- **Pin the arithmetic; key on the pin, not on the regime** (above) — a **startup conformance
+  digest** in the key, so a machine off the pin is excluded rather than silently serving. Keying the
+  regime itself, or the device, the fast-math flags or the library version, splits the cache along
+  the one axis it exists to share; take that only if you are prepared to test the equivalence you
+  would otherwise be asserting.
 - **Iteration order counts as arithmetic.** A parallel reduction that sums in completion order is
   not deterministic, and floating-point addition is not associative.
 
@@ -276,9 +273,8 @@ pure — which is the same assumption the cache key already makes.
 The same graph is evaluated under two budgets, and the right answers differ. This is the general
 rule in `simulation-time-budget.md` applied to authoring. **The preview tier** is the reduced
 resolution and iteration budget the graph is evaluated at for display — 512² rather than 4096², a
-capped iteration count on the iterative nodes — under the standing rule that a preview must
-*predict* the build: the same terrain at a lower sampling density (see resolution independence
-below), never a different answer.
+capped iteration count — under the rule that a preview must *predict* the build: the same terrain
+at a lower sampling density (resolution independence, below), never a different answer.
 
 | | **Interactive edit** | **Farm build** |
 |---|---|---|
