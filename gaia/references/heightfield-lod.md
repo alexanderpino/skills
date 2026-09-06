@@ -72,7 +72,7 @@ never guessed from a mip level. Project it [ulrich2002]:
 
 ```
 K   = viewportHeight / (2 * tan(fovY / 2))   // pixels; the perspective scale constant
-rho = (e * K) / d                            // projected error in pixels
+rho = (e * K) / d                            // WORST-CASE projected error, in pixels
 refine while rho > tau                       // tau = the budget, 1-4 px in practice
 ```
 
@@ -124,8 +124,8 @@ normal   = normalize(lerp(sampleNormal(uv, nodeLod), sampleNormal(uv, nodeLod + 
 - **One `morphK` drives XZ, height and normal.** Three factors are three chances to disagree, and
   the vertex is identical to its parent only if all three reach 1.0 together. Geometry morphing
   under un-morphed normals still pops, and a lighting discontinuity reads louder than a silhouette
-  change: across the same field the two levels' normals differ by a median 4.6–5.9° and a p95 of
-  11–13° at the shared vertices.
+  change: on the field measured below, the two levels' normals differ at the shared vertices by a
+  median of 4.6–5.9° and a p95 of 11–13°.
 - **Both nodes must share one heightmap registration** — one world-XZ→UV mapping, one reduction
   filter, one mip convention — or `sampleHeight(uv, nodeLod + 1)` on the fine node is not the value
   the parent computed at that XZ. Half a coarse texel of disagreement leaves a residual **4–5×
@@ -187,11 +187,12 @@ breaks under streaming, and it fails precisely on the frames where LOD changes.
 | Skirts | A vertical curtain dropped from each chunk edge [ulrich2002] | The curtain is visible to SSAO, fog, shadows and decals as dark seam lines |
 
 **How big is the gap the XZ morph does not close?** Measured on a synthetic 2048² fBm field at
-2 m spacing, across four roughness settings and three mip-reduction kernels: at the shared vertices
-the mip `L` and mip `L + 1` surfaces disagree by **0.16–0.47 × the coarse level's geometric error
-`e` at p95, and 0.25–1.0 × `e` at maximum**. The ratio is the useful form, because the level
-boundary is by construction where `e·K/d = tau` — so the gap projects to **0.2–0.5 `tau` at p95 and
-up to a full `tau` at worst, at every level, FOV and resolution**, since `K` and `d` cancel. Do not
+2 m spacing, over 36 configurations — four roughness settings × three mip-reduction kernels × three
+levels: at the shared vertices the mip `L` and mip `L + 1` surfaces disagree by **0.16–0.49 × the
+coarse level's geometric error `e` at p95, and 0.26–1.0 × `e` at maximum**. The ratio is the useful
+form, because the level boundary is by construction where `e·K/d = tau` — so the gap projects to
+**0.16–0.49 `tau` at p95 and up to a full `tau` at worst, at every level, FOV and resolution**,
+since `K` and `d` cancel out of the ratio entirely. Do not
 read sub-`tau` as safe: `tau` prices a surface in the wrong *place*, which is invisible, while this
 is a *hole* the background shows through, in a ribbon along every level boundary in the frame.
 Substitute the lerp form and the same measurement is **0.000000 m at `morphK = 1`, exactly, in

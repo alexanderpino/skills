@@ -109,8 +109,8 @@ operator on this field, and diverges at the mask edge as transport accumulates.
 
    The support radius **alone** is the single-application margin, and it is the wrong one for every
    operator in this section. `N` steps of a radius-`R` operator have a domain of dependence of
-   `N·R`, so a window dilated by `R` is contaminated `N·R` cells deep. Measured on the field above
-   at `R = 1`: 20 steps of a linear 3×3 blur cropped at `R` differ from the full-domain result by
+   `N·R`, so a window dilated by `R` is contaminated up to `N·R` cells deep. Measured on this same
+   field at `R = 1`: 20 steps of a linear 3×3 blur cropped at `R` differ from the full-domain by
    **2.60% of relief, reaching 18 cells inside the mask**; dilated by `N·R` the difference is
    **exactly 0.000000000**, so the *"same computation"* claim is true again once the margin is.
    `N·R` is a sound bound rather than a measurement — the same 20 steps of this section's own

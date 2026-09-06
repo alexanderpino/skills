@@ -25,11 +25,12 @@ sources:
 # Node-graph runtime — scheduling, caching and invalidating a terrain graph
 
 **Tier: authoring-time; the runtime that hosts the graph.** Every cost here is an authoring-loop
-cost — an interactive edit answered in milliseconds, a farm build in minutes — never a frame cost.
-A tool in the Gaea / World Machine class is a node graph plus the machine that runs it. The nodes
-are the subject of the rest of this skill; **this document is the machine**, and it is where a
-studio actually loses days — to a rebuild that recomputes an erosion pass nobody changed, or to a
-cache that serves a stale mask and produces a splatmap that is quietly wrong.
+cost — an interactive edit answered in milliseconds, a farm build in minutes — and the one frame
+rate below is the editor's viewport, not a render budget. A tool in the Gaea / World Machine class
+is a node graph plus the machine that runs it. The nodes are the subject of the rest of this skill;
+**this document is the machine**, and it is where a studio actually loses days — to a rebuild that
+recomputes an erosion pass nobody changed, or to a cache that serves a stale mask and produces a
+splatmap that is quietly wrong.
 
 **Boundary.** This document owns evaluation, cache identity, invalidation, resolution independence
 and tiling. `layering-filters-and-masks.md` owns how a filter is applied through a mask and what
@@ -249,10 +250,9 @@ The practical rules that follow, and none of them are optional if the cache is s
 - **Hash the effective seed**, so re-rolling a stochastic node invalidates that node's cone and
   nothing else [ta_graph_runtime].
 - **Pin the arithmetic; key on the pin, not on the regime** (above) — a **startup conformance
-  digest** in the key, so a machine off the pin is excluded rather than silently serving. Keying the
-  regime itself, or the device, the fast-math flags or the library version, splits the cache along
-  the one axis it exists to share; take that only if you are prepared to test the equivalence you
-  would otherwise be asserting.
+  digest** in the key, so a machine off the pin is excluded rather than silently served. Keying the
+  regime, the device, the fast-math flags or the library version splits the cache along the one
+  axis it exists to share; take that only if you will test the equivalence you are asserting.
 - **Iteration order counts as arithmetic.** A parallel reduction that sums in completion order is
   not deterministic, and floating-point addition is not associative.
 
@@ -274,38 +274,37 @@ The same graph is evaluated under two budgets, and the right answers differ. Thi
 rule in `simulation-time-budget.md` applied to authoring. **The preview tier** is the reduced
 resolution and iteration budget the graph is evaluated at for display — 512² rather than 4096², a
 capped iteration count — under the rule that a preview must *predict* the build: the same terrain
-at a lower sampling density (resolution independence, below), never a different answer.
+at a lower sampling density (resolution independence, below), never a different answer. Refining it
+toward the build without popping is `coverage.md`'s `progressive-preview` row, not this one.
 
 | | **Interactive edit** | **Farm build** |
 |---|---|---|
 | Wanted | Latency on one parameter | Throughput on the whole graph |
 | Scheduler | Suspending, on the preview tier only | Suspending; parallelism across independent cones |
 | Rebuilder | **Verifying traces** — hash the result, get cutoff, no value storage | Same, plus **constructive traces** on nodes whose compute exceeds their transfer |
-| Output hashing | Worth it only where the criterion below clears | Worth it: the hash is a rounding error against a farm job |
-| Cheap nodes | **Hash them anyway when their cone is expensive.** The criterion is priced on the dependents, not on the node | Same |
+| Output hashing | Worth it where the criterion below clears — **cheap nodes included**, because it is priced on the dependents, not on the node | Worth it: the hash is a rounding error against a farm job |
 
-⚠️ **Hashing a 4k field is not "milliseconds" — but the node's own cost is not what it is measured
-against.** Measured on one machine, 4096² float32 (67.1 MB): **sha256 50 ms**, blake2b 104 ms —
-against **copy 15 ms**, `a + b` **~22.5 ms**, a masked lerp **30 ms**. Those three are
-bandwidth-bound and agree at **~7.5 ms per pass over the field**: copy touches it twice (read,
-write), `a + b` three times, the masked lerp four. So the hash costs more than the node for every
-pointwise operator in the corpus — and that decides nothing, because **cutoff at a node protects
-that node's dependents, not the node itself**.
+⚠️ **Hashing a 4k field is not "milliseconds" — but the node's own cost is not the yardstick.**
+Measured on one machine, 4096² float32 (67.1 MB): **sha256 50 ms**, blake2b 104 ms — against **copy
+15 ms**, `a + b` **~22.5 ms**, a masked lerp **30 ms**. Those three are bandwidth-bound and agree
+at **~7.5 ms per pass over the field**: copy touches it twice (read, write), `a + b` three times,
+the masked lerp four. So the hash costs more than the node for every pointwise operator in the
+corpus — and that decides nothing: **cutoff at a node protects its dependents, not the node**.
 
-**The criterion is `cost(hash) < P̂(output unchanged) × cost(downstream cone)`.** On this page's own
-figures — a 50 ms hash above an erosion cone of ~10 s, which is conservative against the *minutes*
-the scheduler table quotes — break-even is `50 / 10 000` = **0.5%**. A clamp fails the node-local
-rule and clears this one by two orders of magnitude, which is exactly the point: the worked example
-above is a clamp swallowing a nudge so that erosion reruns, and the clamp is the node that must be
-hashed to stop it. Cutoff still does not belong on an arithmetic combinator that feeds a display —
-because its cone is empty, not because it is cheap.
+**The criterion is `cost(hash) < P̂(output unchanged) × cost(downstream cone)`**: hashing costs
+`hash + (1 − P̂)·cone` against `cone`, and the two are equal at `hash = P̂·cone`. On this page's
+own figures — a 50 ms hash above an erosion cone of ~10 s, conservative against the *minutes* the
+scheduler table quotes — break-even is `50 / 10 000` = **0.5%**. The inversion is the point: a
+clamp fails the node-local rule and clears this one, and it is the node the worked example needs
+hashed — the clamp swallows the nudge, so erosion reruns for nothing. An expensive node whose only
+consumer is the display passed the old rule and fails this one: empty cone.
 
-`P̂` is **estimated, not known**: nothing tells you a priori whether an output will change. Keep a
-running per-node hit rate — the fraction of rebuilds whose output hash came back unchanged — seeded
-with a structural prior. Seed it **≈ 1 for the many-to-one nodes** (clamp, quantise, threshold,
-mask, min/max against a constant): they destroy information, so most input changes cannot reach the
-output at all. Seed near 0 for bijective, noise- and seed-driven nodes. Measurement moves both, and
-a node whose measured rate collapses stops being hashed.
+`P̂` is **estimated, not known**. Keep a running per-node hit rate — the fraction of rebuilds whose
+output hash was unchanged — over a structural prior: seed the **information-destroying** nodes
+(clamp, quantise, threshold, mask, min/max against a constant) high, because a positive-measure set
+of their input changes maps to one output, and `P̂` is 1 where the whole change lands in the
+destroyed region, as above; seed bijective, noise- and seed-driven nodes at 0. Against a 0.5% bar
+the prior rarely decides; measurement retires the nodes that never hit.
 
 These figures are one machine's and are quoted to establish a **ratio**, not a budget: the shape
 that matters is that hash cost is linear in field size and single-threaded, while node cost varies
@@ -325,7 +324,8 @@ rather than fighting them.
 A parameter change and a graph edit are different events and cost different amounts
 [ta_graph_runtime]. A **value** change reuses the execution plan — same nodes, same order, same
 buffer allocations — and only reruns kernels. A **topology** change (rewiring, an octave count, an
-enum that switches algorithm variant) must re-plan.
+enum that switches algorithm variant) must re-plan. That split is also the axis an undo stack
+records, which is `coverage.md`'s `edit-history` row and not this document's.
 
 This distinction is most of the difference between a parameter drag that holds 60 fps and one that
 stutters, because plan construction and buffer allocation are where the frame time hides. Debounce

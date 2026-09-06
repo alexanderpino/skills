@@ -20,10 +20,11 @@ sources:
 ---
 # Noise and domain warping — the initial condition
 
-Noise is the **initial condition** the rest of the pipeline runs on, and nothing more. It has no
-memory of water, so it cannot produce a drainage network: ridged fBm makes ridges that read as
-mountains in a hillshade and fail a flow-accumulation check immediately, because the valleys do
-not connect. Everything here exists to hand erosion a surface worth eroding.
+**Tier: authoring-time for the base layer, and the one generation stage that also fits in a frame**
+(§Time budget). Noise is the **initial condition** the rest of the pipeline runs on, and nothing
+more. It has no memory of water, so it cannot produce a drainage network: ridged fBm makes ridges
+that read as mountains in a hillshade and fail a flow-accumulation check immediately, because the
+valleys do not connect. Everything here exists to hand erosion a surface worth eroding.
 
 ## Use this
 
@@ -33,7 +34,8 @@ not connect. Everything here exists to hand erosion a surface worth eroding.
 multifractal from the same source.
 
 Three constants carry most of the quality: the quintic fade, a lacunarity that is not exactly 2,
-and a warp amplitude near the largest octave's wavelength.
+and a warp amplitude near the largest octave's wavelength — which is also where the warp begins to
+fold (§Domain warp), so it is a ceiling as well as a starting point.
 
 ## The lattice, and the constants that decide the look
 
@@ -109,8 +111,8 @@ makes the stack non-periodic at every octave above the first: measured on a 6-oc
 64, lacunarity 2.0 wraps to 4.8e-14 while 1.93, 2.01 and 2.1 leave a wrap error of 0.51 to 0.58 —
 half the field's own amplitude, so the tile visibly does not meet itself. The condition is that
 `period × lacunarity^k` stays an integer for every octave summed; in lowest terms `p/q`, that means
-`q^(n-1)` must divide the period for `n` octaves. `3/2` needs only 32 and so wraps on any
-power-of-two period.
+`q^(n-1)` must divide the period for `n` octaves. `3/2` at six octaves needs 32, so it wraps on any
+power-of-two period **of 32 or more** — and not at 16, where `16·(3/2)^5 = 121.5`.
 
 This costs nothing here, because the table above is the argument: **offsets recover the pinch grid
 as well as the detune does, 0.44 against 0.44**, and a translation leaves a periodic function
@@ -167,6 +169,35 @@ largest octave. Much smaller does nothing visible; much larger dissolves the str
 Return `q` and `r` alongside the height — they are free masks that correlate with the warp
 structure, so materials placed by them follow the terrain's apparent flow direction.
 
+⚠️ **Divergence-free is not fold-free for a one-shot warp, and a curl warp folds at exactly this
+`K`.** For `p' = p + K·v` with `v = (ψ_y, −ψ_x)`, `det J = 1 + K·tr(∇v) + K²·det(∇v)`; being
+divergence-free zeroes only the **linear** term, leaving `det J = 1 + K²·det(Hess ψ)` — below 1
+at every saddle of `ψ`, and negative once `K²·det(Hess ψ) < −1`. Measured on a 6-octave fBm
+potential with a 64-cell base lattice, gain 0.5, amplitude-normalised, 512², central differences
+at `h` = 0.125, five seeds; `max|∇·v|` = 1.4e-17, and the determinant taken straight off the
+finite-differenced displacement map agrees with the closed form:
+
+| `K` | 1 | 8 | 16 | 32 | 64 | 128 |
+|---|---|---|---|---|---|---|
+| rms displacement, cells | 0.02 | 0.17 | 0.33 | 0.67 | 1.34 | 2.68 |
+| fraction of the domain folded | 0.00% | 0.00% | 0.00% | 0.04% | **11.30%** | 37.41% |
+
+`K` = 64 is what the rule above gives for a 64-cell base octave, and the rms displacement there is
+only 1.34 cells — the folds sit at the *finest* octave's scale, not the warp's. A plain fBm warp
+folds **0.00%** at that same 1.34 cells of rms displacement, because `v` is a derivative of `ψ`
+and its Jacobian is one order higher, so **curl buys nothing on this axis**; at the same `K` = 64,
+displacing 14.2 cells, the plain warp folds 28.4% in its turn. The bound comes from the same place
+as the mechanism: with `a` and `λ` the finest octave's amplitude and wavelength (twice its lattice
+spacing), the largest fold-free `K` is about `1/(a·(2π/λ)²)` — predicting 97 / 50 / 25 for a 4- /
+5- / 6-octave stack against 99 / 52 / 25 measured.
+
+**Keep `K` under that bound, or advect in substeps.** [bridson2007] §2.1's `v` is a fluid
+*velocity*, divergence-free because the divergence of a curl is identically zero, and it is the
+**flow map** of such a field that preserves area — one Euler step is not that flow map. Measured
+with `n` sub-steps of `K/n` at `K` = 64: mean `|det J − 1|` falls 0.524 / 0.254 / 0.130 / 0.066 at
+`n` = 1 / 2 / 4 / 8, an `O(1/n)` decay, and the fold fraction is 0.06% at `n` = 2 and **0.00%**
+from `n` = 4 on.
+
 ⚠️ **Warping is not erosion, and a warp after erosion is a bug.** Warp produces the *appearance*
 of flow-aligned structure with none of the connectivity. And because the drainage network was
 computed on the pre-warp geometry, a warp applied downstream of erosion leaves rivers that no
@@ -188,8 +219,9 @@ local control of frequency, bandwidth and **orientation**, so the only one that 
 honestly; far too expensive for base terrain, correct for aligned detail layers. *Wavelet noise*
 [cook2005] — genuinely band-limited, which matters only if you synthesise per-frame at varying
 LOD; for a baked heightfield the export resolution has already band-limited everything.
-*Curl noise* [bridson2007] — divergence-free, so it swirls a warp without pinching or tearing;
-a warp field, not a height source.
+*Curl noise* [bridson2007] — divergence-free, which makes the flow map of an *advected* field
+area-preserving; a one-shot displacement is **not**, and folds at the recommended `K` (⚠️ above).
+A warp field, not a height source.
 
 **Time budget.** An fBm octave is a lattice fetch plus a handful of dots, so the whole stack is a
 per-frame operation — this is the one part of terrain generation that genuinely is. Budget in
@@ -213,3 +245,4 @@ octaves it cannot resolve anyway, and dropping them is also the poor-man's band-
 | A remap curve does nothing to the tails and everything to the middle | The distribution is Gaussian, not uniform, so the knee lands elsewhere | Histogram-match, or apply the curve to the measured range |
 | Shimmering under LOD | Octaves below ~2 cells' wavelength | Cut the octave count to `log2(baseWavelengthInCells) − 1` — resolution does not enter it |
 | Rivers run uphill after a warp node | The warp moved geometry the drainage was solved on | Move every warp upstream of routing |
+| A warped field pinches, or the same terrain appears twice in one lobe | A one-shot warp is not area-preserving even when the field is divergence-free: `det J = 1 + K²·det(Hess ψ)`, negative wherever `K²·det(Hess ψ) < −1`; measured 11.30% of the domain folded at the `K` this document recommends | Keep `K` below `1/(a·(2π/λ)²)` for the potential's finest octave, or advect in substeps [bridson2007] |

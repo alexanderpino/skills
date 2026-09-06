@@ -18,9 +18,9 @@ sources:
 ---
 # Flow routing — where the water goes
 
-Every drainage network, river mask, wetness map and hydraulic-erosion step starts by deciding,
-for each cell, **where its water goes next**. Two decisions, in this order: what to do about
-depressions, and which receiver rule to use.
+**Tier: authoring-time; route once and cache — the runtime reads the baked arrays.** Every drainage
+network, river mask, wetness map and hydraulic-erosion step starts by deciding, for each cell,
+**where its water goes next**. Two decisions, in this order: depressions, then the receiver rule.
 
 ## Use this
 
@@ -356,15 +356,15 @@ buildStack(receivers):                         # [braun2013] — O(N), no sort, 
     return stack                               # every cell appears AFTER its receiver
 ```
 ```
-A[:] = cellArea                                # or any per-cell input: rainfall, mm/step
+A[:] = cellArea                                # m², or P[m/yr]·cellArea[m²] for m³/yr discharge
 for i in REVERSE(stack):                       # donors before receivers
     if receivers[i] != i:  A[receivers[i]] += A[i]
 ```
 
-The stack is [braun2013]'s: base levels first, every cell after its receiver. The reverse pass
-over it is D8 accumulation; the **forward** pass over the same stack is the order
-`stream-power.md`'s solver walks. Both rules need this traversal — it is what the budget
-note above means by "topological".
+The stack is [braun2013]'s: base levels first, every cell after its receiver. The reverse pass over
+it is D8 accumulation; the **forward** pass over the same stack is the order `stream-power.md`'s
+solver walks. Both rules need this traversal — it is what the budget note above means by
+"topological". Seed discharge instead and that solver's `K` changes too — see `driver-fields.md`.
 
 MFD has no single-receiver stack to build, so it orders by elevation instead, which is why it
 needs a depression-free surface and not merely a receiver array:

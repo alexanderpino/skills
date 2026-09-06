@@ -15,6 +15,9 @@ sources:
 ---
 # Stream power — the erosion backbone at map scale
 
+**Tier: authoring-time.** `Δt` is a millennium and the whole solve is a bake; what ships is the
+eroded heightfield, not this loop.
+
 Past roughly 50 km of extent, this is the only erosion model that is stable over geological time
 and the only one that produces correct large-scale drainage. Everything it needs comes from
 elsewhere: `U` from `tectonic-uplift.md`, drainage area `A` and the receiver array from
@@ -40,6 +43,13 @@ itself could not be opened here; the claim is taken from [cordonnier2016] §3.1,
 `m/n ≈ 0.5`" and cites Whipple & Tucker for it, then adopts `n = 1`, `m = 0.5` on that basis.
 Use `n = 1` unless you have a reason; `n` in 1–2 is defensible and the visual difference is
 subtle.
+
+⚠️ **`K` is not a dimensionless dial, and its units move with `m`.** With `[E] = L·T^(−1)` and
+`[A] = L²`, `K` carries `L^(1−2m)·T^(−1)` — plain `yr^(−1)` at `m = 0.5`, and something else at
+every other `m`. A `K` table tuned at one `m` does not transfer to another:
+`stratigraphy-and-lithology.md` states this with a source and gives the fix, which is to author
+dimensionless **contrasts** against a reference `K`. And substituting discharge for area does not
+reuse it — `K_Q = K_A·P̄^−m`, units `L^(1−3m)·T^(m−1)`, derived in `driver-fields.md`.
 
 ## Why the solver is the whole difficulty
 
@@ -80,7 +90,8 @@ pinned, and `U` there must be zero. Every other self-receiving cell is an *inter
 the receiver rule produced this step — and for those, `h[i] += U[i]*Δt` is the only thing that
 lifts a pit back out. It is not bookkeeping for cells that happen to have no receiver; it is the
 mechanism, and skipping it is a plausible misreading of the word "base level". Measured on a
-100×100 plate, 500 steps, `U = 5e-4 m/yr`, `Δt = 1000 yr`, `K = 3e-5`, `m = 0.5`, `n = 1`:
+100×100 plate, 500 steps, `U = 5e-4 m/yr`, `Δt = 1000 yr`, `m = 0.5`, `n = 1`, and
+`K = 3e-5 yr^(−1)` — `yr^(−1)` because `L^(1−2m)·T^(−1)` collapses to `T^(−1)` at `m = 0.5`:
 
 | base-level handling | after 500 steps |
 |---|---|
@@ -142,6 +153,7 @@ Whipple & Tucker, which was not obtainable, and which the second-hand reading th
 
 ```
 C_kp(A) = K * pow(A, m)      # m/yr upstream — larger rivers consume knickpoints faster
+                             # same K as the incision law: L^(1-2m)T^-1 * L^2m = L*T^-1
 ```
 
 Which is why trunk streams have rapids and small tributaries keep their falls — [crosby2006]
@@ -185,6 +197,7 @@ that look fine in a hillshade.
 | Each step costs O(n log n) and the run crawls | A full depression fill re-run every step | Lake graph inside the loop [cordonnier2016] |
 | `log S` vs `log A` is not a straight line of slope −m/n | Wrong drainage area, wrong receiver distances, or an unhandled depression | Fix routing before touching the erosion |
 | A convex long profile | `U` and `K` mis-scaled, or the run stopped far from equilibrium | Check `U × time` against the relief you want |
+| A `K` borrowed from a paper, another `m`, or a discharge-form solver gives the wrong incision rate | `K` is not dimensionless — it carries `L^(1−2m)·T^(−1)`, so its value is tied to `m`, and the discharge form is a different coefficient again | Re-derive at your `m` (`yr^(−1)` at `m = 0.5`); for discharge, `K_Q = K_A·P̄^−m` — see `driver-fields.md` |
 | A carved waterfall relaxes into a rapid | Uniform `K`, so nothing pins the step | A hard bed across the channel, then let the solver run |
 | Waterfalls everywhere, including on trunk rivers | Knickpoints stamped rather than produced | Author the cause — a `K` jump or a base-level fall |
 | A flat, featureless result on a small map | No drainage area at this extent | Wrong backbone; use droplet or pipe |

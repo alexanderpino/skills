@@ -19,10 +19,10 @@ sources:
 ---
 # Driver fields — temperature, sun, shadow and flow
 
-A terrain graph carries more than a heightfield. It carries **driver fields**: temperature,
-insolation, shadow, and the flow fields for water and wind. These are what make erosion, snow and
-vegetation respond to *where* they are rather than uniformly, and they behave differently from
-heightfields in ways the runtime has to know about.
+**Tier: authoring-time; the runtime consumes the baked fields.** A terrain graph carries more than
+a heightfield. It carries **driver fields**: temperature, insolation, shadow, and the flow fields
+for water and wind. They make erosion, snow and vegetation respond to *where* they are rather than
+uniformly, and they behave differently from heightfields in ways the runtime has to know about.
 
 This document exists because Gaia had a hole: `thermal-and-aeolian-erosion.md` states that an
 aeolian pass "needs a wind field computed first", and nothing produced one.
@@ -141,9 +141,7 @@ support it, and the reason is structural rather than generational.
 ⚠️ **Those two rows are not a like-for-like comparison, and reading them as one is a trap this
 document nearly set.** Normalise: the sweep on the larger grid at the same 580 directions is
 `3.566 × 580 × 2 s ≈ 4136 s ≈ 1.15 h` — *inside* the band it would appear to beat. The apparent
-thousandfold gap is the **direction count**, not the algorithm. This document's own rule two
-sections down — a number quoted without saying what consumes it is meaningless — applies to its
-author first.
+thousandfold gap is the **direction count**, not the algorithm.
 
 **What actually survives, and it is enough.** Both methods cost roughly `directions × O(cells)`, so
 per direction they are comparable. The sweep wins for two structural reasons instead:
@@ -312,8 +310,7 @@ tilted plane you will not see this bug, and every real heightfield will trip it.
 
 ### Three ways the cheap model is wrong, in the direction that matters here
 
-The upslope model is a teaching tool, and this corpus's rule is to say where a recommendation
-breaks before recommending it.
+The upslope model is a teaching tool, and this section says where it breaks before recommending it.
 
 **It has no timescales, so the pattern is pinned to the wrong place.** Condensate does not fall
 where it forms — it is advected downwind while it converts to precipitation and while it falls. The
@@ -353,11 +350,14 @@ multiplier reach zero has invented a desert that the physics does not support.
 ### What it costs downstream, which is the reason to bother
 
 Precipitation enters erosion as **discharge**, not as area: `Q = Σ(P · cellArea)` over the
-contributing cells, accumulated by exactly the machinery `flow-routing.md` already describes — the
-accumulation is a weighted sum instead of a count, and nothing else about it changes. Substituting
-`Q` for `A` in the stream-power law is a one-line change to `stream-power.md`'s update and it is the
-single highest-value use of any field in this document, because it is what makes the wet side of a
-range incise and the dry side keep its relief.
+contributing cells, by the accumulation `flow-routing.md` already describes — weighted instead of
+counted. It is the single highest-value use of any field here, because it makes the wet side of a
+range incise and the dry side keep its relief. ⚠️ **But it is not the one-line change this passage
+used to call it.** `[A] = L²` against `[Q] = L³T⁻¹`, so the coefficient moves too: with `Q = P̄·A`
+(`P̄` the contributing-area mean rate), `K_Q·(P̄A)^m·S^n = K_A·A^m·S^n` gives
+**`K_Q = K_A·P̄^−m`**, units `L^(1−3m)·T^(m−1)` — at `m = 0.5`, `m^−0.5·yr^−0.5` against
+`K_A`'s `1/yr`. Re-derive it; do not reuse an area-form `K` table. And carry `P` in **metres** per
+step: millimetres multiply incision by `1000^m` = **31.6×** at `m = 0.5`.
 
 ⚠️ **It is also a global field with a non-local dependence, so it breaks tiling the same way flow
 accumulation does** — see `## What these fields do to the runtime` below. Worse than the horizon
@@ -431,7 +431,7 @@ Driver fields are not heightfields, and three properties follow:
 | The occlusion bake takes hours | Per-cell, per-direction ray marching — 1–2 hours per tile on a GPU against ~2 s per azimuth for the sweep on CPU [stendardo2020] [dozier2022] | Use the order-N sweep; it is O(N) and sun-independent |
 | Changing the time of day rebuilds everything | The horizon sweep sits below the sun parameter in the graph | Put the sun-independent sweep above the sun parameter; only the projection is downstream |
 | Rivers run out of dry valleys, or half the map is a desert | An unclamped upslope field: 49.6–50.1% of cells measure negative, and clamping alone then halves the base rate | Clamp at zero, then rescale so the domain total matches the intended base rate |
-| Erosion is identical on both sides of a range | Discharge taken as drainage area `A`, which assumes uniform rainfall | Accumulate `Q = Σ(P·cellArea)` with the same router and substitute `Q` for `A` [minderroe] |
+| Erosion is identical on both sides of a range | Discharge taken as drainage area `A`, which assumes uniform rainfall | Accumulate `Q = Σ(P·cellArea)` with the same router, and re-derive the coefficient — `K_Q = K_A·P̄^−m`, not `K_A` [minderroe] |
 | The rain shadow is sharper than any real range | A single authored wind direction; the Alps' storms arrive from many, which erases the simple shadow [minderroe] | Average the dot product over three to five weighted directions |
 | The wet band sits on the windward face and looks pasted on | The upslope model has no conversion or fallout timescale, so nothing is advected downwind | Named fix is Smith and Barstad's linear theory — read it before implementing; the cheap partial fix is to advect the clamped field downwind before accumulating |
 | Ridge-tops are drier than the reference imagery | The upslope model's known failure at kilometre scale — measured maxima sit on ridge-tops via seeder-feeder [minderroe] | Add a curvature-weighted term and label it a correction, not physics |
