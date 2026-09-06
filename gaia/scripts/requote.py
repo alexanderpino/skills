@@ -90,6 +90,16 @@ _QUOTE_PATTERNS = [
     re.compile(r"(?<![A-Za-z])'([^'\n]{%d,})'(?![A-Za-z])" % MIN_QUOTE),
 ]
 
+# The same three shapes BELOW the threshold, so what MIN_QUOTE discards is a number on screen
+# rather than a silence. A threshold nobody can see is a threshold nobody can argue with: 40
+# characters was chosen against a false-positive rate, and the only way to revisit it is to know
+# how much it is throwing away. Same lookarounds on the apostrophe, for the same reason.
+_SHORT_PATTERNS = [
+    re.compile(r'"([^"\n]{1,%d})"' % (MIN_QUOTE - 1)),
+    re.compile(r'“([^”\n]{1,%d})”' % (MIN_QUOTE - 1)),
+    re.compile(r"(?<![A-Za-z])'([^'\n]{1,%d})'(?![A-Za-z])" % (MIN_QUOTE - 1)),
+]
+
 
 def normalise(s: str) -> str:
     """Collapse a string to what survives PDF extraction on both sides.

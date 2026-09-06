@@ -24,10 +24,13 @@ sources:
 ---
 # Node-graph runtime — scheduling, caching and invalidating a terrain graph
 
-A tool in the Gaea / World Machine class is a node graph plus the machine that runs it. The nodes
-are the subject of the rest of this skill; **this document is the machine**, and it is where a
-studio actually loses days — to a rebuild that recomputes an erosion pass nobody changed, or to a
-cache that serves a stale mask and produces a splatmap that is quietly wrong.
+**Tier: authoring-time; the runtime that hosts the graph.** Every cost here is an authoring-loop
+cost — an interactive edit answered in milliseconds, a farm build in minutes — and none of it runs
+inside a rendered frame. A tool in the Gaea / World Machine class is a node graph plus the machine
+that runs it. The nodes are the subject of the rest of this skill; **this document is the
+machine**, and it is where a studio actually loses days — to a rebuild that recomputes an erosion
+pass nobody changed, or to a cache that serves a stale mask and produces a splatmap that is quietly
+wrong.
 
 **Boundary.** This document owns evaluation, cache identity, invalidation, resolution independence
 and tiling. `layering-filters-and-masks.md` owns how a filter is applied through a mask and what
@@ -60,11 +63,11 @@ option is barred here specifically, because the stored value is what the next no
 quantising it changes every downstream key. A ten-node cone re-evaluated 400 times in a working day
 is on the order of **hundreds of gigabytes** of stored artefacts per artist.
 
-Worse, sharing is not free either. Fetching 67 MB over 1 GbE takes **~537 ms**, while computing
-`a + b` on that field takes **~14 ms**: for a cheap node the shared cache is **38× slower than
-recomputing**. So the promotion rule is a comparison, not a policy — **store the value only where
-the node's compute time exceeds its transfer time**, and let everything else be a verifying trace
-that stores a hash and reruns on a miss.
+Worse, sharing is not free either. Fetching 67.1 MB over 1 GbE takes **~537 ms** (67.1 MB at
+125 MB/s), while computing `a + b` on that field takes **~22.5 ms**: for a cheap node the shared
+cache is **~24× slower than recomputing**. So the promotion rule is a comparison, not a policy —
+**store the value only where the node's compute time exceeds its transfer time**, and let
+everything else be a verifying trace that stores a hash and reruns on a miss.
 
 **What it beats.** *Topological scheduling* [alacarte] §4.1.1 — a linear pre-pass, correct and
 simple, but it can only extract dependencies from an applicative task, so a node whose inputs
@@ -210,7 +213,7 @@ SIMD dispatch regimes of the same numpy build:
 ```
                     AVX512 on    AVX512 off
 canyon relief         268.99       270.71
-canyon pit-storage   5.2169e6     4.1597e6      <- 25% apart
+canyon pit-storage   5.2169e6     4.1597e6      <- 20% apart
 badlands relief       260.52       258.63
 ```
 
@@ -220,8 +223,11 @@ The mechanism is a 1-ULP difference: transcendental ufunc loops (`pow`, `exp`, `
 because a steepest-descent step is a **discrete choice** and a tie flips [simd_dispatch_drift].
 
 ⚠️ **Read the magnitudes honestly before drawing the conclusion.** Relief moved 0.6% and
-**pit storage moved 20%** — and pit storage is an extremal, topology-sensitive statistic, exactly
-the kind of quantity a flipped tie moves most. This is not evidence that terrain arithmetic is
+**pit storage moved 20%** — every percentage here, the table's included, is the gap over the
+**AVX512-on** value: `(5.2169e6 − 4.1597e6) / 5.2169e6 = 20.3%`. (Against the other column the same
+gap reads 25%; neither run is a reference, so the denominator has to be stated rather than picked
+per sentence.) Pit storage is an extremal, topology-sensitive statistic, exactly the kind of
+quantity a flipped tie moves most. This is not evidence that terrain arithmetic is
 generally unstable; it is evidence that **an operator making a discrete choice on a float
 comparison** will amplify any divergence, however small. The root cause is tie-breaking, and
 `flow-routing.md` already fixes the analogous case with a monotonic tie-break rather than by
@@ -244,9 +250,12 @@ The practical rules that follow, and none of them are optional if the cache is s
   never-reused entries per drag [ta_graph_runtime].
 - **Hash the effective seed**, so re-rolling a stochastic node invalidates that node's cone and
   nothing else [ta_graph_runtime].
-- **Anything that changes the arithmetic belongs in the key** — the dispatch regime, the device,
-  the fast-math flags, the library version — unless you are prepared to test the equivalence you
-  are asserting.
+- **Pin the arithmetic; key on the pin, not on the regime.** One toolchain, opportunistic dispatch
+  disabled, no fast-math, deterministic reductions — and a **startup conformance digest** in the
+  key, so a machine that fails the pin is excluded rather than silently serving. Putting the regime
+  itself in the key, or the device, the fast-math flags or the library version, splits the cache
+  along the one axis it exists to share (above); take that only if you are prepared to test the
+  equivalence you would otherwise be asserting.
 - **Iteration order counts as arithmetic.** A parallel reduction that sums in completion order is
   not deterministic, and floating-point addition is not associative.
 
@@ -265,26 +274,48 @@ pure — which is the same assumption the cache key already makes.
 ## The crossover: an edit is not a build
 
 The same graph is evaluated under two budgets, and the right answers differ. This is the general
-rule in `simulation-time-budget.md` applied to authoring.
+rule in `simulation-time-budget.md` applied to authoring. **The preview tier** is the reduced
+resolution and iteration budget the graph is evaluated at for display — 512² rather than 4096², a
+capped iteration count on the iterative nodes — under the standing rule that a preview must
+*predict* the build: the same terrain at a lower sampling density (see resolution independence
+below), never a different answer.
 
 | | **Interactive edit** | **Farm build** |
 |---|---|---|
 | Wanted | Latency on one parameter | Throughput on the whole graph |
 | Scheduler | Suspending, on the preview tier only | Suspending; parallelism across independent cones |
 | Rebuilder | **Verifying traces** — hash the result, get cutoff, no value storage | Same, plus **constructive traces** on nodes whose compute exceeds their transfer |
-| Output hashing | Worth it only above the threshold below | Worth it: the hash is a rounding error against a farm job |
-| Cheap nodes | **Do not hash.** A node that costs less than hashing its output should just rerun | Same |
+| Output hashing | Worth it only where the criterion below clears | Worth it: the hash is a rounding error against a farm job |
+| Cheap nodes | **Hash them anyway when their cone is expensive.** The criterion is priced on the dependents, not on the node | Same |
 
-⚠️ **Hashing a 4k field is not "milliseconds", and the threshold is higher than it looks.** Measured
-on one machine, 4096² float32 (67.1 MB): **sha256 50 ms**, blake2b 104 ms — against **copy 15 ms**,
-`a + b` **14 ms**, a masked lerp **30 ms**. The hash costs *more than the node* for every pointwise
-operator in the corpus. So cutoff belongs on erosion, flow accumulation and long-baseline occlusion,
-and nowhere near an arithmetic combinator.
+⚠️ **Hashing a 4k field is not "milliseconds" — but the node's own cost is not what it is measured
+against.** Measured on one machine, 4096² float32 (67.1 MB): **sha256 50 ms**, blake2b 104 ms —
+against **copy 15 ms**, `a + b` **~22.5 ms**, a masked lerp **30 ms**. Those three are
+bandwidth-bound and agree at **~7.5 ms per pass over the field**: copy touches it twice (read,
+write), `a + b` three times, the masked lerp four. So the hash costs more than the node for every
+pointwise operator in the corpus — and that decides nothing, because **cutoff at a node protects
+that node's dependents, not the node itself**.
+
+**The criterion is `cost(hash) < P̂(output unchanged) × cost(downstream cone)`.** On this page's own
+figures — a 50 ms hash above an erosion cone of ~10 s, which is conservative against the *minutes*
+the scheduler table quotes — break-even is `50 / 10 000` = **0.5%**. A clamp fails the node-local
+rule and clears this one by two orders of magnitude, which is exactly the point: the worked example
+above is a clamp swallowing a nudge so that erosion reruns, and the clamp is the node that must be
+hashed to stop it. Cutoff still does not belong on an arithmetic combinator that feeds a display —
+because its cone is empty, not because it is cheap.
+
+`P̂` is **estimated, not known**: nothing tells you a priori whether an output will change. Keep a
+running per-node hit rate — the fraction of rebuilds whose output hash came back unchanged — seeded
+with a structural prior. Seed it **≈ 1 for the many-to-one nodes** (clamp, quantise, threshold,
+mask, min/max against a constant): they destroy information, so most input changes cannot reach the
+output at all. Seed near 0 for bijective, noise- and seed-driven nodes. Measurement moves both, and
+a node whose measured rate collapses stops being hashed.
 
 These figures are one machine's and are quoted to establish a **ratio**, not a budget: the shape
 that matters is that hash cost is linear in field size and single-threaded, while node cost varies
 by orders of magnitude and parallelises. That asymmetry moves the crossover *against* cutoff on
-better hardware, which is the opposite of the usual intuition.
+better hardware — the cone term shrinks while the hash term does not — which is the opposite of the
+usual intuition.
 
 **Hash the tiles, not the field.** The document already requires every node to declare a tiling
 class, so make the tile the Merkle leaf: hash each tile, then hash the tile hashes. Measured on the
@@ -383,10 +414,10 @@ already allocated the wrong buffers.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | A parameter nudge reruns an erosion pass that produces identical output | Deep constructive trace: the key is over inputs, so it changes even when the value does not [alacarte] §4.2.4 | Compare the output hash — verifying or constructive traces [alacarte] §4.2.2 |
-| Terrain differs between two machines from the same graph and the same seed | The cache key asserts determinism the operations do not have [alacarte] §4.2.4; measured across SIMD regimes on one CPU [simd_dispatch_drift] | Put the arithmetic regime in the key, or test the equivalence being promised |
+| Terrain differs between two machines from the same graph and the same seed | The cache key asserts determinism the operations do not have [alacarte] §4.2.4; measured across SIMD regimes on one CPU [simd_dispatch_drift] | Pin the arithmetic and put the *startup conformance digest* in the key, so a machine off the pin is excluded rather than served — not the regime itself, which splits the cache; or test the equivalence being promised |
 | The cache fills with thousands of entries during a slider drag | Float parameters hashed unquantised [ta_graph_runtime] | Quantise before hashing |
 | Parameter drag holds 60 fps, then stutters when one particular value changes | That value is a topology change, not a value change — it re-plans [ta_graph_runtime] | Classify parameters VALUE vs TOPOLOGY; debounce the re-plan |
-| Adding cutoff made the graph slower | Output hashing applied to nodes cheaper than their own hash | Apply cutoff only where the node is expensive and its output stable |
+| Adding cutoff made the graph slower | Output hashing priced against the node's own cost instead of its dependents', or applied to a node whose output changes whenever its inputs do | Apply cutoff where `cost(hash) < P̂(unchanged) × cost(downstream cone)`: a cheap clamp above an erosion pass qualifies; an expensive node feeding nothing does not |
 | The 512 preview does not match the 4k build | A parameter stored in cells rather than world units | Store radii and lengths in world units; resolution stays in the key |
 | Tiled build has a seam only in some places | A node's halo is smaller than its true support | Size the halo from the operator's support radius, summed along the chain |
 | Tiled build's rivers stop at tile boundaries | Flow accumulation run per tile — it is global-ordered, and no halo fixes it (`flow-routing.md`) | Classify the node as global-ordered; route on the whole domain |

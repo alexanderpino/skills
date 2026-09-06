@@ -1,10 +1,29 @@
 """Physical invariants for the virtual-pipe shallow-water flow (shallow_water.py, Mei et al. 2007).
 Water is a real mass-conserving volume, so the checks are the conservation laws: depth stays
 non-negative, a closed basin conserves every drop of rain, an open domain balances rain in = out +
-stored, and discharge grows downstream as tributaries join."""
+stored, and discharge grows downstream as tributaries join. Plus the one invariant that is not a
+conservation law: the default `dt` is the step this scheme's own stability condition allows, and the
+grid does not slosh at it."""
+import math
+
 import numpy as np
 
 import shallow_water as sw
+
+
+def _cfl_dt(cellsize):
+    """The step `simulate` must choose at `dt=None`. Constant-A pipe model: `pipe = G*cellsize` is
+    A·g/l with A = l² and l = cellsize, so A/l = cellsize, the linear two-pipe scheme propagates at
+    sqrt(2·g·A/l), and the 2-D leapfrog bound 1/sqrt(2) on that speed puts dt_crit at
+    0.50·cellsize/sqrt(g·cellsize). C = 0.20 is the 2.5× margin the module runs at."""
+    return 0.20 * cellsize / math.sqrt(sw.G * cellsize)
+
+
+def _checkerboard_amplitude(depth):
+    """Amplitude of the (pi, pi) grid mode relative to the mean depth — the signature of a step above
+    the CFL limit, which the outflow clamp keeps NaN-free and therefore invisible to a smoke test."""
+    ii, jj = np.mgrid[0:depth.shape[0], 0:depth.shape[1]]
+    return abs(float((depth * (-1.0) ** (ii + jj)).sum())) / depth.size / max(float(depth.mean()), 1e-30)
 
 
 def test_depth_nonnegative_and_finite():
