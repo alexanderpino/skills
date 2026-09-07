@@ -181,10 +181,33 @@ hundreds of steps rather than millions. What costs is the per-step routing — r
 accumulation — which is why the in-loop depression handling matters more than the erosion
 arithmetic. Nothing here runs per frame; a runtime consumes the baked result.
 
+**And what it costs in memory, which is the part that does not depend on a machine.** The loop
+above touches six full-grid arrays — `h`, `U`, `A` and `dist` at fp32, `receivers` and `stack` at
+int32 — **24 bytes per cell**, of which 12 (`receivers`, `dist`, `A`) are `flow-routing.md`'s
+output contract and were allocated before this solver ran. At 4096² that is **403 MB**; the
+explicit Laplacian's second height buffer (+4) and `buildStack`'s donor lists held in CSR form
+(+8) take a working implementation to 36 bytes per cell, **604 MB**, which is what decides whether
+the bake fits in memory at all. That is arithmetic on the printed block, not a measurement. **No
+wall-clock figure is given here on purpose**: the run time is set by the depression handling and by
+how many steps you take to equilibrium, both of them yours, and nobody here has benchmarked either
+— measure it in your own bake and report the step count beside it.
+
 **Verify it, because eyeballing will not.** Plot the main channel's long profile: it must be
 concave. Plot `log(S)` against `log(A)` for channel cells: it must be a straight line of slope
 `−m/n ≈ −0.5`. That check is direct, cheap and quantitative, and it catches implementation errors
 that look fine in a hillshade.
+
+**And it has a tolerance, which is the half that makes it usable.** Setting `∂h/∂t = 0` in the law
+above gives `S = (U/K)^(1/n)·A^(−m/n)` in closed form, so the fitted slope is a numerical result
+measured against an *analytic* exponent and not against a second run of the same code. Three runs
+recorded for this document — the 100×100 plate in the table above, and two in
+`registers/pseudocode-execution.tsv` — return **−0.498**, −0.499 and −0.501 against the analytic
+−0.500: **within 0.4%**, with the sign of the residual not fixed. So test a band, not a target:
+0.005 either side of `−m/n` — a little over twice the largest residual seen here, which is 0.002 —
+is the solver working, and −0.45 or −0.55 is a routing bug. ⚠️ The closed form drops `D·∇²h`, and all three runs were made
+with diffusion off; on channel cells stream power dominates and the fit survives, but a `D` raised
+far enough to compete for valley spacing bends it, and then the check is measuring your `D` and
+not your solver.
 
 ## How this fails, and what it looks like
 

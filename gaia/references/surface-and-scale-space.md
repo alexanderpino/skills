@@ -13,6 +13,10 @@ sources:
 ---
 # Surface modification and scale space — changing the skin without moving the mountain
 
+**Tier: authoring-time.** `## Use this` prices a whole-field analysis-and-synthesis pass as build
+work — 0.096 s per decimated 512² split at `L = 5` in numpy, and a `3·2^L` halo that makes 47% of
+the pixels a five-level tiled build touches apron. What ships is the heightfield, not the pyramid.
+
 A terrain has a shape and it has a skin. Erosion, stratification, rock growth and every "add
 character" operator works on the skin, and every one of them will happily eat the shape while
 doing it. Gaea states the problem better than a paraphrase can: *"when you erode a terrain or
@@ -92,7 +96,7 @@ cost of storing a full undecimated *pyramid*; `## Use this` builds **two bands**
 `hi = h − lo`, and an à-trous `lo` is `L` dilated separable convolutions in place — **2 fields,
 same as the decimated version**. Measured on the same kernel:
 
-| | decimated (recommended) | à-trous |
+| | decimated (untiled default) | à-trous (tiled default) |
 |---|---|---|
 | support radius, `L = 4` / `L = 5` | 46 / 94 px | **30 / 62 px** |
 | halo needed | `3·2^L` **and** a phase rule | the radius, no phase rule |
@@ -102,13 +106,11 @@ same as the decimated version**. Measured on the same kernel:
 
 **The crossover is whether the build is tiled and whether you need more than two bands.** Untiled,
 or building a full multi-band pyramid where the `4^-k` storage decay is what makes depth
-affordable, the decimated version wins on time and on storage. Tiled — which is the Gaea-class case
-this skill targets — the à-trous form is **35.4%** cheaper in halo at `L = 5` (the row above:
-`3·2⁵ = 96` px against 62, so `(96−62)/96` — check it against the row above rather than taking
-the number; an earlier version said 48%, which that table does not give), is exactly shift-invariant
-where the decimated pyramid drifts metres, and makes every phase rule in this document *vacuous*.
-It costs about 1.5× the arithmetic. Four pages below are spent on the decimated pyramid's phase
-tax; that tax is the price of the recommendation, not a law of band splitting. *Editing the full field and
+affordable, the decimated version wins. Tiled, `## Use this` takes the à-trous form, and its one
+number is the row above: `3·2⁵ = 96` px of halo against 62, so `(96−62)/96` = **35.4%** — check it
+against the table rather than taking it; an earlier version said 48%, which that table does not
+give. Four pages below are spent on the decimated pyramid's phase tax; that tax is the price of
+the *decimated* choice, not a law of band splitting. *Editing the full field and
 re-imposing the low band afterwards* — looks equivalent, is not, and has its own section.
 *Frequency-domain (FFT) filtering* — clean band shapes and a natural `Keep DC`, but it is globally
 supported, so it cannot be tiled at all and a single edited cell rebuilds the whole domain.
@@ -336,11 +338,8 @@ where `N` is the period. Measured: 0.000e+00 at `N = 256` for `L = 2, 3, 5` and 
 
 An undecimated (à-trous) split has no phase at all: measured shift-invariant to 0.0000 m at shifts
 of 1, 2, 4, 8 and 16 px, where the decimated pyramid drifted 0.45, 0.89, 1.72 and 2.72 m and only
-returned to zero at the full period of 16. If your build is tiled and the seams are the thing that
-keeps failing, that exactness is close to free: the two-band recipe in `## Use this` stores `lo`
-and `hi` either way, so an à-trous split costs **2 fields, the same as the decimated one**, at about
-1.5× the arithmetic. ⚠️ The `(L+1)×` storage figure this line used to cite is the cost of a full
-undecimated *pyramid*, which is not what is being built — see the retraction above.
+returned to zero at the full period of 16. That measurement is why `## Use this` takes the à-trous
+form on a tiled build, and it is what the retracted `(L+1)×` storage figure there argued against.
 
 ## Where this competes with erosion, and where it does not
 

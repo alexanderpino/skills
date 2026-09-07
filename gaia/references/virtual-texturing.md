@@ -101,6 +101,15 @@ not for a parameter that touches every page at once.
   the footprint they should cover — under-filtering on the fine pages where `s > 1`, at exactly the
   grazing angles the border-capped aniso above exists to serve, and over-spread into blur on the
   coarse pages where `s < 1`.
+  ⚠️ **And the gradient this scales has to be a legal derivative first.** `shader-craft.md` carries
+  the general form of the jump above — a screen-space derivative is a difference taken across the
+  hardware's 2×2 shading quad, so *any* quantity that steps inside one quad is differenced across
+  the step, and `physUV` is one instance of a class that also holds a `frac`-wrapped detail UV and a
+  triplanar axis flip, both of which a page composite is full of — and one case where the fetch is
+  undefined rather than merely wrong: a value read back through a UAV may not contribute to a
+  derivative at all, which is what the page table is the moment a shader reads it through the same
+  UAV a GPU-side update writes.
+  Every case lands on the call this bullet already writes: gradients supplied, never inferred.
 - **A feedback pass** discovers which pages pixels want: render a reduced-resolution buffer of
   (pageID, mip), read it back, dedupe, prioritise coarse mips first [barrett2008]. Latency is 1–3
   frames minimum. Design for it — prefetch along predicted camera motion, prime requests before a

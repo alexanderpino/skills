@@ -146,6 +146,18 @@ per tile diverge at edges unless they were baked over tile + apron with the apro
 tiles arrive apron-less, the lighting seam cannot be fixed at runtime — reject the data and fix
 the bake. Blurring the seam hides it at one distance and reveals it at every other.
 
+⚠️ **The line that survives a correct apron is a different defect, and the derivative is not it.**
+The drawn set is a *complete cut* through the tree, so neighbouring tiles routinely sit one level
+apart, and the two sides then hand **different inputs** — a different texel size, a different
+detail-UV scale, a different resident mip — to their own, correct screen-space derivatives. Under a
+rasteriser two tiles are two primitives, so no shading quad ever spans the boundary and no
+derivative is taken across it; "fixing the derivative" changes nothing, and neither does re-baking
+an apron that was already right. `shader-craft.md` carries the specification text, the full list of
+the differing inputs, the one shading path where the no-quad-spans-it argument does not hold, and
+the fix: make the LOD-dependent inputs agree across the boundary, or take the gradients from a
+quantity that does not depend on which level a tile is at. `heightfield-lod.md` states the same
+defect along its morph bands.
+
 ## How this fails, and what it looks like
 
 | Symptom | Mechanism | Fix |
@@ -156,7 +168,7 @@ the bake. Blurring the seam hides it at one distance and reveals it at every oth
 | A hole, or the sky, where terrain should be | Parent released before all four children were renderable, or children dropped before a re-requested parent arrived | The always-renderable invariant, enforced in both directions |
 | Double-drawn, z-fighting terrain at one tile | Parent and children both drawn during a transition | Refinement is atomic per parent |
 | Distant tiles never sharpen | Requests dropped silently — queue overflow, or IDs recycled by the streamer | Count every drop; key requests by stable tile ID |
-| A visible seam in lighting exactly on tile edges | Per-tile bakes ran without a neighbour apron | Re-bake with an apron at least the kernel radius; do not blur at runtime |
+| A visible seam in lighting exactly on tile edges | Per-tile bakes ran without a neighbour apron — or the apron is correct, and the two sides sit at different pyramid levels feeding different inputs to their own correct derivatives | Re-bake with an apron at least the kernel radius; do not blur at runtime. If a correct apron does not move it, it is the cross-level filtering discontinuity and not the bake — see the seams section |
 | Resident set grows through a long flight and never plateaus | Eviction never reaches the cache; evictable tiles are pinned by a stale reference; or `resident` tiles whose want expired have no discard edge, so they hold their bytes until the upload budget finally reaches them | Plot the resident-set curve on a soak; it must plateau. Give `resident` an exit |
 | Cross-tile seams appear only after a patch | Old baked tiles mixed with new ones | Version every tile blob by a content hash of source data plus bake parameters; reject mixed versions per region |
 | Players fall through the world at speed | Collision residency coupled to render residency, or R sized without the latency term | Separate pyramid, guaranteed ring, R from max speed × worst-case latency |

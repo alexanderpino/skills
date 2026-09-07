@@ -323,14 +323,21 @@ not the routing an erosion *solver* runs on: stream power builds its stack from 
 array and keys incision on single-receiver accumulation, so it needs D8 (or D∞ collapsed to one
 neighbour) and cannot consume an MFD field at all (`stream-power.md`).
 
-Thresholding an MFD field to get a network produces a smeared, braided mask; smoothing a D8
-field to get a wetness map produces stripes. Route twice if you need both — it is cheaper than
-post-processing either into the other.
+Route twice if you need both — cheaper than post-processing either into the other, and the failure
+table names each symptom you get by not doing it.
 
-**Per-frame budget.** Both rules need a topological traversal to accumulate — that is not the
-difference, and saying so would be wrong. The difference is per cell: D8 stores one receiver
-and adds one contribution, MFD stores up to seven weights and accumulates a contribution from
-each, so its inner loop and its memory traffic are several times D8's on the same grid.
+**Per-frame budget, and what the arrays cost to hold.** Both rules need a topological traversal to
+accumulate — that is not the difference, and saying so would be wrong. The difference is per cell:
+D8 stores one receiver and adds one contribution, MFD stores up to seven weights and accumulates a
+contribution from each, so its inner loop and its memory traffic are several times D8's on the same
+grid. In *residency* they are closer than that suggests, and there the number is arithmetic rather
+than a benchmark: the output contract below is an int32 index and two fp32 fields,
+**12 bytes per cell**, **201 MB** at 4096², while the MFD block stores no weights at all —
+`mfdWeights` is called inside the accumulation loop and its result is consumed there. Neither is
+the peak. `priorityFlood` pushes every cell exactly once and the total-order requirement above puts
+a monotonic counter inside each entry, so the queue can reach one `(elevation, counter, index)`
+triple per cell — **12 bytes per cell** again — on top of the routing copy of `z`, and that is what
+has to fit.
 
 ⚠️ **No measured crossover is stated here, deliberately.** The honest answer is that it depends
 on grid size, memory layout and hardware, and this skill has no benchmark to cite — writing a

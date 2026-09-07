@@ -229,12 +229,31 @@ Musgrave's paper both defeated it. *Thermal erosion alone* — relaxes what is t
 **Time budget.** Both are authoring-time. Droplet cost is droplet count × lifetime, decoupled from
 resolution, so it is the one you can dial down to interact with; pipe cost is a fixed number of
 full-grid passes per step with `Δt` bounded by `Δt·|v| < cellSize` — Mei's own stated CFL
-[mei2007] — **and by the pipe stencil's own signal speed `sqrt(g·A/l)`**, which with `A` and `l`
+[mei2007] — **and by the pipe stencil's own signal speed `sqrt(2·g·A/l)`**, which with `A` and `l`
 constant does not move with depth at all: `shallow-water.md` owns that bound and the reason the
-familiar `sqrt(g·h)` is not it here. So it is the one that maps onto
+familiar `sqrt(g·h)` is not it here. ⚠️ **That factor of 2 is the second one-way pipe on every
+face, and this line lost it** — it read `sqrt(g·A/l)` while the sibling that derives it read
+`sqrt(2·g·A/l)`, the same correction-at-one-end defect `shallow-water.md` had between its own body
+and its own failure table. So it is the one that maps onto
 a compute shader and the one to pick if the tool must show the erosion progressing. Neither is a
 per-frame operation at authoring resolution. If velocity spikes, clamp it rather than reducing
 `Δt` globally — the spike is almost always one bad cell.
+
+**How good the water is, and what the grid costs to hold.** With `A` and `l` constant the
+stencil's celerity is fixed by parameters, so it stands in the ratio `sqrt(2·A/(l·h))` to the
+physical `sqrt(g·h)` — **within 10% only for water roughly 1.65 to 2.47 cells deep**, 347% too fast
+at a tenth of a cell and 55% too slow at ten (`shallow-water.md` derives it, and it is the same
+stencil here). ⚠️ Read that as the accuracy of the **water**: arrival times, slosh period, how a fill
+front spreads. It is not an error bar on the erosion, which reads `|v|` out of the fluxes rather
+than out of the celerity — **this document has no measured error for the erosion itself**, and
+droplet erosion cannot have one, because it approximates no reference solution to be measured
+against. Memory does have a number, and it is arithmetic rather than a benchmark: bed, depth,
+suspended sediment and the four fluxes are seven fp32 fields, **28 bytes per cell**, plus a second
+sediment field for the semi-Lagrangian advection — 32 in all, since depth needs no second buffer
+(the depth update reads fluxes, not neighbouring depths). At 1024² that is **33.6 MB**, at 4096²
+**537 MB**, before any material layer. Droplet erosion allocates nothing per cell beyond the
+heightfield; its cost is the count, above. The only wall-clock figures anywhere in this document
+are the papers' own, in §The crossover, on hardware that is not yours.
 
 **Order in the graph: hydraulic first, thermal after.** Hydraulic over-steepens and thermal
 relaxes; reversed, the hydraulic pass re-steepens what thermal fixed and the thermal pass was
@@ -349,9 +368,13 @@ This is the material-layer stack again: grain classes are layers distinguished b
 [stava2008] §5, and `stratigraphy-and-lithology.md` is the same idea applied to rock rather than to
 sediment. The cost is honest and linear — `k` sediment fields, `k` advections, `k` capacity
 evaluations, `k` slippage passes — against a flow solve that dominates the step, so three classes
-cost far less than three times a single-class run. **Three is where the returns stop**: two gives
-you armouring and a fining gradient, three gives you scree that behaves unlike sand, and a fourth
-is a constant nobody can tune by eye.
+cost far less than three times a single-class run. In memory that linearity is **8 bytes per cell**
+per class (one fp32 sediment field and its advection buffer), and the 32 above already carries one
+class: `k` classes is `24 + 8·k` bytes per cell, so three is 48 — **50.3 MB** at 1024² against
+33.6 MB for one. The step *time* is not linear in `k` and nothing here measures it; [stava2008]
+Table 1 is the nearest thing, and it reports layers, not grain classes. **Three is where the
+returns stop**: two gives you armouring and a fining gradient, three gives you scree that behaves
+unlike sand, and a fourth is a constant nobody can tune by eye.
 
 ## How this fails, and what it looks like
 

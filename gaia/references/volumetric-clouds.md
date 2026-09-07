@@ -138,6 +138,16 @@ is what stops the escalation missing the iso-surface it just crossed.
   [hillaire2016] p.36. The last sample is placed far from the rest to catch distant-cloud shadowing.
 - **The early-out** is three texture reads, one multiply, `return 0.0` [schneider2022] p.91.
 
+⚠️ **A per-pixel iteration count makes every fetch inside that loop an explicit-LOD one.** The
+sample count above is itself per-pixel — 64 rising toward a potential 128 as the ray nears the
+horizon — so the loop's own step cap is a lane-varying exit, and that takes the *whole* body in
+with it; the early-out and the cheap-to-expensive escalation are two further divergences inside it.
+There the derivative and implicit-LOD instructions are forbidden on one API and undefined on the
+other, and compile on both. So in a pixel shader every density, noise and weather fetch names
+its own level — `SampleLevel`/`textureLod`, or `SampleGrad` where the footprint matters — rather
+than letting the hardware infer one. `shader-craft.md` carries the specification text and the
+symptom, which is mip noise appearing only where the march is expensive and moving with the camera.
+
 ## The three couplings terrain owns
 
 This is where a terrain engine's needs diverge from general sky rendering, and where the most-cited
@@ -287,6 +297,7 @@ pixels**. A cloud budget quoted without the geometry it displaces is half a numb
 | Cloud drawn over a mountain the first time a peak enters the deck | The march does not terminate at the terrain depth hit | Depth-aware compositing; pick one of the three depth definitions and use it everywhere [yusov2014] |
 | Clouds pop at silhouettes as the camera turns | The depth-mip reduce picks the NEAREST depth in the footprint, so the march terminates early — the operator that does this flips with the depth convention | Reduce toward the FARTHEST depth: `min()` under reversed-Z, `max()` under standard depth. Write the quantity, not the operator [schneidervos2017] p.98 |
 | A fringe hugging every ridge — cloud bleeding onto the rock, a thinned band just past it — crawling under camera motion | The low-res march is resolved by a plain bilinear tap, which mixes low-res samples that stopped on terrain with samples that ran to the cloud exit; at `1/S` per axis it reaches at most `S` full-res pixels either side | Nearest-depth or bilateral resolve against the depth the march stopped at; bilinear only where the four candidates agree. The two reductions differ in *quantity*, not in operator: termination takes the FARTHEST depth, the resolve the smallest depth *difference* — one helper cannot serve both |
+| Mip noise or blocky texture LOD on the clouds, only where the march is expensive, and it moves with the camera | An implicit-LOD `Sample`/`texture()` on density, noise or weather inside a march whose sample count is per-pixel, so its whole body is in varying flow control — forbidden on one API, undefined on the other, and it compiles on both | `SampleLevel`/`textureLod` for every fetch in the loop, or `SampleGrad` where the footprint matters — see *The march* above, which carries the rule and routes on |
 | Landscape looks dead and evenly lit under a dramatic sky | No ground-receiving cloud shadow — it is absent from the 2015/2017 lineage, so an implementation faithful to those decks has none | Light-space transparency buffer on the CSM matrices [yusov2014] p.133 |
 | Cloud shadows drift wrong across a large map | The projected-shadow formulation assumes a flat planet, and its error grows with BOTH vista length and falling sun | Bound both, not just the map: the shadow offset is `h/tan(elevation)`, so it leaves any map at low sun. Or project on the sphere [hillaire2016] p.42 |
 | Ghosting and smearing on fast camera turns, worst near camera | Temporal amortisation over 16 frames cannot resolve in time | Depth-split the render instead of upscaling near clouds [schneider2023] p.185 |

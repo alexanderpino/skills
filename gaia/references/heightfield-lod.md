@@ -215,6 +215,21 @@ breaks under streaming, and it fails precisely on the frames where LOD changes.
 | Index stitching | The finer chunk drops every other edge vertex [deboer2000] | Heights still pop; needs the ≤1-level adjacency invariant |
 | Skirts | A vertical curtain dropped from each chunk edge [ulrich2002] | The curtain is visible to SSAO, fog, shadows and decals as dark seam lines |
 
+**What the morphing contract costs to feed, which is not triangles.** *Both* levels of every band
+resident is a residency requirement, not an optimisation you can defer, so price it: at R16 a
+heightfield is **2 bytes per cell** — **134 MB** for the 8k × 8k field in the tier line above, and
+its full mip pyramid adds a third, **179 MB**. The morph blends *normals* by the same `morphK`, so
+a mipped RG8 normal field doubles both to 4 bytes per cell, **268 MB** and **358 MB**.
+`tiled-streaming.md` is what stops that ever being the resident set; this arithmetic is what tells
+you the tile budget it has to work inside, and it is the figure that decides between CDLOD and a
+clipmap's fixed allocation long before triangle counts do. ⚠️ These are byte counts derived from a
+named format, not measurements. **No per-frame time is measured in this document and none should
+be quoted**: the per-frame cost is the *selected cut*, a few thousand nodes set by the view, the
+field and the machine, so it is measured in your own frame capture or not at all. The error half
+this document does bound, and it bounds it in the currency that transfers — `tau` pixels, and
+multiples of a level's own `e` — never in metres, which belong to your heightfield and not to the
+scheme.
+
 **How big is the gap the XZ morph does not close?** Measured on a synthetic 2048² fBm field at
 2 m spacing, over 36 configurations — four roughness settings × three mip-reduction kernels × three
 levels: at the shared vertices the mip `L` and mip `L + 1` surfaces disagree by **0.19–0.52 × the

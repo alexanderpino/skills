@@ -86,6 +86,18 @@ triangles; it is the pre-float-depth era's answer, reached for only when float d
 unavailable. *Engine-native large-world support* [epiclwc] — the same doctrine, engine-side, and
 it does **not** exempt content: any shader doing maths on absolute world position still breaks.
 
+⚠️ **"Used carefully" in that log-depth line is a token and a promise, and the reversed-Z above is
+what fixes which token.** Reversing the mapping reverses the depth comparison, and the
+conservative-depth declaration that keeps early cull alive is the one whose promised direction
+agrees with it: under this document's reversed-Z that is `SV_DepthLessEqual` — never write a value
+*larger* than the rasterized depth — and `SV_DepthGreaterEqual` under standard depth. The two are
+opposite tokens for one promise, so a shader carried between conventions keeps the wrong one
+silently: the declaration stays legal, the image stays identical, and the cull it was declared for
+is simply off. `shader-craft.md` carries the specification text for both tokens, why the wrong one
+costs nothing visible, the two cheap ways to catch it, and the harder half — the promise is
+undefined behaviour to break, so a pass that declares it owes rasterized geometry that really does
+bound the depth the shader goes on to write.
+
 ## Precision is an architecture, not a patch
 
 Decide three things once, globally, and audit every path that bypasses them: the authoritative

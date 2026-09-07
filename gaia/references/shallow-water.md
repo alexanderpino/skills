@@ -155,6 +155,18 @@ sloshes at the speed of water **two cells** deep, whatever the water is, and tyi
 as `A ≈ h·lx` still runs `sqrt(2)` fast — `A ≈ h·lx/2` is what reproduces `sqrt(g·h)`. What does not
 change is the shape of the dependence, and that is what the `dt` decision turns on.
 
+**How wrong the water is, in one number.** Divide the two celerities: the model's `sqrt(2·g·A/l)`
+over the physical `sqrt(g·h)` is `sqrt(2·A/(l·h))`, and with `A = l²` that is `sqrt(2·l/h)` — a
+function of cell size over depth and of nothing else. It is exactly 1 at `h = 2l`, which is the
+"two cells deep" above stated as an error rather than as an image, and it is **within 10% only for
+`2l/1.21 ≤ h ≤ 2l/0.81`** — depths of roughly 1.65·l to 2.47·l. A tenth of a cell of water sloshes
+**347% too fast** (ratio `sqrt(20)` = 4.47) and ten cells of water **55% too slow**
+(`sqrt(0.2)` = 0.447). That is the error the constant-`A`
+recommendation carries and the reason the two rows of the table below look nothing alike; tying
+`A ≈ h·lx/2` drives it to zero, at the price of the per-step recomputation the first bullet below
+demands. It bounds the *water* — arrival times, slosh period, how fast a fill front spreads — and
+says nothing about the missing `(u.grad)u`, which is limit 6 and is not an error you can shrink.
+
 Measured, clamp disabled so instability is visible, critical `dt` bisected on a 32² grid:
 
 | Pipe area | depth 0.1 | depth 1.0 | depth 10 |
@@ -223,6 +235,17 @@ follow the camera, nest resolutions rather than growing one grid, and sleep bodi
 looking at. Note the boundary contract flips with the body type — an open-water patch fades its
 contribution to zero over the outer ~15% so the edge is never visible; a pool's edge is a real wall
 and must reflect.
+
+⚠️ **Price that decision before you take it.** The block above holds six fp32 fields per cell —
+`h`, `b` and the four pipe fluxes — and no more: velocity is *reconstructed* rather than stored,
+and the depth pass reads only fluxes, so `h` updates in place and needs no second buffer. That is
+**24 bytes per cell**: **1.57 MB** for a 256² interactive patch, **6.29 MB** at 512², **25.2 MB**
+for a 1024² authoring grid. Keeping `|u|` for rendering or for an erosion pass adds 8 bytes per
+cell; sediment and material layers are `hydraulic-erosion.md`'s cost, not this document's. Those
+figures are arithmetic on the printed block and a named format width, reproducible with a
+calculator and **not** a measurement: **no wall-clock or per-step time is measured anywhere in this
+document**, because one grid on one machine does not transfer, and the scheduler that would have to
+measure it is `simulation-time-budget.md`'s.
 
 **6. No momentum advection, so no shocks and no hydraulic jump.** The update drops `(u.grad)u`, so
 the model cannot steepen a front into a discontinuity, cannot form a hydraulic jump where
