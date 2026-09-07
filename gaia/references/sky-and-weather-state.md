@@ -283,10 +283,11 @@ second.
   from the cloud renderer into a bake.
 - **The tables are what the renderer samples.** `atmosphere-and-aerial-perspective.md` owns the
   pass; it consumes the three tables produced here and must not rebuild them.
-- **The coverage field is what the cloud march reads.** ⚠️ `volumetric-clouds.md` is `planned` and
-  **not yet written** — the coverage row exists, the document does not. This is a contract stated in
-  advance, deliberately, so that whoever writes it inherits the one-sky-state rule rather than
-  authoring a second coverage field. Until then the obligation is on the reader, not on a link.
+- **The coverage field is what the cloud march reads.** `volumetric-clouds.md` is **written**, and
+  it names this contract at its weather-texture bullet: the coverage channel is not that pass's to
+  author. The contract was stated here in advance, while that document was still `planned`, so that
+  whoever wrote it would inherit the one-sky-state rule rather than author a second coverage field —
+  and it did. Both ends now say so, which is the point; a contract with one end is a hope.
 
 **And the two graph-visible artefacts here must declare their class.** `node-graph-runtime.md` is
 explicit that "a node's class is part of its description, alongside its type and its parameters, and

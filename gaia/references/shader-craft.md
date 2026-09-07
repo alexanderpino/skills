@@ -10,7 +10,7 @@ sources:
   - { id: glsl460, tier: F, locator: "§7.1.5 Fragment Shader Special Variables, gl_HelperInvocation — helper invocations exist to evaluate derivatives, 'computed implicitly in the built-in function texture()'; §8.2 Exponential Functions — pow, 'Results are undefined if x < 0'; §8.3 Common Functions — clamp as min(max(x, minVal), maxVal), and min/max defined by a bare comparison with no NaN carve-out; §8.14.1 Derivative Functions — 'Derivatives are undefined within non-uniform control flow', and the forward/backward-differencing definition over the 2x2 stamp" }
   - { id: nonuniform_idx, tier: F, locator: "the Resource Binding document's § 'Divergence and derivatives' — the LOD-undefined sentence, the compiler's uniformity assumption, the undefined result without the intrinsic, and 'sufficient to apply NonUniformResourceIndex to any index'; its § 'Shader Derivatives and Divergent Indexing' for the per-lookup cost; the GL_EXT_nonuniform_qualifier extension's Mapping to SPIR-V section, 'nonuniformEXT -> NonUniformEXT decoration on variables'; and the SPIR-V core grammar spirv.core.grammar.json, Decoration value 5300, enumerant NonUniform with NonUniformEXT as an alias, version 1.5, extension SPV_EXT_descriptor_indexing" }
   - { id: tevs2008, tier: P, locator: "§3.1 Data Structure for the max-reduce mipmap whose texels this document forbids filtering; §3.2 Intersection Algorithm for the traversal loop whose fetch must be explicit-LOD" }
-  - { id: mittring2008, tier: F, locator: "§2.3.6 Computing the Local LOD, and §2.3.6.4 the feedback pre-pass; §2.3.2.2 Efficient Filtering Through Borders for the aniso cap the gradient rules sit against" }
+  - { id: mittring2008, tier: F, locator: "§2.3.6 Computing the Local LOD, and §2.3.6.4 the feedback pre-pass; §2.3.2.2 Efficient Filtering Through Borders for the 1-texel and 4-texel border widths (1 for bilinear, 4 for DXT block compression, verbatim -- never a 2-4 range). ⚠️ That section DECLINES anisotropic filtering outright ('we haven't done any implementation so we skip it here'), so it does not carry an aniso cap and is not cited for one" }
   - { id: barrett2008, tier: F, locator: "the software page-table indirection and the feedback loop whose resolution the mip request has to be corrected for" }
   - { id: reed2015, tier: F, locator: "the section The Effects of Roundoff Error — the simulated indistinguishable-and-swap error table, whose reversed-Z float32 row is the zero-error one" }
   - { id: bruneton2010, tier: P, locator: "§5.2 eq. 26, the roughness-aware Fresnel fit — the grazing term whose `pow` base is the one that goes negative" }
@@ -35,8 +35,7 @@ not harvested, and are marked where they appear**: the fp16 `normalize` collapse
 `saturate`/`clamp` divergence are derived here against the specifications, and no document in the
 corpus carries either. **Four of the seven are undefined behaviour by specification** — the
 derivative inside varying flow control, `pow` on a negative base, a divergent resource index
-without the qualifier, and a broken conservative-depth promise — and every one of the seven
-compiles.
+without the qualifier, a broken conservative-depth promise — and every one of the seven compiles.
 
 ## Use this
 
@@ -218,14 +217,15 @@ pages the near field uses, positive once `pageMip` passes `log2(virtualSize/pool
 a 16k² pool gives `s = 16` at `pageMip = 0`, so unscaled gradients state a footprint 16× too small,
 `log2 16 = 4` levels too fine. The anisotropic half does not clamp the way the LOD half does — the
 ratio is scale-invariant, so the hardware takes the right number of taps and spreads them across
-`1/s` of the footprint they should cover, at exactly the grazing angles the border-capped aniso
-[mittring2008] §2.3.2.2 exists to serve.
+`1/s` of the footprint they should cover, at the grazing angles anisotropy exists to serve.
+⚠️ [mittring2008] §2.3.2.2 bounds a tap's reach — 1 texel bilinear, 4 for DXT — but **declines
+anisotropy explicitly**, so no aniso cap is sourced here and none is claimed.
 
 **The bias.** A feedback pass renders (pageID, mip) at reduced resolution [barrett2008]. With
 `feedbackScale = fullResWidth / feedbackWidth`, adjacent pixels of that buffer stand
 `feedbackScale` full-res pixels apart, so its `ddx(virtualUV)` is that much larger and the mip it
 computes is `log2(feedbackScale)` too coarse for what the main pass will sample. Request
-`mip = computeMip(virtualUV) − log2(feedbackScale)` [mittring2008] §2.3.6.4. At quarter resolution
+`mip = computeMip(virtualUV) − log2(feedbackScale)`. ⚠️ **Derived here, not sourced:** [mittring2008] §2.3.6.4 gives [barrett2008]'s tile-id pre-pass and its read-back latency, with no reduced-resolution buffer and no bias term, so it cannot carry this. At quarter resolution
 that is 2 mips, which is **6.25% of the areal texel density the main pass needs**, and over a fixed
 screen area about 6.25% of the pages — the same factor twice. Left uncorrected it is not a
 transient: the finest page the table can serve stays `log2(feedbackScale)` mips coarser than the
