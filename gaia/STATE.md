@@ -35,26 +35,35 @@ covers 16 of 37 documents.
 
 | | |
 |---|---|
-| Documents | **37** written, 11 planned, 4 explicitly out of scope (48 topics in scope) |
-| Bibliography | 214 entries, 214 cited, 0 orphaned |
-| Adversarially audited | **16 of 37** |
-| Never examined | **21 of 37** |
-| Guards | `check.py` exit 0 · 72/72 fixtures · `requote` 6/6 · index current |
+| Documents | **39** written, 13 planned, 6 explicitly out of scope (52 topics in scope) |
+| Bibliography | 225 entries, 225 cited, 0 orphaned |
+| Adversarially audited | **37 of 39** — see the reconciliation below |
+| Verified corrections | **143** rows in `registers/corrections.tsv`, every one signed by an independent verifier |
+| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` 33 red + 4 green |
+| Phase 0 | **closed** 2026-09-07 — the guard layer, verified by mutation under `bash -e` |
 
 Reported metrics, none of them enforced:
 
 | Metric | Value | What it means |
 |---|---|---|
-| `approximation` | **7/37** | documents stating *both* how good a recommendation is and what it costs |
-| `locators` | ~70% | citations naming a section, equation or page rather than a topic |
-| `propagation` | **16/256** | citations naming a section at *both* ends, so the two can be cross-checked at all |
-| `reach` | 17/193 | body sections sharing no word with `## Use this` or the failure table |
-| `unread` | 26/256 | citations that *declare* the source was never opened here |
+| `approximation` | **7/39** | documents stating *both* how good a recommendation is and what it costs |
+| `locators` | 187/264 (71%) | citations naming a section, equation or page rather than a topic |
+| `propagation` | **17/283** | citations naming a section at *both* ends, so the two can be cross-checked at all |
+| `reach` | 16/206 | body sections sharing no word with `## Use this` or the failure table |
+| `unread` | 29/283 | citations that *declare* the source was never opened here |
+| `crossrefs` | **1/227** | shared magnitudes that DISAGREE across documents — new, and it found a live one on its first run |
 
 ## Audit state, per document
 
-Three tiers. Nothing here is "verified" in the strong sense — no document carries the `verified:`
-header that would mean a human read every cited work.
+Three tiers. Nothing here is "verified" in the strong sense — **no document carries the `verified:`
+header**, which is the only one of the three channels that means a human read the cited work.
+
+⚠️ **The tiering below predates the 2026-09-05 audit and its sittings.** Since then every document
+has been through an implementer and an independent verifier, and 143 corrections carry both
+signatures. That raises the middle channel a long way and moves the third not at all: an agent can
+re-derive a number, run a block and read both ends of a cross-reference, and none of that is a
+human having opened the paper. Read the tiers below as *what had been examined by hand before the
+audit*, and `registers/corrections.tsv` as what has been examined since.
 
 **Subject critic + adversarial verifier, findings applied** — a domain specialist audited the
 document, ran its pseudocode and re-derived its numbers; a second agent then tried to *disprove*
@@ -126,19 +135,31 @@ calls the most common complaint against tools in this class.
 
 ## Next steps, in the order I would do them
 
-1. **Audit the tooling** (issue 2). Highest value, because everything downstream trusts it.
-2. **Audit the 21 unexamined documents**, in batches of three, subject critic + adversarial
-   verifier, and an architect pass for anything on Rendering, Architecture or Simulation. Risk
-   order by how heavily a document has already been edited: `mask-to-material` (4 register rows),
-   `sketch-based-authoring` (3), `shallow-water` (3). Promote `node-graph-runtime` (longest
-   unaudited document, on the axis everything else assumes) and `simulation-time-budget` (it tells
-   you how to spend a frame, and cost figures have been found wrong by 1000× and by four orders of
-   magnitude elsewhere in this corpus).
-3. **Widen the artefact cache** so `requote.py` covers more than 5%.
-4. **Write the 11 planned rows**, starting with `resolution-independence`.
-5. **Raise `approximation`** — 30 of 37 documents still give an error or a cost, not both. Do it by
-   supplying the missing half from sources, not by loosening the pattern; the metric has already
-   been caught mismeasuring its own fix once.
+⚠️ **This list was written before the 2026-09-05 audit and is reordered here rather than
+rewritten, because what replaced it is the more useful record.** Items 1, 2 and 4 are done: the
+tooling audit became Phase 0 and closed; the batched audit of 21 documents became 20 per-document
+sittings, each with an independent verifier; and `resolution-independence` is written, along with
+`shader-craft`. The batching was the wrong unit — a sitting that owns one document and states its
+own gates found defects a batch of three would have averaged over.
+
+What remains, in the order I would now do it:
+
+1. **The five sittings still being repaired** — VT + clouds, tiled-streaming + mesh-extraction +
+   sea-ice, precision + craters + coastal + sketch, caustics, stratigraphy. Their verifiers have
+   reported; the fixes are not yet applied.
+2. **Point the eleven rendering documents at `shader-craft.md`.** The document exists and nothing
+   cites it, so a reader still meets each hazard in isolation. G53 is not closed until they do.
+3. **The budget-tag migration** — 37+ documents carrying one canonical tag with a `**Tier:` line
+   that agrees. Success criterion 6, and the last structural item.
+4. **Widen the artefact cache** so `requote.py` covers more than 5%. ⚠️ **This one cannot be done
+   by an agent** — it needs artefacts nobody here can fetch.
+5. **Raise `approximation`** — 32 of 39 documents still give an error or a cost, not both. Supply
+   the missing half from sources; the metric has already been caught mismeasuring its own fix once.
+6. **The `verified:` stamps.** 0 of 39. ⚠️ **Also not available to any agent**, by construction —
+   the stamp means a human read the cited work. Phase 0's verifier found that a stamp on a
+   bibliography certified nothing at all (the digest hashed the empty string, so one stamp was
+   valid on all nine apparatus files); that hole is closed, which makes the stamp worth having and
+   still leaves it a human's to give.
 
 ## Checking any of this yourself
 
