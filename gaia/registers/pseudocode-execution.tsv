@@ -62,13 +62,17 @@
 # HOW A CELL NAMES ANOTHER ROW: by document and block, NEVER by line number. A `:NN` anywhere in
 # this file is a line in a REFERENCE DOCUMENT; a row has no stable line of its own, because every
 # row that lands above it moves it. This column's own edit is the proof. It inserted 55 lines of
-# header above the data, and the seven cells that had been written as `row :52` went on saying
-# `row :52` -- which is now a line of this comment block, not the row they meant. check.py FAILS
-# the register on any `row :NN` / `rows :NN`, so the idiom is enforced and not merely recommended.
-# Positional prose ("the row above") is the same defect and the guard CANNOT see it; do not write
-# it. ⚠️ The guard does NOT resolve the `:NN` references into reference documents: those files are
-# edited by other hands, an insertion anywhere above a fence silently moves it, and several such
-# references in this file are stale right now for exactly that reason.
+# header above the data, and the seven cells written as `row :NN` kept their old NN -- which now
+# lands inside this comment block instead of on the row each one meant, and no guard said a word.
+# check.py now FAILS the register on `row :` or `rows :` followed by a number, so the idiom is
+# enforced and not merely recommended. TWO THINGS THAT GUARD CANNOT DO. ⚠️ It does not see
+# POSITIONAL prose -- one cell below still says "the row above", which breaks the same way the
+# moment a row lands between them, and it survives here only because it is an original cell and
+# not this edit's to rewrite. ⚠️ It does not resolve the `:NN` references INTO reference
+# documents: those files are edited by other hands, an insertion anywhere above a fence silently
+# moves it, and doing so would put a guard in this repo permanently red on other people's work.
+# Where the owning document is under repair right now, the cells below name the fence by its
+# CONTENT and give no line at all -- a description does not go stale.
 #
 # THE 2026-09-07 AUDIT, AND WHAT IT DID NOT DO. All 73 rows were classified by reading the fenced
 # block each row names. NO BLOCK WAS RE-EXECUTED FOR THIS COLUMN. `halts-measured` was written

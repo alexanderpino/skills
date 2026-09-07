@@ -122,7 +122,7 @@ float F = R + (1.0 - R) * m;                                 // R = F0 from the 
 spec-undefined for `x < 0` (GLSL: *"Results are undefined if x < 0"*) and NaN in practice, and a
 NaN written to the colour target is absorbed permanently into TAA history. With a normal blended
 from a detail map and left unrenormalized — the normal case in a water shader — `dot(N, V)`
-exceeds 1 near normal incidence for any blend that does not renormalise — an *additive* blend on essentially every sample — and even a renormalised fp32 pair lands up to one ULP above (`max dot = 1.000000238`). A lerp, UDN or whiteout blend does not, at normal incidence. The rate does not matter: one pixel poisons the history. So `1 - cosThetaV` is negative across the
+exceeds 1 near normal incidence for any blend that does not renormalise — an *additive* blend on essentially every sample — and even a renormalised fp32 pair lands above it, at `max dot = 1.000000238` — **two** ULP, the binary32 step above 1.0 being `2^-23` and one ULP being `1.0000001`. A lerp, UDN or whiteout blend does not, at normal incidence. The rate does not matter: one pixel poisons the history. So `1 - cosThetaV` is negative across the
 whole band around the mirror direction and that band goes NaN. Clamping only the top,
 `max(1.0 - cosThetaV, 0.0)`, removes the NaN and leaves the other end open: a back-facing
 `dot(N, V) = -1` gives `1 - cos = 2`, and at `sigma_v = 0.12` that is `m = 6.3` and **`F = 6.2`** — energy from nowhere. (At this page's own worked `sigma_v = 0.2` it is 2.50 and 2.47; the blow-up is not a property of one roughness.) On **8.8%**

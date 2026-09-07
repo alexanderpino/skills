@@ -21,6 +21,14 @@ names them, and a `termination` token from a closed vocabulary, so that no row c
 about whether its block halts. It cannot check that the token is TRUE -- `halts-proven` is worth
 exactly the argument written beside it. The `unknown` count and the count of documents holding a
 fenced block that no row names are REPORTED, never enforced.
+
+One idiom in that register is enforced too: a cell may not name another row of the same file by
+line number. Rows have no stable lines -- the edit that added the `termination` column inserted
+55 lines of header and left seven cells pointing 55 lines short, into the comment block, every
+one of them still well-formed and none of them caught. References INTO reference documents
+(`flow-routing.md:239`) are the correct idiom and are deliberately not checked: those files are
+edited daily by other hands, and a guard over them would be permanently red on other people's
+work.
 """
 from __future__ import annotations
 
@@ -2055,6 +2063,17 @@ PSEUDOCODE_COLUMNS = ("document", "block", "what was asserted", "what the run me
 # the first says the code has no loop, the second says there is no code.
 TERMINATION_VALUES = {"n/a", "halts-proven", "halts-measured", "cap-bounded", "unknown",
                       "no-block"}
+# A cell that names another row of the same file BY LINE NUMBER. A row has no stable line: every
+# row that lands above it moves it, and the header moves them all at once. The edit that added
+# the `termination` column is the proof and the reason this exists -- it inserted 55 lines of
+# header, and seven cells that had been written `row :52` went on saying :52, which by then was a
+# line of the comment block. Every one of them still parsed, still had seven fields and still
+# carried a legal token, so nothing in this file objected; a reviewer found them by hand. The
+# repair is an idiom (name the row by its document and block, which do not move) and this is the
+# gate that keeps it. Deliberately narrow: `\brows? :\d+` and nothing else, so it cannot fire on
+# `flow-routing.md:239` or on a bare `:42`, both of which are lines in a REFERENCE document and
+# are the normal, correct thing for a cell to carry.
+REGISTER_ROW_REF = re.compile(r"\brows?\s+:\d+")
 
 
 def check_pseudocode_register(path: Path | None = None) -> tuple[list[str], dict[str, int]]:
@@ -2065,12 +2084,20 @@ def check_pseudocode_register(path: Path | None = None) -> tuple[list[str], dict
     measured missed hits, recorded SOUND, and the same block livelocked on 35.7% of 600 rays,
     found by hand a fortnight later. SKILL.md:103 carries the sentence; this carries the column.
 
-    What it ENFORCES is only shape -- seven fields, the header naming them, and a termination
-    token from the closed vocabulary. That is deliberately mechanical: nothing here can tell
-    whether `halts-proven` is true, any more than the citation checks can tell whether a paper
-    says what a document claims. What it REPORTS is the `unknown` count, in the style of the
-    other reported metrics: a number that has to go down, not a gate that can be gamed by
-    writing `n/a` everywhere. A reviewer still has to read the cell's argument.
+    What it ENFORCES is shape -- seven fields, the header naming them, a termination token from
+    the closed vocabulary -- and one idiom: a cell may NOT name another row of this file by line
+    number (see REGISTER_ROW_REF). That is deliberately mechanical: nothing here can tell whether
+    `halts-proven` is true, any more than the citation checks can tell whether a paper says what
+    a document claims. What it REPORTS is the `unknown` count, in the style of the other reported
+    metrics: a number that has to go down, not a gate that can be gamed by writing `n/a`
+    everywhere. A reviewer still has to read the cell's argument.
+
+    ⚠️ It does NOT resolve the `document.md:NN` references the cells DO carry. Those point into
+    39 documents this repo edits daily, and an insertion anywhere above a fence moves it silently
+    -- four such references were stale the day this guard was written, every one of them because
+    another author had inserted a paragraph, none of them because the cell was wrong when
+    written. A guard over them would be permanently red on other people's work, which is a guard
+    nobody reads. Self-references are different in kind: this file moves them itself.
     """
     reg = path or PSEUDOCODE
     problems: list[str] = []
@@ -2078,17 +2105,28 @@ def check_pseudocode_register(path: Path | None = None) -> tuple[list[str], dict
     if not reg.exists():
         return [f"{reg}: the pseudocode execution register is missing -- without it, no block "
                 f"in this corpus is recorded as having been run"], counts
-    rows = [(n, ln) for n, ln in enumerate(reg.read_text(encoding="utf-8").split("\n"), 1)
+    text = reg.read_text(encoding="utf-8")
+    # Every line, comments included: one of the seven references this catches lived in the
+    # header comment block, and a comment that misdirects a reader is not a lesser defect.
+    for n, ln in enumerate(text.split("\n"), 1):
+        if m := REGISTER_ROW_REF.search(ln):
+            problems.append(
+                f"{reg.name}:{n}: {m.group(0)!r} names a row of THIS file by line number, and a "
+                f"row has no stable line -- adding the `termination` header moved every row 55 "
+                f"lines and seven such references followed it into the comment block. Name the "
+                f"row by its document and block, which do not move")
+    rows = [(n, ln) for n, ln in enumerate(text.split("\n"), 1)
             if ln.strip() and not ln.lstrip().startswith("#")]
     if not rows:
-        return [f"{reg.name}: no header row and no rows"], counts
+        return problems + [f"{reg.name}: no header row and no rows"], counts
     n, header = rows[0]
     got = tuple(header.split("\t"))
     if got != PSEUDOCODE_COLUMNS:
         # Returned early: with the header wrong, every per-row message below would be noise
-        # about the same one defect.
-        return ([f"{reg.name}:{n}: columns are [{' | '.join(got)}]; expected "
-                 f"[{' | '.join(PSEUDOCODE_COLUMNS)}]"], counts)
+        # about the same one defect. The line-reference findings are NOT noise about it -- they
+        # are independent of the column shape -- so they are carried out rather than dropped.
+        return (problems + [f"{reg.name}:{n}: columns are [{' | '.join(got)}]; expected "
+                            f"[{' | '.join(PSEUDOCODE_COLUMNS)}]"], counts)
     for n, ln in rows[1:]:
         f = ln.split("\t")
         where = f"{reg.name}:{n}"
@@ -2147,14 +2185,16 @@ def fenced_block_coverage() -> tuple[int, int, list[str]]:
 
 # A register with one defect of each shape the check exists to catch. Every row below is a real
 # failure mode, not a decoration: a dropped tab (the shape a hand edit produces), an extra tab
-# (the shape a note containing a tab produces), a plausible-but-unlisted token, and an empty
-# cell. The FIXED copy differs from it ONLY in those four cells and must go quiet -- a check
+# (the shape a note containing a tab produces), a plausible-but-unlisted token, an empty cell,
+# and -- in a data row AND in the header comment, because both happened -- a row named by line
+# number. The FIXED copy differs from it ONLY in those six places and must go quiet: a check
 # that cannot be made to fail is not a check, and two of this corpus's guards were exactly that.
 _REG_HEAD = "\t".join(PSEUDOCODE_COLUMNS)
 _REG_OK = ("a.md\tthe stack loop\tit halts\t3600 of 3600\tSOUND\tlead\t"
            "halts-proven -- one for-each over a finite set")
 PSEUDOCODE_FIXTURE = "\n".join([
-    "# a comment, and a blank line, both skipped",
+    # the header comment block is scanned too, and a blank line is skipped
+    "# the driver every row here shares is row :4's",
     "",
     _REG_HEAD,
     _REG_OK,
@@ -2166,9 +2206,13 @@ PSEUDOCODE_FIXTURE = "\n".join([
     "d.md\tthe relaxation\tit converges\t155 passes\tSOUND\tlead\tterminates -- it finished",
     # nothing at all in the cell
     "e.md\tthe sweep\tit is exact\tzero drift\tSOUND\tlead\t",
+    # well-formed in every other way, and pointing at a line instead of at a row. Note the
+    # `f.md:12` beside it: a reference into a DOCUMENT is correct and must NOT be flagged.
+    "f.md\tthe second pass\tit repeats the first\t12 passes\tSOUND\tlead\t"
+    "halts-proven -- the fence at f.md:12 repeats row :4's pass",
 ]) + "\n"
 PSEUDOCODE_FIXTURE_FIXED = "\n".join([
-    "# a comment, and a blank line, both skipped",
+    "# the driver every row here shares is the `a.md / the stack loop` row's",
     "",
     _REG_HEAD,
     _REG_OK,
@@ -2177,13 +2221,17 @@ PSEUDOCODE_FIXTURE_FIXED = "\n".join([
     "c.md\tthe march\tit stops\t0/600\tSOUND\tagent\thalts-measured -- 0/600, stepCap 1e9 unhit",
     "d.md\tthe relaxation\tit converges\t155 passes\tSOUND\tlead\thalts-measured -- to tolerance",
     "e.md\tthe sweep\tit is exact\tzero drift\tSOUND\tlead\tunknown",
+    "f.md\tthe second pass\tit repeats the first\t12 passes\tSOUND\tlead\t"
+    "halts-proven -- the fence at f.md:12 repeats the `a.md / the stack loop` row's pass",
 ]) + "\n"
 # (line in the fixture, substring the message must carry)
 PSEUDOCODE_FIXTURE_EXPECTED = [
+    (":1", "'row :4' names a row of THIS file by line number"),
     (":5", "6 fields, expected 7"),
     (":6", "8 fields, expected 7"),
     (":7", "termination is 'terminates'"),
     (":8", "termination is '(empty)'"),
+    (":9", "'row :4' names a row of THIS file by line number"),
 ]
 
 
@@ -2216,15 +2264,30 @@ def register_selftest() -> list[str]:
     if fixed:
         bad.append(f"the repaired fixture register is not quiet: {fixed}")
     if (counts["n/a"], counts["halts-measured"], counts["halts-proven"],
-            counts["unknown"]) != (1, 2, 1, 1):
+            counts["unknown"]) != (1, 2, 2, 1):
         bad.append(f"the repaired fixture register tallies {counts}, expected one each of "
-                   f"n/a, halts-proven and unknown and two halts-measured")
+                   f"n/a and unknown and two each of halts-proven and halts-measured")
+    # The document reference in the repaired `f.md` row -- `f.md:12` -- must survive: a guard
+    # that also flagged those would make the correct idiom unwritable, and that is the shape of
+    # over-reach this repo's guard-proofs register exists to record.
+    if any("f.md:12" in p for p in fixed):
+        bad.append(f"a `document.md:NN` reference is being flagged as a row self-reference: "
+                   f"{fixed}")
     # The header is the other half: drop the column name and every row below it is being read
     # against a shape the file no longer has.
     headless = _register_fixture_run(
         PSEUDOCODE_FIXTURE_FIXED.replace("\ttermination\n", "\n", 1))
     if not any("columns are" in p for p in headless):
         bad.append(f"dropping the `termination` column name is not reported: {headless}")
+    # ...and the header check returns EARLY, which is a place findings can be silently dropped.
+    # A row self-reference has nothing to do with the column shape, so it must survive that
+    # return. Asserted because the first draft of this guard did not: with the header broken it
+    # reported the header and swallowed the reference, and the selftest went green anyway.
+    headless_ref = _register_fixture_run(
+        PSEUDOCODE_FIXTURE.replace("\ttermination\n", "\n", 1))
+    if not (any("columns are" in p for p in headless_ref)
+            and any("names a row of THIS file by line number" in p for p in headless_ref)):
+        bad.append(f"a broken header swallows the row self-reference findings: {headless_ref}")
     return bad
 
 

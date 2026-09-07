@@ -46,11 +46,24 @@ run is a reading list.
 FIXED HERE (the bug the corpus recorded at PLAN.md:191 and never fixed): `words()` was
 `[a-z0-9][a-z0-9.~-]*`, which is greedy over `.` `~` `-` and so KEPT trailing punctuation --
 `elevation.` at the end of a sentence never matched `elevation` in a table cell. One full stop
-broke a shingle. Measured on HEAD: 5126 of 166861 tokens (3.07%) carried trailing punctuation,
-1952 distinct forms, `it.` `eq.` `p.` `fig.` the most common. The replacement requires the last
-character to be alphanumeric; it is token-count preserving (verified across the 39 scanned
-documents), so it can only change a token's VALUE, never split or merge one. What changed:
-  * on HEAD the candidate SET is unchanged -- the same 4 sentences -- and one of them gains
+broke a shingle. Measured at `6a7ac52`: 5126 of 166861 tokens (3.07%) carried trailing
+punctuation, 1952 distinct forms, `it.` `eq.` `p.` `fig.` the most common. That count moves with
+the corpus -- at `f6486e6` the same measurement gives 5173 of 168426, still 3.07%, 1956 forms --
+so it is pinned to a commit, like every other figure above.
+
+WHAT IS AND IS NOT TOKEN-COUNT PRESERVING, because an earlier draft of this docstring got it
+wrong. The REGEX is: `WORD` and `LEGACY_WORD` return the same number of matches on any input
+(168426 each at `f6486e6`), and a fixed token is always the legacy token with trailing `.~-`
+stripped. `words()` is NOT, because the STOP filter runs AFTER the regex -- `it.` is not a stop
+word and `it` is, so stripping carries a token across the filter and DELETES it. Over the
+ends+body text this guard actually scans, at `f6486e6`: 608 tokens deleted, 0 added, across all
+39 documents (`it.` 193, `one.` 49, `not.` 43, `all.` 40). Deletions only, because a token
+already in STOP ends alphanumeric and so is unchanged. A deletion makes two previously
+NON-ADJACENT tokens adjacent, so the fix can manufacture a 3-gram that renames no legacy gram:
+`... gate it. Sun elevation ...` gives ('gate','sun','elevation') under the fix, with no
+counterpart under the bug. The candidate set below is therefore a MEASURED result, not something
+the tokenisation guarantees. What changed:
+  * at `f6486e6` the candidate SET is unchanged -- the same 4 sentences -- and one of them gains
     evidence, volumetric-clouds' depth-operator sentence going 3 -> 4 shared 3-grams, because
     the failure row's `standard depth.` now matches the body's `standard depth`;
   * on `c257351` the set is likewise unchanged (4), with the same sentence going 3 -> 4;

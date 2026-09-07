@@ -61,11 +61,14 @@ return miss
 ```
 
 ⚠️ **The `never Sample` on the `texelAt` line is a language rule, not a preference.** A loop that
-can `break` puts its *whole* body inside varying flow control, where the derivative and
-implicit-LOD instructions are forbidden on one API and undefined on the other — and compile on
-both. `shader-craft.md` carries the specification text for that, the same rule for the fetch at the
-hit below, and a second reason the fetch must not filter: a bilinear tap on a max-reduce pyramid
-returns a convex combination, so it lands at or *below* the bound this loop's skip test needs.
+can exit early puts its *whole* body inside varying flow control — this one has no `break`, it
+`return`s from two places, and the specification counts `ret` with `break` — and there the
+derivative and implicit-LOD instructions are forbidden on one API and undefined on the other, and
+compile on both. `shader-craft.md` carries the specification text for that; the *different* rule
+for the fetch at the hit below, where the flow is uniform again, so the derivative is legal and
+still wrong and the fix is a different instruction; and a second reason the fetch must not filter:
+a bilinear tap on a max-reduce pyramid returns a convex combination, so it lands at or *below* the
+bound this loop's skip test needs.
 
 ⚠️ **Test the predicate, not the crossing.** The form of this loop that circulates most widely asks
 "does the ray cross `node.maxH` before it leaves the node?" and descends only then. That is correct

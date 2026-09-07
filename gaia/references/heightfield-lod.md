@@ -153,10 +153,13 @@ normal   = normalize(lerp(sampleNormal(uv, nodeLod), sampleNormal(uv, nodeLod + 
 ⚠️ **The band shows in the pixel shader too, and that one is not a crack.** Across the band the
 fine node's height and normal are a `morphK`-weighted blend of mips `L` and `L+1`, while the coarse
 side, at its own range start, reads `L+1` alone — so the two sides hand *different inputs* to their
-own, correct screen-space derivatives, and a filtering discontinuity runs along every band even
-with `morphK` reaching exactly 1.0. Under a rasterizer no quad ever spans the two chunks — they are
-two draws — so "fixing the derivative" changes nothing. `shader-craft.md` carries the specification
-behind that, the one shading path where it is not true, and the fix: make the LOD-dependent inputs
+own, correct screen-space derivatives, and a filtering discontinuity runs along every band. **The
+crack contract does not close this one.** `morphK` reaching exactly 1.0 equalises the heightmap mip
+at the boundary line and nothing beyond it; the inputs the morph never touches — a per-LOD
+detail-UV scale, a different resident page mip — do not converge there at all. Under a rasterizer
+no quad ever spans the two chunks — they are two draws — so "fixing the derivative" changes
+nothing. `shader-craft.md` carries the specification behind that, its full list of the differing
+inputs, the one shading path where it is not true, and the fix: make the LOD-dependent inputs
 agree across the band, or derive gradients from a quantity that does not depend on LOD at all.
 
 Restrict morphing to the outer band of each range — the CDLOD whitepaper puts the morph area at
