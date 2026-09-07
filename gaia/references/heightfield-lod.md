@@ -76,13 +76,19 @@ rho = (e * K) / d                            // WORST-CASE projected error, in p
 refine while rho > tau                       // tau = the budget, 1-4 px in practice
 ```
 
-⚠️ **`rho` is an orientation-independent worst case, not the projected error.** `e` is a *vertical*
-deviation, and a vertical segment at distance `d` subtends `e·K·sin θ / d` pixels, where `θ` is the
+⚠️ **`rho` is a worst case over view *orientation*, taken at the centre of the screen — not the
+projected error, and not a bound over the frustum.** `e` is a *vertical* deviation, and near the
+optical axis a vertical segment at distance `d` subtends `e·K·sin θ / d` pixels, where `θ` is the
 angle between the view ray and world up. The form above is the `sin θ = 1` case — looking at the
-horizon — and the projection falls to zero looking straight down. Taking the orientation-free
-maximum is the right engineering call, cheap and conservative, but say that it is one: an engineer
-who instruments `rho` and finds measured error consistently *below* prediction otherwise cannot
-tell a conservative metric from a broken one, and will distrust the quadrupling diagnostic below.
+horizon — and that paraxial projection falls to zero looking straight down. Taking the
+orientation-free maximum is cheap and it is the right engineering call, but it is **not**
+conservative off-axis. The exact first-order length is `(K/z)·|v_xy − (x,y)·v_z/z|` for a
+camera-space error `v` at camera-space `(x, y, z)`, and that second, radial term grows with the
+off-axis angle until it dominates: at a screen corner the worst case over camera orientation is
+exactly `1 + tan²(fovY/2)·(1 + aspect²)` times `rho` — **2.4× at fovY 60°, 5.2× at 90°, 9.5× at
+110°, at 16:9**. So an engineer instrumenting `rho` should expect measured error *below* prediction
+near the axis and *above* it at the screen edges under a wide FOV. Neither reading means the metric
+is broken; neither is licence to distrust the quadrupling diagnostic below.
 
 Three things about this that are wrong in shipped code more often than not:
 
@@ -109,6 +115,7 @@ fracPart = frac(gridPos * meshDim * 0.5) * (2.0 / meshDim);          // 0 for ev
 gridPos  = gridPos - fracPart * morphK;                              // odd verts -> even verts
 uv       = worldToHeightmapUV(gridPos);      // ONE mapping, shared with the parent node
 height   = lerp(sampleHeight(uv, nodeLod), sampleHeight(uv, nodeLod + 1), morphK);
+                                             // spell this lerp (1-s)*x + s*y -- see the crack contract
 normal   = normalize(lerp(sampleNormal(uv, nodeLod), sampleNormal(uv, nodeLod + 1), morphK));
 ```
 
@@ -124,14 +131,24 @@ normal   = normalize(lerp(sampleNormal(uv, nodeLod), sampleNormal(uv, nodeLod + 
 - **One `morphK` drives XZ, height and normal.** Three factors are three chances to disagree, and
   the vertex is identical to its parent only if all three reach 1.0 together. Geometry morphing
   under un-morphed normals still pops, and a lighting discontinuity reads louder than a silhouette
-  change: on the field measured below, the two levels' normals differ at the shared vertices by a
-  median of 4.6–5.9° and a p95 of 11–13°.
+  change: over the 36 configurations measured below, the two levels' normals differ at the shared
+  vertices by a median of **6–34°** and a p95 of **15–125°** — the low end at the smoothest
+  roughness, the high end at the roughest, so the lighting pop is worst exactly where the terrain
+  has the most detail to lose. The spread is why you measure your own field instead of quoting
+  this one: the number is set by roughness, not by the LOD scheme.
 - **Both nodes must share one heightmap registration** — one world-XZ→UV mapping, one reduction
   filter, one mip convention — or `sampleHeight(uv, nodeLod + 1)` on the fine node is not the value
-  the parent computed at that XZ. Half a coarse texel of disagreement leaves a residual **4–5×
-  larger than the crack the lerp was closing**, so this is a condition on the contract, not a
-  detail. A mip chain reduced with a filter centred on the retained sample keeps the registration;
-  a half-texel-shifted box does not.
+  the parent computed at that XZ. Half a coarse texel of disagreement leaves a residual **of the
+  same order as the crack the lerp was closing, and up to 6× larger** — 0.7–5.9× over the sweep
+  below, largest on smooth terrain, where a reduction removes little detail but the coarse gradient
+  does not shrink with it. So this is a condition on the contract, not a detail.
+  ⚠️ The condition is on *sharing*, though, not on the filter. **Any** reduction kernel keeps the
+  crack contract as long as both nodes read the same chain, because `lerp(·, sampleHeight(uv,
+  nodeLod + 1), 1)` returns the parent's texel whatever built it: measured 0.000000000 m at every
+  shared vertex for a centred `[1 2 1]`, a `[1 4 6 4 1]` and a `[1 1]` box alike. What a box costs
+  you is real but elsewhere — it lands the coarse sample a *quarter* of a coarse texel off the
+  retained fine one, inflating the level's own `e` and the un-lerped crack by 1.2–3.0× on the same
+  field. Centre the kernel for that reason; do not expect it to close a crack.
 
 Restrict morphing to the outer band of each range — the CDLOD whitepaper puts the morph area at
 "the last 15%-30% of every LOD range", and that is the figure to start from — so most vertices
@@ -180,7 +197,7 @@ breaks under streaming, and it fails precisely on the frames where LOD changes.
 
 | Contract | Mechanism | What it costs you |
 |---|---|---|
-| Vertex morphing | Fine vertices *become* coarse ones by the boundary | A second, mandatory morph — the heightmap mip lerp — plus one registration shared by both nodes; and `morphK` must hit 1.0 exactly |
+| Vertex morphing | Fine vertices *become* coarse ones by the boundary | A second, mandatory morph — the heightmap mip lerp, which is one trilinear `SampleLevel(uv, nodeLod + morphK)` rather than two fetches wherever the height format filters in the vertex stage — plus one registration shared by both nodes, and both mip levels resident at the band (`tiled-streaming.md`); and `morphK` must hit 1.0 exactly |
 | Conforming subdivision | A split propagates to the edge-neighbour; T-junction-free by rule [dupuy2020] | The whole CBT machinery; bugs move into the split/merge kernel |
 | Transition regions | Ring fringes blend toward the coarser level; the T-junctions that remain are stitched with zero-area (degenerate) triangles along the ring boundary [losasso2004] | Only available inside the clipmap structure |
 | Index stitching | The finer chunk drops every other edge vertex [deboer2000] | Heights still pop; needs the ≤1-level adjacency invariant |
@@ -195,8 +212,15 @@ form, because the level boundary is by construction where `e·K/d = tau` — so 
 since `K` and `d` cancel out of the ratio entirely. Do not
 read sub-`tau` as safe: `tau` prices a surface in the wrong *place*, which is invisible, while this
 is a *hole* the background shows through, in a ribbon along every level boundary in the frame.
-Substitute the lerp form and the same measurement is **0.000000 m at `morphK = 1`, exactly, in
-fp32** — that is what makes it a contract rather than a mitigation.
+Substitute the lerp form and the same measurement is **0.000000000 m at `morphK = 1`** — that is
+what makes it a contract rather than a mitigation. ⚠️ That zero is algebraic, and in fp32 it
+survives only in the `(1 − s)·x + s·y` spelling, where `s = 1` gives `0·x + 1·y = y` bit-exactly.
+HLSL's `lerp` is specified as `x + s·(y − x)`, and that one is not: `y − x` rounds unless Sterbenz
+applies, and re-adding it misses `y` for 0.6–1.2% of close terrain height pairs, and for 0–2% of
+the shared vertices on a real reduced chain — the rate set by nothing but where the height datum
+sits. The worst residual measured is 1.9e-06 m: physically nothing, but it does not print as
+`0.000000`, and an almost-contract is the thing this section is trying not to ship. Spell it
+`(1 − s)·x + s·y`, or take the mip lerp from the single trilinear fetch in the table above.
 
 **A T-junction is a crack even when the vertex lies exactly on the edge.** Watertight
 rasterization is guaranteed only between triangles *sharing the same two vertices*; the coarse

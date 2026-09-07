@@ -21,9 +21,11 @@ sources:
 # Volumetric clouds
 
 **Tier: real-time rasteriser, amortised over frames.** Every cost on this page is a per-frame GPU
-cost on console-class hardware, and the technique only fits a frame because the march is spread
-across frames and, in several configurations here, run below output resolution — which makes the
-resolve back to full res part of the technique rather than a detail of it.
+cost unless it is named as offline or as memory — the offline ones are the 2011 CPU render and the
+34-hour path-traced reference, and the hardware is console-class except for the two desktop-GPU
+figures, which name their card. The technique only fits a frame because the march is spread across
+frames and, in several configurations here, run below output resolution — which makes the resolve
+back to full res part of the technique rather than a detail of it.
 
 ## Use this
 

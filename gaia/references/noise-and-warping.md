@@ -34,8 +34,10 @@ valleys do not connect. Everything here exists to hand erosion a surface worth e
 multifractal from the same source.
 
 Three constants carry most of the quality: the quintic fade, a lacunarity that is not exactly 2,
-and a warp amplitude near the largest octave's wavelength — which is also where the warp begins to
-fold (§Domain warp), so it is a ceiling as well as a starting point.
+and a warp amplitude near the largest octave's **lattice spacing** — a starting point to come
+*down* from, not a ceiling. §Domain warp measures 11.30% of the domain already folded there for a
+curl potential, and 28.4% for a plain fBm warp at the same amplitude, against a fold-free `K` of
+about 25 for six octaves on that same 64-cell base lattice — less again for a plain warp.
 
 ## The lattice, and the constants that decide the look
 
@@ -164,8 +166,8 @@ warp2(p): q = vec2(fbm(p + O1), fbm(p + O2))
 ```
 
 The highest ratio of visual improvement to implementation cost in the whole noise section
-[quilez_warp]. `K` is an amplitude in the units of `p`: start at roughly the wavelength of the
-largest octave. Much smaller does nothing visible; much larger dissolves the structure into soup.
+[quilez_warp]. `K` is an amplitude in the units of `p`: start at roughly the largest octave's
+**lattice spacing**. Much smaller does nothing visible; much larger dissolves it into soup.
 Return `q` and `r` alongside the height — they are free masks that correlate with the warp
 structure, so materials placed by them follow the terrain's apparent flow direction.
 
@@ -182,14 +184,18 @@ finite-differenced displacement map agrees with the closed form:
 | rms displacement, cells | 0.02 | 0.17 | 0.33 | 0.67 | 1.34 | 2.68 |
 | fraction of the domain folded | 0.00% | 0.00% | 0.00% | 0.04% | **11.30%** | 37.41% |
 
-`K` = 64 is what the rule above gives for a 64-cell base octave, and the rms displacement there is
-only 1.34 cells — the folds sit at the *finest* octave's scale, not the warp's. A plain fBm warp
-folds **0.00%** at that same 1.34 cells of rms displacement, because `v` is a derivative of `ψ`
-and its Jacobian is one order higher, so **curl buys nothing on this axis**; at the same `K` = 64,
-displacing 14.2 cells, the plain warp folds 28.4% in its turn. The bound comes from the same place
-as the mechanism: with `a` and `λ` the finest octave's amplitude and wavelength (twice its lattice
-spacing), the largest fold-free `K` is about `1/(a·(2π/λ)²)` — predicting 97 / 50 / 25 for a 4- /
-5- / 6-octave stack against 99 / 52 / 25 measured.
+`K` = 64 is one base **lattice spacing**, which is what the rule above gives for a 64-cell base
+octave. ⚠️ It is not one base **wavelength**: the bound below reads a wavelength as *twice* the
+lattice spacing, and on that reading the same rule would say `K` = 128, where this table is 37.41%
+folded. At `K` = 64 the rms displacement is only 1.34 cells — the folds sit at the *finest*
+octave's scale, not the warp's. A plain fBm warp folds **0.00%** at that same 1.34 cells of rms
+displacement, because `v` is a derivative of `ψ` and its Jacobian is one order higher, so **curl
+buys nothing on this axis**; at the same `K` = 64, displacing 14.2 cells, the plain warp folds
+28.4% in its turn. The bound comes from the same place as the mechanism: with `a` and `λ` the
+finest octave's amplitude and wavelength (twice its lattice spacing), the largest fold-free `K` is
+about `1/(a·(2π/λ)²)` — predicting 97 / 50 / 25 for a 4- / 5- / 6-octave stack against 99 / 52 /
+25 measured. ⚠️ That bound is the **curl** warp's, derived from the quadratic term alone; a plain
+warp keeps the linear one and already folds 1.2% at the `K` = 25 it gives for six octaves.
 
 **Keep `K` under that bound, or advect in substeps.** [bridson2007] §2.1's `v` is a fluid
 *velocity*, divergence-free because the divergence of a curl is identically zero, and it is the
@@ -245,4 +251,4 @@ octaves it cannot resolve anyway, and dropping them is also the poor-man's band-
 | A remap curve does nothing to the tails and everything to the middle | The distribution is Gaussian, not uniform, so the knee lands elsewhere | Histogram-match, or apply the curve to the measured range |
 | Shimmering under LOD | Octaves below ~2 cells' wavelength | Cut the octave count to `log2(baseWavelengthInCells) − 1` — resolution does not enter it |
 | Rivers run uphill after a warp node | The warp moved geometry the drainage was solved on | Move every warp upstream of routing |
-| A warped field pinches, or the same terrain appears twice in one lobe | A one-shot warp is not area-preserving even when the field is divergence-free: `det J = 1 + K²·det(Hess ψ)`, negative wherever `K²·det(Hess ψ) < −1`; measured 11.30% of the domain folded at the `K` this document recommends | Keep `K` below `1/(a·(2π/λ)²)` for the potential's finest octave, or advect in substeps [bridson2007] |
+| A warped field pinches, or the same terrain appears twice in one lobe | A one-shot warp is not area-preserving even when the field is divergence-free: `det J = 1 + K²·det(Hess ψ)`, negative wherever `K²·det(Hess ψ) < −1`; measured 11.30% of the domain folded at the `K` this document recommends | Keep `K` below `1/(a·(2π/λ)²)` for the potential's finest octave, or advect in substeps [bridson2007] — but that bound is the **curl** warp's, where `tr(∇v)` is identically zero. For the plain fBm `warp1` of `## Use this` the *linear* term binds instead, and the plain warp already folds 1.2% at that same bound; size a plain warp by its measured displacement (0.00% folded at 1.34 cells rms, 28.4% at 14.2) rather than by this formula |

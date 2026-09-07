@@ -104,8 +104,13 @@ operator on this field, and diverges at the mask edge as transport accumulates.
 3. **Freezing the exterior is not the only way to restrict a domain, and it is the pessimal one.**
    It imposes a no-flux wall. A runtime would instead evaluate on the mask's bounding box dilated by
    the operator's support radius **times the iteration count** and then post-blend — which is *the
-   same computation* as the post-process form, just cheaper, and is where a masked expensive
-   operator should actually go.
+   same computation* as the post-process form, and cheaper **only while the dilated window still
+   fits inside the domain**. On the left-half mask below (64 columns wide, `R = 1`) the dilated
+   window is columns `0 … 63 + N`: at `N = 20` that is 84 of 128 columns and saves 34%, and at
+   `N ≥ 64` it is the whole domain and saves nothing — so the 80-iteration row of the table above
+   buys no restriction at all, and the 200-iteration mass figure below is further past the ceiling
+   still. Beyond it the honest move is to run the operator on the full domain and stop treating the
+   mask as a domain restriction.
 
    The support radius **alone** is the single-application margin, and it is the wrong one for every
    operator in this section. `N` steps of a radius-`R` operator have a domain of dependence of
@@ -113,9 +118,15 @@ operator on this field, and diverges at the mask edge as transport accumulates.
    field at `R = 1`: 20 steps of a linear 3×3 blur cropped at `R` differ from the full-domain by
    **2.60% of relief, reaching 18 cells inside the mask**; dilated by `N·R` the difference is
    **exactly 0.000000000**, so the *"same computation"* claim is true again once the margin is.
-   `N·R` is a sound bound rather than a measurement — the same 20 steps of this section's own
-   threshold-gated transport needed only 5 cells, because a gated operator does not propagate
-   influence on every step — so size from `N·R` unless you have measured the operator you have.
+   `N·R` is a sound bound rather than a measurement — 20 steps of a threshold-gated transport on
+   this same field (0.15·Δh to any *4*-neighbour more than 0.5 below, edges clamped) needed only 5
+   cells, because a gated operator does not propagate influence on every step — so size from `N·R`
+   unless you have measured the operator you have. ⚠️ Read that parenthesis, not the number. It is
+   **not** the step that produced the table above: it reproduces neither those columns nor their
+   cell counts, and the table's own neighbourhood and boundary handling were never pinned down on
+   this page. Both choices move the margin — the 8-neighbour clamped variants need 16–17 cells, not
+   5 — which is this paragraph's point restated: a margin sized from someone else's published
+   figure is a margin sized for someone else's operator.
    `seamless-and-periodic.md` reaches the same conclusion for a tile's crop margin under *"The hard
    half: the boundary condition IS the tiling decision"*: the margin is a function of simulated
    time rather than of kernel width, and there is no step count at which it stops growing.

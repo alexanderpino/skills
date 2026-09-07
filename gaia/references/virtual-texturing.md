@@ -69,9 +69,14 @@ not for a parameter that touches every page at once.
 ## Plumbing that is not optional
 
 - **Page borders.** Bilinear and anisotropic filtering read neighbours, and at a page edge the
-  neighbour is unrelated pool memory. Each physical page stores a 2–4 texel border duplicated from
-  the adjacent virtual pages [mittring2008]. **Border width caps usable anisotropy** — a footprint
-  wider than the border reads across the seam, so VT samplers clamp max aniso, typically 4–8×.
+  neighbour is unrelated pool memory. Each physical page stores a border duplicated from the
+  adjacent virtual pages: **one texel is enough for bilinear on uncompressed data, four for DXT**,
+  because DXT compresses in 4×4 blocks and anything short of a whole block still seams
+  [mittring2008] §2.3.2.2. **Border width caps usable anisotropy** — a footprint wider than the
+  border reads across the seam, so VT samplers clamp max aniso, typically 4–8×. ⚠️ That cap is
+  **stated here from practice, not from a source**: §2.3.2.2 raises anisotropic filtering only to
+  decline it — "*because we haven't done any implementation we skip it here*" — and no artefact in
+  this set puts a number on it.
 - **Gradients come from *virtual* UVs — and then they must be scaled into the pool's space.**
   Differentiating *after* the page-table lookup gives a garbage mip and aniso choice exactly at
   page boundaries, where `physUV` jumps; that draws the page grid as hairline seams, worst at
@@ -88,13 +93,14 @@ not for a parameter that touches every page at once.
   fine**. In general the error is `pageMip − log2(virtualSize/poolSize)` levels: negative
   (aliasing) on the fine pages the near field uses, positive (over-blur) once `pageMip` passes
   `log2(virtualSize/poolSize)`, and **exactly zero at that one page mip** — which is how a single
-  test view passes. ⚠️ How much of the *LOD* half survives depends on how deep the pool's own mip
-  chain is; a shallow one clamps most of it away in both directions. The *aniso* half does not
-  clamp, and it is the half that bites: the
-  anisotropy ratio is scale-invariant, so the hardware still takes the right number of taps and
-  then spreads them along the gradient vector you passed — across `1/s` of the footprint they
-  should cover. That is under-filtering at exactly the grazing angles the border-capped aniso
-  above exists to serve.
+  test view passes. ⚠️ The *LOD* half is clamped at pool mip 0 in the too-fine direction whatever
+  the pool's chain depth, and by the chain's last mip in the other, so what survives is bounded by
+  that last mip and a shallow chain hides most of it. The *aniso* half does not clamp, and it is
+  the half that bites: the anisotropy ratio is scale-invariant, so the hardware still takes the
+  right number of taps and then spreads them along the gradient vector you passed, across `1/s` of
+  the footprint they should cover — under-filtering on the fine pages where `s > 1`, at exactly the
+  grazing angles the border-capped aniso above exists to serve, and over-spread into blur on the
+  coarse pages where `s < 1`.
 - **A feedback pass** discovers which pages pixels want: render a reduced-resolution buffer of
   (pageID, mip), read it back, dedupe, prioritise coarse mips first [barrett2008]. Latency is 1–3
   frames minimum. Design for it — prefetch along predicted camera motion, prime requests before a

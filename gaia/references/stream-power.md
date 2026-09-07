@@ -49,7 +49,8 @@ subtle.
 every other `m`. A `K` table tuned at one `m` does not transfer to another:
 `stratigraphy-and-lithology.md` states this with a source and gives the fix, which is to author
 dimensionless **contrasts** against a reference `K`. And substituting discharge for area does not
-reuse it — `K_Q = K_A·P̄^−m`, units `L^(1−3m)·T^(m−1)`, derived in `driver-fields.md`.
+reuse it — `K_Q = K_A·P̄^−m`, units `L^(1−3m)·T^(m−1)`, where `P̄` is the one reference rainfall
+rate `K_A` was calibrated at, not a per-cell mean. Both are derived in `driver-fields.md`.
 
 ## Why the solver is the whole difficulty
 
@@ -197,7 +198,7 @@ that look fine in a hillshade.
 | Each step costs O(n log n) and the run crawls | A full depression fill re-run every step | Lake graph inside the loop [cordonnier2016] |
 | `log S` vs `log A` is not a straight line of slope −m/n | Wrong drainage area, wrong receiver distances, or an unhandled depression | Fix routing before touching the erosion |
 | A convex long profile | `U` and `K` mis-scaled, or the run stopped far from equilibrium | Check `U × time` against the relief you want |
-| A `K` borrowed from a paper, another `m`, or a discharge-form solver gives the wrong incision rate | `K` is not dimensionless — it carries `L^(1−2m)·T^(−1)`, so its value is tied to `m`, and the discharge form is a different coefficient again | Re-derive at your `m` (`yr^(−1)` at `m = 0.5`); for discharge, `K_Q = K_A·P̄^−m` — see `driver-fields.md` |
+| A `K` borrowed from a paper, another `m`, or a discharge-form solver gives the wrong incision rate | `K` is not dimensionless — it carries `L^(1−2m)·T^(−1)`, so its value is tied to `m`, and the discharge form is a different coefficient again | Re-derive at your `m` (`yr^(−1)` at `m = 0.5`); for discharge, `K_Q = K_A·P̄^−m` at the one rainfall rate `K_A` was calibrated at — see `driver-fields.md` |
 | A carved waterfall relaxes into a rapid | Uniform `K`, so nothing pins the step | A hard bed across the channel, then let the solver run |
 | Waterfalls everywhere, including on trunk rivers | Knickpoints stamped rather than produced | Author the cause — a `K` jump or a base-level fall |
 | A flat, featureless result on a small map | No drainage area at this extent | Wrong backbone; use droplet or pipe |

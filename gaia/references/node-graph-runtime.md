@@ -64,9 +64,9 @@ quantising it changes every downstream key. A ten-node cone re-evaluated 400 tim
 is on the order of **hundreds of gigabytes** of stored artefacts per artist.
 
 Worse, sharing is not free either. Fetching 67.1 MB over 1 GbE takes **~537 ms** (67.1 MB at
-125 MB/s), while computing `a + b` on that field takes **~22.5 ms**: for a cheap node the shared
-cache is **~24× slower than recomputing**. So the promotion rule is a comparison, not a policy —
-**store the value only where the node's compute time exceeds its transfer time**, and let
+125 MB/s), while `a + b` on that field takes **~22.5 ms** (derived below): for a cheap node the
+shared cache is **~24× slower than recomputing**. So the promotion rule is a comparison, not a
+policy — **store the value only where the node's compute time exceeds its transfer time**, and let
 everything else be a verifying trace that stores a hash and reruns on a miss.
 
 **What it beats.** *Topological scheduling* [alacarte] §4.1.1 — a linear pre-pass, correct and
@@ -235,11 +235,16 @@ a monotonic tie-break rather than by distrusting arithmetic.
 ⚠️ **And putting the regime in the key is in tension with the reason to have a shared cache at
 all.** Key on the arithmetic regime and two machines with different dispatch never share an entry —
 which is most of the benefit gone. The resolution is not to widen the key across a cross-product of
-regime × device × library version, but to **pin the arithmetic** and key on that pin: one toolchain,
-opportunistic dispatch disabled, no fast-math, deterministic reductions, and a startup conformance
-digest in the key so a machine that fails the pin is excluded rather than silently serving. That
-also removes the temptation to trust a "CPU versus GPU" tolerance test, which cannot see the
-failure that was actually measured — two code paths inside one CPU.
+regime × device × library version, but to **pin the arithmetic** and key on that pin: one
+toolchain, opportunistic dispatch disabled, no fast-math, deterministic reductions, and a startup
+conformance digest in the key so a machine that fails the pin is excluded rather than silently
+serving. **That digest is over results, not configuration** — what a fixed battery of the graph's
+own ufuncs *computes* at startup, never the toolchain version, the flags or the CPU features, which
+is the regime renamed and splits the cache the same way. Conforming machines agree on one digest
+and share; a machine diverging *on the battery* misses the key, and a divergence the battery does
+not probe is caught by neither, so the battery is chosen per ufunc. That also removes the
+temptation to trust a "CPU versus GPU" tolerance test, which cannot see the failure that was
+actually measured — two code paths inside one CPU.
 
 ## Determinism is a runtime property, not a node property
 
@@ -249,9 +254,9 @@ The practical rules that follow, and none of them are optional if the cache is s
   never-reused entries per drag [ta_graph_runtime].
 - **Hash the effective seed**, so re-rolling a stochastic node invalidates that node's cone and
   nothing else [ta_graph_runtime].
-- **Pin the arithmetic; key on the pin, not on the regime** (above) — a **startup conformance
-  digest** in the key, so a machine off the pin is excluded rather than silently served. Keying the
-  regime, the device, the fast-math flags or the library version splits the cache along the one
+- **Pin the arithmetic; key on the pin, not on the regime** (above) — the **startup conformance
+  digest** above (results, never configuration), so a machine off the pin misses the key. Keying
+  the regime, the device, the fast-math flags or the library version splits the cache along the one
   axis it exists to share; take that only if you will test the equivalence you are asserting.
 - **Iteration order counts as arithmetic.** A parallel reduction that sums in completion order is
   not deterministic, and floating-point addition is not associative.
@@ -272,10 +277,14 @@ pure — which is the same assumption the cache key already makes.
 
 The same graph is evaluated under two budgets, and the right answers differ. This is the general
 rule in `simulation-time-budget.md` applied to authoring. **The preview tier** is the reduced
-resolution and iteration budget the graph is evaluated at for display — 512² rather than 4096², a
-capped iteration count — under the rule that a preview must *predict* the build: the same terrain
-at a lower sampling density (resolution independence, below), never a different answer. Refining it
-toward the build without popping is `coverage.md`'s `progressive-preview` row, not this one.
+resolution the graph is evaluated at for display — 512² rather than 4096² — under the rule that a
+preview must *predict* the build: the same terrain at a lower sampling density (resolution
+independence, below), to a tolerance published **per operator** and not for all of them — a
+drainage divide is decided by the finest scale in the domain (`resolution-independence.md`). An
+iteration *cap* is a different cut and a different answer at the same sampling density, so a capped
+preview is labelled, not offered as a prediction; a count *derived* from cell size stays inside the
+rule. The rest of the definition — which fields run reduced, which solvers cannot, what a preview
+may get wrong, how it refines without popping — is `coverage.md`'s `progressive-preview` row.
 
 | | **Interactive edit** | **Farm build** |
 |---|---|---|
@@ -286,31 +295,40 @@ toward the build without popping is `coverage.md`'s `progressive-preview` row, n
 
 ⚠️ **Hashing a 4k field is not "milliseconds" — but the node's own cost is not the yardstick.**
 Measured on one machine, 4096² float32 (67.1 MB): **sha256 50 ms**, blake2b 104 ms — against **copy
-15 ms**, `a + b` **~22.5 ms**, a masked lerp **30 ms**. Those three are bandwidth-bound and agree
-at **~7.5 ms per pass over the field**: copy touches it twice (read, write), `a + b` three times,
-the masked lerp four. So the hash costs more than the node for every pointwise operator in the
-corpus — and that decides nothing: **cutoff at a node protects its dependents, not the node**.
+15 ms** and a masked lerp **30 ms**. Both are bandwidth-bound at **~7.5 ms per pass over the
+field** (copy touches it twice, the lerp four), which makes the three-touch `a + b` **~22.5 ms** —
+derived from that line, not measured. So the hash costs more than the node for every pointwise
+operator in the corpus — and that decides nothing: **cutoff at a node protects its dependents, not
+the node**.
 
 **The criterion is `cost(hash) < P̂(output unchanged) × cost(downstream cone)`**: hashing costs
-`hash + (1 − P̂)·cone` against `cone`, and the two are equal at `hash = P̂·cone`. On this page's
-own figures — a 50 ms hash above an erosion cone of ~10 s, conservative against the *minutes* the
-scheduler table quotes — break-even is `50 / 10 000` = **0.5%**. The inversion is the point: a
-clamp fails the node-local rule and clears this one, and it is the node the worked example needs
-hashed — the clamp swallows the nudge, so erosion reruns for nothing. An expensive node whose only
-consumer is the display passed the old rule and fails this one: empty cone.
+`hash + (1 − P̂)·cone` against `cone`, equal at `hash = P̂·cone`. On this page's own figures — a
+50 ms hash above an erosion cone of ~10 s — break-even is `50 / 10 000` = **0.5%**. The inversion
+is the point: a clamp fails the node-local rule and clears this one, and it is the node the worked
+example needs hashed — the clamp swallows the nudge, so erosion reruns for nothing. An expensive
+node whose only consumer is the display passed the old rule and fails this one: empty cone.
 
 `P̂` is **estimated, not known**. Keep a running per-node hit rate — the fraction of rebuilds whose
 output hash was unchanged — over a structural prior: seed the **information-destroying** nodes
-(clamp, quantise, threshold, mask, min/max against a constant) high, because a positive-measure set
-of their input changes maps to one output, and `P̂` is 1 where the whole change lands in the
-destroyed region, as above; seed bijective, noise- and seed-driven nodes at 0. Against a 0.5% bar
-the prior rarely decides; measurement retires the nodes that never hit.
+(clamp, quantise, threshold, mask, min/max against a constant) high — not because most field
+changes are absorbed (the hash is over the whole field, and one unsaturated cell that moved defeats
+a clamp) but because a change can land *entirely* inside the destroyed region — an interval of a
+clamped parameter, a whole branch masked to zero, the two worked cases above. Seed bijective,
+noise- and seed-driven nodes **low, never at 0**: at `P̂ = 0` the criterion never clears, so the
+node is never hashed and the rate never gets a sample — an absorbing seed. Hash a small fixed
+fraction of every node's rebuilds regardless and keep the rate over a window, or measurement can
+only retire. And the bar is `hash/cone`, so it moves with the cone: **0.083%** under the *minutes*
+the scheduler table quotes, **0.5%** above a 10 s erosion pass, **5%** above a 1 s cone, **95%**
+above two pointwise operators (~52 ms), and unattainable below. Under a 5 s cone the bar is over
+1%, where the prior decides everything — the reason to measure it rather than trust it.
 
 These figures are one machine's and are quoted to establish a **ratio**, not a budget: the shape
-that matters is that hash cost is linear in field size and single-threaded, while node cost varies
-by orders of magnitude and parallelises. That asymmetry moves the crossover *against* cutoff on
-better hardware — the cone term shrinks while the hash term does not — which is the opposite of the
-usual intuition.
+that matters is that hash cost is linear in field size, while node cost varies by orders of
+magnitude and parallelises. A *whole-field* hash is also serial, and while it stays serial that
+asymmetry moves the crossover *against* cutoff on better hardware — the cone term shrinks, the hash
+term does not — the opposite of the usual intuition. The tile tree below removes that asymmetry
+rather than exploiting it: its 64 leaves hash independently, so with cores to spare the hash term
+shrinks too, until it is bandwidth- rather than compute-bound.
 
 **Hash the tiles, not the field.** The document already requires every node to declare a tiling
 class, so make the tile the Merkle leaf: hash each tile, then hash the tile hashes. Measured on the
@@ -410,11 +428,11 @@ already allocated the wrong buffers.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | A parameter nudge reruns an erosion pass that produces identical output | Deep constructive trace: the key is over inputs, so it changes even when the value does not [alacarte] §4.2.4 | Compare the output hash — verifying or constructive traces [alacarte] §4.2.2 |
-| Terrain differs between two machines from the same graph and the same seed | The cache key asserts determinism the operations do not have [alacarte] §4.2.4; measured across SIMD regimes on one CPU [simd_dispatch_drift] | Pin the arithmetic and put the *startup conformance digest* in the key, so a machine off the pin is excluded rather than served — not the regime itself, which splits the cache; or test the equivalence being promised |
+| Terrain differs between two machines from the same graph and the same seed | The cache key asserts determinism the operations do not have [alacarte] §4.2.4; measured across SIMD regimes on one CPU [simd_dispatch_drift] | Pin the arithmetic and put the *startup conformance digest* — over the battery's computed results, never over configuration — in the key, so a machine off the pin is excluded rather than served; not the regime itself, which splits the cache; or test the equivalence being promised |
 | The cache fills with thousands of entries during a slider drag | Float parameters hashed unquantised [ta_graph_runtime] | Quantise before hashing |
 | Parameter drag holds 60 fps, then stutters when one particular value changes | That value is a topology change, not a value change — it re-plans [ta_graph_runtime] | Classify parameters VALUE vs TOPOLOGY; debounce the re-plan |
 | Adding cutoff made the graph slower | Output hashing priced against the node's own cost instead of its dependents', or applied to a node whose output changes whenever its inputs do | Apply cutoff where `cost(hash) < P̂(unchanged) × cost(downstream cone)`: a cheap clamp above an erosion pass qualifies; an expensive node feeding nothing does not |
-| The 512 preview does not match the 4k build | A parameter stored in cells rather than world units | Store radii and lengths in world units; resolution stays in the key |
+| The 512 preview does not match the 4k build | A parameter stored in cells rather than world units; or the preview capped an iterative solve, which is a different answer rather than a coarser sample | Store radii and lengths in world units; resolution stays in the key; derive an iteration count from cell size, or label the capped preview as not predicting |
 | Tiled build has a seam only in some places | A node's halo is smaller than its true support | Size the halo from the operator's support radius, summed along the chain |
 | Tiled build's rivers stop at tile boundaries | Flow accumulation run per tile — it is global-ordered, and no halo fixes it (`flow-routing.md`) | Classify the node as global-ordered; route on the whole domain |
 | Memory grows until the build dies | Demand-driven evaluation holding every intermediate | LRU by bytes with the viewed cone pinned; evicted entries re-derive [ta_graph_runtime] |
