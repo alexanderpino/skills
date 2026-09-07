@@ -22,10 +22,10 @@ sources:
 
 **Tier: real-time rasteriser, amortised over frames.** Every cost on this page is a per-frame GPU
 cost unless it is named as offline or as memory — the offline ones are the 2011 CPU render and the
-34-hour path-traced reference, and the hardware is console-class except for the two desktop-GPU
-figures, which name their card. The technique only fits a frame because the march is spread across
-frames and, in several configurations here, run below output resolution — which makes the resolve
-back to full res part of the technique rather than a detail of it.
+34-hour path-traced reference, and the hardware is console-class except for the two figures that
+name a desktop card, the GTX 680 and the GTX 1080. The technique only fits a frame because the
+march is spread across frames and, in several configurations here, run below output resolution —
+which makes the resolve back to full res part of the technique rather than a detail of it.
 
 ## Use this
 
@@ -114,6 +114,10 @@ Three textures and a weather field, all 2015 figures [schneidervos2015] pp.33–
 - **A 2D weather texture** — in 2015, "*Red is coverage, Green is precipitation and blue is cloud
   type*". **Cite the year**: by 2017 R and G are both coverage (Perlin and Perlin–Worley), and the
   sample counts and noise layout moved again in 2022 [schneidervos2017] [schneider2022].
+  ⚠️ **The coverage channel is not this pass's to author.** `sky-and-weather-state.md` carries
+  exactly one coverage field, and the cloud march, the ground-receiving shadow of coupling 2 below
+  and the rain the weather implies all read that same field. Authoring a second one here is the
+  defect that document names by symptom: shadows falling where there is no cloud.
 
 Perlin–Worley itself is inverted Worley layered fBm-style and used *as an offset to dilate Perlin*,
 which keeps Perlin's connectedness while adding billow. [hillaire2016] p.34 reaches the same model
@@ -282,7 +286,7 @@ pixels**. A cloud budget quoted without the geometry it displaces is half a numb
 |---|---|---|
 | Cloud drawn over a mountain the first time a peak enters the deck | The march does not terminate at the terrain depth hit | Depth-aware compositing; pick one of the three depth definitions and use it everywhere [yusov2014] |
 | Clouds pop at silhouettes as the camera turns | The depth-mip reduce picks the NEAREST depth in the footprint, so the march terminates early — the operator that does this flips with the depth convention | Reduce toward the FARTHEST depth: `min()` under reversed-Z, `max()` under standard depth. Write the quantity, not the operator [schneidervos2017] p.98 |
-| A fringe hugging every ridge — cloud bleeding onto the rock, a thinned band just past it — crawling under camera motion | The low-res march is resolved by a plain bilinear tap, which mixes low-res samples that stopped on terrain with samples that ran to the cloud exit; at `1/S` per axis it reaches `S` full-res pixels either side | Nearest-depth or bilateral resolve against the depth the march stopped at; bilinear only where the four candidates agree. The two reductions differ in *quantity*, not in operator: termination takes the FARTHEST depth, the resolve the smallest depth *difference* — one helper cannot serve both |
+| A fringe hugging every ridge — cloud bleeding onto the rock, a thinned band just past it — crawling under camera motion | The low-res march is resolved by a plain bilinear tap, which mixes low-res samples that stopped on terrain with samples that ran to the cloud exit; at `1/S` per axis it reaches at most `S` full-res pixels either side | Nearest-depth or bilateral resolve against the depth the march stopped at; bilinear only where the four candidates agree. The two reductions differ in *quantity*, not in operator: termination takes the FARTHEST depth, the resolve the smallest depth *difference* — one helper cannot serve both |
 | Landscape looks dead and evenly lit under a dramatic sky | No ground-receiving cloud shadow — it is absent from the 2015/2017 lineage, so an implementation faithful to those decks has none | Light-space transparency buffer on the CSM matrices [yusov2014] p.133 |
 | Cloud shadows drift wrong across a large map | The projected-shadow formulation assumes a flat planet, and its error grows with BOTH vista length and falling sun | Bound both, not just the map: the shadow offset is `h/tan(elevation)`, so it leaves any map at low sun. Or project on the sphere [hillaire2016] p.42 |
 | Ghosting and smearing on fast camera turns, worst near camera | Temporal amortisation over 16 frames cannot resolve in time | Depth-split the render instead of upscaling near clouds [schneider2023] p.185 |

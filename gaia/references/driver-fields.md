@@ -74,9 +74,9 @@ whole point of a horizon.
 **And compute precipitation, because it is nearly free and it is what erosion actually wants.** One
 dot product against the wind field you already have, clamped and renormalised, turns
 `stream-power.md`'s drainage area `A` into a real discharge `Q` — but not for free: the incision
-coefficient moves with it (`K_Q = K_A·P̄^−m`), so an area-form `K` table does not transfer; see
-`## Precipitation, the field that decides where the water is` below. Every erosion document in this
-corpus assumes uniform rainfall until you do.
+coefficient moves with it (`K_Q = K_A·P̄^−m`, `P̄` the calibration rainfall), so an area-form `K`
+table does not transfer; see `## Precipitation, the field that decides where the water is` below.
+Every erosion document in this corpus assumes uniform rainfall until you do.
 
 ⚠️ **The two fields want the same sweep and very different search distances.** Wind shelter is
 useful at **100–300 m** — [winstral2002] §4 found `Sx` at 100 m the strongest predictor of snow

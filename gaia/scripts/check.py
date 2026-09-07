@@ -15,6 +15,12 @@ having done it.
 In this repo's vocabulary a green run here is an `attestation` channel, not an `independent`
 one: the same kind of author writes the claim, the citation and this guard. Saying "grounded"
 because this passes would be the exact overstatement Gaia exists to avoid.
+
+It also checks the SHAPE of `registers/pseudocode-execution.tsv`: seven fields, the header that
+names them, and a `termination` token from a closed vocabulary, so that no row can be silent
+about whether its block halts. It cannot check that the token is TRUE -- `halts-proven` is worth
+exactly the argument written beside it. The `unknown` count and the count of documents holding a
+fenced block that no row names are REPORTED, never enforced.
 """
 from __future__ import annotations
 
@@ -34,6 +40,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "references" / "index.md"
 COVERAGE = ROOT / "references" / "coverage.md"
 TRIGGERS = ROOT / "evals" / "trigger-evals.json"
+PSEUDOCODE = ROOT / "registers" / "pseudocode-execution.tsv"
 
 
 # One spelling of the bibliography glob, used by `paper_files()` and by the error text that
@@ -635,8 +642,11 @@ def selftest() -> int:
     xcbad = crossref_corpus_selftest()
     for msg in xcbad:
         print(f"  FAIL  crossref corpus: {msg}")
+    gbad = register_selftest()
+    for msg in gbad:
+        print(f"  FAIL  execution register: {msg}")
     xbad += xpbad + xrbad
-    if bad or nbad or ubad or ebad or cbad or rbad or pbad or xbad or xcbad:
+    if bad or nbad or ubad or ebad or cbad or rbad or pbad or xbad or xcbad or gbad:
         # `ebad` used to gate the exit code and not appear in this sentence, so a run with
         # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
         print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
@@ -649,7 +659,7 @@ def selftest() -> int:
               f"{len(xbad)} of "
               f"{len(CROSSREF_FIXTURES) + len(CROSSREF_PATH_FIXTURES) + len(CROSSREF_RATIO_FIXTURES)}"
               f" crossref fixtures misclassified, and {len(xcbad)} crossref corpus "
-              f"assertion(s) failed.")
+              f"assertion(s) and {len(gbad)} execution-register assertion(s) failed.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
           f"no-artefact marker: {len(NO_ARTEFACT_FIXTURES)}/{len(NO_ARTEFACT_FIXTURES)} correct; "
@@ -663,7 +673,9 @@ def selftest() -> int:
           f"{len(CROSSREF_RATIO_FIXTURES)}/{len(CROSSREF_RATIO_FIXTURES)} ratio correct, and "
           f"check_crossrefs() itself reports {len(CROSSREF_CORPUS_EXPECTED)}/"
           f"{len(CROSSREF_CORPUS_EXPECTED)} reconstructed instances on the fixture corpus and "
-          f"nothing once they are corrected.")
+          f"nothing once they are corrected; the execution-register check reports "
+          f"{len(PSEUDOCODE_FIXTURE_EXPECTED)}/{len(PSEUDOCODE_FIXTURE_EXPECTED)} malformed rows "
+          f"plus the dropped column name, and nothing once they are repaired.")
     return 0
 
 
@@ -2031,6 +2043,191 @@ def check_coverage() -> list[str]:
     return problems
 
 
+# The execution register's columns, in order. Named here rather than counted, so that dropping
+# a column is a FAILURE with a name and not a silent re-interpretation of every row: the file is
+# tab-separated with prose in five of the seven fields, and a lost tab shifts `provenance` into
+# `termination` without changing a single character a reader would notice.
+PSEUDOCODE_COLUMNS = ("document", "block", "what was asserted", "what the run measured",
+                      "outcome", "provenance", "termination")
+# The `termination` vocabulary, documented at the head of the register itself. It is a CLOSED
+# set on purpose: the point of the column is that a row cannot be silent about halting, and a
+# free-text cell is silence with extra steps. `n/a` and `no-block` are not the same value --
+# the first says the code has no loop, the second says there is no code.
+TERMINATION_VALUES = {"n/a", "halts-proven", "halts-measured", "cap-bounded", "unknown",
+                      "no-block"}
+
+
+def check_pseudocode_register(path: Path | None = None) -> tuple[list[str], dict[str, int]]:
+    """The execution register's shape, and how many blocks nobody has checked for halting.
+
+    WHY THIS EXISTS. A row in that register says a block reproduces a NUMBER. It never said the
+    block STOPS. `heightfield-raymarching.md`'s row is the proof that those are two claims: it
+    measured missed hits, recorded SOUND, and the same block livelocked on 35.7% of 600 rays,
+    found by hand a fortnight later. SKILL.md:103 carries the sentence; this carries the column.
+
+    What it ENFORCES is only shape -- seven fields, the header naming them, and a termination
+    token from the closed vocabulary. That is deliberately mechanical: nothing here can tell
+    whether `halts-proven` is true, any more than the citation checks can tell whether a paper
+    says what a document claims. What it REPORTS is the `unknown` count, in the style of the
+    other reported metrics: a number that has to go down, not a gate that can be gamed by
+    writing `n/a` everywhere. A reviewer still has to read the cell's argument.
+    """
+    reg = path or PSEUDOCODE
+    problems: list[str] = []
+    counts: dict[str, int] = {v: 0 for v in TERMINATION_VALUES}
+    if not reg.exists():
+        return [f"{reg}: the pseudocode execution register is missing -- without it, no block "
+                f"in this corpus is recorded as having been run"], counts
+    rows = [(n, ln) for n, ln in enumerate(reg.read_text(encoding="utf-8").split("\n"), 1)
+            if ln.strip() and not ln.lstrip().startswith("#")]
+    if not rows:
+        return [f"{reg.name}: no header row and no rows"], counts
+    n, header = rows[0]
+    got = tuple(header.split("\t"))
+    if got != PSEUDOCODE_COLUMNS:
+        # Returned early: with the header wrong, every per-row message below would be noise
+        # about the same one defect.
+        return ([f"{reg.name}:{n}: columns are [{' | '.join(got)}]; expected "
+                 f"[{' | '.join(PSEUDOCODE_COLUMNS)}]"], counts)
+    for n, ln in rows[1:]:
+        f = ln.split("\t")
+        where = f"{reg.name}:{n}"
+        named = f"{f[0][:36]} / {f[1][:44]}" if len(f) > 1 else f[0][:36]
+        if len(f) != len(PSEUDOCODE_COLUMNS):
+            problems.append(f"{where}: {len(f)} fields, expected {len(PSEUDOCODE_COLUMNS)} "
+                            f"({', '.join(PSEUDOCODE_COLUMNS)})  ->  {named}")
+            continue
+        token = f[-1].split()[0] if f[-1].split() else ""
+        if token not in TERMINATION_VALUES:
+            problems.append(f"{where}: termination is {token or '(empty)'!r}, not one of "
+                            f"{sorted(TERMINATION_VALUES)}  ->  {named}")
+            continue
+        counts[token] += 1
+    return problems, counts
+
+
+def fenced_block_coverage() -> tuple[int, int, list[str]]:
+    """Fenced blocks in the corpus, and the documents holding one that NO register row names.
+
+    Criterion 2 has two halves. The register's own half -- every row says whether its block
+    halts -- is checked above. This is the other: a block with no row at all is untested by
+    construction, and the register cannot see it because the register only knows what it lists.
+
+    It counts DOCUMENTS, not blocks, and the difference matters. Rows are keyed by prose ("the
+    droplet loop, after adding the sediment writes"), never by line, so no mechanical map exists
+    from a row to the fence it ran; a row may cover several fences and several rows may cover
+    one. So a document appearing here is a certainty (nothing in it is registered) while its
+    absence proves nothing about its other fences. REPORTED, not enforced.
+    """
+    skip = {p.name for p in paper_files()} | {INDEX.name, COVERAGE.name}
+    fences: dict[str, int] = {}
+    for p in documents(ROOT):
+        if p.name in skip:
+            continue
+        n = inside = 0
+        for line in p.read_text(encoding="utf-8").split("\n"):
+            if line.lstrip().startswith("```"):
+                inside = not inside
+                n += inside          # count openers only, so ```lang and ``` are one block
+        fences[p.name] = n
+    # Tokenised, not a substring test: one document's name being a substring of another's
+    # would silently mark it registered. The document column holds `a.md, b.md` and `a.md:14`.
+    listed: set[str] = set()
+    if PSEUDOCODE.exists():
+        for ln in PSEUDOCODE.read_text(encoding="utf-8").split("\n"):
+            if not ln.strip() or ln.lstrip().startswith("#"):
+                continue
+            for tok in re.split(r"[,\s]+", ln.split("\t")[0]):
+                listed.add(tok.split(":")[0].strip())
+    total = sum(fences.values())
+    with_fences = sum(1 for v in fences.values() if v)
+    gap = sorted(name for name, v in fences.items() if v and name not in listed)
+    return total, with_fences, gap
+
+
+# A register with one defect of each shape the check exists to catch. Every row below is a real
+# failure mode, not a decoration: a dropped tab (the shape a hand edit produces), an extra tab
+# (the shape a note containing a tab produces), a plausible-but-unlisted token, and an empty
+# cell. The FIXED copy differs from it ONLY in those four cells and must go quiet -- a check
+# that cannot be made to fail is not a check, and two of this corpus's guards were exactly that.
+_REG_HEAD = "\t".join(PSEUDOCODE_COLUMNS)
+_REG_OK = ("a.md\tthe stack loop\tit halts\t3600 of 3600\tSOUND\tlead\t"
+           "halts-proven -- one for-each over a finite set")
+PSEUDOCODE_FIXTURE = "\n".join([
+    "# a comment, and a blank line, both skipped",
+    "",
+    _REG_HEAD,
+    _REG_OK,
+    # a dropped tab: six fields, so `provenance` would be read as `termination`
+    "b.md\tthe droplet step\tit erodes\trelief 1.0 to 0.91\tDEFECT CONFIRMED\tagent",
+    # an extra tab inside the note
+    "c.md\tthe march\tit stops\t0/600\tSOUND\tagent\thalts-measured -- 0/600\tstepCap 1e9",
+    # a token that reads like a value and is not one
+    "d.md\tthe relaxation\tit converges\t155 passes\tSOUND\tlead\tterminates -- it finished",
+    # nothing at all in the cell
+    "e.md\tthe sweep\tit is exact\tzero drift\tSOUND\tlead\t",
+]) + "\n"
+PSEUDOCODE_FIXTURE_FIXED = "\n".join([
+    "# a comment, and a blank line, both skipped",
+    "",
+    _REG_HEAD,
+    _REG_OK,
+    "b.md\tthe droplet step\tit erodes\trelief 1.0 to 0.91\tDEFECT CONFIRMED\tagent\t"
+    "n/a -- the fence is one step, straight-line",
+    "c.md\tthe march\tit stops\t0/600\tSOUND\tagent\thalts-measured -- 0/600, stepCap 1e9 unhit",
+    "d.md\tthe relaxation\tit converges\t155 passes\tSOUND\tlead\thalts-measured -- to tolerance",
+    "e.md\tthe sweep\tit is exact\tzero drift\tSOUND\tlead\tunknown",
+]) + "\n"
+# (line in the fixture, substring the message must carry)
+PSEUDOCODE_FIXTURE_EXPECTED = [
+    (":5", "6 fields, expected 7"),
+    (":6", "8 fields, expected 7"),
+    (":7", "termination is 'terminates'"),
+    (":8", "termination is '(empty)'"),
+]
+
+
+def _register_fixture_run(text: str) -> list[str]:
+    """What check_pseudocode_register() says of a fixture register written to a temp tree."""
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "pseudocode-execution.tsv"
+        p.write_text(text, encoding="utf-8")
+        return check_pseudocode_register(p)[0]
+
+
+def register_selftest() -> list[str]:
+    """Assert the register check goes RED on each defect and GREEN once they are repaired."""
+    bad: list[str] = []
+    broken = _register_fixture_run(PSEUDOCODE_FIXTURE)
+    for line, want in PSEUDOCODE_FIXTURE_EXPECTED:
+        if not any(line in p and want in p for p in broken):
+            bad.append(f"no finding matches {line} + {want!r}: {broken}")
+    if len(broken) != len(PSEUDOCODE_FIXTURE_EXPECTED):
+        bad.append(f"{len(broken)} findings on the broken fixture register, expected "
+                   f"{len(PSEUDOCODE_FIXTURE_EXPECTED)}: {broken}")
+    with tempfile.TemporaryDirectory() as tmp:
+        absent = check_pseudocode_register(Path(tmp) / "absent.tsv")[0]
+    if not any("missing" in p for p in absent):
+        bad.append(f"an absent register is not reported as missing: {absent}")
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "fixed.tsv"
+        p.write_text(PSEUDOCODE_FIXTURE_FIXED, encoding="utf-8")
+        fixed, counts = check_pseudocode_register(p)
+    if fixed:
+        bad.append(f"the repaired fixture register is not quiet: {fixed}")
+    if (counts["n/a"], counts["halts-measured"], counts["halts-proven"],
+            counts["unknown"]) != (1, 2, 1, 1):
+        bad.append(f"the repaired fixture register tallies {counts}, expected one each of "
+                   f"n/a, halts-proven and unknown and two halts-measured")
+    # The header is the other half: drop the column name and every row below it is being read
+    # against a shape the file no longer has.
+    headless = _register_fixture_run(
+        PSEUDOCODE_FIXTURE_FIXED.replace("\ttermination\n", "\n", 1))
+    if not any("columns are" in p for p in headless):
+        bad.append(f"dropping the `termination` column name is not reported: {headless}")
+    return bad
+
+
 def coverage_summary() -> str:
     try:
         _, body = parse_front_matter(COVERAGE)
@@ -2082,11 +2279,12 @@ def main() -> int:
     bib, problems = bibliography()
     doc_problems, used = check_documents(bib)
     rec_problems, rec_first, rec_total = check_recommendation()
+    reg_problems, term = check_pseudocode_register()
     problems += (doc_problems + check_orphans(bib, used) + check_duplication()
                  + check_coverage() + check_index() + rec_problems
                  + check_no_artefact(bib) + check_not_opened(bib, citations_by_id())
                  + check_headings() + check_axis_agreement()
-                 + check_trigger_coverage())
+                 + check_trigger_coverage() + reg_problems)
     prop_problems, prop_both, prop_total = check_propagation(bib, citations_by_id())
     problems += prop_problems
 
@@ -2156,6 +2354,26 @@ def main() -> int:
               f"cannot follow. A further {noart} cite doctrine or classical results with no "
               f"artefact to open — declared in the locator, and excluded from the ratio rather "
               f"than held against it. Reported, not enforced; see registers/guard-proofs.tsv.")
+
+    if (registered := sum(term.values())):
+        blocks = registered - term["no-block"]
+        fences, fdocs, fgap = fenced_block_coverage()
+        print(f"termination {term['unknown']}/{registered} register rows say NOTHING about "
+              f"whether their block halts (`unknown`); {term['n/a']} have no loop, "
+              f"{term['halts-proven']} carry an argument, {term['halts-measured']} rest on a run "
+              f"that finished with the cap unhit, {term['cap-bounded']} halt only because a cap "
+              f"stops them, and {term['no-block']} register a prose claim rather than a block. A "
+              f"row here proves a block reproduces a NUMBER, never that it STOPS: the "
+              f"raymarching row measured missed hits, recorded SOUND, and that block livelocked "
+              f"on 35.7% of 600 rays. ⚠️ The token is ENFORCED, its truth is not -- `halts-proven` "
+              f"is worth only the argument written beside it, and `halts-measured` says nothing "
+              f"about inputs outside the run. ⚠️ And the register cannot see criterion 2's other "
+              f"half: {fences} fenced blocks across {fdocs} documents against {blocks} rows that "
+              f"name a block, with {len(fgap)} document(s) holding a fence and no row at all"
+              + (f" ({', '.join(fgap)})" if fgap else "")
+              + ". Rows are keyed by prose, not by line, so that pair is two counts and NOT a "
+                "matching: it is a floor on the gap, never the size of it. Reported, not "
+                "enforced; see registers/guard-proofs.tsv.")
 
     unread, seen = not_opened_count()
     if seen:

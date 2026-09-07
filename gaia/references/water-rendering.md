@@ -134,6 +134,13 @@ mean-square slope minus the part geometry and normals already resolve — and ro
 that difference a ULP under zero on a near-flat footprint. (This is a different variance from the
 foam pair below: that one comes from the Jacobian, this one from the slope tensor.)
 
+⚠️ **`saturate` closes the domain, not the NaN, and the two APIs disagree about that.** Both clamp
+a *finite* out-of-range `1 - cosThetaV` identically — which is the whole of the fix above. A NaN
+arriving from upstream is a different case: D3D specifies `saturate(NaN)` as `0`, while GLSL's
+`clamp`, read literally against its own definition, propagates it — so the same shader is clean on
+one API and speckles on the other. `shader-craft.md` carries both specifications, and the rule that
+follows: a `saturate` doing load-bearing work is a bug the D3D build is hiding.
+
 ⚠️ **`sigma_v` is an RMS slope here, not a variance, and this block says so because
 `water-optics.md` asks the reader to choose deliberately.** [bruneton2010] is not self-consistent
 about the symbol: eq. 25 defines `sigma_v^2` as the view-direction variance, eq. 26 then writes

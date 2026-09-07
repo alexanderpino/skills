@@ -83,7 +83,7 @@ deterministic function of the *integers* `i, j, k`, and it repeats exactly when 
 modulo the period before hashing** [periodic_lattice_practice]. One line, and it is exact:
 
 ```
-i0 = floor(x) % P;  i1 = (floor(x) + 1) % P     # and likewise for y; hash period >= P
+i0 = floor(x) % P;  i1 = (floor(x) + 1) % P   # likewise y; hash period >= P, and P_l per octave
 ```
 
 Measured, `m1_periodic_noise.py`, recorded in `registers/pseudocode-execution.tsv`, max `|f(x) − f(x+T)|` over 512² samples:
@@ -108,10 +108,10 @@ gets you a full-amplitude seam; the error survived because `T` = 256 satisfies b
 inside it against 1.31 with a 1024-entry table — while the `T = P` wrap test reads 2.6e-13 either
 way, blind to it. **Give the hash a long period** ([lagae2010] §7) **— and the period it must reach
 is the *finest octave's* `P·lacunarity^(n−1)`, not `P`** [periodic_lattice_practice]: octave `l`
-reduces mod `P·lacunarity^l`, so a `P`-long table repeats every `P/lacunarity^l` **cells**. On the
-six-octave stack above at `P` = 1024, a `P`-entry table leaves octaves 1–5 bit-identical at a
-512-cell shift (4.0e-13) against 4.6e-01 at 32768 entries. An integer mixer with no 8-bit mask
-reaches any `P_l` for free.
+reduces mod `P·lacunarity^l`, so a `P`-long table repeats every `P/lacunarity^l` **cells**. On a
+six-octave, lacunarity-2 stack at `P` = 1024, a `P`-entry table leaves octaves 1–5 bit-identical
+at a 512-cell shift (4.0e-13) against 4.6e-01 at 32768 entries. An integer mixer with no 8-bit
+mask reaches any `P_l` for free.
 
 **Simplex does not take the trick.** Simplex noise skews the square lattice by `F2 = (√3−1)/2`
 before flooring, so the integers being hashed live on a triangular lattice whose relationship to
@@ -421,7 +421,7 @@ non-periodic neighbour** is a contradiction: a wrapping tile has decided nothing
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | The noise wraps at 256 and at no other period | The lattice index is hashed raw, so the period is the permutation table's length; [lagae2010] Table 1 footnote 1 defines noise storage in terms of that period | Reduce the lattice index mod the period before hashing [periodic_lattice_practice] |
-| The "periodic" tile visibly repeats 4×4 inside itself | `P` was set to 1024 over a 256-entry permutation table, so the hash aliases and the tile is a 256 tile laid 4×4; measured `max\|f(x) − f(x+256)\|` = 2.4e-13 inside the tile, against 1.31 with a 1024-entry table, while the wrap test at `T = P` reads 2.6e-13 either way and passes. A `P`-entry table moves the same defect one octave down instead of curing it: octave `l` reduces mod `P·lacunarity^l`, so a `P`-long table repeats every `P/lacunarity^l` cells, and octaves 1–5 of the six-octave stack come out bit-identical at a 512-cell shift | Give the hash a period of at least the *finest* octave's `P·lacunarity^(n−1)` — an integer mixer with no 8-bit mask, or a table that long [periodic_lattice_practice], [lagae2010] §7's long-period hashes |
+| The "periodic" tile visibly repeats 4×4 inside itself | `P` was set to 1024 over a 256-entry permutation table, so the hash aliases and the tile is a 256 tile laid 4×4; measured `max\|f(x) − f(x+256)\|` = 2.4e-13 inside the tile, against 1.31 with a 1024-entry table, while the wrap test at `T = P` reads 2.6e-13 either way and passes. A `P`-entry table moves the same defect one octave down instead of curing it: octave `l` reduces mod `P·lacunarity^l`, so a `P`-long table repeats every `P/lacunarity^l` cells, and octaves 1–5 of the six-octave, lacunarity-2 stack come out bit-identical at a 512-cell shift | Give the hash a period of at least the *finest* octave's `P·lacunarity^(n−1)` — an integer mixer with no 8-bit mask, or a table that long [periodic_lattice_practice], [lagae2010] §7's long-period hashes |
 | Base octave wraps, the field does not | `period × lacunarity^k` stopped being an integer at some octave; measured 4.7e-02 at lacunarity 1.25 with period 64 | Lacunarity `p/q` in lowest terms with `q^(n-1)` dividing the period, `n` octaves — `3/2` at six octaves needs 32, so it wraps on any power-of-two period **of 32 or more** and not at 16, where `16·(3/2)^5 = 121.5`; `5/4` needs 1024 |
 | Modular indexing has no effect on a simplex noise | Simplex floors a lattice skewed by an irrational constant, so the integers you reduced are not the tile's; measured full-amplitude error at every period | Four-dimensional torus embedding — 5 simplex corners per sample against 3, and four-dimensional ones, so about 2.8× the arithmetic rather than the corner count's 1.7×; 16-against-4 is the *gradient*-lattice figure, and it is what a third-party gradient kernel you cannot reindex costs [periodic_lattice_practice] |
 | A ridge or trench repeating at exactly the tile pitch after erosion | Closed boundary — the edge is a wall, and a wall is a landform. Mass is conserved and periodicity is not; measured seam ratio 1.085 and rim drift 4.2% of relief | Wrapping neighbours [hobley2017] §3.1.4 `looped` — not a wider blend |

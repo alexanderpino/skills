@@ -165,9 +165,13 @@ streaming, one frame of the wrong world also requests the wrong pages.
   the per-object cost this architecture exists to remove. The material and page IDs this pipeline
   indexes with are per-pixel, not per-wave: a descriptor index that is not wave-uniform must be
   wrapped in `NonUniformResourceIndex()` (HLSL) / `nonuniformEXT` (GLSL, the SPIR-V `NonUniform`
-  decoration) [d3d12indirect], or the compiler may
+  decoration), or the compiler may
   assume uniformity and broadcast one lane's index to the wave — the classic bug that renders
-  correctly on one vendor and ships.
+  correctly on one vendor and ships. `shader-craft.md` carries the specification text behind that
+  rule and two consequences this bullet does not: one wrapped index suffices on a
+  multi-dimensional resource array, and a divergent index degrades the **derivative** as well, so a
+  per-pixel material ID and an implicit-LOD `Sample` are a bad pair even with the intrinsic in
+  place.
 - **Per-pass visibility bits, one dispatch per stage, N frusta.** Opaque, skirts, water and each
   shadow cascade are different pipeline states and therefore different survivor lists — and the
   cascades are different *frusta*. The shape is: each stage's dispatch reads the persistent scene once,

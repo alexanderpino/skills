@@ -150,6 +150,15 @@ normal   = normalize(lerp(sampleNormal(uv, nodeLod), sampleNormal(uv, nodeLod + 
   retained fine one, inflating the level's own `e` and the un-lerped crack by 1.2–3.0× on the same
   field. Centre the kernel for that reason; do not expect it to close a crack.
 
+⚠️ **The band shows in the pixel shader too, and that one is not a crack.** Across the band the
+fine node's height and normal are a `morphK`-weighted blend of mips `L` and `L+1`, while the coarse
+side, at its own range start, reads `L+1` alone — so the two sides hand *different inputs* to their
+own, correct screen-space derivatives, and a filtering discontinuity runs along every band even
+with `morphK` reaching exactly 1.0. Under a rasterizer no quad ever spans the two chunks — they are
+two draws — so "fixing the derivative" changes nothing. `shader-craft.md` carries the specification
+behind that, the one shading path where it is not true, and the fix: make the LOD-dependent inputs
+agree across the band, or derive gradients from a quantity that does not depend on LOD at all.
+
 Restrict morphing to the outer band of each range — the CDLOD whitepaper puts the morph area at
 "the last 15%-30% of every LOD range", and that is the figure to start from — so most vertices
 render un-morphed and the per-frame morph delta stays sub-pixel at real camera speeds.
@@ -205,10 +214,10 @@ breaks under streaming, and it fails precisely on the frames where LOD changes.
 
 **How big is the gap the XZ morph does not close?** Measured on a synthetic 2048² fBm field at
 2 m spacing, over 36 configurations — four roughness settings × three mip-reduction kernels × three
-levels: at the shared vertices the mip `L` and mip `L + 1` surfaces disagree by **0.16–0.49 × the
-coarse level's geometric error `e` at p95, and 0.26–1.0 × `e` at maximum**. The ratio is the useful
+levels: at the shared vertices the mip `L` and mip `L + 1` surfaces disagree by **0.19–0.52 × the
+coarse level's geometric error `e` at p95, and 0.31–1.0 × `e` at maximum**. The ratio is the useful
 form, because the level boundary is by construction where `e·K/d = tau` — so the gap projects to
-**0.16–0.49 `tau` at p95 and up to a full `tau` at worst, at every level, FOV and resolution**,
+**0.19–0.52 `tau` at p95 and up to a full `tau` at worst, at every level, FOV and resolution**,
 since `K` and `d` cancel out of the ratio entirely. Do not
 read sub-`tau` as safe: `tau` prices a surface in the wrong *place*, which is invisible, while this
 is a *hole* the background shows through, in a ribbon along every level boundary in the frame.

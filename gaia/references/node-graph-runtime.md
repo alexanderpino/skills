@@ -317,10 +317,11 @@ clamped parameter, a whole branch masked to zero, the two worked cases above. Se
 noise- and seed-driven nodes **low, never at 0**: at `P̂ = 0` the criterion never clears, so the
 node is never hashed and the rate never gets a sample — an absorbing seed. Hash a small fixed
 fraction of every node's rebuilds regardless and keep the rate over a window, or measurement can
-only retire. And the bar is `hash/cone`, so it moves with the cone: **0.083%** under the *minutes*
-the scheduler table quotes, **0.5%** above a 10 s erosion pass, **5%** above a 1 s cone, **95%**
-above two pointwise operators (~52 ms), and unattainable below. Under a 5 s cone the bar is over
-1%, where the prior decides everything — the reason to measure it rather than trust it.
+only retire. And the bar is `hash/cone`, so it moves with the cone: **0.083%** above a cone of the
+*minutes* the scheduler table quotes, **0.5%** above a 10 s erosion pass, **5%** above a 1 s cone,
+**95%** above two pointwise operators (22.5 + 30 ms) — and unattainable at any `P̂` below a cone of
+50 ms, the hash itself, which two `a + b` nodes are already under. Wherever the cone is under 5 s
+the bar is over 1% and the prior decides everything: the reason to measure it rather than trust it.
 
 These figures are one machine's and are quoted to establish a **ratio**, not a budget: the shape
 that matters is that hash cost is linear in field size, while node cost varies by orders of

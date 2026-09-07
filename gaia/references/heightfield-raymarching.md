@@ -60,6 +60,13 @@ while (t < tExit) {
 return miss
 ```
 
+⚠️ **The `never Sample` on the `texelAt` line is a language rule, not a preference.** A loop that
+can `break` puts its *whole* body inside varying flow control, where the derivative and
+implicit-LOD instructions are forbidden on one API and undefined on the other — and compile on
+both. `shader-craft.md` carries the specification text for that, the same rule for the fetch at the
+hit below, and a second reason the fetch must not filter: a bilinear tap on a max-reduce pyramid
+returns a convex combination, so it lands at or *below* the bound this loop's skip test needs.
+
 ⚠️ **Test the predicate, not the crossing.** The form of this loop that circulates most widely asks
 "does the ray cross `node.maxH` before it leaves the node?" and descends only then. That is correct
 *only for a descending ray*. A ray whose height **increases** with `t` — a shadow ray toward the

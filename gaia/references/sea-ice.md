@@ -25,7 +25,8 @@ What *is* worth the read is the size distribution, because it is the cleanest ex
 corpus of a number everyone quotes and nobody agrees on.
 
 **Tier: authoring-time for the mask and the ridge lines; the drift is the only part with a runtime
-cost, and it is one vector per frame applied to the whole field as a rigid motion.**
+cost.** It is one vector per frame applied to the whole mask as a rigid motion — a transform, not
+a per-cell pass — and nothing else on this page touches a frame budget.
 
 ## Use this
 

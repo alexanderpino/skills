@@ -8,7 +8,7 @@ generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
 sources:
   - { id: dean1991, tier: P, locator: "eq. (1) p. 54, h(y) = A·y^(2/3), attributed to Bruun (1954) on Danish North Sea and Mission Bay profiles; eq. (3) p. 54, Dean (1977) least-squares fit of h = A·y^n to the 504 Atlantic and Gulf profiles of Hayden et al. (1975) giving a central n = 2/3; eq. (4) p. 54 for the physical reading, uniform wave energy dissipation per unit volume D* = (1/h)·∂(E·C_G)/∂y, and eq. (5) p. 54 for A in terms of it; Figure 1 p. 55 for the fitted A = 0.067·w^0.44 with A in m^(1/3) and settling velocity w in cm/s; Figure 9 caption p. 59 for A(D = 0.2 mm) = 0.10 m^(1/3) and A(D = 0.6 mm) = 0.20 m^(1/3); eq. (8) p. 58 for the gravity-corrected profile whose beach face is planar, h = m·y, where eq. (1) has infinite slope; eq. (12) p. 59 for W* = (H_b/(κ·A))^(3/2) and κ ≈ 0.78; eq. (15) p. 59 for the Bruun Rule itself, Δy = −S·W*/(h* + B)" }
   - { id: cooper2004, tier: P, locator: "§3 pp. 159–160 — the claimed field verifications reviewed one at a time, the SCOR Working Group (1991) finding of predicted-versus-measured errors from +224% to −68% at Chesapeake Bay, and the statement that there has not been 'a single field verification that the Bruun Rule actually operates as Bruun (1962) envisioned it'; §4.1 p. 161 for the assumption list — no net longshore transport, no aeolian or overwash exchange, a closed 2D material balance, retreat always and accretion never — and for Zhang et al. (2004) finding no eastern-US site that conclusively meets them; p. 159 for the closure depth being put at 18 m by Bruun and at 4 m in later nourishment design, and for the US east coast shoreface reaching 10–12 m" }
-  - { id: ashton2006b, tier: P, locator: "Table 1 p. 2 — five alongshore transport formulations with their maximising angles, including CERC's H_b^(5/2)·cos(φ_b−θ)·sin(φ_b−θ) peaking at 45° in breaking angle and 42° in deepwater angle, with K ≈ 0.7, ρ_s = 2.65 g/cm³, porosity 0.4; §2.3 p. 4 for the one-line derivation from mass conservation, attributed to Pelnard-Considère (1956), giving eq. (3), a diffusion equation for shoreline position, and eq. (4), μ = −(1/D)·∂Q_s/∂θ with D the shoreface depth, positive μ smoothing and negative μ growing perturbations; §3.2 p. 5 for the deepwater recast eq. (7) with K_2 = 0.34 m^(3/5)·s^(−6/5) for r.m.s. wave height and 0.15 for significant height, and eq. (8) for the diffusivity with its angle factor eq. (10); abstract p. 1 for the 35°–50° span of the deepwater maximum across formulae and for the landform list it produces, 'capes, flying spits, and alongshore sand waves'; Figure 3 p. 3 for breaking wave height and transport varying along an undulating shoreline under refraction" }
+  - { id: ashton2006b, tier: P, locator: "Table 1 p. 2 — five alongshore transport formulations with their maximising angles, including CERC's H_b^(5/2)·cos(φ_b−θ)·sin(φ_b−θ) peaking at 45° in breaking angle and 42° in deepwater angle, with K ≈ 0.7, ρ_s = 2.65 g/cm³, porosity 0.4; §2.3 p. 4 for the one-line derivation from mass conservation, attributed to Pelnard-Considère (1956), giving eq. (3), a diffusion equation for shoreline position, and eq. (4), μ = −(1/D)·∂Q_s/∂θ with D the shoreface depth, positive μ smoothing and negative μ growing perturbations; §3.2 p. 5 for the deepwater recast eq. (7) with K_2 = 0.34 m^(3/5)·s^(−6/5) for r.m.s. wave height and 0.15 for significant height, and eq. (8) for the diffusivity with its angle factor eq. (10), and eq. (5) p. 4 in the same section for the record-averaged diffusivity μ_net = Σ(μ_i·Δt_i)/Σ(Δt_i), positive for stable coasts and negative for unstable ones; eq. (6) p. 5 defining the dimensionless 'instability index' Γ, +1 for a wholly low-angle climate and −1 for a wholly high-angle one, with zero meaning low- and high-angle waves balance each other out; §3.3 p. 5 'Sample Computation: North Carolina Outer Banks', where WIS station 255 at the FRF's 72° shore-perpendicular orientation gives Γ = 0.02, 'a marginally stable climate'; abstract p. 1 for the 35°–50° span of the deepwater maximum across formulae and for the landform list it produces, 'capes, flying spits, and alongshore sand waves'; Figure 3 p. 3 for breaking wave height and transport varying along an undulating shoreline under refraction" }
   - { id: shadrick2022, tier: P, locator: "Methods, 'Modelling' subsection p. 9 — wave attack expressed as an assailing force from wave height with an exponential decay across the platform, on a gridded cell framework, where a cell erodes only once that force exceeds a per-cell material resistance F_R, and intertidal weathering acts by lowering F_R rather than by eroding; the same passage for cliff retreat being driven exclusively at the cliff foot with subaerial weathering unrepresented. P. 3 for ~130-year mean retreat of 5.8 ± 4.0 cm/yr at Bideford and 5.9 ± 4.3 cm/yr at Scalby against a 2–25 cm/yr range along ~2 km of the same coast, 'caused by the stochastic pattern of erosion in space and time'; p. 2 for cliff erosion being intrinsically episodic" }
 ---
 # Coastal erosion — the shore profile, and why a coast smooths
@@ -97,7 +97,7 @@ different beach out of different sand. Dean's two published anchors [dean1991]:
 | 0.6 mm (coarse sand) | 0.20 |
 
 and the fitted relation to settling velocity `w` in cm/s, `A = 0.067·w^0.44` [dean1991]. Inverting
-that at Dean's own two anchors gives `w = 2.49 cm/s` and `w = 12.0 cm/s`; running it forward, `A`
+that at Dean's own two anchors gives `w = 2.48 cm/s` and `w = 12.0 cm/s`; running it forward, `A`
 moves only **2×** across that 4.83× range of settling velocity, because the exponent 0.44 is a
 strong damper — it would take a 20× range of `w` to move `A` by 3.74×. **So `A` is a narrow
 knob.** Expose it as grain size, give it a 0.05–0.25 range, and do not expect it to be the control
@@ -233,8 +233,8 @@ r.m.s. constant, `T = 10 s`, `H0 = 1 m`, waves straight on, and a 10 m shoreface
 | 100 km | 149 yr | 786 yr |
 
 Those are upper-bound rates — real climates spend most of their time at angles that reduce `|μ|`,
-and the net over a wave record needs a climate-averaged `μ` — **unsourced here**, outside this
-file's [ashton2006b] locator. But the **`L²` scaling is the design fact**, and it is the reason a
+and the net over a wave record is what [ashton2006b] eq. (5) computes, a duration-weighted mean
+`μ_net` over the record. But the **`L²` scaling is the design fact**, and it is the reason a
 coastline reads the way it does: metre-scale wiggles are erased within a day, kilometre-scale ones
 within a month, and only the hundred-kilometre features survive long enough to record anything
 else. Halving the wave height costs a factor of 5.3 in rate, because `H^(12/5)`.
@@ -285,10 +285,10 @@ Three consequences a tool must respect:
 
 - **A single wave direction is a modelling decision with a visible outcome.** 42.4° of the 0–90°
   range is stable and the remaining **52.9%** is unstable, so a coast forced by one direction is
-  overwhelmingly likely to be in one regime or the other, permanently. Real coasts sit near the
-  balance point — asserted here and **unsourced**: the instability index [ashton2006b] reports for
-  the Outer Banks is outside this file's declared locator. **Drive the model with a wave-angle
-  distribution, not a vector**, and the balance between smooth and cuspate becomes a knob.
+  overwhelmingly likely to be in one regime or the other, permanently. Real coasts are marginal:
+  [ashton2006b] §3.3 computes an instability index of 0.02 — essentially balanced — for the Outer
+  Banks. **Drive the model with a wave-angle distribution, not a vector**, and the balance between
+  smooth and cuspate becomes a knob.
 - **It is not unique to CERC.** [ashton2006b] compares five transport formulations and every one
   has a deepwater maximum, between 35° and 50°; the threshold is a consequence of energy
   conservation and Snell's law, not of one empirical fit. So the instability is not an artefact
@@ -316,7 +316,8 @@ Three things follow, and each is a modelling instruction:
   and 5.9 ± 4.3 cm/yr at another, against a **2–25 cm/yr range along ~2 km of the same coast**,
   attributed to "the stochastic pattern of erosion in space and time". A cliff operator that
   retreats every cell by the mean rate produces a smooth wall and is wrong by up to **4.3×**
-  locally, in a field spanning 12.5×. Retreat in blocks, at intervals, or not at all.
+  locally — that is the per-cell error, 25 against the 5.8 mean — across a field whose own ends
+  span 12.5×. Retreat in blocks, at intervals, or not at all.
 - **The forcing is concentrated at one elevation.** Retreat in that model is driven exclusively at
   the **cliff foot**, with subaerial weathering and groundwater unrepresented [shadrick2022]. So
   the operator is a *notch* cut in a band around sea level, and the face above it fails by
@@ -366,7 +367,7 @@ later processes would destroy.
 | You need a coastline *shape* | One-line diffusion, never Bruun | Bruun translates uniformly; [cooper2004] is the reason not to trust that |
 | Sandy coast, waves mostly shore-normal | Positive `μ` — the coast smooths, fast at small `L` | `τ = L²/(4π²μ)`; metre-scale wiggles die in hours |
 | Sandy coast, waves mostly oblique | Negative `μ` — capes and spits grow | Past 42.392° the diffusion runs backwards [ashton2006b] |
-| You want both on one map | Give the wave climate an angular distribution | One direction picks a permanent regime, and every formulation [ashton2006b] compares peaks somewhere in 35°–50° |
+| You want both on one map | Give the wave climate an angular distribution | One direction picks a permanent regime, and real coasts sit near the balance point — [ashton2006b] §3.3 puts the Outer Banks at 0.02 |
 | Rock coast | Threshold on `F_R`, notch at the foot, repose collapse above | A cliff has no sediment budget to diffuse [shadrick2022] |
 | Cliff with a wide beach | Suppress the notch | The waves do not reach the foot |
 | A river mouth | Fixed sediment input, then let the shoreline model spread it | Advective process meeting a diffusive one; see `stream-power.md` |

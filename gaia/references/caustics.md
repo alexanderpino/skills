@@ -43,11 +43,13 @@ Three consequences worth fixing in mind before choosing a technique:
 
 - **Caustics redistribute light; they do not add it — so the caustic layer *replaces* the bed's
   direct sun term rather than sitting on top of one.** It is a dimensionless **gain** with mean 1
-  over the bed, and it **multiplies**. Normalizing the layer's mean and then adding it to a bed that
-  is already fully sun-lit does not cure the double-count: a layer normalized to the transmitted
-  irradiance `E_sun` — the symbol the block below defines — plus a direct term of the same mean is
-  exactly `2·E_sun`, one stop too bright everywhere, and *that* is what reads as washed-out
-  flat-bright water between the filaments. Normalizing sets the scale; multiplying is
+  over the *light-space texture that carries it*, never over bed area — the measure the energy
+  argument conserves is the bed's **horizontal footprint**, which is exactly the factor the block
+  below already applies — and it **multiplies**. Normalizing the layer's mean and then adding it to
+  a bed that is already fully sun-lit does not cure the double-count: a layer normalized to the
+  transmitted irradiance `E_sun` — the symbol the block below defines — plus a direct term of the
+  same mean is exactly `2·E_sun`, one stop too bright everywhere, and *that* is what reads as
+  washed-out flat-bright water between the filaments. Normalizing sets the scale; multiplying is
   the composition; they are two different fixes and only the second one removes the double-count.
   Only the *direct* term is modulated: the sky is a hemisphere-wide source, so the patterns its
   many directions cast superimpose and average their own fold structure away. Filaments are a
@@ -87,8 +89,8 @@ different terms and never interchangeably:
 ```
 mu_w  = sqrt(1 - (sin(theta_sun)/n)^2)     # Snell cosine of the SUN below the surface
 L     = z / mu_w                           # refracted solar path to a bed at depth z
-G     = splat density / the density a flat surface deposits   # gain, mean 1 over the bed
-f     = exp(-max(0, c - mu_w*K_d) * L)     # fraction of the beam still coherent after path L
+G     = splat density / the density a flat WATER surface deposits  # mean 1 in LIGHT SPACE
+f     = exp(-max(0, c - mu_w*K_d) * L)     # the coherent beam's SHARE of the irradiance at z
 E_sun = (1 - R_ext(theta_sun)) * E_n * cos(theta_sun) * exp(-K_d * z)
 E_bed = shadow * (dot(N_bed, l_w) / mu_w) * E_sun * (1 + (G - 1) * f)
 #  l_w  is the refracted direction TO the sun below the surface, so the bed factor is 1 when flat
@@ -98,10 +100,17 @@ E_bed = shadow * (dot(N_bed, l_w) / mu_w) * E_sun * (1 + (G - 1) * f)
 #       the SUN's incidence, n = 1.335: 2.06% at 0 deg, 2.17% at 30, 2.82% at 45, 6.01% at 60.
 #       NOT the 6.67% cosine-weighted hemispherical figure, which is a Lambertian average over the
 #       whole hemisphere and is the reflectance at no single angle at all
-#  E_sun*f is identically (1 - R_ext)*E_n*cos(theta_sun)*exp(-c*L): the beam law, intact
-#  G has mean 1 BY CONSTRUCTION -- and only while every emitted photon is deposited. One that
-#       leaves the light-space texture, or whose receiver search fails, is lost energy: the bed
-#       goes dim at the map's edges and no amount of later normalizing puts it back
+#  E_sun*f is (1 - R_ext)*E_n*cos(theta_sun)*exp(-c*L) -- the beam law, intact -- EXACTLY WHILE
+#       c >= mu_w*K_d. Where the max(0, ..) above clamps, f = 1 identically and the beam law is
+#       gone: the pattern then never fades with depth at all, which is the failure row "The
+#       filaments keep their contrast all the way down". The clamp is a floor, not a repair --
+#       where it fires, take the exponent water-only instead: b - b_b = b_b*(1/B(phase_g) - 1),
+#       positive by construction, needing no clamp and carrying no sun angle
+#  G has mean 1 BY CONSTRUCTION over the LIGHT-SPACE texture -- equivalently over the bed weighted
+#       by dot(N_bed, l_w)/mu_w, its horizontal footprint, which is the factor the E_bed line
+#       already carries, and NEVER by bed area. And only while every emitted photon is deposited.
+#       One that leaves the light-space texture, or whose receiver search fails, is lost energy:
+#       the bed goes dim at the map's edges and no amount of later normalizing puts it back
 ```
 
 `f` is the far end of the depth band, and the bracket it sits in is the whole story: `(1 + (G−1)·f)`
@@ -116,15 +125,20 @@ with depth.
 
 ⚠️ **The error this accepts, and why `K_d` is the wrong end of a real bracket rather than simply
 wrong.** `exp(-c·L)` counts *every* scattering event as destroying that photon's contribution to
-the fold. Under the Henyey–Greenstein function the descriptor exports, at `phase_g = 0.924`, that
-is close to true: the mean deflection is **14.4°** and the median **7.5°**, throwing a photon 26 cm
-and 13 cm off course over a remaining metre of path — enough to decorrelate it from its own filament
-for any pattern finer than about half a metre, which is the pattern a rippled surface makes. The
-opposite extreme is `a + b_b`, which is exactly `mu_d·K_d`: only backscatter counts, near-forward
-scattering is assumed to preserve the fold perfectly, and the fade vanishes entirely. *That* is what
-a renderer picks when it attenuates the pattern on `K_d` — less a coefficient confusion than the
-assumption that forward scattering is free. The truth is inside that bracket, and under the phase
-function the descriptor actually exports it sits near the short end, `1/(b − b_b)`.
+the fold. Under the Henyey–Greenstein function the descriptor exports (`water-optics.md`), at
+`phase_g = 0.924`, that is close to true: the mean deflection is **14.4°** and the median **7.5°**,
+throwing a photon 26 cm and 13 cm off course over a remaining metre of path — enough to decorrelate
+it from its own filament wherever the filaments are spaced at that scale or finer. Filament spacing
+is set by the surface rather than chosen: the refracted ray map is periodic in the surface's own
+period, so the fold set is periodic in it too, and the filaments land at a *fraction of the
+wavelength that made them* (`wave-models.md` owns those wavelengths). A 26 cm scramble therefore
+erases what short wind ripple writes on the bed and leaves a long swell's metres-apart structure
+partly intact. The opposite extreme is `a + b_b`, which is exactly `mu_d·K_d`: only backscatter
+counts, near-forward scattering is assumed to preserve the fold perfectly, and the fade vanishes
+entirely. *That* is what a renderer picks when it attenuates the pattern on `K_d` — less a
+coefficient confusion than the assumption that forward scattering is free. The truth is inside that
+bracket, and under the phase function the descriptor actually exports it sits near the short end,
+`1/(b − b_b)`.
 
 The whole thing is one extra light-space pass at modest resolution, and its cost is independent of
 screen resolution and of how much bed is visible. It is the cheapest thing that is genuinely a
@@ -241,7 +255,7 @@ image and must either build one for the light or drop to the stylized tier.
 |---|---|---|
 | The pattern slides across the bed instead of shimmering, and ignores wind | A scrolling texture, not a caustic | Compute it from the surface; or keep the texture and stop calling it physics |
 | Caustics on vertical cliff faces and under overhangs | The projection has no receiver test | Find the receiver by iterating the light-space depth map |
-| The bed is uniformly bright between filaments, one stop hot | The caustic layer was added on top of a full direct term. Normalizing its mean does not fix this: mean `E_sun` plus mean `E_sun` is exactly `2·E_sun` | Make it a gain of mean 1 and **multiply** the direct term by it — `E_sun·(1 + (G−1)·f)`, never `E_sun + layer` |
+| The bed is uniformly bright between filaments, one stop hot | The caustic layer was added on top of a full direct term. Normalizing its mean does not fix this: mean `E_sun` plus mean `E_sun` is exactly `2·E_sun` | Make it a gain of mean 1 **in light space** and **multiply** the direct term by it — `E_sun·(1 + (G−1)·f)`, never `E_sun + layer` |
 | Caustics in the shadow of a rock, a boat or a bridge | The sun's shadow term was not applied to the caustic layer | Gate by the same shadow term the rest of the direct light uses |
 | Bright where the camera is near rather than where the water is shallow | Attenuated along the view ray instead of the light path | Attenuate over the **refracted** solar path `z/mu_w`, with `c` |
 | The filaments keep their contrast all the way down, and murky water still shows them | The pattern was attenuated on `K_d`, or on nothing. `K_d` is the column's coefficient and carries no fade for a beam | The pattern rides `exp(-c·L)` and the mean rides `exp(-K_d·z)`; their ratio `f = exp(-max(0, c − mu_w·K_d)·L)` is the fade, and it is one scattering length of path |

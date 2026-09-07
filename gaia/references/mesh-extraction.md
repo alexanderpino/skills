@@ -9,6 +9,7 @@ sources:
   - { id: garland1997, tier: P, locator: "§5 eq. (2) — the error at a vertex is the SUM of squared distances to the planes of its incident triangles, with the fundamental quadric K_p = p·pᵀ for a plane p = a b c d normalised so a² + b² + c² = 1; §4 for the additive rule Q̄ = Q1 + Q2 and eq. (1), the 4×4 linear solve for the contraction target; §4.1 for the five-step algorithm and the cost heap; §5.1 Geometric Interpretation for the degenerate level surfaces and when eq. (1) is not invertible; §3.2 for the pair-selection threshold t, where t = 0 is plain edge contraction; §6 Preserving Boundaries, which says of terrain height fields that 'it is necessary to preserve boundary curves while simplifying their shape' and adds perpendicular constraint planes at a large penalty weight" }
   - { id: garland1995, tier: F, locator: "§4 Greedy Insertion and Algorithm I — start from two triangles on the grid corners and repeatedly insert the unused input point of largest error; §3.1 for the local error measure, the vertical difference between the field and the interpolated approximation; §3.6 for the finding that importance measures making no reference to the current approximation 'give no guarantee about the accuracy of their approximations', with the city-versus-rolling-hills failure; §4.4 Algorithm III and the abstract for the expected cost O((m+n) log m) against the O(mn) and O(n log m + m²) of earlier variants; §4.5.1 Combating Slivers, where data-dependent triangulation is traded against a shape-quality term; §5.3 for the RMS error against vertex count fitting m^−0.7 empirically where the L2-optimal triangulation converges as m^−1, and for RMS being the steadier quality measure" }
   - { id: hoppe1996, tier: P, locator: "§3.1 Overview — a progressive mesh is a base mesh plus a sequence of vertex-split records, edge collapse alone being sufficient to build it; §3.2 Geomorphs, where the blend between consecutive levels is defined only because the coarser mesh's vertices are the finer one's, interpolated along the split; §3.3 progressive transmission and §3.5 selective refinement" }
+  - { id: karis2021, tier: F, locator: "the cluster-DAG LOD build — clusters gathered into groups, the group's boundary locked while the group is simplified, the result re-split into new clusters, and the grouping re-partitioned one level up so that a locked edge becomes interior. No slide is pinned for this half of the talk; gpu-driven-culling.md's row for the same entry pins the culling half" }
 ---
 # Mesh extraction — getting terrain out of the tool, offline
 
@@ -82,11 +83,15 @@ Three properties, each transcribed and then run:
   on a flat patch: the condition number of that matrix is `inf`. Fall back to the endpoints or the
   midpoint; do not let a linear solver return a random point on a plateau.
 
-The additive rule `Q̄ = Q1 + Q2` double-counts the plane of every triangle that touches **both**
-endpoints: that plane enters `Q1` once and `Q2` once, so **exactly twice**, and never three
-times — a triangle has three distinct vertices, so it contributes to any one `Q_v` at most once.
-[garland1997] accepts that trade deliberately. Keep the trade; the alternative is carrying
-explicit plane sets that grow as simplification proceeds.
+The additive rule `Q̄ = Q1 + Q2` tracks the plane set by addition instead of by union, so a plane
+in both sets is counted more than once. [garland1997] §5 bounds that and takes the trade
+deliberately: *"any single plane can be counted at most 3 times since each plane is initially
+distributed only to the vertices of its defining triangle."* **Twice** is the bound only while
+both endpoints are still original vertices — the plane enters `Q1` once and `Q2` once, and a
+triangle has no third endpoint to give. But `Q` accumulates: once two of a triangle's vertices sit
+in the cluster behind one endpoint, the third arrives at the other and the count is **three**.
+Keep the trade; the alternative is carrying explicit plane sets that grow as simplification
+proceeds.
 
 ## The quadric cost is not a screen-space error
 
@@ -238,11 +243,7 @@ cross-fade.
 each cluster's own border at every level and those vertices survive to the coarsest level, so the
 chain floors out at the cluster-boundary vertex count however far you push the error threshold.
 The published mechanism locks the *group* boundary and then re-partitions, which is what makes a
-locked edge simplifiable one level up. It is Nanite's, from Karis, Stubbe & Wihlidal (2021) —
-named here in prose and not as a marker, because `karis2021` is in this corpus's bibliography and
-cited by `gpu-driven-culling.md` but is **not yet in this document's `sources:`**. A source named
-without a marker is a recorded debt, not a citation; the proposed `sources:` row is with the
-maintainer.
+locked edge simplifiable one level up. It is Nanite's cluster-DAG build [karis2021].
 
 Whichever you pick, **write the measured maximum vertical error into each level's metadata, in
 metres, beside its bounding box.** `heightfield-lod.md` is explicit that this number must come
