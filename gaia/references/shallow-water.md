@@ -2,7 +2,7 @@
 type: Technique
 title: Shallow water — the solver for bounded, interactive bodies
 description: "The virtual-pipe discretisation of the shallow-water equations: why it is the default for a pool, a flood or a ripple patch, and the six places it stops being the right model."
-tags: [simulation, water, shallow-water, solver, runtime, authoring-time]
+tags: [simulation, water, shallow-water, solver, authoring-time, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
@@ -15,6 +15,10 @@ sources:
   - { id: fluid_authority, tier: F, locator: "no artefact: the cosmetic-versus-gameplay liquid state contract. A convention this repository recommends, with no external source" }
 ---
 # Shallow water — the solver for bounded, interactive bodies
+
+**Tier: authoring-time and real-time.** The same virtual-pipe discretisation runs at both budgets —
+a generator's hydraulic-erosion bake and an engine's bounded interactive patch — and only the
+scheduler differs; `simulation-time-budget.md` owns that scheduler.
 
 When water must *respond* — fill, drain, slosh, flood, ripple around the player, break against a
 wall you moved — a wave field cannot do it, because a wave field has no state. This is the solver

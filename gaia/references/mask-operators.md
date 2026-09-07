@@ -2,7 +2,7 @@
 type: Technique
 title: Mask operators — distance fields and component filtering
 description: "The two utilities the rest of this corpus assumes and never provides: an exact Euclidean distance transform, including distance from a spline, and an area-thresholded component filter that despeckles a mask without eroding it."
-tags: [generation, masks, distance-field, morphology, authoring-time]
+tags: [generation, masks, distance-field, morphology, authoring-time, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
 sources:
@@ -15,6 +15,10 @@ sources:
   - { id: salembier2009, tier: P, locator: "§Increasing criterion p. 146 (NOT §Size filtering p. 140, which is the opening by reconstruction of an erosion) — the area opening removes components below a pixel-count threshold and 'is equal to the supremum of all possible openings by a connected structuring element involving T_A pixels'; the abstract for connected operators that 'cannot create new contours nor modify their position'; Figs. 17–18 for the union-find implementation; Fig. 21(b) vs 21(c) for a disk opening against an area filter on the same image" }
 ---
 # Mask operators — distance fields and component filtering
+
+**Tier: authoring-time for the exact transform, real-time for the jump-flood variant.** The
+separable exact transform is a two-sweep bake; the crossover below hands the field to jump flooding
+when it must be rebuilt per frame from moving seeds, and prices that at `log n` full-field passes.
 
 Two operators that half this corpus already assumes. `tectonic-uplift.md` tells you to author
 uplift as "a distance field from a spline" and never says how to compute one.

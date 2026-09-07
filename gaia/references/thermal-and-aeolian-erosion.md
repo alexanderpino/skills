@@ -17,6 +17,9 @@ sources:
 ---
 # Thermal and aeolian erosion — repose, failure and wind
 
+**Tier: authoring-time.** Every pass here is an iterated bake — thermal run to a measured over-steep
+count, the slab automaton to a settled bed — and what ships is the result, not the loop.
+
 Three processes that share one idea: material moves when a *threshold* is crossed — a slope angle,
 a friction angle, a shear velocity. Each is cheap, and each is the thing that makes a hydraulic
 result stop looking like a hydraulic result.

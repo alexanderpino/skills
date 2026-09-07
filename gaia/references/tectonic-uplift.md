@@ -13,6 +13,9 @@ sources:
 ---
 # Tectonic uplift — the field erosion runs against
 
+**Tier: authoring-time.** `U(x,y)` is authored or simulated once and handed to a long-running
+erosion solve; what ships is the eroded heightfield, not this field.
+
 Tectonics does not produce terrain. It produces an **uplift field `U(x,y)`** in metres per year,
 whose only consumer is the uplift term of a long-running erosion solve (`stream-power.md`). The
 realism does not come from the plate model, which is crude. It comes from running fluvial erosion

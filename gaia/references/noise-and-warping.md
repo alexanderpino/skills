@@ -20,7 +20,7 @@ sources:
 ---
 # Noise and domain warping — the initial condition
 
-**Tier: authoring-time for the base layer, and the one generation stage that also fits in a frame**
+**Tier: authoring-time base layer, real-time stack — the one generation stage that fits in a frame**
 (§Time budget). Noise is the **initial condition** the rest of the pipeline runs on, and nothing
 more. It has no memory of water, so it cannot produce a drainage network: ridged fBm makes ridges
 that read as mountains in a hillshade and fail a flow-accumulation check immediately, because the

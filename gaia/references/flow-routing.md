@@ -2,7 +2,7 @@
 type: Technique
 title: Flow routing — where the water goes
 description: "Routing flow over a heightfield: which receiver rule to use, and how to handle depressions."
-tags: [generation, hydrology, flow-routing, authoring-time, real-time]
+tags: [generation, hydrology, flow-routing, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:

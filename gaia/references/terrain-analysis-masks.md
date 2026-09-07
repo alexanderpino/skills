@@ -2,7 +2,7 @@
 type: Technique
 title: Terrain analysis and masks — deriving fields from height
 description: "Slope, curvature, occlusion and wetness computed the way that survives a resolution change, and the selector stack that turns them into materials."
-tags: [generation, analysis, masks, curvature, materials, real-time]
+tags: [generation, analysis, masks, curvature, materials, authoring-time, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
@@ -17,6 +17,10 @@ sources:
   - { id: tomasi1998, tier: P, locator: "§2.1 Example: the Gaussian Case — the product of the CLOSENESS function c(xi,x) and the SIMILARITY function s(phi,f), both Gaussian. The paper's own axis pair is DOMAIN and RANGE, not spatial and range; search it for 'closeness' and 'similarity' to reach these two weights" }
 ---
 # Terrain analysis and masks — deriving fields from height
+
+**Tier: authoring-time and real-time.** §Time budget splits the page: slope, aspect, normals,
+Laplacian, curvature and the selectors over them are 3×3 stencils safe in a shader; horizon
+occlusion, insolation, TWI and anything consuming drainage area are bakes.
 
 Analysis describes a terrain. Masks turn that description into material coverage. Both are cheap;
 both are wrong in ways that look fine, which is what this document is about.

@@ -2,7 +2,7 @@
 type: Technique
 title: Wave models — spectra, trochoids, and what dispersion actually settles
 description: "Which wave field to synthesise for open water, which for a stylised or gameplay sea, and what the dispersion relation constrains in every one of them."
-tags: [simulation, water, waves, spectra, runtime]
+tags: [simulation, water, waves, spectra, authoring-time, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:

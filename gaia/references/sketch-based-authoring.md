@@ -2,7 +2,7 @@
 type: Technique
 title: Sketch-based authoring — a drawn constraint against a solver
 description: "Turning a drawn ridge line or river path into terrain: the sparse-to-dense interpolation as a Laplace solve with a gradient term, hard versus soft constraints as one weight, the C1 falloff at the edge of the edited region, and the three-way choice of whether the constraint is imposed before, during or after the erosion pass."
-tags: [generation, authoring, constraints, sketching, interpolation, diffusion]
+tags: [generation, authoring, constraints, sketching, interpolation, diffusion, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
 sources:

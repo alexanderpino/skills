@@ -2,7 +2,7 @@
 type: Technique
 title: Water optics — absorption, refraction, and the two-sided interface
 description: "The physical quantities that make water look like water: per-channel absorption with depth, the two attenuation coefficients, and the interface read from both of its sides."
-tags: [simulation, water, optics, absorption, refraction, physics]
+tags: [simulation, water, optics, absorption, refraction, physics, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
@@ -21,8 +21,9 @@ sources:
 ---
 # Water optics — absorption, refraction, and the two-sided interface
 
-**Tier: the quantities; both budgets consume them.** Nothing here is a per-frame cost — these are
-coefficients an authoring tool exports once and a renderer reads every frame.
+**Tier: authoring-time.** Nothing here is a per-frame cost: this document owns the *quantities* an
+authoring tool exports once, and every renderer that reads them is named as a consumer rather than
+priced here. That is why the tag is a single regime even though both budgets touch the numbers.
 
 Water's colour is not a swatch and its transparency is not an alpha value. Both are consequences of
 a handful of measured coefficients and one refracting boundary, and picking them from physics

@@ -2,7 +2,7 @@
 type: Technique
 title: Caustics — light focused by the water surface
 description: "Underwater and surface caustics on terrain: the caustic-map path for a rasterizer, the ray-traced path for studio quality, and why the scrolling texture everyone ships is not a caustic."
-tags: [rendering, rasterizer, ray-traced, water, caustics]
+tags: [rendering, rasterizer, ray-traced, water, caustics, real-time, near-real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
@@ -13,6 +13,10 @@ sources:
   - { id: zeltner2020, tier: P, locator: "§4.1 Finding all solutions — seeded Newton walks and the convergence-basin probability — and §4.2 Unbiased SMS; the manifold walk itself is set up in §3.1" }
 ---
 # Caustics — light focused by the water surface
+
+**Tier: real-time rasteriser and near-real-time ray-traced.** `## Use this` names the two tiers
+separately and prices each; the path-traced rows in the crossover table are the offline reference
+they are measured against, not a third budget this document recommends.
 
 **Boundary.** The refraction law, absorption and total internal reflection are established in
 `water-optics.md`; the wave field that does the focusing is `wave-models.md`; surface shading,

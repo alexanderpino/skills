@@ -2,7 +2,7 @@
 type: Technique
 title: Atmosphere and aerial perspective
 description: "How the sky is drawn and how every terrain pixel gets its distance cue: one fullscreen triangle drawn last and depth-tested, four resolution-independent LUTs costing 0.17 ms with only the on-screen apply scaling with pixels, and the rule that stops three participating media attenuating the same path twice."
-tags: [rendering, atmosphere, sky, aerial-perspective, fog]
+tags: [rendering, atmosphere, sky, aerial-perspective, fog, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-04T00:00:00Z }
 sources:

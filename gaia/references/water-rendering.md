@@ -18,7 +18,7 @@ sources:
 ---
 # Water rendering — drawing the surface, not simulating it
 
-**Tier: real-time rasteriser**, with one near-real-time crossover named at the end.
+**Tier: real-time rasteriser.** The marched option is handed to `heightfield-raymarching.md`.
 
 **Boundary, stated once.** The wave field, the dispersion relation, shoaling and breaking, and the
 absorption law are physics and belong elsewhere: `wave-models.md` for the spectrum, its slope

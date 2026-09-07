@@ -2,7 +2,7 @@
 type: Technique
 title: Sky and weather state
 description: "The atmospheric state a world carries: precomputing a scattering model as a solve rather than a lookup, and the one coverage field that clouds, their shadows and the rain they imply must all read."
-tags: [simulation, atmosphere, sky, weather, precomputation, driver-fields]
+tags: [simulation, atmosphere, sky, weather, precomputation, driver-fields, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-04T00:00:00Z }
 sources:
@@ -15,6 +15,9 @@ sources:
   - { id: tr_lighting_shadows, tier: F, locator: "the volumetric-cloud bullets for the ONE SKY STATE rule, verbatim: 'the coverage field that shapes the clouds is the *same* map that drives the cloud-shadow term below and, where a weather system exists, `13`'s weather intensity', and for the cloud scroll vector being the wind vector. A practitioner chapter in a sibling skill, not peer review; cited for what a shipping renderer chose" }
 ---
 # Sky and weather state
+
+**Tier: real-time rasteriser.** Every render figure here is per-frame; the scattering tables and the
+cloud-shadow pass are named as bakes, and the 2020 row is that bake becoming a per-frame solve.
 
 ## Use this
 

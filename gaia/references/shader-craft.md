@@ -2,7 +2,7 @@
 type: Technique
 title: Shader craft — the fetch, the derivative, and the depth token
 description: "Seven heightfield-specific shader hazards no general PBR or engine text teaches, four of them undefined behaviour by specification and all seven compiling: derivatives at LOD seams and inside a divergent march, explicit-LOD fetch in a max-mip traversal, virtual-texture gradient scaling and feedback bias, depth-output direction under both depth conventions, divergent resource indices, and the grazing terms — pow on a negative base, normalize of a vector that vanishes in fp16, and the saturate/clamp NaN semantics HLSL and GLSL do not share."
-tags: [rendering, rasterizer, shading, hlsl, glsl, real-time]
+tags: [rendering, rasterizer, shading, hlsl, glsl, real-time, near-real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-06T00:00:00Z }
 sources:

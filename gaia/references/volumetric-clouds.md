@@ -2,7 +2,7 @@
 type: Technique
 title: Volumetric clouds
 description: "The cloud deck a mountain can pierce: an analytic Perlin-Worley density model marched with a cheap/expensive two-level sampler, the three couplings that make this terrain's problem rather than general sky rendering -- depth compositing against the terrain buffer, a projected shadow the ground receives, and the above-the-deck regime -- and the honest asymmetry that every cost figure here comes from an unrefereed source and every error figure from a refereed one."
-tags: [rendering, clouds, volumetrics, sky, weather]
+tags: [rendering, clouds, volumetrics, sky, weather, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-04T00:00:00Z }
 sources:

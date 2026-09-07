@@ -2,7 +2,7 @@
 type: Technique
 title: Simulation time budget — minutes offline, milliseconds in a frame
 description: "One solver, two schedulers: how the time budget decides the timestep, the substep policy, and what happens when the budget runs out."
-tags: [simulation, water, time-budget, stability, authoring-time, runtime]
+tags: [simulation, water, time-budget, stability, authoring-time, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:

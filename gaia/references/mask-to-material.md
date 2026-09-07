@@ -14,6 +14,10 @@ sources:
 ---
 # Mask to material — from weights to albedo
 
+**Tier: real-time rasteriser.** The composite is the terrain shader's per-texel work; the palette
+LUT is baked once as a step inside that recommendation, and `virtual-texturing.md` owns caching the
+result when the composite will not fit a frame.
+
 `terrain-analysis-masks.md` ends at a set of material weights summing to ≤ 1. Nothing on the
 generation axis says what a material *is*. This document is the rest of that sentence: weights in,
 a colour out, and the four places where the arithmetic between them is routinely wrong.

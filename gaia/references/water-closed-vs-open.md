@@ -2,7 +2,7 @@
 type: Technique
 title: Closed water and open water are two different problems
 description: "Classify the body before you write a line of water code: fetch and boundary decide the wave model, the sim edge, the budget and half the defaults."
-tags: [simulation, water, taxonomy, body-type, authoring-time, runtime]
+tags: [simulation, water, taxonomy, body-type, authoring-time, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
@@ -12,6 +12,10 @@ sources:
   - { id: beaufort, tier: F, locator: "NOAA Storm Prediction Center Beaufort Wind Scale table, §'Appearance of Wind Effects - On the Water', rows Force 3, Force 5 and Force 7. The table numbers nothing but the force" }
 ---
 # Closed water and open water are two different problems
+
+**Tier: authoring-time and real-time.** Nothing here is a cost; it is the classification both
+budgets gate on — the tool sets `bodyType`, and the gate table's rows are the engine defaults
+that flip with it.
 
 Read this before the wave model, before the solver and before the shader. A pool and a sea share
 an interface, a set of optical coefficients and a pass order — and share almost nothing else. Ship
