@@ -104,7 +104,7 @@ Not a criterion: item count. 66 rows closed with these six unmet is failure.
 
 | Phase | Gate passed | Commit | Verifier |
 |---|---|---|---|
-| 0 | — | — | — |
+| 0 | ✅ 2026-09-07 | `3a4541c` (guards), `0334ce1` (rows) | agent-verify-phase0 — ran the `bites` job under `bash -e`: 33 red rows and 4 green, exit 0 in 37 s; every two-pass row red for its **named** rule and green with only that rule stubbed; all 29 stub anchors unique and failing when drifted. Found and closed one hole it created: a `verified:` stamp on apparatus digested the empty string, so one stamp was valid on all nine files |
 | 1 ∥ 2 | — | — | — |
 | 3 | — | — | — |
 | 4 | — | — | — |
@@ -112,6 +112,8 @@ Not a criterion: item count. 66 rows closed with these six unmet is failure.
 | 6 | — | — | — |
 
 A maintainer fills a row when a phase's *done when* holds. Nothing else marks progress.
+
+⚠️ **Phase 0's fourth condition was not met when the first three were, and the row waited for it.** `check.py` exit 0, `--selftest` green and the six holes' red-and-green pairs all held days before *"T3, T4, T8 are `OPEN` rows"* did: T3 and T8 had no row in `guard-proofs.tsv` at all, and T4's was absent too. All three are now open rows that say why no mutation proves them — for T4 and T8 the honest mutation would go **green by design**, which is the finding rather than a bug, and T3's surface is closed only by a human reading the source. A phase gate that is three-quarters met is not met.
 
 ---
 
