@@ -199,6 +199,16 @@ jobs:
               "heading_duplicate": [("check.py", '            if (level, text) in seen:',
                                                  '            if False:')],
               "axis_agreement": [("check.py", '        elif axis != section:', '        elif False:')],
+              # Both directions of the Tier/tag comparison, because the rule the rows below
+              # name is the AGREEMENT, and it is one rule with two failure modes. The
+              # "no budget tag at all" branch is a different rule and is deliberately left
+              # standing: a stub that removes more than the row names proves less.
+              "budget_agreement": [
+                  ("check.py", '        if extra := claimed - tags:', '        if False:'),
+                  ("check.py", '        if unnamed := tags - evidenced:', '        if False:'),
+              ],
+              "path_exists": [("check.py", '                if name not in existing:',
+                                           '                if False:')],
               "coverage_target": [("check.py",
                   '            if not (ROOT / "references" / target).exists():',
                   '            if False:')],
@@ -512,6 +522,56 @@ jobs:
           cp /tmp/bk_ax references/sea-ice.md
           python3 scripts/index.py >/dev/null
 
+          # ── the budget regime on the page, against the tag ───────────────────────────
+          # Criterion 6 shipped 38 Tier lines and nothing compared them to anything. Two rows,
+          # because the rule is asymmetric and one mutation would prove only half of it: the
+          # page may not claim a regime the tags deny, AND the tags may not carry a regime the
+          # page never names. Both anchors are asserted UNIQUE in their file -- the heading row
+          # below is in this suite because a first-substring replace hit a code span instead of
+          # the line it meant.
+          cp references/virtual-texturing.md /tmp/bk_bud
+          python3 - <<'PYBD1'
+          import pathlib
+          p = pathlib.Path("references/virtual-texturing.md"); s = p.read_text(encoding="utf-8")
+          old = "**Tier: real-time rasteriser.**"
+          assert s.count(old) == 1, f"Tier line appears {s.count(old)} times, want 1"
+          p.write_text(s.replace(old, "**Tier: real-time and near-real-time rasteriser.**", 1),
+                       encoding="utf-8")
+          PYBD1
+          red_check "the page claims a budget regime the tags do not carry" \
+                    'line claims .near-real-time.' budget_agreement
+          cp /tmp/bk_bud references/virtual-texturing.md
+
+          cp $SUBJ /tmp/bk
+          python3 - <<'PYBD2'
+          import pathlib
+          p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
+          old = "real-time rasteriser and near-real-time ray-traced."
+          assert s.count(old) == 1, f"Tier line appears {s.count(old)} times, want 1"
+          # The tag stays `near-real-time`; only the page stops saying so. That is the drift
+          # criterion 6 exists to catch -- a reader cannot tell the regime from the page.
+          p.write_text(s.replace(old, "real-time rasteriser.", 1), encoding="utf-8")
+          PYBD2
+          red_check "a budget tag the Tier line stops naming" \
+                    'line never names it' budget_agreement
+          cp /tmp/bk $SUBJ
+
+          # ── a cross-reference to a document nobody wrote ─────────────────────────────
+          # Audit G#9: a reviewer renamed a `.md` reference in caustics.md to a file that does
+          # not exist and check.py exited 0. 560 of these carry a reader through the corpus and
+          # none was read. A rename is the ordinary event that breaks one.
+          cp references/gpu-driven-culling.md /tmp/bk_pa
+          python3 - <<'PYPA'
+          import pathlib
+          p = pathlib.Path("references/gpu-driven-culling.md"); s = p.read_text(encoding="utf-8")
+          old = "`heightfield-raymarching.md`"
+          assert s.count(old) == 1, f"cross-reference appears {s.count(old)} times, want 1"
+          p.write_text(s.replace(old, "`heightfield-raymarch.md`", 1), encoding="utf-8")
+          PYPA
+          red_check "a cross-reference to a document that does not exist" \
+                    'references/heightfield-raymarch.md does not exist' path_exists
+          cp /tmp/bk_pa references/gpu-driven-culling.md
+
           # A coverage target that does not exist. The old form RE-POINTED an existing row,
           # which also unclaimed a real document and broke `routes_to` -- three messages from
           # three functions, so it stayed red with check_coverage gone. ADDING a row leaves
@@ -662,6 +722,26 @@ jobs:
           PYDC
           expect_green "prose reworded outside both anchors, no citation touched"
           cp /tmp/bk $SUBJ
+
+          # A `.md` name that is NOT a cross-reference. check_paths would be worthless if it
+          # fired on the corpus's own examples: a `locator:` in front matter names a place
+          # inside somebody else's repository ("the front-to-back bullet in README.md"), and a
+          # fenced block is code or a template, not prose a reader follows. Both exemptions are
+          # live in the corpus today, so a clean run alone cannot prove they are still wired --
+          # this asserts it with a name that resolves NOWHERE.
+          cp references/tiled-streaming.md /tmp/bk_ts
+          python3 - <<'PYDP'
+          import pathlib
+          p = pathlib.Path("references/tiled-streaming.md"); s = p.read_text(encoding="utf-8")
+          old = "         * predictFactor(cameraVelocity, tile)"
+          assert s.count(old) == 1, f"fenced anchor appears {s.count(old)} times, want 1"
+          p.write_text(s.replace(old, "// see `no-such-document.md` for the derivation\n" + old, 1),
+                       encoding="utf-8")
+          PYDP
+          grep -q 'no-such-document.md' references/tiled-streaming.md \
+            || { echo "::error::path decoy inserted nothing"; fails=$((fails + 1)); }
+          expect_green "a dangling .md name inside a fenced block"
+          cp /tmp/bk_ts references/tiled-streaming.md
 
           # A heading that is NEITHER anchor. This decoy used to rename `## How this fails`,
           # which is structural now -- it went red, correctly, so it is retired and pointed at

@@ -16,6 +16,19 @@ In this repo's vocabulary a green run here is an `attestation` channel, not an `
 one: the same kind of author writes the claim, the citation and this guard. Saying "grounded"
 because this passes would be the exact overstatement Gaia exists to avoid.
 
+Two structural facts about a document are checked against each other rather than reported. A
+`**Tier:` line's budget regime must agree with the budget tag in `tags:`, in BOTH directions:
+a regime named on the page must be a tag, and a tag must be named on the page. It CANNOT check
+that the regime is true -- a real-time claim over a 400 ms recommendation is agreement, not
+correctness -- and a document with no Tier line at all is an ALLOWED state, counted and named,
+because the 450-line cap refuses the insertion in the documents nearest it, which the run
+names. And every
+`document.md` a body names in a code span must be a document that exists: that is a FAILURE,
+not a metric, because the same dangling reference in coverage.md's `→ target` column has always
+been one. Its reach is gaia's own naming shape; bare `.md` names belonging to other
+repositories -- five of them, `19-fluid-simulation.md` among them -- are named in the output
+and NOT checked, and `.py` and `.tsv` paths are not read at all.
+
 It also checks the SHAPE of `registers/pseudocode-execution.tsv`: seven fields, the header that
 names them, and a `termination` token from a closed vocabulary, so that no row can be silent
 about whether its block halts. It cannot check that the token is TRUE -- `halts-proven` is worth
@@ -647,6 +660,15 @@ def selftest() -> int:
     for t, want in xrbad:
         print(f"  FAIL  crossref ratio fixture: {t!r} should yield {sorted(want)}, "
               f"got {sorted(_x_ratios(t))}")
+    dbad = [(t, want) for t, want in DOC_NAME_FIXTURES
+            if bool(_DOC_NAME.match(t)) != want]
+    for t, want in dbad:
+        print(f"  FAIL  cross-reference fixture: {t!r} should be "
+              f"{'a document this corpus must have' if want else 'out of reach'}")
+    bbad = [(t, wc, we) for t, wc, we in BUDGET_FIXTURES if _budget_tokens(t) != (wc, we)]
+    for t, wc, we in bbad:
+        print(f"  FAIL  budget fixture: {t!r} should claim {sorted(wc)} and evidence "
+              f"{sorted(we)}, got {[sorted(s) for s in _budget_tokens(t)]}")
     xcbad = crossref_corpus_selftest()
     for msg in xcbad:
         print(f"  FAIL  crossref corpus: {msg}")
@@ -654,7 +676,8 @@ def selftest() -> int:
     for msg in gbad:
         print(f"  FAIL  execution register: {msg}")
     xbad += xpbad + xrbad
-    if bad or nbad or ubad or ebad or cbad or rbad or pbad or xbad or xcbad or gbad:
+    if bad or nbad or ubad or ebad or cbad or rbad or pbad or xbad or xcbad or gbad \
+            or dbad or bbad:
         # `ebad` used to gate the exit code and not appear in this sentence, so a run with
         # only entry-tag failures printed "0 ... 0 ... 0 misclassified" above a non-zero exit.
         print(f"\n{len(bad)} of {len(LOCATOR_FIXTURES)} locator fixtures, "
@@ -666,7 +689,10 @@ def selftest() -> int:
               f"{len(pbad)} of {len(PROPAGATION_FIXTURES)} propagation fixtures and "
               f"{len(xbad)} of "
               f"{len(CROSSREF_FIXTURES) + len(CROSSREF_PATH_FIXTURES) + len(CROSSREF_RATIO_FIXTURES)}"
-              f" crossref fixtures misclassified, and {len(xcbad)} crossref corpus "
+              f" crossref fixtures misclassified, "
+              f"{len(dbad)} of {len(DOC_NAME_FIXTURES)} cross-reference fixtures and "
+              f"{len(bbad)} of {len(BUDGET_FIXTURES)} budget fixtures misclassified, "
+              f"and {len(xcbad)} crossref corpus "
               f"assertion(s) and {len(gbad)} execution-register assertion(s) failed.")
         return 1
     print(f"locator pattern: {len(LOCATOR_FIXTURES)}/{len(LOCATOR_FIXTURES)} fixtures correct; "
@@ -678,7 +704,10 @@ def selftest() -> int:
           f"propagation: {len(PROPAGATION_FIXTURES)}/{len(PROPAGATION_FIXTURES)} correct; "
           f"crossref: {len(CROSSREF_FIXTURES)}/{len(CROSSREF_FIXTURES)} formula, "
           f"{len(CROSSREF_PATH_FIXTURES)}/{len(CROSSREF_PATH_FIXTURES)} path, "
-          f"{len(CROSSREF_RATIO_FIXTURES)}/{len(CROSSREF_RATIO_FIXTURES)} ratio correct, and "
+          f"{len(CROSSREF_RATIO_FIXTURES)}/{len(CROSSREF_RATIO_FIXTURES)} ratio correct; "
+          f"cross-reference shape: {len(DOC_NAME_FIXTURES)}/{len(DOC_NAME_FIXTURES)} correct; "
+          f"budget vocabulary: {len(BUDGET_FIXTURES)}/{len(BUDGET_FIXTURES)} correct, including "
+          f"the four cases that decide the `runtime` asymmetry; and "
           f"check_crossrefs() itself reports {len(CROSSREF_CORPUS_EXPECTED)}/"
           f"{len(CROSSREF_CORPUS_EXPECTED)} reconstructed instances on the fixture corpus and "
           f"nothing once they are corrected; the execution-register check reports "
@@ -811,8 +840,7 @@ def approximation_coverage() -> tuple[int, int, int, int]:
     cannot see an error stated in cells or an asymptotic cost stated in O-notation. It is a
     floor on how many documents put both halves in front of the reader at all.
     """
-    docs = [p for p in documents(ROOT)
-            if p not in paper_files() and p not in (INDEX, COVERAGE)]
+    docs = content_documents()
     both = err = cost = neither = 0
     for d in docs:
         try:
@@ -931,8 +959,7 @@ def check_section_reach() -> tuple[list[str], int, int]:
     result above so nobody rebuilds this and believes it works.
     """
     problems: list[str] = []
-    docs = [p for p in documents(ROOT)
-            if p not in paper_files() and p not in (INDEX, COVERAGE)]
+    docs = content_documents()
     unreachable = total = 0
     for d in docs:
         try:
@@ -1598,6 +1625,243 @@ def check_not_opened(bib: dict[str, dict], cites: dict[str, list[tuple[Path, str
 
 
 AXIS_TAGS = ("generation", "simulation", "rendering", "architecture")
+
+# The closed budget vocabulary a `tags:` line may use. It is a MEASUREMENT of the corpus, not a
+# wish: over the 39 content documents the tag counts are authoring-time 26, real-time 19,
+# near-real-time 3, and `runtime` -- the fourth word the migration started from -- appears in no
+# `tags:` line at all. It was collapsed into `real-time` and the collapse is complete.
+BUDGET_TAGS = ("authoring-time", "near-real-time", "real-time")
+# `runtime` survives in ONE Tier line (simulation-time-budget.md: "the boundary between
+# authoring-time and runtime") as the pre-migration spelling of the real-time budget. It is
+# accepted as EVIDENCE that a page names the real-time budget, and never as a CLAIM that the
+# page carries a regime its tags do not -- because "the runtime" is also this corpus's word for
+# the host that consumes a baked field, and four authoring-time-only documents use it that way
+# (driver-fields, flow-routing, node-graph-runtime, sea-ice). Reading it symmetrically would
+# fail all four; refusing it entirely would fail simulation-time-budget. The asymmetry is the
+# whole design and it is why this is a pair of one-directional rules and not a set equality.
+BUDGET_ALIASES = {"runtime": "real-time"}
+# Hyphen is a word character on both sides here, so `near-real-time` does NOT also register
+# `real-time`, and `node-graph-runtime.md` -- a document NAME that appears in Tier prose -- does
+# not register `runtime`. Both were live in the corpus when this was written.
+_BUDGET_WORD = {w: re.compile(rf"(?<![a-z-]){re.escape(w)}(?![a-z-])")
+                for w in (*BUDGET_TAGS, *BUDGET_ALIASES)}
+TIER_PREFIX = "**Tier:"
+
+
+def content_documents() -> list[Path]:
+    """The documents a reader is routed to: everything but the bibliographies and apparatus.
+
+    Three call sites computed this by hand with the same comprehension, one of them re-globbing
+    `paper_files()` once per document. A denominator five call sites share is worth one spelling.
+    """
+    papers = set(paper_files())
+    return [p for p in documents(ROOT) if p not in papers and p not in (INDEX, COVERAGE)]
+
+
+def _budget_tokens(text: str) -> tuple[set[str], set[str]]:
+    """`(claimed, evidenced)` budget regimes named in `text`.
+
+    `claimed` is the canonical vocabulary only -- what the page asserts. `evidenced` adds the
+    pre-migration aliases -- what the page can be read as naming. See BUDGET_ALIASES for why
+    those are two sets and not one.
+    """
+    claimed = {w for w in BUDGET_TAGS if _BUDGET_WORD[w].search(text)}
+    return claimed, claimed | {canon for alias, canon in BUDGET_ALIASES.items()
+                               if _BUDGET_WORD[alias].search(text)}
+
+
+def check_budget_agreement() -> tuple[list[str], int, int, list[str]]:
+    """The `**Tier:` line on the page must agree with the budget tag in `tags:`.
+
+    Criterion 6 of the plan reads "37/37 carry a `**Tier:` line that agrees with one canonical
+    budget tag, CHECKED". The lines landed -- 38 of 39 documents carry one -- and for two days
+    nothing compared them to anything. The fact was on the page 38 times and enforced zero
+    times, which is the same shape as the `tier:` field before check_documents grew a comparison
+    for it: a value that LOOKS graded, that a reader trusts, and that no run can contradict.
+
+    Two one-directional rules, because the vocabulary is asymmetric (see BUDGET_ALIASES):
+
+      * a regime NAMED on the page must be a tag -- otherwise the page advertises a budget the
+        machine-readable half denies, and `index.py`'s routing disagrees with the prose;
+      * a regime TAGGED in front matter must be named on the page -- otherwise the reader the
+        criterion is about cannot tell the regime from the page, which is the whole criterion.
+
+    NOT a failure, and deliberately: a document with NO `**Tier:` line at all. Ground rule 2
+    (subtract before you add) blocks a four-line insertion into a document already inside the
+    20-line no-add band, and river-networks.md at 430 lines is there on purpose -- the commit
+    that migrated the other 38 says so in its subject line. A guard that goes red on a decision
+    the corpus made deliberately is a guard that gets stubbed within a week, and this file has
+    the decoys to prove it takes that seriously. But silence is not the alternative: the count
+    is REPORTED with the missing documents NAMED, so the coverage can be seen to fall without
+    anyone being punished for a cap they cannot violate. What IS enforced for every content
+    document, Tier line or not, is that `tags:` carries at least one budget regime -- so the
+    regime is always machine-readable even where the page does not print it.
+
+    What it cannot see: whether the regime is TRUE. `**Tier: real-time rasteriser.**` on a
+    document whose one recommendation takes 400 ms is agreement, not correctness. It compares
+    two declarations to each other, exactly like check_axis_agreement, and the two are written
+    by the same hand on the same day.
+    """
+    problems: list[str] = []
+    stated = 0
+    missing: list[str] = []
+    for path in content_documents():
+        rel = path.relative_to(ROOT)
+        try:
+            fm, body = parse_front_matter(path)
+        except (OSError, Unparseable):
+            continue                      # reported by check_documents
+        tags = {str(t).strip().lower() for t in fm.get("tags", [])} & set(BUDGET_TAGS)
+        if not tags:
+            problems.append(f"{rel}: no budget tag in `tags:` -- one of "
+                            f"{', '.join(sorted(BUDGET_TAGS))} is required, so a reader who "
+                            f"never opens the page can still tell what budget it is written for")
+            continue
+        offset = _offset(path)
+        lines = body.split("\n")
+        start = next((i for i, ln in enumerate(lines) if ln.startswith(TIER_PREFIX)), None)
+        if start is None:
+            missing.append(rel.name)
+            continue
+        stated += 1
+        # The whole PARAGRAPH, not the line. wave-models.md's Tier sentence wraps, and its
+        # second regime -- "the shore band's travel-time solve is / authoring-time" -- is on the
+        # continuation line. Reading one line called that document a disagreement.
+        para: list[str] = []
+        for ln in lines[start:]:
+            if not ln.strip():
+                break
+            para.append(ln)
+        n = start + offset
+        claimed, evidenced = _budget_tokens("\n".join(para))
+        if extra := claimed - tags:
+            problems.append(
+                f"{rel}:{n}: the `{TIER_PREFIX}` line claims "
+                f"{', '.join(f'`{t}`' for t in sorted(extra))}, which `tags:` does not carry "
+                f"({', '.join(f'`{t}`' for t in sorted(tags))}). The page and the routing table "
+                f"name different budgets")
+        if unnamed := tags - evidenced:
+            problems.append(
+                f"{rel}:{n}: `tags:` carries {', '.join(f'`{t}`' for t in sorted(unnamed))} and "
+                f"the `{TIER_PREFIX}` line never names it, so a reader cannot tell that regime "
+                f"from the page -- which is the whole reason the line exists")
+    return problems, stated, stated + len(missing), sorted(missing)
+
+
+# A cross-reference into this corpus, as the corpus actually writes one: a code span whose
+# ENTIRE content is a document filename. That shape is what 560 of them look like today, across
+# all 48 files, and it is deliberately narrower than "anything ending in .md":
+#   - `→ file.md` and `→ document.md` in coverage.md's row-format legend are placeholders in a
+#     schema, not references, and the arrow inside the span is what says so;
+#   - `WorkGraphs.md`, `ResourceBinding.md`, `README.md` name files in other people's
+#     repositories -- CamelCase is not this corpus's naming shape;
+#   - `19-fluid-simulation.md`, `12-water-rendering.md` are files of the retired `terrain-*`
+#     skills, which numbered their documents; gaia never has.
+# The residue is REPORTED by name below rather than dropped in silence.
+_DOC_SPAN = re.compile(r"`([^`\n]+)`")
+_DOC_LINK = re.compile(r"\]\(([^)\s]+\.md)\)")
+_DOC_NAME = re.compile(r"^[a-z][a-z0-9-]*\.md$")
+_MD_BARE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
+
+# (span content, is it a cross-reference this guard must resolve?). Every False here is a live
+# span in the corpus today, not an invented one, and each is the reason the pattern is not
+# simply `.*\.md`.
+DOC_NAME_FIXTURES = [
+    ("shallow-water.md", True),
+    ("caustics.md", True),                 # no hyphen: the corpus has three such documents
+    ("papers-flow.md", True),
+    ("→ file.md", False),                  # coverage.md's row-format legend, not a reference
+    ("WorkGraphs.md", False),              # a Microsoft spec file
+    ("ResourceBinding.md", False),
+    ("19-fluid-simulation.md", False),     # the retired terrain-renderer numbered its documents
+    ("d3d/WorkLists.md", False),           # carries its directory: not a bare sibling name
+    ("scripts/check.py", False),
+    ("see `shallow-water.md`", False),     # a span is the whole reference or it is not one
+]
+
+# (text, claimed regimes, evidenced regimes). The first four are Tier paragraphs from the
+# corpus, verbatim in substance; they are the cases that decide the asymmetry.
+BUDGET_FIXTURES = [
+    ("**Tier: real-time rasteriser.**", {"real-time"}, {"real-time"}),
+    ("**Tier: real-time rasteriser and near-real-time ray-traced.**",
+     {"real-time", "near-real-time"}, {"real-time", "near-real-time"}),
+    # `near-real-time` must not also register `real-time`: the hyphen is a word character.
+    ("**Tier: near-real-time and ray-traced.**", {"near-real-time"}, {"near-real-time"}),
+    # The alias, evidencing a tag it may not claim on its own.
+    ("**Tier: the crossover document; both budgets.** the boundary between authoring-time\n"
+     "and runtime, so every section states the same step under each regime.",
+     {"authoring-time"}, {"authoring-time", "real-time"}),
+    # "the runtime" as a NOUN, on four authoring-time-only documents. Reading it as a claim
+    # would fail all four; it is evidence and nothing more.
+    ("**Tier: authoring-time; the runtime consumes the baked fields.**",
+     {"authoring-time"}, {"authoring-time", "real-time"}),
+    # A document NAME is not a budget word.
+    ("see `node-graph-runtime.md` for the scheduler", set(), set()),
+    ("nothing here states a budget at all", set(), set()),
+]
+
+
+def check_paths() -> tuple[list[str], int, int, list[str]]:
+    """A document this corpus names must be a document this corpus has.
+
+    Audit G#9. `check.py` was green on a dangling `.md` cross-reference: a reviewer renamed one
+    in caustics.md to a file that does not exist and the run exited 0. Nothing read them --
+    check_coverage validates coverage.md's `→ target` column and stops there, so the 560
+    references the BODIES and SKILL.md carry, which is how a reader actually moves through this
+    skill, were unwatched. A rename is the ordinary event that breaks them, and this corpus renames.
+
+    This is a FAILURE, not a metric, and the distinction is the point: a dangling `→ file.md`
+    in coverage.md has been a hard failure since the map existed, and the same sentence in a
+    document's prose was worth nothing. Two spellings of one defect cannot have two verdicts.
+
+    Read from the BODY only, outside fenced blocks. A `locator:` in front matter names a place
+    INSIDE a cited artefact -- "the front-to-back bullet in README.md" is a location in someone
+    else's repository, not a path in this one -- and a fenced block is code or a template.
+
+    ⚠️ What it does NOT check, named rather than implied. Bare `.md` names outside gaia's own
+    naming shape are out of reach, and the corpus has five, at six sites: `19-fluid-simulation.md`
+    (shallow-water.md, papers-simulation.md), `12-water-rendering.md`,
+    `12b-water-provenance.md`, `WorkGraphs.md`, `ResourceBinding.md`. The plan named the first
+    of those -- shallow-water.md's reference to the retired terrain-renderer's fluid document --
+    as G#9's live instance, and it is live still: as written it resolves to no path a reader can
+    open, because the directory that would make it resolvable sits in a DIFFERENT code span.
+    Enforcing those here would go red on five documents this guard's author does not own, so the
+    residue is counted and named in the run's output instead, and a `corrections.tsv` row asks
+    the owners for the one repair that fixes the class: put the directory inside the span.
+    Paths to `.py` harnesses and `.tsv` registers are also unread -- the execution register names
+    27 harness scripts that were never committed, so a check over them would be red on arrival.
+    """
+    problems: list[str] = []
+    existing = {p.name for p in documents(ROOT)}
+    refs = 0
+    residue: dict[str, list[str]] = {}
+    for path in [ROOT / "SKILL.md", *documents(ROOT)]:
+        if not path.exists():
+            continue
+        rel = path.relative_to(ROOT)
+        offset = _offset(path)
+        fenced = False
+        for n, line in enumerate(path.read_text(encoding="utf-8").split("\n")[offset - 1:],
+                                 offset):
+            if line.lstrip().startswith("```"):
+                fenced = not fenced
+                continue
+            if fenced:
+                continue
+            for span in _DOC_SPAN.findall(line) + _DOC_LINK.findall(line):
+                name = span.strip()
+                if not _DOC_NAME.match(name):
+                    if _MD_BARE.match(name):
+                        residue.setdefault(name, []).append(f"{rel}:{n}")
+                    continue
+                refs += 1
+                if name not in existing:
+                    problems.append(
+                        f"{rel}:{n}: names `{name}`, and references/{name} does not exist. A "
+                        f"cross-reference to a document nobody wrote sends the reader nowhere; "
+                        f"either the target was renamed and this end was not, or the document "
+                        f"was never written and belongs in coverage.md as `planned`")
+    return problems, refs, len(existing), [f"{k} ({', '.join(v)})" for k, v in sorted(residue.items())]
 
 
 def covered_documents() -> dict[str, str]:
@@ -2343,16 +2607,18 @@ def main() -> int:
     doc_problems, used = check_documents(bib)
     rec_problems, rec_first, rec_total = check_recommendation()
     reg_problems, term = check_pseudocode_register()
+    bud_problems, bud_stated, bud_total, bud_missing = check_budget_agreement()
+    path_problems, path_refs, path_targets, path_residue = check_paths()
     problems += (doc_problems + check_orphans(bib, used) + check_duplication()
                  + check_coverage() + check_index() + rec_problems
                  + check_no_artefact(bib) + check_not_opened(bib, citations_by_id())
                  + check_headings() + check_axis_agreement()
-                 + check_trigger_coverage() + reg_problems)
+                 + check_trigger_coverage() + reg_problems
+                 + bud_problems + path_problems)
     prop_problems, prop_both, prop_total = check_propagation(bib, citations_by_id())
     problems += prop_problems
 
-    docs = [p for p in documents(ROOT)
-            if p not in paper_files() and p not in (INDEX, COVERAGE)]
+    docs = content_documents()
     print(f"documents {len(docs)}   bibliography {len(bib)}   cited {len(used)}   "
           f"background {sum(1 for e in bib.values() if e['background'])}")
     if (summary := coverage_summary()):
@@ -2360,6 +2626,31 @@ def main() -> int:
     if rec_total:
         print(f"recommendation {rec_total}/{rec_total} documents name an approach to "
               f"implement; {rec_first} state it first, before any explanation.")
+
+    if bud_total:
+        print(f"budget {bud_stated}/{bud_total} documents print their budget regime on the page "
+              f"as a `{TIER_PREFIX}` line, and every one of those {bud_stated} is CHECKED against "
+              f"the budget tag in `tags:` -- both directions, so neither end can move alone. "
+              f"All {bud_total} carry a budget tag, which is ENFORCED. "
+              + (f"⚠️ Printing no Tier line is an ALLOWED state, not a pass: "
+                 f"{', '.join(bud_missing)} "
+                 f"{'sits' if len(bud_missing) == 1 else 'sit'} inside the 20-line no-add band "
+                 f"under the 450 cap, where ground rule 2 refuses the insertion. Named here so "
+                 f"the count can be seen to fall. " if bud_missing else "")
+              + f"⚠️ Agreement is not correctness: this compares two declarations written by the "
+                f"same hand, never the regime against a measured cost.")
+
+    if path_refs:
+        print(f"paths {path_refs} `document.md` cross-references across the corpus and SKILL.md "
+              f"all resolve to one of the {path_targets} documents on disk -- ENFORCED, because a "
+              f"reference to a document nobody wrote is a broken link, not a metric. "
+              + (f"⚠️ Its reach is gaia's own naming shape. {len(path_residue)} bare `.md` "
+                 f"name(s) in another shape are NOT checked: {'; '.join(path_residue)}. "
+                 f"The first of those is audit G#9's named live instance and it is still live. "
+                 if path_residue else "")
+              + f"⚠️ `.py` and `.tsv` paths are unread; the execution register names harness "
+                f"scripts that were never committed, so a check over them would be red on "
+                f"arrival. See registers/guard-proofs.tsv.")
 
     if prop_total:
         print(f"propagation {prop_both}/{prop_total} ({100 * prop_both / prop_total:.0f}%) of "
