@@ -227,9 +227,9 @@ C    = Kc * sin(max(α, α_min)) * |v| * lmax(d1)     # erosion-deposition: tran
   water.** With `l` the grid spacing, `A/l = Δx`: the stencil's effective depth is `2Δx` and its
   signal speed `sqrt(2·g·Δx)`, so **halving the cell size slows every wave by `√2`** on an
   unchanged scene, and the timestep falls only as `√Δx` instead of `Δx`. Nothing reports an error —
-  the water is simply a different fluid at the new resolution. Everything else in the block is
-  already in world units and transfers: `Kc`, `α_min` and `lmax`'s `Kdmax` are an angle, a
-  dimensionless constant and a depth. `shallow-water.md` derives the celerity;
+  the water is simply a different fluid at the new resolution. Everything else in the block
+  transfers: `α_min` is an angle, `lmax`'s `Kdmax` a depth, and `Kc` a capacity constant with no
+  cell in it. `shallow-water.md` derives the celerity;
   `resolution-independence.md` takes the three regimes off it, and `A ≈ h·lx/2` is the one that
   leaves the physics resolution-independent.
 - **Sediment advection is semi-Lagrangian**: unconditionally stable, diffusive, so sediment smears.

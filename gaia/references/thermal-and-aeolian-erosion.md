@@ -213,8 +213,9 @@ no rescale reaches it.** `φ` and `ρw/ρs` are physical and `K_w` is in 1/m —
 but `slope` is `‖∇h‖` measured over one cell, and on a self-affine surface that falls as
 `Δx^(H−1)` (`resolution-independence.md` measures it: 16× coarsening reports slopes 2–5.7×
 smaller). Coarsen and every `FS` in the scene rises off the failure threshold; refine and ground
-that was stable starts failing. `wet` inherits a second, unrelated failure through `A_specific`,
-which is a routed quantity and therefore discontinuous in the surface (`flow-routing.md`). Derived
+that was stable starts failing. `wet` is hit twice over — once through the same slope, in `sinθ`,
+and again through `A_specific`, a routed quantity and so discontinuous in the surface
+(`flow-routing.md`) rather than merely drifting with `Δx`. Derived
 here rather than in `resolution-independence.md`, which grades slope masks and the `A·S²` channel
 head but not this expression: there is no unit to move `FS` into, so state the cell size beside
 the `K_w` you tuned and re-tune per level.
