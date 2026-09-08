@@ -155,6 +155,20 @@ sloshes at the speed of water **two cells** deep, whatever the water is, and tyi
 as `A ≈ h·lx` still runs `sqrt(2)` fast — `A ≈ h·lx/2` is what reproduces `sqrt(g·h)`. What does not
 change is the shape of the dependence, and that is what the `dt` decision turns on.
 
+⚠️ **Read `A = l²` as a resolution decision, because it is one: it ties the wave speed to the grid
+rather than to the water, so changing the output resolution changes the fluid.** With `l` the cell
+spacing, `A/l = Δx`, the effective depth is `2Δx` and the signal speed `sqrt(2·g·Δx)` — so
+**halving the cell size slows every wave by `sqrt(2)`** on an unchanged scene. Arrival times, the
+slosh period and how fast a fill front spreads all move, nothing reports an error, and the
+stability bound follows: `dt_crit = 0.50·sqrt(Δx/g)`, a timestep falling only as `sqrt(Δx)` and
+work rising as `1/Δx^2.5`. The three regimes, from the bound derived below
+(`resolution-independence.md` takes them off it): **`A` and `l` held as fixed numbers** — the
+signal speed is an authored constant unrelated to the water and unrelated to the grid, `Δt ∝ Δx`,
+work `1/Δx³`; **`A = l²`** — the case above, cheaper per halving and wrong in the physics;
+**`A ≈ h·lx/2`** — signal speed `sqrt(g·h)`, `Δt ∝ Δx`, and the model resolution-independent in
+its physics at the price of recomputing the bound each step. Everything else in the loop is
+already in world units and transfers: `g`, `source`, `b`, and the dimensionless `C`.
+
 **How wrong the water is, in one number.** Divide the two celerities: the model's `sqrt(2·g·A/l)`
 over the physical `sqrt(g·h)` is `sqrt(2·A/(l·h))`, and with `A = l²` that is `sqrt(2·l/h)` — a
 function of cell size over depth and of nothing else. It is exactly 1 at `h = 2l`, which is the
@@ -166,6 +180,15 @@ recommendation carries and the reason the two rows of the table below look nothi
 `A ≈ h·lx/2` drives it to zero, at the price of the per-step recomputation the first bullet below
 demands. It bounds the *water* — arrival times, slosh period, how fast a fill front spreads — and
 says nothing about the missing `(u.grad)u`, which is limit 6 and is not an error you can shrink.
+
+⚠️ **That band is stated in cells, so it slides when the cell size does.** `1.65·l ≤ h ≤ 2.47·l` is
+a depth measured in cells, not in metres: refine the grid and the accurate band moves *down* onto
+shallower water, out from under the body you tuned. A 30 cm puddle is reproduced exactly at
+`l = 15 cm` and is a tenth of a cell — **347% too fast** — at `l = 3 m`, with no parameter changed
+and nothing reported. Derived here rather than in `resolution-independence.md`, which carries the
+celerity ratio but not this consequence: under constant `A` there is no cell size at which the
+model is accurate for every depth, only one at which it is accurate for the depth you picked. If
+the patch resolution is a tuning knob, `A ≈ h·lx/2` is not optional.
 
 Measured, clamp disabled so instability is visible, critical `dt` bisected on a 32² grid:
 
@@ -232,7 +255,12 @@ different constitutive model.
 
 **5. The domain does not stream.** Fluid has no LOD. The patch is an explicit budget decision:
 follow the camera, nest resolutions rather than growing one grid, and sleep bodies nobody is
-looking at. Note the boundary contract flips with the body type — an open-water patch fades its
+looking at. ⚠️ **Nested resolutions and a constant `A = l²` do not compose**, and this follows from
+the celerity above rather than from any source: each level then sloshes at `sqrt(2·g·l)`, so a
+2× finer patch runs `sqrt(2)` slower than the one it sits inside and a wave crossing the seam
+changes speed — a reflection at an interface the level designer never built. Nest only with
+`A ≈ h·lx/2`, or hold `A/l` fixed in **metres** across levels and accept one authored signal speed
+everywhere. Note the boundary contract flips with the body type — an open-water patch fades its
 contribution to zero over the outer ~15% so the edge is never visible; a pool's edge is a real wall
 and must reflect.
 
@@ -323,6 +351,9 @@ no solver at all.
 | Reducing `dt` by the deepest cell each step changes nothing, and it still explodes | Constant-`A` pipe model: its signal speed is `sqrt(2·g·A/l)`, fixed by parameters, not by depth | Bound on `sqrt(2·g·A/l)`, i.e. `dt <= 0.50·dx/sqrt(g·A/l)`; lower `A/l` or `dt`, and stop measuring depth |
 | Stable while still, explodes as soon as anything moves fast | Advective speed left out of the CFL bound — in a solver that carries `(u.grad)u`; the constant-`A` pipe form has no `u` in its update to destabilise | Bound on `max\|u\| + sqrt(g*h)`, never on `sqrt(g*h)` alone [courant1928] |
 | A thin supercritical sheet explodes at a "correct" gravity-wave `dt` | Advective solver again: at `Fr ≳ 1` the advective half dominates; at 1 mm depth `sqrt(g*h)` is 0.099 m/s and `\|u\|` is metres per second | Recompute both halves every step from the current state |
+| Halving the cell size makes the water slower and the sloshing period longer, with nothing changed | `A = l²` ties the signal speed to the grid: effective depth `2Δx`, celerity `sqrt(2·g·Δx)` | `A ≈ h·lx/2`, or hold `A/l` fixed in metres and accept an authored signal speed |
+| A patch that was accurate at one cell size is 3× too fast at another | The ±10% band `1.65·l ≤ h ≤ 2.47·l` is depth in *cells*, so it slides with `l` | Tie `A ≈ h·lx/2`, or re-derive the band whenever the patch resolution moves |
+| A wave reflects off the seam between two nested patches | Constant `A = l²` gives each level its own celerity `sqrt(2·g·l)` | Same fix; nested levels must agree on `A/l` in metres |
 | Water piles up along the domain border | Closed boundary where an open one was meant | Ghost cells at a very low elevation drain the edge |
 | A basin never fills | Open boundary where a wall was meant | Reflect at real walls; fade only where a patch ends inside a larger body |
 | Water flows uphill or sits on a slope | Flux driven by bed slope instead of hydraulic head | Drive it by `b + h`, not `b` |

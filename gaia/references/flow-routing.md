@@ -61,7 +61,12 @@ stops, so downstream contributing area is wrong everywhere below it.
   made to the DEM**, which is the defensible form of the argument. The rule of thumb that
   shallow pits tend to be artefacts and deep ones landforms is practitioner folklore, not
   Lindsay's claim — treat the depth limit as a parameter you tune against your own noise, not
-  as a physical boundary.
+  as a physical boundary — and re-tune it per resolution. ⚠️ `maxCut` is a depth in metres and
+  transfers, but the artefact population it separates does not: a noise pit's depth is a height
+  increment over one cell and goes as `Δx^H`, while a real basin's depth is set by the landform and
+  does not move at all (derived here, not in `resolution-independence.md`). A limit that carved
+  artefacts and spared basins at 8 m/px sits far above the artefact population at 1 m/px, where it
+  starts trenching the shallowest real depressions instead.
 
 **Why it wins — and read the source's own qualification before relying on it.** [lindsay2016]
 §"When to breach and when to fill?" reports, verbatim: "*Soille (2004a) and Lindsay and Creed
@@ -84,10 +89,6 @@ argument for the policy, not a property of every depression it meets.
 lose. *Breach alone* [lindsay2016] — correct only if every depression in your input is an
 artefact. *Planchon–Darboux fill* [planchon2002] — a different fill with the same consequence as
 priority-flood.
-
-⚠️ A common trap: applying the filled surface as the terrain. **Fill the copy you route on,
-not the heightmap you render.** The filled surface exists to give the router a downhill path;
-if it reaches the renderer, every basin in the world has been quietly levelled.
 
 ### The fill, and the epsilon that makes it routable
 
@@ -259,6 +260,17 @@ remove. `dist[]` is the array `stream-power.md` divides by; get it wrong and the
 coefficient is wrong with it. Because `s > best` starts at zero and the comparison is strict,
 `receivers[i]` is always *strictly* lower, so a receiver cycle cannot form.
 
+⚠️ **`dist[]` and `A[]` are already in world units — metres and m² — so neither needs a cell-size
+correction; what a resolution change breaks is the receiver that produced them, and no parameter
+reaches that.** The rule is a maximum over eight
+candidates, so a near-tie flips a whole basin from one trunk to another and drainage area at a
+point is a **discontinuous** function of the surface — not a discretisation error that refinement
+shrinks. On the refinement series in `resolution-independence.md`, 41.5% then 62.0% of channel
+cells disagree with the next finer grid's `A` by over 2×, and on resamplings of one real DEM the
+disagreement is not even monotonic: some coarser resolutions give a *better*-connected network
+than finer ones. The verdict for a network is **not available** — report the fraction of area
+affected, and keep authored content off divides rather than promising a divide will stay put.
+
 ```
 # MFD [freeman1991]: p = 1.1, and the normalisation the exponent exists for.
 mfdWeights(i at (x, y), p):                     # i interior, as above
@@ -400,6 +412,16 @@ critical source area falls as slope rises, in the form **A·S² ≈ constant** �
 A·S. Using area alone puts channel heads at a constant contributing area regardless of
 steepness, which draws rivers straight over ridges in steep terrain.
 
+⚠️ **The constant is quoted in m² and is not a physical quantity — it moves with the cell size.**
+Only `S` carries a cell-size exponent: `A` is an area in m² on either grid, its own failure being
+the discontinuity above rather than a drift with `Δx`, while a finite-difference slope over lag
+`Δx` falls as `Δx^(H−1)` on a self-affine surface of Hurst exponent `H`. The *threshold* therefore
+has to scale as `Δx^(2H−2)` to select the same ground (`resolution-independence.md`). At `H = 0.5`
+that is `1/Δx`: coarsening by two **halves** it, the direction nobody guesses. And `H` is a
+property of the terrain, not of the tool, so no coefficient a router ships can carry it —
+[montgomery1992]'s 500–4000 m² is a measurement at *its* sampling density. State the resolution
+beside the threshold and re-tune per level. There is no unit conversion; that is the whole fix.
+
 ## How this fails, and what it looks like
 
 | Symptom | Mechanism | Fix |
@@ -415,4 +437,6 @@ steepness, which draws rivers straight over ridges in steep terrain.
 | Every lake basin has flattened | The filled surface was written back to the heightfield | Fill the routing copy only |
 | Canyons cut through basins that should hold water | Breaching with no depth limit | Set the limit; use the hybrid |
 | Channel heads march up over ridge lines | Area-only channel threshold | Threshold on `A·S²` [montgomery1992] |
+| An `A·S²` threshold tuned at 1 m/px puts channel heads in the wrong place at 8 | `S` is a finite difference over `Δx` and falls as `Δx^(H−1)`; the threshold carries it squared, `Δx^(2H−2)`, and `H` is the terrain's, not the tool's | No conversion exists — state the resolution beside the threshold and re-tune per level |
+| A basin drains to a different outlet at a coarser resolution, and a still coarser one agrees with the fine grid again | The receiver is a maximum over eight, so `A` is discontinuous in the surface; connectivity is non-monotonic in cell size | Not fixable — report the fraction of area affected, and keep divides away from authored content |
 | At a high MFD exponent, wetness pools on hillslope cells that plainly drain, and D8 on the same grid does not | `pow(s, p)` underflows on ε-filled flats, so `total == 0` fires on cells that DO have a lower neighbour and strands their water. The `p` at which this starts scales with your elevations — measured 21/25/27 at base 1 m/1000 m/8000 m | Normalise by the steepest slope before the power, `w[k] = (s[k]/s_max)^p`, keeping an explicit `s_max == 0` guard for real pits |
