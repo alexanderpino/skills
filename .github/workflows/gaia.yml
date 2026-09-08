@@ -487,9 +487,14 @@ jobs:
           python3 - <<'PYHD'
           import pathlib
           p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
-          h = "## Use this"
-          assert h in s, "no `## Use this` -- mutation would pass vacuously"
-          p.write_text(s.replace(h, h + "\n\ndup\n\n" + h, 1), encoding="utf-8")
+          # Anchor on the heading AS A LINE. A plain substring replace hit the first `## Use this`
+          # in the file, which is inside a code span in the Tier block -- splicing the mutation into
+          # backticks and tripping the unbalanced-backtick rule instead of the duplicate-heading one.
+          # The mutation went red for a real defect that was not the one it names, which is exactly
+          # the vacuity the second pass exists to catch.
+          h = "\n## Use this\n"
+          assert s.count(h) == 1, "expected exactly one `## Use this` HEADING -- mutation would be ambiguous"
+          p.write_text(s.replace(h, h + "\ndup\n" + h, 1), encoding="utf-8")
           PYHD
           red_check "a heading duplicated at the same level" 'duplicate heading' heading_duplicate
           cp /tmp/bk $SUBJ
@@ -681,7 +686,7 @@ jobs:
           p.write_text(s.replace(old, r"| \bNEVERMATCHES?\s+\d"), encoding="utf-8")
           PY2
           expect_red_crippled "python3 scripts/check.py --selftest" \
-            "--selftest catches a crippled locator pattern"
+            "--selftest catches a crippled locator pattern" "locator"
 
           python3 - <<'PY3'
           import pathlib
@@ -691,7 +696,7 @@ jobs:
           p.write_text(s.replace(old, 'LOCATOR_NOT_OPENED = ("ZZ_NEVER",)'), encoding="utf-8")
           PY3
           expect_red_crippled "python3 scripts/check.py --selftest" \
-            "--selftest catches a disabled not-opened marker"
+            "--selftest catches a disabled not-opened marker" "not.opened|NOT OPENED"
 
           # requote's `check()` is the function its selftest exists to exercise. The corpus path
           # used to be hard-coded inside it, so `--selftest` never called it at all: gutting it
@@ -705,7 +710,7 @@ jobs:
           p.write_text(s.replace(old, "    return [], 0, 0, 0, 0, {}\n" + old), encoding="utf-8")
           PY4
           expect_red_crippled "python3 scripts/requote.py --selftest" \
-            "requote --selftest catches a gutted check()"
+            "requote --selftest catches a gutted check()" "selftest|MATCH|ALTERED|UNFETCHED"
 
           # "Nothing checked is not a pass." A cache was supplied and not one quotation was
           # located or refuted, so the run enumerated the corpus rather than checking it.
