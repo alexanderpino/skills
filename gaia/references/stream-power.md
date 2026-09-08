@@ -52,6 +52,18 @@ dimensionless **contrasts** against a reference `K`. And substituting discharge 
 reuse it — `K_Q = K_A·P̄^−m`, units `L^(1−3m)·T^(m−1)`, where `P̄` is the one reference rainfall
 rate `K_A` was calibrated at, not a per-cell mean. Both are derived in `driver-fields.md`.
 
+⚠️ **That `L` is a metre, not a cell, so in SI there is no cell-size correction to make on `K`** —
+and the correction that circulates is therefore wrong in kind. Keep `A` in m² and `dist` in metres
+and a calibrated `K` transfers between resolutions untouched. The defect is narrower and better
+hidden: terrain codes routinely mix units, holding heights in metres while counting horizontal
+distance in **cells**. Under that mixture `A_grid = A/Δx²` and `S_grid = S·Δx`, so reproducing the
+same incision needs `K_grid = K_SI·Δx^(2m−n)` (`resolution-independence.md` derives it and checks
+it at three cell sizes spanning 16×). ⚠️ **The exponent vanishes at `n = 2m` — which is exactly
+the default pair above.** So a `K` tuned at 512² appears to transfer to 4k, and stops the moment
+anyone moves `m` or `n`: at `m = 0.45` it moves 32% over that 16× span, at `m = 0.35` 2.30×, and
+at `m = 0.5, n = 2` **16×**, in the direction people get backwards — refining needs a *larger*
+grid-unit `K` whenever `n > 2m`.
+
 ## Why the solver is the whole difficulty
 
 The equation is one line. The explicit form is unstable under a CFL-like condition that scales
@@ -84,6 +96,13 @@ for i in stack:                             # FORWARD order
 Three lines, unconditionally stable, O(N), and it dissects a flat plate under constant uplift into
 a proper dendritic network. `Δt` can be 1000 years or more; a 4k map reaches equilibrium in a few
 hundred steps.
+
+⚠️ **Nothing in that block is counted in cells, and the timestep is free of `Δx` entirely.**
+`A[i]` is an area in m² and `dist[i]` a length in metres — `flow-routing.md`'s output contract —
+and the update above is implicit, so refining the grid does not shorten `Δt` and the step count
+does not move. That makes the incision half the one part of this skill's erosion machinery whose
+cost is quadratic rather than cubic or worse in `1/Δx` (`resolution-independence.md`). Its
+companion diffusion term is the opposite case, and it is next.
 
 ⚠️ **`receivers[i] == i` covers two different things, and the uplift line is not optional for one
 of them.** The *domain edge* is a base level you declared: it is where water leaves, it must be
@@ -134,6 +153,15 @@ every other mode damps, and grid noise is the one thing left standing — so the
 though it roughened the terrain when what it did was smooth everything except the artefact. Keep
 a 0.9 safety factor (`c = 0.225`) and assert the *direction* of the effect, not merely that the
 output is finite.
+
+⚠️ **And the sub-cycle count is where the cell size re-enters the solver.** `Δt ≤ Δx²/(4D)` is a
+bound on `Δx²`, so at a fixed `D` and a fixed `Δt` the number of sub-cycles goes as `1/Δx²` on a
+grid that already grew as `1/Δx²`: the diffusion half is **quartic** where the incision half above
+is quadratic. Computed rather than measured, and checkable in one line —
+`ceil(D·Δt/(0.225·Δx²))` at `D` = 2.0 m²/yr and `Δt` = 1000 yr is **1, 2 and 6** sub-cycles at
+156.25, 78.12 and 39.06 m. `D` itself is in m²/yr and needs no rescale; what it needs is a
+**floor**, because the hillslope it creates has to be resolved at the *coarsest* grid you ship,
+not the finest (`resolution-independence.md`).
 
 ⚠️ **A thermal pass is not a substitute for `D·∇²h`.** Slope-limited relaxation
 (`thermal-and-aeolian-erosion.md`) is cheaper and gives repose-angle behaviour the Laplacian
@@ -209,6 +237,33 @@ with diffusion off; on channel cells stream power dominates and the fit survives
 far enough to compete for valley spacing bends it, and then the check is measuring your `D` and
 not your solver.
 
+⚠️ **And it is blind to a resolution change, which is the one thing it looks like it should
+catch.** The exponent is `−m/n` *by construction* at steady state, so a uniform bias in `S` moves
+the intercept alone. Run this block at three cell sizes over one physical domain, from one initial
+surface decimated down, and the regression reads **−0.500 at every resolution** while relief
+climbs 106 → 134 → 163 m and mean elevation 39 → 49 → 59 m, and the RMS residual against the next
+finer grid does not fall (`resolution-independence.md`, measured on this document's solver). Keep
+the check for what it catches; never report it as evidence of resolution independence.
+
+## Resolution: the verdict here is *not available*
+
+⚠️ **Change the cell size and this model gives a different terrain, and no rescale of any
+parameter reaches it.** Two mechanisms, neither of them a discretisation error that refinement
+shrinks. **Pure stream power carries no length scale except the cell**: `S ∝ A^(−m/n)`, so relief
+accumulates from the divide downward and keeps rising as the smallest `A` the grid can carry — one
+cell's area — falls as `Δx²`. And `S` is a finite difference, which on a self-affine surface of
+Hurst exponent `H` goes as `Δx^(H−1)`; there is no unit to move a slope into. Underneath both,
+`A` arrives from a receiver chosen by a maximum over eight neighbours (`flow-routing.md`), so
+drainage area at a point is a **discontinuous** function of the surface: on that same refinement
+series 41.5% then 62.0% of channel cells disagreed with the next finer grid's `A` by more than 2×.
+
+`D·∇²h` is what supplies the missing length scale, which is one more reason it is not optional —
+but `resolution-independence.md` did not find a `D` that restores convergence, and publishes the
+attempts rather than a number. What holds without one: size `D` from the hillslope length you
+want, check that length is resolved at the coarsest grid you ship, and test by refinement — three
+levels, one decimated initial surface, and report whether the residual **falls**, because a flat
+residual is two terrains rather than one terrain sampled twice.
+
 ## How this fails, and what it looks like
 
 | Symptom | Mechanism | Fix |
@@ -222,6 +277,10 @@ not your solver.
 | `log S` vs `log A` is not a straight line of slope −m/n | Wrong drainage area, wrong receiver distances, or an unhandled depression | Fix routing before touching the erosion |
 | A convex long profile | `U` and `K` mis-scaled, or the run stopped far from equilibrium | Check `U × time` against the relief you want |
 | A `K` borrowed from a paper, another `m`, or a discharge-form solver gives the wrong incision rate | `K` is not dimensionless — it carries `L^(1−2m)·T^(−1)`, so its value is tied to `m`, and the discharge form is a different coefficient again | Re-derive at your `m` (`yr^(−1)` at `m = 0.5`); for discharge, `K_Q = K_A·P̄^−m` at the one rainfall rate `K_A` was calibrated at — see `driver-fields.md` |
+| Relief and mean elevation climb with every increase in resolution, no parameter changed | Pure stream power has no length scale but the cell, so relief accumulates from the smallest resolved `A` | Not removable by rescaling: add `D·∇²h` and resolve the hillslope it creates at the *coarsest* grid shipped |
+| The `log S` vs `log A` check passes at every resolution while the terrain plainly changes | The regression slope is `−m/n` by construction at steady state; a uniform `S` bias moves only the intercept | Keep the check for routing bugs; test resolution by refinement residual and by `A` disagreement |
+| A `K` that transferred between two resolutions stops transferring when `m` or `n` moves | Heights in metres, horizontal distance in cells: `K_grid = K_SI·Δx^(2m−n)`, and the default `m = 0.5, n = 1` is the one pair where that exponent is zero | Store `K` in SI, with `A` in m² and `dist[]` in metres |
+| The bake fits at 1024² and not at 2048², with the incision solve unchanged | The explicit Laplacian's sub-cycle count goes as `1/Δx²` on a grid already growing as `1/Δx²` — quartic, where the implicit incision half is quadratic | Budget the diffusion half separately; `ceil(D·Δt/(0.225·Δx²))` predicts it in one line |
 | A carved waterfall relaxes into a rapid | Uniform `K`, so nothing pins the step | A hard bed across the channel, then let the solver run |
 | Waterfalls everywhere, including on trunk rivers | Knickpoints stamped rather than produced | Author the cause — a `K` jump or a base-level fall |
 | A flat, featureless result on a small map | No drainage area at this extent | Wrong backbone; use droplet or pipe |

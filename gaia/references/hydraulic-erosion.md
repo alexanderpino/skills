@@ -147,6 +147,29 @@ pos    = pos_new
   valleys; low gives gradient-hugging scratches.
 - **Count** is the honest cost: roughly 0.5–2× the cell count for a visible effect, 4× for a mature
   look. A 4k map wants tens of millions of droplets.
+- **Every constant in that loop is counted in cells or in steps, which is why the result moves
+  when the output resolution does.** Author them in metres and derive the grid form at evaluation
+  time: `lifetime = reach_m/Δx` (§The crossover for the reach), `radius_cells = radius_m/Δx`, and
+  for the *per-step* rates — `evaporate`, `erodeSpeed`, `depositSpeed` — note that a path of fixed
+  physical length now compounds them `L/Δx` times, so what is invariant is `ln(1 − e)/Δx` and for
+  small rates the fix is simply `e ∝ Δx` (`resolution-independence.md` derives all three, with the
+  exact form `e(Δx) = 1 − (1 − e₀)^(Δx/L₀)` for `e₀` authored at cell size `L₀`). Do **not** put a
+  `Δx` on the speed update: `speed² += (−Δh)·gravity` telescopes to `g ×` the total drop along the
+  path, a physical quantity, and is already invariant wherever the `max(0, ·)` does not bite.
+- ⚠️ **`minSlope` is the one that bites in the wrong direction.** `max(−Δh, minSlope)` floors a
+  per-step **drop**, and a drop across one step is `S·Δx` — so the effective slope floor is
+  `minSlope/Δx`, which *rises* as you refine: nearly inert at coarse spacing, dominant over much of
+  the map at fine. Write `max(−Δh, minSlope·Δx)` and the floor becomes the slope it is named for.
+- **The count scales as `1/Δx²` and the work as `1/Δx⁵`.** Holding eroded volume fixed needs
+  roughly four times the droplets per halving (measured in `resolution-independence.md` on this
+  loop); each erode step then touches a brush of `radius_m/Δx` cells, so the work goes as the fifth
+  power — **32 768×** over a 512² → 4096² span, not 512×. Capping the brush in cells buys that back
+  and re-introduces the resolution dependence; declare it if you do.
+- ⚠️ **Pointwise invariance is not available at any price.** A path is a sequence of bilinear
+  gradient reads, so perturbing the surface by one decimation diverges it. What can be held across
+  resolutions is the *statistics* — eroded volume, hypsometry, the distribution of channel depths —
+  and that is what an acceptance test has to measure. A per-pixel difference between two
+  resolutions is measuring chaos, not a bug.
 - **On GPU, droplets race.** Overlapping brush footprints make naive parallelism
   non-deterministic and lose deposits. Accumulate `Δh` into a separate buffer with atomics and
   apply in a second pass; contention is low because droplets spread out fast.
@@ -200,6 +223,15 @@ C    = Kc * sin(max(α, α_min)) * |v| * lmax(d1)     # erosion-deposition: tran
   diagonal staircases and channels drift toward the axes over long runs. The fix is 8 pipes with a
   per-pipe length (`cellSize` cardinal, `cellSize·√2` diagonal) in the `Δh/l` term, and a velocity
   field summing all eight fluxes componentwise.
+- ⚠️ **`A = l²` ties the wave speed to the cell, so changing the output resolution changes the
+  water.** With `l` the grid spacing, `A/l = Δx`: the stencil's effective depth is `2Δx` and its
+  signal speed `sqrt(2·g·Δx)`, so **halving the cell size slows every wave by `√2`** on an
+  unchanged scene, and the timestep falls only as `√Δx` instead of `Δx`. Nothing reports an error —
+  the water is simply a different fluid at the new resolution. Everything else in the block is
+  already in world units and transfers: `Kc`, `α_min` and `lmax`'s `Kdmax` are an angle, a
+  dimensionless constant and a depth. `shallow-water.md` derives the celerity;
+  `resolution-independence.md` takes the three regimes off it, and `A ≈ h·lx/2` is the one that
+  leaves the physics resolution-independent.
 - **Sediment advection is semi-Lagrangian**: unconditionally stable, diffusive, so sediment smears.
   Usually acceptable; MacCormack or BFECC costs one extra advection if it is not.
 - **Double-buffer everything**, or the result depends on traversal order and stops being
@@ -397,5 +429,10 @@ unlike sand, and a fourth is a constant nobody can tune by eye.
 | Channels drifting toward the grid axes | 4-pipe cardinal-only stencil | 8 pipes with per-pipe length |
 | Different result with threading enabled | In-place neighbour updates | Double-buffer |
 | Deposits missing on GPU, non-repeatably | Droplet brush footprints racing | Accumulate with atomics, apply in a second pass |
+| Erosion detail is finer and weaker at every increase in resolution | Droplet reach is `lifetime × cellSize` and the brush radius is counted in cells | `lifetime = reach_m/Δx`, `radius_cells = radius_m/Δx` |
+| Droplets run dry and dump their load early once the grid is refined | `evaporate` and the erode/deposit fractions are per *step*, and a path of the same length now takes `L/Δx` of them | Re-express per unit path length; for small rates, `e ∝ Δx` |
+| Deposit spikes on flats when the map is coarsened; erosion goes slope-blind when it is refined | `max(−Δh, minSlope)` floors a per-step **drop**, so the effective slope floor is `minSlope/Δx` | `max(−Δh, minSlope·Δx)` |
+| A droplet pass that fits at 512² misses its 4k budget by orders of magnitude, every parameter correctly in metres | Steps go as `1/Δx³`, but each erode step touches a brush of `radius_m/Δx` cells, so the work goes as `1/Δx⁵` | Budget the fifth power; cap the brush in cells only if you declare the resolution dependence it re-introduces |
+| Halving the cell size makes the water slower and the sloshing period longer | `A = l²` with `l` the cell, so the effective depth is `2Δx` and the signal speed `sqrt(2·g·Δx)` | `A ≈ h·lx/2`, or accept an authored signal speed and say so |
 | Scratches instead of valleys on a large map | A droplet reaches 30–60 cells whatever the cell measures; the network spans thousands | Change backbone: pipe, or stream power |
 | The brief mentions lakes and there are none | Droplet erosion has no standing water | Pipe model |
