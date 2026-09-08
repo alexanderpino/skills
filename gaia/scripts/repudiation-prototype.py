@@ -26,14 +26,35 @@ way, not from memory):
         were looked at and missed -- X26 wave-models (5 body sentences) and X38 tectonic-uplift
         (1) -- every one of them scoring 0 shared 3-grams and no retracted number, because they
         retract something other than the inversion.
-  * HEAD (2026-09-07), after the sittings closed X8 and X56:
+  * `a6c10ad` through `2a0cb6f` (2026-09-07), after the sittings closed X8 and X56:
         4 candidates, 0 of them real -- PRECISION 0/4 = 0%, FALSE-POSITIVE RATE 4/4 = 100%,
         from a population of 45 body repudiation sentences across 39 documents
         (whole-document count 54, again not this guard's denominator).
-        All four are triaged with their reasons. The driver-fields one is recorded in
-        registers/corrections.tsv, row `guard triage`; the other three were triaged by
-        agent-inversion-triage and their rows are awaiting a verifier, so do not read this
-        docstring as a claim that four rows are already in the register.
+  * HEAD `44d38d4` (2026-09-08), re-measured rather than carried forward:
+        THE SAME 4 candidates, the same 3 documents, still 0 real -- PRECISION 0/4 = 0%,
+        FALSE-POSITIVE RATE 4/4 = 100% -- from a population of 44 body repudiation sentences
+        across 39 documents (whole-document count 53). The 45/54 line above is not wrong; it is
+        pinned to its own commits. The corpus shed one repudiation sentence at `8e547fd` and the
+        candidate set did not move, which is the useful fact: the set has been the same four
+        since `a6c10ad` across five commits.
+        ALL FOUR ARE NOW TRIAGED IN THE REGISTER, each with its reason -- driver-fields in row
+        `guard triage` (landed `0334ce1`), and seamless-and-periodic and both volumetric-clouds
+        candidates in the three `guard triage: ...` rows written 2026-09-08 beside the X12, X29
+        and X56 inversion rows. The clouds depth-operator row is the worked example of the limit
+        stated below, and its verdict was reached independently twice: by wave three's VT +
+        clouds repairer (see the `a6c10ad` commit message) and again from the depth conventions
+        by the agent that wrote the row.
+
+A SCORING BIAS FOUND DURING THAT TRIAGE, recorded rather than fixed. Sentences are split on
+`(?<=[.!?])\\s+`, and a markdown table row ends in `|`, not in sentence punctuation -- so a whole
+table plus the paragraph after it is ONE "sentence", and a repudiating phrase falling after a
+table inherits every content 3-gram in that table. Measured on the volumetric-clouds cost
+candidate at `44d38d4`: 6 shared 3-grams, of which 2 -- ('22','ms','1.2') and ('ms','1.2','ms')
+-- come from the 2017 timeline row, about 470 characters BEFORE the repudiating clause. It did
+not change that verdict (the other 4 grams clear the threshold on their own, and the candidate is
+a false positive for an unrelated reason), so it is left alone on a single instance rather than
+moving a threshold that was tuned on shingle size. Splitting on table-row boundaries as well as
+sentence punctuation is the fix if a second instance appears.
 
 THE LIMIT THAT MUST SHIP WITH IT, and the reason the second row of numbers is not a regression:
 the guard cannot tell a SURVIVING retraction from a CORRECTLY LANDED one. A correction that
