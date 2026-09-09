@@ -36,10 +36,19 @@ fifty-nine remain exactly as raised.
 | `TAM-1` | **CONFIRMED** | `terrain-analysis-masks.md:245` states `f − mean_ring_r(f) = (r²/4)·∇²f`. Measured on `z = 100 − (x²+y²)` at `r = 3` over 20,000 ring samples: centre 100.000, ring mean 91.000, difference **+9.000**, while `(r²/4)·∇²f = (9/4)(−4) = −9`. The identity is off by a sign; the correct form is `−(r²/4)·∇²f`. |
 | `RN-3` | **CONFIRMED (arithmetic)** | `river-networks.md:82` tabulates `E − N + C` with an expected **0** against a measured **194,674**. Working back from the finding's stated inputs gives `C = 194,674 − 259,190 + 65,536 = 1,020`, exactly the perimeter-cell count of a 256² grid (4·256 − 4). Caveat: `E` and `N` are the finding's figures, not re-read from the page. |
 
-`SKY-7` was attempted and is **not settleable from the cited lines alone** — the fp32 ULP
-arithmetic reproduces exactly (2¹⁶·2⁻²³ = 7.8125 mm at 10⁵ m, confirmed against
-`numpy.nextafter`), but `sky-and-weather-state.md:201-204` does not print the two magnitudes
-the finding attacks, so the finding and the page have to be reconciled first.
+`SKY-7` — **CONFIRMED, and my earlier note on it was wrong.** I wrote that
+`sky-and-weather-state.md:201-204` "does not print the two magnitudes the finding attacks". It
+does. My excerpt stopped at an em dash mid-sentence and missed the second clause, *"the sky
+visibly freezes after some tens of minutes of simulated time"*. Both magnitudes are inside the
+cited range, in the document's own words, and both **understate** — so the finding's own prose
+("wrong in different directions") is itself wrong while its numbers are right. Re-derived
+independently: the fp32 ULP at 10⁵ m is 2¹⁶·2⁻²³ = 7.8125 mm, which over-resolves a metre-scale
+octave 128×, and first reaches 1 m only at 2²³ ≈ 8.39·10⁶ m. Per-frame motion quantises at
+`t = dt·2²³`, **independently of wind speed** because `|W|` cancels — 38.8 h at 60 fps, 18.6 h
+even at the 125 fps the page itself quotes; "tens of minutes" would need ~3500 fps. The two
+stated magnitudes also cannot be reconciled with each other: reaching 10⁵ m in tens of minutes
+needs ~56 m/s, against the page's own `:267` "moves at metres per second". The prescribed remedy
+is correct; only its sizing was wrong. Repaired in place, one sentence, no failure-table row.
 
 ---
 

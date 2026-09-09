@@ -198,10 +198,13 @@ revision of this document said "advected by that field", which is not a thing th
 do. Blowing snow and bending grass read the field; the cloud deck reads the parameter; both agree
 about the weather because the field is derived from the same prevailing wind.
 
-⚠️ **Keep the offset bounded.** `prevailingWind·t` grows without limit, and in fp32 a noise
-coordinate stops resolving detail after roughly 10⁵ metres of accumulated offset — the sky visibly
-freezes after some tens of minutes of simulated time. Wrap the offset into the noise's period, or
-carry `t` in double and reduce before the fetch. It reads the same on screen and buys three properties an integrated field cannot have — though not
+⚠️ **Keep the offset bounded.** `prevailingWind·t` grows without limit and in fp32 eventually stops
+resolving detail — later than an earlier draft of this line claimed, and by two different clocks.
+The ULP is `2⁻²³` of the magnitude: **7.8 mm at 10⁵ m**, which still over-resolves a metre-scale
+octave 128×, and it first reaches 1 m at `2²³ ≈ 8.4·10⁶ m`. Per-frame *motion* dies earlier and
+**independently of wind speed**, because `|W|` cancels — a step vanishes once `|W|·dt < |W|·t·2⁻²³`,
+i.e. at `t = dt·2²³`: **38.8 h at 60 fps**, 18.6 h at the 125 fps quoted above. Wrap the offset into
+the noise's period, or carry `t` in double and reduce before the fetch. It reads the same on screen and buys three properties an integrated field cannot have — though not
 necessarily more cheaply, since a cloud march pays N octaves of noise per sample where a buffer pays
 one fetch:
 
