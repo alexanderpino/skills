@@ -164,7 +164,12 @@ def doc_kind(path, fm):
     if name.startswith("EP-"): return "EP"
     fid = str(fm.get("id", ""))
     if fid in ("architecture-index", "decision-log"): return "INDEX"
-    if fid: return fid.split("-")[0].upper() if fid.startswith(("SD",)) else fid.upper()
+    if fid:
+        # An uppercase ID-scheme prefix (SD-rendering, SAD-checkout, SDM-payments,
+        # LLD-core, ...) classifies as its family, so per-instance ids share their
+        # family's checks and house rules.
+        m = re.match(r"^([A-Z]{2,5})-", fid)
+        return m.group(1) if m else fid.upper()
     if name.lower() == "readme.md": return "INDEX"
     return name.replace(".md", "").upper()
 

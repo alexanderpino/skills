@@ -17,6 +17,7 @@ reflect the real system and the real decisions — not guesses dressed up as fac
 10. Evidence discipline — derive, then ask, then assume (visibly)
 11. Evaluating an existing architecture (ATAM-lite)
 12. Gap analysis — current state vs target, at any altitude
+13. Designing forward — attribute-driven iteration (ADD)
 
 ---
 
@@ -255,6 +256,14 @@ code embodies a significant choice with no record:
 Use Nygård by default; reach for the MADR option fields when the options genuinely
 need a pros/cons comparison (`references/standards.md`).
 
+**Advisory mode — the same loop, delivered as an answer.** When the user asks
+*"should we do X?"*, the deliverable is a **recommendation, not a document**: run
+steps 1–4 and present them directly — the options considered, a committed verdict
+with its costs (`writing-style.md`: a verdict, not a survey), and **what evidence
+would change it**. Write the ADR (`status: proposed`) only once the recommendation
+is accepted; advice that was declined can still be worth recording as `rejected`
+if the question will recur.
+
 ---
 
 ## 9. Recognising patterns, styles & smells
@@ -407,3 +416,43 @@ Where each instance lives — use these, don't reinvent them:
 Two rules carry over from the rest of the skill: a gap you can't yet close is recorded as a
 **visible assumption or gap** (§10), never hidden; and gap analysis earns its keep only when a
 real delta exists — don't manufacture a baseline→target table for a change that has neither.
+
+---
+
+## 13. Designing forward — attribute-driven iteration (ADD)
+
+Sections 3–12 derive and evaluate what exists. When you must **synthesize a
+structure that doesn't exist yet** — greenfield, a new subsystem, a To-Be for a
+migration — use **Attribute-Driven Design** (ADD 3.0; Cervantes & Kazman,
+*Designing Software Architectures: A Practical Approach*; SEI). It is the forward
+counterpart of ATAM, from the same method family as the quality scenarios the PRD
+already carries, and every step lands in an artifact this skill already has:
+
+1. **Review the drivers** — the PRD is the input contract: `F.xx`, prioritised
+   `Q.xx` scenarios (the utility tree tells you what to design *for*), `C.xx`
+   constraints. No drivers → elicit first (§6); designing without them is
+   decoration.
+2. **Set the iteration goal** by picking the driver(s) this round addresses —
+   greenfield round one is almost always the highest-value/highest-difficulty
+   `Q.xx` cell plus the primary functional flow.
+3. **Choose the element to refine** — the whole system in round one; afterwards
+   the container/component the goal lives in.
+4. **Pick design concepts** from the catalogue: boundaries via strategic DDD,
+   a structuring style, tactics per quality (`structure.md` §§1–3) — genuine
+   alternatives, including the boring one (§8).
+5. **Instantiate**: allocate responsibilities to named elements and define the
+   interfaces between them (`interfaces.md` for anything published).
+6. **Sketch and record in the same pass** — the C4 view at the altitude you
+   refined (HLD container / SD component) and the ADR for each choice a future
+   reader could plausibly reverse. An iteration that produced no view delta and
+   no ADR designed nothing.
+7. **Analyze before the next round**: walk the iteration's `Q.xx` scenarios
+   against the sketch (ATAM-lite, §11 — risks, sensitivity, trade-off points).
+   Unaddressed drivers seed the next iteration; stop when the remaining drivers
+   are below the significance bar (`significance.md`), not when the diagram
+   looks finished.
+
+Two or three iterations cover most systems — ADD's value is that each round is
+*driven by a named driver*, so the structure is an argument from the drivers, not
+taste. Scope discipline carries over: design the slice the task needs
+(SKILL.md triage), and let §10 govern anything you had to assume.

@@ -266,6 +266,67 @@ SOUT0="$("$PY" "$LINT" frontmatter --root "$SROOT" --max-age-days 0 2>&1)"
 echo "$SOUT0" | grep -q "stale: " \
   && bad "--max-age-days 0 should disable staleness" || ok "--max-age-days 0 disables staleness"
 
+# ---------- house doc families: SDM-/SDW-style ids classify consistently ----------
+echo "== 7. house doc families (uppercase ID-scheme prefixes) =="
+FROOT="$WORK/family/docs/architecture"
+mkdir -p "$FROOT"
+for n in a b; do
+cat > "$FROOT/SDM-$n.md" <<EOF2
+---
+id: SDM-$n
+title: Solution design module $n
+status: current
+level: software
+updated: $TODAY
+---
+# SDM $n
+## Scope
+x
+## Interfaces
+y
+EOF2
+done
+FP="$WORK/family-profile.yaml"
+"$PY" "$DETECT" --root "$FROOT" --repo-root "$WORK" --out "$FP" >/dev/null 2>&1
+grep -q "SDM:" "$FP" \
+  && ok "detector aggregates SDM-* ids into one SDM type" \
+  || bad "detector failed to aggregate the SDM family"
+# a new SDM doc missing the family's common section must fail house enforcement
+cat > "$FROOT/SDM-c.md" <<EOF2
+---
+id: SDM-c
+title: Solution design module c
+status: current
+level: software
+updated: $TODAY
+---
+# SDM c
+## Interfaces
+y
+EOF2
+FOUT="$("$PY" "$LINT" frontmatter --root "$FROOT" --house "$FP" 2>&1)"
+echo "$FOUT" | grep -qi "SDM must contain section" \
+  && ok "detected house rule enforced on the SDM family" \
+  || bad "house rule not enforced on the SDM family"
+# a per-solution SAD id (SAD-<name>, the documented layout) must not escape the
+# mandatory threat-model/FinOps checks
+cat > "$FROOT/SAD-checkout.md" <<EOF2
+---
+id: SAD-checkout
+title: Checkout solution architecture
+status: current
+level: solution
+updated: $TODAY
+---
+# SAD — Checkout
+## Overview
+Deliberately missing the mandatory sections.
+EOF2
+SADOUT="$("$PY" "$LINT" frontmatter --root "$FROOT" 2>&1)"
+echo "$SADOUT" | grep -q "SAD must contain a mandatory Threat model" \
+  && ok "SAD-<name> ids get the mandatory-section checks" \
+  || bad "SAD-<name> id escaped the mandatory-section checks"
+
 echo
 echo "Summary: $pass passed, $fail failed."
 [ "$fail" -eq 0 ] && { echo "DRIVER OK"; exit 0; } || { echo "DRIVER FAILED"; exit 1; }
