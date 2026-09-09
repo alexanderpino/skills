@@ -79,10 +79,16 @@ Measured on a 256×256 fractal dome, priority-flood filled, D8 routed
 | edges | 64,516 | 259,190 |
 | `edges == N − roots` | true (65,536 − 1,020) | — |
 | cells with >1 receiver | **0** | 63,983 (99.2% of interior) |
-| undirected cycles, `E − N + C` | **0** | 194,674 |
+| undirected cycles, `E − N + C` | **0** | ≤ 194,674 ⚠️ |
 | confluences (in-degree ≥ 2) | 9,205 | — |
 | max in-degree | 5 | — |
 | longest flow path | 169 cells | — |
+
+⚠️ The MFD cycle count is an **upper bound**, not a measurement: `C` in `E − N + C` is the number of
+connected *components*, and the figure above reuses D8's 1,020 self-receiving roots for it. Those
+coincide in a forest, so the D8 zero is exact; MFD adds 194,674 edges on the same 65,536 nodes and
+added edges can only merge components, so the true `C ≤ 1,020` and the count is overstated by
+`1,020 − C`. The sign of the argument is unaffected — MFD has cycles and D8 provably cannot.
 
 The two zeros are the argument. Confluences are plentiful — 9,205 of them — because *merging*
 costs nothing in a tree; it is *splitting* that is impossible. Braiding and anastomosis are both
@@ -375,7 +381,7 @@ minimum height over all channels" — a `min`, never a blend, or the bar between
 into a dam.
 
 **Junction angle** is not free either: near perpendicular when the two flows differ markedly,
-narrow when they are similar. [genevaux2013] §6.1 and [paris2023] §6.1 print the same rule six
+narrow when they are similar. [genevaux2013] §6.1 and [paris2023] §6.1 print the same rule ten
 years apart; [paris2023] attributes it to Hooshyar et al. 2017, which was not opened here. The
 two share authors, so treat this as one rule stated twice rather than as corroboration.
 

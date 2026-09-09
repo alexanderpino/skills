@@ -110,7 +110,11 @@ measured:
   the analytic value — so `sqrt(Δ)` grows as `√n`: 1.63, 1.88, 2.30, 2.66 and 3.26 times the
   true displacement. Same geometric error, five different numbers, decided by mesh valence.
 - **On a real surface the gap is large.** Over 3,453 interior edge contractions on the
-  paraboloid, mean `sqrt(Δ)` was **0.0175** against a mean true vertical miss of **0.0031** — a
+  paraboloid ⚠️ (**that count cannot be right and the run needs repeating**: the rig at :77 is
+  41×41, so 1,681 vertices of which 39² = 1,521 are interior, and one interior contraction removes
+  exactly one interior vertex — 3,453 is more than twice the budget that exists. The ratio below is
+  a mean over contractions, so it survives a smaller denominator, but the count itself does not),
+  mean `sqrt(Δ)` was **0.0175** against a mean true vertical miss of **0.0031** — a
   ratio of **5.60**, ranging 4.17 to 6.94 across the contractions. Feeding `sqrt(Δ)` into the
   runtime controller as `e` therefore over-tessellates *and* by an amount that varies per region,
   which is the worst of both. ⚠️ **The factor is not a constant of the metric — it is a function of

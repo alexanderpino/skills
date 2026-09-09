@@ -242,7 +242,8 @@ smoothed on clean R32F; pick by input quality, not by habit. *Topographic positi
 [weiss2001] — no peer review; a multi-radius neighbourhood-mean difference that classifies
 ridge/slope/valley. ⚠️ **It is not the same signal as curvature, and an earlier version of this line
 said it was.** TPI is a band-pass at a chosen radius, and it degenerates to the Laplacian only as
-`r → 0`: `f − mean_ring_r(f) = (r²/4)·∇²f + O(r⁴)`. The poster's own worked scales are annuli of
+`r → 0`: `f − mean_ring_r(f) = −(r²/4)·∇²f + O(r⁴)` — note the sign, and check it against a peak,
+where `∇²f < 0` makes TPI positive as the convention requires. The poster's own worked scales are annuli of
 62 and 67 cells on a 30 m DEM — **1.86 and 2.01 km** — where no expansion in `r` survives, and its
 introduction exists to make exactly this point, that topographic position is "*an inherently
 scale-dependent phenomenon*": a point in Yosemite is a flat plain at 100 m and the bottom of a
