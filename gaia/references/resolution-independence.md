@@ -239,15 +239,15 @@ units, keeping heights in metres while counting horizontal distance in cells. Un
 K_grid = K_SI · Δx^(2m − n)        # heights in metres, horizontal lengths in CELLS
 ```
 
-[grid_unit_transfer]. The exponent vanishes at `n = 2m` — and the field's default pair,
-`m = 0.5, n = 1` [cordonnier2016] §3.1, sits exactly on that line. **The defaults are the one
-case where the bug cancels**, which is why a `K` tuned at 512² appears to transfer to 4k and then
-stops transferring the moment someone moves `m` or `n`. Confirmed by arithmetic at three cell
-sizes spanning 16×: at `m = 0.5, n = 1` the grid-unit `K` is the same 3.0×10⁻⁵ at 10, 40 and
-160 m; at `m = 0.45` it moves 32% over that range; at `m = 0.35`, 2.30×; at `m = 0.5, n = 2` the
-exponent is −1 and it moves **16×**. This is dimensional bookkeeping rather than an experiment,
-and it is worth the arithmetic only because the direction is the one people get backwards: refining
-the grid needs a *larger* grid-unit `K`, not a smaller one, whenever `n > 2m`.
+[grid_unit_transfer]. **The exponent is zero for any pair with `n = 2m` (`m/n = 0.5`), the defaults
+among them** — a ray, not a point. `m = 0.5, n = 1` [cordonnier2016] §3.1 is one point on it;
+`m = 0.75, n = 1.5` and `m = 1, n = 2` cancel too, both inside the `n` in 1–2 that `stream-power.md`
+calls defensible at that `m/n`. That is why a `K` tuned at 512² appears to transfer to 4k and stops
+the moment `m` or `n` leaves the ray. Confirmed at three cell sizes spanning 16×: on the ray the
+grid-unit `K` is the same 3.0×10⁻⁵ at 10, 40 and 160 m; at `m = 0.45` it moves 32% over that range;
+at `m = 0.35`, 2.30×; at `m = 0.5, n = 2` the exponent is −1 and it moves **16×**. Dimensional
+bookkeeping rather than an experiment, worth the arithmetic only because the direction is the one
+people get backwards: refining the grid needs a *larger* grid-unit `K` whenever `n > 2m`.
 
 Fix the units and the model still is not resolution-independent, for two reasons that no rescale
 reaches. `S` is a finite difference and falls as `Δx` grows on any real surface — the table above.
@@ -436,7 +436,7 @@ holds is not evidence that the model is doing the same thing.
 | The pipe solve is stable at one resolution and explodes at the next | `Δt` chosen once; the bound is `0.50·dx/√(g·A/l)`, and `dx` moved — and if `A = l²`, so did `A/l` | Recompute per resolution, and per step wherever the celerity tracks depth [courant1928] |
 | Ridges relax fully at 512 and stay knife-edged at 4k on the same pass budget | Thermal pass count goes as `4.5·(r_m/Δx)²` | Stop on a measured over-steep count, never a pass count |
 | Dunes turn to noise as the grid is refined | `L_sat` no longer spans several cells, so the chain degenerates to `q = q_sat` and short wavelengths dominate `∇·q⃗` | Resolve `L_sat` [sauermann2001]; it is a floor, not a parameter |
-| A `K` that transferred between resolutions stops transferring when `m` or `n` is changed | `K_grid = K_SI·Δx^(2m−n)`, and the default `m = 0.5, n = 1` is the one pair where the exponent is zero | Store `K` in SI with `A` in m² and `dist` in metres [grid_unit_transfer] |
+| A `K` that transferred between resolutions stops transferring when `m` or `n` is changed | `K_grid = K_SI·Δx^(2m−n)`, and that exponent is zero for any pair with `n = 2m` (`m/n = 0.5`), the defaults among them | Store `K` in SI with `A` in m² and `dist` in metres [grid_unit_transfer] |
 | Relief and mean elevation climb with every refinement, with no parameter changed | Pure stream power has no length scale but the cell, so relief accumulates from the smallest resolved `A` | Add `D·∇²h` [cordonnier2016] and resolve the hillslope it creates at the coarsest grid |
 | The slope–area check passes at every resolution while the terrain plainly changes | The regression slope is `−m/n` at steady state whatever the cell size; a uniform `S` bias moves only the intercept | Keep the check for what it catches; test resolution by refinement residual and by `A` disagreement |
 | A slope or `A·S²` threshold tuned at 1 m/px selects the wrong ground at 8 | Slope is a finite difference over `Δx`, `∝ Δx^(H−1)` [selfaffine_slope] | State the resolution beside the threshold; re-tune per level. No unit conversion exists |

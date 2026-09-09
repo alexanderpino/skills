@@ -58,11 +58,13 @@ and a calibrated `K` transfers between resolutions untouched. The defect is narr
 hidden: terrain codes routinely mix units, holding heights in metres while counting horizontal
 distance in **cells**. Under that mixture `A_grid = A/Δx²` and `S_grid = S·Δx`, so reproducing the
 same incision needs `K_grid = K_SI·Δx^(2m−n)` (`resolution-independence.md` derives it and checks
-it at three cell sizes spanning 16×). ⚠️ **The exponent vanishes at `n = 2m` — which is exactly
-the default pair above.** So a `K` tuned at 512² appears to transfer to 4k, and stops the moment
-anyone moves `m` or `n`: at `m = 0.45` it moves 32% over that 16× span, at `m = 0.35` 2.30×, and
-at `m = 0.5, n = 2` **16×**, in the direction people get backwards — refining needs a *larger*
-grid-unit `K` whenever `n > 2m`.
+it at three cell sizes spanning 16×). ⚠️ **The exponent is zero for any pair with `n = 2m`
+(`m/n = 0.5`) — a ray, not a point — the default pair above among them**, and the `n` in 1–2
+allowed above at that `m/n` puts `m = 0.75, n = 1.5` and `m = 1, n = 2` on it as well. So a `K`
+tuned at 512² appears to transfer to 4k, and stops the moment anyone moves `m` or `n` off the
+ray: at `m = 0.45` it moves 32% over that 16× span, at `m = 0.35` 2.30×, and at `m = 0.5, n = 2`
+**16×**, in the direction people get backwards — refining needs a *larger* grid-unit `K` whenever
+`n > 2m`.
 
 ## Why the solver is the whole difficulty
 
