@@ -20,6 +20,29 @@ technique document with no adversarial read at all.
 
 ---
 
+## VERIFIED BY HAND, 2026-09-09 — four of the sixty-three
+
+The adversarial refutation pass could not run: a broken harness permission handler rejected
+every file-access tool in all 64 workflow subagents (719 rejected calls; `Read`, `Bash`,
+`Grep`, `Glob` each returning "the parameter ... is expected as `string` but provided as
+`unknown`"). The agents never read a byte. The four below were therefore re-derived by the
+orchestrator directly, and **only these four have any verification at all.** The other
+fifty-nine remain exactly as raised.
+
+| id | verdict | what was reproduced |
+|---|---|---|
+| `RN-4` | **CONFIRMED** | `river-networks.md:378` says `[genevaux2013]` and `[paris2023]` print the same rule "six years apart". 2023 − 2013 = **10**. |
+| `ME-1` | **CONFIRMED** | `mesh-extraction.md:112` reports "3,453 interior edge contractions on the 41×41 grid". That grid has 41² = 1,681 vertices, 4·40 = 160 on the boundary, 39² = **1,521** interior. One interior contraction removes one interior vertex, so 3,453 is more than twice the available budget. |
+| `TAM-1` | **CONFIRMED** | `terrain-analysis-masks.md:245` states `f − mean_ring_r(f) = (r²/4)·∇²f`. Measured on `z = 100 − (x²+y²)` at `r = 3` over 20,000 ring samples: centre 100.000, ring mean 91.000, difference **+9.000**, while `(r²/4)·∇²f = (9/4)(−4) = −9`. The identity is off by a sign; the correct form is `−(r²/4)·∇²f`. |
+| `RN-3` | **CONFIRMED (arithmetic)** | `river-networks.md:82` tabulates `E − N + C` with an expected **0** against a measured **194,674**. Working back from the finding's stated inputs gives `C = 194,674 − 259,190 + 65,536 = 1,020`, exactly the perimeter-cell count of a 256² grid (4·256 − 4). Caveat: `E` and `N` are the finding's figures, not re-read from the page. |
+
+`SKY-7` was attempted and is **not settleable from the cited lines alone** — the fp32 ULP
+arithmetic reproduces exactly (2¹⁶·2⁻²³ = 7.8125 mm at 10⁵ m, confirmed against
+`numpy.nextafter`), but `sky-and-weather-state.md:201-204` does not print the two magnitudes
+the finding attacks, so the finding and the page have to be reconciled first.
+
+---
+
 ## coastal-erosion.md — 6 raised, 0 refuted
 
 `incomplete` 1  `unsupported` 3  `wrong` 2
