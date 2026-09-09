@@ -115,7 +115,9 @@
 # documents that DO have rows. That 32 is the hand count the paragraph above put at "about 33" and
 # is the closest thing to independent corroboration this criterion has -- two hands, a day apart,
 # one fence apart. 48 rows were added, one per unregistered fence, so check.py's document-level
-# gap is now 0 and every fence in references/ is named by a row.
+# gap is now 0 and every one of those 103 is named by a row. The remaining 4 are named by no row
+# and are meant not to be: 2 in papers-flow.md, 1 each in papers-generation.md and coverage.md,
+# all four entry-format templates, and none of those three files appears in the document column.
 #
 # WHAT THOSE 48 ROWS ARE AND ARE NOT. 28 were transcribed and RUN; 20 were READ and not run, and
 # every one of those says NOT RUN in its provenance cell and NOT MEASURED in its outcome. Grep the

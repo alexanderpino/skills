@@ -25,9 +25,11 @@ because the 450-line cap refuses the insertion in the documents nearest it, whic
 names. And every
 `document.md` a body names in a code span must be a document that exists: that is a FAILURE,
 not a metric, because the same dangling reference in coverage.md's `→ target` column has always
-been one. Its reach is gaia's own naming shape; bare `.md` names belonging to other
-repositories -- five of them, `19-fluid-simulation.md` among them -- are named in the output
-and NOT checked, and `.py` and `.tsv` paths are not read at all.
+been one. Its reach is gaia's own naming shape; a bare `.md` name belonging to another
+repository is NAMED in the output rather than checked, and the corpus now has none -- the five
+that motivated the report, `19-fluid-simulation.md` among them, all carry their directory inside
+the span, so the residue is empty and the clause is not printed. `.py` and `.tsv` paths are not
+read at all.
 
 It also checks the SHAPE of `registers/pseudocode-execution.tsv`: seven fields, the header that
 names them, and a `termination` token from a closed vocabulary, so that no row can be silent
@@ -1763,9 +1765,12 @@ _DOC_LINK = re.compile(r"\]\(([^)\s]+\.md)\)")
 _DOC_NAME = re.compile(r"^[a-z][a-z0-9-]*\.md$")
 _MD_BARE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
 
-# (span content, is it a cross-reference this guard must resolve?). Every False here is a live
-# span in the corpus today, not an invented one, and each is the reason the pattern is not
-# simply `.*\.md`.
+# (span content, is it a cross-reference this guard must resolve?). None of these is invented:
+# every one was a live span when the pattern was written, and each is the reason it is not simply
+# `.*\.md`. Four are live still (`→ file.md` at coverage.md:32, `d3d/WorkLists.md` at
+# papers-architecture.md:120, `scripts/check.py`, the non-span form). The bare CamelCase and
+# numbered names are NOT live any more -- the corpus repaired them by moving the directory inside
+# the span -- and they stay here because the pattern must go on rejecting that shape.
 DOC_NAME_FIXTURES = [
     ("shallow-water.md", True),
     ("caustics.md", True),                 # no hyphen: the corpus has three such documents
@@ -1818,18 +1823,24 @@ def check_paths() -> tuple[list[str], int, int, list[str]]:
     INSIDE a cited artefact -- "the front-to-back bullet in README.md" is a location in someone
     else's repository, not a path in this one -- and a fenced block is code or a template.
 
-    ⚠️ What it does NOT check, named rather than implied. Bare `.md` names outside gaia's own
-    naming shape are out of reach, and the corpus has five, at six sites: `19-fluid-simulation.md`
-    (shallow-water.md, papers-simulation.md), `12-water-rendering.md`,
-    `12b-water-provenance.md`, `WorkGraphs.md`, `ResourceBinding.md`. The plan named the first
-    of those -- shallow-water.md's reference to the retired terrain-renderer's fluid document --
-    as G#9's live instance, and it is live still: as written it resolves to no path a reader can
-    open, because the directory that would make it resolvable sits in a DIFFERENT code span.
-    Enforcing those here would go red on five documents this guard's author does not own, so the
-    residue is counted and named in the run's output instead, and a `corrections.tsv` row asks
-    the owners for the one repair that fixes the class: put the directory inside the span.
-    Paths to `.py` harnesses and `.tsv` registers are also unread -- the execution register names
-    27 harness scripts that were never committed, so a check over them would be red on arrival.
+    ⚠️ What it does NOT check, named rather than implied. A bare `.md` name outside gaia's own
+    naming shape is out of reach of the shape test. The corpus held five such names at six sites
+    -- `19-fluid-simulation.md` (shallow-water.md, papers-simulation.md), `12-water-rendering.md`
+    and `12b-water-provenance.md` (papers-simulation.md), `WorkGraphs.md` (node-graph-runtime.md),
+    `ResourceBinding.md` (papers-rendering.md) -- among them the one PLAN.md named as G#9's live
+    instance, shallow-water.md's reference to the retired terrain-renderer's fluid document, which
+    resolved to no path a reader could open because the directory that would resolve it sat in a
+    DIFFERENT code span. All six sites are now REPAIRED by their owners, each with the directory
+    inside the span, so the residue is EMPTY and the run prints no residue clause at all.
+    The shape test is deliberately NOT widened to every bare `.md` name here: that is the next
+    owner's decision, not a side effect of the last repair. A new bare name would therefore be
+    named in the run's output again, and still not enforced.
+
+    Paths to `.py` harnesses and `.tsv` registers are also unread. Measured over this function's
+    own scope, the corpus names 14 harness scripts that were never committed, in 34 code spans
+    across 9 documents, so a check over them would be red on arrival. That figure is a count of
+    code spans in the DOCUMENTS, not of rows in the execution register -- an earlier form of this
+    sentence said "the execution register names 27 harness scripts" and was wrong at both ends.
     """
     problems: list[str] = []
     existing = {p.name for p in documents(ROOT)}
@@ -2646,9 +2657,9 @@ def main() -> int:
               f"reference to a document nobody wrote is a broken link, not a metric. "
               + (f"⚠️ Its reach is gaia's own naming shape. {len(path_residue)} bare `.md` "
                  f"name(s) in another shape are NOT checked: {'; '.join(path_residue)}. "
-                 f"The first of those is audit G#9's named live instance and it is still live. "
+                 f"The repair that clears one is to put its directory INSIDE the span. "
                  if path_residue else "")
-              + f"⚠️ `.py` and `.tsv` paths are unread; the execution register names harness "
+              + f"⚠️ `.py` and `.tsv` paths are unread; documents in this corpus name harness "
                 f"scripts that were never committed, so a check over them would be red on "
                 f"arrival. See registers/guard-proofs.tsv.")
 

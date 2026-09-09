@@ -151,7 +151,7 @@ plainly that "implementations are not ready" and hopes for a preview "some time 
 not claim to replace work graphs — that framing is press narrative, not spec.
 
 ⚠️ **How this was established, because the method matters more than the conclusion.** The obvious
-primary source is the `WorkGraphs.md` spec, and it contains **no deprecation language at all** —
+primary source is the `d3d/WorkGraphs.md` spec, and it contains **no deprecation language at all** —
 its `## Shader target` even says node shaders target "lib_6_8 **or above**", an open floor. That
 reads as evidence the feature is alive. It is not: that file's last edit was 2026-02-04 and the
 decision landed in August 2026 in two different repositories. **Absence of a statement in a spec is
@@ -313,7 +313,7 @@ output hash was unchanged — over a structural prior: seed the **information-de
 (clamp, quantise, threshold, mask, min/max against a constant) high — not because most field
 changes are absorbed (the hash is over the whole field, and one unsaturated cell that moved defeats
 a clamp) but because a change can land *entirely* inside the destroyed region — an interval of a
-clamped parameter, a whole branch masked to zero, the two worked cases above. Seed bijective,
+clamped parameter, a whole branch masked to zero, two of the worked cases above. Seed bijective,
 noise- and seed-driven nodes **low, never at 0**: at `P̂ = 0` the criterion never clears, so the
 node is never hashed and the rate never gets a sample — an absorbing seed. Hash a small fixed
 fraction of every node's rebuilds regardless and keep the rate over a window, or measurement can

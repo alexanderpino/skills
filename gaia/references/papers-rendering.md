@@ -471,7 +471,7 @@ named, and the quoted sentences are transcribed from it rather than recalled.
   undefined within non-uniform control flow", followed by the forward/backward-differencing
   definition that makes a derivative a difference over the 2×2 stamp and by the coarse/fine
   split. A Khronos specification, not peer review.
-- **nonuniform_idx** `F` — Microsoft. *Resource Binding* (the D3D12 `ResourceBinding.md` in
+- **nonuniform_idx** `F` — Microsoft. *Resource Binding* (the D3D12 `d3d/ResourceBinding.md` in
   `microsoft/DirectX-Specs`), and The Khronos Group, `GL_EXT_nonuniform_qualifier` (the
   `extensions/ext/` text in `KhronosGroup/GLSL`). — Two spellings of one rule. The Microsoft
   document's § "Divergence and derivatives" states that when a resource index diverges across a

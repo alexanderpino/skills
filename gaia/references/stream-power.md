@@ -100,9 +100,10 @@ hundred steps.
 ⚠️ **Nothing in that block is counted in cells, and the timestep is free of `Δx` entirely.**
 `A[i]` is an area in m² and `dist[i]` a length in metres — `flow-routing.md`'s output contract —
 and the update above is implicit, so refining the grid does not shorten `Δt` and the step count
-does not move. That makes the incision half the one part of this skill's erosion machinery whose
-cost is quadratic rather than cubic or worse in `1/Δx` (`resolution-independence.md`). Its
-companion diffusion term is the opposite case, and it is next.
+does not move. That makes the incision half the one part of the three erosion backbones whose cost
+is quadratic rather than cubic or worse in `1/Δx` — ×4 per halving against droplet's ×32 and
+pipe's ×8 (`resolution-independence.md`). Its companion diffusion term is the opposite case, and
+it is next.
 
 ⚠️ **`receivers[i] == i` covers two different things, and the uplift line is not optional for one
 of them.** The *domain edge* is a base level you declared: it is where water leaves, it must be
@@ -279,8 +280,8 @@ residual is two terrains rather than one terrain sampled twice.
 | A `K` borrowed from a paper, another `m`, or a discharge-form solver gives the wrong incision rate | `K` is not dimensionless — it carries `L^(1−2m)·T^(−1)`, so its value is tied to `m`, and the discharge form is a different coefficient again | Re-derive at your `m` (`yr^(−1)` at `m = 0.5`); for discharge, `K_Q = K_A·P̄^−m` at the one rainfall rate `K_A` was calibrated at — see `driver-fields.md` |
 | Relief and mean elevation climb with every increase in resolution, no parameter changed | Pure stream power has no length scale but the cell, so relief accumulates from the smallest resolved `A` | Not removable by rescaling: add `D·∇²h` and resolve the hillslope it creates at the *coarsest* grid shipped |
 | The `log S` vs `log A` check passes at every resolution while the terrain plainly changes | The regression slope is `−m/n` by construction at steady state; a uniform `S` bias moves only the intercept | Keep the check for routing bugs; test resolution by refinement residual and by `A` disagreement |
-| A `K` that transferred between two resolutions stops transferring when `m` or `n` moves | Heights in metres, horizontal distance in cells: `K_grid = K_SI·Δx^(2m−n)`, and the default `m = 0.5, n = 1` is the one pair where that exponent is zero | Store `K` in SI, with `A` in m² and `dist[]` in metres |
-| The bake fits at 1024² and not at 2048², with the incision solve unchanged | The explicit Laplacian's sub-cycle count goes as `1/Δx²` on a grid already growing as `1/Δx²` — quartic, where the implicit incision half is quadratic | Budget the diffusion half separately; `ceil(D·Δt/(0.225·Δx²))` predicts it in one line |
+| A `K` that transferred between two resolutions stops transferring when `m` or `n` moves | Heights in metres, horizontal distance in cells: `K_grid = K_SI·Δx^(2m−n)`, and that exponent is zero for any pair with `n = 2m` (`m/n = 0.5`), the defaults among them | Store `K` in SI, with `A` in m² and `dist[]` in metres |
+| The bake is affordable at 1024² and blows its time budget at 2048², with the incision solve unchanged | The explicit Laplacian's sub-cycle count goes as `1/Δx²` on a grid already growing as `1/Δx²` — quartic, where the implicit incision half is quadratic | Budget the diffusion half separately; `ceil(D·Δt/(0.225·Δx²))` predicts it in one line |
 | A carved waterfall relaxes into a rapid | Uniform `K`, so nothing pins the step | A hard bed across the channel, then let the solver run |
 | Waterfalls everywhere, including on trunk rivers | Knickpoints stamped rather than produced | Author the cause — a `K` jump or a base-level fall |
 | A flat, featureless result on a small map | No drainage area at this extent | Wrong backbone; use droplet or pipe |
