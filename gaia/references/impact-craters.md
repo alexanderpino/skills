@@ -134,9 +134,10 @@ Those were computed, not quoted, and **only the lunar row rests on a source read
 the rest as what the scaling law predicts, not as observations — the values in the literature for
 Earth and Mars are of the same order, but this document has not verified them and does not assert
 them. The direction is the usable part, and it is not in doubt: **halve your world's gravity and
-every crater above about 10 km changes shape.** A low-gravity moon is a world of
-deep bowls where Earth would have terraced, flat-floored, central-peaked basins, and that single
-threshold does more for "this is not Earth" than any amount of palette work.
+every crater above about 10 km changes shape.** A low-gravity moon is a world of bowls where
+Earth would have terraced, flat-floored, central-peaked basins at the same diameter — a **shape**
+contrast and not a depth one, because the floored depth below is a function of diameter alone —
+and that single threshold does more for "this is not Earth" than any amount of palette work.
 
 Do not oversell it. [silber2017] is explicit that gravity does not fix `D*` on its own: Mars and
 Mercury have essentially the same surface gravity, 3.72 and 3.70 m/s², and transition at
@@ -157,20 +158,22 @@ Worked on Earth (`D*` = 3.14 km, band 1.66–4.96 km, printed as 1.7–5.0 km fu
 `D` = 5 km the unfloored prescription returns **1.695 km** of depth against the simple law's
 **0.996 km** — a `d/D` of **1:2.95**, deeper relative to its diameter than the simple-bowl 1:5
 above, and **1.70×** deeper than the same-diameter lunar crater the same prescription produces.
-That is the "deep bowls on a low-gravity moon, flat terraced basins on Earth" sentence above
-running backwards. Blending only softens it: the over-deepening still peaks at **1.717×** at
-`D` = 4.55 km (`d/D` 1:2.93). With a bare threshold and no blend it is a **2.37×** step at
-`D` = 3.14 km.
+That turns the bowl-versus-basin contrast above into a depth contrast pointing the wrong way.
+Blending only softens it: the over-deepening still peaks at **1.717×** at `D` = 4.55 km. With a
+bare threshold and no blend it is a **2.37×** step at `D` = 3.14 km.
 
 **The fix is a floor: evaluate both branches and keep the smaller.** That is the same rule as
-"switch each quantity at its own crossing", because each complex fit sits above its simple
-counterpart below the crossing and below it above. The gravity-scaled `D*` keeps the job it is
-good for — deciding whether the crater is terraced, flat-floored and central-peaked — while the
+"switch each quantity at its own crossing". The gravity-scaled `D*` keeps the job it is good
+for — deciding whether the crater is terraced, flat-floored and central-peaked — while the
 depth, rim and width *numbers* stay on the branch each was measured over. Below the lunar
 crossings that means an Earth-gravity complex crater gets simple-branch **dimensions** with
-complex **morphology**, and its depth stops differing from the lunar crater of the same diameter:
-the shape change is real, the depth change is not something Pike supports there, because his
-complex depth sample begins at 15 km. Expose that limit rather than papering over it with an
+complex **morphology**: the shape change is real, and a depth change there is not something Pike
+supports, because his complex depth sample begins at 15 km. Above them the floor hands every
+world the same complex branch, so this is not a below-the-crossings hedge but the whole rule —
+the floored depth is `min(0.196·D^1.010, 1.044·D^0.301)`, which carries no `g`, so at **every**
+diameter it equals the depth of the lunar crater of that diameter. Blending cannot move it
+either: a blend of the two branches never falls below the smaller of them. **Gravity moves the
+shape, never the dimensions.** Expose that limit rather than papering over it with an
 extrapolated coefficient.
 
 ## Rim and ejecta
