@@ -2,7 +2,7 @@
 type: Technique
 title: Volumetric clouds
 description: "The cloud deck a mountain can pierce: an analytic Perlin-Worley density model marched with a cheap/expensive two-level sampler, the three couplings that make this terrain's problem rather than general sky rendering -- depth compositing against the terrain buffer, a projected shadow the ground receives, and the above-the-deck regime -- and the honest asymmetry that every cost figure here comes from an unrefereed source and every error figure from a refereed one."
-tags: [rendering, clouds, volumetrics, sky, weather]
+tags: [rendering, clouds, volumetrics, sky, weather, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-04T00:00:00Z }
 sources:
@@ -20,6 +20,13 @@ sources:
 ---
 # Volumetric clouds
 
+**Tier: real-time rasteriser, amortised over frames.** Every cost on this page is a per-frame GPU
+cost unless it is named as offline or as memory — the offline ones are the 2011 CPU render and the
+34-hour path-traced reference, and the hardware is console-class except for the two figures that
+name a desktop card, the GTX 680 and the GTX 1080. The technique only fits a frame because the
+march is spread across frames and, in several configurations here, run below output resolution —
+which makes the resolve back to full res part of the technique rather than a detail of it.
+
 ## Use this
 
 **Model density analytically and spend the saved memory on instructions; then buy the frame back
@@ -30,7 +37,9 @@ with a cheap sampler that only escalates to the expensive one where the cheap sa
 ⚠️ **The density model is the durable part; the 2015 rendering envelope around it is not.** Its own
 originator's 2023 capability table scores that method **No** on terrain-cast shadows, **No** on
 flight-capability and **No** on freeform modelling, and their verdict on the voxel successor is
-"**Voxel clouds check almost all of the boxes**" [schneider2023]. Two of those three failures are
+"**Voxel clouds check almost all of the boxes**" [schneider2023] — a verdict about *capability*,
+and the boxes are not free: normalised like for like, voxels cost **4.4–5.3× per pixel**, paid for
+by running at a quarter of them (*the crossover has a date*, below). Two of those three failures are
 exactly terrain's problems. Take the density model from the 2015 lineage; do **not** take the
 couplings from it, because they are not in it.
 
@@ -105,6 +114,10 @@ Three textures and a weather field, all 2015 figures [schneidervos2015] pp.33–
 - **A 2D weather texture** — in 2015, "*Red is coverage, Green is precipitation and blue is cloud
   type*". **Cite the year**: by 2017 R and G are both coverage (Perlin and Perlin–Worley), and the
   sample counts and noise layout moved again in 2022 [schneidervos2017] [schneider2022].
+  ⚠️ **The coverage channel is not this pass's to author.** `sky-and-weather-state.md` carries
+  exactly one coverage field, and the cloud march, the ground-receiving shadow of coupling 2 below
+  and the rain the weather implies all read that same field. Authoring a second one here is the
+  defect that document names by symptom: shadows falling where there is no cloud.
 
 Perlin–Worley itself is inverted Worley layered fBm-style and used *as an offset to dilate Perlin*,
 which keeps Perlin's connectedness while adding billow. [hillaire2016] p.34 reaches the same model
@@ -124,6 +137,16 @@ is what stops the escalation missing the iso-surface it just crossed.
 - **Sun cone:** 6 samples (2015), 5 (2017), 6 on PS4 and 10 on PS5 (2022), **4** in Frostbite
   [hillaire2016] p.36. The last sample is placed far from the rest to catch distant-cloud shadowing.
 - **The early-out** is three texture reads, one multiply, `return 0.0` [schneider2022] p.91.
+
+⚠️ **A per-pixel iteration count makes every fetch inside that loop an explicit-LOD one.** The
+sample count above is itself per-pixel — 64 rising toward a potential 128 as the ray nears the
+horizon — so the loop's own step cap is a lane-varying exit, and that takes the *whole* body in
+with it; the early-out and the cheap-to-expensive escalation are two further divergences inside it.
+There the derivative and implicit-LOD instructions are forbidden on one API and undefined on the
+other, and compile on both. So in a pixel shader every density, noise and weather fetch names
+its own level — `SampleLevel`/`textureLod`, or `SampleGrad` where the footprint matters — rather
+than letting the hardware infer one. `shader-craft.md` carries the specification text and the
+symptom, which is mip noise appearing only where the march is expensive and moving with the camera.
 
 ## The three couplings terrain owns
 
@@ -157,6 +180,30 @@ almost certainly running. Transcribing the source's `max()` unchanged selects th
 terminates the march early, and produces exactly the popping this optimisation exists to avoid —
 `gpu-driven-culling.md` states the same rule for its HiZ reduce and names the same symptom,
 "geometry near silhouettes disappears for a frame under motion".
+
+- **Resolve the low-res march with a depth-aware filter — nearest-depth or bilateral — never a
+  plain bilinear one.** Several configurations here march below output resolution (2015's
+  reduced-res reprojection buffer, at the factor the deck contradicts itself on; 2023's 480×270
+  near and 960×540 far) and every one of them has to land back on the full-res scene. At a
+  mountain silhouette the four low-res neighbours a bilinear tap mixes are not one surface: one
+  stopped on rock a kilometre out, its neighbour ran to the cloud exit tens of kilometres beyond.
+  Blending them fringes every ridge — cloud bleeding onto the rock, a thinned band just past
+  it — and the fringe crawls as the camera turns. Bilinear support is one low-res texel, so at
+  `1/S` per axis it reaches **at most `S` full-res pixels either side of the silhouette**: 2 px at
+  half-res, 4 px at quarter-res. Instead pick, per full-res pixel, the low-res neighbour whose
+  depth is closest to *this* pixel's (nearest-depth), or weight the four by a falloff in the depth
+  difference (bilateral), and keep plain bilinear where all four agree so open sky keeps its
+  smooth gradient. Compare against the depth the march actually stopped at — the farthest-reduced
+  low-res mip above — not a freshly reduced one. Derived here from two facts already on this page,
+  a sub-resolution march and a full-res composite; no artefact in this set is quoted for it.
+  ⚠️ **Two reductions over depth, and neither is the other's opposite.** Termination extremises
+  depth itself — FARTHEST in the footprint. The resolve extremises a *difference* — smallest gap
+  to this pixel's depth. A helper that "reduces depth" is wrong for one of them whichever way its
+  comparator points; write the quantity each is looking for, as the rule directly above and
+  `gpu-driven-culling.md`'s HiZ reduce both say. ⚠️ And it does not close the case it looks like it
+  closes: a ridge thinner than one low-res texel puts sky in every candidate's footprint, so no
+  choice among four sky samples helps. That one wants the near split or a full-res march, not a
+  better filter.
 
 **2 — The shadow the ground receives.** The cheapest large-scale life a vista buys, and absent from
 the 2015/2017 lineage entirely.
@@ -249,6 +296,8 @@ pixels**. A cloud budget quoted without the geometry it displaces is half a numb
 |---|---|---|
 | Cloud drawn over a mountain the first time a peak enters the deck | The march does not terminate at the terrain depth hit | Depth-aware compositing; pick one of the three depth definitions and use it everywhere [yusov2014] |
 | Clouds pop at silhouettes as the camera turns | The depth-mip reduce picks the NEAREST depth in the footprint, so the march terminates early — the operator that does this flips with the depth convention | Reduce toward the FARTHEST depth: `min()` under reversed-Z, `max()` under standard depth. Write the quantity, not the operator [schneidervos2017] p.98 |
+| A fringe hugging every ridge — cloud bleeding onto the rock, a thinned band just past it — crawling under camera motion | The low-res march is resolved by a plain bilinear tap, which mixes low-res samples that stopped on terrain with samples that ran to the cloud exit; at `1/S` per axis it reaches at most `S` full-res pixels either side | Nearest-depth or bilateral resolve against the depth the march stopped at; bilinear only where the four candidates agree. The two reductions differ in *quantity*, not in operator: termination takes the FARTHEST depth, the resolve the smallest depth *difference* — one helper cannot serve both |
+| Mip noise or blocky texture LOD on the clouds, only where the march is expensive, and it moves with the camera | An implicit-LOD `Sample`/`texture()` on density, noise or weather inside a march whose sample count is per-pixel, so its whole body is in varying flow control — forbidden on one API, undefined on the other, and it compiles on both | `SampleLevel`/`textureLod` for every fetch in the loop, or `SampleGrad` where the footprint matters — see *The march* above, which carries the rule and routes on |
 | Landscape looks dead and evenly lit under a dramatic sky | No ground-receiving cloud shadow — it is absent from the 2015/2017 lineage, so an implementation faithful to those decks has none | Light-space transparency buffer on the CSM matrices [yusov2014] p.133 |
 | Cloud shadows drift wrong across a large map | The projected-shadow formulation assumes a flat planet, and its error grows with BOTH vista length and falling sun | Bound both, not just the map: the shadow offset is `h/tan(elevation)`, so it leaves any map at low sun. Or project on the sphere [hillaire2016] p.42 |
 | Ghosting and smearing on fast camera turns, worst near camera | Temporal amortisation over 16 frames cannot resolve in time | Depth-split the render instead of upscaling near clouds [schneider2023] p.185 |

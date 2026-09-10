@@ -19,10 +19,10 @@ sources:
 ---
 # Driver fields — temperature, sun, shadow and flow
 
-A terrain graph carries more than a heightfield. It carries **driver fields**: temperature,
-insolation, shadow, and the flow fields for water and wind. These are what make erosion, snow and
-vegetation respond to *where* they are rather than uniformly, and they behave differently from
-heightfields in ways the runtime has to know about.
+**Tier: authoring-time; the runtime consumes the baked fields.** A terrain graph carries more than
+a heightfield. It carries **driver fields**: temperature, insolation, shadow, and the flow fields
+for water and wind. They make erosion, snow and vegetation respond to *where* they are rather than
+uniformly, and they behave differently from heightfields in ways the runtime has to know about.
 
 This document exists because Gaia had a hole: `thermal-and-aeolian-erosion.md` states that an
 aeolian pass "needs a wind field computed first", and nothing produced one.
@@ -46,19 +46,18 @@ determination of solar shading within the horizon function used in radiation mod
 maximum upwind slope that decides whether a cell is sheltered from wind is the same quantity as the
 horizon angle that decides whether it is shaded from sun. One method, two fields.
 
-⚠️ This recommendation used to read "compute **one** horizon field and drive both from it",
-and "one sweep, two fields". The section below says reusing one for the other is "a real and
-easy mistake", and the failure table says to run the sweep twice — so the headline was
-prescribing what the rest of the document documents as a failure. ⚠️ **What is shared is the IDEA, not the code, and an
-earlier version of this erratum said "the algorithm and the code".** The insight — that maximum
+⚠️ This recommendation used to read "compute **one** horizon field and drive both from it", and
+"one sweep, two fields". The section below says reusing one for the other is "a real and easy
+mistake", and the failure table says to run the sweep twice — so the headline was prescribing what
+the rest of the document documents as a failure. ⚠️ **What is shared is the IDEA, not the code, and
+an earlier version of this erratum said "the algorithm and the code".** The insight — that maximum
 upwind slope and horizon angle are the same quantity — transfers exactly. The implementation does
 not: the unbounded sweep keeps an upper-hull **stack** and pops dominated candidates permanently,
-so a candidate masked by a far tall peak is gone before any bounded query can ask for it.
-Measured here on this document's own profile (`z[3] = 1.0`, `z[40] = 50.0`, window 8): the bounded
-truth is **0.3333** and the retained unbounded hull returns **0.0000**, with 132 of 9900 cells
-disagreeing across 300 random profiles. Bounding the search is a different data structure, not a
-different parameter — and the bounded form is **O(N log W)**, not the amortised O(1) of the
-unbounded one.
+so a candidate masked by a far tall peak is gone before any bounded query can ask for it. Measured
+here on this document's own profile (`z[3] = 1.0`, `z[40] = 50.0`, window 8): the bounded truth is
+**0.3333** and the retained unbounded hull returns **0.0000**, with 132 of 9900 cells disagreeing
+across 300 random profiles. Bounding the search is a different data structure, not a different
+parameter — and the bounded form is **O(N log W)**, not the amortised O(1) of the unbounded one.
 
 **Why it wins.** The horizon field is **sun-independent**. It is a property of the terrain alone, so
 one bake serves every sun position, every hour of every day, and — per the sentence above — the wind
@@ -73,9 +72,11 @@ knows which way a slope faces and not whether the ridge across the valley blocks
 whole point of a horizon.
 
 **And compute precipitation, because it is nearly free and it is what erosion actually wants.** One
-dot product against the wind field you already have, clamped and renormalised, turns `stream-power.md`'s
-drainage area `A` into a real discharge `Q` — see `## Precipitation, the field that decides where
-the water is` below. Every erosion document in this corpus assumes uniform rainfall until you do.
+dot product against the wind field you already have, clamped and renormalised, turns
+`stream-power.md`'s drainage area `A` into a real discharge `Q` — but not for free: the incision
+coefficient moves with it (`K_Q = K_A·P̄^−m`, `P̄` the calibration rainfall), so an area-form `K`
+table does not transfer; see `## Precipitation, the field that decides where the water is` below.
+Every erosion document in this corpus assumes uniform rainfall until you do.
 
 ⚠️ **The two fields want the same sweep and very different search distances.** Wind shelter is
 useful at **100–300 m** — [winstral2002] §4 found `Sx` at 100 m the strongest predictor of snow
@@ -141,9 +142,7 @@ support it, and the reason is structural rather than generational.
 ⚠️ **Those two rows are not a like-for-like comparison, and reading them as one is a trap this
 document nearly set.** Normalise: the sweep on the larger grid at the same 580 directions is
 `3.566 × 580 × 2 s ≈ 4136 s ≈ 1.15 h` — *inside* the band it would appear to beat. The apparent
-thousandfold gap is the **direction count**, not the algorithm. This document's own rule two
-sections down — a number quoted without saying what consumes it is meaningless — applies to its
-author first.
+thousandfold gap is the **direction count**, not the algorithm.
 
 **What actually survives, and it is enough.** Both methods cost roughly `directions × O(cells)`, so
 per direction they are comparable. The sweep wins for two structural reasons instead:
@@ -275,9 +274,8 @@ it. It matters more than temperature does: temperature decides where snow and ve
 precipitation decides where the erosion happens at all.
 
 **The upslope model is the whole of the cheap version.** Condensation rate is the moisture flux
-times the terrain slope **in the direction of the airflow** — `S ∝ ρ · q_v · (v · ∇h)`
-[minderroe] Eq. (1). Three things fall out of that one expression and they are the three things an
-authoring tool needs:
+times the terrain slope **in the direction of the airflow** — `S ∝ ρ · q_v · (v · ∇h)` [minderroe]
+Eq. (1). Three things fall out of it, and they are the three an authoring tool needs:
 
 - It is `v · ∇h`, a **directional derivative**, not `|∇h|`. A slope facing the wind condenses; the
   same slope facing away does not. Steepness alone is the wrong input, and it is the mistake a
@@ -312,8 +310,7 @@ tilted plane you will not see this bug, and every real heightfield will trip it.
 
 ### Three ways the cheap model is wrong, in the direction that matters here
 
-The upslope model is a teaching tool, and this corpus's rule is to say where a recommendation
-breaks before recommending it.
+The upslope model is a teaching tool, and this section says where it breaks before recommending it.
 
 **It has no timescales, so the pattern is pinned to the wrong place.** Condensate does not fall
 where it forms — it is advected downwind while it converts to precipitation and while it falls. The
@@ -353,11 +350,16 @@ multiplier reach zero has invented a desert that the physics does not support.
 ### What it costs downstream, which is the reason to bother
 
 Precipitation enters erosion as **discharge**, not as area: `Q = Σ(P · cellArea)` over the
-contributing cells, accumulated by exactly the machinery `flow-routing.md` already describes — the
-accumulation is a weighted sum instead of a count, and nothing else about it changes. Substituting
-`Q` for `A` in the stream-power law is a one-line change to `stream-power.md`'s update and it is the
-single highest-value use of any field in this document, because it is what makes the wet side of a
-range incise and the dry side keep its relief.
+contributing cells, by the accumulation `flow-routing.md` already describes — weighted instead of
+counted. It is the single highest-value use of any field here, because it makes the wet side of a
+range incise and the dry side keep its relief. ⚠️ **But it is not the one-line change this passage
+used to call it.** `[A] = L²` against `[Q] = L³T⁻¹`, so the coefficient moves as well:
+`K_Q·(P̄A)^m·S^n = K_A·A^m·S^n` gives **`K_Q = K_A·P̄^−m`**, units `L^(1−3m)·T^(m−1)` — at
+`m = 0.5`, **metre**`^−0.5·yr^−0.5` against `K_A`'s `1/yr`. **`P̄` is one reference rate — the
+rainfall your area-form `K` was calibrated at, not a per-cell mean.** Take it per cell as the
+contributing-area mean and `K_Q·Q^m ≡ K_A·A^m` at every cell, so the swap changes nothing at all.
+Re-derive it; do not reuse an area-form `K` table. And carry `P` in **metres** per step:
+millimetres multiply incision by `1000^m` = **31.6×** at `m = 0.5`.
 
 ⚠️ **It is also a global field with a non-local dependence, so it breaks tiling the same way flow
 accumulation does** — see `## What these fields do to the runtime` below. Worse than the horizon
@@ -370,8 +372,7 @@ error from upsampling is far smaller than the error from a seam.
 
 ⚠️ **Two documents route here for fetch and this section exists because they were routing to
 nothing.** `coastal-erosion.md` calls exposure "the input that matters" and `sea-ice.md` needs a
-wind field over water; both pointed at the horizon sweep above. That was wrong, and the reason is
-worth stating because it is the general trap with reusing a sweep.
+wind field over water; both pointed at the horizon sweep above. That was wrong.
 
 **Fetch is the over-water distance the wind has blown before it reaches a cell** — the quantity
 that sets wave height. The horizon sweep computes an **angle**; fetch is a **distance**. They run
@@ -392,8 +393,7 @@ angle**: march from each water cell into the wind, stop at the first cell above 
 the distance, cap it at a maximum fetch. It is the same `O(N)` sweep per direction, the same halo
 argument, the same cache position above the wind parameter — everything the horizon section says
 about cost and invalidation carries over unchanged. What does not carry over is the *value*, and
-reusing the baked horizon field because the code is shared is the mistake this section is here to
-stop.
+reusing the baked horizon field because the code is shared is the mistake.
 
 ⚠️ **No canonical source; standard practice is** to average the fetch over a small arc of azimuths
 rather than take a single ray, because a one-ray fetch flickers between a gap and a headland as the
@@ -431,7 +431,7 @@ Driver fields are not heightfields, and three properties follow:
 | The occlusion bake takes hours | Per-cell, per-direction ray marching — 1–2 hours per tile on a GPU against ~2 s per azimuth for the sweep on CPU [stendardo2020] [dozier2022] | Use the order-N sweep; it is O(N) and sun-independent |
 | Changing the time of day rebuilds everything | The horizon sweep sits below the sun parameter in the graph | Put the sun-independent sweep above the sun parameter; only the projection is downstream |
 | Rivers run out of dry valleys, or half the map is a desert | An unclamped upslope field: 49.6–50.1% of cells measure negative, and clamping alone then halves the base rate | Clamp at zero, then rescale so the domain total matches the intended base rate |
-| Erosion is identical on both sides of a range | Discharge taken as drainage area `A`, which assumes uniform rainfall | Accumulate `Q = Σ(P·cellArea)` with the same router and substitute `Q` for `A` [minderroe] |
+| Erosion is identical on both sides of a range | Discharge taken as drainage area `A`, which assumes uniform rainfall — a real range's windward and lee rates differ [minderroe] | Accumulate `Q = Σ(P·cellArea)` with the same router, and re-derive the coefficient at the rainfall `K_A` was calibrated under — `K_Q = K_A·P̄^−m`, not `K_A` |
 | The rain shadow is sharper than any real range | A single authored wind direction; the Alps' storms arrive from many, which erases the simple shadow [minderroe] | Average the dot product over three to five weighted directions |
 | The wet band sits on the windward face and looks pasted on | The upslope model has no conversion or fallout timescale, so nothing is advected downwind | Named fix is Smith and Barstad's linear theory — read it before implementing; the cheap partial fix is to advect the clamped field downwind before accumulating |
 | Ridge-tops are drier than the reference imagery | The upslope model's known failure at kilometre scale — measured maxima sit on ridge-tops via seeder-feeder [minderroe] | Add a curvature-weighted term and label it a correction, not physics |

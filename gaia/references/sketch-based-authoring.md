@@ -2,7 +2,7 @@
 type: Technique
 title: Sketch-based authoring — a drawn constraint against a solver
 description: "Turning a drawn ridge line or river path into terrain: the sparse-to-dense interpolation as a Laplace solve with a gradient term, hard versus soft constraints as one weight, the C1 falloff at the edge of the edited region, and the three-way choice of whether the constraint is imposed before, during or after the erosion pass."
-tags: [generation, authoring, constraints, sketching, interpolation, diffusion]
+tags: [generation, authoring, constraints, sketching, interpolation, diffusion, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
 sources:
@@ -15,12 +15,12 @@ sources:
 ---
 # Sketch-based authoring — a drawn constraint against a solver
 
-A user draws a ridge line. Two things now want the heightfield and they want different things:
-the drawing, which is a sparse set of exact values on a curve, and the erosion model, which is a
-solver with its own opinion about what a hillside looks like. Everything hard about sketch-based
-authoring is that conflict, and the decision that resolves it is not *how* to interpolate the
-drawing — that part is a linear solve with a known answer — but **when** the constraint is
-imposed relative to the simulation.
+**Tier: authoring-time, interactive.** A user draws a ridge line. Two things now want the
+heightfield and they want different things: the drawing, which is a sparse set of exact values on
+a curve, and the erosion model, which is a solver with its own opinion about what a hillside looks
+like. Everything hard about sketch-based authoring is that conflict, and the decision that
+resolves it is not *how* to interpolate the drawing — that part is a linear solve with a known
+answer — but **when** the constraint is imposed relative to the simulation.
 
 This document owns the general constraint problem: sparse drawing to dense field, hard against
 soft, and the edge of the edited region. The **river carve** is one instance of it and belongs to
@@ -62,7 +62,9 @@ Concretely:
 - *Sculpt the heightfield by hand with no falloff* — a 40 m edit at a hard cut is a
   **40 m/cell** slope step at the seam. A linear falloff over 32 cells still leaves 1.25 m/cell.
 - *Interpolate with a thin-plate (biharmonic) solve* — smooth, but it passes **through** the
-  constraint instead of creasing at it, which is wrong for a ridge and right for a hill (§1).
+  constraint instead of creasing at it, which is wrong for a ridge and right for an isolated hill;
+  and between two drawn heights it rings, 39% of the range past the higher one at six cells on
+  §1's 65² rig — and further on a larger domain (§1).
 - *Example-based synthesis from an exemplar DEM* — excluded from this skill by design; see the
   last section.
 
@@ -96,9 +98,14 @@ principled option — it is a constraint that holds at every instant — and it 
 three on the only metric where it should have won. The mechanism is that a projection is a
 discontinuous operator: it is `where(mask, …)`, and the solver's stencil straddles the mask edge.
 The projection re-adds height inside; diffusion carries it out; the projection re-adds it again.
-Measured, the height re-added per step falls from 4,562 to 867 cell-metres over 200 steps and
-then stops falling — 19% of the initial rate, forever. **A per-step projection does not converge
-to a fixed point; it converges to a steady flux.**
+Measured, the height re-added per step falls from 4,562 to 867 cell-metres over 200 steps — 19%
+of the initial rate, and **still falling there**. That 19% is a transient reading, not a plateau:
+at step 200 the diffusion length is `√(2DT) = 8.9` cells against ~128 to the domain edge, so the
+flux has not yet felt whatever fixes the far field, and it cannot settle until it does — `t =
+128²/2D`, of order 4×10⁴ steps at these settings. The settled level is several times lower again
+and depends on where that far field sits, so it is not a fixed fraction of the step-1 rate. It was
+**not measured here**; that run needs repeating before anyone budgets from it. **A per-step
+projection does not converge to a fixed point; it converges to a steady flux.**
 
 ⚠️ **Cost is not the reason to avoid it.** One whole-grid masked re-projection costs 110 µs
 against 532 µs for one diffusion step, and 26 µs if you restrict the write to the mask's bounding
@@ -158,8 +165,16 @@ statement of it. Three equations, by order:
 | 2 | `ΔF = 0` (Laplace) | everywhere else, be as smooth as possible |
 
 Solved together as one over-constrained system by Jacobi relaxation inside a multigrid, at
-`5(l − i)` iterations on level `i` [hnaidi2010] §5.2 — the same schedule [orzan2008] uses for
-diffusion curves, which is where the method comes from.
+`5(l − i)` iterations on level `i` [hnaidi2010] §5.2; the multigrid-Jacobi solve itself is
+borrowed from [orzan2008] §3.2.2's diffusion curves, which is where the method comes from.
+
+⚠️ **That iteration count is not implementable as printed, and it is not the schedule [orzan2008]
+prints.** Nothing on this page defines `l` or says which end of the hierarchy `i` counts from, and
+[orzan2008] states its own schedule the opposite way round, `5i` iterations at level `i`. The two
+are the same sweep count only under the relabel `j = l − i`, i.e. only if the two papers index
+levels in opposite directions with `l` the maximum level index; neither convention is stated here,
+and under "`l` = number of levels" they are simply different schedules. Read the level convention
+out of whichever paper you implement, and do not assume the two agree.
 
 **Why not Poisson.** [orzan2008] §3.2.2 solves `ΔI = div w`, and that is the right formulation
 for images. [hnaidi2010] §4.2 rejects it for terrain, explicitly and for two reasons worth
@@ -186,10 +201,41 @@ hilltop and wrong for an arête. [hnaidi2010]'s answer — stay second order, ad
 equation — gets both, because the gradient constraint sets the slope leaving the curve on each
 side independently, and a crease is just two different slopes.
 
-⚠️ **The textbook plate overshoot did not appear.** The clamped plate undershot the lowest
-constraint value by 2.2×10⁻⁵ of the constraint height, which is nothing. Do not repeat the folk
-claim that biharmonic interpolation rings badly; for this configuration it does not. The reason
-to prefer Laplace here is the crease, not stability.
+⚠️ **The textbook plate overshoot did not appear — because a single constraint value cannot
+ring.** The clamped plate undershot the lowest constraint value by 2.2×10⁻⁵ of the constraint
+height, which is nothing. But the folk claim is about interpolation *between* values, and that
+test has only one. Add a second drawn line at a different height to the same rig — same 65², same
+columns, values 0 and 1, `s` rows apart — and the plate leaves the constraint range badly:
+
+| `s`, rows between the two drawn lines | plate min | plate max | membrane |
+|---|---|---|---|
+| 6 | **−0.616** | **1.387** | [0.000, 1.000] |
+| 10 | −0.332 | 1.120 | [0.000, 1.000] |
+| 24 | −0.090 | 1.020 | [0.000, 1.000] |
+
+At six cells apart the plate sits 39% of the constraint range above the top value and 62% below
+the bottom one; it is still 2% and 9% out at 24. The membrane cannot do this at any `s` — the
+5-point discrete Laplacian obeys a maximum principle, so its solution is bounded by its own data,
+and that column is guaranteed rather than merely observed. (An independently assembled 1-D clamped
+beam reproduces every plate entry in that table to within 0.014.) **So the folk claim survives,
+scoped to what it was always about: prefer Laplace for the crease, and prefer it again wherever
+two drawn features at different heights run close together — in a sketch, the ordinary case.**
+
+⚠️ **Those two percentages are a property of the gap measured against the 65² rig, not of six
+cells' separation on its own, and the distinction is the design fact.** Hold `s = 6` and the drawn
+lines fixed and grow only the domain, and the same pair leaves `[0, 1]` by **100% above and 122%
+below at 129²**, and by **190% and 210% at 257²**. What sets the excursion is the gap *relative
+to* the distance to the clamped boundary, and neither variable on its own: `Δ²h = 0` with fixed
+data has no intrinsic length, so only a ratio of lengths can set the answer — which is why the
+table above, at one fixed 65² domain, shrinks the undershoot from −0.616 to −0.090 as `s` goes
+6 → 24, even though the wider pair necessarily sits *closer* to the clamped edge, not further.
+The line's own length barely moves it, 17 columns to 63 taking the minimum only from −0.558 to
+−0.628. The 1-D beam grows the same way and faster — 39%/63% at 65 nodes, 272%/298% at 257 —
+on a different assembly, a different dimensionality and a
+different stencil, so this is not an artefact of the 2-D operator. **The overshoot is therefore
+not a number you can budget for**, and on an edit window big enough to be worth having it exceeds
+the range the user drew. The membrane's bound is the opposite kind of statement: a maximum
+principle is a theorem, and it holds at every domain size.
 
 **Both are global.** A single drawn line moved 92% (Laplace) or 80% (plate) of the domain above
 1% of its own height. [orzan2008] §3.2.4 names this directly — "any color value can influence any
@@ -305,10 +351,17 @@ flow routing.
 ## Crossovers
 
 - **Before or after the erosion pass** flips at `σ ≥ √(2DT/3)` for the diffusion term. At
-  `D = 1`, `T = 40` that is 5.2 cells; below it the sim eats the feature.
+  `D = 1`, `T = 40` that is 5.2 cells; below it the sim eats the feature. That threshold is in
+  *peak* amplitude — a ridge sitting exactly on it keeps half its peak and appreciably less than
+  half its relief (§2) — so read it as a floor on the width you need, not a pass mark.
 - **Laplace or biharmonic** flips on whether the drawn feature is a *crease*. Ridges, cliffs and
-  riverbanks: Laplace, which sheds 16.5× more height in the first cell. Hilltops and domes:
-  either, and the plate is smoother.
+  riverbanks: Laplace, which sheds 16.5× more height in the first cell. An isolated hilltop or
+  dome: either, and the plate is smoother. Two drawn heights near each other: Laplace, because the
+  plate leaves the constraint range and the excursion grows with the distance to the clamped
+  boundary *at a fixed gap* — 39% above and 62% below at six cells' separation on §1's 65² rig,
+  190% and 210% on the same pair at 257². Widen the gap instead and it shrinks; only the ratio
+  of the two decides. The membrane's bound is a theorem at any domain size; the plate's
+  overshoot is not a number you can budget.
 - **Hard or soft constraint** flips on whether the feature has an edge. Elevation on a ridge:
   hard (`α = 0`). Noise amplitude, roughness, gradient magnitude: soft.
 - **Per-step projection or not**: never, on these measurements — not on cost (21% of a step) but
@@ -341,16 +394,17 @@ Constraint-based authoring, which is what is above, is not part of that exclusio
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| The drawn ridge is gone after the erosion pass | It was an initial condition and its width is under the diffusion length; a 4-cell ridge keeps 18.8% of its relief in 200 steps | Impose after, or widen it: half-life goes as σ², so `σ ≥ √(2DT/3)` |
+| The drawn ridge is gone after the erosion pass | It was an initial condition and its width is under the diffusion length; a 4-cell ridge keeps 18.8% of its relief in 200 steps | Impose after, or widen it: half-life goes as σ², so `σ ≥ √(2DT/3)` — but that threshold is in *peak* amplitude and is a lower bound only; check relief on your own field (§2) |
 | A thin drawn crease vanishes but a broad drawn massif survives, on the same terrain | Same law; 2 cells is half gone in 30 steps, 16 cells in 1920 | Not a bug. Report the survival estimate to the user at draw time |
 | A wall or trench appears at the edge of the constrained region | A per-step projection through a hard-edged mask; curvature 88.3 against 0.69 for the free field | Do not project per step. If you must, feather the mask and accept the softened edge |
-| The constraint is still "costing" simulation after hundreds of steps | Per-step projection reaches a steady flux, not a fixed point — 19% of the step-1 work at step 200 | Constrain an input instead (`U`, `K`, water), which the solver does not fight |
+| The constraint is still "costing" simulation after hundreds of steps | Per-step projection converges to a steady flux, not a fixed point — still 19% of the step-1 work at step 200, and still falling there, so that 19% is a transient reading and not a budget | Constrain an input instead (`U`, `K`, water), which the solver does not fight |
 | Pits and standing water appear where a feature was stamped in | A hard-edged stamp dams the drainage: 28 interior pits against a control of 15 | C1 falloff on a compact support, and re-run depression handling (`flow-routing.md`) |
 | A visible ring at the edge of every edit | Linear falloff — C0 but not C1, leaving a 1.25 m/cell slope step on a 40 m edit over 32 cells | `w(a) = (a² − 1)²` [gain2009] eq. (1), or any C1 weight |
 | A step you can see the cell boundary of | Hard cut: the whole 40 m in one cell | As above |
 | Editing "here" invalidates the cache everywhere | Gaussian falloff has no support radius | Polynomial weight with `w = 0` beyond `r` [genevaux2013] §7 |
 | Coarse shape smudged, or fine detail with a hard edge, and no radius fixes both | One blend radius used for every frequency | Contract the support per level, `B_i = (φ_i/φ_0)·B_0` [gain2009] §4 |
 | A drawn ridge line comes out as a smooth ridge with no crest | Biharmonic or plate interpolation, which passes through the constraint; or a softened elevation constraint, `α > 0`, which "breaks edges on features" | Laplace plus a gradient equation, elevation constraints hard at `α = 0` [hnaidi2010] §5.2 |
+| A bulge above, or a hollow below, everything the user drew | Biharmonic/plate interpolation ringing between two constraint values at different heights: min −0.616 and max 1.387 on a 0-and-1 pair six cells apart on a 65² domain, and −2.10 and 2.90 on the same pair at 257² — it grows with the edit window | Laplace, whose maximum principle bounds the solution by its own data at any domain size |
 | A drawn hilltop comes out with a crease along the curve | Elevation constraint with no angle constraint — the membrane creases by default | Add the horizontal angle constraint; this is the case Poisson cannot express [hnaidi2010] §4.2 |
 | Two crossing feature curves produce a spike or a smear at the junction | Antagonistic gradient directions averaged | Leave the intersection empty and Laplace-diffuse the hole [hnaidi2010] §4.1 fig. 9 |
 | Sharp features dissolve where two curves run close together | Value sources rasterised onto the curve collide | Offset the sources normal to the curve (`d = 3` px) and keep the gradient on the curve [orzan2008] §3.2.1 |

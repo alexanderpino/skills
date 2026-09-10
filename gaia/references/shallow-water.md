@@ -2,7 +2,7 @@
 type: Technique
 title: Shallow water — the solver for bounded, interactive bodies
 description: "The virtual-pipe discretisation of the shallow-water equations: why it is the default for a pool, a flood or a ripple patch, and the six places it stops being the right model."
-tags: [simulation, water, shallow-water, solver, runtime, authoring-time]
+tags: [simulation, water, shallow-water, solver, authoring-time, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
@@ -15,6 +15,10 @@ sources:
   - { id: fluid_authority, tier: F, locator: "no artefact: the cosmetic-versus-gameplay liquid state contract. A convention this repository recommends, with no external source" }
 ---
 # Shallow water — the solver for bounded, interactive bodies
+
+**Tier: authoring-time and real-time.** The same virtual-pipe discretisation runs at both budgets —
+a generator's hydraulic-erosion bake and an engine's bounded interactive patch — and only the
+scheduler differs; `simulation-time-budget.md` owns that scheduler.
 
 When water must *respond* — fill, drain, slosh, flood, ripple around the player, break against a
 wall you moved — a wave field cannot do it, because a wave field has no state. This is the solver
@@ -53,24 +57,43 @@ the virtual pipe's cross-sectional area and `l` its length, both constant parame
 scheme's signal speed, which is why they reappear under **The stability limit**.
 
 ```
-per step, per cell:
-  h  += source * dt                                  # rain, springs, snowmelt, a hose
-  H   = b + h
-  f_i = max(0, f_i + dt * (A*g/l) * (H - H_neighbour_i))     # accelerate each of 4 fluxes by head
-  Σf  = sum(f_i)
-  K   = (Σf > 0) ? min(1, h * cellArea / (dt * Σf)) : 1      # <-- the clamp; see below
-  f_i *= K
-  h  += dt * (inflow - outflow) / cellArea
+per step, TWO passes over the grid — never one:
+
+  flux pass, every cell:                             # finishes before the depth pass begins
+    h  += source * dt                                # rain, springs, snowmelt, a hose
+    H   = b + h
+    f_i = max(0, f_i + dt * (A*g/l) * (H - H_neighbour_i))   # accelerate each of 4 fluxes by head
+    Σf  = sum(f_i)
+    K   = (Σf > 0) ? min(1, h * cellArea / (dt * Σf)) : 1    # <-- the clamp; see below
+    f_i *= K
+
+  depth pass, every cell:                            # reads only post-clamp fluxes
+    inflow = sum of the four neighbours' pipes aimed at this cell
+    h     += dt * (inflow - K*Σf) / cellArea         # K*Σf — the POST-clamp outflow, not Σf
 ```
+
+⚠️ **Both of those are load-bearing, and both are what a transcription gets wrong.** `Σf` is the
+**pre-clamp** sum, so the outflow subtracted must be `K·Σf` (or `Σf` recomputed after the scale);
+subtract the pre-clamp `Σf` and a cell hands out water it did not have — measured on the block
+below, min depth **−5.6 × 10¹⁷⁸** and then NaN, against **−0.000000** for the line as printed. And
+the two passes are not a convenience: every cell's `K` must land before *any* cell's inflow is
+summed. Fuse them into one sweep and a receiving cell books the neighbour's **unclamped** flux —
+measured on a sequential row-major sweep, mass drift **1.4 × 10³⁷** with pre-clamp neighbours, and
+**24.7%** even in the gentler variant where each cell clamps itself before any neighbour reads it.
+(Read the other way — the cell clamping before *it* reads its neighbours — the change is provably a
+no-op: the inflow sum touches only neighbours' flux entries, and a verifier measured both orders
+byte-identical.)
+The reference implementation does it in two passes for exactly this reason.
 
 Four properties make this the recommendation, in order of how much they matter.
 
 **1. The outflow scaling factor `K` makes positivity unconditional** [mei2007]. A cell may never
 output more water than it holds, so depth cannot go negative regardless of `dt`. A pipe model
 written without this clamp produces negative depths and then NaNs, and it is the single most common
-port error. Verified rather than asserted: with the guard below, a 64² grid over a rough bed runs
-400 steps at every `dt` from `C = 0.2` to `C = 20` with no NaN, `min depth = -0.000000`, and mass
-drift ≤ 1.1e-16. Unconditional means unconditional.
+port error. Verified rather than asserted: transcribing the block above literally — two passes,
+`K·Σf`, the guarded `K` below — a 64² grid over a rough bed runs 400 steps at every `dt` from
+`C = 0.2` to `C = 20` with no NaN, `min depth = -0.000000`, and mass drift ≤ 1.1e-16.
+Unconditional means unconditional.
 
 ⚠️ **But `min(1, h·cellArea/(dt·Σf))` as printed in [mei2007] eq. (4) is itself a `0/0`.** On a
 dry cell — no water, no flux — the argument is `0.0/0.0`. It survives a scalar CPU prototype by
@@ -117,12 +140,55 @@ second, so the gravity-only bound is an order of magnitude too large — in the 
 explodes. The Froude number `Fr = |u| / sqrt(g*h)` is the diagnostic: at `Fr ≳ 1` the advective
 half *dominates* the limit and the gravity-only version is simply wrong.
 
-⚠️ **The pipe form's own signal speed is `sqrt(g·A/l)`, and with `A` and `l` constant it does not
-move with depth at all.** Linearise the block above — flux accelerated by `A·g/l` times the head
-difference, depth updated by flux divergence over `lx·ly` — and the wave speed that falls out is
-`dx·sqrt(A·g/(l·lx·ly))`, i.e. `sqrt(g·A/l)` on a square grid. That is `sqrt(g·h)` **only if the
-pipe area is tied to depth**, `A ≈ h·lx`. `A/l` is the model's *effective depth*: with Šťava's
-`A = l²` [stava2008] the grid sloshes at the speed of water one cell deep, whatever the water is.
+⚠️ **The pipe form's own signal speed is `sqrt(2·g·A/l)`, and with `A` and `l` constant it does not
+move with depth at all.** Linearise the block above — `max(0,·)` and `K` off. Every face carries
+**two** one-way pipes, one owned by each cell, and each integrates the *full* head difference with
+the opposite sign, so the net face flux `F = f_i→j − f_j→i` picks up `2·dt·(A·g/l)·(H_i − H_j)` per
+step. With depth updated by that flux's divergence over `lx·ly` this is the staggered leapfrog wave
+equation with `c² = 2·A·g·dx²/(l·lx·ly)`, i.e. `c = sqrt(2·g·A/l)` on a square grid — **the factor
+of 2 is the second pipe, and it is the easiest thing in the scheme to lose.** Measured on a 1-D
+two-pipe chain with the nonlinearities off, a pulse crest runs at `1.409·sqrt(g·A/l)`, against
+`sqrt(2) = 1.414`.
+
+So `2A/l`, not `A/l`, is the model's *effective depth*: with Šťava's `A = l²` [stava2008] the grid
+sloshes at the speed of water **two cells** deep, whatever the water is, and tying the area to depth
+as `A ≈ h·lx` still runs `sqrt(2)` fast — `A ≈ h·lx/2` is what reproduces `sqrt(g·h)`. What does not
+change is the shape of the dependence, and that is what the `dt` decision turns on.
+
+⚠️ **Read `A = l²` as a resolution decision, because it is one: it ties the wave speed to the grid
+rather than to the water, so changing the output resolution changes the fluid.** With `l` the cell
+spacing, `A/l = Δx`, the effective depth is `2Δx` and the signal speed `sqrt(2·g·Δx)` — so
+**halving the cell size slows every wave by `sqrt(2)`** on an unchanged scene. Arrival times, the
+slosh period and how fast a fill front spreads all move, nothing reports an error, and the
+stability bound follows: `dt_crit = 0.50·sqrt(Δx/g)`, a timestep falling only as `sqrt(Δx)` and
+work rising as `1/Δx^2.5`. The three regimes, from the bound derived below
+(`resolution-independence.md` takes them off it): **`A` and `l` held as fixed numbers** — the
+signal speed is an authored constant unrelated to the water and unrelated to the grid, `Δt ∝ Δx`,
+work `1/Δx³`; **`A = l²`** — the case above, cheaper per halving and wrong in the physics;
+**`A ≈ h·lx/2`** — signal speed `sqrt(g·h)`, `Δt ∝ Δx`, and the model resolution-independent in
+its physics at the price of recomputing the bound each step. Everything else in the loop is
+already in world units and transfers: `g`, `source`, `b`, and the dimensionless `C`.
+
+**How wrong the water is, in one number.** Divide the two celerities: the model's `sqrt(2·g·A/l)`
+over the physical `sqrt(g·h)` is `sqrt(2·A/(l·h))`, and with `A = l²` that is `sqrt(2·l/h)` — a
+function of cell size over depth and of nothing else. It is exactly 1 at `h = 2l`, which is the
+"two cells deep" above stated as an error rather than as an image, and it is **within 10% only for
+`2l/1.21 ≤ h ≤ 2l/0.81`** — depths of roughly 1.65·l to 2.47·l. A tenth of a cell of water sloshes
+**347% too fast** (ratio `sqrt(20)` = 4.47) and ten cells of water **55% too slow**
+(`sqrt(0.2)` = 0.447). That is the error the constant-`A`
+recommendation carries and the reason the two rows of the table below look nothing alike; tying
+`A ≈ h·lx/2` drives it to zero, at the price of the per-step recomputation the first bullet below
+demands. It bounds the *water* — arrival times, slosh period, how fast a fill front spreads — and
+says nothing about the missing `(u.grad)u`, which is limit 6 and is not an error you can shrink.
+
+⚠️ **That band is stated in cells, so it slides when the cell size does.** `1.65·l ≤ h ≤ 2.47·l` is
+a depth measured in cells, not in metres: refine the grid and the accurate band moves *down* onto
+shallower water, out from under the body you tuned. A 30 cm puddle is reproduced exactly at
+`l = 15 cm` and is a tenth of a cell — **347% too fast** — at `l = 3 m`, with no parameter changed
+and nothing reported. Derived here rather than in `resolution-independence.md`, which carries the
+celerity ratio but not this consequence: under constant `A` there is no cell size at which the
+model is accurate for every depth, only one at which it is accurate for the depth you picked. If
+the patch resolution is a tuning knob, `A ≈ h·lx/2` is not optional.
 
 Measured, clamp disabled so instability is visible, critical `dt` bisected on a 32² grid:
 
@@ -133,13 +199,27 @@ Measured, clamp disabled so instability is visible, critical `dt` bisected on a 
 
 The constant-`A` row is flat, and `dt_crit / (dx/sqrt(g·A/l))` held at 0.502 across `A ∈ {1,4}`,
 `l ∈ {1,4}`, `dx ∈ {1,2}` and depths two decades apart. The tied-`A` row is the `1/sqrt(h)` of
-`sqrt(g·h)`, to three digits. So:
+`sqrt(g·h)`, to three digits.
 
-- **Full nonlinear shallow water, and the pipe form with `A ≈ h·lx`**: the bound above, both
+**That 0.502 is not a fitted constant — it is the 2-D leapfrog bound `1/sqrt(2)` on the speed
+above**, and writing it that way is the only form worth remembering:
+
+```
+dt_crit = (1/sqrt2) * dx / sqrt(2*g*A/l)  =  0.50 * dx / sqrt(g*A/l)
+```
+
+Bisected with the nonlinearities off the linear scheme returns **0.5000**; with `max(0,·)` and `K`
+back on, 0.5024. In 1-D, where von Neumann gives `c·dt/dx ≤ 1` rather than `1/sqrt(2)`, the same
+chain returns **0.7071**. So a shipped `C = 0.20` — the constant in
+`obsolete/terrain-architect/reference-impl/shallow_water.py` — is a **2.5× margin** on this scheme's
+limit, *not* the 5× that reading `C ≤ 1` as the bound suggests; what the margin buys is the two
+things the linearisation dropped, the one-way `max(0,·)` pipes and the outflow clamp. So:
+
+- **Full nonlinear shallow water, and the pipe form with `A ≈ h·lx/2`**: the bound above, both
   terms, recomputed every step. Celerity rises with depth, so **a filling pool gets progressively
   more expensive**; velocity rises as a front steepens, so **a dam break gets more expensive as it
   runs**. Do not compute it once at initialisation.
-- **The pipe form as published, `A` constant**: the gravity half is *fixed* at `sqrt(g·A/l)`.
+- **The pipe form as published, `A` constant**: the gravity half is *fixed* at `sqrt(2·g·A/l)`.
   A per-step `max(sqrt(g·h))` reduction over that grid measures nothing; `A/l` is what you are
   choosing when you choose `dt`, and it is chosen once. What remains per-step is Mei's own stated
   condition, `Δt·|u| ≤ lX` and `Δt·|v| ≤ lY` [mei2007] — the domain-of-dependence requirement that
@@ -175,9 +255,25 @@ different constitutive model.
 
 **5. The domain does not stream.** Fluid has no LOD. The patch is an explicit budget decision:
 follow the camera, nest resolutions rather than growing one grid, and sleep bodies nobody is
-looking at. Note the boundary contract flips with the body type — an open-water patch fades its
+looking at. ⚠️ **Nested resolutions and a constant `A = l²` do not compose**, and this follows from
+the celerity above rather than from any source: each level then sloshes at `sqrt(2·g·l)`, so a
+2× finer patch runs `sqrt(2)` slower than the one it sits inside and a wave crossing the seam
+changes speed — a reflection at an interface the level designer never built. Nest only with
+`A ≈ h·lx/2`, or hold `A/l` fixed in **metres** across levels and accept one authored signal speed
+everywhere. Note the boundary contract flips with the body type — an open-water patch fades its
 contribution to zero over the outer ~15% so the edge is never visible; a pool's edge is a real wall
 and must reflect.
+
+⚠️ **Price that decision before you take it.** The block above holds six fp32 fields per cell —
+`h`, `b` and the four pipe fluxes — and no more: velocity is *reconstructed* rather than stored,
+and the depth pass reads only fluxes, so `h` updates in place and needs no second buffer. That is
+**24 bytes per cell**: **1.57 MB** for a 256² interactive patch, **6.29 MB** at 512², **25.2 MB**
+for a 1024² authoring grid. Keeping `|u|` for rendering or for an erosion pass adds 8 bytes per
+cell; sediment and material layers are `hydraulic-erosion.md`'s cost, not this document's. Those
+figures are arithmetic on the printed block and a named format width, reproducible with a
+calculator and **not** a measurement: **no wall-clock or per-step time is measured anywhere in this
+document**, because one grid on one machine does not transfer, and the scheduler that would have to
+measure it is `simulation-time-budget.md`'s.
 
 **6. No momentum advection, so no shocks and no hydraulic jump.** The update drops `(u.grad)u`, so
 the model cannot steepen a front into a discontinuity, cannot form a hydraulic jump where
@@ -209,7 +305,7 @@ error, and unconditional positivity plus a fixed per-cell cost are worth more th
 ## Authority: which half of the water is real
 
 ⚠️ **This section is doctrine, not physics.** `fluid_authority` has **no external source**: it is
-a convention this repository recommends, carried from the retired `obsolete/terrain-renderer`'s `19-fluid-simulation.md`.
+a convention this repository recommends, carried from the retired `obsolete/terrain-renderer/references/19-fluid-simulation.md`.
 It is an engineering preference about ownership, replication and persistence, not a fact about
 water, and it is written as a rule only because a project that leaves it implicit discovers it at
 the worst possible moment.
@@ -251,10 +347,13 @@ no solver at all.
 | Every cell is NaN after one step, and the dry parts went first | The clamp itself: `min(1, h·cellArea/(dt·Σf))` is `0/0` where there is no water and no flux | Scale only when `Σf > 0`; the guarded branch form [stava2008] |
 | Clean in the Python prototype, NaN in the shader | Scalar `min(1, NaN)` returns 1; `np.minimum` propagates, and GLSL/HLSL leave it undefined | Same guard — never let `min` be the NaN handler |
 | Checkerboard sloshing that never damps, no NaN | `dt` above the CFL limit while the clamp holds positivity | Positivity is not stability — lower `dt` [courant1928] |
-| Stable until the pool fills, then explodes | `sqrt(g*h)` grew with depth; `dt` computed once. Only in a scheme whose celerity tracks depth: full SWE, or a pipe model with `A ≈ h·lx` | Recompute the limit each step from the current state |
-| Reducing `dt` by the deepest cell each step changes nothing, and it still explodes | Constant-`A` pipe model: its signal speed is `sqrt(g·A/l)`, fixed by parameters, not by depth | Bound on `sqrt(g·A/l)`; lower `A/l` or `dt`, and stop measuring depth |
+| Stable until the pool fills, then explodes | `sqrt(g*h)` grew with depth; `dt` computed once. Only in a scheme whose celerity tracks depth: full SWE, or a pipe model with `A ≈ h·lx/2` | Recompute the limit each step from the current state |
+| Reducing `dt` by the deepest cell each step changes nothing, and it still explodes | Constant-`A` pipe model: its signal speed is `sqrt(2·g·A/l)`, fixed by parameters, not by depth | Bound on `sqrt(2·g·A/l)`, i.e. `dt <= 0.50·dx/sqrt(g·A/l)`; lower `A/l` or `dt`, and stop measuring depth |
 | Stable while still, explodes as soon as anything moves fast | Advective speed left out of the CFL bound — in a solver that carries `(u.grad)u`; the constant-`A` pipe form has no `u` in its update to destabilise | Bound on `max\|u\| + sqrt(g*h)`, never on `sqrt(g*h)` alone [courant1928] |
 | A thin supercritical sheet explodes at a "correct" gravity-wave `dt` | Advective solver again: at `Fr ≳ 1` the advective half dominates; at 1 mm depth `sqrt(g*h)` is 0.099 m/s and `\|u\|` is metres per second | Recompute both halves every step from the current state |
+| Halving the cell size makes the water slower and the sloshing period longer, with nothing changed | `A = l²` ties the signal speed to the grid: effective depth `2Δx`, celerity `sqrt(2·g·Δx)` | `A ≈ h·lx/2`, or hold `A/l` fixed in metres and accept an authored signal speed |
+| A patch that was accurate at one cell size is 3× too fast at another | The ±10% band `1.65·l ≤ h ≤ 2.47·l` is depth in *cells*, so it slides with `l` | Tie `A ≈ h·lx/2`, or re-derive the band whenever the patch resolution moves |
+| A wave reflects off the seam between two nested patches | Constant `A = l²` gives each level its own celerity `sqrt(2·g·l)` | Same fix; nested levels must agree on `A/l` in metres |
 | Water piles up along the domain border | Closed boundary where an open one was meant | Ghost cells at a very low elevation drain the edge |
 | A basin never fills | Open boundary where a wall was meant | Reflect at real walls; fade only where a patch ends inside a larger body |
 | Water flows uphill or sits on a slope | Flux driven by bed slope instead of hydraulic head | Drive it by `b + h`, not `b` |

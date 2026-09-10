@@ -24,6 +24,10 @@ map is supposed to record what was looked at, not only what was worth building.
 What *is* worth the read is the size distribution, because it is the cleanest example in this
 corpus of a number everyone quotes and nobody agrees on.
 
+**Tier: authoring-time for the mask and the ridge lines; the drift is the only part with a runtime
+cost.** It is one vector per frame applied to the whole mask as a rigid motion — a transform, not
+a per-cell pass — and nothing else on this page touches a frame budget.
+
 ## Use this
 
 **Author the floe field as a mask, not a simulation. Sample floe sizes from a truncated power law
@@ -75,8 +79,8 @@ any of them, and the bibliography records that refusal.
 The one modern number here that was read in its own paper: [denton2022] segmented 78
 high-resolution optical images of the Canada Basin spanning 1999–2014 and fitted the
 **noncumulative area** density `n(a) = c·a^m` over 50 m² to 5 km², getting **m from −2.03 to
-−1.65, mean −1.79 ± 0.08**, with a maximum-likelihood mean of −1.77 ± 0.11 that differs from the
-least-squares value by about 3%.
+−1.65, mean −1.79 ± 0.08**, with a maximum-likelihood mean of −1.77 ± 0.11 — **0.02** from the
+least-squares value, a quarter of the smaller of the two error bars.
 
 ⚠️ **And 76% of those fits pass the goodness-of-fit test.** [denton2022] Sect. 3.1 reports it
 plainly: 76% at `p ≥ 0.1`, meaning the power-law model is *rejected* for roughly a quarter of the
@@ -308,11 +312,15 @@ The numbers, from 12 Arctic ridges mapped in Operation IceBridge imagery [duncan
 - and a **0.6 m lower cutoff**, below which a bump is sastrugi and not a ridge.
 
 Put that against floe sizes. A 1.5 m sail on a 1 km floe is a relief-to-extent ratio of
-`1.5 × 10⁻³` and a mean slope of **0.17°**; on a 10 km floe it is `1.5 × 10⁻⁴`. The most extreme
-combination in [duncan2018] — a 4.8 m sail on a 1 km floe — reaches 0.55°. A mountain range is
-`10⁻¹`. **The entire vertical content of a sea-ice landform is two orders of magnitude below the
-smallest thing a terrain heightfield is usually asked to carry**, which is the whole reason this
-topic is graded the way it is.
+`1.5 × 10⁻³` and a mean slope of **0.086°** — `atan` of that ratio over the floe's *full* extent,
+which is the run the surface actually falls across, because a ridge is painted on a lead edge and
+not on a crest through the middle; on a 10 km floe the ratio is `1.5 × 10⁻⁴`. The most extreme
+combination in [duncan2018] — a 4.8 m sail on a 1 km floe — reaches `4.8 × 10⁻³` and **0.28°**.
+An earlier revision printed both angles at twice these values, taken over the half-width against a
+ratio quoted over the whole floe; that is the arithmetic to check if you meet them elsewhere. A
+mountain range is `10⁻¹`. **The entire vertical content of a sea-ice landform is two orders of
+magnitude below the smallest thing a terrain heightfield is usually asked to carry**, which is
+the whole reason this topic is graded the way it is.
 
 So: **do not simulate convergence.** Take the lead network the partition already gave you, choose
 the edges where your drift field is convergent — the divergence of `U` is one finite difference
@@ -331,7 +339,7 @@ here states it as a published operator.
 | You need the published size statistic | Sample sizes from the power law and place them | Every partition tested fits `m` shallower than −1.65 |
 | You need leads that look right | Voronoi or Laguerre partition, edges as leads | Straight shared edges are what packed-floe cracks are |
 | You need both | Partition for edges, sampled sizes for cells | Merging a fine partition averaged only −1.2, with a −0.9 to −1.5 seed spread |
-| Motion over hours to days | Free drift, `α ≈ 1–2%`, `θ ≈ 20°` | One line, ~70% of the variance [brunette2022] |
+| Motion over hours to days | Free drift, `α ≈ 2%` at `θ ≈ 20–40°` against a **near-surface** wind — or `α ≈ 0.8–1.1%` at `θ ≈ 5–18°` if your wind field is **geostrophic** | One line, ~70% of the variance [brunette2022]; the pair means nothing until you say which wind it is turning |
 | Motion in a converging field | Free drift plus ridge lines on convergent edges | Convergence is the only source of vertical relief |
 | Marginal ice zone, wave-broken | Smaller `p_max`, steeper `m` — but do not quote a break | The two-regime claim is contested and unread here |
 | An ice field that must interact mechanically | Not this document; a DEM contact solver | Rigid-body contact is a different program |

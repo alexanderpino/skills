@@ -2,7 +2,7 @@
 type: Technique
 title: Wave models — spectra, trochoids, and what dispersion actually settles
 description: "Which wave field to synthesise for open water, which for a stylised or gameplay sea, and what the dispersion relation constrains in every one of them."
-tags: [simulation, water, waves, spectra, runtime]
+tags: [simulation, water, waves, spectra, authoring-time, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
@@ -12,17 +12,18 @@ sources:
   - { id: lamb_damping, tier: F, locator: "6th ed. 1932, ch. XI Viscosity, Art. 348, pp. 623-624 — eq. 7 da/dt = -2*nu*k^2*a, eq. 8 its exponential decay, eq. 9 the decay modulus tau = 1/2*nu*k^2 = lambda^2/8*pi^2*nu" }
   - { id: airy_coastal, tier: F, locator: "no artefact: the linear (Airy) dispersion relation, Green's law, the breaker index and the surf-similarity parameter. Coastal-engineering canon with no single citable paper for the set" }
   - { id: coxmunk1954, tier: P, locator: "§6.3 'Mean Square Slopes', p. 847 — the clean- and slick-surface least-squares regressions, with W recorded at 41 ft, i.e. 12.5 m; the 1-14 m/s range and the factor two-or-three slick reduction are in the abstract, p. 838" }
-  - { id: bruneton2010, tier: P, locator: "§3.2 'Model hierarchy' eq. 4, the slope variance summed over the trochoids filtered out of the geometry; §5.1 'Sun light', which clamps sigma_x^2 and sigma_y^2 to a minimum in eq. 15 so the Sun keeps a finite disc" }
+  - { id: bruneton2010, tier: P, locator: "§3.2 'Model hierarchy' eq. 4, the slope variance summed over the trochoids filtered out of the geometry, and the surface itself, a sum of n = 60 trochoid wave trains on a projected grid; §5.1 'Sun light', which clamps sigma_x^2 and sigma_y^2 to a minimum in eq. 15 so the Sun keeps a finite disc; §7.3 'Results' for the timing — 52 fps, i.e. 19.2 ms, at 1024x768 on an NVIDIA 8800 GTS, split 11.1 ms for p, n, sigma_x, sigma_y and 8.1 ms for Algorithm 5.1, with 87 fps at 1000 m and 130 fps at 8000 m" }
   - { id: dupuy2012, tier: P, locator: "the statistical whitecap coverage from the Jacobian's footprint mean and variance" }
   - { id: monahan1980, tier: P, locator: "§5 'Conclusions', p. 2097 eq. 5 — the robust-biweight fit W = 3.84e-6 U^3.41 of Table 3, combined data set; the paper's ordinary-least-squares fit is eq. 4, W = 2.95e-6 U^3.52. U at 10 m in both" }
   - { id: yuksel2007, tier: P, locator: "§3.2 'Wave Particles' — eq. 7, the radial local deviation function, and the subdivision rule that splits one particle into three when neighbour spacing exceeds half the particle radius" }
 ---
 # Wave models — spectra, trochoids, and what dispersion actually settles
 
-A wave field is not a simulation. It is a **closed form evaluated at time `t`**, which is why an
-ocean fits in a frame when a fluid solver does not. Choosing which closed form is most of the work
-— and part of that choice is whether physics can ask the field a question cheaply, which is **not**
-the same answer for every model here; see [querying the
+**Tier: real-time rasteriser for the wave field; the shore band's travel-time solve is
+authoring-time.** A wave field is not a simulation. It is a **closed form evaluated at time `t`**,
+which is why an ocean fits in a frame when a fluid solver does not. Choosing which closed form is
+most of the work — and part of that choice is whether physics can ask the field a question cheaply,
+which is **not** the same answer for every model here; see [querying the
 field](#querying-the-field-is-a-per-model-question).
 
 This document owns the *field*: what it is, what it may contain, what motion it produces, and the
@@ -35,13 +36,15 @@ axis; where a body is closed rather than open, read the taxonomy first.
 **Open sea: a spectral FFT field in 2–4 cascades** [tessendorf_ocean]. Sample an oceanographic
 spectrum into a frequency grid, inverse-FFT to a displacement map per frame, sum cascades at
 different world-space patch sizes. ⚠️ **Pick those sizes near-co-prime, and do not use the round
-numbers this line used to print.** 400 / 60 / 10 m share a factor of 20: their LCM is **1200 m**, so
-the whole stack repeats every 1.2 km — the exact defect the failure table below sends you here to
-avoid. 401 / 61 / 11 m looks identical and has an LCM of **269 071 m**, past any draw distance. It is the AAA default because it is
-the only family that is statistically ocean-like across the whole band. (The spectrum, the
-transform and the choppy displacement are the cited notes. **The cascade stack is not**: the notes
-describe one patch, 10 m to 2 km on a side, and warn that tiling it makes the field periodic.
-Layering several patch sizes is later production practice, and is credited here to nobody.)
+numbers this line used to print.** 400 / 60 / 10 m have a `gcd` of **10** and an LCM of **1200 m**,
+so the whole stack repeats every 1.2 km. 401 / 61 / 11 m looks identical and has an LCM of
+**269 071 m**. ⚠️ **That LCM is not the visible repeat.** Co-prime sizes remove only the *coincident*
+return of all cascades at once; each still tiles at its own `L`, so the largest — **401 m** here —
+is the repeat an eye finds, whatever the LCM. **Choose `L_max` against draw distance.** The family
+is the AAA default because it is the only one statistically ocean-like across the whole band. (The
+spectrum, the transform and the choppy displacement are the cited notes. **The cascade stack is
+not**: the notes describe one patch, 10 m to 2 km on a side, and warn that tiling it makes the field
+periodic. Layering patch sizes is later production practice, credited here to nobody.)
 
 **Stylised, hero, gameplay-authored or tight-budget: a Gerstner (trochoidal) sum**
 [gerstner_trochoid]. 4–16 analytic waves, each with horizontal and vertical displacement, sharp
@@ -56,11 +59,15 @@ far away. The moment the depth field says otherwise, a separate shore-wave band 
 
 **Whatever field you synthesise, the dispersion relation is what makes it read as water**
 [capillary_gravity] [airy_coastal] — it is a constraint on the result, not a feature of one model.
-Four consequences, each a visible bug if ignored: there is a **slowest possible wave** (~23 cm/s,
-at ~1.7 cm), so nothing may travel slower; **long waves outrun short ones**, so a sea without
-groups reads as a metronome; **period is conserved across a depth change and wavelength is not**,
-so a train entering shallow water must shorten rather than slow uniformly; and **in shallow water
-celerity depends on depth alone**, which is what refracts crests onto every shore for free.
+Four consequences, each a visible bug if ignored: **phase speed has a minimum**, 0.2312 m/s at
+1.712 cm — but **energy travels at the group speed, whose minimum is lower still, 0.1776 m/s at
+4.35 cm**, so the *phase* minimum is no floor on how fast water may move: the 3 cm damping row below
+transports at 0.19 m/s, under it. ⚠️ **The group minimum is a floor** — in deep water no free wave
+carries energy slower than it, at any wavelength — and that same row sits just above it, not below.
+**Long waves outrun short ones**, so a sea without groups reads as a metronome; **period is
+conserved across a depth change and wavelength is not**, so a train entering shallow water must
+shorten rather than slow uniformly; and **in shallow water celerity depends on depth alone**, which
+is what refracts crests onto every shore for free.
 
 ## Querying the field is a per-model question
 
@@ -109,13 +116,13 @@ omega^2 = ( g*k + (sigma/rho)*k^3 ) * tanh(k*h)      # k = 2*pi/lambda, h = dept
 
 It is not decoration. Four hard constraints fall out of it, and each one is a bug if you ignore it.
 
-**1. There is a slowest possible wave.** The `k^3` term means phase speed *rises* again for very
-short waves, so `c(k)` has a **minimum**. `lam_min` is the wavelength at which that minimum occurs
-— not a floor on wavelength:
+**1. Phase speed has a minimum, and it is not a speed limit.** The `k^3` term means phase speed
+*rises* again for very short waves, so `c(k)` has a **minimum**. `lam_min` is where that minimum
+sits — not a floor on wavelength, and not the slowest anything travels:
 
 ```
-c_min   = (4 g sigma / rho)^(1/4)    = 0.2312 m/s      # sigma = 0.0728 N/m
-lam_min = 2 pi sqrt(sigma/(rho g))   = 0.01712 m       # 1.712 cm
+c_min   = (4 g sigma / rho)^(1/4)    = 0.2312 m/s      # min PHASE speed. sigma = 0.0728 N/m
+lam_min = 2 pi sqrt(sigma/(rho g))   = 0.01712 m       # 1.712 cm. Min GROUP speed 0.1776 at 4.35 cm
 ```
 
 ⚠️ **The dispersion relation forbids no wavelength.** `omega^2 = (g k + (sigma/rho) k^3) tanh(k h)`
@@ -150,8 +157,11 @@ metronome; superposing two or three in a band (7–14 s for ocean swell) with a 
 produces sets.
 
 **3. Period is conserved across a depth change; wavelength is not.** A train entering shallow water
-keeps `omega`, so `k` must rise: **crests bunch and slow** toward shore. Solve `k(omega, h)` with a
-few Newton iterations into a small 2-D lookup table offline — never per frame [airy_coastal].
+keeps `omega`, so `k` must rise: **crests bunch and slow** toward shore. Tabulate `k(omega,h)`
+offline, never per frame [airy_coastal], and in **1-D** not 2-D: `X·tanh X = ω²h/g` with `X = kh`.
+⚠️ That collapse to one variable needs the `k³` capillary term dropped — with it there is no such
+form — which is free at shore-wave scales (0.03% of `gk` at `lambda = 1 m`) but is a precondition,
+not an identity.
 
 **4. In shallow water celerity depends on depth alone.** `c ≈ sqrt(g*h)` for `h < lambda/20`. Two
 consequences: crests rotate toward alignment with the depth contours (refraction, the strongest
@@ -211,11 +221,10 @@ from the other two and expect the published number.)
 
 Two limits on quoting them: wind speed is referenced at **12.5 m** — the paper says 41 feet — not
 the 10 m of standard wind data, and the fit is calibrated only over **1–14 m/s** — do not
-extrapolate to storm winds. A third
-is worth knowing because it is usually implemented as the wrong mechanism: a **surfactant film damps
-the short waves that carry most of the slope**, and slicked water measures a factor of 2–3 lower
-total mean-square slope [coxmunk1954] — so an oil slick, a wind shadow or a convergence line is a
-*local reduction of this variance*, not a dark decal.
+extrapolate to storm winds. A third is worth knowing because it is usually implemented as the wrong
+mechanism: a **surfactant film damps the short waves that carry most of the slope**, and slicked
+water measures a factor of 2–3 lower total mean-square slope [coxmunk1954] — so an oil slick, a wind
+shadow or a convergence line is a *local reduction of this variance*, not a dark decal.
 
 That is where this document's job ends and the rendering axis begins: the variance tensor, the
 solar-disc clamp on it, and the roughness-aware Fresnel fit that consumes it are how a shader spends
@@ -240,11 +249,10 @@ mean and variance over a footprint — is what keeps it stable at distance [dupu
 
 Two checks that the coverage is physical rather than tuned. Whitecap coverage from wind follows a
 power law with **no offset** — `W = 3.84e-6 * U^3.41`, with `U` at 10 m [monahan1980] — so at zero
-wind the sea must carry exactly zero foam pixels; and that law puts coverage near zero around
-5 m/s and conspicuous by 15 m/s, which agrees
-with the Beaufort observation that whitecaps begin at Force 3. An empirical formula and a
-19th-century observational scale agreeing on where foam starts is a strong argument for driving foam
-from wind rather than from a constant.
+wind the sea must carry exactly zero foam pixels; and that law puts coverage near zero around 5 m/s
+and conspicuous by 15 m/s, which agrees with the Beaufort observation that whitecaps begin at
+Force 3. An empirical formula and a 19th-century observational scale agreeing on where foam starts
+is a strong argument for driving foam from wind rather than from a constant.
 
 ⚠️ **That paper publishes two fits and they are not the same curve.** `3.84e-6 * U^3.41` is its
 **robust-biweight** fit; its **ordinary-least-squares** fit is `2.95e-6 * U^3.52`. They cross near
@@ -252,9 +260,14 @@ from wind rather than from a constant.
 the wind range. Name the fit beside the constant, exactly as this skill asks absorption to be
 quoted beside its sample wavelengths.
 
-⚠️ **Choppiness is the horizontal-displacement scale, and past about 1.0 it drives `J` negative over
-large areas** — which reads as geometry self-intersection shimmer rather than as foam. Clamp it so
-folding stays rare and foamed.
+⚠️ **Choppiness is the horizontal-displacement scale, and *"past ~1.0 it drives `J` negative"* —
+which this line used to print — is not a constant.** At a fixed directional spread the folded
+fraction depends on `q` and on the spectrum only through `s = q·√mss` — the **radial** shape drops
+out exactly; the spread does not. So clamp `q ≤ s_p/√mss_resolved`, `mss` the **total** mean-square
+slope of that cascade, both components. Derived here, `s_p ≈ 0.51 / 0.40 / 0.69` at accepted fold
+fractions `p` of 1% / 0.1% / 5% (`cos²` spread; **6–17% higher** unspread across those three — that
+band is the spread moving the threshold, which is why the spread has to be stated). `p` is a
+choice: **clamp per cascade on its own `J`**.
 
 ## The shore is a different field, not a modulation
 
@@ -288,30 +301,29 @@ isolated obstacle a wavelength across in the scene and look behind it.
 
 ## What it costs, and how close it is
 
-⚠️ **An earlier version of this document stated neither, across 312 lines** — no cost figure, no
-error figure, and the FFT's two governing parameters never named. Both halves exist in the sources
-it already cites:
+⚠️ **An earlier version stated neither, across 312 lines** — no cost figure, no error figure, and
+the FFT's two governing parameters never named. Both halves exist in the sources it already cites:
 
 | Model | Cost, as the source states it | Accuracy, as the source states it |
 |---|---|---|
-| FFT, single patch | interactive at **512²** [tessendorf_ocean] | resolves down to a **~2 cm** floor at that grid; below it, waves become variance |
-| FFT, full pipeline | **19.2 ms**, broken down per stage [bruneton2010] | — |
-| Wave packets / dispersion kernels | **under 10 ms**, **5.33 MB** of state [dupuy2012] Fig. 2 caption | — |
-| Gerstner sum | scales linearly in wave count | **error of 3%** on the stated form, falling to **0.1%** with the correction [yuksel2007] §7 |
+| FFT, single patch | interactive at **512²** [tessendorf_ocean] | resolves to `2L/N` — Nyquist over the notes' own 10 m–2 km patch range, so **3.9 cm** at `L = 10 m` and **1.56 m** at `L = 400 m`; below it, waves become variance |
+| Gerstner/trochoid sum, full lighting pipeline | **19.2 ms** — 52 fps at 1024×768 on an NVIDIA 8800 GTS, 60 trochoids from 2 cm to 30 m, viewed horizontally from 4 m up; 11.1 ms for position, normal and slope variance, 8.1 ms for the shading [bruneton2010] §7.3. ⚠️ **That is 15% over a whole 16.7 ms frame at 60 fps, for the water alone** — but it is that paper's *near-view worst case* on a mid-2000s GPU; the same sentence reports 87 fps (**11.5 ms**) at 1000 m and 130 fps (**7.7 ms**) at 8000 m, both inside a frame. Re-measure before budgeting from it | — |
 
 **The two parameters that set both, and which this document used to leave unstated:** `N`, the
 frequency-grid size, and `L`, the patch size in metres. The sample spacing is `L/N` and the shortest
 representable **wavelength** is **`2L/N`** — Nyquist, two samples per wave. ⚠️ **An earlier version
-of this line called `L/N` the wavelength floor and was short by a factor of two.** So the 2 cm figure
-above is a statement about `2L/N`, not about the FFT: 512² at `L = 400 m` gives a **1.56 m** floor,
-not 2 cm and not the 78 cm that same version printed. Quote `N` and `L` together or the cost means
-nothing, and quote the floor as a wavelength or it is off by two.
+of this line called `L/N` the floor and printed 78 cm where 512² at `L = 400 m` gives 1.56 m; the
+cell above carried a bare "~2 cm", which needs `L = 5.12 m`, outside the notes' own 10 m–2 km
+range.** Quote `N` and `L` together, and the floor as a wavelength, or it is off by two.
 
-⚠️ **Provenance note.** The four figures above were read from the artefacts by a verification pass,
-not re-fetched at the time of writing: `inria.hal.science` serves a bot challenge for the
-[dupuy2012] PDF and `journals.ametsoc.org` returns 403 without a browser user-agent, both confirmed
-here. Treat them as attributed, in this corpus's usual sense, and re-read before relying on the
-exact digits.
+⚠️ **Provenance note.** Two rows were deleted here: a wave-packet cost sourced to the whitecap paper
+[dupuy2012], and a Gerstner accuracy figure sourced to [yuksel2007] §7, whose declared locator is
+§3.2 and which uses no Gerstner waves. A third was **re-labelled**: 19.2 ms stood as the *FFT's*
+cost until [bruneton2010] was re-fetched from `hal.science` and read — that paper sums 60 trochoids
+on a projected grid, writes "Fourier" nowhere, and names FFT once, in related work, as the branch it
+did not take. **A cost is only a cost for the model it was measured on.** The `512²` cell is still
+second-hand — read by a verification pass, not re-fetched — so re-read it before trusting the digits
+(`inria.hal.science` still bot-challenges the [dupuy2012] PDF).
 
 ## What it beats
 
@@ -321,9 +333,10 @@ exact digits.
   the cited chapter names: those are vertex loops that form over a crest once the steepness sum
   `Q_i*w_i*A_i` passes 1, they are avoidable, and the chapter says how. The temporal repeat is
   not.
-- **A single FFT tile** [tessendorf_ocean] — visibly repeats from any altitude; cascades at
-  near-co-prime sizes push the repeat beyond notice, but verify from maximum gameplay altitude,
-  because tiling *returns* at height as the small cascades mip away.
+- **A single FFT tile** [tessendorf_ocean] — visibly repeats from any altitude. ⚠️ Near-co-prime
+  cascades do **not** push that repeat beyond notice: they remove only the *coincident* return, and
+  the one an eye finds is the largest cascade's own `L`. Pick `L_max` against draw distance, and
+  verify from maximum gameplay altitude, where tiling *returns* as the small cascades mip away.
 - **Shallow-water simulation as an ocean** — no dispersion, so no groups, no swell and no correct
   deep-water motion. It is the right tool for a bounded interactive body and the wrong one for a sea.
 - **Wave particles** [yuksel2007] — Lagrangian carriers of wave energy, each holding a radial
@@ -347,11 +360,11 @@ exact digits.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | Surf marches diagonally onto the sand | Deep-water field modulated by depth; no refraction | Travel-time phase field [airy_coastal] |
-| The whole sea visibly repeats its motion | A single FFT tile, or a cascade stack whose patch sizes share a factor — 400/60/10 m repeats at their LCM of 1200 m | Near-co-prime sizes (401/61/11 m, LCM 269 071 m); verify from max altitude |
+| The whole sea visibly repeats its motion | A single FFT tile; a cascade stack whose sizes share a factor (400/60/10 m, `gcd` 10, coincident at 1200 m); or, once they are co-prime, the largest cascade's own `L` | Near-co-prime sizes, and pick `L_max` against draw distance — 401 m repeats at 401 m whatever the LCM; verify from max altitude |
 | A Gerstner sea repeats its motion no matter how the tiles are sized | The sum of N Gerstner waves has a period at the LCM of the component periods — a temporal repeat, not a spatial one, so cascade sizing cannot reach it | Irrational-ratio frequencies push it past a session; otherwise this is a reason to choose the FFT family, not a tuning problem |
 | Waves fade out toward shore instead of growing then breaking | Amplitude faded by depth with no shoaling gain | Green's-law rise, clamped, then cut at the break |
 | A wall of water in the blend band | Ambient and shore bands added rather than cross-faded | Fade one down as the other comes up |
-| Crests shimmer and self-intersect | Choppiness past ~1.0 driving `J` negative over large areas | Clamp choppiness; keep folding rare and foamed |
+| Crests shimmer and self-intersect | Choppiness past the fold threshold, which is `s_p/√mss_resolved` per cascade and not the constant ~1.0 this row used to name, driving `J` negative over large areas | Clamp per cascade against its own measured `J`; keep folding rare and foamed |
 | Foam on a dead-calm sea | Coverage not driven by wind, or driven by a law with an offset | The power law has no offset [monahan1980] |
 | Far water turns to plastic | Wave detail below the geometry band dropped instead of becoming variance | Carry it as slope variance [bruneton2010] |
 | Fine ripple octaves alias and never sharpen | Sub-pixel detail added past the aliasing budget — and at those wavelengths the real surface damps within centimetres | Cut on viscous damping or on footprint, not on `lam_min`: it is a phase-speed minimum, not a shortest wave [lamb_damping] |

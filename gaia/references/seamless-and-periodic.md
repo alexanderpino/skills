@@ -16,12 +16,13 @@ sources:
 ---
 # Seamless and periodic — output that tiles
 
-[lagae2010] §2.3 lists the properties a good procedural noise has, and the third one is that it
-is **not periodic**: it "is unlimited in extent and can cover an arbitrary large area *without
-seams and unwanted repetition*". You are about to ask for the defect on purpose. That is fine —
-periodicity is a *requirement*, not a quality — but it means every source you will find is
-optimising away from where you are going, and the survey's Table 1 says exactly what it costs:
-storage is expressed "in function of the period N", so a lattice noise's memory *is* its period.
+**Tier: authoring-time.** [lagae2010] §2.3 lists the properties a good procedural noise has, and
+the third one is that it is **not periodic**: it "is unlimited in extent and can cover an
+arbitrary large area *without seams and unwanted repetition*". You are about to ask for the defect
+on purpose. That is fine — periodicity is a *requirement*, not a quality — but it means every
+source you will find is optimising away from where you are going, and the survey's Table 1 says
+exactly what it costs: storage is expressed "in function of the period N", so a lattice noise's
+memory *is* its period.
 
 The topic splits cleanly and unevenly. **Making noise wrap is arithmetic** and takes one line.
 **Making an eroded field wrap is a modelling decision made before the first timestep**, because a
@@ -38,6 +39,7 @@ period a multiple of `2^L` for the deepest pyramid anywhere in the graph.**
 
 ```
 period P                       # cells, chosen once, a multiple of 2^L_max
+hash:   integer mixer, or a table >= P*lacunarity^(octaves-1)  # the FINEST octave's P_l, not P
 noise:  gradient(i mod P_l, j mod P_l)     # P_l = P * frequency_l, MUST be an integer
 sim:    neighbour(i, j) = grid[(i + di) mod H, (j + dj) mod W]
 route:  priority_flood(seeds = [the one authored sink])
@@ -61,8 +63,8 @@ boundary* [seam_fake_practice] — correct, and the crop grows with simulated ti
 steps, 13 at 1200, with no sign of converging. *Wang or corner tiles* — the real answer when you
 want variation rather than repetition, named by [lagae2010] §7 as one of the two published fixes
 for a noise's period; a different problem from making **one** tile wrap, and out of scope here.
-*A four-dimensional torus embedding* — the only route when the lattice cannot be reindexed at all,
-which is simplex; measured at `2.3e-14` for any period and 4× the gradient work.
+*A four-dimensional torus embedding* — the only route when the lattice cannot be reindexed: simplex,
+or any kernel you cannot reach inside; `2.3e-14` at any period, at about 2.8× the arithmetic.
 
 `noise-and-warping.md` owns noise construction and `surface-and-scale-space.md` owns the band
 split; this document owns only what makes each of them wrap. `tiled-streaming.md` and
@@ -81,7 +83,7 @@ deterministic function of the *integers* `i, j, k`, and it repeats exactly when 
 modulo the period before hashing** [periodic_lattice_practice]. One line, and it is exact:
 
 ```
-i0 = floor(x) % P;  i1 = (floor(x) + 1) % P     # and likewise for y
+i0 = floor(x) % P;  i1 = (floor(x) + 1) % P   # likewise y; hash period >= P, and P_l per octave
 ```
 
 Measured, `m1_periodic_noise.py`, recorded in `registers/pseudocode-execution.tsv`, max `|f(x) − f(x+T)|` over 512² samples:
@@ -92,20 +94,24 @@ Measured, `m1_periodic_noise.py`, recorded in `registers/pseudocode-execution.ts
 | Perlin, index mod T | **0.0** | **0.0** | **0.0** | **0.0** | **0.0** |
 | 2-D simplex, same trick | 1.85 | 1.79 | 1.87 | 1.96 | — |
 
-Three things fall out of that table.
-
-**The period divides the domain, or there is no wrap.** The naive row is zero at exactly one
-value, 256, which is the permutation table's own length — that is [lagae2010]'s Table 1 footnote 1
-made visible, storage `O(N)` *in the period N*. A field is periodic at `T` if and only if
-**the hash's period divides `T`** — that is, `T` is a *multiple* of the table size, not a divisor
-of it.
-⚠️ **This sentence used to say the reverse**, and the reverse is false in both directions.
-Measured on a 256-entry permutation table, `max |f(x) − f(x+T)|` over random samples:
-`T` = 2, 4, 32, 64 and **128** all divide 256 and all fail at full noise amplitude (0.74–0.98);
-`T` = 512, 768 and 1024 divide by nothing and are exact to 1e-13. A reader who picked `T` = 128
-"because it divides 256" would get a seam at full amplitude. The error survived because the
-canonical case, `T` = 256, satisfies both readings — it is the one period that cannot tell them
-apart.
+Three things fall out of that table. **The period divides the domain, or there is no wrap.** The
+naive row is zero at exactly one value, 256, which is the permutation table's own length — that is
+[lagae2010]'s Table 1 footnote 1 made visible, storage `O(N)` *in the period N*. A field is periodic
+at `T` if and only if **the hash's period divides `T`** — that is, `T` is a *multiple* of the table
+size, not a divisor of it. ⚠️ **This sentence used to say the reverse**, and the reverse is false in
+both directions: measured on a 256-entry table, `T` = 2, 4, 32, 64 and **128** all divide 256 and
+all fail at the full noise amplitude the table above prints — 1.59 at `T` = 64 — while `T` = 512,
+768 and 1024 are multiples of 256 and are exact to 1e-13. Picking `T` = 128 "because it divides 256"
+gets you a full-amplitude seam; the error survived because `T` = 256 satisfies both readings.
+⚠️ **And that is half of it: *divides* makes the field periodic at `T`, it does not make `T` the
+*smallest* period.** With a 256-entry table a `P` = 1024 tile is a 256 tile laid 4×4 — 2.4e-13
+inside it against 1.31 with a 1024-entry table — while the `T = P` wrap test reads 2.6e-13 either
+way, blind to it. **Give the hash a long period** ([lagae2010] §7) **— and the period it must reach
+is the *finest octave's* `P·lacunarity^(n−1)`, not `P`** [periodic_lattice_practice]: octave `l`
+reduces mod `P·lacunarity^l`, so a `P`-long table repeats every `P/lacunarity^l` **cells**. On a
+six-octave, lacunarity-2 stack at `P` = 1024, a `P`-entry table leaves octaves 1–5 bit-identical
+at a 512-cell shift (4.0e-13) against 4.6e-01 at 32768 entries. An integer mixer with no 8-bit
+mask reaches any `P_l` for free.
 
 **Simplex does not take the trick.** Simplex noise skews the square lattice by `F2 = (√3−1)/2`
 before flooring, so the integers being hashed live on a triangular lattice whose relationship to
@@ -113,23 +119,25 @@ your rectangular tile is irrational. Reducing them modulo `T` reduces the *wrong
 measured error stays at full noise amplitude for every period tried. Simplex is periodic-hostile
 by construction and the fix is not a fix to simplex.
 
-**The general fix is a torus embedding, and it costs 4×.** Map the tile onto two circles in four
-dimensions and evaluate a 4-D noise there [periodic_lattice_practice]:
+**The general fix is a torus embedding, and on simplex it costs about 2.8×.** Map the tile onto
+two circles in four dimensions and evaluate a 4-D noise there [periodic_lattice_practice]:
 
 ```
 a = 2*pi*x/T;  b = 2*pi*y/T
-# r is the CIRCLE RADIUS and it is the embedding's only free parameter: it sets feature
-# scale, because arc length around the circle is 2*pi*r while the tile spans T. A feature
-# of f cells in the tile maps to f * (2*pi*r/T) units of 4-D noise space, so pick
-# r = T / (2*pi) to make the mapping unit-rate and then set scale in the noise as usual.
+# r is the CIRCLE RADIUS, the embedding's only free parameter, and it sets feature scale:
+# arc length around the circle is 2*pi*r while the tile spans T, so a feature of f cells
+# maps to f*(2*pi*r/T) units of noise space. Pick r = T/(2*pi) for a unit-rate mapping.
 n(x, y) = noise4(r*cos a, r*sin a, r*cos b, r*sin b)
 ```
 
 Periodic by construction, for any noise, with no modular indexing anywhere. Measured `2.3e-14` at
-`T` = 7, 16, 64 and 300 — the residue is the `cos`/`sin` round-off, not a seam. It costs 16 lattice
-corners per sample instead of 4. **Crossover: use modular indexing whenever you control the hash;
-use the embedding only for a noise whose lattice you cannot reindex** — simplex, or any
-third-party kernel you call as a black box.
+`T` = 7, 16, 64 and 300 — the residue is the `cos`/`sin` round-off, not a seam. It takes 5 simplex
+corners per sample instead of 3 — a corner *count*, not a cost, because those corners are
+four-dimensional: 22 multiply/add-class operations each against 12, so about **2.8×** the kernel's
+arithmetic, plus two sines and two cosines the 2-D path never pays. 16-against-4 is the
+*gradient*-lattice figure — what a third-party gradient kernel you cannot reindex costs.
+**Crossover: use modular indexing whenever you control the hash; use the embedding only for a
+noise whose lattice you cannot reindex** — simplex, or any third-party kernel you call as a black box.
 
 ⚠️ **Lacunarity is now a correctness parameter, and this contradicts `noise-and-warping.md`.**
 That document recommends "a lacunarity that is not exactly 2", for good reasons about octave
@@ -149,8 +157,8 @@ lacunarity in lowest terms as `p/q`, and for `n` octaves the period must be divi
 compounded the most. Checked against the integrality of every octave for lacunarity 2, 3, 3/2,
 5/4, 7/4, 9/8 and 5/2 at `T = 64`: the condition predicts the outcome in every case. It also
 predicts the escape — `5/4` needs `4^5 = 1024`, so at a period of 1024 it wraps exactly, and it is
-the *period* that has to grow, not the lacunarity that has to be abandoned. `3/2` on a power-of-two period buys back most
-of the detuning the other document wants, and costs nothing.
+the *period* that has to grow, not the lacunarity that has to be abandoned. `3/2` needs 32 at six
+octaves, so on any power-of-two period of 32 or more it buys back most of that detuning, free.
 
 ## The hard half: the boundary condition IS the tiling decision
 
@@ -195,9 +203,8 @@ absolute step between interior neighbours; 1.0 means the seam is indistinguishab
   1.085 — a 21% relative rise — and the outer four cells drift 4.2% of relief away from the
   interior. The *sign* of that drift depends on your capacity law; its existence does not. Tiled,
   it reads as a ridge or trench repeating at exactly the tile pitch. Note the closed run's own
-  solver drift, −8.5e-03: that is 0.85% of mass unaccounted for by my transport discretisation,
-  not a physical export, so the "conserved" claim for `closed` rests on `exported = 0.000%` and
-  not on that column.
+  solver drift, −8.5e-03: 0.85% of mass unaccounted for by my transport discretisation, not a
+  physical export, so `closed`'s "conserved" claim rests on `exported = 0.000%`, not that column.
 - **Open planes the seam flat.** 0.389 means the seam is *smoother* than the terrain around it —
   everything within reach of the edge drained out. Tiled, that is a flat cross through the world
   every tile width, which is more visible than a crease because it is straight.
@@ -208,14 +215,12 @@ absolute step between interior neighbours; 1.0 means the seam is indistinguishab
 | boundary | 100 steps | 400 steps | 1200 steps |
 |---|---|---|---|
 | closed, depth where error > 1% of relief | 0 cells | 1 | 3 |
-| closed, depth where error > 0.1% | 3 cells | 10 | 13 |
-| open, depth where error > 0.1% | 3 cells | 10 | 13 |
+| closed **and** open, depth where error > 0.1% (both measured the same) | 3 cells | 10 | 13 |
 
 **That is the crossover for the crop-a-margin approach, and it is bad news.** The margin is not a
 function of the operator's support radius, the way `surface-and-scale-space.md`'s halo is; it is a
-function of *simulated time*, and it grows monotonically with it. A halo you can size once from a
-kernel width. A crop you must re-measure every time an artist adds iterations, and there is no
-step count at which it stops growing.
+function of *simulated time*, and grows monotonically with it. A halo you size once from a kernel
+width; a crop you must re-measure every time an artist adds iterations, and it never stops growing.
 
 ## A torus has no outlet
 
@@ -283,18 +288,19 @@ place where terrain can exist. `m3_mirroring.py`, recorded in `registers/pseudoc
 | spectral energy in the imaginary part of the DFT | **1.9e-32** | 4.65e-01 |
 | local maxima with an exact mirror twin in the same tile | 1221 / 1221 = **100%** | 11 / 1114 = 1.0% |
 
-Read those rows as one statement. `h(x0−d) = h(x0+d)` makes every cell on the axis a stationary
-point in `x`, so the seam is *guaranteed* to be an unbroken alternating chain of ridges and
-troughs — 100.0% against a 28.5% baseline is not a tendency, it is a certainty. The tile correlates
-with its own reflection at exactly 1.0000, which is what "visible symmetry" means numerically.
-And the field is even, so its transform is real: **half the spectral degrees of freedom are gone**,
-and every feature in the tile has a twin. At a fixed tile size you generated half as much terrain.
+Read those rows as one statement, for a mirror centred **on a cell** (tile `2N−2`). Then
+`h(x0−d) = h(x0+d)` makes every cell on the axis a stationary point in `x`, so the seam is
+*guaranteed* to be an unbroken alternating chain of ridges and troughs — 100.0% against a 28.5%
+baseline is a certainty, not a tendency. It correlates with its own reflection at 1.0000, and the
+field is even, so its transform is real: **half the spectral degrees of freedom are gone**, and
+every feature has a twin. At a fixed tile size you generated half as much terrain. The ordinary
+`concat(a, a[::-1])` mirrors *between* cells, tile `2N`: row 1 reads **0.0%**, row 4 is not
+machine-zero at all (4.1e-2 here), and the seam is two identical adjacent columns.
 
 **Use it for**: a background layer at a scale no one will inspect, or a normal map. **Never for**
 anything a drainage network runs through: the x-gradient on the axis is identically zero, so every
 routing decision along the entire seam is a tie broken by neighbour order rather than by terrain.
-(I measured the critical line, not its effect on a routed network — that is asserted from the
-symmetry, not from a run.)
+(I measured the critical line, not its effect on a routed network: that is asserted, not run.)
 
 ### Cross-blending a margin
 
@@ -331,21 +337,19 @@ Measured `B*`, the smallest band at which the band's mean step falls to the terr
 **Crossover: `B ≥ 2·D/s`, with a floor of about 14 cells.** Below the floor the blend's own detail
 loss is the visible artefact rather than the ramp. Above `D/s ≈ 13` the factor is a clean 2.
 
-⚠️ **One folk claim about cross-blending did not survive measurement, and it is the one usually
-given as the reason not to use it.** The story is that the band kills rivers arriving at the seam.
-Measured as total D8 accumulation crossing the seam cut, against the median interior cut, on a
-torus with one authored sink: 0.90, 0.91 and 0.91 for `B` = 8, 16 and 32 — against **0.83** for a
-terrain that is periodic by construction. Drainage crosses the blend band about as freely as it
-crosses anywhere else, and I could not reproduce a loss. The real objection is the one that *is*
-measured: the terrain in the band is a 50/50 average of two independent fields, so the landform
-there belongs to neither, and the river that crosses is not the river that arrived.
+⚠️ **The usual folk objection to cross-blending did not survive measurement.** The story is that
+the band kills rivers arriving at the seam. Measured as total D8 accumulation crossing the seam
+cut against the median interior cut, on a torus with one sink: 0.90, 0.91 and 0.91 for `B` = 8,
+16 and 32 — against **0.83** for a terrain periodic by construction. Drainage crosses the band
+about as freely as it crosses anywhere else; I found no loss. The real objection is the measured
+one: the band is a 50/50 average of two independent fields, so the landform there belongs to
+neither, and the river that crosses is not the river that arrived.
 
 ### Simulating on a torus
 
-Correct, and it constrains the simulation, in exactly the ways §A torus has no outlet lists: no
+Correct, and it constrains the simulation in exactly the ways §A torus has no outlet lists: no
 export, one authored sink, one basin, 59% more lake. It is also the cheapest of the three at run
-time — a modulo in the neighbour lookup — and the only one whose cost is stated up front rather
-than discovered in a screenshot.
+time — a modulo in the neighbour lookup — and the only one whose cost is stated up front.
 
 **Crossover.** Mirror when the layer is decorative and no water runs on it. Cross-blend when you
 are joining two fields you did not generate together and cannot re-run — it is a repair, not a
@@ -388,7 +392,7 @@ padding, the split reproduces the infinite-periodic answer only when the period 
 
 Exact when `N ≡ 0 (mod 2^L)`, and wrong by up to **42%** of relief when it is not — the `N` = 250, `L` = 3 cell in the row above. ⚠️ This line used to say 22%, which is the `N` = 250, `L` = 2 cell: a sample quoted as the maximum, in a sentence whose whole job is to bound the error. The same 22% propagated to `surface-and-scale-space.md` and to `registers/pseudocode-execution.tsv`, so three places agreed with each other and disagreed with the only table that shows the numbers. **Pick the domain
 period as a multiple of `2^L` for the deepest pyramid anywhere in the graph, before anything else
-is chosen.** 1024 or 2048 costs nothing and settles it.
+is chosen.** 1024 or 2048 costs nothing here — but the hash must outrun it, at the *finest* octave (§The easy half).
 
 ## What cannot be made periodic
 
@@ -408,24 +412,23 @@ and is not a function of the terrain alone.** Move the sink one cell and the dra
 reorganises. If two people generate "the same" tile with the same seed and different sink
 placement, they get different rivers, and neither is wrong.
 
-Two more things this document does **not** claim to have solved. An **iterated** global-ordered
-pass out of core is open — `node-graph-runtime.md` states the limit and this document does not lift
-it. And **coupling a periodic tile to a non-periodic neighbour** is a contradiction, not a
-technique: a tile that wraps has already decided that nothing outside it exists.
+Two things stay open. An **iterated** global-ordered pass out of core — `node-graph-runtime.md`
+states that limit and this document does not lift it. And **coupling a periodic tile to a
+non-periodic neighbour** is a contradiction: a wrapping tile has decided nothing outside it exists.
 
 ## How this fails, and what it looks like
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | The noise wraps at 256 and at no other period | The lattice index is hashed raw, so the period is the permutation table's length; [lagae2010] Table 1 footnote 1 defines noise storage in terms of that period | Reduce the lattice index mod the period before hashing [periodic_lattice_practice] |
+| The "periodic" tile visibly repeats 4×4 inside itself | `P` was set to 1024 over a 256-entry permutation table, so the hash aliases and the tile is a 256 tile laid 4×4; measured `max\|f(x) − f(x+256)\|` = 2.4e-13 inside the tile, against 1.31 with a 1024-entry table, while the wrap test at `T = P` reads 2.6e-13 either way and passes. A `P`-entry table moves the same defect one octave down instead of curing it: octave `l` reduces mod `P·lacunarity^l`, so a `P`-long table repeats every `P/lacunarity^l` cells, and octaves 1–5 of the six-octave, lacunarity-2 stack come out bit-identical at a 512-cell shift | Give the hash a period of at least the *finest* octave's `P·lacunarity^(n−1)` — an integer mixer with no 8-bit mask, or a table that long [periodic_lattice_practice], [lagae2010] §7's long-period hashes |
 | Base octave wraps, the field does not | `period × lacunarity^k` stopped being an integer at some octave; measured 4.7e-02 at lacunarity 1.25 with period 64 | Lacunarity `p/q` in lowest terms with `q^(n-1)` dividing the period, `n` octaves — `3/2` at six octaves needs 32, so it wraps on any power-of-two period **of 32 or more** and not at 16, where `16·(3/2)^5 = 121.5`; `5/4` needs 1024 |
-| Modular indexing has no effect on a simplex noise | Simplex floors a lattice skewed by an irrational constant, so the integers you reduced are not the tile's; measured full-amplitude error at every period | Four-dimensional torus embedding, at 4× the gradient work [periodic_lattice_practice] |
+| Modular indexing has no effect on a simplex noise | Simplex floors a lattice skewed by an irrational constant, so the integers you reduced are not the tile's; measured full-amplitude error at every period | Four-dimensional torus embedding — 5 simplex corners per sample against 3, and four-dimensional ones, so about 2.8× the arithmetic rather than the corner count's 1.7×; 16-against-4 is the *gradient*-lattice figure, and it is what a third-party gradient kernel you cannot reindex costs [periodic_lattice_practice] |
 | A ridge or trench repeating at exactly the tile pitch after erosion | Closed boundary — the edge is a wall, and a wall is a landform. Mass is conserved and periodicity is not; measured seam ratio 1.085 and rim drift 4.2% of relief | Wrapping neighbours [hobley2017] §3.1.4 `looped` — not a wider blend |
 | A straight flat cross through the world every tile width | Open boundary planed the edges; measured seam ratio 0.389 against an interior of 1.0, and 2.18% of terrain mass exported | Toroidal boundaries, or crop and re-measure the crop every time the iteration count changes |
 | The crop margin that worked last week now seams | The margin is a function of simulated time, not of a kernel radius: 3 → 10 → 13 cells at 100 → 400 → 1200 steps | Stop cropping; simulate on a torus. There is no converged margin |
 | Priority-flood returns instantly and nothing is filled | The seed set is "the edge cells" [barnes2014] §3.1, and a torus has none; measured 0 cells reached | Seed with the authored sink; a pinned low cell is a legal seed [barnes2014] §3.2 NoData |
-| One river carries the entire tile and there are no others | A torus has one base level because you authored one; max accumulation is 100.00% of the domain by construction | Expected, not a bug. If you want several, author several sinks and accept several basins |
-| Lakes everywhere after making the domain periodic | With a single outlet every basin must be raised until it finds a path to it; measured fill volume +59% and cells raised +38% against an open plane | Expected. Lower the sink, or breach rather than fill (`flow-routing.md`) |
+| One river carries the entire tile, and lakes everywhere | A torus has one base level because you authored one: max accumulation is 100.00% of the domain by construction, and every basin must be raised until it finds a path to that one point — measured fill volume +59% and cells raised +38% against an open plane | Expected, not a bug. Author several sinks and accept several basins; lower the sink, or breach rather than fill (`flow-routing.md`) |
 | Terrain wraps, the erosion mask cut from the low band does not | The pyramid padded with `reflect`; measured seam 221× an interior step at L = 5 while `lo + hi == h` stayed exact to 1.1e-16 | `wrap` padding at every level, and assert the wrapped step — the round-trip test is blind to this |
-| Seam appears only at deep pyramid levels, at a domain size that is not a power of two | The decimation lattice does not survive the wrap unless `N ≡ 0 (mod 2^L)`; measured exact at 256, wrong by 22% of relief at 250 | Choose the period as a multiple of `2^L` for the deepest split in the graph |
+| Seam appears only at deep pyramid levels, at a domain size that is not a power of two | The decimation lattice does not survive the wrap unless `N ≡ 0 (mod 2^L)`; measured exact at 256, wrong by up to 42% of relief at 250 (the `L` = 3 cell; 22% is the `L` = 2 cell) | Choose the period as a multiple of `2^L` for the deepest split in the graph |
 | Two artists' "identical" tiles have different rivers | Flow accumulation on a torus is well defined but has no base level, so it is a function of the sink placement as well as the terrain | Put the sink in the project file, next to the seed |

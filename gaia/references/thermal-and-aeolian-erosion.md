@@ -17,6 +17,9 @@ sources:
 ---
 # Thermal and aeolian erosion — repose, failure and wind
 
+**Tier: authoring-time.** Every pass here is an iterated bake — thermal run to a measured over-steep
+count, the slab automaton to a settled bed — and what ships is the result, not the loop.
+
 Three processes that share one idea: material moves when a *threshold* is crossed — a slope angle,
 a friction angle, a shear velocity. Each is cheap, and each is the thing that makes a hydraulic
 result stop looking like a hydraulic result.
@@ -132,6 +135,20 @@ and it is the only reason the result does not depend on visit order.
   fixed point is much further away than the folklore range says. The defensible stopping rule is a
   measurement: iterate until the count of over-steep pairs (or the total excess) stops falling, and
   report the count you used.
+- **What transfers between cell sizes is the rule, not the cost and not the surface.**
+  `dLimit = tan(talus)·dist` is metres and `c` is dimensionless, so nothing in the block needs
+  rescaling — `resolution-independence.md` grades this pass *invariant at the fixed point* on
+  exactly that ground. Two halves of it are not invariant. **The cost**: `passes ≈ 4.5·(r_m/Δx)²`
+  for a feature of fixed physical radius, on a grid that already grew as `1/Δx²`, so the work is
+  quartic; anyone stopping on a pass *budget* rather than a measurement therefore gets a
+  resolution-dependent result, because at a fixed count the fraction of the relaxation achieved
+  falls as `Δx²` — the same "40 passes" leaves a knife-edge at 1 m that it removed at 8 m.
+  ⚠️ **And the population the rule fires on.** `d[n] > dLimit[n]` is a slope measured across one
+  cell, and a finite-difference slope on a self-affine surface of Hurst exponent `H` goes as
+  `Δx^(H−1)` (measured in `resolution-independence.md`), so a finer grid finds over-steep pairs the
+  coarse one never saw. Derived here rather than there: the constraint is stated in world units and
+  transfers, but **the set of pairs it selects does not**, so a surface relaxed at 8 m/px is
+  over-steep again the moment it is resampled at 1 m/px. Relax at the resolution you ship.
 
 **Use real repose angles, and vary them by material.** Dry sand 30–35°, gravel and scree 35–40°,
 soil 30–45°, fractured bedrock 45–55°, competent rock up to vertical. **No source in this
@@ -191,6 +208,18 @@ plausible, and it understates the factor of safety by about 7% / 17% / 36% at 25
 painting stable hillside as landslide scar. The check that catches it: with `wet = 0` the formula
 collapses to `FS = tan(φ)/slope`, which must cross 1 exactly at the friction angle.
 
+⚠️ **`FS` is also a threshold on a finite difference, so the scar map moves with the cell size and
+no rescale reaches it.** `φ` and `ρw/ρs` are physical and `K_w` is in 1/m — all three transfer —
+but `slope` is `‖∇h‖` measured over one cell, and on a self-affine surface that falls as
+`Δx^(H−1)` (`resolution-independence.md` measures it: 16× coarsening reports slopes 2–5.7×
+smaller). Coarsen and every `FS` in the scene rises off the failure threshold; refine and ground
+that was stable starts failing. `wet` is hit twice over — once through the same slope, in `sinθ`,
+and again through `A_specific`, a routed quantity and so discontinuous in the surface
+(`flow-routing.md`) rather than merely drifting with `Δx`. Derived
+here rather than in `resolution-independence.md`, which grades slope masks and the `A·S²` channel
+head but not this expression: there is no unit to move `FS` into, so state the cell size beside
+the `K_w` you tuned and re-tune per level.
+
 ## Aeolian: two models of the same physics
 
 Both take a **wind field** — a per-cell speed and direction — not a wind direction.
@@ -201,6 +230,13 @@ downwind by a fixed saltation length — implementations typically use ~5 cells,
 against your grid rather than a physical length — and deposit with probability `p_sand` on sand
 or `p_bare` on bare ground, unless it lands in the lee shadow zone, which always captures. Then
 avalanche both sites back to repose.
+
+⚠️ **That hop is the one parameter here counted in cells, so it is the one that has to move with
+the cell size**: author it in metres and use `hop_m/Δx` (`resolution-independence.md`). The angles,
+the shadow criterion and both probabilities are dimensionless and transfer unchanged; the slab is
+not — it is a fixed height over one cell's *area*, so the number of slabs needed to move a fixed
+volume goes as `1/Δx²`, and the iteration count with it. Refine by two and the same bed costs four
+times the slabs before it looks the same.
 
 Three ideas carry it, and dropping any one removes the result:
 
@@ -319,6 +355,17 @@ of shape differences between small and large dunes or the minimum size for slip-
 deferred to a companion paper — Kroy, Sauermann and Herrmann's minimal model, which adds the wind
 field. **Do not cite the saturation-length paper for the minimum dune size.** Clamp deflation to the sand that is there; wind does not excavate bedrock.
 
+⚠️ **`L_sat` is the one length in this chain already in metres, so it takes no rescale — it sets a
+*floor* on the coarsest cell instead, and that is a different kind of limit from every exponent
+above.** Nothing else in the five expressions is grid-valued: `u*`, `q_sat`, `q⃗` and the Exner
+step are SI throughout, and `ds` is a march step in metres. So the chain is
+resolution-independent **above** the floor and degenerate below it: once `L_sat` no longer spans
+several cells the relaxation is invisible, you are back to `q = q_sat`, and the `1/λ` growth above
+means the shortest wavelength the grid carries drives the strongest bed change — so **refining the
+grid makes the result worse**, silently. With `L_sat ≈ 0.5 m` for 250 µm sand that is a floor of
+roughly 0.1–0.2 m/cell; publish it beside any claim that the aeolian pass is
+resolution-independent (`resolution-independence.md`).
+
 **What it beats.** *Gaussian blur as a talus pass* — smooths ridges and cliffs, the features you
 wanted, and leaves the noise. *Perona–Malik anisotropic diffusion* — the same object as thermal
 with a different conductivity function; if you already run thermal you are already running it.
@@ -354,6 +401,10 @@ one that fits a budget, but it needs a wind field computed first.
 |---|---|---|
 | Cones spreading into a diamond, too flat toward the corners | One talus limit shared by cardinals and diagonals caps diagonals at `tan(talus)/√2` | `dLimit = tan(talus)·dist` per neighbour |
 | Thermal stopped after its pass budget with the ridges still knife-edged | A fixed pass count: the real one grows as the square of the feature's width in cells, so folklore ranges undershoot badly | Iterate until the over-steep pair count stops falling, and report the count |
+| Ridges relax fully at 512² and stay knife-edged at 4k on the same pass budget | Pass count goes as `4.5·(r_m/Δx)²`, so a fixed budget completes a smaller fraction of the relaxation at every refinement | Stop on a measured over-steep count, never a pass count |
+| A surface relaxed at preview resolution is over-steep again at build resolution | The rule is in world units but its test is a slope across one cell, and slope grows as the grid is refined | Not fixable by rescaling: relax at the resolution you ship |
+| Dunes come out at a different size when the grid is refined | The saltation hop is counted in cells, so its physical length halved with the cell | `hop_m/Δx`; slabs to move a fixed volume go as `1/Δx²` |
+| Landslide scars appear or vanish when the output resolution changes | `FS` is keyed on `‖∇h‖`, a finite difference that falls as `Δx^(H−1)` | No unit conversion exists — state the cell size beside `K_w` and re-tune per level |
 | Result changes when threading is enabled | In-place neighbour updates | Double-buffer |
 | Thermal ran and the terrain is still over-steepened | It ran *before* hydraulic, which re-steepened it | Hydraulic first, thermal after |
 | Cliffs with no scree at their base | Thermal relaxes; it has no source | Add material at the cliff base, then relax |

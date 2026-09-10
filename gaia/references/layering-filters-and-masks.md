@@ -16,9 +16,11 @@ sources:
 ---
 # Layering, filters and masks — composition and what it costs the runtime
 
-Masking is how a procedural terrain becomes art-directable: erode this valley, leave that plateau.
-It looks like a UI convenience and it is actually a decision about **where the mask sits in the
-graph**, which decides what your cache can reuse and what a mask tweak costs.
+**Tier: authoring-time.** Every cost on this page is a *rebuild* cost inside an artist's edit loop,
+never a per-frame one; what survives into a shipped runtime is the cache key and which node holds
+it. Masking is how a procedural terrain becomes art-directable: erode this valley, leave that
+plateau. It looks like a UI convenience and it is actually a decision about **where the mask sits
+in the graph**, which decides what your cache can reuse and what a mask tweak costs.
 
 ⚠️ **Everything on this axis rests on `F` sources.** There is no canonical paper for how a tool
 composes layers, filters and masks; standard practice is vendor documentation, and the tiers below
@@ -82,7 +84,6 @@ frozen after every step. Percentages are of relief; "cells differing" uses a 1e-
 | Operator | Iterations | max abs difference | as % of relief | cells differing |
 |---|---|---|---|---|
 | Pointwise (`h·0.5 + 10`) | — | **0.000000000** | 0.0000% | 0 |
-
 | Transport (thermal-style) | 1 | **0.000000000** | 0.0000% | 0 |
 | Transport | 5 | 0.206 | 1.18% | 257 |
 | Transport | 20 | 0.664 | 3.80% | 517 |
@@ -102,8 +103,33 @@ operator on this field, and diverges at the mask edge as transport accumulates.
    agrees, because nothing has yet crossed the boundary to be frozen.
 3. **Freezing the exterior is not the only way to restrict a domain, and it is the pessimal one.**
    It imposes a no-flux wall. A runtime would instead evaluate on the mask's bounding box dilated by
-   the operator's support radius and then post-blend — which is *the same computation* as the
-   post-process form, just cheaper, and is where a masked expensive operator should actually go.
+   the operator's support radius **times the iteration count** and then post-blend — which is *the
+   same computation* as the post-process form, and cheaper **only while the dilated window still
+   fits inside the domain**. On the left-half mask below (64 columns wide, `R = 1`) the dilated
+   window is columns `0 … 63 + N`: at `N = 20` that is 84 of 128 columns and saves 34%, and at
+   `N ≥ 64` it is the whole domain and saves nothing — so the 80-iteration row of the table above
+   buys no restriction at all, and the 200-iteration mass figure below is further past the ceiling
+   still. Beyond it the honest move is to run the operator on the full domain and stop treating the
+   mask as a domain restriction.
+
+   The support radius **alone** is the single-application margin, and it is the wrong one for every
+   operator in this section. `N` steps of a radius-`R` operator have a domain of dependence of
+   `N·R`, so a window dilated by `R` is contaminated up to `N·R` cells deep. Measured on this same
+   field at `R = 1`: 20 steps of a linear 3×3 blur cropped at `R` differ from the full-domain by
+   **2.60% of relief, reaching 18 cells inside the mask**; dilated by `N·R` the difference is
+   **exactly 0.000000000**, so the *"same computation"* claim is true again once the margin is.
+   `N·R` is a sound bound rather than a measurement — 20 steps of a threshold-gated transport on
+   this same field (0.15·Δh to any *4*-neighbour more than 0.5 below, edges clamped) needed only 5
+   cells, because a gated operator does not propagate influence on every step — so size from `N·R`
+   unless you have measured the operator you have. ⚠️ Read that parenthesis, not the number. It is
+   **not** the step that produced the table above: it reproduces neither those columns nor their
+   cell counts, and the table's own neighbourhood and boundary handling were never pinned down on
+   this page. Both choices move the margin — the 8-neighbour clamped variants need 16–17 cells, not
+   5 — which is this paragraph's point restated: a margin sized from someone else's published
+   figure is a margin sized for someone else's operator.
+   `seamless-and-periodic.md` reaches the same conclusion for a tile's crop margin under *"The hard
+   half: the boundary condition IS the tiling decision"*: the margin is a function of simulated
+   time rather than of kernel width, and there is no step count at which it stops growing.
 
 ### It does not conserve mass, and that is the defect that matters
 
@@ -176,7 +202,7 @@ what is not allowed is for it to be implicit. Resolve the query at plan time, tu
 edges, and fold the resolved set into the key:
 
 ```
-key(accumulator) += hash(sorted (producerNodeId, outPortName) for each collected mask))
+key(accumulator) += hash(sorted((producerNodeId, outPortName) for each collected mask))
 ```
 
 ⚠️ **This is a house style, not one bad node.** [gaea_masks]'s own Mask node infers its "before"

@@ -6,7 +6,7 @@ tags: [generation, stratigraphy, lithology, erodibility, layers, authoring-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-03T00:00:00Z }
 sources:
-  - { id: cordonnier2016, tier: P, locator: "§3.1 eq. 1 — dh(p)/dt = u(p) - k*A(p)^m*s(p)^n, the term k that this document makes a field; §4.3 Lake Overflow for the in-loop lake handling that stays unchanged" }
+  - { id: cordonnier2016, tier: P, locator: "§3.1 eq. 1 — dh(p)/dt = u(p) - k*A(p)^m*s(p)^n, the term k that this document makes a field; §5 Erosion eq. 2 — the implicit update h_i(t+dt) = (h_i(t) + dt*u_i + f*h_j(t+dt))/(1 + f), the DISCRETE form this document's f = K*dt*A^m/dist is the grouped coefficient of (the paper never prints the symbol f; that naming is stream-power.md's); §4.3 Lake Overflow for the in-loop lake handling that stays unchanged" }
   - { id: benes2001, tier: P, locator: "§4 New Terrain Representation — the landscape as a 2D array of 1D layer arrays, a per-column properties array capped at MAX_LEVEL = 10, column height as the sum of layer heights, and the cost argument k*n^2 rather than n^3; §5 for thermal erosion run over that stack and for eroded material changing its own properties; §7 Fig. 3, a hard letter W buried under weak mud and exhumed unchanged" }
   - { id: mitchell2021, tier: P, locator: "§2.1 eq. (1), the stream-power law with K carrying units L^(1-2m) T^-1; §2.4 eq. (6), kinematic wave speed C_H = K*A^m*|dz/dx|^(n-1); §2.5 eq. (12), the dip-corrected C_H = K_W*A^m*|dz/dx|^n / (|dz/dx| - tan(phi)), with phi < 0 dipping upstream; Table 1 for the dips tested, -45 to +15 degrees" }
   - { id: forte2016, tier: P, locator: "Abstract — the three controls on a two-unit stratigraphy: erodibility contrast, the order of the units (hard over soft versus soft over hard), and contact orientation and dip angle; and the finding that steady-state denudation is unlikely to develop in horizontal to moderately tilted layers. Abstract only; the full text was not reached" }
@@ -16,17 +16,17 @@ sources:
 ---
 # Stratigraphy and lithology — rock as a depth-varying K
 
-Gaia already holds the opinion twice. `tectonic-uplift.md` states the mechanism — *"layered `K`
-produces caprock, cuestas and mesas as outputs, where a terrace node quantises height and produces
-contour lines on a model"* — and `stream-power.md` rejects the alternative in its own words. Neither
-says how. This document is the operator: **rock enters every erosion law in this skill through
-exactly one channel, the erodibility coefficient, and stratigraphy is that coefficient becoming a
-function of depth as well as position.**
+**Tier: authoring-time.** Gaia already holds the opinion twice. `tectonic-uplift.md` states the
+mechanism — *"layered `K` produces caprock, cuestas and mesas as outputs, where a terrace node
+quantises height and produces contour lines on a model"* — and `stream-power.md` rejects the
+alternative in its own words. Neither says how. This document is the operator: **rock enters every
+erosion law in this skill through exactly one channel, the erodibility coefficient, and stratigraphy
+is that coefficient becoming a function of depth as well as position.**
 
-Nothing downstream changes. Stream power's `f = K·Δt·A^m/dist` [cordonnier2016] §3.1 eq. 1 already
-reads `K` per cell; the pipe model's capacity constant already reads a per-layer erodibility
-[stava2008] §5. What is missing is the thing that *supplies* them a value that depends on how deep
-the surface has cut.
+Nothing downstream changes. Stream power's `f = K·Δt·A^m/dist` — the grouped coefficient of the
+implicit update [cordonnier2016] §5 eq. 2, not of §3.1's continuous law — already reads `K` per
+cell; the pipe model's capacity constant already reads a per-layer erodibility [stava2008] §5. What
+is missing is the thing that *supplies* them a value that depends on how deep the surface has cut.
 
 ## Use this
 
@@ -43,12 +43,24 @@ period = sum(t for t, _ in beds)                          # the column repeats
 # once at the boundary -- tan(30) is -6.405 and inverts the dip; tan(radians(30)) is 0.5774.
 psi, delta = radians(strike + 90), radians(dip_degrees)
 dx, dy = cos(psi), sin(psi)                               # dip direction
-
-# per cell, per erosion step, from the CURRENT surface height
-s   = h[y][x] + tan(delta) * (dx * x * cellSize + dy * y * cellSize)     # stratigraphic height
-u   = fmod(s - datum, period);  if u < 0: u += period
+U_cum = zeros_like(h)                                     # rock lifted since t = 0, per cell
+# per cell, per erosion step. THE COLUMN RIDES WITH THE ROCK, so take the uplift back out:
+U_cum[y][x] += U[y][x] * dt                               # beside the loop's own h += U*dt
+s   = h[y][x] - U_cum[y][x] + tan(delta)*(dx*x*cellSize + dy*y*cellSize)   # stratigraphic height
+u   = fmod(s - datum, period)                             # fmod keeps the sign of s, so:
+if u < 0: u += period
 K   = lookup(beds, u)                                     # walk or prefix-sum table
 ```
+
+⚠️ **Subtract the uplift: the column is fixed to the rock, not to the datum.** `h += U·Δt` moves
+the rock the column is cut into, so a sampler reading `h` alone measures elevation. Erosion off,
+uplift only at `U = 5·10⁻⁴ m/yr`: nothing is removed, yet `s = h` walks **every** cell across a
+contact within 50 000 yr, and over this document's own 2 Myr rig through **twenty complete 50 m
+columns — 40 contacts per cell** — where `s = h − U_cum` crosses none. Count the crossings, not the
+net end-state bed: that comparison is periodic in `U·T mod 50 m`, and at 2 Myr and at 4 Myr it
+returns the broken sampler to the bed it started in, where it reads the same **0%** as the corrected
+one. At equilibrium `h` steadies too, so `K` freezes into the elevation bands this document opens
+by rejecting.
 
 Alternatives, and why each is worse:
 
@@ -63,12 +75,13 @@ Alternatives, and why each is worse:
   beds is this document.
 
 ⚠️ **The crossover is deposition, not size.** Use the **implicit column** — the function above,
-which stores nothing and is evaluated from `h` — for as long as the simulation only *removes*
-rock. Switch to an **explicit per-column layer stack** [benes2001] §4 the moment material is put
-**back**: deposited sediment is a new bed with its own erodibility, it exists only where it landed,
-and no closed-form function of `(x, y, z)` describes it. That is the same boundary
-`hydraulic-erosion.md` draws between droplet and pipe, for the same reason — the moment state has
-to persist, a formula stops being enough.
+which carries one accumulator per cell and is otherwise evaluated from `h` — for as long as the
+simulation only *removes* rock. Switch to an **explicit per-column layer stack** [benes2001] §4 the
+moment material is put **back**: deposited sediment is a new bed with its own erodibility, it exists
+only where it landed, and no closed-form function of `(x, y, z)` describes it. That is the same
+boundary `hydraulic-erosion.md` draws between droplet and pipe, for the same reason — the moment
+state that **cannot be recomputed** has to persist, a formula stops being enough. `U_cum` is `U·t`
+for a static `U` and can be; a deposited bed is history and cannot.
 
 ## The column
 
@@ -78,7 +91,7 @@ p. 1 makes the point structurally, with each rock type holding arbitrary attribu
 
 | Knob | What it sets | Sane range |
 |---|---|---|
-| Bed thickness | The vertical spacing of scarps; the outcrop width of a cuesta tread, with dip | 25–200 m measured below; the binding constraint is the outcrop width, not the thickness |
+| Bed thickness | The vertical spacing of scarps; the outcrop width of a cuesta tread, with dip | 25–200 m measured below; outcrop width is a floor the bed must clear, but the runs vary it together with thickness and do not separate the two |
 | Erodibility contrast `K_weak / K_hard` | How hard the scarp reads | 4× and 16× both measured below and both work; the rendered contrast comes out far below the authored one, so author high |
 | Number of distinct beds | Whether the section reads as banded or as noise | 2–6, repeated; ten different beds read as one texture |
 | Thickness jitter, from a seed | Whether the banding looks authored | ±20–30% of nominal |
@@ -107,7 +120,7 @@ Give the column a plane and the beds tilt. With dip angle `δ` and dip direction
 strike is the horizontal line perpendicular to it), the stratigraphic height of a point is
 
 ```
-s(x, y, z) = z + tan(delta) * (x*cos(psi) + y*sin(psi))
+s(x, y, z) = z + tan(delta) * (x*cos(psi) + y*sin(psi))   # z is the ROCK-frame height, h - U_cum
 ```
 
 and everything else is unchanged: the bed is still found by `fmod(s − datum, period)` into the same
@@ -124,21 +137,21 @@ at `δ` crops out across a map-plane width
 w = T / tan(delta)        # T is the VERTICAL span the sampler above uses, not perpendicular thickness
 ```
 
-⚠️ **`T` here is the *vertical* span the sampler uses, not the bed's perpendicular thickness, and
-the two give different formulas.** The block above builds `s` by adding `tan δ · horizontal` to a
-height, so a bed's `thickness` is a vertical interval of `s`. A vertical span `T` crops out over
-`T/tan δ`; a perpendicular thickness `T⊥ = T·cos δ` crops out over `T⊥/sin δ` — the same distance,
-written two ways, and mixing them costs a factor of `1/cos δ`. Measured against the sampler's own
-output on a flat surface at 1 m cells: at 2° the two differ by 0.06%, at 10° by 1.5%, at 30° by
-**15%** and at 60° by **2×**. An earlier draft used `T/sin δ` with the vertical `T`, which is why
+⚠️ **`T` is the *vertical* span the sampler uses, not the bed's perpendicular thickness.** The block
+above builds `s` by adding `tan δ · horizontal` to a height, so a bed's `thickness` is a vertical
+interval of `s`. A vertical span `T` crops out over `T/tan δ`; a perpendicular `T⊥ = T·cos δ` over
+`T⊥/sin δ` — the same distance written two ways, and mixing them costs `1/cos δ`. Measured against
+the sampler's own output on a flat surface at 1 m cells: 0.06% at 2°, 1.5% at 10°, **15%** at 30°
+and **2×** at 60°. An earlier draft used `T/sin δ` with the vertical `T`, which is why
 this note exists — invisible at the shallow dips the results table quotes, and wrong at the top of
 its own stated range.
 
 and if `w` is not several cells wide the bed cannot be expressed at all — it aliases into a
 one-cell stripe that erosion cannot organise around. Measured (see below, same rig): 25 m beds at
-10° give `w = 141.8 m` = **1.4 cells** on a 100 m grid and produce the **weakest** layered signal of
-any run in the set; 100 m beds at the same 10° give `w = 567.1 m` = **5.7 cells** and produce the
-**strongest**. The rule is `T ≥ 4·cellSize·tan(δ)` — steepen the dip and the beds must get thicker
+10° give `w = 141.8 m` = **1.4 cells** on a 100 m grid and 100 m beds at the same 10° give
+`w = 567.1 m` = **5.7 cells**; the thicker beds score higher on both scarp metrics, though those
+runs vary thickness and width together and do not show which did it — see the width note under the
+results table. The rule is `T ≥ 4·cellSize·tan(δ)` — steepen the dip and the beds must get thicker
 in proportion, and a nearly vertical column needs beds as thick as the outcrop pattern you want to
 see. This is the first thing to check when a dipped column looks like noise.
 
@@ -146,12 +159,18 @@ see. This is the first thing to check when a dipped column looks like noise.
 worst.** Horizontal beds do not escape it — they crop out across a *hillside*, and the width is
 `T / tan(surface slope)`, which is the same expression with the surface's slope in place of the
 dip. Measured for 25 m beds on a 100 m grid: **2.86 cells** on a 5° hillside, 1.42 on 10°, 0.69 on
-20° and **0.43 on 30°** — well under the 1.4 cells that made the dipped case the weakest run in the
-set. So the general statement is that a bed's visibility is set by the angle between the bedding
-and the **surface**, not by the dip alone: `w = T / tan(angle between bedding and surface)`, and
-`T ≥ 4·cellSize·tan(that angle)`. Dip is the case where the surface is flat and the bedding is not;
-a hillside with horizontal beds is the same problem with the roles swapped, and it is the case a
-mountainous scene actually hits.
+20° and **0.43 on 30°** — well under the 1.4 cells of the 25 m dipped run below. So a bed's
+visibility is set by the bedding and the **surface** together, not by dip alone. For a dip `δ` and a
+surface slope `σ` in the same vertical plane, signed the same way (both descending in the same
+direction), `w = T / |tan δ − tan σ|` and `T ≥ 4·cellSize·|tan δ − tan σ|`. ⚠️ **Not `tan` of the
+angle *between* the two planes**, which an earlier draft wrote: that angle has
+`tan θ = |tan δ − tan σ| / (1 + tan δ·tan σ)`, so the between-planes form overstates `w`, and
+understates the gate, by `1 + tan δ·tan σ` — exact only when `tan δ·tan σ = 0`, i.e. only the two
+cases it was generalised from. Co-dipping is where it bites: `δ = 10°`, `σ = 30°`, `T = 150 m` on
+100 m cells clears its gate at 145.6 m while the true outcrop is **3.74 cells**, under the four this
+page asks for; opposed at ±30° it demands 692.8 m where 461.9 m does. Dip is the `σ = 0` case and a
+hillside with horizontal beds the `δ = 0` case — each `T/tan` of its one nonzero angle — and it is
+the second that a mountainous scene actually hits.
 
 Dip is not only cosmetic; it changes the *rate* at which the pattern moves. A lithologic contact
 migrates upstream at the kinematic wave speed [mitchell2021] §2.4 eq. (6),
@@ -187,11 +206,11 @@ downstream and the same column's contacts sweep through the catchment and the ba
 
 | | Implicit column | Explicit layer stack [benes2001] §4 |
 |---|---|---|
-| Storage | none — a function of `(x, y, h)` | `k` layers per column, `k·n²` total |
+| Storage | `n²` — one uplift accumulator; the column itself is a function | `k` layers per column, `k·n²` total |
 | Deposition | cannot represent it | a new layer, per column |
 | Voids, caves, overhangs | no | yes — a layer with zero density [benes2001] §4 |
 | Cost per lookup | one dot product, one floor | walk the column, or keep a running cursor |
-| Rebuild on graph change | free | the stack is state; invalidation is real |
+| Rebuild on graph change | not free, but cheap: the uplift accumulator is state, and it is `U·t` for a static `U` — recomputed, not replayed | the stack is state; invalidation is real |
 
 [benes2001] §4 is the graphics origin of the second column and states its own cost argument: the
 structure has voxel expressiveness at `k·n²` rather than `n³`, "where `k` is the number of the
@@ -215,8 +234,8 @@ it fell off.
 
 ## What layered K measurably produces
 
-Gaia asserts caprock, cuestas and mesas. Measured, **the assertion is half right, and the half
-that fails is worth knowing.**
+Gaia asserts caprock, cuestas and mesas. Measured, **the assertion is half right — and the half
+that fails predates the sampler correction above, so it is in doubt rather than settled.**
 
 The model is the one `stream-power.md` prescribes — the implicit `O(N)` stack solve with `D·∇²h`
 sub-cycled at `c = 0.225` — on a 128² grid at 100 m/cell, `U = 5·10⁻⁴ m/yr` with the domain edge
@@ -232,7 +251,7 @@ occupy — 1.0 is no scarp, and above 1.0 is relief packed into short reaches, w
 scarp *is*. `area_hard` is the fraction of the map whose surface sits in a resistant bed; 0.5 is
 what the bed thicknesses alone predict.
 
-| Run | Outcrop width | `S_area` | `conc` | `area_hard` |
+| Run | Outcrop width on a *flat* surface, `T/tan δ` | `S_area` ⚠️ | `conc` ⚠️ | `area_hard` ⚠️ |
 |---|---|---|---|---|
 | **Uniform `K`, control**, 25 m bands scored | — | **1.010** | **0.86×** | 0.499 |
 | **Uniform `K`, control**, 100 m bands scored | — | **0.944** | **0.89×** | 0.464 |
@@ -243,6 +262,12 @@ what the bed thicknesses alone predict.
 | Dip 10°, 100 m beds, 4× | 567.1 m — 5.7 cells | 1.705 | **1.85×** | 0.287 |
 | Dip 2°, 25 m beds, 4× | 716 m — 7.2 cells | 1.408 | 0.92× | 0.476 |
 | Dip 10°, 25 m beds, 4× | 141.8 m — **1.4 cells** | **1.322** | 1.21× | 0.378 |
+
+⚠️ **Every layered row above sampled `K` from `h`**, before the sampler correction in **Use this**.
+Under it both `S_area` and `area_hard` *rise* with contrast instead of falling, reversing the 4×/16×
+ordering of each — see the two warnings below. Read the three metric columns as the pre-correction
+record, not as settled. (The uniform-`K` controls are unaffected: their dynamics never read the
+column, and at 2 Myr `U_cum` is a whole number of periods, so both frames score them identically.)
 
 The two control rows are what make the rest mean anything: with `K` uniform, scoring the same
 bands gives `S_area` 0.94–1.01 and `conc` 0.86–0.89× — no signal, in fact very slightly negative,
@@ -256,26 +281,44 @@ transient.
 Three results cut against the naive reading:
 
 ⚠️ **The slope contrast under-reads the erodibility contrast, badly.** Equilibrium says
-`S ∝ (U/K)^(1/n)`, so 4× in `K` at `n = 1` ought to give 4× in slope. It gives about **2×** (and
-16× in `K` gives about 3.7× — see the timestep table below, which shows part even of that is a
-discretisation artefact). The mechanism is [mitchell2021]'s premise: contacts migrate, and the
-erosion rates on the two sides adjust so that both retreat *horizontally* together, which means
-neither unit is ever at local equilibrium with its own `K`. Practically: **author more contrast
-than you want to see, not less**, and never read an authored `K` ratio off the rendered slope.
+`S ∝ (U/K)^(1/n)`, so 4× in `K` at `n = 1` ought to give 4× in slope. It gives **2.16** on the
+channel slope ratio, resistant ÷ weak (the timestep table below drops it to 1.35 at `Δt = 500`, a
+quartered step), and **1.60** on `S_area`, the map-wide version. Raising the contrast to 16× does
+not raise `S_area` at all: 1.32, *below* the 4× run's 1.60. ⚠️ **That last comparison does not
+survive
+re-measurement.** Both cells come from runs that sampled `K` from `h`, like the `area_hard` column
+below, and four independent rebuilds of the rig reverse it: in the corrected frame `S_area` runs
+**1.11–1.13** at 4× against **1.25–1.66** at 16×, *rising* with contrast, and every rebuild reverses
+it the same way in the old frame too. Read the *direction* as open. What the rebuilds do agree on is
+the under-read itself, and they deepen it — 1.11–1.13 at a 4× contrast, against the table's 1.60.
+The mechanism is [mitchell2021]'s premise — contacts migrate, and the erosion rates on the two sides
+adjust so that both retreat *horizontally* together, so neither unit is ever at local equilibrium
+with its own `K`. Practically: **author more contrast than you want to see, not less**, and never
+read an authored `K` ratio off the slope.
 
-⚠️ **Outcrop width dominates dip angle.** Dipping 100 m beds at 10° gives the strongest scarp in
-the set (`conc` 1.85× against 1.45× for the same beds horizontal) — dip *helps*. Dipping 25 m beds
-at the same 10° gives the weakest (`S_area` 1.322), because their outcrop is 1.4 cells wide. It is
-not the dip that broke it; it is `T / tan δ` falling below the grid.
+⚠️ **Dip is not a single-signed knob, and the width column does not order the runs.** 100 m beds at
+10° take the highest `conc` of the 4× runs — 1.85× against 1.45× for the same beds horizontal,
++27.6% — but the same pair reverses on `S_area`, 2.131 → 1.705, −20.0%. It is the strongest scarp in
+the set on neither metric: `conc` is led by the 16× horizontal run at 2.29×, `S_area` by the
+horizontal 100 m run at 2.131. The 25 m beds at the same 10° do take the lowest `S_area` of any
+layered run (1.322), but the width column cannot explain it: it prints the flat-surface `T/tan δ`,
+hence `∞` on every horizontal row, which the hillside rule above supersedes; and where finite it
+orders nothing — the *widest* dipped outcrop (7.2 cells at 2°) scores the lowest `conc`. **No run
+here separates width from dip**: read the rule above as a floor, not as the cause of these rankings.
 
-⚠️ **Stream power plus linear diffusion gives the riser and never the tread.** `area_hard` runs
-0.287 to 0.502 across every run and **never meaningfully exceeds 0.5** — resistant beds hold no more of the landscape's
-area than their thickness predicts, and at high contrast they hold conspicuously *less* (0.300 at
-16×). The area concentrates in the **weak** beds: those are the gentle stretches wide enough to
-occupy map, which is a strike valley, not a mesa top. A mesa is a flat top *held up* by a caprock,
-and producing one needs the scarp to retreat laterally while the top stays level. So Gaia's sentence
-is right about cuestas and caprock scarps and **overstated about mesas**: layered `K` is necessary
-for a mesa and does not produce one on its own.
+⚠️ **Stream power plus linear diffusion gives the riser and never the tread — and this half is now
+in doubt.** `area_hard` runs 0.287 to 0.502 across every run above and **never meaningfully exceeds
+0.5**: resistant beds hold no more of the landscape's area than their thickness predicts, and at
+high contrast conspicuously *less* (0.300 at 16×). The area concentrates in the **weak** beds,
+which is a strike valley, not a mesa top. **But every run above sampled `K` from `h`.** Four
+independent 128² rebuilds of the same rig with the corrected sampler put `area_hard` at **0.73** at
+4× and **0.86** at 16× — 0.728–0.736 and 0.860–0.869 across all four, agreeing to within 1% —
+because a surface cutting resistant rock rises with the uplift and *sticks* in that bed, which is
+the caprock mechanism. Their *old*-frame figures for those same two runs agree on nothing: 0.32 to
+0.55 at 4× and 0.16 to 0.30 at 16×, with the table's own 0.497 and 0.300 sitting inside that
+scatter. So it is the pre-correction column that is rig-sensitive here, and the corrected one that
+is not. The table has not been re-run, so read its `area_hard` column, and Gaia's mesa claim, as
+open rather than settled. The tread work below rests on shape metrics, not on `area_hard`.
 
 ### The obvious fix does not work, and the per-bed quantity is not the talus angle
 
@@ -337,10 +380,12 @@ state-dependent `K` because it never depended on `K` being constant.** Measured:
 with a **1000× contrast** at `Δt = 20 000 yr` and no diffusion stays finite and bounded, which no
 explicit form would.
 
-What does degrade is **accuracy at contacts**, and it degrades in the direction that flatters the
-result. A cell that starts a step in a resistant bed erodes the **whole step** at the resistant
-`K`, even if it cut through the contact a tenth of the way in. The error is one-sided — it always
-over-resists — so a coarse `Δt` makes resistant beds look more resistant than they are:
+What does degrade is **accuracy at contacts**. A cell that starts a step in a resistant bed erodes
+the **whole step** at the resistant `K` even if it cut through the contact a tenth of the way in —
+and one that starts in a weak bed does the same, overshooting *into* the resistant bed by exactly
+the authored `K` ratio (4× at a 4× contrast, for any offset and any rate). The error runs **both
+ways**, and an alternating column crosses hard→soft and soft→hard in equal numbers, so which way the
+net lands is measured, not derived. Measured, a coarse `Δt` inflates the layered signal:
 
 | Same 2 Myr, same column, 4× contrast | `Δt = 2000`, 1000 steps | `Δt = 500`, 4000 steps |
 |---|---|---|
@@ -349,38 +394,29 @@ over-resists — so a coarse `Δt` makes resistant beds look more resistant than
 | Channel slope ratio, resistant ÷ weak | 2.16 | **1.35** |
 | RMS difference between the two heightfields | 24.8 m on 494 m of relief — **5.0%** | |
 
-The control barely moves (0.89× → 0.87×) and the layered run moves a lot: **the timestep is
+The control barely moves (0.86× → 0.87×) and the layered run moves a lot: **the timestep is
 inflating the very feature the column exists to produce.** The scarp survives at both — 1.23× still
-clears the control decisively — but its *strength* is a discretisation parameter until you check,
-and the check is cheap: halve `Δt` and see whether the scarp holds.
+clears the control — but its *strength* is a discretisation parameter until you check.
 
-**The rule that follows is a ratio, not a timestep.** Keep the typical per-step incision below
-roughly a fifth of the thinnest bed:
+**No formula settles the step.** An earlier draft gave `Δt ≤ 0.2·min(bed thickness)/max(K·A^m·S^n)`
+and a worked `10⁻² m/yr` incision rate; that rate is not reproducible. **Neither is any single
+number to put in its place.** Independent rebuilds of this rig measure `max(K·A^m·S^n)` anywhere
+between `1.0·10⁻³` and `2.8·10⁻³ m/yr` over the domain, and *one* rebuild spans that whole 2.7×
+range on the random seed alone — while the domain **mean** stays within a third of `U = 5·10⁻⁴` in
+every one of them, as the equilibrium above requires. Fed through the old rule those maxima return
+`Δt_max` between **1800 and 4900 yr**, straddling the `Δt = 2000` whose safety is the question: the
+table just above answers it and the rule does not. Reproducing the measured need for `Δt ≤ 500`
+takes a coefficient of `0.020`–`0.056` — **3.6× to 10×** below `0.2`, and moving with the rebuild,
+which is why none of them is worth printing as a rule. **Halve `Δt`, see whether the scarp holds,
+believe the finer step** — and count the cells whose update crossed a contact per step:
+a large fraction of the actively eroding cells means the column is finer than the step can resolve.
+**Thicken the beds or shorten the step; do not raise the contrast to compensate**, which only
+disguises the artefact.
 
-```
-Δt_max ≈ 0.2 * min(bed thickness) / max(K * A^m * S^n)
-```
-
-and it predicts the measurement above. In the trunk of that run, `K·A^m·S` reaches about
-`10⁻² m/yr`, so `Δt_max ≈ 0.2 × 25 / 10⁻² ≈ 500 yr`. **`Δt = 2000` violates it by 4× and `Δt = 500`
-sits on it** — which is exactly the pair that disagreed, and exactly which of the two moved. The
-rule was derived before the runs and the runs land on it, so use it rather than picking a step by
-eye.
-
-The diagnostic is cheap and belongs in the loop: count the cells whose update crossed a contact,
-per step. If that count is a large fraction of the actively eroding cells, the column is finer than
-the timestep can resolve — **thicken the beds or shorten the step; do not raise the contrast to
-compensate**, which is the tempting move, and which makes a coarse-`Δt` artefact look like a
-successful edit.
-
-**What it beats.** *A terrace node* — quantises absolute elevation, so its steps ignore the
-drainage and cross valleys horizontally; it is a contour map, not a stratigraphy
-(`stream-power.md`). *Displacing height at the contact* — the same failure `tectonic-uplift.md`
-records for faults: a step nothing pins, relaxed away by the next pass. *A 2-D `K` mask* — correct
-for faults and intrusions, blind to exhumation. *Noise added after erosion to fake banding* — has
-no relationship to the drainage that would have exploited it. *A full voxel lithology* — `n³` for a
-`k·n²` problem [benes2001] §4, and the extra expressiveness is caves, which a heightfield cannot
-render anyway.
+**What it beats.** The alternatives at the top of this document — terrace node, 2-D `K` mask, voxel
+lithology — plus two that only look like stratigraphy: *displacing height at the contact*, the same
+failure `tectonic-uplift.md` records for faults, a step nothing pins and the next pass relaxes away;
+and *noise added after erosion to fake banding*, unrelated to the drainage that would exploit it.
 
 **Time budget.** Authoring-time, and effectively free. The sampling is a handful of arithmetic ops
 per cell per step against a flow-routing pass that is orders of magnitude more expensive; adding
@@ -395,19 +431,19 @@ a material mask, not as a simulation input.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | Steps that cross valleys horizontally and follow no structure | A terrace or quantise node on absolute elevation | Layered `K` fed to the erosion law; the steps then follow bed geometry |
-| Layers authored, and the result looks uniform | `K` sampled from a 2-D mask, so exhumation never changes it | Sample from `(x, y, h)`; `K` must depend on the current surface height |
-| Bands visible on hillshade but no scarps in the channels | The `K` field built but never handed to the solver — painted as a colour map instead | It is the same `K` in `f = K·Δt·A^m/dist` [cordonnier2016] §3.1 eq. 1 |
+| Layers authored, and the result looks uniform — or freezes into elevation bands that never sweep | `K` sampled from a 2-D mask, so exhumation never changes it; or sampled from `h` alone, so uplift advects the rock past a column pinned to the datum | Sample from `(x, y, h − U_cum)`: the current surface height **in the rock frame** |
+| Bands visible on hillshade but no scarps in the channels | The `K` field built but never handed to the solver — painted as a colour map instead | It is the same `K` in `f = K·Δt·A^m/dist`, the implicit update's coefficient [cordonnier2016] §5 eq. 2 |
 | The scarps read far weaker than the authored contrast | Contact migration keeps neither unit at local equilibrium; a 4× `K` contrast measured 1.35–2.16× in slope | Author more contrast than you want to see, and never read `K` back off the slope [mitchell2021] |
 | Concentric bands on every hill, like a contour map | Zero dip | Give the column dip and strike; even 5° breaks the concentricity |
-| A dipped column that reads as noise or as stripes one cell wide | Outcrop width `T/tan δ` below the grid — 25 m beds at 10° are 1.4 cells on a 100 m grid, and measured the weakest of any layered run | Thicken the beds with the dip: `T ≥ 4·cellSize·tan δ` |
-| The scarp weakened when the timestep was refined | The coarse step was inflating it: one-sided over-resistance at contacts | Believe the finer step; `Δt ≤ 0.2·min(bed thickness)/max(K·A^m·S^n)` |
+| A dipped column that reads as noise or as stripes one cell wide | Outcrop width below the grid — 25 m beds at 10° are 1.4 cells on a 100 m grid, and take the lowest `S_area` of any layered run | Thicken the beds with the dip: `T ≥ 4·cellSize·abs(tan δ − tan σ)` against the surface slope `σ`, which at `σ = 0` is `4·cellSize·tan δ` |
+| The scarp weakened when the timestep was refined | The coarse step was inflating it: contact error, `K` frozen for the whole step at every crossing | Believe the finer step. The old `0.2` coefficient is 3.6–10× too permissive, and the rate it divides by moves 2.7× between rebuilds of the same rig — halve `Δt` and re-measure |
 | Cuestas that vanish after a long run | Beds dipping downstream, so contacts migrate fast | Dip into the drainage: `φ < 0` slows contact migration [mitchell2021] §2.5 eq. (12) |
-| Cliff bands but no flat-topped mesas | Incision plus linear diffusion makes the riser, not the tread | A **per-bed weathering rate**, not a per-bed talus angle: measured, the talus limit alone retreats a 2 km butte by 2 m, and bed-selective removal retreats it by 640 m with the tread bit-preserved |
+| Cliff bands but no flat-topped mesas | Incision plus linear diffusion made the riser, not the tread — measured before the sampler fix and not re-run | A **per-bed weathering rate**, not a per-bed talus angle: measured, the talus limit alone retreats a 2 km butte by 2 m, and bed-selective removal retreats it by 640 m with the tread bit-preserved |
 | A per-bed talus angle changed nothing | A slope limit only moves material where slope exceeds it; once the face sits at the limit the pass converges | Add a removal term. The angle makes the debris apron; the rate makes the landform |
 | Weathering was added and the mesa dissolved | The removal was uniform, so the caprock weathered too — tread mean fell 500 → 151 m at equal mass removed | Gate the removal on the bed: the resistant unit must not be weathered, or nothing holds the top up |
 | The metric says no mesa but the render clearly has one | `area_hard` counts map area, and parallel retreat *shrinks* the cap — it fell 49.61% → 44.66% in the run that produced textbook retreat | Measure shape, not area: the tread's standard deviation and the scarp's position |
-| Thin beds erased entirely | Per-step incision comparable to bed thickness, so the bed is skipped in one update | `Δt ≤ 0.2·min(bed thickness) / max(K·A^m·S^n)`, or thicker beds |
-| Resistant beds look thicker than authored | One-sided contact error: a cell cutting through a contact erodes the whole step at the bed above's `K` | Same ratio; count contact crossings per step as a diagnostic |
+| Thin beds erased entirely | Per-step incision comparable to bed thickness, so the bed is skipped in one update | Hold `max(K·A^m·S^n)·Δt` to a per cent or so of the thinnest bed, or thicken the beds |
+| Beds land at the wrong depth — thicker than authored in places, thinner in others | Contact error, both ways: a cell crossing mid-step erodes the whole step at the bed it started in — under-erodes going hard→soft, and overshoots into the resistant bed by the full `K` ratio going soft→hard | Shorten the step until crossings are rare; count contact crossings per step as a diagnostic |
 | Erosion rates never settle, so the run never looks finished | Expected: layered stratigraphy is not steady-state in the way uniform `K` is [forte2016] | Stop on a morphology target, not on rate convergence |
 | A column that looked right at `m = 0.5` is wrong at `m = 0.45` | `K` has units `L^(1−2m)·T^(−1)` [mitchell2021] §2.1 eq. (1) | Author dimensionless contrasts against a reference `K` |
 | Deposited sediment erodes like bedrock | The implicit column is a function of `z` and knows nothing about what was put back | Explicit layer stack [benes2001] §4; deposit as a bed with its own `K`, and change its properties on transport [benes2001] §5 |
