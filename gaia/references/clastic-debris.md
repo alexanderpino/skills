@@ -6,7 +6,7 @@ tags: [generation, placement, scattering, clasts, poisson-disk, blue-noise, inst
 status: draft
 generated: { by: process:claude-code, at: 2026-09-10T00:00:00Z }
 sources:
-  - { id: bridson2007b, tier: P, locator: "§2 The Algorithm — the three inputs, 'the extent of the sample domain in R^n, the minimum distance r between samples, and a constant k as the limit of samples to choose before rejection in the algorithm (typically k=30)'; step 0's background grid, 'We pick the cell size to be bounded by r/sqrt(n), so that each grid cell will contain at most one sample', stored as 'a simple n-dimensional array of integers: the default -1 indicates no sample'; step 2's candidate draw, 'up to k points chosen uniformly from the spherical annulus between radius r and 2r around x_i'. §3 Analysis — 'Step 2 is executed exactly 2N-1 times to produce N samples' and 'each iteration of step 2 takes O(k) time, and since k is held constant (typically quite small) the algorithm is linear'. Read in full in the author's own PDF, which carries no article number, no DOI and no page numbers, so no page is cited" }
+  - { id: bridson2007b, tier: F, locator: "§2 The Algorithm — the three inputs, 'the extent of the sample domain in R^n, the minimum distance r between samples, and a constant k as the limit of samples to choose before rejection in the algorithm (typically k=30)'; step 0's background grid, 'We pick the cell size to be bounded by r/sqrt(n), so that each grid cell will contain at most one sample', stored as 'a simple n-dimensional array of integers: the default -1 indicates no sample'; step 2's candidate draw, 'up to k points chosen uniformly from the spherical annulus between radius r and 2r around x_i'. §3 Analysis — 'Step 2 is executed exactly 2N-1 times to produce N samples' and 'each iteration of step 2 takes O(k) time, and since k is held constant (typically quite small) the algorithm is linear'. Read in full in the author's own PDF, which carries no article number, no DOI and no page numbers, so no page is cited. Graded F, not P: it is a two-page SIGGRAPH Sketch, not a papers-track publication, and the tier table's criterion is peer review alone. All four of its claims are verified here by measurement, not taken on the venue's authority" }
   - { id: wentworth1922, tier: P, locator: "NOT OPENED -- the grade scale this document names its classes against. journals.uchicago.edu returned HTTP 403 and no other copy was reached, so nothing is quoted from it and no reading is claimed. The class edges printed here rest on arithmetic instead — the scale is geometric with ratio 2 and phi = -log2(d/mm), so integer phi puts every edge on a power of two" }
   - { id: clast_scatter_practice, tier: F, locator: "no artefact: placing size classes largest-first with each pass rejecting against everything already down, and the packed per-instance transform an engine carries for a scattered rock. Standard practice with no canonical paper; every figure attached to it here is measured in this skill rather than cited" }
 ---
@@ -26,17 +26,23 @@ Poisson-disk pass per class, reject each candidate against everything already pl
 instancing below the class where the count stops being affordable.**
 
 ```
-classes  boulder  d > 256 mm      # Wentworth grades: phi = -log2(d/mm) at integer phi,
-         cobble   d 64..256 mm    # so every edge is a power of two, exactly
-         pebble   d 4..64 mm
-         granule  d 2..4 mm
+# Wentworth grades: phi = -log2(d/mm) at integer phi, so every edge is a power of two.
+# The top class is open above and the scale gives it no d_max: you AUTHOR one, and every
+# figure on this page uses 1024 mm. Without it r_cls below is undefined.
+classes  boulder  d 256..1024 mm      # d_max AUTHORED, not from the scale
+         cobble   d  64..256 mm
+         pebble   d   4..64 mm        # <- the instance path ends at or above here;
+#        granule  d   2..4 mm            granule is a MATERIAL, never a loop iteration
 
 for cls in classes, LARGEST FIRST:          # the order is the algorithm
+    if instances_per_m2(cls) > budget: BREAK # the stop rule, and it binds before granule:
+                                            # granule at r = 4 mm is ~930 GB/km2 of transforms
     r_cls = d_max(cls)                      # = 2 * a_max: a class cannot overlap itself
     for p in poisson_disk(domain, r_cls, k=30):     # [bridson2007b] §2
         a = radius drawn from the class' size law
         if clear(p, a): place(p, a, cls)    # clear() tests d_ij >= a_i + a_j against
                                             # every clast already down, not just this class
+                                            # -- one grid PER CLASS, or this costs 42x more
 ```
 
 Four numbers, all measured below on a 10 m × 10 m patch. The largest-first pass places **13,338
@@ -44,8 +50,8 @@ clasts with 0 interpenetrating pairs** and covers 17.60% of the ground; a single
 the pebble spacing places 15,153 and leaves **31 interpenetrating pairs, the worst of them buried
 63% of the way into its neighbour**. Placement costs **214 µs per clast** in CPython — an
 algorithmic figure, not a shipping one, and read as such below. And a per-class count planned off
-independent passes comes out **17.2% high**, because rejection against the earlier classes is not
-a rounding error.
+independent passes overshoots: **multiply it by 0.828**, because rejection against the earlier
+classes takes 17.2% of the candidates and is not a rounding error.
 
 **What it beats.** *One Poisson pass sized for the largest clast* — correct, and it spends the
 whole domain: 67 clasts on the patch and **0.01% of the ground covered**, because a separation
@@ -170,8 +176,9 @@ radius. The rate is a property of your size law, not of the sampler.
 The fix is not a cleverer sampler. It is an ordering: run one Poisson pass per class at that
 class' own `r = d_max` — which is `2·a_max`, so a class cannot overlap **itself** by
 construction — and test each candidate against every clast already placed, using that pair's own
-`a_i + a_j`. Largest first, because a boulder rejected by a pebble is a boulder lost, and there
-are four orders of magnitude more pebbles to lose.
+`a_i + a_j`. Largest first, because a boulder rejected by a pebble is a boulder lost, and the
+table below has **225 pebble candidates for every boulder candidate** (15,075 against 67) — so
+losing pebbles is cheap and losing boulders is not.
 
 | class | `r` | candidates | kept | survive the earlier classes |
 |---|---|---|---|---|
@@ -182,17 +189,40 @@ are four orders of magnitude more pebbles to lose.
 
 Zero interpenetrating pairs over 13,338 clasts, and the cross-class rejection is **17.2%** of the
 candidates. So a budget planned from independent per-class passes — the natural thing to do, since
-each pass is independent until it is not — **comes out 17.2% high**. Plan from the kept counts.
+each pass is independent until it is not — overshoots, and the safe form of that is a
+multiplier: **plan × 0.828**. Stated as a percentage it is ambiguous, and the ambiguity is not
+academic — 16,103 candidates exceed the 13,338 achieved by 20.7% *of the achieved count* while
+being 17.2% *of the plan*. Plan from the kept counts and the question does not arise.
 
-The cross-class test needs no second structure: one uniform grid at cell size `d_max` of the
-largest class makes a 3×3 scan sufficient for every pair, because no clast's radius exceeds half
-a cell.
+### The grid the cross-class test runs on is not free
 
-## The exponent decides whether your budget goes to boulders or pebbles
+One uniform grid at cell size `d_max` of the largest class does make a 3×3 scan sufficient for
+every pair — no clast's radius exceeds half a cell — and it is the wrong structure, because that
+scan sweeps `9 × 1.024²` = 9.44 m² of ground, and at the final 133.38 clasts/m² there are ~1,259
+clasts inside it. **Measured over the whole run: 451.3 pairwise distance tests per candidate.**
+
+Give each class its own grid at its own `d_max`, and scan each one out to `a + a_max(class)`
+instead. Same result, same guarantees, **10.8 tests per candidate — 41.8× fewer**, because the
+dense classes have small radii and the class with the large radius is sparse.
+
+⚠️ So **the rejection test is not O(1) per candidate**, which this document asserted in an earlier
+revision and which is false in a way that matters at scale. It is O(*density* × `a_max²`) for the
+class being scanned, summed over classes — so widening the size range makes it worse twice over,
+once through the candidate count and once through the reach. Drop the pebble floor from 4 mm to
+2 mm and the candidates roughly quadruple while each candidate's pebble scan also quadruples in
+population: the rejection work goes up about 16×, not 4×. That is the term to watch, not the
+sampler.
+
+## The exponent, and the two constructions it means different things in
 
 The size law within and across classes is a parameter, not a fact this skill has a source for.
-What *is* arithmetic is its consequence, and it is sharper than it looks. For a truncated power
-law `N(>d) ∝ d^−b` over 4–1024 mm, sampling 200,000 diameters per row:
+Its consequences are arithmetic — but **they depend on which construction you are in, and the two
+answers are almost opposite.** Getting this backwards was a real defect in an earlier revision of
+this page, so both are stated.
+
+### If you draw one global law and place what you drew
+
+Sampling 200,000 diameters from a truncated power law `N(>d) ∝ d^−b` over 4–1024 mm:
 
 | `b` | boulders | cobbles | pebbles | | boulder area | cobble area | pebble area |
 |---|---|---|---|---|---|---|---|
@@ -208,12 +238,36 @@ Right half: the *visible* ground flips. Area per clast goes as `d²` and the num
 `−1`, which is **equal area per octave of size**. The classes span 2, 2 and 4 octaves
 (256–1024 mm, 64–256, 4–64), so `b = 2` should split the ground 25 : 25 : 50, and the measured row
 reads 27.54 : 24.77 : 47.69. Below `b = 2` the weight moves to the largest class, above it to the
-smallest. At `b = 1` boulders are 1.18% of the count and **75.38% of the covered area**; at
-`b = 3` they are 1.55% of it.
+smallest.
 
-That single crossing is the parameter's whole meaning for a tool. Below `b = 2` you are authoring
-a boulder field with debris between the blocks, and the instance budget is small. Above it you are
-authoring a gravel surface, the count explodes, and the next section is compulsory.
+### If you use the largest-first construction this page recommends — and you should
+
+**None of the above governs your counts.** In the recommended scheme the *count* of each class is
+set by that class' Poisson `r`, and `b` only picks a radius *within* a class it has already been
+assigned to. Re-running the same stratified placement at five exponents, seed 11:
+
+| `b` | boulders | cobbles | pebbles | total | ground covered | transforms / km² |
+|---|---|---|---|---|---|---|
+| 1.0 | **67** | 776 | 11,209 | 12,052 | **26.48%** | 2.89 GB |
+| 1.5 | **67** | 800 | 11,682 | 12,549 | 22.81% | 3.01 GB |
+| 2.0 | **67** | 824 | 12,092 | 12,983 | 19.97% | 3.12 GB |
+| 2.5 | **67** | 840 | 12,431 | 13,338 | 17.60% | 3.20 GB |
+| 3.0 | **67** | 850 | 12,709 | 13,626 | 15.72% | 3.27 GB |
+
+The boulder count is **67 at every exponent**, because 67 is what `r = 1.024 m` yields on a
+10 m × 10 m patch and `b` never enters. The total moves 13% across the entire range, and the
+instance budget moves from 2.89 to 3.27 GB/km² — so **you cannot buy your way out of the memory
+problem by flattening the size law.** Choosing `b = 1` still lands at 90% of the figure the next
+section calls a category error.
+
+What `b` *does* control here is **coverage and rejection**: the ground under clasts falls
+monotonically from 26.48% to 15.72% as `b` rises, because a steeper law makes the clasts within
+each class smaller. A low `b` gives a coarse, blocky field with more of the ground hidden; a high
+`b` gives a finer one with more ground showing. That is a look, and it is priced in area, not in
+instances.
+
+⚠️ **The two tables answer different questions and the first one is not about this algorithm.**
+Read the global table to understand what a size law is; read the second one to plan.
 
 ## What it costs, and where the instance path ends
 
@@ -224,8 +278,10 @@ shipping one — it is an interpreted reference implementation, and the useful c
 107–134 µs per sample for a bare Poisson pass, the three passes' 16,103 candidates account for
 roughly 1.85 s of the 2.85 s, so **the cross-class rejection is about a third of the total** — a
 subtraction of two separately-timed things, so treat it as a ratio and not as a measurement.
-Composition costs about 1.5× a bare pass, and neither half disappears when you rewrite it in C:
-both are O(1) per candidate.
+Composition costs about 1.5× a bare pass, and neither half disappears when you rewrite it in C.
+⚠️ Nor is the rejection half O(1) per candidate — see the grid section above, where it measures
+451.3 distance tests per candidate on one grid and 10.8 on per-class grids. The 214 µs figure is
+the **one-grid** number; the per-class arrangement is the one to port.
 
 The memory is the number that decides the design. Take the smallest honest per-instance
 transform — position 3×`float32`, rotation one packed quaternion `uint32`, uniform scale
