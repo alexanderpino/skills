@@ -99,7 +99,11 @@ construction it recommends as `F`, rather than borrowing authority from a paper 
 ### Clastic debris
 
 **`bridson2007b`** — the author's own PDF at `cs.ubc.ca/~rbridson/docs/`, read in full; it is two
-pages, which is why it is graded `F` rather than `P` — see the entry. §2 and §3 are quoted from that artefact. ⚠️ **That copy carries no article number, no DOI
+pages. ⚠️ It is graded `F` rather than `P` because it is a SIGGRAPH **Sketch** rather than a
+papers-track publication — *not* because it is short. `papers-flow.md` makes the `F` criterion one
+thing, peer review, and length is not a proxy for it: graded by page count a refereed two-page
+technical brief would land at `F` and thirty pages of unrefereed course notes at `P`. See the
+entry. §2 and §3 are quoted from that artefact. ⚠️ **That copy carries no article number, no DOI
 and no page numbers** — only the title, the author and "ACM SIGGRAPH 2007 Sketches" — so the
 locator cites sections and nothing else, and no article number is asserted below.
 
