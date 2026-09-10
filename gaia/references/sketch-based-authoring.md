@@ -98,9 +98,14 @@ principled option — it is a constraint that holds at every instant — and it 
 three on the only metric where it should have won. The mechanism is that a projection is a
 discontinuous operator: it is `where(mask, …)`, and the solver's stencil straddles the mask edge.
 The projection re-adds height inside; diffusion carries it out; the projection re-adds it again.
-Measured, the height re-added per step falls from 4,562 to 867 cell-metres over 200 steps and
-then stops falling — 19% of the initial rate, forever. **A per-step projection does not converge
-to a fixed point; it converges to a steady flux.**
+Measured, the height re-added per step falls from 4,562 to 867 cell-metres over 200 steps — 19%
+of the initial rate, and **still falling there**. That 19% is a transient reading, not a plateau:
+at step 200 the diffusion length is `√(2DT) = 8.9` cells against ~128 to the domain edge, so the
+flux has not yet felt whatever fixes the far field, and it cannot settle until it does — `t =
+128²/2D`, of order 4×10⁴ steps at these settings. The settled level is several times lower again
+and depends on where that far field sits, so it is not a fixed fraction of the step-1 rate. It was
+**not measured here**; that run needs repeating before anyone budgets from it. **A per-step
+projection does not converge to a fixed point; it converges to a steady flux.**
 
 ⚠️ **Cost is not the reason to avoid it.** One whole-grid masked re-projection costs 110 µs
 against 532 µs for one diffusion step, and 26 µs if you restrict the write to the mask's bounding
@@ -160,8 +165,16 @@ statement of it. Three equations, by order:
 | 2 | `ΔF = 0` (Laplace) | everywhere else, be as smooth as possible |
 
 Solved together as one over-constrained system by Jacobi relaxation inside a multigrid, at
-`5(l − i)` iterations on level `i` [hnaidi2010] §5.2 — the same schedule [orzan2008] uses for
-diffusion curves, which is where the method comes from.
+`5(l − i)` iterations on level `i` [hnaidi2010] §5.2; the multigrid-Jacobi solve itself is
+borrowed from [orzan2008] §3.2.2's diffusion curves, which is where the method comes from.
+
+⚠️ **That iteration count is not implementable as printed, and it is not the schedule [orzan2008]
+prints.** Nothing on this page defines `l` or says which end of the hierarchy `i` counts from, and
+[orzan2008] states its own schedule the opposite way round, `5i` iterations at level `i`. The two
+are the same sweep count only under the relabel `j = l − i`, i.e. only if the two papers index
+levels in opposite directions with `l` the maximum level index; neither convention is stated here,
+and under "`l` = number of levels" they are simply different schedules. Read the level convention
+out of whichever paper you implement, and do not assume the two agree.
 
 **Why not Poisson.** [orzan2008] §3.2.2 solves `ΔI = div w`, and that is the right formulation
 for images. [hnaidi2010] §4.2 rejects it for terrain, explicitly and for two reasons worth
@@ -208,13 +221,17 @@ beam reproduces every plate entry in that table to within 0.014.) **So the folk 
 scoped to what it was always about: prefer Laplace for the crease, and prefer it again wherever
 two drawn features at different heights run close together — in a sketch, the ordinary case.**
 
-⚠️ **Those two percentages are a property of the 65² rig, not of six cells' separation, and the
-distinction is the design fact.** Hold `s = 6` and the drawn lines fixed and grow only the domain,
-and the same pair leaves `[0, 1]` by **100% above and 122% below at 129²**, and by **190% and
-210% at 257²**. What sets the excursion is the distance from the constraint to the clamped
-boundary, not the gap between the lines: the line's own length barely moves it, 17 columns to 63
-taking the minimum only from −0.558 to −0.628. The 1-D beam grows the same way and faster —
-39%/63% at 65 nodes, 272%/298% at 257 — on a different assembly, a different dimensionality and a
+⚠️ **Those two percentages are a property of the gap measured against the 65² rig, not of six
+cells' separation on its own, and the distinction is the design fact.** Hold `s = 6` and the drawn
+lines fixed and grow only the domain, and the same pair leaves `[0, 1]` by **100% above and 122%
+below at 129²**, and by **190% and 210% at 257²**. What sets the excursion is the gap *relative
+to* the distance to the clamped boundary, and neither variable on its own: `Δ²h = 0` with fixed
+data has no intrinsic length, so only a ratio of lengths can set the answer — which is why the
+table above, at one fixed 65² domain, shrinks the undershoot from −0.616 to −0.090 as `s` goes
+6 → 24, even though the wider pair necessarily sits *closer* to the clamped edge, not further.
+The line's own length barely moves it, 17 columns to 63 taking the minimum only from −0.558 to
+−0.628. The 1-D beam grows the same way and faster — 39%/63% at 65 nodes, 272%/298% at 257 —
+on a different assembly, a different dimensionality and a
 different stencil, so this is not an artefact of the 2-D operator. **The overshoot is therefore
 not a number you can budget for**, and on an edit window big enough to be worth having it exceeds
 the range the user drew. The membrane's bound is the opposite kind of statement: a maximum
@@ -334,13 +351,16 @@ flow routing.
 ## Crossovers
 
 - **Before or after the erosion pass** flips at `σ ≥ √(2DT/3)` for the diffusion term. At
-  `D = 1`, `T = 40` that is 5.2 cells; below it the sim eats the feature.
+  `D = 1`, `T = 40` that is 5.2 cells; below it the sim eats the feature. That threshold is in
+  *peak* amplitude — a ridge sitting exactly on it keeps half its peak and appreciably less than
+  half its relief (§2) — so read it as a floor on the width you need, not a pass mark.
 - **Laplace or biharmonic** flips on whether the drawn feature is a *crease*. Ridges, cliffs and
   riverbanks: Laplace, which sheds 16.5× more height in the first cell. An isolated hilltop or
   dome: either, and the plate is smoother. Two drawn heights near each other: Laplace, because the
   plate leaves the constraint range and the excursion grows with the distance to the clamped
-  boundary — 39% above and 62% below at six cells' separation on §1's 65² rig, 190% and 210% on
-  the same pair at 257². The membrane's bound is a theorem at any domain size; the plate's
+  boundary *at a fixed gap* — 39% above and 62% below at six cells' separation on §1's 65² rig,
+  190% and 210% on the same pair at 257². Widen the gap instead and it shrinks; only the ratio
+  of the two decides. The membrane's bound is a theorem at any domain size; the plate's
   overshoot is not a number you can budget.
 - **Hard or soft constraint** flips on whether the feature has an edge. Elevation on a ridge:
   hard (`α = 0`). Noise amplitude, roughness, gradient magnitude: soft.
@@ -374,10 +394,10 @@ Constraint-based authoring, which is what is above, is not part of that exclusio
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| The drawn ridge is gone after the erosion pass | It was an initial condition and its width is under the diffusion length; a 4-cell ridge keeps 18.8% of its relief in 200 steps | Impose after, or widen it: half-life goes as σ², so `σ ≥ √(2DT/3)` |
+| The drawn ridge is gone after the erosion pass | It was an initial condition and its width is under the diffusion length; a 4-cell ridge keeps 18.8% of its relief in 200 steps | Impose after, or widen it: half-life goes as σ², so `σ ≥ √(2DT/3)` — but that threshold is in *peak* amplitude and is a lower bound only; check relief on your own field (§2) |
 | A thin drawn crease vanishes but a broad drawn massif survives, on the same terrain | Same law; 2 cells is half gone in 30 steps, 16 cells in 1920 | Not a bug. Report the survival estimate to the user at draw time |
 | A wall or trench appears at the edge of the constrained region | A per-step projection through a hard-edged mask; curvature 88.3 against 0.69 for the free field | Do not project per step. If you must, feather the mask and accept the softened edge |
-| The constraint is still "costing" simulation after hundreds of steps | Per-step projection reaches a steady flux, not a fixed point — 19% of the step-1 work at step 200 | Constrain an input instead (`U`, `K`, water), which the solver does not fight |
+| The constraint is still "costing" simulation after hundreds of steps | Per-step projection converges to a steady flux, not a fixed point — still 19% of the step-1 work at step 200, and still falling there, so that 19% is a transient reading and not a budget | Constrain an input instead (`U`, `K`, water), which the solver does not fight |
 | Pits and standing water appear where a feature was stamped in | A hard-edged stamp dams the drainage: 28 interior pits against a control of 15 | C1 falloff on a compact support, and re-run depression handling (`flow-routing.md`) |
 | A visible ring at the edge of every edit | Linear falloff — C0 but not C1, leaving a 1.25 m/cell slope step on a 40 m edit over 32 cells | `w(a) = (a² − 1)²` [gain2009] eq. (1), or any C1 weight |
 | A step you can see the cell boundary of | Hard cut: the whole 40 m in one cell | As above |

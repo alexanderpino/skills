@@ -153,6 +153,11 @@ which is the `maxDist` falloff below rather than the angular weighting above.
 **`maxDist` is the parameter that matters.** A small radius gives a crevice map that reads as dirt;
 a large radius darkens valleys and lets mountains catch light, which is what actually sells
 terrain. Start at 2–5% of the domain extent, `N = 8–16` azimuths — the horizon varies smoothly.
+⚠️ **That `N = 8–16` is this corpus's own practice, not a published figure.** `driver-fields.md`
+grades it as folklore and names this file as the one that prints it bare; the direction counts that
+do come from a source are **32–64** for a view factor [dozier2022] — whose own timing run used 32 —
+and 137 then 580 for an urban solar cadaster. It is load-bearing here rather than decorative: both
+timing figures below are computed at the top of the range, `N = 16`, and halve at `N = 8`.
 Attenuate with distance rather than cutting off hard: [bavoil2008]'s `W(r) = 1 − r²` is the cheap
 choice and stops the bake showing a ring at the radius you picked.
 
@@ -174,10 +179,18 @@ amortised O(1) per cell. ⚠️ **An earlier
 version priced that difference as "seconds and hours"; the "hours" end was an order of magnitude
 out.** Naive marching at 4096² × 16 azimuths × 1000 steps is 2.68·10¹¹ samples, which is **4.5 to 45
 minutes on one core** at 10⁹ to 10⁸ samples/s. Neither figure had a source, a date or a machine
-attached, which is how it drifted. **Hours is reachable, but only at a far heavier configuration**:
-`driver-fields.md` prices a sourced per-point DDA bake at 1–2 hours per tile on a GPU for 46 Mcell
-across **580** directions — about a hundred times the work of the 4k × 16 case above. State the cell
-count, the direction count and the machine, or the figure means nothing. It is also the substrate for insolation —
+attached, which is how it drifted. ⚠️ **Hours does not need "a far heavier configuration", and the
+sentence that stood here said it did.** Hold grid, step count, algorithm and machine at the very
+baseline above and vary only the azimuth count: at 10⁸ samples/s one hour arrives at **N ≈ 21**,
+1.34× the 16-azimuth work, and N = 32 — the direction count of [dozier2022]'s own timing run, as
+`driver-fields.md` records it — takes **1.49 h** at exactly 2× it. At 10⁹ samples/s the same hour needs N ≈ 215, 13.4×. The "about a hundred times the
+work" that used to close this paragraph read `driver-fields.md`'s sourced per-point DDA bake — 1–2
+hours per tile on a GPU for 46 Mcell across **580** directions, 99× the cell-direction count of the
+4k × 16 case — as if it were a work multiple on this CPU baseline. It is not one: different
+algorithm, different machine, step count unstated, and `driver-fields.md` flags that cross-row
+reading as a trap in as many words. Carried onto this baseline anyway, 100× is **74.6 h** at 10⁸
+samples/s or **7.5 h** at 10⁹ — never the 1–2 hours it was pointing at. State the cell
+count, the direction count, the step count and the machine, or the figure means nothing. It is also the substrate for insolation —
 horizon angle depends on azimuth, not on the sun, so a precomputed per-azimuth horizon makes every
 sun sample a table lookup. **Insolation is not AO**: a pole-facing wall can be wide open to the sky
 and never see the sun, so substituting one for the other puts melt in shaded ravines.
@@ -203,6 +216,20 @@ heightSel(h, lo, hi, w) = smoothstep(lo-w, lo+w, h) * (1 - smoothstep(hi-w, hi+w
 slopeSel(s, lo, hi, w)  = ...                      # s is tan, not degrees
 aspectSel(a, dir, wid)  = smoothstep(cos(wid), 1, dot(aspectVec(a), dir))
 ```
+
+⚠️ **`lo` and `hi` are half-height points, not band edges, and `w` is the half-width of one edge,
+not the band.** Two consequences follow from the algebra and neither is obvious from the line
+above. The support is `lo-w` to `hi+w`, so a band authored in the world units this document
+demands passes material `w` outside each authored number, and the value *at* `lo` and at `hi` is
+exactly 1/2 whenever the band is at least `w` wide. And the mask reaches 1 only when the band is at
+least twice `w` — at exactly twice, at the single midpoint. Narrower and the peak falls short
+silently: at `w` = 0.6 of the band it is 0.961, at `w` equal to the band 0.712, and for lo 2000,
+hi 2050, w 100 the peak is 0.467 with both authored numbers sitting at 27/64 ≈ 0.422. The
+degradation is gradual, not a cliff — a band 1% short of twice `w` still peaks at 0.99985 — so the
+regime that bites is `w` comparable to the band, not every band narrower than twice `w`. Nothing
+downstream catches it: the `Σ ≤ 1` and `Σ = 1` assertions below both pass while the deficit is
+absorbed by the bare base material, which is the clause that licenses them. Size `w` against
+`hi - lo`, not against the terrain.
 
 Four rules make a selector correct rather than a tell:
 

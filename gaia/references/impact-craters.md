@@ -31,9 +31,12 @@ at each size, and which ones cut which.
 morphometric power laws, choosing the simple or the complex branch by comparing the diameter
 against a transition diameter you scaled to your world's gravity — blending the two branches
 across 0.53–1.58 × `D*` if the scene shows craters near it, which the body argues is the faithful
-form; then lay the field down in age order, oldest first, so later craters overwrite earlier ones.** Everything that makes a
+form, and then keeping whichever branch returns the *smaller* value, because Pike's coefficients
+are lunar and his fits cross at fixed diameters that do not move with `g`; then lay the field down
+in age order, oldest first, so later craters overwrite earlier ones.** Everything that makes a
 crater field read correctly is in that sentence: the profile is measured, the branch is chosen
-by a gravity-dependent threshold, and the history is carried by draw order.
+by a gravity-dependent threshold, that choice is floored at each fit's own crossing, and the
+history is carried by draw order.
 
 Nothing here is simulated. There is **no canonical source for the procedural recipe** — no paper
 tells a tool builder how to stamp a crater into a heightfield; standard practice is to author a
@@ -43,8 +46,8 @@ number the profile has to hit.
 
 **What it beats.** *A subtracted paraboloid* — the commonest crater node there is, and it has no
 rim, so it reads as a dent; the raised rim is roughly 18% of the crater's depth **for simple
-craters** — the complex branch runs 0.25–0.39 — and above about 0.75 km of diameter most of that
-rim is uplift rather than deposit; below it the deposit wins, 55% ejecta at `D` = 0.5 km in the
+craters** — the complex branch runs 0.31–0.39, and only above the rim fits' own 21.3 km crossing
+— and above about 0.75 km of diameter most of that rim is uplift rather than deposit; below it the deposit wins, 55% ejecta at `D` = 0.5 km in the
 table further down. It is the feature the eye uses to identify the landform. *Radially-warped
 noise* — a texture, with no depth law, so it does not change shape as it changes size, and
 therefore no branch either. *An impact hydrocode* (iSALE and relatives) — the right tool for
@@ -63,6 +66,11 @@ below it actually hits.
 | **Simple**, `D` below the transition | `0.196·D^1.010` | `0.036·D^1.014` | `0.257·D^1.011` |
 | **Complex**, `D` above it | `1.044·D^0.301` | `0.236·D^0.399` | `0.467·D^0.836` |
 | *Fits intersect at* | *10.6 km* | *21.3 km* | *30.4 km* |
+
+**The two depth fits come from disjoint samples.** Pike measured the simple branch on craters
+**below 15 km (N = 171)** and the complex branch on craters **above 15 km (N = 33)** [pike1977].
+Neither is evidence about diameters outside its own sample, and both misbehave badly there — which
+is why the crossings in the last row are load-bearing and not decoration.
 
 The exponents are the whole story. Every simple-crater exponent is within 1.5% of **1.0** —
 1.010, 1.014, 1.011 — and [pike1977] says of the rim-height fit that its slope "is now
@@ -86,10 +94,17 @@ two intercepts, 0.036/0.196 = 0.1837. **Treat both as constants and you are insi
 own scatter.** So for the simple branch, the practical form is: depth `= D/5`, rim crest
 `= 0.18·depth` above the pre-impact surface, rim flank out to about `0.26·D` beyond the crest.
 
-**On the complex branch that ratio is neither 0.18 nor a constant.** It is
-`(0.236/1.044)·D^(0.399−0.301)` = `0.226·D^0.098` — 0.25 at `D` = 3 km, 0.30 at 19 km, 0.39 at
-250 km, so roughly double the simple value at basin scale, and still climbing. Carrying 0.18
-across the transition understates every large rim; carry the branch, not the constant.
+**Above the transition that ratio is neither 0.18 nor a constant — but only once each fit is past
+its own crossing.** Floor every quantity at the crossing of its own fit pair (below that crossing
+the complex fit returns *more* than the simple one, not less — the trap the next section is
+about), and the rim-to-depth ratio goes: **0.184, flat**, up to 10.583 km; then climbing through
+the window where the depth is already complex and the rim height is not — 0.24 at 15 km, 0.28 at
+19 km; then `(0.236/1.044)·D^(0.399−0.301)` = `0.226·D^0.098` above 21.273 km, which is 0.305
+there, 0.32 at 30 km and 0.39 at 250 km — roughly double the simple value at basin scale, and
+still climbing. **Do not read that last formula below 21.3 km.** At `D` = 3 km it claims 0.25,
+out of a complex rim fit evaluated seven times below its own crossing — where it returns **3.34×**
+the simple rim — over a complex depth fit whose sample is `>15 km, N=33`. Carrying 0.18 across the
+transition understates every large rim; carry the branch, not the constant.
 
 ⚠️ **There is no single diameter at which a crater becomes complex, and the paper says so three
 separate times.** Pike's depth fits intersect at about 10.6 km, his rim-height fits at about
@@ -128,6 +143,35 @@ Mercury have essentially the same surface gravity, 3.72 and 3.70 m/s², and tran
 noticeably different diameters, because target strength, porosity and layering all move the
 threshold. `1/g` is the scaling you should expose as a knob's default, not a law you should
 hard-code.
+
+⚠️ **The gravity-scaled `D*` picks the branch; it does not move the fits.** Pike's coefficients
+are lunar, and his three fit pairs cross at fixed diameters — **10.583 km** (depth), **21.273 km**
+(rim height), **30.352 km** (rim-flank width) — which are properties of those regressions and do
+not scale with `g`. One gravity-scaled selector therefore cannot coincide with all three, and on a
+high-gravity world it coincides with none: wherever the top of the blend band, `1.58·D*`, falls
+below a crossing, the rule sends craters onto a complex fit *below* that fit's crossing, where it
+returns **more** than the simple fit instead of less. At this page's `D*·g = 30.8` that is every
+body with `g` above **4.60 m/s²** for the depth fit — Earth and Venus.
+
+Worked on Earth (`D*` = 3.14 km, band 1.66–4.96 km, printed as 1.7–5.0 km further down): at
+`D` = 5 km the unfloored prescription returns **1.695 km** of depth against the simple law's
+**0.996 km** — a `d/D` of **1:2.95**, deeper relative to its diameter than the simple-bowl 1:5
+above, and **1.70×** deeper than the same-diameter lunar crater the same prescription produces.
+That is the "deep bowls on a low-gravity moon, flat terraced basins on Earth" sentence above
+running backwards. Blending only softens it: the over-deepening still peaks at **1.717×** at
+`D` = 4.55 km (`d/D` 1:2.93). With a bare threshold and no blend it is a **2.37×** step at
+`D` = 3.14 km.
+
+**The fix is a floor: evaluate both branches and keep the smaller.** That is the same rule as
+"switch each quantity at its own crossing", because each complex fit sits above its simple
+counterpart below the crossing and below it above. The gravity-scaled `D*` keeps the job it is
+good for — deciding whether the crater is terraced, flat-floored and central-peaked — while the
+depth, rim and width *numbers* stay on the branch each was measured over. Below the lunar
+crossings that means an Earth-gravity complex crater gets simple-branch **dimensions** with
+complex **morphology**, and its depth stops differing from the lunar crater of the same diameter:
+the shape change is real, the depth change is not something Pike supports there, because his
+complex depth sample begins at 15 km. Expose that limit rather than papering over it with an
+extrapolated coefficient.
 
 ## Rim and ejecta
 
@@ -269,7 +313,7 @@ argument: it is material added to slopes, so it should be there before the mater
 |---|---|---|
 | One hero crater, art-directed | Author the profile directly; ignore the SFD | The population statistics say nothing about a single object |
 | A field on a planet, any airless body | SFD sampling + age-ordered stamping | Both the count and the cut-order are what make it read as history |
-| Diameters straddling the transition | Blend the two branches across **0.53–1.58 × `D*`** | The transition is a band, not a threshold [pike1977]. ⚠️ Pike's 10–30 km is the **lunar** band; expressed against the lunar `D*` of 19 km it is 0.53–1.58 × `D*`, and in that form it scales with gravity like `D*` does. On Earth's predicted `D* = 3.1 km` that is **1.7–5.0 km** — blending across 10–30 km there would blend entirely inside the complex regime, at 3× to 10× `D*` |
+| Diameters straddling the transition | Blend the two branches across **0.53–1.58 × `D*`**, then floor: keep whichever branch returns the **smaller** value | The transition is a band, not a threshold [pike1977]. ⚠️ Pike's 10–30 km is the **lunar** band; expressed against the lunar `D*` of 19 km it is 0.53–1.58 × `D*`, and in that form it scales with gravity like `D*` does. On Earth's predicted `D* = 3.1 km` that is **1.7–5.0 km** — blending across 10–30 km there would blend entirely inside the complex regime, at 3× to 10× `D*`. ⚠️ But the band scales with `g` and Pike's crossings (10.583 / 21.273 / 30.352 km) do not, and on Earth the whole band sits below all three: unfloored, the blend makes a 5 km crater **1.70× deeper** than the simple law. Hence the floor |
 | A world that is not Earth or Moon | Scale `D*` by `1/g` first, then everything else | The branch choice moves before any coefficient does [silber2017] |
 | An old, saturated surface | Drive `η` toward 2 and cap at ~2% of geometric saturation | Past the cap, more craters make mush, not more age [minton2019] |
 | Craters on a world with water and weather | Stamp, then erode — never the reverse | The rim is a divide and the floor is a lake; `flow-routing.md` owns the rest |
@@ -278,8 +322,9 @@ argument: it is material added to slopes, so it should be there before the mater
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| Craters read as dents, not craters | No raised rim — a subtracted paraboloid | Rim crest at ~0.18 of the depth above the pre-impact surface **for simple craters**; `0.226·D^0.098`, i.e. 0.25–0.39, on the complex branch [pike1977] |
-| Big craters look like scaled-up small ones | One profile for every diameter; the complex branch never used | Switch to `1.044·D^0.301` above the transition; the exponent is 0.301, not 1 |
+| Craters read as dents, not craters | No raised rim — a subtracted paraboloid | Rim crest at ~0.18 of the depth above the pre-impact surface **below 10.6 km**; `0.226·D^0.098`, i.e. **0.31–0.39**, only above the rim fits' own **21.3 km** crossing; between the two, floor each fit at its crossing and the ratio climbs 0.18 → 0.31 [pike1977] |
+| Big craters look like scaled-up small ones | One profile for every diameter; the complex branch never used | Switch to `1.044·D^0.301` above the transition, floored at that fit's own **10.583 km** crossing; the exponent is 0.301, not 1 |
+| Earth-gravity craters come out deeper than lunar ones of the same diameter | The gravity-scaled `D*` sent them onto a complex fit **below that fit's own crossing**, where it returns more depth, not less | Keep the smaller of the two branches. `D*` scales with `1/g`; Pike's 10.583 / 21.273 / 30.352 km crossings are lunar constants and do not [pike1977] |
 | Large craters are implausibly deep | Simple-branch depth extrapolated past the transition | At 250 km the simple law gives ~52 km of depth against the complex law's ~5.5 km |
 | Every crater on an alien world is the same shape as the Moon's | `D*` hard-coded at a lunar value | Scale by `1/g`; then expose it, because target strength moves it too [silber2017] |
 | Ejecta reads as a wide stain or a pedestal | Falloff exponent far below 3 | `t ∝ (r/R)^−2.8`; thickness is 1/7 at 2R and 1/49 at 4R [austin2024] |

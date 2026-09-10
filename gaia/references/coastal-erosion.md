@@ -13,11 +13,14 @@ sources:
 ---
 # Coastal erosion — the shore profile, and why a coast smooths
 
-**Tier: authoring-time.** Everything else in this skill's erosion axis **roughens**. Stream power
-cuts valleys into a surface and sharpens the divides between them; thermal relaxation smooths, but
-only locally and to a repose angle. The coast is the corpus's one process whose governing equation
-is the **heat equation** — the one-line shoreline model is a diffusion equation, literally, in the
-form its authors write it [ashton2006b]. A coastline is where the terrain gets *simpler*.
+**Tier: authoring-time.** The coast is the only process in this skill whose **entire** governing
+equation is a diffusion equation — the one-line shoreline model is the heat equation, literally, in
+the form its authors write it [ashton2006b]. It is not the only heat-equation *term* in the erosion
+axis: `stream-power.md`'s always-on hillslope term `D·∇²h` is the same operator and smooths too,
+but it sits inside `∂h/∂t = U − K·A^m·S^n + D·∇²h` beside an incision term that sharpens, so stream
+power *net* cuts valleys and sharpens the divides between them. Thermal relaxation smooths, but
+only locally and to a repose angle. A coastline is where the terrain gets *simpler*, with nothing
+pulling the other way.
 
 And then there is the twist that makes the subject worth a document: **that diffusivity changes
 sign.** Above a deepwater wave approach angle of about 42° it is negative, the equation runs
@@ -116,12 +119,17 @@ All computed from the two published equations; the mean slope over that width ru
 closure depth**, and that is the visible difference between a Gulf barrier beach and a shingle
 one.
 
-⚠️ **`h = A·x^(2/3)` has infinite slope at the waterline, and Dean says so.** At `x = 1 cm` with
-`A = 0.10` the local gradient is 0.31 — one in 3.2 — which is a cliff, not a beach face.
+⚠️ **`h = A·x^(2/3)` has infinite slope at the waterline — analytically, and only analytically.**
+The gradient reaches 0.31 (one in 3.2) at `x = 1 cm` with `A = 0.10`, but 1 cm is 244× finer than
+the finest cell the resolution table below admits, and no node-sampled heightfield ever draws it.
+What the first cell actually draws is the mean slope `A·Δx^(−1/3)`: **1 in 13.5, 23.0, 36.6 and
+49.6** — steepest 4.25° — at that table's four cell sizes, and the first cell is 1.70× the second
+at *any* `Δx`. That is a slope break, not a step. A first-cell gradient of 0.31 would need
+`Δx ≈ 3.4 cm`, a 138 m domain across 4096 cells, far outside the 10–500 km regime below.
 [dean1991] eq. (8) adds gravity to the force balance and integrates to a form that is **planar**,
-`h = m·x`, in shallow water and reduces to `A·x^(2/3)` in deeper water. Use it, or splice a linear
-face onto the power law over the first few cells. The pure power law drawn straight into a
-heightfield puts a step at the shoreline, and it is the first thing anyone notices.
+`h = m·x`, in shallow water and reduces to `A·x^(2/3)` in deeper water. Use it if you want the
+profile analytically right near the waterline; splicing a linear face over the first three cells is
+the cheap version and costs ≤ 5.6 cm of depth across 7.3 m of a 465 m shoreface.
 
 **Resolution decides whether you have a beach at all.** For `A = 0.10`, `h* = 6 m`, `W*` is 465 m:
 
@@ -161,7 +169,11 @@ to −68%**; and there has not been "a single field verification that the Bruun 
 operates as Bruun (1962) envisioned it" [cooper2004].
 
 The most useful part of the criticism for a tool builder is mechanical rather than rhetorical.
-**Nearly all of the answer is `h*`, and `h*` is a convention.** [cooper2004] p. 159 records that
+**`h*` is a convention, and it moves the answer by an amount nobody measured — but `A` moves it
+more.** `∂lnR/∂lnA = −3/2` exactly, against `∂lnR/∂lnh* = (h*+3B)/(2(h*+B))`, which is 0.833 at
+`h* = 4 m` and 0.600 at 18 m: `R` is 1.8× to 2.5× more sensitive to grain size than to closure
+depth, and since `3/2 − ∂lnR/∂lnh* = h*/(h*+B) > 0` for every `h* > 0`, no admissible input
+reverses that ordering. [cooper2004] p. 159 records that
 Bruun put the closure depth off east Florida at 18 m, while nourishment design has since used
 values as shallow as 4 m. Holding everything else fixed and sweeping `h*` across exactly that
 published range:
@@ -170,9 +182,10 @@ published range:
 |---|---|---|---|---|---|---|
 | retreat `R` | 12.6 m | 17.4 m | 21.5 m | 25.0 m | 28.2 m | 36.2 m |
 
-A **2.86× spread** from one unmeasured parameter, on the same rise, the same sand and the same
-equation. Grain size does the same thing in the other direction: at `h* = 8 m`, moving `A` from
-0.10 to 0.20 takes the retreat from 21.5 m to 7.6 m.
+A **2.86× spread** from one unmeasured convention, on the same rise, the same sand and the same
+equation — and it is the smaller half. At `h* = 8 m`, moving `A` from 0.10 to 0.20 takes the
+retreat from 21.5 m to 7.6 m (2.83×), and the 0.05–0.25 grain-size slider prescribed above spans
+**11.18×**, which `h*` alone could match only by running from 4 m to 226 m.
 
 **So: use the Bruun rule as a scale hint and never as an operator.** It tells you that a shoreline
 responds to sea level by 7.2 m per decimetre in the case worked above, which is genuinely useful
@@ -195,6 +208,14 @@ mu    = -(1/D) * dQs/dtheta                   # theta = local shoreline orientat
 [ashton2006b]. **Positive `μ` smooths the shoreline; negative `μ` grows perturbations**
 [ashton2006b].
 
+⚠️ **A diffusion equation carries a timestep bound, and nothing else on this page states one.**
+Discretised explicitly (FTCS) along the contour, `Δt ≤ Δx²/(2·μ)`. At the `μ = 0.0539 m²/s` worked
+below that is **55 s** at the 2.44 m cell of the 10 km row above and **23 min** at 12.2 m — it
+tightens as `Δx²`, and since `μ ∝ H0^(12/5)`, doubling the wave height shortens it 5.3×. An
+implicit or spectral solve has no such bound, and the mode solution `τ = L²/(4π²·μ)` below is
+exactly the spectral form. Pick one deliberately: an over-long explicit step explodes at
+**positive** `μ`, on a coast that is supposed to be smoothing, and no wave-angle clamp touches it.
+
 `Q_s` is alongshore sediment transport. The CERC form depends on the waves as
 `H_b^(5/2)·cos(ψ_b)·sin(ψ_b)` where `ψ_b` is the breaking wave angle relative to the shore
 [ashton2006b] — which, since `cos·sin = ½·sin(2ψ)`, is the familiar `Q ∝ H^2.5·sin(2θ)`. That form
@@ -210,8 +231,13 @@ K2 = 0.15            # the same constant for SIGNIFICANT wave height
 
 ⚠️ **Two constants, two wave-height conventions, a factor of 2.3 between them.** [ashton2006b]
 gives both because `H_s ≈ 1.4·H_rms`; feed significant heights into the r.m.s. constant and every
-transport rate is out by that factor. `wave-models.md` owns which height your spectrum produces —
-go and check before wiring this up.
+transport rate is out by that factor. `wave-models.md` owns the spectrum — but **it does not state
+this convention**: it names Pierson–Moskowitz, JONSWAP and Phillips and stops, and never defines
+`H_s`, `H_rms` or `H_s = 4·√m₀` (its only wave heights are the `0.78·h` breaking criterion and
+Green's-law shoaling). `coverage.md`'s `wave-spectra` row records that gap as open. So there is
+nothing to go and check — **decide it here**: normalise the spectrum so `H_s = 4·√m₀` with `m₀` the
+surface-elevation variance (the acceptance test `coverage.md` names), then feed `H_s` with
+`K_2 = 0.15`, or divide by 1.4 and feed `H_rms` with 0.34.
 
 Note the exponents. Transport goes as `H0^(12/5)` and as `T^(1/5)`: **wave height is nearly
 everything and period is nearly nothing.** A wave field with the right period and the wrong height
@@ -239,10 +265,13 @@ coastline reads the way it does: metre-scale wiggles are erased within a day, ki
 within a month, and only the hundred-kilometre features survive long enough to record anything
 else. Halving the wave height costs a factor of 5.3 in rate, because `H^(12/5)`.
 
-**This is the exact opposite of the fluvial axis, and the contrast is the point.** `stream-power.md`
-describes an *advective* process: knickpoints propagate upstream, a signal travels and is
-preserved, and small features are created rather than destroyed. The coast is *diffusive*: signals
-do not travel, they decay, fastest at the smallest scale. Put both in one pipeline and the seam
+**This is the opposite of what *dominates* the fluvial axis, and the contrast is the point.**
+`stream-power.md`'s incision term is *advective*: knickpoints propagate upstream, a signal travels
+and is preserved, and small features are created rather than destroyed. Its hillslope term `D·∇²h`
+is diffusive and does erase small features — `sketch-based-authoring.md` measures drawn creases
+dying under exactly that law — but it competes with incision rather than being the whole equation.
+The coast has no competing term: signals do not travel, they decay, fastest at the smallest scale.
+Put both in one pipeline and the seam
 between them — a river mouth — is where a preserved fluvial signal meets a process that erases it,
 which is why deltas and estuaries are the hardest thing on any generated coast and why the honest
 move is to give the river mouth a fixed sediment input and let the shoreline model spread it.
@@ -297,9 +326,20 @@ Three consequences a tool must respect:
   converges on headlands and spreads in bays. That is the classical straightening mechanism, and
   in this framework it is not a separate rule: it is where the diffusivity comes from.
 
-`wave-models.md` already owns the machinery you need to evaluate this — the travel-time/eikonal
+`wave-models.md` already owns the machinery you need to render this — the travel-time/eikonal
 field whose iso-lines are refracted wavefronts, and the `H ≈ 0.78·h` breaking criterion. Do not
-rebuild it here; sample the shore-normal and the local wave direction out of it and feed `ψ`.
+rebuild it here.
+
+⚠️ **But do not read `ψ` out of that field.** `ψ` in eq. (7)/(8) is the **deepwater** angle, and a
+direction sampled from a travel-time field is by construction already refracted. Under that
+document's own `c(h) = sqrt(g·h)` at `T = 10 s` (`c₀ = 15.61 m/s`), Snell caps the sampled angle at
+`arcsin(sqrt(g·h)/c₀)` — **39.37° at the 10 m shoreface used above, for any deepwater angle
+whatever** — falling to 0° at the sea-level contour the shore normal comes from, and not reaching
+42.392° until `h = 11.30 m` (`h_crit ∝ T²`). An unstable `ψ₀ = 60°` arrives as 33.32° at
+`h = 10 m` and 25.19° at 6 m — angle factor **+0.324** and **+0.590** — so `μ` comes out positive
+at every sample taken at or inside that depth, for every wave climate: the two failure rows below,
+produced by the instruction above them. **Build `ψ` from the deepwater wave direction differenced
+against the local shore normal**, and sample the field only for the normal and the breaking height.
 
 ## Cliff coasts are a threshold, not a rate
 
@@ -349,7 +389,7 @@ one is a bake rather than a per-cell query.
 |---|---|---|
 | Sea level | one scalar | authored; everything below is a contour of it |
 | Exposure / fetch | per-cell, over water | `driver-fields.md`'s fetch sweep — the same traversal as the wind-shelter horizon, accumulating distance rather than angle |
-| Wave angle `ψ` | per-shoreline-cell | shore normal from the contour, wave direction from `wave-models.md` |
+| Wave angle `ψ` | per-shoreline-cell | shore normal from the contour, **deepwater** wave direction from `wave-models.md` — never a direction sampled out of its travel-time field, which is already refracted |
 
 ⚠️ **Run the coastal pass after erosion, not before.** A coastline cut into a pre-erosion surface
 gets re-cut by every subsequent hydraulic pass, and the rivers then drain into a shoreline that no
@@ -370,21 +410,22 @@ later processes would destroy.
 | You want both on one map | Give the wave climate an angular distribution | One direction picks a permanent regime, and real coasts sit near the balance point — [ashton2006b] §3.3 puts the Outer Banks at 0.02 |
 | Rock coast | Threshold on `F_R`, notch at the foot, repose collapse above | A cliff has no sediment budget to diffuse [shadrick2022] |
 | Cliff with a wide beach | Suppress the notch | The waves do not reach the foot |
-| A river mouth | Fixed sediment input, then let the shoreline model spread it | Advective process meeting a diffusive one; see `stream-power.md` |
+| A river mouth | Fixed sediment input, then let the shoreline model spread it | A net-advective process meeting a purely diffusive one; see `stream-power.md` |
 
 ## How this fails, and what it looks like
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| A step or wall at the waterline | `h = A·x^(2/3)` drawn to `x = 0`, where its slope is infinite | Splice a planar face — [dean1991] eq. (8) is the gravity-corrected form |
+| A wall at the waterline | Not the profile: at every cell size above, its first cell is 1 in 13.5 or gentler. Look at the land/sea slope break across the contour instead | Match the beach face to the land slope at the contour; [dean1991] eq. (8) is the gravity-corrected profile if you also want the analytic fix |
 | Every beach the same width regardless of sand | `A` not exposed, or exposed and ignored | `W* = (h*/A)^(3/2)`: halving `A` widens the shoreface by 2^(3/2) = 2.83× |
 | Beaches invisible at map scale, and tuning does nothing | Shoreface is under ~5 cells wide | Above ~50 km of domain, express the profile as material, not height |
 | Sheltered lee shores eroded like exposed ones | No fetch/exposure field; one global wave height | Bake exposure with `driver-fields.md`'s fetch sweep — **not** its `Sx` horizon, which saturates: 10 m of land reads 0.0115° at 50 km and 0.1146° at 5 km; `H0^(12/5)` makes the difference enormous |
 | Transport rates out by ~2.3× | Significant wave height fed into the r.m.s. constant | `K_2` = 0.34 for `H_rms`, 0.15 for `H_s` [ashton2006b] |
 | The whole coast retreats by the same distance | Bruun applied per-cell as an operator | Bruun is a one-number estimate; use one-line diffusion for shape [cooper2004] |
-| Sea-level retreat numbers feel arbitrary | They are — `h*` is a convention | 4 m to 18 m of assumed closure depth spans 2.86× in retreat [cooper2004] |
+| Sea-level retreat numbers feel arbitrary | They are — `h*` is a convention, and `A` is a slider that moves it further | 4 m to 18 m of assumed closure depth spans 2.86× in retreat [cooper2004]; the 0.05–0.25 `A` range spans 11.18×, and `R` is 1.8×–2.5× more sensitive to `A` than to `h*` |
 | Coastline is uniformly smooth, everywhere, always | Diffusivity forced positive; one wave direction, shore-normal | 52.9% of the angle range is unstable — drive with a distribution |
-| Grid-scale noise on the shoreline explodes | Negative `μ` with no regularisation: backward diffusion amplifies the smallest `L` fastest | Cap the instability with wave shadowing, or clamp `ψ` below 42.392° |
+| Grid-scale noise explodes while `μ > 0` | Explicit step past `Δt = Δx²/(2μ)` — a scheme failure, not a physical one, and clamping `ψ` is a no-op because `ψ` is already low | Sub-cycle to the bound (55 s at `Δx` = 2.44 m, `μ` = 0.0539), or solve implicitly |
+| Grid-scale noise explodes while `μ < 0` | Backward diffusion with no regularisation: it amplifies the smallest `L` fastest, and no timestep cures it | Cap the instability with wave shadowing, or clamp `ψ` below 42.392° |
 | Capes and spits never appear at any setting | Wave angles never exceed 42° | The instability threshold is a deepwater angle, not a breaking angle — refraction has already reduced the latter |
 | Headlands and bays do not track the geology | `F_R` is a global constant | One resistance per cell, from `stratigraphy-and-lithology.md` |
 | Cliffs are smooth vertical walls | Mean retreat rate applied uniformly | Erosion is threshold-crossing and episodic: 2–25 cm/yr across 2 km of one coast [shadrick2022] |

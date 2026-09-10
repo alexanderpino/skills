@@ -10,7 +10,7 @@ sources:
   - { id: leopoldwolman1957, tier: P, locator: "p. 60 eq. (1), s = 0.06 Q^−0.44, 'a line described by the equation' separating braided from meandering channels, Q bankfull in cfs, plotted as fig. 46 on p. 59; p. 60 for the definitions — a braid is a reach with 'relatively stable alluvial islands, and hence two or more separate channels', a meander is sinuosity ≥ 1.5 and that value 'is an arbitrary one'; p. 60 for Cottonwood Creek, meandering at slope 0.0011 and braided at 0.004 with no tributary between them; p. 59 for the meander wavelength fit λ = 6.5 w^1.1 and 'the relation is not a constant ratio but a power function having an exponent slightly larger than 1.0'; p. 58 fig. 45B for the observed wavelength-to-width ratio 'from about 7 for small streams having widths of 1 to 10 feet, up to 15 for large rivers having widths in excess of 1,000 feet'" }
   - { id: strahler1957, tier: P, locator: "p. 914 §Order analysis — the ordering rule 'only slightly modified from Horton (1945, pp. 281-282)', finger-tip tributaries order 1, two of order k joining to make k+1; p. 914 §Bifurcation ratio for Horton's law of stream numbers as an inverse geometric sequence and for 'the number is highly stable and shows a small range of variation from region to region or environment to environment, except where powerful geologic controls dominate', with Coates (1956) ranges 4.0–5.1 and 2.8–4.9; p. 915 fig. 3 for the fitted regression b = 0.541, r_b = 3.52 and the segment counts 139/46/11/3/1 from Smith (1953, Plate 8); p. 915 fig. 4 for the stream-length regression b = 1.67" }
   - { id: candel2021, tier: P, locator: "Table 1 — the Leopold & Wolman discriminator classifies 79% of 126 rivers correctly, κ = 0.48, 'moderate' agreement (79% of 97 single-thread, 76% of 29 multi-thread), against 96% of 111 and κ = 0.95 for Kleinhans & Van den Berg read as lower limits; §2.2 eqs. (4)–(5) for potential specific stream power ω_pot = ρgQ_ef·S_v/W_r with reference width W_r = φ√Q_ef, φ = 4.7 sand-bed and 3.0 gravel-bed; eq. (6) ω_bm = 900 D50^0.42 for the braided–meandering transition and eq. (7) ω_ia = 90 D50^0.42, 'defined at a tenfold lower stream power', for the inactive–active transition anchored on the anastomosing upper Columbia; p. 9 eq. (10) for the bar mode m² = (0.17g(n−3)/√(((ρs−ρ)/ρ)D50)) · W³S/(CQ) with n = 4 sand and 10 gravel, and eq. (11) B_i = (m−1)/2 + 1" }
-  - { id: genevaux2013, tier: P, locator: "§4 Table 1 and fig. 6 — the expansion grammar whose branching rules are Horton–Strahler symmetric (n−1, n−1) and asymmetric (n, m<n) junctions, applied with user probabilities Pc + Ps + Pa = 1, and fig. 8 for what those probabilities do to the order histogram (Ps = 0.7 gives >75% order-1 streams); §5.1 §River flow evaluation for φ = 0.42·A^0.69 with A in m² and φ in m³/s, 'This equation takes into account evaporation and infiltration, and that is why the volume flow is not preserved'; §7 for the river primitive h(p) = u_z(p) + δ(d(p)) — the elevation of the projection on the centreline plus a stored profile of signed distance — and for the replace operator h_C(A,B) = (1−w_B)h_A + w_B h_B that puts it into the terrain; §6.2 fig. 14 for terrain elevation as a distance-weighted combination of the projection on the river and the projection on the ridge; §6.1 fig. 12 for the junction-angle rule, 'nearly perpendicular' when the joining flows differ and a small angle when they are the same size" }
+  - { id: genevaux2013, tier: P, locator: "§4 Table 1 and fig. 6 — the expansion grammar whose branching rules are Horton–Strahler symmetric (n−1, n−1) and asymmetric (n, m<n) junctions, applied with user probabilities Pc + Ps + Pa = 1, and fig. 8 for what those probabilities do to the order histogram (Ps = 0.7 gives >75% order-1 streams); §5.1 §River flow evaluation for φ = 0.42·A^0.69 with A in m² and φ in m³/s — the paper's units, verbatim, and read as absolutes they give 2.84×10⁴ m³/s off a 10 km² basin, so the body takes the exponent and calibrates the coefficient (see the warning under '## Use this'); 'This equation takes into account evaporation and infiltration, and that is why the volume flow is not preserved'; §7 for the river primitive h(p) = u_z(p) + δ(d(p)) — the elevation of the projection on the centreline plus a stored profile of signed distance — and for the replace operator h_C(A,B) = (1−w_B)h_A + w_B h_B that puts it into the terrain; §6.2 fig. 14 for terrain elevation as a distance-weighted combination of the projection on the river and the projection on the ridge; §6.1 fig. 12 for the junction-angle rule, 'nearly perpendicular' when the joining flows differ and a small angle when they are the same size" }
   - { id: peytavie2019, tier: P, locator: "§5.1 and its margin note — 'We check that the river height is monotonically decreasing. When this fails, we propagate the heights of the river trajectories downwards and perform local adjusments at the junctions'; §5.2 with fig. 8 for cross-section templates 'normalized in the sense that their scale assumes unit area for water in the cross section', scaled by a = φ/‖u‖ with φ = 0.42A^0.69; §5.2 with fig. 13 for Rosgen D — 'We first establish the number of channels based on the flow volume and width of the river', each thread on its own trajectory with width and depth 'determined by partitioning the aggregate flow between channels', and 'in order to preserve flow, the final height of the riverbed is set as the minimum height over all channels'; §5.2 fig. 12 for the asymmetric cross-section in high-curvature bends" }
   - { id: paris2023, tier: P, locator: "§3.1 (NOT §4, which is the migration model) — 'the width of the channel is related to the drainage by the power law w_Γ ∝ a^0.5' and the width–depth relation w_Γ = 18.8 d_Γ^1.41 attributed to Konsoer et al. 2013, both held constant per channel; §6.1 fig. 21 for the junction-angle rule, near perpendicular when the two flows differ and a small angle when they are similar; §6.2 fig. 22 for the three collision cases — upstream, downstream and disconnected — that a migrating network needs and a static tree does not" }
   - { id: braid_flow_split, tier: F, locator: "no artefact: how a reach's discharge is divided among the threads of a braid. peytavie2019 §5.2 says only that the parameters are 'determined by partitioning the aggregate flow between channels' and prints no rule" }
@@ -40,7 +40,16 @@ stored cross-section profile evaluated at the signed distance from it [genevaux2
 The three numbers that fill that graph:
 
 - **Discharge from drainage area**: `φ = 0.42·A^0.69`, `A` in m², `φ` in m³/s [genevaux2013],
-  used unchanged by [peytavie2019]. Or take `A` straight from `flow-routing.md`'s accumulation.
+  used unchanged by [peytavie2019]. Or take `A` straight from `flow-routing.md`'s accumulation,
+  which is m². ⚠️ **Those are the paper's units, verbatim, and no *absolute* `φ` survives them.**
+  In m² the relation sits `10^(6·0.69)` = 1.38×10⁴ above the km² reading: a 10 km² headwater
+  returns 2.84×10⁴ m³/s, an areal runoff of 9.0×10⁴ m/yr. Reading `A` in km² is **not** a verified
+  repair either — 13.3 m/yr at 1 km², 6.5 at 10 km², defensible only above ~10³ km² (1.6 m/yr) —
+  so no corrected coefficient is printed here: take the **exponent**, and anchor the coefficient
+  on one known discharge exactly as the width chain below is anchored. Ratios are unharmed, the
+  scale cancelling in `w ∝ A^0.345`; the two absolute consumers on this page are not — the
+  profile scale `a = φ/‖u‖`, and `Q` into the planform line, which wants *bankfull* `Q` where
+  `φ` is a *mean* flow.
 - **Width from discharge**: `w ∝ Q^0.5` [leopold1953]. The exponent is published; the
   coefficient is not, and you calibrate it from one river on your map (below).
 - **Planform from slope and discharge**: braided above `S = 0.06·Q^−0.44` with `Q` bankfull in
@@ -96,9 +105,9 @@ splitting.
 
 ⚠️ **MFD is not the fix.** The right-hand column has cycles, so it can in principle hold a
 braid — but it puts a receiver split on essentially every cell, which is a diffuse wetness
-field, not a channel network. `flow-routing.md` says exactly what you get if you try:
-"thresholding an MFD field to get a network produces a smeared, braided mask". *Smeared* is
-the operative word — those cycles are dispersion artefacts at cell scale, not islands.
+field, not a channel network. `flow-routing.md`'s failure table carries the row (:436): "| River
+mask smeared and braided | MFD thresholded to make a network | Route D8 for the network |".
+*Smeared* is its word and the operative one — dispersion artefacts at cell scale, not islands.
 
 The fix is not a different routing rule; it is **not deriving the planform from routing at
 all**. Author the threads as separate edges in a graph that is allowed to be a DAG, and the
@@ -195,10 +204,9 @@ not state. ⚠️ **That unit is METRES, and an earlier version of this line sai
 [candel2021] §2.1 states it in prose — "median bed grain size (**D50, m**)" — and the axes of
 Fig. 2d, Fig. 3c and Fig. 6 all read `D50 (m)`. The error is not cosmetic and it has a direction:
 converting a metre value to millimetres multiplies `ω_bm` by `1000^0.42 = 18.2`, which lifts the
-braiding threshold clean out of range, **so the tool never braids**. Neither constant is
-dimensionless and neither survives a unit change; convert the discharge, leave `D50` in metres,
-or refit. The `√Q` reference width is what
-makes this pattern-independent: it does not need to know the answer to compute the input.
+braiding threshold clean out of range, **so the tool never braids**. Convert the discharge, leave
+`D50` in metres, or refit. The `√Q` reference width is what makes this pattern-independent: it
+does not need to know the answer to compute the input.
 
 ## Two multi-thread planforms, and they are opposites
 
@@ -206,11 +214,10 @@ Both braided and anastomosing rivers have more than one thread, so both are unre
 tree — and an authoring tool that lumps them will get both wrong, because they sit at opposite
 ends of the energy axis.
 
-⚠️ **`ω` discriminates *among* multi-thread rivers; it does not detect them.** [candel2021] anchors
-`ω_ia` on the anastomosing upper Columbia, so anastomosis does sit below the line — but the class
-below it is dominated by laterally immobile, bar-free **single**-thread rivers. Read the test as
-necessary and not sufficient, or a tool will author a multi-thread channel everywhere the terrain
-is flat.
+⚠️ **`ω` discriminates *among* multi-thread rivers; it does not detect them.** Anastomosis does
+sit below `ω_ia`, which is anchored on it (below) — but the class below that line is dominated
+by laterally immobile, bar-free **single**-thread rivers. Read the test as necessary and not
+sufficient, or a tool will author a multi-thread channel everywhere the terrain is flat.
 
 [candel2021] eq. (7) puts the inactive–active transition at `ω_ia = 90·D50^0.42`, "defined at a
 tenfold lower stream power than the ω_bm-discriminator", and anchors it on the laterally stable
@@ -222,11 +229,10 @@ reaches of the anastomosing upper Columbia. So:
 | what holds the planform in place | nothing — it is reworked | cohesive banks |
 | [candel2021] fig. 1 exemplar | Rakaia, New Zealand | Nqoga, Botswana |
 
-An order of magnitude in stream power separates them, and it is bank strength that does it:
-[candel2021] attributes the low-energy class's stability to the fact that "rivers with cohesive
-banks are not able to form wide channels", and reports that this is exactly where every
-discriminator does worst — 43% correct for rivers without bars. If your tool has one
-"multi-channel" switch, it is authoring a braid.
+It is bank strength that does it: [candel2021] attributes the low-energy class's stability to
+the fact that "rivers with cohesive banks are not able to form wide channels", and reports that
+this is exactly where every discriminator does worst — 43% correct for rivers without bars. If
+your tool has one "multi-channel" switch, it is authoring a braid.
 
 ⚠️ **Not verified.** The rest of the usual contrast — mobile gravel bars reworked each flood
 against vegetated islands stable for centuries, a wide flat braid belt against narrow deep
@@ -325,11 +331,18 @@ distance, and `δ` a stored 1-D profile — piecewise, per river type, and it ca
 bedrock, water and sand. Put it into the terrain with [genevaux2013]'s *replace* operator,
 `h_C = (1−w_B)h_A + w_B h_B`. ⚠️ **That expression is a convex blend, and this
 document used to say it "replaces" because `w_B` saturates to 1 inside the channel. It does not
-saturate.** [genevaux2013] §7 prints `w(p) = (1 − d(p)²)² / r⁴` — a quartic bump with **no flat
-top**, reaching 1 only at the single point `d = 0`. So the case the warning described as safe is
-the paper's actual weight, and the channel bed does come out shallower than the profile asks for
-except directly on the centreline. Compensate on the profile, or use a weight with a genuine
-plateau and know you have left the paper. ⚠️ The name is also not from the weight: [genevaux2013]
+saturate.** The weight is a compact-support quartic on the **normalised** distance `a = d(p)/r`:
+`w = (a² − 1)²`, the form `sketch-based-authoring.md` carries, zero outside `d² ≥ r²`
+[genevaux2013] §7 — a bump with **no flat top**, reaching 1 only at the single point `d = 0`. So
+the case the warning described as safe is the actual weight, and the channel bed does come out
+shallower than the profile asks for except directly on the centreline.
+Compensate on the profile, or use a weight with a genuine plateau and know you have left the
+paper. ⚠️ **Normalise it — this line used to print it un-normalised, as `(1 − d(p)²)²/r⁴`**,
+which is that quartic only at `r = 1`, a radius the page never states. With `r` free it is a
+different function: `w(0) = r⁻⁴`, so at `r = 10 m` a requested 4 m carve lands 0.4 mm, and it
+*rises* outward to 0.9801 at `d → r`, where the compact-support rule sets it to 0. At `r < 1` it
+exceeds 1 (`w(0)` = 16 at `r = 0.5 m`), making `h_C` the extrapolation `−15·h_A + 16·h_B` and
+not a blend at all. ⚠️ The name is also not from the weight: [genevaux2013]
 calls it "*This asymmetric operator*", after the asymmetry of the formula in `h_A` and `h_B` — this
 document had that backwards too. **Valley widening is the same operator with a wider support and a shallower profile**
 — [genevaux2013] §6.2 computes terrain elevation as a distance-weighted combination of the
@@ -338,7 +351,8 @@ construction. It is not a separate algorithm.
 
 For the profile *scale*, [peytavie2019] §5.2 normalises each template to **unit water area** and
 scales it by `a = φ/‖u‖` — cross-sectional area is discharge over velocity, which is continuity
-and needs no calibration. Note what that fixes and what it leaves open: it fixes the *area*, so
+and needs no calibration — though `φ` does, and this is one of the two places an uncalibrated one
+lands (⚠️ under *Use this*). Note what that fixes and what it leaves open: it fixes the *area*, so
 the width–depth split inside the template is still yours. With [leopold1953]'s downstream
 exponents, `A_xs = Q/v ∝ Q^0.9`, so a template of **fixed shape** scaled to that area gives
 `w ∝ d ∝ Q^0.45` — where the measurements want `w ∝ Q^0.5` and `d ∝ Q^0.4`. Over three decades of

@@ -6,9 +6,9 @@ tags: [rendering, rasterizer, precision, planetary, real-time]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
-  - { id: cozzi2011, tier: F, locator: "ch. 5 Vertex Transform Precision — §5.3 rendering relative to eye on the CPU, §5.4 the GPU double-single form, §5.5 recommendations — and ch. 6 Depth Buffer Precision, §6.3 complementary depth buffering, §6.4 logarithmic depth" }
+  - { id: cozzi2011, tier: F, locator: "ch. 5 Vertex Transform Precision — §5.3 rendering relative to eye on the CPU, §5.4 the GPU double-single form, §5.5 recommendations — and ch. 6 Depth Buffer Precision, §6.3 complementary depth buffering, §6.4 logarithmic depth. The horizon-culling test below is NOT in that range — it is ch. 12 Massive-Terrain Rendering, §12.4 Culling, named separately here because a reader checking it against ch. 5-6 alone would find nothing about horizons, occlusion cones or occluder radii. The sub-subsection and page inside §12.4 are unverified here" }
   - { id: upchurch2012, tier: P, locator: "§3.2 Infinite Projection and §4.1 Two-Step Transform, the paper two recommendations; §2 for the first-order roundoff method. §6 states complementary reversed Z suffers the same 2ε arithmetic loss as 1/Z, so the paper does not support reversed Z" }
-  - { id: reed2015, tier: F, locator: "the section The Effects of Roundoff Error — the simulated indistinguishable-and-swap error table, whose reversed-Z float32 row is the zero-error one" }
+  - { id: reed2015, tier: F, locator: "the section The Effects of Roundoff Error — the simulated indistinguishable-and-swap error table, whose two reversed-Z rows (Reversed Z, and Infinite + reversed-Z) are both zero-error in float32. They are the only zero-error *mappings*, not the only zero-error rows — the unaltered-Z control row is zero too, and Reed's own sentence says only that reversed-Z with a float depth buffer gives a zero error rate, never that it is the sole one" }
   - { id: epiclwc, tier: F, locator: "the Rendering → Shaders section — the new HLSL types in LargeWorldCoordinates.ush and the linked LWC Rendering doc; Niagara and Chaos are separately sectioned below it" }
 ---
 # Planetary precision — big coordinates in small floats
@@ -66,8 +66,11 @@ second recommendation — keep the projection matrix out of the composed view ma
 separately in the vertex shader, §4.1 [upchurch2012]. *Reversed-Z* is not theirs: their §6 says
 complementary Z "will suffer the same arithmetic precision loss of 2ε as 1/Z", i.e. it does
 nothing for the transform arithmetic they analyse. Its win is in the **storage**, and the evidence
-for it is Reed's direct simulation, where reversed-Z with a float depth buffer is the only
-zero-error row and erases the finite-versus-infinite far plane distinction entirely [reed2015].
+for it is Reed's direct simulation, where reversed-Z with a float depth buffer is the only depth
+*mapping* that scores zero error — and scores it in **both** of its rows, finite far plane and
+infinite, which is exactly why it erases the finite-versus-infinite distinction [reed2015]. Read
+that "only" as *among the mappings*: the table's third zero row is the unaltered-Z control, the
+baseline the mappings are scored against, and Reed's own sentence carries no "only" at all.
 The two fixes are orthogonal; take both.
 
 ⚠️ Reversed-Z buys almost nothing on a **fixed-point** 24-bit depth buffer. The gain comes from the
@@ -147,16 +150,27 @@ the simulation lattice.** Declare the resample as part of the bake.
 ellipsoid is the unit sphere, let `cv` be the camera in that space, and for a target point `t`:
 
 ```
+r  = 1 - maxDepression/planetRadius               // occluder radius; hoist, it is per-frame
 vc = -cv                                          // camera to centre
 vt = t - cv                                       // camera to target
-occluded =  dot(vt, vc) > dot(vc, vc) - 1                        // beyond the horizon plane
-         && dot(vt, vc)^2 / dot(vt, vt) > dot(vc, vc) - 1        // inside the occlusion cone
+occluded =  dot(vt, vc) > dot(vc, vc) - r*r                      // beyond the horizon plane
+         && dot(vt, vc)^2 / dot(vt, vt) > dot(vc, vc) - r*r      // inside the occlusion cone
 ```
+
+**Those two `r*r` terms are the only place any radius enters the test.** Leave the literal `1`
+there and you have hard-coded the ellipsoid itself as the occluder — the exact failure the next
+paragraph and the fix table below tell you to avoid, so it has to be `r` here or the prescription
+never reaches the code. Take `planetRadius` as the *smallest* radius space was scaled by, the
+polar one on an ellipsoid, or the margin thins toward the poles. The size of getting it wrong, on
+a sphere of the equatorial radius 6 378 137 m with the camera at 10 km: `r = 1` culls a target
+430 m below the ellipsoid from 349.165 km to 364.521 km of ground distance — a 15.356 km annulus
+of terrain cut while plainly in view. With `r = 1 - 430/planetRadius` the same target survives to
+364.521 km, where it has genuinely gone under the horizon.
 
 At surface level this kills nearly half of what the frustum keeps — the frustum happily contains
 the far side of the planet through the ground. Run it *before* frustum and error tests. Use the
-patch's *maximum* height so peaks over the horizon survive, and the ellipsoid minus the deepest
-depression as the occluder radius, or valleys get culled while still visible. Terrain occluding
+patch's *maximum* height so peaks over the horizon survive; the deepest depression is not a
+second step, it is `r` above, or valleys get culled while still visible. Terrain occluding
 terrain is a different mechanism; see `gpu-driven-culling.md`.
 
 ## How this fails, and what it looks like
@@ -172,7 +186,7 @@ terrain is a different mechanism; see `gpu-driven-culling.md`.
 | Lighting seams exactly on cube-face edges, pinwheels at the corners | Per-face tangent bases used directly across a face boundary | Express directions in an ENU/world frame, or apply per-edge rotations |
 | Texture swims toward face corners | Geometry and texturing used different cube→sphere mappings | One mapping, baked into tile addressing |
 | Deep zoom quantizes UVs around level 20+ | Absolute face-wide UVs in float32 | Patch-local UVs with a double offset on the CPU |
-| Valleys culled while still visible | Horizon test used the ellipsoid radius, not the deepest depression | Occluder radius = ellipsoid minus max depression; test with patch max height |
+| Valleys culled while still visible | Horizon test used the ellipsoid radius — the literal `1` left in both comparisons — not the deepest depression | Occluder radius `r` = ellipsoid minus max depression, substituted into **both** `r*r` terms; test with patch max height |
 | Ragdolls jitter, contacts pop, only far from the origin | Physics fed planet-absolute float32 coordinates | Simulation islands with local origins; convert at the boundary |
 | Parked objects drift on a rotating planet | Physics run in an inertial frame while the surface accelerates | Simulate in the planet-fixed frame; rotate the frame, not the objects |
 | Everything works in the demo | The demo runs at (0,0,0) | Verify by teleporting to the antipode, soaking at max coordinate, and cycling orbit→surface→orbit |
