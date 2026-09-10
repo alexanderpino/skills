@@ -409,5 +409,19 @@
       "resolution-independence.md",
       "hydraulic-erosion.md"
     ]
+  },
+  {
+    "query": "scattering rocks on my terrain - how do i stop boulders and pebbles from intersecting each other when i use one poisson disk radius for all of them",
+    "should_trigger": true,
+    "routes_to": [
+      "clastic-debris.md"
+    ]
+  },
+  {
+    "query": "my rock instance buffer is several gigabytes per square kilometre once i add gravel, is there a standard cutoff for what to instance and what to fake",
+    "should_trigger": true,
+    "routes_to": [
+      "clastic-debris.md"
+    ]
   }
 ]

@@ -1,7 +1,7 @@
 ---
 type: Bibliography
 title: Papers — generation
-description: "Sources for the generation axis: noise and fractal composition, tectonics and isostasy, hydraulic, thermal and aeolian erosion, landscape evolution, layered rock and grain classes, impact cratering, constraint-based authoring, and periodic construction. Terrain analysis and edge-aware filtering moved to papers-masks-and-filtering.md."
+description: "Sources for the generation axis: noise and fractal composition, tectonics and isostasy, hydraulic, thermal and aeolian erosion, landscape evolution, layered rock and grain classes, impact cratering, constraint-based authoring, periodic construction, and clastic debris as scattered objects. Terrain analysis and edge-aware filtering moved to papers-masks-and-filtering.md."
 tags: [bibliography, provenance, generation]
 status: draft
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
@@ -21,13 +21,13 @@ Entry format, as in the flow family:
 
 ## What was read, and what was not
 
-Six sections were added to this file from documents written separately, and **three** of them
-carry a read log below — impact cratering, constraint and sketch-based authoring, and periodicity
-and boundaries. ⚠️ This paragraph used to say "three families … and each carries its own read log",
-which counted the read logs and called it the number of sections. *Layered rock and stratigraphy*
-and *Grain classes in sediment transport* have none: of their seven entries, exactly one says where
-it was read. Older sections of this bibliography predate the practice; where a source was never
-obtained, its entry carries `[not-opened]`.
+Seven sections were added to this file from documents written separately, and **four** of them
+carry a read log below — impact cratering, constraint and sketch-based authoring, periodicity
+and boundaries, and clastic debris. ⚠️ This paragraph used to say "three families … and each
+carries its own read log", which counted the read logs and called it the number of sections.
+*Layered rock and stratigraphy* and *Grain classes in sediment transport* have none: of their
+seven entries, exactly one says where it was read. Older sections of this bibliography predate
+the practice; where a source was never obtained, its entry carries `[not-opened]`.
 
 ### Impact cratering
 
@@ -95,6 +95,20 @@ functions for procedural texturing* — the reference `lagae2010` §7 gives for 
 noise's period — **was not obtained**. `seamless-and-periodic.md` therefore attributes the
 period-versus-storage relationship to the survey that reports it, and grades the modular-indexing
 construction it recommends as `F`, rather than borrowing authority from a paper nobody here read.
+
+### Clastic debris
+
+**`bridson2007b`** — the author's own PDF at `cs.ubc.ca/~rbridson/docs/`, read in full; it is two
+pages. §2 and §3 are quoted from that artefact. ⚠️ **That copy carries no article number, no DOI
+and no page numbers** — only the title, the author and "ACM SIGGRAPH 2007 Sketches" — so the
+locator cites sections and nothing else, and no article number is asserted below.
+
+**`wentworth1922`** — **not obtained.** `journals.uchicago.edu` returned HTTP 403 to an
+unauthenticated fetch and no author-side or repository copy was reached. The entry carries
+`[not-opened]` and the size limits attached to it are stated on arithmetic this corpus can check
+— the scale is geometric in φ = −log₂(d/mm), so its class edges fall on powers of two — not on
+that paper's text. ⚠️ **The nearest openable secondary is corrupted**; see the entry.
+
 ## Attribution corrections that bind this family
 
 The general table is in `papers-flow.md`. These four decide where an implementer of the erosion
@@ -389,3 +403,10 @@ axis is sent, so they are restated:
 
 - **hobley2017** `P` — Hobley, D.E.J., Adams, J.M., Nudurupati, S.S., Hutton, E.W.H., Gasparini, N.M., Istanbulluoglu, E. & Tucker, G.E. (2017). *Creative computing with Landlab: an open-source toolkit for building, coupling, and exploring two-dimensional numerical models of Earth-surface dynamics.* Earth Surface Dynamics 5, 21–46, doi:10.5194/esurf-5-21-2017. Open access. — The framework paper for the most widely used landscape-evolution toolkit. Cited here for §3.1.4 and Table 4, which are the clearest published statement that a periodic boundary is one *enumerated modelling choice* among four rather than a post-process: a node is fixed-value (Dirichlet), fixed-gradient (Neumann), **looped**, or closed, and the node status determines whether each attached link carries flux at all — core-to-looped is Active, core-to-closed is Inactive. Two further sentences in the same section carry weight for this document: that "the edges of a Landlab grid are always defined by boundary nodes", so periodicity is expressed by *pairing* perimeter nodes rather than by removing them; and the worked description of a basin whose only outlet is a single fixed-value node with the rest of the perimeter closed, which is exactly the authored-sink recipe a torus requires.
 - **seam_fake_practice** `F` — No canonical source. The three constructions used to force a field that does not wrap into wrapping — mirroring the tile about its own edge; cross-blending a margin against the field's own translate with a smootherstep weight; and simulating on a larger domain and cropping back inside the boundary's influence. All three are ubiquitous in terrain tools, shader code and texture pipelines, none has a citable origin, and their costs are what `seamless-and-periodic.md` measures rather than asserts — 100.0% of a mirror seam being a local extremum, `a² + (1−a)²` of the detail variance surviving a blend (0.488 measured against 0.500 predicted), and a crop margin that grows from 3 to 13 cells between 100 and 1200 simulated steps. Graded `F` because the alternative is to hang the claims off a tool's release notes, which would be `N`, or off a paper that nearly says it, which the tier rules forbid. [no-artefact]
+
+## Clastic debris: size classes and scattering
+
+
+- **bridson2007b** `P` — Bridson, R. (2007). *Fast Poisson Disk Sampling in Arbitrary Dimensions.* ACM SIGGRAPH 2007 Sketches. (The article number and DOI are not on the author's copy read here and are not asserted.) — The O(N) replacement for dart throwing, and the reason a scatter of rocks can be blue-noise without being slow. Three inputs: the domain extent in Rⁿ, **the minimum distance `r` between samples**, and a rejection limit `k`, "typically k=30". A background grid with cell size "bounded by r/sqrt(n), so that each grid cell will contain at most one sample" makes the neighbour test a fixed-size local scan, and the grid is then "a simple n-dimensional array of integers", −1 for empty. The loop keeps an active list; each iteration draws up to `k` candidates "uniformly from the spherical annulus between radius r and 2r around x_i" and either emits one or retires `x_i`. §3 gives the cost exactly: step 2 "is executed exactly 2N−1 times to produce N samples", each iteration O(k), so the algorithm is linear. ⚠️ **Its parameter is a separation, not a density.** One `r` fixes one spacing over the whole domain, so a single Bridson pass cannot express a boulder field and a pebble bed at once — that composition is `clastic-debris.md`'s problem, and this paper does not address it. ⚠️ **Not to be confused with `bridson2007`** in `## Noise` above, which is Bridson, Hourihan & Nordenstam's curl-noise paper of the same year; the two share a first author and nothing else.
+- **clast_scatter_practice** `F` — No canonical source. Placing clast size classes **largest-first**, one Poisson-disk pass per class at that class' own `r = d_max`, with every candidate tested against everything already down using that pair's own `a_i + a_j` — together with the packed per-instance transform an engine carries for a scattered rock (position, a quaternion, a scale, a mesh id). Ubiquitous in terrain tools and scatter nodes, and no paper claims it: [bridson2007b] gives the single-`r` sampler each pass runs and says nothing about composing several, and the tier rules forbid hanging the composition off a paper that nearly says it. Graded `F` and left there deliberately, because every figure attached to it in `clastic-debris.md` is **measured in this skill** rather than cited — 13,338 clasts placed with 0 interpenetrating pairs against 31 for a single pass, 17.2% of candidates lost to cross-class rejection, 214 µs per clast — and those runs are recorded in `registers/pseudocode-execution.tsv`. [no-artefact]
+- **wentworth1922** `P` [not-opened] — Wentworth, C.K. (1922). *A Scale of Grade and Class Terms for Clastic Sediments.* The Journal of Geology 30(5), 377–392. doi:10.1086/622910. — The origin of the grade scale every clast size in this skill is named against: boulder, cobble, pebble, granule, sand. **The artefact was not obtained** (see the read log), so nothing is quoted from it and no locator here claims a reading. What *is* asserted is arithmetic, and it is checkable without the paper: the scale is geometric with ratio 2, and Krumbein's φ = −log₂(d/mm) puts every class edge at an integer φ — φ = −8, −6, −2, −1 give **boulder > 256 mm, cobble 64–256, pebble 4–64, granule 2–4**. ⚠️ **The nearest openable secondary is corrupted, and was rejected.** "Exploring Our Fluid Earth" (Univ. of Hawaiʻi CRDG, 2014), Table 1.1, captioned "adapted from the Wentworth scale, Wentworth, C.K. (1922)", prints boulders as "250–100" — the range reversed and 250 for 256 — cobbles "65–250", pebbles "4–65", and coarse silt "0.031–0.625", the last off by a factor of ten. Rounding 64 to 65 and 256 to 250 destroys the one property that makes the scale usable, that a φ value converts to millimetres exactly. Recorded here because it is this corpus's most-feared defect class: a plausible number from a plausible source, wrong.
