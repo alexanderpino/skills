@@ -25,10 +25,11 @@ a river the user placed, whose width is right for its discharge, that meanders w
 is flat and braids where it steepens, none of that is a by-product of `stream-power.md`. It is
 an authoring operator, and it has its own literature.
 
-This document owns the network **as an object you make**: its planform, its cross-section, its
-width, and how a centreline becomes terrain. It does not re-derive routing (`flow-routing.md`),
-incision (`stream-power.md`) or droplet and pipe erosion (`hydraulic-erosion.md`), and it cites
-them where they are needed.
+This document owns the network **as an object you make**: its planform, cross-section, width, and
+how a centreline becomes terrain. It does not re-derive routing, incision or droplet and pipe
+erosion — it cites `flow-routing.md`, `stream-power.md` and `hydraulic-erosion.md` where needed.
+
+**Tier: authoring-time.** Grown, carved and baked once; what ships is the heightfield.
 
 ## Use this
 
@@ -418,12 +419,11 @@ two share authors, so treat this as one rule stated twice rather than as corrobo
 
 ## Where this sits in the pipeline
 
-Strictly authoring-time. Consumes drainage area from `flow-routing.md` (or replaces it entirely,
-if the network is grown rather than extracted). Produces a heightfield that `stream-power.md`
-can then relax — and note the direction of that interaction: a carved channel with uniform `K`
-is a step the solver will erase, exactly as `stream-power.md` says about carved waterfalls. If
-you want the carve to survive an erosion pass, either run the carve *after* it, or pin it with
-lithology. The water surface itself belongs to `water-closed-vs-open.md` and `shallow-water.md`;
+Consumes drainage area from `flow-routing.md` (or replaces it entirely, if the network is grown
+rather than extracted). Produces a heightfield `stream-power.md` can relax — note the direction:
+a carved channel with uniform `K` is a step the solver will erase, exactly as `stream-power.md`
+says about carved waterfalls. To make a carve survive an erosion pass, run it *after*, or pin it
+with lithology. The water surface belongs to `water-closed-vs-open.md` and `shallow-water.md`;
 this document produces the bed the water sits in, not the water.
 
 ## How this fails, and what it looks like
