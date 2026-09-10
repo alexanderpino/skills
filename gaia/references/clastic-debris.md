@@ -36,7 +36,7 @@ classes  boulder  d 256..1024 mm      # d_max AUTHORED, not from the scale
 
 for cls in classes, LARGEST FIRST:          # the order is the algorithm
     if instances_per_m2(cls) > budget: BREAK # the stop rule, and it binds before granule:
-                                            # granule at r = 4 mm is ~930 GB/km2 of transforms
+                                            # granule at r = 4 mm is 923 GB/km2 of transforms
     r_cls = d_max(cls)                      # = 2 * a_max: a class cannot overlap itself
     for p in poisson_disk(domain, r_cls, k=30):     # [bridson2007b] §2
         a = radius drawn from the class' size law
@@ -48,8 +48,9 @@ for cls in classes, LARGEST FIRST:          # the order is the algorithm
 Four numbers, all measured below on a 10 m × 10 m patch. The largest-first pass places **13,338
 clasts with 0 interpenetrating pairs** and covers 17.60% of the ground; a single Poisson pass at
 the pebble spacing places 15,153 and leaves **31 interpenetrating pairs, the worst of them buried
-63% of the way into its neighbour**. Placement costs **214 µs per clast** in CPython — an
-algorithmic figure, not a shipping one, and read as such below. And a per-class count planned off
+63% of the way into its neighbour**. Placement costs **214 µs per clast** in CPython on one shared
+grid, or **≈148 µs** on the per-class grids the fence mandates — algorithmic figures, not shipping
+ones, and read as such below. And a per-class count planned off
 independent passes overshoots: **multiply it by 0.828**, because rejection against the earlier
 classes takes 17.2% of the candidates and is not a rounding error.
 
@@ -207,11 +208,29 @@ dense classes have small radii and the class with the large radius is sparse.
 
 ⚠️ So **the rejection test is not O(1) per candidate**, which this document asserted in an earlier
 revision and which is false in a way that matters at scale. It is O(*density* × `a_max²`) for the
-class being scanned, summed over classes — so widening the size range makes it worse twice over,
-once through the candidate count and once through the reach. Drop the pebble floor from 4 mm to
-2 mm and the candidates roughly quadruple while each candidate's pebble scan also quadruples in
-population: the rejection work goes up about 16×, not 4×. That is the term to watch, not the
-sampler.
+class being scanned, summed over classes.
+
+**What makes that grow is a new class, not a lower floor** — and an earlier revision of this page
+got that backwards too, by pricing a change in the construction of `## One r cannot hold two
+classes` rather than in the one it recommends. `r_cls = d_max(cls)`, so a class' *floor* never
+reaches the sampler; it only picks a radius once the candidate exists. Measured: dropping the
+pebble floor from 4 mm to 2 mm leaves the candidate count **identical at 16,103** and moves the
+rejection work by **0.3%** (173,566 → 174,094 tests on per-class grids). Adding a *finer class* is
+the expensive move, and it is exactly quadratic — candidates go as `1/d_max²`:
+
+| a class with `d_max` | candidates on the patch | transforms / km² if all kept |
+|---|---|---|
+| 64 mm (pebble) | 15,153 | 3.64 GB |
+| 32 mm | 60,260 | 14.46 GB |
+| 16 mm | 240,608 | 57.75 GB |
+| 8 mm | 961,790 | 230.83 GB |
+| 4 mm (granule) | 3,845,804 | **922.99 GB** |
+
+Four halvings, each 4.00× the last. That is where the fence's granule warning comes from, and it
+is why the stop rule is in the loop rather than in the prose. On per-class grids the *per class
+scanned* cost stays roughly scale-free — the dense classes have small reach and the far-reaching
+class is sparse — so the 10.8 tests per candidate is about 3.6 per class, and a new class adds a
+term instead of inflating the existing ones.
 
 ## The exponent, and the two constructions it means different things in
 
@@ -271,7 +290,9 @@ Read the global table to understand what a size law is; read the second one to p
 
 ## What it costs, and where the instance path ends
 
-Placement cost, from the run above: **2,853 ms for 13,338 clasts, or 214 µs per clast**, CPython
+Placement cost, from the run above and **on one shared grid** — the arrangement the section above
+argues against, and the per-class number follows four paragraphs down: **2,853 ms for 13,338
+clasts, or 214 µs per clast**, CPython
 3, single-threaded, on a 10 m × 10 m patch. ⚠️ Read that as an *algorithmic* figure and never as a
 shipping one — it is an interpreted reference implementation, and the useful content of it is the
 `2N−1` iterations of O(k) work underneath, which is what survives a port. Against the same rig's
@@ -280,8 +301,12 @@ roughly 1.85 s of the 2.85 s, so **the cross-class rejection is about a third of
 subtraction of two separately-timed things, so treat it as a ratio and not as a measurement.
 Composition costs about 1.5× a bare pass, and neither half disappears when you rewrite it in C.
 ⚠️ Nor is the rejection half O(1) per candidate — see the grid section above, where it measures
-451.3 distance tests per candidate on one grid and 10.8 on per-class grids. The 214 µs figure is
-the **one-grid** number; the per-class arrangement is the one to port.
+451.3 distance tests per candidate on one grid and 10.8 on per-class grids. **Timed on the same
+rig, placement alone is 76.1 µs per kept clast on one grid and 9.8 µs on per-class grids — 7.8×.**
+So the 214 µs above is the one-grid total; subtracting the one and adding the other puts the
+per-class arrangement at **≈148 µs per clast**, and that is the number to plan against. It is a
+subtraction across two runs — the 214 includes sampling and the 76.1/9.8 pair does not — so treat
+148 as a composed figure and the 7.8× as the measurement.
 
 The memory is the number that decides the design. Take the smallest honest per-instance
 transform — position 3×`float32`, rotation one packed quaternion `uint32`, uniform scale
@@ -306,8 +331,10 @@ they compose:
 - **Regenerate the near field instead of storing it.** The sampler is seeded and the grid is
   local, so a patch can be re-placed on demand from `(tile, class, seed)` and thrown away behind
   the camera; `tiled-streaming.md` gives the residency machinery and `node-graph-runtime.md` the
-  per-tile determinism contract. Regeneration converts 3.20 GB of storage into 214 µs per clast of
-  compute, which is only a good trade for the classes you can afford to pay it on.
+  per-tile determinism contract. Regeneration converts 3.20 GB of storage into ≈148 µs per clast of
+  compute on per-class grids (214 µs if you build the one-grid version the section above argues
+  against, which over-prices the trade by 45%) — only a good trade for the classes you can afford
+  to pay it on.
 
 ⚠️ **Where the boundary sits is unpriced here.** Choosing between "store it" and "regenerate it"
 needs the cost of a ported sampler on the target hardware and the streaming budget it competes
