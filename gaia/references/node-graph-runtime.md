@@ -58,16 +58,20 @@ unavailable"* in 2018.
 
 ⚠️ **Why "promoted onto the nodes that earn them", rather than constructive everywhere.** A
 constructive trace stores the *value*, and terrain values are enormous. A 4096² float32 field is
-**67.1 MB**, and it is essentially incompressible — zlib at level 1 gives **1.11×**, and the lossy
+**67.1 MB**, and it is essentially incompressible — zlib at level 1 gives **1.11×** ⚠️ (that ratio
+is unsourced: no rig, no register row, and it occurs nowhere in this corpus but this line) — and the lossy
 option is barred here specifically, because the stored value is what the next node hashes, so
 quantising it changes every downstream key. A ten-node cone re-evaluated 400 times in a working day
 is on the order of **hundreds of gigabytes** of stored artefacts per artist.
 
-Worse, sharing is not free either. Fetching 67.1 MB over 1 GbE takes **~537 ms** (67.1 MB at
-125 MB/s), while `a + b` on that field takes **~22.5 ms** (derived below): for a cheap node the
-shared cache is **~24× slower than recomputing**. So the promotion rule is a comparison, not a
-policy — **store the value only where the node's compute time exceeds its transfer time**, and let
-everything else be a verifying trace that stores a hash and reruns on a miss.
+Worse, sharing is not free either, and **the crossover is a property of your link, not a constant**.
+Fetching a 4096² field costs `67.1 MB / B` for link bandwidth `B`, against `a + b` on that field at
+**~22.5 ms** (derived below). So the node pays off only above `B ≈ 67.1 MB / 22.5 ms ≈ **3.0 GB/s**`
+— which is memory-bus territory, not network: on 1 GbE (125 MB/s) the fetch is **~537 ms**, **~24×
+slower than recomputing**; on 10 GbE **~54 ms**, still ~2.4× slower; only at ~25 GbE and above does
+sharing start to win for a node this cheap. **Store the value only where the node's compute time
+exceeds `size / B` on the link you actually have**, and let everything else be a verifying trace
+that stores a hash and reruns on a miss.
 
 ⚠️ **And a hit is only as good as the identity its key asserts — that is the error term here.** The
 cache returns a value this machine did not compute, so "how good" is not a tolerance but a bet on

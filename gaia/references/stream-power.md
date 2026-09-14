@@ -122,6 +122,14 @@ mechanism, and skipping it is a plausible misreading of the word "base level". M
 | the printed line applied to the edge as well | **632** pits; edge and interior both at 250 m, so no relief at all — the whole plate rose |
 | uplift on interior minima, edge pinned at `h = 0` with `U = 0` | **0** pits; `log S` vs `log A` slope −0.498 |
 
+⚠️ **Rows 1 and 2 are unreproduced.** Only the third row was independently re-run (twice); `1027`
+and `632` appear nowhere in this repository outside this table — no register row, and the rig that
+produced them was never saved, so they cannot be re-run as printed. The *conclusion* below does not
+depend on their exact values, only on the sign of the effect, and that is reproduced: a sweep run
+for the sign-off review (`gaia/rigs/approx/stream-power.py`) leaves pits in the tens-to-thirties on
+under-drained configurations and **0** once the outlet edge is pinned. Read the two counts as
+indicative, not as measurements.
+
 So: pin the edge outside this loop (or keep it out of the stack), and let the printed line run on
 everything else. A reader who treats the edge as an ordinary base level raises the plate uniformly
 and erodes nothing.

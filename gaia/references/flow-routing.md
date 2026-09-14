@@ -11,7 +11,7 @@ sources:
   - { id: quinn1991, tier: P, locator: "eq. 4, contour-length weighting" }
   - { id: tarboton1997, tier: P, locator: "§3, the 8-facet construction" }
   - { id: barnes2014, tier: P, locator: "§3 Algorithm 1 the base Priority-Flood and Algorithm 2 the Improved form that adds a plain queue; Algorithm 3 Priority-Flood+epsilon, whose line 1 requires a priority queue WITH TOTAL ORDER; §4 Ordering for why; §5 Analysis for the O(m log2 m), m <= n float bound" }
-  - { id: lindsay2016, tier: P, locator: "hybrid breach/fill with a depth limit; DEM-modification comparison" }
+  - { id: lindsay2016, tier: P, locator: "NOT OPENED -- hybrid breach/fill with a depth limit, and the DEM-modification comparison. The artefact was never obtained here; the block quote in the body is reproduced as received and is not a reading anyone in this corpus performed" }
   - { id: planchon2002, tier: P, locator: "the fill algorithm" }
   - { id: montgomery1992, tier: P, locator: "the area-slope channel-initiation threshold, A*S^2 = const" }
   - { id: braun2013, tier: P, locator: "the O(N) stack ordering and the unconditionally stable implicit discretisation. NOT OPENED — Geomorphology is paywalled at Elsevier and no open copy was reachable from here, so nothing inside it is named; the scheme is read instead in cordonnier2016 SECTION 5 eq. 2, which restates it and states the ordering requirement. NOTE section 5 CREDITS NOBODY: the attribution to BW13 sits in section 1 and section 4, per the checked retraction in stream-power.md. Section 5 is nonetheless the correct locator for the scheme and eq. 2, and an intermediate revision here wrongly deleted it along with the false attribution clause" }
@@ -68,8 +68,9 @@ stops, so downstream contributing area is wrong everywhere below it.
   artefacts and spared basins at 8 m/px sits far above the artefact population at 1 m/px, where it
   starts trenching the shallowest real depressions instead.
 
-**Why it wins — and read the source's own qualification before relying on it.** [lindsay2016]
-§"When to breach and when to fill?" reports, verbatim: "*Soille (2004a) and Lindsay and Creed
+**Why it wins — and read the source's own qualification before relying on it.** ⚠️ **The quote below is UNVERIFIED**: `lindsay2016` is `[not-opened]`, nobody here obtained the paper, and this
+passage appears nowhere else in the corpus. It is kept because the recommendation does not rest on it — `:221-222` derives the same default from the page's own definitions — and because deleting it would hide where the claim came from. [lindsay2016]
+§"When to breach and when to fill?" is said to report, verbatim: "*Soille (2004a) and Lindsay and Creed
 (2005) both compared the modifications to DEMs made by filling, breaching, and hybrid approaches.
 These studies showed that hybrid solutions offer the lowest impact on modelled flow paths but that
 the improvements are only marginally better than a breaching-only solution. Thus, when breaching
@@ -121,7 +122,12 @@ you want the `m ≤ n` bound that is the one to transcribe.
 ⚠️ **It does not produce the same fill, and an earlier version of this line said it did.** With
 both run on a total order, so tie-breaking is not the variable: Algorithm 3 differs from the block
 above on **171 of 441** cells and moves **187 of 441** receivers, and it is **strictly higher on
-all 171 and lower on none**. The reason is structural — the block above ramps by shortest path
+all 171 and lower on none**. ⚠️ **Those four figures are UNREGISTERED and this paragraph is not
+covered by the page's stamp.** No row in any register carries 171, 187, 342 or 355, and
+`source-findings.tsv:36` still records the opposite conclusion — that the fill is identical either
+way. `barnes2014` *is* obtained (arXiv 1511.04463), so re-transcribing Algorithm 3 settles both the
+figures and whether the diagnosis below describes the paper or our transcription of it. Until
+somebody does, read this paragraph as a claim, not a measurement. The reason is structural — the block above ramps by shortest path
 from the *nearest* outlet, while Algorithm 3 as printed ramps one way from a *single* outlet. On
 that input Algorithm 3 fails [barnes2014]'s own third criterion for a depression fill, "*W is the
 lowest surface allowed by properties (1) and (2)*", which the simpler block satisfies. **The

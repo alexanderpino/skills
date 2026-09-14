@@ -100,7 +100,9 @@ first digit, which is all it is for.
 
 **Put a number on that, and budget the worst cell rather than the sampled one.** Measured here on
 that same Gaussian hill at `L` = 0.1, the **max relative error** of `plan/√p` against `−1/r` over the
-ring `0.5 ≤ r ≤ 3.0` is **2.16%**, and the worst cell sits on the OUTER edge at `r ≈ 2.97`, where the
+ring `0.5 ≤ r ≤ 3.0` is **2.16%** ⚠️ (this ring of error figures is the page's other unregistered
+cluster — no rig, no row, excluded from the stamp with the cost block above), and the worst cell
+sits on the OUTER edge at `r ≈ 2.97`, where the
 hill has flattened — not at the summit, where the curvature is largest. At the well-sloped `r = 1.3`
 the same quantity is out by **0.031%** at that `L`, about seventy times better. And it keeps climbing
 outward: median 0.72% over `2.5 ≤ r < 3.0`, 1.4% with a 5.2% worst cell over `3.0 ≤ r < 3.5`. ⚠️ **The
@@ -304,7 +306,11 @@ the terrain is not changing per frame. The line is the baseline length, not the 
 ⚠️ **"Cheap" is not a budget, so here is a measured one — and here is what it is not.** The curvature
 block above, evaluated exactly as written over a 4096² R32F tile, takes **493 ms** (best of five;
 median 500 ms) and holds **36 bytes per cell** — its eight named intermediates plus the input,
-**603 MB** — in NumPy 2.4.6 under CPython 3.11 on one process, Xeon @ 2.10 GHz. **That is an
+**603 MB** — in NumPy 2.4.6 under CPython 3.11 on one process, Xeon @ 2.10 GHz. ⚠️ **These three
+figures have no rig in `gaia/rigs/` and no register row carrying them**, unlike every other measured
+number in this corpus; they landed after the 2026-09-09 audit and the sign-off review of
+2026-09-14 explicitly excluded them from this page's stamp. Re-measurable in one sitting by anyone
+who wants them; until then, read them as reported rather than as reproduced. **That is an
 authoring-time CPU figure and nothing else: it is not a GPU frame cost and must never be quoted as
 one.** It is bandwidth, not arithmetic — NumPy materialises every intermediate as a full-tile array,
 where a shader holds all eight in registers and does nine loads per cell. The per-frame verdict
