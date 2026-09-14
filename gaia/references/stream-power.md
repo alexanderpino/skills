@@ -182,6 +182,29 @@ repose where diffusion makes hilltops convex, and it carries no `D`, so it canno
 the `D`-versus-`K` competition that selects valley spacing. Run both if you want repose faces;
 if valley spacing is a parameter you are tuning, `D·∇²h` stays.
 
+**Measured, because this was the page's only reason to keep the term and nobody had checked it.**
+Integrating `∂h/∂t = U − K·A^m·S^n + D·∇²h` on a 96² plate draining to one pinned edge, 1200 steps,
+`m = 0.5`, `n = 1`, `U = 1e-3`, `Δx = 100 m`, seed 20260914, spacing read as domain width over the
+mean count of cross-slope local minima (`rigs/approx/stream-power.py`; 0 pits in 10 of 11 runs, so
+the drainage is resolved):
+
+| `D` at `K` = 3e-5 | 0 | 0.01 | 0.03 | 0.1 | 0.3 | 1.0 |
+|---|---|---|---|---|---|---|
+| spacing | 310 m | 354 | 395 | 632 | 1102 | **2589** |
+
+| `K` at `D` = 0.1 | 1e-5 | 3e-5 | 1e-4 | 3e-4 | 1e-3 |
+|---|---|---|---|---|---|
+| spacing | **940 m** | 632 | 409 | 376 | 367 |
+
+Both directions hold: **spacing ~ `D`^+0.44 and ~ `K`^−0.21**, monotone throughout, 7.3× of range on
+`D` and 2.6× on `K`. ⚠️ **But it is not the ratio the word "competition" implies.** Were spacing a
+function of `D/K` alone the two exponents would be equal and opposite; they differ by **2.1×**, so
+`D` carries about twice the leverage of `K`. And `K` **saturates**: the whole decade from 1e-4 to
+1e-3 moves spacing 409 → 367 m, under 10%, so nearly all of `K`'s influence sits at its low end.
+Tune spacing with `D`. Reach for `K` only when `D` is already small, and expect it to stop
+responding. The log-log fits are `r` = 0.97 and −0.93, which is why the exponents are quoted to two
+figures and no more.
+
 ## Knickpoints are outputs, not stamps
 
 A waterfall is a **knickpoint** — a step where the long profile departs from its concave
