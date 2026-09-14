@@ -373,13 +373,16 @@ Three things follow, and each is a modelling instruction:
 resident per-cell resistance field: **4 bytes per cell** at float32, **64.0 MiB** across the 4096²
 grid the resolution table above uses, against no per-cell state at all for a uniform mean rate;
 `uint8` grades take it to **16.0 MiB**. One vectorised pass over that grid measured **204 ms**
-(four runs of 30, medians 202.0–205.2 ms) against **5.2 ms** for the same field's uniform
-subtraction — **~39×** the work to stop being wrong by 4.3× per cell. Rig: NumPy 2.4.6 /
+(four runs of 30, medians 202.0–205.2 ms **on this container**; a second one reproduced the same
+rig at 267.3–278.3 ms, so read the spread as precision, never as portability) against **5.2 ms** for the same field's uniform
+subtraction — **~40×** the work to stop being wrong by 4.3× per cell; that ratio has been measured 12 times across three containers and spans **38–47×**, so take the order and not the digits. Rig: NumPy 2.4.6 /
 CPython 3.11 on one x86-64 container CPU — a CPU authoring-pass floor, **not** a frame cost and
-**not** a GPU number. ⚠️ The two ratio figures are the orchestrator's re-derivation, not the
+**not** a GPU number. ⚠️ The 5.2 ms and the ratio are the orchestrator's re-derivation, not the
 original author's: this block was written by an agent that was killed before it could report, and
-re-running its own rig four times gives a stable 5.2 ms and ~39× where it had printed 2.8 ms and
-~70×. The storage figures reproduce exactly; those two did not.
+re-running its own rig four times gave a stable 5.2 ms and ~39× where it had printed 2.8 ms and
+~70×; eight further runs on two other containers put the ratio at 40.7–46.9×, which is why the
+figure above is stated as ~40× with its measured span rather than as a single digit pair. The
+storage figures reproduce exactly; those two did not.
 
 **The crossover between the two operators is the sediment supply, not the rock type.** A cliff
 with a wide beach in front of it is protected — the waves never reach the foot — and a cliff with
@@ -440,6 +443,6 @@ later processes would destroy.
 | Grid-scale noise explodes while `μ < 0` | Backward diffusion with no regularisation: it amplifies the smallest `L` fastest, and no timestep cures it | Cap the instability with wave shadowing, or clamp `ψ` below 42.392° |
 | Capes and spits never appear at any setting | Wave angles never exceed 42° | The instability threshold is a deepwater angle, not a breaking angle — refraction has already reduced the latter |
 | Headlands and bays do not track the geology | `F_R` is a global constant | One resistance per cell, from `stratigraphy-and-lithology.md` |
-| Cliffs are smooth vertical walls | Mean retreat rate applied uniformly | Erosion is threshold-crossing and episodic: 2–25 cm/yr across 2 km of one coast [shadrick2022]; the per-cell `F_R` that fixes it costs 4 bytes per cell, 64.0 MiB at 4096², and ~39× the uniform step |
+| Cliffs are smooth vertical walls | Mean retreat rate applied uniformly | Erosion is threshold-crossing and episodic: 2–25 cm/yr across 2 km of one coast [shadrick2022]; the per-cell `F_R` that fixes it costs 4 bytes per cell, 64.0 MiB at 4096², and ~40× (38-47 across three containers) the uniform step |
 | Bare cliffs standing behind wide beaches | Cliff and beach operators run independently | The beach is the cliff's armour; couple them through the sediment |
 | Rivers drain to a shoreline that is not there | Coastal pass run before hydraulic erosion | Sea level and the coastal pass come last |

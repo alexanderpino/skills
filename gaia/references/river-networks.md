@@ -379,10 +379,10 @@ you whether the path was authorable**. Report the deepest cut back to the user; 
 requested depth by more than a small factor, the path is fighting the terrain and the honest
 response is to say so, not to excavate. **And what it costs the machine is nothing.** The fix is
 one vectorised running minimum (`np.minimum.accumulate`, on `bed + ε·i` for the epsilon slope):
-**4.6 µs** for 899 samples against **~30 ms** to stamp that path into a 512² field — **~6,400×**,
-5,800–6,900 over 10 runs (`river-networks.py`, CPython + numpy on a shared container; quote the
-ratio, the absolutes drift). Memory is the heightfield: **4 bytes per cell**, 16.8 MB at 2048². The
-cost that decides here is the one in metres.
+**4.6 µs** for 899 samples (4.4–5.0 µs over 11 invocations, unmoved under CPU contention) against
+**~30 ms** to stamp it into a 512² field: **more than three orders of magnitude**, and no tighter —
+the carve is one un-repeated 899-step Python loop while the fix is a 200×-averaged vectorised call,
+so the stamp drifts and the fix does not. Memory: **4 bytes per cell**, 16.8 MB at 2048².
 
 ⚠️ **Direction matters and the wrong one is silently plausible.** Enforcing monotonicity by
 raising each cell above its receiver (an upstream pass) also produces zero uphill segments — and

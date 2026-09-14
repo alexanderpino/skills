@@ -39,7 +39,7 @@ parameter. For a distance *from a spline*, rasterise the curve into the seed mas
 transform that; for a *signed* field, run it twice and subtract.
 
 **What it costs: one full-resolution scratch field.** Measured here — peak RSS against grid size
-over 1536²–3072², least-squares slope, both passes swept in place, three runs giving 8.53, 8.63
+over 1536²–3072², least-squares slope, both passes swept in place, three runs giving 8.54, 8.63
 and 8.53 — **8.5 bytes per cell** including the seed mask, so **136 MiB at 4096²** and **2.1 GiB
 at 16384²**. That is the number to budget: the passes are linear and the CPU is not what a bake
 runs out of. Halving it takes a 4-byte *integer* field, not a float one — float32 stops

@@ -369,7 +369,7 @@ frame cost), for a composite cached at 4096²:
 | RGBA8 UNORM, encoded sRGB | **4 bytes per cell**, 64.0 MiB | the wrong space to blend in — this is the bug above |
 | RGBA8 UNORM, **linear** | **4 bytes per cell**, 64.0 MiB | 20 levels; ΔE00 2.13 per LSB, median 0.94 |
 | **R11G11B10F** | **4 bytes per cell**, 64.0 MiB | 718/718/359 levels; ΔE00 0.99 per ULP, 0.74 round-trip |
-| **RGBA16F** | **8 bytes per cell**, 128.0 MiB | 11476 levels; ΔE00 0.022 per ULP, 0.009 round-trip |
+| **RGBA16F** | **8 bytes per cell**, 128.0 MiB | 11475 levels; ΔE00 0.022 per ULP, 0.009 round-trip |
 
 So the linear rule is **free** if the composite is consumed in-register and encoded at the end of
 the frame; **free again** in R11G11B10F, which is the same 4 bytes per cell as the 8-bit buffer it

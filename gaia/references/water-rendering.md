@@ -212,7 +212,13 @@ a Heaviside where the entire point was a soft edge. Offset-centring — store `(
 `(A − 1)²` and add the offset back — repairs it while the offset is small against the spread,
 because the cancellation amplifies the format's `2^-11` unit roundoff (the fp16 ULP at 1.0 is
 `2^-10`) by `1 + (|mu_A − 1|/sigma_A)²`: **10×
-at 3σ** (~0.2% error in `sigma_A`; 0.34% worst over twenty seeds), 101× at 10σ (3.1%), 901× at 30σ (23.5%). A footprint
+at 3σ** (~0.2% error in `sigma_A`; 0.34% worst over twenty seeds), 101× at 10σ (3.1%), 901× at 30σ (23.5%).
+⚠️ **That last figure is the weakest number on this page, and the rig disagrees with it.** 23.5%
+comes from an earlier run that was never recorded; `water-rendering.py`, the rig on disk, measures
+**35.80% mean and 100.00% worst over twenty seeds** at 30σ. Treat 30σ not as "lossy" but as
+**outside the regime where the centred pair estimates anything at all** — a worst case of 100% is
+not an error bar, it is a failure. The 3σ and 10σ rows reproduce (0.20%/0.37% and 2.92%/5.40%).
+A footprint
 straddling a breaking crest leaves that band, and there the pair goes in **R32G32F**. What the
 coverage being right costs is storage, and the price is exact: **8 bytes per cell** against the
 fp16 pair's **4**, or **10.7 against 5.3 bytes per cell** counting the mip chain the prefilter is
