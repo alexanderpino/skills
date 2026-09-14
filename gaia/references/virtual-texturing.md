@@ -45,9 +45,25 @@ budget arithmetic below. They are different problems that happen to share plumbi
 | Cost centre | Page render (the full material graph) | IO and transcode |
 
 ⚠️ **Do the unique-texel arithmetic before promising streaming VT.** 100 km² at one texel per
-centimetre is 10¹² texels — about a terabyte even at one compressed byte each. Nobody ships that.
+centimetre is 10¹² texels — about **1 TB** even at one compressed byte each. Nobody ships that.
 Real worlds mix a sparse near-unique layer with tiling detail on top, or drop to texels per
 decimetre in the far field. If the disk cannot hold it, no cache architecture will fix it.
+
+**What it costs, and how good it is.** The resident cost is arithmetic, not a measurement: one
+128² page at the one compressed byte per texel above is **16 KiB**, so a 16k² pool is 16384 pages
+and **256 MiB** — scale that by the bytes per texel your formats really cost, across every channel
+the composite caches. The page render, the cost centre the table above assigns to runtime VT, is
+**unpriced here**: it is the whole material graph, so it is content-dependent, and only a GPU
+capture of your own compositor prices it. Until you have one, budget it as a burst rather than a
+rate — cap pages composited per frame — and read eviction age rather than hit rate to tell whether
+the cap is starving the image. On the other half: what a runtime VT gets wrong is plumbing, and
+the two plumbing errors with numbers on this page are large. An uncorrected feedback pass at
+quarter res serves areal texel density **93.75% low** — the feedback bullet below states the same
+term from the other side, as 6.25% of the density the main pass needs — and unscaled gradients
+pick a mip 4 levels too fine on the mip-0 pages of a 256k² virtual over a 16k² pool. What is left
+after both are fixed is the page's own storage format against a per-pixel resolve, and that is
+**unpriced here** too: nothing in this set measures it, and pricing it means rendering one view
+both ways and differencing. Fix the plumbing first.
 
 ## The cache boundary — the one rule that decides correctness
 
@@ -179,7 +195,7 @@ in the distance — a defect that is invisible in the near view where it was aut
 | The page grid appears as hairline seams, worst at grazing angles | Gradients computed after indirection, or aniso set above what the border supports | Take derivatives from virtual UVs; clamp aniso to the border width. That kills the seams and only the seams — the derivatives still have to be scaled, next row |
 | The whole surface filters wrong with the page seams clean — aliasing on near pages, over-blur on far ones, and one distance where it looks right | Virtual-UV gradients handed to `SampleGrad` unscaled, so the pool measured the footprint against its own size: an error of `pageMip − log2(virtualSize/poolSize)` LOD levels, and the anisotropic taps spread across `1/s` of the footprint | Scale both gradients by `s = virtualSize/(poolSize × 2^pageMip)`. Test a view holding several page mips at once — the error passes through zero at one page mip, so a view sitting there proves nothing |
 | Blurry patches that sharpen a beat later | Feedback → request → upload latency, showing the fallback mip meanwhile | Prefetch by camera velocity; budget the burst against the regime's cost centre — page render under runtime VT, transcode under streaming (:45) — and measure the latency, not the hit rate |
-| Permanent blur — and the eviction-age histogram says which of the two causes it is | **Thrash**: the working set exceeds the pool. Eviction age under a couple of seconds of camera motion. **Or the feedback bias**: requests are `log2(feedbackScale)` mips too coarse, so the finest pages are never asked for. Eviction age long, live working set about `feedbackScale⁻²` of what the image needs | Read the eviction-age histogram first, and grow nothing before it (:131). Short: grow the pool or bias mips, or cut the aniso overshoot inflating the set. Long: subtract `log2(feedbackScale)` from the requested mip. ⚠️ A saturated-or-quiet IO queue corroborates the two arms **under streaming VT only** — the runtime VT this page prescribes has no such queue, so its quietness is not evidence for the second arm |
+| Permanent blur — and the eviction-age histogram says which of the two causes it is | **Thrash**: the working set exceeds the pool. Eviction age under a couple of seconds of camera motion. **Or the feedback bias**: requests are `log2(feedbackScale)` mips too coarse, so the finest pages are never asked for. Eviction age long, live working set about `feedbackScale⁻²` of what the image needs | Read the eviction-age histogram first, and grow nothing before it (:147). Short: grow the pool or bias mips, or cut the aniso overshoot inflating the set. Long: subtract `log2(feedbackScale)` from the requested mip. ⚠️ A saturated-or-quiet IO queue corroborates the two arms **under streaming VT only** — the runtime VT this page prescribes has no such queue, so its quietness is not evidence for the second arm |
 | A multi-frame spike when the season or rain level changes | Global dynamic state was composited into pages, so one parameter dirtied the world | Move it out of the cache; sample the base, apply the overlay after |
 | Persistent decals vanish sporadically | Stamps injected into pages were evicted with them and never replayed | Keep a stamp replay list; re-apply on page load |
 | Dark or wrong-hue halos at layer boundaries, only in the distance | Composite mips box-filtered in non-premultiplied space | Premultiply weights before generating mips |

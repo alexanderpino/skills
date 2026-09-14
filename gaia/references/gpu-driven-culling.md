@@ -41,6 +41,13 @@ restated rather than replaced:
 **The test for whether you have actually built this**: if any array proportional to world size is
 rebuilt on the CPU each frame, you have a CPU renderer with GPU-flavoured syntax.
 
+**What it costs, and how good it is.** The one allocation this pipeline adds that scales with the
+*screen* rather than the world is the HiZ pyramid — **11.1 MB at 1920×1080**, R32_FLOAT, full mip
+chain. With conservative bounds and the footprint mip chosen by the rule below, the occlusion stage
+carries a false-cull error of 0: it draws exactly what the unculled frame draws. The per-frame
+*time* of the culling dispatches is unpriced in this corpus; the two-phase section below says what
+pricing it would take.
+
 **What it beats.** *The CPU visible-list architecture it replaced* — walk every resident chunk,
 frustum-test it, select its LOD, patch the visible list, submit one draw each; O(resident) on the
 render thread even when nothing is visible, and per-frame argument uploads make the GPU wait on a
@@ -142,6 +149,29 @@ Three HiZ build details, in the order they bite:
    128 px texel [0, 128) reaches the gap, the max comes back 1.0, `0.6 > 1.0` is false, and the cull
    is silently lost. Under-reading is the direction that costs you pixels, whether
    the cause is a dropped edge texel or a mip chosen too fine; over-reading only costs you the win.
+
+**The rule checked, and the error it carries.** The covering argument is not a statistical claim:
+at the rule's mip one texel is at least as wide as the rect, so the four corner taps read a
+superset of it and `sampled ≥ trueMax` holds at *every* alignment. A software model of the test
+agrees — 20,000 random rect/`zNear` trials against a 1024×1024 standard-Z max-depth pyramid, ground
+truth by brute force over every pixel of the rect, seed 20260910 — giving the rule a false-cull
+error of 0 in 15,478 drawable trials, and one level finer a false-cull error of 0.11%: 17 visible
+objects culled. That rig is CPython arithmetic over the test, **not** a GPU and not a frame cost;
+the rate belongs to its synthetic scene, the zero belongs to the invariant, and each of those 17 is
+an object you can see and do not get. Lost culls rise again at the next level coarser, where no
+visible object is culled and the win shrinks — the *saves nothing* failure row, in numbers.
+
+**What the pyramid costs.** An R32_FLOAT depth pyramid is ≈4/3 of its base image: **11.1 MB at
+1920×1080**, 44.2 MB at 3840×2160 (MB = 10^6 bytes, mip chain summed closed-form). A driver aligns
+and pads, so a real allocation is at least that. Budget it as the price of the occlusion rung —
+it is the only allocation this architecture adds that scales with the screen.
+
+**The per-frame time of the culling dispatches is unpriced.** No GPU ran here and this corpus holds
+no measurement of one; a CPython number would be a different quantity wearing the same units.
+Pricing it takes timestamp queries bracketing each ladder stage and each of the two phases, read
+back N frames late like everything else, on the peak-vista frame rather than the canyon frame.
+Until someone runs that, budget the pyramid from the figure above and rank the ladder by measured
+kill rate per stage — the last failure row is the whole warning.
 
 **After a teleport or camera cut there is no history.** Treat everything as visible for one frame
 and budget the spike. Never carry stale visibility bits across a cut: with feedback-driven

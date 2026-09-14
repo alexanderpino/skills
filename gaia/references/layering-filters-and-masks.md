@@ -47,6 +47,18 @@ results between the Mask port on a node and the Mask node"**, and the reason to 
 that **"when a node is masked directly, a change to the mask will force a rebuild of the entire
 node. A Mask node, however, adds masking as a post-process and is extremely fast."**
 
+**What "extremely fast" is worth, and what it costs to hold.** The vendor quantifies neither, so
+measured here — 1024² float32, one core of an Intel Xeon @ 2.10 GHz, CPython 3.11 + NumPy, driving
+the 8-neighbour transport step this page's own harness uses. A mask tweak in the downstream-node
+arrangement re-runs the blend alone: **1.2 ms**. With the mask on the operator's port it re-runs the
+20 transport iterations first: **615 ms**, 34.6 ms per iteration — so the factoring is worth
+**~500×** on this rig (490–511× over three runs). ⚠️ Read the ratio, not the milliseconds: a
+shipping erosion solver is far more work per iteration than this step, and this is an
+authoring-time rebuild cost in interpreted NumPy, never a GPU frame cost. The reuse also has a price
+the cache-key argument never states: the expensive node's output has to stay resident for the blend
+to re-run against, **4 bytes per cell** at float32 — **67 MB** per pinned node at 4096². How many
+expensive nodes you can afford to pin is the budget question this recommendation hands you.
+
 That is **early cutoff** [alacarte] §2.3 obtained by *graph shape* rather than by the rebuilder. If
 your runtime ships the recursive-hash design that cannot do cutoff (`node-graph-runtime.md`), this
 is how you buy the case that matters anyway: factor the mask out of the operator.
@@ -115,9 +127,10 @@ operator on this field, and diverges at the mask edge as transport accumulates.
    The support radius **alone** is the single-application margin, and it is the wrong one for every
    operator in this section. `N` steps of a radius-`R` operator have a domain of dependence of
    `N·R`, so a window dilated by `R` is contaminated up to `N·R` cells deep. Measured on this same
-   field at `R = 1`: 20 steps of a linear 3×3 blur cropped at `R` differ from the full-domain by
-   **2.60% of relief, reaching 18 cells inside the mask**; dilated by `N·R` the difference is
-   **exactly 0.000000000**, so the *"same computation"* claim is true again once the margin is.
+   field at `R = 1`: 20 steps of a linear 3×3 blur cropped at `R` differ from the full-domain by a
+   **max error of 0.4548 — 2.60% of relief — reaching 18 cells inside the mask**; dilated by `N·R`
+   the difference is **exactly 0.000000000**, so the *"same computation"* claim is true again
+   once the margin is.
    `N·R` is a sound bound rather than a measurement — 20 steps of a threshold-gated transport on
    this same field (0.15·Δh to any *4*-neighbour more than 0.5 below, edges clamped) needed only 5
    cells, because a gated operator does not propagate influence on every step — so size from `N·R`
@@ -258,7 +271,7 @@ Two practical consequences:
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| Every mask tweak reruns the erosion | The mask is an input port on the expensive node, so it is in that node's key | Move masking to a downstream node [gaea_masks] |
+| Every mask tweak reruns the erosion | The mask is an input port on the expensive node, so it is in that node's key — measured here at 615 ms against 1.2 ms for the blend alone, ~500× (1024², CPython/NumPy, authoring-time rebuild) | Move masking to a downstream node [gaea_masks], and budget 4 bytes per cell to keep its output resident |
 | A masked simulation looks wrong at the mask edge, and worse the longer it runs | Post-process masking is exact only for pointwise operators; transport crosses the boundary — 6.65% of relief at 80 iterations, 45% of it within four cells of the edge | Accept the edge effect, or use a genuinely domain-restricted node and pay for it |
 | Adding a new simulation leaves the splatmap missing its mask, with no error | A registry node's inputs are intensional, so its key did not change [gaea_accumulator] | Resolve the query at plan time into explicit edges; fold the resolved set into the key [houdini_hdk] |
 | A registry node returns a partial result that changes between runs | "The Accumulator will only add nodes that have been built" — the runtime cannot schedule what it cannot see [gaea_accumulator] | Register discovered dependencies on every cook [houdini_hdk], rather than asking the user to wire a fake ordering edge |

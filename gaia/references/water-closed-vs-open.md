@@ -13,9 +13,10 @@ sources:
 ---
 # Closed water and open water are two different problems
 
-**Tier: authoring-time and real-time.** Nothing here is a cost; it is the classification both
+**Tier: authoring-time and real-time.** The classification is not itself a cost; it is what both
 budgets gate on — the tool sets `bodyType`, and the gate table's rows are the engine defaults
-that flip with it.
+that flip with it. What flips is expensive: the swing is sized in bytes under the gate table, and
+how far the numbers behind the gate can be trusted is stated under the damping section.
 
 Read this before the wave model, before the solver and before the shader. A pool and a sea share
 an interface, a set of optical coefficients and a pass order — and share almost nothing else. Ship
@@ -135,11 +136,23 @@ exposes immediately. Pool water is organised by the plumbing and the walls
   24% and reflects, and reaches a wall 1 m away at 84%. The long-versus-short contrast at the far
   wall of that pool is about 4x (91% against 24%), not everything against nothing.
 
+⚠️ **How good those distances are: under 1% as arithmetic, a factor of 20 as physics.** Re-derived
+from Lamb's rate against the group speed at `sigma = 0.0728 N/m`, `rho = 1000 kg/m^3`, `g = 9.81
+m/s^2`, `nu = 1e-6 m^2/s`, the exact lengths are 89.848 m, 5.656 m and 2.118 m: 90 m is 0.17% high
+and 5.7 m is 0.8% high, while the deliberately hedged "about 2 m" is looser at 5.6% low. **The
+rounding is the smallest error here.** All three assume a *clean* surface, and this repository's
+2026-09-05 audit raised — as X30, marked PLAUSIBLE and never verified against a source — that the
+classical inextensible-film term raises damping about 20x, which would take the long band from
+89.8 m to roughly 4.5 m: half a pool length, not eleven of them. Nobody has measured that film;
+nobody has measured the wall reflection coefficient either. So lean on the **band split** — short
+dies, long carries — which is what the table below and the lee test rest on, and quote a printed
+reach as ±1% (the hedged one as ±6%) *on a clean surface only*.
+
 | | Long band (≳10 cm) | Short band (≲5 cm) |
 |---|---|---|
 | Source | Return jets, swimmers — a fixed point | Wind, over the whole surface |
 | Structure | Coherent, reverberant, stationary in the basin frame | Incoherent, statistically homogeneous |
-| Reach | Rings the basin many times | Dies within ~2 m at 3 cm, ~5.7 m at the 5 cm band edge; what reaches a wall does reflect, but incoherently, and adds no structure |
+| Reach | Rings the basin many times — on a clean surface; see the note above | Dies within ~2 m at 3 cm, ~5.7 m at the 5 cm band edge; what reaches a wall does reflect, but incoherently, and adds no structure |
 | Carries | The visible undulation and most of the slope | Sparkle and fine bed texture |
 | A lee or wind shadow | **Passes straight through** | **Removed** |
 
@@ -178,6 +191,20 @@ and `reservoir` take the Open default on every other row.
 **The net effect is an inverted budget.** On an ocean you spend on the surface and economise on the
 bottom. On a pool you spend on the bottom — caustics, bed albedo, refraction fidelity — and the
 surface is a nearly flat sheet with ripples on it.
+
+**And the closed body is small enough to grid outright.** Two samples per wavelength — Nyquist — at
+the 5 cm band edge is a 2.5 cm cell, so an 8 m pool is 320 x 320 = 102,400 cells; at **4 bytes per
+cell**, one fp32 height and nothing else, that whole surface is 409,600 bytes, **0.41 MB**. Storage
+goes as the square of extent over cell, so holding the same cell across a 1 km open patch is
+40,000 x 40,000 = 1.6e9 cells and 6.4e9 bytes, **6.4 GB** — 15,625x the pool for the same fidelity.
+That ratio is the arithmetic reason an open body gets a spectral, tiled surface with its short band
+pushed into a normal map, while a closed body can afford to grid the water it actually has.
+
+⚠️ **That is a storage floor, not a budget, and nothing here was timed.** It counts one height
+field — no velocity, no history, no derivatives, no GPU alignment, no bed or caustic buffers — and a
+byte count is not a frame cost. What either body costs per frame is **unpriced in this corpus**:
+pricing it takes a profiler on a target device, and until someone runs one, budget from the ratio
+and from the inverted structure above, not from a number nobody measured.
 
 ## Open water has an energy ladder; closed water does not
 

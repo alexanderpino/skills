@@ -54,6 +54,11 @@ authored sink drains **100.00%** of the domain through it, against 30.41% for th
 plane's 380 edge outlets. And a five-level band split with `reflect` padding leaves a seam **221×**
 an ordinary step while its round-trip test still reads machine-precision-exact.
 
+**And what it costs, measured here.** The modular reduction adds **2.4 ms** to a **39.5 ms** 512²
+evaluation — 6%, and the two runs' spreads overlap, so it is free to measurement. The 4-D embedding
+is **241.9 ms**, **6.1×** that, at a max wrap error of `5.2e-14` (`3.5e-14` on x, `5.2e-14` on y). The long hash the modular route needs
+is **256 KB**. ⚠️ A vectorised CPU rig, not a frame cost; both figures are derived in §The easy half.
+
 **What it beats.** *Mirroring* [seam_fake_practice] — free, and it makes **100.0%** of the seam
 column a local extremum against 28.5% for an ordinary column, so every edge becomes an alternating
 chain of ridges and troughs; §The three fakes. *Cross-blending a margin* [seam_fake_practice] —
@@ -112,6 +117,9 @@ reduces mod `P·lacunarity^l`, so a `P`-long table repeats every `P/lacunarity^l
 six-octave, lacunarity-2 stack at `P` = 1024, a `P`-entry table leaves octaves 1–5 bit-identical
 at a 512-cell shift (4.0e-13) against 4.6e-01 at 32768 entries. An integer mixer with no 8-bit
 mask reaches any `P_l` for free.
+**The table is the one machine cost this half has, and it is small.** Measured with numpy
+`nbytes` (`seamless-and-periodic.py`): 32768 entries is **256 KB** as `int32` doubled for the
+wrap-around read, **64 KB** as `uint16`; the `P`-entry table that fails is 8 KB, and the mixer 0.
 
 **Simplex does not take the trick.** Simplex noise skews the square lattice by `F2 = (√3−1)/2`
 before flooring, so the integers being hashed live on a triangular lattice whose relationship to
@@ -136,6 +144,11 @@ corners per sample instead of 3 — a corner *count*, not a cost, because those 
 four-dimensional: 22 multiply/add-class operations each against 12, so about **2.8×** the kernel's
 arithmetic, plus two sines and two cosines the 2-D path never pays. 16-against-4 is the
 *gradient*-lattice figure — what a third-party gradient kernel you cannot reindex costs.
+⚠️ **A corner count is not a cost, and this one understates.** Timed on the gradient-lattice pair
+(`seamless-and-periodic.py`: CPython 3.11, numpy 2.4, 512² samples, seed 20260910, median of 15),
+the 2-D path is **39.5 ms** and the embedding **241.9 ms** — **6.1×**, where 16-against-4 predicts
+4×; the gap is four trig calls and a four-deep table lookup the count omits. Same run, max error
+`3.5e-14` on x and `5.2e-14` on y, reproducing the round-off floor above. ⚠️ Vectorised CPU, **not** a GPU frame cost.
 **Crossover: use modular indexing whenever you control the hash; use the embedding only for a
 noise whose lattice you cannot reindex** — simplex, or any third-party kernel you call as a black box.
 
@@ -223,8 +236,6 @@ function of *simulated time*, and grows monotonically with it. A halo you size o
 width; a crop you must re-measure every time an artist adds iterations, and it never stops growing.
 
 ## A torus has no outlet
-
-This is the consequence people meet last and it is structural, not a tuning problem.
 
 **Erosion on a torus cannot remove one gram of material from the tile.** Measured: `exported =
 0.000%` and mass drift `1.97e-16` over 1200 steps. Every grain lifted off a hillside is deposited
@@ -421,9 +432,9 @@ non-periodic neighbour** is a contradiction: a wrapping tile has decided nothing
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | The noise wraps at 256 and at no other period | The lattice index is hashed raw, so the period is the permutation table's length; [lagae2010] Table 1 footnote 1 defines noise storage in terms of that period | Reduce the lattice index mod the period before hashing [periodic_lattice_practice] |
-| The "periodic" tile visibly repeats 4×4 inside itself | `P` was set to 1024 over a 256-entry permutation table, so the hash aliases and the tile is a 256 tile laid 4×4; measured `max\|f(x) − f(x+256)\|` = 2.4e-13 inside the tile, against 1.31 with a 1024-entry table, while the wrap test at `T = P` reads 2.6e-13 either way and passes. A `P`-entry table moves the same defect one octave down instead of curing it: octave `l` reduces mod `P·lacunarity^l`, so a `P`-long table repeats every `P/lacunarity^l` cells, and octaves 1–5 of the six-octave, lacunarity-2 stack come out bit-identical at a 512-cell shift | Give the hash a period of at least the *finest* octave's `P·lacunarity^(n−1)` — an integer mixer with no 8-bit mask, or a table that long [periodic_lattice_practice], [lagae2010] §7's long-period hashes |
+| The "periodic" tile visibly repeats 4×4 inside itself | `P` was set to 1024 over a 256-entry permutation table, so the hash aliases and the tile is a 256 tile laid 4×4; measured `max\|f(x) − f(x+256)\|` = 2.4e-13 inside the tile, against 1.31 with a 1024-entry table, while the wrap test at `T = P` reads 2.6e-13 either way and passes. A `P`-entry table moves the same defect one octave down instead of curing it: octave `l` reduces mod `P·lacunarity^l`, so a `P`-long table repeats every `P/lacunarity^l` cells, and octaves 1–5 of the six-octave, lacunarity-2 stack come out bit-identical at a 512-cell shift | Give the hash a period of at least the *finest* octave's `P·lacunarity^(n−1)` — an integer mixer with no 8-bit mask, or a table that long [periodic_lattice_practice], [lagae2010] §7's long-period hashes — measured, 32768 entries is 256 KB as `int32` and 64 KB as `uint16`, against 8 KB for the `P`-entry table that fails, and 0 for the mixer |
 | Base octave wraps, the field does not | `period × lacunarity^k` stopped being an integer at some octave; measured 4.7e-02 at lacunarity 1.25 with period 64 | Lacunarity `p/q` in lowest terms with `q^(n-1)` dividing the period, `n` octaves — `3/2` at six octaves needs 32, so it wraps on any power-of-two period **of 32 or more** and not at 16, where `16·(3/2)^5 = 121.5`; `5/4` needs 1024 |
-| Modular indexing has no effect on a simplex noise | Simplex floors a lattice skewed by an irrational constant, so the integers you reduced are not the tile's; measured full-amplitude error at every period | Four-dimensional torus embedding — 5 simplex corners per sample against 3, and four-dimensional ones, so about 2.8× the arithmetic rather than the corner count's 1.7×; 16-against-4 is the *gradient*-lattice figure, and it is what a third-party gradient kernel you cannot reindex costs [periodic_lattice_practice] |
+| Modular indexing has no effect on a simplex noise | Simplex floors a lattice skewed by an irrational constant, so the integers you reduced are not the tile's; measured full-amplitude error at every period | Four-dimensional torus embedding — 5 simplex corners per sample against 3, and four-dimensional ones, so about 2.8× the arithmetic rather than the corner count's 1.7×; 16-against-4 is the *gradient*-lattice figure, and it is what a third-party gradient kernel you cannot reindex costs — timed, that pair is 39.5 ms against 241.9 ms per 512² samples on a CPU rig, 6.1× and not the counted 4×, at a max error of 3.5e-14 [periodic_lattice_practice] |
 | A ridge or trench repeating at exactly the tile pitch after erosion | Closed boundary — the edge is a wall, and a wall is a landform. Mass is conserved and periodicity is not; measured seam ratio 1.085 and rim drift 4.2% of relief | Wrapping neighbours [hobley2017] §3.1.4 `looped` — not a wider blend |
 | A straight flat cross through the world every tile width | Open boundary planed the edges; measured seam ratio 0.389 against an interior of 1.0, and 2.18% of terrain mass exported | Toroidal boundaries, or crop and re-measure the crop every time the iteration count changes |
 | The crop margin that worked last week now seams | The margin is a function of simulated time, not of a kernel radius: 3 → 10 → 13 cells at 100 → 400 → 1200 steps | Stop cropping; simulate on a torus. There is no converged margin |

@@ -52,6 +52,16 @@ you do when you run out.*
   `dt` never moves. The whole scheduler is stated once, under
   [the slider](#when-the-user-drags-a-slider).
 
+**What that costs and how wrong it is**, both halves together. The **cost** is the frame it has to
+fit inside — a slice of the same **16 ms** the renderer is spending; this page does not split that
+16 ms across stages, and [says why](#the-crossover). What the cap bounds is physics, not machine
+time: at most `N_max·dt`, **67 ms** of *simulated* time per frame at `dt = 1/60`, `N_max = 4`. The
+**error** is whatever that clamp drops, and it is not in the physics — every tick taken is a full,
+legal step — it is in simulated time delivered per wall-second: ten wall-seconds run the full 600
+ticks at every frame rate at or above 20 fps, then **6.7% low** at 16 fps, **20% low** at 12 fps
+and **46.7% low** at 8 fps. Budget the 16 ms; read the shortfall as how far behind the wall clock
+the world on screen has fallen.
+
 Reach for an implicit or unconditionally-stable scheme only when the *physical time you must cover
 per call* is enormous compared to the stable step. That is the authoring-time case and almost never
 the runtime case. The reasoning is below, and it is not "implicit is slower".
@@ -214,8 +224,8 @@ the reference implementation's open, draining edges, seven when the basin is clo
 
 What it does **not** buy — and nothing can, without moving `dt` — is an equal number of ticks per
 wall-second once the clamp binds: on the same settings, ten seconds of wall clock is 600 ticks at
-60 fps, 480 at 12 fps and 320 at 8 fps, and the slow machine is showing the *same* simulation
-later, not a different one. At or above `1/((N_max−1)·dt)` — 20 fps here — the counts are equal by
+60 fps, 480 at 12 fps and 320 at 8 fps — **20% low** and **46.7% low** against the wall clock —
+and the slow machine is showing the *same* simulation later, not a different one. At or above `1/((N_max−1)·dt)` — 20 fps here — the counts are equal by
 construction, because a remainder smaller than `dt` plus a frame no longer than `(N_max−1)·dt` can
 never reach the cap. ⚠️ Between 15 and 20 fps the clamp bites *intermittently* and the count falls
 short while the frame rate still looks fine: 16 fps gives **560** ticks in ten seconds, not 600, and
@@ -292,7 +302,7 @@ the tens of metres the player is standing in.
 | Depth goes negative, then NaN | Outflow exceeded what the cell held | The outflow scaling clamp [mei2007] |
 | Checkerboard sloshing that never damps, but no NaN | `dt` above the limit while a positivity clamp holds | Positivity is not stability — lower `dt` |
 | Frame time spikes whenever the water is deep | Substep count unbounded at runtime — the accumulator is not clamped | Clamp it to `N_max·dt`; let sim time lag |
-| Slow motion nobody asked for | The `N_max·dt` clamp is binding every frame | That is the clamp working; shrink resolution or domain, do not raise `N_max` |
+| Slow motion nobody asked for | The `N_max·dt` clamp is binding every frame | That is the clamp working, and it costs simulated time — **46.7% low** at 8 fps; shrink resolution or domain, do not raise `N_max` |
 | A hitch, then the water runs fast-forward for a second | The accumulator was not clamped: the debt was kept and paid back at `N_max` ticks a frame | Clamp to `N_max·dt`; the lag is dropped, not repaid |
 | Two machines diverge from the same inputs | An input keyed to a frame or to wall time lands on a different tick; or `dt` moved | Fixed `dt`; key every input to a tick — the state after tick `k` is then identical, and only how far behind the wall clock it sits differs |
 | An offline solver ported to the viewport tanks the frame | Global solve per step [kass1990] [braun2013] | Bake it, or amortise with checkpoints; do not shrink it |

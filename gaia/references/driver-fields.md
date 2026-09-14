@@ -61,15 +61,15 @@ parameter — and the bounded form is **O(N log W)**, not the amortised O(1) of 
 
 **Why it wins.** The horizon field is **sun-independent**. It is a property of the terrain alone, so
 one bake serves every sun position, every hour of every day, and — per the sentence above — the wind
-field as well. Nothing else in this document has that property, and it is what makes a driver-field
-pass affordable at all.
+field as well. Nothing else here has that property. It is not free to keep: **64 bytes per cell**
+at 16 fp32 azimuths, where a 10° sun's shadow bit is wrong on **2.6–3.8% of cells** — below.
 
 **What it beats.** *Per-cell ray marching over the heightfield* — the obvious implementation, and
-measurably the wrong one, quantified below. *A full CFD solve for wind* — the most accurate of the three, and
-slower, but not as far outside an authoring budget as its reputation: [forthofer2014] reports
-30–90 minutes per simulation on a laptop [forthofer2014]. *Aspect alone as a proxy for insolation* — cheap and blind: it
-knows which way a slope faces and not whether the ridge across the valley blocks it, which is the
-whole point of a horizon.
+measurably the wrong one, quantified below. *A full CFD solve for wind* — the most accurate of the
+three, and slower, but not as far outside an authoring budget as its reputation: [forthofer2014]
+reports 30–90 minutes per simulation on a laptop. *Aspect alone as a proxy for insolation* — cheap
+and blind: it knows which way a slope faces and not whether the ridge across the valley blocks it,
+which is the whole point of a horizon.
 
 **And compute precipitation, because it is nearly free and it is what erosion actually wants.** One
 dot product against the wind field you already have, clamped and renormalised, turns
@@ -89,12 +89,11 @@ a sliding-window query, and the discarded candidate is often the answer inside t
 Constructed and run: a flat profile with a 1-unit bump at `j = 3` and a 50-unit peak at `j = 40`.
 The unbounded structure retains only cells 40 and beyond — cell 3 is never the unbounded answer for
 any cell before it, so it is dropped — yet at `dmax = 10` cell 3 **is** the horizon for cells 0, 1
-and 2 (angles 0.333, 0.500, 1.000). So the two fields need **two bakes**, and the second is not the
-first with a different constant: bounding the search changes the algorithm, not just a parameter.
-Running one and reusing it for the other is a real and easy mistake, and so is assuming one code
-path serves both. [winstral2002] Fig. 4 shows why it matters: at 300 m the shelter-defining
-pixel lies across the valley and a cell reads sheltered; at 100 m the search never crosses and the
-same cell reads exposed. **The search distance chooses which landform does the sheltering.**
+and 2 (angles 0.333, 0.500, 1.000). So the two fields need **two bakes**, and running one and
+reusing it for the other is a real and easy mistake. [winstral2002] Fig. 4 shows why it matters: at
+300 m the shelter-defining pixel lies across the valley and a cell reads sheltered; at 100 m the
+search never crosses and the same cell reads exposed. **The search distance chooses which landform
+does the sheltering.**
 
 ## The horizon sweep, and who actually invented it
 
@@ -193,6 +192,18 @@ consumes it is meaningless.
 `terrain-analysis-masks.md` without a citation, and this sentence used to place it "in the sources"
 alongside two figures that really are. It is a reasonable default and it is graded as folklore, not
 borrowed authority — which matters because the crossover below leans on it.
+
+⚠️ **What the azimuth count costs and what it buys — measured here, not sourced.** A baked
+per-azimuth horizon field in float32 is `4N` **bytes per cell**: **64 bytes per cell** at 16
+azimuths, **1.07 GB** for a 4096² tile. Against a 576-azimuth reference on 256² synthetic fBm (rms
+slope 0.25, 1.6 km search, seed 20260910), 16 azimuths hold the sky-view factor to a **mean error of
+0.0005–0.0009** (0.05–0.09% of a mean SVF of 0.97), but the horizon angle at a sun azimuth *between*
+two baked ones carries a **mean error of 0.5–0.7°**, p99 3–5°, and the lit/shadowed bit is wrong on
+**2.6–3.8% of cells at a 10° sun**, 0.6–1.0% at 20°. The view factor is converged at 8–16 — 3× that
+error at 8 — and a low-sun shadow is not. Where only the scalar is consumed, reduce at bake time
+and keep **4 bytes per cell** (67 MB per 4096²). Rig: smooth synthetic terrain, not an urban skyline
+whose horizon steps with azimuth, and the worst cells (max 15–22°) are the whole-cell ray
+rasterisation, not the count — bilinear sampling caps that same max at 4.5°.
 
 ## Temperature, and a constant that is a convention
 
@@ -429,6 +440,7 @@ Driver fields are not heightfields, and three properties follow:
 | The wind shelter field marks the wrong cells | Search distance chosen without reference to the landform — at 100 m the search never crosses the valley, at 300 m it does [winstral2002] Fig. 4 | Choose `dmax` by which landform should do the sheltering; 100–300 m is the measured useful range |
 | Reusing the insolation horizon for wind gives nonsense | Same algorithm, but the insolation baseline is kilometres and the wind baseline is hundreds of metres | Run the sweep twice with different `dmax`; the IDEA is shared, the implementation is not -- the bounded sweep needs a windowed structure, because the unbounded hull discards the nearer candidates a bounded query needs |
 | The occlusion bake takes hours | Per-cell, per-direction ray marching — 1–2 hours per tile on a GPU against ~2 s per azimuth for the sweep on CPU [stendardo2020] [dozier2022] | Use the order-N sweep; it is O(N) and sun-independent |
+| Low-sun shadows are wrong on scattered cells, or the baked field is enormous | Too few azimuths — the sun falls between two of them and the interpolated horizon misses: at 16 the shadow bit is wrong on 2.6–3.8% of cells at a 10° sun — while keeping the whole per-azimuth field costs 64 bytes per cell | Bake more azimuths where low-sun shading matters; where only the sky-view factor is consumed, reduce at bake time to 4 bytes per cell — at 16 azimuths it is already within a mean error of 0.0005–0.0009 |
 | Changing the time of day rebuilds everything | The horizon sweep sits below the sun parameter in the graph | Put the sun-independent sweep above the sun parameter; only the projection is downstream |
 | Rivers run out of dry valleys, or half the map is a desert | An unclamped upslope field: 49.6–50.1% of cells measure negative, and clamping alone then halves the base rate | Clamp at zero, then rescale so the domain total matches the intended base rate |
 | Erosion is identical on both sides of a range | Discharge taken as drainage area `A`, which assumes uniform rainfall — a real range's windward and lee rates differ [minderroe] | Accumulate `Q = Σ(P·cellArea)` with the same router, and re-derive the coefficient at the rainfall `K_A` was calibrated under — `K_Q = K_A·P̄^−m`, not `K_A` |

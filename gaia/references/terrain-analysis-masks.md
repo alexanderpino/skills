@@ -98,6 +98,17 @@ property of the operator: on a Gaussian hill at `r = 1.3` this test gives 2.4, 3
 significant digits at `L` = 0.4, 0.1 and 0.025. It catches a wrong sign or a dropped `L` at the
 first digit, which is all it is for.
 
+**Put a number on that, and budget the worst cell rather than the sampled one.** Measured here on
+that same Gaussian hill at `L` = 0.1, the **max relative error** of `plan/√p` against `−1/r` over the
+ring `0.5 ≤ r ≤ 3.0` is **2.16%**, and the worst cell sits on the OUTER edge at `r ≈ 2.97`, where the
+hill has flattened — not at the summit, where the curvature is largest. At the well-sloped `r = 1.3`
+the same quantity is out by **0.031%** at that `L`, about seventy times better. And it keeps climbing
+outward: median 0.72% over `2.5 ≤ r < 3.0`, 1.4% with a 5.2% worst cell over `3.0 ≤ r < 3.5`. ⚠️ **The
+ring bound is therefore part of the figure**, exactly as the surface and the sample point are above:
+a curvature error quoted without the slope range it was measured over means nothing. This is the
+`p < eps` guard below wearing a different hat — as `p` falls, both curvatures become a ratio of two
+vanishing quantities, and they degrade smoothly long before any `eps` fires.
+
 - **Profile** (along steepest descent) — negative where the slope steepens downhill (ridges, cliff
   lips), positive where it flattens (valley floors, slope bases). This is the erosion/deposition
   mask.
@@ -290,6 +301,16 @@ Everything with a long baseline — horizon occlusion, insolation, TWI and anyth
 drainage area — is a bake: even the O(1) sweep is a whole-field sequential pass per azimuth, and
 the terrain is not changing per frame. The line is the baseline length, not the arithmetic.
 
+⚠️ **"Cheap" is not a budget, so here is a measured one — and here is what it is not.** The curvature
+block above, evaluated exactly as written over a 4096² R32F tile, takes **493 ms** (best of five;
+median 500 ms) and holds **36 bytes per cell** — its eight named intermediates plus the input,
+**603 MB** — in NumPy 2.4.6 under CPython 3.11 on one process, Xeon @ 2.10 GHz. **That is an
+authoring-time CPU figure and nothing else: it is not a GPU frame cost and must never be quoted as
+one.** It is bandwidth, not arithmetic — NumPy materialises every intermediate as a full-tile array,
+where a shader holds all eight in registers and does nine loads per cell. The per-frame verdict
+above rests on that register form; evaluate curvature the way the block is written, on a CPU, and
+budget the half-second and the 603 MB per 4k tile.
+
 ## How this fails, and what it looks like
 
 | Symptom | Mechanism | Fix |
@@ -299,6 +320,7 @@ the terrain is not changing per frame. The line is the baseline length, not the 
 | A slope mask that was right at 1 m/px and wrong at 8 | Slope is resolution-dependent | State the resolution with the threshold; re-tune per LOD |
 | Factor of safety, TWI or wetness biased low | `tan(slope)` applied to a value that is already a tangent | Divide by `slope` bare |
 | Curvature mask is speckle, or shows concentric rings | Second derivative of a quantised field | Compute on R32F, pre-smooth σ ≈ 1 cell |
+| Curvature wild on near-flat ground, clean on the slopes | Both curvatures divide by `p`, so as the slope dies they are a ratio of two vanishing quantities — the error is worst where `p` is smallest, not where the curvature is largest | Raise the `p < eps` guard, emit zero curvature on flats, and budget the flat-tail error rather than a sampled-point one |
 | Curvature mask selects ridges where it should select valleys | Sign convention differs from the tool you learned it in | Render over a known ridge and document the convention |
 | AO reads as dirt in the crevices, mountains unlit | `maxDist` far too small | 2–5% of domain extent |
 | AO bake is far slower than it needs to be at 4k | Naive per-cell marching | The horizon sweep — Dozier's 1981 idea, [timonen2010] for the GPU formulation |

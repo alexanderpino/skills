@@ -161,8 +161,10 @@ run leaves nothing. Nor is the half-fix of
 computing `w_new` from the deflected `h` and subtracting only the increment: that converges to
 `h₀/(1 + T)`, `0.54·h₀` at long wavelength against the correct `0.15·h₀`, and a gate of *"the
 ridge survives"* passes it. The gate that catches both is numeric: ten calls must agree with one
-to `< 1e-9 m`. The block above does, to fp64 roundoff (`~10⁻¹³ m` on a 512² grid; `~10⁻⁴ m` in
-fp32, still idempotent to the metre).
+to `< 1e-9 m`. The block above does, to fp64 roundoff: **max error `2.3e-13 m`** over ten calls
+on a 512²×2 km grid, `4.5e-13 m` on 512²×1 km — four orders inside the gate, and rig-dependent
+roundoff rather than a property of the block. fp32 reads `1.2e-4 m` on the same rig: past the
+gate, still idempotent to the metre.
 
 `Te`, the effective elastic thickness inside `D`, is the one knob that matters: a few km for weak
 hot lithosphere, tens of km for old cold lithosphere. The response width is
@@ -192,8 +194,15 @@ the same mistake that made the old form of the block eat the range. The domain m
 **Time budget.** All of this is authoring-time. `U` is built once; the flexure solve is two FFTs,
 which is nothing next to the erosion run it feeds, and it belongs *inside* the erosion loop as a
 periodic update, not as a post-process — which is exactly why the block has to be idempotent, and
-why `w_prev` is state the loop owns rather than a temporary. Nothing in this document runs per
-frame — a runtime that needs tectonics needs a baked `U` and a baked heightfield.
+why `w_prev` is state the loop owns rather than a temporary. Measured, one x86-64 core, CPython
+3.11 + numpy `pocketfft`, fp64, median of 11: one update costs **`2.8 ms` at 256², `11.7 ms` at
+512², `56.5 ms` at 1024²**, and `w_prev` costs **`8 bytes per cell`** — 2 MB at 512², 128 MB at
+4096². Those are CPython/numpy numbers, not GPU or engine ones; take the order of magnitude, and
+bill them per *periodic update*, not per erosion step. The "orders of magnitude more" claimed for
+a full geodynamic solve above is **unpriced** — nobody here has timed one at game scale, and
+pricing it means running one; until then read it as a direction, not a ratio. Nothing in this
+document runs per frame — a runtime that needs tectonics needs a baked `U` and a baked
+heightfield.
 
 ## How this fails, and what it looks like
 

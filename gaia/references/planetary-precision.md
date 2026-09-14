@@ -52,6 +52,30 @@ frame. Per draw, upload `float32(patchOrigin_f64 - cameraPos_f64)` and add in th
 then never sees a planet-radius coordinate — which is why a correctly built planet renderer needs
 no fp64 on the GPU at all.
 
+**What that discipline buys and what it costs, measured on this machine — not cited, not borrowed.**
+One million vertices filling a 4 km cube around a camera standing on a 6 371 km sphere, seed
+20260910. Truncate world positions to float32 *first* and subtract in float32, and the **max position
+error is 0.398 m**, RMS 0.205 m — the table's last row arriving as geometry. Subtract in float64 and
+truncate once, and the **max error is 0.104 mm**, RMS 0.046 mm, fixed by the size of that cube and
+not by the planet radius at all. Those two numbers are the whole argument for the discipline.
+
+Two qualifications on the 0.398 m, because both are ways to misread it. It is *per-axis* spacing that
+bites, not distance from the origin: this camera sits at (130, −1 545, 6 180) km, whose components
+carry ULPs of 7.8 mm, 12.5 cm and 0.5 m, and the error is almost all in the largest one. And 0.141 m
+of it is a rigid offset — the camera's own truncation, shared by every vertex, which shifts the scene
+rather than shaking it. Remove that and the *differential* error, the part that actually shows as
+wobble, still peaks at 0.258 m.
+
+**The cost is the f64 subtract you moved the truncation behind: 0.03 ms for 4 096 camera-relative
+origins, and 9–10 ms per million positions.** Read the first figure, because the per-patch form
+above subtracts once per *patch* — a 4 096-patch frame pays about 0.03 ms of CPU and the vertex count
+never enters. The per-million rate is what a per-vertex rebase costs on this rig only; a hand-written
+SIMD loop would beat it comfortably. **Neither figure is a GPU cost or a frame time**: it is a
+bandwidth-bound numpy 2.4.6 / CPython 3.11 array measurement on one core of a 2.1 GHz Xeon,
+allocation included — take the ratio and the shape, not the budget. The f64 authoritative store is
+the other half of the price and it needs no measuring: 24 bytes per position against 12, so 24 MB per
+million.
+
 **And reversed-Z into a float depth buffer, with an infinite far plane.** Map near to 1 and far to
 0. A standard projection piles depth resolution near the near plane hyperbolically while float32
 piles representable values near zero; reversing aligns the two gradients instead of opposing them,

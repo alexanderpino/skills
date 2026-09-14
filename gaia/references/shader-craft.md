@@ -62,18 +62,19 @@ inside the loop and at the hit are different failures with different fixes:
 ```
 
 **What it beats.** *Reading the two sibling skills and assuming the rest transfers* — both are
-correct and neither says a word about an explicit-LOD fetch inside a divergent traversal, because
-neither is about heightfields. *A global negative texture LOD bias* — the standard response to
-"the terrain looks blurry", which treats the symptom of an unscaled gradient and poisons weight
-maps, ID maps and page tables on the way past; `virtual-texturing.md` carries that as its own
-failure row. *Compiling on one API and looking at the frame* — the four undefined-behaviour hazards
-named above all compile, and are warned about on at most one of the two APIs; choosing the wrong
-depth token produces no error, no warning and no visual difference whatever, only the loss of the
-performance you thought you were buying; and one hazard is *hidden* on D3D by a `saturate` that
-eats the NaN, and exposed the moment the same shader runs through GLSL. *Leaving them in eleven failure
-tables* — still the right place for each hazard's context, and this document does not replace
-them: it collects the shader-level rows so that a reader who opened one document does not have to
-have opened the other ten.
+correct and neither says a word about an explicit-LOD fetch inside a divergent traversal, neither
+being about heightfields. *A global negative texture LOD bias* — the standard answer to "the
+terrain looks blurry", which treats the symptom of an unscaled gradient and poisons weight maps, ID
+maps and page tables on the way past; `virtual-texturing.md` carries it as its own failure row.
+*Compiling on one API and looking at the frame* — the four undefined-behaviour hazards all compile
+and are warned about on at most one API; the wrong depth token not even that: no error, no warning,
+no visual difference, only the performance you thought you were buying; and one hazard is *hidden*
+on D3D by a `saturate` that eats the NaN and exposed through GLSL. *Leaving them in eleven failure
+tables* — still the right place for each hazard's context; this collects the shader-level rows so a
+reader who opened one need not have opened the other ten.
+⚠️ **And none of the eight is priced.** Not on this page, not anywhere in this corpus: each is a
+GPU cost, and only an A/B on your own hardware — the same pass with the change and without — prices
+one. Until you run that, take the eight as correctness fixes and not optimisations.
 
 ## The derivative is a property of the quad, not of the surface
 
@@ -145,16 +146,15 @@ calculation is required, and there is no issue with flow control"* — and `samp
 reason with gradients supplied. `SampleLevel` and `SampleGrad` are those two instructions.
 
 **And after the loop, a defined derivative is still the wrong number.** Once the march has
-converged the flow is uniform again and `ddx` of the hit position is perfectly legal — and
-useless, because neighbouring pixels hit different terrain across a silhouette.
-`heightfield-raymarching.md` states this as a rule about the pixel quad rather than about normals,
-and the wording is load-bearing: *"`ddx/ddy` of anything derived from the hit position is garbage
-across a silhouette, so a plain `Sample` there is the same defect wearing a mip-noise costume
-instead of a normal-noise one."* It covers albedo, splat weights and detail UVs, not only the
-normal. The replacement it names is `SampleGrad` with gradients built from **ray differentials** —
-the neighbouring pixel's ray evaluated at this hit's distance — a quantity the marcher has and the
-quad does not. Normals come from analytic central differences at a footprint-matched mip, not from
-the quad at all.
+converged the flow is uniform again and `ddx` of the hit position is perfectly legal — and useless,
+because neighbouring pixels hit different terrain across a silhouette. `heightfield-raymarching.md`
+states this as a rule about the pixel quad rather than about normals, and the wording is
+load-bearing: *"`ddx/ddy` of anything derived from the hit position is garbage across a silhouette,
+so a plain `Sample` there is the same defect wearing a mip-noise costume instead of a normal-noise
+one."* It covers albedo, splat weights and detail UVs, not only the normal. The replacement it
+names is `SampleGrad` with gradients built from **ray differentials** — the neighbouring pixel's
+ray evaluated at this hit's distance — a quantity the marcher has and the quad does not. Normals
+come from analytic central differences at a footprint-matched mip, not from the quad at all.
 
 These are two different failures and they need saying separately, because the second survives
 fixing the first: hoisting the fetch out of the loop makes it *defined*, and it is still taken
@@ -214,8 +214,8 @@ SampleGrad(pool, physUV, ddx(virtualUV) * s, ddy(virtualUV) * s)
 Dropped, the LOD error is `pageMip − log2(virtualSize/poolSize)` levels — negative on the fine
 pages the near field uses, positive once `pageMip` passes `log2(virtualSize/poolSize)`, and
 **exactly zero at that one page mip**, which is how a single test view passes. A 256k² virtual over
-a 16k² pool gives `s = 16` at `pageMip = 0`, so unscaled gradients state a footprint 16× too small,
-`log2 16 = 4` levels too fine. The anisotropic half does not clamp the way the LOD half does — the
+a 16k² pool gives `s = 16` at `pageMip = 0`: unscaled gradients state a footprint 16× too small, an
+**error of 4** LOD levels. The anisotropic half does not clamp the way the LOD half does — the
 ratio is scale-invariant, so the hardware takes the right number of taps and spreads them across
 `1/s` of the footprint they should cover, at the grazing angles anisotropy exists to serve.
 ⚠️ [mittring2008] §2.3.2.2 bounds a tap's reach — 1 texel bilinear, 4 for DXT — but **declines
@@ -441,7 +441,7 @@ under [glsl460] §8.3.
 | A filtering discontinuity along every LOD band, and "fixing the derivative" changes nothing | No quad spans two chunks — the far lanes are helper invocations from this triangle. The two sides fed *different inputs* to their own correct derivatives: heightmap mip, detail-UV scale or resident page mip | Make the LOD-dependent inputs agree across the band, or derive gradients from a LOD-independent quantity (world XZ, virtual UVs) |
 | Derivatives go wrong only after a pass starts reading a GPU-written page table or chunk record | A UAV read feeding a derivative — invalid by [d3d11spec] §16.13, enforced by the compiler only "to the extent possible" | Copy to an SRV, or move to explicit LOD |
 | Correct on one vendor, garbage material or page on another, in the same frame | A per-pixel material or page index left unwrapped; the compiler assumes uniformity and may broadcast one lane's index [nonuniform_idx] | `NonUniformResourceIndex` / `nonuniformEXT`; one index suffices on a multi-dimensional array |
-| Aliasing on near pages, over-blur on far ones, and one distance where it looks right | Virtual-UV gradients handed to `SampleGrad` unscaled — an error of `pageMip − log2(virtualSize/poolSize)` levels that passes through zero at one page mip | Scale both gradients by `s = virtualSize/(poolSize·2^pageMip)`; test a view holding several page mips at once (`virtual-texturing.md`) |
+| Aliasing on near pages, over-blur on far ones, and one distance where it looks right | Virtual-UV gradients handed to `SampleGrad` unscaled — an error of `pageMip − log2(virtualSize/poolSize)` LOD levels, **4** for the 256k²-over-16k² case above, passing through zero at one page mip | Scale both gradients by `s = virtualSize/(poolSize·2^pageMip)`; test a view holding several page mips at once (`virtual-texturing.md`) |
 | Permanent blur with long eviction ages — ⚠️ a quiet IO queue corroborates this only under **streaming** VT; the runtime VT `virtual-texturing.md` prescribes has no such queue, so its quietness is not evidence here | The feedback pass's own downscale was not subtracted, so requests are `log2(feedbackScale)` mips too coarse — 6.25% of the areal density at quarter res | `mip = computeMip(virtualUV) − log2(feedbackScale)` [mittring2008] |
 | Conservative depth declared, image correct, and the pass costs exactly what it did before | The token is the wrong one for the depth convention. §16.9.3.1: valid with any depth mode, "but the early depth cull will be disabled" — no error, no warning, no visual change | `SV_DepthLessEqual` under reversed-Z, `SV_DepthGreaterEqual` under standard Z; assert the token against the pipeline's comparison function |
 | Pixels missing from a depth-writing march, worst where the proxy is coarse | The conservative-depth promise was broken; §16.9.3.2's clamp is optional and mostly absent | The proxy must be a **max-height** hull (`heightfield-raymarching.md`), not a mean-height or raster-LOD one |

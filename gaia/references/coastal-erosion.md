@@ -36,7 +36,7 @@ operators out.** Cross-shore, relax the submerged heightfield toward Dean's equi
 view, extract the sea-level contour and run **one-line diffusion** along it with the CERC
 diffusivity, whose sign flips at 42° [ashton2006b]. Where the shore is rock rather than sand,
 replace the second operator with a **threshold**: erode a cell only when wave force exceeds its
-resistance [shadrick2022].
+resistance [shadrick2022] — one resistance number per cell, 4 bytes per cell, 64.0 MiB at 4096².
 
 **There is no canonical source for any of this as a heightfield operator; standard practice is**
 to author the cross-shore shape and let the plan-view model move the contour, then rasterise. The
@@ -357,7 +357,7 @@ Three things follow, and each is a modelling instruction:
   attributed to "the stochastic pattern of erosion in space and time". A cliff operator that
   retreats every cell by the mean rate produces a smooth wall and is wrong by up to **4.3×**
   locally — that is the per-cell error, 25 against the 5.8 mean — across a field whose own ends
-  span 12.5×. Retreat in blocks, at intervals, or not at all.
+  span 12.5×. Retreat in blocks, at intervals, or not at all — priced below.
 - **The forcing is concentrated at one elevation.** Retreat in that model is driven exclusively at
   the **cliff foot**, with subaerial weathering and groundwater unrepresented [shadrick2022]. So
   the operator is a *notch* cut in a band around sea level, and the face above it fails by
@@ -368,6 +368,18 @@ Three things follow, and each is a modelling instruction:
   structural controls together — but that is exactly the interface a heightfield tool has:
   `stratigraphy-and-lithology.md` already turns a bed stack into a per-cell erodibility `K`, and
   `F_R` is that same field read by a different operator. Hard bands make headlands and stacks; soft bands make bays. That is the whole of it.
+
+**What the threshold operator costs — measured here, not taken from the paper.** It needs a
+resident per-cell resistance field: **4 bytes per cell** at float32, **64.0 MiB** across the 4096²
+grid the resolution table above uses, against no per-cell state at all for a uniform mean rate;
+`uint8` grades take it to **16.0 MiB**. One vectorised pass over that grid measured **204 ms**
+(four runs of 30, medians 202.0–205.2 ms) against **5.2 ms** for the same field's uniform
+subtraction — **~39×** the work to stop being wrong by 4.3× per cell. Rig: NumPy 2.4.6 /
+CPython 3.11 on one x86-64 container CPU — a CPU authoring-pass floor, **not** a frame cost and
+**not** a GPU number. ⚠️ The two ratio figures are the orchestrator's re-derivation, not the
+original author's: this block was written by an agent that was killed before it could report, and
+re-running its own rig four times gives a stable 5.2 ms and ~39× where it had printed 2.8 ms and
+~70×. The storage figures reproduce exactly; those two did not.
 
 **The crossover between the two operators is the sediment supply, not the rock type.** A cliff
 with a wide beach in front of it is protected — the waves never reach the foot — and a cliff with
@@ -428,6 +440,6 @@ later processes would destroy.
 | Grid-scale noise explodes while `μ < 0` | Backward diffusion with no regularisation: it amplifies the smallest `L` fastest, and no timestep cures it | Cap the instability with wave shadowing, or clamp `ψ` below 42.392° |
 | Capes and spits never appear at any setting | Wave angles never exceed 42° | The instability threshold is a deepwater angle, not a breaking angle — refraction has already reduced the latter |
 | Headlands and bays do not track the geology | `F_R` is a global constant | One resistance per cell, from `stratigraphy-and-lithology.md` |
-| Cliffs are smooth vertical walls | Mean retreat rate applied uniformly | Erosion is threshold-crossing and episodic: 2–25 cm/yr across 2 km of one coast [shadrick2022] |
+| Cliffs are smooth vertical walls | Mean retreat rate applied uniformly | Erosion is threshold-crossing and episodic: 2–25 cm/yr across 2 km of one coast [shadrick2022]; the per-cell `F_R` that fixes it costs 4 bytes per cell, 64.0 MiB at 4096², and ~39× the uniform step |
 | Bare cliffs standing behind wide beaches | Cliff and beach operators run independently | The beach is the cliff's armour; couple them through the sediment |
 | Rivers drain to a shoreline that is not there | Coastal pass run before hydraulic erosion | Sea level and the coastal pass come last |

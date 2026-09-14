@@ -144,12 +144,48 @@ coefficient confusion than the assumption that forward scattering is free. The t
 bracket, and under the phase function the descriptor actually exports it sits near the short end,
 `1/(b − b_b)`.
 
-The whole thing is one extra light-space pass at modest resolution, and its cost is independent of
-screen resolution and of how much bed is visible. It is the cheapest thing that is genuinely a
-caustic: it moves with the waves because it is *computed from* the waves, it converges and diverges
-correctly with depth, and it produces cusps because the splat density is the **reciprocal** of the
-Jacobian — the same quantity the irradiance statement above is written in. Getting that the wrong
-way up inverts the image: the folds come out as dark seams and the flat regions as the bright ones.
+The whole thing is one extra light-space pass, and its cost is independent of screen resolution and
+of how much bed is visible. It is the cheapest thing that is genuinely a caustic: it moves with the
+waves because it is *computed from* the waves, it converges and diverges correctly with depth, and
+it produces cusps because the splat density is the **reciprocal** of the Jacobian — the same
+quantity the irradiance statement above is written in. Getting that the wrong way up inverts the
+image: the folds come out as dark seams and the flat regions as the bright ones.
+
+**What it costs.** Two resident light-space targets, and their size is arithmetic: at 1024² a scalar
+R16F caustic texture is **2.0 MiB** and the R32F light-space depth map that step 3 needs is another
+**4.0 MiB** — **6.0 MiB** together, 1.5 MiB at 512², 24.0 MiB at 2048². That part is fixed by the
+resolution and independent of screen coverage. ⚠️ **The frame time is unpriced here, and this
+document will not guess it.** The raster half resembles a shadow-map pass of the same resolution;
+the splat half is a scatter and has no shadow-map analogue; only a GPU capture on the target
+hardware settles it. Budget the pass, measure it on your own hardware before you ship it, and do not
+carry a number across from another engine.
+
+**How good it is — the emission grid is the error, and it is the part that is not modest.**
+Splatting one photon per *caustic* texel is not a coarse caustic; it is sampling noise standing
+where one should be. On a crossed 0.5 m ripple of 0.02 m amplitude refracted to a bed 3 m down, one
+emitted photon per caustic texel gives an **RMS error of ±1.27** on a gain whose mean is 1 — the
+estimator is louder than the thing it estimates. Sixteen photons per texel reach **±0.22**,
+sixty-four **±0.11**. A 1024² caustic texture therefore wants a 4096²–8192² emission grid, and
+*that* is the pass to budget rather than the 6 MiB; materialised as an RG16F normal image it is a
+further 64.0 MiB at 4096², which is the reason to emit straight from the wave field in the same
+pass. Two fixes that look like they should help do not. A **wider splat kernel** does not converge:
+in the *1-D* form of the same rig, where one photon per texel is ±0.56, a one-texel tent bottoms out
+at ±0.38 and an eight-texel one climbs back to ±0.81 while the fold peak falls from 15.9 to 5.1 —
+past the first texel the kernel is spending the filament to buy smoothness. And **temporal
+accumulation buys nothing unless the emission grid is jittered between frames**, because a fixed
+grid's error is deterministic aliasing rather than noise — four frames of the same grid are still
+±1.27, four jittered by a quarter texel give ±0.52, which is exactly the grid twice as fine, because
+that is what they are.
+
+*Provenance of those figures:* measured on a deterministic CPU rig, 1-D and 2-D, geometric optics,
+one refraction, no scattering, no Fresnel and no receiver search, each sweep referenced against the
+same estimator run to convergence. It prices the splat estimator's *sampling* error and the storage
+arithmetic, and nothing else — it is not a frame cost, not a render, and not a validation of the
+technique against a ground truth. How far the caustic-map *model* itself sits from a path-traced
+reference — single refraction only, no dispersion, no photon that refracts twice — is a different
+error and is **unpriced**: no one in this corpus has rendered the photon-map tier as ground truth on
+the same scene and differenced the two. Until someone does, treat the tier choice below as a
+judgement about structure rather than as a measured error bound.
 
 **Near-real-time / ray-traced tier: solve the specular chain rather than sampling toward it.** Path
 tracing finds a light→water→bed→eye path only by chance, and the chance is essentially zero for a
@@ -179,7 +215,7 @@ from a spectrum or a simulation.
 
 | You have | Use | Because |
 |---|---|---|
-| A rasterizer, a real bathymetry field, sun-lit shallows | **Caustic map** with depth-map receiver estimation [shah2007] | One light-space pass, cost independent of screen coverage; correct response to wave state and depth |
+| A rasterizer, a real bathymetry field, sun-lit shallows | **Caustic map** with depth-map receiver estimation [shah2007] | One light-space pass, 6.0 MiB resident at 1024² and independent of screen coverage; correct response to wave state and depth — budget the emission grid, not the map |
 | A rasterizer, stylized art direction, no bathymetry | Projected animated texture — nearest published relative [guardado2004] | Cheap and legible — label it as an effect, not as light |
 | A path tracer, and caustics are part of the shot | **Caustic photon map** [jensen1996] | Robust, handles any surface, blurs the fold |
 | A path tracer, and the filaments are the shot | **Specular manifold sampling** [zeltner2020] | Keeps the high-frequency structure photon gathering smooths away |
@@ -212,7 +248,10 @@ image and must either build one for the light or drop to the stylized tier.
   screen footprint — the same "move the variance rather than lose it" discipline that governs the
   water surface itself in `water-rendering.md` — but not across a receiver discontinuity; see the
   next bullet. Temporal accumulation over a few frames is the cheap complement, and it is safe here
-  because the pattern is already animating.
+  because the pattern is already animating — but it adds samples only if the emission grid is
+  jittered between frames; re-splatting the same grid re-splats the same error. Neither this nor a
+  wider kernel is the fix for a map that is grainy *up close*: that is emission-grid density, and
+  `## Use this` prices it.
 - **Never filter across a light-space depth discontinuity — not when splatting, not when
   projecting.** Both ends of the caustic map filter blind by default. A splat kernel widened over a
   ledge deposits energy on a face the photon never reached; a bilinear tap at projection time reads
@@ -265,6 +304,7 @@ image and must either build one for the light or drop to the stylized tier.
 | The filaments keep their contrast all the way down, and murky water still shows them | The pattern was attenuated on `K_d`, or on nothing. `K_d` is the column's coefficient and carries no fade for a beam | The pattern rides `exp(-c·L)` and the mean rides `exp(-K_d·z)`; their ratio `f = exp(-max(0, c − mu_w·K_d)·L)` is the fade, and it is one scattering length of path |
 | The whole bed goes several times too dark with depth | `c` applied to *everything*, so the forward-scattered light that still reaches the bed was thrown away | `c` attenuates the pattern only; the mean is `K_d` on the vertical depth. The gap is `1/f` — 4.4x at 7.5 m of depth in clear oceanic water at `mu_w = 0.75` |
 | Crawling sparkle on distant shallows | Sub-pixel filaments, unfiltered | Widen the splat kernel with the receiver footprint; add a short temporal accumulation |
+| The map is grainy or blotchy *up close*, and widening the kernel only mushes it | One photon emitted per caustic texel: ±1.27 RMS on a gain whose mean is 1. A kernel trades the fold for blur instead of converging, and re-splatting a fixed grid re-splats the same error | Emit 16–64 photons per caustic texel — a 4–8x finer emission grid per axis — or jitter the grid between accumulated frames; figures in `## Use this` |
 | Caustics visible in deep or turbid water | Fade driven by view distance, or not at all | Fade on the bathymetry depth, at the water's own scattering length of path `1/(b − b_b)` — tabulated under *Details* |
 | Caustics bleed off a ledge onto the face beneath it | A splat kernel or a projection tap filtered across a light-space depth discontinuity | Compare each tap against the light-space depth map already built for step 3; clamp the kernel where the receivers disagree |
 | The pattern is blocky and follows the bed's triangles | Per-vertex intensity on a coarse receiver | Move to a light-space texture; per-vertex ties the effect to tessellation |

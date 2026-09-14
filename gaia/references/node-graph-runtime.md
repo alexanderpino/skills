@@ -69,6 +69,14 @@ shared cache is **~24× slower than recomputing**. So the promotion rule is a co
 policy — **store the value only where the node's compute time exceeds its transfer time**, and let
 everything else be a verifying trace that stores a hash and reruns on a miss.
 
+⚠️ **And a hit is only as good as the identity its key asserts — that is the error term here.** The
+cache returns a value this machine did not compute, so "how good" is not a tolerance but a bet on
+determinism: bit-exact while every producer ran the pinned arithmetic (below), and without that pin
+— which [ta_graph_runtime] ships without — the same graph and seed on **one CPU** across two SIMD
+dispatch regimes came back **0.6% off** on canyon relief and **20.3% off** on canyon pit storage,
+the 1-ULP root cause amplified ~1e14 through droplet erosion [simd_dispatch_drift]. So the pair to
+budget is **~537 ms** to fetch a 67.1 MB entry against a **20.3%** disagreement produced off the pin.
+
 **What it beats.** *Topological scheduling* [alacarte] §4.1.1 — a linear pre-pass, correct and
 simple, but it can only extract dependencies from an applicative task, so a node whose inputs
 depend on its parameters is out. *Restarting* [alacarte] §4.1.2 — build in an arbitrary order and
@@ -102,9 +110,7 @@ the useful fact is that **no widely used system has all of them**:
 
 \* [alacarte]'s footnote: user-defined Bazel rules cannot have dynamic dependencies.
 
-Make is minimal but static and has no cutoff. Excel is not even minimal. Shake gets minimality and
-cutoff but cannot share. Bazel shares and cuts off but is not minimal. The empty cell in every row
-is what a terrain tool is trying to fill.
+The empty cell in every row is what a terrain tool is trying to fill.
 
 ## The scheduler: three options, and the terrain answer
 
@@ -429,7 +435,7 @@ already allocated the wrong buffers.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | A parameter nudge reruns an erosion pass that produces identical output | Deep constructive trace: the key is over inputs, so it changes even when the value does not [alacarte] §4.2.4 | Compare the output hash — verifying or constructive traces [alacarte] §4.2.2 |
-| Terrain differs between two machines from the same graph and the same seed | The cache key asserts determinism the operations do not have [alacarte] §4.2.4; measured across SIMD regimes on one CPU [simd_dispatch_drift] | Pin the arithmetic and put the *startup conformance digest* — over the battery's computed results, never over configuration — in the key, so a machine off the pin is excluded rather than served; not the regime itself, which splits the cache; or test the equivalence being promised |
+| Terrain differs between two machines from the same graph and the same seed | The cache key asserts determinism the operations do not have [alacarte] §4.2.4; measured across SIMD regimes on one CPU — **0.6% off** on canyon relief, **20.3% off** on pit storage [simd_dispatch_drift] | Pin the arithmetic and put the *startup conformance digest* — over the battery's computed results, never over configuration — in the key, so a machine off the pin is excluded rather than served; not the regime itself, which splits the cache; or test the equivalence being promised |
 | The cache fills with thousands of entries during a slider drag | Float parameters hashed unquantised [ta_graph_runtime] | Quantise before hashing |
 | Parameter drag holds 60 fps, then stutters when one particular value changes | That value is a topology change, not a value change — it re-plans [ta_graph_runtime] | Classify parameters VALUE vs TOPOLOGY; debounce the re-plan |
 | Adding cutoff made the graph slower | Output hashing priced against the node's own cost instead of its dependents', or applied to a node whose output changes whenever its inputs do | Apply cutoff where `cost(hash) < P̂(unchanged) × cost(downstream cone)`: a cheap clamp above an erosion pass qualifies; an expensive node feeding nothing does not |

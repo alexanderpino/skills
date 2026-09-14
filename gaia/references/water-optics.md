@@ -14,7 +14,7 @@ sources:
   - { id: gordon1989, tier: P, locator: "the approximation K_d ~= (a + b_b)/mu_d, from which c/K_d = mu_d*(a+b)/(a+b_b) follows with c = a + b. NOT OPENED -- Limnology and Oceanography sits behind a Wiley bot challenge that returned 403 on all four routes tried on 2026-09-06: the DOI resolver, the /doi/ landing page, /doi/pdf/ and the pdfdirect URL OpenAlex lists as open access. So no section, equation or page inside it is named. The reference metadata 34(8), 1389-1409 IS verified, and against Crossref rather than the register that claimed the OA link; the RELATION is not, and is repeated from its standard secondary statement" }
   - { id: morel1974, tier: F, locator: "molecular scattering of pure water, b_w(500 nm) = 0.0029 1/m falling as lambda^-4.32, with b_b = b/2 for the symmetric Rayleigh phase function. NO LOCATOR -- the chapter was not obtained and NO PAGE RANGE IS GUESSED; Crossref holds no DOI for it. What was verified here is only the containing volume, Open Library edition OL5415268M, Optical aspects of oceanography, edited by N. G. Jerlov and E. Steemann Nielsen, Academic Press 1974, 494 pp. The VALUE is repeated from standard secondary statement, and all this document can show is that it is the value its own printed pure-water table already assumes: with b_b = b/2 and Pope and Fry absorption at 450/500/550/610 nm = 0.00922/0.0204/0.0565/0.2644 1/m -- three of those four are printed in this document, and the 500 nm value is carried from the same popefry1997 secondary table, which is itself NOT OPENED -- it reproduces the printed row 0.90/0.80/0.76/0.75 at mu_d = 0.75 to the last digit, which is internal consistency and NOT verification of b_w" }
   - { id: mobley1994, tier: F, locator: "OBTAINED AND READ 2026-09-06 -- the author's companion site links the whole book as a free zipped pdf, 22.4 Mbytes, 22,977,808 bytes down here, one file per chapter, so these pointers are read rather than guessed. §3.1 eq. (3.7) p. 64 writes the volume scattering function as the scattering coefficient times the phase function, beta = b*p_tilde. §5.2 eqs. (5.1)-(5.4) pp. 238-240 define the elastic path function, and §5.8 eqs. (5.28)-(5.30) pp. 256-257 give the integral, apparent-radiance form of the RTE: direct beam plus the path radiance generated at each point along the view path and attenuated to the observer, which is the b*p_tilde(theta_s)*E_d term this document integrates. WARNING f/Q ~= 0.09 per steradian is NOT a figure this book prints. §5.12 eqs. (5.73)-(5.74) pp. 281-282 give R(0) = f*b_b/a with f ~= 0.33 for a zenith sun over a level surface, and §10.5 p. 495 gives Q between 3 and 6 after Morel and Gentili 1993; 0.09 is f/Q at Q ~= 3.67, inside that range, but it composes two of Mobley's numbers rather than quoting one. Mobley also divides by a where this document divides by a + b_b, a factor a/(a + b_b) of 0.80/0.93/0.98/1.00 at 450/500/550/610 nm on this document's own pure-water table. The other check behind the 0.09 is this document's own arithmetic and is retained: the isotropic reduction of the single-scattering form gives f/Q -> 1/(4*pi) = 0.0796 per steradian in the weak-scattering limit, and 0.09 is 1.13x that" }
-  - { id: schlick1994, tier: P, locator: "the Fresnel approximation R(theta) = R0 + (1 − R0)*(1 − cos theta)^5, and the accuracy the original claims for it. NOT OPENED — Computer Graphics Forum is paywalled at Wiley, the Eurographics digital library copy was not reachable, and every mirror tried returned 403 or 404, so no section or equation inside it is named. The 'about 1 percent of R for common dielectrics' figure in the bibliography entry is therefore UNVERIFIED against the paper; the counter-measurement beside it, +11 percent at grazing and 22 percent low at Brewster, is this repository's own arithmetic against the exact Fresnel equations and does not depend on Schlick's text" }
+  - { id: schlick1994, tier: P, locator: "the Fresnel approximation R(theta) = R0 + (1 − R0)*(1 − cos theta)^5, and the accuracy the original claims for it. NOT OPENED — Computer Graphics Forum is paywalled at Wiley, the Eurographics digital library copy was not reachable, and every mirror tried returned 403 or 404, so no section or equation inside it is named. The 'about 1 percent of R for common dielectrics' figure in the bibliography entry is therefore UNVERIFIED against the paper; the counter-measurement beside it -- maximum relative error +14.3 percent at 78.9 deg, minimum -22.8 percent at 51.3 deg, mean -8.9 percent over 38-79 deg -- is this repository's own arithmetic against the exact Fresnel equations and does not depend on Schlick's text. NOT '+11 percent at grazing': that wording was withdrawn from the bibliography entry because the error goes to ZERO at true grazing, and +11.4 percent is the value at 83.8 deg" }
   - { id: bruneton2010, tier: P, locator: "§5.2 'Sky light', sub-head 'Average Fresnel reflectance' — eq. 26 is the roughness-aware mean-Fresnel fit, plotted against the exact integral in Fig. 7; the view-direction slope variance it takes is eq. 25. Not §3, which is the ocean model" }
   - { id: bornwolf_optics, tier: F, locator: "the exact unpolarised Fresnel reflectance for a dielectric interface, and the Snell relation behind the critical angle. NO LOCATOR — not obtained, and deliberately not guessed. The section number this entry used to carry was withdrawn as unchecked and no edition was ever named; three attempts across two agents have failed on Cambridge, on cambridge.org/core and on five lending-restricted archive.org scans. The physics is canonical; the pointer is not" }
   - { id: iop_split, tier: F, locator: "no artefact: the beam-versus-diffuse attenuation split, c = a + b against K_d. Ocean-optics canon with no single canonical source, and that bare split is the whole of what this id covers -- it is cited once, on the sentence saying no canonical paper states the split as such. The RATIO between the two coefficients is NOT covered here and is not artefact-less: it follows from gordon1989's K_d ~= (a + b_b)/mu_d, and it is entered and cited under gordon1989" }
@@ -24,6 +24,12 @@ sources:
 **Tier: authoring-time.** Nothing here is a per-frame cost: this document owns the *quantities* an
 authoring tool exports once, and every renderer that reads them is named as a consumer rather than
 priced here. That is why the tag is a single regime even though both budgets touch the numbers.
+
+⚠️ **The consuming cost is unpriced.** Neither `water-rendering.md` nor `caustics.md` prints a
+machine cost, so nothing on this axis says what `L_scatter` or an exact Fresnel evaluation costs in
+a frame; pricing one needs a GPU capture on named hardware, not a desk estimate. Until somebody
+runs it, budget the one cost this tier does own — the export, priced below — and read any
+per-frame figure you meet as somebody else's hardware.
 
 Water's colour is not a swatch and its transparency is not an alpha value. Both are consequences of
 a handful of measured coefficients and one refracting boundary, and picking them from physics
@@ -49,6 +55,11 @@ K_d(lambda)   diffuse attenuation           [1/m]   per channel   <-- NOT the sa
 phase_g       scattering asymmetry          [-]     forward-peaked for natural water
 ior           index of refraction           [-]     1.31 - 1.47 across natural liquids
 ```
+
+**The whole descriptor is 44 bytes.** Eleven fp32 fields — three channels each of `a`, `b_b` and
+`K_d`, plus `phase_g` and `ior` — so a thousand distinct water bodies is **44 KB** of export. That
+is arithmetic on the block above, not a measurement, and it is the entire storage case against a
+global water constant: what the constant saves you is 44 bytes.
 
 **Take pure-water absorption from Pope & Fry above 380 nm** [popefry1997] — a table this
 repository has not been able to open, so the values below are carried from secondary sources and
@@ -295,9 +306,10 @@ suite cannot see, because it never crosses the boundary.
 1% of `R` for common dielectrics, and at water's low IOR it is not. (That 1% figure is attributed
 to Schlick throughout the literature, but the paper could not be obtained here, so treat it as
 **unverified**: what follows does not depend on it.) Recomputed against the exact
-equations at `n = 1.335`, the signed error over 38–79° has a **maximum of +14.3%** at 78.9°, a
-**minimum of −22.8%** at 51.3° beside the 53.2° Brewster angle, and a **mean of −8.9%**; at 83.8°
-it is **+11.4%**. Read the statistic, not just the number: it is **not** a uniform +14.3% bias
+equations at `n = 1.335` over 38–79°, its **maximum relative error is +14.3%**, at 78.9°, with a
+**minimum of −22.8%** at 51.3° beside the 53.2° Brewster angle (−22.4% at the angle itself) and a
+**mean of −8.9%**; at 83.8° it is **+11.4%**, and at true grazing it falls back to zero because
+both forms tend to 1. Read the statistic, not just the number: it is **not** a uniform +14.3% bias
 across the range but a curve that runs low through the middle and high only at the top, so no
 exposure or `F0` tweak absorbs it. Use the exact unpolarised form for offline and reference work;
 water is the dielectric where the fit is worst. Note the tier: there is no peer-reviewed paper to

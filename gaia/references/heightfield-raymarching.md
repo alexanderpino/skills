@@ -36,6 +36,26 @@ distance rather than linear, the build is a mip chain (cheap enough to rebuild p
 deforming field), and the pyramid *is* the LOD — selected per step by footprint, with no LOD
 machinery to write.
 
+**What it costs, and how close it lands.** The pyramid is **4/3 of the field it is built over**, not
+the familiar third: its level 0 is the 3×3-dilated max described below — a *second* full-resolution
+array, because the height samples themselves are not conservative under bilinear reconstruction —
+and only the levels above it sum to the third. Over an R16 field at **2 bytes per cell** that is
+**2.67 bytes per cell** of pyramid and **4.67 bytes per cell** resident, exactly
+`(4^(n+1) − 1)/(3·4^n)` of the base for a 2ⁿ×2ⁿ field; trade the level-0 copy for nine taps per
+fetch if you would rather spend bandwidth than memory. Measured against the exact first crossing of
+the same bilinearly reconstructed surface — 515 rays, 398 of them hits — the traversal returns
+**zero missed and zero spurious hits** at every refinement count, and the hit lands within **±11 mm
+at 6 bisections** (±21 mm at 5, ±2.6 mm at 8) for primary, ascending and grazing rays. That residual
+is `span/2ᵏ` and nothing else, so it follows the *span*, not the terrain: a **column-locked picking
+ray never leaves its column**, so its level-0 span is the rest of the ray — 57 m median here, not
+one texel — and the same 6 bisections land **±0.64 m**. Refine to a tolerance there, not to a fixed
+count. ⚠️ **The rig**: CPython/fp64, 512² samples of `h = a·sin(kx) + b·sin(k′z)` at 1 m texels,
+seed 20260910, reference roots solved in closed form per bilinear cell. **It prices no frame.** The
+per-frame GPU cost of this march, and of the per-frame rebuild claimed above, is **unpriced in this
+corpus**: pricing it takes a capture at a stated resolution on named hardware on the worst-case
+grazing view, and until someone runs one, budget from that capture — everything above is accuracy
+and residency, never time.
+
 ```
 level = coarsestMip; t = tEnter; steps = 0          // tEnter = max(0, ·), tExit: ray ∩ [mapMin, mapMax]
                                                     // both FINITE and NON-NEGATIVE
@@ -98,7 +118,8 @@ changes `level` between them, so there is no one cell index to increment.
 The clamp is not tidiness. A straight-down picking ray — a use this kernel is sold for — never
 leaves its column, so `exitDistance` is `+inf` and the level-0 branch calls `refine(t, ∞)`, a
 binary search on an unbounded interval. Clamping to a finite `tExit` removes that, and every
-unbounded operand with it. ⚠️ It does **not** remove every NaN: a reciprocal-form DDA
+unbounded operand with it — finite is not short, and what the residual then costs is priced
+under `## Use this`. ⚠️ It does **not** remove every NaN: a reciprocal-form DDA
 (`invD = 1/0 = ∞`) on a ray with `dir.x == 0` sitting exactly on an x-boundary computes
 `(bound − o.x)·invD = 0·∞ = NaN`, and `min(NaN, tExit)` is still NaN. Which branch that takes
 depends on your `min`: a NaN-propagating one skips and reports clear line of sight through
@@ -192,10 +213,10 @@ A fullscreen pass reconstructs a world ray per pixel, clips it to `[mapMin, mapM
 traversal above. No terrain mesh exists.
 
 *Where it wins*: pixel-exact silhouettes at any zoom with zero LOD machinery; displacement-scale
-detail with no tessellation; memory is the heightfield you already stream. *Where it loses*:
-horizon-grazing rays take the maximum step count **and** diverge within a wave, so the worst view
-costs many times the average; no early-Z or raster culling helps; and every material feature the
-raster pipeline gives free needs bespoke plumbing.
+detail with no tessellation; memory is the heightfield you already stream **plus the pyramid's 4/3
+of it**, and no mesh at all. *Where it loses*: horizon-grazing rays take the maximum step count
+**and** diverge within a wave, so the worst view costs many times the average; no early-Z or raster
+culling helps; and every material feature the raster pipeline gives free needs bespoke plumbing.
 
 Three integration duties, all of which are where the real cost and the real bugs live:
 
@@ -229,9 +250,10 @@ secondary rays do not need. Fixed-topology height edits may **refit**; topology 
 
 **Cross over to procedural AABBs plus an intersection shader** running the traversal above when
 memory is the binding constraint or the field deforms often: memory is roughly the heightfield
-itself, and an edit is a texture update plus a pyramid rebuild with no geometry churn. The cost is
-that intersection shaders forgo the hardware triangle test, and incoherent secondary rays make the
-divergence worse; the gap is vendor- and generation-dependent [dxrspec].
+**and its pyramid — 2.33× the field, not the field itself** — and an edit is a texture update plus
+a pyramid rebuild with no geometry churn. The cost is that intersection shaders forgo the hardware
+triangle test, and incoherent secondary rays make the divergence worse; the gap is vendor- and
+generation-dependent [dxrspec].
 
 ⚠️ **The proxy is at a different LOD than the raster terrain, so rays originating on raster
 surfaces self-intersect or float.** Offset ray origins along the geometric normal by a bound
@@ -252,7 +274,7 @@ baseline.
 | Symptom | Mechanism | Fix |
 |---|---|---|
 | Some pixels hang, or the shader TDRs, and only far from the camera | The skip branch set `t = tExitNode`, landing on a node boundary that re-derives the same node — `t = t` forever. An absolute `+ eps` hides it near the camera and is absorbed by fp32 ULP past 2048 m | `t = max(t, tExitNode)·(1 + 2⁻²²)`; a step cap only converts the hang into a slow frame |
-| A picking or straight-down ray never returns | `exitDistance` is `+inf` for a column-locked ray, so `refine(t, ∞)` bisects an unbounded interval; a reciprocal-form DDA can make `exitDistance` NaN, which the clamp does not remove, the predicate false, and the query reports clear sight | `tExitNode = min(exitDistance(...), tExit)` before the predicate |
+| A picking or straight-down ray never returns | `exitDistance` is `+inf` for a column-locked ray, so `refine(t, ∞)` bisects an unbounded interval; a reciprocal-form DDA can make `exitDistance` NaN, which the clamp does not remove, the predicate false, and the query reports clear sight | `tExitNode = min(exitDistance(...), tExit)` before the predicate — which makes the refine interval finite, not short: for a column-locked ray it is the rest of the ray, so refine to a tolerance rather than to a fixed 5–8 bisections |
 | Concentric contour steps on slopes | The march found the crossing one step late | Binary or secant refinement, then per-pixel first-step jitter, then a temporal resolve. Raising the raw step count is the expensive non-fix |
 | Frame rate collapses only on the mountaintop horizon shot | Grazing rays take max steps and diverge within the wave | Budget from the worst-case capture; cap steps with a graceful miss; prefer pyramid traversal, whose step count degrades logarithmically |
 | Normals dissolve into noise at silhouettes | Screen-space derivatives of the hit position across a silhouette | Analytic central differences at a footprint-matched mip |

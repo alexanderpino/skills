@@ -14,8 +14,10 @@ sources:
 # Surface modification and scale space — changing the skin without moving the mountain
 
 **Tier: authoring-time.** `## Use this` prices a whole-field analysis-and-synthesis pass as build
-work — 0.096 s per decimated 512² split at `L = 5` in numpy, and a `3·2^L` halo that makes 47% of
-the pixels a five-level tiled build touches apron. What ships is the heightfield, not the pyramid.
+work — 96 ms per decimated 512² split at `L = 5` in numpy (142 ms à-trous), and a `3·2^L` halo that
+makes 47% of the pixels a five-level tiled build touches apron. Mean-corrected it lands **0.0050%
+low** on `Σh` on the 257² rig below — the split's own floor, not the operator's. What ships is the
+heightfield, not the pyramid.
 
 A terrain has a shape and it has a skin. Erosion, stratification, rock growth and every "add
 character" operator works on the skin, and every one of them will happily eat the shape while
@@ -99,8 +101,8 @@ decimated version**. Measured on the same kernel:
 | support radius, `L = 4` / `L = 5` | 46 / 94 px | **30 / 62 px** |
 | halo needed | `3·2^L` **and** a phase rule | the radius, no phase rule |
 | low band under a 1/2/4/8 px shift | 2.23 / 4.35 / 8.02 / 12.35 m ⚠️ field and statistic unrecorded | **0.00 / 0.00 / 0.00 / 0.00** |
-| storage for the two-band split | 2 fields | 2 fields |
-| wall time, 512², `L = 5`, numpy | 0.096 s | 0.142 s |
+| storage for the two-band split | 2 fields, 16 bytes/cell (float64) | same |
+| wall time, 512², `L = 5`, numpy | 96 ms | 142 ms |
 
 **The crossover is whether the build is tiled and whether you need more than two bands.** Untiled,
 or building a full multi-band pyramid where the `4^-k` storage decay is what makes depth
@@ -345,8 +347,7 @@ returned to zero at the full period of 16 (so `L = 4`). ⚠️ **Neither that se
 2.23 / 4.35 / 8.02 / 12.35 m in `## Use this` records its field or its statistic, and the two sit a
 near-constant 4.5–5.0× apart.** max |Δ| over mean |Δ| of a single sweep reproduces that spread, so
 they are plausibly one run read two ways — but nothing on the page or in the register says so.
-Re-run both with field, level and statistic recorded; until then quote the pair as a range, not a
-number. Either way it is why `## Use this` takes the à-trous form on a tiled build.
+Re-run both with field, level and statistic recorded; until then quote the pair as a range, not a number.
 
 ## Where this competes with erosion, and where it does not
 
@@ -405,9 +406,8 @@ from a locally remapped copy of the input rather than scaling the input's coeffi
 against O(N), and the reason to pay it is cliffs.
 
 Gaia's bibliography already carries the bilateral filter (`tomasi1998`) and the guided filter
-(`he2010`) at `P` in `papers-masks-and-filtering.md` as edge-aware alternatives to a Gaussian low band.
-Neither was read for this document, so nothing here rests on them; they are named so the next
-author knows where to start.
+(`he2010`) at `P` in `papers-masks-and-filtering.md`, edge-aware alternatives to a Gaussian low band.
+Neither was read for this document, so nothing here rests on them; they are named for the next author.
 
 ## Choosing the cutoff
 

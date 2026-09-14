@@ -225,8 +225,15 @@ you the tile budget it has to work inside, and it is the figure that decides bet
 clipmap's fixed allocation long before triangle counts do. ⚠️ These are byte counts derived from a
 named format, not measurements. **No per-frame time is measured in this document and none should
 be quoted**: the per-frame cost is the *selected cut*, a few thousand nodes set by the view, the
-field and the machine, so it is measured in your own frame capture or not at all. The error half
-this document does bound, and it bounds it in the currency that transfers — `tau` pixels, and
+field and the machine, so it is measured in your own frame capture or not at all.
+
+**And the error those bytes buy, in the same place.** The recommendation's **maximum error** on
+screen is its budget: the controller refines while `rho > tau`, so every drawn region sits at or
+under `tau` — **1–4 px** in practice. Read that as the on-axis figure it is; at a screen corner the
+worst case over camera orientation is **2.4× that at fovY 60° and 9.5× at 110°** (above). What the
+residency itself buys is the seam: with the height lerp in place the two levels disagree by
+**0.000000000 m** at the shared vertices, against **0.19–0.52 `tau` at p95 and up to a full `tau`**
+without it (measured below). Both halves are in the currency that transfers — `tau` pixels and
 multiples of a level's own `e` — never in metres, which belong to your heightfield and not to the
 scheme.
 
