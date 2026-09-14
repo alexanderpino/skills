@@ -1,0 +1,51 @@
+=== PASS 1 ===
+rig      CPython 3.11.15, numpy 2.4.6, shared 4-core x86_64 container
+grid     1024^2 periodic = 1048576 cells;  N = 1000 floes;  seed = 20260914
+WHAT THIS IS NOT: a GPU frame cost. This is a CPU authoring-time bake.
+
+  run 0: A(partition-only)   1320.4 ms   B(sample+place+partition)   1336.5 ms   cells A 1000  B 927
+  run 1: A(partition-only)   1092.3 ms   B(sample+place+partition)   1197.3 ms   cells A 1000  B 956
+  run 2: A(partition-only)   1068.5 ms   B(sample+place+partition)   1278.4 ms   cells A 1000  B 964
+  run 3: A(partition-only)   1125.2 ms   B(sample+place+partition)   1270.6 ms   cells A 999  B 973
+  run 4: A(partition-only)   1067.1 ms   B(sample+place+partition)   1195.4 ms   cells A 999  B 923
+
+A  median 1092 ms   min 1067   max 1320   spread 23% of median
+B  median 1271 ms   min 1195   max 1337   spread 11% of median
+RATIO B/A  median 1.16x   per-run 1.01 1.10 1.20 1.13 1.12
+
+sampling step alone (inverse transform, N = 1000): median 12 us  -- 0.0009% of route B (1 part in 109982)
+
+resident floe-id mask   2 bytes per cell (uint16, N = 1000 < 65536)
+    1024^2  ->       2.0 MiB resident,     12.0 MiB jump-flood working set
+    2048^2  ->       8.0 MiB resident,     48.0 MiB jump-flood working set
+    4096^2  ->      32.0 MiB resident,    192.0 MiB jump-flood working set
+    8192^2  ->     128.0 MiB resident,    768.0 MiB jump-flood working set
+jump-flood working set  12 bytes per cell (int32 label + 2 x int16 seed coords + int32 best-distance)
+
+free-drift step (U = a*exp(-i*th)*U_wind + U_current), per frame: 0.284 us -- ONE complex multiply for the whole mask, not a per-cell pass
+
+=== PASS 2 (re-run, same seed, reproducibility check) ===
+rig      CPython 3.11.15, numpy 2.4.6, shared 4-core x86_64 container
+grid     1024^2 periodic = 1048576 cells;  N = 1000 floes;  seed = 20260914
+WHAT THIS IS NOT: a GPU frame cost. This is a CPU authoring-time bake.
+
+  run 0: A(partition-only)   1078.3 ms   B(sample+place+partition)   1324.3 ms   cells A 1000  B 927
+  run 1: A(partition-only)   1121.9 ms   B(sample+place+partition)   1253.2 ms   cells A 1000  B 956
+  run 2: A(partition-only)   1099.7 ms   B(sample+place+partition)   1348.1 ms   cells A 1000  B 964
+  run 3: A(partition-only)   1177.7 ms   B(sample+place+partition)   1379.6 ms   cells A 999  B 973
+  run 4: A(partition-only)   1057.0 ms   B(sample+place+partition)   1261.3 ms   cells A 999  B 923
+
+A  median 1100 ms   min 1057   max 1178   spread 11% of median
+B  median 1324 ms   min 1253   max 1380   spread 10% of median
+RATIO B/A  median 1.20x   per-run 1.23 1.12 1.23 1.17 1.19
+
+sampling step alone (inverse transform, N = 1000): median 11 us  -- 0.0009% of route B (1 part in 117101)
+
+resident floe-id mask   2 bytes per cell (uint16, N = 1000 < 65536)
+    1024^2  ->       2.0 MiB resident,     12.0 MiB jump-flood working set
+    2048^2  ->       8.0 MiB resident,     48.0 MiB jump-flood working set
+    4096^2  ->      32.0 MiB resident,    192.0 MiB jump-flood working set
+    8192^2  ->     128.0 MiB resident,    768.0 MiB jump-flood working set
+jump-flood working set  12 bytes per cell (int32 label + 2 x int16 seed coords + int32 best-distance)
+
+free-drift step (U = a*exp(-i*th)*U_wind + U_current), per frame: 0.284 us -- ONE complex multiply for the whole mask, not a per-cell pass

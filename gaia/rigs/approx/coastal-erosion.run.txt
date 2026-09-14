@@ -1,0 +1,40 @@
+=== run 1 ===
+rig      : NumPy 2.4.6, CPython 3.11.15, x86_64 CPU. NOT a GPU, NOT a frame cost.
+grid     : 4096 x 4096 = 16777216 cells, seed 20260910, reps 30
+F_R dtype: float32, itemsize 4 bytes per cell
+F_R field: 67108864 bytes = 64.0 MiB at 4096^2
+           float64 would be 128.0 MiB; uint8 16.0 MiB
+uniform-mean-rate operator resident state: 0 bytes per cell (one scalar for the whole field)
+threshold step: median 277.2 ms  (min 270.8, max 856.9) over 16777216 cells
+uniform  step: median 6.3 ms  (min 6.2, max 6.6)
+ratio        : 43.8x
+=== run 2 ===
+rig      : NumPy 2.4.6, CPython 3.11.15, x86_64 CPU. NOT a GPU, NOT a frame cost.
+grid     : 4096 x 4096 = 16777216 cells, seed 20260910, reps 30
+F_R dtype: float32, itemsize 4 bytes per cell
+F_R field: 67108864 bytes = 64.0 MiB at 4096^2
+           float64 would be 128.0 MiB; uint8 16.0 MiB
+uniform-mean-rate operator resident state: 0 bytes per cell (one scalar for the whole field)
+threshold step: median 278.7 ms  (min 270.8, max 803.6) over 16777216 cells
+uniform  step: median 6.4 ms  (min 6.0, max 6.7)
+ratio        : 43.6x
+=== run 3 ===
+rig      : NumPy 2.4.6, CPython 3.11.15, x86_64 CPU. NOT a GPU, NOT a frame cost.
+grid     : 4096 x 4096 = 16777216 cells, seed 20260910, reps 30
+F_R dtype: float32, itemsize 4 bytes per cell
+F_R field: 67108864 bytes = 64.0 MiB at 4096^2
+           float64 would be 128.0 MiB; uint8 16.0 MiB
+uniform-mean-rate operator resident state: 0 bytes per cell (one scalar for the whole field)
+threshold step: median 283.0 ms  (min 276.5, max 895.9) over 16777216 cells
+uniform  step: median 6.6 ms  (min 6.3, max 7.2)
+ratio        : 42.7x
+=== run 4 ===
+rig      : NumPy 2.4.6, CPython 3.11.15, x86_64 CPU. NOT a GPU, NOT a frame cost.
+grid     : 4096 x 4096 = 16777216 cells, seed 20260910, reps 30
+F_R dtype: float32, itemsize 4 bytes per cell
+F_R field: 67108864 bytes = 64.0 MiB at 4096^2
+           float64 would be 128.0 MiB; uint8 16.0 MiB
+uniform-mean-rate operator resident state: 0 bytes per cell (one scalar for the whole field)
+threshold step: median 278.4 ms  (min 266.8, max 785.7) over 16777216 cells
+uniform  step: median 6.1 ms  (min 5.8, max 6.7)
+ratio        : 45.3x

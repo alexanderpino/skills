@@ -1,0 +1,28 @@
+== capillary-gravity constants (document lines 68-71) ==
+c_min   = 0.231188 m/s      printed 0.2312
+lam_min = 0.017116 m      printed 0.01712
+
+== the circulating pair 23.1 cm/s at 1.73 cm (document line 73-76) ==
+sigma from 0.231 m/s  = 0.0725636 N/m
+sigma from 0.0173 m   = 0.0743706 N/m
+apart                 = 2.490 %   printed 2.5%
+
+== e-folding distances, Lamb clean surface (document lines 130-136, 142) ==
+lam= 16.5 cm  L =   89.84818 m   printed  90.0 m   printed is  +0.169 %
+lam=  5.0 cm  L =    5.65618 m   printed   5.7 m   printed is  +0.775 %
+lam=  3.0 cm  L =    2.11761 m   printed   2.0 m   printed is  -5.554 %
+L(16.5cm)/8 m pool    = 11.23 lengths        printed 'eleven'
+exp(-8/L5)            = 24.31 %             printed 24%
+exp(-1/L5)            = 83.79 %             printed 84%
+exp(-8/L165)          = 91.48 %             printed 91%
+far-wall contrast     = 3.7635 x            printed 'about 4x'
+e^-1                  = 36.79 %             printed 37%
+
+== AUDIT-2026-09-05 X30: inextensible-film term, damping x20 (PLAUSIBLE, unverified) ==
+L(16.5 cm)/20         = 4.4924 m           audit prints ~4.4 m
+                        = 0.562 pool lengths
+
+== storage floor: one fp32 height per cell, 2 samples per 5 cm wavelength ==
+closed: 8 m pool   cell 2.5 cm  320 x 320 = 102,400 cells  -> 409,600 B = 0.4096 MB = 0.0004 GB
+open: 1 km patch   cell 2.5 cm  40000 x 40000 = 1,600,000,000 cells  -> 6,400,000,000 B = 6400.0000 MB = 6.4000 GB
+ratio                = 15,625 x   ( = (1000/8)^2 = 15625 )

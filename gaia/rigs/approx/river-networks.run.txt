@@ -1,0 +1,56 @@
+rig: CPython + numpy 2.4.6, single thread, shared container
+seed 20260914   grid 512x512   path 899 samples   radius 8.0 cells   depth 4.0 m
+terrain relief 170.0 m
+
+uphill segments before fix 495 of 898, after fix 0
+  (this rig's own terrain, NOT a re-measurement of carve_monotone.py's 289 of 899)
+epsilon variant (bed + eps*i, eps = 0.001): min drop per segment 1.00e-03 >= eps: True; never above input: True
+
+run 1: monotone pass      4.5 us   +eps     10.0 us   carve stamp   29.71 ms   ratio 1 : 6584
+run 2: monotone pass      4.4 us   +eps     10.3 us   carve stamp   30.07 ms   ratio 1 : 6817
+run 3: monotone pass      4.6 us   +eps     10.4 us   carve stamp   29.39 ms   ratio 1 : 6342
+run 4: monotone pass      4.7 us   +eps     10.6 us   carve stamp   32.14 ms   ratio 1 : 6786
+run 5: monotone pass      4.7 us   +eps     10.6 us   carve stamp   32.47 ms   ratio 1 : 6923
+
+median monotone +eps  10.4 us
+median monotone pass  4.6 us   (spread 4.4-4.7 us, 7% of median)
+median carve stamp    30.07 ms   (spread 29.39-32.47 ms, 10% of median)
+median ratio          carve is 6489x the monotone pass
+ratio spread          6342x - 6923x
+
+memory (float32 heightfield, exact arithmetic):
+  bytes per cell 4
+  512x512:     1.05 MB
+  1024x1024:     4.19 MB
+  2048x2048:    16.78 MB
+  4096x4096:    67.11 MB
+  authored graph, (discharge,width,type) + endpoints per edge: ~32 bytes/edge; a 10,000-edge network is 0.32 MB
+
+===== second invocation, same script, same seed =====
+rig: CPython + numpy 2.4.6, single thread, shared container
+seed 20260914   grid 512x512   path 899 samples   radius 8.0 cells   depth 4.0 m
+terrain relief 170.0 m
+
+uphill segments before fix 495 of 898, after fix 0
+  (this rig's own terrain, NOT a re-measurement of carve_monotone.py's 289 of 899)
+epsilon variant (bed + eps*i, eps = 0.001): min drop per segment 1.00e-03 >= eps: True; never above input: True
+
+run 1: monotone pass      4.5 us   +eps     10.7 us   carve stamp   29.44 ms   ratio 1 : 6503
+run 2: monotone pass      5.1 us   +eps     11.1 us   carve stamp   30.25 ms   ratio 1 : 5951
+run 3: monotone pass      4.7 us   +eps     10.5 us   carve stamp   28.25 ms   ratio 1 : 6057
+run 4: monotone pass      5.1 us   +eps     10.1 us   carve stamp   29.97 ms   ratio 1 : 5834
+run 5: monotone pass      4.5 us   +eps      9.6 us   carve stamp   28.25 ms   ratio 1 : 6312
+
+median monotone +eps  10.5 us
+median monotone pass  4.7 us   (spread 4.5-5.1 us, 14% of median)
+median carve stamp    29.44 ms   (spread 28.25-30.25 ms, 7% of median)
+median ratio          carve is 6313x the monotone pass
+ratio spread          5834x - 6503x
+
+memory (float32 heightfield, exact arithmetic):
+  bytes per cell 4
+  512x512:     1.05 MB
+  1024x1024:     4.19 MB
+  2048x2048:    16.78 MB
+  4096x4096:    67.11 MB
+  authored graph, (discharge,width,type) + endpoints per edge: ~32 bytes/edge; a 10,000-edge network is 0.32 MB

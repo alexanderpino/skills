@@ -1,0 +1,75 @@
+=== run 1 (512^2, seed 20260914) ===
+rig: CPython 3.11.15, numpy 2.4.6, one container core, 512x512 grid, 8 octaves, lacunarity 2.03, gain 0.5, seed 20260914, reps 7
+NOT a GPU frame cost. The transferable figure is the ratio.
+
+fbm            (1 fBm call )  median    289.8 ms   min    275.7  max    302.6  spread  9.3%   range of field [-0.609, +0.587]
+warp1          (3 fBm calls)  median    836.3 ms   min    817.1  max    880.6  spread  7.6%   range of field [-0.595, +0.590]
+warp2          (5 fBm calls)  median   1418.0 ms   min   1392.0  max   1448.1  spread  4.0%   range of field [-0.594, +0.564]
+
+fbm            (1 fBm call )  ratio to plain fBm   1.00x
+warp1          (3 fBm calls)  ratio to plain fBm   2.89x
+warp2          (5 fBm calls)  ratio to plain fBm   4.89x
+
+per-sample, plain 8-octave fBm: 1106 ns/sample (numpy-vectorised, not a shader)
+
+octave-drop error, 8-octave stack, same normalisation across bands (peak-to-peak of the full field = 1.1951):
+  drop to 7 octaves (1 dropped): max  0.328% of range   rms  0.088%   (bound: sum of dropped amplitudes / norm =  0.392%)
+  drop to 6 octaves (2 dropped): max  0.788% of range   rms  0.197%   (bound: sum of dropped amplitudes / norm =  1.176%)
+  drop to 5 octaves (3 dropped): max  1.703% of range   rms  0.403%   (bound: sum of dropped amplitudes / norm =  2.745%)
+
+=== run 2 (identical, must reproduce) ===
+rig: CPython 3.11.15, numpy 2.4.6, one container core, 512x512 grid, 8 octaves, lacunarity 2.03, gain 0.5, seed 20260914, reps 7
+NOT a GPU frame cost. The transferable figure is the ratio.
+
+fbm            (1 fBm call )  median    288.8 ms   min    280.2  max    306.5  spread  9.1%   range of field [-0.609, +0.587]
+warp1          (3 fBm calls)  median    842.0 ms   min    817.2  max    906.6  spread 10.6%   range of field [-0.595, +0.590]
+warp2          (5 fBm calls)  median   1433.8 ms   min   1398.3  max   1477.1  spread  5.5%   range of field [-0.594, +0.564]
+
+fbm            (1 fBm call )  ratio to plain fBm   1.00x
+warp1          (3 fBm calls)  ratio to plain fBm   2.92x
+warp2          (5 fBm calls)  ratio to plain fBm   4.96x
+
+per-sample, plain 8-octave fBm: 1102 ns/sample (numpy-vectorised, not a shader)
+
+octave-drop error, 8-octave stack, same normalisation across bands (peak-to-peak of the full field = 1.1951):
+  drop to 7 octaves (1 dropped): max  0.328% of range   rms  0.088%   (bound: sum of dropped amplitudes / norm =  0.392%)
+  drop to 6 octaves (2 dropped): max  0.788% of range   rms  0.197%   (bound: sum of dropped amplitudes / norm =  1.176%)
+  drop to 5 octaves (3 dropped): max  1.703% of range   rms  0.403%   (bound: sum of dropped amplitudes / norm =  2.745%)
+
+=== run 3 (seed 7 -- ratio and octave-drop error must survive a reseed) ===
+rig: CPython 3.11.15, numpy 2.4.6, one container core, 512x512 grid, 8 octaves, lacunarity 2.03, gain 0.5, seed 7, reps 7
+NOT a GPU frame cost. The transferable figure is the ratio.
+
+fbm            (1 fBm call )  median    300.3 ms   min    294.5  max    307.3  spread  4.2%   range of field [-0.613, +0.578]
+warp1          (3 fBm calls)  median    923.0 ms   min    826.7  max    932.3  spread 11.4%   range of field [-0.597, +0.586]
+warp2          (5 fBm calls)  median   1489.7 ms   min   1446.2  max   1557.8  spread  7.5%   range of field [-0.609, +0.560]
+
+fbm            (1 fBm call )  ratio to plain fBm   1.00x
+warp1          (3 fBm calls)  ratio to plain fBm   3.07x
+warp2          (5 fBm calls)  ratio to plain fBm   4.96x
+
+per-sample, plain 8-octave fBm: 1146 ns/sample (numpy-vectorised, not a shader)
+
+octave-drop error, 8-octave stack, same normalisation across bands (peak-to-peak of the full field = 1.1911):
+  drop to 7 octaves (1 dropped): max  0.297% of range   rms  0.089%   (bound: sum of dropped amplitudes / norm =  0.392%)
+  drop to 6 octaves (2 dropped): max  0.833% of range   rms  0.198%   (bound: sum of dropped amplitudes / norm =  1.176%)
+  drop to 5 octaves (3 dropped): max  1.690% of range   rms  0.406%   (bound: sum of dropped amplitudes / norm =  2.745%)
+
+=== run 4 (1024^2 -- ratio must survive a 4x bigger grid) ===
+rig: CPython 3.11.15, numpy 2.4.6, one container core, 1024x1024 grid, 8 octaves, lacunarity 2.03, gain 0.5, seed 20260914, reps 5
+NOT a GPU frame cost. The transferable figure is the ratio.
+
+fbm            (1 fBm call )  median   1084.1 ms   min   1025.6  max   1134.9  spread 10.1%   range of field [-0.609, +0.595]
+warp1          (3 fBm calls)  median   3137.2 ms   min   3092.2  max   3515.9  spread 13.5%   range of field [-0.621, +0.610]
+warp2          (5 fBm calls)  median   5359.9 ms   min   5246.8  max   5487.2  spread  4.5%   range of field [-0.616, +0.606]
+
+fbm            (1 fBm call )  ratio to plain fBm   1.00x
+warp1          (3 fBm calls)  ratio to plain fBm   2.89x
+warp2          (5 fBm calls)  ratio to plain fBm   4.94x
+
+per-sample, plain 8-octave fBm: 1034 ns/sample (numpy-vectorised, not a shader)
+
+octave-drop error, 8-octave stack, same normalisation across bands (peak-to-peak of the full field = 1.2035):
+  drop to 7 octaves (1 dropped): max  0.326% of range   rms  0.087%   (bound: sum of dropped amplitudes / norm =  0.392%)
+  drop to 6 octaves (2 dropped): max  0.820% of range   rms  0.195%   (bound: sum of dropped amplitudes / norm =  1.176%)
+  drop to 5 octaves (3 dropped): max  1.691% of range   rms  0.401%   (bound: sum of dropped amplitudes / norm =  2.745%)
