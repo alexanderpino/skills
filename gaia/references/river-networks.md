@@ -40,31 +40,29 @@ stored cross-section profile evaluated at the signed distance from it [genevaux2
 
 The three numbers that fill that graph:
 
-- **Discharge from drainage area**: `φ = 0.42·A^0.69`, `A` in m², `φ` in m³/s [genevaux2013],
-  used unchanged by [peytavie2019]. Or take `A` straight from `flow-routing.md`'s accumulation,
-  which is m². ⚠️ **Those are the paper's units, verbatim, and no *absolute* `φ` survives them.**
-  In m² the relation sits `10^(6·0.69)` = 1.38×10⁴ above the km² reading: a 10 km² headwater
-  returns 2.84×10⁴ m³/s, an areal runoff of 9.0×10⁴ m/yr. Reading `A` in km² is **not** a verified
-  repair either — 13.3 m/yr at 1 km², 6.5 at 10 km², defensible only above ~10³ km² (1.6 m/yr) —
-  so no corrected coefficient is printed here: take the **exponent**, and anchor the coefficient
-  on one known discharge exactly as the width chain below is anchored. Ratios are unharmed, the
-  scale cancelling in `w ∝ A^0.345`; the two absolute consumers on this page are not — the
-  profile scale `a = φ/‖u‖`, and `Q` into the planform line, which wants *bankfull* `Q` where
-  `φ` is a *mean* flow.
+- **Discharge from drainage area**: `φ = 0.42·A^0.69`, `A` in m², `φ` in m³/s [genevaux2013], used
+  unchanged by [peytavie2019]. Or take `A` straight from `flow-routing.md`'s accumulation, which is
+  m². ⚠️ **Those are the paper's units, verbatim, and no *absolute* `φ` survives them.** In m² the
+  relation sits `10^(6·0.69)` = 1.38×10⁴ above the km² reading: a 10 km² headwater returns 2.84×10⁴
+  m³/s, an areal runoff of 9.0×10⁴ m/yr. Reading `A` in km² is **not** a verified repair either —
+  13.3 m/yr at 1 km², 6.5 at 10 km², defensible only above ~10³ km² (1.6 m/yr) — so no corrected
+  coefficient is printed here: take the **exponent**, and anchor the coefficient on one known
+  discharge exactly as the width chain below is anchored. Ratios are unharmed, the scale cancelling
+  in `w ∝ A^0.345`; the two absolute consumers on this page are not — the profile scale `a =
+  φ/‖u‖`, and `Q` into the planform line, which wants *bankfull* `Q` where `φ` is a *mean* flow.
 - **Width from discharge**: `w ∝ Q^0.5` [leopold1953]. The exponent is published; the
   coefficient is not, and you calibrate it from one river on your map (below).
 - **Planform from slope and discharge**: braided above `S = 0.06·Q^−0.44` with `Q` bankfull in
   cfs, meandering below [leopoldwolman1957]. In SI that line is `S = 0.0125·Q^−0.44`, `Q` in
   m³/s — derived by unit conversion in `hydraulic_geometry.py` §3, not quoted from anywhere.
 
-**What it beats.** *Taking the network from erosion output* — you get a tree with no width and
-no planform control, and the user cannot move it. *Routing D8 at authoring time and calling the
-result the river* — same tree, and see the next section for why that is fatal rather than
-merely limited. *MFD as a channel network* — MFD is a wetness field; on the terrain measured
-below, 99.2% of interior cells have more than one receiver, so it marks the whole hillslope as
-river. *Sketching a path and subtracting a constant depth* — measured below: 32% of segments
-run uphill. *Stamping a meander from a sine wave* — wavelength has to scale with width or the
-river reads as wallpaper.
+**What it beats.** *Taking the network from erosion output* — you get a tree with no width and no
+planform control, and the user cannot move it. *Routing D8 at authoring time and calling the result
+the river* — same tree, and see the next section for why that is fatal rather than merely limited.
+*MFD as a channel network* — MFD is a wetness field; on the terrain measured below, 99.2% of
+interior cells have more than one receiver, so it marks the whole hillslope as river. *Sketching a
+path and subtracting a constant depth* — measured below: 32% of segments run uphill. *Stamping a
+meander from a sine wave* — wavelength has to scale with width or the river reads as wallpaper.
 
 ## A single-receiver network is a tree, and that is the whole problem
 
@@ -291,19 +289,18 @@ counts per order form an inverse geometric sequence, whose ratio is the **bifurc
 
 Two uses, and they are not equally good.
 
-**As a check: excellent.** Count segments per order in whatever network you produced and plot
-`log N` against order: it must be a straight line, of slope `−log₁₀ r_b`. Strahler's fig. 3 (Smith 1953
-data) gives counts 139, 46, 11, 3, 1 for orders 1–5; refitting those by least squares reproduces
-`b = 0.547` against the paper's printed 0.541 and `r_b = 3.53` against its 3.52
+**As a check: excellent.** Count segments per order in whatever network you produced and plot `log
+N` against order: it must be a straight line, of slope `−log₁₀ r_b`. Strahler's fig. 3 (Smith 1953
+data) gives counts 139, 46, 11, 3, 1 for orders 1–5; refitting those by least squares reproduces `b
+= 0.547` against the paper's printed 0.541 and `r_b = 3.53` against its 3.52
 (`hydraulic_geometry.py` §7). ⚠️ **The residual disagreement is Strahler's, not the refit's**:
 `10^0.541 = 3.475`, so the paper's own printed slope and its own printed `r_b` of 3.52 do not
-correspond — a discrepancy the figure carries unremarked. The refit is internally consistent — the unrounded
-slope is `b = 0.547167` and `10^b = 3.52506`, which is the printed 3.53. ⚠️ Check it from the
-unrounded slope: `10^0.547` alone gives 3.5237, which rounds to 3.52 and makes the refit look
+correspond — a discrepancy the figure carries unremarked. The refit is internally consistent — the
+unrounded slope is `b = 0.547167` and `10^b = 3.52506`, which is the printed 3.53. ⚠️ Check it from
+the unrounded slope: `10^0.547` alone gives 3.5237, which rounds to 3.52 and makes the refit look
 inconsistent when it is not. Do not tune a generator to close the 0.3%; it is an artefact of the
-source, not of the fit. This is the drainage-network analogue of the `log S` vs `log A`
-check in `stream-power.md`: cheap, quantitative, and it catches networks that look plausible in
-a hillshade.
+source, not of the fit. This is the drainage-network analogue of the `log S` vs `log A` check in
+`stream-power.md`: cheap, quantitative, and it catches networks that look plausible in a hillshade.
 
 **As a parameter: poor, and Strahler says so.** "The number is highly stable and shows a small
 range of variation from region to region or environment to environment, except where powerful
@@ -329,26 +326,25 @@ h(p) = u_z(p) + delta(d(p))
 
 `u(p)` is the projection of `p` onto the centreline, `u_z` its bed elevation, `d(p)` the signed
 distance, and `δ` a stored 1-D profile — piecewise, per river type, and it can carry layers for
-bedrock, water and sand. Put it into the terrain with [genevaux2013]'s *replace* operator,
-`h_C = (1−w_B)h_A + w_B h_B`. ⚠️ **That expression is a convex blend, and this
-document used to say it "replaces" because `w_B` saturates to 1 inside the channel. It does not
-saturate.** The weight is a compact-support quartic on the **normalised** distance `a = d(p)/r`:
-`w = (a² − 1)²`, the form `sketch-based-authoring.md` carries, zero outside `d² ≥ r²`
-[genevaux2013] §7 — a bump with **no flat top**, reaching 1 only at the single point `d = 0`. So
-the case the warning described as safe is the actual weight, and the channel bed does come out
-shallower than the profile asks for except directly on the centreline. Compensate on the
-profile, or use a weight with a genuine plateau and know you have left the paper. ⚠️ **Normalise
-it — the un-normalised `(1 − d(p)²)²/r⁴` this line used to print is [genevaux2013] §7's own**,
-which is that quartic only at `r = 1`, a radius this page never states. With `r` free it is a
-different function: `w(0) = r⁻⁴`, so at `r = 10 m` a requested 4 m carve lands 0.4 mm, and it
-*rises* outward to 0.9801 at `d → r`, where the compact-support rule sets it to 0. At `r < 1` it
-exceeds 1 (`w(0)` = 16 at `r = 0.5 m`), making `h_C` the extrapolation `−15·h_A + 16·h_B` and
-not a blend at all. ⚠️ The name is also not from the weight: [genevaux2013]
-calls it "*This asymmetric operator*", after the asymmetry of the formula in `h_A` and `h_B` — this
-document had that backwards too. **Valley widening is the same operator with a wider support and a shallower profile**
-— [genevaux2013] §6.2 computes terrain elevation as a distance-weighted combination of the
-projection on the river and the projection on the ridge, which is a valley cross-section by
-construction. It is not a separate algorithm.
+bedrock, water and sand. Put it into the terrain with [genevaux2013]'s *replace* operator, `h_C =
+(1−w_B)h_A + w_B h_B`. ⚠️ **That expression is a convex blend, and this document used to say it
+"replaces" because `w_B` saturates to 1 inside the channel. It does not saturate.** The weight is a
+compact-support quartic on the **normalised** distance `a = d(p)/r`: `w = (a² − 1)²`, the form
+`sketch-based-authoring.md` carries, zero outside `d² ≥ r²` [genevaux2013] §7 — a bump with **no
+flat top**, reaching 1 only at the single point `d = 0`. So the case the warning described as safe
+is the actual weight, and the channel bed does come out shallower than the profile asks for except
+directly on the centreline. Compensate on the profile, or use a weight with a genuine plateau and
+know you have left the paper. ⚠️ **Normalise it — the un-normalised `(1 − d(p)²)²/r⁴` this line
+used to print is [genevaux2013] §7's own**, which is that quartic only at `r = 1`, a radius this
+page never states. With `r` free it is a different function: `w(0) = r⁻⁴`, so at `r = 10 m` a
+requested 4 m carve lands 0.4 mm, and it *rises* outward to 0.9801 at `d → r`, where the
+compact-support rule sets it to 0. At `r < 1` it exceeds 1 (`w(0)` = 16 at `r = 0.5 m`), making
+`h_C` the extrapolation `−15·h_A + 16·h_B` and not a blend at all. ⚠️ The name is also not from the
+weight: [genevaux2013] calls it "*This asymmetric operator*", after the asymmetry of the formula in
+`h_A` and `h_B` — this document had that backwards too. **Valley widening is the same operator with
+a wider support and a shallower profile** — [genevaux2013] §6.2 computes terrain elevation as a
+distance-weighted combination of the projection on the river and the projection on the ridge, which
+is a valley cross-section by construction. It is not a separate algorithm.
 
 For the profile *scale*, [peytavie2019] §5.2 normalises each template to **unit water area** and
 scales it by `a = φ/‖u‖` — cross-sectional area is discharge over velocity, which is continuity
@@ -377,23 +373,27 @@ Measured on a 512×512 terrain with 170 m of relief along the path
 | drawn across the grain (12.4 km sine) | **289 of 899 (32.1%)** | 107.9 m | 138.6 m |
 | traced along a valley, ±3 cells of jitter | 4 of 71 (5.6%) | 0.03 m | 4.6 m |
 
-Both were asked for a 4 m channel. The first got a 139 m canyon, because the running minimum has
-to saw through every ridge the path crosses. So the rule is not "run the fix" — it is **the fix
-tells you whether the path was authorable**. Report the deepest cut back to the user; when it
-exceeds the requested depth by more than a small factor, the path is fighting the terrain and
-the honest response is to say so, not to excavate.
+Both were asked for a 4 m channel. The first got a 139 m canyon, because the running minimum has to
+saw through every ridge the path crosses. So the rule is not "run the fix" — it is **the fix tells
+you whether the path was authorable**. Report the deepest cut back to the user; when it exceeds the
+requested depth by more than a small factor, the path is fighting the terrain and the honest
+response is to say so, not to excavate. **And what it costs the machine is nothing.** The fix is
+one vectorised running minimum (`np.minimum.accumulate`, on `bed + ε·i` for the epsilon slope):
+**4.6 µs** for 899 samples against **~30 ms** to stamp that path into a 512² field — **~6,400×**,
+5,800–6,900 over 10 runs (`river-networks.py`, CPython + numpy on a shared container; quote the
+ratio, the absolutes drift). Memory is the heightfield: **4 bytes per cell**, 16.8 MB at 2048². The
+cost that decides here is the one in metres.
 
 ⚠️ **Direction matters and the wrong one is silently plausible.** Enforcing monotonicity by
 raising each cell above its receiver (an upstream pass) also produces zero uphill segments — and
 on the same path it lifted 112 samples *above the original terrain*, i.e. it built an aqueduct.
 Always relax **downstream**, in flow order.
 
-**Ordering when rivers meet.** Carve in downstream order over the network so a tributary's mouth
-is fixed before the tributary is cut, and adjust at junctions after propagating, as
-[peytavie2019] §5.1 does. For multiple threads over the same ground, [peytavie2019] §5.2 gives
-the rule outright: "in order to preserve flow, the final height of the riverbed is set as the
-minimum height over all channels" — a `min`, never a blend, or the bar between two threads rises
-into a dam.
+**Ordering when rivers meet.** Carve in downstream order over the network so a tributary's mouth is
+fixed before the tributary is cut, and adjust at junctions after propagating, as [peytavie2019]
+§5.1 does. For multiple threads over the same ground, [peytavie2019] §5.2 gives the rule outright:
+"in order to preserve flow, the final height of the riverbed is set as the minimum height over all
+channels" — a `min`, never a blend, or the bar between two threads rises into a dam.
 
 **Junction angle** is not free either: near perpendicular when the two flows differ markedly,
 narrow when they are similar. [genevaux2013] §6.1 and [paris2023] §6.1 print the same rule ten

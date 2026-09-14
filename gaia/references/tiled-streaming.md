@@ -59,9 +59,9 @@ Four parts, none optional:
 **Crossover — do not build this at all** when the full pyramid fits in the memory budget with
 headroom. A resident world needs none of this machinery, and the machinery has a permanent cost
 in complexity and in bugs that only appear at speed. Run the budget arithmetic first, over the
-drawn cut *plus its parent level* — morphing reads parent height, so the parents are resident
-whether or not you budgeted them. It is one spreadsheet, and it decides whether the rest of this
-document applies to you.
+drawn cut *plus its parent level* at a third of the cut, not a quarter (seams section) — morphing
+reads parent height, so the parents are resident whether or not you budgeted them. It is one
+spreadsheet, and it decides whether the rest of this document applies to you.
 
 ## The residency state machine
 
@@ -172,6 +172,22 @@ boundary by construction and has no notion of partial detail.
 - **No derived-data work on the render thread.** Mip generation and BCn encoding happen in the
   worker or compute budget, before the tile is declared renderable.
 
+**That byte budget is the cost half; the error half is what the frame draws while it drains.**
+`8–32 MB/frame at 60 Hz` is the only byte figure on this page a scheduler can spend, and alone it
+says nothing about quality. Two regimes, two bounds. *Caught up*: every drawn tile satisfies the
+refine predicate, so the drawn screen-space error sits at or under `tau` — that bound is what
+`tau` means, and `heightfield-lod.md` carries the band `tau` is set to and what halving it costs.
+*Behind*: the budget is a rate limit, so while a backlog drains the front is coarser than the cut
+the controller asked for and the frame draws above `tau`. The invariant floors that excursion —
+blurry, never absent — and **nothing on this page ceilings it**: pricing it needs bytes per tile,
+decode throughput and a traversal profile, none of which this document carries. So do not read
+`8–32 MB/frame` as a quality claim. Set it, then measure worst-frame lag on the two traversals the
+failure table already prescribes — max traversal speed, and a teleport into a cold region — and
+report that lag in `tau`, so it composes with `heightfield-lod.md`'s price rather than becoming a
+second one. Budget the parent level onto the same ring: distinct parents are a **third** of the
+cut, not a quarter, so a quarter runs **25% too low** (seams section) exactly when a fast camera is
+already saturating it.
+
 **Which payloads share the tile's lifecycle is the load-bearing decision.** Height, baked normals,
 watermask and holes ride with the geometry. Material weights usually graduate to their own
 residency system with an independently sized cache [andersson2007] — see
@@ -189,11 +205,16 @@ vertices, cross-level edges constrain the fine tile to the coarse neighbour's ed
 morph regions over the outer band of a tile remove the *pop* at replacement as well as the crack —
 the CDLOD whitepaper sizes that band at the last 15–30% of each LOD range [strugar2009]. Morphing
 needs the parent's height at the child's vertices, which is why parents are *excluded from
-eviction* above rather than merely favoured by priority. Budget for them: refinement is atomic per
-parent, so the cut is whole sibling quads and its distinct parents number a quarter of it — at the
-constant per-tile size of part 1, at most **+25% of drawn bytes**. Steady state is well under that
-bound, since only tiles inside their morph band need the parent this frame, but size for the
-bound. `heightfield-lod.md` prices the resident set that follows; take its numbers rather than
+eviction* above rather than merely favoured by priority. Budget for them — and not at a quarter.
+The cut is *not* partitioned into whole sibling quads: a parent whose other children refined
+further still holds children in the cut, and still has to be resident. A quarter is the fraction
+only where no parent mixes cut children with refined ones, which is a uniform-depth cut; mix
+levels, the entire point of the architecture, and it rises. Refine one quad per level and `I`
+internal nodes give `L = 3I + 1` cut tiles with all `I` parents live — `I/(3I+1)`, rising to a
+third. At the constant per-tile size of part 1 the bound is therefore **+33% of drawn bytes**, and
+the quarter a whole-sibling-quads reading gives is **25% too low** against it. Steady state is
+under the bound, since only tiles inside their morph band need the parent this frame, but size for
+the bound. `heightfield-lod.md` prices the resident set that follows; take its numbers rather than
 deriving a second set here.
 
 ⚠️ **Attribute continuity is not a renderer problem.** Normals, AO and material weights baked
@@ -223,7 +244,7 @@ defect along its morph bands.
 | A hole, or the sky, where terrain should be | Parent released before all four children were renderable, or children dropped before a re-requested parent arrived | The always-renderable invariant, enforced in both directions |
 | Double-drawn, z-fighting terrain at one tile | Parent and children both drawn during a transition | Refinement is atomic per parent |
 | Distant tiles never sharpen | Requests dropped silently — queue overflow, or IDs recycled by the streamer | Count every drop; size the queue at 4× the per-frame request count so it cannot overflow under its own submissions; key requests by stable tile ID |
-| A pop, or a crack, along a morph band after a long flight or a teleport | The parent of a cut tile was evicted, so morphing has no parent height to blend toward | Exclude parents of cut tiles from eviction, and budget the parent level with the cut |
+| A pop, or a crack, along a morph band after a long flight or a teleport | The parent of a cut tile was evicted, so morphing has no parent height to blend toward | Exclude parents of cut tiles from eviction, and budget the parent level at a third of the cut, not a quarter |
 | A visible seam in lighting exactly on tile edges | Per-tile bakes ran without a neighbour apron — or the apron is correct, and the two sides sit at different pyramid levels feeding different inputs to their own correct derivatives | Re-bake with an apron at least the kernel radius; do not blur at runtime. If a correct apron does not move it, it is the cross-level filtering discontinuity and not the bake — see the seams section |
 | Resident set grows through a long flight and never plateaus | Eviction never reaches the cache; evictable tiles are pinned by a stale reference; or `resident` tiles whose want expired have no discard edge, so they hold their bytes until the upload budget finally reaches them | Plot the resident-set curve on a soak; it must plateau. Give `resident` an exit |
 | Cross-tile seams appear only after a patch | Old baked tiles mixed with new ones | Version every tile blob by a content hash of source data plus bake parameters; reject mixed versions per region |

@@ -201,7 +201,9 @@ fifth-order *polynomial* in `t = 1/(1 + p·x)`, times `exp(-x²)`, odd-extended 
 published error bound is `1.5e-7` (measured 1.4e-7 over ±6), orders below anything foam coverage
 can resolve. ⚠️ Implement it as a *rational* in `t` instead and you get `erf(0) = 1` and a maximum
 error of 1.0. The cheap alternative is a `tanh` fit **with a cubic argument** (3.7e-4); a genuinely
-single-term `tanh(1.12838x)` is 3.5e-2, which foam coverage can resolve.
+single-term `tanh(1.12838x)` is 3.5e-2, which foam coverage can resolve. **What the cheaper fits
+buy is unpriced**: nothing here has profiled the three in a shader, and a CPython timing would not
+transfer to one — so choose on the error column, and take 7.1.26 unless a profile names this block.
 
 ⚠️ **An offset-centred fp16 pair holds only while `|mu_A − 1| ≲ 3·sigma_A`; an *uncentred* one
 fails on calm water at any offset.** `A ≈ 1` on unbroken water, so
@@ -211,8 +213,12 @@ a Heaviside where the entire point was a soft edge. Offset-centring — store `(
 because the cancellation amplifies the format's `2^-11` unit roundoff (the fp16 ULP at 1.0 is
 `2^-10`) by `1 + (|mu_A − 1|/sigma_A)²`: **10×
 at 3σ** (~0.2% error in `sigma_A`; 0.34% worst over twenty seeds), 101× at 10σ (3.1%), 901× at 30σ (23.5%). A footprint
-straddling a breaking crest leaves that band, and there the pair goes in **R32G32F**; the memory is
-what the coverage being right costs.
+straddling a breaking crest leaves that band, and there the pair goes in **R32G32F**. What the
+coverage being right costs is storage, and the price is exact: **8 bytes per cell** against the
+fp16 pair's **4**, or **10.7 against 5.3 bytes per cell** counting the mip chain the prefilter is
+built on — a full 2D chain adds a third. That is the whole trade: 4 bytes per cell per cascade
+against the errors just quoted, so the fp16 pair inside the 3σ band and R32G32F outside it,
+chosen per footprint rather than for the whole field.
 
 Ground-truth the *amount* against the oceanographic wind→coverage power law, which `wave-models.md`
 states with its no-offset property and its Beaufort cross-check: essentially no foam at 5 m/s,

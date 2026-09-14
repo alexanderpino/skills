@@ -26,7 +26,9 @@ corpus of a number everyone quotes and nobody agrees on.
 
 **Tier: authoring-time for the mask and the ridge lines; the drift is the only part with a runtime
 cost.** It is one vector per frame applied to the whole mask as a rigid motion — a transform, not
-a per-cell pass — and nothing else on this page touches a frame budget.
+a per-cell pass — and nothing else on this page touches a frame budget. What the bake leaves
+resident is one floe id per cell: **2 bytes per cell** below 65 536 floes and 4 above, so **2 MiB
+at 1024² and 32 MiB at 4096²**, over **12 bytes per cell** of jump-flood state while it builds.
 
 ## Use this
 
@@ -192,6 +194,16 @@ partition for what it is genuinely good at — producing a **space-filling netwo
 shared edges**, which is what leads between packed floes look like — and not for what it is bad
 at, which is deciding how big anything is.
 
+**And the correction is free, which is the half of this a budget needs.** The error is the whole
+exponent: Poisson-Voronoi fits `m` between −0.07 and −0.53 against the target `m = −1.79 ± 0.08`.
+The cost of not making that mistake is **1.16–1.20×** the same build — sampling-and-placing medians
+`≈1300 ms` at 1024² against `≈1100 ms` for scatter-and-tessellate, five seeds, run twice.
+⚠️ That is a CPython + numpy CPU bake measured for this page, **not** a GPU frame cost, and the
+absolutes drift 10–23% with load on a shared box, so carry the ratio and not the milliseconds.
+Drawing the sizes is not what costs: the inverse transform for 1000 floes is **12 µs**, one part
+in 10⁵ of the build, which is all rasterisation. **The cheap recipe and the correct one cost the
+same; only one of them is right.**
+
 ## Floe shape is measured, and it is nearly a disc
 
 [rothrock1984] Table 1 digitised 782 summer floes over about 1 km across and reports the
@@ -336,7 +348,7 @@ here states it as a published operator.
 | Situation | Do | Because |
 |---|---|---|
 | A still frame, ice as ground cover | Mask only; no drift, no ridging | The relief is `10⁻³`; nothing else is visible |
-| You need the published size statistic | Sample sizes from the power law and place them | Every partition tested fits `m` shallower than −1.65 |
+| You need the published size statistic | Sample sizes from the power law and place them | Every partition tested fits `m` shallower than −1.65, and sampling instead costs 1.2× the same bake |
 | You need leads that look right | Voronoi or Laguerre partition, edges as leads | Straight shared edges are what packed-floe cracks are |
 | You need both | Partition for edges, sampled sizes for cells | Merging a fine partition averaged only −1.2, with a −0.9 to −1.5 seed spread |
 | Motion over hours to days | Free drift, `α ≈ 2%` at `θ ≈ 20–40°` against a **near-surface** wind — or `α ≈ 0.8–1.1%` at `θ ≈ 5–18°` if your wind field is **geostrophic** | One line, ~70% of the variance [brunette2022]; the pair means nothing until you say which wind it is turning |
@@ -348,7 +360,7 @@ here states it as a published operator.
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| Every floe is the same size | Cell sizes taken from a Poisson-Voronoi partition | Measured CV 0.52 and a fitted slope near zero; sample sizes from the distribution instead |
+| Every floe is the same size | Cell sizes taken from a Poisson-Voronoi partition | Measured CV 0.52 and a fitted slope near zero; sample sizes from the distribution instead, at 1.2× the bake |
 | A few huge floes and nothing between | Power law sampled with no `p_min`, or `p_min` set from cell size | `p_min` sets what the field looks like, not just its cost |
 | Total floe area diverges as you refine | Cumulative diameter exponent at or past −2 | `α > −2` is required for finite area [rothrock1984] §3 |
 | Your fitted exponent disagrees with a paper's by ~2× | Comparing area-based to diameter-based, or cumulative to noncumulative | Diameter slope = `2m+1` [denton2022] Sect. 3.4; settle the convention first |
