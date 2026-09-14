@@ -38,6 +38,9 @@ and a warp amplitude near the largest octave's **lattice spacing** — a startin
 *down* from, not a ceiling. §Domain warp measures 11.30% of the domain already folded there for a
 curl potential, and 28.4% for a plain fBm warp at the same amplitude, against a fold-free `K` of
 about 25 for six octaves on that same 64-cell base lattice — less again for a plain warp.
+The warp is also where the cost sits: `warp1` triples the stack — 3 fBm evaluations, measured at
+**2.9–3.1×** a plain fBm on the rig in §Time budget, where only the ratio transfers and the shader
+cost is unpriced.
 
 ## The lattice, and the constants that decide the look
 
@@ -232,9 +235,26 @@ A warp field, not a height source.
 **Time budget.** An fBm octave is a lattice fetch plus a handful of dots, so the whole stack is a
 per-frame operation — this is the one part of terrain generation that genuinely is. Budget in
 evaluations, not octaves: `warp1` is 3 fBm calls and `warp2` is 5, so a warped 8-octave field is
-24 or 40 noise evaluations per sample. Offline, take `warp2` and as many octaves as Nyquist
-allows. Per frame, take `warp1` and drop octaves by distance — the far LOD does not need the
-octaves it cannot resolve anyway, and dropping them is also the poor-man's band-limiting.
+24 or 40 noise evaluations per sample. **That accounting is measured and it holds**: over four
+runs — numpy/CPython on one container core, 8 octaves, lacunarity 2.03, 512² and 1024², two seeds,
+median of 5–7 reps — `warp1` costs **2.9–3.1×** a plain fBm and `warp2` **4.9–5.0×**, against the
+3× and 5× the call counts predict, at **1.03–1.15 µs per sample** for the plain stack. **The ratio
+is the half that transfers** — it is the same code run three or five times — **and the absolute is
+not**: that rig is an interpreter-bound array benchmark, *not a shader*, and the per-frame claim
+above rests on the arithmetic per sample, never on this number. **The GPU cost of this stack is
+unpriced here.** Pricing it takes a timestamp query around the noise pass on the target part at
+the target resolution; until someone runs one, budget a warp at 3× or 5× whatever your own single
+fBm measures.
+
+Offline, take `warp2` and as many octaves as Nyquist allows. Per frame, take `warp1` and drop
+octaves by distance — the far LOD does not need the octaves it cannot resolve anyway, and dropping
+them is also the poor-man's band-limiting. **What that last trade costs is small, and known before
+you run it**: holding the coarse band's normalisation across bands (renormalising per band shifts
+the height at the band boundary, which is the pop LOD exists to avoid), dropping the finest of 8
+octaves gives a **max error of 0.30–0.33% of the field's peak-to-peak range**, rms 0.09%; dropping
+two, 0.79–0.83% and rms 0.20%. The ceiling is arithmetic rather than luck — the dropped octaves'
+share of the amplitude sum, 0.39% and 1.18% — so the far LOD's error is budgetable before it is
+measured.
 
 ## How this fails, and what it looks like
 

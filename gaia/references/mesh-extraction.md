@@ -13,8 +13,9 @@ sources:
 ---
 # Mesh extraction — getting terrain out of the tool, offline
 
-**Tier: authoring-time.** Every cost on this page is an offline bake inside the exporter; nothing
-here runs in a frame, and the only thing that crosses into a frame budget is one number per level.
+**Tier: authoring-time.** Every cost on this page is an offline bake inside the exporter, or the
+size of the file it writes; nothing here runs in a frame, and the only thing that crosses into a
+frame budget is one number per level.
 
 `heightfield-lod.md` is about a mesh that never exists on disk: CDLOD, clipmaps and CBTs all
 synthesise triangles per frame from a heightfield and a camera. **This document is the other
@@ -38,7 +39,12 @@ heap keyed on the cost of collapsing it, and pop until the cost exceeds your bud
 default in every mesh toolchain for a reason: the state per vertex is ten floats, the work per
 step is a heap pop and a few local updates, and it makes no assumption that the surface is a
 function of `x, y` — so overhangs, welded tiles, attribute seams and the non-manifold joins
-[garland1997] explicitly supports all survive it.
+[garland1997] explicitly supports all survive it. Ten floats is **80 bytes per cell** of source
+heightfield at `float64` (40 at `float32`) — one quadric per initial vertex, by step 1 of
+[garland1997] §4.1, so the state peaks *before* the first contraction: **1.25 GiB at 4096²**,
+640 MiB at `float32`, with the heap, the connectivity and the positions on top. Measured, not
+estimated — a byte count is exact and does not drift with load the way a timing does. Bake in
+tiles if it does not fit, under the seam rules below.
 
 **Cross over to greedy insertion** [garland1995] when the source is a *pure single-valued
 heightfield* with no attributes and you want the fewest triangles for a stated vertical error —
@@ -117,7 +123,7 @@ measured:
   the analytic value — so `sqrt(Δ)` grows as `√n`: 1.63, 1.88, 2.30, 2.66 and 3.26 times the
   true displacement. Same geometric error, five different numbers, decided by mesh valence.
 - **On a real surface the gap is large.** Over 3,453 interior edge contractions on the
-  paraboloid ⚠️ (**that count cannot be right and the run needs repeating**: the rig at :77 is
+  paraboloid ⚠️ (**that count cannot be right and the run needs repeating**: the rig above is
   41×41, so 1,681 vertices of which 39² = 1,521 are interior, and one interior contraction removes
   exactly one interior vertex — 3,453 is more than twice the budget that exists. The ratio below is
   a mean over contractions, so it survives a smaller denominator, but the count itself does not),
@@ -211,6 +217,15 @@ Four things it gets right that are worth stealing even if you use QEM:
   L2-optimal triangulation is known to converge as `m^−1`. That is your budgeting law: to halve
   the RMS error of an exported TIN, expect to spend about **2.7×** the vertices, not 2×. It also
   says how far from optimal a greedy result is, which is the honest way to defend it.
+  **And what those vertices cost is bytes, measured:** a position-only export is 12 B of `float32`
+  position plus 24 B of `uint32` index per vertex — a planar triangulation has `t = 2m − 2 − hull`
+  triangles, two per vertex — so **36 bytes per vertex, 36 MB per million**, a rate flat in `m`
+  (35.63 B at 16.6 k vertices, 36.00 B at 1 M; the shortfall is the hull term). Flat is what
+  carries the error law over intact: halving the RMS error costs 2.7× the vertices *and* 2.7× the
+  file, **36 MB → 96.9 MB**. Add 12 B per vertex for a `float32` normal, 8 for a UV. The bake's
+  *time* stays **unpriced here**: the only rig available is CPython, which would misstate a
+  production exporter by orders of magnitude — time yours once per grid size and scale it by the
+  `O((m+n) log m)` above.
 - **RMS is the steadier stopping criterion than maximum error**, which is spiky and
   outlier-driven (§5.3). Stop on RMS; *report* the maximum, because the maximum is what the
   screen-space controller consumes.
@@ -297,10 +312,11 @@ carry the removed detail, which is the whole point; the reverse loses it permane
 | Two chunks with the same true error get different LOD | `Δ` scales with mesh valence, not with deviation | Same fix; `Δ/(n·d²)` is constant, so `Δ` is measuring `n` too |
 | An export threshold that worked yesterday keeps 10× the triangles | Model rescaled; `Δ` is in squared units | Specify the target in metres and solve for the threshold |
 | Refining the source grid changes the exported triangle count at a fixed threshold | A quadric threshold is not resolution-independent | Same fix; see `node-graph-runtime.md` on parameters that must rescale |
+| The exporter runs out of memory on a 4k source before it has contracted anything | One quadric per initial vertex, and a quadric is ten floats: 80 bytes per cell, 1.25 GiB at 4096² before the heap | `float32` halves it; otherwise bake in tiles, under the seam rules [garland1997] |
 | Random vertices scattered across a plateau | eq. (1)'s matrix is singular on flat ground | Detect it; fall back to endpoints or midpoint [garland1997] |
 | Every vertex reports non-zero error before any contraction | Plane normals not unit length, or `d` has the wrong sign | The initial error is provably 0 [garland1997]; assert it |
 | All the vertices land in one rough region and the rest of the terrain is coarse | Feature-based importance measure, blind to the approximation | Use error against the current approximation [garland1995] |
-| Doubling the vertex budget barely improves the mesh | Expected: RMS goes as about `m^−0.7` | Halving error costs ~2.7× the vertices [garland1995] |
+| Doubling the vertex budget barely improves the mesh | Expected: RMS goes as about `m^−0.7` | Halving error costs ~2.7× the vertices, and at 36 B per exported vertex ~2.7× the file [garland1995] |
 | Stopping criterion oscillates and will not converge | Stopping on maximum error, which is spiky | Stop on RMS; report the maximum [garland1995] |
 | Nothing can blend between exported LOD levels | Levels simplified independently, no vertex correspondence | Export a nested chain if the engine geomorphs [hoppe1996] |
 | Slivers and near-degenerate triangles in the TIN | Data-dependent triangulation optimises the fit to the height function, and does not care about triangle shape | Add a shape-quality term, as §4.5.1 does [garland1995] |

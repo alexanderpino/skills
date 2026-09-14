@@ -52,7 +52,8 @@ table further down. It is the feature the eye uses to identify the landform. *Ra
 noise* — a texture, with no depth law, so it does not change shape as it changes size, and
 therefore no branch either. *An impact hydrocode* (iSALE and relatives) — the right tool for
 asking why the transition diameter is where it is, and orders of magnitude too expensive to place
-a thousand craters; use its published outputs, which is what the morphometry already is. *Gaea's
+a thousand craters — a thousand stamped profiles is **59–73 ms** of CPU here, measured below;
+use its published outputs, which is what the morphometry already is. *Gaea's
 `Crater`, `CraterField` and `Pockmarks`* — UI branding over exactly this stamping operation; the
 node names are not algorithms, and the question to ask of any of them is which of the numbers
 below it actually hits.
@@ -93,6 +94,23 @@ a spread of 5.1%; the rim-height-to-depth ratio runs 0.1820 to 0.1857 against th
 two intercepts, 0.036/0.196 = 0.1837. **Treat both as constants and you are inside the fit's
 own scatter.** So for the simple branch, the practical form is: depth `= D/5`, rim crest
 `= 0.18·depth` above the pre-impact surface, rim flank out to about `0.26·D` beyond the crest.
+
+**That error has no cost beside it, so here is the cost — measured here, not taken from the
+paper.** The page states how good the approximation is twice: every simple-crater exponent is
+"within 1.5% of **1.0**", and the ratio above spans 0.1915–0.2014, a **5.1%** spread. Neither
+says what the exact form costs, and a reader cannot trade one against the other without both.
+Evaluating the floored two-branch laws costs **under 1 µs per crater** (eight runs, medians
+0.57–0.61 µs) against **43–52 µs** to rasterise the 50 m crater that dominates a field's count
+and **5.5–6.1 ms** for a 2 km one — **1.1–1.4%** of the cheapest raster, **0.01%** of a large one.
+**A crater's price is its footprint in cells, not its dimensions**: take the constants for
+readability if you like, never for speed. The whole field is cheap too — 1000 craters sampled at
+`η = 3` over `D ∈ [0.05, 8]` km, age-ordered, one radial profile each into its own bounding
+box on a 2048² float32 grid, stamps in **59–73 ms** across eight runs — and it carries **no
+per-cell state of its own**: **32 bytes per crater** (`D`, x, y, age), **32 KB** for the
+thousand, written into the heightfield already resident at **4 bytes per cell**, **16.0 MiB** at
+2048². Rig: CPython 3.11 / NumPy 2.4.6 on one shared x86-64 container core — a CPU
+authoring-pass floor, **not** a frame cost and **not** a GPU number. The absolute milliseconds
+drift with container load; the ratios do not, which is why the trade-off above is stated as one.
 
 **Above the transition that ratio is neither 0.18 nor a constant — but only once each fit is past
 its own crossing.** Floor every quantity at the crossing of its own fit pair (below that crossing
@@ -334,7 +352,7 @@ argument: it is material added to slopes, so it should be there before the mater
 | Far too much material heaped around the crater | The whole rim height extruded outward as ejecta | Only the ejecta share travels: `T = 0.14·R^0.77` m, 0.55 of the rim height at D = 0.5 km falling to 0.27 at 10 km [austin2024] |
 | A visible seam or ring at the rim crest | Cavity and rim authored as two stamps that disagree there | One radial profile covering cavity, crest and blanket |
 | Craters landing in a basin float above its floor | The whole stamp added to existing height | Cavity replaces, ejecta adds |
-| The field is all tiny pits and one big hole | `D_min` set from performance, with `η ≈ 3` | Half the cratered area lives in the smallest tenth of the log range; choose `D_min` deliberately |
+| The field is all tiny pits and one big hole | `D_min` set from performance, with `η ≈ 3` | Half the cratered area lives in the smallest tenth of the log range; choose `D_min` deliberately — lowering it costs **43–52 µs** per extra crater and no per-cell state, so it is a budget with a number in it |
 | No sense of scale in the render, and that was not wanted | `η` near 2 — a scale-free, saturated surface | A slope-2 population is dimensionless by construction [minton2019] |
 | Adding craters stops making the surface look older | Past equilibrium, each new crater destroys one old one | Cap the density near ~2% of geometric saturation [minton2019] |
 | Overlaps look like smooth figure-of-eights | Craters blended, max'd or soft-unioned | Stamp in age order; later cuts earlier, with a hard edge |

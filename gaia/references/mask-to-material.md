@@ -48,7 +48,9 @@ Five decisions are packed into that, and each is dismissible in a line:
   weight set completely (`terrain-analysis-masks.md` makes the same point at the producer end); a
   normalised sum makes the bug visible and the result order-independent.
 - **Linear albedo, not sRGB.** Blending in the encoded space is measurably wrong — up to
-  **ΔE00 = 16.4** and **48% of the luminance** on the pairs measured below.
+  **ΔE00 = 16.4** and **48% of the luminance** on the pairs measured below. Fixing it is free where
+  the albedo is *read* — `*_SRGB` decode is fixed-function — and costs at most **4 bytes per cell**
+  more where the composite is *stored*, priced by format below.
 - **Height-aware weights, not a linear cross-fade.** A cross-fade makes every texel at the
   boundary a 50/50 average, which is a third material that exists nowhere. Measured below: alpha
   blending leaves **100%** of texels a mix at the midpoint against **8.1%** for the blend above at
@@ -355,6 +357,27 @@ splatmaps are **not colours** and must be stored in linear/UNORM formats — dec
 through an sRGB sampler is the mirror-image bug and produces surfaces that are too smooth in the
 mid-range.
 
+**And what that costs.** Nothing where the albedo is read: `*_SRGB` decode is fixed-function, so
+the **48.2%** above is bought for zero bytes and zero instructions. The bill arrives only where a
+linear result is *stored* — an 8-bit **linear** buffer reintroduces the palette section's banding
+exactly, because it has **20 representable levels** below `L* = 33` where the same 8 bits encoded
+sRGB has **78**. Priced by format (`mask-to-material.py`, exact format arithmetic — storage, not a
+frame cost), for a composite cached at 4096²:
+
+| Stored as | cost | quantisation in the dark third |
+|---|---|---|
+| RGBA8 UNORM, encoded sRGB | **4 bytes per cell**, 64.0 MiB | the wrong space to blend in — this is the bug above |
+| RGBA8 UNORM, **linear** | **4 bytes per cell**, 64.0 MiB | 20 levels; ΔE00 2.13 per LSB, median 0.94 |
+| **R11G11B10F** | **4 bytes per cell**, 64.0 MiB | 718/718/359 levels; ΔE00 0.99 per ULP, 0.74 round-trip |
+| **RGBA16F** | **8 bytes per cell**, 128.0 MiB | 11476 levels; ΔE00 0.022 per ULP, 0.009 round-trip |
+
+So the linear rule is **free** if the composite is consumed in-register and encoded at the end of
+the frame; **free again** in R11G11B10F, which is the same 4 bytes per cell as the 8-bit buffer it
+replaces; and costs **+4 bytes per cell — a 2× page cache** only where it has to be fp16. The
+palette LUT is the same arithmetic at a size nobody need think about: 32 entries is **128 bytes**
+in R11G11B10F against **256** in fp16. `virtual-texturing.md` owns the page budget that turns
+bytes per cell into a total.
+
 **Measuring it yourself.** ΔE00 is the right metric and a famously easy formula to get wrong.
 [sharma2005] exists because several independently published implementations passed the CIE's own
 worked examples and were still incorrect; the paper ships 34 supplementary CIELAB pairs chosen to
@@ -367,15 +390,15 @@ been run against that file.
 
 | Symptom | Mechanism | Fix |
 |---|---|---|
-| A dark seam along every material boundary | Albedo blended in sRGB; the encoding curve is concave, so the midpoint is always darker | Decode to linear before blending; up to 48% luminance, ΔE00 16 |
+| A dark seam along every material boundary | Albedo blended in sRGB; the encoding curve is concave, so the midpoint is always darker | Decode to linear before blending; up to 48% luminance, ΔE00 16 — free at the sampler, and at most 4 bytes per cell more where the composite is stored |
 | The seam is invisible in the grey blockout and obvious on snow | The sRGB blend error scales with the contrast of the pair | Same fix; test on the highest-contrast pair, not the average one |
 | Whole terrain looks mis-exposed, uniformly | `Σ w ≠ 1` below the clipping point — an exact brightness multiplier | Normalise by `Σ w` at the point of use; assert |
 | Bright patches wash out to white and shift hue | `Σ w > 1` and channels clipping — luminance stops tracking | Same fix; render `Σ w` to a debug view with 1.0 as grey |
 | Surfaces too smooth in the mid-range | Roughness map sampled through an sRGB decoder | Roughness, height, AO and masks are linear/UNORM data, not colour |
 | A muddy 50/50 band at every material boundary | Linear cross-fade; every texel is a genuine average | Height blend [mishkinis2013] |
 | Material textures look softer where they meet | Averaging two textures of equal σ gives σ/√2 — 29% of contrast lost | Height blend keeps 96%, or 93% with the weight-scaled bias |
-| Boundaries blurry in exact proportion to the splatmap resolution | Both bands are a fixed fraction of the splatmap's bilinear ramp — 0.80 cross-faded, 0.55 with the additive bias, 0.19 with the weight-scaled one; `depth` sets the dither grain, not the band width | Raise the splatmap resolution. A height blend buys a 4× narrower, grainier band, never independence, never independence |
-| A material with no weight at all is painted over the terrain | `b_i = w_i + h_i` compares an absent material's height against a present one's weight-plus-height — 19.3% of texels at `Σ w = 0.5` | Normalise `w` first, then scale the bias: `w_i·(1 + h_i)`. A `w_i > 0` gate fixes only exactly zero |
+| Boundaries blurry in exact proportion to the splatmap resolution | Both bands are a fixed fraction of the splatmap's bilinear ramp — 0.80 cross-faded, 0.55 with the additive bias, 0.19 with the weight-scaled one; `depth` sets the dither grain, not the band width | Raise the splatmap resolution. A height blend buys a 4× narrower, grainier band, never independence |
+| A material with no weight at all is painted over the terrain | `b_i = w_i + h_i` compares an absent material's height against a present one's weight-plus-height — 4.3% of texels at `Σ w = 1`, 18.9% at `Σ w = 0.5` | Normalise `w` first, then scale the bias: `w_i·(1 + h_i)`. A `w_i > 0` gate fixes only exactly zero |
 | The interlocking edge becomes a hard cross-fade at distance, and shimmers | Height sampled at the footprint's mip; `σ(h)` halves per level, so by mip 3–4 every texel is a mixture and the band has collapsed to a step | Cap the height LOD, or widen `depth` to `σ(h)` at the sampled mip; or cache the composite and mip the result |
 | One material wins every boundary regardless of weights | Height channels authored at incomparable ranges | Normalise every height channel to the same range at import |
 | Lighting at a boundary disagrees with the colour | Albedo height-blended, normals cross-faded | One weight set for albedo, normal, roughness |
@@ -384,7 +407,7 @@ been run against that file.
 | A faint grid of brighter and darker cells at splatmap-texel spacing, ≈0.8% of brightness | Weights normalised per-texel *before* 8-bit quantisation, so `Σ w` interpolates between 254/255 and 256/255. Bilinear is C0 — there is no step to hunt for | Normalise in the shader after the fetch |
 | Horizontal colour banding across the whole terrain | Palette driven by height alone | Drive from wetness, deposition or occlusion; noise-break the index |
 | A palette ramp that crawls then jumps | Ramp interpolated in linear light — 10.6× step-size ratio measured | Interpolate in CIELAB; store the baked LUT linear, in fp16 or R11G11B10F |
-| The baked palette bands in its dark half, though the authored ramp was even | LUT stored as 8-bit *linear* UNORM: ΔE00 2.13 per LSB at the bottom, median 0.94 below `L* = 33` | fp16 or R11G11B10F — never 8-bit UNORM for a linear colour LUT |
+| The baked palette bands in its dark half, though the authored ramp was even | LUT stored as 8-bit *linear* UNORM: ΔE00 2.13 per LSB at the bottom, median 0.94 below `L* = 33` | fp16 or R11G11B10F — never 8-bit UNORM for a linear colour LUT; 32 entries is 128 bytes in R11G11B10F, 256 in fp16 |
 | The palette obscures the very feature it was made to show | Rainbow map: no perceptual order, uneven rate | [moreland2009] §2; a monotone or diverging ramp |
 | 24 texture fetches per pixel and falling frame rate | One splatmap channel per material, all fetched everywhere | Bound *simultaneous* materials with ID+weight pairs into a texture array |
 | A new material cannot be added without re-exporting the library | Texture array requires identical dimensions, format and mip count per slice | Fix the array format at project start |
