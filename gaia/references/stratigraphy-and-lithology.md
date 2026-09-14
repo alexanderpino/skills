@@ -164,9 +164,9 @@ visibility is set by the bedding and the **surface** together, not by dip alone.
 surface slope `σ` in the same vertical plane, signed the same way (both descending in the same
 direction), `w = T / |tan δ − tan σ|` and `T ≥ 4·cellSize·|tan δ − tan σ|`. ⚠️ **Not `tan` of the
 angle *between* the two planes**, which an earlier draft wrote: that angle has
-`tan θ = |tan δ − tan σ| / (1 + tan δ·tan σ)`, so the between-planes form overstates `w`, and
-understates the gate, by `1 + tan δ·tan σ` — exact only when `tan δ·tan σ = 0`, i.e. only the two
-cases it was generalised from. Co-dipping is where it bites: `δ = 10°`, `σ = 30°`, `T = 150 m` on
+`tan θ = |tan δ − tan σ| / (1 + tan δ·tan σ)`, so the between-planes form is off by a factor
+`1 + tan δ·tan σ` — overstating `w` and understating the gate where the two dip the same way,
+reversing both where they oppose — exact only at `tan δ·tan σ = 0`, the two cases it came from. Co-dipping is where it bites: `δ = 10°`, `σ = 30°`, `T = 150 m` on
 100 m cells clears its gate at 145.6 m while the true outcrop is **3.74 cells**, under the four this
 page asks for; opposed at ±30° it demands 692.8 m where 461.9 m does. Dip is the `σ = 0` case and a
 hillside with horizontal beds the `δ = 0` case — each `T/tan` of its one nonzero angle — and it is

@@ -228,7 +228,10 @@ below at 129²**, and by **190% and 210% at 257²**. What sets the excursion is 
 to* the distance to the clamped boundary, and neither variable on its own: `Δ²h = 0` with fixed
 data has no intrinsic length, so only a ratio of lengths can set the answer — which is why the
 table above, at one fixed 65² domain, shrinks the undershoot from −0.616 to −0.090 as `s` goes
-6 → 24, even though the wider pair necessarily sits *closer* to the clamped edge, not further.
+6 → 24. The wider pair does sit *closer* to the clamped edge — 18 cells against 27, for a pair
+centred in the domain inside a 2-cell clamped ring, which the table does not print — and on the
+near-linear scaling of the domain sweep above that clearance buys a factor of about **1.5**, not
+the **6.8** the table shows. The gap carries the rest.
 The line's own length barely moves it, 17 columns to 63 taking the minimum only from −0.558 to
 −0.628. The 1-D beam grows the same way and faster — 39%/63% at 65 nodes, 272%/298% at 257 —
 on a different assembly, a different dimensionality and a

@@ -655,9 +655,9 @@ jobs:
           python3 - <<'PYUT'
           import pathlib
           p = pathlib.Path("references/caustics.md"); s = p.read_text(encoding="utf-8")
-          old = "one extra light-space pass at modest resolution"
+          old = "its cost is independent of screen resolution"
           assert s.count(old) == 1, f"anchor sentence appears {s.count(old)} times, want 1"
-          p.write_text(s.replace(old, "one extra light-space pass at quarter resolution"),
+          p.write_text(s.replace(old, "its cost scales with screen resolution"),
                        encoding="utf-8")
           PYUT
           red_check "a claim rewritten inside ## Use this, under a stamp" 'the CLAIMS changed' covers_body
@@ -733,7 +733,7 @@ jobs:
           python3 - <<'PYDP'
           import pathlib
           p = pathlib.Path("references/tiled-streaming.md"); s = p.read_text(encoding="utf-8")
-          old = "         * predictFactor(cameraVelocity, tile)"
+          old = "         * frustumFactor"
           assert s.count(old) == 1, f"fenced anchor appears {s.count(old)} times, want 1"
           p.write_text(s.replace(old, "// see `no-such-document.md` for the derivation\n" + old, 1),
                        encoding="utf-8")
