@@ -58,7 +58,7 @@ inside the loop and at the hit are different failures with different fixes:
 7. Per-pixel material or page index: NonUniformResourceIndex (HLSL) / nonuniformEXT (GLSL).
 8. Grazing terms: saturate BOTH ends of a pow base; branch AROUND a normalize whose vector
    can vanish. In fp16 it vanishes at 1.7e-4 per component at BEST, and at 7.8e-3 where
-   float16 denorms are flushed -- 45x worse.             [d3d11spec] §3.1.5, §7.20.2.2.1
+   float16 denorms are flushed -- 46x worse.             [d3d11spec] §3.1.5, §7.20.2.2.1
 ```
 
 **What it beats.** *Reading the two sibling skills and assuming the rest transfers* — both are
@@ -362,7 +362,7 @@ returns exactly those three as the largest giving `dot(v,v) == 0`, 2-vector and 
 is far above the smallest normal — `2.83×` at the floor, `128×` at the top — so each **component**
 is an ordinary normal number and the collapse is never an artefact of denormal *inputs*. Flushing
 decides the fate of the **products**, and the squares land in the subnormal range by construction,
-so a target that flushes them loses the dot `45×` earlier. ⚠️ The boundary moves with it: one step
+so a target that flushes them loses the dot `46×` earlier. ⚠️ The boundary moves with it: one step
 above the floor, at `2^-12 = 2.441e-4`, three squares sum to `3·2^-24 = 1.788e-7` and the normalize
 succeeds — *on a target that preserves float16 denorms*. Where they are flushed, `2^-24` **is** the
 smallest subnormal, each product goes to zero alone, the sum is `0.0`, and the normalize fails here
@@ -373,7 +373,7 @@ needs each product rounded to binary16 *before* it is accumulated, which is what
 `mediump`/`min16float` dot does when the multiply-add is not fused and the accumulator is not
 widened — the one direction that helps, since an FMA or an fp32 accumulator means the products
 never round and there is no collapse at all. The other two make it worse: truncation by `1.41×`,
-flushed subnormal products by `45×`, and `water-rendering.md` already records that flush-to-zero is
+flushed subnormal products by `46×`, and `water-rendering.md` already records that flush-to-zero is
 *"the default on many mobile parts"*, on exactly the `mediump` this section names. Which you get
 can change between driver versions, so **size the hazard at `7.8e-3`, not `1.7e-4`** — and the
 guard below is the right code in every regime, and free.
