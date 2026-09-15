@@ -54,7 +54,7 @@ The three numbers that fill that graph:
   coefficient is not, and you calibrate it from one river on your map (below).
 - **Planform from slope and discharge**: braided above `S = 0.06·Q^−0.44` with `Q` bankfull in
   cfs, meandering below [leopoldwolman1957]. In SI that line is `S = 0.0125·Q^−0.44`, `Q` in
-  m³/s — derived by unit conversion in `hydraulic_geometry.py` §3, not quoted from anywhere.
+  m³/s — by unit conversion in `rigs/networks/hydraulic_geometry.py` §3, not quoted anywhere.
 
 **What it beats.** *Taking the network from erosion output* — you get a tree with no width and no
 planform control, and the user cannot move it. *Routing D8 at authoring time and calling the result

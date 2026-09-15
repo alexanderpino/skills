@@ -38,3 +38,10 @@ unpolarised Fresnel at `n = 1.335`. It exists because `water-optics.md` printed 
 it *uniform*; 0.86 is the standard overcast sky and uniform is 0.84. Unlike most rigs here it
 asserts nothing against the page — it computes two numbers and prints a convergence table, an
 `n`-sensitivity table and a no-Fresnel control, and the page was corrected to match.
+
+`networks/` — one rig, added 2026-09-15. `hydraulic_geometry.py` re-derives the ten sections
+`river-networks.md` cites as `hydraulic_geometry.py §1..§10` — eleven citations to a file that
+had never been committed, so eleven numeric derivations had no artefact and no register row. It
+is the second rig here to assert against its page rather than against a transcript: every
+expected value is parsed out of `river-networks.md`, and a figure that has gone missing is a
+FAIL, not a silent skip. 23 checks, exit 0, and red under four separate mutations of the page.
