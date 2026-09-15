@@ -3,7 +3,9 @@ type: Technique
 title: Node-graph runtime — scheduling, caching and invalidating a terrain graph
 description: "Executing a terrain node graph: the scheduler and rebuilder that decide it, why early cutoff is the property that matters, and the determinism a shared cache silently assumes."
 tags: [architecture, tooling, caching, evaluation, authoring-time]
-status: draft
+status: stable
+verified:
+  - { by: "human:alexander.pino", covers: 61b68625368f, covers_body: c233cd62000a }
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: alacarte, tier: P, locator: "§4.1 the three schedulers — 4.1.1 topological, 4.1.2 restarting, 4.1.3 suspending; §4.2 the four rebuilders — 4.2.1 dirty bit, 4.2.2 verifying traces, 4.2.3 constructive traces, 4.2.4 deep constructive traces; §2.3 and Fig. 3 for early cutoff; §2.5 Table 1 for the classification of Make, Excel, Shake and Bazel; §5.4 for Bazel, CloudBuild, Buck and Nix, and the closing paragraph naming suspending + constructive traces" }
@@ -305,11 +307,10 @@ may get wrong, how it refines without popping — is `coverage.md`'s `progressiv
 
 ⚠️ **Hashing a 4k field is not "milliseconds" — but the node's own cost is not the yardstick.**
 Measured on one machine, 4096² float32 (67.1 MB): **sha256 50 ms**, blake2b 104 ms — against **copy
-15 ms** and a masked lerp **30 ms**. Both are bandwidth-bound at **~7.5 ms per pass over the
-field** (copy touches it twice, the lerp four), which makes the three-touch `a + b` **~22.5 ms** —
-derived from that line, not measured. So the hash costs more than the node for every pointwise
-operator in the corpus — and that decides nothing: **cutoff at a node protects its dependents, not
-the node**.
+15 ms** and a masked lerp **30 ms**. Both are bandwidth-bound at **~7.5 ms per pass over the field**
+(copy touches it twice, the lerp four), which makes the three-touch `a + b` **~22.5 ms** — derived
+from that line, not measured. So the hash costs more than the node for every pointwise operator in
+the corpus — and that decides nothing: **cutoff at a node protects its dependents, not the node**.
 
 **The criterion is `cost(hash) < P̂(output unchanged) × cost(downstream cone)`**: hashing costs
 `hash + (1 − P̂)·cone` against `cone`, equal at `hash = P̂·cone`. On this page's own figures — a

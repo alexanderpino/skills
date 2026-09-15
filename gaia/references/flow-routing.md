@@ -3,7 +3,9 @@ type: Technique
 title: Flow routing — where the water goes
 description: "Routing flow over a heightfield: which receiver rule to use, and how to handle depressions."
 tags: [generation, hydrology, flow-routing, authoring-time]
-status: draft
+status: stable
+verified:
+  - { by: "human:alexander.pino", covers: f0b2884eaccd, covers_body: cffd1d66d806 }
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: ocallaghan1984, tier: P, locator: "§3, the 8-neighbour steepest-descent rule" }

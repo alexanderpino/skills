@@ -3,7 +3,9 @@ type: Technique
 title: Stream power — the erosion backbone at map scale
 description: "The one-line incision law, the O(N) implicit solver that makes it tractable, the companion diffusion term, and the slope-area check that proves it."
 tags: [generation, erosion, stream-power, landscape-evolution, authoring-time]
-status: draft
+status: stable
+verified:
+  - { by: "human:alexander.pino", covers: e5259b593517, covers_body: 92d37b59e51a }
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: braun2013, tier: P, locator: "the O(N) stack ordering and the unconditionally stable implicit discretisation. NOT OPENED — Geomorphology is paywalled at Elsevier and no open copy was reachable from here, so nothing inside it is named. The scheme this document implements was read instead in cordonnier2016 section 5, eq. 2 — the same implicit update, solved with the receiver already known by parsing the stream trees root-to-leaves, and stated there as O(N) — and cordonnier2016 section 1 calls it 'the original method from Braun and Willett 2013'" }

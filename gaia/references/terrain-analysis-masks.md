@@ -3,7 +3,9 @@ type: Technique
 title: Terrain analysis and masks — deriving fields from height
 description: "Slope, curvature, occlusion and wetness computed the way that survives a resolution change, and the selector stack that turns them into materials."
 tags: [generation, analysis, masks, curvature, materials, authoring-time, real-time]
-status: draft
+status: stable
+verified:
+  - { by: "human:alexander.pino", covers: 0f7a2772879a, covers_body: 0cdf2897c25d }
 generated: { by: process:claude-code, at: 2026-09-02T00:00:00Z }
 sources:
   - { id: zevenbergen1987, tier: P, locator: "the 3x3 partial-quartic fit, and the profile and plan curvature expressions. NOT OPENED — Earth Surface Processes and Landforms is paywalled at Wiley and no open copy was reachable from here, so no equation number is named. The five coefficients and the two curvature expressions this document writes out are the standard published form, but they have not been checked against Zevenbergen and Thorne's own numbering" }

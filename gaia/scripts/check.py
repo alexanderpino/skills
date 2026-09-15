@@ -2706,9 +2706,14 @@ def main() -> int:
               f"water-rendering.md's `exp(-K_d*z)` against water-optics.md's "
               f"`exp(-(K_d + c/mu_v)*z)` reports NOTHING, because the correction added a TERM "
               f"and the two ends stop sharing a key. It sees a constant that moved, never a "
-              f"rewording. Output is CANDIDATES with a known false positive (caustics.md's "
+              f"rewording. Output is CANDIDATES with TWO known false positives. (1) caustics.md's "
               f"`1/(b − b_b)` against water-optics.md's `b_b = b/2`, two formulas over one "
-              f"identifier pair). Reported, not enforced; see registers/guard-proofs.tsv.")
+              f"identifier pair. (2) stream-power.md's D/K spacing result against its own "
+              f"failure row, where the `2` this check reads is the superscript of the "
+              f"Laplacian in `D·\u2207\u00b2h` -- the fixture at the `\u0394t \u2264 \u0394x\u00b2/(4D)` row pins that "
+              f"reading deliberately (a superscript IS a constant), so the cost of the "
+              f"rule is this candidate, not a parser bug to fix. Reported, not enforced; "
+              f"see registers/guard-proofs.tsv.")
         for p in _x_problems:
             print(p)
 
