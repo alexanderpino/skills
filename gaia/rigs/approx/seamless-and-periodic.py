@@ -82,6 +82,15 @@ FULL_AMP = 0.5          # "fail at the full noise amplitude" := at least half th
 # called it a pass. OFFSET is a dyadic fraction, so every sample coordinate and every x+T is
 # still exactly representable and a 0.0 is still a true 0.0.
 OFFSET = 0.3125
+# "MACHINE PRECISION"/"EXACT", where the page prints the RESIDUE of a float64 computation --
+# :207's toroidal mass drift 1.97e-16, :380-384's round-trip column 1.1e-16, :443's 1.1e-16.
+# One ulp of a unit-scale quantity is 2^-52; 16 ulps lets a handful of roundings compound in a
+# multi-term sum and is the WHOLE width of this gate. It is a rig constant with its reason
+# written here -- it is NOT read off the digits of any number under test, so the page cannot
+# buy itself a wider gate by printing fewer of them. The other population on this page is
+# -8.5e-03 and 2.1e-02, thirteen orders away, so nothing legitimate sits near the edge.
+MACHINE_ULP = 2.0 ** -52            # 2.220446e-16
+MACHINE_MAX = 16.0 * MACHINE_ULP    # 3.553e-15
 
 
 def passed(msg: str) -> None:
@@ -104,6 +113,16 @@ def page(pattern: str, what: str, group: int = 1, flags: int = 0) -> str:
                  f"             pattern {pattern!r}\n"
                  f"             a figure that has gone missing is a FAIL, not a silent skip")
     return m.group(group)
+
+
+def inner(pattern: str, text: str, what: str, flags: int = 0):
+    """A sub-pattern inside a span `page()` already anchored. Gone => exit 1, never skip."""
+    m = re.search(pattern, text, flags)
+    if not m:
+        sys.exit(f"ANCHOR GONE: the page no longer states {what}\n"
+                 f"             pattern {pattern!r}\n"
+                 f"             a figure that has gone missing is a FAIL, not a silent skip")
+    return m
 
 
 def pagef(pattern: str, what: str, group: int = 1, flags: int = 0) -> float:
@@ -229,9 +248,9 @@ def wrap_error(T: int, hsh, period, samples: int = 64):
     worst = 0.0
     lo = hi = None
     for a in range(samples):
-        x = (a + OFFSET) * T / samples
-        for b in range(samples):
-            y = (b + OFFSET) * T / samples
+        x = a * T / samples + OFFSET      # ⚠️ offset OUTSIDE the stride: `(a+OFFSET)*T/samples`
+        for b in range(samples):          # is an INTEGER whenever OFFSET*T/samples is, and at
+            y = b * T / samples + OFFSET  # T = 1024, samples = 64 it is exactly 5.
             f = noise2(x, y, hsh, period)
             dx = abs(noise2(x + T, y, hsh, period) - f)
             dy = abs(noise2(x, y + T, hsh, period) - f)
@@ -244,7 +263,7 @@ def wrap_error(T: int, hsh, period, samples: int = 64):
     return worst, (hi - lo)
 
 
-def fbm_wrap_error(P: int, lac: float, octaves: int, samples: int = 32) -> float:
+def fbm_wrap_error(P: int, lac: float, octaves: int, samples: int = 32):
     """:115-116 octave l reduces mod `P·lacunarity^l`; :158 it must stay an INTEGER.
 
     Where it does not, the rig does what an implementer does -- rounds -- and the seam that
@@ -262,13 +281,16 @@ def fbm_wrap_error(P: int, lac: float, octaves: int, samples: int = 32) -> float
         return t
 
     worst = 0.0
+    lo = hi = None
     for a in range(samples):
-        x = (a + OFFSET) * P / samples
+        x = a * P / samples + OFFSET      # offset outside the stride; see wrap_error
         for b in range(samples):
-            y = (b + OFFSET) * P / samples
+            y = b * P / samples + OFFSET
             v = f(x, y)
             worst = max(worst, abs(f(x + P, y) - v), abs(f(x, y + P) - v))
-    return worst
+            lo = v if lo is None or v < lo else lo
+            hi = v if hi is None or v > hi else hi
+    return worst, (hi - lo)
 
 
 def neighbours4(c: int, H: int, W: int, torus: bool):
@@ -549,6 +571,69 @@ def gate() -> int:
     else:
         fail(f"the prose claims bit-exact at {PROSE_T}; the modular row is 0.0 only at "
              f"{sorted(mod_zeros)}")
+    # ⚠️ `<=` alone lets the prose DROP periods and stay green. :49-50 is an exhaustive
+    # statement about this table: the modular row wraps at the periods it lists, and the naive
+    # row "wraps only at" one more. So the two lists together must be the table's own columns.
+    if set(PERIODS) == mod_zeros:
+        passed(f"the modular row is 0.0 at every period the table measures, {PERIODS}")
+    else:
+        fail(f"the modular row is 0.0 at {sorted(mod_zeros)}, not at every measured period "
+             f"{PERIODS}")
+    if set(PROSE_T) | {ONLY_50} == set(PERIODS):
+        passed(f"the prose's {sorted(PROSE_T)} plus the naive row's {ONLY_50} is exactly the "
+               f"set of periods the table measures -- :49-50 names every column")
+    else:
+        fail(f":49-50 names {sorted(PROSE_T)} plus {ONLY_50} = {sorted(set(PROSE_T) | {ONLY_50})}; "
+             f"the table measures {PERIODS} -- the prose no longer covers the table")
+
+    # ── the 2-D simplex row of the SAME table (:100), gated by the SAME structural claim ──
+    # :127 'the measured error stays at full noise amplitude for every period tried'; :437
+    # 'measured full-amplitude error at every period'. That is field-independent: every cell
+    # the row prints must be in the FAILING population and none may collapse toward zero.
+    SIMROW = row(r"^\| 2-D simplex, same trick \|.*$", "the 2-D simplex row (:100)")
+    SIM127 = page(r"the\s*\nmeasured error stays at (full noise amplitude) for every period tried",
+                  "the simplex claim (:126-127)")
+    SIM437 = page(r"the integers you reduced are not the tile's; measured (full-amplitude) error "
+                  r"at every period", "the failure table's simplex claim (:437)")
+    sim = [(T, cell(c, "a 2-D simplex cell")) for T, c in zip(PERIODS, SIMROW)
+           if re.search(r"\d", c)]
+    if not sim:
+        fail(f"the 2-D simplex row measures nothing, and :127 claims '{SIM127}' at every "
+             f"period tried")
+    else:
+        top = max(v for _, v in sim)
+        floor_amp = FULL_AMP * max(max(NAIVE), top)
+        for T, v in sim:
+            if v >= FAIL_MIN and v >= floor_amp:
+                passed(f"T = {T:<4d} 2-D simplex: {v:g}, still {SIM127} (>= {floor_amp:g}, half "
+                       f"of the largest amplitude this table prints) -- :127 and :437 say the "
+                       f"trick does not take")
+            else:
+                fail(f"T = {T:<4d} 2-D simplex: {v:g} -- :127 says '{SIM127}' and :437 says "
+                     f"'{SIM437} at every period'; against the naive row's own {max(NAIVE):g}, "
+                     f"{v:g} is not a full-amplitude error")
+        blank = [T for T, c in zip(PERIODS, SIMROW) if not re.search(r"\d", c)]
+        passed(f"the 2-D simplex row is measured at {[T for T, _ in sim]} and not at {blank}, "
+               f"and every measured cell fails")
+
+    # ── :141 the 4-D torus embedding's residue, 'the cos/sin round-off, not a seam' ───────
+    RES141 = pagef(r"with no modular indexing anywhere\. Measured `([-\d.eE+]+)` at",
+                   "the embedding's measured residue (:141)")
+    T141 = ints(page(r"with no modular indexing anywhere\. Measured `[-\d.eE+]+` at\s*\n"
+                     r"`T` = ([\d,\sand]+) — the residue is", "the periods it was measured at (:141-142)"))
+    if RES141 <= EXACT_MAX:
+        passed(f"the embedding's {RES141:g} at T = {T141} is in this rig's EXACT population "
+               f"(<= {EXACT_MAX:g}), as ':142 the residue is the cos/sin round-off, not a "
+               f"seam' requires")
+    else:
+        fail(f":141 measures {RES141:g} and :142 calls it round-off and not a seam; "
+             f"{RES141:g} is in the FAILING population (>= {FAIL_MIN:g})")
+    if set(T141) == set(PROSE_T):
+        passed(f"the embedding was measured at the same periods :49-50 claims for the modular "
+               f"lattice, {sorted(T141)} -- the two halves of the fix are compared like for like")
+    else:
+        fail(f":141 measures the embedding at {sorted(T141)}; :49-50 claims the modular "
+             f"lattice at {sorted(PROSE_T)} -- they are no longer the same periods")
 
     # ── C. multiple, not divisor: the correction :106-110 carries, re-run ──────────────────
     head("C. :106-110 'a multiple of the table size, not a divisor of it'")
@@ -559,7 +644,7 @@ def gate() -> int:
     MULS = ints(page(r"while `T` = ([\d,\sand\n]+?) are multiples of \d+ and are exact to",
                      "the multiples that wrap (:108-109)"))
     MUL_OF = pagei(r"are multiples of (\d+) and are exact to", "what they are multiples of (:109)")
-    BOUND = pagef(r"are multiples of \d+ and are exact to ([\d.e-]+)\.", "the bound they meet (:109)")
+    BOUND = pagef(r"are multiples of \d+ and are exact to ([-\d.eE+]+)\.", "the bound they meet (:109)")
     QUOTED = pagef(r"the table above prints — ([\d.]+) at `T` = \d+ —", "the amplitude quoted (:108)")
     QUOTED_AT = pagei(r"the table above prints — [\d.]+ at `T` = (\d+) —", "where it is quoted from")
     same(f"the amplitude quoted at :108 against the table's own T = {QUOTED_AT} cell",
@@ -596,7 +681,10 @@ def gate() -> int:
         fail(f"the page calls {BOUND:g} 'exact'; that is not machine-epsilon scale, and a rig "
              f"asserting err <= {BOUND:g} would be asserting nothing")
     for T in MULS:
-        e, _ = wrap_error(T, tbl, None)
+        e, pp = wrap_error(T, tbl, None)
+        if pp <= 0.0:
+            fail(f"T = {T}: the rig's own sample set is degenerate (peak-to-peak 0)")
+            continue
         check(f"T = {T:<4d} is a multiple of {TSIZE} and wraps (page: exact to {BOUND:g})",
               e, 0.0, BOUND)
 
@@ -627,7 +715,8 @@ def gate() -> int:
     check(f"{ENTRIES_121} uint16 entries", ENTRIES_121 * 2 / 1024, KB_U16_121)
     check(f"the P-entry table that fails, P = {HPER}, int32 doubled",
           HPER * 4 * 2 / 1024, KB_P_121)
-    SHIFT = pagei(r"at a (\d+)-cell shift \([\d.e-]+\) against", "the shift the P-entry table aliases at (:118)")
+    SHIFT = pagei(r"at a (\d+)-cell shift \([-\d.eE+]+\) against",
+                  "the shift the P-entry table aliases at (:118)")
     LO, HI = ints(page(r"leaves octaves (\d+–\d+) bit-identical", "the octaves that alias (:117)"))
     if (LO, HI) == (1, HOCT - 1):
         passed(f"the aliasing octaves {LO}–{HI} are exactly 1..n−1 of a {HOCT}-octave stack")
@@ -641,6 +730,181 @@ def gate() -> int:
     else:
         passed(f"a P-long table repeats every P/lacunarity^l cells, so octaves {LO}–{HI} are "
                f"bit-identical at exactly {SHIFT} cells and octave 0 is not")
+    # ⚠️ "divides every octave's repeat and does not divide P" is satisfied by 1536, 2560, ...
+    # :116 states the repeat exactly -- P/lacunarity^l cells -- so the SMALLEST shift at which
+    # octaves LO..HI are all bit-identical is P/lacunarity^LO. That is the one the page prints.
+    check(f"the shift octaves {LO}–{HI} FIRST repeat at, P/lacunarity^{LO} = {HPER}/{HLAC}^{LO} "
+          f"(:116's own rule)", float(SHIFT), float(HPER // HLAC ** LO))
+
+    # ── :118's aliasing pair, classified and RUN octave by octave ─────────────────────────
+    ALIAS_ERR = pagef(r"at a \d+-cell shift \(([-\d.eE+]+)\) against [-\d.eE+]+ at \d+ entries",
+                      "the P-entry table's shift error (:118)")
+    LONG_ERR = pagef(r"at a \d+-cell shift \([-\d.eE+]+\) against ([-\d.eE+]+) at \d+ entries",
+                     "the long table's shift error (:118)")
+    LONG_TS = pagei(r"at a \d+-cell shift \([-\d.eE+]+\) against [-\d.eE+]+ at (\d+) entries",
+                    "the long table's length (:118)")
+    same("the long table's length, :118 against :121", LONG_TS, ENTRIES_121, ":118", ":121")
+    if ALIAS_ERR <= EXACT_MAX:
+        passed(f"the P-entry table's {ALIAS_ERR:g} at a {SHIFT}-cell shift is in the EXACT "
+               f"population (<= {EXACT_MAX:g}), as ':117 bit-identical' requires")
+    else:
+        fail(f":117 calls octaves {LO}–{HI} bit-identical at {SHIFT} cells and :118 measures "
+             f"{ALIAS_ERR:g} -- that is in the FAILING population (>= {FAIL_MIN:g})")
+    if LONG_ERR >= FAIL_MIN:
+        passed(f"and a {LONG_TS}-entry table breaks the aliasing: {LONG_ERR:g}, the FAILING "
+               f"population -- the two cells are not interchangeable")
+    else:
+        fail(f":118 measures {LONG_ERR:g} at {LONG_TS} entries; that is in the EXACT population, "
+             f"so the long table would alias too and :114-118's whole point is gone")
+
+    tbl_P = table_hash(HPER)                    # the `P`-entry table that fails
+    tbl_long = table_hash(ENTRIES_121)          # the finest octave's P*lacunarity^(n-1)
+
+    def octave_shift(tb, l, shift, samples=32):
+        """max |g_l(x+shift) − g_l(x)| for octave l alone, and that octave's peak-to-peak.
+
+        ⚠️ Measured in the OCTAVE's OWN lattice coordinates (u = x·lacunarity^l), at u = a +
+        OFFSET for a = 0..samples-1, and the domain shift carried across as shift·lacunarity^l.
+        Walking the DOMAIN at a fixed stride instead re-aliases: a stride of P/samples cells is
+        P·lacunarity^l/samples lattice units, which at octave 5 of this stack is exactly the
+        table length, so every sample lands in the same table slot with the same fractional
+        part and the field is CONSTANT -- a 0.0 measured over a 0.0 peak-to-peak. Every
+        coordinate here is a dyadic rational, so a 0.0 is a true 0.0.
+        Fixed bound: samples*samples.
+        """
+        per = HPER * HLAC ** l
+        lshift = shift * HLAC ** l              # the shift, in this octave's lattice units
+        worst = 0.0
+        lo_v = hi_v = None
+        for a in range(samples):
+            u = a + OFFSET
+            for b in range(samples):
+                v = b + OFFSET
+                f = noise2(u, v, tb, per)
+                d = max(abs(noise2(u + lshift, v, tb, per) - f),
+                        abs(noise2(u, v + lshift, tb, per) - f))
+                if d > worst:
+                    worst = d
+                lo_v = f if lo_v is None or f < lo_v else lo_v
+                hi_v = f if hi_v is None or f > hi_v else hi_v
+        return worst, hi_v - lo_v
+
+    for l in range(0, HI + 1):
+        e, pp = octave_shift(tbl_P, l, SHIFT)
+        if pp <= 0.0:
+            fail(f"octave {l}: the rig's own sample set is degenerate (peak-to-peak 0)")
+        elif LO <= l <= HI:
+            check(f"octave {l} of the {HOCT}-octave stack, shifted {SHIFT} cells over a "
+                  f"{HPER}-entry table (:117 'bit-identical')", e, 0.0)
+        elif e >= FULL_AMP * pp:
+            passed(f"octave {l} is NOT bit-identical at {SHIFT} cells ({e:.3g} over a {pp:.3g} "
+                   f"peak-to-peak), which is why :117 says {LO}–{HI} and not 0–{HI}")
+        else:
+            fail(f"octave {l} repeats at {SHIFT} cells too ({e:.3g}); :117 says only {LO}–{HI} do")
+    for l in range(LO, HI + 1):
+        e, pp = octave_shift(tbl_long, l, SHIFT)
+        if e >= FULL_AMP * pp:
+            passed(f"octave {l} over a {ENTRIES_121}-entry table is NOT bit-identical at "
+                   f"{SHIFT} cells: {e:.3g} over a {pp:.3g} peak-to-peak, page {LONG_ERR:g}")
+        else:
+            fail(f"octave {l} over a {ENTRIES_121}-entry table still repeats at {SHIFT} cells "
+                 f"({e:.3g}); :118 says the long table cures it ({LONG_ERR:g})")
+
+    # ── :112-113 and :435 are the SAME measurement printed twice. Cross-read every figure. ─
+    A112 = page(r"(With a \d+-entry table a `P` = \d+ tile is a \d+ tile laid \d+×\d+ — "
+                r"[-\d.eE+]+\s*\ninside it against [-\d.eE+]+ with a \d+-entry table — while the "
+                r"`T = P` wrap test reads [-\d.eE+]+ either\s*\nway, blind to it)",
+                "the 4×4 self-repeat measurement (:112-113)", 1, re.S)
+    a112 = inner(r"With a (\d+)-entry table a `P` = (\d+) tile is a (\d+) tile laid (\d+)×(\d+) — "
+                 r"([-\d.eE+]+)\s+inside it against ([-\d.eE+]+) with a (\d+)-entry table — while "
+                 r"the `T = P` wrap test reads ([-\d.eE+]+) either", A112,
+                 "the figures of the 4×4 self-repeat measurement (:112-113)", re.S)
+    F435 = page(r"(`P` was set to \d+ over a \d+-entry permutation table.*?come out bit-identical "
+                r"at a \d+-cell shift)", "the failure table's aliasing mechanism cell (:435)", 1, re.S)
+    f435a = inner(r"`P` was set to (\d+) over a (\d+)-entry permutation table", F435,
+                  "the failure table's P and table length (:435)")
+    f435b = inner(r"the tile is a (\d+) tile laid (\d+)×(\d+); measured "
+                  r"`max\\\|f\(x\) − f\(x\+(\d+)\)\\\|` = ([-\d.eE+]+) inside the tile, against "
+                  r"([-\d.eE+]+) with a (\d+)-entry table, while the wrap test at `T = P` reads "
+                  r"([-\d.eE+]+) either way", F435,
+                  "the failure table's restatement of the 4×4 measurement (:435)")
+    f435c = inner(r"octaves (\d+)–(\d+) of the (\w+)-octave, lacunarity-(\d+) stack come out "
+                  r"bit-identical at a (\d+)-cell shift", F435,
+                  "the failure table's restatement of the octave aliasing (:435)")
+    same("the tile period P, :117 against :112", HPER, int(a112.group(2)), ":117", ":112")
+    same("the tile period P, :117 against the failure table", HPER, int(f435a.group(1)),
+         ":117", ":435")
+    same("the permutation table's length, :107 against :112", TSIZE, int(a112.group(1)),
+         ":107", ":112")
+    same("the permutation table's length, :107 against the failure table", TSIZE,
+         int(f435a.group(2)), ":107", ":435")
+    same("the aliased inner tile, :112 against the failure table", int(a112.group(3)),
+         int(f435b.group(1)), ":112", ":435")
+    check(f"the inner tile is the permutation table's own length", float(int(a112.group(3))),
+          float(TSIZE))
+    check(f"the tile is laid P/table = {HPER}/{TSIZE} across", float(HPER // TSIZE),
+          float(int(a112.group(4))))
+    check(f"and P/table = {HPER}/{TSIZE} down", float(HPER // TSIZE), float(int(a112.group(5))))
+    same("the repeat count across, :112 against the failure table", int(a112.group(4)),
+         int(f435b.group(2)), ":112", ":435")
+    same("the repeat count down, :112 against the failure table", int(a112.group(5)),
+         int(f435b.group(3)), ":112", ":435")
+    same("the shift the inner repeat is measured at, :435 against the table length :107",
+         int(f435b.group(4)), TSIZE, ":435", ":107")
+    same("the inner-repeat error, :112 against the failure table", float(a112.group(6)),
+         float(f435b.group(5)), ":112", ":435")
+    same("the long-table control, :112 against the failure table", float(a112.group(7)),
+         float(f435b.group(6)), ":112", ":435")
+    same("the control table's length, :112 against the failure table", int(a112.group(8)),
+         int(f435b.group(7)), ":112", ":435")
+    same("the T = P wrap test, :113 against the failure table", float(a112.group(9)),
+         float(f435b.group(8)), ":113", ":435")
+    same("the aliasing octaves (lower), :117 against the failure table", LO,
+         int(f435c.group(1)), ":117", ":435")
+    same("the aliasing octaves (upper), :117 against the failure table", HI,
+         int(f435c.group(2)), ":117", ":435")
+    same("the stack's octave count, :117 against the failure table", HOCT,
+         WORDS[f435c.group(3)], ":117", ":435")
+    same("the stack's lacunarity, :117 against the failure table", HLAC, int(f435c.group(4)),
+         ":117", ":435")
+    same("the aliasing shift, :118 against the failure table", SHIFT, int(f435c.group(5)),
+         ":118", ":435")
+    check(f"the control table is as long as the tile is wide, P = {HPER}",
+          float(int(a112.group(8))), float(HPER))
+
+    INNER_E, CTRL_E, TP_E = (float(a112.group(g)) for g in (6, 7, 9))
+    if INNER_E <= EXACT_MAX:
+        passed(f"the {TSIZE}-cell self-repeat inside the tile measures {INNER_E:g} -- the EXACT "
+               f"population, i.e. the tile really is {a112.group(4)}×{a112.group(5)} copies")
+    else:
+        fail(f":112 says a P tile over a {TSIZE}-entry table IS a {TSIZE} tile laid "
+             f"{a112.group(4)}×{a112.group(5)}, and measures {INNER_E:g} -- not a repeat at all")
+    if CTRL_E >= FAIL_MIN:
+        passed(f"and with a {HPER}-entry table that same shift measures {CTRL_E:g} -- the "
+               f"FAILING population, so the defect is the table's length and nothing else")
+    else:
+        fail(f":112's {HPER}-entry control measures {CTRL_E:g}, in the EXACT population -- then "
+             f"the long table aliases too and the sentence has no control")
+    if TP_E <= EXACT_MAX:
+        passed(f"the `T = P` wrap test reads {TP_E:g} either way -- EXACT, which is exactly why "
+               f":113 calls it blind to the defect")
+    else:
+        fail(f":113 says the `T = P` wrap test passes either way; {TP_E:g} is a failing wrap")
+
+    e, _ = wrap_error(TSIZE, tbl, HPER)
+    check(f"a P = {HPER} tile hashed through a {TSIZE}-entry table repeats every {TSIZE} cells "
+          f"INSIDE itself (:112)", e, 0.0)
+    e, pp = wrap_error(TSIZE, tbl_P, HPER)
+    if pp > 0.0 and e >= FULL_AMP * pp:
+        passed(f"and with a {HPER}-entry table it does not: {e:.3g} over a {pp:.3g} peak-to-peak, "
+               f"page {CTRL_E:g}")
+    else:
+        fail(f"a {HPER}-entry table still repeats every {TSIZE} cells here ({e:.3g}); :112 says "
+             f"{CTRL_E:g}")
+    e_s, _ = wrap_error(HPER, tbl, HPER)
+    e_l, _ = wrap_error(HPER, tbl_P, HPER)
+    check(f"the `T = P` wrap test over the {TSIZE}-entry table (:113 'either way')", e_s, 0.0)
+    check(f"the `T = P` wrap test over the {HPER}-entry table (:113 'either way')", e_l, 0.0)
 
     # ── E. `P_l = P * frequency_l, MUST be an integer` ─────────────────────────────────────
     head("E. :43 P_l MUST be an integer, against the lacunarity table :161-163")
@@ -691,12 +955,31 @@ def gate() -> int:
           float(Fraction(int(f436.group(7))) * Fraction(int(f436.group(8)), int(f436.group(9)))
                 ** int(f436.group(10))), float(Fraction(f436.group(11))))
 
+    M436 = page(r"(`period × lacunarity\^k` stopped being an integer at some octave; measured "
+                r"[-\d.eE+]+ at lacunarity [\d.]+ with period \d+)",
+                "the failure table's lacunarity mechanism cell (:436)")
+    m436 = inner(r"measured ([-\d.eE+]+) at lacunarity ([\d.]+) with period (\d+)", M436,
+                 "the figures of the failure table's lacunarity mechanism (:436)")
+    same("the fBm's period, :159 against the failure table", PBASE, int(m436.group(3)),
+         ":159", ":436")
+    if float(m436.group(2)) in LACS:
+        passed(f"the failure table's lacunarity {m436.group(2)} is a column of the table "
+               f":161 measures ({[f'{x:g}' for x in LACS]})")
+        same(f"the wrap error at lacunarity {m436.group(2)}, :163 against the failure table",
+             ERRS[LACS.index(float(m436.group(2)))], float(m436.group(1)), ":163", ":436")
+    else:
+        fail(f"the failure table measures lacunarity {m436.group(2)}; :161's columns are "
+             f"{[f'{x:g}' for x in LACS]} -- the two ends no longer measure the same thing")
+
     for lac, want in zip(LACS, ERRS):
         if not (want <= EXACT_MAX or want >= FAIL_MIN):
             fail(f"lacunarity {lac:g}: the page's {want:g} falls between this rig's two "
                  f"populations ({EXACT_MAX:g} .. {FAIL_MIN:g}) and states neither")
             continue
-        got = fbm_wrap_error(PBASE, lac, NOCT)
+        got, pp = fbm_wrap_error(PBASE, lac, NOCT)
+        if pp <= 0.0:
+            fail(f"lacunarity {lac:g}: the rig's own sample set is degenerate (peak-to-peak 0)")
+            continue
         page_exact = want <= EXACT_MAX
         rig_exact = got <= EXACT_MAX
         if page_exact == rig_exact and (rig_exact or got >= FAIL_MIN):
@@ -710,9 +993,28 @@ def gate() -> int:
     PRED_T = pagei(r"integrality of every octave for lacunarity [^:]+? at `T = (\d+)`",
                    "the period they were checked at (:171)", 1)
     fr = [(int(a), int(b or 1)) for a, b in re.findall(r"(\d+)(?:/(\d+))?", PRED)]
+    # ⚠️ `PRED_T % den**E` and `fbm_wrap_error(PRED_T, ...)` are the same arithmetic on the
+    # same two parsed numbers, so "the condition predicts the outcome" is green at ANY T the
+    # page cares to print -- 63, 97, 2048. T is therefore pinned to the period the fBm this
+    # rule was checked against actually ran at (:159, restated at :436), and the rule is then
+    # re-derived a second way, from the integrality of each octave's P·lacunarity^k over exact
+    # rationals, which is the check :170 says was performed.
+    same("the period the rule was checked at, :171 against the fBm's own period :159",
+         PRED_T, PBASE, ":171", ":159")
     for num, den in fr:
         rule = PRED_T % (den ** E) == 0
-        got = fbm_wrap_error(PRED_T, num / den, NOCT)
+        octs = [Fraction(PRED_T) * Fraction(num, den) ** k for k in range(NOCT)]
+        integral = all(o.denominator == 1 for o in octs)
+        if rule != integral:
+            fail(f"lacunarity {num}/{den}: q^(n−1) = {den}^{E} "
+                 f"{'divides' if rule else 'does not divide'} {PRED_T}, but the octave periods "
+                 f"{[str(o) for o in octs]} are {'all' if integral else 'not all'} integers -- "
+                 f":170's 'checked against the integrality of every octave' does not hold")
+            continue
+        got, pp = fbm_wrap_error(PRED_T, num / den, NOCT)
+        if pp <= 0.0:
+            fail(f"lacunarity {num}/{den}: the rig's own sample set is degenerate")
+            continue
         seen = got <= EXACT_MAX
         if rule == seen:
             passed(f"lacunarity {num}/{den}: q^(n−1) = {den}^{E} "
@@ -723,39 +1025,131 @@ def gate() -> int:
                  f"the rig measures {got:.3g} -- 'the condition predicts the outcome in every "
                  f"case' does not hold")
 
+    # :172-173 name three MORE periods, independently of :171's T: 5/4 escapes at q^(n−1) =
+    # 1024, 3/2 escapes at 32 over six octaves, and :436 says 3/2 does NOT escape at 16. Run
+    # all three. A T walked at :171 now contradicts a T fixed here.
+    for lacstr, per, oct_n, want_exact, at in (
+            (ESC_LAC, ESC_N, NOCT, True, ":172"),
+            (NEED_LAC, NEED_P, NEED_OCT, True, ":173"),
+            (NEED_LAC, int(f436.group(6)), NEED_OCT, False, ":436")):
+        n_, d_ = (int(x) for x in lacstr.split("/"))
+        got, pp = fbm_wrap_error(per, n_ / d_, oct_n)
+        if pp <= 0.0:
+            fail(f"lacunarity {lacstr} at P = {per}: degenerate sample set (peak-to-peak 0)")
+            continue
+        seen = got <= EXACT_MAX
+        if seen == want_exact:
+            passed(f"{at}: a {oct_n}-octave fBm at lacunarity {lacstr} and period {per} "
+                   f"{'WRAPS' if seen else 'SEAMS'} ({got:.3g}), as the page says -- and "
+                   f"{d_}^{oct_n - 1} = {d_ ** (oct_n - 1)} "
+                   f"{'divides' if per % d_ ** (oct_n - 1) == 0 else 'does not divide'} {per}")
+        else:
+            fail(f"{at}: a {oct_n}-octave fBm at lacunarity {lacstr} and period {per} measures "
+                 f"{got:.3g}; the page says it "
+                 f"{'wraps exactly' if want_exact else 'does not wrap'}")
+
     # ── F. `sim: neighbour(i, j) = grid[(i + di) mod H, (j + dj) mod W]` ───────────────────
     head("F. :44 the wrapping neighbour lookup, and what it exports")
     SIDE_E = pagei(r"A (\d+)² field is built by the modular construction", "the erosion grid (:198)")
+    DHDR = ints(" ".join(row(r"^\| boundary \| \d+ steps \|.*$", "the depth table's header (:228)")))
+    DEPTHS = [int(cell(c, "a depth")) for c in
+              row(r"^\| closed \*\*and\*\* open, depth where error > 0\.1% \(both measured the "
+                  r"same\) \|.*$", "the 0.1%-error depth row (:231)")]
+    D440 = ints(page(r"not of a kernel radius: ([\d ,→]+?) cells at [\d ,→]+ steps",
+                     "the failure table's crop depths (:440)"))
+    S440 = ints(page(r"not of a kernel radius: [\d ,→]+ cells at ([\d ,→]+?) steps",
+                     "the failure table's crop step counts (:440)"))
+    _C66 = r"the crop grows with simulated time: (\d+) cells at (\d+)\s*\nsteps, (\d+) at (\d+),"
+    D66 = [pagei(_C66, "the shallowest crop in the headline (:66)", 1),
+           pagei(_C66, "the deepest crop in the headline (:67)", 3)]
+    S66 = [pagei(_C66, "its first step count (:66)", 2),
+           pagei(_C66, "its last step count (:67)", 4)]
     STEPS = ints(page(r"^\| torus \| ([\d /]+) \|", "the torus row's step counts (:207)", 1, re.M))
     T_EXPORT = cell(row(r"^\| torus \|.*$", "the torus row")[4], "the torus export")
     C_EXPORT = cell(row(r"^\| closed \|.*$", "the closed row")[4], "the closed export")
     O_EXPORT = cell(row(r"^\| open \|.*$", "the open row")[4], "the open export")
     T_DRIFT = cell(row(r"^\| torus \|.*$", "the torus row")[3], "the torus mass drift")
-    E51 = pagef(r"Toroidal erosion conserves mass to `([\d.e-]+)` and exports \*\*([\d.]+)%\*\*",
+    E51 = pagef(r"Toroidal erosion conserves mass to `([-\d.eE+]+)` and exports \*\*([\d.]+)%\*\*",
                 "the headline's toroidal drift (:51)")
-    E51X = pagef(r"conserves mass to `[\d.e-]+` and exports \*\*([\d.]+)%\*\*",
+    E51X = pagef(r"conserves mass to `[-\d.eE+]+` and exports \*\*([\d.]+)%\*\*",
                  "the headline's toroidal export (:51)")
     E52 = pagef(r"export ([\d.]+)% of the terrain and flatten the seam", "the headline's open export (:52)")
     E439 = pagef(r"and ([\d.]+)% of terrain mass exported", "the failure table's open export (:439)")
     same("toroidal export, :51 against the table", E51X, T_EXPORT, ":51", ":207")
     same("toroidal mass drift, :51 against the table", E51, T_DRIFT, ":51", ":207")
+    _R241 = (r"Measured: `exported =\s*\n([\d.]+)%` and mass drift `([-\d.eE+]+)` over (\d+) steps")
+    same("toroidal export, :207 against §A torus has no outlet", T_EXPORT,
+         pagef(_R241, "the toroidal export restated (:240)", 1), ":207", ":240")
+    same("toroidal mass drift, :207 against §A torus has no outlet", T_DRIFT,
+         pagef(_R241, "the toroidal drift restated (:241)", 2), ":207", ":241")
+    same("the step count that drift is measured over, :207 against :241", STEPS[-1],
+         pagei(_R241, "the step count it is measured over (:241)", 3), ":207", ":241")
     same("open export, :52 against the failure table", E52, E439, ":52", ":439")
     check("open export, the headline's 2 dp against the table's 3", round(O_EXPORT, 2), E52)
-    if T_DRIFT <= 1e-14:
-        passed(f"the page's toroidal drift {T_DRIFT:g} is machine-epsilon scale, as 'conserved' "
-               f"requires (this rig cannot reproduce another solver's summation order)")
+    if T_DRIFT <= MACHINE_MAX:
+        passed(f"the page's toroidal drift {T_DRIFT:g} is {T_DRIFT / MACHINE_ULP:.2f} ulp of a "
+               f"unit-scale sum -- machine precision, as :212 claims (this rig cannot reproduce "
+               f"another solver's summation order, only the scale of its residue)")
     else:
-        fail(f"the page calls {T_DRIFT:g} conserved; that is not machine-epsilon scale")
+        fail(f":212 calls the toroidal drift 'machine precision' and :207 prints {T_DRIFT:g} -- "
+             f"{T_DRIFT / MACHINE_ULP:.0f} ulp, past this rig's {MACHINE_MAX:g} ceiling; a "
+             f"drift that large is a solver residue, not a rounding")
+    if len(D440) == len(DEPTHS) and all(a == b for a, b in zip(D440, DEPTHS)):
+        passed(f"the crop depths, :231 against the failure table: both say {DEPTHS} cells")
+    else:
+        fail(f"the crop depths disagree: :231 says {DEPTHS}, :440 says {D440}")
+    if len(S440) == len(DHDR) == len(STEPS) and all(a == b == c for a, b, c
+                                                    in zip(S440, DHDR, STEPS)):
+        passed(f"the step counts, :207 against :228 against the failure table: all {STEPS}")
+    else:
+        fail(f"the step counts disagree: :207 {STEPS}, :228 {DHDR}, :440 {S440}")
+    if [D66[0], D66[-1]] == [DEPTHS[0], DEPTHS[-1]] and [S66[0], S66[-1]] == [STEPS[0], STEPS[-1]]:
+        passed(f"the headline's '{D66[0]} cells at {S66[0]} steps, {D66[-1]} at {S66[-1]}' is "
+               f"the depth table's own first and last columns")
+    else:
+        fail(f":66-67 says {D66} cells at {S66} steps; the table says {DEPTHS} at {STEPS}")
+    # ⚠️ :198's grid is BOTH the size under test and this rig's own grid, so shrinking it on
+    # the page silently re-points the rig. It is pinned here to the page's OTHER measurement of
+    # the same run: at the deepest step count the wrong boundary reaches DEEPEST cells in from
+    # every edge (:231), so only (side − 2·DEEPEST)² cells are undamaged interior. :201 divides
+    # every ratio in :204-209 by a mean over "interior neighbours"; require that undamaged
+    # interior to be at least half the domain, or the denominator is itself boundary-damaged
+    # and the table does not measure what :201 says it measures.
+    DEEPEST = max(DEPTHS)
+    core = (SIDE_E - 2 * DEEPEST) ** 2
+    if core * 2 >= SIDE_E * SIDE_E:
+        passed(f"{SIDE_E}² leaves {core} of {SIDE_E * SIDE_E} cells more than {DEEPEST} cells "
+               f"(:231, at {STEPS[-1]} steps) from an edge -- the interior :201 divides by is "
+               f"{100.0 * core / (SIDE_E * SIDE_E):.0f}% of the domain")
+    else:
+        fail(f":198 measures on {SIDE_E}², and :231 says the wrong boundary reaches "
+             f"{DEEPEST} cells in from every edge at {STEPS[-1]} steps -- that leaves only "
+             f"{core} of {SIDE_E * SIDE_E} cells undamaged, under half, so :201's 'mean "
+             f"absolute step between interior neighbours' has no interior to average over")
+
     tiles = {}
     for name in ("closed", "open", "looped / toroidal"):
         r = row(rf"^\| \*\*{re.escape(name)}\*\*.*$", f"the {name} row of the boundary table (:186-190)")
-        tiles[name] = (r[0], r[2])
+        tiles[name] = (r[0], r[1], r[2])
+    # :219-220 states the rule the mass column has to obey: "`closed`'s 'conserved' claim rests
+    # on `exported = 0.000%`, not that column". So the mass column is the export column, in
+    # words -- and a row that exports is a row that does not conserve.
+    for name, exp, at in (("closed", C_EXPORT, ":208"), ("open", O_EXPORT, ":209"),
+                          ("looped / toroidal", T_EXPORT, ":207")):
+        want = "exported" if exp > 0.0 else "conserved"
+        got_mass = tiles[name][1]
+        if got_mass == want:
+            passed(f"the boundary table calls {name!r} mass {got_mass!r}, and {at} measures "
+                   f"{exp:g}% exported -- :219-220's rule")
+        else:
+            fail(f"the boundary table calls {name!r} mass {got_mass!r} while {at} measures "
+                 f"{exp:g}% of the terrain exported")
     if re.search(r"grid\[\(i\+di\) % H, \(j\+dj\) % W\]", tiles["looped / toroidal"][0]):
         passed("the boundary table's looped row carries the fence's own neighbour expression")
     else:
         fail(f"the looped row's line is {tiles['looped / toroidal'][0]!r}, not the fence's "
              f"`grid[(i+di) % H, (j+dj) % W]`")
-    yes = [k for k, v in tiles.items() if v[1] == "yes"]
+    yes = [k for k, v in tiles.items() if v[2] == "yes"]
     if yes == ["looped / toroidal"]:
         passed("exactly one of the three boundaries tiles, and it is the looped one")
     else:
@@ -810,11 +1204,17 @@ def gate() -> int:
         if torus:
             check(f"toroidal export over 12 steps of the fence's own lookup, % of mass",
                   pct, want)
-            if drift <= 1e-14:
-                passed(f"and the rig's own mass drift is {drift:.3g} -- machine-epsilon, the "
-                       f"page's column is {T_DRIFT:g}")
+            # the rig's OWN residue is a naive sum of H*W terms, so its closed-form worst
+            # case is H*W ulp -- not MACHINE_MAX, which bounds the page's single printed
+            # figure. Using the page's ceiling here would gate this rig's summation order.
+            own_max = H * W * MACHINE_ULP
+            if drift <= own_max:
+                passed(f"and the rig's own mass drift is {drift:.3g} = {drift / MACHINE_ULP:.1f} "
+                       f"ulp, inside the {H * W} ulp a naive sum of {H * W} terms can reach; "
+                       f"the page's column is {T_DRIFT:g}")
             else:
-                fail(f"the rig's toroidal mass drift is {drift:.3g}, not machine-epsilon")
+                fail(f"the rig's toroidal mass drift is {drift:.3g}, past the {own_max:.3g} a "
+                     f"sum of {H * W} float64 terms can accumulate -- mass is leaving a torus")
         elif pct > 0 and want > 0:
             passed(f"open edges export {pct:.3f}% here against the page's {want:g}% -- the "
                    f"magnitude is that solver's, the sign is the claim")
@@ -822,6 +1222,85 @@ def gate() -> int:
             fail(f"open edges exported {pct:.3f}% here and the page says {want:g}%")
     check("the closed boundary exports nothing either (its 'conserved' rests on this column)",
           0.0, C_EXPORT)
+
+    # ── the seam-ratio column, cross-read at every end that restates it ───────────────────
+    SEED_SEAM = cell(row(r"^\| \*seed\* \|.*$", "the seed row (:206)")[1], "the seed seam ratio")
+    C_SEAM = cell(row(r"^\| closed \|.*$", "the closed row")[1].split("/")[-1],
+                  "the closed seam ratio at the deepest step count")
+    O_SEAM = cell(row(r"^\| open \|.*$", "the open row")[1].split("/")[-1],
+                  "the open seam ratio at the deepest step count")
+    SEAM199 = pagef(r"so it wraps bit-exactly before erosion starts \(seam ratio ([\d.]+) —",
+                    "the seed seam ratio in prose (:199)")
+    NEUTRAL = pagef(r"absolute step between interior neighbours; ([\d.]+) means the seam is",
+                    "the seam ratio that means 'indistinguishable' (:202)")
+    _R215 = (r"The wrapped step goes from ([\d.]+) of an interior step to\s*\n\s*([\d.]+) — a "
+             r"(\d+)% relative rise — and the outer four cells drift ([\d.]+)% of relief")
+    FROM215 = pagef(_R215, "the seam ratio it rises from (:215)", 1)
+    TO215 = pagef(_R215, "the seam ratio it rises to (:216)", 2)
+    RISE215 = pagei(_R215, "the relative rise (:216)", 3)
+    RIM216 = pagef(_R215, "the rim drift (:216)", 4)
+    f438 = inner(r"measured seam ratio ([\d.]+) and rim drift ([\d.]+)% of relief",
+                 page(r"(measured seam ratio [\d.]+ and rim drift [\d.]+% of relief)",
+                      "the failure table's closed-boundary row (:438)"),
+                 "the figures of the failure table's closed-boundary row (:438)")
+    S221 = pagef(r"\*\*Open planes the seam flat\.\*\* ([\d.]+) means the seam is",
+                 "the open seam ratio in prose (:221)")
+    f439 = inner(r"measured seam ratio ([\d.]+) against an interior of ([\d.]+)",
+                 page(r"(measured seam ratio [\d.]+ against an interior of [\d.]+)",
+                      "the failure table's open-boundary row (:439)"),
+                 "the figures of the failure table's open-boundary row (:439)")
+    S52 = pagef(r"flatten the seam to ([\d.]+)× the interior roughness",
+                "the headline's open seam ratio (:52)")
+    same("the seed seam ratio, :199 against the table", SEAM199, SEED_SEAM, ":199", ":206")
+    same("the seam ratio it rises from, :215 against the table", FROM215, SEED_SEAM, ":215", ":206")
+    same("the closed seam ratio, :216 against the table", TO215, C_SEAM, ":216", ":208")
+    same("the closed seam ratio, :208 against the failure table", C_SEAM, float(f438.group(1)),
+         ":208", ":438")
+    same("the closed rim drift, :216 against the failure table", RIM216, float(f438.group(2)),
+         ":216", ":438")
+    check(f"the {RISE215}% relative rise, from the table's own two seam ratios "
+          f"({C_SEAM:g} over {SEED_SEAM:g})",
+          round(100.0 * (C_SEAM / SEED_SEAM - 1.0)), float(RISE215))
+    same("the open seam ratio, :221 against the table", S221, O_SEAM, ":221", ":209")
+    same("the open seam ratio, :209 against the failure table", O_SEAM, float(f439.group(1)),
+         ":209", ":439")
+    same("'an interior of 1.0', :439 against the seam ratio's own definition",
+         float(f439.group(2)), NEUTRAL, ":439", ":202")
+    # :54's 221× for a 221.5 cell is the recorded truncate-or-round defect; :52's 0.39× for
+    # 0.389 is the identical relation, gated the identical way. The band is ONE HUNDREDTH,
+    # fixed here in the rig with its reason -- a quote of a ratio may truncate or round at the
+    # hundredth and this corpus has a recorded defect for exactly that -- and NOT read off how
+    # many digits :52 chooses to print, so the page cannot widen it by printing fewer.
+    if math.floor(O_SEAM * 100.0) / 100.0 <= S52 <= math.ceil(O_SEAM * 100.0) / 100.0:
+        passed(f"the headline's {S52:g}× is the table's {O_SEAM:g} "
+               f"{'truncated' if S52 == math.floor(O_SEAM * 100.0) / 100.0 else 'rounded'} "
+               f"to 2 dp (:52 against :209)")
+    else:
+        fail(f":52 says the open boundary flattens the seam to {S52:g}× and :209 measures "
+             f"{O_SEAM:g}")
+    if O_SEAM < NEUTRAL < C_SEAM:
+        passed(f"open planes the seam below {NEUTRAL:g} ({O_SEAM:g}) and closed opens it above "
+               f"({C_SEAM:g}) -- :215 and :221's two directions, from the table's own cells")
+    else:
+        fail(f":215 says closed opens the seam upward and :221 says open planes it flat; the "
+             f"table reads closed {C_SEAM:g}, open {O_SEAM:g}, neutral {NEUTRAL:g}")
+
+    # ── how much mass an OPEN edge can take, bounded by the page's own depth table ────────
+    # :231: at the deepest step count the open boundary's field differs from the torus's by
+    # more than 0.1% of relief only within DEEPEST cells of an edge, and the torus exports
+    # nothing (:207). So the mass that left came out of that rim, and the rim is
+    # 1 − ((side − 2·DEEPEST)/side)² of a side² domain by area. This is an upper bound with a
+    # factor of sixteen of headroom on the page's own 2.184%, not a band around it.
+    rim_pct = 100.0 * (1.0 - ((SIDE_E - 2 * DEEPEST) / SIDE_E) ** 2)
+    if 0.0 < O_EXPORT <= rim_pct:
+        passed(f"the open boundary exports {O_EXPORT:g}% of the terrain, inside the "
+               f"{rim_pct:.1f}% that lies within {DEEPEST} cells of an edge on {SIDE_E}² "
+               f"(:231) -- mass from deeper in would have moved the interior by more than the "
+               f"0.1% of relief :231 measures")
+    else:
+        fail(f":209 exports {O_EXPORT:g}% of the terrain, but :231 says the open boundary only "
+             f"reaches {DEEPEST} cells in, which is {rim_pct:.1f}% of a {SIDE_E}² domain -- the "
+             f"two measurements of the same run contradict each other")
 
     # ── G. `route: priority_flood(seeds = [the one authored sink])` ────────────────────────
     head("G. :45 priority-flood on a torus, against the table :256-260")
@@ -851,8 +1330,28 @@ def gate() -> int:
     same("toroidal catchment, :53 against the failure table", ACC53, ACC442, ":53", ":442")
     same("plane catchment, :53 against the table", ACC53B,
          cell(PLANE[4].split("=")[1], "the % cell"), ":53", ":258")
+    _R278 = (r"With (\d+) outlets sharing the load the largest catchment is (\d+)%\s*\nof the "
+             r"domain; with one, it is (\d+)% by definition")
+    OUT278 = pagei(_R278, "the plane's outlet count (:278)", 1)
+    ACC278 = pagei(_R278, "the plane's largest catchment, to the whole percent (:278)", 2)
+    ONE278 = pagei(_R278, "the torus's catchment, to the whole percent (:279)", 3)
+    same("the plane's outlet count, :54 against :278", OUTLETS, OUT278, ":54", ":278")
+    # ⚠️ count-against-percent alone is one division: move the count and the percent together
+    # and it stays green. :278 prints the same catchment a second time, to the whole percent.
+    check(f"the plane's largest catchment at :258 ({ACC53B:g}%), to the whole percent as :278 "
+          f"prints it", round(ACC53B), float(ACC278))
+    check(f"the torus's catchment at :259 ({ACC53:g}%), to the whole percent as :279 prints it",
+          round(ACC53), float(ONE278))
+    PLANE_CNT = cell(PLANE[4].split("=")[0], "the plane's accumulation count")
+    SINK_CNT = cell(SINK[4].split("=")[0], "the torus's accumulation count")
     check("the plane's largest catchment, count against percent (:258)",
-          round(100.0 * cell(PLANE[4].split("=")[0], "the count") / CELLS, 2), ACC53B)
+          round(100.0 * PLANE_CNT / CELLS, 2), ACC53B)
+    if 0 < PLANE_CNT < CELLS:
+        passed(f"the plane's largest catchment is {PLANE_CNT:g} of {CELLS} cells -- a strict "
+               f"fraction, because {OUT278} outlets share the load (:278)")
+    else:
+        fail(f":258 gives the plane's largest catchment as {PLANE_CNT:g} of {CELLS} cells, and "
+             f":278 says {OUT278} outlets SHARE the load")
     check("the torus's catchment, count against percent (:259)",
           round(100.0 * cell(SINK[4].split("=")[0], "the count") / CELLS, 2), ACC53)
     same("fill volume rise, :280 against the failure table", FILL280, FILL442, ":280", ":442")
@@ -866,8 +1365,9 @@ def gate() -> int:
     edge = [c for c in range(SIDE * SIDE)
             if c // SIDE in (0, SIDE - 1) or c % SIDE in (0, SIDE - 1)]
     check(f"a {SIDE}² plane's edge cells, counted", float(len(edge)), cell(PLANE[0], "seeds"))
-    _, reached, _ = priority_flood(fld, SIDE, edge, torus=False)
+    filled_p, reached, _ = priority_flood(fld, SIDE, edge, torus=False)
     check("plane, open edges: cells reached", float(reached), cell(PLANE[1], "cells reached"))
+    acc_p = d8_accumulation(filled_p, SIDE, torus=False)
     one = [SIDE * SIDE // 2 + SIDE // 3]
     fld_s = list(fld)
     fld_s[one[0]] = -1.0                        # [barnes2014] §3.2: a pinned low cell is a seed
@@ -875,10 +1375,21 @@ def gate() -> int:
     filled, reached, _ = priority_flood(fld_s, SIDE, one, torus=True)
     check("torus, one authored sink: cells reached", float(reached), cell(SINK[1], "cells reached"))
     acc = d8_accumulation(filled, SIDE, torus=True)
-    check("torus, one authored sink: max accumulation, in cells",
-          float(acc), cell(SINK[4].split("=")[0], "the accumulation count"))
+    check("torus, one authored sink: max accumulation, in cells", float(acc), SINK_CNT)
     check("torus, one authored sink: max accumulation, as % of domain",
           round(100.0 * acc / CELLS, 2), ACC53)
+    # the same routing, run on the PLANE's filled field -- the arm :258's 2803 comes from and
+    # the one the rig used to skip. The count is that field's, so what is gated is :278-279's
+    # own contrast: many outlets share, one takes everything.
+    if 0 < acc_p < acc == CELLS:
+        passed(f"plane, {len(edge)} open edge outlets: largest catchment {acc_p} of {CELLS} "
+               f"cells ({100.0 * acc_p / CELLS:.2f}%), strictly inside the torus's {acc} = "
+               f"{ACC53:g}% -- :278's '{ACC278}% ... with one, it is {ONE278}% by definition' "
+               f"(the page's {PLANE_CNT:g} is its own field's)")
+    else:
+        fail(f"plane: largest catchment {acc_p} of {CELLS}, torus: {acc} -- :278-279 says the "
+             f"plane's {OUT278} outlets share the domain and the torus's one sink takes all "
+             f"{ONE278}% of it")
     _, reached, _ = priority_flood(fld, SIDE, [], torus=True)
     check("torus, no sink: cells reached (the queue starts empty)",
           float(reached), cell(NOSINK[1], "cells reached"))
@@ -889,6 +1400,8 @@ def gate() -> int:
     head("H. :46 wrap, never reflect, against the padding table :378-384")
     NPYR = pagei(r"`m6_pyramid_padding\.py`[^\n]*?, (\d+)², `a = [\d.]+`", "the pyramid grid (:375)")
     A = pagef(r", (?:\d+)², `a = ([\d.]+)`, input seam-to-interior", "the generating kernel's a (:375)")
+    IN_RATIO = pagef(r"input seam-to-interior step\s*\nratio ([\d.]+):",
+                     "the pyramid input's own seam ratio (:375-376)")
     LVLS = ints(" ".join(row(r"^\| padding \| L = .*$", "the padding table header")[:-1]))
     WRAPR = row(r"^\| `wrap` \|.*$", "the wrap row (:380)")
     REFR = row(r"^\| `reflect` \|.*$", "the reflect row (:381)")
@@ -899,6 +1412,15 @@ def gate() -> int:
                f"`lo + hi = h` holds by construction and CANNOT see a padding defect")
     else:
         fail(f"the round-trip column is not uniform: {RT} -- the page says it holds for every mode")
+    # ⚠️ uniform-and-equal-to-:443 is satisfied by a column of 1.1e+03. :387-388's claim is
+    # `lo + hi = h` HOLDS TO MACHINE PRECISION for every mode, so each cell has to be one.
+    for m, v in zip(("`wrap`", "`reflect`", "`symmetric`", "`edge`", "`constant` (zero)"), RT):
+        if v <= MACHINE_MAX:
+            passed(f"{m:<18s} round trip {v:g} = {v / MACHINE_ULP:.2f} ulp -- machine "
+                   f"precision, as :387-388 claims for every mode")
+        else:
+            fail(f"{m} round trip {v:g} = {v / MACHINE_ULP:.0f} ulp; :387-388 says `lo + hi = h` "
+                 f"holds to machine precision for every mode, and that is a residue, not one")
     ALLROWS = {m: [cell(c, f"a {m} cell") for c in
                    row(rf"^\| {re.escape(m)} \|.*$", f"the {m} row")[:-1]]
                for m in ("`wrap`", "`reflect`", "`symmetric`", "`edge`", "`constant` (zero)")}
@@ -912,13 +1434,54 @@ def gate() -> int:
         else:
             fail(f"L = {L}: the smallest seam is {best}'s {col[best]:g}, not `wrap`'s "
                  f"{col['`wrap`']:g} -- the fence says wrap")
+    for i, L in enumerate(LVLS):
+        w = ALLROWS["`wrap`"][i]
+        if w <= IN_RATIO:
+            passed(f"L = {L}: `wrap` leaves the seam at {w:g}, no worse than the {IN_RATIO:g} "
+                   f"the input already had (:375) -- ':386 only `wrap` keeps the seam in the "
+                   f"same population as the terrain'")
+        else:
+            fail(f"L = {L}: `wrap` padding raises the seam from the input's {IN_RATIO:g} to "
+                 f"{w:g} -- then :386's 'only `wrap` keeps the seam in the same population as "
+                 f"the terrain' is false and the fence's filter line has no basis")
     DEEP = max(LVLS)
+    for m, v in ALLROWS.items():
+        if m == "`wrap`":
+            continue
+        if v[LVLS.index(DEEP)] > IN_RATIO:
+            passed(f"L = {DEEP}: {m} raises the seam from the input's {IN_RATIO:g} to "
+                   f"{v[LVLS.index(DEEP)]:g}, out of the terrain's population")
+        else:
+            fail(f"L = {DEEP}: {m} leaves the seam at {v[LVLS.index(DEEP)]:g}, no worse than "
+                 f"the input's {IN_RATIO:g} -- :386 says only `wrap` does that")
+    # ⚠️ :375's grid is BOTH the size under test and this rig's own grid. Pin it to the page's
+    # own two statements about how deep a split this table runs: :393's halo for the deepest
+    # level, and :394-395's N ≡ 0 (mod 2^L). A domain shorter than the halo a level-L split
+    # reaches wraps its own padding round more than once, and the table's L column is then not
+    # a band split of that field at all.
+    HALO_A, HALO_B = (pagei(r"band split needs `halo ≥ (\d+)·2\^L − (\d+)`",
+                            "the tiled split's halo rule (:393)", g) for g in (1, 2))
+    need = HALO_A * 2 ** DEEP - HALO_B
+    if NPYR > need:
+        passed(f"{NPYR}² is wider than the halo a level-{DEEP} split reaches, "
+               f"{HALO_A}·2^{DEEP} − {HALO_B} = {need} (:393)")
+    else:
+        fail(f":375 measures on {NPYR}² and tabulates L = {DEEP}, whose halo is "
+             f"{HALO_A}·2^{DEEP} − {HALO_B} = {need} cells (:393) -- the padding wraps the "
+             f"domain more than once and the L = {DEEP} column is not a band split of it")
+    if NPYR % 2 ** DEEP == 0:
+        passed(f"and {NPYR} ≡ 0 (mod 2^{DEEP}), the condition :394-395 requires of the period "
+               f"before a wrap-padded split reproduces the infinite-periodic answer")
+    else:
+        fail(f":375 measures on {NPYR}² at L = {DEEP} and {NPYR} mod 2^{DEEP} = "
+             f"{NPYR % 2 ** DEEP}; :394-395 says the split is only right when that is 0, so the "
+             f"table's own rows are outside the rule this section states")
     L54 = WORDS[page(r"a (\w+)-level band split with `reflect` padding leaves a seam",
                      "the headline's level count (:54)")]
     S54 = pagef(r"band split with `reflect` padding leaves a seam \*\*(\d+)×\*\*",
                 "the headline's seam (:54)")
     S443, L443, RT443 = (page(r"measured seam (\d+)× an interior step at L = (\d+) while "
-                              r"`lo \+ hi == h` stayed exact to ([\d.e-]+)",
+                              r"`lo \+ hi == h` stayed exact to ([-\d.eE+]+)",
                               "the failure table's seam (:443)", g) for g in (1, 2, 3))
     same("the deepest level, :54 against the table header", L54, DEEP, ":54", ":378")
     same("the deepest level, :54 against the failure table", L54, int(L443), ":54", ":443")
@@ -1035,18 +1598,39 @@ def gate() -> int:
     PCT = pagei(r"evaluation — (\d+)%, and the two runs' spreads overlap", "its percentage (:58)")
     EMB, RATIO = (pagef(r"is \*\*([\d.]+) ms\*\*, \*\*([\d.]+)×\*\* that, at a max wrap error",
                         "the embedding's cost (:59)", g) for g in (1, 2))
-    MAXE, EX, EY = (page(r"at a max wrap error of `([\d.e-]+)` \(`([\d.e-]+)` on x, "
-                         r"`([\d.e-]+)` on y\)", "the embedding's wrap error (:59)", g)
+    MAXE, EX, EY = (page(r"at a max wrap error of `([-\d.eE+]+)` \(`([-\d.eE+]+)` on x, "
+                         r"`([-\d.eE+]+)` on y\)", "the embedding's wrap error (:59)", g)
                     for g in (1, 2, 3))
     f437 = re.search(r"timed, that pair is ([\d.]+) ms against ([\d.]+) ms per \d+² samples on a "
                      r"CPU rig, ([\d.]+)× and not the counted (\d+)×, at a max wrap error of "
-                     r"([\d.e-]+) \(([\d.e-]+) on x, ([\d.e-]+) on y\)",
+                     r"([-\d.eE+]+) \(([-\d.eE+]+) on x, ([-\d.eE+]+) on y\)",
                      page(r"(timed, that pair is [\d.]+ ms against [\d.]+ ms per \d+² samples on a "
                           r"CPU rig, [\d.]+× and not the counted \d+×, at a max wrap error of "
-                          r"[\d.e-]+ \([\d.e-]+ on x, [\d.e-]+ on y\))",
+                          r"[-\d.eE+]+ \([-\d.eE+]+ on x, [-\d.eE+]+ on y\))",
                           "the failure table's timing row (:437)"))
     C4, C2, CPRED = (pagei(r"where (\d+)-against-(\d+) predicts\n(\d+)×",
                            "the corner-count prediction (:149)", g) for g in (1, 2, 3))
+    # ⚠️ gating C4/C2 alone lets BOTH counts walk together: 32-against-8 also "predicts 4×".
+    # The two counts are the corner counts of a gradient lattice cell in the dimensions the
+    # page names -- 2^4 and 2^2 -- and the page prints the pair twice more, at :145 and :437.
+    NDIM4 = pagei(r"evaluate a (\d)-D noise there", "the embedding's dimensionality (:131)")
+    NDIM2 = pagei(r"the (\d)-D path is \*\*[\d.]+ ms\*\*", "the planar path's dimensionality (:149)")
+    C4_145, C2_145 = (pagei(r"never pays\. (\d+)-against-(\d+) is the\s*\n\*gradient\*-lattice figure",
+                            "the gradient corner counts in prose (:145)", g) for g in (1, 2))
+    C4_437, C2_437 = (pagei(r"corner count's [\d.]+×; (\d+)-against-(\d+) is the "
+                            r"\*gradient\*-lattice figure",
+                            "the gradient corner counts in the failure table (:437)", g)
+                      for g in (1, 2))
+    check(f"a {NDIM4}-D gradient lattice cell has 2^{NDIM4} corners (:131 'a {NDIM4}-D noise')",
+          float(2 ** NDIM4), float(C4))
+    check(f"a {NDIM2}-D gradient lattice cell has 2^{NDIM2} corners (:149 'the {NDIM2}-D path')",
+          float(2 ** NDIM2), float(C2))
+    same("the 4-D gradient corner count, :149 against :145", C4, C4_145, ":149", ":145")
+    same("the 2-D gradient corner count, :149 against :145", C2, C2_145, ":149", ":145")
+    same("the 4-D gradient corner count, :149 against the failure table", C4, C4_437,
+         ":149", ":437")
+    same("the 2-D gradient corner count, :149 against the failure table", C2, C2_437,
+         ":149", ":437")
     check(f"{ADD:g} ms on top of {BASE57:g} ms, as a percentage", round(100.0 * ADD / BASE57), float(PCT))
     check(f"{EMB:g} ms against {BASE57:g} ms, as a ratio", round(EMB / BASE57, 1), RATIO)
     check(f"{C4} gradient corners against {C2}, as a ratio", C4 / C2, float(CPRED))

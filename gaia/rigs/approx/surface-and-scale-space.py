@@ -107,6 +107,17 @@ def agree(label, a, b):
     print(f"{'PASS' if good else 'FAIL'}  both ends agree on {label}: {a} and {b}")
 
 
+def agree_text(label, a, b):
+    """Two ends of the page state the same RULE, in words. Compare them as text, whitespace
+    normalised -- a rule is not a number and rounding it to a precision would be meaningless."""
+    global ok
+    na, nb = " ".join(a.split()), " ".join(b.split())
+    good = na == nb
+    ok = ok and good
+    print(f"{'PASS' if good else 'FAIL'}  both ends state the same {label}: {na!r} and {nb!r}")
+    return good
+
+
 def cells(row_pattern, what):
     return [c.strip().strip("*") for c in page(row_pattern, what).split("|") if c.strip()]
 
@@ -395,6 +406,19 @@ CL, CV = int(COIN.group(1)), int(COIN.group(2))
 pin(f"the two formulas coincide at L = {CL}", 2 ** (CL + PA) - PB, CV, " px")
 if 3 * 2 ** CL != CV:
     fail(f"the page says 3*2^{CL} = {CV}; it is {3 * 2 ** CL}")
+# :283 states R(5) a FOURTH time, in words, as the reach into the neighbouring tiles. It is the
+# same measurement as the table's last column and the `## Use this` row, so assert all of them
+# against each other and against the impulse: a correction landing on one end alone is a FAIL.
+WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
+REACH = page(r"A (\w+)-level split on a (\d+)² tile reaches (\d+) px\s+into its neighbours",
+             "the reach-into-neighbours restatement of R(L)", 0)
+if REACH.group(1) not in WORDS:
+    sys.exit(f"the page now says a {REACH.group(1)!r}-level split reaches into its neighbours")
+RL = WORDS[REACH.group(1)]
+pin(f"a {RL}-level split's reach into its neighbours, measured by impulse", measure_radius(RL),
+    REACH.group(3), " px")
+agree(f"R({RL}) (the support table vs the reach-into-neighbours sentence)",
+      RADII[LEVELS.index(RL)], REACH.group(3))
 
 
 # ══ §4 the page's own instruction: "Use it as an assertion in your own code." ═════════════
@@ -463,12 +487,29 @@ if FEXP != -FL:
 # The same defect at ONE level, as the failure table states it, in words.
 QUARTER = page(r"\| Every band is a (\w+) of its expected height \| The factor (\d+) dropped "
                r"from `expand`", "the failure-table row for the dropped factor", 0)
-if QUARTER.group(1).lower() != "quarter" or int(QUARTER.group(2)) != FOUR:
-    fail(f"the failure table now says a band is a {QUARTER.group(1)!r} of its height with the "
-         f"factor {QUARTER.group(2)} dropped")
+# The SAME claim in words at :138-139, beside the pyramid fence. Two ends, one word: assert them
+# against each other, and both against the factor itself -- "a quarter" is 1/4 or the page is
+# not describing the factor it names two lines earlier.
+FRACTION = {"half": 2, "third": 3, "quarter": 4, "fifth": 5, "sixth": 6, "eighth": 8}
+PROSE_W = page(r"drop it and every\s+band comes back a (\w+) height",
+               "the pyramid fence's word for what dropping the factor costs")
+agree_text("word for the height a dropped factor leaves", QUARTER.group(1).lower(),
+           PROSE_W.lower())
+if PROSE_W.lower() not in FRACTION:
+    fail(f"the page says a band comes back a {PROSE_W!r} height; that is not a fraction this "
+         f"rig can read, so the claim cannot be checked against the factor {FOUR}")
+elif FRACTION[PROSE_W.lower()] != FOUR:
+    fail(f"the page says a band comes back a {PROSE_W!r} height (1/{FRACTION[PROSE_W.lower()]}) "
+         f"but the factor it drops is {FOUR} -- 1/{FOUR} is not a {PROSE_W}")
+else:
+    print(f"PASS  the page's word {PROSE_W!r} is 1/{FOUR}, the factor the fence prints")
+if int(QUARTER.group(2)) != FOUR:
+    fail(f"the failure table drops the factor {QUARTER.group(2)}, not the {FOUR} in the fence")
 one = max(abs(v) for v in low_band(H, FIELD_N, FIELD_N, 1, four=1.0)) / \
     max(abs(v) for v in low_band(H, FIELD_N, FIELD_N, 1))
-pin("one level with the factor dropped, measured as a fraction of expected height", one, "0.25")
+# The expected fraction is 1/FOUR with FOUR parsed from the fence -- not a constant typed here.
+pin(f"one level with the factor dropped, measured as a fraction of expected height", one,
+    repr(1.0 / FRACTION.get(PROSE_W.lower(), FOUR)))
 
 
 # ══ §6 the round trip is an IDENTITY, not a test -- the page's warning, mechanised ════════
@@ -489,6 +530,56 @@ if rt4 <= SHIP:
 else:
     fail(f"the destroyed low band does NOT pass round-trip <= {SHIP:g}: {rt4:.3e}")
 page(r"A guard that cannot fail is\s+not evidence\.", "the warning this section mechanises")
+# `rt4 <= SHIP` on its own is ONE-SIDED, and a one-sided gate lets the page buy itself room:
+# walk the shipping threshold from 1e-12 to 1e-2 and a destroyed low band still "passes". So
+# assert SHIP itself. It is printed as a bare power of ten and it is the threshold every
+# round-trip figure ON THIS PAGE must clear, so it is DETERMINED, with nothing invented here:
+# the smallest power of ten that admits every round trip the document measures. Tighter and the
+# page's own tables fail the page's own shipping rule; looser and it is not the tightest power
+# of ten available, which is the only thing "assert round-trip to <power of ten>" can mean.
+RT_PRINTED = {
+    ":67 `collapse(split(h)) - h`":
+        num(r"`collapse\(split\(h\)\) - h` is ([\d.]+e-\d+) m, machine precision",
+            "the identity round trip"),
+    ":71 the destroyed low band":
+        num(r"and it still passes at ([\d.]+e-\d+)\.", "the destroyed-band round trip"),
+    ":334 across the wrap seam":
+        num(r"the round trip is ([\d.]+e-\d+) for every row", "the periodic round trip"),
+}
+RT3 = page(r"machine precision at all three values \(([\d.]+e-\d+), ([\d.]+e-\d+), "
+           r"([\d.]+e-\d+) m\)", "the three round trips at the three values of `a`", 0)
+for i in range(3):
+    RT_PRINTED[f":148 value {i + 1} of the three `a` the paragraph names"] = \
+        float(RT3.group(i + 1))
+RT_TABLE = re.findall(r"^\| `?\w+`? \| `?\w+`?(?: \(replicate\))? \| [+-][\d.]+% \| "
+                      r"(?:[+-][\d.]+%|—) \| ([\d.]+e-\d+) m \|$", BODY, re.M)
+if len(RT_TABLE) < 3:
+    sys.exit(f"the padding table's Round-trip column no longer parses (found {RT_TABLE})")
+page(r"\*\*The round-trip is exact in every row\.\*\*", "the padding table's round-trip claim")
+for i, v in enumerate(RT_TABLE):
+    RT_PRINTED[f":165+{i} padding-table row {i + 1}"] = float(v)
+RTR = page(r"alongside a round trip of ([\d.]+e-\d+) to ([\d.]+e-\d+) m",
+           "the failure table's round-trip range", 0)
+agree("the widest round trip (padding table vs the failure table's range)",
+      max(float(v) for v in RT_TABLE), RTR.group(2))
+agree("the narrowest round trip in the failure table's range",
+      min(float(v) for v in RT_TABLE), RTR.group(1))
+RT_PRINTED[":442 the failure table's range"] = float(RTR.group(2))
+WIDEST = max(RT_PRINTED.values())
+TIGHTEST = 10.0 ** math.ceil(math.log10(WIDEST))
+_where = [k for k, v in RT_PRINTED.items() if v == WIDEST]
+if SHIP == TIGHTEST:
+    print(f"PASS  the shipping threshold is the tightest power of ten that admits all "
+          f"{len(RT_PRINTED)} round trips this page measures: widest is {WIDEST:g} m "
+          f"({_where[0]}), so the threshold is {TIGHTEST:g} and the page prints {SHIP:g}")
+elif SHIP < WIDEST:
+    fail(f"the page's shipping threshold {SHIP:g} is TIGHTER than its own widest measured "
+         f"round trip {WIDEST:g} m ({_where[0]}): the page's own tables fail its own rule")
+else:
+    fail(f"the page's shipping threshold {SHIP:g} is looser than the tightest power of ten "
+         f"that admits every round trip it measures ({TIGHTEST:g}; widest {WIDEST:g} m at "
+         f"{_where[0]}) -- an assertion that coarse is not the machine-precision check :446 "
+         f"describes")
 
 
 # ══ §7 `r -= r.mean()`: "The correction is not approximate; it is exact up to the boundary" ═
@@ -500,14 +591,50 @@ if len(ROWS) != 4:
     sys.exit(f"the operator table no longer has 4 named operators (found {len(ROWS)})")
 CORR = page(r"\| \*\*any of the above, with `r -= r\.mean\(\)`\*\* \| \*\*([+-][\d.]+)%\*\* \| "
             r"([+-][\d.e-]+) m \| ([+-]?[\d.]+)% \|", "the mean-corrected table row", 0)
-OPS = {
-    "roughen":  lambda r, i: r + 60.0 * abs(_r[i % len(_r)] - 0.5),
-    "distress": lambda r, i: r - 40.0 * max(-r, 0.0),
-    "craggy":   lambda r, i: max(r, 0.0) * 1.6 + min(r, 0.0),
-    "linear":   lambda r, i: 1.5 * r,
-}
-if sorted(OPS) != sorted(n for n, _f, _a, _b, _c in ROWS):
-    sys.exit(f"the operator table names {[n for n, *_ in ROWS]}, not {sorted(OPS)}")
+# THE OPERATORS ARE THE PAGE'S OWN FORMULAS, COMPILED FROM THE TABLE CELL. An earlier version
+# of this rig hand-wrote them in a dict and threw the captured formula away, so rewriting
+# `r - 40*relu(-r)` as `r + 40*relu(-r)` on the page left the rig running the old sign and
+# reporting the old result -- the exact failure shape 1 this rig exists to avoid, on the one
+# claim §7 is here for ("Rock growth inflates. Wear deflates."). The taps in §1 are already
+# `eval`'d under a whitelist; the formulas get the same treatment and nothing else.
+ALLOWED = {"r", "noise", "relu", "max", "min", "abs"}
+
+
+def compile_op(name, formula):
+    """Turn the page's printed formula into a callable, under a whitelist.
+
+    Three rewrites, and no others: the markdown pipe escapes come off, `|x|` becomes `abs(x)`
+    and `½` becomes 0.5 -- typography, not semantics. `relu`, `max`, `min` and `abs` are the
+    standard functions the page names; `noise` and `r` are the arguments it names.
+    """
+    e = formula.replace("\\|", "|").replace("½", "0.5")
+    if e.count("|") % 2:
+        sys.exit(f"the `{name}` formula {formula!r} has an unpaired |")
+    parts = e.split("|")
+    e = "".join(p if k % 2 == 0 else f"abs({p})" for k, p in enumerate(parts))
+    if not re.fullmatch(r"[0-9A-Za-z_.,()*+/ -]+", e):
+        sys.exit(f"cannot evaluate the page's `{name}` formula {formula!r} without running "
+                 f"arbitrary code")
+    seen = set(re.findall(r"[A-Za-z_]\w*", e))
+    if not seen <= ALLOWED:
+        sys.exit(f"the page's `{name}` formula {formula!r} names {sorted(seen - ALLOWED)}, "
+                 f"which this rig will not evaluate")
+    code = compile(e, f"<page:{name}>", "eval")
+    env = {"__builtins__": {}, "max": max, "min": min, "abs": abs,
+           "relu": lambda x: max(x, 0.0)}      # relu is max(x, 0); the page uses it unqualified
+
+    def op(rv, i):                             # `noise` is the rig's own probe, in [0, 1)
+        return eval(code, env, {"r": rv, "noise": _r[i % len(_r)]})   # noqa: S307
+
+    return op
+
+
+OPS = {n: compile_op(n, f) for n, f, _a, _b, _c in ROWS}
+if "linear" not in OPS:
+    sys.exit(f"the operator table no longer names a `linear` row; §7's last two rows are read "
+             f"together and this rig cannot do that without it (found {sorted(OPS)})")
+print(f"PASS  all {len(OPS)} operators compiled from the page's own printed formulas: "
+      + "; ".join(f"`{n}` = {f}" for n, f, *_ in ROWS))
 # math.fsum throughout: an exactly-rounded sum, so what is measured below is the SPLIT's
 # floor and not this rig's summation order. The page's claim is exactness, so the rig must not
 # bring 1e-14 of its own noise to the comparison.
@@ -638,14 +765,56 @@ page(r"the gap is \*\*exactly\*\* the operator's DC term, (\d+) m for a \1 m off
 # ══ §10 the halo rule, and the apron it costs, at both ends of the page ══════════════════
 print("\n── §10  the halo rule ───────"
       "─────────────")
-RULE = page(r"> \*\*The rule: `halo >= (\d+)\*2\^L - (\d+)` \*\*and\*\* `\(tile_origin - halo\) "
-            r"≡ 0 \(mod 2\^L\)`".replace(">=", "≥"), "the halo rule", 0)
+RULE = page(r"> \*\*The rule: `halo >= (\d+)\*2\^L - (\d+)` \*\*and\*\* "
+            r"`(\(tile_origin [^`]*)`".replace(">=", "≥"), "the halo rule", 0)
 if (int(RULE.group(1)), int(RULE.group(2))) != (RC, RK):
     fail(f"the rule's halo bound {RULE.group(1)}*2^L - {RULE.group(2)} is not R(L) = "
          f"{RC}*2^L - {RK}")
+# THE FAILURE TABLE RESTATES THE WHOLE RULE. Both halves of it, plus R(L) a third time, sit in
+# the `## How this fails` rows -- and a rule corrupted only there used to leave this rig green,
+# because nothing down here was parsed. The restatement is asserted against the blockquote as
+# TEXT (a congruence is not a number and rounding it would mean nothing), and the congruence
+# itself is then EVALUATED against the measurements in §11 below, so inverting the sign or
+# doubling the modulus contradicts a bit-exact halo rather than just disagreeing with prose.
+FTR = page(r"Both halves, never one: `halo >= (\d+)\*2\^L - (\d+)` \*\*and\*\* "
+           r"`(\(tile_origin [^`]*)`".replace(">=", "≥"),
+           "the failure table's restatement of the halo rule", 0)
+agree("the halo bound's coefficient (the rule blockquote vs the failure table)",
+      RULE.group(1), FTR.group(1))
+agree("the halo bound's constant (the rule blockquote vs the failure table)",
+      RULE.group(2), FTR.group(2))
+agree_text("phase congruence", RULE.group(3), FTR.group(3))
+FTRL = page(r"not for the chain: `R\(L\) = (\d+)\*2\^L - (\d+)` doubles per level",
+            "R(L) restated in the failure table's seam row", 0)
+agree("the R(L) formula (the failure table vs §2)", int(FTRL.group(1)) * 1000 +
+      int(FTRL.group(2)), RC * 1000 + RK)
+# The congruence, turned into a predicate. Nothing about it is transcribed: the sign and the
+# modulus come out of the page's own text and are evaluated at the level under test.
+CONG = re.fullmatch(r"\(tile_origin ([+-]) halo\) ≡ 0 \(mod ([0-9^L() +*-]+)\)", RULE.group(3))
+if not CONG:
+    sys.exit(f"cannot read the page's phase congruence {RULE.group(3)!r} as a congruence on "
+             f"(tile_origin ± halo)")
+CSIGN = 1 if CONG.group(1) == "+" else -1
+CMOD_SRC = CONG.group(2).replace("^", "**")
+
+
+def phase_mod(L):
+    """The modulus the page's own congruence names, evaluated at this level."""
+    m = eval(CMOD_SRC, {"__builtins__": {}}, {"L": L})     # noqa: S307 - whitelisted above
+    if not isinstance(m, int) or m <= 0:
+        sys.exit(f"the page's phase modulus {CONG.group(2)!r} is not a positive integer at "
+                 f"L = {L}: {m!r}")
+    return m
+
+
+def aligned(origin, halo, L):
+    return (origin + CSIGN * halo) % phase_mod(L) == 0
+
+
+print(f"PASS  the phase rule reads as `(tile_origin {CONG.group(1)} halo) ≡ 0 (mod "
+      f"{CONG.group(2)})` at both ends of the page; §11 measures it")
 SMALL = page(r"the smallest halo satisfying both is `3\*2\^L`: (\d+) px at three levels,\s+> "
              r"(\d+) at four, (\d+) at five", "the three smallest halos", 0)
-WORDS = {"three": 3, "four": 4, "five": 5}
 for w, printed in zip(("three", "four", "five"), SMALL.groups()):
     L = WORDS[w]
     smallest = next(hh for hh in range(0, 4 * 2 ** L + 1) if hh >= R(L) and hh % 2 ** L == 0)
@@ -709,7 +878,16 @@ if not len(HALOS) == len(GEQ) == len(MODS) == len(ERRS):
     sys.exit("the phase table's four rows no longer have the same number of columns")
 D = 384                                        # the rig's own domain; only exactness is asserted
 HD = probe_field(D)
-LOD = low_band(HD, D, D, PL)
+WHOLE = {}
+
+
+def whole_domain(L):
+    if L not in WHOLE:
+        WHOLE[L] = low_band(HD, D, D, L)
+    return WHOLE[L]
+
+
+LOD = whole_domain(PL)
 
 
 def tile_error(origin, halo, tile=PTILE, L=PL):
@@ -718,9 +896,10 @@ def tile_error(origin, halo, tile=PTILE, L=PL):
         sys.exit(f"the rig's {D}² probe domain cannot hold a tile at {origin} with halo "
                  f"{halo}")
     n = b - a
+    ref = whole_domain(L)
     sub = [HD[(a + y) * D + (a + x)] for y in range(n) for x in range(n)]
     ls = low_band(sub, n, n, L)
-    return max(abs(ls[(halo + y) * n + (halo + x)] - LOD[(origin + y) * D + (origin + x)])
+    return max(abs(ls[(halo + y) * n + (halo + x)] - ref[(origin + y) * D + (origin + x)])
                for y in range(tile) for x in range(tile))
 
 
@@ -736,11 +915,58 @@ for halo, geq, mod, err in zip(HALOS, GEQ, MODS, ERRS):
     if exact_on_page != exact_here:
         fail(f"halo {halo}: the page prints {err} m, this rig measures {e:.8f} m -- one of us "
              f"is wrong about whether this halo is bit-exact")
-    elif exact_here and not (halo >= PR_ and halo % PP == 0):
-        fail(f"halo {halo} is bit-exact but does not satisfy the rule")
-print(f"PASS  all {len(HALOS)} tabulated halos: 'mod {PP}' and '>= R' rows reproduce, and the "
+    # ...and the page's OWN rule, read off its own text in §10, must predict the measurement.
+    elif (halo >= PR_ and aligned(ORIGIN, halo, PL)) != exact_here:
+        fail(f"halo {halo} at origin {ORIGIN}: measured {'bit-exact' if exact_here else e},"
+             f" but the page's rule (halo >= R and `(tile_origin {CONG.group(1)} halo) ≡ 0 "
+             f"(mod {CONG.group(2)})`, modulus {phase_mod(PL)}) says "
+             f"{'bit-exact' if not exact_here else 'not bit-exact'}")
+print(f"PASS  all {len(HALOS)} tabulated halos: 'mod {PP}' and '>= R' rows reproduce, the "
       f"only bit-exact columns are exactly those the page prints as 0 "
-      f"({[h for h, e in zip(HALOS, ERRS) if float(e) == 0.0]})")
+      f"({[h for h, e in zip(HALOS, ERRS) if float(e) == 0.0]}), and every one of the "
+      f"{len(HALOS)} agrees with the rule as the page words it")
+# THE SAME MEASUREMENT AT L = 3, which the page states and nothing used to check. :301-302 is
+# the page's only worked example of a halo that is >= R and still wrong, twice over.
+L3 = page(r"A halo of (\d+) is \*large enough\* and still wrong by ([\d.]+) m; (\d+) is "
+          r"bit-exact\. Repeating at `L = (\d+)`\s+\(`R = (\d+)`, period (\d+)\): halo (\d+) "
+          r"gives ([\d.]+) m, (\d+) gives ([\d.]+) m, \*\*(\d+) gives exactly zero\*\*",
+          "the L = 3 repeat of the phase measurement", 0)
+for g in (1, 3):
+    if int(L3.group(g)) not in HALOS:
+        sys.exit(f"the prose at :301 discusses halo {L3.group(g)}, which the phase table above "
+                 f"no longer tabulates ({HALOS}) -- the two ends cannot be compared")
+pin("the error at the halo :301 calls large enough (prose vs the phase table's own cell)",
+    float(ERRS[HALOS.index(int(L3.group(1)))]), L3.group(2), " m")
+if float(ERRS[HALOS.index(int(L3.group(3)))]) != 0.0:
+    fail(f"the prose says halo {L3.group(3)} is bit-exact; the table's cell for it is "
+         f"{ERRS[HALOS.index(int(L3.group(3)))]}")
+else:
+    print(f"PASS  :301's worked pair agrees with the table above: halo {L3.group(1)} wrong by "
+          f"{L3.group(2)} m, halo {L3.group(3)} bit-exact")
+PL3, PR3, PP3 = int(L3.group(4)), int(L3.group(5)), int(L3.group(6))
+if PR3 != R(PL3) or PP3 != 2 ** PL3:
+    fail(f"the L = {PL3} repeat says R = {PR3}, period {PP3}; R(L) gives {R(PL3)}, period "
+         f"{2 ** PL3}")
+ORIGIN3 = ORIGIN - ORIGIN % PP3                # aligned at L = 3 as well: the "normal case"
+for g in (7, 9, 11):
+    h3, printed3 = int(L3.group(g)), L3.group(g + 1) if g < 11 else "0"
+    e3 = tile_error(ORIGIN3, h3, L=PL3)
+    zero_on_page = float(printed3) == 0.0
+    if (e3 == 0.0) != zero_on_page:
+        fail(f"L = {PL3}, halo {h3}: the page prints {printed3} m, this rig measures "
+             f"{e3:.8f} m -- one of us is wrong about whether this halo is bit-exact")
+    elif (h3 >= PR3 and aligned(ORIGIN3, h3, PL3)) != (e3 == 0.0):
+        fail(f"L = {PL3}, halo {h3} at origin {ORIGIN3}: measured "
+             f"{'bit-exact' if e3 == 0.0 else e3}, but the page's rule (halo >= {PR3} and "
+             f"`(tile_origin {CONG.group(1)} halo) ≡ 0 (mod {CONG.group(2)})`, modulus "
+             f"{phase_mod(PL3)}) says otherwise")
+    elif zero_on_page:
+        print(f"PASS  L = {PL3}, halo {h3} is bit-exact, exactly as the page says, and the "
+              f"page's own rule predicts it")
+    else:
+        print(f"PASS  L = {PL3}, halo {h3} is NOT bit-exact ({e3:.4f} m on this rig's probe "
+              f"field; the page prints {printed3} m on its own, which nobody can re-derive -- "
+              f"only the exactness is asserted), and the page's own rule predicts it")
 # "It is the sub-array's ORIGIN that must be aligned, not the halo."
 OFF = page(r"A tile at global origin\s+(\d+) with `L = (\d+)` is bit-exact at halo \*\*(\d+)"
            r"\*\* and \*\*(\d+)\*\* -- `\(\d+ - \d+\) mod \d+ = 0` -- and wrong by\s+([\d.]+) "
@@ -751,16 +977,27 @@ GOOD = [int(OFF.group(3)), int(OFF.group(4))]
 BADH = [int(OFF.group(6)), int(OFF.group(7)), int(OFF.group(8))]
 for halo in GOOD:
     e = tile_error(OORG, halo, L=OL)
-    if e != 0.0 or (OORG - halo) % 2 ** OL != 0:
+    if e != 0.0:
         fail(f"origin {OORG}, halo {halo}: the page says bit-exact, measured {e:.8f} m")
+    elif not aligned(OORG, halo, OL):
+        fail(f"origin {OORG}, halo {halo} is bit-exact, but the congruence the page states "
+             f"twice -- `(tile_origin {CONG.group(1)} halo) ≡ 0 (mod {CONG.group(2)})`, "
+             f"modulus {phase_mod(OL)} -- says it should not be: "
+             f"({OORG} {CONG.group(1)} {halo}) mod {phase_mod(OL)} = "
+             f"{(OORG + CSIGN * halo) % phase_mod(OL)}")
     else:
-        print(f"PASS  tile at origin {OORG} is bit-exact at halo {halo} "
-              f"(({OORG} - {halo}) mod {2 ** OL} = 0)")
+        print(f"PASS  tile at origin {OORG} is bit-exact at halo {halo}, and the page's own "
+              f"congruence predicts it (({OORG} {CONG.group(1)} {halo}) mod "
+              f"{phase_mod(OL)} = 0)")
 errs = {}
 for halo in BADH:
     errs[halo] = tile_error(OORG, halo, L=OL)
     if errs[halo] == 0.0:
         fail(f"origin {OORG}, halo {halo}: the page says wrong, measured bit-exact")
+    elif aligned(OORG, halo, OL):
+        fail(f"origin {OORG}, halo {halo} is wrong by {errs[halo]:.4f} m, but the page's own "
+             f"congruence says it is aligned -- the rule as worded does not predict the "
+             f"measurement the page prints beside it")
 page(r"the tile error\s+is invariant within a residue class — bit-identical at halos "
      r"[\d, ]+ and \d+", "the residue-class invariance claim")
 if len({repr(v) for v in errs.values()}) == 1:
@@ -854,18 +1091,23 @@ def ramp_ratio(n, L, rpad, epad):
     return ((sum(lf) / sum(f)) * (sum(lc) / sum(c)) - 1.0) * 100.0
 
 
-PROWS = re.findall(r"^\| `(\w+)` \| `?(\w+)`?(?: \(replicate\))? \| ([+-][\d.]+)% \| "
+PROWS = re.findall(r"^\| `?(\w+)`? \| `?(\w+)`?(?: \(replicate\))? \| ([+-][\d.]+)% \| "
                    r"([+-][\d.]+%|—) \| ([\d.e-]+) m \|$", BODY, re.M)
-if len(PROWS) < 3:
-    sys.exit(f"the padding table no longer has its rows (found {len(PROWS)})")
+NPAIRS = WORDS[page(r"The same (\w+)\s+padding pairs at `L = \d+`", "the count of padding "
+                    "pairs the prose names").lower()]
+if len(PROWS) != NPAIRS:
+    sys.exit(f"the prose says {NPAIRS} padding pairs; the table parses {len(PROWS)}")
 SIDE = int(num(r"The same five\s+padding pairs at `L = \d+`, (\d+)², measured across",
                "the padding table's grid size"))
-# EVERY row with a ramp figure is gated. The rule, stated once and applied uniformly: the
-# measurement, rounded to the page's own precision, must equal the page; a row that misses by
-# exactly ONE unit in the page's last printed place is reported as a DISCREPANCY -- loudly,
-# never absorbed -- and anything past that is a FAIL. The one-unit band exists because one cell
-# of this table does not reproduce here (see the docstring); it is narrow enough that walking
-# any of these figures fires the gate.
+# EVERY row with a ramp figure is gated AT TOLERANCE ZERO: the measurement, rounded to the
+# page's own printed precision, must equal the page. There is exactly ONE exception and it is
+# NAMED, keyed to the ROW and not to the value: `reflect`/`reflect` is the single cell of this
+# table this rig does not reproduce (it measures -1.0248% against the page's -1.03%; see the
+# docstring), and there it tolerates a disagreement of exactly one unit in the page's last
+# printed place and prints a NOTE. An earlier version applied that band to every row, which let
+# BOTH ends of `reflect`/`symmetric` and of `reflect`/`edge` be walked one unit and stay green.
+# A band that applies to a row that DOES reproduce is not a tolerance, it is a hole.
+EXCEPT = ("reflect", "reflect")
 NOTE = []
 for rpad, epad, _noise, ramp, _rt in PROWS:
     if ramp == "—":
@@ -873,14 +1115,65 @@ for rpad, epad, _noise, ramp, _rt in PROWS:
     printed = ramp.rstrip("%")
     dec = len(printed.split(".")[1]) if "." in printed else 0
     got = ramp_ratio(SIDE, PADL, rpad, epad)
-    if round(got, dec) == float(printed):
+    # integer units of the page's own last place, so no float slop decides the comparison
+    units = round(round(got, dec) * 10 ** dec) - round(float(printed) * 10 ** dec)
+    if units == 0:
         print(f"PASS  {rpad}/{epad} ramp at {SIDE}², L = {PADL}, measured "
               f"{got:+.4f}% == page's {ramp}")
-    elif abs(got - float(printed)) <= 10.0 ** -dec:
+    elif (rpad, epad) == EXCEPT and abs(units) == 1:
         NOTE.append((rpad, epad, ramp, got))
+    elif (rpad, epad) == EXCEPT:
+        fail(f"{rpad}/{epad} ramp at {SIDE}², L = {PADL}: measured {got:+.4f}%, the page "
+             f"prints {ramp} -- {abs(units)} units past the last place the page printed, and "
+             f"the documented discrepancy on this row is one")
     else:
         fail(f"{rpad}/{epad} ramp at {SIDE}², L = {PADL}: measured {got:+.4f}%, the page "
-             f"prints {ramp} -- past one unit in the last place the page printed")
+             f"prints {ramp} -- this row reproduces exactly and is gated at tolerance zero")
+# The SMOOTHED-NOISE column has no reproducible field behind it, but its RANGE is restated
+# three times and its two smallest cells are quoted a fourth, so every restatement is gated
+# against the column itself. Pure rounding consistency; no field needed, and none assumed.
+NOISE = {(r[0], r[1]): float(r[2]) for r in PROWS}
+SPREAD = page(r"on smoothed noise the spread is\s+-([\d.]+)% to \+([\d.]+)%",
+              "the smoothed-noise spread at :176", 0)
+pin("the low end of the smoothed-noise spread == the column's minimum",
+    abs(min(NOISE.values())), SPREAD.group(1), "%")
+pin("the high end of the smoothed-noise spread == the column's maximum",
+    max(NOISE.values()), SPREAD.group(2), "%")
+FTSP = page(r"Measured -([\d.]+)% to \+([\d.]+)% at `L = \d+` on a \d+² grid depending on the "
+            r"field", "the failure table's restatement of the smoothed-noise spread", 0)
+agree("the low end of the smoothed-noise spread (:176 vs the failure table)",
+      SPREAD.group(1), FTSP.group(1))
+agree("the high end of the smoothed-noise spread (:176 vs the failure table)",
+      SPREAD.group(2), FTSP.group(2))
+ZE = page(r"Both beat the -([\d.]+)% of a zero-padded `EXPAND` \(-([\d.]+)% for a zero-padded "
+          r"`REDUCE`\)", "the failure table's two zero-padded figures", 0)
+pin("the failure table's zero-padded `EXPAND` figure == the table's `reflect`/zero cell",
+    abs(NOISE[("reflect", "zero")]), ZE.group(1), "%")
+pin("the failure table's zero-padded `REDUCE` figure == the table's zero/`reflect` cell",
+    abs(NOISE[("zero", "reflect")]), ZE.group(2), "%")
+SMALLER = page(r"smoothed noise `(\w+)` measured \*\*smaller\*\* than `(\w+)` \(\+([\d.]+)% "
+               r"against -([\d.]+)%\)", "the claim that one pad measured smaller on noise", 0)
+agree(f"the `{SMALLER.group(1)}` noise cell (:203 vs the table)", SMALLER.group(3),
+      NOISE[("reflect", SMALLER.group(1))])
+agree(f"the `{SMALLER.group(2)}` noise cell (:203 vs the table)", f"-{SMALLER.group(4)}",
+      NOISE[("reflect", SMALLER.group(2))])
+if abs(NOISE[("reflect", SMALLER.group(1))]) < abs(NOISE[("reflect", SMALLER.group(2))]):
+    print(f"PASS  `{SMALLER.group(1)}` really is smaller than `{SMALLER.group(2)}` on the "
+          f"noise column ({NOISE[('reflect', SMALLER.group(1))]:+g}% against "
+          f"{NOISE[('reflect', SMALLER.group(2))]:+g}%), as :203 says")
+else:
+    fail(f"the page says `{SMALLER.group(1)}` measured smaller than `{SMALLER.group(2)}` on "
+         f"smoothed noise; the column says {NOISE[('reflect', SMALLER.group(1))]:+g}% against "
+         f"{NOISE[('reflect', SMALLER.group(2))]:+g}%")
+# The ramp/wedge range at :177 -- over a column this rig MEASURES, so this end is a measurement
+# and not just a restatement.
+RWR = page(r"the same pairs all run \*negative\*,\s+-([\d.]+)% to -([\d.]+)%",
+           "the ramp-and-wedge range at :177", 0)
+RAMPS = [float(r[3].rstrip("%")) for r in PROWS if r[3] != "—"]
+pin("the mild end of the ramp/wedge range == the ramp column's smallest magnitude",
+    min(abs(v) for v in RAMPS), RWR.group(1), "%")
+pin("the severe end of the ramp/wedge range == the ramp column's largest magnitude",
+    max(abs(v) for v in RAMPS), RWR.group(2), "%")
 # The 257-grid parity claims: wrap and symmetric numerically identical, reflect exact.
 ODD = page(r"in every case tested: \*\*\+([\d.]+)%\*\* on the ramp at (\d+)², `L = (\d+)`, "
            r"against `reflect`'s\s+\+([\d.]+)%", "the 257-grid wrap/symmetric claim", 0)
@@ -904,6 +1197,15 @@ agree("reflect/edge at 256", float(SWING.group(1)), abs(float(
     [r for r in PROWS if r[1] == "edge"][0][3].rstrip("%"))))
 agree("reflect/symmetric at 256", float(SWING.group(5)), abs(float(
     [r for r in PROWS if r[1] == "symmetric"][0][3].rstrip("%"))))
+# The failure table restates the 257² excursion as a range too. Both ends, against the two
+# figures :181-182 and :200 state -- each of which this rig has just MEASURED above.
+FT257 = page(r"and \+([\d.]+)% to \+([\d.]+)% at (\d+)², where every `EXPAND` target is odd",
+             "the failure table's 257-grid range", 0)
+agree("the 257-grid range's grid", int(FT257.group(3)), ON)
+agree("the low end of the 257-grid range (the failure table vs :200)", FT257.group(1),
+      ODD.group(1))
+pin("the high end of the 257-grid range, measured",
+    ramp_ratio(int(FT257.group(3)), PADL, "reflect", "edge"), FT257.group(2), "%")
 DECAY = page(r"`reflect`/`reflect` is the mildest pair and still not a constant: -([\d.]+)% on "
              r"the \d+² ramp,\s+-([\d.]+)% at (\d+)², -([\d.]+)% at (\d+)²",
              "the reflect/reflect decay with grid size", 0)
@@ -966,10 +1268,119 @@ for pad, want_first_sample in (("wrap", False), ("reflect", True)):
         print(f"PASS  on an ODD-length array `{pad}`'s apron is {got} -- "
               f"{'parity survives' if want_first_sample else 'parity inverted, like symmetric'}")
 
+# ══ §14 the periodic counterpart of the phase rule, and the seam table it sits under ═════
+print("\n── §14  on a periodic domain ─────"
+      "─────────────")
+# The wrap-seam table itself: no field is recorded, so the MAGNITUDES are not assertable. The
+# ORDERING is: the page's whole recommendation ("`reflect` is wrong and `wrap` is the only
+# right pad") is the claim that wrap is least at every level and that the failure grows.
+SEAM_PADS = re.findall(r"^\| `(\w+)` \| \*?\*?([\d.]+)\*?\*? \| \*?\*?([\d.]+)\*?\*? \| "
+                       r"\*?\*?([\d.]+)\*?\*? \|$", BODY, re.M)
+if len(SEAM_PADS) != 4:
+    sys.exit(f"the wrap-seam table no longer has its four pads (found {SEAM_PADS})")
+SEAM_L = [int(c.split("=")[1]) for c in cells(r"\| Pad \|([^\n]*)\|", "the wrap-seam table's "
+                                              "level row")]
+page(r"then `reflect`\s+is wrong and `wrap` is the only right pad, and the failure is large\.",
+     "the periodic-domain recommendation this section mechanises")
+ORDER = [p[0] for p in SEAM_PADS]
+if ORDER[0] != "wrap":
+    fail(f"the page recommends `wrap` on a periodic domain but tabulates {ORDER[0]} first")
+for j, lvl in enumerate(SEAM_L):
+    col = [float(p[j + 1]) for p in SEAM_PADS]
+    if col != sorted(col):
+        fail(f"at L = {lvl} the wrap-seam table does not run {' < '.join(ORDER)}: {col} -- the "
+             f"page's `wrap` recommendation rests on that ordering")
+    elif col[0] != min(col):
+        fail(f"at L = {lvl} `wrap` is not the smallest seam step: {dict(zip(ORDER, col))}")
+print(f"PASS  the wrap-seam table runs {' < '.join(ORDER)} at every level it tabulates "
+      f"({', '.join('L = %d' % v for v in SEAM_L)}) -- `wrap` least at each, as the "
+      f"recommendation requires")
+wrap_row = [float(v) for v in SEAM_PADS[0][1:]]
+refl_row = [float(v) for v in SEAM_PADS[ORDER.index("reflect")][1:]]
+if wrap_row != sorted(wrap_row, reverse=True):
+    fail(f"the page says the `wrap` seam step falls with L; the table gives {wrap_row}")
+elif refl_row != sorted(refl_row):
+    fail(f"the page says the `reflect` failure grows with L; the table gives {refl_row}")
+else:
+    print(f"PASS  `wrap` falls with L ({wrap_row}) while `reflect` rises ({refl_row}) -- "
+          f"'the failure is large' and it gets worse, as the prose says")
+MULT = num(r"blind\s+to a seam (\d+)× the interior step", "the seam multiple in the prose")
+worst = max(float(p[-1]) for p in SEAM_PADS[:ORDER.index("reflect") + 1])
+# The prose quotes the table's `reflect` cell with no decimals. A figure quoted to fewer digits
+# than the cell it comes from is the cell TRUNCATED to those digits -- assert exactly that, so
+# that walking either end off the other fires. Not a tolerance: an integer part is an integer.
+if MULT != math.floor(refl_row[-1]):
+    fail(f"the prose says the round trip is blind to a seam {MULT:g}× the interior step; the "
+         f"table's `reflect` cell at L = {SEAM_L[-1]} is {refl_row[-1]}, whose integer part is "
+         f"{math.floor(refl_row[-1])}")
+else:
+    print(f"PASS  the prose's {MULT:g}× is the table's `reflect` cell {refl_row[-1]} at "
+          f"L = {SEAM_L[-1]} (worst pad in that column: {worst})")
+# The domain-size rule, MEASURED. Same arithmetic as §11's phase rule, and the page says so --
+# and it needs only `wrap`, which `low_band_1d` already has. Nothing here was gated before, so
+# the page could invert the rule and move its own counterexample and stay green.
+PER = page(r"the split reproduces the infinite-periodic low band \*\*iff `N ≡ 0 "
+           r"\(mod ([0-9^L() +*-]+)\)`\*\*,\s+where `N` is the period\. Measured: "
+           r"([\d.]+e[+-]\d+) at `N = (\d+)` for `L = ([\d, ]+)` and at `N = (\d+)` for\s+"
+           r"`L = (\d+)`; wrong by up to (\d+)% of relief at `N = (\d+)`, `L = (\d+)`",
+           "the periodic domain-size rule", 0)
+PER_MOD_SRC = PER.group(1).replace("^", "**")
+PER_EXACT = float(PER.group(2))
+PERIODIC = [(int(PER.group(3)), int(x)) for x in PER.group(4).split(",")] + \
+           [(int(PER.group(5)), int(PER.group(6)))]
+PER_WRONG = (int(PER.group(8)), int(PER.group(9)))
+
+
+def periodic_error(N, L):
+    """How far the split on ONE period is from the split on the infinite periodic signal.
+
+    The reference is the same chain run over `2^L` tiled copies, whose length is a multiple of
+    `2^L` whatever `N` is, so its decimation lattice is the infinite one; the middle period is
+    then read back out. The field is the rig's own -- three harmonics of the period, so it is
+    exactly N-periodic by construction and carries no assumption about the page's.
+    """
+    f = [math.sin(2 * math.pi * i / N) + 0.5 * math.sin(6 * math.pi * i / N)
+         + 0.3 * math.cos(10 * math.pi * i / N) for i in range(N)]
+    reps = 2 ** L
+    ref = low_band_1d(f * reps, L, "wrap", "wrap")
+    one = low_band_1d(f, L, "wrap", "wrap")
+    off = (reps // 2) * N
+    return max(abs(one[i] - ref[off + i]) for i in range(N))
+
+
+for N, L in PERIODIC + [PER_WRONG]:
+    e = periodic_error(N, L)
+    claimed_exact = (N, L) != PER_WRONG
+    rule = eval(PER_MOD_SRC, {"__builtins__": {}}, {"L": L})   # noqa: S307 - whitelisted above
+    if (e == 0.0) != claimed_exact:
+        fail(f"N = {N}, L = {L}: the page says the split "
+             f"{'reproduces' if claimed_exact else 'does not reproduce'} the infinite-periodic "
+             f"low band; measured {e:.6e}")
+    elif (N % rule == 0) != claimed_exact:
+        fail(f"N = {N}, L = {L}: measured {'exact' if e == 0.0 else 'wrong'}, but the page's "
+             f"own rule `N ≡ 0 (mod {PER.group(1)})` (modulus {rule}) says "
+             f"{'exact' if N % rule == 0 else 'wrong'} -- the rule as worded does not predict "
+             f"the page's own measurements")
+    else:
+        print(f"PASS  N = {N}, L = {L}: {'exactly 0' if e == 0.0 else f'{e:.3e}, not zero'}, "
+              f"and `N ≡ 0 (mod {PER.group(1)})` ({N} mod {rule} = {N % rule}) predicts it")
+if PER_EXACT != 0.0:
+    fail(f"the page prints {PER.group(2)} for the exact cases; this section asserts exactness "
+         f"at tolerance zero and {PER.group(2)} is not zero")
+agree("the periodic rule's modulus and the tile rule's (the page says they are the same "
+      "arithmetic)", phase_mod(PER_WRONG[1]), eval(PER_MOD_SRC, {"__builtins__": {}},
+                                                   {"L": PER_WRONG[1]}))
+page(r"Same arithmetic as the tile rule", "the claim that the two rules are one rule")
+FTP = page(r"`wrap`/`wrap` is exact only while `N ≡ 0 \(mod ([0-9^L() +*-]+)\)`",
+           "the failure table's restatement of the periodic rule")
+agree_text("periodic domain-size rule", PER.group(1), FTP)
+
 print()
 for rpad, epad, printed, got in NOTE:
     print(f"NOTE  {rpad}/{epad} on the {SIDE}² ramp at L = {PADL}: the page prints "
-          f"{printed}, this rig measures {got:+.4f}%. Within one unit in the page's last "
-          f"printed place, so not a failure -- but NOT a pass either. See the docstring.")
+          f"{printed}, this rig measures {got:+.4f}%. This is the ONE named exception in §13 "
+          f"-- one unit in the page's last printed place, on the one row of the table that "
+          f"does not reproduce here. Every other row is gated at tolerance zero. Not a "
+          f"failure, and NOT a pass either. See the docstring.")
 print()
 sys.exit(0 if ok else 1)
