@@ -35,23 +35,25 @@ covers 16 of 37 documents.
 
 | | |
 |---|---|
-| Documents | **39** written, 13 planned, 6 explicitly out of scope (52 topics in scope) |
-| Bibliography | 225 entries, 225 cited, 0 orphaned |
-| Adversarially audited | **37 of 39** — see the reconciliation below |
-| Verified corrections | **143** rows in `registers/corrections.tsv`, every one signed by an independent verifier |
-| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` 33 red + 4 green |
+| Documents | **40** written, 13 planned, 6 explicitly out of scope (53 topics in scope) |
+| Bibliography | 228 entries, 228 cited, 1 background |
+| Adversarially audited | **40 of 40** |
+| Corrections | **233** rows in `registers/corrections.tsv`; every one of the 40 documents carries at least one. ⚠️ **34 are `verifier=pending`** — named individually below, not counted away |
+| `verified:` stamps | **4 of 40**, signed 2026-09-14. ⚠️ Each covers `## Use this` and the failure table only — 8%, 11%, 15% and 19% of its document's body. Read it as "the recommendation and the diagnoses were read", never as "the document was read" |
+| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **36 red + 5 green**, every mutation biting for the reason its row names |
+| Measurement rigs | **35** in `rigs/`, 17 with saved output. Every register reference to one resolves; before 2026-09-14 they lived in a scratch directory and none did |
 | Phase 0 | **closed** 2026-09-07 — the guard layer, verified by mutation under `bash -e` |
 
 Reported metrics, none of them enforced:
 
 | Metric | Value | What it means |
 |---|---|---|
-| `approximation` | **7/39** | documents stating *both* how good a recommendation is and what it costs |
-| `locators` | 187/264 (71%) | citations naming a section, equation or page rather than a topic |
-| `propagation` | **17/283** | citations naming a section at *both* ends, so the two can be cross-checked at all |
-| `reach` | 16/206 | body sections sharing no word with `## Use this` or the failure table |
-| `unread` | 29/283 | citations that *declare* the source was never opened here |
-| `crossrefs` | **1/227** | shared magnitudes that DISAGREE across documents — new, and it found a live one on its first run |
+| `approximation` | **39/40** | documents stating *both* how good a recommendation is and what it costs. ⚠️ The fortieth, `shader-craft.md`, is a *tested* refusal, not a gap. ⚠️ And the metric does not require the two halves to describe the same technique: 5 documents put them over 50 body lines apart, 2 over 100 |
+| `locators` | 188/267 (70%) | citations naming a section, equation or page rather than a topic |
+| `propagation` | **18/287** | citations naming a section at *both* ends, so the two can be cross-checked at all |
+| `reach` | 14/213 | body sections sharing no word with `## Use this` or the failure table |
+| `unread` | 31/287 | citations that *declare* the source was never opened here |
+| `crossrefs` | **2/381** | shared magnitudes that DISAGREE. Both are known false positives; its reach is 12% of linked pairs |
 
 ## Audit state, per document
 
@@ -93,6 +95,37 @@ wrong; they are unexamined, which is a different thing.
 `node-graph-runtime` · `noise-and-warping` · `planetary-precision` · `sea-ice` · `shallow-water` ·
 `simulation-time-budget` · `sketch-based-authoring` · `tectonic-uplift` · `tiled-streaming` ·
 `virtual-texturing` · `water-closed-vs-open` · `water-optics` · `water-rendering`
+
+## The 34 unverified corrections, by name
+
+`registers/corrections.tsv` has 233 rows. **34 read `verifier=pending`** — one hand wrote the
+change and no second hand has re-derived it. A count reads like rounding, so here they are.
+
+**15 are one incident.** The `PD-*-APX` rows — CAUS, DRIV, GPUC, HFLOD, HFRAY, LAYER, NGR, PLANP,
+SIMTB, SURF, TAM, TECT, VT, WCVO, WOPT. Commit `11a235d` promised a per-document row for each and
+the digest that was to write them never returned; they were recovered four days later in `c234f87`,
+verbatim from each applying agent's own report. Nothing in them is invented and none of it is
+independently checked. An external rating panel named this cluster as the reason the corpus's
+headline jump is not fully earned, and that reading is correct.
+
+**7 are this project's own bookkeeping** — the one-end sweep row, the two audit-file rows, the
+pseudocode-register row, the criterion-6 row, the coastal-erosion false-positive row, and
+`VB-TRUNCATION`, which records that my own row-writing script silently truncated seven register
+fields mid-word.
+
+**6 are Phase C** — `PC1` impact-craters, `PC2` planetary-precision, `PC3` mesh-extraction,
+`PC4` river-networks, `PC5` coverage, `PC7` water-closed-vs-open. Verification was scoped by the
+owner to the oldest and newest surfaces; these are neither.
+
+**6 are from the verification waves themselves and from the sign-off** — `VA-CI-ANCHORS`,
+`VA-CRITIC-1`, `VB-CRITIC-1`, `VB-RATIO`, `CD1`, `SIGNOFF-SP`. Each records a defect found and
+fixed; what is unverified is the fix, not the finding.
+
+⚠️ **What `pending` does and does not mean here.** It does not mean unmeasured: every `PD-*-APX`
+row names a rig in `rigs/` that re-runs, and the orchestrator re-ran them. It means no hand other
+than the one that made the change has re-derived the reasoning around the numbers. On this project
+that distinction has mattered: of 26 rows given an independent hostile reader, 10 carried a real
+defect — and 2 of 7 disputes raised were themselves wrong and were rejected by a second reader.
 
 ## Known issues
 
@@ -147,15 +180,21 @@ What remains, in the order I would now do it:
 1. **The five sittings still being repaired** — VT + clouds, tiled-streaming + mesh-extraction +
    sea-ice, precision + craters + coastal + sketch, caustics, stratigraphy. Their verifiers have
    reported; the fixes are not yet applied.
-2. **Point the eleven rendering documents at `shader-craft.md`.** The document exists and nothing
-   cites it, so a reader still meets each hazard in isolation. G53 is not closed until they do.
+2. ~~**Point the eleven rendering documents at `shader-craft.md`.**~~ **Done** — eleven files now
+   cite it. (`SKILL.md` said otherwise until 2026-09-15; see the self-description note below.)
 3. **The budget-tag migration** — 37+ documents carrying one canonical tag with a `**Tier:` line
    that agrees. Success criterion 6, and the last structural item.
 4. **Widen the artefact cache** so `requote.py` covers more than 5%. ⚠️ **This one cannot be done
    by an agent** — it needs artefacts nobody here can fetch.
-5. **Raise `approximation`** — 32 of 39 documents still give an error or a cost, not both. Supply
-   the missing half from sources; the metric has already been caught mismeasuring its own fix once.
-6. **The `verified:` stamps.** 0 of 39. ⚠️ **Also not available to any agent**, by construction —
+5. ~~**Raise `approximation`**~~ — **done, 39/40.** ⚠️ But an independent rating panel found the
+   metric oversold at the tails: it credits a document for holding both halves *anywhere* in the
+   body, and 5 of the 38 put them more than 50 lines apart (`water-optics` 249, `terrain-analysis-masks`
+   205). A colocated variant is the honest successor metric.
+6. **The `verified:` stamps.** **4 of 40**, signed 2026-09-14 by `human:alexander.pino` on
+   `flow-routing`, `terrain-analysis-masks`, `node-graph-runtime` and `stream-power`, after four
+   one-page briefs. The stamps were proved to bite: rewording a claim under one goes red,
+   re-pointing a locator goes red, editing prose outside the two anchor sections is correctly
+   ignored. ⚠️ **Also not available to any agent**, by construction —
    the stamp means a human read the cited work. Phase 0's verifier found that a stamp on a
    bibliography certified nothing at all (the digest hashed the empty string, so one stamp was
    valid on all nine apparatus files); that hole is closed, which makes the stamp worth having and

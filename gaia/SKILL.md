@@ -101,7 +101,7 @@ routinely confused:
 |---|---|---|
 | `scripts/check.py` green | every claim points at a real bibliography entry with a locator, nothing is orphaned, nothing cites an unverifiable source | the guard |
 | the block was **run** | the pseudocode, transcribed literally, produces the printed number for the property the register row names — and only that property. Soundness is not termination: a traversal block ran, its row measured missed hits, and the livelock in its skip branch was found later by hand | `registers/pseudocode-execution.tsv` |
-| `verified:` in a header | a human read the cited work and it says what the document claims. The stamp's `covers` digest scopes it to the sources list as it stood when they read it — a change there voids the stamp; it is not a review of the prose | **no document carries this yet** |
+| `verified:` in a header | a human read the cited work and it says what the document claims. The stamp's `covers` digest scopes it to the sources list as it stood when they read it — a change there voids the stamp; it is not a review of the prose | **4 of 40**, signed 2026-09-14. ⚠️ Each covers `## Use this` and the failure table only — 8–19% of its document — so it certifies the recommendation and the diagnoses, never the page |
 
 Only the third is what most readers hear in the word "grounded". The first cannot prove the
 cited paper says what the document claims; the second cannot either — a block can run
@@ -167,9 +167,13 @@ ray march, virtual-texture gradient scaling and feedback bias, explicit-LOD fetc
 max-mip traversal, the depth-output direction under both depth conventions, and the fp16 hazards
 of `pow` and `normalize` on grazing terms.
 
-⚠️ **That document is written and nothing points at it yet.** It was assembled from hazards
-already sitting in the eleven documents' failure tables, but none of those eleven cites it back,
-so a reader who opens one of them still meets each hazard in isolation. Until they do, read the
+⚠️ **This paragraph said until 2026-09-15 that nothing pointed at that document.** **8 of the 11
+cite it back** — the sentence was written when the true count was 0 and never moved as the
+citations landed. It is kept, corrected, as an instance of the defect this skill names as its
+most-recorded: a correction landing at one end only. *(And the first correction of it, the same
+day, said "eleven" — `grep -l shader-craft gaia/references/*.md` says 8 technique documents plus
+`papers-rendering.md`. Recount, do not re-read.)* The three that still do not route are
+`atmosphere-and-aerial-perspective`, `caustics` and `mesh-extraction`; until they do, read the
 failure table of every rendering document you use, not only the one you opened. Closing that half
 is what finishes this item; the document existing is not the same as the corpus routing to it.
 - **terrain-architect**, **terrain-renderer** — the source skills Gaia is distilled from.

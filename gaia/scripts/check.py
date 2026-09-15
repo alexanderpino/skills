@@ -770,7 +770,12 @@ def locator_quality() -> tuple[int, int, int, list[str]]:
 # this UNDER-counts, which is the safe direction for a number that is supposed to go up, and a
 # document that wants credit has to state the cost precisely enough to be actionable anyway.
 COST_UNIT = re.compile(r"(?<![\w.])\d[\d.,]*\s*(?:ms|\u00b5s|us|MB|GB|KB|TB|MiB|GiB|KiB|fps|FPS)\b"
-                       r"|bytes?\s*(?:per|/)\s*cell", re.I)
+                       r"|(?<![\w.])\d[\d.,]*\s*bytes?\s*(?:per|/)\s*cell", re.I)
+# The second branch carried NO DIGIT until 2026-09-15, so "cost in bytes/cell is unpriced"
+# matched -- in the same paragraph whose docstring congratulates this pattern for requiring
+# a number. Found by an independent rating panel, not by this file's own fixtures. Latent,
+# not live: the two documents credited through this branch alone say "2 bytes per cell" and
+# "8 bytes per cell", so the count is unchanged at 39/40. The fixtures below now pin it.
 
 # The other half of the engineer's question. Deliberately NOT matching a bare "N% of": that
 # catches "70% of the variance" and every other proportion in the corpus, and a metric that
@@ -798,6 +803,10 @@ ERROR_FIXTURES = [
 ]
 
 COST_FIXTURES = [
+    ("cost in bytes/cell is unpriced", False),   # the digitless hole, open until 2026-09-15
+    ("bytes per cell", False),                   # a unit is not a measurement
+    ("**8 bytes per cell**", True),              # and the real thing still counts
+
     ("the bake is 104 ms at 4k", True),
     ("32 MB per resident tile", True),
     ("4 bytes per cell, so 1.3 GB", True),
@@ -2589,6 +2598,68 @@ def check_index() -> list[str]:
             for ln in (r.stdout + r.stderr).splitlines() if ln.strip()][:8]
 
 
+def selfdescription_problems() -> list[str]:
+    """SKILL.md and STATE.md describe this corpus. This file can COMPUTE what they describe.
+
+    Added 2026-09-15, on a finding from an independent rating panel and as the single action it
+    named as dominating every other. Four documents carried a `verified:` stamp while `SKILL.md`
+    said in bold that none did, and `STATE.md` said `0 of 39`. That is this corpus's own
+    most-recorded defect -- a correction landing at one end only -- live in the two files a new
+    reader opens first, for the simple reason that `documents()` globs `references/*.md` and the
+    router is not in that glob. Nothing could see it.
+
+    Deliberately NARROW. It pins the self-describing counts that are cheap to compute and were
+    observed to go stale; it does not try to parse arbitrary prose, because a check that guesses
+    at sentences is a check that cries wolf. Each rule names the claim it reads and the truth it
+    reads it against, so a failure tells you which end to move.
+    """
+    docs = content_documents()
+    stamped = 0
+    for d in docs:
+        try:
+            fm, _ = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        if fm.get("verified"):
+            stamped += 1
+    truth = {"documents": len(docs), "stamps": stamped}
+    problems: list[str] = []
+
+    for name in ("SKILL.md", "STATE.md"):
+        f = ROOT / name
+        if not f.exists():
+            continue
+        for n, line in enumerate(f.read_text(encoding="utf-8").split("\n"), 1):
+            low = line.lower()
+
+            # 1. "no document carries this yet" and its spellings, about the stamp
+            if "verified" in low or "stamp" in low:
+                for phrase in ("no document carries this yet", "none carries one yet",
+                               "no document in the corpus carries one"):
+                    if phrase in low and truth["stamps"] != 0:
+                        problems.append(
+                            f"{name}:{n}: says {phrase!r} about `verified:`, but "
+                            f"{truth['stamps']} document(s) carry one. The corpus is describing "
+                            f"itself wrongly in the file a reader opens first.")
+
+                # 2. "N of M" about the stamp
+                m = re.search(r"(\d+)\s*(?:of|/)\s*(\d+)", line)
+                if m and "stamp" in low:
+                    claimed, over = int(m.group(1)), int(m.group(2))
+                    if claimed != truth["stamps"] or over != truth["documents"]:
+                        problems.append(
+                            f"{name}:{n}: claims `{claimed} of {over}` `verified:` stamps; the "
+                            f"tree has {truth['stamps']} of {truth['documents']}.")
+
+            # 3. the document count, where the file states it as a fact about itself
+            m = re.search(r"\|\s*Documents\s*\|\s*\*\*(\d+)\*\*", line)
+            if m and int(m.group(1)) != truth["documents"]:
+                problems.append(
+                    f"{name}:{n}: states **{m.group(1)}** written documents; there are "
+                    f"{truth['documents']}.")
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true", help="what is checked, and what is not")
@@ -2754,6 +2825,8 @@ def main() -> int:
               f"more honest. The tier vocabulary has no cell for 'peer-reviewed, not read', so "
               f"this counts the declaration instead. A writer who declines to declare is making "
               f"a claim in prose the guard will not repeat for them.")
+
+    problems.extend(selfdescription_problems())
 
     if problems:
         for p in problems:
