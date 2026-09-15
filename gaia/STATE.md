@@ -35,16 +35,35 @@ covers 16 of 40 documents.
 
 ## Status
 
+<!-- generated: status -- `python3 gaia/scripts/check.py --emit-state` -->
+
 | | |
 |---|---|
-| Documents | **40** written, 13 planned, 6 explicitly out of scope (53 topics in scope) |
-| Bibliography | 228 entries, 228 cited, 1 background |
-| Adversarially audited | **40 of 40** |
-| Corrections | **236** rows in `registers/corrections.tsv`; every one of the 40 documents carries at least one. ⚠️ **34 are `verifier=pending`** — named individually below, not counted away |
-| `verified:` stamps | **4 of 40**, signed 2026-09-14. ⚠️ Each covers `## Use this` and the failure table only — 8%, 11%, 15% and 19% of its document's body. Read it as "the recommendation and the diagnoses were read", never as "the document was read" |
-| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **41 red + 6 green**, every mutation biting for the reason its row names |
-| Measurement rigs | **37** in `rigs/`, 19 with saved output. Every register reference to one resolves; before 2026-09-14 they lived in a scratch directory and none did |
+| Documents | **40** written · 13 planned · 6 out of scope (59 topics claimed in `coverage.md`) |
+| Bibliography | **231** entries across 7 `papers-*.md` files |
+| Corrections | **236** rows in `registers/corrections.tsv`, **36** still `verifier=pending` |
+| `verified:` stamps | **4 of 40** documents — and **194 of 13,930 body lines, 1.39%**, because a stamp covers `## Use this` and the failure table and nothing else |
+| Measurement rigs | **37** in `rigs/`, **19** with saved output, **4** asserting against their own page |
+
+<!-- /generated: status -->
+
+The rows above are **computed from the tree**, not typed. Every self-description this
+corpus was caught getting wrong — eleven of them in two days, found by two rating panels
+and never by a guard — was a hand-written count. `check.py` fails if the block drifts from
+the tree, or if anyone edits inside the markers. These three are **not** computable and stay
+hand-written:
+
+| | |
+|---|---|
+| Adversarially audited | **40 of 40** — a judgement about coverage, not a count |
+| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **44 red + 7 green**, every mutation biting for the reason its row names. ⚠️ Not generated, because these are properties of a RUN and not of the tree — but the `bites` job asserts this row against what it actually observed, so the authority sits with the thing that knows |
 | Phase 0 | **closed** 2026-09-07 — the guard layer, verified by mutation under `bash -e` |
+
+⚠️ **Read the stamp row's second number, not its first.** `4 of 40` is the count a reader
+remembers and it overstates the position by about a factor of seven: a stamp covers
+`## Use this` and the failure table, so what a human has actually signed is **1.39% of the
+corpus body**. Everything else is *attested* — the same kind of author wrote the claim, the
+citation, and the guard that checks them.
 
 Reported metrics, none of them enforced:
 

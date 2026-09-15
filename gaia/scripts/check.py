@@ -2754,7 +2754,39 @@ def selfdescription_truth() -> dict[str, int]:
             continue
         if fm.get("verified"):
             stamps += 1
+    # How much of the corpus a human has actually signed. The stamp covers `## Use this` plus
+    # the failure table and nothing else, so "4 of 40" overstates it by a factor of seven and
+    # the honest figure is a fraction of BODY LINES. Computed, so it cannot be rounded up.
+    body_total = signed = 0
+    for d in docs:
+        try:
+            fm, body = parse_front_matter(d)
+        except (OSError, Unparseable):
+            continue
+        lines = body.split("\n")
+        body_total += len(lines)
+        if not fm.get("verified"):
+            continue
+        i = 0
+        while i < len(lines):
+            ln = lines[i]
+            if ln.startswith("## ") and ("Use this" in ln or "fails" in ln.lower()):
+                j = i + 1
+                while j < len(lines) and not lines[j].startswith("## "):
+                    j += 1
+                signed += j - i
+                i = j
+            else:
+                i += 1
+
+    states: dict[str, int] = {}
+    if COVERAGE.exists():
+        for _, st in re.findall(r"^- \*\*([a-z0-9-]+)\*\*\s+`([a-z-]+)`",
+                                COVERAGE.read_text(encoding="utf-8"), re.M):
+            states[st] = states.get(st, 0) + 1
+
     rigs = ROOT / "rigs"
+    rig_files = sorted(rigs.rglob("*.py")) if rigs.exists() else []
     return {
         "documents": len(docs),
         "bibliographies": len(papers),
@@ -2762,18 +2794,37 @@ def selfdescription_truth() -> dict[str, int]:
         "corrections": len(crows),
         "pending": sum(1 for f in crows if len(f) > 6 and "pending" in f[6]),
         "stamps": stamps,
-        "rigs": len(list(rigs.rglob("*.py"))) if rigs.exists() else 0,
+        "signed_lines": signed,
+        "body_lines": body_total,
+        "covered": states.get("covered", 0),
+        "planned": states.get("planned", 0),
+        "out_of_scope": states.get("out-of-scope", 0),
+        "rigs": len(rig_files),
         "runs": len(list(rigs.rglob("*.run.txt"))) if rigs.exists() else 0,
+        "rigs_asserting": sum(1 for f in rig_files if rig_asserts(f)),
     }
 
 
-# A Status-table row in STATE.md, keyed by its LABEL, and which computed number it must agree with.
-# Keyed by label rather than by line, because rows move and a line number does not survive an edit.
-STATUS_ROWS = {
-    "Documents": ("documents", r"\*\*(\d+)\*\* written"),
-    "Corrections": ("corrections", r"\*\*(\d+)\*\* rows"),
-    "Measurement rigs": ("rigs", r"\*\*(\d+)\*\* in `rigs/`"),
-}
+def rig_asserts(path: Path) -> bool:
+    """Does this rig check its DOCUMENT, or only its own memory?
+
+    The distinction is the one this corpus was caught on twice in a day: `heightfield-lod.py`
+    printed "document says 134" beside a 134 typed into its own source, and `mu-d-overcast.py`
+    shipped as the fix for a live physics error while computing two numbers and exiting 0
+    whatever the page said. A rig counts here only if it READS a file under `references/` and
+    can EXIT NON-ZERO. Both halves are required: reading without exiting is a report, and
+    exiting without reading is a self-test.
+
+    ⚠️ It reads source text, so it is fooled by a rig that reads its page and ignores what it
+    finds. That is a floor on the count, never the number of rigs that genuinely bite.
+    """
+    try:
+        src = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    reads = "references" in src and ("read_text" in src or "open(" in src)
+    return reads and "sys.exit" in src
+
 
 # Sentences that are FALSE while the tree holds a stamp. Matched against the whitespace-normalised
 # whole text, never line by line -- see the docstring of selfdescription_problems().
@@ -2813,6 +2864,100 @@ def _normalised(text: str) -> tuple[str, list[int]]:
     return "".join(out), lines
 
 
+# ── the generated Status block ───────────────────────────────────────────────────────────
+# WHY THIS IS GENERATED. Every falsehood two rating panels found by hand across 2026-09-14/15
+# was a hand-written claim about this corpus: a stamp count, a document count, a register row
+# count, a rig count. The matcher below catches the ones it has rules for; it cannot catch the
+# ones nobody thought to write a rule for, and it cannot tell a claim from a QUOTATION of one --
+# writing a retired falsehood into STATE.md to record it made STATE.md fail on its own
+# confession. A generator has neither problem, because it never has to recognise a sentence.
+#
+# Only exactly-computable facts go in here. The bites counts do NOT: they are a property of a
+# RUN, not of the tree, and a static count over the workflow misses rows that are plain shell
+# rather than a `red_check` call. That number stays hand-written in the Guards row and the
+# `bites` job itself asserts STATE.md agrees with what it observed -- the authority sits with
+# the thing that actually knows.
+STATE = ROOT / "STATE.md"
+GEN_OPEN = "<!-- generated: status -- `python3 gaia/scripts/check.py --emit-state` -->"
+GEN_CLOSE = "<!-- /generated: status -->"
+
+
+def render_status() -> str:
+    """The Status rows, from `selfdescription_truth()` and nothing else."""
+    n = selfdescription_truth()
+    pct = 100.0 * n["signed_lines"] / n["body_lines"] if n["body_lines"] else 0.0
+    return "\n".join([
+        GEN_OPEN,
+        "",
+        "| | |",
+        "|---|---|",
+        f"| Documents | **{n['documents']}** written \u00b7 {n['planned']} planned \u00b7 "
+        f"{n['out_of_scope']} out of scope "
+        f"({n['covered'] + n['planned'] + n['out_of_scope']} topics claimed in `coverage.md`) |",
+        f"| Bibliography | **{n['entries']}** entries across {n['bibliographies']} "
+        f"`papers-*.md` files |",
+        f"| Corrections | **{n['corrections']}** rows in `registers/corrections.tsv`, "
+        f"**{n['pending']}** still `verifier=pending` |",
+        f"| `verified:` stamps | **{n['stamps']} of {n['documents']}** documents \u2014 and "
+        f"**{n['signed_lines']} of {n['body_lines']:,} body lines, {pct:.2f}%**, because a stamp "
+        f"covers `## Use this` and the failure table and nothing else |",
+        f"| Measurement rigs | **{n['rigs']}** in `rigs/`, **{n['runs']}** with saved output, "
+        f"**{n['rigs_asserting']}** asserting against their own page |",
+        "",
+        GEN_CLOSE,
+    ])
+
+
+def emit_state() -> int:
+    """Write the generated block into STATE.md between its markers."""
+    if not STATE.exists():
+        print(f"  FAIL  {STATE} does not exist")
+        return 1
+    text = STATE.read_text(encoding="utf-8")
+    if GEN_OPEN not in text or GEN_CLOSE not in text:
+        print(f"  FAIL  STATE.md carries no generated region. Insert these two markers where the "
+              f"Status table belongs and re-run:\n    {GEN_OPEN}\n    {GEN_CLOSE}")
+        return 1
+    a = text.index(GEN_OPEN)
+    b = text.index(GEN_CLOSE) + len(GEN_CLOSE)
+    new = text[:a] + render_status() + text[b:]
+    if new == text:
+        print("STATE.md's status block is current.")
+        return 0
+    STATE.write_text(new, encoding="utf-8")
+    print("wrote STATE.md's status block.")
+    return 0
+
+
+def generated_block_problems() -> list[str]:
+    """The generated region must equal what `render_status()` emits right now.
+
+    A hand edit inside the markers, and a change to the tree that nobody regenerated for, are
+    the same failure and get the same message: regenerate.
+    """
+    if not STATE.exists():
+        return []
+    text = STATE.read_text(encoding="utf-8")
+    if GEN_OPEN not in text or GEN_CLOSE not in text:
+        return [f"STATE.md: the generated status block is missing its markers. "
+                f"Run `python3 gaia/scripts/check.py --emit-state`."]
+    a = text.index(GEN_OPEN)
+    b = text.index(GEN_CLOSE) + len(GEN_CLOSE)
+    have, want = text[a:b], render_status()
+    if have == want:
+        return []
+    out = [f"STATE.md:{text[:a].count(chr(10)) + 1}: the generated status block is out of date. "
+           f"Run `python3 gaia/scripts/check.py --emit-state`."]
+    hl, wl = have.split("\n"), want.split("\n")
+    for i in range(max(len(hl), len(wl))):
+        h = hl[i] if i < len(hl) else "(missing)"
+        w = wl[i] if i < len(wl) else "(deleted)"
+        if h != w:
+            out.append(f"    row {i}: file has {h.strip()[:96]!r}")
+            out.append(f"             tree says {w.strip()[:96]!r}")
+    return out
+
+
 def selfdescription_problems() -> list[str]:
     """SKILL.md and STATE.md describe this corpus. This file can COMPUTE what they describe.
 
@@ -2826,6 +2971,13 @@ def selfdescription_problems() -> list[str]:
        immediately: the commit that introduced it wrote "**233** rows" into STATE.md while the
        register held 238, wrong on arrival, in the commit titled "the corpus described itself
        wrongly in the two files a reader opens first".
+
+    Its table-cell half is GONE, not extended. Those rows are generated now
+    (`render_status()`), and it read the generated stamp row's "194 of 13,930 body lines" as a
+    claim that 194 of 13,930 documents were stamped -- failing a block the generator had just
+    written. Two rules owning one fact is the defect this corpus keeps rediscovering. What is
+    left here is the half a generator cannot do: prose, outside the markers, where a human
+    writes a sentence about the corpus in their own words.
 
     Both are fixed by the same move: compute the truth ONCE (`selfdescription_truth()`), then
     match against the whitespace-NORMALISED whole text.
@@ -2850,6 +3002,14 @@ def selfdescription_problems() -> list[str]:
         if not f.exists():
             continue
         raw = f.read_text(encoding="utf-8")
+        # The generated region belongs to `generated_block_problems()`. Blanking it (rather than
+        # deleting it) keeps every later line number right, and stops the two rules disagreeing:
+        # the matcher read the generated stamp row's "194 of 13,930 body lines" as a claim that
+        # 194 of 13,930 documents were stamped, and failed a block the generator had just written.
+        # One fact, one owner.
+        if GEN_OPEN in raw and GEN_CLOSE in raw:
+            a, b = raw.index(GEN_OPEN), raw.index(GEN_CLOSE) + len(GEN_CLOSE)
+            raw = raw[:a] + "".join("\n" if c == "\n" else " " for c in raw[a:b]) + raw[b:]
         flat, lines = _normalised(raw)
         low = flat.lower()
 
@@ -2873,17 +3033,6 @@ def selfdescription_problems() -> list[str]:
                 problems.append(
                     f"{name}:{lines[m.start()]}: claims `{claimed} of {over}` `verified:` "
                     f"stamps; the tree has {truth['stamps']} of {truth['documents']}.")
-
-        # 3. every Status-table row this check knows how to compute
-        for label, (key, pattern) in STATUS_ROWS.items():
-            rm = re.search(r"\|\s*" + re.escape(label) + r"\s*\|([^|]*)\|", flat)
-            if not rm:
-                continue
-            vm = re.search(pattern, rm.group(1))
-            if vm and int(vm.group(1)) != truth[key]:
-                problems.append(
-                    f"{name}:{lines[rm.start()]}: the `{label}` row states "
-                    f"**{vm.group(1)}**; the tree has {truth[key]}.")
 
     return problems
 
@@ -2957,6 +3106,8 @@ def notopened_inline_problems() -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true", help="what is checked, and what is not")
+    ap.add_argument("--emit-state", action="store_true",
+                    help="write STATE.md's generated status block from the tree")
     ap.add_argument("--selftest", action="store_true",
                     help="assert the reported metrics classify their fixture sets correctly")
     ap.add_argument("--digest", metavar="DOC",
@@ -2978,6 +3129,9 @@ def main() -> int:
     if args.list:
         print(__doc__)
         return 0
+
+    if args.emit_state:
+        return emit_state()
 
     bib, problems = bibliography()
     doc_problems, used = check_documents(bib)
@@ -3135,6 +3289,24 @@ def main() -> int:
               f"and there are {len(DATED_CROSSOVER_FIXTURES)} fixtures pinning that. Reported, "
               f"not enforced; see registers/guard-proofs.tsv.")
 
+    _t = selfdescription_truth()
+    if _t["rigs"]:
+        print(f"rigs-asserting {_t['rigs_asserting']}/{_t['rigs']} measurement rigs both READ a "
+              f"document under `references/` and can exit non-zero on what they find. The rest "
+              f"compute a number that no page-side assertion ever reads back, so a figure they "
+              f"once reproduced can drift out of the document underneath them and nothing goes "
+              f"red. This corpus has been caught three times with a harness checking its own "
+              f"memory -- `heightfield-lod.py` printed \"document says 134\" beside a 134 typed "
+              f"into its own source, `mu-d-overcast.py` shipped as the fix for a live physics "
+              f"error while exiting 0 whatever the page said, and `node-graph-runtime.py` held a "
+              f"six-number transcript of a fence under a comment claiming it came from the "
+              f"document. All three are repaired and all three are in the numerator. "
+              f"\u26a0\ufe0f This reads SOURCE TEXT, so a rig that reads its page and ignores what "
+              f"it finds still counts: it is a FLOOR on the number that genuinely bite, never "
+              f"that number. \u26a0\ufe0f And CI runs only the asserting ones. "
+              f"Reported, not enforced; see registers/guard-proofs.tsv.")
+
+    problems.extend(generated_block_problems())
     problems.extend(selfdescription_problems())
     problems.extend(notopened_inline_problems())
 

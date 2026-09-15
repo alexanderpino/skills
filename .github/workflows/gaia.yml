@@ -68,6 +68,48 @@ jobs:
       - name: Generated index must be current
         run: python3 gaia/scripts/index.py --check
 
+      # ── the rigs that assert ────────────────────────────────────────────────────────────
+      # `grep -c "rigs/" .github/workflows/gaia.yml` returned 0 until 2026-09-15: 37 measurement
+      # rigs on disk, cited by 59 register rows, and CI ran none of them. Three independent
+      # raters named it in the same round.
+      #
+      # ONLY the rigs that assert against their document run here, and that is the whole design.
+      # A rig that computes a number and prints it cannot fail, so running it would add a log
+      # nobody reads and a green tick nobody should trust. A rig that PARSES its page and exits
+      # non-zero on a mismatch is a gate, and each of these four has its red-and-green proof in
+      # `registers/guard-proofs.tsv`. `check.py` reports `rigs-asserting N/M` so the gap between
+      # the two populations stays on screen and converting another rig visibly moves it.
+      - name: Rigs that assert against their document must still agree with it
+        run: |
+          set -u
+          fails=0
+          for rig in gaia/rigs/approx/heightfield-lod.py \
+                     gaia/rigs/approx/node-graph-runtime.py \
+                     gaia/rigs/networks/hydraulic_geometry.py \
+                     gaia/rigs/optics/mu-d-overcast.py; do
+            if python3 "$rig" > /tmp/rig.out 2>&1; then
+              echo "  OK    $rig"
+            else
+              echo "::error::$rig disagrees with the document it checks"
+              grep -E 'FAIL|Error|Traceback' /tmp/rig.out | head -5
+              fails=$((fails + 1))
+            fi
+          done
+          # The gate is the LIST above, and the list must not silently shrink: check.py's own
+          # count of asserting rigs has to match it, or a rig was converted and never wired in.
+          python3 - <<'PYC'
+          import sys
+          sys.path.insert(0, "gaia/scripts")
+          import check
+          n = check.selfdescription_truth()["rigs_asserting"]
+          if n != 4:
+              print(f"::error::check.py counts {n} asserting rigs; this job runs 4. "
+                    f"Add the new one to the loop above, or find out why one stopped asserting.")
+              raise SystemExit(1)
+          print(f"  rigs-asserting {n}/{check.selfdescription_truth()['rigs']}, all 4 gated here")
+          PYC
+          [ "$fails" -eq 0 ]
+
       - name: Evals must be valid JSON with the shape the runner expects
         run: |
           python3 - <<'PY'
@@ -194,6 +236,10 @@ jobs:
               # letter off ONE of them, which is what a drifting rewrite would really do.
               "list_names_open_surfaces": [("check.py",
                   "  T3 -- FABRICATION, as a whole.", "  Fabrication, as a whole.")],
+              # The generated Status block. Stubbing the comparison is what makes these rows
+              # prove the GENERATOR rather than some other rule that happens to notice.
+              "generated_block": [("check.py",
+                  "    problems.extend(generated_block_problems())", "    pass")],
 
               # --- citations ------------------------------------------------------------
               "source_key_unknown": [("check.py", '            if extra:', '            if False:')],
@@ -288,8 +334,19 @@ jobs:
           }
 
           # $1 command   $2 label   $3 ERE the failing output must carry   $4 stub name
+          # STATE.md's generated status block is DERIVED STATE, not an assertion: it moves
+          # whenever the tree moves, including for a mutation aimed at some entirely other rule.
+          # Left alone it made fifteen unrelated rows report "stayed RED, something ELSE reports
+          # it" -- the same cross-talk the stamp fixture's re-count already exists to prevent,
+          # one level up. So every row reconciles the block with the tree it is about to test,
+          # and the two rows that TEST the block set NO_REGEN=1 because staleness is their
+          # subject. A row that needs derived state stale says so; the rest never see it.
+          NO_REGEN=""
+          regen() { [ -n "$NO_REGEN" ] || python3 scripts/check.py --emit-state >/dev/null 2>&1 || true; }
+
           expect_red() {
             cmd="$1"; label="$2"; pat="$3"; stub="$4"
+            regen
             if $cmd >/tmp/out 2>&1; then
               echo "::error::guard stayed GREEN on mutation '$label' -- it does not bite"
               fails=$((fails + 1)); return
@@ -304,8 +361,9 @@ jobs:
               echo "::error::'$label': stub '$stub' did not apply"
               fails=$((fails + 1)); restore_guard; return
             fi
+            regen
             if $cmd >/tmp/out2 2>&1; then
-              echo "  BITES  $label   (red via $stub, green without it)"
+              say "  BITES  $label   (red via $stub, green without it)"
             else
               echo "::error::'$label' stayed RED with '$stub' stubbed -- something ELSE reports"
               echo "          it, so this row proves nothing about the guard it names:"
@@ -314,14 +372,20 @@ jobs:
             fi
             restore_guard
           }
+          # Every BITES/GREEN line also lands in a log, so the tail of this job can count what
+          # it actually observed rather than trusting a number typed into STATE.md.
+          : > /tmp/bites.log
+          say() { echo "$1"; echo "$1" >> /tmp/bites.log; }
+
           red_check() { expect_red "python3 scripts/check.py" "$@"; }
           red_index() { expect_red "python3 scripts/index.py --check" "$@"; }
 
           # The decoys. A guard that fires on rewording gets ignored within a week, and this
           # corpus is reworded constantly -- so staying green here is a requirement.
           expect_green() {
+            regen
             if python3 scripts/check.py >/tmp/out 2>&1; then
-              echo "  GREEN  $1"
+              say "  GREEN  $1"
             else
               echo "::error::guard fired on '$1' -- it is too eager to be trusted"
               grep -m3 FAIL /tmp/out | cut -c1-160
@@ -344,7 +408,7 @@ jobs:
               sed -n '1,12p' /tmp/out
               fails=$((fails + 1))
             else
-              echo "  BITES  $2"
+              say "  BITES  $2"
             fi
             restore_guard
           }
@@ -802,21 +866,6 @@ jobs:
             "says 'no document carries this yet'" selfdescription
           cp /tmp/bk_state1 STATE.md
 
-          # And the Status-table row the flagship commit got wrong ON ARRIVAL: it wrote
-          # "**233** rows" while the register held 238, in the commit whose subject was the
-          # corpus describing itself wrongly. That row is computed now.
-          cp STATE.md /tmp/bk_state2
-          python3 - <<'PYSD2'
-          import pathlib, re
-          p = pathlib.Path("STATE.md"); s = p.read_text(encoding="utf-8")
-          m = re.search(r"\| Corrections \| \*\*(\d+)\*\* rows", s)
-          assert m, "the Corrections row moved"
-          p.write_text(s.replace(m.group(0), m.group(0).replace(m.group(1), "999"), 1),
-                       encoding="utf-8")
-          PYSD2
-          red_check "the Corrections row disagreeing with the register" \
-            "the .Corrections. row states" selfdescription
-          cp /tmp/bk_state2 STATE.md
 
           # A source the front matter declares NOT OPENED, cited bare in the body with nothing
           # above it saying so. The real instance was 67 such citations across 10 documents.
@@ -884,7 +933,7 @@ jobs:
           sys.exit(1 if bad else 0)
           PYLC
           if python3 /tmp/listcheck.py; then
-            echo "  GREEN  --list names T3, T4 and T8, and all three are OPEN rows"
+            say "  GREEN  --list names T3, T4 and T8, and all three are OPEN rows"
           else
             echo "::error::criterion 1's last clause: --list or guard-proofs.tsv lost a surface"
             fails=$((fails + 1))
@@ -895,9 +944,52 @@ jobs:
             echo "::error::the --list assertion stayed GREEN with the naming block removed"
             fails=$((fails + 1))
           else
-            echo "  BITES  --list stops naming T3/T4/T8   (red via list_names_open_surfaces)"
+            say "  BITES  --list stops naming T3/T4/T8   (red via list_names_open_surfaces)"
           fi
           cp /tmp/bk_lc scripts/check.py
+
+          # ── the generated Status block ───────────────────────────────────────────────
+          # Two directions, because they are different failures with the same fix. (1) Someone
+          # edits inside the markers. (2) The TREE moves and nobody regenerates -- which is the
+          # one that actually happened: the commit that introduced the self-description check
+          # wrote "**233** rows" into STATE.md while the register held 238, wrong on arrival.
+          cp STATE.md /tmp/bk_gen
+          python3 - <<'PYG1'
+          import pathlib, re
+          p = pathlib.Path("STATE.md"); s = p.read_text(encoding="utf-8")
+          m = re.search(r"\| Bibliography \| \*\*(\d+)\*\* entries", s)
+          assert m, "the generated Bibliography row moved"
+          p.write_text(s.replace(m.group(0), m.group(0).replace(m.group(1), "999"), 1),
+                       encoding="utf-8")
+          PYG1
+          NO_REGEN=1
+          red_check "a hand edit inside the generated status block" \
+            "generated status block is out of date" generated_block
+          cp /tmp/bk_gen STATE.md
+
+          cp gaia_corrections_bk /dev/null 2>/dev/null || cp registers/corrections.tsv /tmp/bk_corr
+          printf 'CI-FIXTURE-ROW\treferences/x.md\tprose\tevidence\tgate\tactor\tverified\tnote\n' \
+            >> registers/corrections.tsv
+          red_check "the tree moving with nobody regenerating the status block" \
+            "generated status block is out of date" generated_block
+          NO_REGEN=""
+          cp /tmp/bk_corr registers/corrections.tsv
+
+          # And regenerating must actually fix it -- a generator whose output does not satisfy
+          # its own checker is worse than no generator.
+          cp /tmp/bk_corr /tmp/bk_corr2
+          printf 'CI-FIXTURE-ROW2\treferences/x.md\tprose\tevidence\tgate\tactor\tverified\tnote\n' \
+            >> registers/corrections.tsv
+          python3 scripts/check.py --emit-state >/dev/null
+          if python3 scripts/check.py >/dev/null 2>&1; then
+            say "  GREEN  --emit-state reconciles the block with a changed tree"
+          else
+            echo "::error::--emit-state ran but check.py is still red; the generator disagrees with its own checker"
+            python3 scripts/check.py 2>&1 | grep -m3 FAIL
+            fails=$((fails + 1))
+          fi
+          cp /tmp/bk_corr2 registers/corrections.tsv
+          cp /tmp/bk_gen STATE.md
 
           # ── the decoys ───────────────────────────────────────────────────────────────
           # Reworded prose OUTSIDE both anchors, and it ASSERTS that: the old form of this
@@ -1006,6 +1098,29 @@ jobs:
             || { echo "::error::copy not restored"; fails=$((fails + 1)); }
           python3 scripts/check.py --selftest >/dev/null \
             || { echo "::error::guard not restored"; fails=$((fails + 1)); }
+          # ── STATE.md's Guards row, policed by the thing that actually knows ──────────
+          # The bites counts are a property of a RUN, so `check.py` cannot compute them and the
+          # generated status block deliberately leaves them out. That made them the one
+          # self-description with no owner, and they went stale twice in a single day (36 -> 41
+          # -> 43 -> 44 while the row said 36). The authority belongs here: this job counted
+          # them, so this job checks the claim.
+          OBS_RED=$(grep -c "  BITES " /tmp/bites.log 2>/dev/null || true)
+          OBS_GREEN=$(grep -c "  GREEN " /tmp/bites.log 2>/dev/null || true)
+          if [ -z "${OBS_RED:-}" ] || [ "$OBS_RED" = "0" ]; then
+            echo "  (bites counts not captured; skipping the STATE.md assertion)"
+          else
+            CLAIM=$(grep -oE '\*\*[0-9]+ red \+ [0-9]+ green\*\*' STATE.md | head -1)
+            WANT="**$OBS_RED red + $OBS_GREEN green**"
+            if [ "$CLAIM" = "$WANT" ]; then
+              echo "  GREEN  STATE.md's Guards row matches what this job observed ($WANT)"
+            else
+              echo "::error::STATE.md's Guards row says '$CLAIM'; this run observed '$WANT'."
+              echo "          The bites counts are not computable from the tree, so this job is"
+              echo "          their only check. Update the row."
+              fails=$((fails + 1))
+            fi
+          fi
+
           echo
           [ "$fails" -eq 0 ] && echo "every mutation bites for the reason its row names; decoys clean" \
             || { echo "$fails problem(s)"; exit 1; }
