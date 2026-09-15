@@ -124,6 +124,13 @@ jobs:
           PYC
           [ "$fails" -eq 0 ]
 
+      - name: The published errata page must not have drifted from the registers
+        # A page describing this corpus is a SECOND END of every claim it repeats, and on the
+        # open web it is the end that gets cited. `ledger.py --check` re-renders from the
+        # registers and fails on any difference -- a hand edit, a register row added without
+        # regenerating, or a forged verification banner. Proved by all three mutations.
+        run: python3 gaia/scripts/ledger.py --check
+
       - name: Evals must be valid JSON with the shape the runner expects
         run: |
           python3 - <<'PY'
