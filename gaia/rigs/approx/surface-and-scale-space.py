@@ -33,9 +33,22 @@ at 256², L = 5 (:166, restated :186 and :441) is printed as -1.03%; this rig me
 -1.0248%, i.e. -1.02%. Every other cell of that column and of the parity paragraph reproduces to
 the last digit the page prints -- -10.91, -11.22, +25.58, +34.10, +0.00, -0.26, -0.06 -- so the
 rig's reading is that the page, not the rig, is off by one in the last place. The document is not
-this rig's to edit, so §13 gates the column with an explicit one-unit-in-the-last-place rule
-and prints a NOTE naming the disagreement. Walking that figure past its own last digit still
-fails.
+this rig's to edit, so §13 carries ONE NAMED EXCEPTION, keyed to that row and to nothing else:
+`reflect`/`reflect` may miss by exactly one unit in the page's last printed place, and a NOTE
+says so. EVERY OTHER ROW IS GATED AT TOLERANCE ZERO. An earlier version applied the one-unit
+band to the whole column, which let both ends of `reflect`/`symmetric` (-10.91 -> -10.92) and of
+`reflect`/`edge` (-11.22 -> -11.23) be walked together and stay green -- a band that covers a row
+that DOES reproduce is not a tolerance, it is a hole. The same figure is also asserted at all
+three of its ends against each other, so a correction landing on one end alone still fails, and a
+correction landing on all three (to -1.02%) passes cleanly and the NOTE goes away.
+
+WHAT WAS TRANSCRIBED AND IS NOT ANY MORE. §7 used to hand-write the four surface operators of
+:214-217 in a dict while throwing away the formula its own regex had captured, so rewriting
+`r - 40*relu(-r)` as `r + 40*relu(-r)` on the page left this rig running the old sign and
+reporting the old result -- failure shape 1, on the one claim §7 exists for. The formulas are now
+COMPILED FROM THE TABLE CELL under the same whitelist the kernel taps get in §1. §14 is new for
+the same reason: the periodic domain-size rule at :339-341 was stated, measurable with the `wrap`
+chain this rig already had, and gated nowhere.
 
 HALTING. Every loop bound is a literal, a parsed integer, or the length of a list built by an
 already-halted loop. The two bisections in §12 run a fixed 80 iterations. No loop anywhere has a
@@ -490,7 +503,8 @@ QUARTER = page(r"\| Every band is a (\w+) of its expected height \| The factor (
 # The SAME claim in words at :138-139, beside the pyramid fence. Two ends, one word: assert them
 # against each other, and both against the factor itself -- "a quarter" is 1/4 or the page is
 # not describing the factor it names two lines earlier.
-FRACTION = {"half": 2, "third": 3, "quarter": 4, "fifth": 5, "sixth": 6, "eighth": 8}
+FRACTION = {"half": 2, "third": 3, "quarter": 4, "fourth": 4, "fifth": 5, "sixth": 6,
+            "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10, "sixteenth": 16}
 PROSE_W = page(r"drop it and every\s+band comes back a (\w+) height",
                "the pyramid fence's word for what dropping the factor costs")
 agree_text("word for the height a dropped factor leaves", QUARTER.group(1).lower(),
@@ -815,9 +829,11 @@ print(f"PASS  the phase rule reads as `(tile_origin {CONG.group(1)} halo) ≡ 0 
       f"{CONG.group(2)})` at both ends of the page; §11 measures it")
 SMALL = page(r"the smallest halo satisfying both is `3\*2\^L`: (\d+) px at three levels,\s+> "
              r"(\d+) at four, (\d+) at five", "the three smallest halos", 0)
+SMALLEST = {}
 for w, printed in zip(("three", "four", "five"), SMALL.groups()):
     L = WORDS[w]
     smallest = next(hh for hh in range(0, 4 * 2 ** L + 1) if hh >= R(L) and hh % 2 ** L == 0)
+    SMALLEST[L] = int(printed)
     pin(f"smallest halo at L = {L} with halo >= R(L) and halo = 0 (mod 2^L)", smallest,
         printed, " px")
     if smallest != 3 * 2 ** L:
@@ -947,6 +963,13 @@ PL3, PR3, PP3 = int(L3.group(4)), int(L3.group(5)), int(L3.group(6))
 if PR3 != R(PL3) or PP3 != 2 ** PL3:
     fail(f"the L = {PL3} repeat says R = {PR3}, period {PP3}; R(L) gives {R(PL3)}, period "
          f"{2 ** PL3}")
+if PL3 in SMALLEST:
+    agree(f"the halo that works at L = {PL3} (:302's worked example vs the rule's own list)",
+          int(L3.group(11)), SMALLEST[PL3])
+for g in (7, 9, 11):
+    if int(L3.group(g)) < PR3:
+        fail(f"the L = {PL3} repeat discusses halo {L3.group(g)}, which is below R = {PR3}; "
+             f"the point of the passage is that being large enough is not enough")
 ORIGIN3 = ORIGIN - ORIGIN % PP3                # aligned at L = 3 as well: the "normal case"
 for g in (7, 9, 11):
     h3, printed3 = int(L3.group(g)), L3.group(g + 1) if g < 11 else "0"
@@ -1348,9 +1371,14 @@ def periodic_error(N, L):
     return max(abs(one[i] - ref[off + i]) for i in range(N))
 
 
-for N, L in PERIODIC + [PER_WRONG]:
+CASES = [(N, L, True) for N, L in PERIODIC] + [(PER_WRONG[0], PER_WRONG[1], False)]
+CLAIMED = {}
+for N, L, claimed_exact in CASES:
+    if CLAIMED.setdefault((N, L), claimed_exact) != claimed_exact:
+        fail(f"the page names N = {N}, L = {L} as BOTH a case that reproduces the "
+             f"infinite-periodic low band and its own counterexample")
+for N, L, claimed_exact in CASES:
     e = periodic_error(N, L)
-    claimed_exact = (N, L) != PER_WRONG
     rule = eval(PER_MOD_SRC, {"__builtins__": {}}, {"L": L})   # noqa: S307 - whitelisted above
     if (e == 0.0) != claimed_exact:
         fail(f"N = {N}, L = {L}: the page says the split "
