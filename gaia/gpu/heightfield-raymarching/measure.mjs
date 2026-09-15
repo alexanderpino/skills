@@ -208,8 +208,14 @@ console.log(`GL version: ${result.glVersion}`);
 console.log(`${NUM_RAYS} rays, ${NLevels}-level pyramid over a ${NG}x${NG} field\n`);
 
 // ── correctness: hit/miss/spurious against the Python rig's own closed-form reference ────
+// Split by ray kind from the start: ascending/grazing are the GATED classes (span/2^6 below);
+// primary and picking are NOT GATED, for the reasons the report below states in full, so a
+// miss or a spurious hit on THOSE kinds must not flip the overall exit code -- doing so would
+// contradict the very outcomes this file documents and reports.
+const GATED_KINDS = new Set(['ascending', 'grazing']);
 let ok = true;
 let missed = 0, spurious = 0, agreeing = 0;
+let gatedMissed = 0, gatedSpurious = 0;
 const errsByKind = {};
 const stepsByKind = {};
 for (let i = 0; i < NUM_RAYS; i++) {
@@ -218,8 +224,9 @@ for (let i = 0; i < NUM_RAYS; i++) {
   const ref = ray.ref;
   const gotHit = got.t >= 0.0;
   const refHit = ref !== null;
-  if (refHit && !gotHit) { missed++; continue; }
-  if (!refHit && gotHit) { spurious++; continue; }
+  const gated = GATED_KINDS.has(ray.kind);
+  if (refHit && !gotHit) { missed++; if (gated) gatedMissed++; continue; }
+  if (!refHit && gotHit) { spurious++; if (gated) gatedSpurious++; continue; }
   if (refHit && gotHit) {
     const err = Math.abs(got.t - ref);
     agreeing++;
@@ -230,7 +237,9 @@ for (let i = 0; i < NUM_RAYS; i++) {
 
 console.log(`hit/miss agreement: ${agreeing} agree, ${missed} missed (ref hit, shader missed), `
            + `${spurious} spurious (ref miss, shader hit)`);
-if (missed > 0 || spurious > 0) ok = false;
+console.log(`  of which, on the GATED classes (ascending/grazing): ${gatedMissed} missed, `
+           + `${gatedSpurious} spurious`);
+if (gatedMissed > 0 || gatedSpurious > 0) ok = false;
 
 console.log('\nerror vs the Python rig\'s closed-form reference, by ray class, at 6 bisections:');
 for (const [kind, errs] of Object.entries(errsByKind)) {
@@ -240,45 +249,53 @@ for (const [kind, errs] of Object.entries(errsByKind)) {
              + `avg steps=${(stepsByKind[kind].reduce((a, b) => a + b, 0) / stepsByKind[kind].length).toFixed(1)}`);
 }
 
-// ── THREE DIFFERENT OUTCOMES, and they must not be collapsed into one PASS/FAIL ──────────
+// ── THE FINDING APPLIES TO EVERY RAY CLASS, NOT ONLY "primary" ──────────────────────────
 //
-// ascending/grazing: gated at the page's own span/2^6 bound. These rays hit within a few
-// dozen steps and never sit near a level boundary for long, and they PASS -- which is the
-// actual validation this file exists to produce: the fence, transcribed into real GLSL ES
-// 3.00 and run on a real (if software) rasteriser, reproduces the Python fp64 rig's own
-// closed-form reference to millimetre precision. That is a genuine, novel confirmation --
-// nothing here before today ran this fence as a shader.
+// An earlier version of this file reported ascending/grazing as a clean PASS and confined
+// the fp32 finding to primary rays. That was wrong, and the wrongness was caught the same
+// way everything else in this corpus is: by tracing a specific failure rather than trusting
+// a class-level summary. 7 of 105 rays -- some ascending, some grazing -- MISS entirely.
+// Traced one by hand (idx 71, ascending): the ray's z-coordinate crosses a mip-level cell
+// boundary at a point where the true value is a few times 1e-7 away from exactly zero. In
+// real GLSL fp32 it lands on the NEGATIVE side (z = -7.15e-7), and `floor`/`mod` correctly
+// wrap that to the LAST row of the level's texture rather than the first -- exactly the
+// periodic wrap this rig relies on, working as designed. The trajectory that follows from
+// the wrapped cell diverges from the one a slightly different fp32 rounding would take.
 //
-// picking: NOT gated to the same bound, matching the Python rig's OWN documented reason
-// (heightfield-raymarching.py's diagnostics, ":51 residual = span/2^k ... NOT GATED"): a
-// column-locked ray's level-0 span is the rest of the ray, tens of metres on this field, and
-// refine's fixed 8-step scan is not fine enough to bracket a thin feature over that span
-// reliably. This is a KNOWN limitation the Python rig already reports and declines to gate.
+// So the finding is broader than first reported: ANY ray whose trajectory crosses a
+// mip-level boundary within about 1e-6 of exactly on it is subject to this sensitivity,
+// REGARDLESS OF KIND. Primary and picking rays hit it often because they march far and
+// cross many boundaries; ascending/grazing rays hit it rarely because they converge in a
+// few dozen steps and rarely land on one. "Rarely" is not "never" -- 7 of 105 here -- and
+// reporting the class as immune because a first pass did not sample the exception would
+// have been exactly the kind of overclaim this corpus's registers exist to catch.
 //
-// primary: THIS is the finding this file exists to surface, and it is NEW -- the page's own
-// :154-155 already documents fp32 sensitivity, but ONLY for the UNFIXED registration ("a
-// third, in fp32, ranged over 36-63% with nothing changed but the registration convention").
-// This shader implements the CORRECT, fixed registration (the 3x3-dilated apron, matching
-// _pyramid(h, "level0")) and STILL shows severe errors on a subset of primary rays, for a
-// DIFFERENT reason: a ray that crosses a mip-level cell boundary within about 1e-6 of exactly
-// on the boundary can enter a many-step near-livelock, because the relative-step epsilon
-// (2.38e-7) is at the edge of what fp32 can resolve there. A bit-for-bit fp32 EMULATION of
-// this exact algorithm in Python (numpy.float32 on every operation) reproduces the same
-// livelock pattern and DOES eventually escape to the correct answer, ~90 steps in on the
-// worst ray tested by hand. SwiftShader's actual GLSL execution of the identical algorithm
-// escaped after only 49 steps, to a WRONG answer 13.6 m off -- meaning the escape point is
-// sensitive to the exact rounding behaviour of floor()/mod() on the executing GPU driver,
-// not just to "fp32 vs fp64" in the abstract. NOT gated (a page that states no a,b,k,k' for
-// this field cannot be gated on an absolute error a real GPU may or may not reproduce), but
-// loudly reported, because a silent PASS/FAIL here would hide the one result this whole
-// exercise was built to find.
+// The page's own :154-155 already documents fp32 sensitivity, but ONLY for the UNFIXED
+// registration. This shader implements the CORRECT, fixed registration (the 3x3-dilated
+// apron, matching _pyramid(h, "level0")) and still shows this sensitivity -- a genuinely
+// new finding, now stated for what it actually is: a property of the ALGORITHM under fp32,
+// triggered by trajectory, not a property of one ray class.
 const GENERAL_BOUND_MM = (S0 / 64) * 1000; // span/2^6 for a one-texel span
+const missedByKind = {};
+for (let i = 0; i < NUM_RAYS; i++) {
+  const ray = rays[i], got = result.hits[i];
+  if (ray.ref !== null && got.t < 0) missedByKind[ray.kind] = (missedByKind[ray.kind] || 0) + 1;
+}
 for (const kind of ['ascending', 'grazing']) {
   const errs = errsByKind[kind] || [];
   const max = errs.length ? Math.max(...errs) * 1000 : 0;
-  const bad = max > GENERAL_BOUND_MM * 1.05; // 5% slack for fp32 vs the Python rig's fp64
-  if (bad) { console.log(`FAIL  ${kind} worst error ${max.toFixed(3)} mm exceeds span/2^6 = ${GENERAL_BOUND_MM.toFixed(3)} mm`); ok = false; }
-  else console.log(`PASS  ${kind} worst error ${max.toFixed(3)} mm is within span/2^6 = ${GENERAL_BOUND_MM.toFixed(3)} mm (+5% fp32 slack)`);
+  const miss = missedByKind[kind] || 0;
+  const errBad = max > GENERAL_BOUND_MM * 1.05; // 5% slack for fp32 vs the Python rig's fp64
+  const bad = errBad || miss > 0;
+  const total = errs.length + miss;
+  if (bad) {
+    console.log(`FAIL  ${kind}: ${miss} of ${total} missed entirely (fp32 boundary `
+               + `sensitivity, see above)${errBad ? `; worst error among the rest ${max.toFixed(3)} mm exceeds ${GENERAL_BOUND_MM.toFixed(3)} mm` : `; the ${errs.length} that hit are within ${GENERAL_BOUND_MM.toFixed(3)} mm`}`);
+  } else {
+    console.log(`PASS  ${kind}: all ${total} hit, worst error ${max.toFixed(3)} mm is within `
+               + `span/2^6 = ${GENERAL_BOUND_MM.toFixed(3)} mm (+5% fp32 slack)`);
+  }
+  if (bad) ok = false;
 }
 console.log('\nNOT GATED, reported instead, and why:');
 const pickErrs = errsByKind['picking'] || [];
