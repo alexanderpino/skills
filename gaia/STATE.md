@@ -43,7 +43,7 @@ covers 16 of 40 documents.
 | Bibliography | **231** entries across 7 `papers-*.md` files |
 | Corrections | **238** rows in `registers/corrections.tsv`, **37** still `verifier=pending` |
 | `verified:` stamps | **4 of 40** documents — and **194 of 13,937 body lines, 1.39%**, because a stamp covers `## Use this` and the failure table and nothing else |
-| Measurement rigs | **40** in `rigs/`, **19** with saved output, **8** asserting against their own page |
+| Measurement rigs | **41** in `rigs/`, **19** with saved output, **9** asserting against their own page |
 
 <!-- /generated: status -->
 
