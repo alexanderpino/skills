@@ -159,6 +159,105 @@ jobs:
                 f"({pos} positive, {len(tr) - pos} negative)")
           PY
 
+      - name: A page gate must go red when its own page moves, and green when it is put back
+        # The mutation table above proves `check.py` and `index.py` bite. It says nothing about
+        # the rigs the `guard` job runs -- and a rig is exactly the artefact this corpus has
+        # caught four times checking its own memory instead of its page. Each row below moves
+        # ONE figure on ONE page and requires (a) the rig to exit non-zero and (b) its output to
+        # NAME the figure. A rig that goes red for some other reason is not a gate for this
+        # figure, which is the same rule the stub table enforces on the guards.
+        #
+        # The converse is the second half of every row: put the page back, and the rig must be
+        # green again. Without it a rig that is simply broken would read as 47 passing bites.
+        run: |
+          set -u
+          # `cd` into the COPY or die. Extracted and run from the wrong directory during
+          # development, the `&&` chain below skipped the `cd` on a failed copy and every
+          # mutation ran against the real tree -- restoring each time, so it exited 0 and
+          # looked like a pass. A guard that can silently operate on the original is the
+          # same defect this job exists to catch, committed by the job.
+          rm -rf /tmp/rg
+          cp -r gaia /tmp/rg || { echo "::error::no gaia/ here -- run this from the repo root"; exit 1; }
+          cd /tmp/rg || exit 1
+          [ -d references ] && [ -d rigs ] || { echo "::error::/tmp/rg is not the corpus copy"; exit 1; }
+          fails=0
+
+          rig_bites() {
+            label="$1"; rig="$2"; page="$3"; mut="$4"; want="$5"
+            cp "$page" /tmp/page.bak
+            sed -i "$mut" "$page"
+            if ! cmp -s "$page" /tmp/page.bak; then :; else
+              echo "::error::$label -- the mutation changed nothing; its anchor has drifted"
+              fails=$((fails + 1))
+            fi
+            if python3 "$rig" > /tmp/rb.out 2>&1; then
+              echo "::error::$label -- $rig stayed GREEN with its own page mutated"
+              fails=$((fails + 1))
+            elif ! grep -qF -- "$want" /tmp/rb.out; then
+              echo "::error::$label -- $rig went red but never named: $want"
+              grep -E '^FAIL|no longer states|ANCHOR GONE' /tmp/rb.out | head -3
+              fails=$((fails + 1))
+            else
+              echo "  BITES  $label"
+            fi
+            cp /tmp/page.bak "$page"
+            if python3 "$rig" > /tmp/rb.out 2>&1; then
+              echo "  GREEN  ...and green again once the page is restored"
+            else
+              echo "::error::$label -- $rig is red on the UNMUTATED page; its row proves nothing"
+              grep -E '^FAIL|no longer states|ANCHOR GONE' /tmp/rb.out | head -3
+              fails=$((fails + 1))
+            fi
+          }
+
+          # ── the conclusion a page draws from a figure it cannot reproduce ───────────────
+          # ±11 mm is unreproducible here (the page gives the FORM of its field and never
+          # a, b, k or k'), and the rig says so. The INFERENCE from it is arithmetic over the
+          # page's own numbers and needs no field at all.
+          rig_bites "±0.64 m stops following from ±11 mm at a 57 m span" \
+            rigs/approx/heightfield-raymarching.py references/heightfield-raymarching.md \
+            's/±0\.64 m\*\*/±0.90 m**/' \
+            'does not follow from its ±11 mm'
+          rig_bites "the 57 m column-locked span moves under the same conclusion" \
+            rigs/approx/heightfield-raymarching.py references/heightfield-raymarching.md \
+            's/57 m median here/40 m median here/' \
+            'does not follow from its ±11 mm'
+
+          # ── the area half of the global size-law table, three checks of three shapes ────
+          rig_bites "one area cell moves: the row stops summing to 100%" \
+            rigs/clasts/clastic-debris.py references/clastic-debris.md \
+            's/| 55\.36% |/| 80.00% |/' \
+            '§10b b=1.5 boulder area share'
+          rig_bites "a row-internal transposition that keeps the sum at 100%" \
+            rigs/clasts/clastic-debris.py references/clastic-debris.md \
+            's/| 27\.54% | 24\.77% | \*\*47\.69%\*\* |/| 47.69% | 24.77% | **27.54%** |/' \
+            '§10b b=2 boulder area share'
+          # Four cells across two rows, every one inside its own 4-sigma band and both rows
+          # still summing to 100. Only :262's direction sentence catches this one, which is why
+          # that check is in the rig at all.
+          rig_bites "four cells across two rows, all in band, sums intact" \
+            rigs/clasts/clastic-debris.py references/clastic-debris.md \
+            's/| 8\.87% | 14\.02% | 77\.10% |/| 3.00% | 14.02% | 82.98% |/; s/| 1\.55% | 5\.24% | 93\.21% |/| 8.00% | 5.24% | 86.76% |/' \
+            'the boulder area share moves down at every step of b'
+
+          # ── a figure printed at three ends, moved at one ────────────────────────────────
+          rig_bites "0.01% corrected in the failure table and nowhere else" \
+            rigs/clasts/clastic-debris.py references/clastic-debris.md \
+            's/67 clasts and 0\.01% of the patch/67 clasts and 0.03% of the patch/' \
+            'the one-pass coverage agrees at 3 ends'
+
+          # ── the rig that used to print the page's figure from its own source ───────────
+          rig_bites "the R(L) support-radius formula moves off its own measurement" \
+            rigs/approx/surface-and-scale-space.py references/surface-and-scale-space.md \
+            's/3·2\^L − 2/3·2^L − 3/' \
+            'but the page'
+          rig_bites "the halo arithmetic moves" \
+            rigs/approx/surface-and-scale-space.py references/surface-and-scale-space.md \
+            's/704/708/g' \
+            'tile + 2 x halo'
+
+          [ "$fails" -eq 0 ]
+
   bites:
     # Proves the guard still fails on what it is supposed to fail on, AND that each failure
     # belongs to the guard its row names. Runs against a COPY so a mutation can never be left

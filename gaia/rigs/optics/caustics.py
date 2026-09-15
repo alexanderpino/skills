@@ -27,7 +27,7 @@ fence edit -- and here the transcription is the page's characters rather than mi
   - frame time (:157-161): the page explicitly refuses to price it.
 
 ⚠️ REPORTED, NOT GATED -- the page states `B(phase_g)` twice with two values. See
-`report_B_contradiction()`. Gating the disagreement would put this rig red on a clean tree.
+report_B_contradiction()`. Gating the disagreement would put this rig red on a clean tree.
 
 Halting: no loop has a data-dependent bound. Every loop runs a literal count of draws or walks
 a list already materialised by one regex pass over a file read once; the table lengths are
@@ -527,6 +527,22 @@ def report_ungated():
           f"{len(XROWS) - len(f_rows) - len(p_rows)} uncited. Gated as")
     print("    \"no row other than the F row cites a non-P source\", which is the true form.")
 
+
+# ── the photon-count scaling, added after a figure-walk found it ungated ────────
+# Scaling every bolded figure in the page by 1.37 one at a time, this rig caught six and MISSED
+# **±0.22** and **±0.11** -- the pair carrying the page's actual sizing advice. It gated the
+# ±1.27 beside them and not the two drawn from it.
+_m = grabm(r"Sixteen photons per texel reach \*\*±([\d.]+)\*\*,\s*\n?"
+           r"sixty-four \*\*±([\d.]+)\*\*", "the 16- and 64-photon RMS errors")
+_e16, _e64 = float(_m.group(1)), float(_m.group(2))
+_one = num(r"an \*\*RMS error of ±([\d.]+)\*\* on a gain whose mean is 1",
+           "the one-photon RMS error")
+# A mean-1 Monte-Carlo estimator's RMS falls as 1/sqrt(N): 16 -> 64 is a factor of exactly 2.
+check("RMS at 64 photons, from the 16-photon figure and 1/sqrt(N)", _e16 / 2.0, str(_e64))
+print(f"      (16 → 64 measured {_e16 / _e64:.3f}×; 1/sqrt(N) requires exactly 2)")
+print(f"      ⚠️ the one-photon figure ±{_one} is NOT on that law: {_one / _e16:.2f}× the "
+      f"16-photon value where 1/sqrt(N) wants 4.00×. An N = 1 estimator is not in the "
+      f"asymptotic regime and the page claims no law, so this is reported, not asserted.")
 
 report_B_contradiction()
 report_ungated()

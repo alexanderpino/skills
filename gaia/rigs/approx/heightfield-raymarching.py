@@ -998,6 +998,77 @@ def gate_rig_description():
 
 
 # ═════════════════════════════════════════════════════════════════════════════════════════
+# GATE 9 -- the CONCLUSION the page draws from ±11 mm, at :49-53.
+#
+# The absolute millimetres are not gated and cannot be (see the diagnostics below: the page
+# gives the FORM of its field and never a, b, k or k′, so no rig can rebuild that ray set).
+# But the page does not only print them -- it draws a claim from them: "That residual is
+# `span/2ᵏ` and nothing else, so it follows the *span*, not the terrain", and then applies
+# it to get ±0.64 m at a 57 m span.  That inference is checkable WITHOUT the field, because
+# it is a statement about the page's own four numbers: both residuals must sit at the SAME
+# fraction of their own span/2ᵏ.  They are printed to different precisions, so the test is
+# whether the two fractions' ROUNDING BANDS overlap -- a tolerance read off the page's own
+# digits, not chosen here to make the check pass.
+#
+# The general-ray span is one texel: :52 says the column-locked span is "not one texel", and
+# :54 states the texel size.  That size is a rig constant, not a measurement -- gate 8 above
+# `_agree`s it exactly against this file's own S0 -- so it enters with no rounding band.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def _half(printed):
+    """The rounding half-width implied by how many digits the page printed."""
+    dp = len(printed.split(".")[1]) if "." in printed else 0
+    return 0.5 * 10.0 ** -dp
+
+
+def gate_residual_follows_span():
+    print("\n── 9. 'the residual follows the span': the page's own four numbers, at :49-53 ─")
+    _require(r"That residual\s*\nis `span/2ᵏ` and nothing else, so it follows the \*span\*, "
+             r"not the terrain", "that the residual follows the span and nothing else (:50-51)")
+    _require(r"so its level-0 span is the rest of the ray", "why a picking ray's span is long (:52)")
+    _require(r"median here, not\s*\none texel", "that the general span IS one texel (:52-53)")
+
+    r_gen_s = _page(r"the hit lands within \*\*±([\d.]+) mm\s*\nat \d+ bisections\*\*",
+                    "the per-texel residual (:49-50)")
+    k_gen = _int(r"the hit lands within \*\*±[\d.]+ mm\s*\nat (\d+) bisections\*\*",
+                 "its bisection count (:50)")
+    span_s = _page(r"the rest of the ray — ([\d.]+) m median here", "the column-locked span (:52)")
+    r_col_s = _page(r"and the same \d+ bisections land \*\*±([\d.]+) m\*\*",
+                    "the column-locked residual (:53)")
+    k_col = _int(r"and the same (\d+) bisections land \*\*±[\d.]+ m\*\*",
+                 "its bisection count (:53)")
+    texel = _num(r"b·sin\(k′z\)` at ([\d.]+) m texels", "the texel size (:54)")
+
+    _agree("the bisection count both residuals are quoted at", k_gen, k_col)
+    if k_gen != k_col:
+        return
+
+    r_gen, r_col, span = float(r_gen_s) / 1000.0, float(r_col_s), float(span_s)
+    h_gen, h_col, h_span = _half(r_gen_s) / 1000.0, _half(r_col_s), _half(span_s)
+    two_k = 2.0 ** k_gen
+
+    # fraction of the span/2^k bound each residual sits at, widened by the printed precision
+    lo_gen = (r_gen - h_gen) / (texel / two_k)
+    hi_gen = (r_gen + h_gen) / (texel / two_k)
+    lo_col = (r_col - h_col) / ((span + h_span) / two_k)
+    hi_col = (r_col + h_col) / ((span - h_span) / two_k)
+
+    print(f"      per-texel : ±{r_gen_s} mm of a {texel:g} m span/2^{k_gen} = "
+          f"{texel / two_k * 1000:.3f} mm  ->  {lo_gen:.4f}..{hi_gen:.4f} of the bound")
+    print(f"      column-locked: ±{r_col_s} m of a {span_s} m span/2^{k_col} = "
+          f"{span / two_k:.4f} m  ->  {lo_col:.4f}..{hi_col:.4f} of the bound")
+
+    global _ok
+    good = lo_gen <= hi_col and lo_col <= hi_gen
+    _ok = _ok and good
+    print(f"{'PASS' if good else 'FAIL'}  the two fractions of span/2^{k_gen} overlap within "
+          f"the page's own printed precision")
+    if not good:
+        _fail(f"the page's ±{r_col_s} m does not follow from its ±{r_gen_s} mm at a {span_s} m "
+              f"span: the same law gives ±{r_gen * span / texel:.3f} m, and the printed digits "
+              f"are too tight to reconcile the two")
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
 # DIAGNOSTICS -- measured, printed, and DELIBERATELY NOT GATED.  Each says why.
 # ═════════════════════════════════════════════════════════════════════════════════════════
 def diagnostics(h, pyr, rs):
@@ -1011,6 +1082,9 @@ def diagnostics(h, pyr, rs):
     print("              ±11 mm to ±110 mm and `worst < claimed` stays green.  The counts")
     print("              the same sentence states as WORDS -- zero missed, zero spurious --")
     print("              are exact and ARE gated above, on this rig's own field.")
+    print("              So is the RATIO between the two residuals: gate 9 above checks that\n"
+          "              ±0.64 m at 57 m and ±11 mm at one texel sit at the same fraction of\n"
+          "              their own span/2\u1d4f, which is the page's inference and needs no field.")
     ref = [_reference(h, o, d, t0, t1) for (o, d, t0, t1, _k) in rs]
     worst = 0.0
     for (o, d, t0, t1, _k), rt in zip(rs, ref):
@@ -1025,6 +1099,8 @@ def diagnostics(h, pyr, rs):
     print("              NOT GATED: `err <= span/2^k` is a property of bisection, true for")
     print("              any k and any span, so both sides move together when the page is")
     print("              edited.  A gate that cannot fail is not a gate.")
+    print("              What IS gated, at 9 above, is the page's own use of that law across\n"
+          "              its two spans -- an arithmetic claim, not a property of bisection.")
 
     # the block's own `return refine(...)`, run literally
     bad = 0
@@ -1080,6 +1156,7 @@ def run_gate():
     gate_predicate(h, pyr, rs)
     gate_depth()
     gate_rig_description()
+    gate_residual_follows_span()
     diagnostics(h, pyr, rs)
     print()
     return 0 if _ok else 1

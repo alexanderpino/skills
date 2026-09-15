@@ -41,9 +41,9 @@ covers 16 of 40 documents.
 |---|---|
 | Documents | **40** written · 13 planned · 6 out of scope (59 topics claimed in `coverage.md`) |
 | Bibliography | **231** entries across 7 `papers-*.md` files |
-| Corrections | **238** rows in `registers/corrections.tsv`, **37** still `verifier=pending` |
+| Corrections | **239** rows in `registers/corrections.tsv`, **38** still `verifier=pending` |
 | `verified:` stamps | **4 of 40** documents — and **194 of 13,937 body lines, 1.39%**, because a stamp covers `## Use this` and the failure table and nothing else |
-| Measurement rigs | **44** in `rigs/`, **19** with saved output, **14** asserting against their own page |
+| Measurement rigs | **44** in `rigs/`, **19** with saved output, **15** asserting against their own page |
 
 <!-- /generated: status -->
 
@@ -56,7 +56,7 @@ hand-written:
 | | |
 |---|---|
 | Adversarially audited | **40 of 40** — a judgement about coverage, not a count |
-| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **47 red + 7 green**, every mutation biting for the reason its row names. ⚠️ Not generated, because these are properties of a RUN and not of the tree — but the `bites` job asserts this row against what it actually observed, so the authority sits with the thing that knows |
+| Guards | `check.py` exit 0 · `--selftest` green · `index --check` current · `requote --selftest` green · CI `bites` **47 red + 7 green**, every mutation biting for the reason its row names. ⚠️ Not generated, because these are properties of a RUN and not of the tree — but the `bites` job asserts this row against what it actually observed, so the authority sits with the thing that knows. A separate `guard`-job step proves the **page gates** bite too: 8 mutations across 3 rigs, each required to exit non-zero AND to name the figure moved, then required to go green again with the page restored. Those 8 are NOT in the count above — they run in a different job and write no `bites.log`, which is the only reason the two counts stay separable |
 | Phase 0 | **closed** 2026-09-07 — the guard layer, verified by mutation under `bash -e` |
 
 ⚠️ **Read the stamp row's second number, not its first.** `4 of 40` is the count a reader

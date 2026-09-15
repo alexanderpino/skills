@@ -44,10 +44,13 @@ A figure that has gone missing is a FAIL -- every `page()` miss exits non-zero.
     other coverages, 31 pairs, "buried 63%") -- the page names seed 11 but not the generator,
     so no rig can land on its counts. Every arithmetic RELATION between them is gated, and
     every figure printed at two ends of the page is asserted at both ends and against itself.
-  * The measured AREA columns of the global size-law table (75.38% ... 93.21%) -- area is
-    dominated by the handful of largest draws, so the Monte-Carlo error on a 200,000-draw area
-    fraction is not a number this rig can state honestly. The page's own closed-form claim
-    about them -- equal area per octave at b = 2, i.e. 25 : 25 : 50 -- IS gated (§10).
+  * (WITHDRAWN 2026-09-15.) This list used to decline the measured AREA columns of the global
+    size-law table (75.38% ... 93.21%) on the ground that "the Monte-Carlo error on a 200,000-
+    draw area fraction is not a number this rig can state honestly". It is: the share is a
+    RATIO estimator and the delta method gives its variance in closed form from the same
+    truncated power law the count half already uses. All fifteen cells are now gated at 4 sigma
+    plus the page's own rounding (§10b), and every one lands inside 1.3 sigma. The decline was
+    wrong, not conservative -- two figures went ungated behind it for as long as it stood.
 
 ⚠️ TWO PAGE DEFECTS THIS RIG TOLERATES RATHER THAN HIDES. Both are rounding, both are
 named at the gate that tolerates them, and each is gated at the smallest band that admits the
@@ -644,6 +647,107 @@ PEB_LO = page(r"— (\d+)% at `b = 1` and [\d.]+% at `b = 3`", "the pebble share
 PEB_HI = page(r"at `b = 1` and ([\d.]+)% at `b = 3`", "the pebble share at b=3")
 check("§10 the b=1 pebble share, as the prose rounds it", round(f(GLOB[0][3])), PEB_LO, 0.0)
 agree("§10 the b=3 pebble share", [("prose", PEB_HI), ("table", f(GLOB[-1][3]))])
+
+# ── §10b THE AREA HALF OF THE GLOBAL TABLE, AGAINST THE CLOSED FORM + ITS MC ERROR ───────
+# The docstring above used to decline these fifteen cells on the ground that "the Monte-Carlo
+# error on a 200,000-draw area fraction is not a number this rig can state honestly". It is:
+# the area share is a RATIO estimator, sum(d^2 | class) / sum(d^2), and the delta method gives
+# its variance in closed form from the moments of the same truncated power law the count half
+# already uses. Every moment below is analytic; nothing is sampled here. The tolerance is
+# 4 sigma of the page's own 200,000 draws plus the rounding of the digits it printed -- both
+# read off the page, neither chosen to make the check pass.
+print("\n-- §10b the area half of the global table --")
+
+
+def pl_int(lo, hi, e):
+    """int_lo^hi d^e dd -- the log branch at e = -1 is the b = 2 case and must not be missed."""
+    return math.log(hi / lo) if abs(e + 1.0) < 1e-12 else (hi ** (e + 1) - lo ** (e + 1)) / (e + 1)
+
+
+GAREA = rows(r"^\| ([\d.]+) \| [\d.]+% \| [\d.]+% \| [\d.]+% \| \| \**([\d.]+)%\** \| "
+            r"\**([\d.]+)%\** \| \**([\d.]+)%\** \|", "the global area table", 5)
+for bexp, *pcts in GAREA:
+    bexp = f(bexp)
+    Z = pl_int(LAW_LO, LAW_HI, -bexp - 1)           # the law's own normaliser
+    Ey = pl_int(LAW_LO, LAW_HI, 1 - bexp) / Z       # E[d^2]
+    Ey2 = pl_int(LAW_LO, LAW_HI, 3 - bexp) / Z      # E[d^4]
+    tot = 0.0
+    for name, want in zip(("boulder", "cobble", "pebble"), pcts):
+        lo, hi = CLS[name]
+        Ex = pl_int(lo, hi, 1 - bexp) / Z           # E[d^2 . 1_class]
+        Ex2 = pl_int(lo, hi, 3 - bexp) / Z          # E[d^4 . 1_class], and E[xy] too: xy = d^4 inside
+        R = Ex / Ey
+        var = (Ex2 - Ex * Ex) - 2 * R * (Ex2 - Ex * Ey) + R * R * (Ey2 - Ey * Ey)
+        sig = math.sqrt(max(var, 0.0) / GLOB_N) / Ey * 100
+        half = 0.5 * 10 ** -(len(want.split(".")[1]) if "." in want else 0)
+        check(f"§10b b={bexp:g} {name} area share (4 sigma + rounding = {4 * sig + half:.4f})",
+              R * 100, f(want), 4 * sig + half)
+        tot += f(want)
+    check(f"§10b b={bexp:g} the three area shares sum to 100%", tot, 100.0, 0.05)
+
+# The 4-sigma band above is WIDE where the area is carried by a handful of boulders -- at
+# b = 2 it is +/-15 points on a 25-point figure, and the row prints that band so a reader can
+# see it. The page makes a tighter claim about the same cells, and it costs no tolerance at
+# all: "Below `b = 2` the weight moves to the largest class, above it to the smallest."
+DRIFT = re.search(r"Below (?:\*\*)?`b = 2`(?:\*\*)? the weight moves to the largest class, above it to "
+                  r"the\s*\nsmallest\.", BODY)
+if not DRIFT:
+    gone("which way the area moves with b", "Below `b = 2` the weight moves to the largest class")
+_bs = [f(r[0]) for r in GAREA]
+if _bs != sorted(_bs):
+    gone("the global table in ascending b", "| 1.0 | ... | 3.0 |")
+for _i, (_name, _dir) in enumerate((("boulder", -1), ("pebble", +1))):
+    _col = [f(r[1 if _name == "boulder" else 3]) for r in GAREA]
+    _mono = all((_b - _a) * _dir > 0 for _a, _b in zip(_col, _col[1:]))
+    ok = ok and _mono
+    print(f"{'PASS' if _mono else 'FAIL'}  \u00a710b the {_name} area share moves "
+          f"{'down' if _dir < 0 else 'up'} at every step of b, as :262 says: {_col}")
+
+MEAS = re.search(r"should split the ground \d+ : \d+ : \d+, and the measured row\s*\n"
+                 r"reads ([\d.]+) : ([\d.]+) : ([\d.]+)\.", BODY)
+if not MEAS:
+    gone("the prose restatement of the b = 2 area row", "... the measured row\nreads A : B : C.")
+B2 = [r for r in GAREA if f(r[0]) == 2.0]
+if len(B2) != 1:
+    gone(f"exactly one b = 2 row in the global area table (found {len(B2)})", "| 2.0 | ... |")
+for i, name in enumerate(("boulder", "cobble", "pebble")):
+    agree(f"§10b the b=2 {name} area share",
+          [("prose :261", f(MEAS.group(i + 1))), ("table :252", f(B2[0][i + 1]))])
+
+# ── §10c THE ONE-PASS COVERAGE, PRINTED AT THREE ENDS AND UNTIL NOW AT NONE ──────────────
+# The docstring's promise is that "every figure printed at two ends of the page is asserted at
+# both ends". 0.01% is printed at THREE and was asserted at none: the what-it-beats table is
+# the one table on this page no section parsed.
+print("\n-- §10c the one-pass coverage, at three ends --")
+COV_USE = page(r"67 clasts on the patch and \*\*([\d.]+)% of the ground covered\*\*",
+               "the one-pass coverage under `## Use this` (:60)")
+COV_TAB = page(r"^\| one pass, sized for the largest \| [\d.]+ m \| \d+ \| \d+ \| \*\*([\d.]+)%\*\* \|",
+               "the one-pass coverage in the what-it-beats table (:160)", flags=re.M)
+COV_FAIL = page(r"67 clasts and ([\d.]+)% of the patch covered against [\d.]+% for the "
+                r"largest-first", "the one-pass coverage in the failure table (:371)")
+agree("§10c the one-pass coverage", [("`## Use this` :60", COV_USE),
+                                     ("what-it-beats table :160", COV_TAB),
+                                     ("failure table :371", COV_FAIL)])
+COV_LF = page(r"67 clasts and [\d.]+% of the patch covered against ([\d.]+)% for the "
+              r"largest-first", "the largest-first coverage it is set against (:371)")
+_empty = COV_USE < COV_LF
+ok = ok and _empty
+print(f"{'PASS' if _empty else 'FAIL'}  §10c one pass sized for the largest leaves LESS ground "
+      f"covered than largest-first: {COV_USE:g}% vs {COV_LF:g}% -- the claim :60 and :371 both make")
+
+# why the 0.01% itself is not recomputed: priced here, not asserted
+_b = 2.5
+_Zc = pl_int(LAW_LO, LAW_HI, -_b - 1)
+_m2 = pl_int(LAW_LO, LAW_HI, 1 - _b) / _Zc
+_m4 = pl_int(LAW_LO, LAW_HI, 3 - _b) / _Zc
+print(f"      NOT RECOMPUTED, and here is the price: 0.01% is 67 draws from the same d^-{_b:g} "
+      f"law.\n"
+      f"      sum(d^2) over 67 draws has mean {67 * _m2:.0f} mm^2 and sd "
+      f"{math.sqrt(67 * (_m4 - _m2 * _m2)):.0f} mm^2 -- sd/mean = "
+      f"{math.sqrt((_m4 - _m2 * _m2) / 67) / _m2:.2f}, so every\n"
+      f"      coverage from 0 to ~0.05% is consistent with this law at the one significant figure\n"
+      f"      the page prints. A recomputation gate here could not fail. The three ends above CAN\n"
+      f"      disagree -- that is the defect this corpus actually records -- and they are gated.")
 
 # ── §11 THE PACKING BOUND ────────────────────────────────────────────────────────────────
 print("\n-- §11 the achieved fraction of the hexagonal bound --")
